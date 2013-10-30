@@ -5,7 +5,7 @@ require 'sexp_processor'
 class Ruby2JS
   VERSION   = '0.0.2'
   LOGICAL   = :and, :not, :or
-  OPERATORS = [:[], :[]=], [:not], [:*, :/, :%], [:+, :-, :<<], [:and], [:or]
+  OPERATORS = [:[], :[]=], [:not, :!], [:*, :/, :%], [:+, :-, :<<], [:and], [:or]
   
   def initialize( sexp, vars = {} )
     @sexp, @vars = sexp, vars.dup
@@ -86,7 +86,7 @@ class Ruby2JS
       lgroup      = LOGICAL.include?( left.first ) && op_index <= operator_index( left.first )
       left        = parse left
       left        = "(#{ left })" if lgroup
-      rgroup      = LOGICAL.include?( right.first ) && op_index <= operator_index( right.first ) if right
+      rgroup      = LOGICAL.include?( right.first ) && op_index <= operator_index( right.first ) if right.length > 0
       right       = parse right
       right       = "(#{ right })" if rgroup
 
@@ -100,28 +100,33 @@ class Ruby2JS
       end
   
     when :call
-      receiver, method, args = sexp.shift, sexp.shift, sexp.shift
+      receiver, method = sexp.shift, sexp.shift
+      args = s(:arglist, *sexp)
       return parse args, :lambda if receiver == s(:const, :Proc) and method == :new or method == :lambda && !receiver
       op_index   = operator_index method
-      group      = receiver.first == :call && op_index <= operator_index( receiver[2] ) if receiver
-      call       = args.find_node(:call) 
-      group_args = op_index <= operator_index( call[2] ) if call
+      target = sexp.first if op_index != -1
+      group_receiver = receiver.first == :call && op_index <= operator_index( receiver[2] ) if receiver
+      group_target = target.first == :call && op_index <= operator_index( target[2] ) if target
 
       case method
+      when :!
+        group_receiver ||= (receiver.length > 2)
+        "!#{ group_receiver ? group(receiver) : parse(receiver) }"
+
       when :[]
         raise 'parse error' unless receiver
         "#{ parse receiver }[#{ parse args }]"
         
       when :attr_accessor
         args.shift
-        args   = args.collect do |name|
-          name = name.last
+        args   = args.collect do |arg|
+          name = arg.last
           parse( s(:defn, name, name) ).sub(/return null\}\z/, "if (name) {self._#{ name } = name} else {self._#{ name }}}")
         end.join('; ')
         
       when *OPERATORS.flatten
         method = method_name_substitution receiver, method
-        "#{ group ? group(receiver) : parse(receiver) } #{ method } #{ group_args ? group(args) : parse(args) }"  
+        "#{ group_receiver ? group(receiver) : parse(receiver) } #{ method } #{ group_target ? group(args) : parse(args) }"  
 
       else
         method = method_name_substitution receiver, method
@@ -164,7 +169,7 @@ class Ruby2JS
       caller       = sexp.shift
       args         = sexp.shift
       function     = s(:function, args, sexp.shift)
-      caller.last << function
+      caller      << function
       parse caller
     
     when :function
@@ -187,16 +192,11 @@ class Ruby2JS
       body = scope body, @vars
       
     when :class
-      name, inheritance, body = sexp.shift, sexp.shift, sexp.shift
-      unless init = body.find_node(:defn)
-        if block  = body.find_node(:block) and block.shift
-          methods = block.find_nodes(:defn) or s()
-          init    = block.delete methods.find { |m| m[1] == :initialize }
-          block   = block.collect { |m| parse( m ).sub(/function (\w+)/, "#{ name }.prototype.\\1 = function") }.join '; '
-        end
-      end
-      init ||= []
-      "#{ parse( s(:defn, name, init[2], init[3]) ).sub(/return (?:null|(.*))\}\z/, '\1}') }#{ '; ' if block }#{ block }"
+      name, inheritance, body = sexp.shift, sexp.shift, sexp
+      methods = body.find_nodes(:defn) or s()
+      init    = (body.delete methods.find { |m| m[1] == :initialize }) || []
+      block   = body.collect { |m| parse( m ).sub(/function (\w+)/, "#{ name }.prototype.\\1 = function") }.join '; '
+      "#{ parse( s(:defn, name, init[2], init[3]) ).sub(/return (?:null|(.*))\}\z/, '\1}') }#{ '; ' if block and not block.empty?}#{ block }"
 
     when :args
       sexp.join(', ')
@@ -209,7 +209,7 @@ class Ruby2JS
       parse sexp.shift
       
     else 
-      raise "unkonwn operand #{ operand.inspect }"
+      raise "unknown operand #{ operand.inspect }"
     end
   end
   
