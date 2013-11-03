@@ -295,8 +295,14 @@ describe Ruby2JS do
         must_equal 'function Person(name) {this._name = name}; Person.prototype.name = function(name) {if (name) {self._name = name} else {self._name}}'
     end
     
-    it "should parse metod def" do
+    it "should parse method def" do
       to_js('def method; end').must_equal 'function method() {return null}'
+    end
+  end
+  
+  describe 'attribute access' do
+    it "should support attribute assignments" do
+      to_js('x={}; x.a="y"').must_equal 'var x = {}; x.a = "y"'
     end
   end
   

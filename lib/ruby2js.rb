@@ -99,6 +99,10 @@ class Ruby2JS
         "!#{ left }"
       end
   
+    when :attrasgn
+      receiver, attribute, expression = sexp.shift, sexp.shift, sexp.shift
+      "#{ parse receiver }.#{ attribute.to_s.sub(/=$/,' = ')}#{ parse expression }"
+
     when :call
       receiver, method = sexp.shift, sexp.shift
       args = s(:arglist, *sexp)
@@ -169,6 +173,7 @@ class Ruby2JS
       caller       = sexp.shift
       args         = sexp.shift
       function     = s(:function, args, sexp.shift)
+      caller.pop if caller.last == s(:arglist)
       caller      << function
       parse caller
     
