@@ -51,6 +51,15 @@ class Ruby2JS
       @vars[var] ||= []
       @vars[var] << (val && val.first == :lvar ? @vars[ val.last ] : val )
       output
+
+    when :cdecl
+      var         = mutate_name sexp.shift
+      value       = sexp.shift
+      val         = value.dup if value
+      output      = "const #{ var } = #{ parse value }"
+      @vars[var] ||= []
+      @vars[var] << (val && val.first == :lvar ? @vars[ val.last ] : val )
+      output
       
     when :gasgn
       "#{ mutate_name sexp.shift } = #{ parse sexp.shift }".sub('$', '')

@@ -50,6 +50,10 @@ describe Ruby2JS do
       to_js( "a = 'string'" ).must_equal 'var a = "string"'
       to_js( "a = :symbol" ).must_equal 'var a = "symbol"'
     end
+
+    it "should parse constant assign" do
+      to_js( "PI = 3.14159" ).must_equal 'const PI = 3.14159'
+    end
     
     it "should not output var if variable is allready declared within a context" do
       to_js( "a = 1; a = 2" ).must_equal 'var a = 1; a = 2'
