@@ -1,6 +1,5 @@
 require 'sexp_processor'
-
-# $:.unshift(File.dirname(__FILE__)) unless $:.include?(File.dirname(__FILE__)) || $:.include?(File.expand_path(File.dirname(__FILE__)))
+require 'ruby_parser'
 
 class Ruby2JS
   VERSION   = '0.0.2'
@@ -9,10 +8,49 @@ class Ruby2JS
   
   def initialize( sexp, vars = {} )
     @sexp, @vars = sexp, vars.dup
+    @sep = '; '
+    @nl = ''
   end
   
+  def enable_vertical_whitespace
+    @sep = ";\n"
+    @nl = "\n"
+  end
+
   def to_js
     parse( @sexp, nil )
+  end
+
+  def self.convert(string)
+    ruby2js = Ruby2JS.new( RubyParser.new.parse( string ) )
+
+    if string.include? "\n"
+      ruby2js.enable_vertical_whitespace 
+      lines = ruby2js.to_js.split("\n")
+      pre = ''
+      pending = false
+      blank = true
+      lines.each do |line|
+        if line.start_with? '}'
+          pre.sub!(/^  /,'')
+          line.sub!(/;$/,";\n")
+          pending = true
+        else
+          pending = false
+        end
+
+        line.sub! /^/, pre
+        if line.end_with? '{'
+          pre += '  ' 
+          line.sub!(/^/,"\n") unless blank or pending
+        end
+
+        blank = pending
+      end
+      lines.join("\n")
+    else
+      ruby2js.to_js
+    end
   end
   
   protected
@@ -84,7 +122,7 @@ class Ruby2JS
       "[#{ sexp.map{ |a| parse a }.join(', ') }]"
 
     when :block
-      sexp.map{ |e| parse e }.join('; ')
+      sexp.map{ |e| parse e }.join(@sep)
       
     when :return
       "return #{ parse sexp.shift }"
@@ -136,7 +174,7 @@ class Ruby2JS
           name = arg.last
           parse( s(:defn, name, name) ).sub(/return null\}\z/, 
             "if (name) {this._#{ name } = name} else {return this._#{ name }}}")
-        end.join('; ')
+        end.join(@sep)
         
       when *OPERATORS.flatten
         method = method_name_substitution receiver, method
@@ -167,17 +205,17 @@ class Ruby2JS
       true_block   = scope sexp.shift, @vars
       elseif       = parse sexp.find_node( :if, true ), :if
       else_block   = parse sexp.shift
-      output       = "if (#{ condition }) {#{ true_block }}"
+      output       = "if (#{ condition }) {#@nl#{ true_block }#@nl}"
       output.sub!('if', 'else if') if ancestor == :if
       output << " #{ elseif }" if elseif
-      output << " else {#{ else_block }}" if else_block
+      output << " else {#@nl#{ else_block }#@nl}" if else_block
       output
       
     when :while
       condition    = parse sexp.shift
       block        = scope sexp.shift, @vars
       unknown      = parse sexp.shift
-      "while (#{ condition }) {#{ block }}"
+      "while (#{ condition }) {#@nl#{ block }#@nl}"
 
     when :iter
       caller       = sexp.shift
@@ -192,8 +230,8 @@ class Ruby2JS
       body ||= s(:nil)
       body   = s(:scope, body) unless body.first == :scope
       body   = parse body
-      body.sub!(/return var (\w+) = ([^;]+)\z/, 'var \1 = \2; return \1')
-      "function(#{ parse args }) {#{ body }}"
+      body.sub! /return var (\w+) = ([^;]+)\z/, "var \\1 = \\2#{@sep}return \\1"
+      "function(#{ parse args }) {#@nl#{ body }#@nl}"
       
     when :defn
       name = sexp.shift
@@ -210,8 +248,8 @@ class Ruby2JS
       name, inheritance, body = sexp.shift, sexp.shift, sexp
       methods = body.find_nodes(:defn) or s()
       init    = (body.delete methods.find { |m| m[1] == :initialize }) || []
-      block   = body.collect { |m| parse( m ).sub(/function (\w+)/, "#{ name }.prototype.\\1 = function") }.join '; '
-      "#{ parse( s(:defn, name, init[2], init[3]) ).sub(/return (?:null|(.*))\}\z/, '\1}') }#{ '; ' if block and not block.empty?}#{ block }"
+      block   = body.collect { |m| parse( m ).sub(/function (\w+)/, "#{ name }.prototype.\\1 = function") }.join @sep
+      "#{ parse( s(:defn, name, init[2], init[3]) ).sub(/return (?:null|(.*))\}\z/, '\1}') }#{ @sep if block and not block.empty?}#{ block }"
 
     when :args
       sexp.join(', ')

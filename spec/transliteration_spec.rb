@@ -1,15 +1,10 @@
 require 'minitest/autorun'
 require 'ruby2js'
-require 'ruby_parser'
 
 describe Ruby2JS do
   
-  def rb_parse( string )
-    RubyParser.new.parse string
-  end
-  
   def to_js( string)
-    Ruby2JS.new( rb_parse( string ) ).to_js
+    Ruby2JS.convert(string)
   end
   
   describe 'literals' do
@@ -335,6 +330,37 @@ describe Ruby2JS do
     
     it "should subtitute << for + for array" do
       to_js('a = []; a << []').must_equal 'var a = []; a + []'
+    end
+  end
+
+  describe 'whitespace' do
+    it "should handle newlines" do
+      to_js( "a = 1\na = 2" ).must_equal "var a = 1;\na = 2"
+    end
+
+    it "should handle if statements" do
+      to_js( "a if true\n" ).must_equal "if (true) {\n  a()\n}"
+    end
+
+    it "should handle while statements" do
+      to_js( "a while false\n" ).must_equal "while (false) {\n  a()\n}"
+    end
+
+    it "should handle function declarations" do
+      to_js("Proc.new {}\n").must_equal "function() {\n  return null\n}"
+    end
+
+    it "should add a blank line before blocks" do
+      to_js( "x\na if true" ).must_equal "x();\n\nif (true) {\n  a()\n}"
+    end
+
+    it "should add a blank line after blocks" do
+      to_js( "a if true\nx" ).must_equal "if (true) {\n  a()\n};\n\nx()"
+    end
+
+    it "should add a single blank line between blocks" do
+      to_js( "a if true\nb if false" ).
+        must_equal "if (true) {\n  a()\n};\n\nif (false) {\n  b()\n}"
     end
   end
 end
