@@ -297,7 +297,7 @@ describe Ruby2JS do
     
     it "should parse class" do
       to_js('class Person; attr_accessor :name; def initialize(name); @name = name; end; end').
-        must_equal 'function Person(name) {this._name = name}; Person.prototype.name = function(name) {if (name) {self._name = name} else {self._name}}'
+        must_equal 'function Person(name) {this._name = name}; Person.prototype.name = function(name) {if (name) {this._name = name} else {return this._name}}'
     end
     
     it "should parse method def" do

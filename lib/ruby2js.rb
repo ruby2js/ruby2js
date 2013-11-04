@@ -134,7 +134,8 @@ class Ruby2JS
         args.shift
         args   = args.collect do |arg|
           name = arg.last
-          parse( s(:defn, name, name) ).sub(/return null\}\z/, "if (name) {self._#{ name } = name} else {self._#{ name }}}")
+          parse( s(:defn, name, name) ).sub(/return null\}\z/, 
+            "if (name) {this._#{ name } = name} else {return this._#{ name }}}")
         end.join('; ')
         
       when *OPERATORS.flatten
