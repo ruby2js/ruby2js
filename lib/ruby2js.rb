@@ -241,8 +241,14 @@ class Ruby2JS
       parse caller
     
     when :function
-      args, body = sexp.shift, sexp.shift
-      body ||= s(:nil)
+      args = sexp.shift
+      if sexp.length > 1
+        body = sexp
+        body.unshift :block
+      else
+        body = sexp.shift
+        body ||= s(:nil)
+      end
       body   = s(:scope, body) unless body.first == :scope
       body   = parse body
       body.sub! /return var (\w+) = ([^;]+)\z/, "var \\1 = \\2#{@sep}return \\1"

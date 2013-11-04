@@ -308,6 +308,11 @@ describe Ruby2JS do
       to_js('def method; self.foo; end').
         must_equal 'function method() {return this.foo}'
     end
+    
+    it "should handle methods with multiple statements" do
+      to_js('def method; self.foo(); self.bar; end').
+        must_equal 'function method() {this.foo(); return this.bar}'
+    end
   end
   
   describe 'attribute access' do
