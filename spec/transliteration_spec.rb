@@ -303,6 +303,11 @@ describe Ruby2JS do
     it "should parse method def" do
       to_js('def method; end').must_equal 'function method() {return null}'
     end
+    
+    it "should parse method def" do
+      to_js('def method; self.foo; end').
+        must_equal 'function method() {return this.foo()}'
+    end
   end
   
   describe 'attribute access' do

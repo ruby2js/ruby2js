@@ -222,7 +222,10 @@ class Ruby2JS
       
     when :evstr, :svalue
       parse sexp.shift
-      
+
+    when :self
+      'this'
+
     else 
       raise "unknown operand #{ operand.inspect }"
     end
