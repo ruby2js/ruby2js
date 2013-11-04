@@ -219,7 +219,7 @@ class Ruby2JS
       sexp.unshift s(:str, sexp.shift)
       sexp.collect{ |s| parse s }.join(' + ')
       
-    when :evstr
+    when :evstr, :svalue
       parse sexp.shift
       
     else 

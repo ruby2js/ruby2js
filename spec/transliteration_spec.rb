@@ -54,13 +54,14 @@ describe Ruby2JS do
     it "should parse constant assign" do
       to_js( "PI = 3.14159" ).must_equal 'const PI = 3.14159'
     end
-    
+
     it "should not output var if variable is allready declared within a context" do
       to_js( "a = 1; a = 2" ).must_equal 'var a = 1; a = 2'
     end
     
     it "should parse mass assign" do
       to_js( "a , b = 1, 2" ).must_equal 'var a = 1; var b = 2'
+      to_js( "a = 1, 2" ).must_equal 'var a = [1, 2]'
     end
     
     it "should parse" do
