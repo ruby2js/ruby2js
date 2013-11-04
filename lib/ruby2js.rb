@@ -172,6 +172,9 @@ class Ruby2JS
         group_receiver ||= (receiver.length > 2)
         "!#{ group_receiver ? group(receiver) : parse(receiver) }"
 
+      when :call
+        "#{ parse receiver }(#{ parse args })"
+
       when :[]
         raise 'parse error' unless receiver
         "#{ parse receiver }[#{ parse args }]"
