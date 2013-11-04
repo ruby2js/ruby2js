@@ -6,10 +6,13 @@ class Ruby2JS
   LOGICAL   = :and, :not, :or
   OPERATORS = [:[], :[]=], [:not, :!], [:*, :/, :%], [:+, :-, :<<], [:and], [:or]
   
+  attr_accessor :method_calls
+
   def initialize( sexp, vars = {} )
     @sexp, @vars = sexp, vars.dup
     @sep = '; '
     @nl = ''
+    @method_calls = []
   end
   
   def enable_vertical_whitespace
@@ -23,6 +26,8 @@ class Ruby2JS
 
   def self.convert(string)
     ruby2js = Ruby2JS.new( RubyParser.new.parse( string ) )
+
+    ruby2js.method_calls += string.scan(/(\w+)\(\)/).flatten.map(&:to_sym)
 
     if string.include? "\n"
       ruby2js.enable_vertical_whitespace 
@@ -59,7 +64,10 @@ class Ruby2JS
   end
   
   def scope( sexp, vars, ancestor = nil )
-    self.class.new( nil, vars ).parse( sexp, ancestor )
+    frame = self.class.new( nil, vars )
+    frame.enable_vertical_whitespace if @nl == "\n"
+    frame.method_calls = @method_calls
+    frame.parse( sexp, ancestor )
   end
 
   def parse sexp, ancestor = nil
@@ -182,7 +190,11 @@ class Ruby2JS
 
       else
         method = method_name_substitution receiver, method
-        "#{ parse receiver }#{ '.' if receiver }#{ method }(#{ parse args })"
+        if args.length == 1 and not @method_calls.include? method
+          "#{ parse receiver }#{ '.' if receiver }#{ method }"
+        else
+          "#{ parse receiver }#{ '.' if receiver }#{ method }(#{ parse args })"
+        end
       end
       
     when :arglist

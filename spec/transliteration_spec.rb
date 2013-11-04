@@ -74,7 +74,7 @@ describe Ruby2JS do
   
   describe 'method call' do
     it "should parse method call with no args" do
-      to_js( "a" ).must_equal 'a()'
+      to_js( "a()" ).must_equal 'a()'
     end
     
     it "should parse method call with args" do
@@ -187,11 +187,11 @@ describe Ruby2JS do
     # end
     
     it "should parse string " do
-      to_js( '"time is #{ Time.now }, say #{ hello }"' ).must_equal '"time is " + Time.now() + ", say " + hello()'
+      to_js( '"time is #{ Time.now() }, say #{ hello }"' ).must_equal '"time is " + Time.now() + ", say " + hello'
     end
     
     it "should parse string " do
-      to_js( '"time is #{ Time.now }"' ).must_equal '"time is " + Time.now()'
+      to_js( '"time is #{ Time.now() }"' ).must_equal '"time is " + Time.now()'
     end
     
   end
@@ -210,7 +210,7 @@ describe Ruby2JS do
     end
     
     it "should parse if elsif elsif" do
-      to_js( 'if true; 1; elsif false; 2; elsif (true or false); 3; else; nassif; end' ).must_equal 'if (true) {1} else if (false) {2} else if (true || false) {3} else {nassif()}' 
+      to_js( 'if true; 1; elsif false; 2; elsif (true or false); 3; else; nassif(); end' ).must_equal 'if (true) {1} else if (false) {2} else if (true || false) {3} else {nassif()}' 
     end
     
     it "should handle basic variable scope" do
@@ -301,7 +301,7 @@ describe Ruby2JS do
     
     it "should convert self to this" do
       to_js('def method; self.foo; end').
-        must_equal 'function method() {return this.foo()}'
+        must_equal 'function method() {return this.foo}'
     end
   end
   
@@ -312,20 +312,21 @@ describe Ruby2JS do
   end
   
   describe 'method substitutions' do
-    # it "should not convert name" do
-    #       to_js('a.size').must_equal 'a().size()'
-    #     end
+    it "should not convert name" do
+      to_js('a.size').must_equal 'a.length'
+    end
     
     it "should convert size to length" do
-      to_js('[].size').must_equal '[].length()'
+      to_js('[].size').must_equal '[].length'
     end
     
     it "should convert size to length after assign" do
-      to_js('a = []; a.size').must_equal 'var a = []; a.length()'
+      to_js('a = []; a.size').must_equal 'var a = []; a.length'
     end
     
     it "should convert size to length after several assigns" do
-      to_js('a = []; b = a; c = b; d = c; d.size').must_equal 'var a = []; var b = a; var c = b; var d = c; d.length()'
+      to_js('a = []; b = a; c = b; d = c; d.size').
+        must_equal 'var a = []; var b = a; var c = b; var d = c; d.length'
     end
     
     it "should subtitute << for + for array" do
@@ -339,11 +340,11 @@ describe Ruby2JS do
     end
 
     it "should handle if statements" do
-      to_js( "a if true\n" ).must_equal "if (true) {\n  a()\n}"
+      to_js( "a() if true\n" ).must_equal "if (true) {\n  a()\n}"
     end
 
     it "should handle while statements" do
-      to_js( "a while false\n" ).must_equal "while (false) {\n  a()\n}"
+      to_js( "a() while false\n" ).must_equal "while (false) {\n  a()\n}"
     end
 
     it "should handle function declarations" do
@@ -351,15 +352,15 @@ describe Ruby2JS do
     end
 
     it "should add a blank line before blocks" do
-      to_js( "x\na if true" ).must_equal "x();\n\nif (true) {\n  a()\n}"
+      to_js( "x()\na() if true" ).must_equal "x();\n\nif (true) {\n  a()\n}"
     end
 
     it "should add a blank line after blocks" do
-      to_js( "a if true\nx" ).must_equal "if (true) {\n  a()\n};\n\nx()"
+      to_js( "a() if true\nx()" ).must_equal "if (true) {\n  a()\n};\n\nx()"
     end
 
     it "should add a single blank line between blocks" do
-      to_js( "a if true\nb if false" ).
+      to_js( "a() if true\nb() if false" ).
         must_equal "if (true) {\n  a()\n};\n\nif (false) {\n  b()\n}"
     end
   end
