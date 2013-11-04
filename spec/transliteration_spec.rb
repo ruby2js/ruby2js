@@ -304,7 +304,7 @@ describe Ruby2JS do
       to_js('def method; end').must_equal 'function method() {return null}'
     end
     
-    it "should parse method def" do
+    it "should convert self to this" do
       to_js('def method; self.foo; end').
         must_equal 'function method() {return this.foo()}'
     end
