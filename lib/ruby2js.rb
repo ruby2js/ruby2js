@@ -4,7 +4,9 @@ require 'ruby_parser'
 class Ruby2JS
   VERSION   = '0.0.2'
   LOGICAL   = :and, :not, :or
-  OPERATORS = [:[], :[]=], [:not, :!], [:*, :/, :%], [:+, :-, :<<], [:and], [:or]
+  OPERATORS = [:[], :[]=], [:not, :!], [:*, :/, :%], [:+, :-], [:>>, :<<], 
+    [:<=, :<, :>, :>=], [:==, :!=], [:and, :or]
+
   
   attr_accessor :method_calls
 

@@ -116,7 +116,15 @@ describe Ruby2JS do
     it "should parse boolean" do
       to_js( "true; false" ).must_equal 'true; false'
     end
-    
+
+    it "should parse relation operators" do
+      to_js( "a < b" ).must_equal 'a < b'
+      to_js( "a <= b" ).must_equal 'a <= b'
+      to_js( "a == b" ).must_equal 'a == b'
+      to_js( "a >= b" ).must_equal 'a >= b'
+      to_js( "a > b" ).must_equal 'a > b'
+    end
+
     it "should parse logic operators" do
       to_js( "true && false" ).must_equal 'true && false'
       to_js( "true and false" ).must_equal 'true && false'
@@ -134,7 +142,7 @@ describe Ruby2JS do
     
     it "should parse more complex nested logic" do
       logic = '!((true && false) || (false || false))'
-      to_js( logic ).must_equal "!(true && false || (false || false))"
+      to_js( logic ).must_equal logic
     end
     
     it "should parse another nested login example" do
