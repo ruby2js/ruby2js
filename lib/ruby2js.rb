@@ -38,7 +38,7 @@ class Ruby2JS
       pending = false
       blank = true
       lines.each do |line|
-        if line.start_with? '}'
+        if line.start_with? '}' or line.start_with? ']'
           pre.sub!(/^  /,'')
           line.sub!(/;$/,";\n")
           pending = true
@@ -47,9 +47,10 @@ class Ruby2JS
         end
 
         line.sub! /^/, pre
-        if line.end_with? '{'
+        if line.end_with? '{' or line.end_with? '['
           pre += '  ' 
           line.sub!(/^/,"\n") unless blank or pending
+          pending = true
         end
 
         blank = pending
@@ -126,10 +127,15 @@ class Ruby2JS
     when :hash
       hashy  = []
       hashy << [ parse( sexp.shift ), parse( sexp.shift ) ] until sexp.empty?
-      "{#{ hashy.map{ |k,v| k << ' : ' << v }.join(',') }}"
+      "{#{ hashy.map{ |k,v| k << ' : ' << v }.join(', ') }}"
 
     when :array
-      "[#{ sexp.map{ |a| parse a }.join(', ') }]"
+      list = sexp.map{ |a| parse a }
+      if list.join(', ').length < 80
+        "[#{ list.join(', ') }]"
+      else
+        "[\n#{ list.join(",\n") }\n]"
+      end
 
     when :block
       sexp.map{ |e| parse e }.join(@sep)
