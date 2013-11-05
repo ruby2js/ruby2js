@@ -179,6 +179,15 @@ describe Ruby2JS do
       exp = 'a((1 + 2) * 2 - 1)'
       to_js( exp ).must_equal exp
     end
+
+    it "should handle function calls" do
+      to_js( 'a = lambda {|x| x+1}; a.(1)').
+        must_equal 'var a = function(x) {return x + 1}; a(1)'
+    end
+
+    it "should handle jquery calls" do
+      to_js( '$$.("span")' ).must_equal '$("span")';
+    end
   end
   
   describe 'string concat' do
@@ -238,11 +247,6 @@ describe Ruby2JS do
     
     it "should parse lambda" do
       to_js( 'lambda {}').must_equal 'function() {return null}'
-    end
-
-    it "should handle function calls" do
-      to_js( 'a = lambda {|x| x+1}; a.(1)').
-        must_equal 'var a = function(x) {return x + 1}; a(1)'
     end
 
     it "should handle basic variable scope" do

@@ -80,8 +80,8 @@ class Ruby2JS
       lit = sexp.shift
       lit.is_a?( Numeric ) ? lit.to_s : lit.to_s.inspect
       
-    when :lvar, :const
-      sexp.shift.to_s
+    when :lvar, :const, :gvar
+      mutate_name sexp.shift
       
     when :true, :false
       operand.to_s
@@ -325,7 +325,11 @@ class Ruby2JS
   end
   
   def mutate_name( name )
-    name
+    if name == :$$
+      '$'
+    else
+      name.to_s
+    end
   end
 
 end
