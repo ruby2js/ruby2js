@@ -19,6 +19,7 @@ describe Ruby2JS do
     it "should parse simple hash" do
       to_js( "{}" ).must_equal '{}'
       to_js( "{ :a => :b }" ).must_equal '{"a" : "b"}'
+      to_js( "{ :a => :b, :c => :d }" ).must_equal '{"a" : "b", "c" : "d"}'
     end
     
     it "should parse array" do
