@@ -12,7 +12,7 @@ class Ruby2JS
     @sexp, @vars = sexp, vars.dup
     @sep = '; '
     @nl = ''
-    @method_calls = []
+    @method_calls = [:toString]
   end
   
   def enable_vertical_whitespace
@@ -175,6 +175,14 @@ class Ruby2JS
       when :call
         "#{ parse receiver }(#{ parse args })"
 
+      when :to_i
+        args.insert 1, receiver
+        "ParseInt(#{ parse args })"
+
+      when :to_f
+        args.insert 1, receiver
+        "ParseFloat(#{ parse args })"
+
       when :[]
         raise 'parse error' unless receiver
         "#{ parse receiver }[#{ parse args }]"
@@ -302,8 +310,8 @@ class Ruby2JS
       :each_with_index => 'each',
     # },
     #     :* => {
-      :to_a => 'toArray',
-      :to_s => 'toString',
+      :to_a => :toArray,
+      :to_s => :toString,
     #     }
   })
   

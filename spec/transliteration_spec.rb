@@ -342,9 +342,21 @@ describe Ruby2JS do
       to_js('a = []; b = a; c = b; d = c; d.size').
         must_equal 'var a = []; var b = a; var c = b; var d = c; d.length'
     end
-    
+
     it "should subtitute << for + for array" do
       to_js('a = []; a << []').must_equal 'var a = []; a + []'
+    end
+
+    it "should subtitute ParseInt for to_i" do
+      to_js('a.to_i').must_equal 'ParseInt(a)'
+    end
+
+    it "should subtitute ParseFloat for to_f" do
+      to_js('a.to_f').must_equal 'ParseFloat(a)'
+    end
+
+    it "should subtitute toString() for to_s" do
+      to_js('a.to_s').must_equal 'a.toString()'
     end
   end
 
