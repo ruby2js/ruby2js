@@ -61,7 +61,7 @@ describe Ruby2JS do
     end
     
     it "should parse" do
-      to_js( 'a += 1').must_equal 'var a = a + 1'
+      to_js( 'a += 1' ).must_equal 'a += 1'
     end
     
     it "should do short circuit assign" do
@@ -236,11 +236,11 @@ describe Ruby2JS do
     end
     
     it "should handle while loop" do
-      to_js( 'a = 0; while true; a += 1; end').must_equal 'var a = 0; while (true) {a = a + 1}'
+      to_js( 'a = 0; while true; a += 1; end').must_equal 'var a = 0; while (true) {a += 1}'
     end
     
     it "should handle another while loop" do
-      to_js( 'a = 0; while true || false; a += 1; end').must_equal 'var a = 0; while (true || false) {a = a + 1}'
+      to_js( 'a = 0; while true || false; a += 1; end').must_equal 'var a = 0; while (true || false) {a += 1}'
     end
   end
   
@@ -397,6 +397,18 @@ describe Ruby2JS do
     it "should add a single blank line between blocks" do
       to_js( "a() if true\nb() if false" ).
         must_equal "if (true) {\n  a()\n};\n\nif (false) {\n  b()\n}"
+    end
+  end
+
+  describe 'procs' do
+    it "should handle procs" do
+      source = Proc.new { c + 1 }
+      to_js( source ).must_equal "c + 1"
+    end
+
+    it "should handle lambdas" do
+      source = lambda { c + 1 }
+      to_js( source ).must_equal "c + 1"
     end
   end
 end

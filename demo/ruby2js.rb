@@ -28,20 +28,17 @@ _html do
     _textarea @ruby, name: 'ruby', rows: 8, cols: 80
     _input type: 'submit', value: 'Convert'
 
-    _input type: 'checkbox', name: 'sexp', id: 'sexp', checked: !!@sexp
-    _label 'Show SEXP', for: 'sexp'
+    _input type: 'checkbox', name: 'ast', id: 'ast', checked: !!@ast
+    _label 'Show AST', for: 'ast'
   end
 
   if @ruby
     _div_? do
       raise $load_error if $load_error
 
-      if @sexp
-        _h2 'SEXP'
-        io = StringIO.new
-        PP.pp(RubyParser.new.parse(@ruby), io)
-        io.rewind
-        _pre io.read.chomp
+      if @ast
+        _h2 'AST'
+        _pre Parser::CurrentRuby.parse(@ruby).inspect
       end
 
       _h2 'JavaScript'

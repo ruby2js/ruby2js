@@ -1,17 +1,15 @@
-require 'sexp_processor'
-require 'ruby_parser'
+require 'parser/current'
 
 class Ruby2JS
   VERSION   = '0.0.2'
   LOGICAL   = :and, :not, :or
   OPERATORS = [:[], :[]=], [:not, :!], [:*, :/, :%], [:+, :-], [:>>, :<<], 
     [:<=, :<, :>, :>=], [:==, :!=], [:and, :or]
-
   
   attr_accessor :method_calls
 
-  def initialize( sexp, vars = {} )
-    @sexp, @vars = sexp, vars.dup
+  def initialize( ast, vars = {} )
+    @ast, @vars = ast, vars.dup
     @sep = '; '
     @nl = ''
     @method_calls = [:toString]
@@ -23,15 +21,24 @@ class Ruby2JS
   end
 
   def to_js
-    parse( @sexp, nil )
+    parse( @ast )
   end
 
-  def self.convert(string)
-    ruby2js = Ruby2JS.new( RubyParser.new.parse( string ) )
+  def self.convert(source)
 
-    ruby2js.method_calls += string.scan(/(\w+)\(\)/).flatten.map(&:to_sym)
+    if Proc === source
+      file,line = source.source_location
+      source = File.read(file)
+      ast = find_block( Parser::CurrentRuby.parse(source), line )
+    else
+      ast = Parser::CurrentRuby.parse( source )
+    end
 
-    if string.include? "\n"
+    ruby2js = Ruby2JS.new( ast )
+
+    ruby2js.method_calls += source.scan(/(\w+)\(\)/).flatten.map(&:to_sym)
+
+    if source.include? "\n"
       ruby2js.enable_vertical_whitespace 
       lines = ruby2js.to_js.split("\n")
       pre = ''
@@ -62,98 +69,128 @@ class Ruby2JS
   end
   
   protected
+  def self.find_block(ast, line)
+    if ast.type == :block and ast.loc.expression.line == line
+      return ast.children.last
+    end
+
+    ast.children.each do |child|
+      if Parser::AST::Node === child
+        block = find_block child, line
+        return block if block
+      end
+    end
+
+    nil
+  end
+
   def operator_index op
     OPERATORS.index( OPERATORS.find{ |el| el.include? op } ) || -1
   end
   
-  def scope( sexp, vars, ancestor = nil )
-    frame = self.class.new( nil, vars )
+  def scope( ast )
+    frame = self.class.new( nil, @vars )
     frame.enable_vertical_whitespace if @nl == "\n"
     frame.method_calls = @method_calls
-    frame.parse( sexp, ancestor )
+    frame.parse( ast )
   end
 
-  def parse sexp, ancestor = nil
-    return sexp unless sexp.kind_of? Array
-    operand = sexp.shift
+  def s(type, *args)
+    Parser::AST::Node.new(type, args)
+  end
 
-    case operand
+  def parse ast
+    return ast unless Parser::AST::Node === ast
+
+    case ast.type
       
-    when :lit, :str
-      lit = sexp.shift
-      lit.is_a?( Numeric ) ? lit.to_s : lit.to_s.inspect
-      
-    when :lvar, :const, :gvar
-      mutate_name sexp.shift
+    when :int, :float, :str
+      ast.children.first.inspect
+
+    when :sym
+      ast.children.first.to_s.inspect
+
+    when :lvar, :gvar
+      mutate_name ast.children.first
       
     when :true, :false
-      operand.to_s
+      ast.type.to_s
       
     when :nil
       'null'
 
-    when :lasgn
-      var         = mutate_name sexp.shift
-      value       = sexp.shift
-      val         = value.dup if value
+    when :lvasgn
+      var, value = ast.children
       output      = value ? "#{ 'var ' unless @vars.keys.include? var }#{ var } = #{ parse value }" : var
-      @vars[var] ||= []
-      @vars[var] << (val && val.first == :lvar ? @vars[ val.last ] : val )
+      @vars[var] = true
       output
 
-    when :cdecl
-      var         = mutate_name sexp.shift
-      value       = sexp.shift
-      val         = value.dup if value
-      output      = "const #{ var } = #{ parse value }"
-      @vars[var] ||= []
-      @vars[var] << (val && val.first == :lvar ? @vars[ val.last ] : val )
+    when :op_asgn
+      var, op, value = ast.children
+      "#{ parse var } #{ op }= #{ parse value }"
+
+    when :casgn
+      cbase, var, value = ast.children
+      var = mutate_name var
+      var = "#{cbase}.var" if cbase
+      output = "const #{ var } = #{ parse value }"
+      @vars[var] = true
       output
       
-    when :gasgn
-      "#{ mutate_name sexp.shift } = #{ parse sexp.shift }".sub('$', '')
+    when :gvasgn
+      name, value = ast.children
+      "#{ mutate_name(name).sub('$', '') } = #{ parse value }"
       
-    when :iasgn
-      "#{ sexp.shift.to_s.sub('@', 'this._') } = #{ parse sexp.shift }"
+    when :ivasgn
+      name, expression = ast.children
+      "#{ name.to_s.sub('@', 'this._') } = #{ parse expression }"
       
-    when :op_asgn_or
-      var  = sexp.shift
-      asgn = sexp.shift
-      parse asgn.push( s(:or, var, asgn.pop) )
+    when :or_asgn
+      var, value = ast.children
+      "#{ parse var } = #{parse var} || #{ parse value }"
+
+    when :and_asgn
+      var, value = ast.children
+      "#{ parse var } = #{parse var} && #{ parse value }"
       
     when :ivar
-      sexp.shift.to_s.sub('@', 'this._')
+      name = ast.children.first
+      name.to_s.sub('@', 'this._')
       
     when :hash
-      hashy  = []
-      hashy << [ parse( sexp.shift ), parse( sexp.shift ) ] until sexp.empty?
-      "{#{ hashy.map{ |k,v| k << ' : ' << v }.join(', ') }}"
+      hashy  = ast.children.map do |node|
+        left, right = node.children
+        "#{parse left} : #{parse right}"
+      end
+      "{#{ hashy.join(', ') }}"
 
     when :array
-      list = sexp.map{ |a| parse a }
+      list = ast.children.map { |a| parse a }
       if list.join(', ').length < 80
         "[#{ list.join(', ') }]"
       else
         "[\n#{ list.join(",\n") }\n]"
       end
 
-    when :block
-      sexp.map{ |e| parse e }.join(@sep)
+    when :begin
+      ast.children.map{ |e| parse e }.join(@sep)
       
     when :return
-      "return #{ parse sexp.shift }"
+      "return #{ parse ast.children.first }"
       
     when *LOGICAL
-      left, right = sexp.shift, sexp.shift
-      op_index    = operator_index operand
-      lgroup      = LOGICAL.include?( left.first ) && op_index <= operator_index( left.first )
+      left, right = ast.children
+      left = left.children.first if left and left.type == :begin
+      right = right.children.first if right.type == :begin
+      op_index    = operator_index ast.type
+      lgroup      = LOGICAL.include?( left.type ) && op_index <= operator_index( left.type )
       left        = parse left
       left        = "(#{ left })" if lgroup
-      rgroup      = LOGICAL.include?( right.first ) && op_index <= operator_index( right.first ) if right.length > 0
+      rgroup      = LOGICAL.include?( right.type ) && op_index <= operator_index( right.type ) if right.children.length > 0
       right       = parse right
       right       = "(#{ right })" if rgroup
 
-      case operand
+      case ast.type
       when :and
         "#{ left } && #{ right }"
       when :or
@@ -162,147 +199,137 @@ class Ruby2JS
         "!#{ left }"
       end
   
-    when :attrasgn
-      receiver, attribute, expression = sexp.shift, sexp.shift, sexp.shift
-      "#{ parse receiver }.#{ attribute.to_s.sub(/=$/,' = ')}#{ parse expression }"
+    when :send
+      receiver, method, *args = ast.children
+      if method == :new and receiver and receiver.children == [nil, :Proc]
+        return parse args.first
+      elsif method == :lambda and not receiver
+        return parse args.first
+      end
 
-    when :call
-      receiver, method = sexp.shift, sexp.shift
-      args = s(:arglist, *sexp)
-      return parse args, :lambda if receiver == s(:const, :Proc) and method == :new or method == :lambda && !receiver
       op_index   = operator_index method
-      target = sexp.first if op_index != -1
-      group_receiver = receiver.first == :call && op_index <= operator_index( receiver[2] ) if receiver
-      group_target = target.first == :call && op_index <= operator_index( target[2] ) if target
+      if op_index != -1
+        target = args.first 
+        target = target.children.first if target and target.type == :begin
+        receiver = receiver.children.first if receiver.type == :begin
+      end
+
+      group_receiver = receiver.type == :send && op_index <= operator_index( receiver.children[1] ) if receiver
+      group_target = target.type == :send && op_index <= operator_index( target.children[1] ) if target
 
       case method
       when :!
-        group_receiver ||= (receiver.length > 2)
+        group_receiver ||= (receiver.children.length > 1)
         "!#{ group_receiver ? group(receiver) : parse(receiver) }"
 
       when :call
-        "#{ parse receiver }(#{ parse args })"
+        "#{ parse receiver }(#{ parse args.first })"
 
       when :to_i
-        args.insert 1, receiver
-        "ParseInt(#{ parse args })"
+        "ParseInt(#{ parse receiver })"
 
       when :to_f
-        args.insert 1, receiver
-        "ParseFloat(#{ parse args })"
+        "ParseFloat(#{ parse receiver })"
 
       when :[]
         raise 'parse error' unless receiver
-        "#{ parse receiver }[#{ parse args }]"
+        "#{ parse receiver }[#{ parse args.first }]"
         
       when :attr_accessor
-        args.shift
-        args   = args.collect do |arg|
-          name = arg.last
-          parse( s(:defn, name, name) ).sub(/return null\}\z/, 
-            "if (name) {this._#{ name } = name} else {return this._#{ name }}}")
+        args = args.map do |arg|
+          name = arg.children.last
+          parse( s(:def, name, name) ).sub(/return null(\s*\})\z/, 
+            "if (name) {this._#{ name } = name} else {return this._#{ name }}\\1")
         end.join(@sep)
         
       when *OPERATORS.flatten
-        method = method_name_substitution receiver, method
-        "#{ group_receiver ? group(receiver) : parse(receiver) } #{ method } #{ group_target ? group(args) : parse(args) }"  
+        method = method_name_substitution method
+        "#{ group_receiver ? group(receiver) : parse(receiver) } #{ method } #{ group_target ? group(target) : parse(target) }"  
+
+      when /=$/
+        "#{ parse receiver }#{ '.' if receiver }#{ method.to_s.sub(/=$/, ' =') } #{ parse args.first }"
 
       else
-        method = method_name_substitution receiver, method
-        if args.length == 1 and not @method_calls.include? method
+        method = method_name_substitution method
+        if args.length == 0 and not @method_calls.include? method
           "#{ parse receiver }#{ '.' if receiver }#{ method }"
         else
-          "#{ parse receiver }#{ '.' if receiver }#{ method }(#{ parse args })"
+          args = args.map {|a| parse a}.join(', ')
+          "#{ parse receiver }#{ '.' if receiver }#{ method }(#{ args })"
         end
       end
       
-    when :arglist
-      sexp.map{ |e| parse e }.join(', ')
-      
+    when :const
+      receiver, name = ast.children
+      "#{ parse receiver }#{ '.' if receiver }#{ name }"
+
     when :masgn
-      if sexp.size == 1
-        sexp    = sexp.shift
-        sexp[0] = :arglist
-        parse sexp
-      else
-        sexp.first[1..-1].zip sexp.last[1..-1] { |var, val| var << val }
-        sexp = sexp.first
-        sexp[0] = :block
-        parse sexp
+      lhs, rhs = ast.children
+      block = []
+      lhs.children.zip rhs.children.zip do |var, val| 
+        block << s(var.type, *var.children, *val)
       end
+      parse s(:begin, *block)
     
     when :if
-      condition    = parse sexp.shift
-      true_block   = scope sexp.shift, @vars
-      elseif       = parse sexp.find_node( :if, true ), :if
-      else_block   = parse sexp.shift
-      output       = "if (#{ condition }) {#@nl#{ true_block }#@nl}"
-      output.sub!('if', 'else if') if ancestor == :if
-      output << " #{ elseif }" if elseif
-      output << " else {#@nl#{ else_block }#@nl}" if else_block
+      condition, true_block, else_block = ast.children
+      output = "if (#{ parse condition }) {#@nl#{ scope true_block }#@nl}"
+      while else_block and else_block.type == :if
+        condition, true_block, else_block = else_block.children
+        output <<  " else if (#{ parse condition }) {#@nl#{ scope true_block }#@nl}"
+      end
+      output << " else {#@nl#{ scope else_block }#@nl}" if else_block
       output
       
     when :while
-      condition    = parse sexp.shift
-      block        = scope sexp.shift, @vars
-      unknown      = parse sexp.shift
-      "while (#{ condition }) {#@nl#{ block }#@nl}"
+      condition, block = ast.children
+      "while (#{ parse condition }) {#@nl#{ scope block }#@nl}"
 
-    when :iter
-      caller       = sexp.shift
-      args         = sexp.shift
-      function     = s(:function, args, sexp.shift)
-      caller.pop if caller.last == s(:arglist)
-      caller      << function
-      parse caller
+    when :block
+      call, args, block = ast.children
+      block ||= s(:nil)
+      function = s(:def, name, args, block)
+      parse s(:send, *call.children, function)
     
-    when :function
-      args = sexp.shift
-      if sexp.length > 1
-        body = sexp
-        body.unshift :block
-      else
-        body = sexp.shift
-        body ||= s(:nil)
-      end
-      body   = s(:scope, body) unless body.first == :scope
+    when :def
+      name, args, body = ast.children
+      body ||= s(:nil)
+      body   = s(:scope, body) unless body.type == :scope
       body   = parse body
       body.sub! /return var (\w+) = ([^;]+)\z/, "var \\1 = \\2#{@sep}return \\1"
-      "function(#{ parse args }) {#@nl#{ body }#@nl}"
-      
-    when :defn
-      name = sexp.shift
-      sexp.unshift :function
-      parse( sexp ).sub('function', "function #{ name }")
-      
+      "function#{ " #{name}" if name }(#{ parse args }) {#@nl#{ body }#@nl}"
+
     when :scope
-      body = sexp.shift
-      body = s(:block, body) unless body.first == :block
-      body.push s(:return, body.pop) unless body.last.first == :return
-      body = scope body, @vars
+      body = ast.children.first
+      body = s(:begin, body) unless body.type == :begin
+      block = body.children
+      unless block.last.type == :return
+        children = block.dup
+        children.push s(:return, children.pop)
+        body = s(:begin, *children)
+      end
+      scope body
       
     when :class
-      name, inheritance, body = sexp.shift, sexp.shift, sexp
-      methods = body.find_nodes(:defn) or s()
-      init    = (body.delete methods.find { |m| m[1] == :initialize }) || []
-      block   = body.collect { |m| parse( m ).sub(/function (\w+)/, "#{ name }.prototype.\\1 = function") }.join @sep
-      "#{ parse( s(:defn, name, init[2], init[3]) ).sub(/return (?:null|(.*))\}\z/, '\1}') }#{ @sep if block and not block.empty?}#{ block }"
+      name, inheritance, *body = ast.children
+      body.compact!
+      body = body.first.children.dup if body.length == 1 and body.first.type == :begin
+      methods = body.select { |a| a.type == :def }
+      init    = (body.delete methods.find { |m| m.children.first == :initialize }) || s(:def, :initialize)
+      block   = body.collect { |m| parse( m ).sub(/function (\w+)/, "#{ parse name }.prototype.\\1 = function") }.join @sep
+      "#{ parse( s(:def, parse(name), init.children[1], init.children[2]) ).sub(/return (?:null|(.*))\}\z/, '\1}') }#{ @sep if block and not block.empty?}#{ block }"
 
     when :args
-      sexp.join(', ')
+      ast.children.map { |a| a.children.first }.join(', ')
       
     when :dstr
-      sexp.unshift s(:str, sexp.shift)
-      sexp.collect{ |s| parse s }.join(' + ')
+      ast.children.map{ |s| parse s }.join(' + ')
       
-    when :evstr, :svalue
-      parse sexp.shift
-
     when :self
       'this'
 
     else 
-      raise "unknown operand #{ operand.inspect }"
+      raise "unknown AST type #{ ast.type }"
     end
   end
   
@@ -323,21 +350,12 @@ class Ruby2JS
     #     }
   })
   
-  def method_name_substitution receiver, method
-    # if receiver
-    #       receiver = last_original_assign receiver if receiver.first == :lvar
-    #       receiver = receiver.flatten.first
-    #     end
-    # SUBSTITUTIONS[ :* ][ method ] || method || SUBSTITUTIONS[ receiver ][ method ] || method
+  def method_name_substitution method
     SUBSTITUTIONS[ method ] || method
   end
   
-  def last_original_assign receiver
-    ( @vars[ receiver.last ] || [] ).first || []
-  end
-  
-  def group( sexp )
-    "(#{ parse sexp })"
+  def group( ast )
+    "(#{ parse ast })"
   end
   
   def mutate_name( name )
