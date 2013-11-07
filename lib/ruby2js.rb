@@ -29,9 +29,9 @@ class Ruby2JS
     if Proc === source
       file,line = source.source_location
       source = File.read(file)
-      ast = find_block( Parser::CurrentRuby.parse(source), line )
+      ast = find_block( parse(source), line )
     else
-      ast = Parser::CurrentRuby.parse( source )
+      ast = parse( source )
     end
 
     ruby2js = Ruby2JS.new( ast )
@@ -69,6 +69,14 @@ class Ruby2JS
   end
   
   protected
+
+  def self.parse(source)
+    # workaround for https://github.com/whitequark/parser/issues/112
+    buffer = Parser::Source::Buffer.new('__SOURCE__')
+    buffer.raw_source = source.encode('utf-8')
+    Parser::CurrentRuby.new.parse(buffer)
+  end
+
   def self.find_block(ast, line)
     if ast.type == :block and ast.loc.expression.line == line
       return ast.children.last

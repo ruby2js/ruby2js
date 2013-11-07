@@ -14,6 +14,7 @@ describe Ruby2JS do
       to_js( ":symbol" ).must_equal '"symbol"'
       to_js( "nil" ).must_equal 'null'
       to_js( "Constant" ).must_equal 'Constant'
+      to_js( '"\u2620"' ).must_equal "\"\u2620\""
     end
     
     it "should parse simple hash" do
