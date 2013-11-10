@@ -4,14 +4,25 @@ require 'ruby2js/converter'
 module Ruby2JS
   VERSION   = '0.0.2'
   
-  def self.convert(source)
+  def self.convert(source, options={})
 
     if Proc === source
       file,line = source.source_location
       source = File.read(file)
       ast = find_block( parse(source), line )
+    elsif Parser::AST::Node === source
+      ast = source
+      source = ast.loc.expression.source_buffer.source
     else
       ast = parse( source )
+    end
+
+    if options[:filters]
+      filter = Parser::AST::Processor
+      options[:filters].reverse.each do |mod|
+        filter = Class.new(filter) {include mod} 
+      end
+      ast = filter.new.process(ast)
     end
 
     ruby2js = Ruby2JS::Converter.new( ast )
