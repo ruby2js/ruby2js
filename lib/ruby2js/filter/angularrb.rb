@@ -11,11 +11,12 @@ module Ruby2JS
 
       # input: 
       #   module Angular::AppName
+      #     use :Dependency
       #     ...
       #   end
       #
       # output: 
-      #   AppName = angular.module("AppName", [])
+      #   AppName = angular.module("AppName", ["Dependency"])
       #   ...
 
       def on_module(node)
@@ -27,25 +28,45 @@ module Ruby2JS
 
         @ngApp = module_name.children[1]
 
+        # find the block
+        block = process_all(node.children[1..-1])
+        while block.length == 1 and block.first.type == :begin
+          block = block.first.children.dup
+        end
+
+        # find use class method calls
+        uses = block.find_all do |node|
+          node.type == :send and node.children[0..1] == [nil, :use]
+        end
+
+        # convert use calls into dependencies
+        depends = []
+        uses.each do |use|
+          pending = []
+          use.children[2..-1].each do |node|
+            break unless [:str, :sym].include? node.type
+            pending << node
+          end
+          depends += pending
+          block.delete use
+        end
+
         # build constant assignment statement
         casgn = s(:casgn, nil, @ngApp, s(:send, 
                   s(:lvar, :angular), 
                   :module,
                   s(:str, @ngApp.to_s), 
-                  s(:array)))
-
-        # process remaining children
-        children = process_all(node.children[1..-1])
+                  s(:array, *depends)))
 
         @ngApp = nil
 
         # replace module with a constant assign followed by the module contents
-        node.updated :begin, [casgn, *children]
+        node.updated :begin, [casgn, *block]
       end
 
       # input: 
       #   class Name < Angular::Controller
-      #     inject :$service
+      #     use :$service
       #     ...
       #   end
       #
@@ -57,26 +78,40 @@ module Ruby2JS
       def on_class(node)
         return super unless @ngApp
         return super unless node.children.length == 3
-        return super unless node.children.last.type == :begin
+
+        # (const nil :Name)
         name = node.children.first
         return super unless name.type == :const and name.children.first == nil
-        block = process_all(node.children.last.children)
 
-        # find inject class method calls
-        injects = block.find_all do |node|
-          node.type == :send and node.children[0..1] == [nil, :inject]
+        # (const (const nil :Angular) :Controller)
+        parent = node.children[1]
+        return super unless parent and parent.children.length == 2
+        return super unless parent.children[0]
+        return super unless parent.children[0].type == :const
+        return super unless parent.children[0].children == [nil, :Angular]
+        return super unless [:Controller].include? parent.children[1]
+
+        # find the block
+        block = process_all(node.children[2..-1])
+        while block.length == 1 and block.first.type == :begin
+          block = block.first.children.dup
         end
 
-        # convert inject calls into args
+        # find use class method calls
+        uses = block.find_all do |node|
+          node.type == :send and node.children[0..1] == [nil, :use]
+        end
+
+        # convert use calls into args
         args = []
-        injects.each do |inject|
+        uses.each do |use|
           pending = []
-          inject.children[2..-1].each do |child|
-            break unless child.type == :sym
-            pending << s(:arg, *child.children)
+          use.children[2..-1].each do |node|
+            break unless [:str, :sym].include? node.type
+            pending << s(:arg, *node.children)
           end
           args += pending
-          block.delete inject
+          block.delete use
         end
 
         # build Appname.controller call statement
