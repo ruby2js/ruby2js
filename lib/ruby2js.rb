@@ -27,8 +27,6 @@ module Ruby2JS
 
     ruby2js = Ruby2JS::Converter.new( ast )
 
-    ruby2js.method_calls += source.scan(/(\w+)\(\)/).flatten.map(&:to_sym)
-
     if source.include? "\n"
       ruby2js.enable_vertical_whitespace 
       lines = ruby2js.to_js.split("\n")

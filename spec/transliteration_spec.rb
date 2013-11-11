@@ -37,7 +37,7 @@ describe Ruby2JS do
     end
     
     it "should parse global variables" do
-      to_js( "$a = 1" ).must_equal 'a = 1'
+      to_js( "$a = 1" ).must_equal '$a = 1'
     end
   end
   
@@ -194,10 +194,6 @@ describe Ruby2JS do
       to_js( 'a = lambda {|x| x+1}; a.(1)').
         must_equal 'var a = function(x) {return x + 1}; a(1)'
     end
-
-    it "should handle jquery calls" do
-      to_js( '$$.("span")' ).must_equal '$("span")';
-    end
   end
   
   describe 'string concat' do
@@ -335,41 +331,6 @@ describe Ruby2JS do
     end
   end
   
-  describe 'method substitutions' do
-    it "should not convert name" do
-      to_js('a.size').must_equal 'a.length'
-    end
-    
-    it "should convert size to length" do
-      to_js('[].size').must_equal '[].length'
-    end
-    
-    it "should convert size to length after assign" do
-      to_js('a = []; a.size').must_equal 'var a = []; a.length'
-    end
-    
-    it "should convert size to length after several assigns" do
-      to_js('a = []; b = a; c = b; d = c; d.size').
-        must_equal 'var a = []; var b = a; var c = b; var d = c; d.length'
-    end
-
-    it "should subtitute << for + for array" do
-      to_js('a = []; a << []').must_equal 'var a = []; a + []'
-    end
-
-    it "should subtitute ParseInt for to_i" do
-      to_js('a.to_i').must_equal 'ParseInt(a)'
-    end
-
-    it "should subtitute ParseFloat for to_f" do
-      to_js('a.to_f').must_equal 'ParseFloat(a)'
-    end
-
-    it "should subtitute toString() for to_s" do
-      to_js('a.to_s').must_equal 'a.toString()'
-    end
-  end
-
   describe 'whitespace' do
     it "should handle newlines" do
       to_js( "a = 1\na = 2" ).must_equal "var a = 1;\na = 2"

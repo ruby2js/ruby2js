@@ -6,13 +6,10 @@ module Ruby2JS
     OPERATORS = [:[], :[]=], [:not, :!], [:*, :/, :%], [:+, :-], [:>>, :<<], 
       [:<=, :<, :>, :>=], [:==, :!=], [:and, :or]
     
-    attr_accessor :method_calls
-
     def initialize( ast, vars = {} )
       @ast, @vars = ast, vars.dup
       @sep = '; '
       @nl = ''
-      @method_calls = [:toString]
     end
     
     def enable_vertical_whitespace
@@ -31,12 +28,19 @@ module Ruby2JS
     def scope( ast )
       frame = self.class.new( nil, @vars )
       frame.enable_vertical_whitespace if @nl == "\n"
-      frame.method_calls = @method_calls
       frame.parse( ast )
     end
 
     def s(type, *args)
       Parser::AST::Node.new(type, args)
+    end
+
+    def is_method?(node)
+      return false unless node.type == :send
+      return true unless node.loc
+      selector = node.loc.selector
+      return true unless selector.source_buffer
+      selector.source_buffer.source[selector.end_pos] == '('
     end
 
     def parse ast
@@ -51,7 +55,7 @@ module Ruby2JS
         ast.children.first.to_s.inspect
 
       when :lvar, :gvar
-        mutate_name ast.children.first
+        ast.children.first
         
       when :true, :false
         ast.type.to_s
@@ -71,7 +75,6 @@ module Ruby2JS
 
       when :casgn
         cbase, var, value = ast.children
-        var = mutate_name var
         var = "#{cbase}.var" if cbase
         output = "const #{ var } = #{ parse value }"
         @vars[var] = true
@@ -79,7 +82,7 @@ module Ruby2JS
         
       when :gvasgn
         name, value = ast.children
-        "#{ mutate_name(name).sub('$', '') } = #{ parse value }"
+        "#{ name } = #{ parse value }"
         
       when :ivasgn
         name, expression = ast.children
@@ -139,7 +142,7 @@ module Ruby2JS
           "!#{ left }"
         end
     
-      when :send
+      when :send, :attr
         receiver, method, *args = ast.children
         if method == :new and receiver and receiver.children == [nil, :Proc]
           return parse args.first
@@ -165,12 +168,6 @@ module Ruby2JS
         when :call
           "#{ parse receiver }(#{ parse args.first })"
 
-        when :to_i
-          "ParseInt(#{ parse receiver })"
-
-        when :to_f
-          "ParseFloat(#{ parse receiver })"
-
         when :[]
           raise 'parse error' unless receiver
           "#{ parse receiver }[#{ parse args.first }]"
@@ -183,15 +180,13 @@ module Ruby2JS
           end.join(@sep)
           
         when *OPERATORS.flatten
-          method = method_name_substitution method
           "#{ group_receiver ? group(receiver) : parse(receiver) } #{ method } #{ group_target ? group(target) : parse(target) }"  
 
         when /=$/
           "#{ parse receiver }#{ '.' if receiver }#{ method.to_s.sub(/=$/, ' =') } #{ parse args.first }"
 
         else
-          method = method_name_substitution method
-          if args.length == 0 and not @method_calls.include? method
+          if args.length == 0 and not is_method?(ast)
             "#{ parse receiver }#{ '.' if receiver }#{ method }"
           else
             args = args.map {|a| parse a}.join(', ')
@@ -273,37 +268,8 @@ module Ruby2JS
       end
     end
     
-    SUBSTITUTIONS = Hash.new().merge({ 
-      # :array => {
-        :size     => :length,
-        :<<       => :+,
-        :index    => 'indexOf',
-        :rindex   => 'lastIndexOf',
-        :any?     => 'some',
-        :all?     => 'every',
-        :find_all => 'filter',
-        :each_with_index => 'each',
-      # },
-      #     :* => {
-        :to_a => :toArray,
-        :to_s => :toString,
-      #     }
-    })
-    
-    def method_name_substitution method
-      SUBSTITUTIONS[ method ] || method
-    end
-    
     def group( ast )
       "(#{ parse ast })"
-    end
-    
-    def mutate_name( name )
-      if name == :$$
-        '$'
-      else
-        name.to_s
-      end
     end
   end
 end

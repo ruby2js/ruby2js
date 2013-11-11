@@ -29,7 +29,7 @@ module Ruby2JS
 
         # build constant assignment statement
         casgn = s(:casgn, nil, @ngApp, s(:send, 
-                  s(:send, nil, :angular), 
+                  s(:lvar, :angular), 
                   :module,
                   s(:str, @ngApp.to_s), 
                   s(:array)))
