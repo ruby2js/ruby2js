@@ -2,8 +2,6 @@ require 'parser/current'
 require 'ruby2js/converter'
 
 module Ruby2JS
-  VERSION   = '0.0.2'
-  
   def self.convert(source, options={})
 
     if Proc === source
