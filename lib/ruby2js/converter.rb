@@ -18,7 +18,7 @@ module Ruby2JS
     end
 
     def to_js
-      parse( @ast )
+      parse( @ast, :statement )
     end
 
     def operator_index op
@@ -28,7 +28,7 @@ module Ruby2JS
     def scope( ast )
       frame = self.class.new( nil, @vars )
       frame.enable_vertical_whitespace if @nl == "\n"
-      frame.parse( ast )
+      frame.parse( ast, :statement )
     end
 
     def s(type, *args)
@@ -43,7 +43,7 @@ module Ruby2JS
       selector.source_buffer.source[selector.end_pos] == '('
     end
 
-    def parse ast
+    def parse(ast, state=:expression)
       return ast unless Parser::AST::Node === ast
 
       case ast.type
@@ -118,7 +118,7 @@ module Ruby2JS
         end
 
       when :begin
-        ast.children.map{ |e| parse e }.join(@sep)
+        ast.children.map{ |e| parse e, :statement }.join(@sep)
         
       when :return
         "return #{ parse ast.children.first }"
@@ -203,13 +203,17 @@ module Ruby2JS
       
       when :if
         condition, true_block, else_block = ast.children
-        output = "if (#{ parse condition }) {#@nl#{ scope true_block }#@nl}"
-        while else_block and else_block.type == :if
-          condition, true_block, else_block = else_block.children
-          output <<  " else if (#{ parse condition }) {#@nl#{ scope true_block }#@nl}"
+        if state == :statement
+          output = "if (#{ parse condition }) {#@nl#{ scope true_block }#@nl}"
+          while else_block and else_block.type == :if
+            condition, true_block, else_block = else_block.children
+            output <<  " else if (#{ parse condition }) {#@nl#{ scope true_block }#@nl}"
+          end
+          output << " else {#@nl#{ scope else_block }#@nl}" if else_block
+          output
+        else
+          "(#{ parse condition } ? #{ parse true_block } : #{ parse else_block })"
         end
-        output << " else {#@nl#{ scope else_block }#@nl}" if else_block
-        output
         
       when :while
         condition, block = ast.children

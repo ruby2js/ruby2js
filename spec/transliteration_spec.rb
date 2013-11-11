@@ -74,8 +74,9 @@ describe Ruby2JS do
       to_js( 'a = nil; a ||= 1').must_equal 'var a = null; a = a || 1'
     end
     
-    it "should parse tertiary operator" do
-      to_js( 'true ? true : false').must_equal "if (true) {true} else {false}"
+    it "should parse ternary operator" do
+      to_js( 'x = true ? true : false').
+        must_equal "var x = (true ? true : false)"
     end
   end
   
