@@ -19,8 +19,13 @@ describe Ruby2JS do
     
     it "should parse simple hash" do
       to_js( "{}" ).must_equal '{}'
-      to_js( "{ :a => :b }" ).must_equal '{"a" : "b"}'
-      to_js( "{ :a => :b, :c => :d }" ).must_equal '{"a" : "b", "c" : "d"}'
+      to_js( "{ :a => :b }" ).must_equal '{a: "b"}'
+      to_js( "{ :a => :b, 'c' => :d }" ).must_equal '{a: "b", c: "d"}'
+    end
+
+    it "should handle hashes with keys that aren't identifiers" do
+      to_js( "{ 1 => 2 }" ).must_equal '{1: 2}'
+      to_js( "{ 'data-foo' => 2 }" ).must_equal '{"data-foo": 2}'
     end
     
     it "should parse array" do
@@ -29,7 +34,7 @@ describe Ruby2JS do
     end
     
     it "should parse nested hash" do
-      to_js( "{ :a => {:b => :c} }" ).must_equal '{"a" : {"b" : "c"}}'
+      to_js( "{ :a => {:b => :c} }" ).must_equal '{a: {b: "c"}}'
     end
     
     it "should parse array" do

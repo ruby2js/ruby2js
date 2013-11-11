@@ -103,7 +103,9 @@ module Ruby2JS
       when :hash
         hashy  = ast.children.map do |node|
           left, right = node.children
-          "#{parse left} : #{parse right}"
+          key = parse left
+          key = $1 if key =~ /\A"([a-zA-Z_$][a-zA-Z_$0-9]*)"\Z/
+          "#{key}: #{parse right}"
         end
         "{#{ hashy.join(', ') }}"
 
