@@ -124,6 +124,37 @@ module Ruby2JS
         node.updated :block, [call, s(:args, *args), s(:begin, *block)]
       end
 
+      # input: 
+      #   filter :name do |input|
+      #     ...
+      #   end
+      #
+      # output: 
+      #   AppName.filter :name do
+      #     return lambda {|input| return ... }
+      #   end
+      def on_block(node)
+        return super unless @ngApp
+
+        call = node.children.first
+        return super unless call.children[0..1] == [nil, :filter]
+
+        # insert return
+        children = process_all(node.children[1..-1])
+        block = [children.pop || s(:nil)]
+        while block.length == 1 and block.first.type == :begin
+          block = block.first.children.dup
+        end
+        block.push s(:return, block.pop) unless block.last.type == :return
+        children.push (block.length == 1 ? block.first : s(:begin, *block))
+
+        # construct a function returning a function
+        inner = s(:block, s(:send, nil, :lambda), *children)
+        outer = s(:send, s(:lvar, @ngApp), :filter, *call.children[2..-1])
+
+        node.updated nil, [outer, s(:args), s(:return, inner)]
+      end
+
       private
 
       # construct an AST Node
@@ -132,7 +163,5 @@ module Ruby2JS
       end
 
     end
-
   end
-
 end

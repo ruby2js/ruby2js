@@ -46,4 +46,32 @@ describe Ruby2JS::Filter::AngularRB do
       to_js( ruby ).must_equal js
     end
   end
+  
+  describe 'filter' do
+    it "should convert apps with a filter" do
+      ruby = <<-RUBY
+        module Angular::PhonecatApp 
+          filter :pnl do |input|
+            if input < 0
+              "loss"
+            else
+              "profit"
+            end
+          end
+        end
+      RUBY
+
+      js = <<-JS.gsub!(/^ {8}/, '').chomp
+        const PhonecatApp = angular.module("PhonecatApp", []);
+
+        PhonecatApp.filter("pnl", function() {
+          return function(input) {
+            return (input < 0 ? "loss" : "profit")
+          }
+        })
+      JS
+
+      to_js( ruby ).must_equal js
+    end
+  end
 end
