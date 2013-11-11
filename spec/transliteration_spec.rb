@@ -305,11 +305,6 @@ describe Ruby2JS do
         must_equal 'function Person(name, surname) {this._name = name; this._surname = surname}; Person.prototype.full_name = function() {return this._name + this._surname}'
     end
     
-    it "should parse class" do
-      to_js('class Person; attr_accessor :name; def initialize(name); @name = name; end; end').
-        must_equal 'function Person(name) {this._name = name}; Person.prototype.name = function(name) {if (name) {this._name = name} else {return this._name}}'
-    end
-    
     it "should parse method def" do
       to_js('def method; end').must_equal 'function method() {return null}'
     end

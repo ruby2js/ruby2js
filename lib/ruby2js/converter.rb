@@ -172,13 +172,6 @@ module Ruby2JS
           raise 'parse error' unless receiver
           "#{ parse receiver }[#{ parse args.first }]"
           
-        when :attr_accessor
-          args = args.map do |arg|
-            name = arg.children.last
-            parse( s(:def, name, name) ).sub(/return null(\s*\})\z/, 
-              "if (name) {this._#{ name } = name} else {return this._#{ name }}\\1")
-          end.join(@sep)
-          
         when *OPERATORS.flatten
           "#{ group_receiver ? group(receiver) : parse(receiver) } #{ method } #{ group_target ? group(target) : parse(target) }"  
 
