@@ -39,7 +39,7 @@ describe Ruby2JS::Filter::AngularRB do
         const PhonecatApp = angular.module("PhonecatApp", []);
 
         PhonecatApp.controller("PhoneListCtrl", function($scope) {
-          return $scope.orderProp = "age"
+          $scope.orderProp = "age"
         })
       JS
 

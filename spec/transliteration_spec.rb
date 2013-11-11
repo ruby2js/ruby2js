@@ -202,7 +202,7 @@ describe Ruby2JS do
     end
 
     it "should handle function calls" do
-      to_js( 'a = lambda {|x| x+1}; a.(1)').
+      to_js( 'a = lambda {|x| return x+1}; a.(1)').
         must_equal 'var a = function(x) {return x + 1}; a(1)'
     end
   end
@@ -261,37 +261,39 @@ describe Ruby2JS do
     end
     
     it "should parse proc" do
-      to_js('Proc.new {}').must_equal 'function() {return null}'
+      to_js('Proc.new {}').must_equal 'function() {}'
     end
     
     it "should parse lambda" do
-      to_js( 'lambda {}').must_equal 'function() {return null}'
+      to_js( 'lambda {}').must_equal 'function() {}'
     end
 
     it "should handle basic variable scope" do
-      to_js( 'a = 1; lambda { a = 2; b = 1}').must_equal 'var a = 1; function() {a = 2; var b = 1; return b}'
+      to_js( 'a = 1; lambda { a = 2; b = 1}').must_equal 'var a = 1; function() {a = 2; var b = 1}'
     end
     
     it "should handle one argument" do
-      to_js( 'lambda { |a| a + 1 }').must_equal 'function(a) {return a + 1}'
+      to_js( 'lambda { |a| return a + 1 }').
+        must_equal 'function(a) {return a + 1}'
     end
     
     it "should handle arguments" do
-      to_js( 'lambda { |a,b| a + b }').must_equal 'function(a, b) {return a + b}'
+      to_js( 'lambda { |a,b| return a + b }').
+        must_equal 'function(a, b) {return a + b}'
     end
     
     it "should pass functions" do
-      to_js( 'run("task"){ |task| do_run task}').must_equal 'run("task", function(task) {return do_run(task)})'
+      to_js( 'run("task"){ |task| do_run task}').must_equal 'run("task", function(task) {do_run(task)})'
     end
     
     it "should handle variable scope" do
       to_js('a = 1; lambda {|b| c = 0; a = b - c }; lambda { |b| c = 1; a = b + c }').
-        must_equal 'var a = 1; function(b) {var c = 0; return a = b - c}; function(b) {var c = 1; return a = b + c}'
+        must_equal 'var a = 1; function(b) {var c = 0; a = b - c}; function(b) {var c = 1; a = b + c}'
     end
     
     it "should really handle variable scope" do
       to_js('a, d = 1, 2; lambda {|b| c = 0; a = b - c * d}; lambda { |b| c = 1; a = b + c * d}').
-        must_equal 'var a = 1; var d = 2; function(b) {var c = 0; return a = b - c * d}; function(b) {var c = 1; return a = b + c * d}'
+        must_equal 'var a = 1; var d = 2; function(b) {var c = 0; a = b - c * d}; function(b) {var c = 1; a = b + c * d}'
     end
     
     it "should parse with explicit return" do
@@ -309,27 +311,27 @@ describe Ruby2JS do
     end
     
     it "should parse class" do
-      to_js('class Person; def initialize(name); @name = name; end; def name; @name; end; end').
+      to_js('class Person; def initialize(name); @name = name; end; def name; return @name; end; end').
         must_equal 'function Person(name) {this._name = name}; Person.prototype.name = function() {return this._name}'
     end
     
     it "should parse class" do
-      to_js('class Person; def initialize(name, surname); @name, @surname = name, surname; end; def full_name; @name  + @surname; end; end').
+      to_js('class Person; def initialize(name, surname); @name, @surname = name, surname; end; def full_name; return @name  + @surname; end; end').
         must_equal 'function Person(name, surname) {this._name = name; this._surname = surname}; Person.prototype.full_name = function() {return this._name + this._surname}'
     end
     
     it "should parse method def" do
-      to_js('def method; end').must_equal 'function method() {return null}'
+      to_js('def method; end').must_equal 'function method() {}'
     end
     
     it "should convert self to this" do
-      to_js('def method; self.foo; end').
+      to_js('def method; return self.foo; end').
         must_equal 'function method() {return this.foo}'
     end
     
     it "should handle methods with multiple statements" do
       to_js('def method; self.foo(); self.bar; end').
-        must_equal 'function method() {this.foo(); return this.bar}'
+        must_equal 'function method() {this.foo(); this.bar}'
     end
   end
   
@@ -353,7 +355,8 @@ describe Ruby2JS do
     end
 
     it "should handle function declarations" do
-      to_js("Proc.new {}\n").must_equal "function() {\n  return null\n}"
+      to_js("Proc.new {return null}\n").
+        must_equal "function() {\n  return null\n}"
     end
 
     it "should add a blank line before blocks" do

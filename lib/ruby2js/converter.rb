@@ -233,13 +233,13 @@ module Ruby2JS
 
       when :block
         call, args, block = ast.children
-        block ||= s(:nil)
+        block ||= s(:begin)
         function = s(:def, name, args, block)
         parse s(:send, *call.children, function)
       
       when :def
         name, args, body = ast.children
-        body ||= s(:nil)
+        body ||= s(:begin)
         body   = s(:scope, body) unless body.type == :scope
         body   = parse body
         body.sub! /return var (\w+) = ([^;]+)\z/, "var \\1 = \\2#{@sep}return \\1"
@@ -249,11 +249,6 @@ module Ruby2JS
         body = ast.children.first
         body = s(:begin, body) unless body.type == :begin
         block = body.children
-        unless block.last.type == :return
-          children = block.dup
-          children.push s(:return, children.pop)
-          body = s(:begin, *children)
-        end
         scope body
         
       when :class
