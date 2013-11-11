@@ -71,7 +71,16 @@ module Ruby2JS
 
       when :op_asgn
         var, op, value = ast.children
-        "#{ parse var } #{ op }= #{ parse value }"
+
+        if [:+, :-].include?(op) and value.type==:int and value.children==[1]
+          if state == :statement
+            "#{ parse var }#{ op }#{ op }"
+          else
+            "#{ op }#{ op }#{ parse var }"
+          end
+        else
+          "#{ parse var } #{ op }= #{ parse value }"
+        end
 
       when :casgn
         cbase, var, value = ast.children
@@ -173,6 +182,9 @@ module Ruby2JS
         when :[]
           raise 'parse error' unless receiver
           "#{ parse receiver }[#{ parse args.first }]"
+
+        when :-@, :+@
+          "#{ method.to_s[0] }#{ parse receiver }"
           
         when *OPERATORS.flatten
           "#{ group_receiver ? group(receiver) : parse(receiver) } #{ method } #{ group_target ? group(target) : parse(target) }"  

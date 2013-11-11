@@ -66,10 +66,15 @@ describe Ruby2JS do
       to_js( "a = 1, 2" ).must_equal 'var a = [1, 2]'
     end
     
-    it "should parse" do
-      to_js( 'a += 1' ).must_equal 'a += 1'
+    it "should parse op assignments" do
+      to_js( 'a += 1' ).must_equal 'a++'
     end
-    
+
+    it "should parse unary operators" do
+      to_js( '+a' ).must_equal '+a'
+      to_js( '-a' ).must_equal '-a'
+    end
+
     it "should do short circuit assign" do
       to_js( 'a = nil; a ||= 1').must_equal 'var a = null; a = a || 1'
     end
@@ -239,11 +244,13 @@ describe Ruby2JS do
     end
     
     it "should handle while loop" do
-      to_js( 'a = 0; while true; a += 1; end').must_equal 'var a = 0; while (true) {a += 1}'
+      to_js( 'a = 0; while true; a += 1; end').
+        must_equal 'var a = 0; while (true) {a++}'
     end
     
     it "should handle another while loop" do
-      to_js( 'a = 0; while true || false; a += 1; end').must_equal 'var a = 0; while (true || false) {a += 1}'
+      to_js( 'a = 0; while true || false; a += 1; end').
+        must_equal 'var a = 0; while (true || false) {a++}'
     end
   end
   
