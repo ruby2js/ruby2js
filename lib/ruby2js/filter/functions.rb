@@ -27,6 +27,15 @@ module Ruby2JS
           node.updated nil, [nil, :parseFloat, target, *args]
 
         elsif node.children[1] == :each
+          if target.type == :gvar and target.children == ['$']
+            super
+          elsif target.type == :send and target.children == [nil, :jQuery]
+            super
+          else
+            node.updated nil, [target, :forEach, *args]
+          end
+
+        elsif node.children[1] == :each_with_index
           node.updated nil, [target, :forEach, *args]
 
         else

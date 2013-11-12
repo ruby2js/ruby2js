@@ -40,5 +40,20 @@ describe Ruby2JS::Filter::Functions do
       to_js( 'a = 0; [1,2,3].each {|i| a += i}').
         must_equal 'var a = 0; [1, 2, 3].forEach(function(i) {a += i})'
     end
+
+    it "should map each_with_index to forEach" do
+      to_js( 'a = 0; [1,2,3].each_with_index {|n, i| a += n}').
+        must_equal 'var a = 0; [1, 2, 3].forEach(function(n, i) {a += n})'
+    end
+
+    it "should leave $.each alone" do
+      to_js( 'a = 0; $$.each([1,2,3]) {|n, i| a += n}').
+        must_equal 'var a = 0; $.each([1, 2, 3], function(n, i) {a += n})'
+    end
+
+    it "should leave jquery.each alone" do
+      to_js( 'a = 0; jQuery.each([1,2,3]) {|n, i| a += n}').
+        must_equal 'var a = 0; jQuery.each([1, 2, 3], function(n, i) {a += n})'
+    end
   end
 end
