@@ -216,10 +216,13 @@ describe Ruby2JS do
       to_js( '"time is #{ Time.now() }, say #{ hello }"' ).must_equal '"time is " + Time.now() + ", say " + hello'
     end
     
-    it "should parse string " do
+    it "should parse string" do
       to_js( '"time is #{ Time.now() }"' ).must_equal '"time is " + Time.now()'
     end
     
+    it "should parse interpolated symbols" do
+      to_js( ':"a#{b}c"' ).must_equal '"a" + b + "c"'
+    end
   end
   
   describe 'control' do

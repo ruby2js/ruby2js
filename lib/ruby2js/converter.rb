@@ -270,7 +270,7 @@ module Ruby2JS
       when :args
         ast.children.map { |a| a.children.first }.join(', ')
         
-      when :dstr
+      when :dstr, :dsym
         ast.children.map{ |s| parse s }.join(' + ')
         
       when :self
