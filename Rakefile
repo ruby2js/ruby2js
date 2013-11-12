@@ -18,6 +18,7 @@ spec = Gem::Specification.new do |s|
 
   # Change these as appropriate
   s.name           = "ruby2js"
+  s.license        = 'MIT'
   s.version        = Ruby2JS::VERSION::STRING
   s.summary        = "Minimal yet extensible Ruby to JavaScript conversion."
   s.author         = "Sam Ruby"
