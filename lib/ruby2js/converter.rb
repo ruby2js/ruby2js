@@ -231,6 +231,13 @@ module Ruby2JS
         condition, block = ast.children
         "while (#{ parse condition }) {#@nl#{ scope block }#@nl}"
 
+      when :for
+        var, expression, block = ast.children
+        parse s(:block, 
+          s(:send, expression, :forEach),
+          s(:args, s(:arg, var.children.last)),
+          block);
+
       when :block
         call, args, block = ast.children
         block ||= s(:begin)

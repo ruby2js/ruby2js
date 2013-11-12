@@ -34,4 +34,11 @@ describe Ruby2JS::Filter::Functions do
       to_js( 'a.to_f' ).must_equal 'parseFloat(a)'
     end
   end
+    
+  describe 'array' do
+    it "should map each to forEach" do
+      to_js( 'a = 0; [1,2,3].each {|i| a += i}').
+        must_equal 'var a = 0; [1, 2, 3].forEach(function(i) {a += i})'
+    end
+  end
 end

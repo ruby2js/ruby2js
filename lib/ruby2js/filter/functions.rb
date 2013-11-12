@@ -14,16 +14,20 @@ module Ruby2JS
       end
 
       def on_send(node)
+        target = process(node.children.first)
+        args = process_all(node.children[2..-1])
+
         if node.children[1] == :to_s
-          s(:send, node.children[0], :toString, *node.children[2..-1])
+          s(:send, target, :toString, *args)
 
         elsif node.children[1] == :to_i
-          node.updated nil, [nil, :parseInt, node.children[0], 
-            *node.children[2..-1]]
+          node.updated nil, [nil, :parseInt, target, *args]
 
         elsif node.children[1] == :to_f
-          node.updated nil, [nil, :parseFloat, node.children[0], 
-            *node.children[2..-1]]
+          node.updated nil, [nil, :parseFloat, target, *args]
+
+        elsif node.children[1] == :each
+          node.updated nil, [target, :forEach, *args]
 
         else
           super

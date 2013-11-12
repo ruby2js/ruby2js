@@ -252,6 +252,11 @@ describe Ruby2JS do
       to_js( 'a = 0; while true || false; a += 1; end').
         must_equal 'var a = 0; while (true || false) {a++}'
     end
+    
+    it "should handle a for loop" do
+      to_js( 'a = 0; for i in [1,2,3]; a += i; end').
+        must_equal 'var a = 0; [1, 2, 3].forEach(function(i) {a += i})'
+    end
   end
   
   describe 'blocks' do
