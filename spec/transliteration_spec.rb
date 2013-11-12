@@ -392,4 +392,22 @@ describe Ruby2JS do
       to_js( source ).must_equal "c + 1"
     end
   end
+
+  describe 'regular expressions' do
+    it "should handle regular expressions with options" do
+      to_js( '/a.*b/im' ).must_equal "/a.*b/im"
+    end
+
+    it "should handle regular expressions with options" do
+      to_js( '%r{/\w+}' ).must_equal 'new RegExp("/\\w+/")'
+    end
+
+    it "should regular expressions tests" do
+      to_js( "'abc' =~ /abc/" ).must_equal '/abc/.test("abc")'
+    end
+
+    it "should regular expressions not tests" do
+      to_js( "'abc' !~ /abc/" ).must_equal '!/abc/.test("abc")'
+    end
+  end
 end

@@ -118,6 +118,18 @@ module Ruby2JS
         end
         "{#{ hashy.join(', ') }}"
 
+      when :regexp
+        str, opt = ast.children
+        if str.children.first.include? '/'
+          if opt.children.empty?
+            "new RegExp(#{ str.children.first.inspect })"
+          else
+            "new RegExp(#{ str.children.first.inspect }, #{ opt.children.join.inspect})"
+          end
+        else
+          "/#{ str.children.first }/#{ opt.children.join }"
+        end
+
       when :array
         list = ast.children.map { |a| parse a }
         if list.join(', ').length < 80
@@ -185,7 +197,13 @@ module Ruby2JS
 
         when :-@, :+@
           "#{ method.to_s[0] }#{ parse receiver }"
-          
+
+        when :=~
+          "#{ parse args.first }.test(#{ parse receiver })"
+
+        when :!~
+          "!#{ parse args.first }.test(#{ parse receiver })"
+
         when *OPERATORS.flatten
           "#{ group_receiver ? group(receiver) : parse(receiver) } #{ method } #{ group_target ? group(target) : parse(target) }"  
 
