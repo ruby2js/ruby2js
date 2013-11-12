@@ -124,6 +124,18 @@ describe Ruby2JS do
       to_js( exp ).must_equal exp
     end
   end
+
+  describe "splat" do
+    it "should pass splat" do
+      to_js( "console.log 'a', 'b', *%w(c d e)" ).
+        must_equal 'console.log.apply(console, ["a", "b"].concat(["c", "d", "e"]))'
+    end
+
+    it "should receive splat" do
+      to_js( "def f(a,*b); return b; end" ).
+        must_equal "function f(a) {var b = Array.prototype.slice.call(arguments, 1); return b}"
+    end
+  end
   
   describe 'boolean' do
     it "should parse boolean" do
@@ -202,8 +214,8 @@ describe Ruby2JS do
     end
 
     it "should handle function calls" do
-      to_js( 'a = lambda {|x| return x+1}; a.(1)').
-        must_equal 'var a = function(x) {return x + 1}; a(1)'
+      to_js( 'a = lambda {|x| return x+1}; a.(nil, 1)').
+        must_equal 'var a = function(x) {return x + 1}; a.call(null, 1)'
     end
   end
   

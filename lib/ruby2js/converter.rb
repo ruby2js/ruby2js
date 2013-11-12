@@ -188,9 +188,6 @@ module Ruby2JS
           group_receiver ||= (receiver.children.length > 1)
           "!#{ group_receiver ? group(receiver) : parse(receiver) }"
 
-        when :call
-          "#{ parse receiver }(#{ parse args.first })"
-
         when :[]
           raise 'parse error' unless receiver
           "#{ parse receiver }[#{ parse args.first }]"
@@ -213,6 +210,10 @@ module Ruby2JS
         else
           if args.length == 0 and not is_method?(ast)
             "#{ parse receiver }#{ '.' if receiver }#{ method }"
+          elsif args.length > 0 and args.last.type == :splat
+            parse s(:send, s(:attr, receiver, method), :apply, receiver, 
+              s(:send, s(:array, *args[0..-2]), :concat,
+                args[-1].children.first))
           else
             args = args.map {|a| parse a}.join(', ')
             "#{ parse receiver }#{ '.' if receiver }#{ method }(#{ args })"
@@ -265,9 +266,17 @@ module Ruby2JS
       when :def
         name, args, body = ast.children
         body ||= s(:begin)
+        if args and !args.children.empty? and args.children.last.type == :restarg
+          body = s(:begin, body) unless body.type == :begin
+          slice = s(:attr, s(:attr, s(:const, nil, :Array), :prototype), :slice)
+          call = s(:send, slice, :call, s(:lvar, :arguments),
+            s(:int, args.children.length-1))
+          assign = s(:lvasgn, args.children[-1].children.last, call)
+          body = s(:begin, assign, *body.children)
+          args = s(:args, *args.children[0..-2])
+        end
         body   = s(:scope, body) unless body.type == :scope
         body   = parse body
-        body.sub! /return var (\w+) = ([^;]+)\z/, "var \\1 = \\2#{@sep}return \\1"
         "function#{ " #{name}" if name }(#{ parse args }) {#@nl#{ body }#@nl}"
 
       when :scope

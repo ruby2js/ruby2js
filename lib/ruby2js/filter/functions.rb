@@ -35,6 +35,13 @@ module Ruby2JS
             node.updated nil, [target, :forEach, *args]
           end
 
+        elsif node.children[1] == :call
+          if target.type == :gvar and target.children == ['$']
+            s(:send, nil, '$', *args)
+          else
+            super
+          end
+
         elsif node.children[1] == :each_with_index
           node.updated nil, [target, :forEach, *args]
 
