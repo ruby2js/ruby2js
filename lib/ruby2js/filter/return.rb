@@ -16,8 +16,6 @@ module Ruby2JS
 
         if EXPRESSIONS.include? block.last.type 
           block.push s(:return, block.pop)
-else
-p block.last.type
         end
 
         if block.length == 1
