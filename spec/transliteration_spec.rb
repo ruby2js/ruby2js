@@ -399,7 +399,7 @@ describe Ruby2JS do
     end
 
     it "should handle regular expressions with options" do
-      to_js( '%r{/\w+}' ).must_equal 'new RegExp("/\\w+/")'
+      to_js( '%r{/\w+}' ).must_equal %{new RegExp("/\\\\w+")}
     end
 
     it "should regular expressions tests" do
