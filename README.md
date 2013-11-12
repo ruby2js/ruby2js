@@ -25,13 +25,13 @@ Basic:
 ```ruby
 require 'ruby2js'
 puts Ruby2JS.convert("a={age:3}\na.age+=1")
-
 ```
+
 With filter:
 
 ```ruby
 require 'ruby2js/filter/functions'
-puts Ruby2JS.convert('"2A".to_i(16)', filters: [Ruby2JS::Filter::Functions])
+puts Ruby2JS.convert('"2A".to_i(16)')
 ```
 
 Conversions can be explored interactively using the

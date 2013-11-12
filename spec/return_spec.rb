@@ -75,4 +75,10 @@ describe Ruby2JS::Filter::Return do
         must_equal 'function(x) {return (x < 0 ? -x : x)}'
     end
   end
+
+  describe Ruby2JS::Filter::DEFAULTS do
+    it "should include Return" do
+      Ruby2JS::Filter::DEFAULTS.must_include Ruby2JS::Filter::Return
+    end
+  end
 end

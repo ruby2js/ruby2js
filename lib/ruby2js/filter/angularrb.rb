@@ -161,7 +161,8 @@ module Ruby2JS
       def s(type, *args)
         Parser::AST::Node.new type, args
       end
-
     end
+
+    DEFAULTS.push AngularRB
   end
 end

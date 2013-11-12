@@ -2,6 +2,10 @@ require 'parser/current'
 require 'ruby2js/converter'
 
 module Ruby2JS
+  module Filter
+    DEFAULTS = []
+  end
+
   def self.convert(source, options={})
 
     if Proc === source
@@ -15,9 +19,11 @@ module Ruby2JS
       ast = parse( source )
     end
 
-    if options[:filters]
+    filters = options[:filters] || Filter::DEFAULTS
+
+    unless filters.empty?
       filter = Parser::AST::Processor
-      options[:filters].reverse.each do |mod|
+      filters.reverse.each do |mod|
         filter = Class.new(filter) {include mod} 
       end
       ast = filter.new.process(ast)

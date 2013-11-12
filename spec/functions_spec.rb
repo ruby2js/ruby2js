@@ -56,4 +56,10 @@ describe Ruby2JS::Filter::Functions do
         must_equal 'var a = 0; jQuery.each([1, 2, 3], function(n, i) {a += n})'
     end
   end
+
+  describe Ruby2JS::Filter::DEFAULTS do
+    it "should include Functions" do
+      Ruby2JS::Filter::DEFAULTS.must_include Ruby2JS::Filter::Functions
+    end
+  end
 end

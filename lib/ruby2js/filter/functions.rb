@@ -50,5 +50,7 @@ module Ruby2JS
         Parser::AST::Node.new type, args
       end
     end
+
+    DEFAULTS.push Functions
   end
 end

@@ -4,7 +4,7 @@ require 'ruby2js'
 describe Ruby2JS do
   
   def to_js( string)
-    Ruby2JS.convert(string)
+    Ruby2JS.convert(string, filters: [])
   end
   
   describe 'literals' do

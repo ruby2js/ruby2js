@@ -74,4 +74,10 @@ describe Ruby2JS::Filter::AngularRB do
       to_js( ruby ).must_equal js
     end
   end
+
+  describe Ruby2JS::Filter::DEFAULTS do
+    it "should include AngularRB" do
+      Ruby2JS::Filter::DEFAULTS.must_include Ruby2JS::Filter::AngularRB
+    end
+  end
 end
