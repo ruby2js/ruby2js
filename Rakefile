@@ -69,4 +69,6 @@ end
 task :package => :gemspec
 
 require 'rake/clean'
-CLEAN.include('pkg')
+CLOBBER.include FileList.new('pkg')
+Rake::Task[:clobber_package].clear
+CLOBBER.existing!
