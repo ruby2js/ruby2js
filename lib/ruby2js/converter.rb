@@ -186,7 +186,7 @@ module Ruby2JS
         receiver, method, *args = ast.children
         if method == :new and receiver and receiver.children == [nil, :Proc]
           return parse args.first
-        elsif method == :lambda and not receiver
+        elsif not receiver and [:lambda, :proc].include? method
           return parse args.first
         end
 

@@ -294,6 +294,10 @@ describe Ruby2JS do
       to_js( 'lambda {}').must_equal 'function() {}'
     end
 
+    it "should parse proc" do
+      to_js( 'proc {}').must_equal 'function() {}'
+    end
+
     it "should handle basic variable scope" do
       to_js( 'a = 1; lambda { a = 2; b = 1}').must_equal 'var a = 1; function() {a = 2; var b = 1}'
     end
