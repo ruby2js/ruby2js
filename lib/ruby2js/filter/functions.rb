@@ -3,16 +3,6 @@ require 'ruby2js'
 module Ruby2JS
   module Filter
     module Functions
-
-      # map $$ to $
-      def on_gvar(node)
-        if node.children[0] == :$$
-          node.updated nil, ['$']
-        else
-          super
-        end
-      end
-
       def on_send(node)
         target = process(node.children.first)
         args = process_all(node.children[2..-1])
@@ -27,9 +17,7 @@ module Ruby2JS
           node.updated nil, [nil, :parseFloat, target, *args]
 
         elsif node.children[1] == :each
-          if target.type == :gvar and target.children == ['$']
-            super
-          elsif target.type == :send and target.children == [nil, :jQuery]
+          if @each # disable each mapping, see jquery filter for an example
             super
           else
             node.updated nil, [target, :forEach, *args]
@@ -76,13 +64,6 @@ module Ruby2JS
             end
             node.updated nil, [source, :slice, start, finish]
 
-          else
-            super
-          end
-
-        elsif node.children[1] == :call
-          if target.type == :gvar and target.children == ['$']
-            s(:send, nil, '$', *args)
           else
             super
           end
