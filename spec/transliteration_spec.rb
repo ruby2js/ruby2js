@@ -377,6 +377,11 @@ describe Ruby2JS do
         must_equal 'function method() {this.foo(); this.bar}'
     end
 
+    it "should handle methods with optional arguments" do
+      to_js( 'def method(opt=1); return opt; end' ).
+        must_equal "function method(opt) {if (typeof opt === 'undefined') {opt = 1}; return opt}"
+    end
+
     it "should handle methods with block arguments" do
       to_js( 'def method(&b); return b; end' ).
         must_equal 'function method(b) {return b}'
@@ -395,7 +400,8 @@ describe Ruby2JS do
 
   describe 'defined' do
     it "should handle defined?" do
-      to_js( 'defined? x' ).must_equal "typeof x === 'undefined'"
+      to_js( 'defined? x' ).must_equal "typeof x !== 'undefined'"
+      to_js( '!defined? x' ).must_equal "typeof x === 'undefined'"
     end
 
     it "should handle undef" do

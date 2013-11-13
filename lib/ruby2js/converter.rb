@@ -25,8 +25,8 @@ module Ruby2JS
       OPERATORS.index( OPERATORS.find{ |el| el.include? op } ) || -1
     end
     
-    def scope( ast )
-      frame = self.class.new( nil, @vars )
+    def scope( ast, args={} )
+      frame = self.class.new( nil, @vars.merge(args) )
       frame.enable_vertical_whitespace if @nl == "\n"
       frame.parse( ast, :statement )
     end
@@ -202,8 +202,12 @@ module Ruby2JS
 
         case method
         when :!
-          group_receiver ||= (receiver.children.length > 1)
-          "!#{ group_receiver ? group(receiver) : parse(receiver) }"
+          if receiver.type == :defined?
+            parse s(:undefined?, *receiver.children)
+          else
+            group_receiver ||= (receiver.children.length > 1)
+            "!#{ group_receiver ? group(receiver) : parse(receiver) }"
+          end
 
         when :[]
           raise 'parse error' unless receiver
@@ -287,27 +291,43 @@ module Ruby2JS
       when :def
         name, args, body = ast.children
         body ||= s(:begin)
-        if args and !args.children.empty? and args.children.last.type == :restarg
-          if args.children[-1].children.first
-            body = s(:begin, body) unless body.type == :begin
-            slice = s(:attr, s(:attr, s(:const, nil, :Array), :prototype), :slice)
-            call = s(:send, slice, :call, s(:lvar, :arguments),
-              s(:int, args.children.length-1))
-            assign = s(:lvasgn, args.children[-1].children.first, call)
-            body = s(:begin, assign, *body.children)
-          end
-          args = s(:args, *args.children[0..-2])
-        end
-        body   = s(:scope, body) unless body.type == :scope
-        body   = parse body
-        "function#{ " #{name}" if name }(#{ parse args }) {#@nl#{ body }#@nl}"
 
-      when :scope
-        body = ast.children.first
-        body = s(:begin, body) unless body.type == :begin
-        block = body.children
-        scope body
-        
+        vars = {}
+        if args and !args.children.empty?
+          # splats
+          if args.children.last.type == :restarg
+            if args.children[-1].children.first
+              body = s(:begin, body) unless body.type == :begin
+              assign = s(:lvasgn, args.children[-1].children.first,
+                s(:send, s(:attr, 
+                  s(:attr, s(:const, nil, :Array), :prototype), :slice),
+                  :call, s(:lvar, :arguments),
+                  s(:int, args.children.length-1)))
+              body = s(:begin, assign, *body.children)
+            end
+
+            args = s(:args, *args.children[0..-2])
+          end
+
+          # optional arguments
+          args.children.each_with_index do |arg, i|
+            if arg.type == :optarg
+              body = s(:begin, body) unless body.type == :begin
+              argname, value = arg.children
+              children = args.children.dup
+              children[i] = s(:arg, argname)
+              args = s(:args, *children)
+              body = s(:begin, body) unless body.type == :begin
+              default = s(:if, s(:send, s(:defined?, s(:lvar, argname)), :!),
+                s(:lvasgn, argname, value), nil)
+              body = s(:begin, default, *body.children)
+            end
+            vars[arg.children.first] = true
+          end
+        end
+
+        "function#{ " #{name}" if name }(#{ parse args }) {#@nl#{ scope body, vars}#@nl}"
+
       when :class
         name, inheritance, *body = ast.children
         body.compact!
@@ -339,6 +359,9 @@ module Ruby2JS
         'continue'
 
       when :defined?
+        "typeof #{ parse ast.children.first } !== 'undefined'"
+
+      when :undefined?
         "typeof #{ parse ast.children.first } === 'undefined'"
 
       when :undef

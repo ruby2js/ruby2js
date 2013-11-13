@@ -32,11 +32,6 @@ describe 'not implemented' do
     todo( 'alias foo bar' )
   end
 
-  it "optional arguments" do
-    # TODO: if (typeof arg === "undefined") arg = value;
-    todo( 'def f(x=1); return x; end' )
-  end
-
   it "shadow arguments" do
     todo(' proc {|;a|} ')
   end
