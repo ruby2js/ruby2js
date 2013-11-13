@@ -131,11 +131,28 @@ module Ruby2JS
         end
 
       when :array
-        list = ast.children.map { |a| parse a }
-        if list.join(', ').length < 80
-          "[#{ list.join(', ') }]"
+        splat = ast.children.rindex { |a| a.type == :splat }
+        if splat
+          items = ast.children
+          item = items[splat].children.first
+          if items.length == 1
+            parse item
+          elsif splat == items.length - 1
+            parse s(:send, s(:array, *items[0..-2]), :concat, item)
+          elsif splat == 0
+            parse s(:send, item, :concat, s(:array, *items[1..-1]))
+          else
+            parse s(:send, 
+              s(:send, s(:array, *items[0..splat-1]), :concat, item), 
+              :concat, s(:array, *items[splat+1..-1]))
+          end
         else
-          "[\n#{ list.join(",\n") }\n]"
+          list = ast.children.map { |a| parse a }
+          if list.join(', ').length < 80
+            "[#{ list.join(', ') }]"
+          else
+            "[\n#{ list.join(",\n") }\n]"
+          end
         end
 
       when :begin

@@ -135,6 +135,11 @@ describe Ruby2JS do
       to_js( "def f(a,*b); return b; end" ).
         must_equal "function f(a) {var b = Array.prototype.slice.call(arguments, 1); return b}"
     end
+
+    it "should handle splats in array literals" do
+      to_js( "[*a,1,2,*b,3,4,*c]" ).
+        must_equal "a.concat([1, 2]).concat(b).concat([3, 4]).concat(c)"
+    end
   end
   
   describe 'boolean' do
