@@ -36,8 +36,8 @@ describe Ruby2JS::Filter::JQuery do
   end
 
   describe Ruby2JS::Filter::DEFAULTS do
-    it "should include Functions" do
-      Ruby2JS::Filter::DEFAULTS.must_include Ruby2JS::Filter::Functions
+    it "should include JQuery" do
+      Ruby2JS::Filter::DEFAULTS.must_include Ruby2JS::Filter::JQuery
     end
   end
 end
