@@ -4,7 +4,7 @@ module Ruby2JS
   class Converter
     LOGICAL   = :and, :not, :or
     OPERATORS = [:[], :[]=], [:not, :!], [:*, :/, :%], [:+, :-], [:>>, :<<], 
-      [:<=, :<, :>, :>=], [:==, :!=], [:and, :or]
+      [:<=, :<, :>, :>=], [:==, :!=, :===], [:and, :or]
     
     def initialize( ast, vars = {} )
       @ast, @vars = ast, vars.dup
@@ -326,6 +326,9 @@ module Ruby2JS
 
       when :defined?
         "typeof #{ parse ast.children.first } === 'undefined'"
+
+      when :undef
+        ast.children.map {|c| "delete #{c.children.last}"}.join @sep
 
       else 
         raise "unknown AST type #{ ast.type }"

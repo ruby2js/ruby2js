@@ -151,6 +151,7 @@ describe Ruby2JS do
       to_js( "a < b" ).must_equal 'a < b'
       to_js( "a <= b" ).must_equal 'a <= b'
       to_js( "a == b" ).must_equal 'a == b'
+      to_js( "a === b" ).must_equal 'a === b'
       to_js( "a >= b" ).must_equal 'a >= b'
       to_js( "a > b" ).must_equal 'a > b'
     end
@@ -369,6 +370,10 @@ describe Ruby2JS do
   describe 'defined' do
     it "should handle defined?" do
       to_js( 'defined? x' ).must_equal "typeof x === 'undefined'"
+    end
+
+    it "should handle undef" do
+      to_js( 'undef x' ).must_equal "delete x"
     end
   end
 
