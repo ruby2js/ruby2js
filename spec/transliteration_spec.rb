@@ -136,6 +136,11 @@ describe Ruby2JS do
         must_equal "function f(a) {var b = Array.prototype.slice.call(arguments, 1); return b}"
     end
 
+    it "should receive unnamed splat" do
+      to_js( "def f(a,*); return a; end" ).
+        must_equal "function f(a) {return a}"
+    end
+
     it "should handle splats in array literals" do
       to_js( "[*a,1,2,*b,3,4,*c]" ).
         must_equal "a.concat([1, 2]).concat(b).concat([3, 4]).concat(c)"
@@ -265,18 +270,26 @@ describe Ruby2JS do
     end
     
     it "should handle while loop" do
-      to_js( 'a = 0; while true; a += 1; end').
+      to_js( 'a = 0; while true; a += 1; end' ).
         must_equal 'var a = 0; while (true) {a++}'
     end
     
     it "should handle another while loop" do
-      to_js( 'a = 0; while true || false; a += 1; end').
+      to_js( 'a = 0; while true || false; a += 1; end' ).
         must_equal 'var a = 0; while (true || false) {a++}'
     end
     
     it "should handle a for loop" do
-      to_js( 'a = 0; for i in [1,2,3]; a += i; end').
+      to_js( 'a = 0; for i in [1,2,3]; a += i; end' ).
         must_equal 'var a = 0; [1, 2, 3].forEach(function(i) {a += i})'
+    end
+
+    it "should handle break" do
+      to_js( 'break' ).must_equal 'break'
+    end
+
+    it "should handle break" do
+      to_js( 'next' ).must_equal 'continue'
     end
   end
   
@@ -363,6 +376,15 @@ describe Ruby2JS do
       to_js('def method; self.foo(); self.bar; end').
         must_equal 'function method() {this.foo(); this.bar}'
     end
+
+    it "should handle methods with block arguments" do
+      to_js( 'def method(&b); return b; end' ).
+        must_equal 'function method(b) {return b}'
+    end
+
+    it "should handle calls with block arguments" do
+      to_js( 'method(&b)' ).must_equal 'method(b)'
+    end
   end
   
   describe 'allocation' do
@@ -440,11 +462,11 @@ describe Ruby2JS do
       to_js( '%r{/\w+}' ).must_equal %{new RegExp("/\\\\w+")}
     end
 
-    it "should regular expressions tests" do
+    it "should handle regular expressions tests" do
       to_js( "'abc' =~ /abc/" ).must_equal '/abc/.test("abc")'
     end
 
-    it "should regular expressions not tests" do
+    it "should handle regular expressions not tests" do
       to_js( "'abc' !~ /abc/" ).must_equal '!/abc/.test("abc")'
     end
   end

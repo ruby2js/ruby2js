@@ -17,6 +17,10 @@ Filters may be provided to add Ruby-specific or framework specific
 behavior.  Filters are essentially macro facilities that operate on
 an AST representation of the code.
 
+See
+[notimplemented_spec](https://github.com/rubys/ruby2js/blob/master/spec/notimplemented_spec.rb)
+for a list of Ruby features _known_ to be not implemented.
+
 Synopsis
 ---
 

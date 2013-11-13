@@ -54,7 +54,7 @@ module Ruby2JS
       when :sym
         ast.children.first.to_s.inspect
 
-      when :lvar, :gvar
+      when :lvar, :gvar, :cvar
         ast.children.first
         
       when :true, :false
@@ -288,12 +288,14 @@ module Ruby2JS
         name, args, body = ast.children
         body ||= s(:begin)
         if args and !args.children.empty? and args.children.last.type == :restarg
-          body = s(:begin, body) unless body.type == :begin
-          slice = s(:attr, s(:attr, s(:const, nil, :Array), :prototype), :slice)
-          call = s(:send, slice, :call, s(:lvar, :arguments),
-            s(:int, args.children.length-1))
-          assign = s(:lvasgn, args.children[-1].children.last, call)
-          body = s(:begin, assign, *body.children)
+          if args.children[-1].children.first
+            body = s(:begin, body) unless body.type == :begin
+            slice = s(:attr, s(:attr, s(:const, nil, :Array), :prototype), :slice)
+            call = s(:send, slice, :call, s(:lvar, :arguments),
+              s(:int, args.children.length-1))
+            assign = s(:lvasgn, args.children[-1].children.first, call)
+            body = s(:begin, assign, *body.children)
+          end
           args = s(:args, *args.children[0..-2])
         end
         body   = s(:scope, body) unless body.type == :scope
@@ -316,13 +318,25 @@ module Ruby2JS
         "#{ parse( s(:def, parse(name), init.children[1], init.children[2]) ).sub(/return (?:null|(.*))\}\z/, '\1}') }#{ @sep if block and not block.empty?}#{ block }"
 
       when :args
-        ast.children.map { |a| a.children.first }.join(', ')
+        ast.children.map { |a| parse a }.join(', ')
+
+      when :arg, :blockarg
+        ast.children.first
+
+      when :block_pass
+        parse ast.children.first
         
       when :dstr, :dsym
         ast.children.map{ |s| parse s }.join(' + ')
         
       when :self
         'this'
+
+      when :break
+        'break'
+
+      when :next
+        'continue'
 
       when :defined?
         "typeof #{ parse ast.children.first } === 'undefined'"
@@ -331,7 +345,7 @@ module Ruby2JS
         ast.children.map {|c| "delete #{c.children.last}"}.join @sep
 
       else 
-        raise "unknown AST type #{ ast.type }"
+        raise NotImplementedError, "unknown AST type #{ ast.type }"
       end
     end
     
