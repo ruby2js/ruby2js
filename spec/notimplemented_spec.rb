@@ -9,14 +9,18 @@ describe 'not implemented' do
   end
 
   it "execute-string" do
+    # TODO: investigate https://github.com/banister/binding_of_caller
     todo( '`echo hi`' )
+    todo( '%x(echo hi)' )
   end
 
   it "range inclusive" do
+    # NOTE: filter/functions will handle the special case of array indexes
     todo( '1..2' )
   end
 
   it "range exclusive" do
+    # NOTE: filter/functions will handle the special case of array indexes
     todo( '1...2' )
   end
 
