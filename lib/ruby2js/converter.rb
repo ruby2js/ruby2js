@@ -211,7 +211,7 @@ module Ruby2JS
 
         when :[]
           raise 'parse error' unless receiver
-          "#{ parse receiver }[#{ parse args.first }]"
+          "#{ parse receiver }[#{ args.map {|arg| parse arg}.join(', ') }]"
 
         when :-@, :+@
           "#{ method.to_s[0] }#{ parse receiver }"

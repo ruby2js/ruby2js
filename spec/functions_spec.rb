@@ -55,6 +55,29 @@ describe Ruby2JS::Filter::Functions do
       to_js( 'a = 0; jQuery.each([1,2,3]) {|n, i| a += n}').
         must_equal 'var a = 0; jQuery.each([1, 2, 3], function(n, i) {a += n})'
     end
+
+    it "should handle first" do
+      to_js( 'a.first' ).must_equal 'a[0]'
+    end
+
+    it "should handle last" do
+      to_js( 'a.last' ).must_equal 'a[a.length - 1]'
+    end
+
+    it "should handle literal negative offsets" do
+      to_js( 'a[-2]' ).must_equal 'a[a.length - 2]'
+    end
+
+    it "should handle inclusive ranges" do
+      to_js( 'a[2..4]' ).must_equal 'a.slice(2, 5)'
+      to_js( 'a[2..-1]' ).must_equal 'a.slice(2, a.length)'
+      to_js( 'a[-4..-2]' ).must_equal 'a.slice(a.length - 4, a.length - 1)'
+    end
+
+    it "should handle exclusive ranges" do
+      to_js( 'a[2...4]' ).must_equal 'a.slice(2, 4)'
+      to_js( 'a[-4...-2]' ).must_equal 'a.slice(a.length - 4, a.length - 2)'
+    end
   end
 
   describe Ruby2JS::Filter::DEFAULTS do
