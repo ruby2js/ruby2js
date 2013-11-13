@@ -26,7 +26,7 @@ spec = Gem::Specification.new do |s|
   s.homepage       = "http://github.com/rubys/ruby2js"
   s.description    = <<-EOD
     The base package maps Ruby syntax to JavaScript semantics.
-    Filters may be provided to add Ruby-specific or Framework specific
+    Filters may be provided to add Ruby-specific or framework specific
     behavior.
   EOD
 

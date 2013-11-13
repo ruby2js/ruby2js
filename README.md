@@ -13,7 +13,7 @@ calls IF there are either one or more arguments passed OR parenthesis are
 used, otherwise Ruby method calls become JavaScript property accesses.
 By default, methods, lambdas, and procs return `undefined`.
 
-Filters may be provided to add Ruby-specific or Framework specific
+Filters may be provided to add Ruby-specific or framework specific
 behavior.  Filters are essentially macro facilities that operate on
 an AST representation of the code.
 
