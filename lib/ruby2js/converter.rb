@@ -324,6 +324,9 @@ module Ruby2JS
       when :self
         'this'
 
+      when :defined?
+        "typeof #{ parse ast.children.first } === 'undefined'"
+
       else 
         raise "unknown AST type #{ ast.type }"
       end

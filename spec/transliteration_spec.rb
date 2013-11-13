@@ -366,6 +366,12 @@ describe Ruby2JS do
     end
   end
 
+  describe 'defined' do
+    it "should handle defined?" do
+      to_js( 'defined? x' ).must_equal "typeof x === 'undefined'"
+    end
+  end
+
   describe 'attribute access' do
     it "should support attribute assignments" do
       to_js('x={}; x.a="y"').must_equal 'var x = {}; x.a = "y"'
