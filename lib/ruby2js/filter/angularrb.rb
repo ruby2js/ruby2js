@@ -4,6 +4,8 @@ require 'ruby2js'
 module Ruby2JS
   module Filter
     module AngularRB
+      include SEXP
+
       def initialize(*args)
         @ngApp = nil
         super
@@ -153,13 +155,6 @@ module Ruby2JS
         outer = s(:send, s(:lvar, @ngApp), :filter, *call.children[2..-1])
 
         node.updated nil, [outer, s(:args), s(:return, inner)]
-      end
-
-      private
-
-      # construct an AST Node
-      def s(type, *args)
-        Parser::AST::Node.new type, args
       end
     end
 

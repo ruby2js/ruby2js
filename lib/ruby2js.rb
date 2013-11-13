@@ -4,6 +4,13 @@ require 'ruby2js/converter'
 module Ruby2JS
   module Filter
     DEFAULTS = []
+
+    module SEXP
+      # construct an AST Node
+      def s(type, *args)
+        Parser::AST::Node.new type, args
+      end
+    end
   end
 
   def self.convert(source, options={})

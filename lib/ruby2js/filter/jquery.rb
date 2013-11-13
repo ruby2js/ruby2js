@@ -3,6 +3,8 @@ require 'ruby2js'
 module Ruby2JS
   module Filter
     module JQuery
+      include SEXP
+
       def initialize
         @each = true # disable each mapping, see functions filter
       end
@@ -27,13 +29,6 @@ module Ruby2JS
         else
           super
         end
-      end
-
-      private
-
-      # construct an AST Node
-      def s(type, *args)
-        Parser::AST::Node.new type, args
       end
     end
 

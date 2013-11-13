@@ -3,6 +3,8 @@ require 'ruby2js'
 module Ruby2JS
   module Filter
     module Return
+      include SEXP
+
       EXPRESSIONS = [ :array, :float, :hash, :if, :int, :lvar, :nil, :send ]
 
       def on_block(node)
@@ -48,13 +50,6 @@ module Ruby2JS
         end
 
         node.updated nil, children
-      end
-      
-      private
-
-      # construct an AST Node
-      def s(type, *args)
-        Parser::AST::Node.new type, args
       end
     end
 

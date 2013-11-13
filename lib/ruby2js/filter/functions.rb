@@ -3,6 +3,8 @@ require 'ruby2js'
 module Ruby2JS
   module Filter
     module Functions
+      include SEXP
+
       def on_send(node)
         target = process(node.children.first)
         args = process_all(node.children[2..-1])
@@ -74,13 +76,6 @@ module Ruby2JS
         else
           super
         end
-      end
-
-      private
-
-      # construct an AST Node
-      def s(type, *args)
-        Parser::AST::Node.new type, args
       end
     end
 
