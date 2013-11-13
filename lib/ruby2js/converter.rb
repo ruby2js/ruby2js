@@ -224,6 +224,10 @@ module Ruby2JS
         when /=$/
           "#{ parse receiver }#{ '.' if receiver }#{ method.to_s.sub(/=$/, ' =') } #{ parse args.first }"
 
+        when :new
+          args = args.map {|a| parse a}.join(', ')
+          "new #{ parse receiver }(#{ args })"
+
         else
           if args.length == 0 and not is_method?(ast)
             "#{ parse receiver }#{ '.' if receiver }#{ method }"

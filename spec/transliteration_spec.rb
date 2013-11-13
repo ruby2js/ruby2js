@@ -360,6 +360,12 @@ describe Ruby2JS do
     end
   end
   
+  describe 'allocation' do
+    it "should handle class new" do
+      to_js( 'Date.new' ).must_equal 'new Date()'
+    end
+  end
+
   describe 'attribute access' do
     it "should support attribute assignments" do
       to_js('x={}; x.a="y"').must_equal 'var x = {}; x.a = "y"'
