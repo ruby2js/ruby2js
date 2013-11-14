@@ -3,8 +3,8 @@ require 'ruby2js'
 
 describe Ruby2JS do
   
-  def to_js( string)
-    Ruby2JS.convert(string, filters: [])
+  def to_js( string, opts={} )
+    Ruby2JS.convert(string, opts.merge(filters: []))
   end
   
   describe 'literals' do
@@ -474,6 +474,21 @@ describe Ruby2JS do
 
     it "should handle regular expressions not tests" do
       to_js( "'abc' !~ /abc/" ).must_equal '!/abc/.test("abc")'
+    end
+  end
+
+  describe 'execution' do
+    it "should handle tic marks" do
+      to_js( '`1+2`' ).must_equal '3'
+    end
+
+    it "should handle execute strings" do
+      to_js( '%x(3*4)' ).must_equal '12'
+    end
+
+    it "should handle execute strings" do
+      foo = "console.log('hi there')"
+      to_js( '%x(foo)', binding: binding ).must_equal foo
     end
   end
 end

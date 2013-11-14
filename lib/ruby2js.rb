@@ -38,6 +38,8 @@ module Ruby2JS
 
     ruby2js = Ruby2JS::Converter.new( ast )
 
+    ruby2js.binding = options[:binding]
+
     if source.include? "\n"
       ruby2js.enable_vertical_whitespace 
       lines = ruby2js.to_js.split("\n")

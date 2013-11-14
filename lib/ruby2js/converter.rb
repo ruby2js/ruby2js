@@ -6,6 +6,8 @@ module Ruby2JS
     OPERATORS = [:[], :[]=], [:not, :!], [:*, :/, :%], [:+, :-], [:>>, :<<], 
       [:<=, :<, :>, :>=], [:==, :!=, :===], [:and, :or]
     
+    attr_accessor :binding
+
     def initialize( ast, vars = {} )
       @ast, @vars = ast, vars.dup
       @sep = '; '
@@ -16,6 +18,10 @@ module Ruby2JS
     def enable_vertical_whitespace
       @sep = ";\n"
       @nl = "\n"
+    end
+
+    def binding=(binding)
+      @binding = binding
     end
 
     def to_js
@@ -352,6 +358,13 @@ module Ruby2JS
       when :dstr, :dsym
         ast.children.map{ |s| parse s }.join(' + ')
         
+      when :xstr
+        if @binding
+          @binding.eval(ast.children.first.children.first).to_s
+        else
+          eval(ast.children.first.children.first).to_s
+        end
+
       when :self
         'this'
 
