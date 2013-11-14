@@ -19,11 +19,14 @@ module Ruby2JS
           node.updated nil, [nil, :parseFloat, target, *args]
 
         elsif node.children[1] == :each
-          if @each # disable each mapping, see jquery filter for an example
+          if @each # disable `each` mapping, see jquery filter for an example
             super
           else
             node.updated nil, [target, :forEach, *args]
           end
+
+        elsif node.children[0..1] == [nil, :puts]
+          s(:send, s(:attr, nil, :console), :log, *node.children[2..-1])
 
         elsif node.children[1..-1] == [:first]
           node.updated nil, [node.children[0], :[], s(:int, 0)]

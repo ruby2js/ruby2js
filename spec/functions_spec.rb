@@ -27,6 +27,10 @@ describe Ruby2JS::Filter::Functions do
     it "should handle to_f" do
       to_js( 'a.to_f' ).must_equal 'parseFloat(a)'
     end
+
+    it "should handle to_f" do
+      to_js( 'puts "hi"' ).must_equal 'console.log("hi")'
+    end
   end
     
   describe 'array' do
