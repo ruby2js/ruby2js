@@ -195,6 +195,10 @@ module Ruby2JS
     
       when :send, :attr
         receiver, method, *args = ast.children
+        if method =~ /\w[!?]$/
+          raise NotImplementedError, "invalid method name #{ method }"
+        end
+
         if method == :new and receiver and receiver.children == [nil, :Proc]
           return parse args.first
         elsif not receiver and [:lambda, :proc].include? method
@@ -315,6 +319,9 @@ module Ruby2JS
       when :def
         name, args, body = ast.children
         body ||= s(:begin)
+        if name =~ /[!?]$/
+          raise NotImplementedError, "invalid method name #{ name }"
+        end
 
         vars = {}
         if args and !args.children.empty?
