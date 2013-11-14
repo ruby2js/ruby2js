@@ -64,7 +64,8 @@ module Ruby2JS
 
         blank = pending
       end
-      lines.join("\n")
+
+      lines.join("\n").gsub(/^  ( *(case.*|default):$)/, '\1')
     else
       ruby2js.to_js
     end

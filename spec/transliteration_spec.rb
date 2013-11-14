@@ -278,7 +278,12 @@ describe Ruby2JS do
       to_js( 'a = 0; while true || false; a += 1; end' ).
         must_equal 'var a = 0; while (true || false) {a++}'
     end
-    
+
+    it "should handle case statement" do
+      to_js( 'case a; when 1,2; puts :a; else; puts :b; end' ).
+        must_equal 'switch (a) {case 1: case 2: puts("a"); break; default: puts("b")}'
+    end
+
     it "should handle a for loop" do
       to_js( 'a = 0; for i in [1,2,3]; a += i; end' ).
         must_equal 'var a = 0; [1, 2, 3].forEach(function(i) {a += i})'

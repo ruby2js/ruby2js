@@ -47,11 +47,6 @@ describe 'not implemented' do
     todo( 'yield' )
   end
 
-  it "case" do
-    # TODO: switch
-    todo("case a; when 1; nil; else nil; end")
-  end
-
   it "until" do
     # TODO: while !
     todo("1 until false")

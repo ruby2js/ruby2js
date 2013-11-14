@@ -12,12 +12,14 @@ module Ruby2JS
       @ast, @vars = ast, vars.dup
       @sep = '; '
       @nl = ''
+      @ws = ' '
       @varstack = []
     end
     
     def enable_vertical_whitespace
       @sep = ";\n"
       @nl = "\n"
+      @ws = @nl
     end
 
     def binding=(binding)
@@ -290,6 +292,19 @@ module Ruby2JS
           s(:send, expression, :forEach),
           s(:args, s(:arg, var.children.last)),
           block);
+
+      when :case
+        expr, *whens, other = ast.children
+
+        whens.map! do |node|
+          *values, code = node.children
+          cases = values.map {|value| "case #{ parse value }:#@ws"}.join
+          "#{ cases }#{ parse code }#{@sep}break#@sep"
+        end
+
+        other = "#{@nl}default:#@ws#{ parse other }#@nl" if other
+
+        "switch (#{ parse expr }) {#@nl#{whens.join(@nl)}#{other}}"
 
       when :block
         call, args, block = ast.children
