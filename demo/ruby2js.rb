@@ -6,15 +6,25 @@
 #   Web server set up to run CGI programs?
 #     $ ruby ruby2js.rb --install=/web/docroot
 #
-#   Standalone server:
+#   Want to run a standalone server?
 #     $ ruby ruby2js.rb --port=8080
 
 require 'wunderbar'
-require 'pp'
 
 begin
+  # support running directly from a git clone
   $:.unshift File.absolute_path('../../lib', __FILE__)
   require 'ruby2js'
+
+  # allow filters to be selected based on the path
+  env['PATH_INFO'].to_s.split('/').each do |filter|
+    case filter
+      when 'angularrb'; require 'ruby2js/filter/angularrb'
+      when 'functions'; require 'ruby2js/filter/functions'
+      when 'jquery';    require 'ruby2js/filter/jquery'
+      when 'return';    require 'ruby2js/filter/return'
+    end
+  end
 rescue Exception => $load_error
 end
 
