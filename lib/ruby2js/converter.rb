@@ -10,6 +10,7 @@ module Ruby2JS
       @ast, @vars = ast, vars.dup
       @sep = '; '
       @nl = ''
+      @varstack = []
     end
     
     def enable_vertical_whitespace
@@ -26,9 +27,11 @@ module Ruby2JS
     end
     
     def scope( ast, args={} )
-      frame = self.class.new( nil, @vars.merge(args) )
-      frame.enable_vertical_whitespace if @nl == "\n"
-      frame.parse( ast, :statement )
+      @varstack.push @vars
+      @vars = @vars.merge(args)
+      parse( ast, :statement )
+    ensure
+      @vars = @varstack.pop
     end
 
     def s(type, *args)
