@@ -220,7 +220,7 @@ module Ruby2JS
           if receiver.type == :defined?
             parse s(:undefined?, *receiver.children)
           else
-            group_receiver ||= (receiver.children.length > 1)
+            group_receiver ||= (receiver.type != :send && receiver.children.length > 1)
             "!#{ group_receiver ? group(receiver) : parse(receiver) }"
           end
 
@@ -289,6 +289,19 @@ module Ruby2JS
       when :while
         condition, block = ast.children
         "while (#{ parse condition }) {#@nl#{ scope block }#@nl}"
+
+      when :until
+        condition, block = ast.children
+        parse s(:while, s(:send, condition, :!), block)
+
+      when :while_post
+        condition, block = ast.children
+        block = block.updated(:begin) if block.type == :kwbegin
+        "do {#@nl#{ scope block }#@nl} while (#{ parse condition })"
+
+      when :until_post
+        condition, block = ast.children
+        parse s(:while_post, s(:send, condition, :!), block)
 
       when :for
         var, expression, block = ast.children

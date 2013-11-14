@@ -296,6 +296,20 @@ describe Ruby2JS do
     it "should handle break" do
       to_js( 'next' ).must_equal 'continue'
     end
+
+    it "should handle until" do
+      to_js( '1 until false' ).must_equal 'while (!false) {1}'
+    end
+
+    it "should handle while with post condition" do
+      to_js( 'begin; foo; end while condition' ).
+        must_equal 'do {foo} while (condition)'
+    end
+
+    it "should handle until with post condition" do
+      to_js( 'begin; foo; end until condition' ).
+        must_equal 'do {foo} while (!condition)'
+    end
   end
   
   describe 'blocks' do

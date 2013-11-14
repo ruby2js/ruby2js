@@ -47,21 +47,6 @@ describe 'not implemented' do
     todo( 'yield' )
   end
 
-  it "until" do
-    # TODO: while !
-    todo("1 until false")
-  end
-
-  it "while with post condition" do
-    # TODO: do while
-    todo("begin; foo; end while condition")
-  end
-
-  it "until with post condition" do
-    # TODO: do while !
-    todo("begin; foo; end until condition")
-  end
-
   it "catching exceptions" do
     # TODO: try catch
     todo("begin; rescue Exception; end")
@@ -72,6 +57,7 @@ describe 'not implemented' do
   end
 
   it "ensure" do
+    # TODO: try finally
     todo("begin; ensure; end")
   end
 
