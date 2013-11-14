@@ -32,8 +32,21 @@ describe Ruby2JS::Filter::Functions do
       to_js( 'puts "hi"' ).must_equal 'console.log("hi")'
     end
   end
+
+  describe 'string functions' do
+    it 'should handle sub' do
+      to_js( 'str.sub("a", "b")' ).must_equal 'str.replace("a", "b")'
+    end
+
+    it 'should handle gsub' do
+      to_js( 'str.gsub("a", "b")' ).must_equal 'str.replace(/a/g, "b")'
+      to_js( 'str.gsub(/a/i, "b")' ).must_equal 'str.replace(/a/gi, "b")'
+      to_js( 'str.gsub("a/", "b")' ).
+        must_equal 'str.replace(new RegExp("a/", "g"), "b")'
+    end
+  end
     
-  describe 'array' do
+  describe 'array functions' do
     it "should map each to forEach" do
       to_js( 'a = 0; [1,2,3].each {|i| a += i}').
         must_equal 'var a = 0; [1, 2, 3].forEach(function(i) {a += i})'

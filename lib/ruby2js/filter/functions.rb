@@ -18,6 +18,21 @@ module Ruby2JS
         elsif node.children[1] == :to_f
           node.updated nil, [nil, :parseFloat, target, *args]
 
+        elsif node.children[1] == :sub and node.children.length == 4
+          source, method, before, after = node.children
+          node.updated nil, [source, :replace, before, after]
+
+        elsif node.children[1] == :gsub and node.children.length == 4
+          source, method, before, after = node.children
+          if before.type == :regexp
+            before = s(:regexp, before.children.first,
+              s(:regopt, :g, *before.children[1]))
+          elsif before.type == :str
+            before = s(:regexp, s(:str, Regexp.escape(before.children.first)),
+              s(:regopt, :g))
+          end
+          node.updated nil, [source, :replace, before, after]
+
         elsif node.children[1] == :each
           if @each # disable `each` mapping, see jquery filter for an example
             super
