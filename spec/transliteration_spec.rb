@@ -367,21 +367,41 @@ describe Ruby2JS do
     it "should parse class" do
       to_js('class Person; end').must_equal 'function Person() {}'
     end
-    
-    it "should parse class" do
+
+    it "should parse class with constructor" do
       to_js('class Person; def initialize(name); @name = name; end; end').must_equal 'function Person(name) {this._name = name}'
     end
-    
-    it "should parse class" do
+
+    it "should parse class with constructor and method" do
       to_js('class Person; def initialize(name); @name = name; end; def name; return @name; end; end').
         must_equal 'function Person(name) {this._name = name}; Person.prototype.name = function() {return this._name}'
     end
-    
-    it "should parse class" do
+
+    it "should parse class with contructor and methods with multiple arguments" do
       to_js('class Person; def initialize(name, surname); @name, @surname = name, surname; end; def full_name; return @name  + @surname; end; end').
         must_equal 'function Person(name, surname) {this._name = name; this._surname = surname}; Person.prototype.full_name = function() {return this._name + this._surname}'
     end
-    
+
+    it "should parse class with inheritance" do
+      to_js('class Employee < Person; end').
+        must_equal 'function Employee() {}; Employee.prototype = new Person()'
+    end
+
+    it "should parse class with class variables" do
+      to_js('class Person; count=0; end').
+        must_equal 'function Person() {}; Person.count = 0'
+    end
+
+    it "should parse class with class constants" do
+      to_js('class Person; ID=7; end').
+        must_equal 'function Person() {}; Person.ID = 7'
+    end
+
+    it "should parse class with class methods" do
+      to_js('class Person; def self.search(name); end; end').
+        must_equal 'function Person() {}; Person.search = function(name) {}'
+    end
+
     it "should parse method def" do
       to_js('def method; end').must_equal 'function method() {}'
     end

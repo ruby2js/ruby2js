@@ -377,16 +377,54 @@ module Ruby2JS
           end
         end
 
-        "function#{ " #{name}" if name }(#{ parse args }) {#@nl#{ scope body, vars}#@nl}"
+        "function#{ " #{name}" if name }(#{ parse args }) {#@nl#{ scope body, vars}#{@nl unless body == s(:begin)}}"
 
       when :class
         name, inheritance, *body = ast.children
+        init = s(:def, :initialize, s(:args))
         body.compact!
-        body = body.first.children.dup if body.length == 1 and body.first.type == :begin
-        methods = body.select { |a| a.type == :def }
-        init    = (body.delete methods.find { |m| m.children.first == :initialize }) || s(:def, :initialize)
-        block   = body.collect { |m| parse( m ).sub(/function (\w+)/, "#{ parse name }.prototype.\\1 = function") }.join @sep
-        "#{ parse( s(:def, parse(name), init.children[1], init.children[2]) ).sub(/return (?:null|(.*))\}\z/, '\1}') }#{ @sep if block and not block.empty?}#{ block }"
+
+        if body.length == 1 and body.first.type == :begin
+          body = body.first.children.dup 
+        end
+
+        body.map! do |m| 
+          if m.type == :def
+            if m.children.first == :initialize
+              # constructor: remove from body and overwrite init function
+              init = m
+              nil
+            else
+              # method: add to prototype
+              s(:send, s(:attr, name, :prototype), "#{m.children[0]}=",
+                s(:block, s(:send, nil, :proc), *m.children[1..-1]))
+            end
+          elsif m.type == :defs and m.children.first == s(:self)
+            # class method definition: add to prototype
+            s(:send, name, "#{m.children[1]}=",
+              s(:block, s(:send, nil, :proc), *m.children[2..-1]))
+          elsif m.type == :send and m.children.first == nil
+            # class method call
+            s(:send, name, *m.children[1..-1])
+          elsif m.type == :lvasgn
+            # class variable
+            s(:send, name, "#{m.children[0]}=", *m.children[1..-1])
+          elsif m.type == :casgn and m.children[0] == nil
+            # class constant
+            s(:send, name, "#{m.children[1]}=", *m.children[2..-1])
+          else
+            raise NotImplementedError, "class #{ m.type }"
+          end
+        end
+
+        if inheritance
+          body.unshift s(:send, name, :prototype=, s(:send, inheritance, :new))
+        end
+
+        # prepend constructor
+        body.unshift s(:def, parse(name), *init.children[1..-1])
+
+        parse s(:begin, *body.compact)
 
       when :args
         ast.children.map { |a| parse a }.join(', ')
@@ -451,7 +489,6 @@ module Ruby2JS
         else
           parse s(:begin, *ast.children)
         end
-
 
       else 
         raise NotImplementedError, "unknown AST type #{ ast.type }"
