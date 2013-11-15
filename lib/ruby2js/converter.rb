@@ -4,7 +4,7 @@ module Ruby2JS
   class Converter
     LOGICAL   = :and, :not, :or
     OPERATORS = [:[], :[]=], [:not, :!], [:*, :/, :%], [:+, :-], [:>>, :<<], 
-      [:<=, :<, :>, :>=], [:==, :!=, :===], [:and, :or]
+      [:<=, :<, :>, :>=], [:==, :!=, :===, :"!=="], [:and, :or]
     
     attr_accessor :binding
 
@@ -215,8 +215,7 @@ module Ruby2JS
         group_receiver = receiver.type == :send && op_index <= operator_index( receiver.children[1] ) if receiver
         group_target = target.type == :send && op_index <= operator_index( target.children[1] ) if target
 
-        case method
-        when :!
+        if method == :!
           if receiver.type == :defined?
             parse s(:undefined?, *receiver.children)
           else
@@ -224,35 +223,37 @@ module Ruby2JS
             "!#{ group_receiver ? group(receiver) : parse(receiver) }"
           end
 
-        when :[]
+        elsif method == :[]
           "#{ parse receiver }[#{ args.map {|arg| parse arg}.join(', ') }]"
 
-        when :-@, :+@
+        elsif method == :-@ or method == :+@
           "#{ method.to_s[0] }#{ parse receiver }"
 
-        when :=~
+        elsif method == :=~
           "#{ parse args.first }.test(#{ parse receiver })"
 
-        when :!~
+        elsif method == :!~
           "!#{ parse args.first }.test(#{ parse receiver })"
 
-        when *OPERATORS.flatten
+        elsif OPERATORS.flatten.include? method
           "#{ group_receiver ? group(receiver) : parse(receiver) } #{ method } #{ group_target ? group(target) : parse(target) }"  
 
-        when /=$/
+        elsif method =~ /=$/
           "#{ parse receiver }#{ '.' if receiver }#{ method.to_s.sub(/=$/, ' =') } #{ parse args.first }"
 
-        when :new
+        elsif method == :new and receiver
           args = args.map {|a| parse a}.join(', ')
           "new #{ parse receiver }(#{ args })"
 
-        when :raise
-          raise NotImplementedError, "raise as method" if receiver
+        elsif method == :raise and receiver == nil
           if args.length == 1
             "throw #{ parse args.first }"
           else
             "throw new #{ parse args.first }(#{ parse args[1] })"
           end
+
+        elsif method == :typeof and receiver == nil
+          "typeof #{ parse args.first }"
 
         else
           if args.length == 0 and not is_method?(ast)
@@ -358,6 +359,42 @@ module Ruby2JS
             end
 
             args = s(:args, *args.children[0..-2])
+
+          elsif args.children.last.type == :blockarg and
+            args.children.length > 1 and args.children[-2].type == :restarg
+            body = s(:begin, body) unless body.type == :begin
+            blk = args.children[-1].children.first
+            vararg = args.children[-2].children.first
+            last = s(:send, s(:attr, s(:lvar, :arguments), :length), :-,
+                    s(:int, 1))
+
+            # set block argument to the last argument passed
+            assign2 = s(:lvasgn, blk, s(:send, s(:lvar, :arguments), :[], last))
+
+            if vararg
+              # extract arguments between those defined and the last
+              assign1 = s(:lvasgn, vararg, s(:send, s(:attr, s(:attr, s(:const,
+                nil, :Array), :prototype), :slice), :call, s(:lvar, :arguments),
+                s(:int, args.children.length-1), last))
+              # push block argument back onto args if not a function
+              pushback = s(:if, s(:send, s(:send, nil, :typeof, s(:lvar, blk)), 
+                :"!==", s(:str, "function")), s(:begin, s(:send, s(:lvar,
+                vararg), :push, s(:lvar, blk)), s(:lvasgn, blk, s(:nil))), nil)
+              # set block argument to null if all arguments were defined
+              pushback = s(:if, s(:send, s(:attr, s(:lvar, :arguments),
+                :length), :<=, s(:int, args.children.length-2)), s(:lvasgn, 
+                blk, s(:nil)), pushback)
+              # combine statements
+              body = s(:begin, assign1, assign2, pushback, *body.children)
+            else
+              # set block argument to null if all arguments were defined
+              ignore = s(:if, s(:send, s(:attr, s(:lvar, :arguments),
+                :length), :<=, s(:int, args.children.length-2)), s(:lvasgn, 
+                blk, s(:nil)), nil)
+              body = s(:begin, assign2, ignore, *body.children)
+            end
+
+            args = s(:args, *args.children[0..-3])
           end
 
           # optional arguments

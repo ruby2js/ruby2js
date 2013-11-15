@@ -141,6 +141,11 @@ describe Ruby2JS do
         must_equal "function f(a) {return a}"
     end
 
+    it "should receive splat and block" do
+      to_js( "def f(a,*args, &block); end" ).
+        must_equal "function f(a) {var args = Array.prototype.slice.call(arguments, 2, arguments.length - 1); var block = arguments[arguments.length - 1]; if (arguments.length <= 1) {block = null} else if (typeof block !== \"function\") {args.push(block); block = null}}"
+    end
+
     it "should handle splats in array literals" do
       to_js( "[*a,1,2,*b,3,4,*c]" ).
         must_equal "a.concat([1, 2]).concat(b).concat([3, 4]).concat(c)"
