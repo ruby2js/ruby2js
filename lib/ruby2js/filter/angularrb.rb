@@ -32,13 +32,13 @@ module Ruby2JS
 
         # find the block
         block = process_all(node.children[1..-1])
-        while block.length == 1 and block.first.type == :begin
+        while block.length == 1 and block.first and block.first.type == :begin
           block = block.first.children.dup
         end
 
         # find use class method calls
         uses = block.find_all do |node|
-          node.type == :send and node.children[0..1] == [nil, :use]
+          node and node.type == :send and node.children[0..1] == [nil, :use]
         end
 
         # convert use calls into dependencies

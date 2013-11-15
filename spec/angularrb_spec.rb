@@ -8,7 +8,12 @@ describe Ruby2JS::Filter::AngularRB do
   end
   
   describe 'module' do
-    it "should convert modules" do
+    it "should convert empty modules" do
+      to_js( 'module Angular::X; end' ).
+        must_equal 'const X = angular.module("X", []);'
+    end
+
+    it "should convert modules with a use statement" do
       ruby = <<-RUBY
         module Angular::PhonecatApp 
           use :PhonecatFilters
