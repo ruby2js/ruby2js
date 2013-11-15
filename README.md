@@ -98,14 +98,14 @@ Picking a Ruby to JS mapping tool
 
 If you simply want to get a job done, and would like a mature and tested
 framework, and only use one of the many integrations that
-[opal](http://opalrb.org/) provides, then Opal is the way to go right now.
+[Opal](http://opalrb.org/) provides, then Opal is the way to go right now.
 
 ruby2js is for those that want to produce JavaScript that looks like it
 wasn’t machine generated, and with the absolute bare minimum in terms of
 limitations as to what JavaScript can be produced.
 
 [Try](http://intertwingly.net/projects/ruby2js/all) for yourself.
-[compare](http://opalrb.org/try/#code:).
+[Compare](http://opalrb.org/try/#code:).
 
 License
 ---
