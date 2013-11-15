@@ -16,14 +16,17 @@ begin
   $:.unshift File.absolute_path('../../lib', __FILE__)
   require 'ruby2js'
 
+  filters = {
+    'angularrb' => 'ruby2js/filter/angularrb',
+    'functions' => 'ruby2js/filter/functions',
+    'jquery'    => 'ruby2js/filter/jquery',
+    'return'    => 'ruby2js/filter/return'
+  }
+
   # allow filters to be selected based on the path
-  env['PATH_INFO'].to_s.split('/').each do |filter|
-    case filter
-      when 'angularrb'; require 'ruby2js/filter/angularrb'
-      when 'functions'; require 'ruby2js/filter/functions'
-      when 'jquery';    require 'ruby2js/filter/jquery'
-      when 'return';    require 'ruby2js/filter/return'
-    end
+  selected = env['PATH_INFO'].to_s.split('/')
+  filters.each do |name, filter|
+    require filter if selected.include?(name) or selected.include? 'all'
   end
 rescue Exception => $load_error
 end
