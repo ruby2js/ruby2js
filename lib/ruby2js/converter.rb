@@ -225,7 +225,6 @@ module Ruby2JS
           end
 
         when :[]
-          raise 'parse error' unless receiver
           "#{ parse receiver }[#{ args.map {|arg| parse arg}.join(', ') }]"
 
         when :-@, :+@
@@ -246,6 +245,14 @@ module Ruby2JS
         when :new
           args = args.map {|a| parse a}.join(', ')
           "new #{ parse receiver }(#{ args })"
+
+        when :raise
+          raise NotImplementedError, "raise as method" if receiver
+          if args.length == 1
+            "throw #{ parse args.first }"
+          else
+            "throw new #{ parse args.first }(#{ parse args[1] })"
+          end
 
         else
           if args.length == 0 and not is_method?(ast)
@@ -417,6 +424,34 @@ module Ruby2JS
 
       when :undef
         ast.children.map {|c| "delete #{c.children.last}"}.join @sep
+
+      when :kwbegin
+        block = ast.children.first
+        if block.type == :ensure
+          block, finally = block.children
+        else
+          finally = nil
+        end
+
+        if block and block.type == :rescue
+          body, recover, otherwise = block.children
+          raise NotImplementedError, "block else" if otherwise
+          exception, name, recovery = recover.children
+          raise NotImplementedError, parse(exception) if exception
+        else
+          body = block
+        end
+
+        output = "try {#@nl#{ parse body }#@nl}"
+        output += " catch (#{ parse name }) {#@nl#{ parse recovery }#@nl}" if recovery
+        output += " finally {#@nl#{ parse finally }#@nl}" if finally
+
+        if recovery or finally
+          output
+        else
+          parse s(:begin, *ast.children)
+        end
+
 
       else 
         raise NotImplementedError, "unknown AST type #{ ast.type }"

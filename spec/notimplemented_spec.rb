@@ -47,18 +47,16 @@ describe 'not implemented' do
     todo( 'yield' )
   end
 
-  it "catching exceptions" do
-    # TODO: try catch
+  it "catching specific exceptions" do
     todo("begin; rescue Exception; end")
+  end
+
+  it "else clauses in begin...end" do
+    todo("begin; a; rescue => e; b; else; c; end")
   end
 
   it "redo" do
     todo("redo")
-  end
-
-  it "ensure" do
-    # TODO: try finally
-    todo("begin; ensure; end")
   end
 
   it "retry" do

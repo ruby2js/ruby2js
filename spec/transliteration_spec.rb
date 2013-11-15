@@ -496,6 +496,36 @@ describe Ruby2JS do
     end
   end
 
+  describe "exceptions" do
+    it "should handle raise with a string" do
+      to_js( 'raise "heck"' ).must_equal 'throw "heck"'
+    end
+
+    it "should handle raise with a class and string" do
+      to_js( 'raise Exception, "heck"' ).
+        must_equal 'throw new Exception("heck")'
+    end
+
+    it "should handle catching an exception" do
+      to_js( 'begin a; rescue => e; b; end' ).
+        must_equal 'try {a} catch (e) {b}'
+    end
+
+    it "should handle an ensure clause" do
+      to_js( 'begin a; ensure b; end' ).
+        must_equal 'try {a} finally {b}'
+    end
+
+    it "should handle catching an exception and an ensure clause" do
+      to_js( 'begin a; rescue => e; b; ensure; c; end' ).
+        must_equal 'try {a} catch (e) {b} finally {c}'
+    end
+
+    it "should gracefully neither a rescue nor an ensure being present" do
+      to_js( 'begin a; b; end' ).must_equal 'a; b'
+    end
+  end
+
   describe 'execution' do
     it "should handle tic marks" do
       to_js( '`1+2`' ).must_equal '3'
