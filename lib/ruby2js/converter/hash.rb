@@ -13,7 +13,12 @@ module Ruby2JS
         key = $1 if key =~ /\A"([a-zA-Z_$][a-zA-Z_$0-9]*)"\Z/
         "#{key}: #{parse right}"
       end
-      "{#{ pairs.join(', ') }}"
+
+      if pairs.map {|item| pairs.length+2}.reduce(&:+).to_i < 72
+        "{#{ pairs.join(', ') }}"
+      else
+        "{#@nl#{ pairs.join(",#@ws") }#@nl}"
+      end
     end
   end
 end

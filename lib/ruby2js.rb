@@ -49,7 +49,7 @@ module Ruby2JS
       lines.each do |line|
         if line.start_with? '}' or line.start_with? ']'
           pre.sub!(/^  /,'')
-          line.sub!(/;$/,";\n")
+          line.sub!(/([,;])$/,"\\1\n")
           pending = true
         else
           pending = false
