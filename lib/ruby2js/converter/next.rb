@@ -1,0 +1,12 @@
+module Ruby2JS
+  class Converter
+
+    # (next
+    #   (int 1))
+
+    handle :next do |n=nil|
+      raise NotImplementedError, "next argument #{ n.inspect }" if n
+      'continue'
+    end
+  end
+end

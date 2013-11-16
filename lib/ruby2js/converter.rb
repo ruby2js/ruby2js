@@ -14,6 +14,11 @@ module Ruby2JS
       @nl = ''
       @ws = ' '
       @varstack = []
+
+      @handlers = {}
+      @@handlers.each do |name|
+        @handlers[name] = method("on_#{name}")
+      end
     end
     
     def enable_vertical_whitespace
@@ -54,482 +59,26 @@ module Ruby2JS
       selector.source_buffer.source[selector.end_pos] == '('
     end
 
+    @@handlers = []
+    def self.handle(*types, &block)
+      types.each do |type| 
+        define_method("on_#{type}", block)
+        @@handlers << type
+      end
+    end
+
     def parse(ast, state=:expression)
-      return ast unless Parser::AST::Node === ast
+      return ast unless ast
 
-      case ast.type
-        
-      when :int, :float, :str
-        ast.children.first.inspect
+      @state = state
+      @ast = ast
+      handler = @handlers[ast.type]
 
-      when :sym
-        ast.children.first.to_s.inspect
-
-      when :lvar, :gvar, :cvar
-        ast.children.first
-        
-      when :true, :false
-        ast.type.to_s
-        
-      when :nil
-        'null'
-
-      when :lvasgn
-        var, value = ast.children
-        output      = value ? "#{ 'var ' unless @vars.keys.include? var }#{ var } = #{ parse value }" : var
-        @vars[var] = true
-        output
-
-      when :op_asgn
-        var, op, value = ast.children
-
-        if [:+, :-].include?(op) and value.type==:int and value.children==[1]
-          if state == :statement
-            "#{ parse var }#{ op }#{ op }"
-          else
-            "#{ op }#{ op }#{ parse var }"
-          end
-        else
-          "#{ parse var } #{ op }= #{ parse value }"
-        end
-
-      when :casgn
-        cbase, var, value = ast.children
-        var = "#{cbase}.var" if cbase
-        output = "const #{ var } = #{ parse value }"
-        @vars[var] = true
-        output
-        
-      when :gvasgn
-        name, value = ast.children
-        "#{ name } = #{ parse value }"
-        
-      when :ivasgn
-        name, expression = ast.children
-        "#{ name.to_s.sub('@', 'this._') } = #{ parse expression }"
-        
-      when :or_asgn
-        var, value = ast.children
-        "#{ parse var } = #{parse var} || #{ parse value }"
-
-      when :and_asgn
-        var, value = ast.children
-        "#{ parse var } = #{parse var} && #{ parse value }"
-        
-      when :ivar
-        name = ast.children.first
-        name.to_s.sub('@', 'this._')
-        
-      when :hash
-        hashy  = ast.children.map do |node|
-          left, right = node.children
-          key = parse left
-          key = $1 if key =~ /\A"([a-zA-Z_$][a-zA-Z_$0-9]*)"\Z/
-          "#{key}: #{parse right}"
-        end
-        "{#{ hashy.join(', ') }}"
-
-      when :regexp
-        str, opt = ast.children
-        if str.children.first.include? '/'
-          if opt.children.empty?
-            "new RegExp(#{ str.children.first.inspect })"
-          else
-            "new RegExp(#{ str.children.first.inspect }, #{ opt.children.join.inspect})"
-          end
-        else
-          "/#{ str.children.first }/#{ opt.children.join }"
-        end
-
-      when :array
-        splat = ast.children.rindex { |a| a.type == :splat }
-        if splat
-          items = ast.children
-          item = items[splat].children.first
-          if items.length == 1
-            parse item
-          elsif splat == items.length - 1
-            parse s(:send, s(:array, *items[0..-2]), :concat, item)
-          elsif splat == 0
-            parse s(:send, item, :concat, s(:array, *items[1..-1]))
-          else
-            parse s(:send, 
-              s(:send, s(:array, *items[0..splat-1]), :concat, item), 
-              :concat, s(:array, *items[splat+1..-1]))
-          end
-        else
-          list = ast.children.map { |a| parse a }
-          if list.join(', ').length < 80
-            "[#{ list.join(', ') }]"
-          else
-            "[\n#{ list.join(",\n") }\n]"
-          end
-        end
-
-      when :begin
-        ast.children.map{ |e| parse e, :statement }.join(@sep)
-        
-      when :return
-        "return #{ parse ast.children.first }"
-        
-      when *LOGICAL
-        left, right = ast.children
-        left = left.children.first if left and left.type == :begin
-        right = right.children.first if right.type == :begin
-        op_index    = operator_index ast.type
-        lgroup      = LOGICAL.include?( left.type ) && op_index <= operator_index( left.type )
-        left        = parse left
-        left        = "(#{ left })" if lgroup
-        rgroup      = LOGICAL.include?( right.type ) && op_index <= operator_index( right.type ) if right.children.length > 0
-        right       = parse right
-        right       = "(#{ right })" if rgroup
-
-        case ast.type
-        when :and
-          "#{ left } && #{ right }"
-        when :or
-          "#{ left } || #{ right }"
-        else
-          "!#{ left }"
-        end
-    
-      when :send, :attr
-        receiver, method, *args = ast.children
-        if method =~ /\w[!?]$/
-          raise NotImplementedError, "invalid method name #{ method }"
-        end
-
-        if method == :new and receiver and receiver.children == [nil, :Proc]
-          return parse args.first
-        elsif not receiver and [:lambda, :proc].include? method
-          return parse args.first
-        end
-
-        op_index   = operator_index method
-        if op_index != -1
-          target = args.first 
-          target = target.children.first if target and target.type == :begin
-          receiver = receiver.children.first if receiver.type == :begin
-        end
-
-        group_receiver = receiver.type == :send && op_index <= operator_index( receiver.children[1] ) if receiver
-        group_target = target.type == :send && op_index <= operator_index( target.children[1] ) if target
-
-        if method == :!
-          if receiver.type == :defined?
-            parse s(:undefined?, *receiver.children)
-          else
-            group_receiver ||= (receiver.type != :send && receiver.children.length > 1)
-            "!#{ group_receiver ? group(receiver) : parse(receiver) }"
-          end
-
-        elsif method == :[]
-          "#{ parse receiver }[#{ args.map {|arg| parse arg}.join(', ') }]"
-
-        elsif method == :-@ or method == :+@
-          "#{ method.to_s[0] }#{ parse receiver }"
-
-        elsif method == :=~
-          "#{ parse args.first }.test(#{ parse receiver })"
-
-        elsif method == :!~
-          "!#{ parse args.first }.test(#{ parse receiver })"
-
-        elsif OPERATORS.flatten.include? method
-          "#{ group_receiver ? group(receiver) : parse(receiver) } #{ method } #{ group_target ? group(target) : parse(target) }"  
-
-        elsif method =~ /=$/
-          "#{ parse receiver }#{ '.' if receiver }#{ method.to_s.sub(/=$/, ' =') } #{ parse args.first }"
-
-        elsif method == :new and receiver
-          args = args.map {|a| parse a}.join(', ')
-          "new #{ parse receiver }(#{ args })"
-
-        elsif method == :raise and receiver == nil
-          if args.length == 1
-            "throw #{ parse args.first }"
-          else
-            "throw new #{ parse args.first }(#{ parse args[1] })"
-          end
-
-        elsif method == :typeof and receiver == nil
-          "typeof #{ parse args.first }"
-
-        else
-          if args.length == 0 and not is_method?(ast)
-            "#{ parse receiver }#{ '.' if receiver }#{ method }"
-          elsif args.length > 0 and args.last.type == :splat
-            parse s(:send, s(:attr, receiver, method), :apply, receiver, 
-              s(:send, s(:array, *args[0..-2]), :concat,
-                args[-1].children.first))
-          else
-            args = args.map {|a| parse a}.join(', ')
-            "#{ parse receiver }#{ '.' if receiver }#{ method }(#{ args })"
-          end
-        end
-        
-      when :const
-        receiver, name = ast.children
-        "#{ parse receiver }#{ '.' if receiver }#{ name }"
-
-      when :masgn
-        lhs, rhs = ast.children
-        block = []
-        lhs.children.zip rhs.children.zip do |var, val| 
-          block << s(var.type, *var.children, *val)
-        end
-        parse s(:begin, *block)
-      
-      when :if
-        condition, true_block, else_block = ast.children
-        if state == :statement
-          output = "if (#{ parse condition }) {#@nl#{ scope true_block }#@nl}"
-          while else_block and else_block.type == :if
-            condition, true_block, else_block = else_block.children
-            output <<  " else if (#{ parse condition }) {#@nl#{ scope true_block }#@nl}"
-          end
-          output << " else {#@nl#{ scope else_block }#@nl}" if else_block
-          output
-        else
-          "(#{ parse condition } ? #{ parse true_block } : #{ parse else_block })"
-        end
-        
-      when :while
-        condition, block = ast.children
-        "while (#{ parse condition }) {#@nl#{ scope block }#@nl}"
-
-      when :until
-        condition, block = ast.children
-        parse s(:while, s(:send, condition, :!), block)
-
-      when :while_post
-        condition, block = ast.children
-        block = block.updated(:begin) if block.type == :kwbegin
-        "do {#@nl#{ scope block }#@nl} while (#{ parse condition })"
-
-      when :until_post
-        condition, block = ast.children
-        parse s(:while_post, s(:send, condition, :!), block)
-
-      when :for
-        var, expression, block = ast.children
-        parse s(:block, 
-          s(:send, expression, :forEach),
-          s(:args, s(:arg, var.children.last)),
-          block);
-
-      when :case
-        expr, *whens, other = ast.children
-
-        whens.map! do |node|
-          *values, code = node.children
-          cases = values.map {|value| "case #{ parse value }:#@ws"}.join
-          "#{ cases }#{ parse code }#{@sep}break#@sep"
-        end
-
-        other = "#{@nl}default:#@ws#{ parse other }#@nl" if other
-
-        "switch (#{ parse expr }) {#@nl#{whens.join(@nl)}#{other}}"
-
-      when :block
-        call, args, block = ast.children
-        block ||= s(:begin)
-        function = s(:def, name, args, block)
-        parse s(:send, *call.children, function)
-      
-      when :def
-        name, args, body = ast.children
-        body ||= s(:begin)
-        if name =~ /[!?]$/
-          raise NotImplementedError, "invalid method name #{ name }"
-        end
-
-        vars = {}
-        if args and !args.children.empty?
-          # splats
-          if args.children.last.type == :restarg
-            if args.children[-1].children.first
-              body = s(:begin, body) unless body.type == :begin
-              assign = s(:lvasgn, args.children[-1].children.first,
-                s(:send, s(:attr, 
-                  s(:attr, s(:const, nil, :Array), :prototype), :slice),
-                  :call, s(:lvar, :arguments),
-                  s(:int, args.children.length-1)))
-              body = s(:begin, assign, *body.children)
-            end
-
-            args = s(:args, *args.children[0..-2])
-
-          elsif args.children.last.type == :blockarg and
-            args.children.length > 1 and args.children[-2].type == :restarg
-            body = s(:begin, body) unless body.type == :begin
-            blk = args.children[-1].children.first
-            vararg = args.children[-2].children.first
-            last = s(:send, s(:attr, s(:lvar, :arguments), :length), :-,
-                    s(:int, 1))
-
-            # set block argument to the last argument passed
-            assign2 = s(:lvasgn, blk, s(:send, s(:lvar, :arguments), :[], last))
-
-            if vararg
-              # extract arguments between those defined and the last
-              assign1 = s(:lvasgn, vararg, s(:send, s(:attr, s(:attr, s(:const,
-                nil, :Array), :prototype), :slice), :call, s(:lvar, :arguments),
-                s(:int, args.children.length-1), last))
-              # push block argument back onto args if not a function
-              pushback = s(:if, s(:send, s(:send, nil, :typeof, s(:lvar, blk)), 
-                :"!==", s(:str, "function")), s(:begin, s(:send, s(:lvar,
-                vararg), :push, s(:lvar, blk)), s(:lvasgn, blk, s(:nil))), nil)
-              # set block argument to null if all arguments were defined
-              pushback = s(:if, s(:send, s(:attr, s(:lvar, :arguments),
-                :length), :<=, s(:int, args.children.length-2)), s(:lvasgn, 
-                blk, s(:nil)), pushback)
-              # combine statements
-              body = s(:begin, assign1, assign2, pushback, *body.children)
-            else
-              # set block argument to null if all arguments were defined
-              ignore = s(:if, s(:send, s(:attr, s(:lvar, :arguments),
-                :length), :<=, s(:int, args.children.length-2)), s(:lvasgn, 
-                blk, s(:nil)), nil)
-              body = s(:begin, assign2, ignore, *body.children)
-            end
-
-            args = s(:args, *args.children[0..-3])
-          end
-
-          # optional arguments
-          args.children.each_with_index do |arg, i|
-            if arg.type == :optarg
-              body = s(:begin, body) unless body.type == :begin
-              argname, value = arg.children
-              children = args.children.dup
-              children[i] = s(:arg, argname)
-              args = s(:args, *children)
-              body = s(:begin, body) unless body.type == :begin
-              default = s(:if, s(:send, s(:defined?, s(:lvar, argname)), :!),
-                s(:lvasgn, argname, value), nil)
-              body = s(:begin, default, *body.children)
-            end
-            vars[arg.children.first] = true
-          end
-        end
-
-        "function#{ " #{name}" if name }(#{ parse args }) {#@nl#{ scope body, vars}#{@nl unless body == s(:begin)}}"
-
-      when :class
-        name, inheritance, *body = ast.children
-        init = s(:def, :initialize, s(:args))
-        body.compact!
-
-        if body.length == 1 and body.first.type == :begin
-          body = body.first.children.dup 
-        end
-
-        body.map! do |m| 
-          if m.type == :def
-            if m.children.first == :initialize
-              # constructor: remove from body and overwrite init function
-              init = m
-              nil
-            else
-              # method: add to prototype
-              s(:send, s(:attr, name, :prototype), "#{m.children[0]}=",
-                s(:block, s(:send, nil, :proc), *m.children[1..-1]))
-            end
-          elsif m.type == :defs and m.children.first == s(:self)
-            # class method definition: add to prototype
-            s(:send, name, "#{m.children[1]}=",
-              s(:block, s(:send, nil, :proc), *m.children[2..-1]))
-          elsif m.type == :send and m.children.first == nil
-            # class method call
-            s(:send, name, *m.children[1..-1])
-          elsif m.type == :lvasgn
-            # class variable
-            s(:send, name, "#{m.children[0]}=", *m.children[1..-1])
-          elsif m.type == :casgn and m.children[0] == nil
-            # class constant
-            s(:send, name, "#{m.children[1]}=", *m.children[2..-1])
-          else
-            raise NotImplementedError, "class #{ m.type }"
-          end
-        end
-
-        if inheritance
-          body.unshift s(:send, name, :prototype=, s(:send, inheritance, :new))
-        end
-
-        # prepend constructor
-        body.unshift s(:def, parse(name), *init.children[1..-1])
-
-        parse s(:begin, *body.compact)
-
-      when :args
-        ast.children.map { |a| parse a }.join(', ')
-
-      when :arg, :blockarg
-        ast.children.first
-
-      when :block_pass
-        parse ast.children.first
-        
-      when :dstr, :dsym
-        ast.children.map{ |s| parse s }.join(' + ')
-        
-      when :xstr
-        if @binding
-          @binding.eval(ast.children.first.children.first).to_s
-        else
-          eval(ast.children.first.children.first).to_s
-        end
-
-      when :self
-        'this'
-
-      when :break
-        'break'
-
-      when :next
-        'continue'
-
-      when :defined?
-        "typeof #{ parse ast.children.first } !== 'undefined'"
-
-      when :undefined?
-        "typeof #{ parse ast.children.first } === 'undefined'"
-
-      when :undef
-        ast.children.map {|c| "delete #{c.children.last}"}.join @sep
-
-      when :kwbegin
-        block = ast.children.first
-        if block.type == :ensure
-          block, finally = block.children
-        else
-          finally = nil
-        end
-
-        if block and block.type == :rescue
-          body, recover, otherwise = block.children
-          raise NotImplementedError, "block else" if otherwise
-          exception, name, recovery = recover.children
-          raise NotImplementedError, parse(exception) if exception
-        else
-          body = block
-        end
-
-        output = "try {#@nl#{ parse body }#@nl}"
-        output += " catch (#{ parse name }) {#@nl#{ parse recovery }#@nl}" if recovery
-        output += " finally {#@nl#{ parse finally }#@nl}" if finally
-
-        if recovery or finally
-          output
-        else
-          parse s(:begin, *ast.children)
-        end
-
-      else 
+      unless handler
         raise NotImplementedError, "unknown AST type #{ ast.type }"
       end
+
+      handler.call(*ast.children) if handler
     end
     
     def group( ast )
@@ -537,3 +86,48 @@ module Ruby2JS
     end
   end
 end
+
+# see https://github.com/whitequark/parser/blob/master/doc/AST_FORMAT.md
+
+require 'ruby2js/converter/andasgn'
+require 'ruby2js/converter/arg'
+require 'ruby2js/converter/args'
+require 'ruby2js/converter/array'
+require 'ruby2js/converter/begin'
+require 'ruby2js/converter/block'
+require 'ruby2js/converter/blockpass'
+require 'ruby2js/converter/boolean'
+require 'ruby2js/converter/break'
+require 'ruby2js/converter/case'
+require 'ruby2js/converter/casgn'
+require 'ruby2js/converter/class'
+require 'ruby2js/converter/const'
+require 'ruby2js/converter/def'
+require 'ruby2js/converter/defined'
+require 'ruby2js/converter/dstr'
+require 'ruby2js/converter/for'
+require 'ruby2js/converter/hash'
+require 'ruby2js/converter/if'
+require 'ruby2js/converter/ivar'
+require 'ruby2js/converter/ivasgn'
+require 'ruby2js/converter/kwbegin'
+require 'ruby2js/converter/literal'
+require 'ruby2js/converter/logical'
+require 'ruby2js/converter/masgn'
+require 'ruby2js/converter/next'
+require 'ruby2js/converter/nil'
+require 'ruby2js/converter/opasgn'
+require 'ruby2js/converter/orasgn'
+require 'ruby2js/converter/regexp'
+require 'ruby2js/converter/return'
+require 'ruby2js/converter/self'
+require 'ruby2js/converter/send'
+require 'ruby2js/converter/sym'
+require 'ruby2js/converter/undef'
+require 'ruby2js/converter/until'
+require 'ruby2js/converter/untilpost'
+require 'ruby2js/converter/var'
+require 'ruby2js/converter/vasgn'
+require 'ruby2js/converter/while'
+require 'ruby2js/converter/whilepost'
+require 'ruby2js/converter/xstr'

@@ -42,7 +42,7 @@ describe Ruby2JS do
     end
     
     it "should parse global variables" do
-      to_js( "$a = 1" ).must_equal '$a = 1'
+      to_js( "$a = 1" ).must_equal 'var $a = 1'
     end
   end
   
