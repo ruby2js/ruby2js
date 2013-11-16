@@ -14,7 +14,7 @@ module Ruby2JS
       lhs.children.zip rhs.children.zip do |var, val| 
         block << s(var.type, *var.children, *val)
       end
-      parse s(:begin, *block)
+      parse s(:begin, *block), @state
     end
   end
 end

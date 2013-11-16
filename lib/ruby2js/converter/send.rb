@@ -72,7 +72,11 @@ module Ruby2JS
 
       else
         if args.length == 0 and not is_method?(ast)
-          "#{ parse receiver }#{ '.' if receiver }#{ method }"
+          if receiver
+            "#{ parse receiver }.#{ method }"
+          else
+            parse s(:lvasgn, method), @state
+          end
         elsif args.length > 0 and args.last.type == :splat
           parse s(:send, s(:attr, receiver, method), :apply, receiver, 
             s(:send, s(:array, *args[0..-2]), :concat,

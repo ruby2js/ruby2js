@@ -60,12 +60,16 @@ describe Ruby2JS do
     it "should not output var if variable is allready declared within a context" do
       to_js( "a = 1; a = 2" ).must_equal 'var a = 1; a = 2'
     end
-    
+
     it "should parse mass assign" do
       to_js( "a , b = 1, 2" ).must_equal 'var a = 1; var b = 2'
       to_js( "a = 1, 2" ).must_equal 'var a = [1, 2]'
     end
-    
+
+    it "should parse chained assignment statements" do
+      to_js( "a = b = 1" ).must_equal 'var a; var b; a = b = 1'
+    end
+
     it "should parse op assignments" do
       to_js( 'a += 1' ).must_equal 'a++'
     end
@@ -307,13 +311,13 @@ describe Ruby2JS do
     end
 
     it "should handle while with post condition" do
-      to_js( 'begin; foo; end while condition' ).
-        must_equal 'do {foo} while (condition)'
+      to_js( 'begin; foo(); end while condition' ).
+        must_equal 'do {foo()} while (condition)'
     end
 
     it "should handle until with post condition" do
-      to_js( 'begin; foo; end until condition' ).
-        must_equal 'do {foo} while (!condition)'
+      to_js( 'begin; foo(); end until condition' ).
+        must_equal 'do {foo()} while (!condition)'
     end
   end
   

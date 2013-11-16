@@ -6,7 +6,8 @@ module Ruby2JS
     #   (...))
 
     handle :begin do |*statements|
-      statements.map{ |statement| parse statement, :statement }.join(@sep)
+      state = @state
+      statements.map{ |statement| parse statement, state }.join(@sep)
     end
   end
 end
