@@ -63,7 +63,7 @@ module Ruby2JS
         @ngApp = nil
 
         # replace module with a constant assign followed by the module contents
-        node.updated :begin, [casgn, *block]
+        node.updated :begin, [casgn, *block.compact]
       end
 
       # input: 
