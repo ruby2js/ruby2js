@@ -342,7 +342,12 @@ describe Ruby2JS do
     it "should handle basic variable scope" do
       to_js( 'a = 1; lambda { a = 2; b = 1}').must_equal 'var a = 1; function() {a = 2; var b = 1}'
     end
-    
+
+    it "named functions aren't closures" do
+      to_js( 'a = 1; def f; a = 2; b = 1; end').
+        must_equal 'var a = 1; function f() {var a = 2; var b = 1}'
+    end
+
     it "should handle one argument" do
       to_js( 'lambda { |a| return a + 1 }').
         must_equal 'function(a) {return a + 1}'

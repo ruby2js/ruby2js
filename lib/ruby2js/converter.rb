@@ -39,9 +39,9 @@ module Ruby2JS
       OPERATORS.index( OPERATORS.find{ |el| el.include? op } ) || -1
     end
     
-    def scope( ast, args={} )
-      @varstack.push @vars
-      @vars = @vars.merge(args)
+    def scope( ast, args=nil )
+      @varstack.push @vars.dup
+      @vars = args if args
       parse( ast, :statement )
     ensure
       @vars = @varstack.pop

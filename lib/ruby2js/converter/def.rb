@@ -13,6 +13,7 @@ module Ruby2JS
       end
 
       vars = {}
+      vars.merge! @vars unless name
       if args and !args.children.empty?
         # splats
         if args.children.last.type == :restarg
