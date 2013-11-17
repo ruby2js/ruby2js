@@ -48,7 +48,7 @@ module Ruby2JS
       else
         # look for a sequence of methods
         methods = 0
-        body.compact!.each do |node|
+        body.compact.each do |node|
           break unless node and node.type == :send and node.children[0]
           break unless node.children[0].type == :attr
           break unless node.children[0].children[0..1] == [name, :prototype]
