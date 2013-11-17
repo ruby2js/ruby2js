@@ -259,7 +259,7 @@ describe Ruby2JS do
   
   describe 'control' do
     it "should parse single line if" do
-      to_js( '1 if true' ).must_equal 'if (true) {1}'
+      to_js( '1 if true' ).must_equal 'if (true) 1'
     end
     
     it "should parse if else" do
@@ -427,7 +427,7 @@ describe Ruby2JS do
 
     it "should handle methods with optional arguments" do
       to_js( 'def method(opt=1); return opt; end' ).
-        must_equal "function method(opt) {if (typeof opt === 'undefined') {opt = 1}; return opt}"
+        must_equal "function method(opt) {if (typeof opt === 'undefined') opt = 1; return opt}"
     end
 
     it "should handle methods with block arguments" do
@@ -469,7 +469,7 @@ describe Ruby2JS do
     end
 
     it "should handle if statements" do
-      to_js( "a() if true\n" ).must_equal "if (true) {\n  a()\n}"
+      to_js( "a() if true" ).must_equal "if (true) a()"
     end
 
     it "should handle while statements" do
@@ -482,16 +482,19 @@ describe Ruby2JS do
     end
 
     it "should add a blank line before blocks" do
-      to_js( "x()\na() if true" ).must_equal "x();\n\nif (true) {\n  a()\n}"
+      to_js( "x()\nif true; a(); b(); end" ).
+        must_equal "x();\n\nif (true) {\n  a();\n  b()\n}"
     end
 
     it "should add a blank line after blocks" do
-      to_js( "a() if true\nx()" ).must_equal "if (true) {\n  a()\n};\n\nx()"
+      to_js( "if true; a(); b(); end\nx()" ).
+        must_equal "if (true) {\n  a();\n  b()\n};\n\nx()"
     end
 
     it "should add a single blank line between blocks" do
-      to_js( "a() if true\nb() if false" ).
-        must_equal "if (true) {\n  a()\n};\n\nif (false) {\n  b()\n}"
+      to_js( "if true; a(); b(); end\nif false; c(); d(); end" ).
+        must_equal "if (true) {\n  a();\n  b()\n};\n\n" +
+          "if (false) {\n  c();\n  d()\n}"
     end
   end
 
