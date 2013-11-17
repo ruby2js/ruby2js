@@ -45,6 +45,25 @@ module Ruby2JS
 
       if inheritance
         body.unshift s(:send, name, :prototype=, s(:send, inheritance, :new))
+      else
+        # look for a sequence of methods
+        methods = 0
+        body.compact!.each do |node|
+          break unless node and node.type == :send and node.children[0]
+          break unless node.children[0].type == :attr
+          break unless node.children[0].children[0..1] == [name, :prototype]
+          break unless node.children[1] =~ /=$/
+          methods += 1
+        end
+
+        # collapse sequence of methods to a single assignment
+        if methods > 1
+          pairs = body[0...methods].map do |node|
+            s(:pair, s(:str, node.children[1].chomp('=')), node.children[2])
+          end
+          body.shift(methods)
+          body.unshift s(:send, name, :prototype=, s(:hash, *pairs))
+        end
       end
 
       # prepend constructor

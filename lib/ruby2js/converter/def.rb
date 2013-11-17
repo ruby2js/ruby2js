@@ -82,8 +82,9 @@ module Ruby2JS
         end
       end
 
+       nl = @nl unless body == s(:begin)
       "function#{ " #{name}" if name }(#{ parse args }) " +
-        "{#@nl#{ scope body, vars}#{@nl unless body == s(:begin)}}"
+        "{#{nl}#{ scope body, vars}#{nl}}"
     end
   end
 end

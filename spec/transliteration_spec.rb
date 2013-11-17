@@ -391,6 +391,11 @@ describe Ruby2JS do
         must_equal 'function Person(name, surname) {this._name = name; this._surname = surname}; Person.prototype.full_name = function() {return this._name + this._surname}'
     end
 
+    it "should collapse multiple methods in a class" do
+      to_js('class C; def a; end; def b; end; end').
+        must_equal 'function C() {}; C.prototype = {a: function() {}, b: function() {}}'
+    end
+
     it "should parse class with inheritance" do
       to_js('class Employee < Person; end').
         must_equal 'function Employee() {}; Employee.prototype = new Person()'
