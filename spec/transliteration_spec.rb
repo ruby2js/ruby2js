@@ -456,7 +456,8 @@ describe Ruby2JS do
   
   describe 'allocation' do
     it "should handle class new" do
-      to_js( 'Date.new' ).must_equal 'new Date()'
+      to_js( 'Date.new' ).must_equal 'new Date'
+      to_js( 'Date.new()' ).must_equal 'new Date()'
     end
   end
 

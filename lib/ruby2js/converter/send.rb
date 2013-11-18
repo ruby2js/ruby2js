@@ -58,7 +58,11 @@ module Ruby2JS
 
       elsif method == :new and receiver
         args = args.map {|a| parse a}.join(', ')
-        "new #{ parse receiver }(#{ args })"
+        if args.length > 0 or is_method?(ast)
+          "new #{ parse receiver }(#{ args })"
+        else
+          "new #{ parse receiver }"
+        end
 
       elsif method == :raise and receiver == nil
         if args.length == 1
