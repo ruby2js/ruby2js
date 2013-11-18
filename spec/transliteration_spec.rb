@@ -105,7 +105,11 @@ describe Ruby2JS do
     it "should parse square bracket call" do
       to_js( "a = [1]; a[0]" ).must_equal 'var a = [1]; a[0]'
     end
-    
+
+    it "should parse square bracket assignment" do
+      to_js( "a = [1]; a[0]=2" ).must_equal 'var a = [1]; a[0] = 2'
+    end
+
     it "should parse nested square bracket call" do
       to_js( "a = [[1]]; a[0][0]" ).must_equal 'var a = [[1]]; a[0][0]'
     end
