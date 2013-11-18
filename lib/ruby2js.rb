@@ -17,7 +17,7 @@ module Ruby2JS
 
     if Proc === source
       file,line = source.source_location
-      source = File.read(file).untaint
+      source = File.read(file.dup.untaint).untaint
       ast = find_block( parse(source), line )
     elsif Parser::AST::Node === source
       ast = source
