@@ -7,6 +7,10 @@ module Ruby2JS
     #   (...))
 
     handle :if do |condition, then_block, else_block|
+      if else_block and not then_block
+        return parse(s(:if, s(:not, condition), else_block, nil), @state) 
+      end
+
       if @state == :statement
         output = "if (#{ parse condition }) {#@nl#{ scope then_block }#@nl}"
         while else_block and else_block.type == :if

@@ -262,6 +262,10 @@ describe Ruby2JS do
       to_js( '1 if true' ).must_equal 'if (true) 1'
     end
     
+    it "should parse single line unless" do
+      to_js( '1 unless false' ).must_equal 'if (!false) 1'
+    end
+    
     it "should parse if else" do
       to_js( 'if true; 1; else; 2; end' ).must_equal 'if (true) {1} else {2}'
     end
