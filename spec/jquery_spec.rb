@@ -15,6 +15,26 @@ describe Ruby2JS::Filter::JQuery do
   describe :gvars do
     it "should handle jquery calls" do
       to_js( '$$.("span")' ).must_equal '$("span")'
+      to_js( '$$["span"]' ).must_equal '$("span")'
+    end
+  end
+
+  describe 'tilde' do
+    it "should handle simple jquery calls" do
+      to_js( '~"span"' ).must_equal '$("span")'
+    end
+
+    it "should handle chained jquery calls" do
+      to_js( '~this.show.fadeOut' ).must_equal '$(this).show().fadeOut()'
+    end
+
+    it "should handle consecutive tildes" do
+      to_js( '~~value' ).must_equal '~~value'
+      to_js( '~~~value' ).must_equal '~value'
+    end
+
+    it "should handle setters" do
+      to_js( '~this.text = "*"' ).must_equal '$(this).text("*")'
     end
   end
   

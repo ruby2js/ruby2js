@@ -41,7 +41,7 @@ module Ruby2JS
       elsif method == :[]
         "#{ parse receiver }[#{ args.map {|arg| parse arg}.join(', ') }]"
 
-      elsif method == :-@ or method == :+@
+      elsif [:-@, :+@, :~].include? method
         "#{ method.to_s[0] }#{ parse receiver }"
 
       elsif method == :=~
