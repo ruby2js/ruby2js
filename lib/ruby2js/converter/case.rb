@@ -12,10 +12,10 @@ module Ruby2JS
       whens.map! do |node|
         *values, code = node.children
         cases = values.map {|value| "case #{ parse value }:#@ws"}.join
-        "#{ cases }#{ parse code }#{@sep}break#@sep"
+        "#{ cases }#{ parse code, :statement }#{@sep}break#@sep"
       end
 
-      other = "#{@nl}default:#@ws#{ parse other }#@nl" if other
+      other = "#{@nl}default:#@ws#{ parse other, :statement }#@nl" if other
 
       "switch (#{ parse expr }) {#@nl#{whens.join(@nl)}#{other}}"
     end

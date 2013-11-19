@@ -302,6 +302,11 @@ describe Ruby2JS do
         must_equal 'switch (a) {case 1: case 2: puts("a"); break; default: puts("b")}'
     end
 
+    it "should parse when and else clauses as statements" do
+      to_js( 'case 1; when 1; if true; end; else if false; end; end' ).
+        must_equal 'switch (1) {case 1: if (true) null; break; default: if (false) null}'
+    end
+
     it "should handle a for loop" do
       to_js( 'a = 0; for i in [1,2,3]; a += i; end' ).
         must_equal 'var a = 0; [1, 2, 3].forEach(function(i) {a += i})'
