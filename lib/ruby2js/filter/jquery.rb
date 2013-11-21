@@ -79,6 +79,20 @@ module Ruby2JS
         elsif node.children[1] == :~
           # map ~expression.method to $(expression).method
 
+          if node.children[0] and node.children[0].type == :op_asgn
+            asgn = node.children[0]
+            if asgn.children[0] and asgn.children[0].type == :send
+              inner = asgn.children[0]
+              return on_send s(:send, s(:send, inner.children[0],
+                (inner.children[1].to_s+'=').to_sym,
+                s(:send, s(:send, s(:send, inner.children[0], :~),
+                *inner.children[1..-1]), *asgn.children[1..-1])), :~)
+            else
+              return on_send asgn.updated nil, [s(:send, asgn.children[0], :~),
+                *asgn.children[1..-1]]
+            end
+          end
+
           # See http://api.jquery.com/category/properties/
           props = :context, :jquery, :browser, :fx, :support, :length, :selector
 

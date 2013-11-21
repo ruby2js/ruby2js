@@ -33,6 +33,11 @@ describe Ruby2JS::Filter::JQuery do
       to_js( '~~~value' ).must_equal '~value'
     end
 
+    it "should handle operator assignments" do
+      to_js( '~"textarea".text += "TODO: empty trash\n"' ).
+        must_equal '$("textarea").text($("textarea").text() + "TODO: empty trash\n")'
+    end
+
     it "should handle setters" do
       to_js( '~this.text = "*"' ).must_equal '$(this).text("*")'
     end
