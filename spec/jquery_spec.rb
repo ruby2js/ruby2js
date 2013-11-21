@@ -41,6 +41,11 @@ describe Ruby2JS::Filter::JQuery do
     it "should handle setters" do
       to_js( '~this.text = "*"' ).must_equal '$(this).text("*")'
     end
+
+    it "should handle DOM properties" do
+      to_js( '~"button".readonly = false' ).
+        must_equal '$("button").prop("readOnly", false)'
+    end
   end
   
   describe 'array' do

@@ -16,6 +16,10 @@ require 'ruby2js'
 # to match jQuery's convention for getters and setters:
 #  http://learn.jquery.com/using-jquery-core/working-with-selections/
 #
+# Selected DOM properties (namely checked, disabled, readOnly, and required)
+# can also use getter and setter syntax.  Additionally, readOnly may be
+# spelled 'readonly'.
+#
 # Of course, using jQuery's style of getter and setter calls is supported,
 # and indeed is convenient when using method chaining.
 #
@@ -26,12 +30,15 @@ require 'ruby2js'
 # 
 # Some examples of before/after conversions:
 #
-#   `this.val
+#   ~this.val
 #   $(this).val()
 #
-#   `"button.continue".html = "Next Step..."
+#   ~"button.continue".html = "Next Step..."
 #   $("button.continue").html("Next Step...")
 #
+#   ~"button".readonly = false
+#   $("button").prop("readOnly", false)
+#   
 #  $$.ajax(
 #    url: "/api/getWeather",
 #    data: {zipcode: 97201},
@@ -95,6 +102,7 @@ module Ruby2JS
 
           # See http://api.jquery.com/category/properties/
           props = :context, :jquery, :browser, :fx, :support, :length, :selector
+          domprops = %w(checked disabled readonly readOnly required)
 
           rewrite_tilda = proc do |node|
             # Example conversion:
@@ -119,6 +127,9 @@ module Ruby2JS
                   method, *process_all(node.children[2..-1])]
                 if props.include? node.children[1]
                   node.updated nil, rewrite
+                elsif domprops.include? method.to_s
+                  method = :readOnly if method.to_s == 'readonly'
+                  s(:send, rewrite[0], :prop, s(:sym, method), *rewrite[2..-1]) 
                 else
                   s(:send, *rewrite)
                 end
