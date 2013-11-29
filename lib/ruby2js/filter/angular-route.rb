@@ -7,17 +7,20 @@ module Ruby2JS
       include SEXP
 
       # input: 
-      #   module Angular::AppName
-      #     use :Dependency
-      #     ...
+      #   case $routeProvider
+      #   when '/path'
+      #     templateUrl = 'partials/path.html'
+      #   else
+      #     redirectTo '/path'
       #   end
       #
       # output: 
-      #   AppName = angular.module("AppName", ["Dependency"])
-      #   ...
+      #   AppName.config(["$routeProvider", function($routeProvider) {
+      #     $routeProvider.when("/path", {templateUrl: 'partials/path.html'}).
+      #     otherwise({redirectTo: "/path"}))
 
       def on_case(node)
-       rp = :$routeProvider
+        rp = :$routeProvider
         return super unless @ngApp and node.children.first == s(:gvar, rp)
         code = s(:lvar, rp)
 
