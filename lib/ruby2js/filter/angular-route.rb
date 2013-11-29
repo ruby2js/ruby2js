@@ -22,6 +22,7 @@ module Ruby2JS
       def on_case(node)
         rp = :$routeProvider
         return super unless @ngApp and node.children.first == s(:gvar, rp)
+        @ngAppUses << :ngRoute
         code = s(:lvar, rp)
 
         hash = proc do |pairs|

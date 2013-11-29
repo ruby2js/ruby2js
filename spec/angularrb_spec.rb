@@ -1,10 +1,12 @@
 require 'minitest/autorun'
 require 'ruby2js/filter/angularrb'
+require 'ruby2js/filter/angular-route'
 
 describe Ruby2JS::Filter::AngularRB do
   
   def to_js( string)
-    Ruby2JS.convert(string, filters: [Ruby2JS::Filter::AngularRB])
+    Ruby2JS.convert(string, filters: [Ruby2JS::Filter::AngularRB,
+      Ruby2JS::Filter::AngularRoute])
   end
   
   describe 'module' do
@@ -33,8 +35,6 @@ describe Ruby2JS::Filter::AngularRB do
       ruby = <<-RUBY
         module Angular::PhonecatApp 
           class PhoneListCtrl < Angular::Controller 
-            use :$scope
-
             $scope.orderProp = 'age'
           end
         end
@@ -79,10 +79,43 @@ describe Ruby2JS::Filter::AngularRB do
       to_js( ruby ).must_equal js
     end
   end
+  
+  describe 'route' do
+    it "should convert apps with a route" do
+      ruby = <<-RUBY
+        module Angular::PhonecatApp 
+          case $routeProvider
+          when '/phones'
+            controller = :PhoneListCtrl
+          else
+            redirectTo '/phones'
+          end
+        end
+      RUBY
+
+      js = <<-JS.gsub!(/^ {8}/, '').chomp
+        const PhonecatApp = angular.module("PhonecatApp", ["ngRoute"]);
+
+        PhonecatApp.config([
+          "$routeProvider",
+        
+          function($routeProvider) {
+            $routeProvider.when("/phones", {controller: "PhoneListCtrl"}).otherwise({redirectTo: "/phones"})
+          }
+        ])
+      JS
+
+      to_js( ruby ).must_equal js
+    end
+  end
 
   describe Ruby2JS::Filter::DEFAULTS do
     it "should include AngularRB" do
       Ruby2JS::Filter::DEFAULTS.must_include Ruby2JS::Filter::AngularRB
+    end
+
+    it "should include AngularRoute" do
+      Ruby2JS::Filter::DEFAULTS.must_include Ruby2JS::Filter::AngularRoute
     end
   end
 end

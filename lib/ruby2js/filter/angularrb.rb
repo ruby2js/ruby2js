@@ -8,6 +8,8 @@ module Ruby2JS
 
       def initialize(*args)
         @ngApp = nil
+        @ngAppUses = []
+        @ngClassUses = []
         super
       end
 
@@ -29,6 +31,7 @@ module Ruby2JS
         return super unless parent_name.children == [nil, :Angular]
 
         @ngApp = module_name.children[1]
+        @ngAppUses = []
 
         # find the block
         block = process_all(node.children[1..-1])
@@ -42,7 +45,7 @@ module Ruby2JS
         end
 
         # convert use calls into dependencies
-        depends = []
+        depends = @ngAppUses.map {|sym| s(:sym, sym)}
         uses.each do |use|
           pending = []
           use.children[2..-1].each do |node|
@@ -53,12 +56,15 @@ module Ruby2JS
           block.delete use
         end
 
+        depends = depends.map {|node| node.children.first.to_s}.uniq.
+          map {|sym| s(:str, sym)}
+
         # build constant assignment statement
         casgn = s(:casgn, nil, @ngApp, s(:send, 
                   s(:lvar, :angular), 
                   :module,
                   s(:str, @ngApp.to_s), 
-                  s(:array, *depends)))
+                  s(:array, *depends.uniq)))
 
         @ngApp = nil
 
@@ -105,7 +111,7 @@ module Ruby2JS
         end
 
         # convert use calls into args
-        args = []
+        args = @ngClassUses.map {|sym| s(:arg, sym)}
         uses.each do |use|
           pending = []
           use.children[2..-1].each do |node|
@@ -115,6 +121,9 @@ module Ruby2JS
           args += pending
           block.delete use
         end
+
+        args = args.map {|node| node.children.first.to_sym}.uniq.
+          map {|sym| s(:arg, sym)}
 
         # build Appname.controller call statement
         call = s(:send,
@@ -155,6 +164,11 @@ module Ruby2JS
         outer = s(:send, s(:lvar, @ngApp), :filter, *call.children[2..-1])
 
         node.updated nil, [outer, s(:args), s(:return, inner)]
+      end
+
+      def on_gvar(node)
+        @ngClassUses << node.children.first if node
+        super
       end
     end
 
