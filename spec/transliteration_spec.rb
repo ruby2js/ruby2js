@@ -439,6 +439,10 @@ describe Ruby2JS do
       to_js('def method; end').must_equal 'function method() {}'
     end
     
+    it "should parse singleton method def" do
+      to_js('def self.method; end').must_equal 'this.method = function() {}'
+    end
+    
     it "should convert self to this" do
       to_js('def method; return self.foo; end').
         must_equal 'function method() {return this.foo}'
