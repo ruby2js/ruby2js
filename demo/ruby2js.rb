@@ -22,7 +22,8 @@ begin
     'angular-resource' => 'ruby2js/filter/angular-resource',
     'functions' => 'ruby2js/filter/functions',
     'jquery'    => 'ruby2js/filter/jquery',
-    'return'    => 'ruby2js/filter/return'
+    'return'    => 'ruby2js/filter/return',
+    'strict'    => 'ruby2js/filter/strict'
   }
 
   # allow filters to be selected based on the path
