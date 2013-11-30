@@ -14,10 +14,19 @@ module Ruby2JS
         raise NotImplementedError, "invalid method name #{ method }"
       end
 
+      # three ways to define anonymous functions
       if method == :new and receiver and receiver.children == [nil, :Proc]
         return parse args.first
       elsif not receiver and [:lambda, :proc].include? method
         return parse args.first
+      end
+
+      # call anonymous function
+      if [:call, :[]].include? method and receiver and receiver.type == :block 
+        t2,m2,*args2 = receiver.children.first.children
+        if not t2 and [:lambda, :proc].include? m2 and args2.length == 0
+          return parse s(:send, nil, parse(receiver), *args)
+        end
       end
 
       op_index   = operator_index method
