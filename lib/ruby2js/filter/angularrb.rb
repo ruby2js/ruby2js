@@ -40,22 +40,9 @@ module Ruby2JS
         end
 
         # find use class method calls
-        uses = block.find_all do |node|
-          node and node.type == :send and node.children[0..1] == [nil, :use]
-        end
 
         # convert use calls into dependencies
-        depends = @ngAppUses.map {|sym| s(:sym, sym)}
-        uses.each do |use|
-          pending = []
-          use.children[2..-1].each do |node|
-            break unless [:str, :sym].include? node.type
-            pending << node
-          end
-          depends += pending
-          block.delete use
-        end
-
+        depends = @ngAppUses.map {|sym| s(:sym, sym)} + extract_uses(block)
         depends = depends.map {|node| node.children.first.to_s}.uniq.
           map {|sym| s(:str, sym)}
 
@@ -73,31 +60,36 @@ module Ruby2JS
       end
 
       # input: 
-      #   class Name < Angular::Controller
-      #     use :$service
-      #     ...
-      #   end
-      #
-      # output: 
-      #   AppName.controller :Name do |$service|
-      #     ...
-      #   end
+      #   filter :name { ... }
+      #   controller :name { ... }
+      #   factory :name { ... }
 
-      def on_class(node)
+      def on_block(node)
         return super unless @ngApp
-        return super unless node.children.length == 3
+        call = node.children.first
+        return super if call.children.first
 
-        # (const nil :Name)
-        name = node.children.first
-        return super unless name.type == :const and name.children.first == nil
+        case call.children[1]
+        when :controller
+          ng_controller(node)
+        when :factory
+          ng_factory(node)
+        when :filter
+          ng_filter(node)
+        else
+          super
+        end
+      end
 
-        # (const (const nil :Angular) :Controller)
-        parent = node.children[1]
-        return super unless parent and parent.children.length == 2
-        return super unless parent.children[0]
-        return super unless parent.children[0].type == :const
-        return super unless parent.children[0].children == [nil, :Angular]
-        return super unless [:Controller].include? parent.children[1]
+      # input:
+      #  controller :name do
+      #    ...
+      #  end
+      #
+      def ng_controller(node)
+        target = node.children.first
+        target = target.updated(nil, [s(:const, nil, @ngApp), 
+          *target.children[1..-1]])
 
         # find the block
         block = process_all(node.children[2..-1])
@@ -105,34 +97,13 @@ module Ruby2JS
           block = block.first.children.dup
         end
 
-        # find use class method calls
-        uses = block.find_all do |node|
-          node.type == :send and node.children[0..1] == [nil, :use]
-        end
-
         # convert use calls into args
-        args = @ngClassUses.map {|sym| s(:arg, sym)}
-        uses.each do |use|
-          pending = []
-          use.children[2..-1].each do |node|
-            break unless [:str, :sym].include? node.type
-            pending << s(:arg, *node.children)
-          end
-          args += pending
-          block.delete use
-        end
-
+        args = node.children[1].children
+        args += @ngClassUses.map {|sym| s(:arg, sym)} + extract_uses(block)
         args = args.map {|node| node.children.first.to_sym}.uniq.
           map {|sym| s(:arg, sym)}
 
-        # build Appname.controller call statement
-        call = s(:send,
-                 s(:const, nil, @ngApp),
-                 :controller,
-                 s(:sym, name.children.last))
-
-        # replace class with a block
-        node.updated :block, [call, s(:args, *args), s(:begin, *block)]
+        node.updated :block, [target, s(:args, *args), s(:begin, *block)]
       end
 
       # input: 
@@ -144,31 +115,103 @@ module Ruby2JS
       #   AppName.filter :name do
       #     return lambda {|input| return ... }
       #   end
-      def on_block(node)
-        return super unless @ngApp
-
+      def ng_filter(node)
         call = node.children.first
-        return super unless call.children[0..1] == [nil, :filter]
 
         # insert return
-        children = process_all(node.children[1..-1])
-        block = [children.pop || s(:nil)]
-        while block.length == 1 and block.first.type == :begin
-          block = block.first.children.dup
+        args = process_all(node.children[1].children)
+        block = process_all(node.children[2..-1])
+        tail = [block.pop || s(:nil)]
+        while tail.length == 1 and tail.first.type == :begin
+          tail = tail.first.children.dup
         end
-        block.push s(:return, block.pop) unless block.last.type == :return
-        children.push (block.length == 1 ? block.first : s(:begin, *block))
+        tail.push s(:return, tail.pop) unless tail.last.type == :return
+        block.push (tail.length == 1 ? tail.first : s(:begin, *tail))
 
         # construct a function returning a function
-        inner = s(:block, s(:send, nil, :lambda), *children)
+        inner = s(:block, s(:send, nil, :lambda), s(:args, *args), *block)
         outer = s(:send, s(:lvar, @ngApp), :filter, *call.children[2..-1])
 
         node.updated nil, [outer, s(:args), s(:return, inner)]
       end
 
+      # input: 
+      #   factory :name do |uses|
+      #     ...
+      #   end
+      #
+      # output: 
+      #   AppName.factory :name, [uses, lambda {|uses| ...}]
+      def ng_factory(node)
+        call = node.children.first
+        call = call.updated(nil, [s(:lvar, @ngApp), *call.children[1..-1]])
+
+        # insert return
+        block = process_all(node.children[2..-1])
+        tail = [block.pop || s(:nil)]
+        while tail.length == 1 and tail.first.type == :begin
+          tail = tail.first.children.dup
+        end
+        tail.push s(:return, tail.pop) unless tail.last.type == :return
+        block.push (tail.length == 1 ? tail.first : s(:begin, *tail))
+
+        # extract dependencies
+        args = process_all(node.children[1].children)
+        args += @ngClassUses.map {|sym| s(:arg, sym)} + extract_uses(block)
+        args = args.map {|node| node.children.first.to_sym}.uniq.
+          map {|sym| s(:arg, sym)}
+
+        # construct a function
+        function = s(:block, s(:send, nil, :lambda), s(:args, *args), *block)
+        array = args.map {|arg| s(:str, arg.children.first.to_s)}
+
+        s(:send, *call.children, s(:array, *array, function))
+      end
+
+      # input: 
+      #   Constant = ...
+      #
+      # output: 
+      #   AppName.factory :name, [uses, lambda {|uses| ...}]
+      def on_casgn(node)
+        return super unless @ngApp
+        return super if node.children[0]
+        ng_factory s(:block, s(:send, nil, :factory, s(:sym, node.children[1])),
+          s(:args), process(node.children[2]))
+      end
+
       def on_gvar(node)
-        @ngClassUses << node.children.first if node
+        if @ngClassUses
+          @ngClassUses << node.children.first
+        end
+
         super
+      end
+
+      def on_const(node)
+        if @ngClassUses
+          @ngClassUses << node.children.last if not node.children.first
+        end
+
+        super
+      end
+
+      def extract_uses(block)
+        # find use class method calls
+        uses = block.find_all do |node|
+          node and node.type == :send and node.children[0..1] == [nil, :use]
+        end
+
+        # convert use calls into dependencies
+        depends = []
+        uses.each do |use|
+          use.children[2..-1].each do |node|
+            depends << node if [:str, :sym].include? node.type
+          end
+          block.delete use
+        end
+
+        depends
       end
     end
 

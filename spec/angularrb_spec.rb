@@ -1,12 +1,13 @@
 require 'minitest/autorun'
 require 'ruby2js/filter/angularrb'
 require 'ruby2js/filter/angular-route'
+require 'ruby2js/filter/angular-resource'
 
 describe Ruby2JS::Filter::AngularRB do
   
   def to_js( string)
     Ruby2JS.convert(string, filters: [Ruby2JS::Filter::AngularRB,
-      Ruby2JS::Filter::AngularRoute])
+      Ruby2JS::Filter::AngularRoute, Ruby2JS::Filter::AngularResource])
   end
   
   describe 'module' do
@@ -34,7 +35,7 @@ describe Ruby2JS::Filter::AngularRB do
     it "should convert apps with a controller" do
       ruby = <<-RUBY
         module Angular::PhonecatApp 
-          class PhoneListCtrl < Angular::Controller 
+          controller :PhoneListCtrl do 
             $scope.orderProp = 'age'
           end
         end
@@ -109,6 +110,54 @@ describe Ruby2JS::Filter::AngularRB do
     end
   end
 
+  describe 'factory' do
+    it "should convert apps with a factory" do
+      ruby = <<-RUBY
+        module Angular::Service
+          factory :Phone do
+            return $resource.new 'phone/:phoneId.json'
+          end
+        end
+      RUBY
+
+      js = <<-JS.gsub!(/^ {8}/, '').chomp
+        const Service = angular.module("Service", ["ngResource"]);
+
+        Service.factory("Phone", [
+          "$resource",
+        
+          function($resource) {
+            return $resource("phone/:phoneId.json")
+          }
+        ])
+      JS
+
+      to_js( ruby ).must_equal js
+    end
+
+    it "should convert apps with a factory defined as a constant" do
+      ruby = <<-RUBY
+        module Angular::Service
+          Phone = $resource.new 'phone/:phoneId.json'
+        end
+      RUBY
+
+      js = <<-JS.gsub!(/^ {8}/, '').chomp
+        const Service = angular.module("Service", ["ngResource"]);
+
+        Service.factory("Phone", [
+          "$resource",
+        
+          function($resource) {
+            return $resource("phone/:phoneId.json")
+          }
+        ])
+      JS
+
+      to_js( ruby ).must_equal js
+    end
+  end
+
   describe Ruby2JS::Filter::DEFAULTS do
     it "should include AngularRB" do
       Ruby2JS::Filter::DEFAULTS.must_include Ruby2JS::Filter::AngularRB
@@ -116,6 +165,10 @@ describe Ruby2JS::Filter::AngularRB do
 
     it "should include AngularRoute" do
       Ruby2JS::Filter::DEFAULTS.must_include Ruby2JS::Filter::AngularRoute
+    end
+
+    it "should include AngularResource" do
+      Ruby2JS::Filter::DEFAULTS.must_include Ruby2JS::Filter::AngularResource
     end
   end
 end

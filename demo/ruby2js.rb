@@ -19,6 +19,7 @@ begin
   filters = {
     'angularrb' => 'ruby2js/filter/angularrb',
     'angular-route' => 'ruby2js/filter/angular-route',
+    'angular-resource' => 'ruby2js/filter/angular-resource',
     'functions' => 'ruby2js/filter/functions',
     'jquery'    => 'ruby2js/filter/jquery',
     'return'    => 'ruby2js/filter/return'

@@ -89,8 +89,15 @@ module Ruby2JS
             s(:send, s(:array, *args[0..-2]), :concat,
               args[-1].children.first))
         else
-          args = args.map {|a| parse a}.join(', ')
-          "#{ parse receiver }#{ '.' if receiver }#{ method }(#{ args })"
+          call = "#{ parse receiver }#{ '.' if receiver }#{ method }"
+          args = args.map {|a| parse a}
+          if args.any? {|arg| arg.to_s.include? "\n"}
+            "#{ call }(#{ args.join(', ') })"
+          elsif args.map {|arg| arg.length+2}.reduce(&:+).to_i < 70
+            "#{ call }(#{ args.join(', ') })"
+          else
+            "#{ call }(#@nl#{ args.join(",#@ws") }#@nl)"
+          end
         end
       end
     end

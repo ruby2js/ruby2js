@@ -47,7 +47,7 @@ module Ruby2JS
       pending = false
       blank = true
       lines.each do |line|
-        if line.start_with? '}' or line.start_with? ']'
+        if ')}]'.include? line[0]
           pre.sub!(/^  /,'')
           line.sub!(/([,;])$/,"\\1\n")
           pending = true
@@ -56,7 +56,7 @@ module Ruby2JS
         end
 
         line.sub! /^/, pre
-        if line.end_with? '{' or line.end_with? '['
+        if '({['.include? line[-1]
           pre += '  ' 
           line.sub!(/^/,"\n") unless blank or pending
           pending = true
