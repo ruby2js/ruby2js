@@ -472,6 +472,22 @@ describe Ruby2JS do
     end
   end
   
+  describe 'module definition' do
+    it "should handle module definitions" do
+      to_js( 'module A; B=1; end' ).
+        must_equal 'A = function() {const B = 1; return {B: B}}()'
+      to_js( 'module A; def b; return 1; end; end' ).
+        must_equal 'A = function() {function b() {return 1}; return {b: b}}()'
+      to_js( 'module A; class B; def initialize; @c=1; end; end; end' ).
+        must_equal 'A = function() {function B() {this._c = 1}; return {B: B}}()'
+    end
+
+    it "should handle private sections" do
+      to_js( 'module A; B=1; private; C=1; end' ).
+        must_equal 'A = function() {const B = 1; const C = 1; return {B: B}}()'
+    end
+  end
+
   describe 'allocation' do
     it "should handle class new" do
       to_js( 'Date.new' ).must_equal 'new Date'

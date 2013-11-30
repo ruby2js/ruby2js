@@ -22,10 +22,6 @@ describe 'not implemented' do
     todo( '::Foo' )
   end
 
-  it "module" do
-    todo( 'module Foo; end' )
-  end
-
   it "alias" do
     todo( 'alias foo bar' )
   end
