@@ -39,24 +39,48 @@ module Ruby2JS
           block = block.first.children.dup
         end
 
-        # find use class method calls
+        factories = []
+        block.compact.each do |child|
+          if child.type == :class and child.children.first.children.first == nil
+            name = child.children.first
+            if name.children.first == nil
+              name = name.children.last
+              factories << on_block(s(:block, s(:send, nil, :factory,
+                s(:sym, name)), s(:args), s(:return, s(:const, nil, name))))
+            end
+          end
+        end
+        block += factories
 
         # convert use calls into dependencies
         depends = @ngAppUses.map {|sym| s(:sym, sym)} + extract_uses(block)
         depends = depends.map {|node| node.children.first.to_s}.uniq.
           map {|sym| s(:str, sym)}
 
-        # build constant assignment statement
-        casgn = s(:casgn, nil, @ngApp, s(:send, 
-                  s(:lvar, :angular), 
-                  :module,
-                  s(:str, @ngApp.to_s), 
-                  s(:array, *depends.uniq)))
+        name, @ngApp = @ngApp, nil
 
-        @ngApp = nil
+        # construct app
+        app = s(:send, s(:lvar, :angular), :module, s(:str, name.to_s), 
+          s(:array, *depends.uniq))
 
-        # replace module with a constant assign followed by the module contents
-        node.updated :begin, [casgn, *block.compact]
+        # return a single chained statement when there is only one call
+        block.compact!
+        if block.length == 0
+          return app
+        elsif block.length == 1
+          call = block.first.children.first
+          if block.first.type == :send and call == s(:lvar, name)
+            return block.first.updated nil, [app, *block.first.children[1..-1]]
+          elsif block.first.type == :block and call.children.first == s(:lvar, name)
+            call = call.updated nil, [app, *call.children[1..-1]]
+            return block.first.updated nil, [call, *block.first.children[1..-1]]
+          end
+        end
+
+        # replace module with a constant assign followed by the module
+        # contents all wrapped in an anonymous function
+        s(:send, s(:block, s(:send, nil, :lambda), s(:args),
+          s(:begin, s(:casgn, nil, name, app), *block)), :[])
       end
 
       # input: 
@@ -88,7 +112,7 @@ module Ruby2JS
       #
       def ng_controller(node)
         target = node.children.first
-        target = target.updated(nil, [s(:const, nil, @ngApp), 
+        target = target.updated(nil, [s(:lvar, @ngApp), 
           *target.children[1..-1]])
 
         # find the block
@@ -156,6 +180,7 @@ module Ruby2JS
         block.push (tail.length == 1 ? tail.first : s(:begin, *tail))
 
         # extract dependencies
+        @ngClassUses.delete call.children[2].children[0]
         args = process_all(node.children[1].children)
         args += @ngClassUses.map {|sym| s(:arg, sym)} + extract_uses(block)
         args = args.map {|node| node.children.first.to_sym}.uniq.

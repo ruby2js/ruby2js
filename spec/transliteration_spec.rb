@@ -354,7 +354,7 @@ describe Ruby2JS do
     end
 
     it "should support calls to anonymous functions" do
-      to_js( 'proc {}[]').must_equal 'function() {}()'
+      to_js( 'proc {}[]').must_equal '(function() {})()'
     end
 
     it "should handle basic variable scope" do

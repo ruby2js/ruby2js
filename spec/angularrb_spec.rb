@@ -13,7 +13,7 @@ describe Ruby2JS::Filter::AngularRB do
   describe 'module' do
     it "should convert empty modules" do
       to_js( 'module Angular::X; end' ).
-        must_equal 'const X = angular.module("X", [])'
+        must_equal 'angular.module("X", [])'
     end
 
     it "should convert modules with a use statement" do
@@ -24,7 +24,7 @@ describe Ruby2JS::Filter::AngularRB do
       RUBY
 
       js = <<-JS.gsub!(/^ {8}/, '').chomp
-        const PhonecatApp = angular.module("PhonecatApp", ["PhonecatFilters"])
+        angular.module("PhonecatApp", ["PhonecatFilters"])
       JS
 
       to_js( ruby ).must_equal js
@@ -42,9 +42,7 @@ describe Ruby2JS::Filter::AngularRB do
       RUBY
 
       js = <<-JS.gsub!(/^ {8}/, '').chomp
-        const PhonecatApp = angular.module("PhonecatApp", []);
-
-        PhonecatApp.controller("PhoneListCtrl", function($scope) {
+        angular.module("PhonecatApp", []).controller("PhoneListCtrl", function($scope) {
           $scope.orderProp = "age"
         })
       JS
@@ -68,9 +66,7 @@ describe Ruby2JS::Filter::AngularRB do
       RUBY
 
       js = <<-JS.gsub!(/^ {8}/, '').chomp
-        const PhonecatApp = angular.module("PhonecatApp", []);
-
-        PhonecatApp.filter("pnl", function() {
+        angular.module("PhonecatApp", []).filter("pnl", function() {
           return function(input) {
             return (input < 0 ? "loss" : "profit")
           }
@@ -95,11 +91,9 @@ describe Ruby2JS::Filter::AngularRB do
       RUBY
 
       js = <<-JS.gsub!(/^ {8}/, '').chomp
-        const PhonecatApp = angular.module("PhonecatApp", ["ngRoute"]);
-
-        PhonecatApp.config([
+        angular.module("PhonecatApp", ["ngRoute"]).config([
           "$routeProvider",
-        
+
           function($routeProvider) {
             $routeProvider.when("/phones", {controller: "PhoneListCtrl"}).otherwise({redirectTo: "/phones"})
           }
@@ -121,11 +115,9 @@ describe Ruby2JS::Filter::AngularRB do
       RUBY
 
       js = <<-JS.gsub!(/^ {8}/, '').chomp
-        const Service = angular.module("Service", ["ngResource"]);
-
-        Service.factory("Phone", [
+        angular.module("Service", ["ngResource"]).factory("Phone", [
           "$resource",
-        
+
           function($resource) {
             return $resource("phone/:phoneId.json")
           }
@@ -135,23 +127,28 @@ describe Ruby2JS::Filter::AngularRB do
       to_js( ruby ).must_equal js
     end
 
-    it "should convert apps with a factory defined as a constant" do
+    it "should convert apps with a factory defined as a class" do
       ruby = <<-RUBY
         module Angular::Service
-          Phone = $resource.new 'phone/:phoneId.json'
+          class Phone
+            def self.name
+              "XYZZY"
+            end
+          end
         end
       RUBY
 
-      js = <<-JS.gsub!(/^ {8}/, '').chomp
-        const Service = angular.module("Service", ["ngResource"]);
+      js = "(function() {\n#{<<-JS.gsub!(/^ {6}/, '')}})()"
+        const Service = angular.module("Service", []);
+        function Phone() {};
 
-        Service.factory("Phone", [
-          "$resource",
-        
-          function($resource) {
-            return $resource("phone/:phoneId.json")
-          }
-        ])
+        Phone.name = function() {
+          "XYZZY"
+        };
+
+        Service.factory("Phone", [function() {
+          return Phone
+        }])
       JS
 
       to_js( ruby ).must_equal js
