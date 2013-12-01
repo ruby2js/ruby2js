@@ -155,6 +155,26 @@ describe Ruby2JS::Filter::AngularRB do
     end
   end
 
+  describe 'controllers' do
+    it "should convert apps with a directive" do
+      ruby = <<-RUBY
+        module Angular::PhonecatApp 
+          directive :my_signature do 
+            return {template: '--signature'}
+          end
+        end
+      RUBY
+
+      js = <<-JS.gsub!(/^ {8}/, '').chomp
+        angular.module("PhonecatApp", []).directive("my_signature", function() {
+          return {template: "--signature"}
+        })
+      JS
+
+      to_js( ruby ).must_equal js
+    end
+  end
+
   describe Ruby2JS::Filter::DEFAULTS do
     it "should include AngularRB" do
       Ruby2JS::Filter::DEFAULTS.must_include Ruby2JS::Filter::AngularRB

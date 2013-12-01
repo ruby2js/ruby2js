@@ -10,6 +10,7 @@ module Ruby2JS
         @ngApp = nil
         @ngAppUses = []
         @ngClassUses = []
+        @ngClassOmit = []
         super
       end
 
@@ -31,6 +32,7 @@ module Ruby2JS
         return super unless parent_name.children == [nil, :Angular]
 
         @ngApp = module_name.children[1]
+        @ngChildren = node.children
         @ngAppUses = []
 
         # find the block
@@ -57,7 +59,7 @@ module Ruby2JS
         depends = depends.map {|node| node.children.first.to_s}.uniq.
           map {|sym| s(:str, sym)}
 
-        name, @ngApp = @ngApp, nil
+        name, @ngApp, @ngChildren = @ngApp, nil, nil
 
         # construct app
         app = s(:send, s(:lvar, :angular), :module, s(:str, name.to_s), 
@@ -100,6 +102,8 @@ module Ruby2JS
           ng_factory(node)
         when :filter
           ng_filter(node)
+        when :directive
+          ng_controller(node) # reuse template
         else
           super
         end
@@ -122,10 +126,12 @@ module Ruby2JS
         end
 
         # convert use calls into args
+        @ngClassUses -= @ngClassOmit
         args = node.children[1].children
         args += @ngClassUses.map {|sym| s(:arg, sym)} + extract_uses(block)
         args = args.map {|node| node.children.first.to_sym}.uniq.
           map {|sym| s(:arg, sym)}
+        @ngClassUses = @ngClassOmit = []
 
         node.updated :block, [target, s(:args, *args), s(:begin, *block)]
       end
@@ -199,8 +205,9 @@ module Ruby2JS
       # output: 
       #   AppName.factory :name, [uses, lambda {|uses| ...}]
       def on_casgn(node)
-        return super unless @ngApp
         return super if node.children[0]
+        @ngClassOmit << node.children[1]
+        return super unless @ngApp and @ngChildren.include? node
         ng_factory s(:block, s(:send, nil, :factory, s(:sym, node.children[1])),
           s(:args), process(node.children[2]))
       end
