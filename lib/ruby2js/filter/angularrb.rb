@@ -32,27 +32,13 @@ module Ruby2JS
         return super unless parent_name.children == [nil, :Angular]
 
         @ngApp = module_name.children[1]
-        @ngChildren = node.children
+        @ngChildren = node.children[1..-1]
+        while @ngChildren.length == 1 and @ngChildren.first and @ngChildren.first.type == :begin
+          @ngChildren = @ngChildren.first.children.dup
+        end
         @ngAppUses = []
 
-        # find the block
         block = process_all(node.children[1..-1])
-        while block.length == 1 and block.first and block.first.type == :begin
-          block = block.first.children.dup
-        end
-
-        factories = []
-        block.compact.each do |child|
-          if child.type == :class and child.children.first.children.first == nil
-            name = child.children.first
-            if name.children.first == nil
-              name = name.children.last
-              factories << on_block(s(:block, s(:send, nil, :factory,
-                s(:sym, name)), s(:args), s(:return, s(:const, nil, name))))
-            end
-          end
-        end
-        block += factories
 
         # convert use calls into dependencies
         depends = @ngAppUses.map {|sym| s(:sym, sym)} + extract_uses(block)
@@ -86,9 +72,39 @@ module Ruby2JS
       end
 
       # input: 
+      #   class name {...}
+      #
+      # output:
+      #  app.factory(uses) do
+      #    ...
+      #  end
+      def on_class(node)
+        return super unless @ngApp and @ngChildren.include? node
+        name = node.children.first
+        if name.children.first == nil
+          block = [node.children.last]
+          uses = extract_uses(block)
+          node = process s(:class, name, node.children[1], s(:begin, *block))
+
+          @ngClassUses -= @ngClassOmit + [name.children.last]
+          args = @ngClassUses.map {|sym| s(:arg, sym)} + uses
+          args = args.map {|node| node.children.first.to_sym}.uniq.
+            map {|sym| s(:arg, sym)}
+          @ngClassUses = @ngClassOmit = []
+
+         s(:block, s(:send, s(:lvar, @ngApp), :factory,
+            s(:sym, name.children.last)), s(:args, *args), 
+            s(:begin, node, s(:return, s(:const, nil, name.children.last))))
+        else
+          super
+        end
+      end
+
+      # input: 
       #   filter :name { ... }
       #   controller :name { ... }
       #   factory :name { ... }
+      #   directive :name { ... }
 
       def on_block(node)
         return super unless @ngApp
@@ -119,11 +135,7 @@ module Ruby2JS
         target = target.updated(nil, [s(:lvar, @ngApp), 
           *target.children[1..-1]])
 
-        # find the block
         block = process_all(node.children[2..-1])
-        while block.length == 1 and block.first.type == :begin
-          block = block.first.children.dup
-        end
 
         # convert use calls into args
         @ngClassUses -= @ngClassOmit
@@ -229,6 +241,11 @@ module Ruby2JS
       end
 
       def extract_uses(block)
+        # find the block
+        while block.length == 1 and block.first and block.first.type == :begin
+          block.push *block.shift.children
+        end
+
         # find use class method calls
         uses = block.find_all do |node|
           node and node.type == :send and node.children[0..1] == [nil, :use]

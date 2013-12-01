@@ -138,17 +138,16 @@ describe Ruby2JS::Filter::AngularRB do
         end
       RUBY
 
-      js = "(function() {\n#{<<-JS.gsub!(/^ {6}/, '')}})()"
-        const Service = angular.module("Service", []);
-        function Phone() {};
+      js = <<-JS.gsub!(/^ {8}/, '').chomp
+        angular.module("Service", []).factory("Phone", function() {
+          function Phone() {};
 
-        Phone.name = function() {
-          "XYZZY"
-        };
+          Phone.name = function() {
+            "XYZZY"
+          };
 
-        Service.factory("Phone", [function() {
           return Phone
-        }])
+        })
       JS
 
       to_js( ruby ).must_equal js
