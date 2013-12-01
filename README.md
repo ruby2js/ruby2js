@@ -1,4 +1,4 @@
-ruby2js
+Ruby2js
 =======
 
 Minimal yet extensible Ruby to JavaScript conversion.  
@@ -90,8 +90,82 @@ provides a function named [each](http://api.jquery.com/jQuery.each/).
 
 These approaches aren’t mutually exclusive. With enough static transformations
 and runtime libraries, one could reproduce any functionality desired.  Just be
-forewarned, that implementing a function like `method_missing` would require a
+forewarned, that implementing a function like `method\_missing` would require a
 _lot_ of work.
+
+Integrations
+---
+
+While this is a low level library suitable for DIY integration, one of the
+obvious uses of a tool that produces JavaScript is by web servers.  Ruby2JS
+includes three such integrations:
+
+*  [CGI](https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/cgi.rb)
+*  [Sinatra](https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/sinatra.rb)
+*  [Rails](https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/rails.rb)
+
+As you might expect, CGI is a bit sluggish.  By constrast, Sinatra is speedy.
+Rails is not only equally speedy on the first call, after that it will
+completely cache the results.
+
+Filters
+---
+
+In general, making use of a filter is as simple as requiring it.  If multiple
+filters are selected, they will all be applied in parallel in one pass through
+the script.
+
+* [strict](https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/strict.rb)
+  adds `'use strict';` to the output
+
+* [return](https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/return.rb)
+  adds `return` to the last expression in functions
+
+* [functions](https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/functions.rb)
+
+    * `to\_s` becomes `to\_String`
+    * `to\_i` becomes `parseInt`
+    * `to\_f` becomes `parseFloat`
+    * `sub` becomes `replace`
+    * `gsub` becomes `replace //g`
+    * `first` becomes `[0]`
+    * `last` becomes `[\*.length-1]`
+    * `[-n]` becomes `[\*.length-n]` for literal values of `n`
+    * `[n..m]` becomes `slice(n,m+1)`
+    * `[n...m]` becomes `slice(n,m)`
+    * `puts` becomes `console.log`
+    * `each` becomes `forEach` unless jquery is included
+    * `each\_with\_index` becomes `forEach`
+
+* [jquery](https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/jquery.rb)
+
+    * maps Ruby unary operator `~` to jQuery `$` function
+    * maps Ruby attribute syntax to jquery attribute syntax
+    * maps `$$` to jQuery `$` function
+
+* [angularrb](https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/angularrb.rb)
+
+    * maps Ruby `module` to `angular.module`
+    * maps `filter`, `controller`, `factory`, and `directive` to calls to
+      angular module functions.
+    * maps `use` statements to formal arguments or array values (as
+      appropriate) depending on the module function.
+    * tracks globals variable and constant references and adds additional
+      implicit `use` statements
+    * maps constant assignments in an angular module to a filter
+    * maps class definitions in an angular module to a filter
+
+* [angular-route](https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/angular-routerb.rb)
+
+    * maps `case` statements on `$routeProvider` to angular.js module
+      configuration.
+    * adds implicit module `use` of `ngRoute` when such a `case` statement
+      is encountered
+
+* [angular-resource](https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/angular-resource.rb)
+    * maps `$resource.new` statements on `$resource` function calls.
+    * adds implicit module `use` of `ngResource` when `$resource.new` calls
+      are encountered
 
 Picking a Ruby to JS mapping tool
 ---
@@ -106,6 +180,9 @@ limitations as to what JavaScript can be produced.
 
 [Try](http://intertwingly.net/projects/ruby2js/all) for yourself.
 [Compare](http://opalrb.org/try/#code:).
+
+And, of course, the right solution might be to use
+[CoffeeScript](http://coffeescript.org/) instead.
 
 License
 ---
