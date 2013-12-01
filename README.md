@@ -90,7 +90,7 @@ provides a function named [each](http://api.jquery.com/jQuery.each/).
 
 These approaches aren’t mutually exclusive. With enough static transformations
 and runtime libraries, one could reproduce any functionality desired.  Just be
-forewarned, that implementing a function like `method\_missing` would require a
+forewarned, that implementing a function like `method_missing` would require a
 _lot_ of work.
 
 Integrations
@@ -123,19 +123,19 @@ the script.
 
 * [functions](https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/functions.rb)
 
-    * `to\_s` becomes `to\_String`
-    * `to\_i` becomes `parseInt`
-    * `to\_f` becomes `parseFloat`
+    * `to_s` becomes `to_String`
+    * `to_i` becomes `parseInt`
+    * `to_f` becomes `parseFloat`
     * `sub` becomes `replace`
     * `gsub` becomes `replace //g`
     * `first` becomes `[0]`
-    * `last` becomes `[\*.length-1]`
-    * `[-n]` becomes `[\*.length-n]` for literal values of `n`
+    * `last` becomes `[*.length-1]`
+    * `[-n]` becomes `[*.length-n]` for literal values of `n`
     * `[n..m]` becomes `slice(n,m+1)`
     * `[n...m]` becomes `slice(n,m)`
     * `puts` becomes `console.log`
     * `each` becomes `forEach` unless jquery is included
-    * `each\_with\_index` becomes `forEach`
+    * `each_with_index` becomes `forEach`
 
 * [jquery](https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/jquery.rb)
 
