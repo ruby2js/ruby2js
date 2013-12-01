@@ -64,7 +64,7 @@ and to provide a runtime library that adds properties to global JavaScript
 objects to handle this.  It’s the approach that [Opal](http://opalrb.org/)
 takes.  It is a fine approach, with a number of benefits.  It also has some
 notable drawbacks.  For example,
-[Readability](http://opalrb.org/try/#code:a%20%3D%20%22abc%22%3B%20puts%20a[-1])
+[readability](http://opalrb.org/try/#code:a%20%3D%20%22abc%22%3B%20puts%20a[-1])
 and 
 [compatibility with other frameworks](https://github.com/opal/opal/issues/400).
 
@@ -106,7 +106,7 @@ includes three such integrations:
 
 As you might expect, CGI is a bit sluggish.  By constrast, Sinatra is speedy.
 Rails is not only equally speedy on the first call, after that it will
-completely cache the results.
+avoid the coversion entirely and serve cached results instead.
 
 Filters
 ---
@@ -189,7 +189,7 @@ License
 
 (The MIT License)
 
-Copyright (c) 2009,2013 Macario Ortega, Sam Ruby
+Copyright (c) 2009, 2013 Macario Ortega, Sam Ruby
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
