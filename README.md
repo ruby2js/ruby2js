@@ -144,6 +144,8 @@ the script.
     * maps Ruby unary operator `~` to jQuery `$` function
     * maps Ruby attribute syntax to jquery attribute syntax
     * maps `$$` to jQuery `$` function
+    * defaults fourth parameter of $$.post to :jquery, allowing Ruby block
+      syntax to be used for the success function.
 
 * [angularrb](https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/angularrb.rb)
 

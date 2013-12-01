@@ -23,10 +23,13 @@ require 'ruby2js'
 # Of course, using jQuery's style of getter and setter calls is supported,
 # and indeed is convenient when using method chaining.
 #
-# Finally, the tilde AST rewriting can be avoided by using consecutive tildes
-# (~~ is a common Ruby idiom for Math.floor, ~~~ will return the binary
+# Additionally, the tilde AST rewriting can be avoided by using consecutive
+# tildes (~~ is a common Ruby idiom for Math.floor, ~~~ will return the binary
 # one's complement.); and the getter and setter AST rewriting can be avoided
 # by the use of parenthesis, e.g. (~this).text.
+#
+# Finally, the fourth parameter of $.post defaults to :json, allowing Ruby
+# block syntax to be used for the success function.
 # 
 # Some examples of before/after conversions:
 #
@@ -148,6 +151,27 @@ module Ruby2JS
         else
           super
         end
+      end
+
+      # Example conversion:
+      #   before:
+      #    $$.post ... do ... end
+      #    (block (send (gvar :$$) :post ...) (args) (...))
+      #   after:
+      #    $$.post ..., proc { ... }, :json
+      #    (send (gvar :$$) :post ... 
+      #      (block (send nil :proc) (args) (...)) (:sym :json))
+      def on_block(node)
+        call = node.children.first
+        return super unless call.children.first == s(:gvar, :$$)
+        return super unless call.children[1] == :post
+        return super unless call.children.length <= 4
+        children = call.children.dup
+        children << s(:str, '') if children.length <= 2
+        children << s(:hash) if children.length <= 3
+        children << s(:block, s(:send, nil, :proc), *node.children[1..-1])
+        children << s(:sym, :json)
+        process call.updated nil, children
       end
     end
 

@@ -65,6 +65,13 @@ describe Ruby2JS::Filter::JQuery do
     end
   end
 
+  describe 'post defaults' do
+    it 'should default post parameters' do
+      to_js( '$$.post { x() }' ).
+        must_equal '$.post("", {}, function() {x()}, "json")'
+    end
+  end
+
   describe Ruby2JS::Filter::DEFAULTS do
     it "should include JQuery" do
       Ruby2JS::Filter::DEFAULTS.must_include Ruby2JS::Filter::JQuery
