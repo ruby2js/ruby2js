@@ -136,6 +136,8 @@ the script.
     * `puts` becomes `console.log`
     * `each` becomes `forEach` unless jquery is included
     * `each_with_index` becomes `forEach`
+    * `setInterval` and `setTimeout` allow block to be treated as the
+       first parameter on the call
 
 * [jquery](https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/jquery.rb)
 

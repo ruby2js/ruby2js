@@ -95,6 +95,14 @@ module Ruby2JS
           super
         end
       end
+
+      def on_block(node)
+        call = node.children.first
+        return super unless call.children.first == nil
+        return super unless [:setInterval, :setTimeout].include? call.children[1]
+        block = s(:block, s(:send, nil, :proc), *node.children[1..-1])
+        call.updated nil, [*call.children[0..1], block, *call.children[2..-1]]
+      end
     end
 
     DEFAULTS.push Functions

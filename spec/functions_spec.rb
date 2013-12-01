@@ -81,6 +81,18 @@ describe Ruby2JS::Filter::Functions do
     end
   end
 
+  describe 'setTimeout/setInterval' do
+    it "should handle setTimeout with first parameter passed as a block" do
+      to_js( 'setInterval(100) {x()}' ).
+        must_equal 'setInterval(function() {x()}, 100)'
+    end
+
+    it "should handle setInterval with first parameter passed as a block" do
+      to_js( 'setInterval(100) {x()}' ).
+        must_equal 'setInterval(function() {x()}, 100)'
+    end
+  end
+
   describe Ruby2JS::Filter::DEFAULTS do
     it "should include Functions" do
       Ruby2JS::Filter::DEFAULTS.must_include Ruby2JS::Filter::Functions
