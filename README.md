@@ -167,6 +167,19 @@ the script.
     * adds implicit module `use` of `ngResource` when `$resource.new` calls
       are encountered
 
+[Wunderbar](https://github.com/rubys/wunderbar) includes additional demos:
+
+* [wiki](https://github.com/rubys/wunderbar/blob/master/demo/wiki.rb) makes
+  use of the jquery filter.
+
+* [angularjs](https://github.com/rubys/wunderbar/blob/master/demo/angularjs.rb)
+  makes use of the angular filters to implement the 
+  [angular.js tutorial](http://docs.angularjs.org/tutorial).  This demo
+  includes:
+    * [view](https://github.com/rubys/wunderbar/blob/master/demo/views/index._html)
+    * [partials](https://github.com/rubys/wunderbar/tree/master/demo/partials)
+    * [js](https://github.com/rubys/wunderbar/tree/master/demo/js)
+
 Picking a Ruby to JS mapping tool
 ---
 
