@@ -69,7 +69,13 @@ module Ruby2JS
       # prepend constructor
       body.unshift s(:def, parse(name), *init.children[1..-1])
 
-      parse s(:begin, *body.compact)
+      begin
+        # inhibit ivar substitution within a class definition.  See ivars.rb
+        ivars, self.ivars = self.ivars, nil
+        parse s(:begin, *body.compact)
+      ensure
+        self.ivars = ivars
+      end
     end
   end
 end

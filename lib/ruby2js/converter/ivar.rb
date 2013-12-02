@@ -4,7 +4,11 @@ module Ruby2JS
     # (ivar :@a)
 
     handle :ivar do |var|
-      var.to_s.sub('@', 'this._')
+      if self.ivars and self.ivars.include? var
+        Ruby2JS.convert(self.ivars[var].inspect)
+      else
+        var.to_s.sub('@', 'this._')
+      end
     end
   end
 end

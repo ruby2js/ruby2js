@@ -39,6 +39,11 @@ module Ruby2JS
     ruby2js = Ruby2JS::Converter.new( ast )
 
     ruby2js.binding = options[:binding]
+    ruby2js.ivars = options[:ivars]
+    if ruby2js.binding and not ruby2js.ivars
+      ruby2js.ivars = ruby2js.binding.eval \
+        'Hash[instance_variables.map {|var| [var, instance_variable_get(var)]}]'
+    end
 
     if source.include? "\n"
       ruby2js.enable_vertical_whitespace 

@@ -621,4 +621,15 @@ describe Ruby2JS do
       to_js( '%x(foo)', binding: binding ).must_equal foo
     end
   end
+
+  describe 'ivars' do
+    it "should handle ivars" do
+      to_js( '@x', ivars: {:@x => 1} ).must_equal '1'
+    end
+
+    it "should not handle replace ivars in class definitions" do
+      to_js( 'class F; def f; @x; end; end', ivars: {:@x => 1} ).
+        must_equal 'function F() {}; F.prototype.f = function() {this._x}'
+    end
+  end
 end

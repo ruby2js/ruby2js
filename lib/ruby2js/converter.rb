@@ -6,7 +6,7 @@ module Ruby2JS
     OPERATORS = [:[], :[]=], [:not, :!], [:*, :/, :%], [:+, :-], [:>>, :<<], 
       [:<=, :<, :>, :>=], [:==, :!=, :===, :"!=="], [:and, :or]
     
-    attr_accessor :binding
+    attr_accessor :binding, :ivars
 
     def initialize( ast, vars = {} )
       @ast, @vars = ast, vars.dup
