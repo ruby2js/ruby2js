@@ -52,6 +52,8 @@ module Ruby2JS
       pending = false
       blank = true
       lines.each do |line|
+        next if line.empty?
+
         if ')}]'.include? line[0]
           pre.sub!(/^  /,'')
           line.sub!(/([,;])$/,"\\1\n")
