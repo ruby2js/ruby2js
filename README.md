@@ -45,8 +45,8 @@ Introduction
 ---
 
 JavaScript is a language where `0` is considered `false`, strings are
-immutable, and the [behaviors](http://zero.milosz.ca/) for operators like `==` 
-are, at best, convoluted.
+immutable, and the behaviors for operators like `==` are, at best,
+[convoluted](http://zero.milosz.ca/).
 
 Any attempt to bridge the semantics of Ruby and JavaScript will involve
 trade-offs.  Consider the following expression:
@@ -57,7 +57,7 @@ a[-1]
 
 Programmers who are familiar with Ruby will recognize that this returns the
 last element (or character) of an array (or string).  However, the meaning is
-quite different if a is a Hash.
+quite different if `a` is a Hash.
 
 One way to resolve this is to change the way indexing operators are evaluated,
 and to provide a runtime library that adds properties to global JavaScript
@@ -104,9 +104,9 @@ includes three such integrations:
 *  [Sinatra](https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/sinatra.rb)
 *  [Rails](https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/rails.rb)
 
-As you might expect, CGI is a bit sluggish.  By constrast, Sinatra is speedy.
-Rails is not only equally speedy on the first call, after that it will
-avoid the coversion entirely and serve cached results instead.
+As you might expect, CGI is a bit sluggish.  By constrast, Sinatra are quite
+speedy as the bulk of the time is spend on the initial load of the required
+libraries.
 
 Filters
 ---
