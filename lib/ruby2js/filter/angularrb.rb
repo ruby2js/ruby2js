@@ -90,7 +90,7 @@ module Ruby2JS
           args = @ngClassUses.map {|sym| s(:arg, sym)} + uses
           args = args.map {|node| node.children.first.to_sym}.uniq.
             map {|sym| s(:arg, sym)}
-          @ngClassUses = @ngClassOmit = []
+          @ngClassUses, @ngClassOmit = [], []
 
          s(:block, s(:send, s(:lvar, @ngApp), :factory,
             s(:sym, name.children.last)), s(:args, *args), 
@@ -143,7 +143,7 @@ module Ruby2JS
         args += @ngClassUses.map {|sym| s(:arg, sym)} + extract_uses(block)
         args = args.map {|node| node.children.first.to_sym}.uniq.
           map {|sym| s(:arg, sym)}
-        @ngClassUses = @ngClassOmit = []
+        @ngClassUses, @ngClassOmit = [], []
 
         node.updated :block, [target, s(:args, *args), s(:begin, *block)]
       end
