@@ -24,6 +24,10 @@ describe Ruby2JS::Filter::JQuery do
       to_js( '~"span"' ).must_equal '$("span")'
     end
 
+    it "should handle jquery calls with multiple parameters" do
+      to_js( '~["span", self]' ).must_equal '$("span", this)'
+    end
+
     it "should handle chained jquery calls" do
       to_js( '~this.show.fadeOut' ).must_equal '$(this).show().fadeOut()'
     end

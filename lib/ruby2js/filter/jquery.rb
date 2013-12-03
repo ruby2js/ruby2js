@@ -11,6 +11,8 @@ require 'ruby2js'
 # So as a second accomodation, the rarely used binary one's complement unary
 # operator (namely, ~) is usurped, and the AST is rewritten to provide the
 # effect of this operator being of a higher precedence than method calls.
+# Passing multiple parameters can be accomplished by using array index
+# syntax (e.g., ~['a', self])
 #
 # As a part of this rewriting, calls to getters and setters are rewritten
 # to match jQuery's convention for getters and setters:
@@ -141,8 +143,11 @@ module Ruby2JS
               # method call with a block parameter
               node.updated nil, [rewrite_tilda[node.children[0]],
                 *process_all(node.children[1..-1])]
+            elsif node.type == :array
+              # innermost expression is an array
+              s(:send, nil, '$', *process(node))
             else
-              # innermost expression
+              # innermost expression is a scalar
               s(:send, nil, '$', process(node))
             end
           end
