@@ -103,7 +103,7 @@ module Ruby2JS
           args = args.map {|a| parse a}
           if args.any? {|arg| arg.to_s.include? "\n"}
             "#{ call }(#{ args.join(', ') })"
-          elsif args.map {|arg| arg.length+2}.reduce(&:+).to_i < 70
+          elsif args.map {|arg| arg.length+2}.reduce(&:+).to_i < @width-10
             "#{ call }(#{ args.join(', ') })"
           else
             "#{ call }(#@nl#{ args.join(",#@ws") }#@nl)"

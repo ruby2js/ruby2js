@@ -14,6 +14,7 @@ module Ruby2JS
       @nl = ''
       @ws = ' '
       @varstack = []
+      @width = 80
 
       @handlers = {}
       @@handlers.each do |name|
@@ -29,6 +30,10 @@ module Ruby2JS
 
     def binding=(binding)
       @binding = binding
+    end
+
+    def width=(width)
+      @width = width
     end
 
     def to_js

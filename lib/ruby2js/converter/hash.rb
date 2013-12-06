@@ -14,7 +14,7 @@ module Ruby2JS
         "#{key}: #{parse right}"
       end
 
-      if pairs.map {|item| item.length+2}.reduce(&:+).to_i < 70
+      if pairs.map {|item| item.length+2}.reduce(&:+).to_i < @width-10
         "{#{ pairs.join(', ') }}"
       else
         "{#@nl#{ pairs.join(",#@ws") }#@nl}"

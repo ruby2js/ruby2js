@@ -22,7 +22,7 @@ module Ruby2JS
         end
       else
         items.map! { |item| parse item }
-        if items.map {|item| item.length+2}.reduce(&:+).to_i < 72
+        if items.map {|item| item.length+2}.reduce(&:+).to_i < @width-8
           "[#{ items.join(', ') }]"
         else
           "[#@nl#{ items.join(",#@ws") }#@nl]"

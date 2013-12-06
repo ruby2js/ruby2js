@@ -45,6 +45,8 @@ module Ruby2JS
         'Hash[instance_variables.map {|var| [var, instance_variable_get(var)]}]'
     end
 
+    ruby2js.width = options[:width] if options[:width]
+
     if source.include? "\n"
       ruby2js.enable_vertical_whitespace 
       lines = ruby2js.to_js.split("\n")

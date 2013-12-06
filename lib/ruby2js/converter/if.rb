@@ -24,7 +24,7 @@ module Ruby2JS
         output << " else {#@nl#{ scope else_block }#@nl}" if else_block
 
         # use short form when appropriate
-        unless output.length > 72 or else_block or then_block.type == :begin
+        unless output.length>@width-8 or else_block or then_block.type == :begin
           output = "if (#{ parse condition }) #{ scope then_block }"
         end
 
