@@ -312,6 +312,16 @@ describe Ruby2JS do
         must_equal 'var a = 0; [1, 2, 3].forEach(function(i) {a += i})'
     end
 
+    it "should handle a for loop with an inclusive range" do
+      to_js( 'a = 0; for i in 1..3; a += i; end' ).
+        must_equal 'var a = 0; for (var i = 1; i <= 3; i++) {a += i}'
+    end
+
+    it "should handle a for loop with an exclusive range" do
+      to_js( 'a = 0; for i in 1...4; a += i; end' ).
+        must_equal 'var a = 0; for (var i = 1; i < 4; i++) {a += i}'
+    end
+
     it "should handle break" do
       to_js( 'break' ).must_equal 'break'
     end
