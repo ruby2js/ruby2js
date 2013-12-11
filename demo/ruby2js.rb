@@ -35,11 +35,12 @@ rescue Exception => $load_error
 end
 
 _html do
-  _h1 'Ruby2JS'
+  _title 'Ruby2JS'
   _style %{
     textarea {display: block}
   }
 
+  _h1 { _a 'Ruby2JS', href: 'https://github.com/rubys/ruby2js#ruby2js' }
   _form method: 'post' do
     _textarea @ruby, name: 'ruby', rows: 8, cols: 80
     _input type: 'submit', value: 'Convert'
