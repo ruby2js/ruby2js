@@ -134,6 +134,9 @@ describe Ruby2JS::Filter::AngularRB do
             def self.name
               "XYZZY"
             end
+            def self.reset
+              "PLUGH"
+            end
           end
         end
       RUBY
@@ -144,6 +147,10 @@ describe Ruby2JS::Filter::AngularRB do
 
           Phone.name = function() {
             "XYZZY"
+          };
+
+          Phone.reset = function() {
+            "PLUGH"
           };
 
           return Phone

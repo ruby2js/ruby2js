@@ -84,7 +84,8 @@ module Ruby2JS
         if name.children.first == nil
           block = [node.children.last]
           uses = extract_uses(block)
-          node = process s(:class, name, node.children[1], s(:begin, *block))
+          node = s(:class, name, node.children[1], 
+            s(:begin, *process_all(block)))
 
           @ngClassUses -= @ngClassOmit + [name.children.last]
           args = @ngClassUses.map {|sym| s(:arg, sym)} + uses
