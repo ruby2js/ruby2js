@@ -27,14 +27,17 @@ module Ruby2JS
           end
         elsif m.type == :defs and m.children.first == s(:self)
           # class method definition: add to prototype
-          s(:send, name, "#{m.children[1]}=",
-            s(:block, s(:send, nil, :proc), *m.children[2..-1]))
+          s(:prototype, s(:send, name, "#{m.children[1]}=",
+            s(:block, s(:send, nil, :proc), *m.children[2..-1])))
         elsif m.type == :send and m.children.first == nil
           # class method call
           s(:send, name, *m.children[1..-1])
         elsif m.type == :lvasgn
           # class variable
           s(:send, name, "#{m.children[0]}=", *m.children[1..-1])
+        elsif m.type == :cvasgn
+          # class variable
+          s(:send, name, "_#{m.children[0][2..-1]}=", *m.children[1..-1])
         elsif m.type == :casgn and m.children[0] == nil
           # class constant
           s(:send, name, "#{m.children[1]}=", *m.children[2..-1])
@@ -58,6 +61,7 @@ module Ruby2JS
 
         # collapse sequence of methods to a single assignment
         if methods > 1
+          body.compact!
           pairs = body[0...methods].map do |node|
             s(:pair, s(:str, node.children[1].chomp('=')), node.children[2])
           end

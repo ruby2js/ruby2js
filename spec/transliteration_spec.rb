@@ -424,6 +424,11 @@ describe Ruby2JS do
         must_equal 'function Person(name) {this._name = name}; Person.prototype.name = function() {return this._name}'
     end
 
+    it "should parse class with constructor and two methods" do
+      to_js('class Person; def initialize(name); @name = name; end; def name; return @name; end; def reset; @name = nil; end; end').
+        must_equal 'function Person(name) {this._name = name}; Person.prototype = {name: function() {return this._name}, reset: function() {this._name = null}}'
+    end
+
     it "should parse class with contructor and methods with multiple arguments" do
       to_js('class Person; def initialize(name, surname); @name, @surname = name, surname; end; def full_name; return @name  + @surname; end; end').
         must_equal 'function Person(name, surname) {this._name = name; this._surname = surname}; Person.prototype.full_name = function() {return this._name + this._surname}'
