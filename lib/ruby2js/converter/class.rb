@@ -74,11 +74,14 @@ module Ruby2JS
       body.unshift s(:def, parse(name), *init.children[1..-1])
 
       begin
+        # save class name
+        class_name, @class_name = @class_name, name
         # inhibit ivar substitution within a class definition.  See ivars.rb
         ivars, self.ivars = self.ivars, nil
         parse s(:begin, *body.compact)
       ensure
         self.ivars = ivars
+        @class_name = class_name
       end
     end
   end

@@ -445,8 +445,23 @@ describe Ruby2JS do
     end
 
     it "should parse class with class variables" do
-      to_js('class Person; count=0; end').
-        must_equal 'function Person() {}; Person.count = 0'
+      to_js('class Person; @@count=0; end').
+        must_equal 'function Person() {}; Person._count = 0'
+    end
+
+    it "should parse instance methods with class variables" do
+      to_js('class Person; def count; return @@count; end; end').
+        must_equal 'function Person() {}; Person.prototype.count = function() {return Person._count}'
+    end
+
+    it "should parse class methods with class variables" do
+      to_js('class Person; def self.count; return @@count; end; end').
+        must_equal 'function Person() {}; Person.count = function() {return this._count}'
+    end
+
+    it "should parse constructor methods with class variables" do
+      to_js('class Person; def initialize; @@count+=1; end; end').
+        must_equal 'function Person() {Person._count++}'
     end
 
     it "should parse class with class constants" do
