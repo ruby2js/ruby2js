@@ -94,6 +94,9 @@ module Ruby2JS
           else
             parse s(:lvasgn, method), @state
           end
+        elsif args.length == 1 and args.first.type == :splat
+          parse s(:send, s(:attr, receiver, method), :apply, receiver, 
+            args.first.children.first)
         elsif args.length > 0 and args.last.type == :splat
           parse s(:send, s(:attr, receiver, method), :apply, receiver, 
             s(:send, s(:array, *args[0..-2]), :concat,

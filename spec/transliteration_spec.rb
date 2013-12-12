@@ -139,6 +139,11 @@ describe Ruby2JS do
         must_equal 'console.log.apply(console, ["a", "b"].concat(["c", "d", "e"]))'
     end
 
+    it "should optimize splat as only arg" do
+      to_js( "console.log *%w(a b c d e)" ).
+        must_equal 'console.log.apply(console, ["a", "b", "c", "d", "e"])'
+    end
+
     it "should receive splat" do
       to_js( "def f(a,*b); return b; end" ).
         must_equal "function f(a) {var b = Array.prototype.slice.call(arguments, 1); return b}"
