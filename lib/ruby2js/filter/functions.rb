@@ -33,6 +33,16 @@ module Ruby2JS
           end
           node.updated nil, [source, :replace, before, after]
 
+        elsif node.children[1] == :empty? and node.children.length == 2
+          s(:send, s(:attr, node.children[0], :length), :==, s(:int, 0))
+
+        elsif node.children[1] == :clear! and node.children.length == 2
+          s(:send, node.children[0], :length=, s(:int, 0))
+
+        elsif node.children[1] == :include? and node.children.length == 3
+          s(:send, s(:send, node.children[0], :indexOf, node.children[2]),
+            :!=, s(:int, -1))
+
         elsif node.children[1] == :each
           if @each # disable `each` mapping, see jquery filter for an example
             super
@@ -98,10 +108,22 @@ module Ruby2JS
 
       def on_block(node)
         call = node.children.first
-        return super unless call.children.first == nil
-        return super unless [:setInterval, :setTimeout].include? call.children[1]
-        block = process s(:block, s(:send, nil, :proc), *node.children[1..-1])
-        call.updated nil, [*call.children[0..1], block, *call.children[2..-1]]
+        if [:setInterval, :setTimeout].include? call.children[1]
+          return super unless call.children.first == nil
+          block = process s(:block, s(:send, nil, :proc), *node.children[1..-1])
+          call.updated nil, [*call.children[0..1], block, *call.children[2..-1]]
+
+        elsif [:any?].include? call.children[1] and call.children.length == 2
+          call = call.updated nil, [call.children.first, :some]
+          node.updated nil, [call, *node.children[1..-1]]
+
+        elsif [:all?].include? call.children[1] and call.children.length == 2
+          call = call.updated nil, [call.children.first, :every]
+          node.updated nil, [call, *node.children[1..-1]]
+
+        else
+          super
+        end
       end
     end
 
