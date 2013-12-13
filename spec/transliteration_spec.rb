@@ -456,7 +456,7 @@ describe Ruby2JS do
 
     it "should parse class methods with class variables" do
       to_js('class Person; def self.count; return @@count; end; end').
-        must_equal 'function Person() {}; Person.count = function() {return this._count}'
+        must_equal 'function Person() {}; Person.count = function() {return Person._count}'
     end
 
     it "should parse constructor methods with class variables" do

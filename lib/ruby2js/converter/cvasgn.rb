@@ -5,10 +5,10 @@ module Ruby2JS
     #   (int 1))
 
     handle :cvasgn do |var, expression=nil|
-      if @prototype
-        var = var.to_s.sub('@@', 'this._')
-      elsif @class_name
+      if @class_name
         var = var.to_s.sub('@@', "#{parse @class_name}._")
+      elsif @prototype
+        var = var.to_s.sub('@@', 'this._')
       else
         var = var.to_s.sub('@@', 'this.constructor._')
       end
