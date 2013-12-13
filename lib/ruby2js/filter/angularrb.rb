@@ -158,6 +158,10 @@ module Ruby2JS
       #   AppName.filter :name do
       #     return lambda {|input| return ... }
       #   end
+      EXPRESSION = [ :and, :array, :attr, :const, :cvar, :defined?, :dstr,
+        :dsym, :false, :float, :gvar, :hash, :int, :ivar, :lvar, :nil, :not,
+        :or, :regexp, :self, :send, :str, :sym, :true, :undefined?, :xstr ]
+
       def ng_filter(node)
         call = node.children.first
 
@@ -168,7 +172,7 @@ module Ruby2JS
         while tail.length == 1 and tail.first.type == :begin
           tail = tail.first.children.dup
         end
-        tail.push s(:return, tail.pop) unless tail.last.type == :return
+        tail.push s(:return, tail.pop) if EXPRESSION.include? tail.last.type
         block.push (tail.length == 1 ? tail.first : s(:begin, *tail))
 
         # construct a function returning a function

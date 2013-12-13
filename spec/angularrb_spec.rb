@@ -56,11 +56,7 @@ describe Ruby2JS::Filter::AngularRB do
       ruby = <<-RUBY
         module Angular::PhonecatApp 
           filter :pnl do |input|
-            if input < 0
-              "loss"
-            else
-              "profit"
-            end
+            return (input < 0 ? "loss" : "profit")
           end
         end
       RUBY
