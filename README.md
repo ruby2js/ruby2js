@@ -133,6 +133,11 @@ the script.
     * `[-n]` becomes `[*.length-n]` for literal values of `n`
     * `[n..m]` becomes `slice(n,m+1)`
     * `[n...m]` becomes `slice(n,m)`
+    * `.empty?` becomes `.length == 0`
+    * `.clear!` becomes `.length = 0`
+    * `.include?` becomes `.indexOf() != -1`
+    * `.any?` becomes `.some`
+    * `.all?` becomes `.every`
     * `puts` becomes `console.log`
     * `each` becomes `forEach` unless jquery is included
     * `each_with_index` becomes `forEach`
