@@ -19,10 +19,8 @@ module Ruby2JS
           "#{ parse var } < #{ parse expression.children.last }; " +
           "#{ parse var }++) {#@nl#{ scope block }#@nl}"
       else
-        parse s(:block,
-          s(:send, expression, :forEach),
-          s(:args, s(:arg, var.children.last)),
-          block);
+        "for (var #{parse var} in #{ parse expression }) " +
+          "{#@nl#{ scope block }#@nl}"
       end
     end
   end

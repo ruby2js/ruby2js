@@ -313,8 +313,8 @@ describe Ruby2JS do
     end
 
     it "should handle a for loop" do
-      to_js( 'a = 0; for i in [1,2,3]; a += i; end' ).
-        must_equal 'var a = 0; [1, 2, 3].forEach(function(i) {a += i})'
+      to_js( 'a = {}; b = {}; for i in a; b[i] = a[i]; end' ).
+        must_equal 'var a = {}; var b = {}; for (var i in a) {b[i] = a[i]}'
     end
 
     it "should handle a for loop with an inclusive range" do
