@@ -599,8 +599,16 @@ describe Ruby2JS do
       to_js( '/a.*b/im' ).must_equal "/a.*b/im"
     end
 
-    it "should handle regular expressions with options" do
+    it "should handle %regular expressions" do
       to_js( '%r{/\w+}' ).must_equal %{new RegExp("/\\\\w+")}
+    end
+
+    it "should handle extended regular expressions" do
+      to_js( "/a\nb/x" ).must_equal "/ab/"
+    end
+
+    it "should handle regular expressions with interpolation" do
+      to_js( '/a#{b}c/x' ).must_equal 'new RegExp("a" + b + "c")'
     end
 
     it "should handle regular expressions tests" do

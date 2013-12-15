@@ -5,16 +5,38 @@ module Ruby2JS
     #   (str "x")
     #   (regopt :i))
 
-    handle :regexp do |str, opt|
-      str = str.children.first 
-      if str.include? '/'
-        if opt.children.empty?
-          "new RegExp(#{ str.inspect })"
-        else
-          "new RegExp(#{ str.inspect }, #{ opt.children.join.inspect})"
+    handle :regexp do |*parts, opt|
+      extended = false
+      opts = opt.children
+      if opts.include? :x
+        opts = opts.dup - [:x]
+        extended = true
+      end
+
+      if parts.all? {|part| part.type == :str}
+        str = parts.map {|part| part.children.first}.join
+        str = str.gsub(/ #.*/,'').gsub(/\s/,'') if extended
+        unless str.include? '/'
+          return "/#{ str }/#{ opts.join }"
         end
+        str = str.inspect
       else
-        "/#{ str }/#{ opt.children.join }"
+        parts.map! do |part|
+          if part.type == :str
+            str = part.children.first 
+            str = str.gsub(/ #.*/,'').gsub(/\s/,'') if extended
+            str.inspect
+          else
+            parse part
+          end
+        end
+        str = parts.join(' + ')
+      end
+
+      if opts.empty?
+        "new RegExp(#{ str })"
+      else
+        "new RegExp(#{ str }, #{ opts.join.inspect})"
       end
     end
   end
