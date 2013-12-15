@@ -49,6 +49,42 @@ describe Ruby2JS::Filter::AngularRB do
 
       to_js( ruby ).must_equal js
     end
+
+    it "factory references should imply use" do
+      ruby = <<-RUBY
+        module Angular::PhonecatApp 
+          controller :PhoneListCtrl do 
+            $scope.phones = Phone.list()
+          end
+        end
+      RUBY
+
+      js = <<-JS.gsub!(/^ {8}/, '').chomp
+        angular.module("PhonecatApp", []).controller("PhoneListCtrl", function($scope, Phone) {
+          $scope.phones = Phone.list()
+        })
+      JS
+
+      to_js( ruby ).must_equal js
+    end
+
+    it "reference to builtins shouldn't imply use" do
+      ruby = <<-'RUBY'
+        module Angular::PhonecatApp 
+          controller :PhoneListCtrl do 
+            $scope.phone_pattern = RegExp.new('\d{3}-\d{3}-\d{4}')
+          end
+        end
+      RUBY
+
+      js = <<-'JS'.gsub!(/^ {8}/, '').chomp
+        angular.module("PhonecatApp", []).controller("PhoneListCtrl", function($scope) {
+          $scope.phone_pattern = new RegExp("\\d{3}-\\d{3}-\\d{4}")
+        })
+      JS
+
+      to_js( ruby ).must_equal js
+    end
   end
   
   describe 'filter' do
@@ -56,15 +92,15 @@ describe Ruby2JS::Filter::AngularRB do
       ruby = <<-RUBY
         module Angular::PhonecatApp 
           filter :pnl do |input|
-            return (input < 0 ? "loss" : "profit")
+            return $sce.trustAsHTML(input < 0 ? "loss" : "<em>profit</em>")
           end
         end
       RUBY
 
       js = <<-JS.gsub!(/^ {8}/, '').chomp
-        angular.module("PhonecatApp", []).filter("pnl", function() {
+        angular.module("PhonecatApp", []).filter("pnl", function($sce) {
           return function(input) {
-            return (input < 0 ? "loss" : "profit")
+            return $sce.trustAsHTML((input < 0 ? "loss" : "<em>profit</em>"))
           }
         })
       JS

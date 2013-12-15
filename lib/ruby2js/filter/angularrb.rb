@@ -168,6 +168,7 @@ module Ruby2JS
         # insert return
         args = process_all(node.children[1].children)
         block = process_all(node.children[2..-1])
+        uses = @ngClassUses.uniq.map {|sym| s(:arg, sym)}
         tail = [block.pop || s(:nil)]
         while tail.length == 1 and tail.first.type == :begin
           tail = tail.first.children.dup
@@ -179,7 +180,7 @@ module Ruby2JS
         inner = s(:block, s(:send, nil, :lambda), s(:args, *args), *block)
         outer = s(:send, s(:lvar, @ngApp), :filter, *call.children[2..-1])
 
-        node.updated nil, [outer, s(:args), s(:return, inner)]
+        node.updated nil, [outer, s(:args, *uses), s(:return, inner)]
       end
 
       # input: 
@@ -237,9 +238,14 @@ module Ruby2JS
         super
       end
 
+      BUILTINS = [ :Array, :Boolean, :Date, :Error, :Function, :Infinity, :JSON,
+        :Math, :NaN, :Number, :Object, :RegExp, :String ]
+
       def on_const(node)
-        if @ngClassUses
-          @ngClassUses << node.children.last if not node.children.first
+        if @ngClassUses and not node.children.first
+          unless BUILTINS.include? node.children.last
+            @ngClassUses << node.children.last
+          end
         end
 
         super
