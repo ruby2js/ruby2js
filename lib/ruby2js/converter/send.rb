@@ -70,7 +70,30 @@ module Ruby2JS
         "#{ parse receiver }#{ '.' if receiver }#{ method.to_s.sub(/=$/, ' =') } #{ parse args.first }"
 
       elsif method == :new and receiver
+        # map Ruby's "Regexp" to JavaScript's "Regexp"
+        if receiver == s(:const, nil, :Regexp)
+          receiver = s(:const, nil, :RegExp)
+        end
+
+        # allow a RegExp to be constructed from another RegExp
+        if receiver == s(:const, nil, :RegExp)
+          if args.first.type == :regexp
+            opts = ''
+            if args.first.children.last.children.length > 0
+              opts = args.first.children.last.children.join
+            end
+
+            if args.length > 1
+              opts += args.last.children.last
+            end
+
+            return parse s(:regexp, *args.first.children[0...-1],
+              s(:regopt, *opts.split('').map(&:to_sym)))
+          end
+        end
+
         args = args.map {|a| parse a}.join(', ')
+
         if args.length > 0 or is_method?(ast)
           "new #{ parse receiver }(#{ args })"
         else

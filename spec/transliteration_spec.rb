@@ -611,6 +611,15 @@ describe Ruby2JS do
       to_js( '/a#{b}c/x' ).must_equal 'new RegExp("a" + b + "c")'
     end
 
+    it "should map Ruby's Regexp to JavaScript's RegExp" do
+      to_js( 'Regexp.new("a")' ).must_equal 'new RegExp("a")'
+    end
+
+    it "should allow Regexps to be passed on the Regexp constructor" do
+      # not allowed by Ruby or JS, but useful for adding JS specific flags
+      to_js( "Regexp.new(/a\nb/ix, 'g')" ).must_equal '/ab/ig'
+    end
+
     it "should handle regular expressions tests" do
       to_js( "'abc' =~ /abc/" ).must_equal '/abc/.test("abc")'
     end
