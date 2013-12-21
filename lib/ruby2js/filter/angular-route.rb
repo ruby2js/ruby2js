@@ -39,12 +39,12 @@ module Ruby2JS
         end
 
         node.children[1..-2].each do |child|
-          code = s(:send, code, :when, child.children.first,
+          code = s(:sendw, code, :when, child.children.first,
             hash[child.children[1..-1]])
         end
 
         if node.children.last
-          code = s(:send, code, :otherwise, 
+          code = s(:sendw, code, :otherwise, 
             hash[node.children[-1..-1]])
         end
 
