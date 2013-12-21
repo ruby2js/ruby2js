@@ -61,7 +61,7 @@ quite different if `a` is a Hash.
 
 One way to resolve this is to change the way indexing operators are evaluated,
 and to provide a runtime library that adds properties to global JavaScript
-objects to handle this.  It’s the approach that [Opal](http://opalrb.org/)
+objects to handle this.  This is the approach that [Opal](http://opalrb.org/)
 takes.  It is a fine approach, with a number of benefits.  It also has some
 notable drawbacks.  For example,
 [readability](http://opalrb.org/try/#code:a%20%3D%20%22abc%22%3B%20puts%20a[-1])
@@ -76,11 +76,11 @@ A third approach would be to do static transformations on the source in order
 to address common usage patterns or idioms.  These transformations can even be
 occasionally unsafe, as long as the transformations themselves are opt-in.
 ruby2js provides a number of such filters, including one that handles negative
-indexes when passes as a literal.  As indicated above, this is unsafe in that
+indexes when passed as a literal.  As indicated above, this is unsafe in that
 it will do the wrong thing when it encounters a hash index which is expressed
 as a literal constant negative one.  My experience is that such is rare enough
 to be safely ignored, but YMMV.  More troublesome, this also won’t work when
-the index is not a literal (e.g., `a[n]`) where the index happens to be
+the index is not a literal (e.g., `a[n]`) and the index happens to be
 negative at runtime.
 
 This quickly gets into gray areas.  `each` in Ruby is a common method that
@@ -104,9 +104,9 @@ includes three such integrations:
 *  [Sinatra](https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/sinatra.rb)
 *  [Rails](https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/rails.rb)
 
-As you might expect, CGI is a bit sluggish.  By constrast, Sinatra are quite
-speedy as the bulk of the time is spend on the initial load of the required
-libraries.
+As you might expect, CGI is a bit sluggish.  By constrast, Sinatra and Rails
+are quite speedy as the bulk of the time is spend on the initial load of the
+required libraries.
 
 Filters
 ---
@@ -123,13 +123,13 @@ the script.
 
 * [functions](https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/functions.rb)
 
-    * `to_s` becomes `to_String`
-    * `to_i` becomes `parseInt`
-    * `to_f` becomes `parseFloat`
-    * `sub` becomes `replace`
-    * `gsub` becomes `replace //g`
-    * `first` becomes `[0]`
-    * `last` becomes `[*.length-1]`
+    * `.to_s` becomes `to_String`
+    * `.to_i` becomes `parseInt`
+    * `.to_f` becomes `parseFloat`
+    * `.sub` becomes `replace`
+    * `.gsub` becomes `replace //g`
+    * `.first` becomes `[0]`
+    * `.last` becomes `[*.length-1]`
     * `[-n]` becomes `[*.length-n]` for literal values of `n`
     * `[n..m]` becomes `slice(n,m+1)`
     * `[n...m]` becomes `slice(n,m)`
@@ -139,8 +139,8 @@ the script.
     * `.any?` becomes `.some`
     * `.all?` becomes `.every`
     * `puts` becomes `console.log`
-    * `each` becomes `forEach` unless jquery is included
-    * `each_with_index` becomes `forEach`
+    * `.each` becomes `forEach` unless jquery is included
+    * `.each_with_index` becomes `forEach`
     * `setInterval` and `setTimeout` allow block to be treated as the
        first parameter on the call
 
@@ -149,7 +149,7 @@ the script.
     * maps Ruby unary operator `~` to jQuery `$` function
     * maps Ruby attribute syntax to jquery attribute syntax
     * maps `$$` to jQuery `$` function
-    * defaults fourth parameter of $$.post to :jquery, allowing Ruby block
+    * defaults the fourth parameter of $$.post to :jquery, allowing Ruby block
       syntax to be used for the success function.
 
 * [angularrb](https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/angularrb.rb)
@@ -178,7 +178,9 @@ the script.
 
 [Wunderbar](https://github.com/rubys/wunderbar) includes additional demos:
 
-* [wiki](https://github.com/rubys/wunderbar/blob/master/demo/wiki.rb) makes
+* [chat](https://github.com/rubys/wunderbar/blob/master/demo/chat.rb),
+  [diskusage](https://github.com/rubys/wunderbar/blob/master/demo/diskusage.rb),
+  and [wiki](https://github.com/rubys/wunderbar/blob/master/demo/wiki.rb) make
   use of the jquery filter.
 
 * [angularjs](https://github.com/rubys/wunderbar/blob/master/demo/angularjs.rb)
@@ -197,7 +199,7 @@ framework, and only use one of the many integrations that
 [Opal](http://opalrb.org/) provides, then Opal is the way to go right now.
 
 ruby2js is for those that want to produce JavaScript that looks like it
-wasn’t machine generated, and with the absolute bare minimum in terms of
+wasn’t machine generated, and want the absolute bare minimum in terms of
 limitations as to what JavaScript can be produced.
 
 [Try](http://intertwingly.net/projects/ruby2js/all) for yourself.
