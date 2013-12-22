@@ -83,9 +83,14 @@ module Ruby2JS
         end
       end
 
-       nl = @nl unless body == s(:begin)
-      "function#{ " #{name}" if name }(#{ parse args }) " +
-        "{#{nl}#{ scope body, vars}#{nl}}"
+      nl = @nl unless body == s(:begin)
+      begin
+        next_token, @next_token = @next_token, :return
+        "function#{ " #{name}" if name }(#{ parse args }) " +
+          "{#{nl}#{ scope body, vars}#{nl}}"
+      ensure
+        @next_token = next_token
+      end
     end
   end
 end

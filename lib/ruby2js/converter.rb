@@ -15,6 +15,7 @@ module Ruby2JS
       @ws = ' '
       @varstack = []
       @width = 80
+      @next_token = :return
 
       @handlers = {}
       @@handlers.each do |name|

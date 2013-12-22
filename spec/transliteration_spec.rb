@@ -328,11 +328,15 @@ describe Ruby2JS do
     end
 
     it "should handle break" do
-      to_js( 'break' ).must_equal 'break'
+      to_js( 'while true; break; end' ).must_equal 'while (true) {break}'
     end
 
-    it "should handle break" do
-      to_js( 'next' ).must_equal 'continue'
+    it "should handle next as return" do
+      to_js( 'x.forEach { next }' ).must_equal 'x.forEach(function() {return})'
+    end
+
+    it "should handle next as continue" do
+      to_js( 'while false; next; end' ).must_equal 'while (false) {continue}'
     end
 
     it "should handle until" do
