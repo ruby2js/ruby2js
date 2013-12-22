@@ -82,6 +82,7 @@ module Ruby2JS
         return super unless @ngApp and @ngChildren.include? node
         name = node.children.first
         if name.children.first == nil
+          @ngClassUses, @ngClassOmit = [], []
           block = [node.children.last]
           uses = extract_uses(block)
           node = s(:class, name, node.children[1], 
@@ -132,6 +133,7 @@ module Ruby2JS
       #  end
       #
       def ng_controller(node)
+        @ngClassUses, @ngClassOmit = [], []
         target = node.children.first
         target = target.updated(nil, [s(:lvar, @ngApp), 
           *target.children[1..-1]])
@@ -163,12 +165,13 @@ module Ruby2JS
         :or, :regexp, :self, :send, :str, :sym, :true, :undefined?, :xstr ]
 
       def ng_filter(node)
+        @ngClassUses, @ngClassOmit = [], []
         call = node.children.first
 
         # insert return
         args = process_all(node.children[1].children)
         block = process_all(node.children[2..-1])
-        uses = @ngClassUses.uniq.map {|sym| s(:arg, sym)}
+        uses = (@ngClassUses - @ngClassOmit).uniq.map {|sym| s(:arg, sym)}
         tail = [block.pop || s(:nil)]
         while tail.length == 1 and tail.first.type == :begin
           tail = tail.first.children.dup
