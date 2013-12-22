@@ -16,7 +16,7 @@ module Ruby2JS
     handle :send, :sendw, :attr do |receiver, method, *args|
       ast = @ast
 
-      width = (ast.type == :sendw ? 0 : @width)
+      width = ((ast.type == :sendw && !@nl.empty?) ? 0 : @width)
 
       if method =~ /\w[!?]$/
         raise NotImplementedError, "invalid method name #{ method }"

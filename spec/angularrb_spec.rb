@@ -127,7 +127,12 @@ describe Ruby2JS::Filter::AngularRB do
           "$routeProvider",
 
           function($routeProvider) {
-            $routeProvider.when("/phones", {controller: "PhoneListCtrl"}).otherwise({redirectTo: "/phones"})
+            $routeProvider.when(
+              "/phones",
+              {controller: "PhoneListCtrl"}
+            ).otherwise(
+              {redirectTo: "/phones"}
+            )
           }
         ])
       JS
