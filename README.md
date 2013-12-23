@@ -127,6 +127,8 @@ the script.
     * `.to_i` becomes `parseInt`
     * `.to_f` becomes `parseFloat`
     * `.sub` becomes `replace`
+    * `.ord` becomes `charCodeAt(0)`
+    * `.chr` becomes `fromCharCode`
     * `.gsub` becomes `replace //g`
     * `.first` becomes `[0]`
     * `.last` becomes `[*.length-1]`

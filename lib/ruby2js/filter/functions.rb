@@ -25,13 +25,28 @@ module Ruby2JS
         elsif node.children[1] == :gsub and node.children.length == 4
           source, method, before, after = node.children
           if before.type == :regexp
-            before = s(:regexp, before.children.first,
-              s(:regopt, :g, *before.children[1]))
+            before = s(:regexp, *before.children[0...-1],
+              s(:regopt, :g, *before.children.last))
           elsif before.type == :str
             before = s(:regexp, s(:str, Regexp.escape(before.children.first)),
               s(:regopt, :g))
           end
           node.updated nil, [source, :replace, before, after]
+
+        elsif node.children[1] == :ord and node.children.length == 2
+          if node.children.first.type == :str
+            s(:int, node.children.first.children.last.ord)
+          else
+            node.updated nil, [node.children.first, :charCodeAt, s(:int, 0)]
+          end
+
+        elsif node.children[1] == :chr and node.children.length == 2
+          if node.children.first.type == :int
+            s(:str, node.children.first.children.last.chr)
+          else
+            node.updated nil, [s(:const, nil, :String), :fromCharCode, 
+              node.children.first]
+          end
 
         elsif node.children[1] == :empty? and node.children.length == 2
           s(:send, s(:attr, node.children[0], :length), :==, s(:int, 0))
@@ -113,11 +128,16 @@ module Ruby2JS
           block = process s(:block, s(:send, nil, :proc), *node.children[1..-1])
           call.updated nil, [*call.children[0..1], block, *call.children[2..-1]]
 
-        elsif [:any?].include? call.children[1] and call.children.length == 2
+        elsif [:sub, :gsub].include? call.children[1]
+          return super if call.children.first == nil
+          block = s(:block, s(:send, nil, :proc), *node.children[1..-1])
+          process call.updated(nil, [*call.children, block])
+
+        elsif call.children[1] == :any? and call.children.length == 2
           call = call.updated nil, [call.children.first, :some]
           node.updated nil, [call, *node.children[1..-1]]
 
-        elsif [:all?].include? call.children[1] and call.children.length == 2
+        elsif call.children[1] == :all? and call.children.length == 2
           call = call.updated nil, [call.children.first, :every]
           node.updated nil, [call, *node.children[1..-1]]
 

@@ -36,13 +36,23 @@ describe Ruby2JS::Filter::Functions do
   describe 'string functions' do
     it 'should handle sub' do
       to_js( 'str.sub("a", "b")' ).must_equal 'str.replace("a", "b")'
+      to_js( 'str.sub(/a/) {return "x"}' ).
+        must_equal 'str.replace(/a/, function() {return "x"})'
     end
 
     it 'should handle gsub' do
       to_js( 'str.gsub("a", "b")' ).must_equal 'str.replace(/a/g, "b")'
       to_js( 'str.gsub(/a/i, "b")' ).must_equal 'str.replace(/a/gi, "b")'
-      to_js( 'str.gsub("a/", "b")' ).
-        must_equal 'str.replace(new RegExp("a/", "g"), "b")'
+      to_js( 'str.gsub(/a/, "b")' ).must_equal 'str.replace(/a/g, "b")'
+      to_js( 'str.gsub(/a/) {return "x"}' ).
+        must_equal 'str.replace(/a/g, function() {return "x"})'
+    end
+
+    it 'should handle ord and chr' do
+      to_js( '"A".ord' ).must_equal '65'
+      to_js( 'a.ord' ).must_equal 'a.charCodeAt(0)'
+      to_js( '65.chr' ).must_equal '"A"'
+      to_js( 'a.chr' ).must_equal 'String.fromCharCode(a)'
     end
   end
     
