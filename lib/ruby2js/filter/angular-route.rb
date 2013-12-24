@@ -48,8 +48,7 @@ module Ruby2JS
             hash[node.children[-1..-1]])
         end
 
-        s(:send, s(:lvar, @ngApp), :config, s(:array, s(:str, rp.to_s),
-          s(:block, 
+        s(:send, @ngApp, :config, s(:array, s(:str, rp.to_s), s(:block, 
             s(:send, nil, :proc), s(:args, s(:arg, rp)), code)))
       end
     end

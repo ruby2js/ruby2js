@@ -50,6 +50,22 @@ describe Ruby2JS::Filter::AngularRB do
       to_js( ruby ).must_equal js
     end
 
+    it "should allow modules to be reopend to add a controller" do
+      ruby = <<-RUBY
+        Angular::PhonecatApp.controller :PhoneListCtrl do 
+          $scope.orderProp = 'age'
+        end
+      RUBY
+
+      js = <<-JS.gsub!(/^ {8}/, '').chomp
+        angular.module("PhonecatApp").controller("PhoneListCtrl", function($scope) {
+          $scope.orderProp = "age"
+        })
+      JS
+
+      to_js( ruby ).must_equal js
+    end
+
     it "factory references should imply use" do
       ruby = <<-RUBY
         module Angular::PhonecatApp 
@@ -198,7 +214,7 @@ describe Ruby2JS::Filter::AngularRB do
     end
   end
 
-  describe 'controllers' do
+  describe 'directives' do
     it "should convert apps with a directive" do
       ruby = <<-RUBY
         module Angular::PhonecatApp 

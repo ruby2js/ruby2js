@@ -5,6 +5,7 @@ module Ruby2JS
   module Filter
     module AngularRB
       include SEXP
+      Angular = Parser::AST::Node.new(:const, [nil, :Angular])
 
       def initialize(*args)
         @ngApp = nil
@@ -28,10 +29,9 @@ module Ruby2JS
         module_name = node.children[0]
         parent_name = module_name.children[0]
 
-        return super unless parent_name and parent_name.type == :const
-        return super unless parent_name.children == [nil, :Angular]
+        return super unless parent_name == Angular
 
-        @ngApp = module_name.children[1]
+        @ngApp = s(:lvar, module_name.children[1])
         @ngChildren = node.children[1..-1]
         while @ngChildren.length == 1 and @ngChildren.first and @ngChildren.first.type == :begin
           @ngChildren = @ngChildren.first.children.dup
@@ -48,8 +48,8 @@ module Ruby2JS
         name, @ngApp, @ngChildren = @ngApp, nil, nil
 
         # construct app
-        app = s(:send, s(:lvar, :angular), :module, s(:str, name.to_s), 
-          s(:array, *depends.uniq))
+        app = s(:send, s(:lvar, :angular), :module, 
+          s(:str, module_name.children[1].to_s), s(:array, *depends.uniq))
 
         # return a single chained statement when there is only one call
         block.compact!
@@ -57,9 +57,9 @@ module Ruby2JS
           return app
         elsif block.length == 1
           call = block.first.children.first
-          if block.first.type == :send and call == s(:lvar, name)
+          if block.first.type == :send and call == name
             return block.first.updated nil, [app, *block.first.children[1..-1]]
-          elsif block.first.type == :block and call.children.first == s(:lvar, name)
+          elsif block.first.type == :block and call.children.first == name
             call = call.updated nil, [app, *call.children[1..-1]]
             return block.first.updated nil, [call, *block.first.children[1..-1]]
           end
@@ -94,7 +94,7 @@ module Ruby2JS
             map {|sym| s(:arg, sym)}
           @ngClassUses, @ngClassOmit = [], []
 
-         s(:block, s(:send, s(:lvar, @ngApp), :factory,
+         s(:block, s(:send, @ngApp, :factory,
             s(:sym, name.children.last)), s(:args, *args), 
             s(:begin, node, s(:return, s(:const, nil, name.children.last))))
         else
@@ -109,21 +109,31 @@ module Ruby2JS
       #   directive :name { ... }
 
       def on_block(node)
-        return super unless @ngApp
+        ngApp = @ngApp
         call = node.children.first
-        return super if call.children.first
-
-        case call.children[1]
-        when :controller
-          ng_controller(node)
-        when :factory
-          ng_factory(node)
-        when :filter
-          ng_filter(node)
-        when :directive
-          ng_controller(node) # reuse template
+        target = call.children.first
+        if target and target.type == :const and target.children.first == Angular
+          @ngApp = s(:send, s(:lvar, :angular), :module, s(:str,
+            target.children.last.to_s))
         else
-          super
+          return super unless @ngApp
+        end
+
+        begin
+          case call.children[1]
+          when :controller
+            ng_controller(node)
+          when :factory
+            ng_factory(node)
+          when :filter
+            ng_filter(node)
+          when :directive
+            ng_controller(node) # reuse template
+          else
+            super
+          end
+        ensure
+          @ngApp = ngApp
         end
       end
 
@@ -135,8 +145,7 @@ module Ruby2JS
       def ng_controller(node)
         @ngClassUses, @ngClassOmit = [], []
         target = node.children.first
-        target = target.updated(nil, [s(:lvar, @ngApp), 
-          *target.children[1..-1]])
+        target = target.updated(nil, [@ngApp, *target.children[1..-1]])
 
         block = process_all(node.children[2..-1])
 
@@ -181,7 +190,7 @@ module Ruby2JS
 
         # construct a function returning a function
         inner = s(:block, s(:send, nil, :lambda), s(:args, *args), *block)
-        outer = s(:send, s(:lvar, @ngApp), :filter, *call.children[2..-1])
+        outer = s(:send, @ngApp, :filter, *call.children[2..-1])
 
         node.updated nil, [outer, s(:args, *uses), s(:return, inner)]
       end
@@ -195,7 +204,7 @@ module Ruby2JS
       #   AppName.factory :name, [uses, lambda {|uses| ...}]
       def ng_factory(node)
         call = node.children.first
-        call = call.updated(nil, [s(:lvar, @ngApp), *call.children[1..-1]])
+        call = call.updated(nil, [@ngApp, *call.children[1..-1]])
 
         # insert return
         block = process_all(node.children[2..-1])
