@@ -215,7 +215,25 @@ describe Ruby2JS::Filter::AngularRB do
   end
 
   describe 'directives' do
-    it "should convert apps with a directive" do
+    it "should convert apps with a directive -- short form" do
+      ruby = <<-RUBY
+        module Angular::PhonecatApp 
+          directive :my_signature do 
+            template '--signature'
+          end
+        end
+      RUBY
+
+      js = <<-JS.gsub!(/^ {8}/, '').chomp
+        angular.module("PhonecatApp", []).directive("my_signature", function() {
+          return {template: "--signature"}
+        })
+      JS
+
+      to_js( ruby ).must_equal js
+    end
+
+    it "should convert apps with a directive -- long form" do
       ruby = <<-RUBY
         module Angular::PhonecatApp 
           directive :my_signature do 

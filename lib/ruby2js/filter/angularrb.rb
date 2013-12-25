@@ -5,7 +5,33 @@ module Ruby2JS
   module Filter
     module AngularRB
       include SEXP
-      Angular = Parser::AST::Node.new(:const, [nil, :Angular])
+
+      def self.s(type, *args)
+        Parser::AST::Node.new type, args
+      end
+
+      Angular = s(:const, nil, :Angular)
+
+      # convert simple assignments, simple method calls, and simple method
+      # definitions into a hash when possible; return false otherwise
+      def self.hash(pairs)
+        if pairs.length == 1 and pairs.first.type == :begin
+          pairs = pairs.first.children
+        end
+
+        s(:hash, *pairs.map {|pair| 
+          if pair.type == :send and pair.children[0] == nil
+            s(:pair, s(:sym, pair.children[1]), pair.children[2])
+          elsif pair.type == :lvasgn
+            s(:pair, s(:sym, pair.children[0]), pair.children[1])
+          elsif pair.type == :def
+            s(:pair, s(:sym, pair.children[0]), s(:block, s(:send, nil, :proc),
+              *pair.children[1..-1]))
+          else
+            return false
+          end
+        })
+      end
 
       def initialize(*args)
         @ngApp = nil
@@ -128,6 +154,10 @@ module Ruby2JS
           when :filter
             ng_filter(node)
           when :directive
+            hash = AngularRB.hash(node.children[2..-1])
+            if hash
+              node = node.updated nil, [*node.children[0..1], s(:return, hash)]
+            end
             ng_controller(node) # reuse template
           else
             super

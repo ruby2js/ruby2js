@@ -25,27 +25,14 @@ module Ruby2JS
         @ngAppUses << :ngRoute
         code = s(:lvar, rp)
 
-        hash = proc do |pairs|
-          if pairs.length == 1 and pairs.first.type == :begin
-            pairs = pairs.first.children
-          end
-          s(:hash, *pairs.map {|pair| 
-            if pair.type == :send
-              s(:pair, s(:sym, pair.children[1]), pair.children[2])
-            else
-              s(:pair, s(:sym, pair.children[0]), pair.children[1])
-            end
-          })
-        end
-
         node.children[1..-2].each do |child|
           code = s(:sendw, code, :when, child.children.first,
-            hash[child.children[1..-1]])
+            AngularRB.hash(child.children[1..-1]))
         end
 
         if node.children.last
           code = s(:sendw, code, :otherwise, 
-            hash[node.children[-1..-1]])
+            AngularRB.hash(node.children[-1..-1]))
         end
 
         s(:send, @ngApp, :config, s(:array, s(:str, rp.to_s), s(:block, 
