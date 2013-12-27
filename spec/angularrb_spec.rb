@@ -29,6 +29,31 @@ describe Ruby2JS::Filter::AngularRB do
 
       to_js( ruby ).must_equal js
     end
+
+    it "should convert modules with multiple controllers" do
+      ruby = <<-RUBY
+        module Angular::PhonecatApp 
+          controller(:foo) {}
+          controller(:bar) {}
+        end
+      RUBY
+
+      js = <<-JS.gsub!(/^ {8}/, '').chomp
+        (function() {
+          const PhonecatApp = angular.module("PhonecatApp", []);
+
+          PhonecatApp.controller("foo", function() {
+
+          });
+
+          PhonecatApp.controller("bar", function() {
+
+          })
+        })()
+      JS
+
+      to_js( ruby ).must_equal js
+    end
   end
   
   describe 'controllers' do

@@ -71,11 +71,12 @@ module Ruby2JS
         depends = depends.map {|node| node.children.first.to_s}.uniq.
           map {|sym| s(:str, sym)}
 
-        name, @ngApp, @ngChildren = @ngApp, nil, nil
+        ngApp, @ngApp, @ngChildren = @ngApp, nil, nil
+        name = module_name.children[1].to_s
 
         # construct app
         app = s(:send, s(:lvar, :angular), :module, 
-          s(:str, module_name.children[1].to_s), s(:array, *depends.uniq))
+          s(:str, name), s(:array, *depends.uniq))
 
         # return a single chained statement when there is only one call
         block.compact!
@@ -83,9 +84,9 @@ module Ruby2JS
           return app
         elsif block.length == 1
           call = block.first.children.first
-          if block.first.type == :send and call == name
+          if block.first.type == :send and call == ngApp
             return block.first.updated nil, [app, *block.first.children[1..-1]]
-          elsif block.first.type == :block and call.children.first == name
+          elsif block.first.type == :block and call.children.first == ngApp
             call = call.updated nil, [app, *call.children[1..-1]]
             return block.first.updated nil, [call, *block.first.children[1..-1]]
           end
@@ -142,6 +143,7 @@ module Ruby2JS
           @ngApp = s(:send, s(:lvar, :angular), :module, s(:str,
             target.children.last.to_s))
         else
+          return super if target
           return super unless @ngApp
         end
 
