@@ -35,6 +35,7 @@ module Ruby2JS
 
       def initialize(*args)
         @ngApp = nil
+        @ngContext = nil
         @ngAppUses = []
         @ngClassUses = []
         @ngClassOmit = []
@@ -150,7 +151,7 @@ module Ruby2JS
         begin
           case call.children[1]
           when :controller
-            ng_controller(node)
+            ng_controller(node, :controller)
           when :factory
             ng_factory(node)
           when :filter
@@ -160,7 +161,7 @@ module Ruby2JS
             if hash
               node = node.updated nil, [*node.children[0..1], s(:return, hash)]
             end
-            ng_controller(node) # reuse template
+            ng_controller(node, :directive)
           else
             super
           end
@@ -174,7 +175,8 @@ module Ruby2JS
       #    ...
       #  end
       #
-      def ng_controller(node)
+      def ng_controller(node, scope)
+        ngContext, @ngContext = @ngContext, scope
         @ngClassUses, @ngClassOmit = [], []
         target = node.children.first
         target = target.updated(nil, [@ngApp, *target.children[1..-1]])
@@ -187,9 +189,11 @@ module Ruby2JS
         args += @ngClassUses.map {|sym| s(:arg, sym)} + extract_uses(block)
         args = args.map {|node| node.children.first.to_sym}.uniq.
           map {|sym| s(:arg, sym)}
-        @ngClassUses, @ngClassOmit = [], []
 
         node.updated :block, [target, s(:args, *args), s(:begin, *block)]
+      ensure
+        @ngClassUses, @ngClassOmit = [], []
+        @ngContext = ngContext
       end
 
       # input: 
@@ -272,6 +276,34 @@ module Ruby2JS
         return super unless @ngApp and @ngChildren.include? node
         ng_factory s(:block, s(:send, nil, :factory, s(:sym, node.children[1])),
           s(:args), process(node.children[2]))
+      end
+
+      # convert ivar referencess in controllers to $scope
+      def on_ivar(node)
+        if @ngContext == :controller
+          process s(:attr, s(:gvar, :$scope), node.children.first.to_s[1..-1])
+        else
+          super
+        end
+      end
+
+      # convert ivar assignments in controllers to $scope
+      def on_ivasgn(node)
+        if @ngContext == :controller
+          process s(:send, s(:gvar, :$scope),
+            "#{node.children.first.to_s[1..-1]}=", node.children.last)
+        else
+          super
+        end
+      end
+
+      # convert instance method definitions in controllers to $scope
+      def on_def(node)
+        if @ngContext == :controller
+          process s(:defs, s(:gvar, :$scope), *node.children)
+        else
+          super
+        end
       end
 
       def on_gvar(node)

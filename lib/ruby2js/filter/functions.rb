@@ -16,11 +16,11 @@ module Ruby2JS
           node.updated nil, [nil, :parseInt, target, *args]
 
         elsif node.children[1] == :to_f
-          node.updated nil, [nil, :parseFloat, target, *args]
+          process node.updated nil, [nil, :parseFloat, target, *args]
 
         elsif node.children[1] == :sub and node.children.length == 4
           source, method, before, after = node.children
-          node.updated nil, [source, :replace, before, after]
+          process node.updated nil, [source, :replace, before, after]
 
         elsif node.children[1] == :gsub and node.children.length == 4
           source, method, before, after = node.children
@@ -31,32 +31,30 @@ module Ruby2JS
             before = s(:regexp, s(:str, Regexp.escape(before.children.first)),
               s(:regopt, :g))
           end
-          node.updated nil, [source, :replace, before, after]
+          process node.updated nil, [source, :replace, before, after]
 
         elsif node.children[1] == :ord and node.children.length == 2
-          if node.children.first.type == :str
-            s(:int, node.children.first.children.last.ord)
+          if target.type == :str
+            s(:int, target.children.last.ord)
           else
-            node.updated nil, [node.children.first, :charCodeAt, s(:int, 0)]
+            node.updated nil, [target, :charCodeAt, s(:int, 0)]
           end
 
         elsif node.children[1] == :chr and node.children.length == 2
-          if node.children.first.type == :int
-            s(:str, node.children.first.children.last.chr)
+          if target.type == :int
+            s(:str, target.children.last.chr)
           else
-            node.updated nil, [s(:const, nil, :String), :fromCharCode, 
-              node.children.first]
+            node.updated nil, [s(:const, nil, :String), :fromCharCode, target]
           end
 
         elsif node.children[1] == :empty? and node.children.length == 2
-          s(:send, s(:attr, node.children[0], :length), :==, s(:int, 0))
+          s(:send, s(:attr, target, :length), :==, s(:int, 0))
 
         elsif node.children[1] == :clear! and node.children.length == 2
-          s(:send, node.children[0], :length=, s(:int, 0))
+          s(:send, target, :length=, s(:int, 0))
 
         elsif node.children[1] == :include? and node.children.length == 3
-          s(:send, s(:send, node.children[0], :indexOf, node.children[2]),
-            :!=, s(:int, -1))
+          s(:send, s(:send, target, :indexOf, args.first), :!=, s(:int, -1))
 
         elsif node.children[1] == :each
           if @each # disable `each` mapping, see jquery filter for an example
@@ -66,22 +64,21 @@ module Ruby2JS
           end
 
         elsif node.children[0..1] == [nil, :puts]
-          s(:send, s(:attr, nil, :console), :log, *node.children[2..-1])
+          s(:send, s(:attr, nil, :console), :log, *args)
 
         elsif node.children[1..-1] == [:first]
-          node.updated nil, [node.children[0], :[], s(:int, 0)]
+          node.updated nil, [target, :[], s(:int, 0)]
 
         elsif node.children[1..-1] == [:last]
-          on_send node.updated nil, [node.children[0], :[], s(:int, -1)]
+          on_send node.updated nil, [target, :[], s(:int, -1)]
 
         elsif node.children[1] == :[] and node.children.length == 3
-          source = node.children[0]
-          index = node.children[2]
+          index = args.first
 
           # resolve negative literal indexes
           i = proc do |index|
             if index.type == :int and index.children.first < 0
-              s(:send, s(:attr, source, :length), :-, 
+              s(:send, s(:attr, target, :length), :-, 
                 s(:int, -index.children.first))
             else
               index
@@ -89,25 +86,25 @@ module Ruby2JS
           end
 
           if index.type == :int and index.children.first < 0
-            node.updated nil, [source, :[], i.(index)]
+            node.updated nil, [target, :[], i.(index)]
 
           elsif index.type == :erange
             start, finish = index.children
-            node.updated nil, [source, :slice, i.(start), i.(finish)]
+            node.updated nil, [target, :slice, i.(start), i.(finish)]
 
           elsif index.type == :irange
             start, finish = index.children
             start = i.(start)
             if finish.type == :int
               if finish.children.first == -1
-                finish = s(:attr, source, :length)
+                finish = s(:attr, target, :length)
               else
                 finish = i.(s(:int, finish.children.first+1))
               end
             else
               finish = s(:send, finish, :+, s(:int, 1))
             end
-            node.updated nil, [source, :slice, start, finish]
+            node.updated nil, [target, :slice, start, finish]
 
           else
             super
