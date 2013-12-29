@@ -12,6 +12,9 @@ module Ruby2JS
         if node.children[1] == :to_s
           s(:send, target, :toString, *args)
 
+        elsif node.children[1] == :to_a
+          s(:send, target, :toArray, *args)
+
         elsif node.children[1] == :to_i
           node.updated nil, [nil, :parseInt, target, *args]
 

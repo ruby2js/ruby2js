@@ -124,6 +124,7 @@ the script.
 * [functions](https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/functions.rb)
 
     * `.to_s` becomes `to_String`
+    * `.to_a` becomes `to_Array`
     * `.to_i` becomes `parseInt`
     * `.to_f` becomes `parseFloat`
     * `.sub` becomes `replace`
