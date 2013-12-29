@@ -78,6 +78,10 @@ module Ruby2JS
         end
       end
 
+      def on_attr(node)
+        node.updated nil, [process(node.children.first), node.children.last]
+      end
+
       def on_send(node)
         if [:call, :[]].include? node.children[1]
           # map $$.call(..), $$.(..), and $$[...] to $(...)
@@ -119,17 +123,17 @@ module Ruby2JS
               if node.children[1] == :~ and node.children[0].children[1] == :~
                 # consecutive tildes
                 if node.children[0].children[0].children[1] == :~
-                  result = process(node.children[0].children[0].children[0])
+                  result = node.children[0].children[0].children[0]
                 else
-                  result = s(:send, process(node.children[0].children[0]), :~)
+                  result = s(:attr, node.children[0].children[0], :~)
                 end
-                s(:send, s(:send, result, :~), :~)
+                s(:attr, s(:attr, process(result), :~), :~)
               else
                 # possible getter/setter
                 method = node.children[1]
                 method = method.to_s.chomp('=') if method =~ /=$/
                 rewrite = [rewrite_tilda[node.children[0]], 
-                  method, *process_all(node.children[2..-1])]
+                  method, *node.children[2..-1]]
                 if props.include? node.children[1]
                   node.updated nil, rewrite
                 elsif domprops.include? method.to_s
@@ -142,17 +146,17 @@ module Ruby2JS
             elsif node.type == :block
               # method call with a block parameter
               node.updated nil, [rewrite_tilda[node.children[0]],
-                *process_all(node.children[1..-1])]
+                *node.children[1..-1]]
             elsif node.type == :array
               # innermost expression is an array
-              s(:send, nil, '$', *process(node))
+              s(:send, nil, '$', *node)
             else
               # innermost expression is a scalar
-              s(:send, nil, '$', process(node))
+              s(:send, nil, '$', node)
             end
           end
 
-          rewrite_tilda[node].children[0]
+          process rewrite_tilda[node].children[0]
         else
           super
         end
