@@ -6,10 +6,25 @@ module Ruby2JS
     #   (...)
     #   (...))
 
+    INVERT_OP = {
+      :<  => :>=,
+      :<= => :>,
+      :== => :!=,
+      :!= => :==,
+      :>  => :<=,
+      :>= => :<
+    }
+
     handle :if do |condition, then_block, else_block|
       # return parse condition if not else_block and not then_block
       if else_block and not then_block
-        return parse(s(:if, s(:send, condition, :!), else_block, nil), @state) 
+        if condition.type == :send and INVERT_OP.include? condition.children[1]
+          return parse(s(:if, s(:send, condition.children[0],
+            INVERT_OP[condition.children[1]], condition.children[2]),
+            else_block,nil), @state) 
+        else
+          return parse(s(:if, s(:send, condition, :!), else_block, nil), @state) 
+        end
       end
 
       then_block ||= s(:nil)
