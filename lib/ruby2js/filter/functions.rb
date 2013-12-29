@@ -72,7 +72,7 @@ module Ruby2JS
         elsif node.children[1..-1] == [:last]
           on_send node.updated nil, [target, :[], s(:int, -1)]
 
-        elsif node.children[1] == :[] and node.children.length == 3
+        elsif node.children[1] == :[]
           index = args.first
 
           # resolve negative literal indexes
@@ -85,7 +85,14 @@ module Ruby2JS
             end
           end
 
-          if index.type == :int and index.children.first < 0
+          if index.type == :regexp
+            s(:send, s(:send, target, :match, index), :[], 
+              args[1] || s(:int, 0))
+
+          elsif node.children.length != 3
+            super
+
+          elsif index.type == :int and index.children.first < 0
             node.updated nil, [target, :[], i.(index)]
 
           elsif index.type == :erange

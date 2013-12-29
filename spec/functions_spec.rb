@@ -90,6 +90,11 @@ describe Ruby2JS::Filter::Functions do
       to_js( 'a[-4...-2]' ).must_equal 'a.slice(a.length - 4, a.length - 2)'
     end
 
+    it "should handle regular expression indexes" do
+      to_js( 'a[/\d+/]' ).must_equal 'a.match(/\d+/)[0]'
+      to_js( 'a[/(\d+)/, 1]' ).must_equal 'a.match(/(\d+)/)[1]'
+    end
+
     it "should handle empty?" do
       to_js( 'a.empty?' ).must_equal 'a.length == 0'
     end

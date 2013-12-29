@@ -133,8 +133,9 @@ the script.
     * `.first` becomes `[0]`
     * `.last` becomes `[*.length-1]`
     * `[-n]` becomes `[*.length-n]` for literal values of `n`
-    * `[n..m]` becomes `slice(n,m+1)`
-    * `[n...m]` becomes `slice(n,m)`
+    * `[n..m]` becomes `.slice(n,m+1)`
+    * `[n...m]` becomes `.slice(n,m)`
+    * `[/r/, n]` becomes `.match(/r/)[n]`
     * `.empty?` becomes `.length == 0`
     * `.clear!` becomes `.length = 0`
     * `.include?` becomes `.indexOf() != -1`
