@@ -56,6 +56,10 @@ module Ruby2JS
         elsif node.children[1] == :clear! and node.children.length == 2
           s(:send, target, :length=, s(:int, 0))
 
+        elsif node.children[1] == :replace! and node.children.length == 3
+          s(:begin, s(:send, target, :length=, s(:int, 0)),
+             s(:send, target, :push, s(:splat, node.children[2])))
+
         elsif node.children[1] == :include? and node.children.length == 3
           s(:send, s(:send, target, :indexOf, args.first), :!=, s(:int, -1))
 

@@ -107,6 +107,11 @@ describe Ruby2JS::Filter::Functions do
       to_js( 'a.clear!' ).must_equal 'a.length = 0'
     end
 
+    it "should handle replace!" do
+      to_js( 'a.replace!(b)' ).
+        must_equal 'a.length = 0; a.push.apply(a, b)'
+    end
+
     it "should handle include?" do
       to_js( 'a.include? b' ).must_equal 'a.indexOf(b) != -1'
     end

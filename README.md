@@ -139,6 +139,7 @@ the script.
     * `[/r/, n]` becomes `.match(/r/)[n]`
     * `.empty?` becomes `.length == 0`
     * `.clear!` becomes `.length = 0`
+    * `.replace!` becomes `.length = 0; ...push.apply(*)`
     * `.include?` becomes `.indexOf() != -1`
     * `.any?` becomes `.some`
     * `.all?` becomes `.every`
