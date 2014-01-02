@@ -186,6 +186,10 @@ describe Ruby2JS do
       to_js( "true or false" ).must_equal 'true || false'
     end
     
+    it "should respect parens" do
+      to_js( "true && (true || false)" ).must_equal 'true && (true || false)'
+    end
+    
     it "should parse not" do
       to_js( "not true" ).must_equal '!true'
     end
@@ -207,6 +211,16 @@ describe Ruby2JS do
   end
   
   describe 'expressions' do
+    it "should handle simple chaining" do
+      exp = '1 + 1 + 1'
+      to_js( exp ).must_equal exp
+    end
+    
+    it "should respect parens" do
+      exp = '1 + (1 - 1)'
+      to_js( exp ).must_equal exp
+    end
+    
     it "should not nest" do
       exp = '1 + 1 * 1'
       to_js( exp ).must_equal exp

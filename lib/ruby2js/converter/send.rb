@@ -38,15 +38,22 @@ module Ruby2JS
         end
       end
 
-      op_index   = operator_index method
+      op_index = operator_index method
       if op_index != -1
         target = args.first 
-        target = target.children.first if target and target.type == :begin
-        receiver = receiver.children.first if receiver.type == :begin
       end
 
-      group_receiver = receiver.type == :send && op_index <= operator_index( receiver.children[1] ) if receiver
-      group_target = target.type == :send && op_index <= operator_index( target.children[1] ) if target
+      if receiver
+        group_receiver = receiver.type == :send &&
+          op_index < operator_index( receiver.children[1] ) if receiver
+        group_receiver ||= (receiver.type == :begin)
+      end
+
+      if target
+        group_target = target.type == :send && 
+          op_index < operator_index( target.children[1] )
+        group_target ||= (target.type == :begin)
+      end
 
       if method == :!
         if receiver.type == :defined?

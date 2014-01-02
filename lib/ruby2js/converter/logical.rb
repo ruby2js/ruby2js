@@ -16,16 +16,16 @@ module Ruby2JS
       type = @ast.type
       op_index = operator_index type
 
-      left = left.children.first if left and left.type == :begin
       lgroup   = LOGICAL.include?( left.type ) && 
-        op_index <= operator_index( left.type )
+        op_index < operator_index( left.type )
+      lgroup = true if left and left.type == :begin
       left     = parse left
       left     = "(#{ left })" if lgroup
 
       if right
-        right = right.children.first if right.type == :begin
         rgroup = LOGICAL.include?( right.type ) && 
-          op_index <= operator_index( right.type )
+          op_index < operator_index( right.type )
+        rgroup = true if right.type == :begin
         right    = parse right
         right    = "(#{ right })" if rgroup
       end
