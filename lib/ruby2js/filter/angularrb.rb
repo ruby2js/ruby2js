@@ -162,6 +162,8 @@ module Ruby2JS
               node = node.updated nil, [*node.children[0..1], s(:return, hash)]
             end
             ng_controller(node, :directive)
+          when :watch
+            ng_watch(node)
           else
             super
           end
@@ -175,6 +177,10 @@ module Ruby2JS
       #    ...
       #  end
       #
+      # output:
+      #  AppName.controller("name", do |uses|
+      #    ...
+      #  end
       def ng_controller(node, scope)
         ngContext, @ngContext = @ngContext, scope
         @ngClassUses, @ngClassOmit = [], []
@@ -285,6 +291,24 @@ module Ruby2JS
         else
           super
         end
+      end
+
+      # input:
+      #  watch 'expression' do |oldvalue, newvalue|
+      #    ...
+      #  end
+      #
+      # output:
+      #  $scope.$watch 'expression' do |oldvalue, newvalue|
+      #    ...
+      #  end
+      def ng_watch(node)
+        call = node.children.first
+        if @ngContext == :controller and call.children.first == nil
+          call = s(:send, s(:gvar, :$scope), :$watch, *call.children[2..-1])
+          node = node.updated nil, [call, *node.children[1..-1]]
+        end
+        return process node
       end
 
       # convert ivar assignments in controllers to $scope

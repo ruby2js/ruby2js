@@ -164,6 +164,7 @@ the script.
       angular module functions.
     * maps `use` statements to formal arguments or array values (as
       appropriate) depending on the module function.
+    * maps `watch` statments to calls to `$scope.$watch`.
     * tracks globals variable and constant references and adds additional
       implicit `use` statements
     * maps constant assignments in an angular module to a filter

@@ -115,6 +115,28 @@ describe Ruby2JS::Filter::AngularRB do
       to_js( ruby ).must_equal js
     end
 
+    it "should map watch to $scope.$watch within a controller" do
+      ruby = <<-RUBY
+        module Angular::PhonecatApp 
+          controller :PhoneListCtrl do 
+            watch 'list' do
+              @orderProp = 'age'
+            end
+          end
+        end
+      RUBY
+
+      js = <<-JS.gsub!(/^ {8}/, '').chomp
+        angular.module("PhonecatApp", []).controller("PhoneListCtrl", function($scope) {
+          $scope.$watch("list", function() {
+            $scope.orderProp = "age"
+          })
+        })
+      JS
+
+      to_js( ruby ).must_equal js
+    end
+
     it "should allow modules to be reopend to add a controller" do
       ruby = <<-RUBY
         Angular::PhonecatApp.controller :PhoneListCtrl do 
