@@ -95,7 +95,6 @@ end
 
 # see https://github.com/whitequark/parser/blob/master/doc/AST_FORMAT.md
 
-require 'ruby2js/converter/andasgn'
 require 'ruby2js/converter/arg'
 require 'ruby2js/converter/args'
 require 'ruby2js/converter/array'
@@ -127,7 +126,6 @@ require 'ruby2js/converter/module'
 require 'ruby2js/converter/next'
 require 'ruby2js/converter/nil'
 require 'ruby2js/converter/opasgn'
-require 'ruby2js/converter/orasgn'
 require 'ruby2js/converter/prototype'
 require 'ruby2js/converter/regexp'
 require 'ruby2js/converter/return'

@@ -72,6 +72,8 @@ describe Ruby2JS do
 
     it "should parse op assignments" do
       to_js( 'a += 1' ).must_equal 'a++'
+      to_js( '@a += 1' ).must_equal 'this._a++'
+      to_js( '@@a += 1' ).must_equal 'this.constructor._a++'
     end
 
     it "should parse unary operators" do
@@ -81,6 +83,9 @@ describe Ruby2JS do
 
     it "should do short circuit assign" do
       to_js( 'a = nil; a ||= 1').must_equal 'var a = null; a = a || 1'
+      to_js( '@a ||= 1').must_equal 'this._a = this._a || 1'
+      to_js( '@@a ||= 1').
+        must_equal 'this.constructor._a = this.constructor._a || 1'
     end
     
     it "should parse ternary operator" do

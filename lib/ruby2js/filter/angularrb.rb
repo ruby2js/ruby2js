@@ -293,6 +293,10 @@ module Ruby2JS
         end
       end
 
+      def on_attr(node)
+        node.updated nil, [process(node.children.first), node.children.last]
+      end
+
       # input:
       #  watch 'expression' do |oldvalue, newvalue|
       #    ...
@@ -314,8 +318,13 @@ module Ruby2JS
       # convert ivar assignments in controllers to $scope
       def on_ivasgn(node)
         if @ngContext == :controller
-          process s(:send, s(:gvar, :$scope),
-            "#{node.children.first.to_s[1..-1]}=", node.children.last)
+          if node.children.length == 1
+            process s(:attr, s(:gvar, :$scope),
+              "#{node.children.first.to_s[1..-1]}")
+          else
+            process s(:send, s(:gvar, :$scope),
+              "#{node.children.first.to_s[1..-1]}=", node.children.last)
+          end
         else
           super
         end

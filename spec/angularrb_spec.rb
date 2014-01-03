@@ -93,6 +93,24 @@ describe Ruby2JS::Filter::AngularRB do
       to_js( ruby ).must_equal js
     end
 
+    it "should support operator assignments using instance variables" do
+      ruby = <<-RUBY
+        module Angular::PhonecatApp 
+          controller :PhoneListCtrl do 
+            @orderProp ||= 'age'
+          end
+        end
+      RUBY
+
+      js = <<-JS.gsub!(/^ {8}/, '').chomp
+        angular.module("PhonecatApp", []).controller("PhoneListCtrl", function($scope) {
+          $scope.orderProp = $scope.orderProp || "age"
+        })
+      JS
+
+      to_js( ruby ).must_equal js
+    end
+
     it "should map instance methods to $scope within a controller" do
       ruby = <<-RUBY
         module Angular::PhonecatApp 
