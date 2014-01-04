@@ -78,10 +78,6 @@ module Ruby2JS
         end
       end
 
-      def on_attr(node)
-        node.updated nil, [process(node.children.first), node.children.last]
-      end
-
       def on_send(node)
         if [:call, :[]].include? node.children[1]
           # map $$.call(..), $$.(..), and $$[...] to $(...)

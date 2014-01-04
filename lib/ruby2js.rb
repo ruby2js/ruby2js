@@ -11,6 +11,12 @@ module Ruby2JS
         Parser::AST::Node.new type, args
       end
     end
+
+    class Processor < Parser::AST::Processor
+      def on_attr(node)
+        node.updated nil, [process(node.children.first), node.children.last]
+      end
+    end
   end
 
   def self.convert(source, options={})
@@ -29,7 +35,7 @@ module Ruby2JS
     filters = options[:filters] || Filter::DEFAULTS
 
     unless filters.empty?
-      filter = Parser::AST::Processor
+      filter = Filter::Processor
       filters.reverse.each do |mod|
         filter = Class.new(filter) {include mod} 
       end

@@ -293,10 +293,6 @@ module Ruby2JS
         end
       end
 
-      def on_attr(node)
-        node.updated nil, [process(node.children.first), node.children.last]
-      end
-
       # input:
       #  watch 'expression' do |oldvalue, newvalue|
       #    ...
