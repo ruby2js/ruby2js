@@ -38,6 +38,9 @@ module Ruby2JS
         elsif m.type == :cvasgn
           # class variable
           s(:send, name, "_#{m.children[0][2..-1]}=", *m.children[1..-1])
+        elsif m.type == :send and m.children[0].type == :cvar
+          s(:send, s(:attr, name, "_#{m.children[0].children[0][2..-1]}"),
+            *m.children[1..-1])
         elsif m.type == :casgn and m.children[0] == nil
           # class constant
           s(:send, name, "#{m.children[1]}=", *m.children[2..-1])

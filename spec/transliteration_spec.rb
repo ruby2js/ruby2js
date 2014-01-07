@@ -471,6 +471,8 @@ describe Ruby2JS do
     it "should parse class with class variables" do
       to_js('class Person; @@count=0; end').
         must_equal 'function Person() {}; Person._count = 0'
+      to_js('class Person; @@count={}; @@count[1]=1; end').
+        must_equal 'function Person() {}; Person._count = {}; Person._count[1] = 1'
     end
 
     it "should parse instance methods with class variables" do
