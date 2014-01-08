@@ -294,6 +294,9 @@ describe Ruby2JS do
       to_js( '1 unless false' ).must_equal 'if (!false) 1'
       to_js( '1 unless a' ).must_equal 'if (!a) 1'
       to_js( '1 unless a == b' ).must_equal 'if (a != b) 1'
+      to_js( '1 unless a === b' ).must_equal 'if (a !== b) 1'
+      to_js( '1 unless a or b' ).must_equal 'if (!a && !b) 1'
+      to_js( '1 unless a and b' ).must_equal 'if (!a || !b) 1'
     end
     
     it "should parse if else" do

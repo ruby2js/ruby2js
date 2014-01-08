@@ -56,12 +56,7 @@ module Ruby2JS
       end
 
       if method == :!
-        if receiver.type == :defined?
-          parse s(:undefined?, *receiver.children)
-        else
-          group_receiver ||= (receiver.type != :send && receiver.children.length > 1)
-          "!#{ group_receiver ? group(receiver) : parse(receiver) }"
-        end
+        parse s(:not, receiver)
 
       elsif method == :[]
         "#{ parse receiver }[#{ args.map {|arg| parse arg}.join(', ') }]"

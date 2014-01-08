@@ -8,7 +8,7 @@ module Ruby2JS
     # NOTE: undefined is not produced directly by Parser
 
     handle :defined?, :undefined? do |var|
-      op = (@ast.type == :defined? ? "!==" : "===")
+      op = (@ast.type == :defined? ? :"!==" : :===)
       "typeof #{ parse var } #{ op } 'undefined'"
     end
   end
