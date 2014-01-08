@@ -30,6 +30,7 @@ module Ruby2JS
 
         output
       else
+        else_block ||= s(:nil)
         "(#{ parse condition } ? #{ parse then_block } : #{ parse else_block })"
       end
     end
