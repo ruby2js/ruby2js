@@ -155,6 +155,64 @@ describe Ruby2JS::Filter::AngularRB do
       to_js( ruby ).must_equal js
     end
 
+    it "should map on to $scope.$on within a controller" do
+      ruby = <<-RUBY
+        module Angular::PhonecatApp 
+          controller :PhoneListCtrl do 
+            on :update do
+              @orderProp = 'age'
+            end
+          end
+        end
+      RUBY
+
+      js = <<-JS.gsub!(/^ {8}/, '').chomp
+        angular.module("PhonecatApp", []).controller("PhoneListCtrl", function($scope) {
+          $scope.$on("update", function() {
+            $scope.orderProp = "age"
+          })
+        })
+      JS
+
+      to_js( ruby ).must_equal js
+    end
+
+    it "should map broadcast! to $rootScope.$broadcast within a controller" do
+      ruby = <<-RUBY
+        module Angular::PhonecatApp 
+          controller :PhoneListCtrl do 
+            broadcast! :update
+          end
+        end
+      RUBY
+
+      js = <<-JS.gsub!(/^ {8}/, '').chomp
+        angular.module("PhonecatApp", []).controller("PhoneListCtrl", function($rootScope) {
+          $rootScope.$broadcast("update")
+        })
+      JS
+
+      to_js( ruby ).must_equal js
+    end
+
+    it "should map filter to $filter within a controller" do
+      ruby = <<-RUBY
+        module Angular::PhonecatApp 
+          controller :PhoneListCtrl do 
+            f = filter(:f)
+          end
+        end
+      RUBY
+
+      js = <<-JS.gsub!(/^ {8}/, '').chomp
+        angular.module("PhonecatApp", []).controller("PhoneListCtrl", function($filter) {
+          var f = $filter("f")
+        })
+      JS
+
+      to_js( ruby ).must_equal js
+    end
+
     it "should allow modules to be reopend to add a controller" do
       ruby = <<-RUBY
         Angular::PhonecatApp.controller :PhoneListCtrl do 

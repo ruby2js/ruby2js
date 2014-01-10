@@ -163,7 +163,9 @@ module Ruby2JS
             end
             ng_controller(node, :directive)
           when :watch
-            ng_watch(node)
+            ng_watch(node, :$watch)
+          when :on
+            ng_watch(node, :$on)
           else
             super
           end
@@ -302,10 +304,13 @@ module Ruby2JS
       #  $scope.$watch 'expression' do |oldvalue, newvalue|
       #    ...
       #  end
-      def ng_watch(node)
+      #
+      # also handles 'on'
+      #
+      def ng_watch(node, method)
         call = node.children.first
         if @ngContext == :controller and call.children.first == nil
-          call = s(:send, s(:gvar, :$scope), :$watch, *call.children[2..-1])
+          call = s(:send, s(:gvar, :$scope), method, *call.children[2..-1])
           node = node.updated nil, [call, *node.children[1..-1]]
         end
         return process node
@@ -324,6 +329,35 @@ module Ruby2JS
         else
           super
         end
+      end
+
+      NG_METHOD_MAP = {
+        :apply! => [:$rootScope, :$apply],
+        :apply => [:$scope, :$apply],
+        :broadcast! => [:$rootScope, :$broadcast],
+        :broadcast => [:$scope, :$broadcast],
+        :digest! => [:$rootScope, :$digest],
+        :digest => [:$scope, :$digest],
+        :emit => [:$scope, :$emit],
+        :evalAsync! => [:$rootScope, :$evalAsync],
+        :evalAsync => [:$scope, :$evalAsync],
+        :eval! => [:$rootScope, :$eval],
+        :eval => [:$scope, :$eval],
+        :filter => [nil, :$filter],
+        :parent => [:$scope, :$parent],
+      }
+
+      def on_send(node)
+        return super unless @ngContext == :controller
+
+        scope, method = NG_METHOD_MAP[node.children[1]]
+
+        return super unless node.children.first == nil and method
+
+        scope = s(:gvar, scope) if scope
+        process s(:gvar, method) unless scope
+
+        process node.updated nil, [scope, method, *node.children[2..-1]]
       end
 
       # convert instance method definitions in controllers to $scope
