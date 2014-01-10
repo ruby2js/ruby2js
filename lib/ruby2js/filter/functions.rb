@@ -146,11 +146,11 @@ module Ruby2JS
 
         elsif call.children[1] == :any? and call.children.length == 2
           call = call.updated nil, [call.children.first, :some]
-          node.updated nil, [call, *node.children[1..-1]]
+          process node.updated nil, [call, *node.children[1..-1]]
 
         elsif call.children[1] == :all? and call.children.length == 2
           call = call.updated nil, [call.children.first, :every]
-          node.updated nil, [call, *node.children[1..-1]]
+          process node.updated nil, [call, *node.children[1..-1]]
 
         else
           super
