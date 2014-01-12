@@ -53,6 +53,7 @@ module Ruby2JS
       #   ...
 
       def on_module(node)
+        ngContext, @ngContext = @ngContext, :module
         module_name = node.children[0]
         parent_name = module_name.children[0]
 
@@ -97,6 +98,8 @@ module Ruby2JS
         # contents all wrapped in an anonymous function
         s(:send, s(:block, s(:send, nil, :lambda), s(:args),
           s(:begin, s(:casgn, nil, name, app), *block)), :[])
+      ensure
+        @ngContext = ngContext
       end
 
       # input: 
@@ -107,7 +110,9 @@ module Ruby2JS
       #    ...
       #  end
       def on_class(node)
+        ngContext, @ngContext = @ngContext, :class
         return super unless @ngApp and @ngChildren.include? node
+
         name = node.children.first
         if name.children.first == nil
           @ngClassUses, @ngClassOmit = [], []
@@ -128,6 +133,9 @@ module Ruby2JS
         else
           super
         end
+      ensure
+        @ngClassUses, @ngClassOmit = [], []
+        @ngContext = ngContext
       end
 
       # input: 
@@ -156,6 +164,8 @@ module Ruby2JS
             ng_factory(node)
           when :filter
             ng_filter(node)
+          when :config
+            ng_config(node)
           when :directive
             hash = AngularRB.hash(node.children[2..-1])
             if hash
@@ -175,12 +185,43 @@ module Ruby2JS
       end
 
       # input:
+      #  config :service do
+      #    name = value
+      #  end
+      #
+      # output:
+      #  AppName.config("service") do |service|
+      #    service.name = value
+      #  end
+      def ng_config(node)
+        call = node.children.first
+        services = call.children[2..-1].map {|sym| sym.children[0]}
+        list = node.children[2..-1]
+
+        if services.length == 1
+          hash = AngularRB.hash(node.children[2..-1])
+          if hash
+            service = call.children[2].children[0]
+            list = hash.children.map do |pair|
+              s(:send, s(:gvar, service), "#{pair.children[0].children[0]}=",
+                pair.children[1])
+            end
+          end
+        end
+
+        s(:send, @ngApp, :config, 
+          s(:array, *services.map {|sym| s(:str, sym.to_s)}, 
+            s(:block, s(:send, nil, :proc), 
+              s(:args, *services.map {|sym| s(:arg, sym)}), s(:begin, *list))))
+      end
+
+      # input:
       #  controller :name do
       #    ...
       #  end
       #
       # output:
-      #  AppName.controller("name", do |uses|
+      #  AppName.controller("name") do |uses|
       #    ...
       #  end
       def ng_controller(node, scope)
@@ -218,6 +259,7 @@ module Ruby2JS
         :or, :regexp, :self, :send, :str, :sym, :true, :undefined?, :xstr ]
 
       def ng_filter(node)
+        ngContext, @ngContext = @ngContext, :filter
         @ngClassUses, @ngClassOmit = [], []
         call = node.children.first
 
@@ -237,6 +279,9 @@ module Ruby2JS
         outer = s(:send, @ngApp, :filter, *call.children[2..-1])
 
         node.updated nil, [outer, s(:args, *uses), s(:return, inner)]
+      ensure
+        @ngClassUses, @ngClassOmit = [], []
+        @ngContext = ngContext
       end
 
       # input: 
@@ -247,6 +292,7 @@ module Ruby2JS
       # output: 
       #   AppName.factory :name, [uses, lambda {|uses| ...}]
       def ng_factory(node)
+        ngContext, @ngContext = @ngContext, :factory
         call = node.children.first
         call = call.updated(nil, [@ngApp, *call.children[1..-1]])
 
@@ -271,6 +317,9 @@ module Ruby2JS
         array = args.map {|arg| s(:str, arg.children.first.to_s)}
 
         s(:send, *call.children, s(:array, *array, function))
+      ensure
+        @ngClassUses, @ngClassOmit = [], []
+        @ngContext = ngContext
       end
 
       # input: 
@@ -348,16 +397,33 @@ module Ruby2JS
       }
 
       def on_send(node)
-        return super unless @ngContext == :controller
+        if @ngContext == :controller
+          # map well known method names to the appropriate service
+          scope, method = NG_METHOD_MAP[node.children[1]]
 
-        scope, method = NG_METHOD_MAP[node.children[1]]
+          return super unless node.children.first == nil and method
 
-        return super unless node.children.first == nil and method
+          scope = s(:gvar, scope) if scope
+          process s(:gvar, method) unless scope
 
-        scope = s(:gvar, scope) if scope
-        process s(:gvar, method) unless scope
+          process node.updated nil, [scope, method, *node.children[2..-1]]
 
-        process node.updated nil, [scope, method, *node.children[2..-1]]
+        elsif @ngContext == :module and node.children[0]
+          child = node
+          while child and child.type == :send
+            child = child.children[0]
+          end
+
+          # singleton configuration syntax
+          return super unless child and (child.type == :gvar or 
+            (child.type == :const and child.children[0] == nil))
+
+          service = child.children.last
+          s(:send, @ngApp, :config, s(:array, s(:str, service.to_s), s(:block, 
+            s(:send, nil, :proc), s(:args, s(:arg, service)), node)))
+        else
+          super
+        end
       end
 
       # convert instance method definitions in controllers to $scope

@@ -10,6 +10,10 @@ describe Ruby2JS::Filter::AngularRB do
       Ruby2JS::Filter::AngularRoute, Ruby2JS::Filter::AngularResource])
   end
   
+  # ************************************************************ 
+  #                            module
+  # ************************************************************ 
+
   describe 'module' do
     it "should convert empty modules" do
       to_js( 'module Angular::X; end' ).
@@ -56,6 +60,10 @@ describe Ruby2JS::Filter::AngularRB do
     end
   end
   
+  # ************************************************************ 
+  #                         controllers
+  # ************************************************************ 
+
   describe 'controllers' do
     it "should convert apps with a controller" do
       ruby = <<-RUBY
@@ -266,6 +274,10 @@ describe Ruby2JS::Filter::AngularRB do
     end
   end
   
+  # ************************************************************ 
+  #                            filter
+  # ************************************************************ 
+
   describe 'filter' do
     it "should convert apps with a filter" do
       ruby = <<-RUBY
@@ -288,6 +300,10 @@ describe Ruby2JS::Filter::AngularRB do
     end
   end
   
+  # ************************************************************ 
+  #                            route
+  # ************************************************************ 
+
   describe 'route' do
     it "should convert apps with a route" do
       ruby = <<-RUBY
@@ -319,6 +335,10 @@ describe Ruby2JS::Filter::AngularRB do
       to_js( ruby ).must_equal js
     end
   end
+
+  # ************************************************************ 
+  #                            filter
+  # ************************************************************ 
 
   describe 'factory' do
     it "should convert apps with a factory" do
@@ -377,6 +397,10 @@ describe Ruby2JS::Filter::AngularRB do
     end
   end
 
+  # ************************************************************ 
+  #                          directives
+  # ************************************************************ 
+
   describe 'directives' do
     it "should convert apps with a directive -- short form" do
       ruby = <<-RUBY
@@ -414,6 +438,58 @@ describe Ruby2JS::Filter::AngularRB do
       to_js( ruby ).must_equal js
     end
   end
+
+  # ************************************************************
+  #                            config
+  # ************************************************************ 
+
+  describe 'config' do
+    it "should convert apps with config -- long form" do
+      ruby = <<-RUBY
+        module Angular::PhonecatApp 
+          config :$locationServices do 
+            html5mode = true
+          end
+        end
+      RUBY
+
+      js = <<-JS.gsub!(/^ {8}/, '').chomp
+        angular.module("PhonecatApp", []).config([
+          "$locationServices",
+
+          function($locationServices) {
+            $locationServices.html5mode = true
+          }
+        ])
+      JS
+
+      to_js( ruby ).must_equal js
+    end
+
+    it "should convert apps with config -- short form" do
+      ruby = <<-RUBY
+        module Angular::PhonecatApp 
+          $locationServices.html5mode = true
+        end
+      RUBY
+
+      js = <<-JS.gsub!(/^ {8}/, '').chomp
+        angular.module("PhonecatApp", []).config([
+          "$locationServices",
+
+          function($locationServices) {
+            $locationServices.html5mode = true
+          }
+        ])
+      JS
+
+      to_js( ruby ).must_equal js
+    end
+  end
+
+  # ************************************************************ 
+  #                           defaults
+  # ************************************************************ 
 
   describe Ruby2JS::Filter::DEFAULTS do
     it "should include AngularRB" do
