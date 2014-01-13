@@ -420,6 +420,34 @@ describe Ruby2JS::Filter::AngularRB do
       to_js( ruby ).must_equal js
     end
 
+    it "should convert apps with a link/observe" do
+      ruby = <<-RUBY
+        module Angular::PhonecatApp 
+          directive :name1 do
+            def link(scope, elem, attrs)
+              observe attrs, 'name1' do |value|
+                elem.attr('name2', value)
+              end
+            end
+          end
+        end
+      RUBY
+
+      js = <<-JS.gsub!(/^ {8}/, '').chomp
+        angular.module("PhonecatApp", []).directive("name1", function() {
+          return {
+            link: function(scope, elem, attrs) {
+              attrs.$observe(\"name1\", function(value) {
+                elem.attr(\"name2\", value)
+              })
+            }
+          }
+        })
+      JS
+
+      to_js( ruby ).must_equal js
+    end
+
     it "should convert apps with a directive -- long form" do
       ruby = <<-RUBY
         module Angular::PhonecatApp 

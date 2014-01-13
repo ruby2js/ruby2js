@@ -180,6 +180,8 @@ module Ruby2JS
             ng_watch(node, :$watch)
           when :on
             ng_watch(node, :$on)
+          when :observe
+            ng_observe(node)
           else
             super
           end
@@ -363,10 +365,32 @@ module Ruby2JS
       def ng_watch(node, method)
         call = node.children.first
         if @ngContext == :controller and call.children.first == nil
-          call = s(:send, s(:gvar, :$scope), method, *call.children[2..-1])
-          node = node.updated nil, [call, *node.children[1..-1]]
+          target = s(:gvar, :$scope)
+        else
+          target = nil
+          method = node.children[0].children[1]
         end
-        return process node
+        call = s(:send, target, method, *process_all(call.children[2..-1]))
+        node = node.updated nil, [call, *process_all(node.children[1..-1])]
+      end
+
+      # input:
+      #  observe attr, 'name' do |value|
+      #    ...
+      #  end
+      #
+      # output:
+      #  attr.$observe('name') do |value|
+      #    ...
+      #  end
+      def ng_observe(node)
+        if @ngContext == :directive
+          call = node.children[0]
+          call = s(:send, call.children[2], :$observe, call.children[3])
+          process node.updated nil, [call, *node.children[1..-1]]
+        else
+          node.updated nil, process_all(node.children) 
+        end
       end
 
       # convert ivar assignments in controllers to $scope
