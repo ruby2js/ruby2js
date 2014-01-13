@@ -450,6 +450,18 @@ module Ruby2JS
           service = child.children.last
           s(:send, @ngApp, :config, s(:array, s(:str, service.to_s), s(:block, 
             s(:send, nil, :proc), s(:args, s(:arg, service)), node)))
+
+        elsif @ngContext == :directive
+          return super unless node.children[0..1] == [nil, :interpolate]
+
+          @ngClassUses << :$interpolate
+          if node.children.length == 3
+            process node.updated nil, [nil, :$interpolate, node.children[2]]
+          else
+            process s(:send, s(:send, nil, :$interpolate, node.children[2]), 
+              nil, node.children[3])
+          end
+
         else
           super
         end

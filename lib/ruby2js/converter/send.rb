@@ -135,7 +135,7 @@ module Ruby2JS
             s(:send, s(:array, *args[0..-2]), :concat,
               args[-1].children.first))
         else
-          call = "#{ parse receiver }#{ '.' if receiver }#{ method }"
+          call = "#{ parse receiver }#{ '.' if receiver && method}#{ method }"
           args = args.map {|a| parse a}
           if args.any? {|arg| arg.to_s.include? "\n"}
             "#{ call }(#{ args.join(', ') })"

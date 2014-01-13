@@ -420,7 +420,31 @@ describe Ruby2JS::Filter::AngularRB do
       to_js( ruby ).must_equal js
     end
 
-    it "should convert apps with a link/observe" do
+    it "should convert directives with a link/interpolate" do
+      ruby = <<-RUBY
+        module Angular::PhonecatApp 
+          directive :name1 do
+            def link(scope, elem, attrs)
+              elem.attr('name2', interpolate(attrs.name1, scope))
+            end
+          end
+        end
+      RUBY
+
+      js = <<-JS.gsub!(/^ {8}/, '').chomp
+        angular.module("PhonecatApp", []).directive("name1", function($interpolate) {
+          return {
+            link: function(scope, elem, attrs) {
+              elem.attr("name2", $interpolate(attrs.name1)(scope))
+            }
+          }
+        })
+      JS
+
+      to_js( ruby ).must_equal js
+    end
+
+    it "should convert directives with a link/observe" do
       ruby = <<-RUBY
         module Angular::PhonecatApp 
           directive :name1 do
