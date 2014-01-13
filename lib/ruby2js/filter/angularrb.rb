@@ -54,7 +54,10 @@ module Ruby2JS
 
       def on_module(node)
         ngContext, @ngContext = @ngContext, :module
-        @ngModule = node 
+        @ngModule = node.children
+        if @ngModule.last and @ngModule.last.type == :begin
+          @ngModule = @ngModule.last.children
+        end
         module_name = node.children[0]
         parent_name = module_name.children[0]
 
@@ -410,7 +413,7 @@ module Ruby2JS
           process node.updated nil, [scope, method, *node.children[2..-1]]
 
         elsif @ngContext == :module and node.children[0]
-          return super unless @ngModule.children.include? node
+          return super unless @ngModule.include? node
           child = node
           while child and child.type == :send
             child = child.children[0]
