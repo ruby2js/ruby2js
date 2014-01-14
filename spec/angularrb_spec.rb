@@ -163,6 +163,30 @@ describe Ruby2JS::Filter::AngularRB do
       to_js( ruby ).must_equal js
     end
 
+    it "should allow you to watch expressions" do
+      ruby = <<-RUBY
+        module Angular::PhonecatApp 
+          controller :PhoneListCtrl do 
+            watch @value do |value|
+              @orderProp = value
+            end
+          end
+        end
+      RUBY
+
+      js = <<-JS.gsub!(/^ {8}/, '').chomp
+        angular.module("PhonecatApp", []).controller("PhoneListCtrl", function($scope) {
+          $scope.$watch(function() {
+            return $scope.value
+          }, function(value) {
+            $scope.orderProp = value
+          })
+        })
+      JS
+
+      to_js( ruby ).must_equal js
+    end
+
     it "should map on to $scope.$on within a controller" do
       ruby = <<-RUBY
         module Angular::PhonecatApp 
@@ -449,7 +473,7 @@ describe Ruby2JS::Filter::AngularRB do
         module Angular::PhonecatApp 
           directive :name1 do
             def link(scope, elem, attrs)
-              observe attrs, 'name1' do |value|
+              observe attrs.name1 do |value|
                 elem.attr('name2', value)
               end
             end

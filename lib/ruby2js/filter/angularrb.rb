@@ -366,16 +366,23 @@ module Ruby2JS
         call = node.children.first
         if @ngContext == :controller and call.children.first == nil
           target = s(:gvar, :$scope)
+          expression = call.children[2]
+          if not [:str, :dstr, :sym, :dsym].include? expression.type
+            expression = s(:block, s(:send, nil, :proc), s(:args), 
+              s(:return, expression))
+          end
         else
           target = nil
-          method = node.children[0].children[1]
+          method = call.children[1]
+          expression = call.children[2]
         end
-        call = s(:send, target, method, *process_all(call.children[2..-1]))
+        call = s(:send, target, method, process(expression), 
+          *process_all(call.children[3..-1]))
         node = node.updated nil, [call, *process_all(node.children[1..-1])]
       end
 
       # input:
-      #  observe attr, 'name' do |value|
+      #  observe attr.name do |value|
       #    ...
       #  end
       #
@@ -386,7 +393,9 @@ module Ruby2JS
       def ng_observe(node)
         if @ngContext == :directive
           call = node.children[0]
-          call = s(:send, call.children[2], :$observe, call.children[3])
+          expression = call.children[2]
+          call = s(:send, expression.children[0], :$observe, 
+            s(:sym, expression.children[1]))
           process node.updated nil, [call, *node.children[1..-1]]
         else
           node.updated nil, process_all(node.children) 
