@@ -13,6 +13,14 @@ calls IF there are either one or more arguments passed OR parenthesis are
 used, otherwise Ruby method calls become JavaScript property accesses.
 By default, methods, lambdas, and procs return `undefined`.
 
+Ruby attribute accessors, as well as getter and setter method definitions, are
+mapped to
+[Object.defineProperty](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/defineProperty?redirectlocale=en-US&redirectslug=JavaScript%2FReference%2FGlobal_Objects%2FObject%2FdefineProperty),
+so avoid these if you wish to target users running IE8 or lower.  Instance
+methods defined with no arguments are presumed to be defining a property
+accessor; if you want a method with no arguments append a `!` to the method
+name.
+
 Filters may be provided to add Ruby-specific or framework specific
 behavior.  Filters are essentially macro facilities that operate on
 an AST representation of the code.
