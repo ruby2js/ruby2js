@@ -9,10 +9,25 @@ module Ruby2JS
     handle :hash do |*pairs|
       pairs.map! do |node|
         left, right = node.children
-        key = parse left
-        key = $1 if key =~ /\A"([a-zA-Z_$][a-zA-Z_$0-9]*)"\Z/
-        "#{key}: #{parse right}"
+        if left.type == :prop
+          result = []
+          if right[:get]
+            result << "get #{left.children[0]}#{
+              parse(right[:get]).sub(/^function/,'')}"
+          end
+          if right[:set]
+            result << "set #{left.children[0]}#{
+              parse(right[:set]).sub(/^function/,'')}"
+          end
+          result
+        else
+          key = parse left
+          key = $1 if key =~ /\A"([a-zA-Z_$][a-zA-Z_$0-9]*)"\Z/
+          "#{key}: #{parse right}"
+        end
       end
+
+      pairs.flatten!
 
       if pairs.map {|item| item.length+2}.reduce(&:+).to_i < @width-10
         "{#{ pairs.join(', ') }}"

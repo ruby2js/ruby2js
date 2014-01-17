@@ -446,28 +446,33 @@ describe Ruby2JS do
       to_js('class Person; end').must_equal 'function Person() {}'
     end
 
+    it "should parse class with attr_accessor" do
+      to_js('class Person; attr_accessor :a; end').
+        must_equal 'function Person() {}; Person.prototype = {get a() {return this._a}, set a(a) {this._a = a}}'
+    end
+
     it "should parse class with constructor" do
       to_js('class Person; def initialize(name); @name = name; end; end').must_equal 'function Person(name) {this._name = name}'
     end
 
     it "should parse class with constructor and method" do
       to_js('class Person; def initialize(name); @name = name; end; def name; return @name; end; end').
-        must_equal 'function Person(name) {this._name = name}; Person.prototype.name = function() {return this._name}'
+        must_equal 'function Person(name) {this._name = name}; Person.prototype = {get name() {return this._name}}'
     end
 
     it "should parse class with constructor and two methods" do
-      to_js('class Person; def initialize(name); @name = name; end; def name; return @name; end; def reset; @name = nil; end; end').
-        must_equal 'function Person(name) {this._name = name}; Person.prototype = {name: function() {return this._name}, reset: function() {this._name = null}}'
+      to_js('class Person; def initialize(name); @name = name; end; def name; return @name; end; def reset!; @name = nil; end; end').
+        must_equal 'function Person(name) {this._name = name}; Person.prototype = {get name() {return this._name}, reset: function() {this._name = null}}'
     end
 
     it "should parse class with contructor and methods with multiple arguments" do
       to_js('class Person; def initialize(name, surname); @name, @surname = name, surname; end; def full_name; return @name  + @surname; end; end').
-        must_equal 'function Person(name, surname) {this._name = name; this._surname = surname}; Person.prototype.full_name = function() {return this._name + this._surname}'
+        must_equal 'function Person(name, surname) {this._name = name; this._surname = surname}; Person.prototype = {get full_name() {return this._name + this._surname}}'
     end
 
     it "should collapse multiple methods in a class" do
       to_js('class C; def a; end; def b; end; end').
-        must_equal 'function C() {}; C.prototype = {a: function() {}, b: function() {}}'
+        must_equal 'function C() {}; C.prototype = {get a() {}, get b() {}}'
     end
 
     it "should parse class with inheritance" do
@@ -482,9 +487,16 @@ describe Ruby2JS do
         must_equal 'function Person() {}; Person._count = {}; Person._count[1] = 1'
     end
 
+    it "should parse class with class variables and methods" do
+      to_js('class Person; @@count=0; def offset(x); return @@count+x; end; end').
+        must_equal 'function Person() {}; Person._count = 0; Person.prototype.offset = function(x) {return Person._count + x}'
+      to_js('class Person; @@count=0; def count; return @@count; end; end').
+        must_equal 'function Person() {}; Person._count = 0; Object.defineProperty(Person.prototype, "count", {enumerable: true, configurable: true, get: function() {return Person._count}})'
+    end
+
     it "should parse instance methods with class variables" do
       to_js('class Person; def count; return @@count; end; end').
-        must_equal 'function Person() {}; Person.prototype.count = function() {return Person._count}'
+        must_equal 'function Person() {}; Person.prototype = {get count() {return Person._count}}'
     end
 
     it "should parse class methods with class variables" do
@@ -712,9 +724,9 @@ describe Ruby2JS do
       to_js( '@x', ivars: {:@x => 1} ).must_equal '1'
     end
 
-    it "should not handle replace ivars in class definitions" do
+    it "should not replace ivars in class definitions" do
       to_js( 'class F; def f; @x; end; end', ivars: {:@x => 1} ).
-        must_equal 'function F() {}; F.prototype.f = function() {this._x}'
+        must_equal 'function F() {}; F.prototype = {get f() {this._x}}'
     end
   end
 end
