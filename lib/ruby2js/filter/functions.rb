@@ -141,16 +141,23 @@ module Ruby2JS
 
         elsif [:sub, :gsub].include? call.children[1]
           return super if call.children.first == nil
-          block = s(:block, s(:send, nil, :proc), *node.children[1..-1])
+          block = s(:block, s(:send, nil, :proc), node.children[1],
+            s(:autoreturn, *node.children[2..-1]))
           process call.updated(nil, [*call.children, block])
 
         elsif call.children[1] == :any? and call.children.length == 2
           call = call.updated nil, [call.children.first, :some]
-          process node.updated nil, [call, *node.children[1..-1]]
+          process node.updated nil, [call, node.children[1],
+            s(:autoreturn, *node.children[2..-1])]
 
         elsif call.children[1] == :all? and call.children.length == 2
           call = call.updated nil, [call.children.first, :every]
-          process node.updated nil, [call, *node.children[1..-1]]
+          process node.updated nil, [call, node.children[1],
+            s(:autoreturn, *node.children[2..-1])]
+
+        elsif call.children[1] == :map and call.children.length == 2
+          node.updated nil, [call, process(node.children[1]),
+            s(:autoreturn, *process_all(node.children[2..-1]))]
 
         else
           super

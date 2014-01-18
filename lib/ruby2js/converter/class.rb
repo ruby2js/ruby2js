@@ -32,7 +32,8 @@ module Ruby2JS
             # property getter
             s(:prop, s(:attr, name, :prototype), m.children.first, 
                 enumerable: s(:true), configurable: s(:true),
-                get: s(:block, s(:send, nil, :proc), *m.children[1..-1]))
+                get: s(:block, s(:send, nil, :proc), m.children[1],
+                  s(:autoreturn, *m.children[2..-1])))
           else
             # method: add to prototype
             s(:send, s(:attr, name, :prototype),

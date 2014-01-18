@@ -156,6 +156,9 @@ the script.
     * `.each_with_index` becomes `forEach`
     * `setInterval` and `setTimeout` allow block to be treated as the
        first parameter on the call
+    * for the following methods, if the block consists entirely of a simple
+      expression (or ends with one), a `return` is added prior to the
+      expression: `sub`, `gsub`, `any?`, `all?`, `map`.
 
 * [jquery](https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/jquery.rb)
 

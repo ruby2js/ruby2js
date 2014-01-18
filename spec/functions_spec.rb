@@ -40,7 +40,7 @@ describe Ruby2JS::Filter::Functions do
   describe 'string functions' do
     it 'should handle sub' do
       to_js( 'str.sub("a", "b")' ).must_equal 'str.replace("a", "b")'
-      to_js( 'str.sub(/a/) {return "x"}' ).
+      to_js( 'str.sub(/a/) {"x"}' ).
         must_equal 'str.replace(/a/, function() {return "x"})'
     end
 
@@ -48,7 +48,7 @@ describe Ruby2JS::Filter::Functions do
       to_js( 'str.gsub("a", "b")' ).must_equal 'str.replace(/a/g, "b")'
       to_js( 'str.gsub(/a/i, "b")' ).must_equal 'str.replace(/a/gi, "b")'
       to_js( 'str.gsub(/a/, "b")' ).must_equal 'str.replace(/a/g, "b")'
-      to_js( 'str.gsub(/a/) {return "x"}' ).
+      to_js( 'str.gsub(/a/) {"x"}' ).
         must_equal 'str.replace(/a/g, function() {return "x"})'
     end
 
@@ -117,11 +117,18 @@ describe Ruby2JS::Filter::Functions do
     end
 
     it "should handle any?" do
-      to_js( 'a.any? {|i| i==0}' ).must_equal 'a.some(function(i) {i == 0})'
+      to_js( 'a.any? {|i| i==0}' ).
+        must_equal 'a.some(function(i) {return i == 0})'
+    end
+
+    it "should handle map" do
+      to_js( 'a.map {|i| i+1}' ).
+        must_equal 'a.map(function(i) {return i + 1})'
     end
 
     it "should handle all?" do
-      to_js( 'a.all? {|i| i==0}' ).must_equal 'a.every(function(i) {i == 0})'
+      to_js( 'a.all? {|i| i==0}' ).
+        must_equal 'a.every(function(i) {return i == 0})'
     end
   end
 
