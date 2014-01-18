@@ -468,6 +468,28 @@ describe Ruby2JS::Filter::AngularRB do
       to_js( ruby ).must_equal js
     end
 
+    it "should convert directives with a link/compile" do
+      ruby = <<-RUBY
+        module Angular::PhonecatApp 
+          directive :name1 do
+            def link(scope, elem, attrs)
+              compile(elem, scope)
+            end
+          end
+        end
+      RUBY
+
+      js = <<-JS.gsub!(/^ {8}/, '').chomp
+        angular.module("PhonecatApp", []).directive("name1", function($compile) {
+          return {link: function(scope, elem, attrs) {
+            $compile(elem)(scope)
+          }}
+        })
+      JS
+
+      to_js( ruby ).must_equal js
+    end
+
     it "should convert directives with a link/observe" do
       ruby = <<-RUBY
         module Angular::PhonecatApp 

@@ -461,14 +461,29 @@ module Ruby2JS
             s(:send, nil, :proc), s(:args, s(:arg, service)), node)))
 
         elsif @ngContext == :directive
-          return super unless node.children[0..1] == [nil, :interpolate]
+          if node.children[0..1] == [nil, :interpolate]
 
-          @ngClassUses << :$interpolate
-          if node.children.length == 3
-            process node.updated nil, [nil, :$interpolate, node.children[2]]
+            @ngClassUses << :$interpolate
+            if node.children.length == 3
+              process node.updated nil, [nil, :$interpolate, node.children[2]]
+            else
+              process s(:send, s(:send, nil, :$interpolate, node.children[2]), 
+                nil, node.children[3])
+            end
+
+          elsif node.children[0..1] == [nil, :compile]
+
+            @ngClassUses << :$compile
+            if node.children.length == 3
+              process node.updated nil, [nil, :$compile, node.children[2]]
+            else
+              process s(:send, s(:send, nil, :$compile, node.children[2]), 
+                nil, node.children[3])
+            end
+
+
           else
-            process s(:send, s(:send, nil, :$interpolate, node.children[2]), 
-              nil, node.children[3])
+            super
           end
 
         else
