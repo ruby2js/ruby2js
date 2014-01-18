@@ -25,6 +25,24 @@ module Ruby2JS
           source, method, before, after = node.children
           process node.updated nil, [source, :replace, before, after]
 
+        elsif [:sub!, :gsub!].include? node.children[1]
+          method = :"#{node.children[1].to_s[0..-2]}"
+          target = node.children[0]
+          if target.type == :lvar
+            process s(:lvasgn, target.children[0], s(:send,
+              s(:lvar, target.children[0]), method, *node.children[2..-1]))
+          elsif target.type == :send
+            if target.children[0] == nil
+              process s(:lvasgn, target.children[1], s(:send,
+                s(:lvar, target.children[1]), method, *node.children[2..-1]))
+            else
+              process s(:send, target.children[0], :"#{target.children[1]}=", 
+                s(:send, target, method, *node.children[2..-1]))
+            end
+          else
+            super
+          end
+
         elsif node.children[1] == :gsub and node.children.length == 4
           source, method, before, after = node.children
           if before.type == :regexp

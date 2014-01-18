@@ -135,10 +135,11 @@ the script.
     * `.to_a` becomes `to_Array`
     * `.to_i` becomes `parseInt`
     * `.to_f` becomes `parseFloat`
-    * `.sub` becomes `replace`
     * `.ord` becomes `charCodeAt(0)`
     * `.chr` becomes `fromCharCode`
+    * `.sub` becomes `replace`
     * `.gsub` becomes `replace //g`
+    * `x.sub!` and `x.gsub!` become equivalent `x = x.replace` statements
     * `.first` becomes `[0]`
     * `.last` becomes `[*.length-1]`
     * `[-n]` becomes `[*.length-n]` for literal values of `n`
