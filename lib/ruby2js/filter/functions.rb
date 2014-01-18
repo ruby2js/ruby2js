@@ -174,7 +174,7 @@ module Ruby2JS
             s(:autoreturn, *node.children[2..-1])]
 
         elsif call.children[1] == :map and call.children.length == 2
-          node.updated nil, [call, process(node.children[1]),
+          node.updated nil, [process(call), process(node.children[1]),
             s(:autoreturn, *process_all(node.children[2..-1]))]
 
         else
