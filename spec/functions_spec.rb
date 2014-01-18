@@ -46,6 +46,8 @@ describe Ruby2JS::Filter::Functions do
         must_equal 'var str = str.replace("a", "b")'
       to_js( 'item.str.sub!("a", "b")' ).
         must_equal 'item.str = item.str.replace("a", "b")'
+      to_js( 'str.sub!(/a/) {"x"}' ).
+        must_equal 'var str = str.replace(/a/, function() {return "x"})'
     end
 
     it 'should handle gsub and gsub!' do
@@ -58,6 +60,8 @@ describe Ruby2JS::Filter::Functions do
         must_equal 'var str = str.replace(/a/g, "b")'
       to_js( 'item.str.gsub!("a", "b")' ).
         must_equal 'item.str = item.str.replace(/a/g, "b")'
+      to_js( 'str.gsub!(/a/, "b")' ).
+        must_equal 'var str = str.replace(/a/g, "b")'
     end
 
     it 'should handle ord and chr' do
