@@ -212,6 +212,10 @@ the script.
 Picking a Ruby to JS mapping tool
 ---
 
+> dsl — A domain specific language, where code is written in one language and
+> errors are given in another. 
+> -- [Devil’s Dictionary of Programming](http://programmingisterrible.com/post/65781074112/devils-dictionary-of-programming)
+
 If you simply want to get a job done, and would like a mature and tested
 framework, and only use one of the many integrations that
 [Opal](http://opalrb.org/) provides, then Opal is the way to go right now.
