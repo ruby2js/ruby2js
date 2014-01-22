@@ -72,6 +72,9 @@ module Ruby2JS
       elsif method == :!~
         "!#{ parse args.first }.test(#{ parse receiver })"
 
+      elsif method == :<< and args.length == 1 and @state == :statement
+        "#{ parse receiver }.push(#{ parse args.first })"
+
       elsif OPERATORS.flatten.include? method
         "#{ group_receiver ? group(receiver) : parse(receiver) } #{ method } #{ group_target ? group(target) : parse(target) }"  
 

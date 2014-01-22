@@ -297,6 +297,16 @@ describe Ruby2JS do
     end
   end
   
+  describe 'array push' do
+    it "should convert << statements to .push calls" do
+      to_js( 'a << b' ).must_equal 'a.push(b)'
+    end
+    
+    it "should leave << expressions alone" do
+      to_js( 'y = a << b' ).must_equal 'var y = a << b'
+    end
+  end
+
   describe 'control' do
     it "should parse single line if" do
       to_js( '1 if true' ).must_equal 'if (true) 1'
