@@ -350,6 +350,15 @@ module Ruby2JS
         end
       end
 
+      # convert cvar referencess in controllers to self
+      def on_cvar(node)
+        if @ngContext == :controller
+          process s(:attr, s(:self), node.children.first.to_s[2..-1])
+        else
+          super
+        end
+      end
+
       # input:
       #  watch 'expression' do |oldvalue, newvalue|
       #    ...
@@ -376,9 +385,9 @@ module Ruby2JS
           method = call.children[1]
           expression = call.children[2]
         end
-        call = s(:send, target, method, process(expression), 
+        call = s(:send, process(target), method, process(expression), 
           *process_all(call.children[3..-1]))
-        node = node.updated nil, [call, *process_all(node.children[1..-1])]
+        node.updated nil, [call, *process_all(node.children[1..-1])]
       end
 
       # input:
@@ -411,6 +420,20 @@ module Ruby2JS
           else
             process s(:send, s(:gvar, :$scope),
               "#{node.children.first.to_s[1..-1]}=", node.children.last)
+          end
+        else
+          super
+        end
+      end
+
+      # convert cvar assignments in controllers to self 
+      def on_cvasgn(node)
+        if @ngContext == :controller
+          if node.children.length == 1
+            process s(:attr, s(:self), "#{node.children.first.to_s[2..-1]}")
+          else
+            process s(:send, s(:self), "#{node.children.first.to_s[2..-1]}=",
+              node.children.last)
           end
         else
           super

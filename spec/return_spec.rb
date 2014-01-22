@@ -70,11 +70,6 @@ describe Ruby2JS::Filter::Return do
     it "should handle method calls" do
       to_js( 'lambda {|x| x+x}' ).must_equal 'function(x) {return x + x}'
     end
-
-    it "should handle if statements" do
-      to_js( 'lambda {|x| if x<0; -x; else x; end}' ).
-        must_equal 'function(x) {return (x < 0 ? -x : x)}'
-    end
   end
 
   describe Ruby2JS::Filter::DEFAULTS do

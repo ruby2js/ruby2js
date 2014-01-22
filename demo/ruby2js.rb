@@ -23,7 +23,8 @@ begin
     'functions' => 'ruby2js/filter/functions',
     'jquery'    => 'ruby2js/filter/jquery',
     'return'    => 'ruby2js/filter/return',
-    'strict'    => 'ruby2js/filter/strict'
+    'strict'    => 'ruby2js/filter/strict',
+    'underscore' => 'ruby2js/filter/underscore'
   }
 
   # allow filters to be selected based on the path

@@ -96,8 +96,14 @@ facilitates iteration over arrays.  `forEach` is the JavaScript equivalent.
 Mapping this is fine until you start using a framework like jQuery which
 provides a function named [each](http://api.jquery.com/jQuery.each/).
 
-These approaches aren’t mutually exclusive. With enough static transformations
-and runtime libraries, one could reproduce any functionality desired.  Just be
+Fortunately, Ruby provides `?` and `!` as legal suffixes for method names,
+Ruby2js filters do an exact match, so if you select a filter that maps `each`
+to `forEach`, `each!` will pass through the filter.  The final code that emits
+JavaScript function calls and parameter accesses will strip off these
+suffixes.
+
+Static transformations and runtime libraries aren't aren’t mutually exclusive.
+With enough of each, one could reproduce any functionality desired.  Just be
 forewarned, that implementing a function like `method_missing` would require a
 _lot_ of work.
 
@@ -131,35 +137,76 @@ the script.
 
 * [functions](https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/functions.rb)
 
-    * `.to_s` becomes `to_String`
-    * `.to_a` becomes `to_Array`
-    * `.to_i` becomes `parseInt`
-    * `.to_f` becomes `parseFloat`
-    * `.ord` becomes `charCodeAt(0)`
-    * `.chr` becomes `fromCharCode`
-    * `.sub` becomes `replace`
-    * `.gsub` becomes `replace //g`
-    * `x.sub!` and `x.gsub!` become equivalent `x = x.replace` statements
-    * `.first` becomes `[0]`
-    * `.last` becomes `[*.length-1]`
-    * `[-n]` becomes `[*.length-n]` for literal values of `n`
-    * `[n..m]` becomes `.slice(n,m+1)`
-    * `[n...m]` becomes `.slice(n,m)`
-    * `[/r/, n]` becomes `.match(/r/)[n]`
-    * `.empty?` becomes `.length == 0`
-    * `.clear!` becomes `.length = 0`
-    * `.replace!` becomes `.length = 0; ...push.apply(*)`
-    * `.include?` becomes `.indexOf() != -1`
-    * `.any?` becomes `.some`
     * `.all?` becomes `.every`
-    * `puts` becomes `console.log`
-    * `.each` becomes `forEach` unless jquery is included
+    * `.any?` becomes `.some`
+    * `.chr` becomes `fromCharCode`
+    * `.clear!` becomes `.length = 0`
+    * `.each` becomes `forEach`
     * `.each_with_index` becomes `forEach`
+    * `.empty?` becomes `.length == 0`
+    * `.first` becomes `[0]`
+    * `.first(n)` becomes `.slice(0, n)`
+    * `.gsub` becomes `replace //g`
+    * `.include?` becomes `.indexOf() != -1`
+    * `.keys` becomes `Object.keys()`
+    * `.last` becomes `[*.length-1]`
+    * `.last(n)` becomes `.slice(*.length-1, *.length)`
+    * `.max` becomes `Math.max.apply(Math)`
+    * `.min` becomes `Math.min.apply(Math)`
+    * `.ord` becomes `charCodeAt(0)`
+    * `puts` becomes `console.log`
+    * `.replace!` becomes `.length = 0; ...push.apply(*)`
+    * `.sub` becomes `replace`
+    * `.to_a` becomes `to_Array`
+    * `.to_f` becomes `parseFloat`
+    * `.to_i` becomes `parseInt`
+    * `.to_s` becomes `to_String`
+    * `x.sub!` and `x.gsub!` become equivalent `x = x.replace` statements
+    * `[-n]` becomes `[*.length-n]` for literal values of `n`
+    * `[n...m]` becomes `.slice(n,m)`
+    * `[n..m]` becomes `.slice(n,m+1)`
+    * `[/r/, n]` becomes `.match(/r/)[n]`
     * `setInterval` and `setTimeout` allow block to be treated as the
        first parameter on the call
     * for the following methods, if the block consists entirely of a simple
       expression (or ends with one), a `return` is added prior to the
       expression: `sub`, `gsub`, `any?`, `all?`, `map`.
+
+* [underscore](https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/underscore.rb)
+
+    * `.clone()` becomes `_.clone()`
+    * `.compact()` becomes `_.compact()`
+    * `.count_by {}` becomes `_.countBy {}`
+    * `.find {}` becomes `_.find {}`
+    * `.find_by()` becomes `_.findWhere()`
+    * `.flatten()` becomes `_.flatten()`
+    * `.group_by {}` becomes `_.groupBy {}`
+    * `.has_key?()` becomes `_.has()`
+    * `.index_by {}` becomes `_.indexBy {}`
+    * `.invert()` becomes `_.invert()`
+    * `.invoke(&:n)` becomes `_.invoke(, :n)`
+    * `.map(&:n)` becomes `_.pluck(, :n)`
+    * `.merge!()` becomes `_.extend()`
+    * `.merge()` becomes `_.extend({}, )`
+    * `.reduce {}` becomes `_.reduce {}`
+    * `.reduce()` becomes `_.reduce()`
+    * `.reject {}` becomes `_.reject {}`
+    * `.sample()` becomes `_.sample()`
+    * `.select {}` becomes `_.select {}`
+    * `.shuffle()` becomes `_.shuffle()`
+    * `.size()` becomes `_.size()`
+    * `.sort()` becomes `_.sort_by(, _.identity)`
+    * `.sort_by {}` becomes `_.sortBy {}`
+    * `.times {}` becomes `_.times {}`
+    * `.values()` becomes `_.values()`
+    * `.where()` becomes `_.where()`
+    * `.zip()` becomes `_.zip()`
+    * `(n...m)` becomes `_.range(n, m)`
+    * `(n..m)` becomes `_.range(n, m+1)`
+    * for the following methods, if the block consists entirely of a simple
+      expression (or ends with one), a `return` is added prior to the
+      expression: `reduce`, `sort_by`, `group_by`, `index_by`, `count_by`,
+      `find`, `select`, `reject`.
 
 * [jquery](https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/jquery.rb)
 

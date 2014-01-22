@@ -12,7 +12,7 @@ module Ruby2JS
       end
     end
 
-    EXPRESSIONS = [ :array, :float, :hash, :int, :lvar, :nil, :send,
+    EXPRESSIONS = [ :array, :float, :hash, :int, :lvar, :nil, :send, :attr,
       :str, :sym, :dstr, :dsym ]
 
     handle :autoreturn do |*statements|

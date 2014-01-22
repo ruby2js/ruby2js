@@ -77,6 +77,13 @@ module Ruby2JS
             # class method call
             s(:send, name, *m.children[1..-1])
           end
+        elsif m.type == :block and m.children.first.children.first == nil
+          # class method calls passing a block
+          s(:block, s(:send, name, *m.children.first.children[1..-1]), 
+            *m.children[1..-1])
+        elsif [:send, :block].include? m.type
+          # pass through method calls with non-nil targets
+          m
         elsif m.type == :lvasgn
           # class variable
           s(:send, name, "#{m.children[0]}=", *m.children[1..-1])

@@ -68,14 +68,6 @@ describe 'not implemented' do
     todo("if /a/; end")
   end
 
-  it "methods ending with a !" do
-    todo("a.shuffle!")
-  end
-
-  it "methods ending with a ?" do
-    todo("a.frozen?")
-  end
-
   it "methods definitions with invalid names" do
     todo("def bang?; end")
     todo("def bang!; end")

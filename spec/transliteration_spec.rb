@@ -141,6 +141,13 @@ describe Ruby2JS do
       exp = 'a().one().two().three()'
       to_js( exp ).must_equal exp
     end
+
+    it "should drop ! and ? from method calls and property accesses" do
+      to_js( "a!()" ).must_equal 'a()'
+      to_js( "a?()" ).must_equal 'a()'
+      to_js( "a!" ).must_equal 'var a'
+      to_js( "a?" ).must_equal 'var a'
+    end
   end
 
   describe "splat" do

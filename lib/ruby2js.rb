@@ -13,8 +13,26 @@ module Ruby2JS
     end
 
     class Processor < Parser::AST::Processor
+      BINARY_OPERATORS = Converter::OPERATORS[2..-1].flatten
+
       def on_attr(node)
-        node.updated nil, [process(node.children.first), node.children.last]
+        on_send(node)
+      end
+
+      def on_send(node)
+        if node.children.length > 2 and node.children.last.type == :block_pass
+          method = node.children.last.children.first.children.last
+          if BINARY_OPERATORS.include? method
+            return on_block s(:block, s(:send, *node.children[0..-2]),
+              s(:args, s(:arg, :a), s(:arg, :b)), s(:return,
+              process(s(:send, s(:lvar, :a), method, s(:lvar, :b)))))
+          else
+            return on_block s(:block, s(:send, *node.children[0..-2]),
+              s(:args, s(:arg, :item)), s(:return,
+              process(s(:attr, s(:lvar, :item), method))))
+          end
+        end
+        super
       end
     end
   end

@@ -18,9 +18,8 @@ module Ruby2JS
 
       width = ((ast.type == :sendw && !@nl.empty?) ? 0 : @width)
 
-      if method =~ /\w[!?]$/
-        raise NotImplementedError, "invalid method name #{ method }"
-      end
+      # strip '!' and '?' decorations
+      method = method.to_s[0..-2] if method =~ /\w[!?]$/
 
       # three ways to define anonymous functions
       if method == :new and receiver and receiver.children == [nil, :Proc]
@@ -104,7 +103,7 @@ module Ruby2JS
 
         args = args.map {|a| parse a}.join(', ')
 
-        if args.length > 0 or is_method?(ast)
+        if args.length > 0 or ast.is_method?
           "new #{ parse receiver }(#{ args })"
         else
           "new #{ parse receiver }"
@@ -121,7 +120,7 @@ module Ruby2JS
         "typeof #{ parse args.first }"
 
       else
-        if args.length == 0 and not is_method?(ast)
+        if args.length == 0 and not ast.is_method?
           if receiver
             "#{ parse receiver }.#{ method }"
           else

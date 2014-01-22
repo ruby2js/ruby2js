@@ -6,28 +6,39 @@ module Ruby2JS
       include SEXP
 
       def on_send(node)
-        target = process(node.children.first)
-        args = process_all(node.children[2..-1])
+        target = node.children.first
 
-        if node.children[1] == :to_s
-          s(:send, target, :toString, *args)
+        args = node.children[2..-1]
+
+        if [:max, :min].include? node.children[1] and args.length == 0
+          return super unless node.is_method?
+          process s(:send, s(:attr, s(:const, nil, :Math), node.children[1]),
+            :apply, s(:const, nil, :Math), target)
+
+        elsif node.children[1] == :keys and  node.children.length == 2
+          if node.is_method?
+            process s(:send, s(:const, nil, :Object), :keys, target)
+          else
+            super
+          end
+
+        elsif node.children[1] == :to_s
+          process s(:send, target, :toString, *args)
 
         elsif node.children[1] == :to_a
-          s(:send, target, :toArray, *args)
+          process s(:send, target, :toArray, *args)
 
         elsif node.children[1] == :to_i
-          node.updated nil, [nil, :parseInt, target, *args]
+          process node.updated :send, [nil, :parseInt, target, *args]
 
         elsif node.children[1] == :to_f
-          process node.updated nil, [nil, :parseFloat, target, *args]
+          process node.updated :send, [nil, :parseFloat, target, *args]
 
-        elsif node.children[1] == :sub and node.children.length == 4
-          source, method, before, after = node.children
-          process node.updated nil, [source, :replace, before, after]
+        elsif node.children[1] == :sub and args.length == 2
+          process node.updated nil, [target, :replace, *args]
 
         elsif [:sub!, :gsub!].include? node.children[1]
           method = :"#{node.children[1].to_s[0..-2]}"
-          target = node.children[0]
           if target.type == :lvar
             process s(:lvasgn, target.children[0], s(:send,
               s(:lvar, target.children[0]), method, *node.children[2..-1]))
@@ -56,46 +67,60 @@ module Ruby2JS
 
         elsif node.children[1] == :ord and node.children.length == 2
           if target.type == :str
-            s(:int, target.children.last.ord)
+            process s(:int, target.children.last.ord)
           else
-            node.updated nil, [target, :charCodeAt, s(:int, 0)]
+            process node.updated nil, [target, :charCodeAt, s(:int, 0)]
           end
 
         elsif node.children[1] == :chr and node.children.length == 2
           if target.type == :int
-            s(:str, target.children.last.chr)
+            process s(:str, target.children.last.chr)
           else
-            node.updated nil, [s(:const, nil, :String), :fromCharCode, target]
+            process node.updated nil, [s(:const, nil, :String), :fromCharCode,
+              target]
           end
 
         elsif node.children[1] == :empty? and node.children.length == 2
-          s(:send, s(:attr, target, :length), :==, s(:int, 0))
+          process s(:send, s(:attr, target, :length), :==, s(:int, 0))
 
         elsif node.children[1] == :clear! and node.children.length == 2
-          s(:send, target, :length=, s(:int, 0))
+          process s(:send, target, :length=, s(:int, 0))
 
         elsif node.children[1] == :replace! and node.children.length == 3
-          s(:begin, s(:send, target, :length=, s(:int, 0)),
+          process s(:begin, s(:send, target, :length=, s(:int, 0)),
              s(:send, target, :push, s(:splat, node.children[2])))
 
         elsif node.children[1] == :include? and node.children.length == 3
-          s(:send, s(:send, target, :indexOf, args.first), :!=, s(:int, -1))
+          process s(:send, s(:send, target, :indexOf, args.first), :!=,
+            s(:int, -1))
 
         elsif node.children[1] == :each
-          if @each # disable `each` mapping, see jquery filter for an example
-            super
-          else
-            node.updated nil, [target, :forEach, *args]
-          end
+          process node.updated nil, [target, :forEach, *args]
 
         elsif node.children[0..1] == [nil, :puts]
-          s(:send, s(:attr, nil, :console), :log, *args)
+          process s(:send, s(:attr, nil, :console), :log, *args)
 
-        elsif node.children[1..-1] == [:first]
-          node.updated nil, [target, :[], s(:int, 0)]
+        elsif node.children[1] == :first
+          if node.children.length == 2
+            process node.updated nil, [target, :[], s(:int, 0)]
+          elsif node.children.length == 3
+            process on_send node.updated nil, [target, :[], s(:erange,
+              s(:int, 0), node.children[2])]
+          else
+            super
+          end
 
-        elsif node.children[1..-1] == [:last]
-          on_send node.updated nil, [target, :[], s(:int, -1)]
+        elsif node.children[1] == :last
+          if node.children.length == 2
+            process on_send node.updated nil, [target, :[], s(:int, -1)]
+          elsif node.children.length == 3
+            process node.updated nil, [target, :slice,
+              s(:send, s(:attr, target, :length), :-, node.children[2]),
+              s(:attr, target, :length)]
+          else
+            super
+          end
+
 
         elsif node.children[1] == :[]
           index = args.first
@@ -103,7 +128,7 @@ module Ruby2JS
           # resolve negative literal indexes
           i = proc do |index|
             if index.type == :int and index.children.first < 0
-              s(:send, s(:attr, target, :length), :-, 
+              process s(:send, s(:attr, target, :length), :-, 
                 s(:int, -index.children.first))
             else
               index
@@ -111,18 +136,18 @@ module Ruby2JS
           end
 
           if index.type == :regexp
-            s(:send, s(:send, target, :match, index), :[], 
+            process s(:send, s(:send, target, :match, index), :[], 
               args[1] || s(:int, 0))
 
           elsif node.children.length != 3
             super
 
           elsif index.type == :int and index.children.first < 0
-            node.updated nil, [target, :[], i.(index)]
+            process node.updated nil, [target, :[], i.(index)]
 
           elsif index.type == :erange
             start, finish = index.children
-            node.updated nil, [target, :slice, i.(start), i.(finish)]
+            process node.updated nil, [target, :slice, i.(start), i.(finish)]
 
           elsif index.type == :irange
             start, finish = index.children
@@ -136,14 +161,14 @@ module Ruby2JS
             else
               finish = s(:send, finish, :+, s(:int, 1))
             end
-            node.updated nil, [target, :slice, start, finish]
+            process node.updated nil, [target, :slice, start, finish]
 
           else
             super
           end
 
         elsif node.children[1] == :each_with_index
-          node.updated nil, [target, :forEach, *args]
+          process node.updated nil, [target, :forEach, *args]
 
         else
           super
@@ -155,7 +180,8 @@ module Ruby2JS
         if [:setInterval, :setTimeout].include? call.children[1]
           return super unless call.children.first == nil
           block = process s(:block, s(:send, nil, :proc), *node.children[1..-1])
-          call.updated nil, [*call.children[0..1], block, *call.children[2..-1]]
+          on_send call.updated nil, [*call.children[0..1], block,
+            *call.children[2..-1]]
 
         elsif [:sub, :gsub, :sub!, :gsub!].include? call.children[1]
           return super if call.children.first == nil
@@ -165,13 +191,13 @@ module Ruby2JS
 
         elsif call.children[1] == :any? and call.children.length == 2
           call = call.updated nil, [call.children.first, :some]
-          process node.updated nil, [call, node.children[1],
-            s(:autoreturn, *node.children[2..-1])]
+          node.updated nil, [process(call), process(node.children[1]),
+            s(:autoreturn, *process_all(node.children[2..-1]))]
 
         elsif call.children[1] == :all? and call.children.length == 2
           call = call.updated nil, [call.children.first, :every]
-          process node.updated nil, [call, node.children[1],
-            s(:autoreturn, *node.children[2..-1])]
+          node.updated nil, [process(call), process(node.children[1]),
+            s(:autoreturn, *process_all(node.children[2..-1]))]
 
         elsif call.children[1] == :map and call.children.length == 2
           node.updated nil, [process(call), process(node.children[1]),

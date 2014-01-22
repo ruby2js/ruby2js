@@ -65,10 +65,6 @@ module Ruby2JS
     module JQuery
       include SEXP
 
-      def initialize
-        @each = true # disable each mapping, see functions filter
-      end
-
       # map $$ to $
       def on_gvar(node)
         if node.children[0] == :$$
@@ -128,6 +124,7 @@ module Ruby2JS
                 # possible getter/setter
                 method = node.children[1]
                 method = method.to_s.chomp('=') if method =~ /=$/
+                method = :each! if method == :each
                 rewrite = [rewrite_tilda[node.children[0]], 
                   method, *node.children[2..-1]]
                 if props.include? node.children[1]

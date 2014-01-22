@@ -67,14 +67,6 @@ module Ruby2JS
       Parser::AST::Node.new(type, args)
     end
 
-    def is_method?(node)
-      return false unless node.type == :send
-      return true unless node.loc
-      selector = node.loc.selector
-      return true unless selector.source_buffer
-      selector.source_buffer.source[selector.end_pos] == '('
-    end
-
     @@handlers = []
     def self.handle(*types, &block)
       types.each do |type| 
@@ -99,6 +91,20 @@ module Ruby2JS
     
     def group( ast )
       "(#{ parse ast })"
+    end
+  end
+end
+
+module Parser
+  module AST
+    class Node
+      def is_method?
+        return false unless type == :send
+        return true unless loc
+        selector = loc.selector
+        return true unless selector.source_buffer
+        selector.source_buffer.source[selector.end_pos] == '('
+      end
     end
   end
 end

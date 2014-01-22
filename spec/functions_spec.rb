@@ -86,10 +86,12 @@ describe Ruby2JS::Filter::Functions do
 
     it "should handle first" do
       to_js( 'a.first' ).must_equal 'a[0]'
+      to_js( 'a.first(n)' ).must_equal 'a.slice(0, n)'
     end
 
     it "should handle last" do
       to_js( 'a.last' ).must_equal 'a[a.length - 1]'
+      to_js( 'a.last(n)' ).must_equal 'a.slice(a.length - n, a.length)'
     end
 
     it "should handle literal negative offsets" do
@@ -143,6 +145,23 @@ describe Ruby2JS::Filter::Functions do
       to_js( 'a.all? {|i| i==0}' ).
         must_equal 'a.every(function(i) {return i == 0})'
     end
+
+    it "should handle max" do
+      to_js( 'a.max' ).must_equal 'a.max'
+      to_js( 'a.max()' ).must_equal 'Math.max.apply(Math, a)'
+    end
+
+    it "should handle min" do
+      to_js( 'a.min' ).must_equal 'a.min'
+      to_js( 'a.min()' ).must_equal 'Math.min.apply(Math, a)'
+    end
+  end
+
+  describe 'hash functions' do
+    it "should handle keys" do
+      to_js( 'a.keys' ).must_equal 'a.keys'
+      to_js( 'a.keys()' ).must_equal 'Object.keys(a)'
+    end
   end
 
   describe 'setTimeout/setInterval' do
@@ -154,6 +173,23 @@ describe Ruby2JS::Filter::Functions do
     it "should handle setInterval with first parameter passed as a block" do
       to_js( 'setInterval(100) {x()}' ).
         must_equal 'setInterval(function() {x()}, 100)'
+    end
+  end
+
+  describe 'block-pass' do
+    it 'should handle properties' do
+      to_js( 'a.all?(&:ready)' ).
+        must_equal 'a.every(function(item) {return item.ready})'
+    end
+
+    it 'should handle well known methods' do
+      to_js( 'a.map(&:to_i)' ).
+        must_equal 'a.map(function(item) {return parseInt(item)})'
+    end
+
+    it 'should handle binary operators' do
+      to_js( 'a.sort(&:<)' ).
+        must_equal 'a.sort(function(a, b) {return a < b})'
     end
   end
 
