@@ -1,3 +1,4 @@
+gem 'minitest'
 require 'minitest/autorun'
 require 'ruby2js/filter/angularrb'
 require 'ruby2js/filter/angular-route'
