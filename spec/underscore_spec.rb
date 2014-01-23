@@ -27,20 +27,20 @@ describe Ruby2JS::Filter::Underscore do
     end
   end
 
-  describe 'find, select, reject, times' do
+  describe 'find, reject, times' do
     it "should map .find to _.find" do
       to_js( 'a.find {|item| item > 0}' ).
         must_equal '_.find(a, function(item) {return item > 0})'
     end
 
-    it "should map .select to _.select" do
-      to_js( 'a.select {|item| item > 0}' ).
-        must_equal '_.select(a, function(item) {return item > 0})'
-    end
-
     it "should map .reject to _.reject" do
       to_js( 'a.reject {|item| item > 0}' ).
         must_equal '_.reject(a, function(item) {return item > 0})'
+    end
+
+    it "should map .reject! to .splice(0, .length, *_.reject)" do
+      to_js( 'a.reject! {|item| item > 0}' ).
+        must_equal 'a.splice.apply(a, [0, a.length].concat(_.reject(a, function(item) {return item > 0})))'
     end
 
     it "should map .times to _.times" do
@@ -74,6 +74,11 @@ describe Ruby2JS::Filter::Underscore do
     it "should map .sort_by to _.sortBy" do
       to_js( 'x.sort_by(&:foo)' ).
         must_equal '_.sortBy(x, function(item) {return item.foo})'
+    end
+
+    it "should map .sort_by! to .splice(0, .length, *_.sortBy)" do
+      to_js( 'a.sort_by! {|item| item > 0}' ).
+        must_equal 'a.splice.apply(a, [0, a.length].concat(_.sortBy(a, function(item) {return item > 0})))'
     end
 
     it "should map .group_by to _.groupBy" do
@@ -135,12 +140,27 @@ describe Ruby2JS::Filter::Underscore do
       to_js( 'a.shuffle()' ).must_equal '_.shuffle(a)'
     end
 
+    it "should map shuffle!() to a.splice(0, .length, *_.shuffle())" do
+      to_js( 'a.shuffle!()' ).
+        must_equal 'a.splice.apply(a, [0, a.length].concat(_.shuffle(a)))'
+    end
+
     it "should map compact() to _.compact()" do
       to_js( 'a.compact()' ).must_equal '_.compact(a)'
     end
 
+    it "should map compact!() to a.splice(0, .length, *_.compact())" do
+      to_js( 'a.compact!()' ).
+        must_equal 'a.splice.apply(a, [0, a.length].concat(_.compact(a)))'
+    end
+
     it "should map flatten() to _.flatten()" do
       to_js( 'a.flatten()' ).must_equal '_.flatten(a)'
+    end
+
+    it "should map flatten!() to a.splice(0, .length, *_.flatten())" do
+      to_js( 'a.flatten!()' ).
+        must_equal 'a.splice.apply(a, [0, a.length].concat(_.flatten(a)))'
     end
 
     it "should map invert() to _.invert()" do
@@ -157,6 +177,11 @@ describe Ruby2JS::Filter::Underscore do
 
     it "should map uniq() to _.uniq()" do
       to_js( 'a.uniq()' ).must_equal '_.uniq(a)'
+    end
+
+    it "should map uniq!() to a.splice(0, .length, *_.uniq())" do
+      to_js( 'a.uniq!()' ).
+        must_equal 'a.splice.apply(a, [0, a.length].concat(_.uniq(a)))'
     end
 
     it "should not map size" do

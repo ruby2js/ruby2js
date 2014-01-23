@@ -99,7 +99,8 @@ module Parser
   module AST
     class Node
       def is_method?
-        return false unless type == :send
+        return false if type == :attr
+        return true if children.length > 2
         return true unless loc
         selector = loc.selector
         return true unless selector.source_buffer

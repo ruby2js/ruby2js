@@ -106,7 +106,7 @@ module Ruby2JS
 
         args = args.map {|a| parse a}.join(', ')
 
-        if args.length > 0 or ast.is_method?
+        if ast.is_method?
           "new #{ parse receiver }(#{ args })"
         else
           "new #{ parse receiver }"
@@ -123,19 +123,15 @@ module Ruby2JS
         "typeof #{ parse args.first }"
 
       else
-        if args.length == 0 and not ast.is_method?
+        if not ast.is_method?
           if receiver
             "#{ parse receiver }.#{ method }"
           else
             parse s(:lvasgn, method), @state
           end
-        elsif args.length == 1 and args.first.type == :splat
-          parse s(:send, s(:attr, receiver, method), :apply, receiver, 
-            args.first.children.first)
-        elsif args.length > 0 and args.last.type == :splat
-          parse s(:send, s(:attr, receiver, method), :apply, receiver, 
-            s(:send, s(:array, *args[0..-2]), :concat,
-              args[-1].children.first))
+        elsif args.length > 0 and args.any? {|arg| arg.type == :splat}
+          parse s(:send, s(:attr, receiver, method), :apply, 
+            (receiver || s(:nil)), s(:array, *args))
         else
           call = "#{ parse receiver }#{ '.' if receiver && method}#{ method }"
           args = args.map {|a| parse a}

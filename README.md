@@ -140,7 +140,7 @@ the script.
     * `.all?` becomes `.every`
     * `.any?` becomes `.some`
     * `.chr` becomes `fromCharCode`
-    * `.clear!` becomes `.length = 0`
+    * `.clear` becomes `.length = 0`
     * `.each` becomes `forEach`
     * `.each_with_index` becomes `forEach`
     * `.empty?` becomes `.length == 0`
@@ -155,17 +155,19 @@ the script.
     * `.min` becomes `Math.min.apply(Math)`
     * `.ord` becomes `charCodeAt(0)`
     * `puts` becomes `console.log`
-    * `.replace!` becomes `.length = 0; ...push.apply(*)`
+    * `.replace` becomes `.length = 0; ...push.apply(*)`
     * `.sub` becomes `replace`
     * `.to_a` becomes `to_Array`
     * `.to_f` becomes `parseFloat`
     * `.to_i` becomes `parseInt`
     * `.to_s` becomes `to_String`
-    * `x.sub!` and `x.gsub!` become equivalent `x = x.replace` statements
     * `[-n]` becomes `[*.length-n]` for literal values of `n`
     * `[n...m]` becomes `.slice(n,m)`
     * `[n..m]` becomes `.slice(n,m+1)`
     * `[/r/, n]` becomes `.match(/r/)[n]`
+    * `.sub!` and `.gsub!` become equivalent `x = x.replace` statements
+    * `.map!`, `.reverse!`, and `.select` become equivalent 
+      `.splice(0, .length, *.method())` statements
     * `setInterval` and `setTimeout` allow block to be treated as the
        first parameter on the call
     * for the following methods, if the block consists entirely of a simple
@@ -203,6 +205,8 @@ the script.
     * `.zip()` becomes `_.zip()`
     * `(n...m)` becomes `_.range(n, m)`
     * `(n..m)` becomes `_.range(n, m+1)`
+    * `.compact!`, `.flatten!`, `shuffle!`, `reject!`, `sort_by!`, and 
+      `.uniq` become equivalent `.splice(0, .length, *.method())` statements
     * for the following methods, if the block consists entirely of a simple
       expression (or ends with one), a `return` is added prior to the
       expression: `reduce`, `sort_by`, `group_by`, `index_by`, `count_by`,

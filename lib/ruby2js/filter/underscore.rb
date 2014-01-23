@@ -84,6 +84,15 @@ module Ruby2JS
           else
             super
           end
+
+        elsif [:compact!, :flatten!, :shuffle!, :uniq!].
+          include? node.children[1] and node.is_method?
+          # input: a.compact!
+          # output: a.splice(0, a.length, *a.compact)
+          target = node.children.first
+          process s(:send, target, :splice, s(:int, 0), 
+            s(:attr, target, :length), s(:splat, s(:send, target, 
+            :"#{node.children[1].to_s[0..-2]}", *node.children[2..-1])))
         else
           super
         end
@@ -92,11 +101,13 @@ module Ruby2JS
       def on_block(node)
         call = node.children.first
         if [:sort_by, :group_by, :index_by, :count_by].include? call.children[1]
+          # input: a.sort_by {}
+          # output: _.sortBy {return expression}
           method = call.children[1].to_s.sub(/\_by$/,'By').to_sym
           process s(:block, s(:send, s(:lvar, :_), method,
-            call.children.first), process(node.children[1]), 
-            s(:autoreturn, process(node.children[2])))
-        elsif [:find, :select, :reject].include? call.children[1]
+            call.children.first), node.children[1], 
+            s(:autoreturn, node.children[2]))
+        elsif [:find, :reject].include? call.children[1]
           if call.children.length == 2
             # input: a.find {|item| item > 0}
             # output: _.find(a) {|item| return item > 0}
@@ -106,11 +117,13 @@ module Ruby2JS
           else
             super
           end
+
         elsif call.children[1] == :times and call.children.length == 2
           # input: 5.times {|i| console.log i}
           # output: _.find(5) {|i| console.log(i)}
           process s(:block, s(:send, s(:lvar, :_), call.children[1], 
             call.children.first), node.children[1], node.children[2])
+
         elsif call.children[1] == :reduce
           if call.children.length == 2
             # input: a.reduce {|memo, item| memo+item}
@@ -130,6 +143,17 @@ module Ruby2JS
                 node.children[1], s(:autoreturn, node.children[2])),
                 call.children[2])
           end
+
+        elsif [:map!, :reject!, :select!, :sort_by!].include? call.children[1]
+          # input: a.map! {expression}
+          # output: a.splice(0, a.length, *a.map {expression})
+          method = :"#{call.children[1].to_s[0..-2]}"
+          target = call.children.first
+          process s(:send, target, :splice, s(:splat, s(:send, s(:array, 
+            s(:int, 0), s(:attr, target, :length)), :concat,
+            s(:block, s(:send, target, method, *call.children[2..-1]),
+            *node.children[1..-1]))))
+
         else
           super
         end

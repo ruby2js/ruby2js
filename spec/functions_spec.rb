@@ -118,12 +118,12 @@ describe Ruby2JS::Filter::Functions do
       to_js( 'a.empty?' ).must_equal 'a.length == 0'
     end
 
-    it "should handle clear!" do
-      to_js( 'a.clear!' ).must_equal 'a.length = 0'
+    it "should handle clear" do
+      to_js( 'a.clear()' ).must_equal 'a.length = 0'
     end
 
-    it "should handle replace!" do
-      to_js( 'a.replace!(b)' ).
+    it "should handle replace" do
+      to_js( 'a.replace(b)' ).
         must_equal 'a.length = 0; a.push.apply(a, b)'
     end
 
@@ -154,6 +154,26 @@ describe Ruby2JS::Filter::Functions do
     it "should handle min" do
       to_js( 'a.min' ).must_equal 'a.min'
       to_js( 'a.min()' ).must_equal 'Math.min.apply(Math, a)'
+    end
+
+    it "should map .select to .filter" do
+      to_js( 'a.select {|item| item > 0}' ).
+        must_equal 'a.filter(function(item) {return item > 0})'
+    end
+
+    it "should map .select! to .splice(0, .length, .filter)" do
+      to_js( 'a.select! {|item| item > 0}' ).
+        must_equal 'a.splice.apply(a, [0, a.length].concat(a.filter(function(item) {return item > 0})))'
+    end
+
+    it "should map .map! to .splice(0, .length, .map)" do
+      to_js( 'a.map! {|item| -item}' ).
+        must_equal 'a.splice.apply(a, [0, a.length].concat(a.map(function(item) {return -item})))'
+    end
+
+    it "should map .reverse! to .splice(0, .length, .reverse)" do
+      to_js( 'a.reverse!()' ).
+        must_equal 'a.splice.apply(a, [0, a.length].concat(a.reverse()))'
     end
   end
 

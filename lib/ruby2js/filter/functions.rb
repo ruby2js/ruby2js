@@ -83,10 +83,14 @@ module Ruby2JS
         elsif node.children[1] == :empty? and node.children.length == 2
           process s(:send, s(:attr, target, :length), :==, s(:int, 0))
 
-        elsif node.children[1] == :clear! and node.children.length == 2
-          process s(:send, target, :length=, s(:int, 0))
+        elsif node.children[1] == :clear and node.children.length == 2
+          if node.is_method?
+            process s(:send, target, :length=, s(:int, 0))
+          else
+            super
+          end
 
-        elsif node.children[1] == :replace! and node.children.length == 3
+        elsif node.children[1] == :replace and node.children.length == 3
           process s(:begin, s(:send, target, :length=, s(:int, 0)),
              s(:send, target, :push, s(:splat, node.children[2])))
 
@@ -167,6 +171,14 @@ module Ruby2JS
             super
           end
 
+        elsif node.children[1] == :reverse! and node.is_method? 
+          # input: a.reverse!
+          # output: a.splice(0, a.length, *a.reverse)
+          target = node.children.first
+          process s(:send, target, :splice, s(:int, 0), 
+            s(:attr, target, :length), s(:splat, s(:send, target, 
+            :"#{node.children[1].to_s[0..-2]}", *node.children[2..-1])))
+
         elsif node.children[1] == :each_with_index
           process node.updated nil, [target, :forEach, *args]
 
@@ -189,6 +201,11 @@ module Ruby2JS
             s(:autoreturn, *node.children[2..-1]))
           process call.updated(nil, [*call.children, block])
 
+        elsif call.children[1] == :select and call.children.length == 2
+          call = call.updated nil, [call.children.first, :filter]
+          node.updated nil, [process(call), process(node.children[1]),
+            s(:autoreturn, *process_all(node.children[2..-1]))]
+
         elsif call.children[1] == :any? and call.children.length == 2
           call = call.updated nil, [call.children.first, :some]
           node.updated nil, [process(call), process(node.children[1]),
@@ -202,6 +219,16 @@ module Ruby2JS
         elsif call.children[1] == :map and call.children.length == 2
           node.updated nil, [process(call), process(node.children[1]),
             s(:autoreturn, *process_all(node.children[2..-1]))]
+
+        elsif [:map!, :select!].include? call.children[1]
+          # input: a.map! {expression}
+          # output: a.splice(0, a.length, *a.map {expression})
+          method = (call.children[1] == :map! ? :map : :select)
+          target = call.children.first
+          process s(:send, target, :splice, s(:splat, s(:send, s(:array, 
+            s(:int, 0), s(:attr, target, :length)), :concat,
+            s(:block, s(:send, target, method, *call.children[2..-1]),
+            *node.children[1..-1]))))
 
         else
           super
