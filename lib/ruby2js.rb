@@ -19,6 +19,10 @@ module Ruby2JS
         on_send(node)
       end
 
+      def on_autoreturn(node)
+        on_return(node)
+      end
+
       def on_send(node)
         if node.children.length > 2 and node.children.last.type == :block_pass
           method = node.children.last.children.first.children.last
