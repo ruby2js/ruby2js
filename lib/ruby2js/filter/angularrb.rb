@@ -400,7 +400,7 @@ module Ruby2JS
       #    ...
       #  end
       def ng_observe(node)
-        if @ngContext == :directive
+        if @ngContext == :controller and @ngScope
           call = node.children[0]
           expression = call.children[2]
           call = s(:send, expression.children[0], :$observe, 
@@ -461,6 +461,28 @@ module Ruby2JS
           # map well known method names to the appropriate service
           scope, method = NG_METHOD_MAP[node.children[1]]
 
+          if node.children[0..1] == [nil, :interpolate] and @ngScope
+            @ngClassUses << :$interpolate
+            if node.children.length > 3 and node.children[3].type == :nil
+              return process node.updated nil, [nil, :$interpolate, 
+                node.children[2]]
+            else
+              return process s(:send, s(:send, nil, :$interpolate, 
+                *node.children[2..-1]), nil, @ngScope)
+            end
+
+          elsif node.children[0..1] == [nil, :compile] and @ngScope
+
+            @ngClassUses << :$compile
+            if node.children.length > 3 and node.children.last.type == :nil
+              return process node.updated nil, [nil, :$compile, 
+                *node.children[2..-2]]
+            else
+              return process s(:send, s(:send, nil, :$compile, 
+                *node.children[2..-1]), nil, @ngScope)
+            end
+          end
+
           return super unless node.children.first == nil and method
 
           scope = s(:gvar, scope) if scope
@@ -483,32 +505,28 @@ module Ruby2JS
           s(:send, @ngApp, :config, s(:array, s(:str, service.to_s), s(:block, 
             s(:send, nil, :proc), s(:args, s(:arg, service)), node)))
 
-        elsif @ngContext == :directive
-          if node.children[0..1] == [nil, :interpolate]
+        else
+          super
+        end
+      end
 
-            @ngClassUses << :$interpolate
-            if node.children.length == 3
-              process node.updated nil, [nil, :$interpolate, node.children[2]]
-            else
-              process s(:send, s(:send, nil, :$interpolate, node.children[2]), 
-                nil, node.children[3])
+      # convert instance method definitions in controllers to $scope
+      def on_pair(node)
+        if @ngContext == :directive and node.children[0] == s(:sym, :link)
+          begin
+            ngScope = @ngScope
+            if node.children[1].type == :block
+              args = node.children[1].children[1]
+              if args.children.length > 0
+                @ngScope = s(:lvar, args.children[0].children[0])
+                @ngContext = :controller
+              end
             end
-
-          elsif node.children[0..1] == [nil, :compile]
-
-            @ngClassUses << :$compile
-            if node.children.length == 3
-              process node.updated nil, [nil, :$compile, node.children[2]]
-            else
-              process s(:send, s(:send, nil, :$compile, node.children[2]), 
-                nil, node.children[3])
-            end
-
-
-          else
             super
+          ensure
+            @ngScope = ngScope
+            @ngContext = :directive
           end
-
         else
           super
         end
@@ -524,6 +542,8 @@ module Ruby2JS
       end
 
       def on_gvar(node)
+        return @ngScope if node.children.first == :$scope and @ngScope
+        
         if @ngClassUses
           @ngClassUses << node.children.first
         end

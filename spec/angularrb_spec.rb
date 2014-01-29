@@ -450,7 +450,7 @@ describe Ruby2JS::Filter::AngularRB do
         module Angular::PhonecatApp 
           directive :name1 do
             def link(scope, elem, attrs)
-              elem.attr('name2', interpolate(attrs.name1, scope))
+              elem.attr('name2', interpolate(attrs.name1))
             end
           end
         end
@@ -474,7 +474,7 @@ describe Ruby2JS::Filter::AngularRB do
         module Angular::PhonecatApp 
           directive :name1 do
             def link(scope, elem, attrs)
-              compile(elem, scope)
+              compile(elem)
             end
           end
         end
@@ -485,6 +485,36 @@ describe Ruby2JS::Filter::AngularRB do
           return {link: function(scope, elem, attrs) {
             $compile(elem)(scope)
           }}
+        })
+      JS
+
+      to_js( ruby ).must_equal js
+    end
+
+    it "should convert directives with a link/watch" do
+      ruby = <<-RUBY
+        module Angular::PhonecatApp 
+          directive :name1 do
+            def link(scope, elem, attrs)
+              watch @value1 do
+                @value2 = @value1
+              end
+            end
+          end
+        end
+      RUBY
+
+      js = <<-JS.gsub!(/^ {8}/, '').chomp
+        angular.module("PhonecatApp", []).directive("name1", function() {
+          return {
+            link: function(scope, elem, attrs) {
+              scope.$watch(function() {
+                return scope.value1
+              }, function() {
+                scope.value2 = scope.value1
+              })
+            }
+          }
         })
       JS
 
