@@ -505,11 +505,15 @@ describe Ruby2JS do
         must_equal 'function Person() {}; Person._count = {}; Person._count[1] = 1'
     end
 
-    it "should parse class with class variables and methods" do
+    it "should parse class with instance variables, properties and methods" do
       to_js('class Person; @@count=0; def offset(x); return @@count+x; end; end').
         must_equal 'function Person() {}; Person._count = 0; Person.prototype.offset = function(x) {return Person._count + x}'
+
       to_js('class Person; @@count=0; def count; return @@count; end; end').
         must_equal 'function Person() {}; Person._count = 0; Object.defineProperty(Person.prototype, "count", {enumerable: true, configurable: true, get: function() {return Person._count}})'
+
+      to_js('class Person; @@count=0; def count(); return @@count; end; end').
+        must_equal 'function Person() {}; Person._count = 0; Person.prototype.count = function() {return Person._count}'
     end
 
     it "should parse instance methods with class variables" do

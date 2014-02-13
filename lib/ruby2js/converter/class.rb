@@ -28,17 +28,22 @@ module Ruby2JS
             s(:prop, s(:attr, name, :prototype), sym,
                 enumerable: s(:true), configurable: s(:true),
                 set: s(:block, s(:send, nil, :proc), *m.children[1..-1]))
-          elsif m.children[1].children.length == 0 and m.children.first !~ /!/
-            # property getter
-            s(:prop, s(:attr, name, :prototype), m.children.first, 
-                enumerable: s(:true), configurable: s(:true),
-                get: s(:block, s(:send, nil, :proc), m.children[1],
-                  s(:autoreturn, *m.children[2..-1])))
           else
-            # method: add to prototype
-            s(:send, s(:attr, name, :prototype),
-              :"#{m.children[0].to_s.chomp('!')}=",
-              s(:block, s(:send, nil, :proc), *m.children[1..-1]))
+            if m.children[1].children.length == 0 and 
+              m.children.first !~ /!/ and m.loc and m.loc.name and
+              m.loc.name.source_buffer.source[m.loc.name.end_pos] != '('
+
+              # property getter
+              s(:prop, s(:attr, name, :prototype), m.children.first, 
+                  enumerable: s(:true), configurable: s(:true),
+                  get: s(:block, s(:send, nil, :proc), m.children[1],
+                    s(:autoreturn, *m.children[2..-1])))
+            else
+              # method: add to prototype
+              s(:send, s(:attr, name, :prototype),
+                :"#{m.children[0].to_s.chomp('!')}=",
+                s(:block, s(:send, nil, :proc), *m.children[1..-1]))
+            end
           end
         elsif m.type == :defs and m.children.first == s(:self)
           # class method definition: add to prototype
