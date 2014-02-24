@@ -126,32 +126,42 @@ module Ruby2JS
       else
         body.compact!
 
-        # look for a sequence of methods
-        methods = 0
-        body.each do |node|
-          break unless node
+        prototype = lambda do |node|
           if node.type == :send
-            break unless node.children[0] and node.children[0].type == :attr
-            break unless node.children[0].children[0..1] == [name, :prototype]
-            break unless node.children[1] =~ /=$/
+            return unless node.children[0] and node.children[0].type == :attr
+            return unless node.children[0].children[0..1] == [name, :prototype]
+            return unless node.children[1] =~ /=$/
           elsif node.type != :prop
-            break
+            return
           end
-          methods += 1
+          return true
         end
 
-        # collapse sequence of methods to a single assignment
-        if methods > 1 or (methods == 1 and body[0].type == :prop)
-          pairs = body[0...methods].map do |node|
+        # look for first sequence of methods and properties
+        methods = 0
+        start = 0
+        body.each do |node|
+          if prototype[node]
+            methods += 1
+          elsif methods == 0
+            start += 1
+          else
+            break
+          end
+        end
+
+        # collapse sequence to a single assignment
+        if methods > 1 or (methods == 1 and body[start].type == :prop)
+          pairs = body[start...start+methods].map do |node|
             if node.type == :send
-              s(:pair, s(:str, node.children[1].to_s.chomp('=')), 
+              s(:pair, s(:str, node.children[1].to_s.chomp('=')),
                 node.children[2])
             else
               s(:pair, s(:prop, node.children[1]), node.children[2])
             end
           end
-          body.shift(methods)
-          body.unshift s(:send, name, :prototype=, s(:hash, *pairs))
+          body[start...start+methods] =
+            s(:send, name, :prototype=, s(:hash, *pairs))
         end
       end
 

@@ -474,17 +474,17 @@ describe Ruby2JS do
     end
 
     it "should parse class with constructor and method" do
-      to_js('class Person; def initialize(name); @name = name; end; def name; return @name; end; end').
+      to_js('class Person; def initialize(name); @name = name; end; def name; @name; end; end').
         must_equal 'function Person(name) {this._name = name}; Person.prototype = {get name() {return this._name}}'
     end
 
     it "should parse class with constructor and two methods" do
-      to_js('class Person; def initialize(name); @name = name; end; def name; return @name; end; def reset!; @name = nil; end; end').
+      to_js('class Person; def initialize(name); @name = name; end; def name; @name; end; def reset!; @name = nil; end; end').
         must_equal 'function Person(name) {this._name = name}; Person.prototype = {get name() {return this._name}, reset: function() {this._name = null}}'
     end
 
     it "should parse class with contructor and methods with multiple arguments" do
-      to_js('class Person; def initialize(name, surname); @name, @surname = name, surname; end; def full_name; return @name  + @surname; end; end').
+      to_js('class Person; def initialize(name, surname); @name, @surname = name, surname; end; def full_name; @name  + @surname; end; end').
         must_equal 'function Person(name, surname) {this._name = name; this._surname = surname}; Person.prototype = {get full_name() {return this._name + this._surname}}'
     end
 
@@ -509,15 +509,21 @@ describe Ruby2JS do
       to_js('class Person; @@count=0; def offset(x); return @@count+x; end; end').
         must_equal 'function Person() {}; Person._count = 0; Person.prototype.offset = function(x) {return Person._count + x}'
 
-      to_js('class Person; @@count=0; def count; return @@count; end; end').
-        must_equal 'function Person() {}; Person._count = 0; Object.defineProperty(Person.prototype, "count", {enumerable: true, configurable: true, get: function() {return Person._count}})'
+      to_js('class Person; @@count=0; def count; @@count; end; end').
+        must_equal 'function Person() {}; Person._count = 0; Person.prototype = {get count() {return Person._count}}'
 
       to_js('class Person; @@count=0; def count(); return @@count; end; end').
         must_equal 'function Person() {}; Person._count = 0; Person.prototype.count = function() {return Person._count}'
+
+      to_js('class Person; def initialize(name); @name = name; end; def name; @name; end; @@count=0; def count; return @@count; end; end').
+        must_equal 'function Person(name) {this._name = name}; Person.prototype = {get name() {return this._name}}; Person._count = 0; Object.defineProperty(Person.prototype, "count", {enumerable: true, configurable: true, get: function() {return Person._count}})'
+
+      to_js('class Person; def initialize(name); @name = name; end; def name; @name; end; @@count=0; def count(); return @@count; end; end').
+        must_equal 'function Person(name) {this._name = name}; Person.prototype = {get name() {return this._name}}; Person._count = 0; Person.prototype.count = function() {return Person._count}'
     end
 
     it "should parse instance methods with class variables" do
-      to_js('class Person; def count; return @@count; end; end').
+      to_js('class Person; def count; @@count; end; end').
         must_equal 'function Person() {}; Person.prototype = {get count() {return Person._count}}'
     end
 
@@ -748,7 +754,7 @@ describe Ruby2JS do
 
     it "should not replace ivars in class definitions" do
       to_js( 'class F; def f; @x; end; end', ivars: {:@x => 1} ).
-        must_equal 'function F() {}; F.prototype = {get f() {this._x}}'
+        must_equal 'function F() {}; F.prototype = {get f() {return this._x}}'
     end
   end
 end
