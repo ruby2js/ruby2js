@@ -122,7 +122,9 @@ module Ruby2JS
       end
 
       if inheritance
-        body.unshift s(:send, name, :prototype=, s(:send, inheritance, :new))
+        body.unshift s(:send, name, :prototype=, 
+          s(:send, s(:const, nil, :Object), :create, inheritance)),
+          s(:send, s(:attr, name, :prototype), :constructor=, name)
       else
         body.compact!
 
