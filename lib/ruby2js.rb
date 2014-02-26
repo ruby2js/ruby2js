@@ -15,14 +15,17 @@ module Ruby2JS
     class Processor < Parser::AST::Processor
       BINARY_OPERATORS = Converter::OPERATORS[2..-1].flatten
 
-      def on_attr(node)
-        on_send(node)
-      end
+      # handle all of the 'invented' ast types
+      def on_attr(node); on_send(node); end
+      def on_autoreturn(node); on_return(node); end
+      def on_constructor(node); on_def(node); end
+      def on_method(node); on_send(node); end
+      def on_prop(node); on_array(node); end
+      def on_prototype(node); on_begin(node); end
+      def on_sendw(node); on_send(node); end
+      def on_undefined?(node); on_defined?(node); end
 
-      def on_autoreturn(node)
-        on_return(node)
-      end
-
+      # convert map(&:symbol) to a block
       def on_send(node)
         if node.children.length > 2 and node.children.last.type == :block_pass
           method = node.children.last.children.first.children.last

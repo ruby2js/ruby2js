@@ -6,7 +6,7 @@ module Ruby2JS
     #   (const nil :B)
     #   (...)
 
-    # NOTE: macro :prop is defined at the bottom of this file
+    # NOTE: :prop and :method macros are defined at the bottom of this file
 
     handle :class do |name, inheritance, *body|
       init = s(:def, :initialize, s(:args))
@@ -40,7 +40,7 @@ module Ruby2JS
                     s(:autoreturn, *m.children[2..-1])))
             else
               # method: add to prototype
-              s(:send, s(:attr, name, :prototype),
+              s(:method, s(:attr, name, :prototype),
                 :"#{m.children[0].to_s.chomp('!')}=",
                 s(:block, s(:send, nil, :proc), *m.children[1..-1]))
             end
@@ -126,22 +126,11 @@ module Ruby2JS
       else
         body.compact!
 
-        prototype = lambda do |node|
-          if node.type == :send
-            return unless node.children[0] and node.children[0].type == :attr
-            return unless node.children[0].children[0..1] == [name, :prototype]
-            return unless node.children[1] =~ /=$/
-          elsif node.type != :prop
-            return
-          end
-          return true
-        end
-
         # look for first sequence of methods and properties
         methods = 0
         start = 0
         body.each do |node|
-          if prototype[node]
+          if [:method, :prop].include? node.type
             methods += 1
           elsif methods == 0
             start += 1
@@ -153,7 +142,7 @@ module Ruby2JS
         # collapse sequence to a single assignment
         if methods > 1 or (methods == 1 and body[start].type == :prop)
           pairs = body[start...start+methods].map do |node|
-            if node.type == :send
+            if node.type == :method
               s(:pair, s(:str, node.children[1].to_s.chomp('=')),
                 node.children[2])
             else
@@ -166,17 +155,19 @@ module Ruby2JS
       end
 
       # prepend constructor
-      body.unshift s(:def, parse(name), *init.children[1..-1])
+      body.unshift s(:constructor, parse(name), *init.children[1..-1])
 
       begin
         # save class name
         class_name, @class_name = @class_name, name
+        class_parent, @class_parent = @class_parent, inheritance
         # inhibit ivar substitution within a class definition.  See ivars.rb
         ivars, self.ivars = self.ivars, nil
         parse s(:begin, *body.compact)
       ensure
         self.ivars = ivars
         @class_name = class_name
+        @class_parent = class_parent
       end
     end
 
@@ -185,6 +176,26 @@ module Ruby2JS
       parse s(:send, s(:const, nil, :Object), :defineProperty,
         obj, s(:sym, prop), s(:hash,
         *descriptor.map { |key, value| s(:pair, s(:sym, key), value) }))
+    end
+
+    # capture methods for use by super
+    handle :method do |*args|
+      begin
+        instance_method, @instance_method = @instance_method, @ast
+        parse s(:send, *args)
+      ensure
+        @instance_method = instance_method
+      end
+    end
+
+    # capture constructors for use by super
+    handle :constructor do |*args|
+      begin
+        instance_method, @instance_method = @instance_method, @ast
+        parse s(:def, *args)
+      ensure
+        @instance_method = instance_method
+      end
     end
   end
 end

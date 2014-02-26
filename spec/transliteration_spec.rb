@@ -498,6 +498,17 @@ describe Ruby2JS do
         must_equal 'function Employee() {}; Employee.prototype = new Person()'
     end
 
+    it "should parse handle super" do
+      to_js('class A; end; class B < A; def initialize(x); super; end; end').
+        must_equal 'function A() {}; function B(x) {A.call(this, x)}; B.prototype = new A()'
+      to_js('class A; end; class B < A; def initialize(x); super(3); end; end').
+        must_equal 'function A() {}; function B(x) {A.call(this, 3)}; B.prototype = new A()'
+      to_js('class A; end; class B < A; def foo(x); super; end; end').
+        must_equal 'function A() {}; function B() {}; B.prototype = new A(); B.prototype.foo = function(x) {A.prototype.foo.call(this, x)}'
+      to_js('class A; end; class B < A; def foo(x); super(3); end; end').
+        must_equal 'function A() {}; function B() {}; B.prototype = new A(); B.prototype.foo = function(x) {A.prototype.foo.call(this, 3)}'
+    end
+
     it "should parse class with class variables" do
       to_js('class Person; @@count=0; end').
         must_equal 'function Person() {}; Person._count = 0'

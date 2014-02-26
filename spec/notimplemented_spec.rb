@@ -35,11 +35,6 @@ describe 'not implemented' do
     todo( 'def f(a, (foo, *bar)); end' )
   end
 
-  it "super" do
-    todo( 'super()' )
-    todo( 'super' )
-  end
-
   it "yield" do
     todo( 'yield' )
   end
