@@ -395,8 +395,8 @@ describe Ruby2JS::Filter::AngularRB do
             def self.name
               "XYZZY"
             end
-            def self.reset
-              "PLUGH"
+            def self.reset()
+              return "PLUGH"
             end
           end
         end
@@ -406,12 +406,17 @@ describe Ruby2JS::Filter::AngularRB do
         angular.module("Service", []).factory("Phone", function() {
           function Phone() {};
 
-          Phone.name = function() {
-            "XYZZY"
-          };
+          Object.defineProperty(Phone, "name", {
+            enumerable: true,
+            configurable: true,
+
+            get: function() {
+              return "XYZZY"
+            }
+          });
 
           Phone.reset = function() {
-            "PLUGH"
+            return "PLUGH"
           };
 
           return Phone

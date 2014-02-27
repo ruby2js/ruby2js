@@ -539,8 +539,14 @@ describe Ruby2JS do
     end
 
     it "should parse class methods with class variables" do
-      to_js('class Person; def self.count; return @@count; end; end').
+      to_js('class Person; def self.count(); return @@count; end; end').
         must_equal 'function Person() {}; Person.count = function() {return Person._count}'
+
+      to_js('class Person; def self.count; @@count; end; end').
+        must_equal 'function Person() {}; Object.defineProperty(Person, "count", {enumerable: true, configurable: true, get: function() {return Person._count}})'
+
+      to_js('class Person; def self.count=(count); @@count=count; end; end').
+        must_equal 'function Person() {}; Object.defineProperty(Person, "count", {enumerable: true, configurable: true, set: function(count) {Person._count = count}})'
     end
 
     it "should parse constructor methods with class variables" do

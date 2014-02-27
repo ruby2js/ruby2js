@@ -45,10 +45,28 @@ module Ruby2JS
                 s(:block, s(:send, nil, :proc), *m.children[1..-1]))
             end
           end
+
         elsif m.type == :defs and m.children.first == s(:self)
-          # class method definition: add to prototype
-          s(:prototype, s(:send, name, "#{m.children[1]}=",
-            s(:block, s(:send, nil, :proc), *m.children[2..-1])))
+          if m.children[1] =~ /=$/
+            # class property setter
+            s(:prop, name, m.children[1].to_s[0..-2], 
+                enumerable: s(:true), configurable: s(:true),
+                set: s(:block, s(:send, nil, :proc), *m.children[2..-1]))
+          elsif m.children[2].children.length == 0 and
+            m.children[1] !~ /!/ and m.loc and m.loc.name and
+            m.loc.name.source_buffer.source[m.loc.name.end_pos] != '('
+
+            # class property getter
+            s(:prop, name, m.children[1].to_s, 
+                enumerable: s(:true), configurable: s(:true),
+                get: s(:block, s(:send, nil, :proc), m.children[2],
+                  s(:autoreturn, *m.children[3..-1])))
+          else
+            # class method definition: add to prototype
+            s(:prototype, s(:send, name, "#{m.children[1]}=",
+              s(:block, s(:send, nil, :proc), *m.children[2..-1])))
+          end
+
         elsif m.type == :send and m.children.first == nil
           if m.children[1] == :attr_accessor
             m.children[2..-1].map do |sym|
@@ -82,6 +100,7 @@ module Ruby2JS
             # class method call
             s(:send, name, *m.children[1..-1])
           end
+
         elsif m.type == :block and m.children.first.children.first == nil
           # class method calls passing a block
           s(:block, s(:send, name, *m.children.first.children[1..-1]), 
@@ -117,6 +136,7 @@ module Ruby2JS
             merge = body[i].children[2].merge(body[j].children[2])
             body[j] = s(:prop, *body[j].children[0..1], merge)
             body[i] = nil
+            break
           end
         end
       end
@@ -128,11 +148,13 @@ module Ruby2JS
       else
         body.compact!
 
-        # look for first sequence of methods and properties
+        # look for first sequence of instance methods and properties
         methods = 0
         start = 0
         body.each do |node|
-          if [:method, :prop].include? node.type
+          if [:method, :prop].include? node.type and 
+            node.children[0].type == :attr and
+            node.children[0].children[1] == :prototype
             methods += 1
           elsif methods == 0
             start += 1
