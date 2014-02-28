@@ -9,13 +9,19 @@ module Ruby2JS
     # NOTE: :prop and :method macros are defined at the bottom of this file
 
     handle :class do |name, inheritance, *body|
-      init = s(:def, :initialize, s(:args))
+      if inheritance
+        init = s(:def, :initialize, s(:args), s(:super))
+      else
+        init = s(:def, :initialize, s(:args))
+      end
+
       body.compact!
 
       if body.length == 1 and body.first.type == :begin
         body = body.first.children.dup 
       end
 
+      body.compact!
       body.map! do |m| 
         if m.type == :def
           if m.children.first == :initialize

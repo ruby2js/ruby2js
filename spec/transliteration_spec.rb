@@ -495,7 +495,7 @@ describe Ruby2JS do
 
     it "should parse class with inheritance" do
       to_js('class Employee < Person; end').
-        must_equal 'function Employee() {}; Employee.prototype = Object.create(Person); Employee.prototype.constructor = Employee'
+        must_equal 'function Employee() {Person.call(this)}; Employee.prototype = Object.create(Person); Employee.prototype.constructor = Employee'
     end
 
     it "should parse handle super" do
@@ -504,9 +504,9 @@ describe Ruby2JS do
       to_js('class A; end; class B < A; def initialize(x); super(3); end; end').
         must_equal 'function A() {}; function B(x) {A.call(this, 3)}; B.prototype = Object.create(A); B.prototype.constructor = B'
       to_js('class A; end; class B < A; def foo(x); super; end; end').
-        must_equal 'function A() {}; function B() {}; B.prototype = Object.create(A); B.prototype.constructor = B; B.prototype.foo = function(x) {A.prototype.foo.call(this, x)}'
+        must_equal 'function A() {}; function B() {A.call(this)}; B.prototype = Object.create(A); B.prototype.constructor = B; B.prototype.foo = function(x) {A.prototype.foo.call(this, x)}'
       to_js('class A; end; class B < A; def foo(x); super(3); end; end').
-        must_equal 'function A() {}; function B() {}; B.prototype = Object.create(A); B.prototype.constructor = B; B.prototype.foo = function(x) {A.prototype.foo.call(this, 3)}'
+        must_equal 'function A() {}; function B() {A.call(this)}; B.prototype = Object.create(A); B.prototype.constructor = B; B.prototype.foo = function(x) {A.prototype.foo.call(this, 3)}'
     end
 
     it "should parse class with class variables" do
