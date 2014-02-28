@@ -577,6 +577,17 @@ describe Ruby2JS do
         must_equal 'function method() {return this.foo}'
     end
     
+    it "should insert var self = this when needed" do
+      to_js('class C; def m; list.each do; @ivar; @ivar; end; end; end').
+        must_equal 'function C() {}; C.prototype = {get m() {var self = this; list.each(function() {self._ivar; self._ivar})}}'
+      to_js('class C; def m(); list.each do; @ivar; @ivar; end; end; end').
+        must_equal 'function C() {}; C.prototype.m = function() {var self = this; list.each(function() {self._ivar; self._ivar})}'
+      to_js('class C < S; def m; list.each do; @ivar; @ivar; end; end; end').
+        must_equal 'function C() {S.call(this)}; C.prototype = Object.create(S); C.prototype.constructor = C; Object.defineProperty(C.prototype, "m", {enumerable: true, configurable: true, get: function() {var self = this; list.each(function() {self._ivar; self._ivar})}})'
+      to_js('class C < S; def m(); list.each do; @ivar; @ivar; end; end; end').
+        must_equal 'function C() {S.call(this)}; C.prototype = Object.create(S); C.prototype.constructor = C; C.prototype.m = function() {var self = this; list.each(function() {self._ivar; self._ivar})}'
+    end
+    
     it "should handle methods with multiple statements" do
       to_js('def method; self.foo(); self.bar; end').
         must_equal 'function method() {this.foo(); this.bar}'

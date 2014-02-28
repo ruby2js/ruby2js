@@ -8,22 +8,29 @@ module Ruby2JS
 
     handle :hash do |*pairs|
       pairs.map! do |node|
-        left, right = node.children
-        if left.type == :prop
-          result = []
-          if right[:get]
-            result << "get #{left.children[0]}#{
-              parse(right[:get]).sub(/^function/,'')}"
+        begin
+          @block_this, @block_depth = false, 0
+
+          left, right = node.children
+          if left.type == :prop
+            result = []
+            if right[:get]
+              result << "get #{left.children[0]}#{
+                parse(right[:get]).sub(/^function/,'')}"
+            end
+            if right[:set]
+              result << "set #{left.children[0]}#{
+                parse(right[:set]).sub(/^function/,'')}"
+            end
+            result
+          else
+            key = parse left
+            key = $1 if key =~ /\A"([a-zA-Z_$][a-zA-Z_$0-9]*)"\Z/
+            "#{key}: #{parse right}"
           end
-          if right[:set]
-            result << "set #{left.children[0]}#{
-              parse(right[:set]).sub(/^function/,'')}"
-          end
-          result
-        else
-          key = parse left
-          key = $1 if key =~ /\A"([a-zA-Z_$][a-zA-Z_$0-9]*)"\Z/
-          "#{key}: #{parse right}"
+
+        ensure
+          @block_this, @block_depth = nil, nil
         end
       end
 

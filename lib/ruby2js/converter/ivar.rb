@@ -10,7 +10,7 @@ module Ruby2JS
         ruby2js.enable_vertical_whitespace if @nl == "\n"
         ruby2js.to_js
       else
-        var.to_s.sub('@', 'this._')
+        parse s(:attr, s(:self), var.to_s.sub('@', '_'))
       end
     end
   end

@@ -201,30 +201,26 @@ module Ruby2JS
       end
     end
 
-    # macro that expands into Object.defineProperty(obj, prop, descriptor)
-    handle :prop do |obj, prop, descriptor|
-      parse s(:send, s(:const, nil, :Object), :defineProperty,
-        obj, s(:sym, prop), s(:hash,
-        *descriptor.map { |key, value| s(:pair, s(:sym, key), value) }))
-    end
-
-    # capture methods for use by super
-    handle :method do |*args|
+    # handle properties, methods, and constructors
+    # @block_this and @block_depth are used by self
+    # @instance_method is used by super and self
+    handle :prop, :method, :constructor do |*args|
       begin
         instance_method, @instance_method = @instance_method, @ast
-        parse s(:send, *args)
+        @block_this, @block_depth = false, 0
+        if @ast.type == :prop
+          obj, prop, descriptor = *args
+          parse s(:send, s(:const, nil, :Object), :defineProperty,
+            obj, s(:sym, prop), s(:hash,
+            *descriptor.map { |key, value| s(:pair, s(:sym, key), value) }))
+        elsif @ast.type == :method
+          parse s(:send, *args)
+        else
+          parse s(:def, *args)
+        end
       ensure
         @instance_method = instance_method
-      end
-    end
-
-    # capture constructors for use by super
-    handle :constructor do |*args|
-      begin
-        instance_method, @instance_method = @instance_method, @ast
-        parse s(:def, *args)
-      ensure
-        @instance_method = instance_method
+        @block_this, @block_depth = nil, nil
       end
     end
   end

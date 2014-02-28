@@ -86,10 +86,16 @@ module Ruby2JS
       nl = @nl unless body == s(:begin)
       begin
         next_token, @next_token = @next_token, :return
-        "function#{ " #{name}" if name }(#{ parse args }) " +
-          "{#{nl}#{ scope body, vars}#{nl}}"
+        @block_depth += 1 if @block_depth
+        body = scope body, vars
+        if @block_this and @block_depth == 1
+          body = "var self = this#{@sep}#{body}"
+        end
+
+        "function#{ " #{name}" if name }(#{ parse args }) {#{nl}#{ body }#{nl}}"
       ensure
         @next_token = next_token
+        @block_depth -= 1 if @block_depth
       end
     end
   end

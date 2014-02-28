@@ -4,7 +4,12 @@ module Ruby2JS
     # (self)
 
     handle :self do
-      'this'
+      if @block_depth and @block_depth > 1
+        @block_this = true
+        'self'
+      else
+        'this'
+      end
     end
   end
 end
