@@ -141,6 +141,7 @@ the script.
     * `.any?` becomes `.some`
     * `.chr` becomes `fromCharCode`
     * `.clear` becomes `.length = 0`
+    * `.downcase` becomes `.toLowerCase`
     * `.each` becomes `forEach`
     * `.each_with_index` becomes `forEach`
     * `.empty?` becomes `.length == 0`
@@ -161,6 +162,7 @@ the script.
     * `.to_f` becomes `parseFloat`
     * `.to_i` becomes `parseInt`
     * `.to_s` becomes `to_String`
+    * `.upcase` becomes `.toUpperCase`
     * `[-n]` becomes `[*.length-n]` for literal values of `n`
     * `[n...m]` becomes `.slice(n,m)`
     * `[n..m]` becomes `.slice(n,m+1)`

@@ -33,7 +33,7 @@ describe Ruby2JS::Filter::Functions do
       to_js( 'a.to_f' ).must_equal 'parseFloat(a)'
     end
 
-    it "should handle to_f" do
+    it "should handle puts" do
       to_js( 'puts "hi"' ).must_equal 'console.log("hi")'
     end
   end
@@ -70,6 +70,14 @@ describe Ruby2JS::Filter::Functions do
       to_js( 'a.ord' ).must_equal 'a.charCodeAt(0)'
       to_js( '65.chr' ).must_equal '"A"'
       to_js( 'a.chr' ).must_equal 'String.fromCharCode(a)'
+    end
+
+    it "should handle downcase" do
+      to_js( 'x.downcase()' ).must_equal 'x.toLowerCase()'
+    end
+
+    it "should handle upcase" do
+      to_js( 'x.upcase()' ).must_equal 'x.toUpperCase()'
     end
   end
     
