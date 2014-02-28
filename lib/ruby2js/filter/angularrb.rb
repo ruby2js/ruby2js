@@ -120,6 +120,8 @@ module Ruby2JS
         name = node.children.first
         if name.children.first == nil
           @ngClassUses, @ngClassOmit = [], []
+          @ngClassUses << node.children[1].children[1] if node.children[1]
+
           block = [node.children.last]
           uses = extract_uses(block)
           node = s(:class, name, node.children[1], 

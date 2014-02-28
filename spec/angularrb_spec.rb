@@ -425,6 +425,17 @@ describe Ruby2JS::Filter::AngularRB do
 
       to_js( ruby ).must_equal js
     end
+
+    it "should handle class inheritance" do
+      ruby = <<-RUBY
+        module Angular::Service
+          class A; end
+          class B < A; end
+        end
+      RUBY
+
+      to_js( ruby ).must_include 'Service.factory("B", function(A) {'
+    end
   end
 
   # ************************************************************ 
