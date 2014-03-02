@@ -190,6 +190,10 @@ describe Ruby2JS::Filter::Functions do
       to_js( 'a.keys' ).must_equal 'a.keys'
       to_js( 'a.keys()' ).must_equal 'Object.keys(a)'
     end
+
+    it "should handle delete" do
+      to_js( 'a.delete "x"' ).must_equal 'delete a["x"]'
+    end
   end
 
   describe 'setTimeout/setInterval' do

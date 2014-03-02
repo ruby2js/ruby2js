@@ -141,6 +141,7 @@ the script.
     * `.any?` becomes `.some`
     * `.chr` becomes `fromCharCode`
     * `.clear` becomes `.length = 0`
+    * `.delete` becomes `delete target[arg]`
     * `.downcase` becomes `.toLowerCase`
     * `.each` becomes `forEach`
     * `.each_with_index` becomes `forEach`

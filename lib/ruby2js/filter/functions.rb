@@ -13,12 +13,11 @@ module Ruby2JS
           process s(:send, s(:attr, s(:const, nil, :Math), node.children[1]),
             :apply, s(:const, nil, :Math), target)
 
-        elsif method == :keys and  node.children.length == 2
-          if node.is_method?
-            process s(:send, s(:const, nil, :Object), :keys, target)
-          else
-            super
-          end
+        elsif method == :keys and args.length == 0 and node.is_method?
+          process s(:send, s(:const, nil, :Object), :keys, target)
+
+        elsif method == :delete and args.length == 1
+          process s(:undef, s(:send, target, :[], args.first))
 
         elsif method == :to_s
           process s(:send, target, :toString, *args)
