@@ -72,6 +72,13 @@ describe Ruby2JS::Filter::Return do
     end
   end
 
+  describe 'flow control statements' do
+    it "should handld if statements" do
+      to_js( 'lambda {|x| if false; a; elsif false; b; else c; end}' ).
+        must_equal 'function(x) {if (false) {return a} else if (false) {return b} else {return c}}'
+    end
+  end
+
   describe Ruby2JS::Filter::DEFAULTS do
     it "should include Return" do
       Ruby2JS::Filter::DEFAULTS.must_include Ruby2JS::Filter::Return
