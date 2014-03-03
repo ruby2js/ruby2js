@@ -87,6 +87,7 @@ describe Ruby2JS do
       to_js( '@a ||= 1').must_equal 'this._a = this._a || 1'
       to_js( '@@a ||= 1').
         must_equal 'this.constructor._a = this.constructor._a || 1'
+      to_js( 'self.p ||= 1').must_equal 'this.p = this.p || 1'
       to_js( 'a[i] ||= 1').must_equal 'a[i] = a[i] || 1'
     end
     
