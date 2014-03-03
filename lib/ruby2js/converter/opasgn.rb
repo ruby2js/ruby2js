@@ -42,6 +42,9 @@ module Ruby2JS
       if vtype
         parse s(asgn.type, asgn.children.first, s(type, 
           s(vtype, asgn.children.first), value))
+      elsif asgn.type == :send
+        parse s(:send, asgn.children.first, :"#{asgn.children[1]}=",
+          asgn.children[2], s(type, asgn, value))
       else
         parse s(:send, asgn.children.first, "#{asgn.children[1]}=",
           s(type, asgn, value))
