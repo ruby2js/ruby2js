@@ -79,6 +79,16 @@ describe Ruby2JS::Filter::Functions do
     it "should handle upcase" do
       to_js( 'x.upcase()' ).must_equal 'x.toUpperCase()'
     end
+
+    it 'should handle start_with?' do
+      to_js( 'x.start_with?(y)' ).must_equal 'x.substring(0, y.length) == y'
+      to_js( 'x.start_with?("z")' ).must_equal 'x.substring(0, 1) == "z"'
+    end
+
+    it 'should handle end_with?' do
+      to_js( 'x.end_with?(y)' ).must_equal 'x.slice(-y.length) == y'
+      to_js( 'x.end_with?("z")' ).must_equal 'x.slice(-1) == "z"'
+    end
   end
     
   describe 'array functions' do

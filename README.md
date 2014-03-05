@@ -144,7 +144,8 @@ the script.
     * `.delete` becomes `delete target[arg]`
     * `.downcase` becomes `.toLowerCase`
     * `.each` becomes `forEach`
-    * `.each_with_index` becomes `forEach`
+    * `.each_with_index` becomes `.forEach`
+    * `.end_with?` becomes `.slice(-arg.length) == arg`
     * `.empty?` becomes `.length == 0`
     * `.first` becomes `[0]`
     * `.first(n)` becomes `.slice(0, n)`
@@ -158,11 +159,12 @@ the script.
     * `.ord` becomes `charCodeAt(0)`
     * `puts` becomes `console.log`
     * `.replace` becomes `.length = 0; ...push.apply(*)`
-    * `.sub` becomes `replace`
+    * `.start_with?` becomes `.substring(0, arg.length) == arg`
+    * `.sub` becomes `.replace`
     * `.to_a` becomes `to_Array`
     * `.to_f` becomes `parseFloat`
     * `.to_i` becomes `parseInt`
-    * `.to_s` becomes `to_String`
+    * `.to_s` becomes `.to_String`
     * `.upcase` becomes `.toUpperCase`
     * `[-n]` becomes `[*.length-n]` for literal values of `n`
     * `[n...m]` becomes `.slice(n,m)`

@@ -34,8 +34,8 @@ module Ruby2JS
         elsif method == :sub and args.length == 2
           process node.updated nil, [target, :replace, *args]
 
-        elsif [:sub!, :gsub!].include? node.children[1]
-          method = :"#{node.children[1].to_s[0..-2]}"
+        elsif [:sub!, :gsub!].include? method
+          method = :"#{method.to_s[0..-2]}"
           if target.type == :lvar
             process s(:lvasgn, target.children[0], s(:send,
               s(:lvar, target.children[0]), method, *node.children[2..-1]))
@@ -51,8 +51,8 @@ module Ruby2JS
             super
           end
 
-        elsif method == :gsub and node.children.length == 4
-          source, method, before, after = node.children
+        elsif method == :gsub and args.length == 2
+          before, after = args
           if before.type == :regexp
             before = s(:regexp, *before.children[0...-1],
               s(:regopt, :g, *before.children.last))
@@ -60,16 +60,16 @@ module Ruby2JS
             before = s(:regexp, s(:str, Regexp.escape(before.children.first)),
               s(:regopt, :g))
           end
-          process node.updated nil, [source, :replace, before, after]
+          process node.updated nil, [target, :replace, before, after]
 
-        elsif method == :ord and node.children.length == 2
+        elsif method == :ord and args.length == 0
           if target.type == :str
             process s(:int, target.children.last.ord)
           else
             process node.updated nil, [target, :charCodeAt, s(:int, 0)]
           end
 
-        elsif method == :chr and node.children.length == 2
+        elsif method == :chr and args.length == 0
           if target.type == :int
             process s(:str, target.children.last.chr)
           else
@@ -77,21 +77,32 @@ module Ruby2JS
               target]
           end
 
-        elsif method == :empty? and node.children.length == 2
+        elsif method == :empty? and args.length == 0
           process s(:send, s(:attr, target, :length), :==, s(:int, 0))
 
-        elsif method == :clear and node.children.length == 2
-          if node.is_method?
-            process s(:send, target, :length=, s(:int, 0))
+        elsif [:start_with?, :end_with?].include? method and args.length == 1
+          if args.first.type == :str
+            length = s(:int, args.first.children.first.length)
           else
-            super
+            length = s(:attr, *args, :length)
           end
 
-        elsif method == :replace and node.children.length == 3
+          if method == :start_with?
+            process s(:send, s(:send, target, :substring, s(:int, 0), 
+              length), :==, *args)
+          else
+            process s(:send, s(:send, target, :slice, 
+              s(:send, length, :-@)), :==, *args)
+          end
+
+        elsif method == :clear and args.length == 0 and node.is_method?
+          process s(:send, target, :length=, s(:int, 0))
+
+        elsif method == :replace and args.length == 1
           process s(:begin, s(:send, target, :length=, s(:int, 0)),
              s(:send, target, :push, s(:splat, node.children[2])))
 
-        elsif method == :include? and node.children.length == 3
+        elsif method == :include? and args.length == 1
           process s(:send, s(:send, target, :indexOf, args.first), :!=,
             s(:int, -1))
 
