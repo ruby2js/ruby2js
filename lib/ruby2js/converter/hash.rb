@@ -9,6 +9,7 @@ module Ruby2JS
     handle :hash do |*pairs|
       pairs.map! do |node|
         begin
+          block_this, block_depth = @block_this, @block_depth
           @block_this, @block_depth = false, 0
 
           left, right = node.children
@@ -30,7 +31,7 @@ module Ruby2JS
           end
 
         ensure
-          @block_this, @block_depth = nil, nil
+          @block_this, @block_depth = block_this, block_depth
         end
       end
 
