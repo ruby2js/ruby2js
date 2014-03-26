@@ -45,7 +45,7 @@ module Ruby2JS
       if receiver
         group_receiver = receiver.type == :send &&
           op_index < operator_index( receiver.children[1] ) if receiver
-        group_receiver ||= (receiver.type == :begin)
+        group_receiver ||= [:begin, :dstr, :dsym].include? receiver.type
       end
 
       if target
@@ -125,7 +125,8 @@ module Ruby2JS
       else
         if not ast.is_method?
           if receiver
-            "#{ parse receiver }.#{ method }"
+             call = (group_receiver ? group(receiver) : parse(receiver))
+            "#{ call }.#{ method }"
           else
             parse s(:lvasgn, method), @state
           end
@@ -133,7 +134,8 @@ module Ruby2JS
           parse s(:send, s(:attr, receiver, method), :apply, 
             (receiver || s(:nil)), s(:array, *args))
         else
-          call = "#{ parse receiver }#{ '.' if receiver && method}#{ method }"
+          call = (group_receiver ? group(receiver) : parse(receiver))
+          call = "#{ call }#{ '.' if receiver && method}#{ method }"
           args = args.map {|a| parse a}
           if args.any? {|arg| arg.to_s.include? "\n"}
             "#{ call }(#{ args.join(', ') })"
