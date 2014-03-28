@@ -5,6 +5,13 @@ module Ruby2JS
     module Functions
       include SEXP
 
+      VAR_TO_ASSIGN = {
+        lvar: :lvasgn,
+        ivar: :ivasgn,
+        cvar: :cvasgn,
+        gvar: :gvasgn
+      }
+
       def on_send(node)
         target, method, *args = node.children
 
@@ -36,9 +43,9 @@ module Ruby2JS
 
         elsif [:sub!, :gsub!].include? method
           method = :"#{method.to_s[0..-2]}"
-          if target.type == :lvar
-            process s(:lvasgn, target.children[0], s(:send,
-              s(:lvar, target.children[0]), method, *node.children[2..-1]))
+          if VAR_TO_ASSIGN.keys.include? target.type
+            process s(VAR_TO_ASSIGN[target.type], target.children[0], 
+              s(:send, target, method, *node.children[2..-1]))
           elsif target.type == :send
             if target.children[0] == nil
               process s(:lvasgn, target.children[1], s(:send,

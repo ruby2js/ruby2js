@@ -47,6 +47,12 @@ describe Ruby2JS::Filter::Functions do
         must_equal 'var str = str.replace("a", "b")'
       to_js( 'item.str.sub!("a", "b")' ).
         must_equal 'item.str = item.str.replace("a", "b")'
+      to_js( '@str.sub!("a", "b")' ).
+        must_equal 'this._str = this._str.replace("a", "b")'
+      to_js( '@@str.sub!("a", "b")' ).
+        must_equal 'this.constructor._str = this.constructor._str.replace("a", "b")'
+      to_js( '$str.sub!("a", "b")' ).
+        must_equal 'var $str = $str.replace("a", "b")'
       to_js( 'str.sub!(/a/) {"x"}' ).
         must_equal 'var str = str.replace(/a/, function() {return "x"})'
     end
