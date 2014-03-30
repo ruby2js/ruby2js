@@ -184,6 +184,10 @@ module Ruby2JS
             ng_watch(node, :$on)
           when :observe
             ng_observe(node)
+          when :timeout
+            process s(:gvar, :$timeout) # for dependency injection purposes
+            process s(:send, nil, :$timeout, s(:block, s(:send, nil, :proc), 
+              *node.children[1..-1]), *call.children[2..-1])
           else
             super
           end
@@ -460,9 +464,6 @@ module Ruby2JS
 
       def on_send(node)
         if @ngContext == :controller
-          # map well known method names to the appropriate service
-          scope, method = NG_METHOD_MAP[node.children[1]]
-
           if node.children[0..1] == [nil, :interpolate] and @ngScope
             @ngClassUses << :$interpolate
             if node.children.length > 3 and node.children[3].type == :nil
@@ -484,6 +485,9 @@ module Ruby2JS
                 *node.children[2..-1]), nil, @ngScope)
             end
           end
+
+          # map well known method names to the appropriate service
+          scope, method = NG_METHOD_MAP[node.children[1]]
 
           return super unless node.children.first == nil and method
 

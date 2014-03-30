@@ -228,6 +228,28 @@ describe Ruby2JS::Filter::AngularRB do
       to_js( ruby ).must_equal js
     end
 
+    it "should map timeout to $timeout within a controller" do
+      ruby = <<-RUBY
+        module Angular::PhonecatApp 
+          controller :PhoneListCtrl do 
+            timeout 5 do
+              update()
+            end
+          end
+        end
+      RUBY
+
+      js = <<-JS.gsub!(/^ {8}/, '').chomp
+        angular.module("PhonecatApp", []).controller("PhoneListCtrl", function($timeout) {
+          $timeout(function() {
+            update()
+          }, 5)
+        })
+      JS
+
+      to_js( ruby ).must_equal js
+    end
+
     it "should map filter to $filter within a controller" do
       ruby = <<-RUBY
         module Angular::PhonecatApp 
