@@ -243,8 +243,8 @@ the script.
         * maps `apply!`, `broadcast!`, `digest!`, `eval!`, and `evalAsync!`
           calls to `$rootScope` functions.
         * maps `filter` calls to '$filter` calls.
-        * maps `timeout` calls with a block to `$timeout` calls where the
-          block is passed as the first parameter.
+        * maps `timeout` and `interval` calls with a block to `$timeout` and
+          `$interval` calls where the block is passed as the first parameter.
 
 * [angular-route](https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/angular-routerb.rb)
 

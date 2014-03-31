@@ -232,7 +232,7 @@ describe Ruby2JS::Filter::AngularRB do
       ruby = <<-RUBY
         module Angular::PhonecatApp 
           controller :PhoneListCtrl do 
-            timeout 5 do
+            timeout 500 do
               update()
             end
           end
@@ -243,7 +243,29 @@ describe Ruby2JS::Filter::AngularRB do
         angular.module("PhonecatApp", []).controller("PhoneListCtrl", function($timeout) {
           $timeout(function() {
             update()
-          }, 5)
+          }, 500)
+        })
+      JS
+
+      to_js( ruby ).must_equal js
+    end
+
+    it "should map interval to $interval within a controller" do
+      ruby = <<-RUBY
+        module Angular::PhonecatApp 
+          controller :PhoneListCtrl do 
+            interval 5000 do
+              update()
+            end
+          end
+        end
+      RUBY
+
+      js = <<-JS.gsub!(/^ {8}/, '').chomp
+        angular.module("PhonecatApp", []).controller("PhoneListCtrl", function($interval) {
+          $interval(function() {
+            update()
+          }, 5000)
         })
       JS
 

@@ -184,9 +184,10 @@ module Ruby2JS
             ng_watch(node, :$on)
           when :observe
             ng_observe(node)
-          when :timeout
-            process s(:gvar, :$timeout) # for dependency injection purposes
-            process s(:send, nil, :$timeout, s(:block, s(:send, nil, :proc), 
+          when :timeout, :interval
+            method = (call.children[1] == :timeout ? :$timeout : :$interval)
+            process s(:gvar, method) # for dependency injection purposes
+            process s(:send, nil, method, s(:block, s(:send, nil, :proc), 
               *node.children[1..-1]), *call.children[2..-1])
           else
             super
