@@ -507,6 +507,16 @@ describe Ruby2JS do
         must_equal 'function C() {}; C.prototype = {get a() {}, get b() {}}'
     end
 
+    it "should collapse getters and setters in a class" do
+      to_js('class C; def a; end; def a=(a); end; end').
+        must_equal 'function C() {}; C.prototype = {get a() {}, set a(a) {}}'
+    end
+
+    it "should collapse properties" do
+      to_js('class C; def self.a; end; def self.b; end; end').
+        must_equal 'function C() {}; Object.defineProperties(C, {a: {enumerable: true, configurable: true, get: function() {}}, b: {enumerable: true, configurable: true, get: function() {}}})'
+    end
+
     it "should parse class with inheritance" do
       to_js('class Employee < Person; end').
         must_equal 'function Employee() {Person.call(this)}; Employee.prototype = Object.create(Person); Employee.prototype.constructor = Employee'

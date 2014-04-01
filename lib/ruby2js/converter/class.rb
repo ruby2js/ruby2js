@@ -31,19 +31,19 @@ module Ruby2JS
           elsif m.children.first =~ /=/
             # property setter
             sym = :"#{m.children.first.to_s[0..-2]}"
-            s(:prop, s(:attr, name, :prototype), sym,
-                enumerable: s(:true), configurable: s(:true),
-                set: s(:block, s(:send, nil, :proc), *m.children[1..-1]))
+            s(:prop, s(:attr, name, :prototype), sym =>
+                {enumerable: s(:true), configurable: s(:true),
+                set: s(:block, s(:send, nil, :proc), *m.children[1..-1])})
           else
             if m.children[1].children.length == 0 and 
               m.children.first !~ /!/ and m.loc and m.loc.name and
               m.loc.name.source_buffer.source[m.loc.name.end_pos] != '('
 
               # property getter
-              s(:prop, s(:attr, name, :prototype), m.children.first, 
-                  enumerable: s(:true), configurable: s(:true),
+              s(:prop, s(:attr, name, :prototype), m.children.first =>
+                  {enumerable: s(:true), configurable: s(:true),
                   get: s(:block, s(:send, nil, :proc), m.children[1],
-                    s(:autoreturn, *m.children[2..-1])))
+                    s(:autoreturn, *m.children[2..-1]))})
             else
               # method: add to prototype
               s(:method, s(:attr, name, :prototype),
@@ -55,18 +55,18 @@ module Ruby2JS
         elsif m.type == :defs and m.children.first == s(:self)
           if m.children[1] =~ /=$/
             # class property setter
-            s(:prop, name, m.children[1].to_s[0..-2], 
-                enumerable: s(:true), configurable: s(:true),
-                set: s(:block, s(:send, nil, :proc), *m.children[2..-1]))
+            s(:prop, name, m.children[1].to_s[0..-2] =>
+                {enumerable: s(:true), configurable: s(:true),
+                set: s(:block, s(:send, nil, :proc), *m.children[2..-1])})
           elsif m.children[2].children.length == 0 and
             m.children[1] !~ /!/ and m.loc and m.loc.name and
             m.loc.name.source_buffer.source[m.loc.name.end_pos] != '('
 
             # class property getter
-            s(:prop, name, m.children[1].to_s, 
-                enumerable: s(:true), configurable: s(:true),
+            s(:prop, name, m.children[1].to_s =>
+                {enumerable: s(:true), configurable: s(:true),
                 get: s(:block, s(:send, nil, :proc), m.children[2],
-                  s(:autoreturn, *m.children[3..-1])))
+                  s(:autoreturn, *m.children[3..-1]))})
           else
             # class method definition: add to prototype
             s(:prototype, s(:send, name, "#{m.children[1]}=",
@@ -77,30 +77,30 @@ module Ruby2JS
           if m.children[1] == :attr_accessor
             m.children[2..-1].map do |sym|
               var = sym.children.first
-              s(:prop, s(:attr, name, :prototype), var, 
-                  enumerable: s(:true), configurable: s(:true),
+              s(:prop, s(:attr, name, :prototype), var =>
+                  {enumerable: s(:true), configurable: s(:true),
                   get: s(:block, s(:send, nil, :proc), s(:args), 
                     s(:return, s(:ivar, :"@#{var}"))),
                   set: s(:block, s(:send, nil, :proc), s(:args, s(:arg, var)), 
-                    s(:ivasgn, :"@#{var}", s(:lvar, var))))
+                    s(:ivasgn, :"@#{var}", s(:lvar, var)))})
             end
           elsif m.children[1] == :attr_reader
             m.children[2..-1].map do |sym|
               var = sym.children.first
-              s(:prop, s(:attr, name, :prototype), var,
-                  get: s(:block, s(:send, nil, :proc), s(:args), 
+              s(:prop, s(:attr, name, :prototype), var =>
+                  {get: s(:block, s(:send, nil, :proc), s(:args), 
                     s(:return, s(:ivar, :"@#{var}"))),
                   enumerable: s(:true),
-                  configurable: s(:true))
+                  configurable: s(:true)})
             end
           elsif m.children[1] == :attr_writer
             m.children[2..-1].map do |sym|
               var = sym.children.first
-              s(:prop, s(:attr, name, :prototype), var,
-                  set: s(:block, s(:send, nil, :proc), s(:args, s(:arg, var)), 
+              s(:prop, s(:attr, name, :prototype), var =>
+                  {set: s(:block, s(:send, nil, :proc), s(:args, s(:arg, var)), 
                     s(:ivasgn, :"@#{var}", s(:lvar, var))),
                   enumerable: s(:true),
-                  configurable: s(:true))
+                  configurable: s(:true)})
             end
           else
             # class method call
@@ -138,9 +138,11 @@ module Ruby2JS
         next unless body[i] and body[i].type == :prop
         for j in i+1...body.length
           break unless body[j] and body[j].type == :prop
-          if body[i].children[0..1] == body[j].children[0..1]
-            merge = body[i].children[2].merge(body[j].children[2])
-            body[j] = s(:prop, *body[j].children[0..1], merge)
+          if body[i].children[0] == body[j].children[0]
+            merge = Hash[(body[i].children[1].to_a+body[j].children[1].to_a).
+              group_by(&:first).map {|name, values|
+              [name, values.map(&:last).reduce(:merge)]}]
+            body[j] = s(:prop, body[j].children[0], merge)
             body[i] = nil
             break
           end
@@ -176,11 +178,12 @@ module Ruby2JS
               s(:pair, s(:str, node.children[1].to_s.chomp('=')),
                 node.children[2])
             else
-              s(:pair, s(:prop, node.children[1]), node.children[2])
+              node.children[1].map {|prop, descriptor|
+                s(:pair, s(:prop, prop), descriptor)}
             end
           end
           body[start...start+methods] =
-            s(:send, name, :prototype=, s(:hash, *pairs))
+            s(:send, name, :prototype=, s(:hash, *pairs.flatten))
         end
       end
 
@@ -209,10 +212,18 @@ module Ruby2JS
         instance_method, @instance_method = @instance_method, @ast
         @block_this, @block_depth = false, 0
         if @ast.type == :prop
-          obj, prop, descriptor = *args
-          parse s(:send, s(:const, nil, :Object), :defineProperty,
-            obj, s(:sym, prop), s(:hash,
-            *descriptor.map { |key, value| s(:pair, s(:sym, key), value) }))
+          obj, props = *args
+          if props.length == 1
+            prop, descriptor = props.flatten
+            parse s(:send, s(:const, nil, :Object), :defineProperty,
+              obj, s(:sym, prop), s(:hash,
+              *descriptor.map { |key, value| s(:pair, s(:sym, key), value) }))
+          else
+            parse s(:send, s(:const, nil, :Object), :defineProperties,
+              obj, s(:hash, *props.map {|prop, descriptor|
+                s(:pair, s(:sym, prop), s(:hash, *descriptor.map {|key, value| 
+                s(:pair, s(:sym, key), value) }))}))
+          end
         elsif @ast.type == :method
           parse s(:send, *args)
         else
