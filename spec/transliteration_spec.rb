@@ -270,9 +270,10 @@ describe Ruby2JS do
       to_js( exp ).must_equal exp
     end
     
-    it "should nest methods called on string interpolation results" do
+    it "nest expressions when needed in string interpolation" do
       to_js( '"#{a}#{b}".length' ).must_equal '(a + b).length'
       to_js( '"#{a}#{b}".split(" ")' ).must_equal '(a + b).split(" ")'
+      to_js( '"a#{b+c}"' ).must_equal '"a" + (b + c)'
     end
     
     it "should nest methods called on expressions" do
