@@ -593,8 +593,12 @@ describe Ruby2JS do
       to_js('def method; end').must_equal 'function method() {}'
     end
     
-    it "should parse singleton method def" do
-      to_js('def self.method; end').must_equal 'this.method = function() {}'
+    it "should parse singleton method and property definitions" do
+      to_js('def self.method(); end').must_equal 'this.method = function() {}'
+      to_js('def self.prop; @prop; end').
+        must_equal 'Object.defineProperty(this, "prop", {enumerable: true, configurable: true, get: function() {return this._prop}})'
+      to_js('def self.prop=(prop); @prop=prop; end').
+        must_equal 'Object.defineProperty(this, "prop", {enumerable: true, configurable: true, set: function(prop) {this._prop = prop}})'
     end
     
     it "should convert self to this" do
