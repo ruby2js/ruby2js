@@ -124,7 +124,7 @@ describe Ruby2JS::Filter::AngularRB do
       ruby = <<-RUBY
         module Angular::PhonecatApp 
           controller :PhoneListCtrl do 
-            def save
+            def save()
               $http.post '/data', @data
             end
           end
@@ -136,6 +136,41 @@ describe Ruby2JS::Filter::AngularRB do
           $scope.save = function() {
             $http.post("/data", $scope.data)
           }
+        })
+      JS
+
+      to_js( ruby ).must_equal js
+    end
+
+    it "should properties to $scope within a controller" do
+      ruby = <<-RUBY
+        module Angular::PhonecatApp 
+          controller :PhoneListCtrl do 
+            def prop 
+              @prop
+            end
+
+            def prop=(prop)
+              @prop=prop
+            end
+          end
+        end
+      RUBY
+
+      js = <<-JS.gsub!(/^ {8}/, '').chomp
+        angular.module("PhonecatApp", []).controller("PhoneListCtrl", function($scope) {
+          Object.defineProperty($scope, "prop", {
+            enumerable: true,
+            configurable: true,
+
+            get: function() {
+              return $scope.prop
+            },
+
+            set: function(prop) {
+              $scope.prop = prop
+            }
+          })
         })
       JS
 

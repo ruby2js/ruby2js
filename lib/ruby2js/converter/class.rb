@@ -130,21 +130,8 @@ module Ruby2JS
 
       body.flatten!
 
-      # merge nearby property definitions
-      for i in 0...body.length-1
-        next unless body[i] and body[i].type == :prop
-        for j in i+1...body.length
-          break unless body[j] and body[j].type == :prop
-          if body[i].children[0] == body[j].children[0]
-            merge = Hash[(body[i].children[1].to_a+body[j].children[1].to_a).
-              group_by(&:first).map {|name, values|
-              [name, values.map(&:last).reduce(:merge)]}]
-            body[j] = s(:prop, body[j].children[0], merge)
-            body[i] = nil
-            break
-          end
-        end
-      end
+      # merge property definitions
+      combine_properties(body)
 
       if inheritance
         body.unshift s(:send, name, :prototype=, 

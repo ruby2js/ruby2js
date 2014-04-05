@@ -599,6 +599,8 @@ describe Ruby2JS do
         must_equal 'Object.defineProperty(this, "prop", {enumerable: true, configurable: true, get: function() {return this._prop}})'
       to_js('def self.prop=(prop); @prop=prop; end').
         must_equal 'Object.defineProperty(this, "prop", {enumerable: true, configurable: true, set: function(prop) {this._prop = prop}})'
+      to_js('def self.prop; @prop; end; def self.prop=(prop); @prop=prop; end').
+        must_equal 'Object.defineProperty(this, "prop", {enumerable: true, configurable: true, get: function() {return this._prop}, set: function(prop) {this._prop = prop}})'
     end
     
     it "should convert self to this" do

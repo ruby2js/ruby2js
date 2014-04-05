@@ -19,6 +19,7 @@ module Ruby2JS
       def on_attr(node); on_send(node); end
       def on_autoreturn(node); on_return(node); end
       def on_constructor(node); on_def(node); end
+      def on_defp(node); on_defs(node); end
       def on_method(node); on_send(node); end
       def on_prop(node); on_array(node); end
       def on_prototype(node); on_begin(node); end

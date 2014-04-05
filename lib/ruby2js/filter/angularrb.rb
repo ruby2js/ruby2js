@@ -542,7 +542,11 @@ module Ruby2JS
       # convert instance method definitions in controllers to $scope
       def on_def(node)
         if @ngContext == :controller
-          process s(:defs, s(:gvar, :$scope), *node.children)
+          if node.is_method?
+            process s(:defs, s(:gvar, :$scope), *node.children)
+          else
+            process s(:defp, s(:gvar, :$scope), *node.children)
+          end
         else
           super
         end

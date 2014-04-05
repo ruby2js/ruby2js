@@ -7,7 +7,45 @@ module Ruby2JS
 
     handle :begin do |*statements|
       state = @state
+      props = false
+
+      statements.map! do |statement|
+        case statement and statement.type
+        when :defs, :defp
+          props = true
+          @ast = statement
+          transform_defs(*statement.children)
+        when :prop
+          props = true
+          statement
+        else
+          statement
+        end
+      end
+
+      if props
+        combine_properties(statements) if props
+        statements.compact!
+      end
+
       statements.map{ |statement| parse statement, state }.join(@sep)
+    end
+
+    def combine_properties(body)
+      for i in 0...body.length-1
+        next unless body[i] and body[i].type == :prop
+        for j in i+1...body.length
+          break unless body[j] and body[j].type == :prop
+          if body[i].children[0] == body[j].children[0]
+            merge = Hash[(body[i].children[1].to_a+body[j].children[1].to_a).
+              group_by {|name, value| name.to_s}.map {|name, values|
+              [name, values.map(&:last).reduce(:merge)]}]
+            body[j] = s(:prop, body[j].children[0], merge)
+            body[i] = nil
+            break
+          end
+        end
+      end
     end
   end
 end
