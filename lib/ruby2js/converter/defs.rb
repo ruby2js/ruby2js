@@ -6,9 +6,7 @@ module Ruby2JS
     #   (...)
 
     handle :defs do |target, method, args, body|
-      name = @ast.loc && @ast.loc.name
-      if args.children.length == 0 and name and
-        name.source_buffer.source[name.end_pos] != '('
+      if not @ast.is_method?
         parse s(:prop, target, method => 
           {enumerable: s(:true), configurable: s(:true),
           get: s(:block, s(:send, nil, :proc), args,

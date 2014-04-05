@@ -100,9 +100,21 @@ module Parser
     class Node
       def is_method?
         return false if type == :attr
-        return true if children.length > 2
         return true unless loc
-        selector = loc.selector
+
+        if loc.respond_to? :selector
+          return true if children.length > 2
+          selector = loc.selector
+        elsif type == :defs
+          return true if children[1] =~ /[!?]$/
+          return true if children[2].children.length > 0
+          selector = loc.name
+        elsif type == :def
+          return true if children[0] =~ /[!?]$/
+          return true if children[1].children.length > 0
+          selector = loc.name
+        end
+
         return true unless selector.source_buffer
         selector.source_buffer.source[selector.end_pos] == '('
       end

@@ -35,10 +35,7 @@ module Ruby2JS
                 {enumerable: s(:true), configurable: s(:true),
                 set: s(:block, s(:send, nil, :proc), *m.children[1..-1])})
           else
-            if m.children[1].children.length == 0 and 
-              m.children.first !~ /!/ and m.loc and m.loc.name and
-              m.loc.name.source_buffer.source[m.loc.name.end_pos] != '('
-
+            if not m.is_method?
               # property getter
               s(:prop, s(:attr, name, :prototype), m.children.first =>
                   {enumerable: s(:true), configurable: s(:true),
