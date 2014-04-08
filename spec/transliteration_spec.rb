@@ -744,7 +744,11 @@ describe Ruby2JS do
     end
 
     it "should map Ruby's Regexp to JavaScript's RegExp" do
-      to_js( 'Regexp.new("a")' ).must_equal 'new RegExp("a")'
+      to_js( 'Regexp.new(a)' ).must_equal 'new RegExp(a)'
+    end
+
+    it "should map static RegExps to regular expression literals" do
+      to_js( 'RegExp.new("a", "g")' ).must_equal '/a/g'
     end
 
     it "should allow Regexps to be passed on the Regexp constructor" do

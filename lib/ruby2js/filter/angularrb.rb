@@ -563,7 +563,7 @@ module Ruby2JS
       end
 
       BUILTINS = [ :Array, :Boolean, :Date, :Error, :Function, :Infinity, :JSON,
-        :Math, :NaN, :Number, :Object, :RegExp, :String ]
+        :Math, :NaN, :Number, :Object, :RegExp, :Regexp, :String ]
 
       def on_const(node)
         if @ngClassUses and not node.children.first

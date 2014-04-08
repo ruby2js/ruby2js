@@ -101,6 +101,14 @@ module Ruby2JS
 
             return parse s(:regexp, *args.first.children[0...-1],
               s(:regopt, *opts.split('').map(&:to_sym)))
+          elsif args.first.type == :str
+            if args.length == 2 and args[1].type == :str
+              opts = args[1].children[0]
+            else
+              opts = ''
+            end
+            return parse s(:regexp, args.first,
+              s(:regopt, *opts.each_char.map {|c| c}))
           end
         end
 

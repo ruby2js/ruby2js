@@ -363,14 +363,14 @@ describe Ruby2JS::Filter::AngularRB do
       ruby = <<-'RUBY'
         module Angular::PhonecatApp 
           controller :PhoneListCtrl do 
-            $scope.phone_pattern = RegExp.new('\d{3}-\d{3}-\d{4}')
+            $scope.phone_pattern = Regexp.new('\d{3}-\d{3}-\d{4}')
           end
         end
       RUBY
 
       js = <<-'JS'.gsub!(/^ {8}/, '').chomp
         angular.module("PhonecatApp", []).controller("PhoneListCtrl", function($scope) {
-          $scope.phone_pattern = new RegExp("\\d{3}-\\d{3}-\\d{4}")
+          $scope.phone_pattern = /\d{3}-\d{3}-\d{4}/
         })
       JS
 
