@@ -116,7 +116,7 @@ includes three such integrations:
 *  [Sinatra](https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/sinatra.rb)
 *  [Rails](https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/rails.rb)
 
-As you might expect, CGI is a bit sluggish.  By constrast, Sinatra and Rails
+As you might expect, CGI is a bit sluggish.  By contrast, Sinatra and Rails
 are quite speedy as the bulk of the time is spend on the initial load of the
 required libraries.
 
@@ -230,7 +230,7 @@ the script.
       angular module functions.
     * maps `use` statements to formal arguments or array values (as
       appropriate) depending on the module function.
-    * maps `watch` statments to calls to `$scope.$watch`.
+    * maps `watch` statements to calls to `$scope.$watch`.
     * tracks globals variable and constant references and adds additional
       implicit `use` statements
     * maps constant assignments in an angular module to a filter
