@@ -74,7 +74,7 @@ module Ruby2JS
 
         # convert use calls into dependencies
         depends = @ngAppUses.map {|sym| s(:sym, sym)} + extract_uses(block)
-        depends = depends.map {|node| node.children.first.to_s}.uniq.
+        depends = depends.map {|node| node.children.first.to_s}.uniq.sort.
           map {|sym| s(:str, sym)}
 
         ngApp, @ngApp, @ngChildren = @ngApp, nil, nil
@@ -129,7 +129,7 @@ module Ruby2JS
 
           @ngClassUses -= @ngClassOmit + [name.children.last]
           args = @ngClassUses.map {|sym| s(:arg, sym)} + uses
-          args = args.map {|node| node.children.first.to_sym}.uniq.
+          args = args.map {|node| node.children.first.to_sym}.uniq.sort.
             map {|sym| s(:arg, sym)}
           @ngClassUses, @ngClassOmit = [], []
 
@@ -249,7 +249,7 @@ module Ruby2JS
         @ngClassUses -= @ngClassOmit
         args = node.children[1].children
         args += @ngClassUses.map {|sym| s(:arg, sym)} + extract_uses(block)
-        args = args.map {|node| node.children.first.to_sym}.uniq.
+        args = args.map {|node| node.children.first.to_sym}.uniq.sort.
           map {|sym| s(:arg, sym)}
 
         node.updated :block, [target, s(:args, *args), s(:begin, *block)]
@@ -279,7 +279,7 @@ module Ruby2JS
         # insert return
         args = process_all(node.children[1].children)
         block = process_all(node.children[2..-1])
-        uses = (@ngClassUses - @ngClassOmit).uniq.map {|sym| s(:arg, sym)}
+        uses = (@ngClassUses - @ngClassOmit).uniq.sort.map {|sym| s(:arg, sym)}
         tail = [block.pop || s(:nil)]
         while tail.length == 1 and tail.first.type == :begin
           tail = tail.first.children.dup
@@ -322,7 +322,7 @@ module Ruby2JS
         @ngClassUses.delete call.children[2].children[0]
         args = process_all(node.children[1].children)
         args += @ngClassUses.map {|sym| s(:arg, sym)} + extract_uses(block)
-        args = args.map {|node| node.children.first.to_sym}.uniq.
+        args = args.map {|node| node.children.first.to_sym}.uniq.sort.
           map {|sym| s(:arg, sym)}
 
         # construct a function

@@ -132,7 +132,7 @@ describe Ruby2JS::Filter::AngularRB do
       RUBY
 
       js = <<-JS.gsub!(/^ {8}/, '').chomp
-        angular.module("PhonecatApp", []).controller("PhoneListCtrl", function($scope, $http) {
+        angular.module("PhonecatApp", []).controller("PhoneListCtrl", function($http, $scope) {
           $scope.save = function() {
             $http.post("/data", $scope.data)
           }
