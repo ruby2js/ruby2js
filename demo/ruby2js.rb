@@ -18,10 +18,11 @@ begin
 
   filters = {
     'angularrb' => 'ruby2js/filter/angularrb',
-    'angular-route' => 'ruby2js/filter/angular-route',
     'angular-resource' => 'ruby2js/filter/angular-resource',
+    'angular-route' => 'ruby2js/filter/angular-route',
     'functions' => 'ruby2js/filter/functions',
     'jquery'    => 'ruby2js/filter/jquery',
+    'minitest-jasmine' => 'ruby2js/filter/minitest-jasmine',
     'return'    => 'ruby2js/filter/return',
     'strict'    => 'ruby2js/filter/strict',
     'underscore' => 'ruby2js/filter/underscore'
