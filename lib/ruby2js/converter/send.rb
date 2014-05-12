@@ -46,6 +46,7 @@ module Ruby2JS
         group_receiver = receiver.type == :send &&
           op_index < operator_index( receiver.children[1] ) if receiver
         group_receiver ||= [:begin, :dstr, :dsym].include? receiver.type
+        group_receiver = false if receiver.children[1] == :[]
       end
 
       if target

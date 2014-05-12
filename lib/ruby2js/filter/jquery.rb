@@ -105,6 +105,7 @@ module Ruby2JS
           props = :context, :jquery, :browser, :fx, :support, :length, :selector
           domprops = %w(checked disabled readonly readOnly required)
 
+          stopProps = false
           rewrite_tilda = proc do |node|
             # Example conversion:
             #   before:
@@ -112,6 +113,7 @@ module Ruby2JS
             #   after:
             #    (send (send (send nil "$" (send nil :a)) :b) :c)
             if node.type == :send and node.children[0]
+              stopProps = true if node.children[1] == :[]
               if node.children[1] == :~ and node.children[0].children[1] == :~
                 # consecutive tildes
                 if node.children[0].children[0].children[1] == :~
@@ -127,7 +129,7 @@ module Ruby2JS
                 method = :each! if method == :each
                 rewrite = [rewrite_tilda[node.children[0]], 
                   method, *node.children[2..-1]]
-                if props.include? node.children[1]
+                if stopProps or props.include? node.children[1]
                   node.updated nil, rewrite
                 elsif domprops.include? method.to_s
                   method = :readOnly if method.to_s == 'readonly'
