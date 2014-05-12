@@ -130,6 +130,7 @@ module Ruby2JS
                 rewrite = [rewrite_tilda[node.children[0]], 
                   method, *node.children[2..-1]]
                 if stopProps or props.include? node.children[1]
+                  rewrite[1] = node.children[1]
                   node.updated nil, rewrite
                 elsif domprops.include? method.to_s
                   method = :readOnly if method.to_s == 'readonly'
