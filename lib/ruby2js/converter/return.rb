@@ -13,7 +13,8 @@ module Ruby2JS
     end
 
     EXPRESSIONS = [ :array, :float, :hash, :int, :lvar, :nil, :send, :attr,
-      :str, :sym, :dstr, :dsym, :cvar, :ivar, :zsuper, :super, :or, :and ]
+      :str, :sym, :dstr, :dsym, :cvar, :ivar, :zsuper, :super, :or, :and,
+      :block ]
 
     handle :autoreturn do |*statements|
       return if statements == [nil]
