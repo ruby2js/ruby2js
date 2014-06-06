@@ -8,6 +8,8 @@ module Ruby2JS
 
     handle :hash do |*pairs|
       pairs.map! do |node|
+        raise NotImplementedError, "kwsplat" if node.type == :kwsplat
+
         begin
           block_this, block_depth = @block_this, @block_depth
           @block_this, @block_depth = false, 0
