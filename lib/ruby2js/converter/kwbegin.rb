@@ -26,13 +26,14 @@ module Ruby2JS
         body = block
       end
 
-      output = "try {#@nl#{ parse body }#@nl}"
+      output = "try {#@nl#{ parse body, :statement }#@nl}"
 
       if recovery
-        output += " catch (#{ parse name }) {#@nl#{ parse recovery }#@nl}"
+        output += " catch (#{ parse name }) " +
+          "{#@nl#{ parse recovery, :statement }#@nl}"
       end
 
-      output += " finally {#@nl#{ parse finally }#@nl}" if finally
+      output += " finally {#@nl#{ parse finally, :statement }#@nl}" if finally
 
       if recovery or finally
         output

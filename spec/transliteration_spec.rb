@@ -777,17 +777,17 @@ describe Ruby2JS do
 
     it "should handle catching an exception" do
       to_js( 'begin a; rescue => e; b; end' ).
-        must_equal 'try {a} catch (e) {b}'
+        must_equal 'try {var a} catch (e) {var b}'
     end
 
     it "should handle an ensure clause" do
       to_js( 'begin a; ensure b; end' ).
-        must_equal 'try {a} finally {b}'
+        must_equal 'try {var a} finally {var b}'
     end
 
     it "should handle catching an exception and an ensure clause" do
       to_js( 'begin a; rescue => e; b; ensure; c; end' ).
-        must_equal 'try {a} catch (e) {b} finally {c}'
+        must_equal 'try {var a} catch (e) {var b} finally {var c}'
     end
 
     it "should gracefully neither a rescue nor an ensure being present" do
