@@ -775,9 +775,15 @@ describe Ruby2JS do
         must_equal 'throw new Exception("heck")'
     end
 
-    it "should handle catching an exception" do
+    it "should handle catching any exception" do
       to_js( 'begin a; rescue => e; b; end' ).
         must_equal 'try {var a} catch (e) {var b}'
+    end
+
+    it "should handle catching a specific exception" do
+      to_js( 'begin a; rescue StandardError => e; b; end' ).
+        must_equal 'try {var a} catch (e) {' +
+          'if (e instanceof StandardError) {var b} else {throw e}}'
     end
 
     it "should handle an ensure clause" do

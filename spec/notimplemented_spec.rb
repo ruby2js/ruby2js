@@ -39,8 +39,13 @@ describe 'not implemented' do
     todo( 'yield' )
   end
 
-  it "catching specific exceptions" do
+  it "catching exceptions without a variable" do
     todo("begin; rescue Exception; end")
+  end
+
+  it "catching exceptions with different variables" do
+    todo("begin; a; rescue StandardException => se; b; " +
+      "rescue Exception => e; c; end")
   end
 
   it "else clauses in begin...end" do
