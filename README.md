@@ -178,6 +178,9 @@ the script.
     * for the following methods, if the block consists entirely of a simple
       expression (or ends with one), a `return` is added prior to the
       expression: `sub`, `gsub`, `any?`, `all?`, `map`.
+    * New classes subclassed off of `Exception` will become subclassed off
+      of `Error` instead; and default constructors will be provided
+    * `loop do...end` will be replaced with `while (true) {...}`
 
 * [underscore](https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/underscore.rb)
 

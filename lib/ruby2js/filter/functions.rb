@@ -251,6 +251,11 @@ module Ruby2JS
             s(:block, s(:send, target, method, *call.children[2..-1]),
             *node.children[1..-1]))))
 
+        elsif node.children[0..1] == [s(:send, nil, :loop), s(:args)]
+          # input: loop {statements}
+          # output: while(true) {statements}
+          s(:while, s(:true), node.children[2])
+
         else
           super
         end

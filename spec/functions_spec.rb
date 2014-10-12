@@ -239,6 +239,11 @@ describe Ruby2JS::Filter::Functions do
       to_js( 'a.sort(&:<)' ).
         must_equal 'a.sort(function(a, b) {return a < b})'
     end
+
+    it 'should handles loops' do
+      to_js( 'loop {sleep 1; break}').
+        must_equal 'while (true) {sleep(1); break}'
+    end
   end
 
   describe 'subclassing Exception' do
