@@ -241,6 +241,15 @@ describe Ruby2JS::Filter::Functions do
     end
   end
 
+  describe 'subclassing Exception' do
+    it 'should create an Exception contructor' do
+      to_js( 'class E < Exception; end' ).
+        must_equal 'function E(message) {this.message = message; ' +
+          'this.name = "E"; this.stack = Error(message).stack()}; ' +
+          'E.prototype = Object.create(Error); E.prototype.constructor = E'
+    end
+  end
+
   describe Ruby2JS::Filter::DEFAULTS do
     it "should include Functions" do
       Ruby2JS::Filter::DEFAULTS.must_include Ruby2JS::Filter::Functions

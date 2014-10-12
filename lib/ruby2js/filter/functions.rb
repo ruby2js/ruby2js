@@ -255,6 +255,29 @@ module Ruby2JS
           super
         end
       end
+
+      def on_class(node)
+        name, inheritance, *body = node.children
+        body.compact!
+
+        if inheritance == s(:const, nil, :Exception)
+          unless 
+            body.any? {|statement| statement.type == :def and
+            statement.children.first == :initialize}
+          then
+            body.unshift s(:def, :initialize, s(:args, s(:arg, :message)),
+              s(:begin, s(:send, s(:self), :message=, s(:lvar, :message)),
+              s(:send, s(:self), :name=, s(:sym, name.children[1])),
+              s(:send, s(:self), :stack=, s(:send, s(:send, nil, :Error,
+              s(:lvar, :message)), :stack))))
+          end
+
+          body = [s(:begin, *body)] if body.length > 1
+          s(:class, name, s(:const, nil, :Error), *body)
+        else
+          super
+        end
+      end
     end
 
     DEFAULTS.push Functions
