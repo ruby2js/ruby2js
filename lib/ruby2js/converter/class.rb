@@ -123,6 +123,11 @@ module Ruby2JS
         elsif m.type == :casgn and m.children[0] == nil
           # class constant
           s(:send, name, "#{m.children[1]}=", *m.children[2..-1])
+        elsif m.type == :alias
+          s(:send, s(:attr, s(:const, nil, :C), :prototype),
+            "#{m.children[0].children.first}=", 
+            s(:attr, s(:attr, s(:const, nil, :C), :prototype),
+            m.children[1].children.first))
         else
           raise NotImplementedError, "class #{ m.type }"
         end

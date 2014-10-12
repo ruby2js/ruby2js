@@ -589,6 +589,12 @@ describe Ruby2JS do
         must_equal 'function Person() {}; Person.search = function(name) {}'
     end
 
+    it "should parse class with alias" do
+      to_js('class Person; def f(name); end; alias :g :f; end').
+        must_equal 'function Person() {}; Person.prototype.f = ' +
+          'function(name) {}; C.prototype.g = C.prototype.f'
+    end
+
     it "should parse method def" do
       to_js('def method; end').must_equal 'function method() {}'
     end

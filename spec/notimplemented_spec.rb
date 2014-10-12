@@ -23,10 +23,6 @@ describe 'not implemented' do
     todo( '::Foo' )
   end
 
-  it "alias" do
-    todo( 'alias foo bar' )
-  end
-
   it "shadow arguments" do
     todo(' proc {|;a|} ')
   end
