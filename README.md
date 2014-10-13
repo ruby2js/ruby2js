@@ -156,6 +156,7 @@ the script.
     * `.last(n)` becomes `.slice(*.length-1, *.length)`
     * `.max` becomes `Math.max.apply(Math)`
     * `.min` becomes `Math.min.apply(Math)`
+    * `.nil?` becomes `== null`
     * `.ord` becomes `charCodeAt(0)`
     * `puts` becomes `console.log`
     * `.replace` becomes `.length = 0; ...push.apply(*)`

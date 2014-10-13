@@ -87,6 +87,9 @@ module Ruby2JS
         elsif method == :empty? and args.length == 0
           process s(:send, s(:attr, target, :length), :==, s(:int, 0))
 
+        elsif method == :nil? and args.length == 0
+          process s(:send, target, :==, s(:nil))
+
         elsif [:start_with?, :end_with?].include? method and args.length == 1
           if args.first.type == :str
             length = s(:int, args.first.children.first.length)
