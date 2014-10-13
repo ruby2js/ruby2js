@@ -592,7 +592,7 @@ describe Ruby2JS do
     it "should parse class with alias" do
       to_js('class Person; def f(name); end; alias :g :f; end').
         must_equal 'function Person() {}; Person.prototype.f = ' +
-          'function(name) {}; C.prototype.g = C.prototype.f'
+          'function(name) {}; Person.prototype.g = Person.prototype.f'
     end
 
     it "should parse method def" do
