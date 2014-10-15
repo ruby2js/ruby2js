@@ -42,6 +42,9 @@ module Ruby2JS
         target = args.first 
       end
 
+      # resolve anonymous receivers against rbstack
+      receiver ||= @rbstack.map {|rb| rb[method]}.compact.last
+
       if receiver
         group_receiver = receiver.type == :send &&
           op_index < operator_index( receiver.children[1] ) if receiver

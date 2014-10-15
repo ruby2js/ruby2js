@@ -22,6 +22,7 @@ module Ruby2JS
       end
 
       body.compact!
+      visible = {}
       body.map! do |m| 
         if m.type == :def
           if m.children.first == :initialize
@@ -35,6 +36,8 @@ module Ruby2JS
                 {enumerable: s(:true), configurable: s(:true),
                 set: s(:block, s(:send, nil, :proc), *m.children[1..-1])})
           else
+            visible[m.children[0]] = s(:self)
+
             if not m.is_method?
               # property getter
               s(:prop, s(:attr, name, :prototype), m.children.first =>
@@ -122,6 +125,7 @@ module Ruby2JS
             *m.children[1..-1])
         elsif m.type == :casgn and m.children[0] == nil
           # class constant
+          visible[m.children[1]] = name
           s(:send, name, "#{m.children[1]}=", *m.children[2..-1])
         elsif m.type == :alias
           s(:send, s(:attr, name, :prototype),
@@ -182,13 +186,19 @@ module Ruby2JS
         # save class name
         class_name, @class_name = @class_name, name
         class_parent, @class_parent = @class_parent, inheritance
+
         # inhibit ivar substitution within a class definition.  See ivars.rb
         ivars, self.ivars = self.ivars, nil
+
+        # add locally visible interfaces to rbstack.  See send.rb, const.rb
+        @rbstack.push visible
+
         parse s(:begin, *body.compact)
       ensure
         self.ivars = ivars
         @class_name = class_name
         @class_parent = class_parent
+        @rbstack.pop
       end
     end
 

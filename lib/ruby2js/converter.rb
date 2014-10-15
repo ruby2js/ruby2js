@@ -24,6 +24,7 @@ module Ruby2JS
       @nl = ''
       @ws = ' '
       @varstack = []
+      @rbstack = []
       @width = 80
       @next_token = :return
 

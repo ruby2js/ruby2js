@@ -613,7 +613,18 @@ describe Ruby2JS do
       to_js('def method; return self.foo; end').
         must_equal 'function method() {return this.foo}'
     end
-    
+
+    it "should prefix intra-method calls with 'this.'" do
+      to_js('class C; def m1; end; def m2; m1; end; end').
+        must_equal 'function C() {}; C.prototype = ' +
+          '{get m1() {}, get m2() {return this.m1}}'
+    end
+
+    it "should prefix class constants referenced in methods by class name" do
+      to_js('class C; X = 1; def m; X; end; end').
+        must_equal 'function C() {}; C.X = 1; C.prototype = {get m() {C.X}}'
+    end
+
     it "should insert var self = this when needed" do
       to_js('class C; def m; list.each do; @ivar; end; end; end').
         must_equal 'function C() {}; C.prototype = {get m() {var self = this; return list.each(function() {self._ivar})}}'
