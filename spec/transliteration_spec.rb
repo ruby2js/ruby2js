@@ -387,6 +387,16 @@ describe Ruby2JS do
         must_equal 'var a = 0; for (var i = 1; i < 4; i++) {a += i}'
     end
 
+    it "should handle a stepped range with an inclusive range" do
+      to_js( 'a = 0; (1..3).step(2) {|i| a += i}' ).
+        must_equal 'var a = 0; for (var i = 1; i <= 3; i += 2) {a += i}'
+    end
+
+    it "should handle a stepped range with an exclusive range" do
+      to_js( 'a = 0; (1...4).step(2) {|i| a += i}' ).
+        must_equal 'var a = 0; for (var i = 1; i < 4; i += 2) {a += i}'
+    end
+
     it "should handle break" do
       to_js( 'while true; break; end' ).must_equal 'while (true) {break}'
     end
