@@ -130,10 +130,15 @@ filters are selected, they will all be applied in parallel in one pass through
 the script.
 
 * [strict](https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/strict.rb)
-  adds `'use strict';` to the output
+  adds `'use strict';` to the output.
 
 * [return](https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/return.rb)
-  adds `return` to the last expression in functions
+  adds `return` to the last expression in functions.
+
+* [camelCase](https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/camelCase.rb)
+  converts `underscore_case` to `camelCase`.  See
+  [camelCase_spec](https://github.com/rubys/ruby2js/blob/master/spec/camelCase_spec.rb)
+  for examples.
 
 * [functions](https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/functions.rb)
 

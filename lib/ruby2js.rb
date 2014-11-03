@@ -26,6 +26,9 @@ module Ruby2JS
       def on_sendw(node); on_send(node); end
       def on_undefined?(node); on_defined?(node); end
 
+      # provide a method so filters can call 'super'
+      def on_sym(node); node; end
+
       # convert map(&:symbol) to a block
       def on_send(node)
         if node.children.length > 2 and node.children.last.type == :block_pass

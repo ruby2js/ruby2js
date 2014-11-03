@@ -25,7 +25,8 @@ begin
     'minitest-jasmine' => 'ruby2js/filter/minitest-jasmine',
     'return'    => 'ruby2js/filter/return',
     'strict'    => 'ruby2js/filter/strict',
-    'underscore' => 'ruby2js/filter/underscore'
+    'underscore' => 'ruby2js/filter/underscore',
+    'camelCase' => 'ruby2js/filter/camelCase' # should be last
   }
 
   # allow filters to be selected based on the path
