@@ -69,6 +69,13 @@ describe 'not implemented' do
     todo("def bang!; end")
   end
 
+  it "regular expression back-references" do
+    todo("$&")
+    todo("$`")
+    todo("$'")
+    todo("$+")
+  end
+
   unless RUBY_VERSION =~ /^1/
     it "keyword splat" do
       todo( 'foo **bar' )

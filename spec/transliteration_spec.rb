@@ -45,6 +45,10 @@ describe Ruby2JS do
     it "should parse global variables" do
       to_js( "$a = 1" ).must_equal 'var $a = 1'
     end
+
+    it "should parse regular expression capture groups" do
+      to_js( "$1 == 1" ).must_equal '$1 == 1'
+    end
   end
   
   describe 'assign' do
