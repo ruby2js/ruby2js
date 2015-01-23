@@ -690,6 +690,10 @@ describe Ruby2JS do
     it "should handle class new" do
       to_js( 'Date.new' ).must_equal 'new Date'
       to_js( 'Date.new()' ).must_equal 'new Date()'
+
+      # support a JavaScript-like syntax too.
+      to_js( 'new Date()' ).must_equal 'new Date()'
+      to_js( 'new Date' ).must_equal 'new Date'
     end
   end
 

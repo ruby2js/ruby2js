@@ -85,43 +85,54 @@ module Ruby2JS
       elsif method =~ /=$/
         "#{ parse receiver }#{ '.' if receiver }#{ method.to_s.sub(/=$/, ' =') } #{ parse args.first }"
 
-      elsif method == :new and receiver
-        # map Ruby's "Regexp" to JavaScript's "Regexp"
-        if receiver == s(:const, nil, :Regexp)
-          receiver = s(:const, nil, :RegExp)
-        end
-
-        # allow a RegExp to be constructed from another RegExp
-        if receiver == s(:const, nil, :RegExp)
-          if args.first.type == :regexp
-            opts = ''
-            if args.first.children.last.children.length > 0
-              opts = args.first.children.last.children.join
-            end
-
-            if args.length > 1
-              opts += args.last.children.last
-            end
-
-            return parse s(:regexp, *args.first.children[0...-1],
-              s(:regopt, *opts.split('').map(&:to_sym)))
-          elsif args.first.type == :str
-            if args.length == 2 and args[1].type == :str
-              opts = args[1].children[0]
-            else
-              opts = ''
-            end
-            return parse s(:regexp, args.first,
-              s(:regopt, *opts.each_char.map {|c| c}))
+      elsif method == :new
+        if receiver
+          # map Ruby's "Regexp" to JavaScript's "Regexp"
+          if receiver == s(:const, nil, :Regexp)
+            receiver = s(:const, nil, :RegExp)
           end
-        end
 
-        args = args.map {|a| parse a}.join(', ')
+          # allow a RegExp to be constructed from another RegExp
+          if receiver == s(:const, nil, :RegExp)
+            if args.first.type == :regexp
+              opts = ''
+              if args.first.children.last.children.length > 0
+                opts = args.first.children.last.children.join
+              end
 
-        if ast.is_method?
-          "new #{ parse receiver }(#{ args })"
+              if args.length > 1
+                opts += args.last.children.last
+              end
+
+              return parse s(:regexp, *args.first.children[0...-1],
+                s(:regopt, *opts.split('').map(&:to_sym)))
+            elsif args.first.type == :str
+              if args.length == 2 and args[1].type == :str
+                opts = args[1].children[0]
+              else
+                opts = ''
+              end
+              return parse s(:regexp, args.first,
+                s(:regopt, *opts.each_char.map {|c| c}))
+            end
+          end
+
+          args = args.map {|a| parse a}.join(', ')
+
+          if ast.is_method?
+            "new #{ parse receiver }(#{ args })"
+          else
+            "new #{ parse receiver }"
+          end
+        elsif args.length == 1 and args.first.type == :send
+          # accommodation for JavaScript like new syntax w/argument list
+          parse s(:send, s(:const, nil, args.first.children[1]), :new,
+            *args.first.children[2..-1]), @state
+        elsif args.length == 1 and args.first.type == :const
+          # accommodation for JavaScript like new syntax w/o argument list
+          parse s(:attr, args.first, :new), @state
         else
-          "new #{ parse receiver }"
+          raise NotImplementedError, "use of JavaScript keyword new"
         end
 
       elsif method == :raise and receiver == nil
