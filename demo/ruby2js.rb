@@ -24,6 +24,7 @@ begin
     'jquery'    => 'ruby2js/filter/jquery',
     'minitest-jasmine' => 'ruby2js/filter/minitest-jasmine',
     'return'    => 'ruby2js/filter/return',
+    'react'     => 'ruby2js/filter/react',
     'strict'    => 'ruby2js/filter/strict',
     'underscore' => 'ruby2js/filter/underscore',
     'camelCase' => 'ruby2js/filter/camelCase' # should be last
