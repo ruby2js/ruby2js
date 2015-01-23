@@ -45,7 +45,7 @@ describe Ruby2JS::Filter::AngularRB do
 
       js = <<-JS.gsub!(/^ {8}/, '').chomp
         (function() {
-          const PhonecatApp = angular.module("PhonecatApp", []);
+          var PhonecatApp = angular.module("PhonecatApp", []);
 
           PhonecatApp.controller("foo", function() {
 

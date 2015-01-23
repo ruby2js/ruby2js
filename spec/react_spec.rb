@@ -11,7 +11,7 @@ describe Ruby2JS::Filter::React do
   describe :createClass do
     it "should create classes" do
       to_js( 'class Foo<React; end' ).
-        must_equal 'const Foo = React.createClass({displayName: "Foo"})'
+        must_equal 'var Foo = React.createClass({displayName: "Foo"})'
     end
 
     it "should create methods" do

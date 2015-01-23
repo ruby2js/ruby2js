@@ -59,7 +59,7 @@ describe Ruby2JS do
     end
 
     it "should parse constant assign" do
-      to_js( "PI = 3.14159" ).must_equal 'const PI = 3.14159'
+      to_js( "PI = 3.14159" ).must_equal 'var PI = 3.14159'
     end
 
     it "should not output var if variable is allready declared within a context" do
@@ -673,7 +673,7 @@ describe Ruby2JS do
   describe 'module definition' do
     it "should handle module definitions" do
       to_js( 'module A; B=1; end' ).
-        must_equal 'A = function() {const B = 1; return {B: B}}()'
+        must_equal 'A = function() {var B = 1; return {B: B}}()'
       to_js( 'module A; def b; return 1; end; end' ).
         must_equal 'A = function() {function b() {return 1}; return {b: b}}()'
       to_js( 'module A; class B; def initialize; @c=1; end; end; end' ).
@@ -682,7 +682,7 @@ describe Ruby2JS do
 
     it "should handle private sections" do
       to_js( 'module A; B=1; private; C=1; end' ).
-        must_equal 'A = function() {const B = 1; const C = 1; return {B: B}}()'
+        must_equal 'A = function() {var B = 1; var C = 1; return {B: B}}()'
     end
   end
 

@@ -7,7 +7,7 @@ module Ruby2JS
     handle :casgn do |cbase, var, value|
       begin
         var = "#{ parse cbase }.var" if cbase
-        "const #{ var } = #{ parse value }"
+        "var #{ var } = #{ parse value }"
       ensure
         @vars[var] = true
       end
