@@ -49,7 +49,7 @@ get '/' do
     _script_ do
       converter = Showdown.new.converter()
 
-      class CommentBlock < React
+      class Comment < React
         def render
           rawMarkup = converter.makeHtml(@@children.toString())
           _div.comment do
@@ -63,7 +63,7 @@ get '/' do
         def render
           _div.commentList do
             @@data.forEach do |comment|
-              _CommentBlock comment.text, author: comment.author
+              _Comment comment.text, author: comment.author
             end
           end
         end
