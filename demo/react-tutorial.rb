@@ -2,7 +2,7 @@
 # Ruby using Sinatra and Wunderbar.
 #
 # Key differences:
-#  * Classes named Comment do bad things, at least in Firefox and Chome.
+#  * Classes named Comment do bad things, at least in Firefox and Chrome.
 #    https://developer.mozilla.org/en-US/docs/Web/API/Comment
 #  * Vanilla JS is used in place of jQuery.  http://vanilla-js.com/
 #  * A modicum of CSS styling is added.
@@ -73,14 +73,14 @@ get '/' do
         def handleSubmit(e)
           e.preventDefault()
 
-          author = $author.getDOMNode().value.trim()
+          author = ~author.value.trim()
           text = ~text.value.trim()
           return unless text and author
 
           @@onCommentSubmit.(author: author, text: text)
 
-          $author.getDOMNode().value = ''
-          $text.getDOMNode().value = ''
+          ~author.value = ''
+          ~text.value = ''
         end
 
         def render
