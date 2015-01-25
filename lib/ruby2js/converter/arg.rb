@@ -10,5 +10,12 @@ module Ruby2JS
       raise NotImplementedError, "argument #{ unknown.inspect }" if unknown
       arg
     end
+
+    # (shadowarg :a)
+
+    handle :shadowarg do |arg, unknown=nil|
+      raise NotImplementedError, "argument #{ unknown.inspect }" if unknown
+      nil
+    end
   end
 end

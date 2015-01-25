@@ -186,7 +186,7 @@ module Ruby2JS
 
             begin
               if simple
-                # in the normal case, each process each argument
+                # in the normal case, process each argument
                 reactApply, @reactApply = @reactApply, false
                 params += args.map {|arg| process(arg)}
               else
@@ -196,13 +196,14 @@ module Ruby2JS
                 # will look something like the following:
                 #
                 #   React.createElement(*proc {
-                #     $_ = ['tag', hash]
+                #     var $_ = ['tag', hash]
                 #     $_.push(React.createElement(...))
                 #   }())
                 #
                 # Base Ruby2JS processing will convert the 'splat' to 'apply'
                 params = [s(:splat, s(:send, s(:block, s(:send, nil, :proc), 
-                  s(:args), s(:begin, s(:lvasgn, :$_, s(:array, *params)),
+                  s(:args, s(:shadowarg, :$_)), s(:begin, 
+                  s(:lvasgn, :$_, s(:array, *params)),
                   *args.map {|arg| process arg},
                   s(:return, s(:lvar, :$_)))), :[]))]
               end

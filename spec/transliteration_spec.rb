@@ -454,6 +454,10 @@ describe Ruby2JS do
       to_js( 'a = 1; lambda { a = 2; b = 1}').must_equal 'var a = 1; function() {a = 2; var b = 1}'
     end
 
+    it "should handle shadow args" do
+      to_js( 'a = 1; lambda {|;a| a = 2}').must_equal 'var a = 1; function() {var a = 2}'
+    end
+
     it "named functions aren't closures" do
       to_js( 'a = 1; def f; a = 2; b = 1; end').
         must_equal 'var a = 1; function f() {var a = 2; var b = 1}'

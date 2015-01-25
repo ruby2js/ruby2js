@@ -23,10 +23,6 @@ describe 'not implemented' do
     todo( '::Foo' )
   end
 
-  it "shadow arguments" do
-    todo(' proc {|;a|} ')
-  end
-
   it "decomposition" do
     todo( 'def f(a, (foo, *bar)); end' )
   end

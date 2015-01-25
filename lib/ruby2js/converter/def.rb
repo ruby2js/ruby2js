@@ -79,7 +79,12 @@ module Ruby2JS
               s(:lvasgn, argname, value), nil)
             body = s(:begin, default, *body.children)
           end
-          vars[arg.children.first] = true
+
+          if arg.type == :shadowarg
+            vars.delete(arg.children.first)
+          else
+            vars[arg.children.first] = true
+          end
         end
       end
 

@@ -7,7 +7,7 @@ module Ruby2JS
    #   (blockarg :c))
 
     handle :args do |*args|
-      args.map { |arg| parse arg }.join(', ')
+      args.map { |arg| parse arg }.compact.join(', ')
     end
   end
 end
