@@ -216,6 +216,9 @@ module Ruby2JS
             params << process(text)
           end
 
+          # trim trailing null if no text or children
+          params.pop if params.last == s(:nil)
+
           # construct element using params
           element = s(:send, s(:const, nil, :React), :createElement, *params)
 

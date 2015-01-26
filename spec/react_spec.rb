@@ -23,12 +23,12 @@ describe Ruby2JS::Filter::React do
   describe "Wunderbar/JSX processing" do
     it "should create elements for HTML tags" do
       to_js( 'class Foo<React; def render; _a; end; end' ).
-        must_include 'return React.createElement("a", null)'
+        must_include 'return React.createElement("a")'
     end
 
     it "should create elements for React Components" do
       to_js( 'class Foo<React; def render; _A; end; end' ).
-        must_include 'return React.createElement(A, null)'
+        must_include 'return React.createElement(A)'
     end
 
     it "should create elements with attributes and text" do
@@ -38,8 +38,7 @@ describe Ruby2JS::Filter::React do
 
     it "should create simple nested elements" do
       to_js( 'class Foo<React; def render; _a {_b}; end; end' ).
-        must_include ' React.createElement("a", null, ' +
-          'React.createElement("b", null))'
+        must_include ' React.createElement("a", null, React.createElement("b"))'
     end
 
     it "should create complex nested elements" do
@@ -156,7 +155,7 @@ describe Ruby2JS::Filter::React do
   describe 'react calls' do
     it 'should create elements' do
       to_js( 'React.render _Element, document.getElementById("sidebar")' ).
-        must_include 'React.createElement(Element, null)'
+        must_include 'React.createElement(Element)'
     end
   end
 
