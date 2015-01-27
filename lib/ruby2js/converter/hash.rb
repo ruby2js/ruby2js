@@ -11,10 +11,12 @@ module Ruby2JS
         raise NotImplementedError, "kwsplat" if node.type == :kwsplat
 
         begin
-          block_depth = @block_depth
+          block_depth, block_this, block_hash = @block_depth, @block_this, false
           left, right = node.children
 
-          @block_depth = 0 if Hash === right or right.type == :block
+          if Hash === right or right.type == :block
+            @block_depth, block_hash = 0, true
+          end
 
           if left.type == :prop
             result = []
@@ -34,7 +36,10 @@ module Ruby2JS
           end
 
         ensure
-          @block_depth = block_depth
+          if block_hash
+            @block_depth = block_depth
+            @block_this = block_this
+          end
         end
       end
 

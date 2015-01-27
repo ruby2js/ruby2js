@@ -95,6 +95,7 @@ module Ruby2JS
         body = scope body, vars
         if @block_this and @block_depth == 1
           body = "var self = this#{@sep}#{body}"
+          @block_this = false
         end
 
         "function#{ " #{name}" if name }(#{ parse args }) {#{nl}#{ body }#{nl}}"
