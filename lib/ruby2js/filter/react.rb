@@ -68,13 +68,19 @@ module Ruby2JS
       end
 
       def on_send(node)
-        # enable React filtering within React class method calls
-        if node.children.first == s(:const, nil, :React)
-          begin
-            react, @react = @react, true
-            return super
-          ensure
-            @react = react
+        if not @react
+          # enable React filtering within React class method calls or
+          # React component calls
+          if 
+            node.children.first == s(:const, nil, :React) or
+            node.children.first == nil and node.children[1] =~ /^_[A-Z]/
+          then
+            begin
+              @react = true
+              return on_send(node)
+            ensure
+              @react = false
+            end
           end
         end
 
@@ -347,8 +353,31 @@ module Ruby2JS
 
       # convert blocks to proc arguments
       def on_block(node)
+        if not @react
+          # enable React filtering on React component calls
+          if 
+            node.children[0].children[0] == nil and 
+            node.children[0].children[1] =~ /^_[A-Z]/
+          then
+            begin
+              @react = true
+              return on_block(node)
+            ensure
+              @react = false
+            end
+          end
+        end
+
         return super unless @react
-        return super unless node.children[1].children.empty?
+
+        # iterate over Enumerable arguments
+        unless node.children[1].children.empty?
+          send = node.children.first.children
+          return super if send.length < 3
+          return process s(:block, s(:send, *send[0..1], *send[3..-1]),
+            s(:args), s(:block, s(:send, send[2], :forEach),
+            *node.children[1..-1]))
+        end
 
         # traverse through potential "css proxy" style method calls
         child = node.children.first
@@ -359,8 +388,7 @@ module Ruby2JS
 
         # append block as a standalone proc to wunderbar style method call
         if child.children[0] == nil and child.children[1] =~ /^_\w/
-          block = s(:block, s(:send, nil, :proc), 
-            s(:args, s(:arg, :_index), s(:arg, :_parent)),
+          block = s(:block, s(:send, nil, :proc), s(:args),
             *node.children[2..-1])
           return on_send s(:send, *node.children.first.children, block)
         end

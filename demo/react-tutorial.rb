@@ -61,10 +61,8 @@ get '/' do
 
       class CommentList < React
         def render
-          _div.commentList do
-            @@data.forEach do |comment|
-              _Comment comment.text, author: comment.author
-            end
+          _div.commentList @@data do |comment|
+            _Comment comment.text, author: comment.author
           end
         end
       end

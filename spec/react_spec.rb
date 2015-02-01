@@ -51,6 +51,18 @@ describe Ruby2JS::Filter::React do
       result.must_include '}())'
     end
 
+    it "should iterate" do
+      result = to_js('class Foo<React; def render; _ul list ' + 
+        'do |i| _li i; end; end; end')
+
+      result.must_include 'React.createElement.apply(React, function() {'
+      result.must_include 'var $_ = ["ul", null];'
+      result.must_include 'list.forEach(function(i)'
+      result.must_include '{$_.push(React.createElement("li", null, i))}'
+      result.must_include 'return $_'
+      result.must_include '}())'
+    end
+
     it "should handle text nodes" do
       to_js( 'class Foo<React; def render; _a {_ "hi"}; end; end' ).
         must_include 'return React.createElement("a", null, "hi")'
