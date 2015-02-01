@@ -46,6 +46,15 @@ require 'ruby2js/filter/functions'
 puts Ruby2JS.convert('"2A".to_i(16)')
 ```
 
+With [ExecJS](https://github.com/sstephenson/execjs):
+```ruby
+require 'ruby2js/execjs'
+require 'date'
+
+context = Ruby2JS.compile(Date.today.strftime('d = new Date(%Y, %-m, %-d)'))
+puts context.eval('d.getYear()')+1900
+```
+
 Conversions can be explored interactively using the
 [demo](https://github.com/rubys/ruby2js/blob/master/demo/ruby2js.rb) provided.
 
