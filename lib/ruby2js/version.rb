@@ -1,8 +1,8 @@
 module Ruby2JS
   module VERSION #:nodoc:
     MAJOR = 1
-    MINOR = 12
-    TINY  = 2
+    MINOR = 13
+    TINY  = 0
 
     STRING = [MAJOR, MINOR, TINY].join('.')
   end
