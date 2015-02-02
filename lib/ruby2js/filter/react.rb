@@ -370,8 +370,13 @@ module Ruby2JS
 
         return super unless @react
 
-        # iterate over Enumerable arguments
-        unless node.children[1].children.empty?
+        # iterate over Enumerable arguments if (a) node is a createElement
+        # type of call, and (b) there are args present
+        if
+          node.children.first.children[0] == nil and
+          node.children.first.children[1] =~ /^_/ and
+          not node.children[1].children.empty?
+        then
           send = node.children.first.children
           return super if send.length < 3
           return process s(:block, s(:send, *send[0..1], *send[3..-1]),
