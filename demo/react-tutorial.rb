@@ -2,8 +2,6 @@
 # Ruby using Sinatra and Wunderbar.
 #
 # Key differences:
-#  * Classes named Comment do bad things, at least in Firefox and Chrome.
-#    https://developer.mozilla.org/en-US/docs/Web/API/Comment
 #  * Vanilla JS is used in place of jQuery.  http://vanilla-js.com/
 #  * A modicum of CSS styling is added.
 #
