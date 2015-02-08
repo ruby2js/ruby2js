@@ -144,6 +144,11 @@ the script.
 * [return](https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/return.rb)
   adds `return` to the last expression in functions.
 
+* [require](https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/require.rb)
+  supports `require` and `require_relative` statements.  Contents of files
+  that are required are converted to JavaScript and expanded inline.
+  `require` function calls in expressions are left alone.
+
 * [camelCase](https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/camelCase.rb)
   converts `underscore_case` to `camelCase`.  See
   [camelCase_spec](https://github.com/rubys/ruby2js/blob/master/spec/camelCase_spec.rb)

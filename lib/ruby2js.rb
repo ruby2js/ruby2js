@@ -15,6 +15,10 @@ module Ruby2JS
     class Processor < Parser::AST::Processor
       BINARY_OPERATORS = Converter::OPERATORS[2..-1].flatten
 
+      def options=(options)
+        @options = options
+      end
+
       # handle all of the 'invented' ast types
       def on_attr(node); on_send(node); end
       def on_autoreturn(node); on_return(node); end
@@ -54,6 +58,7 @@ module Ruby2JS
       file,line = source.source_location
       source = File.read(file.dup.untaint).untaint
       ast = find_block( parse(source), line )
+      options[:file] = file
     elsif Parser::AST::Node === source
       ast = source
       source = ast.loc.expression.source_buffer.source
@@ -68,7 +73,9 @@ module Ruby2JS
       filters.reverse.each do |mod|
         filter = Class.new(filter) {include mod} 
       end
-      ast = filter.new.process(ast)
+      filter = filter.new
+      filter.options = options
+      ast = filter.process(ast)
     end
 
     ruby2js = Ruby2JS::Converter.new( ast )
