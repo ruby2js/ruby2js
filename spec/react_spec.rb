@@ -5,7 +5,7 @@ require 'ruby2js/filter/react'
 describe Ruby2JS::Filter::React do
   
   def to_js(string)
-    Ruby2JS.convert(string, filters: [Ruby2JS::Filter::React])
+    Ruby2JS.convert(string, filters: [Ruby2JS::Filter::React], scope: self)
   end
   
   describe :createClass do
@@ -168,6 +168,13 @@ describe Ruby2JS::Filter::React do
     it 'should create elements' do
       to_js( 'React.render _Element, document.getElementById("sidebar")' ).
         must_include 'React.createElement(Element)'
+    end
+
+    it 'should substitute scope instance variables / props' do
+      @data = 5
+      to_js( "React.render _Element(data: @data),
+        document.getElementById('sidebar')" ).
+        must_include 'React.createElement(Element, {data: 5})'
     end
   end
 

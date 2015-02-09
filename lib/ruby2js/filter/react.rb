@@ -46,6 +46,7 @@ module Ruby2JS
 
         begin
           react, @react = @react, true
+          reactClass, @reactClass = @reactClass, true
 
           # automatically capture the displayName for the class
           pairs = [s(:pair, s(:sym, :displayName), 
@@ -60,6 +61,7 @@ module Ruby2JS
           end
         ensure
           @react = react
+          @reactClass = reactClass
         end
 
         # emit a createClass statement
@@ -403,13 +405,13 @@ module Ruby2JS
 
       # convert global variables to refs
       def on_gvar(node)
-        return super unless @react
+        return super unless @reactClass
         s(:attr, s(:attr, s(:self), :refs), node.children.first.to_s[1..-1])
       end
 
       # convert instance variables to state
       def on_ivar(node)
-        return super unless @react
+        return super unless @reactClass
         s(:attr, s(:attr, s(:self), :state), node.children.first.to_s[1..-1])
       end
 

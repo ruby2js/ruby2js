@@ -85,6 +85,10 @@ module Ruby2JS
     if ruby2js.binding and not ruby2js.ivars
       ruby2js.ivars = ruby2js.binding.eval \
         'Hash[instance_variables.map {|var| [var, instance_variable_get(var)]}]'
+    elsif options[:scope] and not ruby2js.ivars
+      scope = options.delete(:scope)
+      ruby2js.ivars = Hash[scope.instance_variables.map {|var|
+        [var, scope.instance_variable_get(var)]}]
     end
 
     ruby2js.width = options[:width] if options[:width]
