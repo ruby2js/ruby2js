@@ -1,0 +1,12 @@
+source 'https://rubygems.org'
+
+gem 'rake'
+gem 'wunderbar', '>= 0.23.0'
+gem 'ruby2js', '>= 1.13.1'
+gem 'sinatra'
+gem 'nokogumbo'
+gem 'execjs'
+
+group :demo do
+  gem 'puma'
+end
