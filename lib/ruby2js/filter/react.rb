@@ -372,11 +372,17 @@ module Ruby2JS
 
         return super unless @react
 
+        # traverse through potential "css proxy" style method calls
+        child = node.children.first
+        test = child.children.first
+        while test and test.type == :send and not test.is_method?
+          child, test = test, test.children.first
+        end
+
         # iterate over Enumerable arguments if (a) node is a createElement
         # type of call, and (b) there are args present
         if
-          node.children.first.children[0] == nil and
-          node.children.first.children[1] =~ /^_/ and
+          child.children[0] == nil and child.children[1] =~ /^_/ and
           not node.children[1].children.empty?
         then
           send = node.children.first.children
@@ -384,13 +390,6 @@ module Ruby2JS
           return process s(:block, s(:send, *send[0..1], *send[3..-1]),
             s(:args), s(:block, s(:send, send[2], :forEach),
             *node.children[1..-1]))
-        end
-
-        # traverse through potential "css proxy" style method calls
-        child = node.children.first
-        test = child.children.first
-        while test and test.type == :send and not test.is_method?
-          child, test = test, test.children.first
         end
 
         # append block as a standalone proc to wunderbar style method call
