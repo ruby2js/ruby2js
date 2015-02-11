@@ -5,7 +5,7 @@ require 'ruby2js/filter/react'
 describe Ruby2JS::Filter::React do
   
   def to_js(string)
-    Ruby2JS.convert(string, filters: [Ruby2JS::Filter::React])
+    Ruby2JS.convert(string, filters: [Ruby2JS::Filter::React], scope: self)
   end
   
   describe :createClass do
@@ -57,6 +57,18 @@ describe Ruby2JS::Filter::React do
 
       result.must_include 'React.createElement.apply(React, function() {'
       result.must_include 'var $_ = ["ul", null];'
+      result.must_include 'list.forEach(function(i)'
+      result.must_include '{$_.push(React.createElement("li", null, i))}'
+      result.must_include 'return $_'
+      result.must_include '}())'
+    end
+
+    it "should iterate with markaby style classes/ids" do
+      result = to_js('class Foo<React; def render; _ul.todos list ' + 
+        'do |i| _li i; end; end; end')
+
+      result.must_include 'React.createElement.apply(React, function() {'
+      result.must_include 'var $_ = ["ul", {className: "todos"}];'
       result.must_include 'list.forEach(function(i)'
       result.must_include '{$_.push(React.createElement("li", null, i))}'
       result.must_include 'return $_'
@@ -168,6 +180,13 @@ describe Ruby2JS::Filter::React do
     it 'should create elements' do
       to_js( 'React.render _Element, document.getElementById("sidebar")' ).
         must_include 'React.createElement(Element)'
+    end
+
+    it 'should substitute scope instance variables / props' do
+      @data = 5
+      to_js( "React.render _Element(data: @data),
+        document.getElementById('sidebar')" ).
+        must_include 'React.createElement(Element, {data: 5})'
     end
   end
 

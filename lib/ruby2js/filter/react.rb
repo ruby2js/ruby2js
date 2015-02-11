@@ -46,6 +46,7 @@ module Ruby2JS
 
         begin
           react, @react = @react, true
+          reactClass, @reactClass = @reactClass, true
 
           # automatically capture the displayName for the class
           pairs = [s(:pair, s(:sym, :displayName), 
@@ -60,6 +61,7 @@ module Ruby2JS
           end
         ensure
           @react = react
+          @reactClass = reactClass
         end
 
         # emit a createClass statement
@@ -370,11 +372,17 @@ module Ruby2JS
 
         return super unless @react
 
+        # traverse through potential "css proxy" style method calls
+        child = node.children.first
+        test = child.children.first
+        while test and test.type == :send and not test.is_method?
+          child, test = test, test.children.first
+        end
+
         # iterate over Enumerable arguments if (a) node is a createElement
         # type of call, and (b) there are args present
         if
-          node.children.first.children[0] == nil and
-          node.children.first.children[1] =~ /^_/ and
+          child.children[0] == nil and child.children[1] =~ /^_/ and
           not node.children[1].children.empty?
         then
           send = node.children.first.children
@@ -382,13 +390,6 @@ module Ruby2JS
           return process s(:block, s(:send, *send[0..1], *send[3..-1]),
             s(:args), s(:block, s(:send, send[2], :forEach),
             *node.children[1..-1]))
-        end
-
-        # traverse through potential "css proxy" style method calls
-        child = node.children.first
-        test = child.children.first
-        while test and test.type == :send and not test.is_method?
-          child, test = test, test.children.first
         end
 
         # append block as a standalone proc to wunderbar style method call
@@ -403,13 +404,13 @@ module Ruby2JS
 
       # convert global variables to refs
       def on_gvar(node)
-        return super unless @react
+        return super unless @reactClass
         s(:attr, s(:attr, s(:self), :refs), node.children.first.to_s[1..-1])
       end
 
       # convert instance variables to state
       def on_ivar(node)
-        return super unless @react
+        return super unless @reactClass
         s(:attr, s(:attr, s(:self), :state), node.children.first.to_s[1..-1])
       end
 
