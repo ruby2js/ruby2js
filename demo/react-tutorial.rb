@@ -2,15 +2,18 @@
 # Ruby using Sinatra and Wunderbar.
 #
 # Key differences:
+#  * Server side rendering is performed, enabling this application to
+#    degrade gracefully even if JavaScript is disabled
 #  * Vanilla JS is used in place of jQuery.  http://vanilla-js.com/
+#  * marked is used instead of showdown
 #  * A modicum of CSS styling is added.
 #
 # While this is a complete application (client+server) in one source file,
 # more typically Sinatra views would be split out to a separate file.
 
-require 'wunderbar/sinatra'
-require 'wunderbar/script'
-require 'ruby2js/filter/react'
+require 'sinatra'
+require 'wunderbar/react'
+require 'wunderbar/marked'
 
 data = []
 
@@ -26,11 +29,16 @@ post '/comments.json' do
   end
 end
 
+post '/' do
+  data << {author: params[:author], text: params[:text]}
+  call env.merge('REQUEST_METHOD' => 'GET')
+end
+
 get '/' do
+  @data = data
+
   _html do
     _title 'Hello React'
-    _script src: 'http://fb.me/react-0.12.2.js'
-    _script src: 'http://cdnjs.cloudflare.com/ajax/libs/showdown/0.3.1/showdown.min.js'
     _style %{
       fieldset input, fieldset textarea {
         display: block;
@@ -45,11 +53,9 @@ get '/' do
     _div.content!
 
     _script_ do
-      converter = Showdown.new.converter()
-
       class Comment < React
         def render
-          rawMarkup = converter.makeHtml(@@children.toString())
+          rawMarkup = marked(@@children.toString())
           _div.comment do
             _h2.commentAuthor @@author
             _span dangerouslySetInnerHTML: {__html: rawMarkup}
@@ -80,11 +86,13 @@ get '/' do
         end
 
         def render
-          _form.commentForm onSubmit: self.handleSubmit do
+          _form.commentForm method: 'POST', onSubmit: self.handleSubmit do
             _fieldset do
               _legend 'Enter new comment'
-              _input type: 'text', placeholder: 'Your name', ref: 'author'
-              _textarea rows: 8, placeholder: 'Say something...', ref: 'text'
+              _input ref: 'author', name: 'author',
+                placeholder: 'Your name'
+              _textarea rows: 8, ref: 'text', name: 'text',
+                placeholder: 'Say something...'
               _input type: 'submit', value: 'Post'
             end
           end
@@ -95,8 +103,7 @@ get '/' do
         def loadCommentsFromServer()
           request = XMLHttpRequest.new()
           request.open('GET', @@url, true)
-          request.onreadystatechange = proc do
-            return unless request.readyState == 4 and request.status == 200
+          def request.onload()
             @data = JSON.parse(request.responseText)
           end
           request.send()
@@ -108,15 +115,14 @@ get '/' do
           request = XMLHttpRequest.new()
           request.open('POST', @@url, true)
           request.setRequestHeader('Content-type', 'application/json')
-          request.onreadystatechange = proc do
-            return unless request.readyState == 4 and request.status == 200
+          def request.onload()
             @data = JSON.parse(request.responseText)
           end
           request.send(JSON.stringify(comment))
         end
 
         def getInitialState()
-          return {data: []}
+          return {data: @@data}
         end
 
         def componentDidMount()
@@ -132,11 +138,10 @@ get '/' do
           end
         end
       end
+    end
 
-      React.render(
-        _CommentBox(url: 'comments.json', pollInterval: 2000), 
-        document.getElementById('content')
-      )
+    _.render '#content' do
+      _CommentBox data: @data, url: 'comments.json', pollInterval: 2000
     end
   end
 end
