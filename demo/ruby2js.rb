@@ -26,6 +26,7 @@ begin
     'return'    => 'ruby2js/filter/return',
     'require'   => 'ruby2js/filter/require',
     'react'     => 'ruby2js/filter/react',
+    'rubyjs'    => 'ruby2js/filter/rubyjs',
     'strict'    => 'ruby2js/filter/strict',
     'underscore' => 'ruby2js/filter/underscore',
     'camelCase' => 'ruby2js/filter/camelCase' # should be last
