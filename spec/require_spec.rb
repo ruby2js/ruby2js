@@ -11,7 +11,12 @@ describe Ruby2JS::Filter::Require do
   
   describe :statement do
     it "should handle require statements" do
-      to_js( 'require "require/test1.js"' ).
+      to_js( 'require "require/test1.rb"' ).
+        must_equal 'console.log("test2"); console.log("test3")'
+    end
+
+    it "should support implicit '.rb' extensions" do
+      to_js( 'require "require/test1"' ).
         must_equal 'console.log("test2"); console.log("test3")'
     end
   end

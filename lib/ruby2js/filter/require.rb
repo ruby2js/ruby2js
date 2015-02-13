@@ -38,6 +38,10 @@ module Ruby2JS
               filename.untaint 
             end
 
+            if not File.exist? filename and File.exist? filename+".rb"
+              filename += '.rb'
+            end
+
             @options[:file2] = filename
             process Ruby2JS.parse(File.read(filename))
           ensure
