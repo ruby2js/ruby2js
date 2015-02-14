@@ -203,7 +203,21 @@ the script.
       of `Error` instead; and default constructors will be provided
     * `loop do...end` will be replaced with `while (true) {...}`
 
-* [underscore](https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/underscore.rb)
+* [rubyjs](https://github.com/rubys/ruby2js/blob/master/spec/rubyjs_spec.rb)
+    * `.capitalize()` becomes `_s.capitalize()`
+    * `.center()` becomes `_s.center()`
+    * `.chomp()` becomes `_s.chomp()`
+    * `.ljust()` becomes `_s.ljust()`
+    * `.lstrip()` becomes `_s.lstrip()`
+    * `.rindex()` becomes `_s.rindex()`
+    * `.rjust()` becomes `_s.rjust()`
+    * `.rstrip()` becomes `_s.rstrip()`
+    * `.scan()` becomes `_s.scan()`
+    * `.strftime()` becomes `_t.strftime()`
+    * `.swapcase()` becomes `_s.swapcase()`
+    * `.tr()` becomes `_s.tr()`
+
+* [underscore](https://github.com/rubys/ruby2js/blob/master/spec/underscore.rb)
 
     * `.clone()` becomes `_.clone()`
     * `.compact()` becomes `_.compact()`
@@ -241,7 +255,7 @@ the script.
       expression: `reduce`, `sort_by`, `group_by`, `index_by`, `count_by`,
       `find`, `select`, `reject`.
 
-* [jquery](https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/jquery.rb)
+* [jquery](https://github.com/rubys/ruby2js/blob/master/spec/jquery.rb)
 
     * maps Ruby unary operator `~` to jQuery `$` function
     * maps Ruby attribute syntax to jquery attribute syntax
@@ -249,7 +263,7 @@ the script.
     * defaults the fourth parameter of $$.post to `"json"`, allowing Ruby block
       syntax to be used for the success function.
 
-* [angularrb](https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/angularrb.rb)
+* [angularrb](https://github.com/rubys/ruby2js/blob/master/spec/angularrb.rb)
 
     * maps Ruby `module` to `angular.module`
     * maps `filter`, `controller`, `factory`, and `directive` to calls to
@@ -282,7 +296,7 @@ the script.
     * adds implicit module `use` of `ngResource` when `$resource.new` calls
       are encountered
 
-* [minitest-jasmine](https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/minitest-jasmine.rb)
+* [minitest-jasmine](https://github.com/rubys/ruby2js/blob/master/spec/minitest-jasmine.rb)
     * maps subclasses of `Minitest::Test` to `describe` calls
     * maps `test_` methods inside subclasses of `Minitest::Test` to `it` calls
     * maps `setup`, `teardown`, `before`, and `after` calls to `beforeEach`
