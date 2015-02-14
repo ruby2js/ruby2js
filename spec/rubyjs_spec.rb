@@ -61,6 +61,17 @@ describe Ruby2JS::Filter::RubyJS do
     end
   end
 
+  describe 'filter bypass operations' do
+    it 'should handle functional style calls' do
+      to_js( '_s.capitalize("foo")').must_equal  '_s.capitalize("foo")'
+    end
+
+    it 'should leave alone classic ("OO") style chains' do
+      to_js( 'R("a").capitalize().lstrip()' ).
+        must_equal( 'R("a").capitalize().lstrip()' )
+    end
+  end
+
   describe Ruby2JS::Filter::DEFAULTS do
     it "should include Functions" do
       Ruby2JS::Filter::DEFAULTS.must_include Ruby2JS::Filter::Functions
