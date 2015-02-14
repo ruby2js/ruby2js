@@ -170,6 +170,7 @@ the script.
     * `.first(n)` becomes `.slice(0, n)`
     * `.gsub` becomes `replace //g`
     * `.include?` becomes `.indexOf() != -1`
+    * `.inspect` becomes `JSON.stringify()`
     * `.keys` becomes `Object.keys()`
     * `.last` becomes `[*.length-1]`
     * `.last(n)` becomes `.slice(*.length-1, *.length)`

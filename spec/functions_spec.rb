@@ -245,8 +245,12 @@ describe Ruby2JS::Filter::Functions do
     end
 
     it 'should handles loops' do
-      to_js( 'loop {sleep 1; break}').
+      to_js( 'loop {sleep 1; break}' ).
         must_equal 'while (true) {sleep(1); break}'
+    end
+
+    it 'should handles inspect' do
+      to_js( 'a.inspect' ).must_equal 'JSON.stringify(a)'
     end
   end
 

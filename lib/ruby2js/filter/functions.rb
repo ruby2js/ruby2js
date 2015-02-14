@@ -198,13 +198,15 @@ module Ruby2JS
         elsif method == :reverse! and node.is_method? 
           # input: a.reverse!
           # output: a.splice(0, a.length, *a.reverse)
-          target = node.children.first
           process s(:send, target, :splice, s(:int, 0), 
             s(:attr, target, :length), s(:splat, s(:send, target, 
             :"#{node.children[1].to_s[0..-2]}", *node.children[2..-1])))
 
         elsif method == :each_with_index
           process node.updated nil, [target, :forEach, *args]
+
+        elsif method == :inspect and args.length == 0
+          s(:send, s(:const, nil, :JSON), :stringify, process(target))
 
         else
           super
