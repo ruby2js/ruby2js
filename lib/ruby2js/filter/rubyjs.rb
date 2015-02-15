@@ -34,6 +34,41 @@ module Ruby2JS
           super
         end
       end
+
+      def on_block(node)
+        call, args, *block = node.children
+
+        if 
+          [:collect_concat, :count, :cycle, :drop_while, :each_slice,
+          :each_with_index, :each_with_object, :find, :find_all, :flat_map,
+          :inject, :grep, :group_by, :map, :max_by, :min_by, :one?, :partition, 
+          :reject, :reverse_each, :sort_by, :take_while].
+          include? call.children[1]
+        then
+          if 
+            [:collect_concat, :count, :drop_while, :find, :find_all, :flat_map,
+            :grep, :group_by, :map, :max_by, :min_by, :one?, :partition,
+            :reject, :sort_by, :take_while].
+            include? call.children[1]
+          then
+            block = [ s(:autoreturn, *block) ]
+          end
+
+          if call.children[1] == :find and call.children.length == 2
+            call = s(:send, *call.children, s(:nil))
+          end
+
+          if call.children[1] == :inject and call.children.length == 3
+            call = s(:send, *call.children, s(:nil))
+          end
+
+          s(:block, s(:send, s(:lvar, :_e), call.children[1],
+            *process_all([call.children[0], *call.children[2..-1]])),
+            args, *block)
+        else
+          super
+        end
+      end
     end
 
     DEFAULTS.push RubyJS

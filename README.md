@@ -207,14 +207,36 @@ the script.
     * `.capitalize()` becomes `_s.capitalize()`
     * `.center()` becomes `_s.center()`
     * `.chomp()` becomes `_s.chomp()`
+    * `.collect_concat()` becomes `_e.collect_concat()`
+    * `.count()` becomes `_e.count()`
+    * `.cycle()` becomes `_e.cycle()`
+    * `.drop_while()` becomes `_e.drop_while()`
+    * `.each_slice()` becomes `_e.each_slice()`
+    * `.each_with_index()` becomes `_e.each_with_index()`
+    * `.each_with_object()` becomes `_e.each_with_object()`
+    * `.find_all()` becomes `_e.find_all()`
+    * `.find()` becomes `_e.find()`
+    * `.flat_map()` becomes `_e.flat_map()`
+    * `.grep()` becomes `_e.grep()`
+    * `.group_by()` becomes `_e.group_by()`
+    * `.inject()` becomes `_e.inject()`
     * `.ljust()` becomes `_s.ljust()`
     * `.lstrip()` becomes `_s.lstrip()`
+    * `.map()` becomes `_e.map()`
+    * `.max_by()` becomes `_e.max_by()`
+    * `.min_by()` becomes `_e.min_by()`
+    * `.one?()` becomes `_e.one()`
+    * `.partition()` becomes `_e.partition()`
+    * `.reject()` becomes `_e.reject()`
+    * `.reverse_each()` becomes `_e.reverse_each()`
     * `.rindex()` becomes `_s.rindex()`
     * `.rjust()` becomes `_s.rjust()`
     * `.rstrip()` becomes `_s.rstrip()`
     * `.scan()` becomes `_s.scan()`
+    * `.sort_by()` becomes `_e.sort_by()`
     * `.strftime()` becomes `_t.strftime()`
     * `.swapcase()` becomes `_s.swapcase()`
+    * `.take_while()` becomes `_e.take_while(`)
     * `.tr()` becomes `_s.tr()`
 
 * [underscore](https://github.com/rubys/ruby2js/blob/master/spec/underscore.rb)
