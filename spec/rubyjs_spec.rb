@@ -54,6 +54,104 @@ describe Ruby2JS::Filter::RubyJS do
     end
   end
 
+  describe 'Array conversions' do
+    it "should handle at" do
+      to_js( 'a.at(3)' ).must_equal '_a.at(a, 3)'
+    end
+
+    it "should handle compact" do
+      to_js( 'a.compact' ).must_equal '_a.compact(a)'
+    end
+
+    it "should handle compact!" do
+      to_js( 'a.compact!' ).must_equal '_a.compact_bang(a)'
+    end
+
+    it "should handle delete_at" do
+      to_js( 'a.delete_at(3)' ).must_equal '_a.delete_at(a, 3)'
+    end
+
+    it "should handle delete_if" do
+      to_js( 'a.delete_if {|i| i<0}' ).
+        must_equal '_e.delete_if(a, function(i) {return i < 0})'
+    end
+
+    it "should handle each_index" do
+      to_js( 'a.each_index {|i| a[i]+=1}' ).
+        must_equal '_a.each_index(a, function(i) {a[i]++})'
+    end
+
+    it "should handle flatten" do
+      to_js( 'a.flatten' ).must_equal '_a.flatten(a)'
+    end
+
+    it "should handle insert" do
+      to_js( 'a.insert(i,3)' ).must_equal '_a.insert(a, i, 3)'
+    end
+
+    it "should handle keep_if" do
+      to_js( 'a.keep_if {|i| i<0}' ).
+        must_equal '_a.keep_if(a, function(i) {return i < 0})'
+    end
+
+    it "should handle reverse" do
+      to_js( 'a.reverse' ).must_equal '_a.reverse(a)'
+    end
+
+    it "should handle reverse!" do
+      to_js( 'a.reverse!' ).must_equal '_a.reverse_bang(a)'
+    end
+
+    it "should handle rotate" do
+      to_js( 'a.rotate(3)' ).must_equal '_a.rotate(a, 3)'
+    end
+
+    it "should handle rotate!" do
+      to_js( 'a.rotate!(3)' ).must_equal '_a.rotate_bang(a, 3)'
+    end
+
+    it "should handle select" do
+      to_js( 'a.select! {|i| i<0}' ).
+        must_equal '_a.select_bang(a, function(i) {return i < 0})'
+    end
+
+    it "should handle shift" do
+      to_js( 'a.shift(3)' ).must_equal '_a.shift(a, 3)'
+    end
+
+    it "should handle shuffle" do
+      to_js( 'a.shuffle' ).must_equal '_a.shuffle(a)'
+    end
+
+    it "should handle shuffle!" do
+      to_js( 'a.shuffle!' ).must_equal '_a.shuffle_bang(a)'
+    end
+
+    it "should handle slice" do
+      to_js( 'a.slice(i, 3)' ).must_equal '_a.slice(a, i, 3)'
+    end
+
+    it "should handle slice!" do
+      to_js( 'a.slice!(i, 3)' ).must_equal '_a.slice_bang(a, i, 3)'
+    end
+
+    it "should handle transpose" do
+      to_js( 'a.transpose' ).must_equal '_a.transpose(a)'
+    end
+
+    it "should handle uniq" do
+      to_js( 'a.uniq' ).must_equal '_a.uniq(a)'
+    end
+
+    it "should handle uniq_bang" do
+      to_js( 'a.uniq!' ).must_equal '_a.uniq_bang(a)'
+    end
+
+    it "should handle union" do
+      to_js( 'a.union(b)' ).must_equal '_a.union(a, b)'
+    end
+  end
+
   describe 'Enumerable conversions' do
     it "should handle collect_concat" do
       to_js( 'a.collect_concat {|i| i}' ).

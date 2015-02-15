@@ -25,6 +25,17 @@ module Ruby2JS
           s(:send, s(:lvar, :_s), node.children[1],
             *process_all([node.children[0], *node.children[2..-1]]))
 
+        elsif 
+          [:at, :compact, :compact!, :delete_at, :delete_at, :flatten, :insert,
+          :reverse, :reverse!, :rotate, :rotate, :rotate!, :shift, :shuffle,
+          :shuffle!, :slice, :slice!, :transpose, :union, :uniq, :uniq!]
+          .include? node.children[1]
+        then
+          # map selected array functions
+          s(:send, s(:lvar, :_a), node.children[1].to_s.sub("!", '_bang'),
+            *process_all([node.children[0], *node.children[2..-1]]))
+
+
         elsif [:strftime].include? node.children[1]
           # map selected time functions
           s(:send, s(:lvar, :_t), node.children[1],
@@ -39,30 +50,34 @@ module Ruby2JS
         call, args, *block = node.children
 
         if 
-          [:collect_concat, :count, :cycle, :drop_while, :each_slice,
-          :each_with_index, :each_with_object, :find, :find_all, :flat_map,
-          :inject, :grep, :group_by, :map, :max_by, :min_by, :one?, :partition, 
-          :reject, :reverse_each, :sort_by, :take_while].
-          include? call.children[1]
+          [:collect_concat, :count, :cycle, :delete_if, :drop_while,
+          :each_index, :each_slice, :each_with_index, :each_with_object,
+          :find, :find_all, :flat_map, :inject, :grep, :group_by, :keep_if,
+          :map, :max_by, :min_by, :one?, :partition, :reject, :reverse_each,
+          :select!, :sort_by, :take_while].include? call.children[1]
         then
           if 
-            [:collect_concat, :count, :drop_while, :find, :find_all, :flat_map,
-            :grep, :group_by, :map, :max_by, :min_by, :one?, :partition,
-            :reject, :sort_by, :take_while].
-            include? call.children[1]
+            [:collect_concat, :count, :delete_if, :drop_while, :find,
+            :find_all, :flat_map, :grep, :group_by, :keep_if, :map, :max_by,
+            :min_by, :one?, :partition, :reject, :select!, :sort_by,
+            :take_while].include? call.children[1]
           then
             block = [ s(:autoreturn, *block) ]
           end
 
+          lvar = [:each_index, :keep_if, :select!].
+            include?(call.children[1]) ? :_a : :_e
+
           if call.children[1] == :find and call.children.length == 2
             call = s(:send, *call.children, s(:nil))
-          end
-
-          if call.children[1] == :inject and call.children.length == 3
+          elsif call.children[1] == :inject and call.children.length == 3
             call = s(:send, *call.children, s(:nil))
+          elsif call.children[1] == :select!
+            call = s(:send, call.children.first, :select_bang,
+              *call.children[2..-1])
           end
 
-          s(:block, s(:send, s(:lvar, :_e), call.children[1],
+          s(:block, s(:send, s(:lvar, lvar), call.children[1],
             *process_all([call.children[0], *call.children[2..-1]])),
             args, *block)
         else

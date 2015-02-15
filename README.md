@@ -204,6 +204,29 @@ the script.
     * `loop do...end` will be replaced with `while (true) {...}`
 
 * [rubyjs](https://github.com/rubys/ruby2js/blob/master/spec/rubyjs_spec.rb)
+    * `.at()` becomes `_a.at()`
+    * `.compact()` becomes `_a.compact()`
+    * `.compact!()` becomes `_a.compact_bang()`
+    * `.delete_at()` becomes `_a.delete_at()`
+    * `.delete_if()` becomes `_a.delete_if()`
+    * `.each_index()` becomes `_e.each_index()`
+    * `.flatten()` becomes `_a.flatten()`
+    * `.insert()` becomes `_a.insert()`
+    * `.keep_if()` becomes `_a.keep_if()`
+    * `.reverse()` becomes `_a.reverse()`
+    * `.reverse!()` becomes `_a.reverse_bang()`
+    * `.rotate()` becomes `_a.rotate()`
+    * `.rotate!()` becomes `_a.rotate_bang()`
+    * `.select()` becomes `_a.select()`
+    * `.shift()` becomes `_a.shift()`
+    * `.shuffle()` becomes `_a.shuffle()`
+    * `.shuffle!()` becomes `_a.shuffle_bang()`
+    * `.slice()` becomes `_a.slice()`
+    * `.slice!()` becomes `_a.slice_bang()`
+    * `.transpose()` becomes `_a.transpose()`
+    * `.union()` becomes `_a.union()`
+    * `.uniq()` becomes `_a.uniq()`
+    * `.uniq!()` becomes `_a.uniq_bang()`
     * `.capitalize()` becomes `_s.capitalize()`
     * `.center()` becomes `_s.center()`
     * `.chomp()` becomes `_s.chomp()`
