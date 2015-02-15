@@ -279,6 +279,16 @@ describe Ruby2JS::Filter::RubyJS do
     end
   end
 
+  describe 'ranges' do
+    it "should handle inclusive ranges" do
+      to_js( '(1..9)' ).must_equal 'new R.Range(1, 9)'
+    end
+
+    it "should handle enclusive ranges" do
+      to_js( '(1...9)' ).must_equal 'new R.Range(1, 9, true)'
+    end
+  end
+
   describe 'filter bypass operations' do
     it 'should handle functional style calls' do
       to_js( '_s.capitalize("foo")').must_equal  '_s.capitalize("foo")'

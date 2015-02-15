@@ -263,6 +263,7 @@ the script.
     * `.uniq()` becomes `_a.uniq()`
     * `.uniq!()` becomes `_a.uniq_bang()`
     * `<=>` becomes `R.Comparable.cmp()`
+    * `(n..m)` becomes `R.Range.new()`
 
 * [underscore](https://github.com/rubys/ruby2js/blob/master/spec/underscore.rb)
 

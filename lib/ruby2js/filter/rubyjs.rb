@@ -92,6 +92,15 @@ module Ruby2JS
           super
         end
       end
+
+      def on_irange(node)
+        s(:send, s(:attr, s(:const, nil, :R), :Range), :new, *node.children)
+      end
+
+      def on_erange(node)
+        s(:send, s(:attr, s(:const, nil, :R), :Range), :new, *node.children,
+          s(:true))
+      end
     end
 
     DEFAULTS.push RubyJS

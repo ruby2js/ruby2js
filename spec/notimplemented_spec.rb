@@ -11,11 +11,13 @@ describe 'not implemented' do
 
   it "range inclusive" do
     # NOTE: for loops and filter/functions will handle the special case of array indexes
+    # NOTE: filter/rubyjs implements this
     todo( '1..2' )
   end
 
   it "range exclusive" do
     # NOTE: for loops and filter/functions will handle the special case of array indexes
+    # NOTE: filter/rubyjs implements this
     todo( '1...2' )
   end
 
