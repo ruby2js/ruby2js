@@ -205,44 +205,31 @@ the script.
 
 * [rubyjs](https://github.com/rubys/ruby2js/blob/master/spec/rubyjs_spec.rb)
     * `.at()` becomes `_a.at()`
-    * `.compact()` becomes `_a.compact()`
-    * `.compact!()` becomes `_a.compact_bang()`
-    * `.delete_at()` becomes `_a.delete_at()`
-    * `.delete_if()` becomes `_a.delete_if()`
-    * `.each_index()` becomes `_e.each_index()`
-    * `.flatten()` becomes `_a.flatten()`
-    * `.insert()` becomes `_a.insert()`
-    * `.keep_if()` becomes `_a.keep_if()`
-    * `.reverse()` becomes `_a.reverse()`
-    * `.reverse!()` becomes `_a.reverse_bang()`
-    * `.rotate()` becomes `_a.rotate()`
-    * `.rotate!()` becomes `_a.rotate_bang()`
-    * `.select()` becomes `_a.select()`
-    * `.shift()` becomes `_a.shift()`
-    * `.shuffle()` becomes `_a.shuffle()`
-    * `.shuffle!()` becomes `_a.shuffle_bang()`
-    * `.slice()` becomes `_a.slice()`
-    * `.slice!()` becomes `_a.slice_bang()`
-    * `.transpose()` becomes `_a.transpose()`
-    * `.union()` becomes `_a.union()`
-    * `.uniq()` becomes `_a.uniq()`
-    * `.uniq!()` becomes `_a.uniq_bang()`
+    * `.between?()` becomes `R().between()`
     * `.capitalize()` becomes `_s.capitalize()`
     * `.center()` becomes `_s.center()`
     * `.chomp()` becomes `_s.chomp()`
     * `.collect_concat()` becomes `_e.collect_concat()`
+    * `.compact()` becomes `_a.compact()`
+    * `.compact!()` becomes `_a.compact_bang()`
     * `.count()` becomes `_e.count()`
     * `.cycle()` becomes `_e.cycle()`
+    * `.delete_at()` becomes `_a.delete_at()`
+    * `.delete_if()` becomes `_a.delete_if()`
     * `.drop_while()` becomes `_e.drop_while()`
+    * `.each_index()` becomes `_e.each_index()`
     * `.each_slice()` becomes `_e.each_slice()`
     * `.each_with_index()` becomes `_e.each_with_index()`
     * `.each_with_object()` becomes `_e.each_with_object()`
     * `.find_all()` becomes `_e.find_all()`
     * `.find()` becomes `_e.find()`
     * `.flat_map()` becomes `_e.flat_map()`
+    * `.flatten()` becomes `_a.flatten()`
     * `.grep()` becomes `_e.grep()`
     * `.group_by()` becomes `_e.group_by()`
     * `.inject()` becomes `_e.inject()`
+    * `.insert()` becomes `_a.insert()`
+    * `.keep_if()` becomes `_a.keep_if()`
     * `.ljust()` becomes `_s.ljust()`
     * `.lstrip()` becomes `_s.lstrip()`
     * `.map()` becomes `_e.map()`
@@ -251,16 +238,31 @@ the script.
     * `.one?()` becomes `_e.one()`
     * `.partition()` becomes `_e.partition()`
     * `.reject()` becomes `_e.reject()`
+    * `.reverse()` becomes `_a.reverse()`
+    * `.reverse!()` becomes `_a.reverse_bang()`
     * `.reverse_each()` becomes `_e.reverse_each()`
     * `.rindex()` becomes `_s.rindex()`
     * `.rjust()` becomes `_s.rjust()`
+    * `.rotate()` becomes `_a.rotate()`
+    * `.rotate!()` becomes `_a.rotate_bang()`
     * `.rstrip()` becomes `_s.rstrip()`
     * `.scan()` becomes `_s.scan()`
+    * `.select()` becomes `_a.select()`
+    * `.shift()` becomes `_a.shift()`
+    * `.shuffle()` becomes `_a.shuffle()`
+    * `.shuffle!()` becomes `_a.shuffle_bang()`
+    * `.slice()` becomes `_a.slice()`
+    * `.slice!()` becomes `_a.slice_bang()`
     * `.sort_by()` becomes `_e.sort_by()`
     * `.strftime()` becomes `_t.strftime()`
     * `.swapcase()` becomes `_s.swapcase()`
     * `.take_while()` becomes `_e.take_while(`)
+    * `.transpose()` becomes `_a.transpose()`
     * `.tr()` becomes `_s.tr()`
+    * `.union()` becomes `_a.union()`
+    * `.uniq()` becomes `_a.uniq()`
+    * `.uniq!()` becomes `_a.uniq_bang()`
+    * `<=>` becomes `R.Comparable.cmp()`
 
 * [underscore](https://github.com/rubys/ruby2js/blob/master/spec/underscore.rb)
 

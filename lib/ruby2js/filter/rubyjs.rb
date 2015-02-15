@@ -41,6 +41,14 @@ module Ruby2JS
           s(:send, s(:lvar, :_t), node.children[1],
             *process_all([node.children[0], *node.children[2..-1]]))
 
+        elsif node.children[1] == :<=>
+          s(:send, s(:attr, s(:const, nil, :R), :Comparable), :cmp,
+            node.children[0], *node.children[2..-1])
+
+        elsif node.children[1] == :between?
+          s(:send, s(:send, nil, :R, node.children[0]), :between,
+            *node.children[2..-1])
+
         else
           super
         end

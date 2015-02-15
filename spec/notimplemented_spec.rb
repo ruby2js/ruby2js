@@ -72,6 +72,11 @@ describe 'not implemented' do
     todo("$+")
   end
 
+  it "<=>" do
+    # NOTE: filter/rubyjs implements this
+    todo("a<=>b")
+  end
+
   unless RUBY_VERSION =~ /^1/
     it "keyword splat" do
       todo( 'foo **bar' )

@@ -79,6 +79,9 @@ module Ruby2JS
       elsif method == :<< and args.length == 1 and @state == :statement
         "#{ parse receiver }.push(#{ parse args.first })"
 
+      elsif method == :<=>
+        raise NotImplementedError, "use of <=>"
+
       elsif OPERATORS.flatten.include?(method) and not LOGICAL.include?(method)
         "#{ group_receiver ? group(receiver) : parse(receiver) } #{ method } #{ group_target ? group(target) : parse(target) }"  
 

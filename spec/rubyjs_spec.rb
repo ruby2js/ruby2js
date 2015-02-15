@@ -269,6 +269,16 @@ describe Ruby2JS::Filter::RubyJS do
     end
   end
 
+  describe 'Comparable conversions' do
+    it "should handle <=>" do
+      to_js( '3 <=> 5' ).must_equal 'R.Comparable.cmp(3, 5)'
+    end
+
+    it "should between?" do
+      to_js( '3.between?(1,5)' ).must_equal 'R(3).between(1, 5)'
+    end
+  end
+
   describe 'filter bypass operations' do
     it 'should handle functional style calls' do
       to_js( '_s.capitalize("foo")').must_equal  '_s.capitalize("foo")'
