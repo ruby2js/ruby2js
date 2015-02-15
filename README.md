@@ -138,23 +138,23 @@ In general, making use of a filter is as simple as requiring it.  If multiple
 filters are selected, they will all be applied in parallel in one pass through
 the script.
 
-* [strict](https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/strict.rb)
+* <a id="strict" href="https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/strict.rb">strict</a>
   adds `'use strict';` to the output.
 
-* [return](https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/return.rb)
+* <a id="return" href="https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/return.rb">return</a>
   adds `return` to the last expression in functions.
 
-* [require](https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/require.rb)
+* <a id="require" href="https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/require.rb">require</a>
   supports `require` and `require_relative` statements.  Contents of files
   that are required are converted to JavaScript and expanded inline.
   `require` function calls in expressions are left alone.
 
-* [camelCase](https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/camelCase.rb)
+* <a id="camelCase" href="https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/camelCase.rb">camelCase</a>
   converts `underscore_case` to `camelCase`.  See
   [camelCase_spec](https://github.com/rubys/ruby2js/blob/master/spec/camelCase_spec.rb)
   for examples.
 
-* [functions](https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/functions.rb)
+* <a id="functions" href="https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/functions.rb">functions</a>
 
     * `.all?` becomes `.every`
     * `.any?` becomes `.some`
@@ -203,7 +203,7 @@ the script.
       of `Error` instead; and default constructors will be provided
     * `loop do...end` will be replaced with `while (true) {...}`
 
-* [rubyjs](https://github.com/rubys/ruby2js/blob/master/spec/rubyjs_spec.rb)
+* <a id="rubyjs" href="https://github.com/rubys/ruby2js/blob/master/spec/rubyjs_spec.rb">rubyjs</a>
     * `.at()` becomes `_a.at()`
     * `.between?()` becomes `R().between()`
     * `.capitalize()` becomes `_s.capitalize()`
@@ -265,7 +265,7 @@ the script.
     * `<=>` becomes `R.Comparable.cmp()`
     * `(n..m)` becomes `R.Range.new()`
 
-* [underscore](https://github.com/rubys/ruby2js/blob/master/spec/underscore.rb)
+* <a id="underscore" href="https://github.com/rubys/ruby2js/blob/master/spec/underscore.rb">underscore</a>
 
     * `.clone()` becomes `_.clone()`
     * `.compact()` becomes `_.compact()`
@@ -303,7 +303,7 @@ the script.
       expression: `reduce`, `sort_by`, `group_by`, `index_by`, `count_by`,
       `find`, `select`, `reject`.
 
-* [jquery](https://github.com/rubys/ruby2js/blob/master/spec/jquery.rb)
+* <a id="jquery" href="https://github.com/rubys/ruby2js/blob/master/spec/jquery.rb">jquery</a>
 
     * maps Ruby unary operator `~` to jQuery `$` function
     * maps Ruby attribute syntax to jquery attribute syntax
@@ -311,7 +311,7 @@ the script.
     * defaults the fourth parameter of $$.post to `"json"`, allowing Ruby block
       syntax to be used for the success function.
 
-* [angularrb](https://github.com/rubys/ruby2js/blob/master/spec/angularrb.rb)
+* <a id="angularrb" href="https://github.com/rubys/ruby2js/blob/master/spec/angularrb.rb">angularrb</a>
 
     * maps Ruby `module` to `angular.module`
     * maps `filter`, `controller`, `factory`, and `directive` to calls to
@@ -332,19 +332,19 @@ the script.
         * maps `timeout` and `interval` calls with a block to `$timeout` and
           `$interval` calls where the block is passed as the first parameter.
 
-* [angular-route](https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/angular-routerb.rb)
+* <a id="angular-route" href="https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/angular-routerb.rb">angular-route</a>
 
     * maps `case` statements on `$routeProvider` to angular.js module
       configuration.
     * adds implicit module `use` of `ngRoute` when such a `case` statement
       is encountered
 
-* [angular-resource](https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/angular-resource.rb)
+* <a id="angular-resource" href="https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/angular-resource.rb">angular-resource</a>
     * maps `$resource.new` statements on `$resource` function calls.
     * adds implicit module `use` of `ngResource` when `$resource.new` calls
       are encountered
 
-* [minitest-jasmine](https://github.com/rubys/ruby2js/blob/master/spec/minitest-jasmine.rb)
+* <a id="minitest-jasmine" href="https://github.com/rubys/ruby2js/blob/master/spec/minitest-jasmine.rb">minitest-jasmine</a>
     * maps subclasses of `Minitest::Test` to `describe` calls
     * maps `test_` methods inside subclasses of `Minitest::Test` to `it` calls
     * maps `setup`, `teardown`, `before`, and `after` calls to `beforeEach`
