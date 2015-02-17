@@ -40,6 +40,8 @@ module Ruby2JS
 
             if not File.exist? filename and File.exist? filename+".rb"
               filename += '.rb'
+            elsif not File.exist? filename and File.exist? filename+".js.rb"
+              filename += '.js.rb'
             end
 
             @options[:file2] = filename

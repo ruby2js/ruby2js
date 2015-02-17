@@ -1,2 +1,2 @@
-require 'require/test2.rb'
-require_relative 'test3.rb'
+require 'require/test2'
+require_relative 'test3'
