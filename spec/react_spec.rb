@@ -79,6 +79,11 @@ describe Ruby2JS::Filter::React do
       to_js( 'class Foo<React; def render; _a {_ "hi"}; end; end' ).
         must_include 'return React.createElement("a", null, "hi")'
     end
+
+    it "should apply text nodes" do
+      to_js( 'class Foo<React; def render; _a {text="hi"; _ text}; end; end' ).
+        must_include 'var text = "hi"; $_.push(text);'
+    end
   end
 
   describe "class attributes" do

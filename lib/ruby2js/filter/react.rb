@@ -90,7 +90,13 @@ module Ruby2JS
 
         if node.children[0] == nil and node.children[1] == :_
           # text nodes
-          node.children[2]
+          if @reactApply
+            # if apply is set, emit code that pushes text
+            s(:send, s(:gvar, :$_), :push, node.children[2])
+          else
+            # simple/normal case: simply return the text
+            node.children[2]
+          end
 
         elsif node.children[0] == nil and node.children[1] =~ /^_\w/
           # map method calls starting with an underscore to React calls
