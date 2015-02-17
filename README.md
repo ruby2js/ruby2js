@@ -51,7 +51,7 @@ With [ExecJS](https://github.com/sstephenson/execjs):
 require 'ruby2js/execjs'
 require 'date'
 
-context = Ruby2JS.compile(Date.today.strftime('d = new Date(%Y, %-m, %-d)'))
+context = Ruby2JS.compile(Date.today.strftime('d = new Date(%Y, %-m-1, %-d)'))
 puts context.eval('d.getYear()')+1900
 ```
 
