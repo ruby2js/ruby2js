@@ -55,6 +55,41 @@ module Ruby2JS
           # add a proc/function for each method
           body.each do |child|
             mname, args, *block = child.children
+            @reactMethod = mname
+
+            if mname == :initialize
+              mname = :getInitialState
+
+              # extract real list of statements
+              if block.length == 1
+                if not block.first
+                  block = []
+                elsif block.first.type == :begin
+                  block = block.first.children
+                end
+              end
+
+              # peel off the initial set of instance variable assignment stmts
+              assigns = []
+              block = block.dup
+              while not block.empty? and block.first.type == :ivasgn
+                assigns << block.shift
+              end
+
+              # build a hash for state
+              state = s(:hash, *assigns.map {|node| s(:pair, s(:str,
+                node.children.first.to_s[1..-1]), node.children.last)})
+
+              # modify block to build and/or return state
+              if block.empty?
+                block = [s(:return, state)]
+              else
+                block.unshift(s(:send, s(:self), :state=, state))
+                block.push(s(:return, s(:attr, s(:self), :state)))
+              end
+            end
+
+            # add method to class
             pairs << s(:pair, s(:sym, mname), s(:block, s(:send, nil, :proc), 
               args, process(s((child.is_method? ? :begin : :autoreturn),
               *block))))
@@ -62,6 +97,7 @@ module Ruby2JS
         ensure
           @react = react
           @reactClass = reactClass
+          @reactMethod = nil
         end
 
         # emit a createClass statement
@@ -423,9 +459,16 @@ module Ruby2JS
       # convert instance variable assignments to setState calls
       def on_ivasgn(node)
         return super unless @react
-        s(:send, s(:self), :setState, s(:hash, s(:pair,
-          s(:str, node.children.first.to_s[1..-1]),
-          process(node.children.last))))
+
+        if @reactMethod == :initialize
+          s(:send, s(:attr, s(:self), :state),
+            node.children.first.to_s[1..-1] + '=',
+            process(node.children.last))
+        else
+          s(:send, s(:self), :setState, s(:hash, s(:pair,
+            s(:str, node.children.first.to_s[1..-1]),
+            process(node.children.last))))
+        end
       end
 
       # convert class variables to props

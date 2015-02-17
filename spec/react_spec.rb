@@ -18,6 +18,22 @@ describe Ruby2JS::Filter::React do
       to_js( 'class Foo<React; def f(); end; end' ).
         must_include 'f: function() {}'
     end
+
+    it "should convert initialize methods to getInitialState" do
+      to_js( 'class Foo<React; def initialize(); end; end' ).
+        must_include 'getInitialState: function() {return {}}'
+    end
+
+    it "should initialize, accumulate, and return state" do
+      to_js( 'class Foo<React; def initialize; @a=1; b=2; @b = b; end; end' ).
+        must_include 'getInitialState: function() {this.state = {a: 1}; ' +
+          'var b = 2; this.state.b = b; return this.state}'
+    end
+
+    it "should collapse instance variable assignments into a return" do
+      to_js( 'class Foo<React; def initialize; @a=1; @b=2; end; end' ).
+        must_include 'getInitialState: function() {return {a: 1, b: 2}}'
+    end
   end
 
   describe "Wunderbar/JSX processing" do
