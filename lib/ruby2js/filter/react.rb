@@ -21,6 +21,11 @@ module Ruby2JS
     module React
       include SEXP
 
+      def options=(options)
+        super
+        @react = true if options[:react]
+      end
+
       # Example conversion
       #  before:
       #    (class (const nil :Foo) (const nil :React) nil)
@@ -110,14 +115,13 @@ module Ruby2JS
           # enable React filtering within React class method calls or
           # React component calls
           if 
-            node.children.first == s(:const, nil, :React) or
-            node.children.first == nil and node.children[1] =~ /^_[A-Z]/
+            node.children.first == s(:const, nil, :React)
           then
             begin
-              @react = true
+              react, @react = @react, true
               return on_send(node)
             ensure
-              @react = false
+              @react = react
             end
           end
         end
@@ -398,16 +402,16 @@ module Ruby2JS
       # convert blocks to proc arguments
       def on_block(node)
         if not @react
-          # enable React filtering on React component calls
+          # enable React filtering within React class method calls or
+          # React component calls
           if 
-            node.children[0].children[0] == nil and 
-            node.children[0].children[1] =~ /^_[A-Z]/
+            node.children.first == s(:const, nil, :React)
           then
             begin
-              @react = true
+              reacth @react = @react, true
               return on_block(node)
             ensure
-              @react = false
+              @react = react
             end
           end
         end
