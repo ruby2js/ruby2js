@@ -92,6 +92,13 @@ module Ruby2JS
                 block.unshift(s(:send, s(:self), :state=, state))
                 block.push(s(:return, s(:attr, s(:self), :state)))
               end
+
+            elsif mname == :render
+              if block.length != 1 or block.last.type == :begin
+                # wrap multi-line blocks with a 'div' element
+                block = [s(:return, 
+                  s(:block, s(:send, nil, :_div), s(:args), *block))]
+              end
             end
 
             # add method to class

@@ -102,6 +102,15 @@ describe Ruby2JS::Filter::React do
     end
   end
 
+  describe "render method" do
+    it "should wrap multiple elements with a div" do
+      result = to_js( 'class Foo<React; def render; _h1 "a"; _p "b"; end; end' )
+      result.must_include 'return React.createElement("div", null, React'
+      result.must_include ', React.createElement("h1", null, "a"),'
+      result.must_include ', React.createElement("p", null, "b"))}})'
+    end
+  end
+
   describe "class attributes" do
     it "should handle class attributes" do
       to_js( 'class Foo<React; def render; _a class: "b"; end; end' ).
