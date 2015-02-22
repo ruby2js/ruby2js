@@ -859,7 +859,12 @@ describe Ruby2JS do
 
   describe 'ivars' do
     it "should handle ivars" do
-      to_js( '@x', ivars: {:@x => 1} ).must_equal '1'
+      to_js( '@x', ivars: {:@x => {a:1}} ).must_equal '{a: 1}'
+      to_js( '@x', ivars: {:@x => %w{a b c}} ).must_equal '["a", "b", "c"]'
+      to_js( '@x', ivars: {:@x => 5.1} ).must_equal '5.1'
+      to_js( '@x', ivars: {:@x => [true, false, nil]} ).
+        must_equal '[true, false, null]'
+      to_js( '@x', ivars: {:@x => Rational(5,4)} ).must_equal '1'
     end
 
     it "should not replace ivars in class definitions" do
