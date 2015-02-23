@@ -67,6 +67,23 @@ describe Ruby2JS::Filter::React do
       result.must_include '}())'
     end
 
+    it "should treat explicit calls to React.createElement as simple" do
+      to_js( 'class Foo<React; def render; _a {React.createElement("b")}; ' +
+        'end; end' ).
+        must_include ' React.createElement("a", null, React.createElement("b"))'
+    end
+
+    it "should push results of explicit calls to React.createElement" do
+      result = to_js('class Foo<React; def render; _a {c="c"; ' +
+        'React.createElement("b", null, c)}; end; end')
+
+      result.must_include 'React.createElement.apply(React, function() {'
+      result.must_include 'var $_ = ["a", null];'
+      result.must_include '$_.push(React.createElement("b", null, c));'
+      result.must_include 'return $_'
+      result.must_include '}())'
+    end
+
     it "should iterate" do
       result = to_js('class Foo<React; def render; _ul list ' + 
         'do |i| _li i; end; end; end')

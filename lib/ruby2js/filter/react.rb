@@ -145,6 +145,14 @@ module Ruby2JS
             node.children[2]
           end
 
+        elsif 
+          @reactApply and node.children[1] == :createElement and
+          node.children[0] == s(:const, nil, :React)
+        then
+          # push results of explicit calls to React.createElement
+          s(:send, s(:gvar, :$_), :push, s(:send, *node.children[0..1],
+            *process_all(node.children[2..-1])))
+
         elsif node.children[0] == nil and node.children[1] =~ /^_\w/
           # map method calls starting with an underscore to React calls
           # to create an element.  
@@ -238,6 +246,11 @@ module Ruby2JS
 
             # check for normal case: only elements and text
             simple = args.all? do |arg|
+              # explicit call to React.createElement
+              next true if arg.children[1] == :createElement and
+                arg.children[0] == s(:const, nil, :React)
+
+              # wunderbar style call
               arg = arg.children.first if arg.type == :block
               while arg.type == :send and arg.children.first != nil
                 arg = arg.children.first
