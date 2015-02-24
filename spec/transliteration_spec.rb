@@ -640,7 +640,7 @@ describe Ruby2JS do
 
     it "should prefix class constants referenced in methods by class name" do
       to_js('class C; X = 1; def m; X; end; end').
-        must_equal 'function C() {}; C.X = 1; C.prototype = {get m() {C.X}}'
+        must_equal 'function C() {}; C.X = 1; C.prototype = {get m() {return C.X}}'
     end
 
     it "should insert var self = this when needed" do
