@@ -126,6 +126,16 @@ describe Ruby2JS::Filter::React do
       result.must_include ', React.createElement("h1", null, "a"),'
       result.must_include ', React.createElement("p", null, "b"))}})'
     end
+
+    it "should insert a div if no elements are present" do
+      result = to_js( 'class Foo<React; def render; end; end' )
+      result.must_include 'return React.createElement("div")'
+    end
+
+    it "should insert a div if method is empty" do
+      result = to_js( 'class Foo<React; def render; end; end' )
+      result.must_include 'return React.createElement("div")'
+    end
   end
 
   describe "class attributes" do

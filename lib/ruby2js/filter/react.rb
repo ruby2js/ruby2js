@@ -94,7 +94,7 @@ module Ruby2JS
               end
 
             elsif mname == :render
-              if block.length != 1 or block.last.type == :begin
+              if block.length!=1 or not block.last or block.last.type==:begin
                 # wrap multi-line blocks with a 'div' element
                 block = [s(:return, 
                   s(:block, s(:send, nil, :_div), s(:args), *block))]
