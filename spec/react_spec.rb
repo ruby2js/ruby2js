@@ -109,8 +109,8 @@ describe Ruby2JS::Filter::React do
     end
 
     it "should handle text nodes" do
-      to_js( 'class Foo<React; def render; _a {_ "hi"}; end; end' ).
-        must_include 'return React.createElement("a", null, "hi")'
+      to_js( 'class Foo<React; def render; _a {_ @text}; end; end' ).
+        must_include 'return React.createElement("a", null, this.state.text)'
     end
 
     it "should apply text nodes" do

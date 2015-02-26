@@ -139,10 +139,10 @@ module Ruby2JS
           # text nodes
           if @reactApply
             # if apply is set, emit code that pushes text
-            s(:send, s(:gvar, :$_), :push, node.children[2])
+            s(:send, s(:gvar, :$_), :push, process(node.children[2]))
           else
             # simple/normal case: simply return the text
-            node.children[2]
+            process(node.children[2])
           end
 
         elsif 
