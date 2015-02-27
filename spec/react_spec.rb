@@ -117,6 +117,27 @@ describe Ruby2JS::Filter::React do
       to_js( 'class Foo<React; def render; _a {text="hi"; _ text}; end; end' ).
         must_include 'var text = "hi"; $_.push(text);'
     end
+
+    it "should handle arbitrary nodes" do
+      to_js( 'class Foo<React; def render; _a {_[@text]}; end; end' ).
+        must_include 'return React.createElement("a", null, this.state.text)'
+    end
+
+    it "should handle lists of arbitrary nodes" do
+      to_js( 'class Foo<React; def render; _a {_[@text, @text]}; end; end' ).
+        must_include 'return React.createElement.apply(React, ' +
+          '["a", null].concat([this.state.text, this.state.text])'
+    end
+
+    it "should apply arbitrary nodes" do
+      to_js( 'class Foo<React; def render; _a {text="hi"; _[text]}; end; end' ).
+        must_include 'var text = "hi"; $_.push(text);'
+    end
+
+    it "should apply list of arbitrary nodes" do
+      to_js( 'class Foo<React; def render; _a {text="hi"; _[text, text]}; end; end' ).
+        must_include 'var text = "hi"; $_.push(text, text);'
+    end
   end
 
   describe "render method" do

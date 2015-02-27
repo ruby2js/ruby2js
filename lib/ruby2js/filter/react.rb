@@ -304,6 +304,17 @@ module Ruby2JS
             element
           end
 
+        elsif node.children[0]==s(:send, nil, :_) and node.children[1]==:[]
+          if @reactApply
+            # if apply is set, emit code that pushes results
+            s(:send, s(:gvar, :$_), :push, *process_all(node.children[2..-1]))
+          elsif node.children.length == 3
+            process(node.children[2])
+          else
+            # simple/normal case: simply return the element
+            s(:splat, s(:array, *process_all(node.children[2..-1])))
+          end
+
         # map method calls involving i/g/c vars to straight calls
         #
         # input:
