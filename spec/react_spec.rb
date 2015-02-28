@@ -141,21 +141,21 @@ describe Ruby2JS::Filter::React do
   end
 
   describe "render method" do
-    it "should wrap multiple elements with a div" do
+    it "should wrap multiple elements with a span" do
       result = to_js( 'class Foo<React; def render; _h1 "a"; _p "b"; end; end' )
-      result.must_include 'return React.createElement("div", null, React'
+      result.must_include 'return React.createElement("span", null, React'
       result.must_include ', React.createElement("h1", null, "a"),'
       result.must_include ', React.createElement("p", null, "b"))}})'
     end
 
-    it "should insert a div if no elements are present" do
+    it "should insert a span if no elements are present" do
       result = to_js( 'class Foo<React; def render; end; end' )
-      result.must_include 'return React.createElement("div")'
+      result.must_include 'return React.createElement("span")'
     end
 
-    it "should insert a div if method is empty" do
+    it "should insert a span if method is empty" do
       result = to_js( 'class Foo<React; def render; end; end' )
-      result.must_include 'return React.createElement("div")'
+      result.must_include 'return React.createElement("span")'
     end
   end
 

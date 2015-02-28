@@ -95,9 +95,9 @@ module Ruby2JS
 
             elsif mname == :render
               if block.length!=1 or not block.last or block.last.type==:begin
-                # wrap multi-line blocks with a 'div' element
+                # wrap multi-line blocks with a 'span' element
                 block = [s(:return, 
-                  s(:block, s(:send, nil, :_div), s(:args), *block))]
+                  s(:block, s(:send, nil, :_span), s(:args), *block))]
               end
             end
 
