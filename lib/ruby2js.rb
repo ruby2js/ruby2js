@@ -96,24 +96,24 @@ module Ruby2JS
     if source.include? "\n"
       ruby2js.enable_vertical_whitespace 
       lines = ruby2js.to_js.split("\n")
-      pre = ''
+      pre = []
       pending = false
       blank = true
       lines.each do |line|
         next if line.empty?
 
         if ')}]'.include? line[0]
-          pre.sub!(/^  /,'')
+          pre.pop
           line.sub!(/([,;])$/,"\\1\n")
           pending = true
         else
           pending = false
         end
 
-        line.sub! /^/, pre
+        line.insert 0, pre.join
         if '({['.include? line[-1]
-          pre += '  ' 
-          line.sub!(/^/,"\n") unless blank or pending
+          pre.push '  '
+          line.insert 0, "\n" unless blank or pending
           pending = true
         end
 
