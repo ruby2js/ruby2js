@@ -163,9 +163,9 @@ module Ruby2JS
           call = (group_receiver ? group(receiver) : parse(receiver))
           call = "#{ call }#{ '.' if receiver && method}#{ method }"
           args = args.map {|a| parse a}
-          if args.any? {|arg| arg.to_s.include? "\n"}
+          if args.map {|arg| arg.length+2}.reduce(&:+).to_i < width-10
             "#{ call }(#{ args.join(', ') })"
-          elsif args.map {|arg| arg.length+2}.reduce(&:+).to_i < width-10
+          elsif args.length == 1 and args.first.to_s.include? "\n"
             "#{ call }(#{ args.join(', ') })"
           else
             "#{ call }(#@nl#{ args.join(",#@ws") }#@nl)"
