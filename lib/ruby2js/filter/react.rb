@@ -330,7 +330,15 @@ module Ruby2JS
           end
 
         elsif node.children[1] == :~
-          # map ~expression.method to $(expression).method
+          # Locate a DOM Node
+          #   map ~(expression) to document.querySelector(expression)
+          #   map ~name to this.refs.name.getDOMNode()
+          #   map ~"a b" to document.querySelector("a b")
+          #   map ~"#a" to document.getElementById("a")
+          #   map ~"a" to document.getElementsByTagName("a")[0]
+          #   map ~".a.b" to document.getElementsByClassName("a b")[0]
+          #   map ~~expression to ~~expression
+          #   map ~~~expression to ~expression
 
           if node.children[0] and node.children[0].type == :op_asgn
             asgn = node.children[0]
@@ -338,10 +346,10 @@ module Ruby2JS
               inner = asgn.children[0]
               return on_send s(:send, s(:send, inner.children[0],
                 (inner.children[1].to_s+'=').to_sym,
-                s(:send, s(:send, s(:send, inner.children[0], :~),
-                *inner.children[1..-1]), *asgn.children[1..-1])), :~)
+                s(:send, s(:send, s(:send, inner.children[0], '~'),
+                *inner.children[1..-1]), *asgn.children[1..-1])), '~')
             else
-              return on_send asgn.updated nil, [s(:send, asgn.children[0], :~),
+              return on_send asgn.updated nil, [s(:send, asgn.children[0], '~'),
                 *asgn.children[1..-1]]
             end
           end
@@ -358,9 +366,9 @@ module Ruby2JS
                 if node.children[0].children[0].children[1] == :~
                   result = node.children[0].children[0].children[0]
                 else
-                  result = s(:attr, node.children[0].children[0], :~)
+                  result = s(:attr, node.children[0].children[0], '~')
                 end
-                s(:attr, s(:attr, process(result), :~), :~)
+                s(:attr, s(:attr, process(result), '~'), '~')
               else
                 # possible getter/setter
                 method = node.children[1]
@@ -375,9 +383,24 @@ module Ruby2JS
               s(:send, s(:gvar, "$#{node.children[1]}"), :getDOMNode)
             elsif node.type == :lvar
               s(:send, s(:gvar, "$#{node.children[0]}"), :getDOMNode)
+            elsif node.type == :str
+              if node.children.first =~ /^#[-\w]+$/
+                s(:send, s(:attr, nil, :document), :getElementById, 
+                  s(:str, node.children.first[1..-1]))
+              elsif node.children.first =~ /^(\.[-\w]+)+$/
+                s(:send, s(:send, s(:attr, nil, :document), 
+                  :getElementsByClassName, 
+                  s(:str, node.children.first[1..-1].gsub('.', ' '))),
+                  :[], s(:int, 0))
+              elsif node.children.first =~ /^[-\w]+$/
+                s(:send, s(:send, s(:attr, nil, :document), 
+                  :getElementsByTagName, node),
+                  :[], s(:int, 0))
+              else
+                s(:send, s(:attr, nil, :document), :querySelector, node)
+              end
             else
-              # leave alone
-              node
+              s(:send, s(:attr, nil, :document), :querySelector, node)
             end
           end
 

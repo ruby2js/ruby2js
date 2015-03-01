@@ -213,6 +213,36 @@ describe Ruby2JS::Filter::React do
       to_js( 'class Foo<React; def method; ~x.remove(); end; end' ).
         must_include 'this.refs.x.getDOMNode().remove()'
     end
+
+    it "should convert ~(expression) to querySelector calls" do
+      to_js( 'class Foo<React; def method; ~(x).remove(); end; end' ).
+        must_include 'document.querySelector(x).remove()'
+    end
+
+    it "should convert ~'a b' to querySelector calls" do
+      to_js( 'class Foo<React; def method; ~"a b".remove(); end; end' ).
+        must_include 'document.querySelector("a b").remove()'
+    end
+
+    it "should convert ~'#a' to getElementById calls" do
+      to_js( 'class Foo<React; def method; ~"#a".remove(); end; end' ).
+        must_include 'document.getElementById("a").remove()'
+    end
+
+    it "should convert ~'a' to getElementsByTagName calls" do
+      to_js( 'class Foo<React; def method; ~"a".remove(); end; end' ).
+        must_include 'document.getElementsByTagName("a")[0].remove()'
+    end
+
+    it "should leave ~~a alone" do
+      to_js( 'class Foo<React; def method; ~~a; end; end' ).
+        must_include '~~a'
+    end
+
+    it "should convert ~~~a to ~a" do
+      to_js( 'class Foo<React; def method; ~~~a; end; end' ).
+        must_include '~a'
+    end
   end
 
   describe "map gvars/ivars/cvars to refs/state/prop" do
