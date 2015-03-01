@@ -84,7 +84,7 @@ module Ruby2JS
             super
           end
 
-        elsif node.children[1] == :~
+        elsif node.children[1] == :~ and not @react
           # map ~expression.method to $(expression).method
 
           if node.children[0] and node.children[0].type == :op_asgn
