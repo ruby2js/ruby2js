@@ -224,14 +224,19 @@ describe Ruby2JS::Filter::React do
         must_include 'document.querySelector("a b").remove()'
     end
 
-    it "should convert ~'#a' to getElementById calls" do
-      to_js( 'class Foo<React; def method; ~"#a".remove(); end; end' ).
-        must_include 'document.getElementById("a").remove()'
+    it "should convert ~'.a.b_c' to getElementsByClassName calls" do
+      to_js( 'class Foo<React; def method; ~".a.b_c".remove(); end; end' ).
+        must_include 'document.getElementsByClassName("a b-c")[0].remove()'
     end
 
-    it "should convert ~'a' to getElementsByTagName calls" do
-      to_js( 'class Foo<React; def method; ~"a".remove(); end; end' ).
-        must_include 'document.getElementsByTagName("a")[0].remove()'
+    it "should convert ~'#a_b' to getElementById calls" do
+      to_js( 'class Foo<React; def method; ~"#a_b".remove(); end; end' ).
+        must_include 'document.getElementById("a-b").remove()'
+    end
+
+    it "should convert ~'a_b' to getElementsByTagName calls" do
+      to_js( 'class Foo<React; def method; ~"a_b".remove(); end; end' ).
+        must_include 'document.getElementsByTagName("a-b")[0].remove()'
     end
 
     it "should leave ~~a alone" do

@@ -412,16 +412,16 @@ module Ruby2JS
             elsif node.type == :str
               if node.children.first =~ /^#[-\w]+$/
                 s(:send, s(:attr, nil, :document), :getElementById, 
-                  s(:str, node.children.first[1..-1]))
+                  s(:str, node.children.first[1..-1].gsub('_', '-')))
               elsif node.children.first =~ /^(\.[-\w]+)+$/
                 s(:send, s(:send, s(:attr, nil, :document), 
-                  :getElementsByClassName, 
-                  s(:str, node.children.first[1..-1].gsub('.', ' '))),
+                  :getElementsByClassName, s(:str, 
+                  node.children.first[1..-1].gsub('.', ' ').gsub('_', '-'))),
                   :[], s(:int, 0))
               elsif node.children.first =~ /^[-\w]+$/
                 s(:send, s(:send, s(:attr, nil, :document), 
-                  :getElementsByTagName, node),
-                  :[], s(:int, 0))
+                  :getElementsByTagName, s(:str, 
+                  node.children.first.gsub('_', '-'))), :[], s(:int, 0))
               else
                 s(:send, s(:attr, nil, :document), :querySelector, node)
               end
