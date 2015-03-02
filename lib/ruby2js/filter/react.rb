@@ -47,7 +47,10 @@ module Ruby2JS
         end
 
         # abort conversion unless all body statements are method definitions
-        return super unless body.all? {|child| child.type == :def}
+        return super unless body.all? do |child| 
+          child.type == :def or
+          (child.type == :defs and child.children.first == s(:self))
+        end
 
         begin
           react, @react = @react, true
@@ -57,8 +60,31 @@ module Ruby2JS
           pairs = [s(:pair, s(:sym, :displayName), 
             s(:str, cname.children.last.to_s))]
 
+          # collect static properties/functions
+          statics = []
+          body.select {|child| child.type == :defs}.each do |child|
+            parent, mname, args, *block = child.children
+            if child.is_method?
+              statics << s(:pair, s(:sym, mname), 
+                s(:block, s(:send, nil, :proc), args, s(:autoreturn, *block)))
+            elsif 
+              block.length == 1 and 
+              Converter::EXPRESSIONS.include? block.first.type
+            then
+              statics << s(:pair, s(:sym, mname), *block)
+            else
+              statics << s(:pair, s(:prop, mname), {get: 
+                s(:block, s(:send, nil, :proc), args, s(:autoreturn, *block))})
+            end
+          end
+
+          # append statics (if any)
+          unless statics.empty?
+            pairs << s(:pair, s(:sym, :statics), s(:hash, *statics))
+          end
+
           # add a proc/function for each method
-          body.each do |child|
+          body.select {|child| child.type == :def}.each do |child|
             mname, args, *block = child.children
             @reactMethod = mname
 

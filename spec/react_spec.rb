@@ -298,6 +298,22 @@ describe Ruby2JS::Filter::React do
     end
   end
 
+  describe "react statics" do
+    it "should handle static properties" do
+      to_js( 'class Foo<React; def self.one; 1; end; end' ).
+        must_include 'statics: {one: 1}'
+    end
+
+    it "should handle computed static properties" do
+      to_js( 'class Foo<React; def self.one; return 1; end; end' ).
+        must_include 'statics: {get one() {return 1}}'
+    end
+
+    it "should handle static methods" do
+      to_js( 'class Foo<React; def self.one(); return 1; end; end' ).
+        must_include 'statics: {one: function() {return 1}}'
+    end
+  end
   describe Ruby2JS::Filter::DEFAULTS do
     it "should include React" do
       Ruby2JS::Filter::DEFAULTS.must_include Ruby2JS::Filter::React
