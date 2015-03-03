@@ -231,8 +231,13 @@ module Ruby2JS
               end
             end
             pairs -= classes
-            value = s(:str, values.join(' '))
-            value = s(:send, value, :+, expr) if expr
+            if expr
+              value = s(:if, expr, 
+                s(:send, s(:str, values.join(' ')), :+, expr), 
+                s(:str, values.join(' ').strip))
+            else
+              value = s(:str, values.join(' '))
+            end
             pairs.unshift s(:pair, s(:sym, :className), value)
           end
 

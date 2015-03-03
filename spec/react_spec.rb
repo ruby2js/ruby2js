@@ -182,7 +182,7 @@ describe Ruby2JS::Filter::React do
 
     it "should handle mixed strings and a value" do
       to_js( 'class Foo<React; def render; _a.b class: c; end; end' ).
-        must_include 'React.createElement("a", {className: "b " + c})'
+        must_include 'React.createElement("a", {className: (c ? "b " + c : "b")})'
     end
   end
 
