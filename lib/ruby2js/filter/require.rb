@@ -69,6 +69,13 @@ module Ruby2JS
       ensure
         @require_expr = require_expr
       end
+
+      def on_casgn(node)
+        require_expr, @require_expr = @require_expr, true
+        super
+      ensure
+        @require_expr = require_expr
+      end
     end
 
     DEFAULTS.push Require
