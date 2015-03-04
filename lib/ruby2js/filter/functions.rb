@@ -116,6 +116,9 @@ module Ruby2JS
           process s(:send, s(:send, target, :indexOf, args.first), :!=,
             s(:int, -1))
 
+        elsif method == :respond_to? and args.length == 1
+          process s(:in?, args.first, target)
+
         elsif method == :each
           process node.updated nil, [target, :forEach, *args]
 

@@ -159,6 +159,10 @@ describe Ruby2JS::Filter::Functions do
       to_js( 'a.include? b' ).must_equal 'a.indexOf(b) != -1'
     end
 
+    it "should handle respond_to?" do
+      to_js( 'a.respond_to? b' ).must_equal 'b in a'
+    end
+
     it "should handle any?" do
       to_js( 'a.any? {|i| i==0}' ).
         must_equal 'a.some(function(i) {return i == 0})'
