@@ -2,6 +2,9 @@ require 'parser/current'
 require 'ruby2js/converter'
 
 module Ruby2JS
+  class SyntaxError < RuntimeError
+  end
+
   module Filter
     DEFAULTS = []
 
@@ -63,7 +66,7 @@ module Ruby2JS
       ast = source
       source = ast.loc.expression.source_buffer.source
     else
-      ast = parse( source )
+      ast = parse( source, options[:file] )
     end
 
     filters = options[:filters] || Filter::DEFAULTS
@@ -126,11 +129,17 @@ module Ruby2JS
     end
   end
   
-  def self.parse(source)
+  def self.parse(source, file=nil)
     # workaround for https://github.com/whitequark/parser/issues/112
-    buffer = Parser::Source::Buffer.new('__SOURCE__')
+    buffer = Parser::Source::Buffer.new(file || '__SOURCE__')
     buffer.raw_source = source.encode('utf-8')
     Parser::CurrentRuby.new.parse(buffer)
+  rescue Parser::SyntaxError => e
+    split = source[0..e.diagnostic.location.begin_pos].split("\n")
+    line, col = split.length, split.last.length
+    message = "line #{line}, column #{col}: #{e.diagnostic.message}"
+    message += "\n in file #{file}" if file
+    raise Ruby2JS::SyntaxError.new(message)
   end
 
   def self.find_block(ast, line)
