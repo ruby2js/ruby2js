@@ -104,7 +104,15 @@ module Ruby2JS
               assigns = []
               block = block.dup
               while not block.empty? and block.first.type == :ivasgn
-                assigns << block.shift
+                node = block.shift
+                vars = [node.children.first]
+                while node.children[1].type == :ivasgn
+                  node = node.children[1]
+                  vars << node.children.first
+                end
+                vars.each do |var|
+                  assigns << s(:ivasgn, var, node.children.last)
+                end
               end
 
               # build a hash for state
@@ -549,14 +557,20 @@ module Ruby2JS
       def on_ivasgn(node)
         return super unless @react
 
+        vars = [node.children.first]
+
+        while node.children[1].type == :ivasgn
+          node = node.children[1]
+          vars << node.children.first
+        end
+
         if @reactMethod == :initialize
-          s(:send, s(:attr, s(:self), :state),
-            node.children.first.to_s[1..-1] + '=',
-            process(node.children.last))
+          s(:begin, *vars.map {|var| s(:send, s(:attr, s(:self), :state),
+            var.to_s[1..-1] + '=', process(node.children.last))})
         else
-          s(:send, s(:self), :setState, s(:hash, s(:pair,
-            s(:str, node.children.first.to_s[1..-1]),
-            process(node.children.last))))
+          s(:send, s(:self), :setState, s(:hash, 
+            *vars.map {|var| s(:pair, s(:str, var.to_s[1..-1]),
+            process(node.children.last))}))
         end
       end
 
