@@ -47,6 +47,8 @@ module Ruby2JS
 
       if pairs.map {|item| item.length+2}.reduce(&:+).to_i < @width-10
         "{#{ pairs.join(', ') }}"
+      elsif pairs.length == 1
+        "{#{ pairs.join(', ') }}"
       else
         "{#@nl#{ pairs.join(",#@ws") }#@nl}"
       end

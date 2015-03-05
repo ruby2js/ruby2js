@@ -626,11 +626,9 @@ describe Ruby2JS::Filter::AngularRB do
           "name1",
 
           function($interpolate) {
-            return {
-              link: function(scope, elem, attrs) {
-                elem.attr("name2", $interpolate(attrs.name1)(scope))
-              }
-            }
+            return {link: function(scope, elem, attrs) {
+              elem.attr("name2", $interpolate(attrs.name1)(scope))
+            }}
           }
         )
       JS
@@ -682,19 +680,17 @@ describe Ruby2JS::Filter::AngularRB do
           "name1",
 
           function() {
-            return {
-              link: function(scope, elem, attrs) {
-                scope.$watch(
-                  function() {
-                    return scope.value1
-                  },
+            return {link: function(scope, elem, attrs) {
+              scope.$watch(
+                function() {
+                  return scope.value1
+                },
 
-                  function() {
-                    scope.value2 = scope.value1
-                  }
-                )
-              }
-            }
+                function() {
+                  scope.value2 = scope.value1
+                }
+              )
+            }}
           }
         )
       JS
@@ -720,13 +716,11 @@ describe Ruby2JS::Filter::AngularRB do
           "name1",
 
           function() {
-            return {
-              link: function(scope, elem, attrs) {
-                attrs.$observe(\"name1\", function(value) {
-                  elem.attr(\"name2\", value)
-                })
-              }
-            }
+            return {link: function(scope, elem, attrs) {
+              attrs.$observe(\"name1\", function(value) {
+                elem.attr(\"name2\", value)
+              })
+            }}
           }
         )
       JS
