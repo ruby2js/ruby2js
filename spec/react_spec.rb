@@ -39,6 +39,11 @@ describe Ruby2JS::Filter::React do
       to_js( 'class Foo<React; def initialize; @a=@b=1; end; end' ).
         must_include 'getInitialState: function() {return {a: 1, b: 1}}'
     end
+
+    it "should handle operator assignments on state values" do
+      to_js( 'class Foo<React; def initialize; @a+=1; end; end' ).
+        must_include 'this.state = {}; this.state.a++; return this.state'
+    end
   end
 
   describe "Wunderbar/JSX processing" do
@@ -284,6 +289,12 @@ describe Ruby2JS::Filter::React do
     it "should map parallel instance variables to setState" do
       to_js( 'class Foo<React; def method; @x=@y=1; end; end' ).
         must_include 'this.setState({x: 1, y: 1})'
+    end
+
+    it "should create temporary variables when needed" do
+      to_js( 'class Foo<React; def f; @a+=1; b=@a; end; end' ).
+        must_include 'var $a = this.state.a; $a++; var b = $a; ' +
+          'return this.setState({a: $a})'
     end
 
     it "should map class variables to properties" do

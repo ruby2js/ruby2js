@@ -13,6 +13,7 @@
 #  *  @x becomes this.state.x
 #  * @@x becomes this.props.x
 #  *  ~x becomes this.refs.x.getDOMNode()
+#  * ~"x" becomes document.querySelector("x")
 #
 require 'ruby2js'
 
@@ -88,6 +89,12 @@ module Ruby2JS
             mname, args, *block = child.children
             @reactMethod = mname
 
+            # analyze ivar usage
+            @reactIvars = {pre: [], post: [], asgn: [], ref: []}
+            react_walk(child) unless mname == :initialize
+            @reactIvars[:capture] = 
+              (@reactIvars[:pre] + @reactIvars[:post]).uniq
+
             if mname == :initialize
               mname = :getInitialState
 
@@ -132,6 +139,32 @@ module Ruby2JS
                 # wrap multi-line blocks with a 'span' element
                 block = [s(:return, 
                   s(:block, s(:send, nil, :_span), s(:args), *block))]
+              end
+            end
+
+            # drill down if necessary to find the block
+            while block.length==1 and block.first and block.first.type==:begin
+              block = block.first.children.dup
+            end
+
+            # capture ivars that are both set and referenced
+            @reactIvars[:pre].uniq.sort.reverse.each do |ivar|
+              block.unshift(s(:lvasgn, "$#{ivar.to_s[1..-1]}", 
+                s(:attr, s(:attr, s(:self), :state), ivar.to_s[1..-1])))
+            end
+
+            # update ivars that are set and later referenced
+            unless @reactIvars[:post].empty?
+              updates = @reactIvars[:post].uniq.sort.reverse.map do |ivar|
+                s(:pair, s(:lvar, ivar.to_s[1..-1]), 
+                  s(:lvar, "$#{ivar.to_s[1..-1]}"))
+              end
+              update = s(:send, s(:self), :setState, s(:hash, *updates))
+
+              if block.last.type == :return
+                block.insert(block.length-1, update)
+              else
+                block.push(update)
               end
             end
 
@@ -553,16 +586,25 @@ module Ruby2JS
       # convert instance variables to state
       def on_ivar(node)
         return super unless @reactClass
-        s(:attr, s(:attr, s(:self), :state), node.children.first.to_s[1..-1])
+        if @reactMethod and @reactIvars[:capture].include? node.children.first
+          s(:lvar, "$#{node.children.first[1..-1]}")
+        else
+          s(:attr, s(:attr, s(:self), :state), node.children.first.to_s[1..-1])
+        end
       end
 
       # convert instance variable assignments to setState calls
       def on_ivasgn(node)
         return super unless @react
 
+        if @reactMethod and @reactIvars[:capture].include? node.children.first
+          return s(:lvasgn, "$#{node.children.first[1..-1]}",
+            *process_all(node.children[1..-1]))
+        end
+
         vars = [node.children.first]
 
-        while node.children[1].type == :ivasgn
+        while node.children.length > 1 and node.children[1].type == :ivasgn
           node = node.children[1]
           vars << node.children.first
         end
@@ -578,9 +620,66 @@ module Ruby2JS
       end
 
       # convert class variables to props
+      def on_op_asgn(node)
+        return super unless @react
+        return super unless node.children.first.type == :ivasgn
+        var = node.children.first.children.first
+        if @reactMethod and @reactIvars[:capture].include? var
+          process s(:op_asgn, s(:lvasgn, "$#{var[1..-1]}"),
+            *node.children[1..-1])
+        elsif @reactMethod == :initialize
+          process s(:op_asgn, s(:attr, s(:attr, s(:self), :state),
+            var[1..-1]), *node.children[1..-1])
+        else
+          process s(:ivasgn, var, s(:send, s(:ivar, var), 
+            *node.children[1..-1]))
+        end
+      end
+
+      # convert class variables to props
       def on_cvar(node)
         return super unless @react
         s(:attr, s(:attr, s(:self), :props), node.children.first.to_s[2..-1])
+      end
+
+      # analyze ivar usage
+      def react_walk(node)
+        child = node.children.first
+
+        node.children.each do |child|
+          react_walk(child) if Parser::AST::Node === child
+        end
+
+        case node.type
+        when :ivar
+          if @reactIvars[:asgn].include? child
+            @reactIvars[:post] << child
+            @reactIvars[:pre] << child if @reactIvars[:ref].include? child
+          end
+          @reactIvars[:ref] << child
+          
+        when :ivasgn
+          @reactIvars[:asgn] << child
+
+        when :op_asgn 
+          if child.type == :ivasgn
+            gchild = child.children.first
+            if @reactIvars[:ref].include? gchild
+              @reactIvars[:pre] << gchild 
+              @reactIvars[:post] << gchild 
+            end
+            @reactIvars[:ref] << gchild
+            @reactIvars[:asgn] << gchild
+          end
+
+        when :send 
+          if 
+            child and child.type == :self and node.children.length == 2 and
+            node.children[1] == :componentWillReceiveProps
+          then
+            @reactIvars[:post] += @reactIvars[:asgn]
+          end
+        end
       end
     end
 
