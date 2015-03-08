@@ -48,14 +48,14 @@ module Ruby2JS
       if receiver
         group_receiver = receiver.type == :send &&
           op_index < operator_index( receiver.children[1] ) if receiver
-        group_receiver ||= [:begin, :dstr, :dsym].include? receiver.type
+        group_receiver ||= GROUP_OPERATORS.include? receiver.type
         group_receiver = false if receiver.children[1] == :[]
       end
 
       if target
         group_target = target.type == :send && 
           op_index < operator_index( target.children[1] )
-        group_target ||= (target.type == :begin)
+        group_target ||= GROUP_OPERATORS.include? target.type
       end
 
       if method == :!

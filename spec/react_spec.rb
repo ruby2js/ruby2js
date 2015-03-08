@@ -187,7 +187,17 @@ describe Ruby2JS::Filter::React do
 
     it "should handle mixed strings and a value" do
       to_js( 'class Foo<React; def render; _a.b class: c; end; end' ).
-        must_include 'React.createElement("a", {className: (c ? "b " + c : "b")})'
+        must_include 'React.createElement("a", {className: "b " + (c || "")})'
+    end
+
+    it "should handle only a value" do
+      to_js( 'class Foo<React; def render; _a class: c; end; end' ).
+        must_include 'React.createElement("a", {className: c || ""})'
+    end
+
+    it "should handle a constant string" do
+      to_js( 'class Foo<React; def render; _a class: "x"; end; end' ).
+        must_include 'React.createElement("a", {className: "x"})'
     end
   end
 

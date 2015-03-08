@@ -16,6 +16,8 @@ module Ruby2JS
       :=== => :'!=='
     }
 
+    GROUP_OPERATORS = [:begin, :dstr, :dsym, :and, :or]
+
     attr_accessor :binding, :ivars
 
     def initialize( ast, vars = {} )

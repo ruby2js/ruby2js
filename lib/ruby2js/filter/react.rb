@@ -240,9 +240,12 @@ module Ruby2JS
             end
             pairs -= classes
             if expr
-              value = s(:if, expr, 
-                s(:send, s(:str, values.join(' ')), :+, expr), 
-                s(:str, values.join(' ').strip))
+              if values.length > 1
+                value = s(:send, s(:str, values.join(' ')), :+, 
+                  s(:or, expr, s(:str, '')))
+              else
+                value = s(:or, expr, s(:str, ''))
+              end
             else
               value = s(:str, values.join(' '))
             end
