@@ -88,6 +88,7 @@ module Ruby2JS
           body.select {|child| child.type == :def}.each do |child|
             mname, args, *block = child.children
             @reactMethod = mname
+            @reactProps = s(:attr, s(:self), :props)
 
             # analyze ivar usage
             @reactIvars = {pre: [], post: [], asgn: [], ref: []}
@@ -139,6 +140,15 @@ module Ruby2JS
                 # wrap multi-line blocks with a 'span' element
                 block = [s(:return, 
                   s(:block, s(:send, nil, :_span), s(:args), *block))]
+              end
+
+            elsif mname == :componentWillReceiveProps
+              if args.children.length == 0
+                args = s(:args, s(:arg, :"$$props"))
+                child = s(:def, mname, args, *block)
+                @reactProps = s(:lvar, :"$$props")
+              else
+                @reactProps = s(:lvar, args.children.first.children.last)
               end
             end
 
@@ -523,6 +533,13 @@ module Ruby2JS
             super
           end
 
+        elsif 
+          node.children[0] and node.children[0].type == :self and
+          node.children.length == 2 and
+          node.children[1] == :componentWillReceiveProps
+        then
+          s(:send, *node.children, s(:attr, s(:self), :props))
+
         else
           super
         end
@@ -619,6 +636,12 @@ module Ruby2JS
         end
       end
 
+      # prevent attempts to assign to React properties
+      def on_cvasgn(node)
+        return super unless @reactMethod
+        raise NotImplementedError, "setting a React property"
+      end
+
       # convert class variables to props
       def on_op_asgn(node)
         return super unless @react
@@ -638,8 +661,8 @@ module Ruby2JS
 
       # convert class variables to props
       def on_cvar(node)
-        return super unless @react
-        s(:attr, s(:attr, s(:self), :props), node.children.first.to_s[2..-1])
+        return super unless @reactMethod
+        s(:attr, @reactProps, node.children.first.to_s[2..-1])
       end
 
       # analyze ivar usage

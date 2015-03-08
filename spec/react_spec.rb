@@ -301,6 +301,12 @@ describe Ruby2JS::Filter::React do
       to_js( 'class Foo<React; def method; @@x; end; end' ).
         must_include 'this.props.x'
     end
+
+    it "should not support assigning to class variables" do
+      proc { 
+        to_js( 'class Foo<React; def method; @@x=1; end; end' )
+      }.must_raise NotImplementedError
+    end
   end
 
   describe "method calls" do
@@ -350,6 +356,27 @@ describe Ruby2JS::Filter::React do
         must_include 'statics: {one: function() {return 1}}'
     end
   end
+
+  describe "componentWillReceiveProps" do
+    it "should should insert props on calls to componentWillReceiveProps" do
+      to_js( 'class Foo<React; def componentWillMount();' +
+        'self.componentWillReceiveProps(); end; end' ).
+        must_include 'this.componentWillReceiveProps(this.props)'
+    end
+
+    it "should should insert props arg on componentWillReceiveProps" do
+      to_js( 'class Foo<React; def componentWillReceiveProps();' +
+        '@foo = @@foo; end; end' ).
+        must_include 'function($$props) {this.setState({foo: $$props.foo})}'
+    end
+
+    it "should should use props arg on componentWillReceiveProps" do
+      to_js( 'class Foo<React; def componentWillReceiveProps(props);' +
+        '@foo = @@foo; end; end' ).
+        must_include 'function(props) {this.setState({foo: props.foo})}'
+    end
+  end
+
   describe Ruby2JS::Filter::DEFAULTS do
     it "should include React" do
       Ruby2JS::Filter::DEFAULTS.must_include Ruby2JS::Filter::React
