@@ -18,8 +18,22 @@ module Ruby2JS
     class Processor < Parser::AST::Processor
       BINARY_OPERATORS = Converter::OPERATORS[2..-1].flatten
 
+      def initialize(comments)
+        @comments = comments
+      end
+
       def options=(options)
         @options = options
+      end
+
+      def process(node)
+        replacement = super
+
+        if replacement != node and @comments[node]
+          @comments[replacement] = @comments[node]
+        end
+
+        replacement
       end
 
       # handle all of the 'invented' ast types
@@ -60,14 +74,18 @@ module Ruby2JS
     if Proc === source
       file,line = source.source_location
       source = File.read(file.dup.untaint).untaint
-      ast = find_block( parse(source), line )
+      ast, comments = parse(source)
+      comments = Parser::Source::Comment.associate(ast, comments)
+      ast = find_block( ast, line )
       options[:file] = file
     elsif Parser::AST::Node === source
-      ast = source
+      ast, comments = source, {}
       source = ast.loc.expression.source_buffer.source
     else
-      ast = parse( source, options[:file] )
+      ast, comments = parse( source, options[:file] )
+      comments = Parser::Source::Comment.associate(ast, comments)
     end
+
 
     filters = options[:filters] || Filter::DEFAULTS
 
@@ -76,12 +94,12 @@ module Ruby2JS
       filters.reverse.each do |mod|
         filter = Class.new(filter) {include mod} 
       end
-      filter = filter.new
+      filter = filter.new(comments)
       filter.options = options
       ast = filter.process(ast)
     end
 
-    ruby2js = Ruby2JS::Converter.new( ast )
+    ruby2js = Ruby2JS::Converter.new( ast, comments )
 
     ruby2js.binding = options[:binding]
     ruby2js.ivars = options[:ivars]
@@ -102,6 +120,7 @@ module Ruby2JS
       pre = []
       pending = false
       blank = true
+      comment = nil
       lines.each do |line|
         next if line.empty?
 
@@ -114,10 +133,17 @@ module Ruby2JS
         end
 
         line.insert 0, pre.join
-        if '({['.include? line[-1]
+        if line =~ /^\s*\/\//
+          comment ||= line
+          pending = blank
+        elsif '({['.include? line[-1]
           pre.push '  '
-          line.insert 0, "\n" unless blank or pending
+          (comment || line).insert 0, "\n" unless blank or pending
+          comment = nil
           pending = true
+        elsif comment
+          comment.insert 0, "\n" unless blank or pending
+          comment = nil
         end
 
         blank = pending
@@ -133,7 +159,7 @@ module Ruby2JS
     # workaround for https://github.com/whitequark/parser/issues/112
     buffer = Parser::Source::Buffer.new(file || '__SOURCE__')
     buffer.raw_source = source.encode('utf-8')
-    Parser::CurrentRuby.new.parse(buffer)
+    Parser::CurrentRuby.new.parse_with_comments(buffer)
   rescue Parser::SyntaxError => e
     split = source[0..e.diagnostic.location.begin_pos].split("\n")
     line, col = split.length, split.last.length

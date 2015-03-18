@@ -45,7 +45,9 @@ module Ruby2JS
             end
 
             @options[:file2] = filename
-            process Ruby2JS.parse(File.read(filename), filename)
+            ast, comments = Ruby2JS.parse(File.read(filename), filename)
+            @comments.merge! Parser::Source::Comment.associate(ast, comments)
+            process ast
           ensure
             if file2
               @options[:file2] = file2

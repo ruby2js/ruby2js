@@ -20,8 +20,8 @@ module Ruby2JS
 
     attr_accessor :binding, :ivars
 
-    def initialize( ast, vars = {} )
-      @ast, @vars = ast, vars.dup
+    def initialize( ast, comments, vars = {} )
+      @ast, @comments, @vars = ast, comments, vars.dup
       @sep = '; '
       @nl = ''
       @ws = ' '
@@ -89,7 +89,15 @@ module Ruby2JS
         raise NotImplementedError, "unknown AST type #{ ast.type }"
       end
 
-      handler.call(*ast.children) if handler
+      if state == :statement and not @comments[ast].empty?
+        comments = @comments[ast].map do |comment|
+          comment.text.sub(/^\s*#/, '//') + "\n"
+        end
+
+        comments.join + handler.call(*ast.children).to_s
+      else
+        handler.call(*ast.children)
+      end
     end
     
     def group( ast )
