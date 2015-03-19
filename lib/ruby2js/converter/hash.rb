@@ -48,6 +48,7 @@ module Ruby2JS
             # hoist get/set comments to definition of property
             if right.type == :hash
               right.children.each do |pair|
+              next unless Parser::AST::Node === pair.children.last
                 if pair.children.last.type == :block
                   if @comments[pair.children.last]
                     result.insert 0, comments(pair.children.last).join
