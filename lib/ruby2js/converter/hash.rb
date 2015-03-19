@@ -39,7 +39,11 @@ module Ruby2JS
 
           if not @comments[node].empty?
             comments_present = true
-            result.insert 0, comments(node).join
+            if Array === result
+              result.first.insert 0, comments(node).join
+            else
+              result.insert 0, comments(node).join
+            end
           end
 
           result

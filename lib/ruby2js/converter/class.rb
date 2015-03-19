@@ -24,7 +24,7 @@ module Ruby2JS
       body.compact!
       visible = {}
       body.map! do |m| 
-        if m.type == :def
+        node = if m.type == :def
           if m.children.first == :initialize
             # constructor: remove from body and overwrite init function
             init = m
@@ -134,6 +134,19 @@ module Ruby2JS
         else
           raise NotImplementedError, "class #{ m.type }"
         end
+
+        # associate comments
+        if node and @comments[m]
+          if Array === node
+            node[0] = m.updated(node.first.type, node.first.children)
+            @comments[node.first] = @comments[m]
+          else
+            node = m.updated(node.type, node.children)
+            @comments[node] = @comments[m]
+          end
+        end
+
+        node
       end
 
       body.flatten!
@@ -167,12 +180,17 @@ module Ruby2JS
         if methods > 1 or (methods == 1 and body[start].type == :prop)
           pairs = body[start...start+methods].map do |node|
             if node.type == :method
-              s(:pair, s(:str, node.children[1].to_s.chomp('=')),
-                node.children[2])
+              replacement = node.updated(:pair, [
+                s(:str, node.children[1].to_s.chomp('=')),
+                node.children[2]])
             else
-              node.children[1].map {|prop, descriptor|
-                s(:pair, s(:prop, prop), descriptor)}
+              replacement = node.children[1].map do |prop, descriptor|
+                node.updated(:pair, [s(:prop, prop), descriptor])
+              end
             end
+
+            @comments[replacement] = @comments[node]
+            replacement
           end
           body[start...start+methods] =
             s(:send, name, :prototype=, s(:hash, *pairs.flatten))
