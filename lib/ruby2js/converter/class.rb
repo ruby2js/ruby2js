@@ -204,7 +204,10 @@ module Ruby2JS
       end
 
       # prepend constructor
-      body.unshift s(:constructor, parse(name), *init.children[1..-1])
+      constructor = init.updated(:constructor, 
+        [parse(name), *init.children[1..-1]])
+      @comments[constructor] = @comments[init] unless @comments[init].empty?
+      body.unshift constructor
 
       begin
         # save class name
