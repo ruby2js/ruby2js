@@ -25,11 +25,20 @@ module Ruby2JS
             if right[:get]
               result << "get #{left.children[0]}#{
                 parse(right[:get]).sub(/^function/,'')}"
+              unless @comments[right[:get]].empty?
+                comments_present = true
+                result.last.insert 0, comments(right[:get]).join
+              end
             end
             if right[:set]
               result << "set #{left.children[0]}#{
                 parse(right[:set]).sub(/^function/,'')}"
+              unless @comments[right[:set]].empty?
+                comments_present = true
+                result.last.insert 0, comments(right[:set]).join
+              end
             end
+
           else
             key = parse left
             key = $1 if key =~ /\A"([a-zA-Z_$][a-zA-Z_$0-9]*)"\Z/

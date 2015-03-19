@@ -189,7 +189,13 @@ module Ruby2JS
               end
             end
 
-            @comments[replacement] = @comments[node]
+            if @comments[node]
+              if Array === replacement
+                @comments[replacement.first] = @comments[node]
+              else
+                @comments[replacement] = @comments[node]
+              end
+            end
             replacement
           end
           body[start...start+methods] =
@@ -211,7 +217,7 @@ module Ruby2JS
         # add locally visible interfaces to rbstack.  See send.rb, const.rb
         @rbstack.push visible
 
-        parse s(:begin, *body.compact)
+        parse s(:begin, *body.compact), :statement
       ensure
         self.ivars = ivars
         @class_name = class_name
