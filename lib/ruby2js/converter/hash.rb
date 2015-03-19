@@ -44,6 +44,17 @@ module Ruby2JS
             key = $1 if key =~ /\A"([a-zA-Z_$][a-zA-Z_$0-9]*)"\Z/
 
             result = "#{key}: #{parse right}"
+
+            # hoist get/set comments to definition of property
+            if right.type == :hash
+              right.children.each do |pair|
+                if pair.children.last.type == :block
+                  if @comments[pair.children.last]
+                    result.insert 0, comments(pair.children.last).join
+                  end
+                end
+              end
+            end
           end
 
           if not @comments[node].empty?
