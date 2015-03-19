@@ -179,9 +179,15 @@ module Ruby2JS
             end
 
             # add method to class
-            pairs << s(:pair, s(:sym, mname), s(:block, s(:send, nil, :proc), 
-              args, process(s((child.is_method? ? :begin : :autoreturn),
-              *block))))
+            pairs << child.updated(:pair, [s(:sym, mname), s(:block,
+              s(:send, nil, :proc), args,
+              process(s((child.is_method? ? :begin : :autoreturn),
+              *block)))])
+
+            # retain comment
+            unless @comments[child].empty?
+              @comments[pairs.last] = @comments[child]
+            end
           end
         ensure
           @react = react

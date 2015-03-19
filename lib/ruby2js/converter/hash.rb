@@ -7,6 +7,8 @@ module Ruby2JS
     #     (str "value")))
 
     handle :hash do |*pairs|
+      comments_present = false
+
       pairs.map! do |node|
         raise NotImplementedError, "kwsplat" if node.type == :kwsplat
 
@@ -28,13 +30,19 @@ module Ruby2JS
               result << "set #{left.children[0]}#{
                 parse(right[:set]).sub(/^function/,'')}"
             end
-            result
           else
             key = parse left
             key = $1 if key =~ /\A"([a-zA-Z_$][a-zA-Z_$0-9]*)"\Z/
-            "#{key}: #{parse right}"
+
+            result = "#{key}: #{parse right}"
           end
 
+          if not @comments[node].empty?
+            comments_present = true
+            result.insert 0, comments(node).join
+          end
+
+          result
         ensure
           if block_hash
             @block_depth = block_depth
@@ -45,7 +53,9 @@ module Ruby2JS
 
       pairs.flatten!
 
-      if pairs.map {|item| item.length+2}.reduce(&:+).to_i < @width-10
+      if comments_present
+        "{#@nl#{ pairs.join(",#@ws") }#@nl}"
+      elsif pairs.map {|item| item.length+2}.reduce(&:+).to_i < @width-10
         "{#{ pairs.join(', ') }}"
       elsif pairs.length == 1
         "{#{ pairs.join(', ') }}"

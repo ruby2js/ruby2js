@@ -78,6 +78,27 @@ module Ruby2JS
       end
     end
 
+    # extract comments that either precede or are included in the node.
+    # remove from the list this node may appear later in the tree.
+    def comments(ast)
+      if ast.loc and ast.loc.respond_to? :expression
+        expression = ast.loc.expression
+
+        list = @comments[ast].select do |comment|
+          expression.source_buffer == comment.loc.expression.source_buffer and
+          comment.loc.expression.begin_pos < expression.end_pos
+        end
+      else
+        list = @comments[ast]
+      end
+
+      @comments[ast] -= list
+
+      list.map do |comment|
+        comment.text.sub(/^#/, '//') + "\n"
+      end
+    end
+
     def parse(ast, state=:expression)
       return ast unless ast
 
@@ -90,11 +111,7 @@ module Ruby2JS
       end
 
       if state == :statement and not @comments[ast].empty?
-        comments = @comments[ast].map do |comment|
-          comment.text.sub(/^\s*#/, '//') + "\n"
-        end
-
-        comments.join + handler.call(*ast.children).to_s
+        comments(ast).join + handler.call(*ast.children).to_s
       else
         handler.call(*ast.children)
       end
