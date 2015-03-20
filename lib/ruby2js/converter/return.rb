@@ -24,7 +24,7 @@ module Ruby2JS
       end
 
       if EXPRESSIONS.include? block.last.type 
-        block.push s(:return, block.pop)
+        block.push @ast.updated(:return, [block.pop])
       elsif block.last.type == :if
         node = block.pop
         if node.children[1] and node.children[2] and

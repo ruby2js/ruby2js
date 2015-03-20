@@ -43,7 +43,7 @@ module Ruby2JS
               s(:prop, s(:attr, name, :prototype), m.children.first =>
                   {enumerable: s(:true), configurable: s(:true),
                   get: s(:block, s(:send, nil, :proc), m.children[1],
-                    s(:autoreturn, *m.children[2..-1]))})
+                    m.updated(:autoreturn, m.children[2..-1]))})
             else
               # method: add to prototype
               s(:method, s(:attr, name, :prototype),
@@ -66,7 +66,7 @@ module Ruby2JS
             s(:prop, name, m.children[1].to_s =>
                 {enumerable: s(:true), configurable: s(:true),
                 get: s(:block, s(:send, nil, :proc), m.children[2],
-                  s(:autoreturn, *m.children[3..-1]))})
+                  m.updated(:autoreturn, m.children[3..-1]))})
           else
             # class method definition: add to prototype
             s(:prototype, s(:send, name, "#{m.children[1]}=",
