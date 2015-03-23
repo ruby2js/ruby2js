@@ -12,7 +12,7 @@ module Ruby2JS
       if inheritance
         init = s(:def, :initialize, s(:args), s(:super))
       else
-        init = s(:def, :initialize, s(:args))
+        init = s(:def, :initialize, s(:args), nil)
       end
 
       body.compact!
@@ -179,9 +179,6 @@ module Ruby2JS
         end
       end
 
-      # prepend constructor
-      body.unshift s(:constructor, parse(name), *init.children[1..-1])
-
       begin
         # save class name
         class_name, @class_name = @class_name, name
@@ -193,7 +190,8 @@ module Ruby2JS
         # add locally visible interfaces to rbstack.  See send.rb, const.rb
         @rbstack.push visible
 
-        parse s(:begin, *body.compact)
+        parse s(:begin, s(:constructor, name, *init.children[1..-1]),
+          *body.compact)
       ensure
         self.ivars = ivars
         @class_name = class_name
@@ -224,8 +222,12 @@ module Ruby2JS
           end
         elsif @ast.type == :method
           parse s(:send, *args)
+        elsif args.first.children.first
+          parse s(:send, args.first.children.first,
+            "#{args.first.children[1]}=", s(:block, s(:send, nil, :proc), 
+            *args[1..-1]))
         else
-          parse s(:def, *args)
+          parse s(:def, args.first.children[1], *args[1..-1])
         end
       ensure
         @instance_method = instance_method

@@ -6,7 +6,7 @@ module Ruby2JS
 
     handle :next do |n=nil|
       raise NotImplementedError, "next argument #{ n.inspect }" if n
-      @next_token.to_s
+      put @next_token.to_s
     end
   end
 end

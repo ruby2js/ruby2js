@@ -5,7 +5,7 @@ module Ruby2JS
     #   (int 1))
 
     handle :ivasgn do |var, expression|
-      "#{ var.to_s.sub('@', 'this._') } = #{ parse expression }"
+      put "#{ var.to_s.sub('@', 'this._') } = "; parse expression
     end
   end
 end

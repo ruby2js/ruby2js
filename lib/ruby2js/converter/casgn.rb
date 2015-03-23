@@ -6,8 +6,11 @@ module Ruby2JS
 
     handle :casgn do |cbase, var, value|
       begin
-        var = "#{ parse cbase }.var" if cbase
-        "var #{ var } = #{ parse value }"
+        put "var "
+
+        (parse cbase; put '.') if cbase
+
+        put "#{ var } = "; parse value
       ensure
         @vars[var] = true
       end

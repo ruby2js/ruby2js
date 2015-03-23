@@ -28,10 +28,9 @@ module Ruby2JS
         var = 'var ' unless @vars.include?(name) or @state != :statement
 
         if value
-
-          "#{ var }#{ name } = #{ parse value }"
+          put "#{ var }#{ name } = "; parse value
         else
-          "#{ var }#{ name }"
+          put "#{ var }#{ name }"
         end
       ensure
         @vars[name] = true

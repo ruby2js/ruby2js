@@ -6,7 +6,7 @@ module Ruby2JS
     # NOTE: in? is a synthetic 
 
     handle :in? do |left, right|
-      "#{ parse left } in #{ parse right }"
+      parse left; put " in "; parse right
     end
   end
 end

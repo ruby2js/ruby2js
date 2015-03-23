@@ -7,7 +7,7 @@ module Ruby2JS
     handle :break do |n=nil|
       raise NotImplementedError, "break argument #{ n.inspect }" if n
       raise NotImplementedError, "break outside of loop" if @next_token == :return
-      'break'
+      put 'break'
     end
   end
 end

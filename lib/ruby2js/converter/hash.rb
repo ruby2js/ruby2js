@@ -7,8 +7,15 @@ module Ruby2JS
     #     (str "value")))
 
     handle :hash do |*pairs|
-      pairs.map! do |node|
+      compact = pairs.length <= 1
+      #TODO pairs.map {|item| item.length+2}.reduce(&:+).to_i < @width-10
+
+      (compact ? put('{') : puts('{'))
+
+      pairs.each_with_index do |node, index|
         raise NotImplementedError, "kwsplat" if node.type == :kwsplat
+
+        (compact ? put(', ') : put(",#@ws")) unless index == 0
 
         begin
           block_depth, block_this, block_hash = @block_depth, @block_this, false
@@ -19,20 +26,25 @@ module Ruby2JS
           end
 
           if left.type == :prop
-            result = []
             if right[:get]
-              result << "get #{left.children[0]}#{
-                parse(right[:get]).sub(/^function/,'')}"
+              @prop = "get #{left.children[0]}"
+              parse(right[:get])
+              (compact ? put(', ') : put(",#@ws")) if right[:set]
             end
             if right[:set]
-              result << "set #{left.children[0]}#{
-                parse(right[:set]).sub(/^function/,'')}"
+              @prop = "set #{left.children[0]}"
+              parse(right[:set])
             end
-            result
           else
-            key = parse left
-            key = $1 if key =~ /\A"([a-zA-Z_$][a-zA-Z_$0-9]*)"\Z/
-            "#{key}: #{parse right}"
+            if 
+              left.children.first.to_s =~ /\A[a-zA-Z_$][a-zA-Z_$0-9]*\Z/
+            then
+              put left.children.first
+            else
+              parse left
+            end
+
+            put ': '; parse right
           end
 
         ensure
@@ -43,15 +55,7 @@ module Ruby2JS
         end
       end
 
-      pairs.flatten!
-
-      if pairs.map {|item| item.length+2}.reduce(&:+).to_i < @width-10
-        "{#{ pairs.join(', ') }}"
-      elsif pairs.length == 1
-        "{#{ pairs.join(', ') }}"
-      else
-        "{#@nl#{ pairs.join(",#@ws") }#@nl}"
-      end
+      (compact ? put('}') : sput('}'))
     end
   end
 end

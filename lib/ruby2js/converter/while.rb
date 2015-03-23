@@ -8,7 +8,8 @@ module Ruby2JS
     handle :while do |condition, block|
       begin
         next_token, @next_token = @next_token, :continue
-        "while (#{ parse condition }) {#@nl#{ scope block }#@nl}"
+
+        put 'while ('; parse condition; puts ') {'; scope block; sput '}'
       ensure
         @next_token = next_token
       end

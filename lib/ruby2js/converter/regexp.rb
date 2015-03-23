@@ -17,27 +17,30 @@ module Ruby2JS
         str = parts.map {|part| part.children.first}.join
         str = str.gsub(/ #.*/,'').gsub(/\s/,'') if extended
         unless str.include? '/'
-          return "/#{ str }/#{ opts.join }"
+          return put "/#{ str }/#{ opts.join }"
         end
-        str = str.inspect
+        put "new RegExp(#{ str.inspect }"
       else
-        parts.map! do |part|
+        put 'new RegExp('
+
+        parts.each_with_index do |part, index|
+          put ' + ' unless index == 0
+
           if part.type == :str
             str = part.children.first 
             str = str.gsub(/ #.*/,'').gsub(/\s/,'') if extended
-            str.inspect
+            put str.inspect
           else
             parse part
           end
         end
-        str = parts.join(' + ')
       end
 
-      if opts.empty?
-        "new RegExp(#{ str })"
-      else
-        "new RegExp(#{ str }, #{ opts.join.inspect})"
+      unless opts.empty?
+        put ", #{ opts.join.inspect})"
       end
+
+      put ')'
     end
   end
 end

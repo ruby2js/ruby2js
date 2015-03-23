@@ -8,7 +8,7 @@ module Ruby2JS
 
     handle :arg, :blockarg do |arg, unknown=nil|
       raise NotImplementedError, "argument #{ unknown.inspect }" if unknown
-      arg
+      put arg
     end
 
     # (shadowarg :a)

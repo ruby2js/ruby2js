@@ -10,7 +10,9 @@ module Ruby2JS
     #   (...))
 
     handle :dstr, :dsym do |*children|
-      children.map! do |child| 
+      children.each_with_index do |child, index|
+        put ' + ' unless index == 0
+
         if child.type == :begin and child.children.length == 1
           child = child.children.first
         end
@@ -26,8 +28,6 @@ module Ruby2JS
           parse child
         end
       end
-
-      children.join(' + ')
     end
   end
 end

@@ -46,14 +46,8 @@ describe Ruby2JS::Filter::AngularRB do
       js = <<-JS.gsub!(/^ {8}/, '').chomp
         (function() {
           var PhonecatApp = angular.module("PhonecatApp", []);
-
-          PhonecatApp.controller("foo", function() {
-
-          });
-
-          PhonecatApp.controller("bar", function() {
-
-          })
+          PhonecatApp.controller("foo", function() {  });
+          PhonecatApp.controller("bar", function() {  })
         })()
       JS
 
@@ -76,9 +70,13 @@ describe Ruby2JS::Filter::AngularRB do
       RUBY
 
       js = <<-JS.gsub!(/^ {8}/, '').chomp
-        angular.module("PhonecatApp", []).controller("PhoneListCtrl", function($scope) {
-          $scope.orderProp = "age"
-        })
+        angular.module("PhonecatApp", []).controller(
+          "PhoneListCtrl",
+
+          function($scope) {
+            $scope.orderProp = "age"
+          }
+        )
       JS
 
       to_js( ruby ).must_equal js
@@ -94,9 +92,13 @@ describe Ruby2JS::Filter::AngularRB do
       RUBY
 
       js = <<-JS.gsub!(/^ {8}/, '').chomp
-        angular.module("PhonecatApp", []).controller("PhoneListCtrl", function($scope) {
-          $scope.orderProp = "age"
-        })
+        angular.module("PhonecatApp", []).controller(
+          "PhoneListCtrl",
+
+          function($scope) {
+            $scope.orderProp = "age"
+          }
+        )
       JS
 
       to_js( ruby ).must_equal js
@@ -210,9 +212,7 @@ describe Ruby2JS::Filter::AngularRB do
           "PhoneListCtrl",
 
           function($scope) {
-            $scope.$watch("list", function() {
-              $scope.orderProp = "age"
-            })
+            $scope.$watch("list", function() { $scope.orderProp = "age" })
           }
         )
       JS
@@ -268,9 +268,7 @@ describe Ruby2JS::Filter::AngularRB do
           "PhoneListCtrl",
 
           function($scope) {
-            $scope.$on("update", function() {
-              $scope.orderProp = "age"
-            })
+            $scope.$on("update", function() { $scope.orderProp = "age" })
           }
         )
       JS
@@ -316,9 +314,7 @@ describe Ruby2JS::Filter::AngularRB do
           "PhoneListCtrl",
 
           function($timeout) {
-            $timeout(function() {
-              update()
-            }, 500)
+            $timeout(function() { update() }, 500)
           }
         )
       JS
@@ -342,9 +338,7 @@ describe Ruby2JS::Filter::AngularRB do
           "PhoneListCtrl",
 
           function($interval) {
-            $interval(function() {
-              update()
-            }, 5000)
+            $interval(function() { update() }, 5000)
           }
         )
       JS
@@ -362,9 +356,13 @@ describe Ruby2JS::Filter::AngularRB do
       RUBY
 
       js = <<-JS.gsub!(/^ {8}/, '').chomp
-        angular.module("PhonecatApp", []).controller("PhoneListCtrl", function($filter) {
-          var f = $filter("f")
-        })
+        angular.module("PhonecatApp", []).controller(
+          "PhoneListCtrl",
+
+          function($filter) {
+            var f = $filter("f")
+          }
+        )
       JS
 
       to_js( ruby ).must_equal js
@@ -378,9 +376,13 @@ describe Ruby2JS::Filter::AngularRB do
       RUBY
 
       js = <<-JS.gsub!(/^ {8}/, '').chomp
-        angular.module("PhonecatApp").controller("PhoneListCtrl", function($scope) {
-          $scope.orderProp = "age"
-        })
+        angular.module("PhonecatApp").controller(
+          "PhoneListCtrl",
+
+          function($scope) {
+            $scope.orderProp = "age"
+          }
+        )
       JS
 
       to_js( ruby ).must_equal js
@@ -483,12 +485,7 @@ describe Ruby2JS::Filter::AngularRB do
           "$routeProvider",
 
           function($routeProvider) {
-            $routeProvider.when(
-              "/phones",
-              {controller: "PhoneListCtrl"}
-            ).otherwise(
-              {redirectTo: "/phones"}
-            )
+            $routeProvider.when("/phones", {controller: "PhoneListCtrl"}).otherwise({redirectTo: "/phones"})
           }
         ])
       JS
@@ -602,9 +599,13 @@ describe Ruby2JS::Filter::AngularRB do
       RUBY
 
       js = <<-JS.gsub!(/^ {8}/, '').chomp
-        angular.module("PhonecatApp", []).directive("my_signature", function() {
-          return {template: "--signature"}
-        })
+        angular.module("PhonecatApp", []).directive(
+          "my_signature",
+
+          function() {
+            return {template: "--signature"}
+          }
+        )
       JS
 
       to_js( ruby ).must_equal js
@@ -717,9 +718,13 @@ describe Ruby2JS::Filter::AngularRB do
 
           function() {
             return {link: function(scope, elem, attrs) {
-              attrs.$observe(\"name1\", function(value) {
-                elem.attr(\"name2\", value)
-              })
+              attrs.$observe(
+                \"name1\",
+
+                function(value) {
+                  elem.attr(\"name2\", value)
+                }
+              )
             }}
           }
         )
@@ -738,9 +743,13 @@ describe Ruby2JS::Filter::AngularRB do
       RUBY
 
       js = <<-JS.gsub!(/^ {8}/, '').chomp
-        angular.module("PhonecatApp", []).directive("my_signature", function() {
-          return {template: "--signature"}
-        })
+        angular.module("PhonecatApp", []).directive(
+          "my_signature",
+
+          function() {
+            return {template: "--signature"}
+          }
+        )
       JS
 
       to_js( ruby ).must_equal js

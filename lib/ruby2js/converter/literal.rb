@@ -6,7 +6,7 @@ module Ruby2JS
     # (str "1"))
 
     handle :int, :float, :str do |value|
-      value.inspect
+      put value.inspect
     end
   end
 end

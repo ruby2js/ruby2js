@@ -4,7 +4,7 @@ module Ruby2JS
     # (nthref 1)
 
     handle :nth_ref do |var|
-      "$#{var}"
+      put "$#{var}"
     end
   end
 end

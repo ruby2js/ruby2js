@@ -12,18 +12,15 @@ module Ruby2JS
     handle :for do |var, expression, block|
       begin
         next_token, @next_token = @next_token, :continue
-        if expression.type == :irange
-          "for (var #{parse var} = #{ parse expression.children.first }; " +
-            "#{ parse var } <= #{ parse expression.children.last }; " +
-            "#{ parse var }++) {#@nl#{ scope block }#@nl}"
-        elsif expression.type == :erange
-          "for (var #{parse var} = #{ parse expression.children.first }; " +
-            "#{ parse var } < #{ parse expression.children.last }; " +
-            "#{ parse var }++) {#@nl#{ scope block }#@nl}"
+        put "for (var "; parse var
+        if [:irange, :erange].include? expression.type
+          put ' = '; parse expression.children.first; put '; '; parse var
+          (expression.type == :erange ? put(' < ') : put(' <= '))
+          parse expression.children.last; put '; '; parse var; puts '++'
         else
-          "for (var #{parse var} in #{ parse expression }) " +
-            "{#@nl#{ scope block }#@nl}"
+          put ' in '; parse expression; 
         end
+        puts ') {'; scope block; sput '}'
       ensure
         @next_token = next_token
       end

@@ -35,51 +35,51 @@ module Ruby2JS
         body = block
       end
 
-      output = "try {#@nl#{ parse body, :statement }#@nl}"
+      if not recovers and not finally
+        return parse s(:begin, *children)
+      end
+
+      puts "try {"; parse body, :statement; sput '}'
 
       if recovers
         if recovers.length == 1 and not recovers.first.children.first
           # single catch with no exception named
-          output += " catch (#{ parse var }) " +
-            "{#@nl#{ parse recovers.first.children.last, :statement }#@nl}"
+          put " catch ("; parse var; puts ") {"
+          parse recovers.first.children.last, :statement; sput '}'
         else
-          output += " catch (#{ parse var }) {#@nl"
+          put " catch ("; parse var; puts ') {'
 
           first = true
           recovers.each do |recover|
             exceptions, var, recovery = recover.children
 
             if exceptions
-              tests = exceptions.children.map do |exception|
-                "#{ parse var} instanceof #{ parse exception }"
-              end
 
-              output += "} else " if not first
+              put "} else " if not first
               first = false
 
-              output += "if (#{ tests.join(' || ') }) {#@nl"
+              put  'if ('
+              exceptions.children.each_with_index do |exception, index|
+                put ' || ' unless index == 0
+                parse var; put ' instanceof '; parse exception
+              end
+              puts ') {'
             else
-              output += "} else {#@nl"
+              puts '} else {'
             end
 
-            output += "#{ parse recovery, :statement }#@nl"
+            parse recovery, :statement; puts ''
           end
 
           if recovers.last.children.first
-            output += "} else {#{@nl}throw #{ parse var }#@nl"
+            puts "} else {"; put 'throw '; parse var; puts ''
           end
 
-          output += "}#@nl}"
+          puts '}'; put '}'
         end
       end
 
-      output += " finally {#@nl#{ parse finally, :statement }#@nl}" if finally
-
-      if recovers or finally
-        output
-      else
-        parse s(:begin, *children)
-      end
+      (puts ' finally {'; parse finally, :statement; sput '}') if finally
     end
   end
 end

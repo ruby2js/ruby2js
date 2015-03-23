@@ -9,7 +9,7 @@ module Ruby2JS
 
     handle :defined?, :undefined? do |var|
       op = (@ast.type == :defined? ? :"!==" : :===)
-      "typeof #{ parse var } #{ op } 'undefined'"
+      put "typeof "; parse var; put " #{ op } 'undefined'"
     end
   end
 end

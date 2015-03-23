@@ -1,5 +1,7 @@
 require 'parser/current'
 
+require 'ruby2js/serializer'
+
 module Ruby2JS
   class Converter
     LOGICAL   = :and, :not, :or
@@ -34,6 +36,8 @@ module Ruby2JS
       @@handlers.each do |name|
         @handlers[name] = method("on_#{name}")
       end
+
+      init_serializer
     end
     
     def enable_vertical_whitespace
@@ -52,6 +56,7 @@ module Ruby2JS
 
     def to_js
       parse( @ast, :statement )
+      @line.join
     end
 
     def operator_index op
@@ -89,11 +94,11 @@ module Ruby2JS
         raise NotImplementedError, "unknown AST type #{ ast.type }"
       end
 
-      handler.call(*ast.children) if handler
+      handler.call(*ast.children)
     end
     
     def group( ast )
-      "(#{ parse ast })"
+      put '('; parse ast; put ')'
     end
   end
 end

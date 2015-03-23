@@ -503,7 +503,13 @@ describe Ruby2JS do
     end
 
     it "should parse class with constructor" do
-      to_js('class Person; def initialize(name); @name = name; end; end').must_equal 'function Person(name) {this._name = name}'
+      to_js('class Person; def initialize(name); @name = name; end; end').
+        must_equal 'function Person(name) {this._name = name}'
+    end
+
+    it "should parse a nested class with constructor" do
+      to_js('class A::Person; def initialize(name); @name = name; end; end').
+        must_equal 'A.Person = function(name) {this._name = name}'
     end
 
     it "should parse class with constructor and method" do

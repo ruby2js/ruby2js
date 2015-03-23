@@ -32,8 +32,9 @@ module Ruby2JS
       if [:call, :[]].include? method and receiver and receiver.type == :block 
         t2,m2,*args2 = receiver.children.first.children
         if not t2 and [:lambda, :proc].include? m2 and args2.length == 0
-          receiver = (@state == :statement ? group(receiver) : parse(receiver))
-          return parse s(:send, nil, receiver, *args)
+          (@state == :statement ? group(receiver) : parse(receiver))
+          put '('; parse_all *args, join: ', '; put ')'
+          return
         end
       end
 
@@ -62,31 +63,36 @@ module Ruby2JS
         parse s(:not, receiver)
 
       elsif method == :[]
-        "#{ parse receiver }[#{ args.map {|arg| parse arg}.join(', ') }]"
+        parse receiver; put '['; parse_all *args, join: ', '; put ']'
 
       elsif method == :[]=
-        "#{ parse receiver }[#{ args[0..-2].map {|arg| parse arg}.join(', ') }] = #{ parse args[-1] }"
+        parse receiver; put '['; parse_all *args[0..-2], join: ', '; put '] = '
+        parse args[-1]
 
       elsif [:-@, :+@, :~, '~'].include? method
-        "#{ method.to_s[0] }#{ parse receiver }"
+        put method.to_s[0]; parse receiver
 
       elsif method == :=~
-        "#{ parse args.first }.test(#{ parse receiver })"
+        parse args.first; put '.test('; parse receiver; put ')'
 
       elsif method == :!~
-        "!#{ parse args.first }.test(#{ parse receiver })"
+        put '!'; parse args.first; put '.test('; parse receiver; put ')'
 
       elsif method == :<< and args.length == 1 and @state == :statement
-        "#{ parse receiver }.push(#{ parse args.first })"
+        parse receiver; put '.push('; parse args.first; put ')'
 
       elsif method == :<=>
         raise NotImplementedError, "use of <=>"
 
       elsif OPERATORS.flatten.include?(method) and not LOGICAL.include?(method)
-        "#{ group_receiver ? group(receiver) : parse(receiver) } #{ method } #{ group_target ? group(target) : parse(target) }"  
+        (group_receiver ? group(receiver) : parse(receiver))
+        put " #{ method } "
+        (group_target ? group(target) : parse(target))
 
       elsif method =~ /=$/
-        "#{ parse receiver }#{ '.' if receiver }#{ method.to_s.sub(/=$/, ' =') } #{ parse args.first }"
+        parse receiver
+        put "#{ '.' if receiver }#{ method.to_s.sub(/=$/, ' =') } "
+        parse args.first
 
       elsif method == :new
         if receiver
@@ -120,12 +126,9 @@ module Ruby2JS
             end
           end
 
-          args = args.map {|a| parse a}.join(', ')
-
+          put "new "; parse receiver
           if ast.is_method?
-            "new #{ parse receiver }(#{ args })"
-          else
-            "new #{ parse receiver }"
+            put '('; parse_all *args, join: ', '; put ')'
           end
         elsif args.length == 1 and args.first.type == :send
           # accommodation for JavaScript like new syntax w/argument list
@@ -140,19 +143,19 @@ module Ruby2JS
 
       elsif method == :raise and receiver == nil
         if args.length == 1
-          "throw #{ parse args.first }"
+          put 'throw '; parse args.first
         else
-          "throw new #{ parse args.first }(#{ parse args[1] })"
+          put 'throw new '; parse args.first; put '('; parse args[1]; put ')'
         end
 
       elsif method == :typeof and receiver == nil
-        "typeof #{ parse args.first }"
+        put 'typeof '; parse args.first
 
       else
         if not ast.is_method?
           if receiver
-             call = (group_receiver ? group(receiver) : parse(receiver))
-            "#{ call }.#{ method }"
+            (group_receiver ? group(receiver) : parse(receiver))
+            put ".#{ method }"
           else
             parse s(:lvasgn, method), @state
           end
@@ -160,15 +163,16 @@ module Ruby2JS
           parse s(:send, s(:attr, receiver, method), :apply, 
             (receiver || s(:nil)), s(:array, *args))
         else
-          call = (group_receiver ? group(receiver) : parse(receiver))
-          call = "#{ call }#{ '.' if receiver && method}#{ method }"
-          args = args.map {|a| parse a}
-          if args.map {|arg| arg.length+2}.reduce(&:+).to_i < width-10
-            "#{ call }(#{ args.join(', ') })"
-          elsif args.length == 1 and args.first.to_s.include? "\n"
-            "#{ call }(#{ args.join(', ') })"
+          (group_receiver ? group(receiver) : parse(receiver))
+          put "#{ '.' if receiver && method}#{ method }"
+
+          # TODO args.map {|arg| arg.length+2}.reduce(&:+).to_i < width-10
+          if args.length <= 1
+            put "("; parse_all *args, join: ', '; put ')'
           else
-            "#{ call }(#@nl#{ args.join(",#@ws") }#@nl)"
+            mark = output_location
+            puts "("; parse_all *args, join: ",#@ws"; sput ')'
+            compact mark
           end
         end
       end

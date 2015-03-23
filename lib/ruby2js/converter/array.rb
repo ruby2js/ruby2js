@@ -21,11 +21,11 @@ module Ruby2JS
             :concat, s(:array, *items[splat+1..-1]))
         end
       else
-        items.map! { |item| parse item }
-        if items.map {|item| item.length+2}.reduce(&:+).to_i < @width-8
-          "[#{ items.join(', ') }]"
+        if items.length <= 1
+          # TODO items.map {|item| item.length+2}.reduce(&:+).to_i < @width-8
+          put '['; parse_all *items, join: ', '; put ']'
         else
-          "[#@nl#{ items.join(",#@ws") }#@nl]"
+          puts '['; parse_all *items, join: ",#{@ws}"; sput ']'
         end
       end
     end

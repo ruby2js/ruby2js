@@ -5,11 +5,12 @@ module Ruby2JS
 
     handle :cvar do |var|
       if @class_name
-        var.to_s.sub('@@', "#{parse @class_name}._")
+        parse @class_name
+        put var.to_s.sub('@@', "._")
       elsif @prototype
-        var.to_s.sub('@@', 'this._')
+        put var.to_s.sub('@@', 'this._')
       else
-        var.to_s.sub('@@', 'this.constructor._')
+        put var.to_s.sub('@@', 'this.constructor._')
       end
     end
   end

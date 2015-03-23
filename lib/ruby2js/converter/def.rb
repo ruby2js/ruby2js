@@ -90,15 +90,27 @@ module Ruby2JS
 
       nl = @nl unless body == s(:begin)
       begin
+        if name
+          put "function #{name}"
+        elsif @prop
+          put @prop
+          @prop = nil
+        else
+          put 'function'
+        end
+
+        put '('; parse args; put ") {#{nl}"
+
         next_token, @next_token = @next_token, :return
         @block_depth += 1 if @block_depth
-        body = scope body, vars
+        mark = output_location
+        scope body, vars
         if @block_this and @block_depth == 1
-          body = "var self = this#{@sep}#{body}"
+          insert mark, "var self = this#{@sep}"
           @block_this = false
         end
 
-        "function#{ " #{name}" if name }(#{ parse args }) {#{nl}#{ body }#{nl}}"
+        put "#{nl}}"
       ensure
         @next_token = next_token
         @block_depth -= 1 if @block_depth

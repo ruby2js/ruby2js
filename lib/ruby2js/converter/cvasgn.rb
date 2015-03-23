@@ -6,17 +6,16 @@ module Ruby2JS
 
     handle :cvasgn do |var, expression=nil|
       if @class_name
-        var = var.to_s.sub('@@', "#{parse @class_name}._")
+        parse @class_name
+        put var.to_s.sub('@@', "._")
       elsif @prototype
-        var = var.to_s.sub('@@', 'this._')
+        put var.to_s.sub('@@', 'this._')
       else
-        var = var.to_s.sub('@@', 'this.constructor._')
+        put var.to_s.sub('@@', 'this.constructor._')
       end
 
       if expression
-        "#{ var } = #{ parse expression }"
-      else
-        var
+        put " = "; parse expression
       end
     end
   end

@@ -6,8 +6,15 @@ module Ruby2JS
     #   (sym :bar))
 
     handle :undef do |*syms|
-      "delete " + syms.
-        map {|sym| sym.type == :sym ? sym.children.last : parse(sym)}.join(@sep)
+      syms.each_with_index do |sym, index|
+        put @sep unless index == 0
+
+        if sym.type == :sym
+          put "delete #{sym.children.last}"
+        else
+          put "delete "; parse sym
+        end
+      end
     end
   end
 end

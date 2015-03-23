@@ -7,7 +7,7 @@ module Ruby2JS
       # resolve anonymous receivers against rbstack
       receiver ||= @rbstack.map {|rb| rb[name]}.compact.last
 
-      "#{ parse receiver }#{ '.' if receiver }#{ name }"
+      parse receiver; put '.' if receiver; put name
     end
   end
 end

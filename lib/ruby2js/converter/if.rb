@@ -15,23 +15,23 @@ module Ruby2JS
       then_block ||= s(:nil)
 
       if @state == :statement
-        output = "if (#{ parse condition }) {#@nl#{ scope then_block }#@nl}"
-        while else_block and else_block.type == :if
-          condition, then_block, else_block = else_block.children
-          output <<  " else if (#{ parse condition }) " +
-            "{#@nl#{ scope then_block }#@nl}"
-        end
-        output << " else {#@nl#{ scope else_block }#@nl}" if else_block
-
         # use short form when appropriate
-        unless output.length>@width-8 or else_block or then_block.type == :begin
-          output = "if (#{ parse condition }) #{ scope then_block }"
+        # output.length>@width-8 TODO
+        unless else_block or then_block.type == :begin
+          put "if ("; parse condition; put ') '; scope then_block
+        else
+          put "if ("; parse condition; puts ') {'; scope then_block; sput '}'
+          while else_block and else_block.type == :if
+            condition, then_block, else_block = else_block.children
+            put ' else if ('; parse condition; puts ') {'
+            scope then_block; sput '}'
+          end
+          (puts ' else {'; scope else_block; sput '}') if else_block
         end
-
-        output
       else
         else_block ||= s(:nil)
-        "(#{ parse condition } ? #{ parse then_block } : #{ parse else_block })"
+        put '('; parse condition; put ' ? '; parse then_block
+        put ' : '; parse else_block; put ')'
       end
     end
   end

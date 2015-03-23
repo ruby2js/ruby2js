@@ -10,7 +10,8 @@ module Ruby2JS
       block = block.updated(:begin) if block.type == :kwbegin
       begin
         next_token, @next_token = @next_token, :continue
-        "do {#@nl#{ scope block }#@nl} while (#{ parse condition })"
+
+        puts 'do {'; scope block; sput '} while ('; parse condition; put ')'
       ensure
         @next_token = next_token
       end

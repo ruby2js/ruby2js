@@ -19,16 +19,14 @@ module Ruby2JS
       lgroup   = LOGICAL.include?( left.type ) && 
         op_index < operator_index( left.type )
       lgroup = true if left and left.type == :begin
-      left     = parse left
-      left     = "(#{ left })" if lgroup
 
       rgroup = LOGICAL.include?( right.type ) && 
         op_index < operator_index( right.type )
       rgroup = true if right.type == :begin
-      right    = parse right
-      right    = "(#{ right })" if rgroup
 
-      "#{ left } #{ type==:and ? '&&' : '||' } #{ right }"
+      put '(' if lgroup; parse left; put ')' if lgroup
+      put (type==:and ? ' && ' : ' || ')
+      put '(' if rgroup; parse right; put ')' if rgroup
     end
 
     # (not
@@ -49,10 +47,8 @@ module Ruby2JS
         group   = LOGICAL.include?( expr.type ) && 
           operator_index( :not ) < operator_index( expr.type )
         group = true if expr and expr.type == :begin
-        expr     = parse expr
-        expr     = "(#{ expr })" if group
 
-        "!#{ expr }"
+        put '!'; put '(' if group; parse expr; put ')' if group
       end
     end
   end

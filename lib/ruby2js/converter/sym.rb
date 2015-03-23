@@ -4,7 +4,7 @@ module Ruby2JS
     # (sym :sym))
 
     handle :sym do |sym|
-      sym.to_s.inspect
+      put sym.to_s.inspect
     end
   end
 end

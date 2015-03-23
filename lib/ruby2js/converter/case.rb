@@ -9,15 +9,19 @@ module Ruby2JS
     #   (...))
 
     handle :case do |expr, *whens, other|
-      whens.map! do |node|
+      put 'switch ('; parse expr; puts ') {'
+
+      whens.each_with_index do |node, index|
+        puts '' unless index == 0
+
         *values, code = node.children
-        cases = values.map {|value| "case #{ parse value }:#@ws"}.join
-        "#{ cases }#{ parse code, :statement }#{@sep}break#@sep"
+        values.each {|value| put 'case '; parse value; put ":#@ws"}
+        parse code, :statement; put "#{@sep}break#@sep"
       end
 
-      other = "#{@nl}default:#@ws#{ parse other, :statement }#@nl" if other
+      (puts "#{@nl}default: "; parse other, :statement; puts '') if other
 
-      "switch (#{ parse expr }) {#@nl#{whens.join(@nl)}#{other}}"
+      sput '}'
     end
   end
 end

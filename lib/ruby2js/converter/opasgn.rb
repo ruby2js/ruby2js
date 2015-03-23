@@ -14,12 +14,12 @@ module Ruby2JS
 
       if [:+, :-].include?(op) and value.type==:int and value.children==[1]
         if @state == :statement
-          "#{ parse var }#{ op }#{ op }"
+          parse var; put "#{ op }#{ op }"
         else
-          "#{ op }#{ op }#{ parse var }"
+          put "#{ op }#{ op }"; parse var
         end
       else
-        "#{ parse var } #{ op }= #{ parse value }"
+        parse var; put " #{ op }= "; parse value
       end
     end
 

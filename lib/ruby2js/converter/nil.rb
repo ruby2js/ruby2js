@@ -4,7 +4,7 @@ module Ruby2JS
     # (nil)
 
     handle :nil do
-      'null'
+      put 'null'
     end
   end
 end

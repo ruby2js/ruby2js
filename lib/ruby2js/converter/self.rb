@@ -6,9 +6,9 @@ module Ruby2JS
     handle :self do
       if @block_depth and @block_depth > 1
         @block_this = true
-        'self'
+        put 'self'
       else
-        'this'
+        put 'this'
       end
     end
   end

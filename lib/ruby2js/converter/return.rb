@@ -6,9 +6,9 @@ module Ruby2JS
 
     handle :return do |value=nil|
       if value
-        "return #{ parse value }"
+        put 'return '; parse value
       else
-        "return"
+        put 'return'
       end
     end
 

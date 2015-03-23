@@ -5,7 +5,7 @@ module Ruby2JS
     # (false)
 
     handle :true, :false do
-      @ast.type.to_s
+      put @ast.type.to_s
     end
   end
 end

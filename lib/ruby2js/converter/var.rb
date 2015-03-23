@@ -5,7 +5,7 @@ module Ruby2JS
     # (gvar :$a)
 
     handle :lvar, :gvar do |var|
-      var
+      put var
     end
   end
 end
