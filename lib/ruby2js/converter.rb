@@ -3,7 +3,7 @@ require 'parser/current'
 require 'ruby2js/serializer'
 
 module Ruby2JS
-  class Converter
+  class Converter < Serializer
     LOGICAL   = :and, :not, :or
     OPERATORS = [:[], :[]=], [:not, :!], [:*, :/, :%], [:+, :-], [:>>, :<<], 
       [:&], [:^, :|], [:<=, :<, :>, :>=], [:==, :!=, :===, :"!=="], [:and, :or]
@@ -23,29 +23,19 @@ module Ruby2JS
     attr_accessor :binding, :ivars
 
     def initialize( ast, vars = {} )
+      super()
+
       @ast, @vars = ast, vars.dup
-      @sep = '; '
-      @nl = ''
-      @ws = ' '
       @varstack = []
       @rbstack = []
-      @width = 80
       @next_token = :return
 
       @handlers = {}
       @@handlers.each do |name|
         @handlers[name] = method("on_#{name}")
       end
-
-      init_serializer
     end
     
-    def enable_vertical_whitespace
-      @sep = ";\n"
-      @nl = "\n"
-      @ws = @nl
-    end
-
     def binding=(binding)
       @binding = binding
     end
@@ -56,7 +46,7 @@ module Ruby2JS
 
     def to_js
       parse( @ast, :statement )
-      @lines.map(&:join).join(@nl)
+      serialize
     end
 
     def operator_index op
@@ -95,6 +85,17 @@ module Ruby2JS
       end
 
       handler.call(*ast.children)
+    end
+
+    def parse_all(*args)
+      options = (Hash === args.last) ? args.pop : {}
+      sep = options[:join].to_s
+      state = options[:state] || :expression
+
+      args.each_with_index do |arg, index|
+        put sep unless index == 0
+        parse arg, state
+      end
     end
     
     def group( ast )

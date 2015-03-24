@@ -1,10 +1,23 @@
 module Ruby2JS
-  class Converter
-    def init_serializer
+  class Serializer
+    def initialize
+      @sep = '; '
+      @nl = ''
+      @ws = ' '
+
+      @width = 80
+
       @lines = [[]]
       @line = @lines.last
     end
 
+    def enable_vertical_whitespace
+      @sep = ";\n"
+      @nl = "\n"
+      @ws = @nl
+    end
+
+    # add a single token to the current line
     def put(string)
       unless String === string and string.include? "\n"
         @line << string.to_s
@@ -17,6 +30,7 @@ module Ruby2JS
       end
     end
 
+    # add a single token to the current line and then advance to next line
     def puts(string)
       unless String === string and string.include? "\n"
         @line << string.to_s
@@ -28,6 +42,7 @@ module Ruby2JS
       @lines << @line
     end
 
+    # advance to next line and then add a single token to the current line
     def sput(string)
       unless String === string and string.include? "\n"
         @line = [string]
@@ -39,60 +54,54 @@ module Ruby2JS
       end
     end
 
-    def parse_all(*args)
-      options = (Hash === args.last) ? args.pop : {}
-      sep = options[:join].to_s
-      state = options[:state] || :expression
-
-      args.each_with_index do |arg, index|
-        put sep unless index == 0
-        parse arg, state
-      end
-    end
-
+    # current location: [line number, token number]
     def output_location
-      [@lines.length, @line.length]
+      [@lines.length-1, @line.length]
     end
 
-    def insert(location, string)
-      @lines[location.first-1].insert(location.last, string)
+    # insert a line into the output
+    def insert(mark, line)
+      @lines[mark.first].insert(mark.last, line)
     end
 
+    # capture (and remove) tokens from the output stream
     def capture(&block)
       mark = output_location
       block.call
-      lines = @lines.slice!(mark.first..-1)
+      lines = @lines.slice!(mark.first+1..-1)
       @line = @lines.last
 
       if lines.empty?
         lines = [@line.slice!(mark.last..-1)]
       elsif @line.length != mark.last
-        lines.unshift @line.slice!(mark.last..-1)
+        lines.unshift @line.slice!(mark.last..-1), [@ws]
       end
 
       lines.map(&:join).join(@nl)
     end
 
+    # wrap long statements in curly braces
     def wrap
       mark = output_location
       yield
-      return if @lines.length == mark.first and @line.join.length < @width
-      @lines.insert mark.first, @lines[mark.first-1].slice!(mark.last..-1)
-      @lines[mark.first-1] << '{'
+      return if @lines.length == mark.first+1 and @line.join.length < @width
+      @lines.insert mark.first+1, @lines[mark.first].slice!(mark.last..-1)
+      @lines[mark.first] << '{'
       sput '}'
     end
 
+    # compact small expressions into a single line
     def compact
       mark = output_location
       yield
-      return unless @lines.length - mark.first >= 2
+      return unless @lines.length - mark.first+1 >= 2
 
-      len = @lines[mark.first-1..-1].map { |line| 
+      len = @lines[mark.first..-1].map { |line|
         line.map(&:length).reduce(&:+).to_i + 1
       }.reduce(&:+).to_i
 
       if len < @width - 10
-        lines = @lines.slice!(mark.first-1..-1)
+        lines = @lines.slice!(mark.first..-1)
         @line = []
         lines.each_with_index do |line, index|
           @line << ' ' unless index <= 1 or index >= lines.length-1
@@ -100,6 +109,11 @@ module Ruby2JS
         end
         @lines.push @line
       end
+    end
+
+    # return the output as a string
+    def serialize
+      @lines.map(&:join).join(@nl)
     end
   end
 end
