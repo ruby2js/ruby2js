@@ -28,7 +28,6 @@ module Ruby2JS
         statements.compact!
       end
 
-      # statements.map{ |statement| parse statement, state }.join(@sep)
       parse_all *statements, state: state, join: @sep
     end
 

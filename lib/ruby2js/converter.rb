@@ -56,7 +56,7 @@ module Ruby2JS
 
     def to_js
       parse( @ast, :statement )
-      @line.join
+      @lines.map(&:join).join(@nl)
     end
 
     def operator_index op

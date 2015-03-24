@@ -25,7 +25,7 @@ module Ruby2JS
           # TODO items.map {|item| item.length+2}.reduce(&:+).to_i < @width-8
           put '['; parse_all *items, join: ', '; put ']'
         else
-          puts '['; parse_all *items, join: ",#{@ws}"; sput ']'
+          compact { puts '['; parse_all *items, join: ",#{@ws}"; sput ']' }
         end
       end
     end

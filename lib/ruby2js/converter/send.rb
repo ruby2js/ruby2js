@@ -170,9 +170,7 @@ module Ruby2JS
           if args.length <= 1
             put "("; parse_all *args, join: ', '; put ')'
           else
-            mark = output_location
-            puts "("; parse_all *args, join: ",#@ws"; sput ')'
-            compact mark
+            compact { puts "("; parse_all *args, join: ",#@ws"; sput ')' }
           end
         end
       end

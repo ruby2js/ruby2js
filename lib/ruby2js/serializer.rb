@@ -1,19 +1,42 @@
 module Ruby2JS
   class Converter
     def init_serializer
-      @line = []
+      @lines = [[]]
+      @line = @lines.last
     end
 
     def put(string)
-      @line << string
+      unless String === string and string.include? "\n"
+        @line << string
+      else
+        parts = string.split("\n")
+        @line << parts.shift
+        @lines += parts.map {|part| [part]}
+        @lines << [] if string.end_with?("\n")
+        @line = @lines.last
+      end
     end
 
-    def puts(string='')
-      @line << string + @nl
+    def puts(string)
+      unless String === string and string.include? "\n"
+        @line << string
+      else
+        put string
+      end
+
+      @line = []
+      @lines << @line
     end
 
     def sput(string)
-      @line << @nl + string
+      unless String === string and string.include? "\n"
+        @line = [string]
+        @lines << @line
+      else
+        @line = []
+        @lines << @line
+        put string
+      end
     end
 
     def parse_all(*args)
@@ -28,29 +51,45 @@ module Ruby2JS
     end
 
     def output_location
-      # TODO
-      @line.join.length
+      [@lines.length, @line.length]
     end
 
     def insert(location, string)
-      @line = [@line.join.insert(location, string)]
+      @lines[location.first-1].insert(location.last, string)
     end
 
     def capture(&block)
       mark = output_location
       block.call
-      @line = [@line.join]
-      @line.first.slice! mark..-1
+      lines = @lines.slice!(mark.first..-1)
+      @line = @lines.last
+
+      if lines.empty?
+        lines = [@line.slice!(mark.last..-1)]
+      elsif @line.length != mark.last
+        lines.unshift @line.slice!(mark.last..-1)
+      end
+
+      lines.map(&:join).join(@nl)
     end
 
-    def compact(mark)
-      line = @line.join
-      start = line.rindex("\n", mark) || -1
-      if line.length - start < 70 and line[start+1..-1].split("\n").length >= 3
-        @line = [line[0...start+1], line[start+1..-1]]
-        @line.last.sub!(/\n/, '')
-        @line.last[/(\n).*\Z/, 1] = ''
-        @line.last.gsub!(/\n/, ' ')
+    def compact
+      mark = output_location
+      yield
+      return unless @lines.length - mark.first >= 2
+
+      len = @lines[mark.first-1..-1].map { |line| 
+        line.map {|token| token.to_s.length}.reduce(&:+).to_i + 1
+      }.reduce(&:+).to_i
+
+      if len < @width - 10
+        lines = @lines.slice!(mark.first-1..-1)
+        @line = []
+        lines.each_with_index do |line, index|
+          @line << ' ' unless index <= 1 or index >= lines.length-1
+          @line += line
+        end
+        @lines.push @line
       end
     end
   end
