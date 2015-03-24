@@ -95,6 +95,7 @@ module Ruby2JS
       mark = output_location
       yield
       return unless @lines.length - mark.first+1 >= 2
+      return if @lines.any? {|line| line.first.to_s.start_with? '//'}
 
       len = @lines[mark.first..-1].map { |line|
         line.map(&:length).reduce(&:+).to_i + 1

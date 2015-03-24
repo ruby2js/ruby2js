@@ -22,10 +22,10 @@ module Ruby2JS
 
     attr_accessor :binding, :ivars
 
-    def initialize( ast, vars = {} )
+    def initialize( ast, comments, vars = {} )
       super()
 
-      @ast, @vars = ast, vars.dup
+      @ast, @comments, @vars = ast, comments, vars.dup
       @varstack = []
       @rbstack = []
       @next_token = :return
@@ -73,6 +73,27 @@ module Ruby2JS
       end
     end
 
+    # extract comments that either precede or are included in the node.
+    # remove from the list this node may appear later in the tree.
+    def comments(ast)
+      if ast.loc and ast.loc.respond_to? :expression
+        expression = ast.loc.expression
+
+        list = @comments[ast].select do |comment|
+          expression.source_buffer == comment.loc.expression.source_buffer and
+          comment.loc.expression.begin_pos < expression.end_pos
+        end
+      else
+        list = @comments[ast]
+      end
+
+      @comments[ast] -= list
+
+      list.map do |comment|
+        comment.text.sub(/^#/, '//') + "\n"
+      end
+    end
+
     def parse(ast, state=:expression)
       return ast unless ast
 
@@ -82,6 +103,10 @@ module Ruby2JS
 
       unless handler
         raise NotImplementedError, "unknown AST type #{ ast.type }"
+      end
+
+      if state == :statement and not @comments[ast].empty?
+        comments(ast).each {|comment| puts comment.chomp}
       end
 
       handler.call(*ast.children)

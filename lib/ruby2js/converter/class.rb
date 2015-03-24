@@ -24,7 +24,7 @@ module Ruby2JS
       body.compact!
       visible = {}
       body.map! do |m| 
-        if m.type == :def
+        node = if m.type == :def
           if m.children.first == :initialize
             # constructor: remove from body and overwrite init function
             init = m
@@ -43,7 +43,7 @@ module Ruby2JS
               s(:prop, s(:attr, name, :prototype), m.children.first =>
                   {enumerable: s(:true), configurable: s(:true),
                   get: s(:block, s(:send, nil, :proc), m.children[1],
-                    s(:autoreturn, *m.children[2..-1]))})
+                    m.updated(:autoreturn, m.children[2..-1]))})
             else
               # method: add to prototype
               s(:method, s(:attr, name, :prototype),
@@ -66,7 +66,7 @@ module Ruby2JS
             s(:prop, name, m.children[1].to_s =>
                 {enumerable: s(:true), configurable: s(:true),
                 get: s(:block, s(:send, nil, :proc), m.children[2],
-                  s(:autoreturn, *m.children[3..-1]))})
+                  m.updated(:autoreturn, m.children[3..-1]))})
           else
             # class method definition: add to prototype
             s(:prototype, s(:send, name, "#{m.children[1]}=",
@@ -134,6 +134,19 @@ module Ruby2JS
         else
           raise NotImplementedError, "class #{ m.type }"
         end
+
+        # associate comments
+        if node and @comments[m]
+          if Array === node
+            node[0] = m.updated(node.first.type, node.first.children)
+            @comments[node.first] = @comments[m]
+          else
+            node = m.updated(node.type, node.children)
+            @comments[node] = @comments[m]
+          end
+        end
+
+        node
       end
 
       body.flatten!
@@ -167,17 +180,33 @@ module Ruby2JS
         if methods > 1 or (methods == 1 and body[start].type == :prop)
           pairs = body[start...start+methods].map do |node|
             if node.type == :method
-              s(:pair, s(:str, node.children[1].to_s.chomp('=')),
-                node.children[2])
+              replacement = node.updated(:pair, [
+                s(:str, node.children[1].to_s.chomp('=')),
+                node.children[2]])
             else
-              node.children[1].map {|prop, descriptor|
-                s(:pair, s(:prop, prop), descriptor)}
+              replacement = node.children[1].map do |prop, descriptor|
+                node.updated(:pair, [s(:prop, prop), descriptor])
+              end
             end
+
+            if @comments[node]
+              if Array === replacement
+                @comments[replacement.first] = @comments[node]
+              else
+                @comments[replacement] = @comments[node]
+              end
+            end
+            replacement
           end
           body[start...start+methods] =
             s(:send, name, :prototype=, s(:hash, *pairs.flatten))
         end
       end
+
+      # prepend constructor
+      constructor = init.updated(:constructor, [name, *init.children[1..-1]])
+      @comments[constructor] = @comments[init] unless @comments[init].empty?
+      body.unshift constructor
 
       begin
         # save class name
@@ -190,8 +219,7 @@ module Ruby2JS
         # add locally visible interfaces to rbstack.  See send.rb, const.rb
         @rbstack.push visible
 
-        parse s(:begin, s(:constructor, name, *init.children[1..-1]),
-          *body.compact)
+        parse s(:begin, *body.compact), :statement
       ensure
         self.ivars = ivars
         @class_name = class_name

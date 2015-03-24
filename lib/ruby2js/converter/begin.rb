@@ -36,7 +36,21 @@ module Ruby2JS
         next unless body[i] and body[i].type == :prop
         for j in i+1...body.length
           break unless body[j] and body[j].type == :prop
+
           if body[i].children[0] == body[j].children[0]
+            # relocate property comment to first method
+            [body[i], body[j]].each do |node|
+              unless @comments[node].empty?
+                node.children[1].values.first.each do |key, value| 
+                  if [:get, :set].include? key and Parser::AST::Node === value
+                    @comments[value] = @comments[node]
+                    break
+                  end
+                end
+              end
+            end
+
+            # merge properties
             merge = Hash[(body[i].children[1].to_a+body[j].children[1].to_a).
               group_by {|name, value| name.to_s}.map {|name, values|
               [name, values.map(&:last).reduce(:merge)]}]

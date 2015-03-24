@@ -121,6 +121,15 @@ describe 'serializer tests' do
       end
       @serializer.lines.must_equal [["["], ["token, "]*29 + ["token"], ["]"]]
     end
+
+    it "shouldn't compact comments" do
+      @serializer.compact do
+        @serializer.puts '['
+        @serializer.put '// comment'
+        @serializer.sput ']'
+      end
+      @serializer.lines.must_equal [["["], ["// comment"], ["]"]]
+    end
   end
 
   describe 'serialize' do

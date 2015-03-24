@@ -17,6 +17,11 @@ module Ruby2JS
 
           (singleton ? put(', ') : put(",#@ws")) unless index == 0
 
+          if not @comments[node].empty?
+            (puts ''; singleton = false) if singleton
+            comments(node).each {|comment| put comment}
+          end
+
           begin
             block_depth,block_this,block_hash = @block_depth,@block_this,false
             left, right = node.children
@@ -27,15 +32,41 @@ module Ruby2JS
 
             if left.type == :prop
               if right[:get]
+                unless @comments[right[:get]].empty?
+                  (puts ''; singleton = false) if singleton
+                  comments(right[:get]).each {|comment| put comment}
+                end
+
                 @prop = "get #{left.children[0]}"
                 parse(right[:get])
                 (singleton ? put(', ') : put(",#@ws")) if right[:set]
               end
+
               if right[:set]
+                unless @comments[right[:set]].empty?
+                  (puts ''; singleton = false) if singleton
+                  comments(right[:set]).each {|comment| put comment}
+                end
+
                 @prop = "set #{left.children[0]}"
                 parse(right[:set])
               end
             else
+              # hoist get/set comments to definition of property
+              if right.type == :hash
+                right.children.each do |pair|
+                next unless Parser::AST::Node === pair.children.last
+                  if pair.children.last.type == :block
+                    if @comments[pair.children.last]
+                      (puts ''; singleton = false) if singleton
+                      comments(pair.children.last).each do |comment|
+                        put comment
+                      end
+                    end
+                  end
+                end
+              end
+
               if 
                 left.children.first.to_s =~ /\A[a-zA-Z_$][a-zA-Z_$0-9]*\Z/
               then
