@@ -22,7 +22,6 @@ module Ruby2JS
         end
       else
         if items.length <= 1
-          # TODO items.map {|item| item.length+2}.reduce(&:+).to_i < @width-8
           put '['; parse_all *items, join: ', '; put ']'
         else
           compact { puts '['; parse_all *items, join: ",#{@ws}"; sput ']' }

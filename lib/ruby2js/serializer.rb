@@ -7,7 +7,7 @@ module Ruby2JS
 
     def put(string)
       unless String === string and string.include? "\n"
-        @line << string
+        @line << string.to_s
       else
         parts = string.split("\n")
         @line << parts.shift
@@ -19,7 +19,7 @@ module Ruby2JS
 
     def puts(string)
       unless String === string and string.include? "\n"
-        @line << string
+        @line << string.to_s
       else
         put string
       end
@@ -73,13 +73,22 @@ module Ruby2JS
       lines.map(&:join).join(@nl)
     end
 
+    def wrap
+      mark = output_location
+      yield
+      return if @lines.length == mark.first and @line.join.length < @width
+      @lines.insert mark.first, @lines[mark.first-1].slice!(mark.last..-1)
+      @lines[mark.first-1] << '{'
+      sput '}'
+    end
+
     def compact
       mark = output_location
       yield
       return unless @lines.length - mark.first >= 2
 
       len = @lines[mark.first-1..-1].map { |line| 
-        line.map {|token| token.to_s.length}.reduce(&:+).to_i + 1
+        line.map(&:length).reduce(&:+).to_i + 1
       }.reduce(&:+).to_i
 
       if len < @width - 10

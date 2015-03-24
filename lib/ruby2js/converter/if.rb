@@ -16,9 +16,9 @@ module Ruby2JS
 
       if @state == :statement
         # use short form when appropriate
-        # output.length>@width-8 TODO
         unless else_block or then_block.type == :begin
-          put "if ("; parse condition; put ') '; scope then_block
+          mark = output_location
+          put "if ("; parse condition; put ') '; wrap { scope then_block }
         else
           put "if ("; parse condition; puts ') {'; scope then_block; sput '}'
           while else_block and else_block.type == :if

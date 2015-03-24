@@ -166,7 +166,6 @@ module Ruby2JS
           (group_receiver ? group(receiver) : parse(receiver))
           put "#{ '.' if receiver && method}#{ method }"
 
-          # TODO args.map {|arg| arg.length+2}.reduce(&:+).to_i < width-10
           if args.length <= 1
             put "("; parse_all *args, join: ', '; put ')'
           else
