@@ -787,7 +787,7 @@ describe Ruby2JS do
     end
 
     it "should handle regular expressions with interpolation" do
-      to_js( '/a#{b}c/x' ).must_equal 'new RegExp("a" + b + "c")'
+      to_js( '/a#{b}c/i' ).must_equal 'new RegExp("a" + b + "c", "i")'
     end
 
     it "should map Ruby's Regexp to JavaScript's RegExp" do

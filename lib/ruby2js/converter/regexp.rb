@@ -37,7 +37,7 @@ module Ruby2JS
       end
 
       unless opts.empty?
-        put ", #{ opts.join.inspect})"
+        put ", #{ opts.join.inspect}"
       end
 
       put ')'
