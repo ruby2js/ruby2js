@@ -82,20 +82,29 @@ module Ruby2JS
 
     # wrap long statements in curly braces
     def wrap
+      puts '{'
       mark = output_location
       yield
-      return if @lines.length == mark.first+1 and @line.join.length < @width
-      @lines.insert mark.first+1, @lines[mark.first].slice!(mark.last..-1)
-      @lines[mark.first] << '{'
-      sput '}'
+
+      if
+        @lines.length > mark.first+1 or
+        @lines[mark.first-1].join.length + @line.join.length >= @width
+      then
+        sput '}'
+      else
+        @line = @lines[mark.first-1]
+        @line[-1..-1] = @lines.pop
+      end
     end
 
     # compact small expressions into a single line
     def compact
       mark = output_location
       yield
-      return unless @lines.length - mark.first+1 >= 2
-      return if @lines.any? {|line| line.first.to_s.start_with? '//'}
+      return unless @lines.length - mark.first > 1
+      return if @lines[mark.first..-1].any? do |line|
+        line.first.to_s.start_with? '//'
+      end
 
       len = @lines[mark.first..-1].map { |line|
         line.map(&:length).reduce(&:+).to_i + 1

@@ -17,7 +17,6 @@ module Ruby2JS
       if @state == :statement
         # use short form when appropriate
         unless else_block or then_block.type == :begin
-          mark = output_location
           put "if ("; parse condition; put ') '; wrap { scope then_block }
         else
           put "if ("; parse condition; puts ') {'; scope then_block; sput '}'
