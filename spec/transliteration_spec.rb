@@ -367,8 +367,8 @@ describe Ruby2JS do
     end
 
     it "should handle case statement" do
-      to_js( 'case a; when 1,2; puts :a; else; puts :b; end' ).
-        must_equal 'switch (a) {case 1: case 2: puts("a"); break; default: puts("b")}'
+      to_js( 'case a; when 1,2; puts :a; end' ).
+        must_equal 'switch (a) {case 1: case 2: puts("a")}'
     end
 
     it "should parse when and else clauses as statements" do
@@ -737,6 +737,12 @@ describe Ruby2JS do
 
     it "should handle while statements" do
       to_js( "a() while false\n" ).must_equal "while (false) {\n  a()\n}"
+    end
+
+    it "should parse when and else clauses as statements" do
+      # TODO extra spaces on blank line
+      to_js( "case 1\nwhen 1\na()\nelse\nb()\nend" ).
+        must_equal "switch (1) {\ncase 1:\n  a();\n  break;\n  \ndefault:\n  b()\n}"
     end
 
     it "should handle function declarations" do

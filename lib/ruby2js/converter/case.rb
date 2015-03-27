@@ -16,10 +16,11 @@ module Ruby2JS
 
         *values, code = node.children
         values.each {|value| put 'case '; parse value; put ":#@ws"}
-        parse code, :statement; put "#{@sep}break#@sep"
+        parse code, :statement
+        put "#{@sep}break#@sep" if other or index < whens.length-1
       end
 
-      (puts "#{@nl}default: "; parse other, :statement; puts '') if other
+      (put "#{@nl}default:#@ws"; parse other, :statement) if other
 
       sput '}'
     end

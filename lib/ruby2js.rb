@@ -114,45 +114,9 @@ module Ruby2JS
 
     ruby2js.width = options[:width] if options[:width]
 
-    if source.include? "\n"
-      ruby2js.enable_vertical_whitespace 
-      lines = ruby2js.to_js.split("\n")
-      pre = []
-      pending = false
-      blank = true
-      comment = nil
-      lines.each do |line|
-        next if line.empty?
+    ruby2js.enable_vertical_whitespace if source.include? "\n"
 
-        if ')}]'.include? line[0]
-          pre.pop
-          line.sub!(/([,;])$/,"\\1\n")
-          pending = true
-        else
-          pending = false
-        end
-
-        line.insert 0, pre.join
-        if line =~ /^\s*\/\//
-          comment ||= line
-          pending = blank
-        elsif '({['.include? line[-1]
-          pre.push '  '
-          (comment || line).insert 0, "\n" unless blank or pending
-          comment = nil
-          pending = true
-        elsif comment
-          comment.insert 0, "\n" unless blank or pending
-          comment = nil
-        end
-
-        blank = pending
-      end
-
-      lines.join("\n").gsub(/^  ( *(case.*|default):$)/, '\1')
-    else
-      ruby2js.to_js
-    end
+    ruby2js.to_js
   end
   
   def self.parse(source, file=nil)

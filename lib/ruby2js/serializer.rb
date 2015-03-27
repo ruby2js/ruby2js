@@ -1,4 +1,31 @@
 module Ruby2JS
+  class Token < String
+    attr_accessor :loc
+
+    def initialize(string, ast)
+      super(string.to_s)
+      @loc = ast.location if ast
+    end
+  end
+
+  class Line < Array
+    attr_accessor :indent
+
+    def initialize(*args)
+      super(args)
+      @indent = 0
+    end
+
+    def comment?
+      first = find {|token| !token.empty?}
+      first and first.start_with? '//'
+    end
+
+    def empty?
+      all? {|line| line.empty?}
+    end
+  end
+
   class Serializer
     def initialize
       @sep = '; '
@@ -6,8 +33,9 @@ module Ruby2JS
       @ws = ' '
 
       @width = 80
+      @indent = 0
 
-      @lines = [[]]
+      @lines = [Line.new]
       @line = @lines.last
     end
 
@@ -15,17 +43,62 @@ module Ruby2JS
       @sep = ";\n"
       @nl = "\n"
       @ws = @nl
+      @indent = 2
+    end
+
+    # indent multi-line parameter lists, array constants, blocks
+    def reindent
+      indent = 0
+      @lines.each do |line|
+        first = line.find {|token| !token.empty?}
+        if first
+          last = line[line.rindex {|token| !token.empty?}]
+          indent -= @indent if ')}]'.include? first[0]
+          line.indent = indent
+          indent += @indent if '({['.include? last[-1]
+        else
+          line.indent = indent
+        end
+      end
+    end
+
+    # add horizonal (indentation) and vertical (blank lines) whitespace
+    def respace
+      reindent
+
+      (@lines.length-3).downto(0) do |i|
+        if
+          @lines[i+1].comment? and not @lines[i].comment?
+        then
+          # before a comment
+          @lines.insert i+1, Line.new
+        elsif
+          @lines[i].indent == @lines[i+1].indent and 
+          @lines[i+1].indent < @lines[i+2].indent and
+          not @lines[i].comment?
+        then
+          # start of indented block
+          @lines.insert i+1, Line.new
+        elsif
+          @lines[i].indent > @lines[i+1].indent and 
+          @lines[i+1].indent == @lines[i+2].indent and
+          not @lines[i+2].empty?
+        then
+          # end of indented block
+          @lines.insert i+2, Line.new
+        end
+      end
     end
 
     # add a single token to the current line
     def put(string)
       unless String === string and string.include? "\n"
-        @line << string.to_s
+        @line << Token.new(string, @ast)
       else
         parts = string.split("\n")
-        @line << parts.shift
-        @lines += parts.map {|part| [part]}
-        @lines << [] if string.end_with?("\n")
+        @line << Token.new(parts.shift, @ast)
+        @lines += parts.map {|part| Line.new(Token.new(part, @ast))}
+        @lines << Line.new if string.end_with?("\n")
         @line = @lines.last
       end
     end
@@ -33,22 +106,22 @@ module Ruby2JS
     # add a single token to the current line and then advance to next line
     def puts(string)
       unless String === string and string.include? "\n"
-        @line << string.to_s
+        @line << Token.new(string, @ast)
       else
         put string
       end
 
-      @line = []
+      @line = Line.new
       @lines << @line
     end
 
     # advance to next line and then add a single token to the current line
     def sput(string)
       unless String === string and string.include? "\n"
-        @line = [string]
+        @line = Line.new(Token.new(string, @ast))
         @lines << @line
       else
-        @line = []
+        @line = Line.new
         @lines << @line
         put string
       end
@@ -61,7 +134,11 @@ module Ruby2JS
 
     # insert a line into the output
     def insert(mark, line)
-      @lines[mark.first].insert(mark.last, line)
+      if mark.last == 0
+        @lines.insert(mark.first, Line.new(line.chomp))
+      else
+        @lines[mark.first].insert(mark.last, line)
+      end
     end
 
     # capture (and remove) tokens from the output stream
@@ -112,10 +189,10 @@ module Ruby2JS
 
       if len < @width - 10
         lines = @lines.slice!(mark.first..-1)
-        @line = []
+        @line = Line.new
         lines.each_with_index do |line, index|
           @line << ' ' unless index <= 1 or index >= lines.length-1
-          @line += line
+          @line.push *line
         end
         @lines.push @line
       end
@@ -123,7 +200,11 @@ module Ruby2JS
 
     # return the output as a string
     def serialize
-      @lines.map(&:join).join(@nl)
+      respace if @indent > 0
+
+      @lines.map do |line|
+        (' ' * line.indent + line.join).sub(/^  ( *(case.*|default):$)/, '\1')
+      end.join(@nl)
     end
   end
 end
