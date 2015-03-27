@@ -24,6 +24,16 @@ module Ruby2JS
     def empty?
       all? {|line| line.empty?}
     end
+
+    def to_s
+      if empty?
+        ''
+      elsif ['case ', 'default:'].include? self[0]
+        ' ' * ([0,indent-2].max) + join
+      else
+        ' ' * indent + join
+      end
+    end
   end
 
   class Serializer
@@ -201,10 +211,7 @@ module Ruby2JS
     # return the output as a string
     def serialize
       respace if @indent > 0
-
-      @lines.map do |line|
-        (' ' * line.indent + line.join).sub(/^  ( *(case.*|default):$)/, '\1')
-      end.join(@nl)
+      @lines.map(&:to_s).join(@nl)
     end
   end
 end

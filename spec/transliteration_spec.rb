@@ -740,9 +740,8 @@ describe Ruby2JS do
     end
 
     it "should parse when and else clauses as statements" do
-      # TODO extra spaces on blank line
       to_js( "case 1\nwhen 1\na()\nelse\nb()\nend" ).
-        must_equal "switch (1) {\ncase 1:\n  a();\n  break;\n  \ndefault:\n  b()\n}"
+        must_equal "switch (1) {\ncase 1:\n  a();\n  break;\n\ndefault:\n  b()\n}"
     end
 
     it "should handle function declarations" do
