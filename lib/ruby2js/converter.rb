@@ -35,7 +35,7 @@ module Ruby2JS
         @handlers[name] = method("on_#{name}")
       end
     end
-    
+
     def binding=(binding)
       @binding = binding
     end

@@ -39,6 +39,8 @@ module Ruby2JS
   end
 
   class Serializer
+    attr_reader :timestamps
+
     def initialize
       @sep = '; '
       @nl = ''
@@ -49,6 +51,21 @@ module Ruby2JS
 
       @lines = [Line.new]
       @line = @lines.last
+      @timestamps = {}
+    end
+
+    def timestamp(file)
+      @timestamps[file] = File.mtime(file) if file and File.exist?(file)
+    end
+
+    def uptodate?
+      return false if @timestamps.empty?
+      return @timestamps.all? {|file, mtime| File.mtime(file) == mtime}
+    end
+
+    def mtime
+      return Time.now if @timestamps.empty?
+      return @timestamps.values.max
     end
 
     def enable_vertical_whitespace
@@ -283,6 +300,7 @@ module Ruby2JS
             source_index = sources.index(buffer)
             if not source_index
               source_index = sources.length
+              timestamp buffer.name
               sources << buffer
             end
 

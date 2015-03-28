@@ -76,7 +76,7 @@ module Ruby2JS
       ast, comments = parse(source)
       comments = Parser::Source::Comment.associate(ast, comments)
       ast = find_block( ast, line )
-      options[:file] = file
+      options = options.merge(file => file) unless options[:file]
     elsif Parser::AST::Node === source
       ast, comments = source, {}
       source = ast.loc.expression.source_buffer.source
@@ -97,7 +97,7 @@ module Ruby2JS
       ast = filter.process(ast)
     end
 
-    ruby2js = Ruby2JS::Converter.new( ast, comments )
+    ruby2js = Ruby2JS::Converter.new(ast, comments)
 
     ruby2js.binding = options[:binding]
     ruby2js.ivars = options[:ivars]
@@ -115,6 +115,8 @@ module Ruby2JS
     ruby2js.enable_vertical_whitespace if source.include? "\n"
 
     ruby2js.convert
+
+    ruby2js.timestamp options[:file]
 
     ruby2js
   end
