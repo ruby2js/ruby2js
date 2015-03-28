@@ -95,10 +95,10 @@ module Ruby2JS
     end
 
     def parse(ast, state=:expression)
-      return ast unless ast
+      oldstate, @state = @state, state
+      oldast, @ast = @ast, ast
+      return unless ast
 
-      @state = state
-      @ast = ast
       handler = @handlers[ast.type]
 
       unless handler
@@ -110,6 +110,8 @@ module Ruby2JS
       end
 
       handler.call(*ast.children)
+    ensure
+      @ast = oldast
     end
 
     def parse_all(*args)

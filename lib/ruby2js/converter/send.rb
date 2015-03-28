@@ -157,7 +157,7 @@ module Ruby2JS
             (group_receiver ? group(receiver) : parse(receiver))
             put ".#{ method }"
           else
-            parse s(:lvasgn, method), @state
+            parse ast.updated(:lvasgn, [method]), @state
           end
         elsif args.length > 0 and args.any? {|arg| arg.type == :splat}
           parse s(:send, s(:attr, receiver, method), :apply, 

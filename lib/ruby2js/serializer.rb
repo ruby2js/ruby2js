@@ -1,9 +1,11 @@
 module Ruby2JS
   class Token < String
     attr_accessor :loc
+    attr_accessor :ast
 
     def initialize(string, ast)
       super(string.to_s)
+      @ast = ast
       @loc = ast.location if ast
     end
   end
@@ -145,9 +147,9 @@ module Ruby2JS
     # insert a line into the output
     def insert(mark, line)
       if mark.last == 0
-        @lines.insert(mark.first, Line.new(line.chomp))
+        @lines.insert(mark.first, Line.new(Token.new(line.chomp, @ast)))
       else
-        @lines[mark.first].insert(mark.last, line)
+        @lines[mark.first].insert(mark.last, Token.new(line, @ast))
       end
     end
 
@@ -212,6 +214,70 @@ module Ruby2JS
     def serialize
       respace if @indent > 0
       @lines.map(&:to_s).join(@nl)
+    end
+
+    BASE64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+
+    # https://docs.google.com/document/d/1U1RGAehQwRypUTovF1KRlpiOFze0b-_2gc6fAH0KY0k/edit
+    def vlq(*mark)
+      if @mark[0] == mark[0]
+        return if @mark[-3..-1] == mark[-3..-1]
+        @mappings << ',' unless @mappings == ''
+      end
+
+      while @mark[0] < mark[0]
+        @mappings << ';'
+        @mark[0] += 1
+        @mark[1] = 0
+      end
+
+      diffs = mark.zip(@mark).map {|a,b| a-b}
+      @mark = mark
+
+      diffs[1..4].each do |diff|
+        if diff < 0
+          data = (-diff << 1) + 1
+        else
+          data = diff << 1
+        end
+
+        encoded = ''
+
+        begin
+          digit = data & 0b11111
+          data >>= 5
+          digit |= 0b100000 if data > 0
+          encoded << BASE64[digit]
+        end while data > 0
+
+        @mappings << encoded
+      end
+    end
+
+    def sourcemap
+      @mappings = ''
+      sources = []
+      @mark = [0, 0, 0, 0, 0]
+
+      @lines.each_with_index do |line, row|
+        col = line.indent
+        line.each do |token|
+          if token != ' ' and token.loc
+            pos = token.loc.expression.begin_pos
+
+            source = token.loc.expression.source_buffer.source
+            source_index = sources.index(source)
+            if not source_index
+              source_index = sources.length
+              sources << source
+            end
+
+            split = source[0...pos].split("\n")
+            vlq row, col, source_index, split.length-1, split.last.to_s.length
+          end
+          col += token.length
+        end
+      end
     end
   end
 end
