@@ -5,7 +5,7 @@ require 'ruby2js/filter/return'
 describe Ruby2JS::Filter::Return do
   
   def to_js( string)
-    Ruby2JS.convert(string, filters: [Ruby2JS::Filter::Return])
+    Ruby2JS.convert(string, filters: [Ruby2JS::Filter::Return]).to_s
   end
   
   describe :lambda do

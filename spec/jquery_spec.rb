@@ -5,7 +5,7 @@ require 'ruby2js/filter/jquery'
 describe Ruby2JS::Filter::JQuery do
   
   def to_js(string)
-    Ruby2JS.convert(string, filters: [Ruby2JS::Filter::JQuery])
+    Ruby2JS.convert(string, filters: [Ruby2JS::Filter::JQuery]).to_s
   end
   
   describe :gvars do

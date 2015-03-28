@@ -5,7 +5,7 @@ require 'ruby2js/filter/camelCase'
 describe Ruby2JS::Filter::CamelCase do
   
   def to_js( string)
-    Ruby2JS.convert(string, filters: [Ruby2JS::Filter::CamelCase])
+    Ruby2JS.convert(string, filters: [Ruby2JS::Filter::CamelCase]).to_s
   end
   
   describe :camelCase do

@@ -44,9 +44,8 @@ module Ruby2JS
       @width = width
     end
 
-    def to_js
+    def convert
       parse( @ast, :statement )
-      serialize
     end
 
     def operator_index op

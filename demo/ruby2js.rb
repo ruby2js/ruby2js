@@ -61,7 +61,7 @@ _html do
 
       if @ast
         _h2 'AST'
-        _pre Ruby2JS.parse(@ruby).inspect
+        _pre Ruby2JS.parse(@ruby).first.inspect
       end
 
       _h2 'JavaScript'

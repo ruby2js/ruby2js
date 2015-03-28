@@ -6,7 +6,7 @@ describe Ruby2JS::Filter::Require do
   
   def to_js( string)
     Ruby2JS.convert(string, filters: [Ruby2JS::Filter::Require],
-      file: __FILE__)
+      file: __FILE__).to_s
   end
   
   describe :statement do

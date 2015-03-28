@@ -8,7 +8,7 @@ describe Ruby2JS::Filter::AngularRB do
   
   def to_js( string)
     Ruby2JS.convert(string, filters: [Ruby2JS::Filter::AngularRB,
-      Ruby2JS::Filter::AngularRoute, Ruby2JS::Filter::AngularResource])
+      Ruby2JS::Filter::AngularRoute, Ruby2JS::Filter::AngularResource]).to_s
   end
   
   # ************************************************************ 

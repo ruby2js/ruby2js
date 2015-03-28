@@ -5,7 +5,7 @@ require 'ruby2js/filter/react'
 describe Ruby2JS::Filter::React do
   
   def to_js(string)
-    Ruby2JS.convert(string, filters: [Ruby2JS::Filter::React], scope: self)
+    Ruby2JS.convert(string, filters: [Ruby2JS::Filter::React], scope: self).to_s
   end
   
   describe :createClass do

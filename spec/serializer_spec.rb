@@ -142,7 +142,7 @@ describe 'serializer tests' do
       @serializer.put 'd'
       @serializer.put 'e'
       
-      @serializer.serialize.must_equal "abc\nde"
+      @serializer.to_s.must_equal "abc\nde"
     end
   end
 end

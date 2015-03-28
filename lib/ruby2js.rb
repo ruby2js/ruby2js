@@ -70,7 +70,6 @@ module Ruby2JS
   end
 
   def self.convert(source, options={})
-
     if Proc === source
       file,line = source.source_location
       source = File.read(file.dup.untaint).untaint
@@ -85,7 +84,6 @@ module Ruby2JS
       ast, comments = parse( source, options[:file] )
       comments = Parser::Source::Comment.associate(ast, comments)
     end
-
 
     filters = options[:filters] || Filter::DEFAULTS
 
@@ -116,7 +114,9 @@ module Ruby2JS
 
     ruby2js.enable_vertical_whitespace if source.include? "\n"
 
-    ruby2js.to_js
+    ruby2js.convert
+
+    ruby2js
   end
   
   def self.parse(source, file=nil)

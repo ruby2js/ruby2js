@@ -5,7 +5,7 @@ require 'ruby2js/filter/rubyjs'
 describe Ruby2JS::Filter::RubyJS do
   
   def to_js( string)
-    Ruby2JS.convert(string, filters: [Ruby2JS::Filter::RubyJS])
+    Ruby2JS.convert(string, filters: [Ruby2JS::Filter::RubyJS]).to_s
   end
   
   describe 'String conversions' do

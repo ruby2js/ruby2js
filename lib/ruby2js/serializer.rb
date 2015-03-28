@@ -80,6 +80,10 @@ module Ruby2JS
 
       (@lines.length-3).downto(0) do |i|
         if
+          @lines[i].length == 0
+        then
+          @lines.delete i
+        elsif
           @lines[i+1].comment? and not @lines[i].comment?
         then
           # before a comment
@@ -211,9 +215,17 @@ module Ruby2JS
     end
 
     # return the output as a string
-    def serialize
+    def to_s
       respace if @indent > 0
       @lines.map(&:to_s).join(@nl)
+    end
+
+    def to_str
+      to_s
+    end
+
+    def +(value)
+      to_s+value
     end
 
     BASE64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
@@ -255,6 +267,8 @@ module Ruby2JS
     end
 
     def sourcemap
+      respace if @indent > 0
+
       @mappings = ''
       sources = []
       @mark = [0, 0, 0, 0, 0]
@@ -265,19 +279,26 @@ module Ruby2JS
           if token != ' ' and token.loc
             pos = token.loc.expression.begin_pos
 
-            source = token.loc.expression.source_buffer.source
-            source_index = sources.index(source)
+            buffer = token.loc.expression.source_buffer
+            source_index = sources.index(buffer)
             if not source_index
               source_index = sources.length
-              sources << source
+              sources << buffer
             end
 
-            split = source[0...pos].split("\n")
+            split = buffer.source[0...pos].split("\n")
             vlq row, col, source_index, split.length-1, split.last.to_s.length
           end
           col += token.length
         end
       end
+
+      {
+        version: 3,
+        file: @ast.loc.expression.source_buffer.name,
+        sources: sources.map(&:name),
+        mappings: @mappings
+      }
     end
   end
 end
