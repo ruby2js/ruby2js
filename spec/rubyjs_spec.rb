@@ -300,6 +300,12 @@ describe Ruby2JS::Filter::RubyJS do
     end
   end
 
+  describe 'no input' do
+    it 'should do nothing with nothing' do
+      to_js( '').must_equal  ''
+    end
+  end
+
   describe Ruby2JS::Filter::DEFAULTS do
     it "should include Functions" do
       Ruby2JS::Filter::DEFAULTS.must_include Ruby2JS::Filter::Functions

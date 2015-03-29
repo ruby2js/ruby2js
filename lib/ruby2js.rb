@@ -74,7 +74,7 @@ module Ruby2JS
       file,line = source.source_location
       source = File.read(file.dup.untaint).untaint
       ast, comments = parse(source)
-      comments = Parser::Source::Comment.associate(ast, comments)
+      comments = Parser::Source::Comment.associate(ast, comments) if ast
       ast = find_block( ast, line )
       options = options.merge(file => file) unless options[:file]
     elsif Parser::AST::Node === source
@@ -82,7 +82,7 @@ module Ruby2JS
       source = ast.loc.expression.source_buffer.source
     else
       ast, comments = parse( source, options[:file] )
-      comments = Parser::Source::Comment.associate(ast, comments)
+      comments = Parser::Source::Comment.associate(ast, comments) if ast
     end
 
     filters = options[:filters] || Filter::DEFAULTS
