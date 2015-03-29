@@ -46,6 +46,7 @@ module Ruby2JS
       # handle all of the 'invented' ast types
       def on_attr(node); on_send(node); end
       def on_autoreturn(node); on_return(node); end
+      def on_call(node); on_send(node); end
       def on_constructor(node); on_def(node); end
       def on_defp(node); on_defs(node); end
       def on_method(node); on_send(node); end
