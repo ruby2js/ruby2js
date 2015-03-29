@@ -137,6 +137,7 @@ module Parser
     class Node
       def is_method?
         return false if type == :attr
+        return true if type == :call
         return true unless loc
 
         if loc.respond_to? :selector

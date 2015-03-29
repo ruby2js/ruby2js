@@ -13,6 +13,10 @@ module Ruby2JS
       def s(type, *args)
         Parser::AST::Node.new type, args
       end
+
+      def S(type, *args)
+        @ast.updated(type, args)
+      end
     end
 
     class Processor < Parser::AST::Processor
@@ -27,6 +31,7 @@ module Ruby2JS
       end
 
       def process(node)
+        ast, @ast = @ast, node
         replacement = super
 
         if replacement != node and @comments[node]
@@ -34,6 +39,8 @@ module Ruby2JS
         end
 
         replacement
+      ensure
+        @ast = ast
       end
 
       # handle all of the 'invented' ast types

@@ -13,7 +13,7 @@ module Ruby2JS
     # interpretation as an attribute vs a function call with zero parameters.
     # Sendw forces parameters to be placed on separate lines.
 
-    handle :send, :sendw, :attr do |receiver, method, *args|
+    handle :send, :sendw, :attr, :call do |receiver, method, *args|
       ast = @ast
 
       width = ((ast.type == :sendw && !@nl.empty?) ? 0 : @width)

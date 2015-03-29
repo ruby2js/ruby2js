@@ -15,22 +15,22 @@ module Ruby2JS
       def on_send(node)
         target, method, *args = node.children
 
-        if [:max, :min].include? node.children[1] and args.length == 0
+        if [:max, :min].include? method and args.length == 0
           return super unless node.is_method?
-          process s(:send, s(:attr, s(:const, nil, :Math), node.children[1]),
+          process S(:send, s(:attr, s(:const, nil, :Math), node.children[1]),
             :apply, s(:const, nil, :Math), target)
 
         elsif method == :keys and args.length == 0 and node.is_method?
-          process s(:send, s(:const, nil, :Object), :keys, target)
+          process S(:send, s(:const, nil, :Object), :keys, target)
 
         elsif method == :delete and args.length == 1
-          process s(:undef, s(:send, target, :[], args.first))
+          process S(:undef, S(:send, target, :[], args.first))
 
         elsif method == :to_s
-          process s(:send, target, :toString, *args)
+          process S(:call, target, :toString, *args)
 
         elsif method == :to_a
-          process s(:send, target, :toArray, *args)
+          process S(:call, target, :toArray, *args)
 
         elsif method == :to_i
           process node.updated :send, [nil, :parseInt, target, *args]
@@ -44,15 +44,15 @@ module Ruby2JS
         elsif [:sub!, :gsub!].include? method
           method = :"#{method.to_s[0..-2]}"
           if VAR_TO_ASSIGN.keys.include? target.type
-            process s(VAR_TO_ASSIGN[target.type], target.children[0], 
-              s(:send, target, method, *node.children[2..-1]))
+            process S(VAR_TO_ASSIGN[target.type], target.children[0], 
+              S(:send, target, method, *node.children[2..-1]))
           elsif target.type == :send
             if target.children[0] == nil
-              process s(:lvasgn, target.children[1], s(:send,
-                s(:lvar, target.children[1]), method, *node.children[2..-1]))
+              process S(:lvasgn, target.children[1], S(:send,
+                S(:lvar, target.children[1]), method, *node.children[2..-1]))
             else
-              process s(:send, target.children[0], :"#{target.children[1]}=", 
-                s(:send, target, method, *node.children[2..-1]))
+              process S(:send, target.children[0], :"#{target.children[1]}=", 
+                S(:send, target, method, *node.children[2..-1]))
             end
           else
             super
@@ -61,93 +61,92 @@ module Ruby2JS
         elsif method == :gsub and args.length == 2
           before, after = args
           if before.type == :regexp
-            before = s(:regexp, *before.children[0...-1],
-              s(:regopt, :g, *before.children.last))
+            before = before.updated(:regexp, [*before.children[0...-1],
+              s(:regopt, :g, *before.children.last)])
           elsif before.type == :str
-            before = s(:regexp, s(:str, Regexp.escape(before.children.first)),
-              s(:regopt, :g))
+            before = before.updated(:regexp,
+              [s(:str, Regexp.escape(before.children.first)), s(:regopt, :g)])
           end
           process node.updated nil, [target, :replace, before, after]
 
         elsif method == :ord and args.length == 0
           if target.type == :str
-            process s(:int, target.children.last.ord)
+            process S(:int, target.children.last.ord)
           else
-            process node.updated nil, [target, :charCodeAt, s(:int, 0)]
+            process S(:send, target, :charCodeAt, s(:int, 0))
           end
 
         elsif method == :chr and args.length == 0
           if target.type == :int
-            process s(:str, target.children.last.chr)
+            process S(:str, target.children.last.chr)
           else
-            process node.updated nil, [s(:const, nil, :String), :fromCharCode,
-              target]
+            process S(:send, s(:const, nil, :String), :fromCharCode, target)
           end
 
         elsif method == :empty? and args.length == 0
-          process s(:send, s(:attr, target, :length), :==, s(:int, 0))
+          process S(:send, S(:attr, target, :length), :==, s(:int, 0))
 
         elsif method == :nil? and args.length == 0
-          process s(:send, target, :==, s(:nil))
+          process S(:send, target, :==, s(:nil))
 
         elsif [:start_with?, :end_with?].include? method and args.length == 1
           if args.first.type == :str
-            length = s(:int, args.first.children.first.length)
+            length = S(:int, args.first.children.first.length)
           else
-            length = s(:attr, *args, :length)
+            length = S(:attr, *args, :length)
           end
 
           if method == :start_with?
-            process s(:send, s(:send, target, :substring, s(:int, 0), 
+            process S(:send, S(:send, target, :substring, s(:int, 0), 
               length), :==, *args)
           else
-            process s(:send, s(:send, target, :slice, 
-              s(:send, length, :-@)), :==, *args)
+            process S(:send, S(:send, target, :slice, 
+              S(:send, length, :-@)), :==, *args)
           end
 
         elsif method == :clear and args.length == 0 and node.is_method?
-          process s(:send, target, :length=, s(:int, 0))
+          process S(:send, target, :length=, s(:int, 0))
 
         elsif method == :replace and args.length == 1
-          process s(:begin, s(:send, target, :length=, s(:int, 0)),
-             s(:send, target, :push, s(:splat, node.children[2])))
+          process S(:begin, S(:send, target, :length=, s(:int, 0)),
+             S(:send, target, :push, s(:splat, node.children[2])))
 
         elsif method == :include? and args.length == 1
-          process s(:send, s(:send, target, :indexOf, args.first), :!=,
+          process S(:send, S(:send, target, :indexOf, args.first), :!=,
             s(:int, -1))
 
         elsif method == :respond_to? and args.length == 1
-          process s(:in?, args.first, target)
+          process S(:in?, args.first, target)
 
         elsif method == :each
-          process node.updated nil, [target, :forEach, *args]
+          process S(:send, target, :forEach, *args)
 
         elsif method == :downcase and args.length == 0
-          process node.updated nil, [target, :toLowerCase]
+          process S(:send, target, :toLowerCase)
 
         elsif method == :upcase and args.length == 0
-          process node.updated nil, [target, :toUpperCase]
+          process S(:send, target, :toUpperCase)
 
         elsif node.children[0..1] == [nil, :puts]
-          process s(:send, s(:attr, nil, :console), :log, *args)
+          process S(:send, s(:attr, nil, :console), :log, *args)
 
         elsif method == :first
           if node.children.length == 2
-            process node.updated nil, [target, :[], s(:int, 0)]
+            process S(:send, target, :[], s(:int, 0))
           elsif node.children.length == 3
-            process on_send node.updated nil, [target, :[], s(:erange,
-              s(:int, 0), node.children[2])]
+            process on_send S(:send, target, :[], s(:erange,
+              s(:int, 0), node.children[2]))
           else
             super
           end
 
         elsif method == :last
           if node.children.length == 2
-            process on_send node.updated nil, [target, :[], s(:int, -1)]
+            process on_send S(:send, target, :[], s(:int, -1))
           elsif node.children.length == 3
-            process node.updated nil, [target, :slice,
+            process S(:send, target, :slice,
               s(:send, s(:attr, target, :length), :-, node.children[2]),
-              s(:attr, target, :length)]
+              s(:attr, target, :length))
           else
             super
           end
@@ -159,7 +158,7 @@ module Ruby2JS
           # resolve negative literal indexes
           i = proc do |index|
             if index.type == :int and index.children.first < 0
-              process s(:send, s(:attr, target, :length), :-, 
+              process S(:send, S(:attr, target, :length), :-, 
                 s(:int, -index.children.first))
             else
               index
@@ -167,32 +166,32 @@ module Ruby2JS
           end
 
           if index.type == :regexp
-            process s(:send, s(:send, target, :match, index), :[], 
+            process S(:send, S(:send, target, :match, index), :[], 
               args[1] || s(:int, 0))
 
           elsif node.children.length != 3
             super
 
           elsif index.type == :int and index.children.first < 0
-            process node.updated nil, [target, :[], i.(index)]
+            process S(:send, target, :[], i.(index))
 
           elsif index.type == :erange
             start, finish = index.children
-            process node.updated nil, [target, :slice, i.(start), i.(finish)]
+            process S(:send, target, :slice, i.(start), i.(finish))
 
           elsif index.type == :irange
             start, finish = index.children
             start = i.(start)
             if finish.type == :int
               if finish.children.first == -1
-                finish = s(:attr, target, :length)
+                finish = S(:attr, target, :length)
               else
-                finish = i.(s(:int, finish.children.first+1))
+                finish = i.(S(:int, finish.children.first+1))
               end
             else
-              finish = s(:send, finish, :+, s(:int, 1))
+              finish = S(:send, finish, :+, s(:int, 1))
             end
-            process node.updated nil, [target, :slice, start, finish]
+            process S(:send, target, :slice, start, finish)
 
           else
             super
@@ -201,15 +200,15 @@ module Ruby2JS
         elsif method == :reverse! and node.is_method? 
           # input: a.reverse!
           # output: a.splice(0, a.length, *a.reverse)
-          process s(:send, target, :splice, s(:int, 0), 
-            s(:attr, target, :length), s(:splat, s(:send, target, 
-            :"#{node.children[1].to_s[0..-2]}", *node.children[2..-1])))
+          process S(:send, target, :splice, s(:int, 0), 
+            s(:attr, target, :length), s(:splat, S(:send, target, 
+            :reverse, *node.children[2..-1])))
 
         elsif method == :each_with_index
-          process node.updated nil, [target, :forEach, *args]
+          process S(:send, target, :forEach, *args)
 
         elsif method == :inspect and args.length == 0
-          s(:send, s(:const, nil, :JSON), :stringify, process(target))
+          S(:send, s(:const, nil, :JSON), :stringify, process(target))
 
         else
           super
@@ -254,15 +253,15 @@ module Ruby2JS
           # output: a.splice(0, a.length, *a.map {expression})
           method = (call.children[1] == :map! ? :map : :select)
           target = call.children.first
-          process s(:send, target, :splice, s(:splat, s(:send, s(:array, 
-            s(:int, 0), s(:attr, target, :length)), :concat,
+          process call.updated(:send, [target, :splice, s(:splat, s(:send, 
+            s(:array, s(:int, 0), s(:attr, target, :length)), :concat,
             s(:block, s(:send, target, method, *call.children[2..-1]),
-            *node.children[1..-1]))))
+            *node.children[1..-1])))])
 
         elsif node.children[0..1] == [s(:send, nil, :loop), s(:args)]
           # input: loop {statements}
           # output: while(true) {statements}
-          s(:while, s(:true), node.children[2])
+          S(:while, s(:true), node.children[2])
 
         else
           super
@@ -278,15 +277,15 @@ module Ruby2JS
             body.any? {|statement| statement.type == :def and
             statement.children.first == :initialize}
           then
-            body.unshift s(:def, :initialize, s(:args, s(:arg, :message)),
-              s(:begin, s(:send, s(:self), :message=, s(:lvar, :message)),
-              s(:send, s(:self), :name=, s(:sym, name.children[1])),
-              s(:send, s(:self), :stack=, s(:send, s(:send, nil, :Error,
+            body.unshift S(:def, :initialize, s(:args, s(:arg, :message)),
+              s(:begin, S(:send, s(:self), :message=, s(:lvar, :message)),
+              S(:send, s(:self), :name=, s(:sym, name.children[1])),
+              S(:send, s(:self), :stack=, s(:send, s(:send, nil, :Error,
               s(:lvar, :message)), :stack))))
           end
 
           body = [s(:begin, *body)] if body.length > 1
-          s(:class, name, s(:const, nil, :Error), *body)
+          S(:class, name, s(:const, nil, :Error), *body)
         else
           super
         end
