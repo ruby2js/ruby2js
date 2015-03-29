@@ -4,6 +4,8 @@ require 'ruby2js/serializer'
 
 module Ruby2JS
   class Converter < Serializer
+    attr_accessor :ast
+
     LOGICAL   = :and, :not, :or
     OPERATORS = [:[], :[]=], [:not, :!], [:*, :/, :%], [:+, :-], [:>>, :<<], 
       [:&], [:^, :|], [:<=, :<, :>, :>=], [:==, :!=, :===, :"!=="], [:and, :or]

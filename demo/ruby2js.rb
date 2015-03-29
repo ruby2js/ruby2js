@@ -44,6 +44,8 @@ _html do
   _title 'Ruby2JS'
   _style %{
     textarea {display: block}
+    .unloc {background-color: yellow}
+    .loc {background-color: white}
   }
 
   _h1 { _a 'Ruby2JS', href: 'https://github.com/rubys/ruby2js#ruby2js' }
@@ -59,13 +61,40 @@ _html do
     _div_? do
       raise $load_error if $load_error
 
+      ruby = Ruby2JS.convert(@ruby)
+
       if @ast
+        walk = proc do |ast, indent=''|
+          _div class: (ast.loc ? 'loc' : 'unloc') do
+            _ "#{indent}#{ast.type}"
+            if ast.children.any? {|child| Parser::AST::Node === child}
+              ast.children.each do |child|
+                if Parser::AST::Node === child
+                  walk[child, "  #{indent}"]
+                else
+                  _div "#{indent}  #{child.inspect}"
+                end
+              end
+            else
+              ast.children.each do |child|
+                _ " #{child.inspect}"
+              end
+            end
+          end
+        end
+
         _h2 'AST'
-        _pre Ruby2JS.parse(@ruby).first.inspect
+        parsed = Ruby2JS.parse(@ruby).first
+        _pre {walk[parsed]}
+
+        if ruby.ast != parsed
+          _h2 'filtered AST'
+          _pre {walk[ruby.ast]}
+        end
       end
 
       _h2 'JavaScript'
-      _pre Ruby2JS.convert(@ruby)
+      _pre ruby.to_s
     end
   end
 end
