@@ -385,7 +385,8 @@ module Ruby2JS
           params.pop if params.last == s(:nil)
 
           # construct element using params
-          element = s(:send, s(:const, nil, :React), :createElement, *params)
+          element = node.updated(:send, [s(:const, nil, :React), 
+            :createElement, *params])
 
           if @reactApply
             # if apply is set, emit code that pushes result
@@ -534,7 +535,7 @@ module Ruby2JS
             end
 
             # collapse series of method calls into a single call
-            return process(s(:send, *node.children[0..1], *children))
+            return process(node.updated(nil, [*node.children[0..1], *children]))
           else
             super
           end
@@ -594,7 +595,8 @@ module Ruby2JS
         if child.children[0] == nil and child.children[1] =~ /^_\w/
           block = s(:block, s(:send, nil, :proc), s(:args),
             *node.children[2..-1])
-          return on_send s(:send, *node.children.first.children, block)
+          return on_send node.children.first.updated(:send, 
+            [*node.children.first.children, block])
         end
 
         super
