@@ -66,16 +66,16 @@ module Ruby2JS
           body.select {|child| child.type == :defs}.each do |child|
             parent, mname, args, *block = child.children
             if child.is_method?
-              statics << s(:pair, s(:sym, mname), 
-                s(:block, s(:send, nil, :proc), args, s(:autoreturn, *block)))
+              statics << s(:pair, s(:sym, mname), child.updated(:block, 
+                [s(:send, nil, :proc), args, s(:autoreturn, *block)]))
             elsif 
               block.length == 1 and 
               Converter::EXPRESSIONS.include? block.first.type
             then
               statics << s(:pair, s(:sym, mname), *block)
             else
-              statics << s(:pair, s(:prop, mname), {get: 
-                s(:block, s(:send, nil, :proc), args, s(:autoreturn, *block))})
+              statics << s(:pair, s(:prop, mname), {get: child.updated(
+                :block, [s(:send, nil, :proc), args, s(:autoreturn, *block)])})
             end
           end
 
@@ -88,7 +88,7 @@ module Ruby2JS
           body.select {|child| child.type == :def}.each do |child|
             mname, args, *block = child.children
             @reactMethod = mname
-            @reactProps = s(:attr, s(:self), :props)
+            @reactProps = child.updated(:attr, [s(:self), :props])
 
             # analyze ivar usage
             @reactIvars = {pre: [], post: [], asgn: [], ref: []}
@@ -179,10 +179,13 @@ module Ruby2JS
             end
 
             # add method to class
-            pairs << child.updated(:pair, [s(:sym, mname), s(:block,
-              s(:send, nil, :proc), args,
-              process(s((child.is_method? ? :begin : :autoreturn),
-              *block)))])
+            type = (child.is_method? ? :begin : :autoreturn)
+            if block.length == 1 and Parser::AST::Node === block.first
+              type = :begin if block.first.type == :return
+            end
+
+            pairs << s(:pair, s(:sym, mname), child.updated(:block,
+              [s(:send, nil, :proc), args, process(s(type, *block))]))
 
             # retain comment
             unless @comments[child].empty?
@@ -196,8 +199,8 @@ module Ruby2JS
         end
 
         # emit a createClass statement
-        s(:casgn, nil, cname.children.last, 
-          s(:send, inheritance, :createClass, s(:hash, *pairs)))
+        node.updated(:casgn, [nil, cname.children.last, 
+          s(:send, inheritance, :createClass, s(:hash, *pairs))])
       end
 
       def on_send(node)
@@ -612,9 +615,10 @@ module Ruby2JS
       def on_ivar(node)
         return super unless @reactClass
         if @reactMethod and @reactIvars[:capture].include? node.children.first
-          s(:lvar, "$#{node.children.first[1..-1]}")
+          node.updated(:lvar, ["$#{node.children.first[1..-1]}"])
         else
-          s(:attr, s(:attr, s(:self), :state), node.children.first.to_s[1..-1])
+          node.updated(:attr, [s(:attr, s(:self), :state), 
+            node.children.first.to_s[1..-1]])
         end
       end
 
