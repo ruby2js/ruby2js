@@ -17,7 +17,7 @@ module Ruby2JS
         if node.children[0] == nil and WHITELIST.include? node.children[1].to_s
           super
         elsif node.children[1] =~ /_.*\w$/
-          super s((node.is_method? ? :send : :attr) , node.children[0],
+          super S((node.is_method? ? :call : :attr) , node.children[0],
             camelCase(node.children[1]), *node.children[2..-1])
         else
           super
@@ -26,7 +26,7 @@ module Ruby2JS
 
       def on_def(node)
         if node.children[0] =~ /_.*\w$/
-          super s(:def , camelCase(node.children[0]), *node.children[1..-1])
+          super S(:def , camelCase(node.children[0]), *node.children[1..-1])
         else
           super
         end
@@ -34,7 +34,7 @@ module Ruby2JS
 
       def on_optarg(node)
         if node.children[0] =~ /_.*\w$/
-          super s(:optarg , camelCase(node.children[0]), *node.children[1..-1])
+          super S(:optarg , camelCase(node.children[0]), *node.children[1..-1])
         else
           super
         end
@@ -42,7 +42,7 @@ module Ruby2JS
 
       def on_lvar(node)
         if node.children[0] =~ /_.*\w$/
-          super s(:lvar , camelCase(node.children[0]), *node.children[1..-1])
+          super S(:lvar , camelCase(node.children[0]), *node.children[1..-1])
         else
           super
         end
@@ -50,7 +50,7 @@ module Ruby2JS
 
       def on_arg(node)
         if node.children[0] =~ /_.*\w$/
-          super s(:arg , camelCase(node.children[0]), *node.children[1..-1])
+          super S(:arg , camelCase(node.children[0]), *node.children[1..-1])
         else
           super
         end
@@ -58,7 +58,7 @@ module Ruby2JS
 
       def on_lvasgn(node)
         if node.children[0] =~ /_.*\w$/
-          super s(:lvasgn , camelCase(node.children[0]), *node.children[1..-1])
+          super S(:lvasgn , camelCase(node.children[0]), *node.children[1..-1])
         else
           super
         end
@@ -66,7 +66,7 @@ module Ruby2JS
 
       def on_sym(node)
         if node.children[0] =~ /_.*\w$/
-          super s(:sym , camelCase(node.children[0]), *node.children[1..-1])
+          super S(:sym , camelCase(node.children[0]), *node.children[1..-1])
         else
           super
         end
@@ -74,7 +74,7 @@ module Ruby2JS
 
       def on_defs(node)
         if node.children[1] =~ /_.*\w$/
-          super s(:defs , node.children[0],
+          super S(:defs , node.children[0],
             camelCase(node.children[1]), *node.children[2..-1])
         else
           super
