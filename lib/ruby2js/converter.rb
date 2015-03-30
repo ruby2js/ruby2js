@@ -29,6 +29,7 @@ module Ruby2JS
 
       @ast, @comments, @vars = ast, comments, vars.dup
       @varstack = []
+      @scope = true
       @rbstack = []
       @next_token = :return
 
@@ -55,11 +56,14 @@ module Ruby2JS
     end
     
     def scope( ast, args=nil )
-      @varstack.push @vars.dup
+      scope, @scope = @scope, true
+      @varstack.push @vars
       @vars = args if args
+      @vars = Hash[@vars.map {|key, value| [key, true]}]
       parse( ast, :statement )
     ensure
       @vars = @varstack.pop
+      @scope = scope
     end
 
     def s(type, *args)

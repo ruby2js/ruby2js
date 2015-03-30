@@ -15,17 +15,40 @@ module Ruby2JS
       then_block ||= s(:nil)
 
       if @state == :statement
-        # use short form when appropriate
-        unless else_block or then_block.type == :begin
-          put "if ("; parse condition; put ') '; wrap { scope then_block }
-        else
-          put "if ("; parse condition; puts ') {'; scope then_block; sput '}'
-          while else_block and else_block.type == :if
-            condition, then_block, else_block = else_block.children
-            put ' else if ('; parse condition; puts ') {'
-            scope then_block; sput '}'
+        begin
+          scope, @scope = @scope, false
+          mark = output_location
+
+          # use short form when appropriate
+          unless else_block or then_block.type == :begin
+            put "if ("; parse condition; put ') '
+            wrap { parse then_block, :statement }
+          else
+            put "if ("; parse condition; puts ') {'
+            parse then_block, :statement
+            sput '}'
+
+            while else_block and else_block.type == :if
+              condition, then_block, else_block = else_block.children
+              put ' else if ('; parse condition; puts ') {'
+              parse then_block, :statement
+              sput '}'
+            end
+
+            if else_block
+              puts ' else {'; parse else_block, :statement; sput '}'
+            end
           end
-          (puts ' else {'; scope else_block; sput '}') if else_block
+
+          if scope
+            vars = @vars.select {|key, value| value == :pending}.keys
+            unless vars.empty?
+              insert mark, "var #{vars.join(', ')}#{@sep}"
+              vars.each {|var| @vars[var] = true}
+            end
+          end
+        ensure
+          @scope = scope
         end
       else
         else_block ||= s(:nil)

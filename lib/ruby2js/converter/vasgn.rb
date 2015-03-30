@@ -8,6 +8,7 @@ module Ruby2JS
     #   (int 1))
 
     handle :lvasgn, :gvasgn do |name, value=nil|
+      state  = @state
       begin
         if value and value.type == :lvasgn and @state == :statement
           undecls = []
@@ -25,7 +26,9 @@ module Ruby2JS
           end
         end
 
-        var = 'var ' unless @vars.include?(name) or @state != :statement
+        if state == :statement and @scope and not @vars.include?(name) 
+          var = 'var ' 
+        end
 
         if value
           put "#{ var }#{ name } = "; parse value
@@ -33,7 +36,13 @@ module Ruby2JS
           put "#{ var }#{ name }"
         end
       ensure
-        @vars[name] = true
+        if @scope
+          @vars[name] = true
+        elsif state == :statement
+          @vars[name] ||= :pending
+        else
+          @vars[name] ||= :implicit # console, document, ...
+        end
       end
     end
   end
