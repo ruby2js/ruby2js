@@ -93,6 +93,7 @@ module Ruby2JS
 
     # add horizonal (indentation) and vertical (blank lines) whitespace
     def respace
+      return if @indent == 0
       reindent
 
       (@lines.length-3).downto(0) do |i|
@@ -233,12 +234,13 @@ module Ruby2JS
 
     # return the output as a string
     def to_s
-      respace if @indent > 0
+      return @str if @str
+      respace
       @lines.map(&:to_s).join(@nl)
     end
 
     def to_str
-      to_s
+      @str ||= to_s
     end
 
     def +(value)
@@ -284,7 +286,8 @@ module Ruby2JS
     end
 
     def sourcemap
-      respace if @indent > 0
+      return @sourcemap if @sourcemap
+      respace
 
       @mappings = ''
       sources = []
@@ -311,7 +314,7 @@ module Ruby2JS
         end
       end
 
-      {
+      @sourcemap = {
         version: 3,
         file: @ast.loc.expression.source_buffer.name,
         sources: sources.map(&:name),
