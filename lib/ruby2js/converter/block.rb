@@ -24,7 +24,7 @@ module Ruby2JS
         sput "}"
       else
         block ||= s(:begin)
-        function = s(:def, nil, args, block)
+        function = @ast.updated(:def, [nil, args, block])
         parse s(:send, *call.children, function)
       end
     end

@@ -145,7 +145,7 @@ module Ruby2JS
             elsif mname == :componentWillReceiveProps
               if args.children.length == 0
                 args = s(:args, s(:arg, :"$$props"))
-                child = s(:def, mname, args, *block)
+                child = child.updated(:def, [mname, args, *block])
                 @reactProps = s(:lvar, :"$$props")
               else
                 @reactProps = s(:lvar, args.children.first.children.last)
