@@ -76,15 +76,15 @@ module Ruby2JS
     end
 
     # indent multi-line parameter lists, array constants, blocks
-    def reindent
+    def reindent(lines, offset)
       indent = 0
-      @lines.each do |line|
+      lines.each do |line|
         first = line.find {|token| !token.empty?}
         if first
           last = line[line.rindex {|token| !token.empty?}]
-          indent -= @indent if ')}]'.include? first[0]
+          indent -= offset if ')}]'.include? first[0]
           line.indent = indent
-          indent += @indent if '({['.include? last[-1]
+          indent += offset if '({['.include? last[-1]
         else
           line.indent = indent
         end
@@ -93,8 +93,8 @@ module Ruby2JS
 
     # add horizonal (indentation) and vertical (blank lines) whitespace
     def respace
+      reindent @lines, @indent
       return if @indent == 0
-      reindent
 
       (@lines.length-3).downto(0) do |i|
         if
@@ -102,7 +102,8 @@ module Ruby2JS
         then
           @lines.delete i
         elsif
-          @lines[i+1].comment? and not @lines[i].comment?
+          @lines[i+1].comment? and not @lines[i].comment? and
+          @lines[i].indent == @lines[i+1].indent
         then
           # before a comment
           @lines.insert i+1, Line.new
@@ -213,22 +214,43 @@ module Ruby2JS
       mark = output_location
       yield
       return unless @lines.length - mark.first > 1
-      return if @lines[mark.first..-1].any? do |line|
-        line.first.to_s.start_with? '//'
+
+      # survey what we have to work with, keeping track of a possible
+      # split of the last argument or value
+      work = []
+      indent = len = 0
+      trail = split = nil
+      slice = @lines[mark.first..-1]
+      reindent(slice, 2)
+      slice.each_with_index do |line, index|
+        if line.first.start_with? '//'
+          len += @width # comments are a deal breaker
+        else
+          (work.push ' '; len += 1) if trail == line.indent and @indent > 0
+          len += line.map(&:length).inject(&:+)
+          work += line
+
+          if trail == @indent and line.indent == @indent
+            split = [len, work.length, index]
+            break if len >= @width - 10
+          end
+          trail = line.indent
+        end
       end
 
-      len = @lines[mark.first..-1].map { |line|
-        line.map(&:length).reduce(&:+).to_i + 1
-      }.reduce(&:+).to_i
-
       if len < @width - 10
-        lines = @lines.slice!(mark.first..-1)
-        @line = Line.new
-        lines.each_with_index do |line, index|
-          @line << ' ' unless index <= 1 or index >= lines.length-1
-          @line.push *line
+        # full collapse
+        @lines[mark.first..-1] = [Line.new(*work)]
+        @line = @lines.last
+      elsif split and split[0] < @width-10
+        if slice[split[2]].indent < slice[split[2]+1].indent
+          # collapse all but the last argument (typically a hash or function)
+          close = slice.pop
+          slice[-1].push *close
+          @lines[mark.first] = Line.new(*work[0..split[1]-1])
+          @lines[mark.first+1..-1] = slice[split[2]+1..-1]
+          @line = @lines.last
         end
-        @lines.push @line
       end
     end
 
@@ -286,7 +308,6 @@ module Ruby2JS
     end
 
     def sourcemap
-      return @sourcemap if @sourcemap
       respace
 
       @mappings = ''

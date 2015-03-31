@@ -135,11 +135,11 @@ describe Ruby2JS::Filter::Functions do
       js.must_include "//subclass\n//constructor\nfunction Subclass() {\n  " +
         "Class.call(this)\n};"
       js.must_include "//method\nSubclass.prototype.method = function() {"
-      js.must_include "//attribute\n    attribute: {"
-      js.must_include "//setter\n    setter: {"
+      js.must_include "//attribute\n  attribute: {"
+      js.must_include "//setter\n  setter: {"
       js.must_include "//classmethod\nSubclass.classmethod = function() {"
-      js.must_include "//classattribute\n    classattribute: {"
-      js.must_include "//classsetter\n    classsetter: {"
+      js.must_include "//classattribute\n  classattribute: {"
+      js.must_include "//classsetter\n  classsetter: {"
     end
   end
 end
