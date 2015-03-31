@@ -95,8 +95,8 @@ module Ruby2JS
             @reactIvars = {pre: [], post: [], asgn: [], ref: []}
             react_walk(node)
             unless @reactIvars.values.flatten.empty?
-              body.unshift s(:def, :getInitialState, s(:args), 
-                s(:return, s(:hash)))
+              body = [s(:def, :getInitialState, s(:args), 
+                s(:return, s(:hash))), *body]
             end
           end
 
