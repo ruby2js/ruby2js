@@ -84,6 +84,22 @@ module Ruby2JS
             pairs << s(:pair, s(:sym, :statics), s(:hash, *statics))
           end
 
+          # create a default getInitialState method if there is no such method
+          # and there are references to instance variables.
+          if
+            not body.any? do |child|
+              child.type == :def and 
+              [:getInitialState, :initialize].include? child.children.first
+            end
+          then
+            @reactIvars = {pre: [], post: [], asgn: [], ref: []}
+            react_walk(node)
+            unless @reactIvars.values.flatten.empty?
+              body.unshift s(:def, :getInitialState, s(:args), 
+                s(:return, s(:hash)))
+            end
+          end
+
           # add a proc/function for each method
           body.select {|child| child.type == :def}.each do |child|
             mname, args, *block = child.children

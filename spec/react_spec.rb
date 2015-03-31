@@ -24,6 +24,11 @@ describe Ruby2JS::Filter::React do
         must_include 'getInitialState: function() {return {}}'
     end
 
+    it "should create default getInitialState methods" do
+      to_js( 'class Foo<React; def foo(); @i=1; end; end' ).
+        must_include 'getInitialState: function() {return {}}'
+    end
+
     it "should initialize, accumulate, and return state" do
       to_js( 'class Foo<React; def initialize; @a=1; b=2; @b = b; end; end' ).
         must_include 'getInitialState: function() {this.state = {a: 1}; ' +
