@@ -76,25 +76,25 @@ module Ruby2JS
     end
 
     # indent multi-line parameter lists, array constants, blocks
-    def reindent(lines, offset)
+    def reindent(lines)
       indent = 0
       lines.each do |line|
         first = line.find {|token| !token.empty?}
         if first
           last = line[line.rindex {|token| !token.empty?}]
-          indent -= offset if ')}]'.include? first[0]
+          indent -= @indent if ')}]'.include? first[0]
           line.indent = indent
-          indent += offset if '({['.include? last[-1]
+          indent += @indent if '({['.include? last[-1]
         else
           line.indent = indent
         end
       end
     end
 
-    # add horizonal (indentation) and vertical (blank lines) whitespace
+    # add horizontal (indentation) and vertical (blank lines) whitespace
     def respace
-      reindent @lines, @indent
       return if @indent == 0
+      reindent @lines
 
       (@lines.length-3).downto(0) do |i|
         if
@@ -186,10 +186,10 @@ module Ruby2JS
       if lines.empty?
         lines = [@line.slice!(mark.last..-1)]
       elsif @line.length != mark.last
-        lines.unshift @line.slice!(mark.last..-1), [@ws]
+        lines.unshift @line.slice!(mark.last..-1)
       end
 
-      lines.map(&:join).join(@nl)
+      lines.map(&:join).join(@ws)
     end
 
     # wrap long statements in curly braces
@@ -214,6 +214,7 @@ module Ruby2JS
       mark = output_location
       yield
       return unless @lines.length - mark.first > 1
+      return if @indent == 0
 
       # survey what we have to work with, keeping track of a possible
       # split of the last argument or value
@@ -221,7 +222,7 @@ module Ruby2JS
       indent = len = 0
       trail = split = nil
       slice = @lines[mark.first..-1]
-      reindent(slice, 2)
+      reindent(slice)
       slice.each_with_index do |line, index|
         if line.first.start_with? '//'
           len += @width # comments are a deal breaker

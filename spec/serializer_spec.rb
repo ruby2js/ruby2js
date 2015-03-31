@@ -9,6 +9,7 @@ end
 describe 'serializer tests' do
   before do
     @serializer = TestSerializer.new
+    @serializer.enable_vertical_whitespace
   end
 
   describe 'put' do
@@ -76,7 +77,7 @@ describe 'serializer tests' do
       end
       
       @serializer.lines.must_equal [['a']]
-      text.must_equal "bc de"
+      text.must_equal "bc\nde"
     end
   end
 
