@@ -82,7 +82,7 @@ module Ruby2JS
         first = line.find {|token| !token.empty?}
         if first
           last = line[line.rindex {|token| !token.empty?}]
-          indent -= @indent if ')}]'.include? first[0]
+          indent -= @indent if ')}]'.include? first[0] and indent >= @indent
           line.indent = indent
           indent += @indent if '({['.include? last[-1]
         else

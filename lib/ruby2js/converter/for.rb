@@ -16,7 +16,7 @@ module Ruby2JS
         if [:irange, :erange].include? expression.type
           put ' = '; parse expression.children.first; put '; '; parse var
           (expression.type == :erange ? put(' < ') : put(' <= '))
-          parse expression.children.last; put '; '; parse var; puts '++'
+          parse expression.children.last; put '; '; parse var; put '++'
         else
           put ' in '; parse expression; 
         end
