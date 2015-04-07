@@ -161,7 +161,9 @@ module Ruby2JS
             elsif mname == :componentWillReceiveProps
               if args.children.length == 0
                 args = s(:args, s(:arg, :"$$props"))
+                comments = @comments[child]
                 child = child.updated(:def, [mname, args, *block])
+                @comments[child] = comments unless comments.empty?
                 @reactProps = s(:lvar, :"$$props")
               else
                 @reactProps = s(:lvar, args.children.first.children.last)
