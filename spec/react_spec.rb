@@ -292,8 +292,13 @@ describe Ruby2JS::Filter::React do
     end
 
     it "should map parallel instance variables to setState" do
-      to_js( 'class Foo<React; def method; @x=@y=1; end; end' ).
+      to_js( 'class Foo<React; def method(); @x=@y=1; end; end' ).
         must_include 'this.setState({x: 1, y: 1})'
+    end
+
+    it "should map consecutive instance variables to setState" do
+      to_js( 'class Foo<React; def method(); @x=1; @y=2; end; end' ).
+        must_include 'this.setState({x: 1, y: 2})'
     end
 
     it "should create temporary variables when needed" do

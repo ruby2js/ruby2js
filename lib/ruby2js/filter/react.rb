@@ -734,6 +734,36 @@ module Ruby2JS
           end
         end
       end
+
+      # collapse consecutive setState calls into a single call
+      def on_begin(node)
+        node = super
+        (node.children.length-2).downto(0) do |i|
+          if 
+            node.children[i].type == :send and
+            node.children[i].children[0] and
+            node.children[i].children[0].type == :self and
+            node.children[i].children[1] == :setState and
+            node.children[i].children[2].type == :hash and
+            node.children[i+1].type == :send and
+            node.children[i+1].children[0] and
+            node.children[i+1].children[0].type == :self and
+            node.children[i+1].children[1] == :setState and
+            node.children[i+1].children[2].type == :hash and
+            @comments[node.children[i+1]].empty?
+          then
+            pairs = node.children[i].children[2].children +
+                   node.children[i+1].children[2].children
+            children = node.children.dup
+            children.delete_at(i)
+            children[i] = children[i].updated(nil, [
+              *children[i].children[0..1],
+              children[i].children[2].updated(nil, pairs)])
+            node = node.updated(nil, children)
+          end
+        end
+        node
+      end
     end
 
     DEFAULTS.push React
