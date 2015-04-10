@@ -163,6 +163,13 @@ describe Ruby2JS::Filter::React do
       result.must_include ', React.createElement("p", null, "b"))}})'
     end
 
+    it "should wrap anything that is not a method or block call with a span" do
+      result = to_js( 'class Foo<React; def render; if @a; _p "a"; else;_p "b"; end; end;end' )
+      result.must_include 'return React.createElement.apply(React'
+      result.must_include 'push(React.createElement("p", null, "a"))} else {'
+      result.must_include 'push(React.createElement("p", null, "b"))};'
+    end
+
     it "should insert a span if no elements are present" do
       result = to_js( 'class Foo<React; def render; end; end' )
       result.must_include 'return React.createElement("span")'

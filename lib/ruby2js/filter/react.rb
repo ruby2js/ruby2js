@@ -152,7 +152,10 @@ module Ruby2JS
               end
 
             elsif mname == :render
-              if block.length!=1 or not block.last or block.last.type==:begin
+              if 
+                block.length != 1 or not block.last or 
+                not [:send, :block].include? block.last.type
+              then
                 # wrap multi-line blocks with a 'span' element
                 block = [s(:return, 
                   s(:block, s(:send, nil, :_span), s(:args), *block))]
