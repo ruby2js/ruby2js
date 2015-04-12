@@ -314,10 +314,25 @@ module Ruby2JS
             pairs -= classes
             if expr
               if values.length > 1
-                value = s(:send, s(:str, values.join(' ')), :+, 
-                  s(:or, expr, s(:str, '')))
+                while expr.type == :begin and expr.children.length == 1
+                  expr = expr.children.first
+                end
+
+                if 
+                  expr.type == :if and expr.children[1] and
+                  expr.children[1].type == :str
+                then
+                  left = expr.children[1]
+                  right = expr.children[2] || s(:str, '')
+                  right = s(:or, right, s(:str, '')) unless right.type == :str
+                  expr = expr.updated(nil, [expr.children[0], left, right])
+                elsif expr.type != :str
+                  expr = s(:or, expr, s(:str, ''))
+                end
+
+                value = s(:send, s(:str, values.join(' ')), :+, expr)
               else
-                value = s(:or, expr, s(:str, ''))
+                value = expr
               end
             else
               value = s(:str, values.join(' '))
