@@ -494,6 +494,11 @@ describe Ruby2JS do
     it "should parse with explicit return" do
       to_js('Proc.new {return nil}').must_equal 'function() {return null}'
     end
+
+    it "should passthrough function definitions" do
+      to_js('a=1; b=function(a,c) {return a + c}').
+        must_equal 'var a = 1; var b = function(a, c) {return a + c}'
+    end
   end
 
   describe 'object definition' do
