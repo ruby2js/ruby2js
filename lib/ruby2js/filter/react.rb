@@ -66,8 +66,8 @@ module Ruby2JS
           body.select {|child| child.type == :defs}.each do |child|
             parent, mname, args, *block = child.children
             if child.is_method?
-              statics << s(:pair, s(:sym, mname), child.updated(:block, 
-                [s(:send, nil, :proc), args, s(:autoreturn, *block)]))
+              statics << s(:pair, s(:sym, mname), process(child.updated(:block, 
+                [s(:send, nil, :proc), args, s(:autoreturn, *block)])))
             elsif 
               block.length == 1 and 
               Converter::EXPRESSIONS.include? block.first.type
