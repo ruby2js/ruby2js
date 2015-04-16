@@ -39,16 +39,16 @@ module Ruby2JS
         return super unless inheritance == s(:const, nil, :React)
 
         # traverse down to actual list of class statements
-        if body.length == 1 
+        if body.length == 1
           if not body.first
             body = []
           elsif body.first.type == :begin
-            body = body.first.children 
+            body = body.first.children
           end
         end
 
         # abort conversion unless all body statements are method definitions
-        return super unless body.all? do |child| 
+        return super unless body.all? do |child|
           child.type == :def or
           (child.type == :defs and child.children.first == s(:self))
         end
@@ -58,7 +58,7 @@ module Ruby2JS
           reactClass, @reactClass = @reactClass, true
 
           # automatically capture the displayName for the class
-          pairs = [s(:pair, s(:sym, :displayName), 
+          pairs = [s(:pair, s(:sym, :displayName),
             s(:str, cname.children.last.to_s))]
 
           # collect static properties/functions
@@ -66,10 +66,10 @@ module Ruby2JS
           body.select {|child| child.type == :defs}.each do |child|
             parent, mname, args, *block = child.children
             if child.is_method?
-              statics << s(:pair, s(:sym, mname), process(child.updated(:block, 
+              statics << s(:pair, s(:sym, mname), process(child.updated(:block,
                 [s(:send, nil, :proc), args, s(:autoreturn, *block)])))
-            elsif 
-              block.length == 1 and 
+            elsif
+              block.length == 1 and
               Converter::EXPRESSIONS.include? block.first.type
             then
               statics << s(:pair, s(:sym, mname), *block)
@@ -88,14 +88,14 @@ module Ruby2JS
           # and there are references to instance variables.
           if
             not body.any? do |child|
-              child.type == :def and 
+              child.type == :def and
               [:getInitialState, :initialize].include? child.children.first
             end
           then
-            @reactIvars = {pre: [], post: [], asgn: [], ref: []}
+            @reactIvars = {pre: [], post: [], asgn: [], ref: [], cond: []}
             react_walk(node)
             unless @reactIvars.values.flatten.empty?
-              body = [s(:def, :getInitialState, s(:args), 
+              body = [s(:def, :getInitialState, s(:args),
                 s(:return, s(:hash))), *body]
             end
           end
@@ -107,9 +107,9 @@ module Ruby2JS
             @reactProps = child.updated(:attr, [s(:self), :props])
 
             # analyze ivar usage
-            @reactIvars = {pre: [], post: [], asgn: [], ref: []}
+            @reactIvars = {pre: [], post: [], asgn: [], ref: [], cond: []}
             react_walk(child) unless mname == :initialize
-            @reactIvars[:capture] = 
+            @reactIvars[:capture] =
               (@reactIvars[:pre] + @reactIvars[:post]).uniq
 
             if mname == :initialize
@@ -152,12 +152,12 @@ module Ruby2JS
               end
 
             elsif mname == :render
-              if 
-                block.length != 1 or not block.last or 
+              if
+                block.length != 1 or not block.last or
                 not [:send, :block].include? block.last.type
               then
                 # wrap multi-line blocks with a 'span' element
-                block = [s(:return, 
+                block = [s(:return,
                   s(:block, s(:send, nil, :_span), s(:args), *block))]
               end
 
@@ -180,14 +180,14 @@ module Ruby2JS
 
             # capture ivars that are both set and referenced
             @reactIvars[:pre].uniq.sort.reverse.each do |ivar|
-              block.unshift(s(:lvasgn, "$#{ivar.to_s[1..-1]}", 
+              block.unshift(s(:lvasgn, "$#{ivar.to_s[1..-1]}",
                 s(:attr, s(:attr, s(:self), :state), ivar.to_s[1..-1])))
             end
 
             # update ivars that are set and later referenced
             unless @reactIvars[:post].empty?
               updates = @reactIvars[:post].uniq.sort.reverse.map do |ivar|
-                s(:pair, s(:lvar, ivar.to_s[1..-1]), 
+                s(:pair, s(:lvar, ivar.to_s[1..-1]),
                   s(:lvar, "$#{ivar.to_s[1..-1]}"))
               end
               update = s(:send, s(:self), :setState, s(:hash, *updates))
@@ -220,7 +220,7 @@ module Ruby2JS
         end
 
         # emit a createClass statement
-        node.updated(:casgn, [nil, cname.children.last, 
+        node.updated(:casgn, [nil, cname.children.last,
           s(:send, inheritance, :createClass, s(:hash, *pairs))])
       end
 
@@ -228,7 +228,7 @@ module Ruby2JS
         if not @react
           # enable React filtering within React class method calls or
           # React component calls
-          if 
+          if
             node.children.first == s(:const, nil, :React)
           then
             begin
@@ -252,7 +252,7 @@ module Ruby2JS
             process(node.children[2])
           end
 
-        elsif 
+        elsif
           @reactApply and node.children[1] == :createElement and
           node.children[0] == s(:const, nil, :React)
         then
@@ -262,7 +262,7 @@ module Ruby2JS
 
         elsif node.children[0] == nil and node.children[1] =~ /^_\w/
           # map method calls starting with an underscore to React calls
-          # to create an element.  
+          # to create an element.
           #
           # input:
           #   _a 'name', href: 'link'
@@ -318,7 +318,7 @@ module Ruby2JS
                   expr = expr.children.first
                 end
 
-                if 
+                if
                   expr.type == :if and expr.children[1] and
                   expr.children[1].type == :str
                 then
@@ -366,11 +366,11 @@ module Ruby2JS
 
             # traverse down to actual list of nested statements
             args = block.children[2..-1]
-            if args.length == 1 
+            if args.length == 1
               if not args.first
                 args = []
               elsif args.first.type == :begin
-                args = args.first.children 
+                args = args.first.children
               end
             end
 
@@ -405,8 +405,8 @@ module Ruby2JS
                 #   }())
                 #
                 # Base Ruby2JS processing will convert the 'splat' to 'apply'
-                params = [s(:splat, s(:send, s(:block, s(:send, nil, :proc), 
-                  s(:args, s(:shadowarg, :$_)), s(:begin, 
+                params = [s(:splat, s(:send, s(:block, s(:send, nil, :proc),
+                  s(:args, s(:shadowarg, :$_)), s(:begin,
                   s(:lvasgn, :$_, s(:array, *params)),
                   *args.map {|arg| process arg},
                   s(:return, s(:lvar, :$_)))), :[]))]
@@ -424,7 +424,7 @@ module Ruby2JS
           params.pop if params.last == s(:nil)
 
           # construct element using params
-          element = node.updated(:send, [s(:const, nil, :React), 
+          element = node.updated(:send, [s(:const, nil, :React),
             :createElement, *params])
 
           if @reactApply
@@ -504,7 +504,7 @@ module Ruby2JS
                 # possible getter/setter
                 method = node.children[1]
                 method = method.to_s.chomp('=') if method =~ /=$/
-                rewrite = [rewrite_tilda[node.children[0]], 
+                rewrite = [rewrite_tilda[node.children[0]],
                   method, *node.children[2..-1]]
                 rewrite[1] = node.children[1]
                 node.updated nil, rewrite
@@ -516,16 +516,16 @@ module Ruby2JS
               s(:send, s(:gvar, "$#{node.children[0]}"), :getDOMNode)
             elsif node.type == :str
               if node.children.first =~ /^#[-\w]+$/
-                s(:send, s(:attr, nil, :document), :getElementById, 
+                s(:send, s(:attr, nil, :document), :getElementById,
                   s(:str, node.children.first[1..-1].gsub('_', '-')))
               elsif node.children.first =~ /^(\.[-\w]+)+$/
-                s(:send, s(:send, s(:attr, nil, :document), 
-                  :getElementsByClassName, s(:str, 
+                s(:send, s(:send, s(:attr, nil, :document),
+                  :getElementsByClassName, s(:str,
                   node.children.first[1..-1].gsub('.', ' ').gsub('_', '-'))),
                   :[], s(:int, 0))
               elsif node.children.first =~ /^[-\w]+$/
-                s(:send, s(:send, s(:attr, nil, :document), 
-                  :getElementsByTagName, s(:str, 
+                s(:send, s(:send, s(:attr, nil, :document),
+                  :getElementsByTagName, s(:str,
                   node.children.first.gsub('_', '-'))), :[], s(:int, 0))
               else
                 s(:send, s(:attr, nil, :document), :querySelector, node)
@@ -553,11 +553,11 @@ module Ruby2JS
             while node != child
               if node.children[1] !~ /!$/
                 # convert method name to hash {className: name} pair
-                pair = s(:pair, s(:sym, :className), 
+                pair = s(:pair, s(:sym, :className),
                   s(:str, node.children[1].to_s.gsub('_','-')))
               else
                 # convert method name to hash {id: name} pair
-                pair = s(:pair, s(:sym, :id), 
+                pair = s(:pair, s(:sym, :id),
                   s(:str, node.children[1].to_s[0..-2].gsub('_','-')))
               end
 
@@ -579,7 +579,7 @@ module Ruby2JS
             super
           end
 
-        elsif 
+        elsif
           node.children[0] and node.children[0].type == :self and
           node.children.length == 2 and
           node.children[1] == :componentWillReceiveProps
@@ -596,11 +596,11 @@ module Ruby2JS
         if not @react
           # enable React filtering within React class method calls or
           # React component calls
-          if 
+          if
             node.children.first == s(:const, nil, :React)
           then
             begin
-              reacth @react = @react, true
+              react, @react = @react, true
               return on_block(node)
             ensure
               @react = react
@@ -634,11 +634,16 @@ module Ruby2JS
         if child.children[0] == nil and child.children[1] =~ /^_\w/
           block = s(:block, s(:send, nil, :proc), s(:args),
             *node.children[2..-1])
-          return on_send node.children.first.updated(:send, 
+          return on_send node.children.first.updated(:send,
             [*node.children.first.children, block])
         end
 
-        super
+        begin
+          reactBlock, @reactBlock = @reactBlock, true
+          super
+        ensure
+          @reactBlock = reactBlock
+        end
       end
 
       # convert global variables to refs
@@ -653,7 +658,7 @@ module Ruby2JS
         if @reactMethod and @reactIvars[:capture].include? node.children.first
           node.updated(:lvar, ["$#{node.children.first[1..-1]}"])
         else
-          node.updated(:attr, [s(:attr, s(:self), :state), 
+          node.updated(:attr, [s(:attr, s(:self), :state),
             node.children.first.to_s[1..-1]])
         end
       end
@@ -663,8 +668,15 @@ module Ruby2JS
         return super unless @react
 
         if @reactMethod and @reactIvars[:capture].include? node.children.first
-          return s(:lvasgn, "$#{node.children.first[1..-1]}",
-            *process_all(node.children[1..-1]))
+          ivar = node.children.first.to_s
+          if @reactBlock
+            return s(:send, s(:self), :setState, s(:hash, s(:pair,
+              s(:lvar, ivar[1..-1]), process(s(:lvasgn, "$#{ivar[1..-1]}",
+              *node.children[1..-1])))))
+          else
+            return s(:lvasgn, "$#{ivar[1..-1]}",
+              *process_all(node.children[1..-1]))
+          end
         end
 
         vars = [node.children.first]
@@ -674,13 +686,15 @@ module Ruby2JS
           vars << node.children.first
         end
 
-        if @reactMethod == :initialize
-          s(:begin, *vars.map {|var| s(:send, s(:attr, s(:self), :state),
-            var.to_s[1..-1] + '=', process(node.children.last))})
-        else
-          s(:send, s(:self), :setState, s(:hash, 
-            *vars.map {|var| s(:pair, s(:str, var.to_s[1..-1]),
-            process(node.children.last))}))
+        if node.children.length == 2
+          if @reactMethod == :initialize
+            s(:begin, *vars.map {|var| s(:send, s(:attr, s(:self), :state),
+              var.to_s[1..-1] + '=', process(node.children.last))})
+          else
+            s(:send, s(:self), :setState, s(:hash,
+              *vars.map {|var| s(:pair, s(:str, var.to_s[1..-1]),
+              process(node.children.last))}))
+          end
         end
       end
 
@@ -690,19 +704,45 @@ module Ruby2JS
         raise NotImplementedError, "setting a React property"
       end
 
-      # convert class variables to props
+      # convert instance variables to state: "@x ||= y"
+      def on_or_asgn(node)
+        return super unless @react
+        return super unless node.children.first.type == :ivasgn
+        on_op_asgn(node)
+      end
+
+      # convert instance variables to state: "@x &&= y"
+      def on_and_asgn(node)
+        return super unless @react
+        return super unless node.children.first.type == :ivasgn
+        on_op_asgn(node)
+      end
+
+      # convert instance variables to state: "@x += y"
       def on_op_asgn(node)
         return super unless @react
         return super unless node.children.first.type == :ivasgn
         var = node.children.first.children.first
         if @reactMethod and @reactIvars[:capture].include? var
-          process s(:op_asgn, s(:lvasgn, "$#{var[1..-1]}"),
-            *node.children[1..-1])
+          if @reactBlock
+            s(:send, s(:self), :setState, s(:hash, s(:pair,
+              s(:lvar, var[1..-1]), process(s(node.type,
+              s(:lvasgn, "$#{var[1..-1]}"), *node.children[1..-1])))))
+          else
+            process s(node.type, s(:lvasgn, "$#{var[1..-1]}"),
+              *node.children[1..-1])
+          end
         elsif @reactMethod == :initialize
-          process s(:op_asgn, s(:attr, s(:attr, s(:self), :state),
+          process s(node.type, s(:attr, s(:attr, s(:self), :state),
             var[1..-1]), *node.children[1..-1])
+        elsif node.type == :or_asgn
+          process s(:ivasgn, var, s(:or, s(:ivar, var),
+            *node.children[1..-1]))
+        elsif node.type == :and_asgn
+          process s(:ivasgn, var, s(:and, s(:ivar, var),
+            *node.children[1..-1]))
         else
-          process s(:ivasgn, var, s(:send, s(:ivar, var), 
+          process s(:ivasgn, var, s(:send, s(:ivar, var),
             *node.children[1..-1]))
         end
       end
@@ -717,34 +757,42 @@ module Ruby2JS
       def react_walk(node)
         child = node.children.first
 
+        base = @reactIvars[:asgn].dup if [:if, :case].include? node.type
+
         node.children.each do |child|
           react_walk(child) if Parser::AST::Node === child
         end
 
         case node.type
+        when :if, :case
+          @reactIvars[:cond] += @reactIvars[:asgn] - base
+
         when :ivar
-          if @reactIvars[:asgn].include? child
+          if @reactIvars[:cond].include? child
+            @reactIvars[:post] << child
+            @reactIvars[:pre] << child
+          elsif @reactIvars[:asgn].include? child
             @reactIvars[:post] << child
             @reactIvars[:pre] << child if @reactIvars[:ref].include? child
           end
           @reactIvars[:ref] << child
-          
+
         when :ivasgn
           @reactIvars[:asgn] << child
 
-        when :op_asgn 
+        when :op_asgn, :or_asgn, :and_asgn
           if child.type == :ivasgn
             gchild = child.children.first
-            if @reactIvars[:ref].include? gchild
-              @reactIvars[:pre] << gchild 
-              @reactIvars[:post] << gchild 
+            if (@reactIvars[:ref]+@reactIvars[:cond]).include? gchild
+              @reactIvars[:pre] << gchild
+              @reactIvars[:post] << gchild
             end
             @reactIvars[:ref] << gchild
             @reactIvars[:asgn] << gchild
           end
 
-        when :send 
-          if 
+        when :send
+          if
             child and child.type == :self and node.children.length == 2 and
             node.children[1] == :componentWillReceiveProps
           then
@@ -757,7 +805,7 @@ module Ruby2JS
       def on_begin(node)
         node = super
         (node.children.length-2).downto(0) do |i|
-          if 
+          if
             node.children[i].type == :send and
             node.children[i].children[0] and
             node.children[i].children[0].type == :self and

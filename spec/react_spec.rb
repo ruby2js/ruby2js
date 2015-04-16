@@ -319,6 +319,25 @@ describe Ruby2JS::Filter::React do
           'return this.setState({a: $a})'
     end
 
+    it "should create temporary variables when conditionals are involved" do
+      to_js( 'class Foo<React; def f; @a+=1 if 1; b=@a; end; end' ).
+        must_include 'var $a = this.state.a; if (1) {$a++}; var b = $a; ' +
+          'return this.setState({a: $a})'
+    end
+
+    it "should create temporary variables when blocks are involved" do
+      to_js( 'class Foo<React; def f; foo {@a=1}; b=@a; end; end' ).
+        must_include 'foo(function() {self.setState({a: $a = 1})}); '
+          'var b = $a; return this.setState({a: $a})'
+    end
+
+    it "should create temporary variables when blocks+opasgn are involved" do
+      to_js( 'class Foo<React; def f; foo {@a+=1}; b=@a; end; end' ).
+        must_include 'var $a = this.state.a; ' +
+          'foo(function() {self.setState({a: ++$a})}); var b = $a; ' +
+          'return this.setState({a: $a})'
+    end
+
     it "should map class variables to properties" do
       to_js( 'class Foo<React; def method; @@x; end; end' ).
         must_include 'this.props.x'
