@@ -38,9 +38,9 @@ module Ruby2JS
               filename.untaint 
             end
 
-            if not File.exist? filename and File.exist? filename+".rb"
+            if not File.file? filename and File.file? filename+".rb"
               filename += '.rb'
-            elsif not File.exist? filename and File.exist? filename+".js.rb"
+            elsif not File.file? filename and File.file? filename+".js.rb"
               filename += '.js.rb'
             end
 
