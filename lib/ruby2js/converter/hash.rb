@@ -23,11 +23,12 @@ module Ruby2JS
           end
 
           begin
-            block_depth,block_this,block_hash = @block_depth,@block_this,false
+            block_depth,block_hash = @block_depth,false
             left, right = node.children
 
             if Hash === right or right.type == :block
-              @block_depth, block_hash = 0, true
+              block_hash = true
+              @block_depth = 0 unless @block_depth
             end
 
             if left.type == :prop
@@ -81,7 +82,6 @@ module Ruby2JS
           ensure
             if block_hash
               @block_depth = block_depth
-              @block_this = block_this
             end
           end
         end

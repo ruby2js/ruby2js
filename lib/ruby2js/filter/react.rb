@@ -340,6 +340,41 @@ module Ruby2JS
             pairs.unshift s(:pair, s(:sym, :className), value)
           end
 
+          # support controlled form components
+          if %w(input select textarea).include? tag
+            # search for the presence of a 'value' attribute
+            value = pairs.find_index do |pair|
+              ['value', :value].include? pair.children.first.children.first
+            end
+
+            # search for the presence of a 'onChange' attribute
+            onChange = pairs.find_index do |pair|
+              ['onChange', :onChange].include? pair.children.first.children[0]
+            end
+
+            if value and pairs[value].children.last.type == :ivar and
+            !onChange
+              pairs << s(:pair, s(:sym, :onChange),
+                s(:block, s(:send, nil, :proc), s(:args, s(:arg, :event)),
+                s(:ivasgn, pairs[value].children.last.children.first,
+                s(:attr, s(:attr, s(:lvar, :event), :target), :value))))
+            end
+
+            if not value and not onChange and tag == 'input'
+              # search for the presence of a 'checked' attribute
+              checked = pairs.find_index do |pair|
+                ['checked', :checked].include? pair.children.first.children[0]
+              end
+
+              if checked and pairs[checked].children.last.type == :ivar
+                pairs << s(:pair, s(:sym, :onChange),
+                  s(:block, s(:send, nil, :proc), s(:args),
+                  s(:ivasgn, pairs[checked].children.last.children.first,
+                  s(:send, pairs[checked].children.last, :!))))
+              end
+            end
+          end
+
           # search for the presence of a 'for' attribute
           htmlFor = pairs.find_index do |pair|
             ['for', :for].include? pair.children.first.children.first

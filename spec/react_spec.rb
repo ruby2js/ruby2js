@@ -418,6 +418,23 @@ describe Ruby2JS::Filter::React do
     end
   end
 
+  describe "controlled components" do
+    it "should should automatically create onChange value functions" do
+      to_js( 'class Foo<React; def render; _input value: @x; end; end' ).
+        must_include 'onChange: function(event) {self.setState({x: event.target.value}'
+    end
+
+    it "should should automatically create onChange checked functions" do
+      to_js( 'class Foo<React; def render; _input checked: @x; end; end' ).
+        must_include 'onChange: function() {self.setState({x: !self.state.x}'
+    end
+
+    it "should should retain onChange functions" do
+      to_js( 'class Foo<React; def render; _input checked: @x, onChange: self.change; end; end' ).
+        must_include 'onChange: this.change'
+    end
+  end
+
   describe Ruby2JS::Filter::DEFAULTS do
     it "should include React" do
       Ruby2JS::Filter::DEFAULTS.must_include Ruby2JS::Filter::React
