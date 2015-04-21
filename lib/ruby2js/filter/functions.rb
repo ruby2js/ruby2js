@@ -210,6 +210,10 @@ module Ruby2JS
         elsif method == :inspect and args.length == 0
           S(:send, s(:const, nil, :JSON), :stringify, process(target))
 
+        elsif method == :* and target.type == :str
+          process S(:send, s(:send, s(:const, nil, :Array), :new,
+            s(:send, args.first, :+, s(:int, 1))), :join, target)
+
         else
           super
         end

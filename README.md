@@ -192,6 +192,7 @@ the script.
     * `[n...m]` becomes `.slice(n,m)`
     * `[n..m]` becomes `.slice(n,m+1)`
     * `[/r/, n]` becomes `.match(/r/)[n]`
+    * `"string" * length` becomes `new Array(length + 1).join("string")`
     * `.sub!` and `.gsub!` become equivalent `x = x.replace` statements
     * `.map!`, `.reverse!`, and `.select` become equivalent 
       `.splice(0, .length, *.method())` statements
