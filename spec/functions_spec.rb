@@ -96,6 +96,10 @@ describe Ruby2JS::Filter::Functions do
       to_js( 'x.end_with?("z")' ).must_equal 'x.slice(-1) == "z"'
     end
 
+    it 'should handle strip' do
+      to_js( 'x.strip()' ).must_equal 'x.trim()'
+    end
+
     it 'should handle string multiply' do
       to_js( '" " * indent' ).must_equal 'new Array(indent + 1).join(" ")'
     end

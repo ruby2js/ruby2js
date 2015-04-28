@@ -127,6 +127,9 @@ module Ruby2JS
         elsif method == :upcase and args.length == 0
           process S(:send, target, :toUpperCase)
 
+        elsif method == :strip and args.length == 0
+          process S(:send, target, :trim)
+
         elsif node.children[0..1] == [nil, :puts]
           process S(:send, s(:attr, nil, :console), :log, *args)
 

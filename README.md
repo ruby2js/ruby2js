@@ -182,6 +182,7 @@ the script.
     * `.replace` becomes `.length = 0; ...push.apply(*)`
     * `.respond_to?` becomes `right in left`
     * `.start_with?` becomes `.substring(0, arg.length) == arg`
+    * `.strip` becomes `.trim`
     * `.sub` becomes `.replace`
     * `.to_a` becomes `to_Array`
     * `.to_f` becomes `parseFloat`
