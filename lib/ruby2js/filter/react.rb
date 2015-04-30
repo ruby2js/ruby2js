@@ -437,6 +437,7 @@ module Ruby2JS
                 #   React.createElement(*proc {
                 #     var $_ = ['tag', hash]
                 #     $_.push(React.createElement(...))
+                #     return $_
                 #   }())
                 #
                 # Base Ruby2JS processing will convert the 'splat' to 'apply'
@@ -645,8 +646,43 @@ module Ruby2JS
 
         return super unless @react
 
-        # traverse through potential "css proxy" style method calls
+        # block calls to createElement
+        #
+        # collect block and apply.  Intermediate representation
+        # will look something like the following:
+        #
+        #   React.createElement(*proc {
+        #     var $_ = ['tag', hash]
+        #     $_.push(React.createElement(...))
+        #     return $_
+        #   }())
+        #
+        # Base Ruby2JS processing will convert the 'splat' to 'apply'
         child = node.children.first
+        if 
+          child.children[1] == :createElement and
+          child.children[0] == s(:const, nil, :React)
+        then
+          begin
+            reactApply, @reactApply = @reactApply, true
+            params = [s(:splat, s(:send, s(:block, s(:send, nil, :proc),
+              s(:args, s(:shadowarg, :$_)), s(:begin,
+              s(:lvasgn, :$_, s(:array, *child.children[2..-1])),
+              process(node.children[2]),
+              s(:return, s(:lvar, :$_)))), :[]))]
+          ensure
+            @reactApply = reactApply
+          end
+
+          if reactApply
+            return child.updated(:send, [s(:gvar, :$_), :push, 
+              s(:send, *child.children[0..1], *params)])
+          else
+            return child.updated(:send, [*child.children[0..1], *params])
+          end
+        end
+
+        # traverse through potential "css proxy" style method calls
         test = child.children.first
         while test and test.type == :send and not test.is_method?
           child, test = test, test.children.first

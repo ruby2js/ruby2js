@@ -99,6 +99,14 @@ describe Ruby2JS::Filter::React do
       result.must_include '}())'
     end
 
+    it "should handle call with blocks to React.createElement" do
+      result = to_js( 'class Foo<React; def render; ' +
+        'React.createElement("a") {_b}; end; end' )
+      result.must_include 'React.createElement.apply(React,'
+      result.must_include 'function() {var $_ = ["a"];'
+      result.must_include '$_.push(React.createElement("b")'
+    end
+
     it "should iterate" do
       result = to_js('class Foo<React; def render; _ul list ' + 
         'do |i| _li i; end; end; end')
