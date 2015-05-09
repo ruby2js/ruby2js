@@ -36,7 +36,7 @@ module Ruby2JS
         # accommodate javascript style syntax: convert function blocks with
         # simple arguments into an anonymous function
         args = call.children[2..-1].map {|arg| s(:arg, arg.children.last)}
-        parse @ast.updated(:block, [s(:send, nil, :lambda),
+        parse @ast.updated(:block, [s(:send, nil, :proc),
           s(:args, *args), block])
 
       else

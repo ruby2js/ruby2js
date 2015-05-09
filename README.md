@@ -13,7 +13,7 @@ a Ruby Hash literal becomes a JavaScript Object literal.  Ruby symbols
 become JavaScript strings.  Ruby method calls become JavaScript function
 calls IF there are either one or more arguments passed OR parenthesis are
 used, otherwise Ruby method calls become JavaScript property accesses.
-By default, methods, lambdas, and procs return `undefined`.
+By default, methods and procs return `undefined`.
 
 Ruby attribute accessors, methods defined with no parameters and no
 parenthesis, as well as setter method definitions, are

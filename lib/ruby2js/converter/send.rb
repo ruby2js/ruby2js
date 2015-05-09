@@ -25,7 +25,12 @@ module Ruby2JS
       if method == :new and receiver and receiver.children == [nil, :Proc]
         return parse args.first
       elsif not receiver and [:lambda, :proc].include? method
-        return parse args.first
+        if method == :lambda
+          return parse s(args.first.type, *args.first.children[0..-2],
+            s(:autoreturn, args.first.children[-1]))
+        else
+          return parse args.first
+        end
       end
 
       # call anonymous function

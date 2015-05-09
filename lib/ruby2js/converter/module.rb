@@ -44,7 +44,7 @@ module Ruby2JS
       body = body - omit + [s(:return, s(:hash, 
         *symbols.map {|sym| s(:pair, s(:sym, sym), s(:lvar, sym))}))]
 
-      body = s(:send, s(:block, s(:send, nil, :lambda), s(:args),
+      body = s(:send, s(:block, s(:send, nil, :proc), s(:args),
         s(:begin, *body)), :[])
       if name.children.first == nil
         parse s(:lvasgn, name.children.last, body)

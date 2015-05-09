@@ -100,7 +100,7 @@ module Ruby2JS
 
         # replace module with a constant assign followed by the module
         # contents all wrapped in an anonymous function
-        s(:send, s(:block, s(:send, nil, :lambda), s(:args),
+        s(:send, s(:block, s(:send, nil, :proc), s(:args),
           s(:begin, s(:casgn, nil, name, app), *block)), :[])
       ensure
         @ngContext = ngContext
@@ -265,7 +265,7 @@ module Ruby2JS
       #
       # output: 
       #   AppName.filter :name do
-      #     return lambda {|input| return ... }
+      #     return proc {|input| return ... }
       #   end
       EXPRESSION = [ :and, :array, :attr, :const, :cvar, :defined?, :dstr,
         :dsym, :false, :float, :gvar, :hash, :int, :ivar, :lvar, :nil, :not,
@@ -288,7 +288,7 @@ module Ruby2JS
         block.push (tail.length == 1 ? tail.first : s(:begin, *tail))
 
         # construct a function returning a function
-        inner = s(:block, s(:send, nil, :lambda), s(:args, *args), *block)
+        inner = s(:block, s(:send, nil, :proc), s(:args, *args), *block)
         outer = s(:send, @ngApp, :filter, *call.children[2..-1])
 
         node.updated nil, [outer, s(:args, *uses), s(:return, inner)]
@@ -303,7 +303,7 @@ module Ruby2JS
       #   end
       #
       # output: 
-      #   AppName.factory :name, [uses, lambda {|uses| ...}]
+      #   AppName.factory :name, [uses, proc {|uses| ...}]
       def ng_factory(node)
         ngContext, @ngContext = @ngContext, :factory
         call = node.children.first
@@ -326,7 +326,7 @@ module Ruby2JS
           map {|sym| s(:arg, sym)}
 
         # construct a function
-        function = s(:block, s(:send, nil, :lambda), s(:args, *args), *block)
+        function = s(:block, s(:send, nil, :proc), s(:args, *args), *block)
         array = args.map {|arg| s(:str, arg.children.first.to_s)}
 
         s(:send, *call.children, s(:array, *array, function))
@@ -339,7 +339,7 @@ module Ruby2JS
       #   Constant = ...
       #
       # output: 
-      #   AppName.factory :name, [uses, lambda {|uses| ...}]
+      #   AppName.factory :name, [uses, proc {|uses| ...}]
       def on_casgn(node)
         return super if node.children[0]
         @ngClassOmit << node.children[1]

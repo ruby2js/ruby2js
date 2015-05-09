@@ -23,6 +23,7 @@ module Ruby2JS
         block = block.first.children.dup
       end
 
+      return if block == []
       if EXPRESSIONS.include? block.last.type 
         block.push @ast.updated(:return, [block.pop])
       elsif block.last.type == :if

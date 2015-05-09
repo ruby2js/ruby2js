@@ -444,6 +444,7 @@ describe Ruby2JS do
     
     it "should parse lambda" do
       to_js( 'lambda {}').must_equal 'function() {}'
+      to_js( 'lambda {|x| x + 1}').must_equal 'function(x) {return x + 1}'
     end
 
     it "should parse proc" do

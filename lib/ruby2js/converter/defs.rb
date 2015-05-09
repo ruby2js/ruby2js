@@ -24,7 +24,7 @@ module Ruby2JS
           body)})
       else
         node = s(:send, target, "#{method}=",
-          s(:block, s(:send, nil, :lambda), args, body))
+          s(:block, s(:send, nil, :proc), args, body))
       end
 
       @comments[node] = @comments[@ast] if @comments[@ast]
