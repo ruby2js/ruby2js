@@ -241,6 +241,12 @@ describe Ruby2JS::Filter::React do
       to_js( 'class Foo<React; def render; _a for: "b"; end; end' ).
         must_include 'React.createElement("a", {htmlFor: "b"})'
     end
+
+    it "should map style string attributes to hashes" do
+      to_js( 'class Foo<React; def render; _a ' +
+        'style: "color: blue; margin-top: 0"; end; end' ).
+        must_include '{style: {color: "blue", marginTop: 0}}'
+    end
   end
 
   describe "~refs" do

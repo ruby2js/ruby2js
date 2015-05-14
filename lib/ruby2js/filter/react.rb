@@ -386,6 +386,30 @@ module Ruby2JS
               pairs[htmlFor].children.last)
           end
 
+          # search for the presence of a 'style' attribute
+          style = pairs.find_index do |pair|
+            ['style', :style].include? pair.children.first.children.first
+          end
+
+          # converts style strings into style hashes
+          if style and pairs[style].children[1].type == :str
+            hash = []
+            pairs[style].children[1].children[0].split(/;\s+/).each do |prop|
+              prop.strip!
+              next unless prop =~ /^([-a-z]+):\s*(.*)$/
+              name, value = $1, $2
+              name.gsub!(/-[a-z]/) {|str| str[1].upcase}
+              if value =~ /^-?\d+$/
+                hash << s(:pair, s(:str, name), s(:int, value.to_i))
+              elsif value =~ /^-?\d+$\.\d*/
+                hash << s(:pair, s(:str, name), s(:float, value.to_f))
+              else
+                hash << s(:pair, s(:str, name), s(:str, value))
+              end
+            end
+            pairs[style] = s(:pair, pairs[style].children[0], s(:hash, *hash))
+          end
+
           # construct hash (or nil) from pairs
           hash = (pairs.length > 0 ? process(s(:hash, *pairs)) : s(:nil))
 
