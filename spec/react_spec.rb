@@ -346,6 +346,16 @@ describe Ruby2JS::Filter::React do
           'return this.setState({a: $a})'
     end
 
+    it "shouldn't produce temporary variables for inline event handlers" do
+      js = to_js( 'class F < React; def render; _input value: @draft; ' +
+        '_button "Cancel", onClick:-> {@draft = @base}; ' +
+        '_button "Save", disabled: @draft == @base; end; end' )
+      js.must_include 'self.setState({draft: event.target.value})'
+      js.must_include '{onClick: function() ' +
+        '{self.setState({draft: self.state.base})}}'
+      js.must_include '{disabled: this.state.draft == this.state.base}'
+    end
+
     it "should map class variables to properties" do
       to_js( 'class Foo<React; def method; @@x; end; end' ).
         must_include 'this.props.x'

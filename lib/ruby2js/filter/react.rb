@@ -826,6 +826,11 @@ module Ruby2JS
 
       # analyze ivar usage
       def react_walk(node)
+        # ignore hash values which are blocks (most typically, event handlers)
+        # as these create their own scopes.
+        return if node.type == :pair and node.children[0].type == :sym and
+          node.children[1].type == :block
+
         child = node.children.first
 
         base = @reactIvars[:asgn].dup if [:if, :case].include? node.type
@@ -869,6 +874,22 @@ module Ruby2JS
           then
             @reactIvars[:post] += @reactIvars[:asgn]
           end
+        end
+      end
+
+      # Convert hash values of type 'lambda' to 'proc'.  This is because
+      # Ruby 'desugars' -> to lambda, and Ruby2JS presumes that lambdas
+      # return a value.
+      def on_pair(node)
+        if
+          node.children[1].type == :block and
+          node.children[1].children[0] == s(:send, nil, :lambda)
+        then
+          process node.updated(nil, [node.children[0],
+            node.children[1].updated(nil, [s(:send, nil, :proc),
+              *node.children[1].children[1..-1]])])
+        else
+          super
         end
       end
 
