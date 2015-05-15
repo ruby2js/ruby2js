@@ -376,8 +376,7 @@ module Ruby2JS
               ['onChange', :onChange].include? pair.children.first.children[0]
             end
 
-            if value and pairs[value].children.last.type == :ivar and
-            !onChange
+            if value and pairs[value].children.last.type == :ivar and !onChange
               pairs << s(:pair, s(:sym, :onChange),
                 s(:block, s(:send, nil, :proc), s(:args, s(:arg, :event)),
                 s(:ivasgn, pairs[value].children.last.children.first,
