@@ -401,7 +401,7 @@ module Ruby2JS
           # replace attribute names with case-sensitive javascript properties
           pairs.each_with_index do |pair, index|
             name = pair.children.first.children.first.downcase
-            if ReactAttrMap[name]
+            if ReactAttrMap[name] and name.to_s != ReactAttrMap[name]
               pairs[index] = pairs[index].updated(nil, 
                 [s(:str, ReactAttrMap[name]), pairs[index].children.last])
             end
