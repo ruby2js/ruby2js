@@ -22,6 +22,30 @@ module Ruby2JS
     module React
       include SEXP
 
+      # the following code was used to generate ReactAttrs:
+      #
+      # require 'nokogumbo'
+      # page = 'https://facebook.github.io/react/docs/tags-and-attributes.html'
+      # attrs = Nokogiri::HTML5.get(page).search('code').map(&:text).join(' ')
+      # attrs = attrs.split(/\s+/).grep(/[A-Z]/).sort.uniq.join(' ')
+      # puts "ReactAttrs = %w(#{attrs})".gsub(/(.{1,74})(\s+|\Z)/, "\\1\n")
+
+      ReactAttrs = %w(acceptCharset accessKey allowFullScreen
+      allowTransparency autoCapitalize autoComplete autoCorrect autoFocus
+      autoPlay cellPadding cellSpacing charSet classID className clipPath
+      colSpan contentEditable contextMenu crossOrigin dangerouslySetInnerHTML
+      dateTime encType fillOpacity fontFamily fontSize formAction formEncType
+      formMethod formNoValidate formTarget frameBorder gradientTransform
+      gradientUnits hrefLang htmlFor httpEquiv itemID itemProp itemRef
+      itemScope itemType linearGradient marginHeight marginWidth markerEnd
+      markerMid markerStart maxLength mediaGroup noValidate
+      patternContentUnits patternUnits preserveAspectRatio radialGradient
+      radioGroup readOnly rowSpan spellCheck spreadMethod srcDoc srcSet
+      stopColor stopOpacity strokeDasharray strokeLinecap strokeOpacity
+      strokeWidth tabIndex textAnchor useMap viewBox)
+      ReactAttrMap = Hash[ReactAttrs.map {|name| [name.downcase, name]}]
+      ReactAttrMap['for'] = 'htmlFor'
+
       def options=(options)
         super
         @react = true if options[:react]
@@ -375,15 +399,13 @@ module Ruby2JS
             end
           end
 
-          # search for the presence of a 'for' attribute
-          htmlFor = pairs.find_index do |pair|
-            ['for', :for].include? pair.children.first.children.first
-          end
-
-          # replace 'for' attribute (if any) with 'htmlFor'
-          if htmlFor
-            pairs[htmlFor] = s(:pair, s(:sym, :htmlFor),
-              pairs[htmlFor].children.last)
+          # replace attribute names with case-sensitive javascript properties
+          pairs.each_with_index do |pair, index|
+            name = pair.children.first.children.first.downcase
+            if ReactAttrMap[name]
+              pairs[index] = pairs[index].updated(nil, 
+                [s(:str, ReactAttrMap[name]), pairs[index].children.last])
+            end
           end
 
           # search for the presence of a 'style' attribute

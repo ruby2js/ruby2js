@@ -242,6 +242,11 @@ describe Ruby2JS::Filter::React do
         must_include 'React.createElement("a", {htmlFor: "b"})'
     end
 
+    it "should map case insensitive attributes to javascript properties" do
+      to_js( 'class Foo<React; def render; _input tabindex: 1; end; end' ).
+        must_include 'React.createElement("input", {tabIndex: 1})'
+    end
+
     it "should map style string attributes to hashes" do
       to_js( 'class Foo<React; def render; _a ' +
         'style: "color: blue; margin-top: 0"; end; end' ).
