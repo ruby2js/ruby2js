@@ -197,6 +197,7 @@ the script.
     * `.sub!` and `.gsub!` become equivalent `x = x.replace` statements
     * `.map!`, `.reverse!`, and `.select` become equivalent 
       `.splice(0, .length, *.method())` statements
+    * `Array(x)` becomes `Array.prototype.slice.call(x)`
     * `setInterval` and `setTimeout` allow block to be treated as the
        first parameter on the call
     * for the following methods, if the block consists entirely of a simple

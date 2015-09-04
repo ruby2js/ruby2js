@@ -29,6 +29,10 @@ module Ruby2JS
         elsif method == :to_s
           process S(:call, target, :toString, *args)
 
+        elsif method == :Array and target == nil
+          process S(:send, s(:attr, s(:attr, s(:const, nil, :Array), 
+            :prototype), :slice), :call, *args)
+
         elsif method == :to_a
           process S(:call, target, :toArray, *args)
 

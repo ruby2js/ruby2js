@@ -215,6 +215,11 @@ describe Ruby2JS::Filter::Functions do
       to_js( 'a.reverse!()' ).
         must_equal 'a.splice.apply(a, [0, a.length].concat(a.reverse()))'
     end
+
+    it "should map Array(foo) to Array.prototype.slice.call(foo)" do
+      to_js( 'Array(foo)' ).
+        must_equal 'Array.prototype.slice.call(foo)'
+    end
   end
 
   describe 'hash functions' do
