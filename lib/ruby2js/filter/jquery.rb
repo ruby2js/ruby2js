@@ -84,6 +84,9 @@ module Ruby2JS
             super
           end
 
+        elsif node.children[1] == :to_a
+          process S(:call, node.children[0], :toArray, *node.children[2..-1])
+
         elsif node.children[1] == :~ and not @react
           # map ~expression.method to $(expression).method
 

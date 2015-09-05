@@ -53,7 +53,13 @@ describe Ruby2JS::Filter::JQuery do
         must_equal '$("button").prop("readOnly", false)'
     end
   end
-  
+
+  describe 'toArray' do
+    it "should handle to_a" do
+      to_js( 'a.to_a' ).must_equal 'a.toArray()'
+    end
+  end
+
   describe 'post defaults' do
     it 'should default post parameters' do
       to_js( '$$.post { x() }' ).

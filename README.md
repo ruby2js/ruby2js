@@ -184,7 +184,6 @@ the script.
     * `.start_with?` becomes `.substring(0, arg.length) == arg`
     * `.strip` becomes `.trim`
     * `.sub` becomes `.replace`
-    * `.to_a` becomes `to_Array`
     * `.to_f` becomes `parseFloat`
     * `.to_i` becomes `parseInt`
     * `.to_s` becomes `.to_String`
@@ -311,6 +310,7 @@ the script.
 
     * maps Ruby unary operator `~` to jQuery `$` function
     * maps Ruby attribute syntax to jquery attribute syntax
+    * `.to_a` becomes `toArray`
     * maps `$$` to jQuery `$` function
     * defaults the fourth parameter of $$.post to `"json"`, allowing Ruby block
       syntax to be used for the success function.

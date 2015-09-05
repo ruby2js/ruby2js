@@ -17,10 +17,6 @@ describe Ruby2JS::Filter::Functions do
       to_js( 'a.to_s(16)' ).must_equal 'a.toString(16)'
     end
 
-    it "should handle to_a" do
-      to_js( 'a.to_a' ).must_equal 'a.toArray()'
-    end
-
     it "should handle to_i" do
       to_js( 'a.to_i' ).must_equal 'parseInt(a)'
     end
