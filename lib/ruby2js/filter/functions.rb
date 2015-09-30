@@ -169,7 +169,10 @@ module Ruby2JS
             end
           end
 
-          if index.type == :regexp
+          if not index
+            super
+
+          elsif index.type == :regexp
             process S(:send, S(:send, target, :match, index), :[], 
               args[1] || s(:int, 0))
 
