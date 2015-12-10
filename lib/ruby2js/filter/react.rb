@@ -22,27 +22,43 @@ module Ruby2JS
     module React
       include SEXP
 
-      # the following code was used to generate ReactAttrs:
+      # the following command can be used to generate ReactAttrs:
+      # 
+      #   ruby -r ruby2js/filter/react -e "Ruby2JS::Filter::React.genAttrs"
       #
-      # require 'nokogumbo'
-      # page = 'https://facebook.github.io/react/docs/tags-and-attributes.html'
-      # attrs = Nokogiri::HTML5.get(page).search('code').map(&:text).join(' ')
-      # attrs = attrs.split(/\s+/).grep(/[A-Z]/).sort.uniq.join(' ')
-      # puts "ReactAttrs = %w(#{attrs})".gsub(/(.{1,74})(\s+|\Z)/, "\\1\n")
+      def self.genAttrs
+        require 'nokogumbo'
+        page = 'https://facebook.github.io/react/docs/tags-and-attributes.html'
+        doc = Nokogiri::HTML5.get(page)
 
+        # delete contents of page prior to the list of supported attributes
+        attrs = doc.at('a[name=supported-attributes]')
+        attrs = attrs.parent while attrs and not attrs.name.start_with? 'h'
+        attrs.previous_sibling.remove while attrs and attrs.previous_sibling
+
+        # extract attribute names with uppercase chars from code and format
+        attrs = doc.search('code').map(&:text).join(' ')
+        attrs = attrs.split(/\s+/).grep(/[A-Z]/).sort.uniq.join(' ')
+        puts "ReactAttrs = %w(#{attrs})".gsub(/(.{1,72})(\s+|\Z)/, "\\1\n")
+      end
+
+      # list of react attributes that require special processing
       ReactAttrs = %w(acceptCharset accessKey allowFullScreen
       allowTransparency autoCapitalize autoComplete autoCorrect autoFocus
-      autoPlay cellPadding cellSpacing charSet classID className clipPath
-      colSpan contentEditable contextMenu crossOrigin dangerouslySetInnerHTML
-      dateTime encType fillOpacity fontFamily fontSize formAction formEncType
-      formMethod formNoValidate formTarget frameBorder gradientTransform
-      gradientUnits hrefLang htmlFor httpEquiv itemID itemProp itemRef
-      itemScope itemType linearGradient marginHeight marginWidth markerEnd
-      markerMid markerStart maxLength mediaGroup noValidate
-      patternContentUnits patternUnits preserveAspectRatio radialGradient
-      radioGroup readOnly rowSpan spellCheck spreadMethod srcDoc srcSet
-      stopColor stopOpacity strokeDasharray strokeLinecap strokeOpacity
-      strokeWidth tabIndex textAnchor useMap viewBox)
+      autoPlay autoSave cellPadding cellSpacing charSet classID className
+      clipPath colSpan contentEditable contextMenu crossOrigin
+      dangerouslySetInnerHTML dateTime encType fillOpacity fontFamily fontSize
+      formAction formEncType formMethod formNoValidate formTarget frameBorder
+      gradientTransform gradientUnits hrefLang htmlFor httpEquiv inputMode
+      itemID itemProp itemRef itemScope itemType keyParams keyType
+      marginHeight marginWidth markerEnd markerMid markerStart maxLength
+      mediaGroup noValidate patternContentUnits patternUnits
+      preserveAspectRatio radioGroup readOnly rowSpan spellCheck spreadMethod
+      srcDoc srcSet stopColor stopOpacity strokeDasharray strokeLinecap
+      strokeOpacity strokeWidth tabIndex textAnchor useMap viewBox
+      xlinkActuate xlinkArcrole xlinkHref xlinkRole xlinkShow xlinkTitle
+      xlinkType xmlBase xmlLang xmlSpace)
+
       ReactAttrMap = Hash[ReactAttrs.map {|name| [name.downcase, name]}]
       ReactAttrMap['for'] = 'htmlFor'
 
