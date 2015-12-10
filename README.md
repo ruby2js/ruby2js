@@ -196,6 +196,8 @@ the script.
     * `.sub!` and `.gsub!` become equivalent `x = x.replace` statements
     * `.map!`, `.reverse!`, and `.select` become equivalent 
       `.splice(0, .length, *.method())` statements
+    * `@foo.call(args)` becomes `this._foo(args)`
+    * `@@foo.call(args)` becomes `this.constructor._foo(args)`
     * `Array(x)` becomes `Array.prototype.slice.call(x)`
     * `setInterval` and `setTimeout` allow block to be treated as the
        first parameter on the call

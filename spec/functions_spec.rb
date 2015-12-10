@@ -267,6 +267,16 @@ describe Ruby2JS::Filter::Functions do
     end
   end
 
+  describe 'call functions' do
+    it 'should handles lvars' do
+      to_js( '@f.call(1, 2, 3)' ).must_equal 'this._f(1, 2, 3)'
+    end
+
+    it 'should handles cvars' do
+      to_js( '@@f.call(1, 2, 3)' ).must_equal 'this.constructor._f(1, 2, 3)'
+    end
+  end
+
   describe 'subclassing Exception' do
     it 'should create an Exception contructor' do
       to_js( 'class E < Exception; end' ).

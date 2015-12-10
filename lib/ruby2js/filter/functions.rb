@@ -20,6 +20,14 @@ module Ruby2JS
           process S(:send, s(:attr, s(:const, nil, :Math), node.children[1]),
             :apply, s(:const, nil, :Math), target)
 
+        elsif method == :call and target and target.type == :ivar
+          process S(:send, s(:self), "_#{target.children.first.to_s[1..-1]}",
+            *args)
+
+        elsif method == :call and target and target.type == :cvar
+          process S(:send, s(:attr, s(:self), :constructor), 
+            "_#{target.children.first.to_s[2..-1]}", *args)
+
         elsif method == :keys and args.length == 0 and node.is_method?
           process S(:send, s(:const, nil, :Object), :keys, target)
 
