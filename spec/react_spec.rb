@@ -367,6 +367,19 @@ describe Ruby2JS::Filter::React do
       js.must_include '{disabled: this.state.draft == this.state.base}'
     end
 
+    it "should treat singleton method definitions as a separate scope" do
+      js = to_js( 'class F < React; def m(); def x.a; @i=1; end; @i; end; end' )
+      js.must_include 'this.setState({i: 1})'
+      js.must_include 'this.state.i'
+    end
+
+    it "should generate code to handle instance vars within singleton method" do
+      js = to_js('class F < React; def m(); def x.a; @i=1; @i+1; end; end; end')
+      js.must_include '$i = 1'
+      js.must_include '$i + 1'
+      js.must_include 'this.setState({i: $i}'
+    end
+
     it "should map class variables to properties" do
       to_js( 'class Foo<React; def method; @@x; end; end' ).
         must_include 'this.props.x'

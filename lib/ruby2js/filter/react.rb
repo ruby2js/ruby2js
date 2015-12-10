@@ -213,31 +213,8 @@ module Ruby2JS
               end
             end
 
-            # drill down if necessary to find the block
-            while block.length==1 and block.first and block.first.type==:begin
-              block = block.first.children.dup
-            end
-
-            # capture ivars that are both set and referenced
-            @reactIvars[:pre].uniq.sort.reverse.each do |ivar|
-              block.unshift(s(:lvasgn, "$#{ivar.to_s[1..-1]}",
-                s(:attr, s(:attr, s(:self), :state), ivar.to_s[1..-1])))
-            end
-
-            # update ivars that are set and later referenced
-            unless @reactIvars[:post].empty?
-              updates = @reactIvars[:post].uniq.sort.reverse.map do |ivar|
-                s(:pair, s(:lvar, ivar.to_s[1..-1]),
-                  s(:lvar, "$#{ivar.to_s[1..-1]}"))
-              end
-              update = s(:send, s(:self), :setState, s(:hash, *updates))
-
-              if block.last.type == :return
-                block.insert(block.length-1, update)
-              else
-                block.push(update)
-              end
-            end
+            # capture and update ivars as required
+            block = react_process_ivars(block)
 
             # add method to class
             type = (child.is_method? ? :begin : :autoreturn)
@@ -891,6 +868,7 @@ module Ruby2JS
         # as these create their own scopes.
         return if node.type == :pair and node.children[0].type == :sym and
           node.children[1].type == :block
+        return if node.type == :defs
 
         child = node.children.first
 
@@ -982,6 +960,53 @@ module Ruby2JS
           end
         end
         node
+      end
+
+      def on_defs(node)
+        return super unless @react
+
+        begin
+          reactIvars = @reactIvars
+          @reactIvars = {pre: [], post: [], asgn: [], ref: [], cond: []}
+          react_walk(node.children.last)
+          @reactIvars[:capture] = (@reactIvars[:pre] + @reactIvars[:post]).uniq
+          node = super
+          block = react_process_ivars([node.children.last.dup])
+          node.updated(nil, [*node.children[0..-2], s(:begin, *block)])
+        ensure
+          @reactIvars = reactIvars
+        end
+      end
+
+      # common logic for inserting code to manage state (ivars)
+      def react_process_ivars(block)
+        # drill down if necessary to find the block
+        while block.length==1 and block.first and block.first.type==:begin
+          block = block.first.children.dup
+        end
+
+        # capture ivars that are both set and referenced
+        @reactIvars[:pre].uniq.sort.reverse.each do |ivar|
+          block.unshift(s(:lvasgn, "$#{ivar.to_s[1..-1]}",
+            s(:attr, s(:attr, s(:self), :state), ivar.to_s[1..-1])))
+        end
+
+        # update ivars that are set and later referenced
+        unless @reactIvars[:post].empty?
+          updates = @reactIvars[:post].uniq.sort.reverse.map do |ivar|
+            s(:pair, s(:lvar, ivar.to_s[1..-1]),
+              s(:lvar, "$#{ivar.to_s[1..-1]}"))
+          end
+          update = s(:send, s(:self), :setState, s(:hash, *updates))
+
+          if block.last.type == :return
+            block.insert(block.length-1, update)
+          else
+            block.push(update)
+          end
+        end
+
+        block
       end
     end
 
