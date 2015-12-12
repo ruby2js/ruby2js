@@ -282,6 +282,19 @@ module Ruby2JS
           # output: while(true) {statements}
           S(:while, s(:true), node.children[2])
 
+        elsif [:delete].include? call.children[1]
+          # restore delete methods that are prematurely mapped to undef
+          result = super
+
+          if result.children[0].type == :undef
+            call = result.children[0].children[0]
+            call = call.updated(nil, 
+              [call.children[0], :delete, *call.children[2..-1]])
+            result = result.updated(nil, [call, *result.children[1..-1]])
+          end
+
+          result
+
         else
           super
         end

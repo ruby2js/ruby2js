@@ -227,6 +227,11 @@ describe Ruby2JS::Filter::Functions do
     it "should handle delete" do
       to_js( 'a.delete "x"' ).must_equal 'delete a["x"]'
     end
+
+    it "should not map delete blocks" do
+      to_js( 'HTTP.delete("x") {}' ).
+        must_equal 'HTTP.delete("x", function() {})'
+    end
   end
 
   describe 'setTimeout/setInterval' do
