@@ -75,7 +75,7 @@ module Ruby2JS
       end
 
       def on_send(node)
-        if [:call, :[]].include? node.children[1]
+        if [:call, :[]].include? node.children[1] and node.children.first
           # map $$.call(..), $$.(..), and $$[...] to $(...)
           target = process(node.children.first)
           if target.type == :gvar and target.children == ['$']
