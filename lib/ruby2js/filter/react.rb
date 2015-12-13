@@ -8,11 +8,12 @@
 #   spec/react_spec.rb contains a specification
 #   demo/react-tutorial.rb contains a working sample
 #
-# Experimental conversions provided:
+# Conversions provided:
 #  *  $x becomes this.refs.x
 #  *  @x becomes this.state.x
 #  * @@x becomes this.props.x
-#  *  ~x becomes this.refs.x.getDOMNode()
+#  *  ~x becomes this.refs.x
+#  * ~(x) becomes document.querySelector(x)
 #  * ~"x" becomes document.querySelector("x")
 #
 require 'ruby2js'
@@ -537,7 +538,7 @@ module Ruby2JS
         elsif node.children[1] == :~
           # Locate a DOM Node
           #   map ~(expression) to document.querySelector(expression)
-          #   map ~name to this.refs.name.getDOMNode()
+          #   map ~name to this.refs.name
           #   map ~"a b" to document.querySelector("a b")
           #   map ~"#a" to document.getElementById("a")
           #   map ~"a" to document.getElementsByTagName("a")[0]
@@ -564,7 +565,7 @@ module Ruby2JS
             #   before:
             #    (send (send nil :a) :text) :~)
             #   after:
-            #    (send (send (gvar :$a), :getDOMNode)), :text)
+            #    (send (gvar :$a))), :text)
             if node.type == :send and node.children[0]
               if node.children[1] == :~ and node.children[0].children[1] == :~
                 # consecutive tildes
@@ -585,9 +586,9 @@ module Ruby2JS
               end
             elsif node.children.first == nil and Symbol === node.children[1]
               # innermost expression is a scalar
-              s(:send, s(:gvar, "$#{node.children[1]}"), :getDOMNode)
+              s(:gvar, "$#{node.children[1]}")
             elsif node.type == :lvar
-              s(:send, s(:gvar, "$#{node.children[0]}"), :getDOMNode)
+              s(:gvar, "$#{node.children[0]}")
             elsif node.type == :str
               if node.children.first =~ /^#[-\w]+$/
                 s(:send, s(:attr, nil, :document), :getElementById,

@@ -256,18 +256,18 @@ describe Ruby2JS::Filter::React do
 
   describe "~refs" do
     it "should handle ~ symbols properties" do
-      to_js( 'class Foo<React; def method; ~x.text; end; end' ).
-        must_include 'this.refs.x.getDOMNode().text'
+      to_js( 'class Foo<React; def method; ~x.textContent; end; end' ).
+        must_include 'this.refs.x.textContent'
     end
 
     it "should handle ~ lvar properties" do
-      to_js( 'class Foo<React; def method; text = ~x.text; end; end' ).
-        must_include 'text = this.refs.x.getDOMNode().text'
+      to_js( 'class Foo<React; def method; text = ~x.textContent; end; end' ).
+        must_include 'text = this.refs.x.textContent'
     end
 
     it "should handle ~ methods" do
       to_js( 'class Foo<React; def method; ~x.remove(); end; end' ).
-        must_include 'this.refs.x.getDOMNode().remove()'
+        must_include 'this.refs.x.remove()'
     end
 
     it "should convert ~(expression) to querySelector calls" do
