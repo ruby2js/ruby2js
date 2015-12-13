@@ -32,7 +32,13 @@ module Ruby2JS
           process S(:send, s(:const, nil, :Object), :keys, target)
 
         elsif method == :delete and args.length == 1
-          process S(:undef, S(:send, target, :[], args.first))
+          if not target
+            process S(:undef, args.first)
+          elsif args.first.type == :str
+            process S(:undef, S(:attr, target, args.first.children.first))
+          else
+            process S(:undef, S(:send, target, :[], args.first))
+          end
 
         elsif method == :to_s
           process S(:call, target, :toString, *args)
@@ -288,9 +294,15 @@ module Ruby2JS
 
           if result.children[0].type == :undef
             call = result.children[0].children[0]
-            call = call.updated(nil, 
-              [call.children[0], :delete, *call.children[2..-1]])
-            result = result.updated(nil, [call, *result.children[1..-1]])
+            if call.type == :attr
+              call = call.updated(:send, 
+                [call.children[0], :delete, s(:str, call.children[1])])
+              result = result.updated(nil, [call, *result.children[1..-1]])
+            else
+              call = call.updated(nil, 
+                [call.children[0], :delete, *call.children[2..-1]])
+              result = result.updated(nil, [call, *result.children[1..-1]])
+            end
           end
 
           result

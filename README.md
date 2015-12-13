@@ -199,6 +199,7 @@ the script.
     * `@foo.call(args)` becomes `this._foo(args)`
     * `@@foo.call(args)` becomes `this.constructor._foo(args)`
     * `Array(x)` becomes `Array.prototype.slice.call(x)`
+    * `delete x` becomes `delete x` (note lack of parenthesis)
     * `setInterval` and `setTimeout` allow block to be treated as the
        first parameter on the call
     * for the following methods, if the block consists entirely of a simple
