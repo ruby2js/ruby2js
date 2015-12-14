@@ -437,6 +437,8 @@ module Ruby2JS
 
           # handle nested elements
           if block
+            # enable hashes to be passed as a variable on block calls
+            params[-1] = text if text and params.last == s(:nil)
 
             # traverse down to actual list of nested statements
             args = block.children[2..-1]
@@ -727,25 +729,22 @@ module Ruby2JS
           child, test = test, test.children.first
         end
 
-        # iterate over Enumerable arguments if (a) node is a createElement
-        # type of call, and (b) there are args present
-        if
-          child.children[0] == nil and child.children[1] =~ /^_/ and
-          not node.children[1].children.empty?
-        then
-          send = node.children.first.children
-          return super if send.length < 3
-          return process s(:block, s(:send, *send[0..1], *send[3..-1]),
-            s(:args), s(:block, s(:send, send[2], :forEach),
-            *node.children[1..-1]))
-        end
-
-        # append block as a standalone proc to wunderbar style method call
+        # wunderbar style calls
         if child.children[0] == nil and child.children[1] =~ /^_\w/
-          block = s(:block, s(:send, nil, :proc), s(:args),
-            *node.children[2..-1])
-          return on_send node.children.first.updated(:send,
-            [*node.children.first.children, block])
+          if node.children[1].children.empty?
+            # append block as a standalone proc
+            block = s(:block, s(:send, nil, :proc), s(:args),
+              *node.children[2..-1])
+            return on_send node.children.first.updated(:send,
+              [*node.children.first.children, block])
+          else
+            # iterate over Enumerable arguments if there are args present
+            send = node.children.first.children
+            return super if send.length < 3
+            return process s(:block, s(:send, *send[0..1], *send[3..-1]),
+              s(:args), s(:block, s(:send, send[2], :forEach),
+              *node.children[1..-1]))
+          end
         end
 
         begin
