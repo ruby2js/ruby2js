@@ -288,7 +288,7 @@ module Ruby2JS
           # output: while(true) {statements}
           S(:while, s(:true), node.children[2])
 
-        elsif [:delete].include? call.children[1]
+        elsif call.children[1] == :delete
           # restore delete methods that are prematurely mapped to undef
           result = super
 
@@ -306,6 +306,28 @@ module Ruby2JS
           end
 
           result
+
+        elsif call.children[1] == :downto
+          range = s(:irange, call.children[0], call.children[2])
+          call = call.updated(nil, [s(:begin, range), :step, s(:int, -1)])
+          process node.updated(nil, [call, *node.children[1..-1]])
+
+        elsif call.children[1] == :upto
+          range = s(:irange, call.children[0], call.children[2])
+          call = call.updated(nil, [s(:begin, range), :step, s(:int, 1)])
+          process node.updated(nil, [call, *node.children[1..-1]])
+
+        elsif 
+          call.children[1] == :each and call.children[0].type == :send and
+          call.children[0].children[1] == :step
+        then
+          # i.step(j, n).each {|v| ...}
+          range = call.children[0]
+          step = range.children[3] || s(:int, 1)
+          call = call.updated(nil, [s(:begin, 
+            s(:irange, range.children[0], range.children[2])),
+            :step, step])
+          process node.updated(nil, [call, *node.children[1..-1]])
 
         else
           super

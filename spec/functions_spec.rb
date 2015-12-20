@@ -242,6 +242,33 @@ describe Ruby2JS::Filter::Functions do
     end
   end
 
+  describe 'step' do
+    it "should map upto to for" do
+      to_js( '1.upto(3) {|i| p i}' ).
+        must_equal 'for (var i = 1; i <= 3; i += 1) {p(i)}'
+    end
+
+    it "should map downto to for" do
+      to_js( '3.downto(1) {|i| p i}' ).
+        must_equal 'for (var i = 3; i >= 1; i -= 1) {p(i)}'
+    end
+
+    it "should map step().each to for -- default" do
+      to_js( '1.step(3).each {|i| p i}' ).
+        must_equal 'for (var i = 1; i <= 3; i += 1) {p(i)}'
+    end
+
+    it "should map step().each to for -- forward" do
+      to_js( '1.step(3, 2).each {|i| p i}' ).
+        must_equal 'for (var i = 1; i <= 3; i += 2) {p(i)}'
+    end
+
+    it "should map step().each to for -- reverse" do
+      to_js( '5.step(1, -2).each {|i| p i}' ).
+        must_equal 'for (var i = 5; i >= 1; i -= 2) {p(i)}'
+    end
+  end
+
   describe 'setTimeout/setInterval' do
     it "should handle setTimeout with first parameter passed as a block" do
       to_js( 'setInterval(100) {x()}' ).

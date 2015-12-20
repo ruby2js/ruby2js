@@ -20,8 +20,16 @@ module Ruby2JS
         expression = call.children.first.children.first
         comp = (expression.type == :irange ? '<=' : '<')
         put "for (var "; parse var; put " = "; parse expression.children.first
-        put "; "; parse var; put " #{comp} "; parse expression.children.last
-        put "; "; parse var; put " += "; parse call.children[2]; puts ") {"
+        put "; "; parse var; 
+        if call.children[2].type == :int and call.children[2].children[0] < 0
+          put " #{comp.sub('<', '>')} "; parse expression.children.last
+          put "; "; parse var; put " -= "
+          parse s(:int, -call.children[2].children[0])
+        else
+          put " #{comp} "; parse expression.children.last
+          put "; "; parse var; put " += "; parse call.children[2]
+        end
+        puts ") {"
         scope block
         sput "}"
 

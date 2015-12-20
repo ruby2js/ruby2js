@@ -182,6 +182,10 @@ the script.
     * `.replace` becomes `.length = 0; ...push.apply(*)`
     * `.respond_to?` becomes `right in left`
     * `.start_with?` becomes `.substring(0, arg.length) == arg`
+    * `.upto(lim)` becomes `for (var i=num; i<=lim; i+=1)`
+    * `.downto(lim)` becomes `for (var i=num; i>=lim; i-=1)`
+    * `.step(lim, n).each` becomes `for (var i=num; i<=lim; i+=n)`
+    * `.step(lim, -n).each` becomes `for (var i=num; i>=lim; i-=n)`
     * `.strip` becomes `.trim`
     * `.sub` becomes `.replace`
     * `.to_f` becomes `parseFloat`
