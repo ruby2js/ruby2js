@@ -312,6 +312,12 @@ the script.
       expression (or ends with one), a `return` is added prior to the
       expression: `reduce`, `sort_by`, `group_by`, `index_by`, `count_by`,
       `find`, `select`, `reject`.
+    * `is_a?` and `kind_of?` map to `Object.prototype.toString.call() ===
+      "[object #{type}]" for the following types: `Arguments`, `Boolean`,
+      `Date`, `Error`, `Function`, `Number`, `Object`, `RegExp`, `String`; and
+      maps Ruby names to JavaScript equivalents for `Exception`, `Float`,
+      `Hash`, `Proc`, and `Regexp`.  Additionally, `is_a?` and `kind_of?` map
+      to `Array.isArray()` for `Array`.
 
 * <a id="jquery" href="https://github.com/rubys/ruby2js/blob/master/spec/jquery.rb">jquery</a>
 

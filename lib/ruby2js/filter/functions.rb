@@ -235,6 +235,28 @@ module Ruby2JS
           process S(:send, s(:send, s(:const, nil, :Array), :new,
             s(:send, args.first, :+, s(:int, 1))), :join, target)
 
+        elsif [:is_a?, :kind_of?].include? method and args.length == 1
+          if args[0].type == :const
+            parent = args[0].children.last
+            parent = :Number if parent == :Float
+            parent = :Object if parent == :Hash
+            parent = :Function if parent == :Proc
+            parent = :Error if parent == :Exception
+            parent = :RegExp if parent == :Regexp
+            if parent == :Array
+              S(:send, s(:const, nil, :Array), :isArray, target)
+            elsif [:Arguments, :Boolean, :Date, :Error, :Function, :Number,
+                :Object, :RegExp, :String].include? parent
+              S(:send, s(:send, s(:attr, s(:attr, s(:const, nil, Object), 
+                :prototype), :toString), :call, target), :===,
+                s(:str, "[object #{parent.to_s}]"))
+            else
+              super
+            end
+          else
+            super
+          end
+
         else
           super
         end
