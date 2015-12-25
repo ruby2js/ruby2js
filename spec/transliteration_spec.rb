@@ -723,6 +723,10 @@ describe Ruby2JS do
       # support a JavaScript-like syntax too.
       to_js( 'new Date()' ).must_equal 'new Date()'
       to_js( 'new Date' ).must_equal 'new Date'
+      to_js( 'new Promise do; y(); end' ).
+        must_equal 'new Promise(function() {y()})'
+      to_js( 'new Promise() do; y(); end' ).
+        must_equal 'new Promise(function() {y()})'
     end
   end
 

@@ -142,6 +142,13 @@ module Ruby2JS
         elsif args.length == 1 and args.first.type == :const
           # accommodation for JavaScript like new syntax w/o argument list
           parse s(:attr, args.first, :new), @state
+        elsif 
+          args.length == 2 and [:send, :const].include? args.first.type and
+          args.last.type == :def and args.last.children.first == nil
+        then
+          # accommodation for JavaScript like new syntax with block
+          parse s(:send, s(:const, nil, args.first.children[1]), :new,
+            *args.first.children[2..-1], args.last), @state
         else
           raise NotImplementedError, "use of JavaScript keyword new"
         end
