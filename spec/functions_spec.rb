@@ -242,6 +242,31 @@ describe Ruby2JS::Filter::Functions do
     end
   end
 
+  describe 'instance tests' do
+    it "should map is_a?" do
+      to_js( 'true.is_a? Boolean' ).
+        must_equal 'Object.prototype.toString.call(true) === ' +
+                   '"[object Boolean]"'
+    end
+
+    it "should map kind_of?" do
+      to_js( '/a/.kind_of? RegExp' ).
+        must_equal 'Object.prototype.toString.call(/a/) === ' +
+                   '"[object RegExp]"'
+    end
+
+    it "should map kind_of? Array" do
+      to_js( '[3].kind_of? Array' ).
+        must_equal 'Array.isArray([3])'
+    end
+
+    it "should map kind_of? Float" do
+      to_js( '3.2.kind_of? Float' ).
+        must_equal 'Object.prototype.toString.call(3.2) === ' +
+                   '"[object Number]"'
+    end
+  end
+
   describe 'step' do
     it "should map upto to for" do
       to_js( '1.upto(3) {|i| p i}' ).
