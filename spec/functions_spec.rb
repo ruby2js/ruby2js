@@ -240,6 +240,11 @@ describe Ruby2JS::Filter::Functions do
       to_js( 'HTTP.delete("x") {}' ).
         must_equal 'HTTP.delete("x", function() {})'
     end
+
+    it "should not map delete chains" do
+      to_js( 'HTTP.delete("x").then {}' ).
+        must_equal 'HTTP.delete("x").then(function() {})'
+    end
   end
 
   describe 'instance tests' do

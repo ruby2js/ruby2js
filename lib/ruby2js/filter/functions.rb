@@ -257,6 +257,10 @@ module Ruby2JS
             super
           end
 
+        elsif target && target.type == :send and target.children[1] == :delete
+          # prevent chained delete methods from being converted to undef
+          S(:send, target.updated(:sendw), *node.children[1..-1])
+
         else
           super
         end
