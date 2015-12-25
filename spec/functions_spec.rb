@@ -177,6 +177,16 @@ describe Ruby2JS::Filter::Functions do
         must_equal 'a.map(function(i) {return i + 1})'
     end
 
+    it "should handle find" do
+      to_js( 'a.find {|i| i<0}' ).
+        must_equal 'a.find(function(i) {return i < 0})'
+    end
+
+    it "should handle find_index" do
+      to_js( 'a.find_index {|i| i<0}' ).
+        must_equal 'a.findIndex(function(i) {return i < 0})'
+    end
+
     it "should handle all?" do
       to_js( 'a.all? {|i| i==0}' ).
         must_equal 'a.every(function(i) {return i == 0})'

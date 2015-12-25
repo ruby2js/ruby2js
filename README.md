@@ -166,6 +166,7 @@ the script.
     * `.each_with_index` becomes `.forEach`
     * `.end_with?` becomes `.slice(-arg.length) == arg`
     * `.empty?` becomes `.length == 0`
+    * `.find_index` becomes `findIndex`
     * `.first` becomes `[0]`
     * `.first(n)` becomes `.slice(0, n)`
     * `.gsub` becomes `replace //g`
@@ -208,7 +209,7 @@ the script.
        first parameter on the call
     * for the following methods, if the block consists entirely of a simple
       expression (or ends with one), a `return` is added prior to the
-      expression: `sub`, `gsub`, `any?`, `all?`, `map`.
+      expression: `sub`, `gsub`, `any?`, `all?`, `map`, `find`, `find_index`.
     * New classes subclassed off of `Exception` will become subclassed off
       of `Error` instead; and default constructors will be provided
     * `loop do...end` will be replaced with `while (true) {...}`

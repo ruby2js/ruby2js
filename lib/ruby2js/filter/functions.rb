@@ -295,6 +295,15 @@ module Ruby2JS
           node.updated nil, [process(call), process(node.children[1]),
             s(:autoreturn, *process_all(node.children[2..-1]))]
 
+        elsif call.children[1] == :find and call.children.length == 2
+          node.updated nil, [process(call), process(node.children[1]),
+            s(:autoreturn, *process_all(node.children[2..-1]))]
+
+        elsif call.children[1] == :find_index and call.children.length == 2
+          call = call.updated nil, [call.children.first, :findIndex]
+          node.updated nil, [process(call), process(node.children[1]),
+            s(:autoreturn, *process_all(node.children[2..-1]))]
+
         elsif call.children[1] == :map and call.children.length == 2
           node.updated nil, [process(call), process(node.children[1]),
             s(:autoreturn, *process_all(node.children[2..-1]))]
