@@ -865,6 +865,11 @@ describe Ruby2JS do
         must_equal 'try {var a} catch (e) {var b} finally {var c}'
     end
 
+    it "should handle implicit begin in methods" do
+      to_js( 'def foo; x(); rescue => e; y(e); end' ).
+        must_equal 'function foo() {try {x()} catch (e) {y(e)}}'
+    end
+
     it "should gracefully neither a rescue nor an ensure being present" do
       to_js( 'begin a; b; end' ).must_equal 'a; b'
     end

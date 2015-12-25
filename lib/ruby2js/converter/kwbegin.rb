@@ -1,12 +1,20 @@
 module Ruby2JS
   class Converter
 
+    # (rescue
+    #   (send nil :a)
+    #     (resbody nil nil
+    #       (send nil :b)) nil)
+    handle :rescue do |*statements|
+      parse_all s(:kwbegin, s(:rescue, *statements))
+    end
+
     # (kwbegin
     #   (ensure
     #     (rescue
-    #      (send nil :a)
-    #      (resbody nil nil
-    #        (send nil :b)) nil)
+    #       (send nil :a)
+    #       (resbody nil nil
+    #         (send nil :b)) nil)
     #    (send nil :c)))
 
     handle :kwbegin do |*children|
