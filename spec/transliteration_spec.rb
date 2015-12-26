@@ -106,8 +106,12 @@ describe Ruby2JS do
   end
   
   describe 'method call' do
-    it "should parse method call with no args" do
+    it "should parse function call with no args" do
       to_js( "a()" ).must_equal 'a()'
+    end
+    
+    it "should parse method call with no args" do
+      to_js( "a.b()" ).must_equal 'a.b()'
     end
     
     it "should parse method call with args" do
@@ -742,8 +746,22 @@ describe Ruby2JS do
   end
 
   describe 'attribute access' do
+    it "should support attribute reference" do
+      to_js('x=a.b').must_equal 'var x = a.b'
+    end
+
     it "should support attribute assignments" do
       to_js('x={}; x.a="y"').must_equal 'var x = {}; x.a = "y"'
+    end
+
+    unless (RUBY_VERSION.split('.').map(&:to_i) <=> [2, 3, 0]) == -1
+      it "should support conditional attribute references" do
+        to_js('x=a&.b').must_equal 'var x = a && a.b'
+      end
+
+      it "should chain conditional attribute references" do
+        to_js('x=a&.b&.c').must_equal 'var x = a && a.b && a.b.c'
+      end
     end
   end
   

@@ -186,5 +186,29 @@ module Ruby2JS
         end
       end
     end
+
+    handle :csend do |receiver, method, *args|
+      node = @ast
+
+      # collect up chain of conditional sends
+      stack = []
+      while node.children.first.type == :csend
+        stack << node
+        node = node.children.first
+      end
+
+      # conditionally evaluate most nested expression
+      expr = node.updated(:send)
+      result = s(:and, node.children.first, expr)
+
+      # build up chain of conditional evaluations
+      until stack.empty?
+        node = stack.pop
+	expr = node.updated(:send, [expr, *node.children[1..-1]])
+	result = s(:and, result, expr)
+      end
+
+      parse result
+    end
   end
 end
