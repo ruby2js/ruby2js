@@ -234,6 +234,10 @@ describe Ruby2JS::Filter::Functions do
       to_js( 'a.keys()' ).must_equal 'Object.keys(a)'
     end
 
+    it "should handle merge!" do
+      to_js( 'a.merge!(b)' ).must_equal 'Object.assign(a, b)'
+    end
+
     it "should handle delete attribute (ruby style) - static" do
       to_js( 'a.delete "x"' ).must_equal 'delete a.x'
     end

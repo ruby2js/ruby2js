@@ -177,6 +177,7 @@ the script.
     * `.last` becomes `[*.length-1]`
     * `.last(n)` becomes `.slice(*.length-1, *.length)`
     * `.max` becomes `Math.max.apply(Math)`
+    * `.merge!` becomes `Object.assign()`
     * `.min` becomes `Math.min.apply(Math)`
     * `.nil?` becomes `== null`
     * `.ord` becomes `charCodeAt(0)`

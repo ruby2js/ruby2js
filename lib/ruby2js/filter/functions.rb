@@ -31,6 +31,9 @@ module Ruby2JS
         elsif method == :keys and args.length == 0 and node.is_method?
           process S(:send, s(:const, nil, :Object), :keys, target)
 
+        elsif method == :merge!
+          process S(:send, s(:const, nil, :Object), :assign, target, *args)
+
         elsif method == :delete and args.length == 1
           if not target
             process S(:undef, args.first)
