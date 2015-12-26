@@ -394,6 +394,7 @@ module Ruby2JS
 
           # replace attribute names with case-sensitive javascript properties
           pairs.each_with_index do |pair, index|
+            next if pair.type == :kwsplat
             name = pair.children.first.children.first.downcase
             if ReactAttrMap[name] and name.to_s != ReactAttrMap[name]
               pairs[index] = pairs[index].updated(nil, 
@@ -426,7 +427,11 @@ module Ruby2JS
           end
 
           # construct hash (or nil) from pairs
-          hash = (pairs.length > 0 ? process(s(:hash, *pairs)) : s(:nil))
+          if pairs.length == 1 and pairs.first.type == :kwsplat
+            hash = pairs.first.children.first
+          else
+            hash = (pairs.length > 0 ? process(s(:hash, *pairs)) : s(:nil))
+          end
 
           # based on case of tag name, build a HTML tag or React component
           if tag =~ /^[A-Z]/

@@ -78,6 +78,19 @@ describe Ruby2JS::Filter::React do
           'React.createElement("b"))'
     end
 
+    unless RUBY_VERSION =~ /^1/
+      it "should handle **options" do
+        to_js( 'class Foo<React; def render; _a **options; end; end' ).
+          must_include ' React.createElement("a", options)'
+      end
+
+      it "should handle **options with blocks" do
+        to_js('class Foo<React; def render; _a **options do _b; end; end; end').
+          must_include ' React.createElement("a", options, ' +
+            'React.createElement("b"))'
+      end
+    end
+
     it "should create complex nested elements" do
       result = to_js('class Foo<React; def render; _a {c="c"; _b c}; end; end')
 
