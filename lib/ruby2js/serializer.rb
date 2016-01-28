@@ -55,7 +55,10 @@ module Ruby2JS
     end
 
     def timestamp(file)
-      @timestamps[file] = File.mtime(file) if file and File.exist?(file)
+      if file
+        file = file.dup.untaint
+        @timestamps[file] = File.mtime(file) if File.exist?(file)
+      end
     end
 
     def uptodate?
