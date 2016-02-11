@@ -4,4 +4,4 @@ rvm:
   - 2.0.0
   - 2.1.8
   - 2.2.4
-  # 2.3.0 - commented out until parser gem v2.3.0 is released
+  - 2.3.0
