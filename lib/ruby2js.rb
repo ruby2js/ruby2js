@@ -130,10 +130,7 @@ module Ruby2JS
   end
   
   def self.parse(source, file=nil)
-    # workaround for https://github.com/whitequark/parser/issues/112
-    buffer = Parser::Source::Buffer.new(file || '__SOURCE__')
-    buffer.raw_source = source.encode('utf-8')
-    Parser::CurrentRuby.new.parse_with_comments(buffer)
+    Parser::CurrentRuby.parse_with_comments(source.encode('utf-8'))
   rescue Parser::SyntaxError => e
     split = source[0..e.diagnostic.location.begin_pos].split("\n")
     line, col = split.length, split.last.length
