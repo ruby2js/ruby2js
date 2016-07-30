@@ -75,8 +75,8 @@ module Ruby2JS
 
         elsif m.type == :send and m.children.first == nil
           if m.children[1] == :attr_accessor
-            m.children[2..-1].map do |sym|
-              var = sym.children.first
+            m.children[2..-1].map do |child_sym|
+              var = child_sym.children.first
               s(:prop, s(:attr, name, :prototype), var =>
                   {enumerable: s(:true), configurable: s(:true),
                   get: s(:block, s(:send, nil, :proc), s(:args), 
@@ -85,8 +85,8 @@ module Ruby2JS
                     s(:ivasgn, :"@#{var}", s(:lvar, var)))})
             end
           elsif m.children[1] == :attr_reader
-            m.children[2..-1].map do |sym|
-              var = sym.children.first
+            m.children[2..-1].map do |child_sym|
+              var = child_sym.children.first
               s(:prop, s(:attr, name, :prototype), var =>
                   {get: s(:block, s(:send, nil, :proc), s(:args), 
                     s(:return, s(:ivar, :"@#{var}"))),
@@ -94,8 +94,8 @@ module Ruby2JS
                   configurable: s(:true)})
             end
           elsif m.children[1] == :attr_writer
-            m.children[2..-1].map do |sym|
-              var = sym.children.first
+            m.children[2..-1].map do |child_sym|
+              var = child_sym.children.first
               s(:prop, s(:attr, name, :prototype), var =>
                   {set: s(:block, s(:send, nil, :proc), s(:args, s(:arg, var)), 
                     s(:ivasgn, :"@#{var}", s(:lvar, var))),
@@ -244,9 +244,10 @@ module Ruby2JS
               *descriptor.map { |key, value| s(:pair, s(:sym, key), value) }))
           else
             parse s(:send, s(:const, nil, :Object), :defineProperties,
-              obj, s(:hash, *props.map {|prop, descriptor|
-                s(:pair, s(:sym, prop), s(:hash, *descriptor.map {|key, value| 
-                s(:pair, s(:sym, key), value) }))}))
+              obj, s(:hash, *props.map {|hprop, hdescriptor|
+                s(:pair, s(:sym, hprop), 
+                s(:hash, *hdescriptor.map {|key, value| 
+                  s(:pair, s(:sym, key), value) }))}))
           end
         elsif @ast.type == :method
           parse s(:send, *args)

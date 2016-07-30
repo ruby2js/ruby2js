@@ -22,9 +22,9 @@ module Ruby2JS
         end
       else
         if items.length <= 1
-          put '['; parse_all *items, join: ', '; put ']'
+          put '['; parse_all(*items, join: ', '); put ']'
         else
-          compact { puts '['; parse_all *items, join: ",#{@ws}"; sput ']' }
+          compact { puts '['; parse_all(*items, join: ",#{@ws}"); sput ']' }
         end
       end
     end

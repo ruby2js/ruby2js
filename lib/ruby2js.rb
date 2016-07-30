@@ -24,6 +24,7 @@ module Ruby2JS
 
       def initialize(comments)
         @comments = comments
+        @ast = nil
       end
 
       def options=(options)

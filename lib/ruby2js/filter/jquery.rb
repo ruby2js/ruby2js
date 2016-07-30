@@ -65,6 +65,11 @@ module Ruby2JS
     module JQuery
       include SEXP
 
+      def initialize(*args)
+        @react = nil
+        super
+      end
+
       # map $$ to $
       def on_gvar(node)
         if node.children[0] == :$$
@@ -109,32 +114,32 @@ module Ruby2JS
           domprops = %w(checked disabled readonly readOnly required)
 
           stopProps = false
-          rewrite_tilda = proc do |node|
+          rewrite_tilda = proc do |tnode|
             # Example conversion:
             #   before:
             #    (send (send (send (send nil :a) :b) :c) :~)
             #   after:
             #    (send (send (send nil "$" (send nil :a)) :b) :c)
-            if node.type == :send and node.children[0]
-              stopProps = true if node.children[1] == :[]
-              if node.children[1] == :~ and node.children[0].children[1] == :~
+            if tnode.type == :send and tnode.children[0]
+              stopProps = true if tnode.children[1] == :[]
+              if tnode.children[1] == :~ and tnode.children[0].children[1] == :~
                 # consecutive tildes
-                if node.children[0].children[0].children[1] == :~
-                  result = node.children[0].children[0].children[0]
+                if tnode.children[0].children[0].children[1] == :~
+                  result = tnode.children[0].children[0].children[0]
                 else
-                  result = s(:attr, node.children[0].children[0], :~)
+                  result = s(:attr, tnode.children[0].children[0], :~)
                 end
                 s(:attr, s(:attr, process(result), :~), :~)
               else
                 # possible getter/setter
-                method = node.children[1]
+                method = tnode.children[1]
                 method = method.to_s.chomp('=') if method =~ /=$/
                 method = :each! if method == :each
-                rewrite = [rewrite_tilda[node.children[0]], 
-                  method, *node.children[2..-1]]
-                if stopProps or props.include? node.children[1]
-                  rewrite[1] = node.children[1]
-                  node.updated nil, rewrite
+                rewrite = [rewrite_tilda[tnode.children[0]], 
+                  method, *tnode.children[2..-1]]
+                if stopProps or props.include? tnode.children[1]
+                  rewrite[1] = tnode.children[1]
+                  tnode.updated nil, rewrite
                 elsif domprops.include? method.to_s
                   method = :readOnly if method.to_s == 'readonly'
                   s(:send, rewrite[0], :prop, s(:sym, method), *rewrite[2..-1]) 
@@ -142,16 +147,16 @@ module Ruby2JS
                   s(:send, *rewrite)
                 end
               end
-            elsif node.type == :block
+            elsif tnode.type == :block
               # method call with a block parameter
-              node.updated nil, [rewrite_tilda[node.children[0]],
-                *node.children[1..-1]]
-            elsif node.type == :array
+              tnode.updated nil, [rewrite_tilda[tnode.children[0]],
+                *tnode.children[1..-1]]
+            elsif tnode.type == :array
               # innermost expression is an array
-              s(:send, nil, '$', *node)
+              s(:send, nil, '$', *tnode)
             else
               # innermost expression is a scalar
-              s(:send, nil, '$', node)
+              s(:send, nil, '$', tnode)
             end
           end
 

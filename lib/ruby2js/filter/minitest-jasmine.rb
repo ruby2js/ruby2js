@@ -5,6 +5,11 @@ module Ruby2JS
     module MiniTestJasmine
       include SEXP
 
+      def initialize(*args)
+        @jasmine_describe = nil
+        super
+      end
+
       RELOPS = [:<, :<=, :==, :>=, :>].
         map {|sym| Parser::AST::Node.new :sym, [sym]}
 
@@ -17,17 +22,17 @@ module Ruby2JS
           body = body.first.children
         end
 
-        body = body.map do |node|
-          if node.type == :def and node.children.first =~ /^test_/
+        body = body.map do |bnode|
+          if bnode.type == :def and bnode.children.first =~ /^test_/
             s(:block, s(:send, nil, :it, s(:str, 
-              node.children.first.to_s.sub(/^test_/, '').gsub('_', ' '))),
-              s(:args), node.children.last)
-          elsif node.type == :def and node.children.first == :setup
-            s(:block, s(:send, nil, :before), s(:args), node.children.last)
-          elsif node.type == :def and node.children.first == :teardown
-            s(:block, s(:send, nil, :after), s(:args), node.children.last)
+              bnode.children.first.to_s.sub(/^test_/, '').gsub('_', ' '))),
+              s(:args), bnode.children.last)
+          elsif bnode.type == :def and bnode.children.first == :setup
+            s(:block, s(:send, nil, :before), s(:args), bnode.children.last)
+          elsif bnode.type == :def and bnode.children.first == :teardown
+            s(:block, s(:send, nil, :after), s(:args), bnode.children.last)
           else
-            node
+            bnode
           end
         end
 

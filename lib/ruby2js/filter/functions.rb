@@ -174,8 +174,6 @@ module Ruby2JS
 
 
         elsif method == :[]
-          index = args.first
-
           # resolve negative literal indexes
           i = proc do |index|
             if index.type == :int and index.children.first < 0
@@ -185,6 +183,8 @@ module Ruby2JS
               index
             end
           end
+
+          index = args.first
 
           if not index
             super

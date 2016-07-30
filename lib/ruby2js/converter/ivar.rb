@@ -14,10 +14,10 @@ module Ruby2JS
     handle :hostvalue do |value|
       case value
       when Hash
-        parse s(:hash, *value.map {|key, value| s(:pair, s(:hostvalue, key), 
-          s(:hostvalue, value))})
+        parse s(:hash, *value.map {|key, hvalue| s(:pair, s(:hostvalue, key), 
+          s(:hostvalue, hvalue))})
       when Array
-        parse s(:array, *value.map {|value| s(:hostvalue, value)})
+        parse s(:array, *value.map {|hvalue| s(:hostvalue, hvalue)})
       when String
         parse s(:str, value)
       when Integer

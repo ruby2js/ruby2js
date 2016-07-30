@@ -4,6 +4,7 @@ module Ruby2JS
     # (cvar :@@a)
 
     handle :cvar do |var|
+      @class_name ||= nil
       if @class_name
         parse @class_name
         put var.to_s.sub('@@', "._")

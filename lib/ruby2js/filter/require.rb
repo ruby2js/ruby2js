@@ -5,10 +5,15 @@ module Ruby2JS
     module Require
       include SEXP
 
-      @@valid_path = /\A[-\w_.]+\Z/
+      @@valid_path = /\A[-\w.]+\Z/
 
       def self.valid_path=(valid_path)
         @@valid_path = valid_path
+      end
+
+      def initialize(*args)
+        @require_expr = nil
+        super
       end
 
       def on_send(node)

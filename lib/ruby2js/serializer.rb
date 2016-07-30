@@ -52,6 +52,8 @@ module Ruby2JS
       @lines = [Line.new]
       @line = @lines.last
       @timestamps = {}
+
+      @ast = nil
     end
 
     def timestamp(file)
@@ -222,7 +224,7 @@ module Ruby2JS
       # survey what we have to work with, keeping track of a possible
       # split of the last argument or value
       work = []
-      indent = len = 0
+      len = 0
       trail = split = nil
       slice = @lines[mark.first..-1]
       reindent(slice)
@@ -250,7 +252,7 @@ module Ruby2JS
         if slice[split[2]].indent < slice[split[2]+1].indent
           # collapse all but the last argument (typically a hash or function)
           close = slice.pop
-          slice[-1].push *close
+          slice[-1].push(*close)
           @lines[mark.first] = Line.new(*work[0..split[1]-1])
           @lines[mark.first+1..-1] = slice[split[2]+1..-1]
           @line = @lines.last
@@ -260,7 +262,7 @@ module Ruby2JS
 
     # return the output as a string
     def to_s
-      return @str if @str
+      return @str if (@str ||= nil)
       respace
       @lines.map(&:to_s).join(@nl)
     end

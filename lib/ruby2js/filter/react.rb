@@ -63,6 +63,14 @@ module Ruby2JS
       ReactAttrMap = Hash[ReactAttrs.map {|name| [name.downcase, name]}]
       ReactAttrMap['for'] = 'htmlFor'
 
+      def initialize(*args)
+        @react = nil
+        @reactApply = nil
+        @reactBlock = nil
+        @reactClass = nil
+        super
+      end
+
       def options=(options)
         super
         @react = true if options[:react]
@@ -105,7 +113,7 @@ module Ruby2JS
           # collect static properties/functions
           statics = []
           body.select {|child| child.type == :defs}.each do |child|
-            parent, mname, args, *block = child.children
+            _parent, mname, args, *block = child.children
             if child.is_method?
               statics << s(:pair, s(:sym, mname), process(child.updated(:block,
                 [s(:send, nil, :proc), args, s(:autoreturn, *block)])))
@@ -181,8 +189,8 @@ module Ruby2JS
               end
 
               # build a hash for state
-              state = s(:hash, *assigns.map {|node| s(:pair, s(:str,
-                node.children.first.to_s[1..-1]), node.children.last)})
+              state = s(:hash, *assigns.map {|anode| s(:pair, s(:str,
+                anode.children.first.to_s[1..-1]), anode.children.last)})
 
               # modify block to build and/or return state
               if block.empty?
@@ -567,53 +575,53 @@ module Ruby2JS
             end
           end
 
-          rewrite_tilda = proc do |node|
+          rewrite_tilda = proc do |tnode|
             # Example conversion:
             #   before:
             #    (send (send nil :a) :text) :~)
             #   after:
             #    (send (gvar :$a))), :text)
-            if node.type == :send and node.children[0]
-              if node.children[1] == :~ and node.children[0].children[1] == :~
+            if tnode.type == :send and tnode.children[0]
+              if tnode.children[1] == :~ and tnode.children[0].children[1] == :~
                 # consecutive tildes
-                if node.children[0].children[0].children[1] == :~
-                  result = node.children[0].children[0].children[0]
+                if tnode.children[0].children[0].children[1] == :~
+                  result = tnode.children[0].children[0].children[0]
                 else
-                  result = s(:attr, node.children[0].children[0], '~')
+                  result = s(:attr, tnode.children[0].children[0], '~')
                 end
                 s(:attr, s(:attr, process(result), '~'), '~')
               else
                 # possible getter/setter
-                method = node.children[1]
+                method = tnode.children[1]
                 method = method.to_s.chomp('=') if method =~ /=$/
-                rewrite = [rewrite_tilda[node.children[0]],
-                  method, *node.children[2..-1]]
-                rewrite[1] = node.children[1]
-                node.updated nil, rewrite
+                rewrite = [rewrite_tilda[tnode.children[0]],
+                  method, *tnode.children[2..-1]]
+                rewrite[1] = tnode.children[1]
+                tnode.updated nil, rewrite
               end
-            elsif node.children.first == nil and Symbol === node.children[1]
+            elsif tnode.children.first == nil and Symbol === tnode.children[1]
               # innermost expression is a scalar
-              s(:gvar, "$#{node.children[1]}")
-            elsif node.type == :lvar
-              s(:gvar, "$#{node.children[0]}")
-            elsif node.type == :str
-              if node.children.first =~ /^#[-\w]+$/
+              s(:gvar, "$#{tnode.children[1]}")
+            elsif tnode.type == :lvar
+              s(:gvar, "$#{tnode.children[0]}")
+            elsif tnode.type == :str
+              if tnode.children.first =~ /^#[-\w]+$/
                 s(:send, s(:attr, nil, :document), :getElementById,
-                  s(:str, node.children.first[1..-1].gsub('_', '-')))
-              elsif node.children.first =~ /^(\.[-\w]+)+$/
+                  s(:str, tnode.children.first[1..-1].gsub('_', '-')))
+              elsif tnode.children.first =~ /^(\.[-\w]+)+$/
                 s(:send, s(:send, s(:attr, nil, :document),
                   :getElementsByClassName, s(:str,
-                  node.children.first[1..-1].gsub('.', ' ').gsub('_', '-'))),
+                  tnode.children.first[1..-1].gsub('.', ' ').gsub('_', '-'))),
                   :[], s(:int, 0))
-              elsif node.children.first =~ /^[-\w]+$/
+              elsif tnode.children.first =~ /^[-\w]+$/
                 s(:send, s(:send, s(:attr, nil, :document),
                   :getElementsByTagName, s(:str,
-                  node.children.first.gsub('_', '-'))), :[], s(:int, 0))
+                  tnode.children.first.gsub('_', '-'))), :[], s(:int, 0))
               else
-                s(:send, s(:attr, nil, :document), :querySelector, node)
+                s(:send, s(:attr, nil, :document), :querySelector, tnode)
               end
             else
-              s(:send, s(:attr, nil, :document), :querySelector, node)
+              s(:send, s(:attr, nil, :document), :querySelector, tnode)
             end
           end
 
@@ -644,7 +652,7 @@ module Ruby2JS
               end
 
               # if a hash argument is already passed, merge in id value
-              hash = children.find_index {|node| node.type == :hash}
+              hash = children.find_index {|cnode| cnode.type == :hash}
               if hash
                 children[hash] = s(:hash, pair, *children[hash].children)
               else
@@ -882,13 +890,13 @@ module Ruby2JS
           node.children[1].type == :block
         return if node.type == :defs
 
-        child = node.children.first
-
         base = @reactIvars[:asgn].dup if [:if, :case].include? node.type
 
         node.children.each do |child|
           react_walk(child) if Parser::AST::Node === child
         end
+
+        child = node.children.first
 
         case node.type
         when :if, :case

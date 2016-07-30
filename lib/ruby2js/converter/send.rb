@@ -16,8 +16,6 @@ module Ruby2JS
     handle :send, :sendw, :attr, :call do |receiver, method, *args|
       ast = @ast
 
-      width = ((ast.type == :sendw && !@nl.empty?) ? 0 : @width)
-
       # strip '!' and '?' decorations
       method = method.to_s[0..-2] if method =~ /\w[!?]$/
 
@@ -38,7 +36,7 @@ module Ruby2JS
         t2,m2,*args2 = receiver.children.first.children
         if not t2 and [:lambda, :proc].include? m2 and args2.length == 0
           (@state == :statement ? group(receiver) : parse(receiver))
-          put '('; parse_all *args, join: ', '; put ')'
+          put '('; parse_all(*args, join: ', '); put ')'
           return
         end
       end
@@ -68,10 +66,10 @@ module Ruby2JS
         parse s(:not, receiver)
 
       elsif method == :[]
-        parse receiver; put '['; parse_all *args, join: ', '; put ']'
+        parse receiver; put '['; parse_all(*args, join: ', '); put ']'
 
       elsif method == :[]=
-        parse receiver; put '['; parse_all *args[0..-2], join: ', '; put '] = '
+        parse receiver; put '['; parse_all(*args[0..-2], join: ', '); put '] = '
         parse args[-1]
 
       elsif [:-@, :+@, :~, '~'].include? method
@@ -133,7 +131,7 @@ module Ruby2JS
 
           put "new "; parse receiver
           if ast.is_method?
-            put '('; parse_all *args, join: ', '; put ')'
+            put '('; parse_all(*args, join: ', '); put ')'
           end
         elsif args.length == 1 and args.first.type == :send
           # accommodation for JavaScript like new syntax w/argument list
@@ -179,9 +177,9 @@ module Ruby2JS
           put "#{ '.' if receiver && method}#{ method }"
 
           if args.length <= 1
-            put "("; parse_all *args, join: ', '; put ')'
+            put "("; parse_all(*args, join: ', '); put ')'
           else
-            compact { puts "("; parse_all *args, join: ",#@ws"; sput ')' }
+            compact { puts "("; parse_all(*args, join: ",#@ws"); sput ')' }
           end
         end
       end

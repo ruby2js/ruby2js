@@ -552,7 +552,7 @@ describe Ruby2JS::Filter::AngularRB do
         end
       RUBY
 
-      to_js( ruby ).must_match /Service.factory\(\s*"B",\s+function\(A\) {/
+      to_js( ruby ).must_match(/Service.factory\(\s*"B",\s+function\(A\) {/)
     end
   end
 

@@ -37,10 +37,15 @@ module Ruby2JS
       @@handlers.each do |name|
         @handlers[name] = method("on_#{name}")
       end
-    end
 
-    def binding=(binding)
-      @binding = binding
+      @state = nil
+      @block_this = nil
+      @block_depth = nil
+      @prop = nil
+      @instance_method = nil
+      @prototype = nil
+      @class_parent = nil
+      @class_name = nil
     end
 
     def width=(width)
@@ -117,6 +122,7 @@ module Ruby2JS
       handler.call(*ast.children)
     ensure
       @ast = oldast
+      @state = oldstate
     end
 
     def parse_all(*args)

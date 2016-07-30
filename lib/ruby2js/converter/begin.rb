@@ -28,7 +28,7 @@ module Ruby2JS
         statements.compact!
       end
 
-      parse_all *statements, state: state, join: @sep
+      parse_all(*statements, state: state, join: @sep)
     end
 
     def combine_properties(body)

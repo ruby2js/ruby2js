@@ -22,7 +22,7 @@ module Ruby2JS
 
           unless undecls.empty?
             return parse s(:begin, 
-              *undecls.map {|name| s(:lvasgn, name)}, @ast), @state
+              *undecls.map {|uname| s(:lvasgn, uname)}, @ast), @state
           end
         end
 

@@ -44,8 +44,8 @@ module Ruby2JS
 
           node = node.children[2] ? s(:autoreturn, node.children[2]) : nil
 
-          conditions.each do |condition, statements| 
-            node = s(:if, condition, statements, node)
+          conditions.each do |condition, cstatements| 
+            node = s(:if, condition, cstatements, node)
           end
         end
         block.push node
