@@ -5,6 +5,7 @@ describe 'Ruby2JS::ExecJS' do
   before do
     begin
       require 'ruby2js/execjs'
+      @skip = false
     rescue LoadError
       @skip = true
     end
