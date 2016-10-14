@@ -85,7 +85,7 @@ module Ruby2JS
       ast, comments = parse(source)
       comments = Parser::Source::Comment.associate(ast, comments) if ast
       ast = find_block( ast, line )
-      options = options.merge(file => file) unless options[:file]
+      options[:file] ||= file
     elsif Parser::AST::Node === source
       ast, comments = source, {}
       source = ast.loc.expression.source_buffer.source
@@ -131,7 +131,7 @@ module Ruby2JS
   end
   
   def self.parse(source, file=nil)
-    Parser::CurrentRuby.parse_with_comments(source.encode('utf-8'))
+    Parser::CurrentRuby.parse_with_comments(source.encode('utf-8'), file)
   rescue Parser::SyntaxError => e
     split = source[0..e.diagnostic.location.begin_pos].split("\n")
     line, col = split.length, split.last.length
