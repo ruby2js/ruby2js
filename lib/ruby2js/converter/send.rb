@@ -54,6 +54,9 @@ module Ruby2JS
           op_index < operator_index( receiver.children[1] ) if receiver
         group_receiver ||= GROUP_OPERATORS.include? receiver.type
         group_receiver = false if receiver.children[1] == :[]
+        if receiver.type == :int and !OPERATORS.flatten.include?(method)
+          group_receiver = true 
+        end
       end
 
       if target

@@ -158,6 +158,11 @@ describe Ruby2JS do
       to_js( "a!" ).must_equal 'var a'
       to_js( "a?" ).must_equal 'var a'
     end
+
+    it "should wrap numeric literals in parenthesis" do
+      to_js( "1000.toLocaleString()" ).
+        must_equal "(1000).toLocaleString()"
+    end
   end
 
   describe "splat" do
