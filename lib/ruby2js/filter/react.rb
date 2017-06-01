@@ -773,12 +773,6 @@ module Ruby2JS
         return super unless @reactClass
         ref = s(:attr, s(:attr, s(:self), :refs), 
           node.children.first.to_s[1..-1])
-
-        # Handle both refs to custom (user-defined) components as well as
-        # refs to built-in DOM components.  See:
-        # https://facebook.github.io/react/blog/2015/10/07/react-v0.14.html#dom-node-refs
-        s(:if, s(:in?, s(:sym, :getDOMNode), ref), 
-          s(:send, ref, :getDOMNode), ref)
       end
 
       # convert instance variables to state

@@ -276,17 +276,17 @@ describe Ruby2JS::Filter::React do
   describe "~refs" do
     it "should handle ~ symbols properties" do
       to_js( 'class Foo<React; def method; ~x.textContent; end; end' ).
-        must_include '("getDOMNode" in this.refs.x ? this.refs.x.getDOMNode() : this.refs.x).textContent'
+        must_include 'this.refs.x.textContent'
     end
 
     it "should handle ~ lvar properties" do
       to_js( 'class Foo<React; def method; text = ~x.textContent; end; end' ).
-        must_include 'text = ("getDOMNode" in this.refs.x ? this.refs.x.getDOMNode() : this.refs.x).textContent'
+        must_include 'text = this.refs.x.textContent'
     end
 
     it "should handle ~ methods" do
       to_js( 'class Foo<React; def method; ~x.remove(); end; end' ).
-        must_include '("getDOMNode" in this.refs.x ? this.refs.x.getDOMNode() : this.refs.x).remove()'
+        must_include 'this.refs.x.remove()'
     end
 
     it "should convert ~(expression) to querySelector calls" do
@@ -328,7 +328,7 @@ describe Ruby2JS::Filter::React do
   describe "map gvars/ivars/cvars to refs/state/prop" do
     it "should map global variables to refs" do
       to_js( 'class Foo<React; def method; $x; end; end' ).
-        must_include '"getDOMNode" in this.refs.x ? this.refs.x.getDOMNode() : this.refs.x'
+        must_include 'this.refs.x'
     end
 
     it "should map instance variables to state" do
@@ -424,7 +424,7 @@ describe Ruby2JS::Filter::React do
 
     it "should handle gvars" do
       to_js( 'class Foo<React; def method; $x.(); end; end' ).
-        must_include '("getDOMNode" in this.refs.x ? this.refs.x.getDOMNode() : this.refs.x)()'
+        must_include 'this.refs.x()'
     end
   end
 
