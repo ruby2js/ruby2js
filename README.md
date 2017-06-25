@@ -129,7 +129,7 @@ includes three such integrations:
 *  [Rails](https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/rails.rb)
 
 As you might expect, CGI is a bit sluggish.  By contrast, Sinatra and Rails
-are quite speedy as the bulk of the time is spend on the initial load of the
+are quite speedy as the bulk of the time is spent on the initial load of the
 required libraries.
 
 Filters
