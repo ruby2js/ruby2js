@@ -1,4 +1,12 @@
-require 'parser/current'
+begin
+  # silence warnings, see 
+  # https://github.com/bbatsov/rubocop/issues/1819#issuecomment-95280926
+  old_verbose, $VERBOSE = $VERBOSE, nil
+  require 'parser/current'
+ensure
+  $VERBOSE = old_verbose
+end
+
 require 'ruby2js/converter'
 
 module Ruby2JS

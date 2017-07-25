@@ -1,4 +1,3 @@
-require 'parser/current'
 require 'ruby2js'
 
 module Ruby2JS

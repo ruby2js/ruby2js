@@ -1,5 +1,3 @@
-require 'parser/current'
-
 require 'ruby2js/serializer'
 
 module Ruby2JS
