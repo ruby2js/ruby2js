@@ -22,6 +22,7 @@ begin
     'angular-route' => 'ruby2js/filter/angular-route',
     'functions' => 'ruby2js/filter/functions',
     'jquery'    => 'ruby2js/filter/jquery',
+    'vue'       => 'ruby2js/filter/vue',
     'minitest-jasmine' => 'ruby2js/filter/minitest-jasmine',
     'return'    => 'ruby2js/filter/return',
     'require'   => 'ruby2js/filter/require',
