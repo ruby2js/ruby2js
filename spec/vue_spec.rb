@@ -13,6 +13,22 @@ describe Ruby2JS::Filter::Vue do
       to_js( 'class FooBar<Vue; end' ).
         must_equal 'var FooBar = Vue.component("foo-bar", {})'
     end
+
+    it "should convert initialize methods to data" do
+      to_js( 'class Foo<Vue; def initialize(); end; end' ).
+        must_include 'data: function() {return {}}'
+    end
+
+    it "should initialize, accumulate, and return state" do
+      to_js( 'class Foo<Vue; def initialize; @a=1; b=2; @b = b; end; end' ).
+        must_include 'data: function() {var $_ = {}; $_.a = 1; ' +
+          'var b = 2; $_.b = b; return $_}}'
+    end
+
+    it "should collapse instance variable assignments into a return" do
+      to_js( 'class Foo<Vue; def initialize; @a=1; @b=2; end; end' ).
+        must_include 'data: function() {return {a: 1, b: 2}}'
+    end
   end
 
   describe "Wunderbar/JSX processing" do
