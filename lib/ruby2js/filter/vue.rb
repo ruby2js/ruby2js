@@ -104,9 +104,52 @@ module Ruby2JS
       def on_send(node)
         return super unless @vue_h
         if node.children[0] == nil and node.children[1] =~ /^_\w/
+          hash = Hash.new {|h, k| h[k] = {}}
+          args = []
+
+          node.children[2..-1].each do |attr|
+            if attr.type == :hash
+              # attributes
+              # https://github.com/vuejs/babel-plugin-transform-vue-jsx#difference-from-react-jsx
+              node.children[-1].children.each do |pair|
+                name = pair.children[0].children[0].to_s
+                if name =~ /^domProps([A-Z])(.*)/
+                  hash[:domProps]["#{$1.downcase}#$2"] = pair.children[1]
+                elsif name =~ /^(nativeOn|on)([A-Z])(.*)/
+                  hash[$1]["#{$2.downcase}#$3"] = pair.children[1]
+                elsif name == 'class' and pair.children[1].type == :hash
+                  hash[:class] = pair.children[1]
+                elsif name == 'style' and pair.children[1].type == :hash
+                  hash[:style] = pair.children[1]
+                elsif %w(key ref refInFor slot).include? name
+                  hash[name] = pair.children[1]
+                else
+                  hash[:attrs][name] = pair.children[1]
+                end
+              end
+            else
+              # text or child elements
+              args << node.children[2]
+            end
+          end
+
+          # put attributes up front
+          unless hash.empty?
+            pairs = hash.to_a.map do |k1, v1| 
+              s(:pair, s(:str, k1.to_s), 
+                if Parser::AST::Node === v1
+                  v1
+                else
+                  s(:hash, *v1.map {|k2, v2| s(:pair, s(:str, k2.to_s), v2)})
+                end
+              )
+            end
+            args.unshift s(:hash, *pairs)
+          end
+
+          # emit $h (createElement) call
           node.updated :send, [nil, @vue_h, 
-            s(:sym, node.children[1].to_s[1..-1]), 
-              *process_all(node.children[2..-1])]
+            s(:str, node.children[1].to_s[1..-1]), *process_all(args)]
         else
           super
         end

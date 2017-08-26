@@ -32,9 +32,60 @@ describe Ruby2JS::Filter::Vue do
   end
 
   describe "Wunderbar/JSX processing" do
+    # https://github.com/vuejs/babel-plugin-transform-vue-jsx#difference-from-react-jsx
     it "should create elements for HTML tags" do
       to_js( 'class Foo<Vue; def render; _a; end; end' ).
         must_include '$h("a")'
+    end
+
+    it "should create elements with attributes and text" do
+      to_js( 'class Foo<Vue; def render; _a "name", href: "link"; end; end' ).
+        must_include '$h("a", {attrs: {href: "link"}}, "name")'
+    end
+
+    it "should create elements with DOM Propoerties" do
+      to_js( 'class Foo<Vue; def render; _a domPropsTextContent: "name"; end; end' ).
+        must_include '$h("a", {domProps: {textContent: "name"}})'
+    end
+
+    it "should create elements with event listeners" do
+      to_js( 'class Foo<Vue; def render; _a onClick: self.click; end; end' ).
+        must_include '$h("a", {on: {click: this.click}})'
+    end
+
+    it "should create elements with native event listeners" do
+      to_js( 'class Foo<Vue; def render; _a nativeOnClick: self.click; end; end' ).
+        must_include '$h("a", {nativeOn: {click: this.click}})'
+    end
+
+    it "should create elements with class expressions" do
+      to_js( 'class Foo<Vue; def render; _a class: {foo: true}; end; end' ).
+        must_include '$h("a", {class: {foo: true}})'
+    end
+
+    it "should create elements with style expressions" do
+      to_js( 'class Foo<Vue; def render; _a style: {color: "red"}; end; end' ).
+        must_include '$h("a", {style: {color: "red"}})'
+    end
+
+    it "should create elements with a key value" do
+      to_js( 'class Foo<Vue; def render; _a key: "key"; end; end' ).
+        must_include '$h("a", {key: "key"})'
+    end
+
+    it "should create elements with a ref value" do
+      to_js( 'class Foo<Vue; def render; _a ref: "ref"; end; end' ).
+        must_include '$h("a", {ref: "ref"})'
+    end
+
+    it "should create elements with a refInFor value" do
+      to_js( 'class Foo<Vue; def render; _a refInFor: true; end; end' ).
+        must_include '$h("a", {refInFor: true})'
+    end
+
+    it "should create elements with a slot value" do
+      to_js( 'class Foo<Vue; def render; _a slot: "slot"; end; end' ).
+        must_include '$h("a", {slot: "slot"})'
     end
   end
 
