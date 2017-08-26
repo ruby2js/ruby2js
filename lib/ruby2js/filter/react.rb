@@ -771,8 +771,7 @@ module Ruby2JS
       # convert global variables to refs
       def on_gvar(node)
         return super unless @reactClass
-        ref = s(:attr, s(:attr, s(:self), :refs), 
-          node.children.first.to_s[1..-1])
+        s(:attr, s(:attr, s(:self), :refs), node.children.first.to_s[1..-1])
       end
 
       # convert instance variables to state
