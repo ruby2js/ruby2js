@@ -87,6 +87,25 @@ describe Ruby2JS::Filter::Vue do
       to_js( 'class Foo<Vue; def render; _a slot: "slot"; end; end' ).
         must_include '$h("a", {slot: "slot"})'
     end
+
+    it "should create simple nested elements" do
+      to_js( 'class Foo<Vue; def render; _a {_b}; end; end' ).
+        must_include '{render: function($h) {return $h("a", [$h("b")])}}'
+    end
+
+    it "should handle options with blocks" do
+      to_js( 'class Foo<Vue; def render; _a options do _b; end; end; end' ).
+        must_include '{render: function($h) ' +
+          '{return $h("a", options, [$h("b")])}}'
+    end
+
+    it "should create complex nested elements" do
+      result = to_js('class Foo<Vue; def render; _a {c="c"; _b c}; end; end')
+
+      result.must_include 'return $h("a", function() {'
+      result.must_include 'var $_ = []; var c = "c"; $_.push($h("b", c));'
+      result.must_include 'return $_}())'
+    end
   end
 
   describe Ruby2JS::Filter::DEFAULTS do

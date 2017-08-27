@@ -7,9 +7,9 @@ module Ruby2JS
       include SEXP
 
       def initialize(*args)
-        @vue = nil
         @vue_h = nil
         @vue_self = nil
+        @vue_apply = nil
         super
       end
 
@@ -87,6 +87,7 @@ module Ruby2JS
               @vue_self = nil
             end
           end
+
         end
 
         # convert class name to camel case
@@ -106,12 +107,13 @@ module Ruby2JS
         if node.children[0] == nil and node.children[1] =~ /^_\w/
           hash = Hash.new {|h, k| h[k] = {}}
           args = []
+          complex_block = []
 
           node.children[2..-1].each do |attr|
             if attr.type == :hash
               # attributes
               # https://github.com/vuejs/babel-plugin-transform-vue-jsx#difference-from-react-jsx
-              node.children[-1].children.each do |pair|
+              attr.children.each do |pair|
                 name = pair.children[0].children[0].to_s
                 if name =~ /^domProps([A-Z])(.*)/
                   hash[:domProps]["#{$1.downcase}#$2"] = pair.children[1]
@@ -127,6 +129,38 @@ module Ruby2JS
                   hash[:attrs][name] = pair.children[1]
                 end
               end
+
+            elsif attr.type == :block
+              # traverse down to actual list of nested statements
+              statements = attr.children[2..-1]
+              if statements.length == 1
+                if not statements.first
+                  statements = []
+                elsif statements.first.type == :begin
+                  statements = statements.first.children
+                end
+              end
+
+              # check for normal case: only elements and text
+              simple = statements.all? do |arg|
+                # explicit call to Vue.createElement
+                next true if arg.children[1] == :createElement and
+                  arg.children[0] == s(:const, nil, :Vue)
+
+                # wunderbar style call
+                arg = arg.children.first if arg.type == :block
+                while arg.type == :send and arg.children.first != nil
+                  arg = arg.children.first
+                end
+                arg.type == :send and arg.children[1] =~ /^_/
+              end
+
+              if simple
+                args << s(:array, *statements)
+              else
+                complex_block += statements
+              end
+
             else
               # text or child elements
               args << node.children[2]
@@ -147,9 +181,77 @@ module Ruby2JS
             args.unshift s(:hash, *pairs)
           end
 
-          # emit $h (createElement) call
-          node.updated :send, [nil, @vue_h, 
-            s(:str, node.children[1].to_s[1..-1]), *process_all(args)]
+          # prepend element name
+          args.unshift  s(:str, node.children[1].to_s[1..-1])
+
+          if complex_block.empty?
+            # emit $h (createElement) call
+            element = node.updated :send, [nil, @vue_h, *process_all(args)]
+          else
+            # block calls to $h (createElement)
+            #
+            # collect array of child elements in a proc, and call that proc
+            #
+            #   $h('tag', hash, proc {
+            #     var $_ = []
+            #     $_.push($h(...))
+            #     return $_
+            #   }())
+            #
+            # Base Ruby2JS processing will convert the 'splat' to 'apply'
+            begin
+              vue_apply, @vue_apply = @vue_apply, true
+              
+              element = node.updated :send, [nil, @vue_h, 
+                *process_all(args),
+                s(:send, s(:block, s(:send, nil, :proc),
+                  s(:args, s(:shadowarg, :$_)), s(:begin,
+                  s(:lvasgn, :$_, s(:array)),
+                  *process_all(complex_block),
+                  s(:return, s(:lvar, :$_)))), :[])]
+            else
+              @vue_apply = vue_apply
+            end
+          end
+
+          if @vue_apply
+            # if apply is set, emit code that pushes result
+            s(:send, s(:gvar, :$_), :push, element)
+          else
+            element
+          end
+        else
+          super
+        end
+      end
+
+      # convert blocks to proc arguments
+      def on_block(node)
+        return super unless @vue_h
+
+        # traverse through potential "css proxy" style method calls
+        child = node.children.first
+        test = child.children.first
+        while test and test.type == :send and not test.is_method?
+          child, test = test, test.children.first
+        end
+
+        # wunderbar style calls
+        if child.children[0] == nil and child.children[1] =~ /^_\w/
+          if node.children[1].children.empty?
+            # append block as a standalone proc
+            block = s(:block, s(:send, nil, :proc), s(:args),
+              *node.children[2..-1])
+            return on_send node.children.first.updated(:send,
+              [*node.children.first.children, block])
+          else
+            # iterate over Enumerable arguments if there are args present
+            send = node.children.first.children
+            return super if send.length < 3
+            return process s(:block, s(:send, *send[0..1], *send[3..-1]),
+              s(:args), s(:block, s(:send, send[2], :forEach),
+              *node.children[1..-1]))
+          end
         else
           super
         end
