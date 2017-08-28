@@ -34,6 +34,7 @@ module Ruby2JS
         end
 
         hash = []
+        methods = []
 
         # convert body into hash
         body.each do |statement|
@@ -79,15 +80,27 @@ module Ruby2JS
                 end
               end
 
-              # return hash
-              hash << s(:pair, s(:sym, method),
+              # add to hash in the appropriate location
+              pair = s(:pair, s(:sym, method),
                 s(:block, s(:send, nil, :lambda), args, process(block)))
+              if %w(data render beforeCreate created beforeMount mounted
+                    beforeUpdate updated beforeDestroy destroyed
+                ).include? method.to_s
+              then
+                hash << pair
+              else
+                methods << pair
+              end
             ensure
               @vue_h = nil
               @vue_self = nil
             end
           end
+        end
 
+        # add methods to hash
+        unless methods.empty?
+          hash << s(:pair, s(:sym, :methods), s(:hash, *methods))
         end
 
         # convert class name to camel case
@@ -108,6 +121,7 @@ module Ruby2JS
           hash = Hash.new {|h, k| h[k] = {}}
           args = []
           complex_block = []
+          component = (node.children[1] =~ /^_[A-Z]/)
 
           node.children[2..-1].each do |attr|
             if attr.type == :hash
@@ -115,10 +129,12 @@ module Ruby2JS
               # https://github.com/vuejs/babel-plugin-transform-vue-jsx#difference-from-react-jsx
               attr.children.each do |pair|
                 name = pair.children[0].children[0].to_s
-                if name =~ /^domProps([A-Z])(.*)/
-                  hash[:domProps]["#{$1.downcase}#$2"] = pair.children[1]
-                elsif name =~ /^(nativeOn|on)([A-Z])(.*)/
+                if name =~ /^(nativeOn|on)([A-Z])(.*)/
                   hash[$1]["#{$2.downcase}#$3"] = pair.children[1]
+                elsif component
+                  hash[:props][name] = pair.children[1]
+                elsif name =~ /^domProps([A-Z])(.*)/
+                  hash[:domProps]["#{$1.downcase}#$2"] = pair.children[1]
                 elsif name == 'class' and pair.children[1].type == :hash
                   hash[:class] = pair.children[1]
                 elsif name == 'style' and pair.children[1].type == :hash
@@ -182,7 +198,11 @@ module Ruby2JS
           end
 
           # prepend element name
-          args.unshift  s(:str, node.children[1].to_s[1..-1])
+          if component
+            args.unshift s(:const, nil, node.children[1].to_s[1..-1])
+          else
+            args.unshift s(:str, node.children[1].to_s[1..-1])
+          end
 
           if complex_block.empty?
             # emit $h (createElement) call
@@ -268,6 +288,14 @@ module Ruby2JS
         return super unless @vue_self
         s(:send, @vue_self, "#{node.children[0].to_s[1..-1]}=", 
           process(node.children[1]))
+      end
+
+      def on_op_asgn(node)
+        return super unless @vue_self
+        return super unless node.children.first.type == :ivasgn
+        node.updated nil, [s(:attr, @vue_self, 
+          node.children[0].children[0].to_s[1..-1]),
+          node.children[1], process(node.children[2])]
       end
     end
 

@@ -29,10 +29,35 @@ describe Ruby2JS::Filter::Vue do
       to_js( 'class Foo<Vue; def initialize; @a=1; @b=2; end; end' ).
         must_include 'data: function() {return {a: 1, b: 2}}'
     end
+
+    it "should handle lifecycle methods" do
+      to_js( 'class Foo<Vue; def updated; console.log "."; end; end' ).
+        must_include ', {updated: function() {return console.log(".")}}'
+    end
+
+    it "should handle other methods" do
+      to_js( 'class Foo<Vue; def clicked; @counter+=1; end; end' ).
+        must_include '{methods: {clicked: function() {this.$data.counter++}}}'
+    end
   end
 
   describe "Wunderbar/JSX processing" do
     # https://github.com/vuejs/babel-plugin-transform-vue-jsx#difference-from-react-jsx
+    it "should create components" do
+      to_js( 'class Foo<Vue; def render; _A; end; end' ).
+        must_include '$h(A)'
+    end
+
+    it "should create components with properties" do
+      to_js( 'class Foo<Vue; def render; _A title: "foo"; end; end' ).
+        must_include '$h(A, {props: {title: "foo"}})'
+    end
+
+    it "should create elements with event listeners" do
+      to_js( 'class Foo<Vue; def render; _A onAlert: self.alert; end; end' ).
+        must_include '$h(A, {on: {alert: this.alert}})'
+    end
+
     it "should create elements for HTML tags" do
       to_js( 'class Foo<Vue; def render; _a; end; end' ).
         must_include '$h("a")'
