@@ -9,7 +9,7 @@ module Ruby2JS
         @vue_h = nil
         @vue_self = nil
         @vue_apply = nil
-        @vue_inventory = {cvar: [], ivar: []}
+        @vue_inventory = Hash.new {|h, k| h[k] = []}
         super
       end
 
@@ -57,14 +57,29 @@ module Ruby2JS
               elsif method == :initialize
                 method = :data
 
+                # find block
                 if block == nil
                   block = s(:begin)
                 elsif block.type != :begin
                   block = s(:begin, block)
                 end
 
+                simple = block.children.all? {|child| child.type == :ivasgn}
+
+                # not so simple if ivars are being read as well as written
+                if simple
+                  begin
+                    vue_inventory, @vue_inventory = 
+                      @vue_inventory, Hash.new {|h, k| h[k] = []}
+                    vue_walk(block)
+                    simple = @vue_inventory[:ivar].empty?
+                  ensure
+                    @vue_inventory = vue_inventory
+                  end
+                end
+
                 # convert to a hash
-                if block.children.all? {|child| child.type == :ivasgn}
+                if simple
                   # simple case: all statements are ivar assignments
                   pairs = block.children.map do |child|
                     s(:pair, s(:sym, child.children[0].to_s[1..-1]),

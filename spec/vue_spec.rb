@@ -19,10 +19,16 @@ describe Ruby2JS::Filter::Vue do
         must_include 'data: function() {return {}}'
     end
 
-    it "should initialize, accumulate, and return state" do
+    it "should initialize, accumulate, and return state if complex" do
       to_js( 'class Foo<Vue; def initialize; @a=1; b=2; @b = b; end; end' ).
         must_include 'data: function() {var $_ = {}; $_.a = 1; ' +
           'var b = 2; $_.b = b; return $_}}'
+    end
+
+    it "should initialize, accumulate, and return state if ivars are read" do
+      to_js( 'class Foo<Vue; def initialize; @a=1; @b = @a; end; end' ).
+        must_include 'data: function() {var $_ = {}; $_.a = 1; ' +
+          '$_.b = $_.a; return $_}}'
     end
 
     it "should collapse instance variable assignments into a return" do
