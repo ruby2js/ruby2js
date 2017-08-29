@@ -133,6 +133,61 @@ describe Ruby2JS::Filter::Vue do
     end
   end
 
+  describe "class attributes" do
+    it "should handle class attributes" do
+      to_js( 'class Foo<Vue; def render; _a class: "b"; end; end' ).
+        must_include '$h("a", {attrs: {class: "b"}})'
+    end
+
+    it "should handle className attributes" do
+      to_js( 'class Foo<Vue; def render; _a className: "b"; end; end' ).
+        must_include '$h("a", {attrs: {class: "b"}})'
+    end
+
+    it "should handle markaby syntax" do
+      to_js( 'class Foo<Vue; def render; _a.b.c href: "d"; end; end' ).
+        must_include '$h("a", {attrs: {class: "b c", href: "d"}})'
+    end
+
+    it "should handle mixed strings" do
+      to_js( 'class Foo<Vue; def render; _a.b class: "c"; end; end' ).
+        must_include '$h("a", {attrs: {class: "b c"}})'
+    end
+
+    it "should handle mixed strings and a value" do
+      to_js( 'class Foo<Vue; def render; _a.b class: c; end; end' ).
+        must_include '$h("a", {attrs: {class: "b " + (c || "")}})'
+    end
+
+    it "should handle mixed strings and a conditional value" do
+      to_js( 'class Foo<Vue; def render; _a.b class: ("c" if d); end; end' ).
+        must_include '$h("a", {attrs: {class: "b " + (d ? "c" : "")}})'
+    end
+
+    it "should handle only a value" do
+      to_js( 'class Foo<Vue; def render; _a class: c; end; end' ).
+        must_include '$h("a", {attrs: {class: c}})'
+    end
+
+    it "should handle a constant string" do
+      to_js( 'class Foo<Vue; def render; _a class: "x"; end; end' ).
+        must_include '$h("a", {attrs: {class: "x"}})'
+    end
+  end
+
+  describe "other attributes" do
+    it "should handle markaby syntax ids" do
+      to_js( 'class Foo<Vue; def render; _a.b! href: "c"; end; end' ).
+        must_include '$h("a", {attrs: {id: "b", href: "c"}})'
+    end
+
+    it "should map style string attributes to hashes" do
+      to_js( 'class Foo<Vue; def render; _a ' +
+        'style: "color: blue; margin-top: 0"; end; end' ).
+        must_include '{style: {color: "blue", marginTop: 0}}'
+    end
+  end
+
   describe "map gvars/ivars/cvars to refs/state/prop" do
     it "should map instance variables to state" do
       to_js( 'class Foo<Vue; def method; @x; end; end' ).

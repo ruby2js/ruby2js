@@ -135,7 +135,86 @@ module Ruby2JS
             if attr.type == :hash
               # attributes
               # https://github.com/vuejs/babel-plugin-transform-vue-jsx#difference-from-react-jsx
-              attr.children.each do |pair|
+              pairs = attr.children.dup
+
+              # extract all class names
+              classes = pairs.find_all do |pair|
+                key = pair.children.first.children.first
+                [:class, 'class', :className, 'className'].include? key
+              end
+
+              # combine all classes into a single value (or expression)
+              if classes.length > 0
+                expr = nil
+                values = classes.map do |pair|
+                  if [:sym, :str].include? pair.children.last.type
+                    pair.children.last.children.first.to_s
+                  else
+                    expr = pair.children.last
+                    ''
+                  end
+                end
+                pairs -= classes
+                if expr
+                  if values.length > 1
+                    while expr.type == :begin and expr.children.length == 1
+                      expr = expr.children.first
+                    end
+
+                    if
+                      expr.type == :if and expr.children[1] and
+                      expr.children[1].type == :str
+                    then
+                      left = expr.children[1]
+                      right = expr.children[2] || s(:str, '')
+
+                      unless right.type == :str
+                        right = s(:or, right, s(:str, '')) 
+                      end
+
+                      expr = expr.updated(nil, [expr.children[0], left, right])
+                    elsif expr.type != :str
+                      expr = s(:or, expr, s(:str, ''))
+                    end
+
+                    value = s(:send, s(:str, values.join(' ')), :+, expr)
+                  else
+                    value = expr
+                  end
+                else
+                  value = s(:str, values.join(' '))
+                end
+                pairs.unshift s(:pair, s(:sym, :class), value)
+              end
+
+              # search for the presence of a 'style' attribute
+              style = pairs.find_index do |pair|
+                ['style', :style].include? pair.children.first.children.first
+              end
+
+              # converts style strings into style hashes
+              if style and pairs[style].children[1].type == :str
+                rules = []
+                value = pairs[style].children[1].children[0]
+                value.split(/;\s+/).each do |prop|
+                  prop.strip!
+                  next unless prop =~ /^([-a-z]+):\s*(.*)$/
+                  name, value = $1, $2
+                  name.gsub!(/-[a-z]/) {|str| str[1].upcase}
+                  if value =~ /^-?\d+$/
+                    rules << s(:pair, s(:str, name), s(:int, value.to_i))
+                  elsif value =~ /^-?\d+$\.\d*/
+                    rules << s(:pair, s(:str, name), s(:float, value.to_f))
+                  else
+                    rules << s(:pair, s(:str, name), s(:str, value))
+                  end
+                end
+                pairs[style] = s(:pair, pairs[style].children[0], 
+                  s(:hash, *rules))
+              end
+
+              # process remaining attributes
+              pairs.each do |pair|
                 name = pair.children[0].children[0].to_s
                 if name =~ /^(nativeOn|on)([A-Z])(.*)/
                   hash[$1]["#{$2.downcase}#$3"] = pair.children[1]
@@ -237,7 +316,7 @@ module Ruby2JS
                   s(:lvasgn, :$_, s(:array)),
                   *process_all(complex_block),
                   s(:return, s(:lvar, :$_)))), :[])]
-            else
+            ensure
               @vue_apply = vue_apply
             end
           end
@@ -247,6 +326,48 @@ module Ruby2JS
             s(:send, s(:gvar, :$_), :push, element)
           else
             element
+          end
+
+        elsif node.children[0] and node.children[0].type == :send
+          # determine if markaby style class and id names are being used
+          child = node
+          test = child.children.first
+          while test and test.type == :send and not test.is_method?
+            child, test = test, test.children.first
+          end
+
+          if child.children[0] == nil and child.children[1] =~ /^_\w/
+            # capture the arguments provided on the current node
+            children = node.children[2..-1]
+
+            # convert method calls to id and class values
+            while node != child
+              if node.children[1] !~ /!$/
+                # convert method name to hash {class: name} pair
+                pair = s(:pair, s(:sym, :class),
+                  s(:str, node.children[1].to_s.gsub('_','-')))
+              else
+                # convert method name to hash {id: name} pair
+                pair = s(:pair, s(:sym, :id),
+                  s(:str, node.children[1].to_s[0..-2].gsub('_','-')))
+              end
+
+              # if a hash argument is already passed, merge in id value
+              hash = children.find_index {|cnode| cnode.type == :hash}
+              if hash
+                children[hash] = s(:hash, pair, *children[hash].children)
+              else
+                children << s(:hash, pair)
+              end
+
+              # advance to next node
+              node = node.children.first
+            end
+
+            # collapse series of method calls into a single call
+            return process(node.updated(nil, [*node.children[0..1], *children]))
+          else
+            super
           end
         else
           super
@@ -322,9 +443,9 @@ module Ruby2JS
       def vue_walk(node)
         # extract ivars and cvars
         if [:ivar, :cvar].include? node.type
-          child = node.children.first
-          unless @vue_inventory[node.type].include? child
-            @vue_inventory[node.type] << child
+          symbol = node.children.first
+          unless @vue_inventory[node.type].include? symbol
+            @vue_inventory[node.type] << symbol
           end
         end
 
