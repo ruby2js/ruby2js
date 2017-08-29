@@ -161,30 +161,43 @@ module Ruby2JS
                       expr = expr.children.first
                     end
 
-                    if
-                      expr.type == :if and expr.children[1] and
-                      expr.children[1].type == :str
-                    then
-                      left = expr.children[1]
-                      right = expr.children[2] || s(:str, '')
+                    if expr.type == :array
+                      hash[:class] = s(:array, *expr.children,
+                        *values.join(' ').split(' ').map {|str| s(:str, str)})
+                    elsif expr.type == :hash
+                      hash[:class] = s(:hash, *expr.children,
+                        *values.join(' ').split(' ').
+                          map {|str| s(:pair, s(:str, str), s(:true))})
+                    else
+                      if
+                        expr.type == :if and expr.children[1] and
+                        expr.children[1].type == :str
+                      then
+                        left = expr.children[1]
+                        right = expr.children[2] || s(:str, '')
 
-                      unless right.type == :str
-                        right = s(:or, right, s(:str, '')) 
+                        unless right.type == :str
+                          right = s(:or, right, s(:str, '')) 
+                        end
+
+                        expr = expr.updated(nil, 
+                          [expr.children[0], left, right])
+                      elsif expr.type != :str
+                        expr = s(:or, expr, s(:str, ''))
                       end
 
-                      expr = expr.updated(nil, [expr.children[0], left, right])
-                    elsif expr.type != :str
-                      expr = s(:or, expr, s(:str, ''))
+                      value = s(:send, s(:str, values.join(' ')), :+, expr)
+                      pairs.unshift s(:pair, s(:sym, :class), value)
                     end
-
-                    value = s(:send, s(:str, values.join(' ')), :+, expr)
+                  elsif [:hash, :array].include? expr.type
+                    hash[:class] = expr
                   else
-                    value = expr
+                    pairs.unshift s(:pair, s(:sym, :class), expr)
                   end
                 else
-                  value = s(:str, values.join(' '))
+                  hash[:class] = s(:array, 
+                    *values.join(' ').split(' ').map {|str| s(:str, str)})
                 end
-                pairs.unshift s(:pair, s(:sym, :class), value)
               end
 
               # search for the presence of a 'style' attribute
@@ -209,8 +222,8 @@ module Ruby2JS
                     rules << s(:pair, s(:str, name), s(:str, value))
                   end
                 end
-                pairs[style] = s(:pair, pairs[style].children[0], 
-                  s(:hash, *rules))
+                pairs.delete_at(style)
+                hash[:style] =  s(:hash, *rules)
               end
 
               # process remaining attributes
@@ -222,8 +235,6 @@ module Ruby2JS
                   hash[:props][name] = pair.children[1]
                 elsif name =~ /^domProps([A-Z])(.*)/
                   hash[:domProps]["#{$1.downcase}#$2"] = pair.children[1]
-                elsif name == 'class' and pair.children[1].type == :hash
-                  hash[:class] = pair.children[1]
                 elsif name == 'style' and pair.children[1].type == :hash
                   hash[:style] = pair.children[1]
                 elsif %w(key ref refInFor slot).include? name

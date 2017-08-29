@@ -83,9 +83,14 @@ describe Ruby2JS::Filter::Vue do
         must_include '$h("a", {nativeOn: {click: this.click}})'
     end
 
-    it "should create elements with class expressions" do
+    it "should create elements with class hash expressions" do
       to_js( 'class Foo<Vue; def render; _a class: {foo: true}; end; end' ).
         must_include '$h("a", {class: {foo: true}})'
+    end
+
+    it "should create elements with class array expressions" do
+      to_js( 'class Foo<Vue; def render; _a class: ["foo", "bar"]; end; end' ).
+        must_include '$h("a", {class: ["foo", "bar"]})'
     end
 
     it "should create elements with style expressions" do
@@ -136,27 +141,42 @@ describe Ruby2JS::Filter::Vue do
   describe "class attributes" do
     it "should handle class attributes" do
       to_js( 'class Foo<Vue; def render; _a class: "b"; end; end' ).
-        must_include '$h("a", {attrs: {class: "b"}})'
+        must_include '$h("a", {class: ["b"]})'
     end
 
     it "should handle className attributes" do
       to_js( 'class Foo<Vue; def render; _a className: "b"; end; end' ).
-        must_include '$h("a", {attrs: {class: "b"}})'
+        must_include '$h("a", {class: ["b"]})'
+    end
+
+    it "should handle class attributes with spaces" do
+      to_js( 'class Foo<Vue; def render; _a class: "b c"; end; end' ).
+        must_include '$h("a", {class: ["b", "c"]})'
     end
 
     it "should handle markaby syntax" do
       to_js( 'class Foo<Vue; def render; _a.b.c href: "d"; end; end' ).
-        must_include '$h("a", {attrs: {class: "b c", href: "d"}})'
+        must_include '$h("a", {class: ["b", "c"], attrs: {href: "d"}})'
     end
 
     it "should handle mixed strings" do
       to_js( 'class Foo<Vue; def render; _a.b class: "c"; end; end' ).
-        must_include '$h("a", {attrs: {class: "b c"}})'
+        must_include '$h("a", {class: ["b", "c"]})'
     end
 
     it "should handle mixed strings and a value" do
       to_js( 'class Foo<Vue; def render; _a.b class: c; end; end' ).
         must_include '$h("a", {attrs: {class: "b " + (c || "")}})'
+    end
+
+    it "should create elements with markup and a class hash expression" do
+      to_js( 'class Foo<Vue; def render; _a.bar class: {foo: true}; end; end' ).
+        must_include '$h("a", {class: {foo: true, bar: true}})'
+    end
+
+    it "should create elements with markup and a class array expression" do
+      to_js( 'class Foo<Vue; def render; _a.bar class: ["foo"]; end; end' ).
+        must_include '$h("a", {class: ["foo", "bar"]})'
     end
 
     it "should handle mixed strings and a conditional value" do
@@ -167,11 +187,6 @@ describe Ruby2JS::Filter::Vue do
     it "should handle only a value" do
       to_js( 'class Foo<Vue; def render; _a class: c; end; end' ).
         must_include '$h("a", {attrs: {class: c}})'
-    end
-
-    it "should handle a constant string" do
-      to_js( 'class Foo<Vue; def render; _a class: "x"; end; end' ).
-        must_include '$h("a", {attrs: {class: "x"}})'
     end
   end
 
