@@ -133,8 +133,41 @@ describe Ruby2JS::Filter::Vue do
     end
   end
 
+  describe "map gvars/ivars/cvars to refs/state/prop" do
+    it "should map instance variables to state" do
+      to_js( 'class Foo<Vue; def method; @x; end; end' ).
+        must_include 'this.$data.x'
+    end
+
+    it "should map setting instance variables to setting properties" do
+      to_js( 'class Foo<Vue; def method; @x=1; end; end' ).
+        must_include 'this.$data.x = 1'
+    end
+
+    it "should handle parallel instance variables assignment" do
+      to_js( 'class Foo<Vue; def method(); @x=@y=1; end; end' ).
+        must_include 'this.$data.x = this.$data.y = 1'
+    end
+
+    it "should enumerate properties" do
+      to_js( 'class Foo<Vue; def render; _span @@x + @@y; end; end' ).
+        must_include '{props: ["x", "y"]'
+    end
+
+    it "should map class variables to properties" do
+      to_js( 'class Foo<Vue; def method; @@x; end; end' ).
+        must_include 'this.$props.x'
+    end
+
+    it "should not support assigning to class variables" do
+      proc { 
+        to_js( 'class Foo<Vue; def method; @@x=1; end; end' )
+      }.must_raise NotImplementedError
+    end
+  end
+
   describe Ruby2JS::Filter::DEFAULTS do
-    it "should include React" do
+    it "should include vue" do
       Ruby2JS::Filter::DEFAULTS.must_include Ruby2JS::Filter::Vue
     end
   end

@@ -1,4 +1,3 @@
-
 require 'ruby2js'
 
 module Ruby2JS
@@ -10,6 +9,7 @@ module Ruby2JS
         @vue_h = nil
         @vue_self = nil
         @vue_apply = nil
+        @vue_inventory = {cvar: [], ivar: []}
         super
       end
 
@@ -41,7 +41,7 @@ module Ruby2JS
 
           # named values
           if statement.type == :send and statement.children.first == nil
-            if statement.children[1] == :template
+            if [:template, :props].include? statement.children[1]
               hash << s(:pair, s(:sym, statement.children[1]), 
                 statement.children[2])
             end
@@ -95,6 +95,14 @@ module Ruby2JS
               @vue_h = nil
               @vue_self = nil
             end
+          end
+        end
+
+        unless hash.any? {|pair| pair.children[0].children[0] == :props}
+          vue_walk(node)
+          unless @vue_inventory[:cvar].empty?
+            hash.unshift s(:pair, s(:sym, :props), s(:array, 
+              *@vue_inventory[:cvar].map {|sym| s(:str, sym.to_s[2..-1])}))
           end
         end
 
@@ -277,7 +285,19 @@ module Ruby2JS
         end
       end
 
-      # expand @ to @vue_self.
+      # expand @@ to self
+      def on_cvar(node)
+        return super unless @vue_self
+        s(:attr, s(:attr, s(:self), :$props), node.children[0].to_s[2..-1])
+      end
+
+      # prevent attempts to assign to Vue properties
+      def on_cvasgn(node)
+        return super unless @vue_self
+        raise NotImplementedError, "setting a Vue property"
+      end
+
+      # expand @ to @vue_self
       def on_ivar(node)
         return super unless @vue_self
         s(:attr, @vue_self, node.children[0].to_s[1..-1])
@@ -296,6 +316,22 @@ module Ruby2JS
         node.updated nil, [s(:attr, @vue_self, 
           node.children[0].children[0].to_s[1..-1]),
           node.children[1], process(node.children[2])]
+      end
+
+      # gather ivar and cvar usage
+      def vue_walk(node)
+        # extract ivars and cvars
+        if [:ivar, :cvar].include? node.type
+          child = node.children.first
+          unless @vue_inventory[node.type].include? child
+            @vue_inventory[node.type] << child
+          end
+        end
+
+        # recurse
+        node.children.each do |child|
+          vue_walk(child) if Parser::AST::Node === child
+        end
       end
     end
 
