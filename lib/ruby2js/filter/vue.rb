@@ -452,9 +452,13 @@ module Ruby2JS
 
       # expand @= to @vue_self.=
       def on_ivasgn(node)
-        return super unless @vue_self
-        s(:send, @vue_self, "#{node.children[0].to_s[1..-1]}=", 
-          process(node.children[1]))
+        return super unless @vue_self 
+        if node.children.length == 1
+          s(:attr, @vue_self, "#{node.children[0].to_s[1..-1]}")
+        else
+          s(:send, @vue_self, "#{node.children[0].to_s[1..-1]}=", 
+            process(node.children[1]))
+        end
       end
 
       def on_op_asgn(node)
@@ -472,6 +476,19 @@ module Ruby2JS
           symbol = node.children.first
           unless @vue_inventory[node.type].include? symbol
             @vue_inventory[node.type] << symbol
+          end
+        elsif node.type == :ivasgn
+          symbol = nil
+          symbol = node.children.first if node.children.length == 1
+          if node.children.length == 2
+            value = node.children[-1]
+            symbol = value.children.first if value.type == :ivasgn
+          end
+
+          if symbol
+            unless @vue_inventory[:ivar].include? symbol
+              @vue_inventory[:ivar] << symbol
+            end
           end
         end
 

@@ -31,6 +31,18 @@ describe Ruby2JS::Filter::Vue do
           '$_.b = $_.a; return $_}}'
     end
 
+    it "should initialize, accumulate, and return state if multi-assignment" do
+      to_js( 'class Foo<Vue; def initialize; @a=@b=1; end; end' ).
+        must_include 'data: function() {var $_ = {}; $_.a = $_.b = 1; ' +
+          'return $_}}'
+    end
+
+    it "should initialize, accumulate, and return state if op-assignment" do
+      to_js( 'class Foo<Vue; def initialize; @a||=1; end; end' ).
+        must_include 'data: function() {var $_ = {}; $_.a = $_.a || 1; ' +
+          'return $_}}'
+    end
+
     it "should collapse instance variable assignments into a return" do
       to_js( 'class Foo<Vue; def initialize; @a=1; @b=2; end; end' ).
         must_include 'data: function() {return {a: 1, b: 2}}'
