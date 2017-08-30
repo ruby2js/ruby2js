@@ -374,6 +374,18 @@ describe Ruby2JS::Filter::Vue do
     end
   end
 
+  describe "method calls" do
+    it "should handle ivars" do
+      to_js( 'class Foo<Vue; def method; @x.(); end; end' ).
+        must_include 'this.$data.x()'
+    end
+
+    it "should handle cvars" do
+      to_js( 'class Foo<Vue; def method; @@x.(); end; end' ).
+        must_include 'this.$props.x()'
+    end
+  end
+
   describe Ruby2JS::Filter::DEFAULTS do
     it "should include vue" do
       Ruby2JS::Filter::DEFAULTS.must_include Ruby2JS::Filter::Vue

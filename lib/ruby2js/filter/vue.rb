@@ -176,7 +176,23 @@ module Ruby2JS
 
       # expand 'wunderbar' like method calls
       def on_send(node)
+        # map method calls involving i/g/c vars to straight calls
+        #
+        # input:
+        #   @x.(a,b,c)
+        # output:
+        #   @x(a,b,c)
+        if @vue_self and node.children[1] == :call
+          if [:ivar, :gvar, :cvar].include? node.children.first.type
+            return process(s(:send, node.children.first, nil,
+              *node.children[2..-1]))
+          else
+            return super
+          end
+        end
+
         return super unless @vue_h
+
         if node.children[0] == nil and node.children[1] =~ /^_\w/
           hash = Hash.new {|h, k| h[k] = {}}
           args = []
