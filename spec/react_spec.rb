@@ -197,12 +197,7 @@ describe Ruby2JS::Filter::React do
       result.must_include 'push(React.createElement("p", null, "b"))};'
     end
 
-    it "should insert a span if no elements are present" do
-      result = to_js( 'class Foo<React; def render; end; end' )
-      result.must_include 'return React.createElement("span")'
-    end
-
-    it "should insert a span if method is empty" do
+    it "should insert a span if render method is empty" do
       result = to_js( 'class Foo<React; def render; end; end' )
       result.must_include 'return React.createElement("span")'
     end

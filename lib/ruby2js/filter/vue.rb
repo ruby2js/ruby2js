@@ -63,6 +63,18 @@ module Ruby2JS
               method, args, block = statement.children
               if method == :render
                 args = s(:args, s(:arg, :$h)) if args.children.empty?
+
+                block = s(:begin, block) unless block and block.type == :begin
+
+                if
+                  block.children.length != 1 or not block.children.last or
+                  not [:send, :block].include? block.children.first.type
+                then
+                  # wrap multi-line blocks with a 'span' element
+                  block = s(:return,
+                    s(:block, s(:send, nil, :_span), s(:args), *block))
+                end
+
                 @vue_h = args.children.first.children.last
               elsif method == :initialize
                 method = :data

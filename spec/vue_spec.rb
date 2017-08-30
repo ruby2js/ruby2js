@@ -256,6 +256,26 @@ describe Ruby2JS::Filter::Vue do
     end
   end
 
+  describe "render method" do
+    it "should wrap multiple elements with a span" do
+      result = to_js( 'class Foo<Vue; def render; _h1 "a"; _p "b"; end; end' )
+      result.must_include 'return $h("span", [$h("h1", "a"), $h("p", "b")])'
+    end
+
+    it "should wrap anything that is not a method or block call with a span" do
+      result = to_js( 'class Foo<Vue; def render; if @a; _p "a"; else;_p "b"; end; end;end' )
+      result.must_include '$h("span", function() {var $_ = [];'
+      result.must_include 'if (self.$data.a) {$_.push($h("p", "a"))}'
+      result.must_include 'else {$_.push($h("p", "b"))};'
+      result.must_include 'return $_}'
+    end
+
+    it "should insert a span if render method is empty" do
+      result = to_js( 'class Foo<Vue; def render; end; end' )
+      result.must_include '{return $h("span", [])}'
+    end
+  end
+
   describe "class attributes" do
     it "should handle class attributes" do
       to_js( 'class Foo<Vue; def render; _a class: "b"; end; end' ).
