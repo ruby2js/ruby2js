@@ -36,6 +36,16 @@ module Ruby2JS
         hash = []
         methods = []
 
+        # insert constructor if none present
+        unless body.any? {|statement| 
+          statement.type == :def and statement.children.first ==:initialize}
+        then
+          body = body.dup
+          body.unshift s(:def, :initialize, s(:args), nil)
+        end
+
+        vue_walk(node)
+
         # convert body into hash
         body.each do |statement|
 
@@ -78,6 +88,14 @@ module Ruby2JS
                   end
                 end
 
+                uninitialized = @vue_inventory[:ivar].dup
+
+                block.children.each do |child|
+                  if child.type == :ivasgn 
+                    uninitialized.delete child.children.first
+                  end
+                end
+
                 # convert to a hash
                 if simple
                   # simple case: all statements are ivar assignments
@@ -86,11 +104,19 @@ module Ruby2JS
                      process(child.children[1]))
                   end
 
+                  pairs += uninitialized.map do |symbol|
+                    s(:pair, s(:sym, symbol.to_s[1..-1]), 
+                      s(:attr, nil, :undefined))
+                  end
+
                   block = s(:return, s(:hash, *pairs))
                 else
                   # general case: build up a hash incrementally
-                  block = s(:begin, s(:gvasgn, :$_, s(:hash)), block,
-                    s(:return, s(:gvar, :$_)))
+                  block = s(:begin, s(:gvasgn, :$_, 
+                    s(:hash, *uninitialized.map {|sym| 
+                      s(:pair, s(:sym, sym.to_s[1..-1]),
+                      s(:attr, nil, :undefined))})),
+                    block, s(:return, s(:gvar, :$_)))
                   @vue_self = s(:gvar, :$_)
                 end
               end
@@ -114,7 +140,6 @@ module Ruby2JS
         end
 
         unless hash.any? {|pair| pair.children[0].children[0] == :props}
-          vue_walk(node)
           unless @vue_inventory[:cvar].empty?
             hash.unshift s(:pair, s(:sym, :props), s(:array, 
               *@vue_inventory[:cvar].map {|sym| s(:str, sym.to_s[2..-1])}))

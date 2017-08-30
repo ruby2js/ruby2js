@@ -11,36 +11,55 @@ describe Ruby2JS::Filter::Vue do
   describe :createClass do
     it "should create classes" do
       to_js( 'class FooBar<Vue; end' ).
-        must_equal 'var FooBar = Vue.component("foo-bar", {})'
+        must_include 'var FooBar = Vue.component("foo-bar",'
     end
 
     it "should convert initialize methods to data" do
       to_js( 'class Foo<Vue; def initialize(); end; end' ).
-        must_include 'data: function() {return {}}'
+        must_include ', {data: function() {return {}}'
+    end
+
+    it "should convert insert initialize methods if none present" do
+      to_js( 'class Foo<Vue; def render; _h1 @title; end; end' ).
+        must_include ', {data: function() {return {title: undefined}}'
+    end
+
+    it "should convert merge uninitialized values - simple" do
+      to_js( 'class Foo<Vue; def initialize; @var = ""; end; ' +
+        'def render; _h1 @title; end; end' ).
+        must_include ', {data: function() {return {var: "", title: undefined}}'
+    end
+
+    it "should convert merge uninitialized values - complex" do
+      to_js( 'class Foo<Vue; def initialize; value = "x"; @var = value; end; ' +
+        'def render; _h1 @title; end; end' ).
+        must_include ', {data: function() {' +
+          'var $_ = {title: undefined}; var value = "x"; $_.var = value; ' +
+          'return $_}'
     end
 
     it "should initialize, accumulate, and return state if complex" do
       to_js( 'class Foo<Vue; def initialize; @a=1; b=2; @b = b; end; end' ).
         must_include 'data: function() {var $_ = {}; $_.a = 1; ' +
-          'var b = 2; $_.b = b; return $_}}'
+          'var b = 2; $_.b = b; return $_}'
     end
 
     it "should initialize, accumulate, and return state if ivars are read" do
       to_js( 'class Foo<Vue; def initialize; @a=1; @b = @a; end; end' ).
-        must_include 'data: function() {var $_ = {}; $_.a = 1; ' +
+        must_include ', {data: function() {var $_ = {}; $_.a = 1; ' +
           '$_.b = $_.a; return $_}}'
     end
 
     it "should initialize, accumulate, and return state if multi-assignment" do
       to_js( 'class Foo<Vue; def initialize; @a=@b=1; end; end' ).
-        must_include 'data: function() {var $_ = {}; $_.a = $_.b = 1; ' +
-          'return $_}}'
+        must_include ', {data: function() {var $_ = {b: undefined}; ' +
+          '$_.a = $_.b = 1; return $_}}'
     end
 
     it "should initialize, accumulate, and return state if op-assignment" do
       to_js( 'class Foo<Vue; def initialize; @a||=1; end; end' ).
-        must_include 'data: function() {var $_ = {}; $_.a = $_.a || 1; ' +
-          'return $_}}'
+        must_include ', {data: function() {var $_ = {a: undefined}; ' +
+          '$_.a = $_.a || 1; return $_}}'
     end
 
     it "should collapse instance variable assignments into a return" do
@@ -50,12 +69,12 @@ describe Ruby2JS::Filter::Vue do
 
     it "should handle lifecycle methods" do
       to_js( 'class Foo<Vue; def updated; console.log "."; end; end' ).
-        must_include ', {updated: function() {return console.log(".")}}'
+        must_include ', updated: function() {return console.log(".")}'
     end
 
     it "should handle other methods" do
       to_js( 'class Foo<Vue; def clicked; @counter+=1; end; end' ).
-        must_include '{methods: {clicked: function() {this.$data.counter++}}}'
+        must_include ', methods: {clicked: function() {this.$data.counter++}}'
     end
   end
 
@@ -138,13 +157,13 @@ describe Ruby2JS::Filter::Vue do
 
     it "should create simple nested elements" do
       to_js( 'class Foo<Vue; def render; _a {_b}; end; end' ).
-        must_include '{render: function($h) {return $h("a", [$h("b")])}}'
+        must_include ', render: function($h) {return $h("a", [$h("b")])}'
     end
 
     it "should handle options with blocks" do
       to_js( 'class Foo<Vue; def render; _a options do _b; end; end; end' ).
-        must_include '{render: function($h) ' +
-          '{return $h("a", options, [$h("b")])}}'
+        must_include ', render: function($h) ' +
+          '{return $h("a", options, [$h("b")])}'
     end
 
     it "should create complex nested elements" do
