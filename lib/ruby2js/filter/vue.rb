@@ -378,6 +378,44 @@ module Ruby2JS
             element
           end
 
+        elsif node.children[0] == nil and node.children[1] == :_
+          # text nodes
+          # https://stackoverflow.com/questions/42414627/create-text-node-with-custom-render-function-in-vue-js
+          text = s(:send, s(:self), :_v, process(node.children[2]))
+          if @vue_apply
+            # if apply is set, emit code that pushes text
+            s(:send, s(:gvar, :$_), :push, text)
+          else
+            # simple/normal case: simply return the text
+            text
+          end
+
+        elsif node.children[0]==s(:send, nil, :_) and node.children[1]==:[]
+          if @vue_apply
+            # if apply is set, emit code that pushes results
+            s(:send, s(:gvar, :$_), :push, *process_all(node.children[2..-1]))
+          elsif node.children.length == 3
+            process(node.children[2])
+          else
+            # simple/normal case: simply return the element
+            s(:splat, s(:array, *process_all(node.children[2..-1])))
+          end
+
+        elsif
+          node.children[1] == :createElement and
+          node.children[0] == s(:const, nil, :Vue)
+        then
+          # explicit calls to Vue.createElement
+          element = node.updated nil, [nil, :$h, 
+            *process_all(node.children[2..-1])]
+
+          if @vue_apply
+            # if apply is set, emit code that pushes result
+            s(:send, s(:gvar, :$_), :push, element)
+          else
+            element
+          end
+
         elsif node.children[0] and node.children[0].type == :send
           # determine if markaby style class and id names are being used
           child = node
@@ -419,33 +457,6 @@ module Ruby2JS
 
           else
             super
-          end
-
-        elsif node.children[0] == nil and node.children[1] == :_
-          # text nodes
-          # https://stackoverflow.com/questions/42414627/create-text-node-with-custom-render-function-in-vue-js
-          text = s(:send, s(:self), :_v, process(node.children[2]))
-          if @vue_apply
-            # if apply is set, emit code that pushes text
-            s(:send, s(:gvar, :$_), :push, text)
-          else
-            # simple/normal case: simply return the text
-            text
-          end
-
-        elsif
-          node.children[1] == :createElement and
-          node.children[0] == s(:const, nil, :Vue)
-        then
-          # explicit calls to Vue.createElement
-          element = node.updated nil, [nil, :$h, 
-            *process_all(node.children[2..-1])]
-
-          if @vue_apply
-            # if apply is set, emit code that pushes result
-            s(:send, s(:gvar, :$_), :push, element)
-          else
-            element
           end
 
         else

@@ -234,6 +234,16 @@ describe Ruby2JS::Filter::Vue do
       to_js( 'class Foo<Vue; def render; _a {text="hi"; _ text}; end; end' ).
         must_include 'var text = "hi"; $_.push(self._v(text));'
     end
+
+    it "should handle arbitrary nodes" do
+      to_js( 'class Foo<Vue; def render; _a {_[@text]}; end; end' ).
+        must_include 'return $h("a", [this.$data.text])'
+    end
+
+    it "should handle lists of arbitrary nodes" do
+      to_js( 'class Foo<Vue; def render; _a {_[@text, @text]}; end; end' ).
+        must_include '$h("a", [this.$data.text, this.$data.text])'
+    end
   end
 
   describe "class attributes" do
