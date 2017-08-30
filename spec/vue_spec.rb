@@ -200,6 +200,30 @@ describe Ruby2JS::Filter::Vue do
       result.must_include 'return $_'
       result.must_include '}())'
     end
+
+    it "should iterate" do
+      result = to_js('class Foo<Vue; def render; _ul list ' + 
+        'do |i| _li i; end; end; end')
+
+      result.must_include '$h("ul", function() {'
+      result.must_include 'var $_ = [];'
+      result.must_include 'list.forEach(function(i) {'
+      result.must_include '{$_.push($h("li", i))}'
+      result.must_include 'return $_'
+      result.must_include '}())'
+    end
+
+    it "should iterate with markaby style classes/ids" do
+      result = to_js('class Foo<Vue; def render; _ul.todos list ' + 
+        'do |i| _li i; end; end; end')
+
+      result.must_include '$h("ul", {class: ["todos"]}, function() {'
+      result.must_include 'var $_ = [];'
+      result.must_include 'list.forEach(function(i) {'
+      result.must_include '{$_.push($h("li", i))}'
+      result.must_include 'return $_'
+      result.must_include '}())'
+    end
   end
 
   describe "class attributes" do
