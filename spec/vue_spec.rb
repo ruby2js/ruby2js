@@ -392,6 +392,12 @@ describe Ruby2JS::Filter::Vue do
         must_include '$h(Element)'
     end
 
+    it 'should map Vue.render with block to Vue instance' do
+      to_js( 'Vue.render "#sidebar" do _Element end' ).
+        must_include 'new Vue({el: "#sidebar", render: ' +
+          'function($h) {return $h(Element)}})'
+    end
+
     it 'should substitute scope instance variables / props' do
       @data = 5
       to_js( "Vue.render _Element(data: @data),

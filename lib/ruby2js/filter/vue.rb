@@ -509,9 +509,39 @@ module Ruby2JS
 
       # convert blocks to proc arguments
       def on_block(node)
-        return super unless @vue_h
-
         child = node.children.first
+
+        # map Vue.render(el, &block) to Vue.new(el: el, render: block)
+        if
+          child.children[1] == :render and
+          child.children[0] == s(:const, nil, :Vue)
+        then
+          begin
+            arg = node.children[1].children[0] || s(:arg, :$h)
+            vue_h, @vue_h = @vue_h, arg.children.first
+
+            block = node.children[2]
+            block = s(:begin, block) unless block and block.type == :begin
+
+            if
+              block.children.length != 1 or not block.children.last or
+              not [:send, :block].include? block.children.first.type
+            then
+              # wrap multi-line blocks with a 'span' element
+              block = s(:return,
+                s(:block, s(:send, nil, :_span), s(:args), *block))
+            end
+
+            return node.updated :send, [child.children[0], :new,
+              s(:hash, s(:pair, s(:sym, :el), process(child.children[2])),
+                s(:pair, s(:sym, :render), s(:block, s(:send, nil, :lambda),
+                s(:args, s(:arg, @vue_h)), process(block))))]
+          ensure
+            @vue_h = vue_h
+          end
+        end
+
+        return super unless @vue_h
 
         if
           child.children[1] == :createElement and
