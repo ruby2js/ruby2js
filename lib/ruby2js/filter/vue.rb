@@ -346,7 +346,7 @@ module Ruby2JS
             # emit $h (createElement) call
             element = node.updated :send, [nil, @vue_h, *process_all(args)]
           else
-            # block calls to $h (createElement)
+            # calls to $h (createElement) which contain a block
             #
             # collect array of child elements in a proc, and call that proc
             #
@@ -356,7 +356,6 @@ module Ruby2JS
             #     return $_
             #   }())
             #
-            # Base Ruby2JS processing will convert the 'splat' to 'apply'
             begin
               vue_apply, @vue_apply = @vue_apply, true
               
@@ -417,9 +416,26 @@ module Ruby2JS
 
             # collapse series of method calls into a single call
             return process(node.updated(nil, [*node.children[0..1], *children]))
+
           else
             super
           end
+
+        elsif
+          node.children[1] == :createElement and
+          node.children[0] == s(:const, nil, :Vue)
+        then
+          # explicit calls to Vue.createElement
+          element = node.updated nil, [nil, :$h, 
+            *process_all(node.children[2..-1])]
+
+          if @vue_apply
+            # if apply is set, emit code that pushes result
+            s(:send, s(:gvar, :$_), :push, element)
+          else
+            element
+          end
+
         else
           super
         end
@@ -428,6 +444,44 @@ module Ruby2JS
       # convert blocks to proc arguments
       def on_block(node)
         return super unless @vue_h
+
+        child = node.children.first
+
+        if
+          child.children[1] == :createElement and
+          child.children[0] == s(:const, nil, :Vue)
+        then
+          # block calls to Vue.createElement
+          #
+          # collect array of child elements in a proc, and call that proc
+          #
+          #   $h('tag', hash, proc {
+          #     var $_ = []
+          #     $_.push($h(...))
+          #     return $_
+          #   }())
+          #
+          begin
+            vue_apply, @vue_apply = @vue_apply, true
+            
+            element = node.updated :send, [nil, @vue_h, 
+              *child.children[2..-1],
+              s(:send, s(:block, s(:send, nil, :proc),
+                s(:args, s(:shadowarg, :$_)), s(:begin,
+                s(:lvasgn, :$_, s(:array)), 
+                process(node.children[2]),
+                s(:return, s(:lvar, :$_)))), :[])]
+          ensure
+            @vue_apply = vue_apply
+          end
+
+          if @vue_apply
+            # if apply is set, emit code that pushes result
+            return s(:send, s(:gvar, :$_), :push, element)
+          else
+            return element
+          end
+        end
 
         # traverse through potential "css proxy" style method calls
         child = node.children.first

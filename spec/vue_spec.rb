@@ -173,6 +173,33 @@ describe Ruby2JS::Filter::Vue do
       result.must_include 'var $_ = []; var c = "c"; $_.push($h("b", c));'
       result.must_include 'return $_}())'
     end
+
+    it "should treat explicit calls to Vue.createElement as simple" do
+      to_js( 'class Foo<Vue; def render; _a {Vue.createElement("b")}; ' +
+        'end; end' ).
+        must_include '$h("a", [$h("b")])'
+    end
+
+    it "should push results of explicit calls to Vue.createElement" do
+      result = to_js('class Foo<Vue; def render; _a {c="c"; ' +
+        'Vue.createElement("b", c)}; end; end')
+
+      result.must_include '$h("a", function() {'
+      result.must_include 'var $_ = [];'
+      result.must_include '$_.push($h("b", c));'
+      result.must_include 'return $_'
+      result.must_include '}())'
+    end
+
+    it "should handle call with blocks to Vue.createElement" do
+      result = to_js( 'class Foo<Vue; def render; ' +
+        'Vue.createElement("a") {_b}; end; end' )
+      result.must_include '$h("a", function() {'
+      result.must_include 'var $_ = [];'
+      result.must_include '$_.push($h("b"));'
+      result.must_include 'return $_'
+      result.must_include '}())'
+    end
   end
 
   describe "class attributes" do

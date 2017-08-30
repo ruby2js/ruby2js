@@ -161,7 +161,7 @@ module Parser
           selector = loc.name
         end
 
-        return true unless selector.source_buffer
+        return true unless selector and selector.source_buffer
         selector.source_buffer.source[selector.end_pos] == '('
       end
     end
