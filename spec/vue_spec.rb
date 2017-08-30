@@ -224,6 +224,16 @@ describe Ruby2JS::Filter::Vue do
       result.must_include 'return $_'
       result.must_include '}())'
     end
+
+    it "should handle text nodes" do
+      to_js( 'class Foo<Vue; def render; _a {_ @text}; end; end' ).
+        must_include '[this._v(this.$data.text)]'
+    end
+
+    it "should apply text nodes" do
+      to_js( 'class Foo<Vue; def render; _a {text="hi"; _ text}; end; end' ).
+        must_include 'var text = "hi"; $_.push(self._v(text));'
+    end
   end
 
   describe "class attributes" do

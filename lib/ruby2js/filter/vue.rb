@@ -421,6 +421,18 @@ module Ruby2JS
             super
           end
 
+        elsif node.children[0] == nil and node.children[1] == :_
+          # text nodes
+          # https://stackoverflow.com/questions/42414627/create-text-node-with-custom-render-function-in-vue-js
+          text = s(:send, s(:self), :_v, process(node.children[2]))
+          if @vue_apply
+            # if apply is set, emit code that pushes text
+            s(:send, s(:gvar, :$_), :push, text)
+          else
+            # simple/normal case: simply return the text
+            text
+          end
+
         elsif
           node.children[1] == :createElement and
           node.children[0] == s(:const, nil, :Vue)
