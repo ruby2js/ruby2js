@@ -386,6 +386,20 @@ describe Ruby2JS::Filter::Vue do
     end
   end
 
+  describe 'Vue calls' do
+    it 'should create elements' do
+      to_js( 'Vue.render _Element, document.getElementById("sidebar")' ).
+        must_include '$h(Element)'
+    end
+
+    it 'should substitute scope instance variables / props' do
+      @data = 5
+      to_js( "Vue.render _Element(data: @data),
+        document.getElementById('sidebar')" ).
+        must_include '$h(Element, {props: {data: 5}})'
+    end
+  end
+
   describe Ruby2JS::Filter::DEFAULTS do
     it "should include vue" do
       Ruby2JS::Filter::DEFAULTS.must_include Ruby2JS::Filter::Vue

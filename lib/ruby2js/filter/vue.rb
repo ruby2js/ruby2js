@@ -176,6 +176,21 @@ module Ruby2JS
 
       # expand 'wunderbar' like method calls
       def on_send(node)
+        if not @vue_h
+          # enable React filtering within React class method calls or
+          # React component calls
+          if
+            node.children.first == s(:const, nil, :Vue)
+          then
+            begin
+              vue_h, @vue_h = @vue_h, :$h
+              return on_send(node)
+            ensure
+              @vue_h = vue_h
+            end
+          end
+        end
+
         # map method calls involving i/g/c vars to straight calls
         #
         # input:
