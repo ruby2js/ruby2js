@@ -44,7 +44,7 @@ module Ruby2JS
           body.unshift s(:def, :initialize, s(:args), nil)
         end
 
-        vue_walk(node)
+        @vue_inventory = vue_walk(node)
 
         # convert body into hash
         body.each do |statement|
@@ -90,14 +90,8 @@ module Ruby2JS
 
                 # not so simple if ivars are being read as well as written
                 if simple
-                  begin
-                    vue_inventory, @vue_inventory = 
-                      @vue_inventory, Hash.new {|h, k| h[k] = []}
-                    vue_walk(block)
-                    simple = @vue_inventory[:ivar].empty?
-                  ensure
-                    @vue_inventory = vue_inventory
-                  end
+                  block_inventory = vue_walk(block)
+                  simple = block_inventory[:ivar].empty?
                 end
 
                 uninitialized = @vue_inventory[:ivar].dup
@@ -209,10 +203,11 @@ module Ruby2JS
         return super unless @vue_h
 
         if node.children[0] == nil and node.children[1] =~ /^_\w/
+          tag = node.children[1].to_s[1..-1]
           hash = Hash.new {|h, k| h[k] = {}}
           args = []
           complex_block = []
-          component = (node.children[1] =~ /^_[A-Z]/)
+          component = (tag =~ /^[A-Z]/)
 
           node.children[2..-1].each do |attr|
             if attr.type == :hash
@@ -364,9 +359,41 @@ module Ruby2JS
             end
           end
 
+          # support controlled form components
+          if %w(input select textarea).include? tag
+            # search for the presence of a 'value' attribute
+            value = hash[:attrs]['value']
+
+            # search for the presence of a 'onChange' attribute
+            onChange = hash['on']['change']
+
+            if value and value.type == :ivar and !onChange
+              hash['domProps']['value'] ||= value
+              hash['on']['input'] ||=
+                s(:block, s(:send, nil, :proc), s(:args, s(:arg, :event)),
+                s(:ivasgn, value.children.first,
+                s(:attr, s(:attr, s(:lvar, :event), :target), :value)))
+              hash[:attrs].delete('value')
+            end
+
+            if not value and not onChange and tag == 'input'
+              # search for the presence of a 'checked' attribute
+              checked = hash[:attrs]['checked']
+
+              if checked and checked.type == :ivar
+                hash['domProps']['checked'] ||= checked
+                hash['on']['input'] ||=
+                  s(:block, s(:send, nil, :proc), s(:args),
+                  s(:ivasgn,checked.children.first,
+                  s(:send, checked, :!)))
+              end
+            end
+          end
+
           # put attributes up front
           unless hash.empty?
             pairs = hash.to_a.map do |k1, v1| 
+              next if Hash === v1 and v1.empty?
               s(:pair, s(:str, k1.to_s), 
                 if Parser::AST::Node === v1
                   v1
@@ -375,14 +402,14 @@ module Ruby2JS
                 end
               )
             end
-            args.unshift s(:hash, *pairs)
+            args.unshift s(:hash, *pairs.compact)
           end
 
           # prepend element name
           if component
-            args.unshift s(:const, nil, node.children[1].to_s[1..-1])
+            args.unshift s(:const, nil, tag)
           else
-            args.unshift s(:str, node.children[1].to_s[1..-1])
+            args.unshift s(:str, tag)
           end
 
           if complex_block.empty?
@@ -645,12 +672,12 @@ module Ruby2JS
       end
 
       # gather ivar and cvar usage
-      def vue_walk(node)
+      def vue_walk(node, inventory = Hash.new {|h, k| h[k] = []})
         # extract ivars and cvars
         if [:ivar, :cvar].include? node.type
           symbol = node.children.first
-          unless @vue_inventory[node.type].include? symbol
-            @vue_inventory[node.type] << symbol
+          unless inventory[node.type].include? symbol
+            inventory[node.type] << symbol
           end
         elsif node.type == :ivasgn
           symbol = nil
@@ -661,16 +688,18 @@ module Ruby2JS
           end
 
           if symbol
-            unless @vue_inventory[:ivar].include? symbol
-              @vue_inventory[:ivar] << symbol
+            unless inventory[:ivar].include? symbol
+              inventory[:ivar] << symbol
             end
           end
         end
 
         # recurse
         node.children.each do |child|
-          vue_walk(child) if Parser::AST::Node === child
+          vue_walk(child, inventory) if Parser::AST::Node === child
         end
+
+        return inventory
       end
     end
 
