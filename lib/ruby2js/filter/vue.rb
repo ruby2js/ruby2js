@@ -13,6 +13,11 @@ module Ruby2JS
         super
       end
 
+      def options=(options)
+        super
+        @vue_h ||= options[:vue_h]
+      end
+
       # Example conversion
       #  before:
       #    (class (const nil :Foo) (const nil :Vue) nil)
