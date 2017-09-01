@@ -420,33 +420,37 @@ module Ruby2JS
             args.unshift s(:str, tag)
           end
 
-          if complex_block.empty?
-            # emit $h (createElement) call
-            element = node.updated :send, [nil, @vue_h, *process_all(args)]
-          else
-            # calls to $h (createElement) which contain a block
-            #
-            # collect array of child elements in a proc, and call that proc
-            #
-            #   $h('tag', hash, proc {
-            #     var $_ = []
-            #     $_.push($h(...))
-            #     return $_
-            #   }())
-            #
-            begin
-              vue_apply, @vue_apply = @vue_apply, true
-              
-              element = node.updated :send, [nil, @vue_h, 
-                *process_all(args),
-                s(:send, s(:block, s(:send, nil, :proc),
-                  s(:args, s(:shadowarg, :$_)), s(:begin,
-                  s(:lvasgn, :$_, s(:array)),
-                  *process_all(complex_block),
-                  s(:return, s(:lvar, :$_)))), :[])]
-            ensure
-              @vue_apply = vue_apply
-            end
+          begin
+	    vue_apply = @vue_apply
+
+	    if complex_block.empty?
+	      @vue_apply = false
+
+	      # emit $h (createElement) call
+	      element = node.updated :send, [nil, @vue_h, *process_all(args)]
+	    else
+	      # calls to $h (createElement) which contain a block
+	      #
+	      # collect array of child elements in a proc, and call that proc
+	      #
+	      #   $h('tag', hash, proc {
+	      #     var $_ = []
+	      #     $_.push($h(...))
+	      #     return $_
+	      #   }())
+	      #
+	      @vue_apply = true
+	      
+	      element = node.updated :send, [nil, @vue_h, 
+		*process_all(args),
+		s(:send, s(:block, s(:send, nil, :proc),
+		  s(:args, s(:shadowarg, :$_)), s(:begin,
+		  s(:lvasgn, :$_, s(:array)),
+		  *process_all(complex_block),
+		  s(:return, s(:lvar, :$_)))), :[])]
+	    end
+	  ensure
+            @vue_apply = vue_apply
           end
 
           if @vue_apply
