@@ -370,7 +370,10 @@ module Ruby2JS
             value = hash[:attrs]['value']
 
             # search for the presence of a 'onChange' attribute
-            onChange = hash['on']['change']
+            onChange = hash['on']['input'] ||
+                       hash['on']['change'] ||
+                       hash['nativeOn']['input'] ||
+                       hash['nativeOn']['change']
 
             if value and value.type == :ivar and !onChange
               hash['domProps']['value'] ||= value
@@ -387,7 +390,7 @@ module Ruby2JS
 
               if checked and checked.type == :ivar
                 hash['domProps']['checked'] ||= checked
-                hash['on']['input'] ||=
+                hash['on']['click'] ||=
                   s(:block, s(:send, nil, :proc), s(:args),
                   s(:ivasgn,checked.children.first,
                   s(:send, checked, :!)))
