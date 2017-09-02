@@ -105,6 +105,11 @@ describe Ruby2JS::Filter::Vue do
         must_include '$h("a", {attrs: {href: "link"}}, "name")'
     end
 
+    it "should map underscores to dashes in attributes names" do
+      to_js( 'class Foo<Vue; def render; _span data_name: "value"; end; end' ).
+        must_include '$h("span", {attrs: {"data-name": "value"}})'
+    end
+
     it "should create elements with DOM Propoerties" do
       to_js( 'class Foo<Vue; def render; _a domPropsTextContent: "name"; end; end' ).
         must_include '$h("a", {domProps: {textContent: "name"}})'

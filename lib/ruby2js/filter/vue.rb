@@ -323,7 +323,7 @@ module Ruby2JS
                 elsif %w(key ref refInFor slot).include? name
                   hash[name] = pair.children[1]
                 else
-                  hash[:attrs][name] = pair.children[1]
+                  hash[:attrs][name.to_s.gsub('_', '-')] = pair.children[1]
                 end
               end
 
