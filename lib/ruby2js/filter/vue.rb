@@ -5,6 +5,11 @@ module Ruby2JS
     module Vue
       include SEXP
 
+      VUE_METHODS = [
+        :delete, :destroy, :emit, :forceUpdate, :mount, :nextTick, :off, :on,
+        :once, :set, :watch
+      ]
+
       def initialize(*args)
         @vue_h = nil
         @vue_self = nil
@@ -497,6 +502,14 @@ module Ruby2JS
           else
             element
           end
+
+        elsif
+          VUE_METHODS.include? node.children[1] and
+          node.children[0] == s(:const, nil, :Vue)
+        then
+          # vm methods
+          node.updated nil, [s(:self), "$#{node.children[1]}", 
+            *process_all(node.children[2..-1])]
 
         elsif node.children[0] and node.children[0].type == :send
           # determine if markaby style class and id names are being used

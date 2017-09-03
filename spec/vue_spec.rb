@@ -414,6 +414,11 @@ describe Ruby2JS::Filter::Vue do
         document.getElementById('sidebar')" ).
         must_include '$h(Element, {props: {data: 5}})'
     end
+
+    it 'should map vm method calls to this.$' do
+      to_js( "Vue.emit('event')" ).
+        must_equal 'this.$emit("event")'
+    end
   end
 
   describe "controlled components" do
