@@ -380,13 +380,16 @@ module Ruby2JS
                        hash['nativeOn']['input'] ||
                        hash['nativeOn']['change']
 
-            if value and value.type == :ivar and !onChange
+            if value and value.type == :ivar
               hash['domProps']['value'] ||= value
-              hash['on']['input'] ||=
-                s(:block, s(:send, nil, :proc), s(:args, s(:arg, :event)),
-                s(:ivasgn, value.children.first,
-                s(:attr, s(:attr, s(:lvar, :event), :target), :value)))
               hash[:attrs].delete('value')
+
+              if not onChange
+                hash['on']['input'] ||=
+                  s(:block, s(:send, nil, :proc), s(:args, s(:arg, :event)),
+                  s(:ivasgn, value.children.first,
+                  s(:attr, s(:attr, s(:lvar, :event), :target), :value)))
+              end
             end
 
             if not value and not onChange and tag == 'input'
@@ -395,10 +398,14 @@ module Ruby2JS
 
               if checked and checked.type == :ivar
                 hash['domProps']['checked'] ||= checked
-                hash['on']['click'] ||=
-                  s(:block, s(:send, nil, :proc), s(:args),
-                  s(:ivasgn,checked.children.first,
-                  s(:send, checked, :!)))
+                hash[:attrs].delete('checked')
+
+                if not onChange
+                  hash['on']['click'] ||=
+                    s(:block, s(:send, nil, :proc), s(:args),
+                    s(:ivasgn,checked.children.first,
+                    s(:send, checked, :!)))
+                end
               end
             end
           end

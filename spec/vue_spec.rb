@@ -431,7 +431,7 @@ describe Ruby2JS::Filter::Vue do
 
     it "should should automatically create onChange checked functions" do
       js = to_js( 'class Foo<Vue; def render; _input checked: @x; end; end' )
-      js.must_include ', on: {click: function() {'
+      js.must_include '{on: {click: function() {'
       js.must_include 'self.$data.x = !self.$data.x}'
       js.must_include ', domProps: {checked: this.$data.x}'
     end
