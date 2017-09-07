@@ -480,6 +480,16 @@ describe Ruby2JS::Filter::Vue do
       js.must_include '{a: b, data:'
       js.must_include '$h("p", this.$options.a)'
     end
+
+    it "should enable a mixin to be defined" do
+      to_js( 'class Foo<Vue::Mixin; def mounted(); @foo=1; end; end' ).
+        must_equal 'var Foo = {mounted: function() {this.$data.foo = 1}}'
+    end
+
+    it "should enable a mixin to be included" do
+      to_js( 'class Bar<Vue; mixin Foo; end' ).
+        must_include 'var Bar = Vue.component("bar", {mixins: [Foo], data: '
+    end
   end
 
   describe Ruby2JS::Filter::DEFAULTS do

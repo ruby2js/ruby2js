@@ -38,7 +38,8 @@ module Ruby2JS
       def on_class(node)
         cname, inheritance, *body = node.children
         return super unless cname.children.first == nil
-        return super unless inheritance == s(:const, nil, :Vue)
+        return super unless inheritance == s(:const, nil, :Vue) or
+          inheritance == s(:const, s(:const, nil, :Vue), :Mixin)
 
         # traverse down to actual list of class statements
         if body.length == 1
@@ -54,13 +55,16 @@ module Ruby2JS
         computed = []
         setters = []
         options = []
+        mixins = []
 
         # insert constructor if none present
-        unless body.any? {|statement| 
-          statement.type == :def and statement.children.first ==:initialize}
-        then
-          body = body.dup
-          body.unshift s(:def, :initialize, s(:args), nil)
+        if inheritance == s(:const, nil, :Vue)
+          unless body.any? {|statement| 
+            statement.type == :def and statement.children.first ==:initialize}
+          then
+            body = body.dup
+            body.unshift s(:def, :initialize, s(:args), nil)
+          end
         end
 
         @vue_inventory = vue_walk(node)
@@ -80,16 +84,23 @@ module Ruby2JS
         # convert body into hash
         body.each do |statement|
 
-          # named values
+          # named values (template, props, options, mixin[s])
           if statement.type == :send and statement.children.first == nil
             if [:template, :props].include? statement.children[1]
               hash << s(:pair, s(:sym, statement.children[1]), 
                 statement.children[2])
+
             elsif 
               statement.children[1] == :options and
               statement.children[2].type == :hash
             then
               options += statement.children[2].children
+
+            elsif statement.children[1] == :mixin or
+                  statement.children[1] == :mixins
+            then
+
+              mixins += statement.children[2..-1]
             end
 
           # methods
@@ -199,6 +210,11 @@ module Ruby2JS
           end
         end
 
+        # add mixins before that
+        unless mixins.empty?
+          hash.unshift s(:pair, s(:sym, :mixins), s(:array, *mixins))
+        end
+
         # append methods to hash
         unless methods.empty?
           hash << s(:pair, s(:sym, :methods), s(:hash, *methods))
@@ -233,10 +249,15 @@ module Ruby2JS
           sub(/^[A-Z]/) {|c| c.downcase}.
           gsub(/[A-Z]/) {|c| "-#{c.downcase}"}
 
-        # build component
-        s(:casgn, nil, cname.children.last,
-          s(:send, s(:const, nil, :Vue), :component, 
-          s(:str, camel), s(:hash, *hash)))
+        if inheritance == s(:const, nil, :Vue)
+          # build component
+          s(:casgn, nil, cname.children.last,
+            s(:send, s(:const, nil, :Vue), :component, 
+            s(:str, camel), s(:hash, *hash)))
+        else
+          # build mixin
+          s(:casgn, nil, cname.children.last, s(:hash, *hash))
+        end
       end
 
       # expand 'wunderbar' like method calls
