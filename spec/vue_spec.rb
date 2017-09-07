@@ -474,6 +474,14 @@ describe Ruby2JS::Filter::Vue do
     end
   end
 
+  describe "options and mixins" do
+    it "should capture and access options" do
+      js = to_js( 'class Foo<Vue; options a: b; def render; _p $options.a; end; end' )
+      js.must_include '{a: b, data:'
+      js.must_include '$h("p", this.$options.a)'
+    end
+  end
+
   describe Ruby2JS::Filter::DEFAULTS do
     it "should include vue" do
       Ruby2JS::Filter::DEFAULTS.must_include Ruby2JS::Filter::Vue

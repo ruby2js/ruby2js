@@ -53,6 +53,7 @@ module Ruby2JS
         methods = []
         computed = []
         setters = []
+        options = []
 
         # insert constructor if none present
         unless body.any? {|statement| 
@@ -84,6 +85,11 @@ module Ruby2JS
             if [:template, :props].include? statement.children[1]
               hash << s(:pair, s(:sym, statement.children[1]), 
                 statement.children[2])
+            elsif 
+              statement.children[1] == :options and
+              statement.children[2].type == :hash
+            then
+              options += statement.children[2].children
             end
 
           # methods
@@ -182,6 +188,10 @@ module Ruby2JS
           end
         end
 
+        # add options to the front
+        hash.unshift(*options)
+
+        # add properties before that
         unless hash.any? {|pair| pair.children[0].children[0] == :props}
           unless @vue_inventory[:cvar].empty?
             hash.unshift s(:pair, s(:sym, :props), s(:array, 
@@ -189,14 +199,14 @@ module Ruby2JS
           end
         end
 
-        # add methods to hash
+        # append methods to hash
         unless methods.empty?
           hash << s(:pair, s(:sym, :methods), s(:hash, *methods))
         end
 
         @vue_instance = []
 
-        # add setters to computed list
+        # append setters to computed list
         setters.each do |setter|
           index = computed.find_index do |pair| 
             pair.children[0].children[0].to_s ==
@@ -213,7 +223,7 @@ module Ruby2JS
           end
         end
 
-        # add computed to hash
+        # append computed to hash
         unless computed.empty?
           hash << s(:pair, s(:sym, :computed), s(:hash, *computed))
         end
@@ -727,6 +737,16 @@ module Ruby2JS
       def on_cvar(node)
         return super unless @vue_self
         s(:attr, s(:attr, s(:self), :$props), node.children[0].to_s[2..-1])
+      end
+
+      # expand $options to this.$options
+      def on_gvar(node)
+        return super unless @vue_self
+        if node.children[0] == :$options
+          node.updated :attr, [s(:self), :$options]
+        else
+          super
+        end
       end
 
       # prevent attempts to assign to Vue properties
