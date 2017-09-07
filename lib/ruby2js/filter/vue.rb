@@ -752,14 +752,29 @@ module Ruby2JS
         end
       end
 
+      # for instance variables, map @x+= to this.x+=
+      # for computed variables with setters, map x+= to this.x+=
       def on_op_asgn(node)
         return super unless @vue_self
-        return super unless node.children.first.type == :ivasgn
-        node.updated nil, [s(:attr, @vue_self, 
-          node.children[0].children[0].to_s[1..-1]),
-          node.children[1], process(node.children[2])]
+        if node.children.first.type == :ivasgn
+          node.updated nil, [s(:attr, @vue_self, 
+            node.children[0].children[0].to_s[1..-1]),
+            node.children[1], process(node.children[2])]
+
+        elsif 
+          node.children.first.type == :lvasgn and
+          @vue_instance.include? node.children[0].children[0]
+        then
+          node.updated nil, [s(:attr, s(:self), 
+            node.children[0].children[0]),
+            node.children[1], process(node.children[2])]
+
+        else
+          super
+        end
       end
 
+      # for computed variables with setters, map x= to this.x=
       def on_lvasgn(node)
         return super unless @vue_instance.include? node.children.first
         s(:send, s(:self), "#{node.children.first}=",

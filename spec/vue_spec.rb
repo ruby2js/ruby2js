@@ -362,6 +362,11 @@ describe Ruby2JS::Filter::Vue do
         must_include 'this.$data.x = 1'
     end
 
+    it "should map setting ivar op_asgn to setting properties" do
+      to_js( 'class Foo<Vue; def method(); @x+=1; end; end' ).
+        must_include 'this.$data.x++'
+    end
+
     it "should handle parallel instance variables assignment" do
       to_js( 'class Foo<Vue; def method(); @x=@y=1; end; end' ).
         must_include 'this.$data.x = this.$data.y = 1'
@@ -409,6 +414,10 @@ describe Ruby2JS::Filter::Vue do
       js.must_include 'this.value = 1'
     end
 
+    it "should handle setters with op_asgn" do
+      js = to_js( 'class Foo<Vue; def value=(x); @x=x; end; def method(); value+=1; end; end' )
+      js.must_include 'this.value++'
+    end
 
     it "should combine getters and setters" do
       js = to_js( 'class Foo<Vue; def value; @x; end; def value=(x); @x=x; end; end' )
