@@ -10,11 +10,17 @@ module Ruby2JS
         :once, :set, :watch
       ]
 
+      VUE_LIFECYCLE = [
+        :data, :render, :beforeCreate, :created, :beforeMount, :mounted,
+        :beforeUpdate, :updated, :beforeDestroy, :destroyed
+      ]
+
       def initialize(*args)
         @vue_h = nil
         @vue_self = nil
         @vue_apply = nil
         @vue_inventory = Hash.new {|h, k| h[k] = []}
+        @vue_instance = []
         super
       end
 
@@ -45,6 +51,8 @@ module Ruby2JS
 
         hash = []
         methods = []
+        computed = []
+        setters = []
 
         # insert constructor if none present
         unless body.any? {|statement| 
@@ -55,6 +63,18 @@ module Ruby2JS
         end
 
         @vue_inventory = vue_walk(node)
+        @vue_instance = []
+
+        # collect instance methods (including getters and setters)
+        body.each do |statement|
+          if statement.type == :def
+            method = statement.children.first
+            unless VUE_LIFECYCLE.include? method or method == :initialize
+              method = method.to_s[0..-2].to_sym if method.to_s.end_with? '='
+              @vue_instance << method unless @vue_instance.include? method
+            end
+          end
+        end
 
         # convert body into hash
         body.each do |statement|
@@ -137,14 +157,21 @@ module Ruby2JS
                 end
               end
 
+              if statement.is_method?
+                method_type = :proc
+              else
+                method_type = :lambda
+              end
+
               # add to hash in the appropriate location
-              pair = s(:pair, s(:sym, method),
-                s(:block, s(:send, nil, :lambda), args, process(block)))
-              if %w(data render beforeCreate created beforeMount mounted
-                    beforeUpdate updated beforeDestroy destroyed
-                ).include? method.to_s
-              then
+              pair = s(:pair, s(:sym, method.to_s.chomp('=')),
+                s(:block, s(:send, nil, method_type), args, process(block)))
+              if VUE_LIFECYCLE.include? method
                 hash << pair
+              elsif not statement.is_method? 
+                computed << pair
+              elsif method.to_s.end_with? '='
+                setters << pair
               else
                 methods << pair
               end
@@ -165,6 +192,30 @@ module Ruby2JS
         # add methods to hash
         unless methods.empty?
           hash << s(:pair, s(:sym, :methods), s(:hash, *methods))
+        end
+
+        @vue_instance = []
+
+        # add setters to computed list
+        setters.each do |setter|
+          index = computed.find_index do |pair| 
+            pair.children[0].children[0].to_s ==
+              setter.children[0].children[0]
+          end
+
+          if index
+            computed[index] = s(:pair, setter.children[0],
+              s(:hash, s(:pair, s(:sym, :get), computed[index].children[1]),
+                s(:pair, s(:sym, :set), setter.children[1])))
+          else
+            computed << s(:pair, setter.children[0],
+              s(:hash, s(:pair, s(:sym, :set), setter.children[1])))
+          end
+        end
+
+        # add computed to hash
+        unless computed.empty?
+          hash << s(:pair, s(:sym, :computed), s(:hash, *computed))
         end
 
         # convert class name to camel case
@@ -208,6 +259,12 @@ module Ruby2JS
           else
             return super
           end
+        end
+
+        # calls to methods (including getters) defined in this class
+        if node.children[0]==nil and @vue_instance.include? node.children[1]
+          return node.updated nil, [s(:self), node.children[1],
+            *process_all(node.children[2..-1])]
         end
 
         return super unless @vue_h
@@ -701,6 +758,12 @@ module Ruby2JS
         node.updated nil, [s(:attr, @vue_self, 
           node.children[0].children[0].to_s[1..-1]),
           node.children[1], process(node.children[2])]
+      end
+
+      def on_lvasgn(node)
+        return super unless @vue_instance.include? node.children.first
+        s(:send, s(:self), "#{node.children.first}=",
+          process(node.children[1]))
       end
 
       # gather ivar and cvar usage

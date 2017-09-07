@@ -73,7 +73,7 @@ describe Ruby2JS::Filter::Vue do
     end
 
     it "should handle other methods" do
-      to_js( 'class Foo<Vue; def clicked; @counter+=1; end; end' ).
+      to_js( 'class Foo<Vue; def clicked(); @counter+=1; end; end' ).
         must_include ', methods: {clicked: function() {this.$data.counter++}}'
     end
   end
@@ -353,12 +353,12 @@ describe Ruby2JS::Filter::Vue do
 
   describe "map gvars/ivars/cvars to refs/state/prop" do
     it "should map instance variables to state" do
-      to_js( 'class Foo<Vue; def method; @x; end; end' ).
+      to_js( 'class Foo<Vue; def method(); @x; end; end' ).
         must_include 'this.$data.x'
     end
 
     it "should map setting instance variables to setting properties" do
-      to_js( 'class Foo<Vue; def method; @x=1; end; end' ).
+      to_js( 'class Foo<Vue; def method(); @x=1; end; end' ).
         must_include 'this.$data.x = 1'
     end
 
@@ -373,27 +373,49 @@ describe Ruby2JS::Filter::Vue do
     end
 
     it "should map class variables to properties" do
-      to_js( 'class Foo<Vue; def method; @@x; end; end' ).
+      to_js( 'class Foo<Vue; def method(); @@x; end; end' ).
         must_include 'this.$props.x'
     end
 
     it "should not support assigning to class variables" do
       proc { 
-        to_js( 'class Foo<Vue; def method; @@x=1; end; end' )
+        to_js( 'class Foo<Vue; def method(); @@x=1; end; end' )
       }.must_raise NotImplementedError
     end
   end
 
   describe "method calls" do
     it "should handle ivars" do
-      to_js( 'class Foo<Vue; def method; @x.(); end; end' ).
+      to_js( 'class Foo<Vue; def method(); @x.(); end; end' ).
         must_include 'this.$data.x()'
     end
 
     it "should handle cvars" do
-      to_js( 'class Foo<Vue; def method; @@x.(); end; end' ).
+      to_js( 'class Foo<Vue; def method(); @@x.(); end; end' ).
         must_include 'this.$props.x()'
     end
+  end
+
+  describe "computed values" do
+    it "should handle getters" do
+      js = to_js( 'class Foo<Vue; def value; @x; end; def method(); value; end; end' )
+      js.must_include ', computed: {value: function() {'
+      js.must_include 'this.value'
+    end
+
+    it "should handle setters" do
+      js = to_js( 'class Foo<Vue; def value=(x); @x=x; end; def method(); value=1; end; end' )
+      js.must_include ', computed: {value: {set: function(x) {'
+      js.must_include 'this.value = 1'
+    end
+
+
+    it "should combine getters and setters" do
+      js = to_js( 'class Foo<Vue; def value; @x; end; def value=(x); @x=x; end; end' )
+      js.must_include ', computed: {value: {get: function() {return '
+      js.must_include ', set: function(x) {this.$data.x = x}'
+    end
+
   end
 
   describe 'Vue calls' do
