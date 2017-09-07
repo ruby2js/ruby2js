@@ -190,8 +190,9 @@ module Ruby2JS
             super
 
           elsif index.type == :regexp
-            process S(:send, S(:send, target, :match, index), :[], 
-              args[1] || s(:int, 0))
+            process S(:send, 
+              s(:or, S(:send, target, :match, index), s(:array)),
+              :[], args[1] || s(:int, 0))
 
           elsif node.children.length != 3
             super

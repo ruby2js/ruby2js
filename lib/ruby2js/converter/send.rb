@@ -69,7 +69,8 @@ module Ruby2JS
         parse s(:not, receiver)
 
       elsif method == :[]
-        parse receiver; put '['; parse_all(*args, join: ', '); put ']'
+        (group_receiver ? group(receiver) : parse(receiver))
+        put '['; parse_all(*args, join: ', '); put ']'
 
       elsif method == :[]=
         parse receiver; put '['; parse_all(*args[0..-2], join: ', '); put '] = '
