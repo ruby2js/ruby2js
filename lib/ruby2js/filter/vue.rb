@@ -15,6 +15,11 @@ module Ruby2JS
         :beforeUpdate, :updated, :beforeDestroy, :destroyed
       ]
 
+      VUE_PROPERTIES = [
+        :$data, :$props, :$el, :$options, :$parent, :$root, :$children,
+        :$slots, :$scopedSlots, :$refs, :$isServer, :$attrs, :$listeners
+      ]
+
       def initialize(*args)
         @vue_h = nil
         @vue_self = nil
@@ -760,11 +765,11 @@ module Ruby2JS
         s(:attr, s(:attr, s(:self), :$props), node.children[0].to_s[2..-1])
       end
 
-      # expand $options to this.$options
+      # expand instance properties like $options to this.$options
       def on_gvar(node)
         return super unless @vue_self
-        if node.children[0] == :$options
-          node.updated :attr, [s(:self), :$options]
+        if VUE_PROPERTIES.include? node.children[0]
+          node.updated :attr, [s(:self), node.children[0]]
         else
           super
         end
