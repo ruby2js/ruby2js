@@ -474,9 +474,16 @@ module Ruby2JS
                        hash['nativeOn']['change']
 
             if value and value.type == :ivar
-              hash['domProps']['value'] ||= value
+              hash[:domProps]['value'] ||= value
               hash[:attrs].delete('value')
 
+              # disable control until script is ready
+              unless hash[:domProps]['disabled'] or hash[:attrs]['disabled']
+                hash[:domProps]['disabled'] = s(:false)
+                hash[:attrs]['disabled'] = s(:true)
+              end
+
+              # define event handler to update ivar on input events
               if not onChange
                 hash['on']['input'] ||=
                   s(:block, s(:send, nil, :proc), s(:args, s(:arg, :event)),
@@ -490,9 +497,16 @@ module Ruby2JS
               checked = hash[:attrs]['checked']
 
               if checked and checked.type == :ivar
-                hash['domProps']['checked'] ||= checked
+                hash[:domProps]['checked'] ||= checked
                 hash[:attrs].delete('checked')
 
+                # disable control until script is ready
+                unless hash[:domProps]['disabled'] or hash[:attrs]['disabled']
+                  hash[:domProps]['disabled'] = s(:false)
+                  hash[:attrs]['disabled'] = s(:true)
+                end
+
+                # define event handler to update ivar on click events
                 if not onChange
                   hash['on']['click'] ||=
                     s(:block, s(:send, nil, :proc), s(:args),

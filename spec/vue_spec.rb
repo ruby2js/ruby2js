@@ -453,21 +453,39 @@ describe Ruby2JS::Filter::Vue do
   end
 
   describe "controlled components" do
-    it "should should automatically create onChange value functions" do
+    it "should automatically create onChange value functions" do
       js = to_js( 'class Foo<Vue; def render; _input value: @x; end; end' )
-      js.must_include ', {on: {input: function(event) {'
+      js.must_include ', on: {input: function(event) {'
       js.must_include '{self.$data.x = event.target.value}'
-      js.must_include ', domProps: {value: this.$data.x}'
+      js.must_include ', domProps: {value: this.$data.x,'
+
+      js.must_include '{attrs: {disabled: true},'
+      js.must_match /domProps: \{.*?, disabled: false\}/
     end
 
-    it "should should automatically create onChange checked functions" do
+    it "shouldn't replace disabled attributes in input elements" do
+      js = to_js( 'class Foo<Vue; def render; _input value: @x, disabled: @disabled; end; end' )
+      js.wont_include 'disabled: true'
+      js.wont_include 'disabled: false'
+    end
+
+    it "should automatically create onChange checked functions" do
       js = to_js( 'class Foo<Vue; def render; _input checked: @x; end; end' )
-      js.must_include '{on: {click: function() {'
+      js.must_include ', on: {click: function() {'
       js.must_include 'self.$data.x = !self.$data.x}'
-      js.must_include ', domProps: {checked: this.$data.x}'
+      js.must_include ', domProps: {checked: this.$data.x,'
+
+      js.must_include '{attrs: {disabled: true},'
+      js.must_match /domProps: \{.*?, disabled: false\}/
     end
 
-    it "should should retain onChange functions" do
+    it "shouldn't replace disabled attributes in checkboxes" do
+      js = to_js( 'class Foo<Vue; def render; _input checked: @x, disabled: @disabled; end; end' )
+      js.wont_include 'disabled: true'
+      js.wont_include 'disabled: false'
+    end
+
+    it "should retain onChange functions" do
       js = to_js( 'class Foo<Vue; def render; _input checked: @x, onChange: self.change; end; end' )
       js.must_include ', on: {change: this.change}'
       js.wont_include ', on: {input: function('
