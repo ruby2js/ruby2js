@@ -188,6 +188,7 @@ module Ruby2JS
               # add to hash in the appropriate location
               pair = s(:pair, s(:sym, method.to_s.chomp('=')),
                 s(:block, s(:send, nil, method_type), args, process(block)))
+              @comments[pair] = @comments[statement]
               if VUE_LIFECYCLE.include? method
                 hash << pair
               elsif not statement.is_method? 
@@ -274,7 +275,7 @@ module Ruby2JS
           defn
         else
           s(:begin, defn, *process_all(class_methods.map {|method|
-            if method.is_method?
+            fn = if method.is_method?
               # class method
               s(:send, s(:const, nil, cname), "#{method.children[1]}=",
                 s(:block, s(:send , nil, :proc), *method.children[2..-1]))
@@ -296,6 +297,9 @@ module Ruby2JS
                 s(:pair, s(:sym, :get), s(:block, s(:send, nil, :proc),
                   *method.children[2..-1]))))
             end
+
+            @comments[fn] = @comments[method]
+            fn
           }))
         end
       end

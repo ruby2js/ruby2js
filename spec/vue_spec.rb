@@ -528,6 +528,33 @@ describe Ruby2JS::Filter::Vue do
     end
   end
 
+  describe 'comments' do
+    it "should handle class comments" do
+      to_js( "#cc\nclass Foo<Vue; end" ).
+        must_include "//cc\nvar"
+    end
+
+    it "should handle constructor comments" do
+      to_js( "class Foo<Vue; \n#ctorc\ndef initialize; end; end" ).
+        must_include "//ctorc\n  data: function("
+    end
+
+    it "should handle lifecycle method comments" do
+      to_js( "class Foo<Vue; \n#lfc\ndef mounted(); end; end" ).
+        must_include "//lfc\n  mounted: function("
+    end
+
+    it "should handle instance method comments" do
+      to_js( "class Foo<Vue; \n#imc\ndef method(); end; end" ).
+        must_include "//imc\n    method: function("
+    end
+
+    it "should handle class method comments" do
+      to_js( "class Foo<Vue; \n#cmc\ndef self.method(); end; end" ).
+        must_include "//cmc\nFoo.method = function("
+    end
+  end
+
   describe Ruby2JS::Filter::DEFAULTS do
     it "should include vue" do
       Ruby2JS::Filter::DEFAULTS.must_include Ruby2JS::Filter::Vue
