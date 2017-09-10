@@ -250,18 +250,53 @@ module Ruby2JS
         end
 
         # convert class name to camel case
-        camel = cname.children.last.to_s.gsub(/[^\w]/, '-').
+        cname = cname.children.last
+        camel = cname.to_s.gsub(/[^\w]/, '-').
           sub(/^[A-Z]/) {|c| c.downcase}.
           gsub(/[A-Z]/) {|c| "-#{c.downcase}"}
 
         if inheritance == s(:const, nil, :Vue)
           # build component
-          s(:casgn, nil, cname.children.last,
+          defn = s(:casgn, nil, cname,
             s(:send, s(:const, nil, :Vue), :component, 
             s(:str, camel), s(:hash, *hash)))
         else
           # build mixin
-          s(:casgn, nil, cname.children.last, s(:hash, *hash))
+          defn = s(:casgn, nil, cname, s(:hash, *hash))
+        end
+
+        # append class methods (if any)
+        class_methods = body.select do |statement| 
+          statement.type == :defs  and statement.children[0] == s(:self)
+        end
+
+        if class_methods.empty?
+          defn
+        else
+          s(:begin, defn, *process_all(class_methods.map {|method|
+            if method.is_method?
+              # class method
+              s(:send, s(:const, nil, cname), "#{method.children[1]}=",
+                s(:block, s(:send , nil, :proc), *method.children[2..-1]))
+
+            elsif
+              method.children.length == 4 and
+              Converter::EXPRESSIONS.include? method.children[3].type
+            then
+              # class property - simple
+              s(:send, s(:const, nil, cname), "#{method.children[1]}=",
+                method.children[3])
+
+            else
+              # class computed property
+              s(:send, s(:const, nil, :Object), :defineProperty,
+                s(:const, nil, cname), s(:str, method.children[1].to_s),
+                s(:hash, s(:pair, s(:sym, :enumerable), s(:true)),
+                s(:pair, s(:sym, :configurable), s(:true)),
+                s(:pair, s(:sym, :get), s(:block, s(:send, nil, :proc),
+                  *method.children[2..-1]))))
+            end
+          }))
         end
       end
 

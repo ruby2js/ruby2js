@@ -460,7 +460,7 @@ describe Ruby2JS::Filter::Vue do
       js.must_include ', domProps: {value: this.$data.x,'
 
       js.must_include '{attrs: {disabled: true},'
-      js.must_match /domProps: \{.*?, disabled: false\}/
+      js.must_match(/domProps: \{.*?, disabled: false\}/)
     end
 
     it "shouldn't replace disabled attributes in input elements" do
@@ -476,7 +476,7 @@ describe Ruby2JS::Filter::Vue do
       js.must_include ', domProps: {checked: this.$data.x,'
 
       js.must_include '{attrs: {disabled: true},'
-      js.must_match /domProps: \{.*?, disabled: false\}/
+      js.must_match(/domProps: \{.*?, disabled: false\}/)
     end
 
     it "shouldn't replace disabled attributes in checkboxes" do
@@ -507,6 +507,24 @@ describe Ruby2JS::Filter::Vue do
     it "should enable a mixin to be included" do
       to_js( 'class Bar<Vue; mixin Foo; end' ).
         must_include 'var Bar = Vue.component("bar", {mixins: [Foo], data: '
+    end
+  end
+
+  describe "statics methods and properties" do
+    it "should handle static properties" do
+      to_js( 'class Foo<Vue; def self.one; 1; end; end' ).
+        must_include 'Foo.one = 1'
+    end
+
+    it "should handle computed static properties" do
+      js = to_js( 'class Foo<Vue; def self.one; return 1; end; end' )
+      js.must_include 'Object.defineProperty(Foo, "one", {'
+      js.must_include 'get: function() {return 1}'
+    end
+
+    it "should handle static methods" do
+      to_js( 'class Foo<Vue; def self.one(); return 1; end; end' ).
+        must_include 'Foo.one = function() {return 1}'
     end
   end
 
