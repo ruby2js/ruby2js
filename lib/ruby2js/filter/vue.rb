@@ -255,6 +255,7 @@ module Ruby2JS
         camel = cname.to_s.gsub(/[^\w]/, '-').
           sub(/^[A-Z]/) {|c| c.downcase}.
           gsub(/[A-Z]/) {|c| "-#{c.downcase}"}
+        camel = "#{camel}-" if camel =~ /^[a-z]*$/
 
         if inheritance == s(:const, nil, :Vue)
           # build component

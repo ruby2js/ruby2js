@@ -506,7 +506,7 @@ describe Ruby2JS::Filter::Vue do
 
     it "should enable a mixin to be included" do
       to_js( 'class Bar<Vue; mixin Foo; end' ).
-        must_include 'var Bar = Vue.component("bar", {mixins: [Foo], data: '
+        must_include 'var Bar = Vue.component("bar-", {mixins: [Foo], data: '
     end
   end
 
