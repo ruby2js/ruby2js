@@ -30,9 +30,16 @@ module Ruby2JS
 
             while else_block and else_block.type == :if
               condition, then_block, else_block = else_block.children
-              put ' else if ('; parse condition; puts ') {'
-              parse then_block, :statement
-              sput '}'
+              if then_block
+                put ' else if ('; parse condition; puts ') {'
+                parse then_block, :statement
+                sput '}'
+              else
+                put ' else if ('; parse s(:not, condition); puts ') {'
+                parse else_block, :statement
+                sput '}'
+                else_block = nil
+              end
             end
 
             if else_block

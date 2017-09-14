@@ -229,6 +229,7 @@ module Ruby2JS
       slice = @lines[mark.first..-1]
       reindent(slice)
       slice.each_with_index do |line, index|
+        line << "" if line.empty?
         if line.first.start_with? '//'
           len += @width # comments are a deal breaker
         else

@@ -353,6 +353,11 @@ describe Ruby2JS do
       to_js( 'if true; 1; else; 2; end' ).must_equal 'if (true) {1} else {2}'
     end
     
+    it "should parse if else unless" do
+      to_js( 'if true; 1; else; 2 unless false; end' ).
+        must_equal 'if (true) {1} else if (!false) {2}'
+    end
+    
     it "should parse if elsif" do
       to_js( 'if true; 1; elsif false; 2; else; 3; end' ).must_equal 'if (true) {1} else if (false) {2} else {3}'
     end
