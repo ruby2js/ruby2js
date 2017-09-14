@@ -76,6 +76,16 @@ describe Ruby2JS::Filter::Vue do
       to_js( 'class Foo<Vue; def clicked(); @counter+=1; end; end' ).
         must_include ', methods: {clicked: function() {this.$data.counter++}}'
     end
+
+    it "should handle calls to methods" do
+      to_js( 'class Foo<Vue; def a(); b(); end; def b(); end; end' ).
+        must_include 'this.b()'
+    end
+
+    it "should NOT handle local variables" do
+      to_js( 'class Foo<Vue; def a(); b; end; def b(); end; end' ).
+        wont_include 'this.b()'
+    end
   end
 
   describe "Wunderbar/JSX processing" do
@@ -408,6 +418,11 @@ describe Ruby2JS::Filter::Vue do
       js.must_include 'this.value'
     end
 
+    it "should NOT handle methods" do
+      js = to_js( 'class Foo<Vue; def value(); end; def method(); value; end; end' )
+      js.wont_include 'this.value'
+    end
+
     it "should handle setters" do
       js = to_js( 'class Foo<Vue; def value=(x); @x=x; end; def method(); value=1; end; end' )
       js.must_include ', computed: {value: {set: function(x) {'
@@ -510,7 +525,7 @@ describe Ruby2JS::Filter::Vue do
     end
   end
 
-  describe "statics methods and properties" do
+  describe "static methods and properties" do
     it "should handle static properties" do
       to_js( 'class Foo<Vue; def self.one; 1; end; end' ).
         must_include 'Foo.one = 1'

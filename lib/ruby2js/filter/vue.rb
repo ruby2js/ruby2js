@@ -25,7 +25,8 @@ module Ruby2JS
         @vue_self = nil
         @vue_apply = nil
         @vue_inventory = Hash.new {|h, k| h[k] = []}
-        @vue_instance = []
+        @vue_methods = []
+        @vue_props = []
         super
       end
 
@@ -73,15 +74,22 @@ module Ruby2JS
         end
 
         @vue_inventory = vue_walk(node)
-        @vue_instance = []
+        @vue_methods = []
+        @vue_props = []
 
         # collect instance methods (including getters and setters)
         body.each do |statement|
           if statement.type == :def
             method = statement.children.first
             unless VUE_LIFECYCLE.include? method or method == :initialize
-              method = method.to_s[0..-2].to_sym if method.to_s.end_with? '='
-              @vue_instance << method unless @vue_instance.include? method
+              if method.to_s.end_with? '='
+                method = method.to_s[0..-2].to_sym
+                @vue_props << method unless @vue_props.include? method
+              elsif statement.is_method?
+                @vue_methods << method unless @vue_methods.include? method
+              else
+                @vue_props << method unless @vue_props.include? method
+              end
             end
           end
         end
@@ -226,7 +234,7 @@ module Ruby2JS
           hash << s(:pair, s(:sym, :methods), s(:hash, *methods))
         end
 
-        @vue_instance = []
+        @vue_methods = []
 
         # append setters to computed list
         setters.each do |setter|
@@ -338,9 +346,20 @@ module Ruby2JS
         end
 
         # calls to methods (including getters) defined in this class
-        if node.children[0]==nil and @vue_instance.include? node.children[1]
-          return node.updated nil, [s(:self), node.children[1],
-            *process_all(node.children[2..-1])]
+        if node.children[0]==nil and Symbol === node.children[1]
+          if node.is_method?
+            if @vue_methods.include? node.children[1]
+              # calls to methods defined in this class
+              return node.updated nil, [s(:self), node.children[1],
+                *process_all(node.children[2..-1])]
+            end
+          else
+            if @vue_props.include? node.children[1]
+              # access to properties defined in this class
+              return node.updated nil, [s(:self), node.children[1],
+                *process_all(node.children[2..-1])]
+            end
+          end
         end
 
         return super unless @vue_h
@@ -863,7 +882,7 @@ module Ruby2JS
 
         elsif 
           node.children.first.type == :lvasgn and
-          @vue_instance.include? node.children[0].children[0]
+          @vue_props.include? node.children[0].children[0]
         then
           node.updated nil, [s(:attr, s(:self), 
             node.children[0].children[0]),
@@ -876,7 +895,7 @@ module Ruby2JS
 
       # for computed variables with setters, map x= to this.x=
       def on_lvasgn(node)
-        return super unless @vue_instance.include? node.children.first
+        return super unless @vue_props.include? node.children.first
         s(:send, s(:self), "#{node.children.first}=",
           process(node.children[1]))
       end
