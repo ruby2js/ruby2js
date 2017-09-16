@@ -414,25 +414,20 @@ module Ruby2JS
                         expr.children[1].type == :str
                       then
                         left = expr.children[1]
-                        right = expr.children[2] || s(:str, '')
-
-                        unless right.type == :str
-                          right = s(:or, right, s(:str, '')) 
-                        end
+                        right = expr.children[2] || s(:nil)
 
                         expr = expr.updated(nil, 
                           [expr.children[0], left, right])
-                      elsif expr.type != :str
-                        expr = s(:or, expr, s(:str, ''))
                       end
 
-                      value = s(:send, s(:str, values.join(' ')), :+, expr)
-                      pairs.unshift s(:pair, s(:sym, :class), value)
+                      hash[:class] = s(:array, 
+                        *values.join(' ').split(' ').map {|str| s(:str, str)},
+                        expr)
                     end
                   elsif [:hash, :array].include? expr.type
                     hash[:class] = expr
                   else
-                    pairs.unshift s(:pair, s(:sym, :class), expr)
+                    hash[:class] = s(:array, expr)
                   end
                 else
                   hash[:class] = s(:array, 

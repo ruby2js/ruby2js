@@ -324,7 +324,7 @@ describe Ruby2JS::Filter::Vue do
 
     it "should handle mixed strings and a value" do
       to_js( 'class Foo<Vue; def render; _a.b class: c; end; end' ).
-        must_include '$h("a", {attrs: {class: "b " + (c || "")}})'
+        must_include '$h("a", {class: ["b", c]})'
     end
 
     it "should create elements with markup and a class hash expression" do
@@ -339,12 +339,22 @@ describe Ruby2JS::Filter::Vue do
 
     it "should handle mixed strings and a conditional value" do
       to_js( 'class Foo<Vue; def render; _a.b class: ("c" if d); end; end' ).
-        must_include '$h("a", {attrs: {class: "b " + (d ? "c" : "")}})'
+        must_include '$h("a", {class: ["b", (d ? "c" : null)]})'
     end
 
     it "should handle only a value" do
       to_js( 'class Foo<Vue; def render; _a class: c; end; end' ).
-        must_include '$h("a", {attrs: {class: c}})'
+        must_include '$h("a", {class: [c]})'
+    end
+
+    it "should handle an array value" do
+      to_js( 'class Foo<Vue; def render; _a class: [*c]; end; end' ).
+        must_include '$h("a", {class: c})'
+    end
+
+    it "should handle an array value mixed with markup" do
+      to_js( 'class Foo<Vue; def render; _a.b class: [*c]; end; end' ).
+        must_include '$h("a", {class: c.concat(["b"])})'
     end
   end
 
