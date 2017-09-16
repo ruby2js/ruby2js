@@ -443,9 +443,9 @@ describe Ruby2JS::Filter::Vue do
   end
 
   describe 'Vue calls' do
-    it 'should create elements' do
-      to_js( 'Vue.render _Element, document.getElementById("sidebar")' ).
-        must_include '$h(Element)'
+    it 'should create elements outside of render methods' do
+      to_js( 'Vue.createElement("span", "text")' ).
+        must_include 'this.$createElement("span", "text")'
     end
 
     it 'should map Vue.render with block to Vue instance' do
@@ -456,8 +456,7 @@ describe Ruby2JS::Filter::Vue do
 
     it 'should substitute scope instance variables / props' do
       @data = 5
-      to_js( "Vue.render _Element(data: @data),
-        document.getElementById('sidebar')" ).
+      to_js( "Vue.render('#sidebar') {_Element(data: @data)}" ).
         must_include '$h(Element, {props: {data: 5}})'
     end
 

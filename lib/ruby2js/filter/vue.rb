@@ -316,13 +316,13 @@ module Ruby2JS
       # expand 'wunderbar' like method calls
       def on_send(node)
         if not @vue_h
-          # enable React filtering within React class method calls or
+          # enable React filtering within Vue class method calls or
           # React component calls
           if
             node.children.first == s(:const, nil, :Vue)
           then
             begin
-              vue_h, @vue_h = @vue_h, :$h
+              vue_h, @vue_h = @vue_h, [s(:self), :$createElement]
               return on_send(node)
             ensure
               @vue_h = vue_h
@@ -605,7 +605,11 @@ module Ruby2JS
               @vue_apply = false
 
               # emit $h (createElement) call
-              element = node.updated :send, [nil, @vue_h, *process_all(args)]
+              if @vue_h.instance_of? Array
+                element = node.updated :send, [*@vue_h, *process_all(args)]
+              else
+                element = node.updated :send, [nil, @vue_h, *process_all(args)]
+              end
             else
               # calls to $h (createElement) which contain a block
               #
@@ -666,8 +670,13 @@ module Ruby2JS
           node.children[0] == s(:const, nil, :Vue)
         then
           # explicit calls to Vue.createElement
-          element = node.updated nil, [nil, :$h, 
-            *process_all(node.children[2..-1])]
+          if @vue_h.instance_of? Array
+            element = node.updated nil, [*@vue_h,
+              *process_all(node.children[2..-1])]
+          else
+            element = node.updated nil, [nil, @vue_h, 
+              *process_all(node.children[2..-1])]
+          end
 
           if @vue_apply
             # if apply is set, emit code that pushes result
