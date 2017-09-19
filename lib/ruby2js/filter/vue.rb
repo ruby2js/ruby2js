@@ -529,6 +529,7 @@ module Ruby2JS
 
             if value and value.type == :ivar
               hash[:domProps]['value'] ||= value
+              hash[:domProps]['textContent'] ||= value if tag == 'textarea'
               hash[:attrs].delete('value')
 
               # disable control until script is ready

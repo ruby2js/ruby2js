@@ -482,11 +482,22 @@ describe Ruby2JS::Filter::Vue do
   end
 
   describe "controlled components" do
-    it "should automatically create onChange value functions" do
+    it "should automatically create onInput value functions: input" do
       js = to_js( 'class Foo<Vue; def render; _input value: @x; end; end' )
       js.must_include ', on: {input: function(event) {'
       js.must_include '{self.$data.x = event.target.value}'
       js.must_include ', domProps: {value: this.$data.x,'
+
+      js.must_include '{attrs: {disabled: true},'
+      js.must_match(/domProps: \{.*?, disabled: false\}/)
+    end
+
+    it "should automatically create onInput value functions: textarea" do
+      js = to_js( 'class Foo<Vue; def render; _textarea value: @x; end; end' )
+      js.must_include ', on: {input: function(event) {'
+      js.must_include '{self.$data.x = event.target.value}'
+      js.must_include ', domProps: {value: this.$data.x,'
+      js.must_include ', textContent: this.$data.x,'
 
       js.must_include '{attrs: {disabled: true},'
       js.must_match(/domProps: \{.*?, disabled: false\}/)
