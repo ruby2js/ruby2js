@@ -1,5 +1,6 @@
 begin
   # silence warnings, see 
+  # https://github.com/whitequark/parser/issues/346#issuecomment-317617695
   # https://github.com/bbatsov/rubocop/issues/1819#issuecomment-95280926
   old_verbose, $VERBOSE = $VERBOSE, nil
   require 'parser/current'
