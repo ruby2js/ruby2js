@@ -681,7 +681,7 @@ module Ruby2JS
           end
 
         elsif
-          VUE_METHODS.include? node.children[1] and
+          @vue_self and VUE_METHODS.include? node.children[1] and
           node.children[0] == s(:const, nil, :Vue)
         then
           # vm methods

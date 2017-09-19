@@ -471,8 +471,13 @@ describe Ruby2JS::Filter::Vue do
     end
 
     it 'should map vm method calls to this.$' do
-      to_js( "Vue.emit('event')" ).
-        must_equal 'this.$emit("event")'
+      to_js( 'class Foo<Vue; def method(); Vue.emit("event"); end; end' ).
+        must_include 'this.$emit("event")'
+    end
+
+    it 'should leave bare Vue.nextTick calls alone' do
+      to_js( 'Vue.nextTick { nil }' ).
+        must_match 'Vue.nextTick(function() {null})'
     end
   end
 
