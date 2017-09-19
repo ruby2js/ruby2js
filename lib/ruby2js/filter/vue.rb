@@ -127,8 +127,13 @@ module Ruby2JS
                 block = s(:begin, block) unless block and block.type == :begin
 
                 if
-                  block.children.length != 1 or not block.children.last or
-                  not [:send, :block].include? block.children.first.type
+                  (block.children.length != 1 and
+                    not vue_wunderbar_free(block.children[0..-2])) or
+
+                  not block.children.last or
+
+                  (block.children.length == 1 and
+                    not [:send, :block].include? block.children.first.type)
                 then
                   # wrap multi-line blocks with a 'span' element
                   block = s(:return,
@@ -903,6 +908,30 @@ module Ruby2JS
         return super unless @vue_props.include? node.children.first
         s(:send, s(:self), "#{node.children.first}=",
           process(node.children[1]))
+      end
+
+      # ensure that there are no "wunderbar" or "createElement" calls in
+      # a set of statements.
+      def vue_wunderbar_free(nodes)
+        nodes.each do |node|
+          if Parser::AST::Node === node
+            if node.type == :send
+              # wunderbar style calls
+              return false if node.children[0] == nil and 
+                node.children[1].to_s.start_with? '_'
+
+              # Vue.createElement calls
+              return false if node.children[0] == s(:const, nil, :Vue) and 
+                node.children[1] == :createElement
+            end
+
+            # recurse
+            return false unless vue_wunderbar_free(node.children)
+          end
+        end
+
+        # no problems found
+        return true
       end
 
       # gather ivar and cvar usage

@@ -278,12 +278,25 @@ describe Ruby2JS::Filter::Vue do
 
   describe "render method" do
     it "should wrap multiple elements with a span" do
-      result = to_js( 'class Foo<Vue; def render; _h1 "a"; _p "b"; end; end' )
-      result.must_include 'return $h("span", [$h("h1", "a"), $h("p", "b")])'
+      to_js( 'class Foo<Vue; def render; _h1 "a"; _p "b"; end; end' ).
+        must_include 'return $h("span", [$h("h1", "a"), $h("p", "b")])'
+    end
+
+    it "should not wrap tail only element with a span" do
+      to_js( 'class Foo<Vue; def render; x = "a"; _p x; end; end' ).
+        must_include 'function($h) {var x = "a"; return $h("p", x)}}'
+    end
+
+    it "should not be fooled by nesting" do
+      result = to_js( 'class Foo<Vue; def render; _p "a" if @a; _p "b"; end; end' )
+      result.must_include '$h("span", function() {var $_ = [];'
+      result.must_include 'if (self.$data.a) {$_.push($h("p", "a"))}'
+      result.must_include '$_.push($h("p", "b"));'
+      result.must_include 'return $_}'
     end
 
     it "should wrap anything that is not a method or block call with a span" do
-      result = to_js( 'class Foo<Vue; def render; if @a; _p "a"; else;_p "b"; end; end;end' )
+      result = to_js( 'class Foo<Vue; def render; if @a; _p "a"; else;_p "b"; end; end; end' )
       result.must_include '$h("span", function() {var $_ = [];'
       result.must_include 'if (self.$data.a) {$_.push($h("p", "a"))}'
       result.must_include 'else {$_.push($h("p", "b"))};'
