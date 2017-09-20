@@ -910,6 +910,18 @@ module Ruby2JS
           process(node.children[1]))
       end
 
+      # instance methods as hash values (e.g., onClick: method)
+      def on_pair(node)
+        key, value = node.children
+        return super unless Parser::AST::Node === value
+        return super unless value.type == :send and 
+          value.children.length == 2 and
+          value.children[0] == nil and
+          @vue_methods.include? value.children[1]
+        node.updated nil, [process(key), value.updated(nil, [s(:self),
+          value.children[1]])]
+      end
+
       # ensure that there are no "wunderbar" or "createElement" calls in
       # a set of statements.
       def vue_wunderbar_free(nodes)

@@ -19,7 +19,7 @@ describe Ruby2JS::Filter::Vue do
         must_include ', {data: function() {return {}}'
     end
 
-    it "should convert insert initialize methods if none present" do
+    it "should insert an initialize method if none is present" do
       to_js( 'class Foo<Vue; def render; _h1 @title; end; end' ).
         must_include ', {data: function() {return {title: undefined}}'
     end
@@ -80,6 +80,11 @@ describe Ruby2JS::Filter::Vue do
     it "should handle calls to methods" do
       to_js( 'class Foo<Vue; def a(); b(); end; def b(); end; end' ).
         must_include 'this.b()'
+    end
+
+    it "should handle methods as hash values" do
+      to_js( 'class Foo<Vue; def render; _a onClick: b; end; def b(); end; end' ).
+        must_include '{click: this.b}'
     end
 
     it "should NOT handle local variables" do
@@ -462,7 +467,6 @@ describe Ruby2JS::Filter::Vue do
       js.must_include ', computed: {value: {get: function() {return '
       js.must_include ', set: function(x) {this.$data.x = x}'
     end
-
   end
 
   describe 'Vue calls' do
