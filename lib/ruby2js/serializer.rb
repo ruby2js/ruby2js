@@ -324,7 +324,7 @@ module Ruby2JS
       @lines.each_with_index do |line, row|
         col = line.indent
         line.each do |token|
-          if token != ' ' and token.loc
+          if token.respond_to? :loc and token.loc
             pos = token.loc.expression.begin_pos
 
             buffer = token.loc.expression.source_buffer
