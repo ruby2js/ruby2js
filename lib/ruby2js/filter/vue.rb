@@ -27,6 +27,7 @@ module Ruby2JS
         @vue_inventory = Hash.new {|h, k| h[k] = []}
         @vue_methods = []
         @vue_props = []
+        @vue_reactive = []
         super
       end
 
@@ -76,8 +77,10 @@ module Ruby2JS
         @vue_inventory = vue_walk(node)
         @vue_methods = []
         @vue_props = []
+        @vue_reactive = []
 
-        # collect instance methods (including getters and setters)
+        # collect instance methods (including getters and setters) and
+        # reactive class attributes
         body.each do |statement|
           if statement.type == :def
             method = statement.children.first
@@ -91,6 +94,16 @@ module Ruby2JS
                 @vue_props << method unless @vue_props.include? method
               end
             end
+
+          elsif 
+            statement.type == :send and statement.children[0] == cname and
+            statement.children[1].to_s.end_with? '='
+          then
+            @vue_reactive << statement.updated(:send, [
+              s(:attr, s(:const, nil, :Vue), :util), :defineReactive, cname, 
+              s(:sym, statement.children[1].to_s[0..-2]),
+              process(statement.children[2])])
+
           end
         end
 
@@ -285,14 +298,52 @@ module Ruby2JS
           statement.type == :defs  and statement.children[0] == s(:self)
         end
 
-        if class_methods.empty?
+        if class_methods.empty? and @vue_reactive.empty?
           defn
         else
           s(:begin, defn, *process_all(class_methods.map {|method|
             fn = if method.is_method?
-              # class method
-              s(:send, s(:const, nil, cname), "#{method.children[1]}=",
-                s(:block, s(:send , nil, :proc), *method.children[2..-1]))
+              if not method.children[1].to_s.end_with? '='
+                # class method
+                s(:send, s(:const, nil, cname), "#{method.children[1]}=",
+                  s(:block, s(:send , nil, :proc), method.children[2],
+                   *process_all(method.children[3..-1])))
+              else
+                getter = class_methods.find do |other_method| 
+                  "#{other_method.children[1]}=" == method.children[1].to_s
+                end
+
+                if getter
+                  # both a getter and setter
+                  s(:send, s(:const, nil, :Object), :defineProperty,
+                    s(:const, nil, cname), s(:str, getter.children[1].to_s),
+                    s(:hash, s(:pair, s(:sym, :enumerable), s(:true)),
+                    s(:pair, s(:sym, :configurable), s(:true)),
+                    s(:pair, s(:sym, :get), s(:block, s(:send, nil, :proc),
+                      getter.children[2],
+                      s(:autoreturn, process(getter.children[3])))),
+                    s(:pair, s(:sym, :set), s(:block, s(:send, nil, :proc),
+                      method.children[2],
+                      *process_all(method.children[3..-1])))))
+                else
+                  # setter only
+                  s(:send, s(:const, nil, :Object), :defineProperty,
+                    s(:const, nil, cname), 
+                    s(:str, method.children[1].to_s[0..-2]),
+                    s(:hash, s(:pair, s(:sym, :enumerable), s(:true)),
+                    s(:pair, s(:sym, :configurable), s(:true)),
+                    s(:pair, s(:sym, :set), s(:block, s(:send, nil, :proc),
+                      method.children[2],
+                      *process_all(method.children[3..-1])))))
+                end
+              end
+
+            elsif
+              class_methods.any? do |other_method| 
+                other_method.children[1].to_s == "#{method.children[1]}="
+              end
+            then
+              nil
 
             elsif
               method.children.length == 4 and
@@ -309,12 +360,12 @@ module Ruby2JS
                 s(:hash, s(:pair, s(:sym, :enumerable), s(:true)),
                 s(:pair, s(:sym, :configurable), s(:true)),
                 s(:pair, s(:sym, :get), s(:block, s(:send, nil, :proc),
-                  *method.children[2..-1]))))
+                  method.children[2], *process_all(method.children[3..-1])))))
             end
 
             @comments[fn] = @comments[method]
             fn
-          }))
+          }).compact, *@vue_reactive)
         end
       end
 

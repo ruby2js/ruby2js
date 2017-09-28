@@ -579,9 +579,28 @@ describe Ruby2JS::Filter::Vue do
       js.must_include 'get: function() {return 1}'
     end
 
+    it "should handle computed static properties with getters and setters" do
+      js = to_js( 'class Foo<Vue; def self.one; Foo._one; end;' +
+        'def self.one=(x); Foo._one = x; end; end' )
+      js.must_include 'Object.defineProperty(Foo, "one", {'
+      js.must_include 'get: function() {return Foo._one}, set'
+      js.must_include 'set: function(x) {Foo._one = x}}'
+    end
+
+    it "should handle static setters" do
+      js = to_js( 'class Foo<Vue; def self.one=(x); Foo._one = x; end; end' )
+      js.must_include 'Object.defineProperty(Foo, "one", {'
+      js.must_include 'set: function(x) {Foo._one = x}}'
+    end
+
     it "should handle static methods" do
       to_js( 'class Foo<Vue; def self.one(); return 1; end; end' ).
         must_include 'Foo.one = function() {return 1}'
+    end
+
+    it "should handle reactive properties" do
+      to_js( 'class Foo<Vue; Foo.one=1; end' ).
+        must_include 'Vue.util.defineReactive(Foo, "one", 1)'
     end
   end
 
