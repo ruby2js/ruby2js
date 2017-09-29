@@ -21,6 +21,7 @@ module Ruby2JS
       ]
 
       def initialize(*args)
+        @vue_class = nil
         @vue_h = nil
         @vue_self = nil
         @vue_apply = nil
@@ -44,9 +45,15 @@ module Ruby2JS
       #      s(:hash)))
       def on_class(node)
         cname, inheritance, *body = node.children
-        return super unless cname.children.first == nil
-        return super unless inheritance == s(:const, nil, :Vue) or
-          inheritance == s(:const, s(:const, nil, :Vue), :Mixin)
+
+        begin
+          vue_class, @vue_class = @vue_class, cname
+          return super unless cname.children.first == nil
+          return super unless inheritance == s(:const, nil, :Vue) or
+            inheritance == s(:const, s(:const, nil, :Vue), :Mixin)
+        ensure
+          @vue_class = vue_class
+        end
 
         # traverse down to actual list of class statements
         if body.length == 1
@@ -372,16 +379,36 @@ module Ruby2JS
       # expand 'wunderbar' like method calls
       def on_send(node)
         if not @vue_h
-          # enable React filtering within Vue class method calls or
-          # React component calls
-          if
-            node.children.first == s(:const, nil, :Vue)
-          then
-            begin
-              vue_h, @vue_h = @vue_h, [s(:self), :$createElement]
-              return on_send(node)
-            ensure
-              @vue_h = vue_h
+	  if node.children.first == s(:const, nil, :Vue)
+	    # enable React filtering within Vue class method calls or
+	    # React component calls
+	    begin
+	      vue_h, @vue_h = @vue_h, [s(:self), :$createElement]
+	      return on_send(node)
+	    ensure
+	      @vue_h = vue_h
+	    end
+
+          elsif node.children.first == s(:send, s(:const, nil, :Vue), :util)
+            if node.children[1] == :defineReactive
+              if node.children.length == 4 and @vue_class
+                var = node.children[2]
+                if var.type == :cvar
+                  scope = @vue_class
+                  var = s(:str, '_' + var.children[0].to_s[2..-1])
+                elsif var.type == :ivar
+                  scope = s(:self)
+                  var = s(:str, '_' + var.children[0].to_s[1..-1])
+                elsif var.type == :send and var.children.length == 2
+                  scope = var.children[0]
+                  var = s(:sym, var.children[1])
+                else
+                  return super
+                end
+
+                return node.updated nil, [*node.children[0..1],
+                  scope, process(var), *process_all(node.children[3..-1])]
+              end
             end
           end
         end

@@ -496,6 +496,21 @@ describe Ruby2JS::Filter::Vue do
       to_js( 'Vue.nextTick { nil }' ).
         must_match 'Vue.nextTick(function() {null})'
     end
+
+    it 'should map Vue.util.defineReactive cvar to class' do
+      to_js( 'class Foo; Vue.util.defineReactive @@i, 1; end' ).
+        must_include 'Vue.util.defineReactive(Foo, "_i", 1)'
+    end
+
+    it 'should map Vue.util.defineReactive ivar to self' do
+      to_js( 'class Foo; def method(); Vue.util.defineReactive @i, 1; end; end' ).
+        must_include 'Vue.util.defineReactive(this, "_i", 1)'
+    end
+
+    it 'should map Vue.util.defineReactive attribute' do
+      to_js( 'class Foo; def method(); Vue.util.defineReactive a.b, 1; end; end' ).
+        must_include 'Vue.util.defineReactive(a, "b", 1)'
+    end
   end
 
   describe "controlled components" do
