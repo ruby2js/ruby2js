@@ -619,7 +619,7 @@ module Ruby2JS
             end
 
             if value and (not test or 
-              test.is_a? Symbol or [:ivar, :cvar].include? test.type)
+              test.is_a? Symbol or [:ivar, :cvar, :self].include? test.type)
             then
               hash[:domProps]['value'] ||= value
               hash[:domProps]['textContent'] ||= value if tag == 'textarea'
@@ -639,6 +639,8 @@ module Ruby2JS
                   assign = s(:ivasgn, value.children.first, update)
                 elsif value.type == :cvar
                   assign = s(:cvasgn, value.children.first, update)
+                elsif value.type == :send and value.children.first == nil
+                  assign = value.updated :lvasgn, [value.children[1], update]
                 else
                   assign = value.updated nil, [value.children.first,
                     "#{value.children[1]}=", update]
@@ -663,7 +665,7 @@ module Ruby2JS
               end
 
               if checked and (not test or 
-                test.is_a? Symbol or [:ivar, :cvar].include? test.type)
+                test.is_a? Symbol or [:ivar, :cvar, :self].include? test.type)
               then
                 hash[:domProps]['checked'] ||= checked
                 hash[:attrs].delete('checked')
@@ -682,6 +684,9 @@ module Ruby2JS
                     assign = s(:ivasgn, checked.children.first, update)
                   elsif checked.type == :cvar
                     assign = s(:cvasgn, checked.children.first, update)
+                  elsif checked.type == :send and checked.children.first == nil
+                    assign = checked.updated :lvasgn, [checked.children[1],
+                      update]
                   else
                     assign = checked.updated nil, [checked.children.first,
                       "#{checked.children[1]}=", update]
