@@ -514,11 +514,21 @@ describe Ruby2JS::Filter::Vue do
   end
 
   describe "controlled components" do
-    it "should automatically create onInput value functions: input" do
+    it "should automatically create onInput value functions: input ivar" do
       js = to_js( 'class Foo<Vue; def render; _input value: @x; end; end' )
       js.must_include ', on: {input: function(event) {'
       js.must_include '{self.$data.x = event.target.value}'
       js.must_include ', domProps: {value: this.$data.x,'
+
+      js.must_include '{attrs: {disabled: true},'
+      js.must_match(/domProps: \{.*?, disabled: false\}/)
+    end
+
+    it "should automatically create onInput value functions: input local" do
+      js = to_js( 'class Foo<Vue; def render; _input value: x; end; end' )
+      js.must_include ', on: {input: function(event) {'
+      js.must_include '{x = event.target.value}'
+      js.must_include ', domProps: {value: x,'
 
       js.must_include '{attrs: {disabled: true},'
       js.must_match(/domProps: \{.*?, disabled: false\}/)
@@ -541,11 +551,21 @@ describe Ruby2JS::Filter::Vue do
       js.wont_include 'disabled: false'
     end
 
-    it "should automatically create onChange checked functions" do
+    it "should automatically create onChange checked functions - ivar" do
       js = to_js( 'class Foo<Vue; def render; _input checked: @x; end; end' )
       js.must_include ', on: {click: function() {'
       js.must_include 'self.$data.x = !self.$data.x}'
       js.must_include ', domProps: {checked: this.$data.x,'
+
+      js.must_include '{attrs: {disabled: true},'
+      js.must_match(/domProps: \{.*?, disabled: false\}/)
+    end
+
+    it "should automatically create onChange checked functions - cvar based" do
+      js = to_js( 'class Foo<Vue; def render; _input checked: @@x.y; end; end' )
+      js.must_include ', on: {click: function() {'
+      js.must_include 'self.$props.x.y = !self.$props.x.y}'
+      js.must_include ', domProps: {checked: this.$props.x.y,'
 
       js.must_include '{attrs: {disabled: true},'
       js.must_match(/domProps: \{.*?, disabled: false\}/)

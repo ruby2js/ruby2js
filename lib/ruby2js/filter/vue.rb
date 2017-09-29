@@ -610,7 +610,17 @@ module Ruby2JS
                        hash['nativeOn']['input'] ||
                        hash['nativeOn']['change']
 
-            if value and value.type == :ivar
+            # test if value is assignable
+            test = value
+            while 
+              test and test.type == :send and test.children.length == 2 and
+              test.children.last.instance_of? Symbol do
+              test = test.children.first 
+            end
+
+            if value and (not test or 
+              test.is_a? Symbol or [:ivar, :cvar].include? test.type)
+            then
               hash[:domProps]['value'] ||= value
               hash[:domProps]['textContent'] ||= value if tag == 'textarea'
               hash[:attrs].delete('value')
@@ -623,10 +633,20 @@ module Ruby2JS
 
               # define event handler to update ivar on input events
               if not onChange
+                update = s(:attr, s(:attr, s(:lvar, :event), :target), :value)
+
+                if value.type == :ivar
+                  assign = s(:ivasgn, value.children.first, update)
+                elsif value.type == :cvar
+                  assign = s(:cvasgn, value.children.first, update)
+                else
+                  assign = value.updated nil, [value.children.first,
+                    "#{value.children[1]}=", update]
+                end
+
                 hash['on']['input'] ||=
                   s(:block, s(:send, nil, :proc), s(:args, s(:arg, :event)),
-                  s(:ivasgn, value.children.first,
-                  s(:attr, s(:attr, s(:lvar, :event), :target), :value)))
+                  assign)
               end
             end
 
@@ -634,7 +654,17 @@ module Ruby2JS
               # search for the presence of a 'checked' attribute
               checked = hash[:attrs]['checked']
 
-              if checked and checked.type == :ivar
+              # test if value is assignable
+              test = checked
+              while 
+                test and test.type == :send and test.children.length == 2 and
+                test.children.last.instance_of? Symbol do
+                test = test.children.first 
+              end
+
+              if checked and (not test or 
+                test.is_a? Symbol or [:ivar, :cvar].include? test.type)
+              then
                 hash[:domProps]['checked'] ||= checked
                 hash[:attrs].delete('checked')
 
@@ -646,10 +676,19 @@ module Ruby2JS
 
                 # define event handler to update ivar on click events
                 if not onChange
+                  update = s(:send, checked, :!)
+
+                  if checked.type == :ivar
+                    assign = s(:ivasgn, checked.children.first, update)
+                  elsif checked.type == :cvar
+                    assign = s(:cvasgn, checked.children.first, update)
+                  else
+                    assign = checked.updated nil, [checked.children.first,
+                      "#{checked.children[1]}=", update]
+                  end
+
                   hash['on']['click'] ||=
-                    s(:block, s(:send, nil, :proc), s(:args),
-                    s(:ivasgn,checked.children.first,
-                    s(:send, checked, :!)))
+                    s(:block, s(:send, nil, :proc), s(:args), assign)
                 end
               end
             end
