@@ -545,6 +545,16 @@ describe Ruby2JS::Filter::Vue do
       js.must_match(/domProps: \{.*?, disabled: false\}/)
     end
 
+    it "shouldn't automatically create onInput value functions: cvar" do
+      js = to_js( 'class Foo<Vue; def render; _input value: @@x; end; end' )
+      js.must_include '{attrs: {value: this.$props.x}'
+
+      js.wont_include ', on: {input: function(event) {'
+      js.wont_include ' = event.target.value'
+      js.wont_include ', domProps: {value: '
+      js.wont_include 'disabled'
+    end
+
     it "should automatically create onInput value functions: textarea" do
       js = to_js( 'class Foo<Vue; def render; _textarea value: @x; end; end' )
       js.must_include ', on: {input: function(event) {'

@@ -618,7 +618,7 @@ module Ruby2JS
               test = test.children.first 
             end
 
-            if value and (not test or 
+            if value and value.type != :cvar and (not test or 
               test.is_a? Symbol or [:ivar, :cvar, :self].include? test.type)
             then
               hash[:domProps]['value'] ||= value
@@ -664,7 +664,7 @@ module Ruby2JS
                 test = test.children.first 
               end
 
-              if checked and (not test or 
+              if checked and checked.type != :cvar and (not test or 
                 test.is_a? Symbol or [:ivar, :cvar, :self].include? test.type)
               then
                 hash[:domProps]['checked'] ||= checked
