@@ -137,6 +137,25 @@ module Ruby2JS
     def group( ast )
       put '('; parse ast; put ')'
     end
+
+    def timestamp(file)
+      super
+
+      return unless file
+
+      walk = proc do |ast|
+        if ast.loc and ast.loc.expression
+          filename = ast.loc.expression.source_buffer.name.dup.untaint
+          @timestamps[filename] ||= File.mtime(filename) if filename
+        end
+
+        ast.children.each do |child|
+          walk[child] if child.is_a? Parser::AST::Node
+        end
+      end
+
+      walk[@ast] if @ast
+    end
   end
 end
 
