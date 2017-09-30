@@ -145,8 +145,11 @@ module Ruby2JS
 
       walk = proc do |ast|
         if ast.loc and ast.loc.expression
-          filename = ast.loc.expression.source_buffer.name.dup.untaint
-          @timestamps[filename] ||= File.mtime(filename) if filename
+          filename = ast.loc.expression.source_buffer.name
+          if filename
+            filename = filename.dup.untaint
+            @timestamps[filename] ||= File.mtime(filename)
+          end
         end
 
         ast.children.each do |child|
