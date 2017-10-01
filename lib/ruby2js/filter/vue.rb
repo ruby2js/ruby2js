@@ -612,9 +612,11 @@ module Ruby2JS
 
             # test if value is assignable
             test = value
-            while 
-              test and test.type == :send and test.children.length == 2 and
-              test.children.last.instance_of? Symbol do
+            loop do
+              break unless test and test.type == :send 
+              break unless (test.children.length == 2 and
+                test.children.last.instance_of? Symbol) or
+                test.children[1] == :[]
               test = test.children.first 
             end
 
@@ -641,6 +643,9 @@ module Ruby2JS
                   assign = s(:cvasgn, value.children.first, update)
                 elsif value.type == :send and value.children.first == nil
                   assign = value.updated :lvasgn, [value.children[1], update]
+                elsif value.children[1] == :[]
+                  assign = value.updated nil, [value.children[0], :[]=,
+                    value.children[2], update]
                 else
                   assign = value.updated nil, [value.children.first,
                     "#{value.children[1]}=", update]
@@ -658,9 +663,11 @@ module Ruby2JS
 
               # test if value is assignable
               test = checked
-              while 
-                test and test.type == :send and test.children.length == 2 and
-                test.children.last.instance_of? Symbol do
+              loop do
+                break unless test and test.type == :send 
+                break unless (test.children.length == 2 and
+                  test.children.last.instance_of? Symbol) or
+                  test.children[1] == :[]
                 test = test.children.first 
               end
 
@@ -687,6 +694,9 @@ module Ruby2JS
                   elsif checked.type == :send and checked.children.first == nil
                     assign = checked.updated :lvasgn, [checked.children[1],
                       update]
+                  elsif checked.children[1] == :[]
+                    assign = checked.updated nil, [checked.children[0], :[]=,
+                      checked.children[2], update]
                   else
                     assign = checked.updated nil, [checked.children.first,
                       "#{checked.children[1]}=", update]
