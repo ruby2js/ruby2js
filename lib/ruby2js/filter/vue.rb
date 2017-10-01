@@ -604,11 +604,21 @@ module Ruby2JS
             # search for the presence of a 'value' attribute
             value = hash[:attrs]['value']
 
-            # search for the presence of a 'onChange' attribute
-            onChange = hash['on']['input'] ||
-                       hash['on']['change'] ||
-                       hash['nativeOn']['input'] ||
-                       hash['nativeOn']['change']
+            if value
+              # search for the presence of a 'onChange' attribute
+              onChange = hash['on']['input'] ||
+                         hash['on']['change'] ||
+                         hash['nativeOn']['input'] ||
+                         hash['nativeOn']['change']
+              attr = 'value'
+              event = 'input'
+            elsif tag == 'input'
+              value = hash[:attrs]['checked']
+              onChange = hash['on']['click'] ||
+                         hash['nativeOn']['click']
+              attr = 'checked'
+              event = 'click'
+            end
 
             # test if value is assignable
             test = value
@@ -623,9 +633,9 @@ module Ruby2JS
             if value and value.type != :cvar and (not test or 
               test.is_a? Symbol or [:ivar, :cvar, :self].include? test.type)
             then
-              hash[:domProps]['value'] ||= value
+              hash[:domProps][attr] ||= value
               hash[:domProps]['textContent'] ||= value if tag == 'textarea'
-              hash[:attrs].delete('value')
+              hash[:attrs].delete(attr)
 
               # disable control until script is ready
               unless hash[:domProps]['disabled'] or hash[:attrs]['disabled']
@@ -635,7 +645,13 @@ module Ruby2JS
 
               # define event handler to update ivar on input events
               if not onChange
-                update = s(:attr, s(:attr, s(:lvar, :event), :target), :value)
+                if attr == 'value'
+                  update = s(:attr, s(:attr, s(:lvar, :event), :target), :value)
+                  args = [s(:arg, :event)]
+                else
+                  update = s(:send, value, :!)
+                  args = []
+                end
 
                 if value.type == :ivar
                   assign = s(:ivasgn, value.children.first, update)
@@ -651,60 +667,8 @@ module Ruby2JS
                     "#{value.children[1]}=", update]
                 end
 
-                hash['on']['input'] ||=
-                  s(:block, s(:send, nil, :proc), s(:args, s(:arg, :event)),
-                  assign)
-              end
-            end
-
-            if not value and not onChange and tag == 'input'
-              # search for the presence of a 'checked' attribute
-              checked = hash[:attrs]['checked']
-
-              # test if value is assignable
-              test = checked
-              loop do
-                break unless test and test.type == :send 
-                break unless (test.children.length == 2 and
-                  test.children.last.instance_of? Symbol) or
-                  test.children[1] == :[]
-                test = test.children.first 
-              end
-
-              if checked and checked.type != :cvar and (not test or 
-                test.is_a? Symbol or [:ivar, :cvar, :self].include? test.type)
-              then
-                hash[:domProps]['checked'] ||= checked
-                hash[:attrs].delete('checked')
-
-                # disable control until script is ready
-                unless hash[:domProps]['disabled'] or hash[:attrs]['disabled']
-                  hash[:domProps]['disabled'] = s(:false)
-                  hash[:attrs]['disabled'] = s(:true)
-                end
-
-                # define event handler to update ivar on click events
-                if not onChange
-                  update = s(:send, checked, :!)
-
-                  if checked.type == :ivar
-                    assign = s(:ivasgn, checked.children.first, update)
-                  elsif checked.type == :cvar
-                    assign = s(:cvasgn, checked.children.first, update)
-                  elsif checked.type == :send and checked.children.first == nil
-                    assign = checked.updated :lvasgn, [checked.children[1],
-                      update]
-                  elsif checked.children[1] == :[]
-                    assign = checked.updated nil, [checked.children[0], :[]=,
-                      checked.children[2], update]
-                  else
-                    assign = checked.updated nil, [checked.children.first,
-                      "#{checked.children[1]}=", update]
-                  end
-
-                  hash['on']['click'] ||=
-                    s(:block, s(:send, nil, :proc), s(:args), assign)
-                end
+                hash['on'][event] ||=
+                  s(:block, s(:send, nil, :proc), s(:args, *args), assign)
               end
             end
           end

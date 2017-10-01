@@ -608,9 +608,9 @@ describe Ruby2JS::Filter::Vue do
       js.wont_include 'disabled: false'
     end
 
-    it "should retain onChange functions" do
-      js = to_js( 'class Foo<Vue; def render; _input checked: @x, onChange: self.change; end; end' )
-      js.must_include ', on: {change: this.change}'
+    it "should retain onClick functions" do
+      js = to_js( 'class Foo<Vue; def render; _input checked: @x, onClick: self.click; end; end' )
+      js.must_include ', on: {click: this.click}'
       js.wont_include ', on: {input: function('
     end
   end
