@@ -625,7 +625,8 @@ module Ruby2JS
             loop do
               break unless test and test.type == :send 
               break unless (test.children.length == 2 and
-                test.children.last.instance_of? Symbol) or
+                test.children.last.instance_of? Symbol and
+                not [:not, :!, :*, :+, :-].include? test.children.last) or
                 test.children[1] == :[]
               test = test.children.first 
             end
@@ -647,10 +648,10 @@ module Ruby2JS
               if not onChange
                 if attr == 'value'
                   update = s(:attr, s(:attr, s(:lvar, :event), :target), :value)
-                  args = [s(:arg, :event)]
+                  upargs = [s(:arg, :event)]
                 else
                   update = s(:send, value, :!)
-                  args = []
+                  upargs = []
                 end
 
                 if value.type == :ivar
@@ -668,7 +669,7 @@ module Ruby2JS
                 end
 
                 hash['on'][event] ||=
-                  s(:block, s(:send, nil, :proc), s(:args, *args), assign)
+                  s(:block, s(:send, nil, :proc), s(:args, *upargs), assign)
               end
             end
           end
