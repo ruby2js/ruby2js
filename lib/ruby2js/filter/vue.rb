@@ -635,7 +635,7 @@ module Ruby2JS
               test.is_a? Symbol or [:ivar, :cvar, :self].include? test.type)
             then
               hash[:domProps][attr] ||= value
-              hash[:domProps]['textContent'] ||= value if tag == 'textarea'
+              args.push value if tag == 'textarea' and args.empty?
               hash[:attrs].delete(attr)
 
               # disable control until script is ready
