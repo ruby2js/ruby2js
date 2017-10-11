@@ -582,7 +582,7 @@ describe Ruby2JS::Filter::Vue do
       js.wont_include 'disabled: false'
     end
 
-    it "should automatically create onChange checked functions - ivar" do
+    it "should automatically create onClick checked functions - ivar" do
       js = to_js( 'class Foo<Vue; def render; _input checked: @x; end; end' )
       js.must_include ', on: {click: function() {'
       js.must_include 'self.$data.x = !self.$data.x}'
@@ -592,7 +592,7 @@ describe Ruby2JS::Filter::Vue do
       js.must_match(/domProps: \{.*?, disabled: false\}/)
     end
 
-    it "should automatically create onChange checked functions - cvar based" do
+    it "should automatically create onClick checked functions - cvar based" do
       js = to_js( 'class Foo<Vue; def render; _input checked: @@x.y; end; end' )
       js.must_include ', on: {click: function() {'
       js.must_include 'self.$props.x.y = !self.$props.x.y}'
@@ -600,6 +600,11 @@ describe Ruby2JS::Filter::Vue do
 
       js.must_include '{attrs: {disabled: true},'
       js.must_match(/domProps: \{.*?, disabled: false\}/)
+    end
+
+    it "should chose checked over value" do
+      to_js( 'class Foo<Vue; def render; _input value: "foo", ' +
+        'checked: @@x.y; end; end' ).must_include ', on: {click: function() {'
     end
 
     it "shouldn't replace disabled attributes in checkboxes" do
