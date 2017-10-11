@@ -604,15 +604,18 @@ module Ruby2JS
             # search for the presence of a 'value' attribute
             value = hash[:attrs]['value']
 
+            # search for the presence of a 'onChange' attribute
             if value
-              # search for the presence of a 'onChange' attribute
               onChange = hash['on']['input'] ||
                          hash['on']['change'] ||
                          hash['nativeOn']['input'] ||
                          hash['nativeOn']['change']
               attr = 'value'
               event = 'input'
-            elsif tag == 'input'
+            end
+
+            # search for the presence of a 'onClick' attribute
+            if tag == 'input' and hash[:attrs]['checked']
               value = hash[:attrs]['checked']
               onChange = hash['on']['click'] ||
                          hash['nativeOn']['click']

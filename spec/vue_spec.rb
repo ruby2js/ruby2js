@@ -570,7 +570,7 @@ describe Ruby2JS::Filter::Vue do
       js.must_include ', on: {input: function(event) {'
       js.must_include '{self.$data.x = event.target.value}'
       js.must_include ', domProps: {value: this.$data.x,'
-      js.must_include ', textContent: this.$data.x,'
+      js.must_include ', this.$data.x)'
 
       js.must_include '{attrs: {disabled: true},'
       js.must_match(/domProps: \{.*?, disabled: false\}/)
