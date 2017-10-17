@@ -22,7 +22,7 @@ end
 #
 # To publish your gem online, install the 'gemcutter' gem; Read more
 # about that here: http://gemcutter.org/pages/gem_docs
-spec = File.read("ruby2js.gemspec")
+spec = eval File.read("ruby2js.gemspec")
 
 Gem::PackageTask.new(spec) do |pkg|
   pkg.gem_spec = spec
