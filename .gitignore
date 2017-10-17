@@ -1,4 +1,3 @@
 pkg
-*.gemspec
 Gemfile.lock
 demo/assets

@@ -14,41 +14,16 @@ end
 #
 #   http://rubygems.org/read/chapter/20
 #
-spec = Gem::Specification.new do |s|
-
-  # Change these as appropriate
-  s.name           = "ruby2js"
-  s.license        = 'MIT'
-  s.version        = Ruby2JS::VERSION::STRING
-  s.summary        = "Minimal yet extensible Ruby to JavaScript conversion."
-  s.author         = "Sam Ruby"
-  s.email          = "rubys@intertwingly.net"
-  s.homepage       = "http://github.com/rubys/ruby2js"
-  s.description    = <<-EOD
-    The base package maps Ruby syntax to JavaScript semantics.
-    Filters may be provided to add Ruby-specific or framework specific
-    behavior.
-  EOD
-
-  # Add any extra files to include in the gem
-  s.files             = %w(ruby2js.gemspec README.md) + Dir.glob("{lib}/**/*")
-  s.require_paths     = ["lib"]
-
-  # If you want to depend on other gems, add them here, along with any
-  # relevant versions
-  s.add_dependency("parser")
-
-  # Require Ruby 1.9.3 or greater
-  s.required_ruby_version = '>= 1.9.3'
-end
 
 # This task actually builds the gem. We also regenerate a static
 # .gemspec file, which is useful if something (i.e. GitHub) will
 # be automatically building a gem for this project. If you're not
 # using GitHub, edit as appropriate.
 #
-# To publish your gem online, install the 'gemcutter' gem; Read more 
+# To publish your gem online, install the 'gemcutter' gem; Read more
 # about that here: http://gemcutter.org/pages/gem_docs
+spec = File.read("ruby2js.gemspec")
+
 Gem::PackageTask.new(spec) do |pkg|
   pkg.gem_spec = spec
 end
