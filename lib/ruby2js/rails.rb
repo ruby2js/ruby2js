@@ -25,4 +25,5 @@ module Ruby2JS
 
     ActionView::Template.register_template_handler :rb, Template
   end
+
 end

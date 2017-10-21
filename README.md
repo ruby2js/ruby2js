@@ -3,7 +3,7 @@ Ruby2js
 
 Minimal yet extensible Ruby to JavaScript conversion.  
 
-[![Build Status](https://travis-ci.org/rubys/ruby2js.svg)](https://travis-ci.org/rubys/ruby2js) 
+[![Build Status](https://travis-ci.org/rubys/ruby2js.svg)](https://travis-ci.org/rubys/ruby2js)
 [![Gem Version](https://badge.fury.io/rb/ruby2js.svg)](https://badge.fury.io/rb/ruby2js)
 
 Description
@@ -20,7 +20,7 @@ Ruby attribute accessors, methods defined with no parameters and no
 parenthesis, as well as setter method definitions, are
 mapped to
 [Object.defineProperty](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/defineProperty?redirectlocale=en-US&redirectslug=JavaScript%2FReference%2FGlobal_Objects%2FObject%2FdefineProperty),
-so avoid these if you wish to target users running IE8 or lower. 
+so avoid these if you wish to target users running IE8 or lower.
 
 Filters may be provided to add Ruby-specific or framework specific
 behavior.  Filters are essentially macro facilities that operate on
@@ -83,7 +83,7 @@ objects to handle this.  This is the approach that [Opal](http://opalrb.org/)
 takes.  It is a fine approach, with a number of benefits.  It also has some
 notable drawbacks.  For example,
 [readability](http://opalrb.org/try/#code:a%20%3D%20%22abc%22%3B%20puts%20a[-1])
-and 
+and
 [compatibility with other frameworks](https://github.com/opal/opal/issues/400).
 
 Another approach is to simply accept JavaScript semantics for what they are.
@@ -127,6 +127,7 @@ includes three such integrations:
 *  [CGI](https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/cgi.rb)
 *  [Sinatra](https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/sinatra.rb)
 *  [Rails](https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/rails.rb)
+*  [Haml](https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/haml.rb)
 
 As you might expect, CGI is a bit sluggish.  By contrast, Sinatra and Rails
 are quite speedy as the bulk of the time is spent on the initial load of the
@@ -201,7 +202,7 @@ the script.
     * `[/r/, n]` becomes `.match(/r/)[n]`
     * `"string" * length` becomes `new Array(length + 1).join("string")`
     * `.sub!` and `.gsub!` become equivalent `x = x.replace` statements
-    * `.map!`, `.reverse!`, and `.select` become equivalent 
+    * `.map!`, `.reverse!`, and `.select` become equivalent
       `.splice(0, .length, *.method())` statements
     * `@foo.call(args)` becomes `this._foo(args)`
     * `@@foo.call(args)` becomes `this.constructor._foo(args)`
@@ -309,7 +310,7 @@ the script.
     * `.zip()` becomes `_.zip()`
     * `(n...m)` becomes `_.range(n, m)`
     * `(n..m)` becomes `_.range(n, m+1)`
-    * `.compact!`, `.flatten!`, `shuffle!`, `reject!`, `sort_by!`, and 
+    * `.compact!`, `.flatten!`, `shuffle!`, `reject!`, `sort_by!`, and
       `.uniq` become equivalent `.splice(0, .length, *.method())` statements
     * for the following methods, if the block consists entirely of a simple
       expression (or ends with one), a `return` is added prior to the
@@ -344,7 +345,7 @@ the script.
     * maps constant assignments in an angular module to a filter
     * maps class definitions in an angular module to a filter
     * within a controller or within a `link` method in a directive:
-        * maps `apply`, `broadcast`, `digest`, `emit`, `eval`, `evalAsync`, and 
+        * maps `apply`, `broadcast`, `digest`, `emit`, `eval`, `evalAsync`, and
           `parent` calls to `$scope` functions.
         * maps `apply!`, `broadcast!`, `digest!`, `eval!`, and `evalAsync!`
           calls to `$rootScope` functions.
@@ -393,7 +394,7 @@ the script.
   use of the jquery filter.
 
 * [angularjs](https://github.com/rubys/wunderbar/blob/master/demo/angularjs.rb)
-  makes use of the angular filters to implement the 
+  makes use of the angular filters to implement the
   [angular.js tutorial](http://docs.angularjs.org/tutorial).  This demo
   includes:
     * [view](https://github.com/rubys/wunderbar/blob/master/demo/views/index._html)
@@ -404,7 +405,7 @@ Picking a Ruby to JS mapping tool
 ---
 
 > dsl — A domain specific language, where code is written in one language and
-> errors are given in another. 
+> errors are given in another.
 > -- [Devil’s Dictionary of Programming](http://programmingisterrible.com/post/65781074112/devils-dictionary-of-programming)
 
 If you simply want to get a job done, and would like a mature and tested
