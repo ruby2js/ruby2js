@@ -7,3 +7,7 @@ group :development, :test do
   gem 'rake'
   gem 'execjs'
 end
+
+group :test do
+  gem 'haml'
+end
