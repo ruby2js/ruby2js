@@ -17,9 +17,9 @@ module Ruby2JS
   module Rails
     class Template
       cattr_accessor :default_format
-      self.default_format = Mime::JS
+      self.default_format = Mime[:js]
       def self.call(template)
-        "Ruby2JS.convert(#{template.source.inspect})"
+        "Ruby2JS.convert(#{template.source.inspect}).to_s"
       end
     end
 
