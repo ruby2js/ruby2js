@@ -25,4 +25,14 @@ module Ruby2JS
 
     ActionView::Template.register_template_handler :rb, Template
   end
+
+  if defined? Haml
+    module Haml::Filters::Ruby2JS
+      include Haml::Filters::Base
+      def render(text)
+        converted = Ruby2JS.convert(text).to_s
+        "<script type='text/javascript'>\n#{converted}\n</script>"
+      end
+    end
+  end
 end
