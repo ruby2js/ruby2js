@@ -431,6 +431,12 @@ describe Ruby2JS do
       to_js( 'while false; next; end' ).must_equal 'while (false) {continue}'
     end
 
+    it "should handle next as continue for step" do
+      to_js( '(1..3).step(1) {|i| next if i%2 == 0}' ).
+        must_include '{if (i % 2 == 0) continue}'
+    end
+
+
     it "should handle until" do
       to_js( '1 until false' ).must_equal 'while (!false) {1}'
     end
