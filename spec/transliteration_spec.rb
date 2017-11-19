@@ -476,11 +476,11 @@ describe Ruby2JS do
     end
 
     it "should handle basic variable scope" do
-      to_js( 'a = 1; lambda { a = 2; b = 1}').must_equal 'var a = 1; function() {a = 2; var b = 1}'
+      to_js( 'a = 1; lambda { a = 2; b = 1}').must_equal 'var a = 1; function() {a = 2; var b = 1; return b}'
     end
 
     it "should handle shadow args" do
-      to_js( 'a = 1; lambda {|;a| a = 2}').must_equal 'var a = 1; function() {var a = 2}'
+      to_js( 'a = 1; lambda {|;a| a = 2}').must_equal 'var a = 1; function() {var a = 2; return a}'
     end
 
     it "named functions aren't closures" do
@@ -504,12 +504,12 @@ describe Ruby2JS do
     
     it "should handle variable scope" do
       to_js('a = 1; lambda {|b| c = 0; a = b - c }; lambda { |b| c = 1; a = b + c }').
-        must_equal 'var a = 1; function(b) {var c = 0; a = b - c}; function(b) {var c = 1; a = b + c}'
+        must_equal 'var a = 1; function(b) {var c = 0; a = b - c; return a}; function(b) {var c = 1; a = b + c; return a}'
     end
     
     it "should really handle variable scope" do
       to_js('a, d = 1, 2; lambda {|b| c = 0; a = b - c * d}; lambda { |b| c = 1; a = b + c * d}').
-        must_equal 'var a = 1; var d = 2; function(b) {var c = 0; a = b - c * d}; function(b) {var c = 1; a = b + c * d}'
+        must_equal 'var a = 1; var d = 2; function(b) {var c = 0; a = b - c * d; return a}; function(b) {var c = 1; a = b + c * d; return a}'
     end
     
     it "should parse with explicit return" do

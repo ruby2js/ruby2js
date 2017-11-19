@@ -49,6 +49,12 @@ module Ruby2JS
           end
         end
         block.push node
+      elsif block.last.type == :lvasgn
+        block.push s(:return, s(:lvar, block.last.children.first))
+      elsif block.last.type == :ivasgn
+        block.push s(:return, s(:ivar, block.last.children.first))
+      elsif block.last.type == :cvasgn
+        block.push s(:return, s(:cvar, block.last.children.first))
       end
 
       if block.length == 1
