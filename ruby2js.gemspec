@@ -1,9 +1,10 @@
 # -*- encoding: utf-8 -*-
-# stub: ruby2js 2.1.22 ruby lib
+lib = File.expand_path('../lib/', __FILE__)
+$:.unshift lib unless $:.include?(lib)
 
 Gem::Specification.new do |s|
   s.name = "ruby2js".freeze
-  s.version = "2.1.22"
+  s.version = Ruby2JS::VERSION::STRING
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0".freeze) if s.respond_to? :required_rubygems_version=
   s.require_paths = ["lib".freeze]

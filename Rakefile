@@ -28,20 +28,12 @@ Gem::PackageTask.new(spec) do |pkg|
   pkg.gem_spec = spec
 end
 
-file "#{spec.name}.gemspec" => [:gemspec]
-
-desc "Build the gemspec file #{spec.name}.gemspec"
-task :gemspec do
-  file = File.dirname(__FILE__) + "/#{spec.name}.gemspec"
-  File.open(file, "w") {|f| f << spec.to_ruby }
-end
-
 # If you don't want to generate the .gemspec file, just remove this line. Reasons
 # why you might want to generate a gemspec:
 #  - using bundler with a git source
 #  - building the gem without rake (i.e. gem build blah.gemspec)
 #  - maybe others?
-task :package => :gemspec
+task :package => :gem
 
 require 'rake/clean'
 CLOBBER.include FileList.new('pkg')
