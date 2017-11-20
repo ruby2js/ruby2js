@@ -98,7 +98,15 @@ module Ruby2JS
       @comments[ast] -= list
 
       list.map do |comment|
-        comment.text.sub(/^#/, '//') + "\n"
+        if comment.text.start_with? '=begin'
+          if comment.text.include? '*/'
+            comment.text.sub(/\A=begin/, '').sub(/^=end\Z/, '').gsub(/^/, '//')
+          else
+            comment.text.sub(/\A=begin/, '/*').sub(/^=end\Z/, '*/')
+          end
+        else
+          comment.text.sub(/^#/, '//') + "\n"
+        end
       end
     end
 

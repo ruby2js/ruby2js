@@ -141,5 +141,27 @@ describe Ruby2JS::Filter::Functions do
       js.must_include "//classattribute\n  classattribute: {"
       js.must_include "//classsetter\n  classsetter: {"
     end
+
+    it "should handle =begin...=end" do
+      js = to_js %{
+        =begin
+        comment
+        =end
+        statement
+      }.gsub(/^\s+/, '')
+
+      js.must_equal "/*\ncomment\n*/\nvar statement"
+    end
+
+    it "should handle =begin...*/...=end" do
+      js = to_js %{
+        =begin
+        /* comment */
+        =end
+        statement
+      }.gsub(/^\s+/, '')
+
+      js.must_equal "//\n///* comment */\n//\nvar statement"
+    end
   end
 end
