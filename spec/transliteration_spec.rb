@@ -15,7 +15,15 @@ describe Ruby2JS do
       to_js( ":symbol" ).must_equal '"symbol"'
       to_js( "nil" ).must_equal 'null'
       to_js( "Constant" ).must_equal 'Constant'
-      to_js( '"\u2620"' ).must_equal "\"\u2620\""
+
+      unicode = to_js( '"\u2620"' )
+
+      # ruby 2.4.2 support
+      if unicode.include? '\u'
+        unicode.must_equal "\"\\u2620\""
+      else
+        unicode.must_equal "\"\u2620\""
+      end
     end
     
     it "should parse simple hash" do
