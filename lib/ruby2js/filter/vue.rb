@@ -352,14 +352,6 @@ module Ruby2JS
             then
               nil
 
-            elsif
-              method.children.length == 4 and
-              Converter::EXPRESSIONS.include? method.children[3].type
-            then
-              # class property - simple
-              s(:send, s(:const, nil, cname), "#{method.children[1]}=",
-                method.children[3])
-
             else
               # class computed property
               s(:send, s(:const, nil, :Object), :defineProperty,
@@ -367,7 +359,8 @@ module Ruby2JS
                 s(:hash, s(:pair, s(:sym, :enumerable), s(:true)),
                 s(:pair, s(:sym, :configurable), s(:true)),
                 s(:pair, s(:sym, :get), s(:block, s(:send, nil, :proc),
-                  method.children[2], *process_all(method.children[3..-1])))))
+                  method.children[2], 
+                  s(:autoreturn, *process_all(method.children[3..-1]))))))
             end
 
             @comments[fn] = @comments[method]

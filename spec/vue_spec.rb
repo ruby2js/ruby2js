@@ -641,7 +641,7 @@ describe Ruby2JS::Filter::Vue do
   describe "static methods and properties" do
     it "should handle static properties" do
       to_js( 'class Foo<Vue; def self.one; 1; end; end' ).
-        must_include 'Foo.one = 1'
+        must_include 'get: function() {return 1}'
     end
 
     it "should handle computed static properties" do
