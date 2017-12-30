@@ -56,13 +56,19 @@ _html do
 
     _input type: 'checkbox', name: 'ast', id: 'ast', checked: !!@ast
     _label 'Show AST', for: 'ast'
+
+    _input type: 'checkbox', name: 'es2015', id: 'es2015', checked: !!@es2015
+    _label 'ES2015', for: 'es2015'
   end
 
   if @ruby
     _div_? do
       raise $load_error if $load_error
 
-      ruby = Ruby2JS.convert(@ruby)
+      options = {}
+      options[:eslevel] = :es2015 if @es2015
+
+      ruby = Ruby2JS.convert(@ruby, options)
 
       if @ast
         walk = proc do |ast, indent=''|

@@ -10,6 +10,32 @@ module Ruby2JS
     #   (...))
 
     handle :dstr, :dsym do |*children|
+      if es2015
+	put '`'
+
+        # gather length of string parts; if long enough, newlines will
+        # not be escaped
+	length = children.select {|child| child.type==:str}.
+	  map {|child| child.children.last.length}.inject(:+)
+
+	children.each do |child|
+	  if child.type == :str
+	    str = child.children.first.inspect[1..-2].gsub('${', '$\{')
+	    if length > 40
+	      put str.gsub("\\n", "\n")
+	    else
+	      put str
+	    end
+	  else
+	    put '${'
+	    parse child
+	    put '}'
+	  end
+	end
+	put '`'
+	return
+      end
+
       children.each_with_index do |child, index|
         put ' + ' unless index == 0
 

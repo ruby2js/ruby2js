@@ -44,6 +44,8 @@ module Ruby2JS
       @prototype = nil
       @class_parent = nil
       @class_name = nil
+
+      @eslevel = :es5
     end
 
     def width=(width)
@@ -71,6 +73,14 @@ module Ruby2JS
 
     def s(type, *args)
       Parser::AST::Node.new(type, args)
+    end
+
+    def eslevel=(value)
+      @eslevel = value
+    end
+
+    def es2015
+      @eslevel == :es2015
     end
 
     @@handlers = []
@@ -132,9 +142,9 @@ module Ruby2JS
     end
 
     def parse_all(*args)
-      options = (Hash === args.last) ? args.pop : {}
-      sep = options[:join].to_s
-      state = options[:state] || :expression
+      @options = (Hash === args.last) ? args.pop : {}
+      sep = @options[:join].to_s
+      state = @options[:state] || :expression
 
       args.each_with_index do |arg, index|
         put sep unless index == 0
