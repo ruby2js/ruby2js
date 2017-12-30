@@ -76,6 +76,13 @@ module Ruby2JS
         parse receiver; put '['; parse_all(*args[0..-2], join: ', '); put '] = '
         parse args[-1]
 
+      elsif method == :** and not es2015
+        put 'Math.pow('
+        parse receiver
+        put ', '
+        parse args.first
+        put ')'
+
       elsif [:-@, :+@, :~, '~'].include? method
         put method.to_s[0]; parse receiver
 

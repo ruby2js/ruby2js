@@ -94,6 +94,10 @@ describe Ruby2JS do
       to_js( '-a' ).must_equal '-a'
     end
 
+    it "should parse exponential operators" do
+      to_js( '2 ** 0.5' ).must_equal 'Math.pow(2, 0.5)'
+    end
+
     it "should do short circuit assign" do
       to_js( 'a = nil; a ||= 1').must_equal 'var a = null; a = a || 1'
       to_js( '@a ||= 1').must_equal 'this._a = this._a || 1'

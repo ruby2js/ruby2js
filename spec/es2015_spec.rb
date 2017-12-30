@@ -25,4 +25,10 @@ describe "ES2015 support" do
        must_equal("`${a}\n12345678901234567890123456789012345678901`")
     end
   end
+
+  describe :operator do
+    it "should parse exponential operators" do
+      to_js( '2 ** 0.5' ).must_equal '2 ** 0.5'
+    end
+  end
 end

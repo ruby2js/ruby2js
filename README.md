@@ -47,6 +47,12 @@ require 'ruby2js/filter/functions'
 puts Ruby2JS.convert('"2A".to_i(16)')
 ```
 
+Enable ES2015 support:
+
+```ruby
+puts Ruby2JS.convert('"#{a}"', eslevel: :es2015)
+```
+
 With [ExecJS](https://github.com/sstephenson/execjs):
 ```ruby
 require 'ruby2js/execjs'
@@ -400,6 +406,15 @@ the script.
     * [view](https://github.com/rubys/wunderbar/blob/master/demo/views/index._html)
     * [partials](https://github.com/rubys/wunderbar/tree/master/demo/partials)
     * [js](https://github.com/rubys/wunderbar/tree/master/demo/js)
+
+ES2015 support
+---
+
+When option `eslevel: :es2015` is provided, the following additional
+conversions are made:
+
+    * `"#{a}"` becomes `\`${a}\``
+    * `a ** b` becomes `a ** b`
 
 Picking a Ruby to JS mapping tool
 ---
