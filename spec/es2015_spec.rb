@@ -27,6 +27,20 @@ describe "ES2015 support" do
     end
   end
 
+  describe :arguments do
+    it "should handle optional parameters" do
+      to_js( 'def a(b=1); end' ).must_equal('function a(b=1) {}')
+    end
+
+    it "should handle rest parameters" do
+      to_js( 'def a(*b); end' ).must_equal('function a(...b) {}')
+    end
+
+    it "should handle splat arguments" do
+      to_js( 'a(*b)' ).must_equal('a(...b)')
+    end
+  end
+
   describe :objectLiteral do
     it "should handle computed property names" do
       to_js( '{a => 1}' ).must_equal('{[a]: 1}')

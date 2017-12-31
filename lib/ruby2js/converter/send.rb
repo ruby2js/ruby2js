@@ -180,7 +180,7 @@ module Ruby2JS
           else
             parse ast.updated(:lvasgn, [method]), @state
           end
-        elsif args.length > 0 and args.any? {|arg| arg.type == :splat}
+        elsif args.any? {|arg| arg.type == :splat} and not es2015
           parse s(:send, s(:attr, receiver, method), :apply, 
             (receiver || s(:nil)), s(:array, *args))
         else
@@ -213,11 +213,16 @@ module Ruby2JS
       # build up chain of conditional evaluations
       until stack.empty?
         node = stack.pop
-	expr = node.updated(:send, [expr, *node.children[1..-1]])
-	result = s(:and, result, expr)
+        expr = node.updated(:send, [expr, *node.children[1..-1]])
+        result = s(:and, result, expr)
       end
 
       parse result
+    end
+
+    handle :splat do |expr|
+       put '...'
+       parse expr
     end
   end
 end

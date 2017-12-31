@@ -16,7 +16,7 @@ module Ruby2JS
       vars.merge! @vars unless name
       if args and !args.children.empty?
         # splats
-        if args.children.last.type == :restarg
+        if args.children.last.type == :restarg and not es2015
           if args.children[-1].children.first
             body = s(:begin, body) unless body.type == :begin
             assign = s(:lvasgn, args.children[-1].children.first,
@@ -68,7 +68,7 @@ module Ruby2JS
 
         # optional arguments
         args.children.each_with_index do |arg, i|
-          if arg.type == :optarg
+          if arg.type == :optarg and not es2015
             body = s(:begin, body) unless body.type == :begin
             argname, value = arg.children
             children = args.children.dup
@@ -139,6 +139,17 @@ module Ruby2JS
         @next_token = next_token
         @block_depth -= 1 if @block_depth
       end
+    end
+
+    handle :optarg do |name, value|
+      put name
+      put '='
+      parse value 
+    end
+
+    handle :restarg do |name|
+      put '...'
+      put name
     end
   end
 end
