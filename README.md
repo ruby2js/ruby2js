@@ -417,7 +417,7 @@ conversions are made:
 * `a ** b` becomes `a ** b`
 * `a = 1` becomes `let a = 1`
 * `A = 1` becomes `const A = 1`
-* `a, b = b, a` becomes `[a, b] = [b, a]``
+* `a, b = b, a` becomes `[a, b] = [b, a]`
 
 Picking a Ruby to JS mapping tool
 ---
