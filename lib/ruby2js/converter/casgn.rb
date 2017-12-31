@@ -6,7 +6,11 @@ module Ruby2JS
 
     handle :casgn do |cbase, var, value|
       begin
-        put "var "
+        if es2015
+          put "const "
+        else
+          put "var "
+        end
 
         (parse cbase; put '.') if cbase
 

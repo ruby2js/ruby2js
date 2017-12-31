@@ -31,7 +31,7 @@ module Ruby2JS
         if scope
           vars = @vars.select {|key, value| value == :pending}.keys
           unless vars.empty?
-            insert mark, "var #{vars.join(', ')}#{@sep}"
+            insert mark, "#{es2015 ? 'let' : 'var'} #{vars.join(', ')}#{@sep}"
             vars.each {|var| @vars[var] = true}
           end
         end

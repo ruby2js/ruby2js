@@ -27,7 +27,11 @@ module Ruby2JS
         end
 
         if state == :statement and @scope and not @vars.include?(name) 
-          var = 'var ' 
+          if es2015
+            var = 'let '
+          else
+            var = 'var ' 
+          end
         end
 
         if value

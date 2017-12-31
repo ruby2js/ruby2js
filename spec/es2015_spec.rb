@@ -7,6 +7,26 @@ describe "ES2015 support" do
     Ruby2JS.convert(string, eslevel: :es2015).to_s
   end
   
+  describe :vars do
+    it "should use let as the new var" do
+      to_js( 'a = 1' ).must_equal('let a = 1')
+    end
+
+    it "should use const for constants" do
+      to_js( 'A = 1' ).must_equal('const A = 1')
+    end
+
+    it "should handle scope" do
+      to_js( 'b=0 if a==1' ).must_equal 'let b; if (a == 1) b = 0'
+    end
+  end
+
+  describe :destructuring do
+    it "should handle parallel assignment" do
+      to_js( 'a,b=b,a' ).must_equal('let [a, b] = [b, a]')
+    end
+  end
+
   describe :templateLiteral do
     it "should convert interpolated strings into ES templates" do
       to_js( '"#{a}"' ).must_equal('`${a}`')
