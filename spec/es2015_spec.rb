@@ -27,6 +27,12 @@ describe "ES2015 support" do
     end
   end
 
+  describe :objectLiteral do
+    it "should handle computed property names" do
+      to_js( '{a => 1}' ).must_equal('{[a]: 1}')
+    end
+  end
+
   describe :templateLiteral do
     it "should convert interpolated strings into ES templates" do
       to_js( '"#{a}"' ).must_equal('`${a}`')

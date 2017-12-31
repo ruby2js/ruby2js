@@ -68,7 +68,11 @@ module Ruby2JS
                 end
               end
 
-              if 
+              if not [:str, :sym].include? left.type and es2015
+                put '['
+                parse left
+                put ']'
+              elsif 
                 left.children.first.to_s =~ /\A[a-zA-Z_$][a-zA-Z_$0-9]*\Z/
               then
                 put left.children.first
