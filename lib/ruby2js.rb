@@ -40,6 +40,10 @@ module Ruby2JS
         @options = options
       end
 
+      def es2015
+        @options[:eslevel] == :es2015
+      end
+
       def process(node)
         ast, @ast = @ast, node
         replacement = super

@@ -85,4 +85,14 @@ describe "ES2015 support" do
       to_js( 'foo = proc {a;b}' ).must_equal 'let foo = () => {a; b}'
     end
   end
+
+  describe :array do
+    it "should handle array conversions" do
+      Ruby2JS.convert(
+        'Array(a)', 
+        filters: [Ruby2JS::Filter::Functions], 
+        eslevel: :es2015
+      ).to_s.must_equal 'Array.from(a)'
+    end
+  end
 end

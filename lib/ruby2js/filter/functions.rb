@@ -47,8 +47,12 @@ module Ruby2JS
           process S(:call, target, :toString, *args)
 
         elsif method == :Array and target == nil
-          process S(:send, s(:attr, s(:attr, s(:const, nil, :Array), 
-            :prototype), :slice), :call, *args)
+          if es2015
+            process S(:send, s(:const, nil, :Array), :from, *args)
+          else
+            process S(:send, s(:attr, s(:attr, s(:const, nil, :Array), 
+              :prototype), :slice), :call, *args)
+          end
 
         elsif method == :to_i
           process node.updated :send, [nil, :parseInt, target, *args]
