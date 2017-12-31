@@ -88,6 +88,30 @@ module Ruby2JS
         end
       end
 
+      # es2015 fat arrow support
+      if not name and es2015
+        put '('; parse args; put ') => '
+
+        expr = body
+        expr = expr.children.first if expr.type == :autoreturn
+        while expr.type == :begin and expr.children.length == 1
+          expr = expr.children.first
+        end
+
+        if EXPRESSIONS.include? expr.type
+          parse expr
+        elsif 
+          expr.type == :if and expr.children[1] and expr.children[2] and
+          EXPRESSIONS.include? expr.children[1].type and
+          EXPRESSIONS.include? expr.children[2].type
+        then
+          parse expr
+        else
+          put "{#{@nl}"; parse body; put "#{@nl}}"
+        end
+        return
+      end
+
       nl = @nl unless body == s(:begin)
       begin
         if name

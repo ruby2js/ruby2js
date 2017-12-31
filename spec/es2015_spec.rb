@@ -4,7 +4,7 @@ require 'minitest/autorun'
 describe "ES2015 support" do
   
   def to_js(string)
-    Ruby2JS.convert(string, eslevel: :es2015).to_s
+    Ruby2JS.convert(string, filters: [], eslevel: :es2015).to_s
   end
   
   describe :vars do
@@ -49,6 +49,20 @@ describe "ES2015 support" do
   describe :operator do
     it "should parse exponential operators" do
       to_js( '2 ** 0.5' ).must_equal '2 ** 0.5'
+    end
+  end
+
+  describe :fat_arrow do
+    it "should handle simple lambda expressions" do
+      to_js( 'foo = lambda {|x| x*x}' ).must_equal 'let foo = (x) => x * x'
+    end
+
+    it "should handle block parameters" do
+      to_js( 'a {|b| c}' ).must_equal 'a((b) => c)'
+    end
+
+    it "should handle multi-statement blocks" do
+      to_js( 'foo = proc {a;b}' ).must_equal 'let foo = () => {a; b}'
     end
   end
 end
