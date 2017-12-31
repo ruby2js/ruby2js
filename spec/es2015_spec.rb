@@ -19,6 +19,10 @@ describe "ES2015 support" do
     it "should handle scope" do
       to_js( 'b=0 if a==1' ).must_equal 'let b; if (a == 1) b = 0'
     end
+
+    it "should handle for loops" do
+      to_js( 'for i in 1..2; end' ).must_equal 'for (let i = 1; i <= 2; i++) {}'
+    end
   end
 
   describe :destructuring do

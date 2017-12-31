@@ -12,7 +12,7 @@ module Ruby2JS
     handle :for do |var, expression, block|
       begin
         next_token, @next_token = @next_token, :continue
-        put "for (var "; parse var
+        put "for (#{es2015 ? 'let' : 'var'} "; parse var
         if [:irange, :erange].include? expression.type
           put ' = '; parse expression.children.first; put '; '; parse var
           (expression.type == :erange ? put(' < ') : put(' <= '))
