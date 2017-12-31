@@ -413,7 +413,7 @@ ES2015 support
 When option `eslevel: :es2015` is provided, the following additional
 conversions are made:
 
-* `"#{a}"` becomes <code>`${a}`</code>
+* `"#{a}"` becomes `\`${a}\``
 * `a ** b` becomes `a ** b`
 * `a = 1` becomes `let a = 1`
 * `A = 1` becomes `const A = 1`
