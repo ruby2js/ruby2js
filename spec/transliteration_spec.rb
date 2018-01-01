@@ -564,7 +564,7 @@ describe Ruby2JS do
         must_equal 'function Person(name) {this._name = name}; Person.prototype = {get name() {return this._name}, reset: function() {this._name = null}}'
     end
 
-    it "should parse class with contructor and methods with multiple arguments" do
+    it "should parse class with constructor and methods with multiple arguments" do
       to_js('class Person; def initialize(name, surname); @name, @surname = name, surname; end; def full_name; @name  + @surname; end; end').
         must_equal 'function Person(name, surname) {this._name = name; this._surname = surname}; Person.prototype = {get full_name() {return this._name + this._surname}}'
     end
@@ -589,7 +589,7 @@ describe Ruby2JS do
         must_equal 'function Employee() {Person.call(this)}; Employee.prototype = Object.create(Person); Employee.prototype.constructor = Employee'
     end
 
-    it "should parse handle super" do
+    it "should handle super" do
       to_js('class A; end; class B < A; def initialize(x); super; end; end').
         must_equal 'function A() {}; function B(x) {A.call(this, x)}; B.prototype = Object.create(A); B.prototype.constructor = B'
       to_js('class A; end; class B < A; def initialize(x); super(3); end; end').

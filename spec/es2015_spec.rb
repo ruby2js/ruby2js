@@ -105,4 +105,203 @@ describe "ES2015 support" do
       ).to_s.must_equal 'Array.from(a)'
     end
   end
+
+  describe 'object definition' do
+    it "should parse class" do
+      to_js('class Person; end').must_equal 'class Person {}'
+    end
+
+    it "should parse class with attr_accessor" do
+      to_js('class Person; attr_accessor :a; end').
+        must_equal 'class Person {get a() {return this._a}; set a(a) {this._a = a}}'
+    end
+
+    it "should parse class with constructor" do
+      to_js('class Person; def initialize(name); @name = name; end; end').
+        must_equal 'class Person {constructor(name) {this._name = name}}'
+    end
+
+    it "should parse a nested class with constructor" do
+      skip
+      to_js('class A::Person; def initialize(name); @name = name; end; end').
+        must_equal 'A.Person = class {constructor(name) {this._name = name}}'
+    end
+
+    it "should parse class with constructor and method" do
+      to_js('class Person; def initialize(name); @name = name; end; def name; @name; end; end').
+        must_equal 'class Person {constructor(name) {this._name = name}; get name() {return this._name}}'
+    end
+
+    it "should parse class with constructor and two methods" do
+      to_js('class Person; def initialize(name); @name = name; end; def name; @name; end; def reset!; @name = nil; end; end').
+        must_equal 'class Person {constructor(name) {this._name = name}; get name() {return this._name}; reset() {this._name = null}}'
+    end
+
+    it "should parse class with constructor and methods with multiple arguments" do
+      skip
+      to_js('class Person; def initialize(name, surname); @name, @surname = name, surname; end; def full_name; @name  + @surname; end; end').
+        must_equal 'function Person(name, surname) {this._name = name; this._surname = surname}; Person.prototype = {get full_name() {return this._name + this._surname}}'
+    end
+
+    it "should collapse multiple methods in a class" do
+      skip
+      to_js('class C; def a; end; def b; end; end').
+        must_equal 'function C() {}; C.prototype = {get a() {}, get b() {}}'
+    end
+
+    it "should collapse getters and setters in a class" do
+      skip
+      to_js('class C; def a; end; def a=(a); end; end').
+        must_equal 'function C() {}; C.prototype = {get a() {}, set a(a) {}}'
+    end
+
+    it "should collapse properties" do
+      skip
+      to_js('class C; def self.a; end; def self.b; end; end').
+        must_equal 'function C() {}; Object.defineProperties(C, {a: {enumerable: true, configurable: true, get: function() {}}, b: {enumerable: true, configurable: true, get: function() {}}})'
+    end
+
+    it "should parse class with inheritance" do
+      skip
+      to_js('class Employee < Person; end').
+        must_equal 'function Employee() {Person.call(this)}; Employee.prototype = Object.create(Person); Employee.prototype.constructor = Employee'
+    end
+
+    it "should handle super" do
+      skip
+      to_js('class A; end; class B < A; def initialize(x); super; end; end').
+        must_equal 'function A() {}; function B(x) {A.call(this, x)}; B.prototype = Object.create(A); B.prototype.constructor = B'
+      to_js('class A; end; class B < A; def initialize(x); super(3); end; end').
+        must_equal 'function A() {}; function B(x) {A.call(this, 3)}; B.prototype = Object.create(A); B.prototype.constructor = B'
+      to_js('class A; end; class B < A; def foo(x); super; end; end').
+        must_equal 'function A() {}; function B() {A.call(this)}; B.prototype = Object.create(A); B.prototype.constructor = B; B.prototype.foo = function(x) {A.prototype.foo.call(this, x)}'
+      to_js('class A; end; class B < A; def foo(x); super(3); end; end').
+        must_equal 'function A() {}; function B() {A.call(this)}; B.prototype = Object.create(A); B.prototype.constructor = B; B.prototype.foo = function(x) {A.prototype.foo.call(this, 3)}'
+    end
+
+    it "should parse class with class variables" do
+      skip
+      to_js('class Person; @@count=0; end').
+        must_equal 'function Person() {}; Person._count = 0'
+      to_js('class Person; @@count={}; @@count[1]=1; end').
+        must_equal 'function Person() {}; Person._count = {}; Person._count[1] = 1'
+    end
+
+    it "should parse class with instance variables, properties and methods" do
+      skip
+      to_js('class Person; @@count=0; def offset(x); return @@count+x; end; end').
+        must_equal 'function Person() {}; Person._count = 0; Person.prototype.offset = function(x) {return Person._count + x}'
+
+      to_js('class Person; @@count=0; def count; @@count; end; end').
+        must_equal 'function Person() {}; Person._count = 0; Person.prototype = {get count() {return Person._count}}'
+
+      to_js('class Person; @@count=0; def count(); return @@count; end; end').
+        must_equal 'function Person() {}; Person._count = 0; Person.prototype.count = function() {return Person._count}'
+
+      to_js('class Person; def initialize(name); @name = name; end; def name; @name; end; @@count=0; def count; return @@count; end; end').
+        must_equal 'function Person(name) {this._name = name}; Person.prototype = {get name() {return this._name}}; Person._count = 0; Object.defineProperty(Person.prototype, "count", {enumerable: true, configurable: true, get: function() {return Person._count}})'
+
+      to_js('class Person; def initialize(name); @name = name; end; def name; @name; end; @@count=0; def count(); return @@count; end; end').
+        must_equal 'function Person(name) {this._name = name}; Person.prototype = {get name() {return this._name}}; Person._count = 0; Person.prototype.count = function() {return Person._count}'
+    end
+
+    it "should parse instance methods with class variables" do
+      skip
+      to_js('class Person; def count; @@count; end; end').
+        must_equal 'function Person() {}; Person.prototype = {get count() {return Person._count}}'
+    end
+
+    it "should parse class methods with class variables" do
+      skip
+      to_js('class Person; def self.count(); return @@count; end; end').
+        must_equal 'function Person() {}; Person.count = function() {return Person._count}'
+
+      to_js('class Person; def self.count; @@count; end; end').
+        must_equal 'function Person() {}; Object.defineProperty(Person, "count", {enumerable: true, configurable: true, get: function() {return Person._count}})'
+
+      to_js('class Person; def self.count=(count); @@count=count; end; end').
+        must_equal 'function Person() {}; Object.defineProperty(Person, "count", {enumerable: true, configurable: true, set: function(count) {Person._count = count}})'
+    end
+
+    it "should parse constructor methods with class variables" do
+      skip
+      to_js('class Person; def initialize; @@count+=1; end; end').
+        must_equal 'function Person() {Person._count++}'
+    end
+
+    it "should parse class with class constants" do
+      skip
+      to_js('class Person; ID=7; end').
+        must_equal 'function Person() {}; Person.ID = 7'
+    end
+
+    it "should parse class with class methods" do
+      skip
+      to_js('class Person; def self.search(name); end; end').
+        must_equal 'function Person() {}; Person.search = function(name) {}'
+    end
+
+    it "should parse class with alias" do
+      skip
+      to_js('class Person; def f(name); end; alias :g :f; end').
+        must_equal 'function Person() {}; Person.prototype.f = ' +
+          'function(name) {}; Person.prototype.g = Person.prototype.f'
+    end
+
+    it "should parse method def" do
+      skip
+      to_js('def method; end').must_equal 'function method() {}'
+    end
+    
+    it "should parse singleton method and property definitions" do
+      skip
+      to_js('def self.method(); end').must_equal 'this.method = function() {}'
+      to_js('def self.prop; @prop; end').
+        must_equal 'Object.defineProperty(this, "prop", {enumerable: true, configurable: true, get: function() {return this._prop}})'
+      to_js('def self.prop=(prop); @prop=prop; end').
+        must_equal 'Object.defineProperty(this, "prop", {enumerable: true, configurable: true, set: function(prop) {this._prop = prop}})'
+      to_js('def self.prop; @prop; end; def self.prop=(prop); @prop=prop; end').
+        must_equal 'Object.defineProperty(this, "prop", {enumerable: true, configurable: true, get: function() {return this._prop}, set: function(prop) {this._prop = prop}})'
+    end
+    
+    it "should convert self to this" do
+      skip
+      to_js('def method; return self.foo; end').
+        must_equal 'function method() {return this.foo}'
+    end
+
+    it "should prefix intra-method calls with 'this.'" do
+      skip
+      to_js('class C; def m1; end; def m2; m1; end; end').
+        must_equal 'function C() {}; C.prototype = ' +
+          '{get m1() {}, get m2() {return this.m1}}'
+    end
+
+    it "should prefix class constants referenced in methods by class name" do
+      skip
+      to_js('class C; X = 1; def m; X; end; end').
+        must_equal 'function C() {}; C.X = 1; C.prototype = {get m() {return C.X}}'
+    end
+
+    it "should insert var self = this when needed" do
+      skip
+      to_js('class C; def m; list.each do; @ivar; end; end; end').
+        must_equal 'function C() {}; C.prototype = {get m() {var self = this; return list.each(function() {self._ivar})}}'
+
+      to_js('class C; def m(); list.each do; @ivar; @ivar; end; end; end').
+        must_equal 'function C() {}; C.prototype.m = function() {var self = this; list.each(function() {self._ivar; self._ivar})}'
+
+      to_js('class C < S; def m; list.each do; @ivar; end; end; end').
+        must_equal 'function C() {S.call(this)}; C.prototype = Object.create(S); C.prototype.constructor = C; Object.defineProperty(C.prototype, "m", {enumerable: true, configurable: true, get: function() {var self = this; return list.each(function() {self._ivar})}})'
+
+      to_js('class C < S; def m(); list.each do; @ivar; @ivar; end; end; end').
+        must_equal 'function C() {S.call(this)}; C.prototype = Object.create(S); C.prototype.constructor = C; C.prototype.m = function() {var self = this; list.each(function() {self._ivar; self._ivar})}'
+
+      to_js('class C < S; def m(); list.each do; {n: @ivar}; end; end; end').
+        must_equal 'function C() {S.call(this)}; C.prototype = Object.create(S); C.prototype.constructor = C; C.prototype.m = function() {var self = this; list.each(function() {{n: self._ivar}})}'
+
+      to_js('class C; def self.a(); window.addEventListener :unload do; self.b(); end; end; end').
+        must_equal 'function C() {}; C.a = function() {var self = this; window.addEventListener("unload", function() {self.b()})}'
+    end
+  end
 end

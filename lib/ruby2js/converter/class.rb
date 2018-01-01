@@ -9,6 +9,11 @@ module Ruby2JS
     # NOTE: :prop and :method macros are defined at the bottom of this file
 
     handle :class do |name, inheritance, *body|
+      if es2015
+        parse @ast.updated(:class2)
+        return
+      end
+
       if inheritance
         init = s(:def, :initialize, s(:args), s(:super))
       else

@@ -114,11 +114,11 @@ module Ruby2JS
 
       nl = @nl unless body == s(:begin)
       begin
-        if name
-          put "function #{name}"
-        elsif @prop
+        if @prop
           put @prop
           @prop = nil
+        elsif name
+          put "function #{name}"
         else
           put 'function'
         end
