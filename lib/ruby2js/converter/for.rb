@@ -18,7 +18,7 @@ module Ruby2JS
           (expression.type == :erange ? put(' < ') : put(' <= '))
           parse expression.children.last; put '; '; parse var; put '++'
         else
-          put ' in '; parse expression; 
+          put (es2015 ? ' of ' : ' in '); parse expression; 
         end
         puts ') {'; scope block; sput '}'
       ensure

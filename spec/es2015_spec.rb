@@ -25,6 +25,12 @@ describe "ES2015 support" do
     end
   end
 
+  describe :for do
+    it "should for loops" do
+      to_js( 'for i in x; end' ).must_equal('for (let i of x) {}')
+    end
+  end
+
   describe :destructuring do
     it "should handle parallel assignment" do
       to_js( 'a,b=b,a' ).must_equal('let [a, b] = [b, a]')
