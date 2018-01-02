@@ -12,6 +12,7 @@ module Ruby2JS
           put "var "
         end
 
+        cbase ||= @rbstack.map {|rb| rb[var]}.compact.last
         (parse cbase; put '.') if cbase
 
         put "#{ var } = "; parse value

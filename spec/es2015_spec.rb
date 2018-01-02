@@ -218,78 +218,28 @@ describe "ES2015 support" do
     end
 
     it "should parse class with class constants" do
-      skip
       to_js('class Person; ID=7; end').
-        must_equal 'function Person() {}; Person.ID = 7'
+        must_equal 'class Person {}; const Person.ID = 7'
     end
 
     it "should parse class with class methods" do
-      skip
       to_js('class Person; def self.search(name); end; end').
-        must_equal 'function Person() {}; Person.search = function(name) {}'
+        must_equal 'class Person {static search(name) {}}'
     end
 
     it "should parse class with alias" do
-      skip
       to_js('class Person; def f(name); end; alias :g :f; end').
-        must_equal 'function Person() {}; Person.prototype.f = ' +
-          'function(name) {}; Person.prototype.g = Person.prototype.f'
-    end
-
-    it "should parse method def" do
-      skip
-      to_js('def method; end').must_equal 'function method() {}'
-    end
-    
-    it "should parse singleton method and property definitions" do
-      skip
-      to_js('def self.method(); end').must_equal 'this.method = function() {}'
-      to_js('def self.prop; @prop; end').
-        must_equal 'Object.defineProperty(this, "prop", {enumerable: true, configurable: true, get: function() {return this._prop}})'
-      to_js('def self.prop=(prop); @prop=prop; end').
-        must_equal 'Object.defineProperty(this, "prop", {enumerable: true, configurable: true, set: function(prop) {this._prop = prop}})'
-      to_js('def self.prop; @prop; end; def self.prop=(prop); @prop=prop; end').
-        must_equal 'Object.defineProperty(this, "prop", {enumerable: true, configurable: true, get: function() {return this._prop}, set: function(prop) {this._prop = prop}})'
-    end
-    
-    it "should convert self to this" do
-      skip
-      to_js('def method; return self.foo; end').
-        must_equal 'function method() {return this.foo}'
+        must_include 'Person.prototype.g = Person.prototype.f'
     end
 
     it "should prefix intra-method calls with 'this.'" do
-      skip
       to_js('class C; def m1; end; def m2; m1; end; end').
-        must_equal 'function C() {}; C.prototype = ' +
-          '{get m1() {}, get m2() {return this.m1}}'
+        must_equal 'class C {get m1() {}; get m2() {return this.m1}}'
     end
 
     it "should prefix class constants referenced in methods by class name" do
-      skip
       to_js('class C; X = 1; def m; X; end; end').
-        must_equal 'function C() {}; C.X = 1; C.prototype = {get m() {return C.X}}'
-    end
-
-    it "should insert var self = this when needed" do
-      skip
-      to_js('class C; def m; list.each do; @ivar; end; end; end').
-        must_equal 'function C() {}; C.prototype = {get m() {var self = this; return list.each(function() {self._ivar})}}'
-
-      to_js('class C; def m(); list.each do; @ivar; @ivar; end; end; end').
-        must_equal 'function C() {}; C.prototype.m = function() {var self = this; list.each(function() {self._ivar; self._ivar})}'
-
-      to_js('class C < S; def m; list.each do; @ivar; end; end; end').
-        must_equal 'function C() {S.call(this)}; C.prototype = Object.create(S); C.prototype.constructor = C; Object.defineProperty(C.prototype, "m", {enumerable: true, configurable: true, get: function() {var self = this; return list.each(function() {self._ivar})}})'
-
-      to_js('class C < S; def m(); list.each do; @ivar; @ivar; end; end; end').
-        must_equal 'function C() {S.call(this)}; C.prototype = Object.create(S); C.prototype.constructor = C; C.prototype.m = function() {var self = this; list.each(function() {self._ivar; self._ivar})}'
-
-      to_js('class C < S; def m(); list.each do; {n: @ivar}; end; end; end').
-        must_equal 'function C() {S.call(this)}; C.prototype = Object.create(S); C.prototype.constructor = C; C.prototype.m = function() {var self = this; list.each(function() {{n: self._ivar}})}'
-
-      to_js('class C; def self.a(); window.addEventListener :unload do; self.b(); end; end; end').
-        must_equal 'function C() {}; C.a = function() {var self = this; window.addEventListener("unload", function() {self.b()})}'
+        must_equal 'class C {get m() {return C.X}}; const C.X = 1'
     end
   end
 end

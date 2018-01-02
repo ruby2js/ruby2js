@@ -32,6 +32,7 @@ module Ruby2JS
       begin
         class_name, @class_name = @class_name, name
         class_parent, @class_parent = @class_parent, inheritance
+        @rbstack.push({})
 
         post = []
         skipped = false
@@ -46,15 +47,20 @@ module Ruby2JS
               @prop = :constructor 
               m = m.updated(m.type, [@prop, *m.children[1..2]])
             elsif not m.is_method?
+              @rbstack.last[@prop] = s(:self)
               @prop = "get #{@prop}"
               m = m.updated(m.type, [*m.children[0..1], 
                 s(:autoreturn, m.children[2])])
             elsif @prop.to_s.end_with? '='
-              @prop = "set #{@prop.to_s.sub('=', '')}"
+              @prop = @prop.to_s.sub('=', '').to_sym
+              @rbstack.last[@prop] = s(:self)
               m = m.updated(m.type, [@prop, *m.children[1..2]])
+              @prop = "set #{@prop}"
             elsif @prop.to_s.end_with? '!'
               @prop = @prop.to_s.sub('!', '')
               m = m.updated(m.type, [@prop, *m.children[1..2]])
+            else
+              @rbstack.last[@prop] = s(:self)
             end
 
             begin
@@ -105,19 +111,37 @@ module Ruby2JS
           else
             post << m
             skipped = true
+
+            if m.type == :casgn and m.children[0] == nil
+              @rbstack.last[m.children[1]] = name
+            elsif m.type == :alias
+              @rbstack.last[m.children[0]] = name
+            end
           end
         end
 
-        put "#@nl}"
+        put @nl unless skipped
+        put '}'
 
         post.each do |m|
           put @sep
-          parse m, :statement
+          if m.type == :alias
+            parse name
+            put '.prototype.'
+            put m.children[0].children[0]
+            put ' = '
+            parse name
+            put '.prototype.'
+            put m.children[1].children[0]
+          else
+            parse m, :statement
+          end
         end
 
       ensure
         @class_name = class_name
         @class_parent = class_parent
+        @rbstack.pop
       end
     end
   end
