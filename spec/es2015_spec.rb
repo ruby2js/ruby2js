@@ -122,7 +122,6 @@ describe "ES2015 support" do
     end
 
     it "should parse a nested class with constructor" do
-      skip
       to_js('class A::Person; def initialize(name); @name = name; end; end').
         must_equal 'A.Person = class {constructor(name) {this._name = name}}'
     end
@@ -138,45 +137,39 @@ describe "ES2015 support" do
     end
 
     it "should parse class with constructor and methods with multiple arguments" do
-      skip
       to_js('class Person; def initialize(name, surname); @name, @surname = name, surname; end; def full_name; @name  + @surname; end; end').
-        must_equal 'function Person(name, surname) {this._name = name; this._surname = surname}; Person.prototype = {get full_name() {return this._name + this._surname}}'
+        must_equal 'class Person {constructor(name, surname) {[this._name, this._surname] = [name, surname]}; get full_name() {return this._name + this._surname}}'
     end
 
-    it "should collapse multiple methods in a class" do
-      skip
+    it "should handle multiple methods in a class" do
       to_js('class C; def a; end; def b; end; end').
-        must_equal 'function C() {}; C.prototype = {get a() {}, get b() {}}'
+        must_equal 'class C {get a() {}; get b() {}}'
     end
 
-    it "should collapse getters and setters in a class" do
-      skip
+    it "should handle both getters and setters in a class" do
       to_js('class C; def a; end; def a=(a); end; end').
-        must_equal 'function C() {}; C.prototype = {get a() {}, set a(a) {}}'
+        must_equal 'class C {get a() {}; set a(a) {}}'
     end
 
-    it "should collapse properties" do
-      skip
+    it "should handles class getters and setters" do
       to_js('class C; def self.a; end; def self.b; end; end').
-        must_equal 'function C() {}; Object.defineProperties(C, {a: {enumerable: true, configurable: true, get: function() {}}, b: {enumerable: true, configurable: true, get: function() {}}})'
+        must_equal 'class C {static get a() {}; static get b() {}}'
     end
 
     it "should parse class with inheritance" do
-      skip
       to_js('class Employee < Person; end').
-        must_equal 'function Employee() {Person.call(this)}; Employee.prototype = Object.create(Person); Employee.prototype.constructor = Employee'
+        must_equal 'class Employee extends Person {}'
     end
 
     it "should handle super" do
-      skip
       to_js('class A; end; class B < A; def initialize(x); super; end; end').
-        must_equal 'function A() {}; function B(x) {A.call(this, x)}; B.prototype = Object.create(A); B.prototype.constructor = B'
+        must_equal 'class A {}; class B extends A {constructor(x) {super(x)}}'
       to_js('class A; end; class B < A; def initialize(x); super(3); end; end').
-        must_equal 'function A() {}; function B(x) {A.call(this, 3)}; B.prototype = Object.create(A); B.prototype.constructor = B'
+        must_equal 'class A {}; class B extends A {constructor(x) {super(3)}}'
       to_js('class A; end; class B < A; def foo(x); super; end; end').
-        must_equal 'function A() {}; function B() {A.call(this)}; B.prototype = Object.create(A); B.prototype.constructor = B; B.prototype.foo = function(x) {A.prototype.foo.call(this, x)}'
+        must_equal 'class A {}; class B extends A {foo(x) {super.foo(x)}}'
       to_js('class A; end; class B < A; def foo(x); super(3); end; end').
-        must_equal 'function A() {}; function B() {A.call(this)}; B.prototype = Object.create(A); B.prototype.constructor = B; B.prototype.foo = function(x) {A.prototype.foo.call(this, 3)}'
+        must_equal 'class A {}; class B extends A {foo(x) {super.foo(3)}}'
     end
 
     it "should parse class with class variables" do

@@ -6,7 +6,7 @@ module Ruby2JS
     # (super ...)
 
     handle :super, :zsuper do |*args|
-      unless @class_parent and @instance_method
+      unless @instance_method and (@class_parent or es2015)
         raise NotImplementedError, "super outside of a method"
       end
 
@@ -21,15 +21,28 @@ module Ruby2JS
         end
       end
 
-      parse @class_parent
+      if es2015
+        if @instance_method.children[0] == :constructor
+          put 'super'
+        else
+          put 'super.'
+          put @instance_method.children[0]
+        end
 
-      # what to call
-      if @instance_method.type != :constructor
-        puts  ".prototype.#{ @instance_method.children[1].to_s.chomp('=') }"
-      end
+        put '('
+        parse s(:args, *args)
+        put ')'
+      else
+        parse @class_parent
 
-      if args
-        put '.call('; parse_all s(:self), *args, join: ', '; put ')'
+        # what to call
+        if @instance_method.type != :constructor
+          puts  ".prototype.#{ @instance_method.children[1].to_s.chomp('=') }"
+        end
+
+        if args
+          put '.call('; parse_all s(:self), *args, join: ', '; put ')'
+        end
       end
     end
   end

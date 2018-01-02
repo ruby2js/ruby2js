@@ -16,6 +16,12 @@ module Ruby2JS
         parse name
         put ' = class'
       end
+
+      if inheritance
+        put ' extends '
+        parse inheritance
+      end
+
       put " {"
 
       body.compact!
@@ -31,6 +37,7 @@ module Ruby2JS
 
           if @prop == :initialize
             @prop = :constructor 
+            m = m.updated(m.type, [@prop, *m.children[1..2]])
           elsif not m.is_method?
             @prop = "get #{@prop}"
             m = m.updated(m.type, [*m.children[0..1], 
@@ -43,6 +50,28 @@ module Ruby2JS
             m = m.updated(m.type, [@prop, *m.children[1..2]])
           end
 
+          begin
+            @instance_method = m
+            parse m
+          ensure
+            @instance_method = nil
+          end
+
+        elsif m.type == :defs and m.children.first.type == :self
+          @prop = "static #{m.children[1]}"
+          if not m.is_method?
+            @prop = "static get #{m.children[1]}"
+            m = m.updated(m.type, [*m.children[0..2], 
+              s(:autoreturn, m.children[3])])
+          elsif @prop.to_s.end_with? '='
+            @prop = "static set #{m.children[1].to_s.sub('=', '')}"
+          elsif @prop.to_s.end_with? '!'
+            m = m.updated(m.type, [m.children[0],
+              m.children[1].to_s.sub('!', ''), *m.children[2..3]])
+            @prop = "static #{m.children[1]}"
+          end
+
+          m = m.updated(:def, m.children[1..3])
           parse m
 
         elsif m.type == :send and m.children.first == nil

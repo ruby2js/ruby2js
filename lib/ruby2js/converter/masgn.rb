@@ -11,18 +11,27 @@ module Ruby2JS
 
     handle :masgn do |lhs, rhs|
       if es2015
-        lhs = lhs.children.map {|child| child.children.last}
-
-        if lhs.all? {|var| !@vars.include? var}
-          put 'let ' 
-        elsif lhs.any? {|var| !@vars.include? var}
-          put "let #{lhs.select {|var| !@vars.include? var}.join(', ')}#{@sep}"
+        newvars = lhs.children.select do |var|
+          var.type == :lvasgn and not @vars.include? var.children.last
         end
 
-        lhs.each {|var| @vars[var] ||= (@scope ? true : :pending)}
+        if newvars.length == lhs.children.length
+          put 'let ' 
+        elsif newvars.length > 0
+          put "let #{newvars.map {|var| var.children.last}.join(', ')}#{@sep}"
+        end
 
-        lhs = '[' + lhs.join(', ') + ']'
-        put "#{ lhs } = "; parse rhs
+        newvars.each do |var| 
+          @vars[var.children.last] ||= (@scope ? true : :pending)
+        end
+
+        put '['
+        lhs.children.each_with_index do |child, index|
+          put ", " unless index == 0
+          parse child
+        end
+        put "] = "
+        parse rhs
       else
         block = []
         lhs.children.zip rhs.children.zip do |var, val| 
