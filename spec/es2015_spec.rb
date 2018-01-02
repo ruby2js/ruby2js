@@ -173,53 +173,48 @@ describe "ES2015 support" do
     end
 
     it "should parse class with class variables" do
-      skip
       to_js('class Person; @@count=0; end').
-        must_equal 'function Person() {}; Person._count = 0'
+        must_equal 'class Person {}; Person._count = 0'
       to_js('class Person; @@count={}; @@count[1]=1; end').
-        must_equal 'function Person() {}; Person._count = {}; Person._count[1] = 1'
+        must_equal 'class Person {}; Person._count = {}; Person._count[1] = 1'
     end
 
     it "should parse class with instance variables, properties and methods" do
-      skip
       to_js('class Person; @@count=0; def offset(x); return @@count+x; end; end').
-        must_equal 'function Person() {}; Person._count = 0; Person.prototype.offset = function(x) {return Person._count + x}'
+        must_equal 'class Person {offset(x) {return Person._count + x}}; Person._count = 0'
 
       to_js('class Person; @@count=0; def count; @@count; end; end').
-        must_equal 'function Person() {}; Person._count = 0; Person.prototype = {get count() {return Person._count}}'
+        must_equal 'class Person {get count() {return Person._count}}; Person._count = 0'
 
       to_js('class Person; @@count=0; def count(); return @@count; end; end').
-        must_equal 'function Person() {}; Person._count = 0; Person.prototype.count = function() {return Person._count}'
+        must_equal 'class Person {count() {return Person._count}}; Person._count = 0'
 
       to_js('class Person; def initialize(name); @name = name; end; def name; @name; end; @@count=0; def count; return @@count; end; end').
-        must_equal 'function Person(name) {this._name = name}; Person.prototype = {get name() {return this._name}}; Person._count = 0; Object.defineProperty(Person.prototype, "count", {enumerable: true, configurable: true, get: function() {return Person._count}})'
+        must_equal 'class Person {constructor(name) {this._name = name}; get name() {return this._name}; get count() {return Person._count}}; Person._count = 0'
 
       to_js('class Person; def initialize(name); @name = name; end; def name; @name; end; @@count=0; def count(); return @@count; end; end').
-        must_equal 'function Person(name) {this._name = name}; Person.prototype = {get name() {return this._name}}; Person._count = 0; Person.prototype.count = function() {return Person._count}'
+        must_equal 'class Person {constructor(name) {this._name = name}; get name() {return this._name}; count() {return Person._count}}; Person._count = 0'
     end
 
     it "should parse instance methods with class variables" do
-      skip
       to_js('class Person; def count; @@count; end; end').
-        must_equal 'function Person() {}; Person.prototype = {get count() {return Person._count}}'
+        must_equal 'class Person {get count() {return Person._count}}'
     end
 
     it "should parse class methods with class variables" do
-      skip
       to_js('class Person; def self.count(); return @@count; end; end').
-        must_equal 'function Person() {}; Person.count = function() {return Person._count}'
+        must_equal 'class Person {static count() {return Person._count}}'
 
       to_js('class Person; def self.count; @@count; end; end').
-        must_equal 'function Person() {}; Object.defineProperty(Person, "count", {enumerable: true, configurable: true, get: function() {return Person._count}})'
+        must_equal 'class Person {static get count() {return Person._count}}'
 
       to_js('class Person; def self.count=(count); @@count=count; end; end').
-        must_equal 'function Person() {}; Object.defineProperty(Person, "count", {enumerable: true, configurable: true, set: function(count) {Person._count = count}})'
+        must_equal 'class Person {static set count(count) {Person._count = count}}'
     end
 
     it "should parse constructor methods with class variables" do
-      skip
       to_js('class Person; def initialize; @@count+=1; end; end').
-        must_equal 'function Person() {Person._count++}'
+        must_equal 'class Person {constructor() {Person._count++}}'
     end
 
     it "should parse class with class constants" do
