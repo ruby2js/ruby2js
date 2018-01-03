@@ -1,11 +1,11 @@
 gem 'minitest'
 require 'minitest/autorun'
-require 'ruby2js/filter/return'
+require 'ruby2js/filter/strict'
 
 describe Ruby2JS::Filter::Strict do
   
   def to_js( string)
-    Ruby2JS.convert(string, filters: [Ruby2JS::Filter::Strict])
+    Ruby2JS.convert(string, filters: [Ruby2JS::Filter::Strict]).to_s
   end
   
   describe :strict do

@@ -18,7 +18,7 @@ describe 'Ruby2JS::ExecJS' do
 
   it "should handle eval" do
     skip if @skip
-    Ruby2JS.eval('"abc" =~ /b/').must_equal true
+    Ruby2JS.eval('"abc" =~ /b/', filters: []).must_equal true
   end
 
   it "should handle exec" do

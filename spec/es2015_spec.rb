@@ -1,10 +1,11 @@
 gem 'minitest'
 require 'minitest/autorun'
+require 'ruby2js/filter/es2015'
 
 describe "ES2015 support" do
   
   def to_js(string)
-    Ruby2JS.convert(string, filters: [], eslevel: :es2015).to_s
+    Ruby2JS.convert(string, filters: [Ruby2JS::Filter::ES2015]).to_s
   end
   
   describe :vars do
@@ -240,6 +241,12 @@ describe "ES2015 support" do
     it "should prefix class constants referenced in methods by class name" do
       to_js('class C; X = 1; def m; X; end; end').
         must_equal 'class C {get m() {return C.X}}; const C.X = 1'
+    end
+  end
+
+  describe Ruby2JS::Filter::DEFAULTS do
+    it "should include ES2015" do
+      Ruby2JS::Filter::DEFAULTS.must_include Ruby2JS::Filter::ES2015
     end
   end
 end

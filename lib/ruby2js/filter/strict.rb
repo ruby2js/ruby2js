@@ -5,6 +5,11 @@ module Ruby2JS
     module Strict
       include SEXP
 
+      def initialize(*args)
+        @strict = false
+        super
+      end
+
       def process(node)
         if @strict
           super
