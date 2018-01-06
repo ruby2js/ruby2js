@@ -7,21 +7,32 @@ describe Ruby2JS::Filter::Vue do
   def to_js(string)
     Ruby2JS.convert(string, filters: [Ruby2JS::Filter::Vue], scope: self).to_s
   end
+
+  describe :createApp do
+    it "should create apps" do
+      to_js( 'class FooBar<Vue; end' ).
+        must_include 'var FooBar = new Vue('
+    end
+  end
   
   describe :createClass do
     it "should create classes" do
-      to_js( 'class FooBar<Vue; end' ).
+      to_js( 'class FooBar<Vue; def render; end; end' ).
+        must_include 'var FooBar = Vue.component("foo-bar",'
+      to_js( 'class FooBar<Vue; template "<span></span>"; end' ).
+        must_include 'var FooBar = Vue.component("foo-bar",'
+      to_js( 'class FooBar<Vue; template "<span></span>"; end' ).
         must_include 'var FooBar = Vue.component("foo-bar",'
     end
 
     it "should convert initialize methods to data" do
       to_js( 'class Foo<Vue; def initialize(); end; end' ).
-        must_include ', {data: function() {return {}}'
+        must_include '{data: function() {return {}}'
     end
 
     it "should insert an initialize method if none is present" do
       to_js( 'class Foo<Vue; def render; _h1 @title; end; end' ).
-        must_include ', {data: function() {return {title: undefined}}'
+        must_include '{data: function() {return {title: undefined}}'
     end
 
     it "should convert merge uninitialized values - simple" do
@@ -46,19 +57,19 @@ describe Ruby2JS::Filter::Vue do
 
     it "should initialize, accumulate, and return state if ivars are read" do
       to_js( 'class Foo<Vue; def initialize; @a=1; @b = @a; end; end' ).
-        must_include ', {data: function() {var $_ = {}; $_.a = 1; ' +
+        must_include '{data: function() {var $_ = {}; $_.a = 1; ' +
           '$_.b = $_.a; return $_}}'
     end
 
     it "should initialize, accumulate, and return state if multi-assignment" do
       to_js( 'class Foo<Vue; def initialize; @a=@b=1; end; end' ).
-        must_include ', {data: function() {var $_ = {b: undefined}; ' +
+        must_include '{data: function() {var $_ = {b: undefined}; ' +
           '$_.a = $_.b = 1; return $_}}'
     end
 
     it "should initialize, accumulate, and return state if op-assignment" do
       to_js( 'class Foo<Vue; def initialize; @a||=1; end; end' ).
-        must_include ', {data: function() {var $_ = {a: undefined}; ' +
+        must_include '{data: function() {var $_ = {a: undefined}; ' +
           '$_.a = $_.a || 1; return $_}}'
     end
 
@@ -634,7 +645,7 @@ describe Ruby2JS::Filter::Vue do
 
     it "should enable a mixin to be included" do
       to_js( 'class Bar<Vue; mixin Foo; end' ).
-        must_include 'var Bar = Vue.component("bar-", {mixins: [Foo], data: '
+        must_include '{mixins: [Foo], data: '
     end
   end
 
@@ -692,7 +703,7 @@ describe Ruby2JS::Filter::Vue do
     end
 
     it "should handle instance method comments" do
-      to_js( "class Foo<Vue; \n#imc\ndef method(); end; end" ).
+      to_js( "class Foo<Vue;\n#imc\ndef method(); end; def render; end; end" ).
         must_include "//imc\n    method: function("
     end
 

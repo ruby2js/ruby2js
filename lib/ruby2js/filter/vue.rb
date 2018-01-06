@@ -291,10 +291,22 @@ module Ruby2JS
         camel = "#{camel}-" if camel =~ /^[a-z]*$/
 
         if inheritance == s(:const, nil, :Vue)
-          # build component
-          defn = s(:casgn, nil, cname,
-            s(:send, s(:const, nil, :Vue), :component, 
-            s(:str, camel), s(:hash, *hash)))
+          component_methods = %w(render template)
+          if 
+            hash.any? do |pair| 
+              component_methods.include? pair.children[0].children[0].to_s
+            end
+          then
+            # build component
+            defn = s(:casgn, nil, cname,
+              s(:send, s(:const, nil, :Vue), :component, 
+              s(:str, camel), s(:hash, *hash)))
+          else
+            # build app
+            defn = s(:casgn, nil, cname,
+              s(:send, s(:const, nil, :Vue), :new, 
+              s(:hash, *hash)))
+          end
         else
           # build mixin
           defn = s(:casgn, nil, cname, s(:hash, *hash))
