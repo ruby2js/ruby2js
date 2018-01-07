@@ -291,12 +291,11 @@ module Ruby2JS
         camel = "#{camel}-" if camel =~ /^[a-z]*$/
 
         if inheritance == s(:const, nil, :Vue)
-          component_methods = %w(render template)
-          if 
-            hash.any? do |pair| 
-              component_methods.include? pair.children[0].children[0].to_s
-            end
-          then
+          hash_keys = hash.map do |pair|
+            pair.children[0].children[0].to_s
+          end
+
+          if hash_keys.any? {|key| %w(render template).include? key}
             # build component
             defn = s(:casgn, nil, cname,
               s(:send, s(:const, nil, :Vue), :component, 
