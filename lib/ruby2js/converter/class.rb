@@ -29,7 +29,7 @@ module Ruby2JS
       body.compact!
       visible = {}
       body.map! do |m| 
-        node = if m.type == :def
+        node = if m.type == :def or m.type == :async
           if m.children.first == :initialize
             # constructor: remove from body and overwrite init function
             init = m
@@ -53,16 +53,17 @@ module Ruby2JS
               # method: add to prototype
               s(:method, s(:attr, name, :prototype),
                 :"#{m.children[0].to_s.chomp('!')}=",
-                s(:block, s(:send, nil, :proc), *m.children[1..-1]))
+                s((m.type == :async ? :async : :def), nil, *m.children[1..-1]))
             end
           end
 
-        elsif m.type == :defs and m.children.first == s(:self)
+        elsif [:defs, :asyncs].include? m.type and m.children.first == s(:self)
           if m.children[1] =~ /=$/
             # class property setter
             s(:prop, name, m.children[1].to_s[0..-2] =>
                 {enumerable: s(:true), configurable: s(:true),
-                set: s(:block, s(:send, nil, :proc), *m.children[2..-1])})
+                set: s((m.type == :async ? :async : :def), nil, 
+                *m.children[2..-1])})
           elsif m.children[2].children.length == 0 and
             m.children[1] !~ /!/ and m.loc and m.loc.name and
             m.loc.name.source_buffer.source[m.loc.name.end_pos] != '('

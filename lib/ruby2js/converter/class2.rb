@@ -40,7 +40,7 @@ module Ruby2JS
           put(index == 0 ? @nl : @sep) unless skipped
           skipped = false
 
-          if m.type == :def
+          if m.type == :def || m.type == :async
             @prop = m.children.first
 
             if @prop == :initialize
@@ -70,7 +70,10 @@ module Ruby2JS
               @instance_method = nil
             end
 
-          elsif m.type == :defs and m.children.first.type == :self
+          elsif 
+            [:defs, :asyncs].include? m.type and m.children.first.type == :self
+          then
+
             @prop = "static #{m.children[1]}"
             if not m.is_method?
               @prop = "static get #{m.children[1]}"
@@ -83,6 +86,8 @@ module Ruby2JS
                 m.children[1].to_s.sub('!', ''), *m.children[2..3]])
               @prop = "static #{m.children[1]}"
             end
+
+            @prop.sub! 'static', 'static async' if m.type == :asyncs
 
             m = m.updated(:def, m.children[1..3])
             parse m

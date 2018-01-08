@@ -17,7 +17,7 @@ module Ruby2JS
         if node.children[0] == nil and WHITELIST.include? node.children[1].to_s
           super
         elsif node.children[1] =~ /_.*\w$/
-          super S((node.is_method? ? :call : :attr) , node.children[0],
+          super S(:send , node.children[0],
             camelCase(node.children[1]), *node.children[2..-1])
         else
           super

@@ -58,7 +58,7 @@ module Ruby2JS
         # consisting of an anonymous function
         block ||= s(:begin)
         function = @ast.updated(:def, [nil, args, block])
-        parse s(:send, *call.children, function)
+        parse s(@ast.children[0].type, *call.children, function)
       end
     end
   end

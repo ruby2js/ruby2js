@@ -17,6 +17,7 @@ begin
   require 'ruby2js'
 
   filters = {
+    'async' => 'ruby2js/filter/async',
     'angularrb' => 'ruby2js/filter/angularrb',
     'angular-resource' => 'ruby2js/filter/angular-resource',
     'angular-route' => 'ruby2js/filter/angular-route',
