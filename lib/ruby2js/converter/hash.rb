@@ -56,8 +56,8 @@ module Ruby2JS
               # hoist get/set comments to definition of property
               if right.type == :hash
                 right.children.each do |pair|
-                next unless Parser::AST::Node === pair.children.last
-                  if pair.children.last.type == :block
+                  next unless Parser::AST::Node === pair.children.last
+                  if [:block, :def, :async].include? pair.children.last.type
                     if @comments[pair.children.last]
                       (puts ''; singleton = false) if singleton
                       comments(pair.children.last).each do |comment|

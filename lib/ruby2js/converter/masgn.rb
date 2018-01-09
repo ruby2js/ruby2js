@@ -11,14 +11,27 @@ module Ruby2JS
 
     handle :masgn do |lhs, rhs|
       if es2015
-        newvars = lhs.children.select do |var|
-          var.type == :lvasgn and not @vars.include? var.children.last
+        walk = lambda do |node|
+          results = []
+          node.children.each do |var|
+            if var.type == :lvasgn
+              results << var 
+            elsif var.type == :mlhs or var.type == :splat
+              results += walk[var]
+            end
+          end
+          results
         end
 
-        if newvars.length == lhs.children.length
-          put 'let ' 
-        elsif newvars.length > 0
-          put "let #{newvars.map {|var| var.children.last}.join(', ')}#{@sep}"
+        vars = walk[lhs]
+        newvars = vars.select {|var| not @vars.include? var.children[0]}
+
+        if newvars.length > 0
+          if vars == newvars
+            put 'let ' 
+          else
+            put "let #{newvars.map {|var| var.children.last}.join(', ')}#{@sep}"
+          end
         end
 
         newvars.each do |var| 

@@ -26,6 +26,7 @@ describe 'not implemented' do
   end
 
   it "decomposition" do
+    # NOTE: option {eslevel: es2015} implements this
     todo( 'def f(a, (foo, *bar)); end' )
   end
 

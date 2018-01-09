@@ -6,7 +6,7 @@ module Ruby2JS
     #     (arg :x)
     #   (...)
 
-    handle :def do |name, args, body=nil|
+    handle :def, :async do |name, args, body=nil|
       body ||= s(:begin)
       if name =~ /[!?]$/
         raise NotImplementedError, "invalid method name #{ name }"
@@ -87,6 +87,8 @@ module Ruby2JS
           end
         end
       end
+
+      put 'async ' if @ast.type == :async
 
       # es2015 fat arrow support
       if not name and es2015

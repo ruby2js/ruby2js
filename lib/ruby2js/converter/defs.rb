@@ -5,10 +5,17 @@ module Ruby2JS
     #   (args)
     #   (...)
 
-    # NOTE: defp is only produced by filters
+    # NOTE: defp and asyncs are only produced by filters
 
-    handle :defs, :defp do |target, method, args, body|
-      parse transform_defs(target, method, args, body)
+    handle :defs, :defp, :asyncs do |target, method, args, body|
+      node = transform_defs(target, method, args, body)
+
+      if node.type == :send and @ast.type == :asyncs
+        node = node.updated(nil, [*node.children[0..1],
+          node.children[2].updated(:async)])
+      end
+
+      parse node
     end
 
     def transform_defs(target, method, args, body)
@@ -23,8 +30,7 @@ module Ruby2JS
           set: s(:block, s(:send, nil, :proc), args,
           body)})
       else
-        node = s(:send, target, "#{method}=",
-          s(:block, s(:send, nil, :proc), args, body))
+        node = s(:send, target, "#{method}=", s(:def, nil, args, body))
       end
 
       @comments[node] = @comments[@ast] if @comments[@ast]
