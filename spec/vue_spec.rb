@@ -3,7 +3,7 @@ require 'minitest/autorun'
 require 'ruby2js/filter/vue'
 
 describe Ruby2JS::Filter::Vue do
-  
+
   def to_js(string)
     Ruby2JS.convert(string, filters: [Ruby2JS::Filter::Vue], scope: self).to_s
   end
@@ -14,7 +14,7 @@ describe Ruby2JS::Filter::Vue do
         must_include 'var FooBar = new Vue('
     end
   end
-  
+
   describe :createClass do
     it "should create classes" do
       to_js( 'class FooBar<Vue; def render; end; end' ).
@@ -238,7 +238,7 @@ describe Ruby2JS::Filter::Vue do
     end
 
     it "should iterate" do
-      result = to_js('class Foo<Vue; def render; _ul list ' + 
+      result = to_js('class Foo<Vue; def render; _ul list ' +
         'do |i| _li i; end; end; end')
 
       result.must_include '$h("ul", function() {'
@@ -250,7 +250,7 @@ describe Ruby2JS::Filter::Vue do
     end
 
     it "should iterate with markaby style classes/ids" do
-      result = to_js('class Foo<Vue; def render; _ul.todos list ' + 
+      result = to_js('class Foo<Vue; def render; _ul.todos list ' +
         'do |i| _li i; end; end; end')
 
       result.must_include '$h("ul", {class: ["todos"]}, function() {'
@@ -432,7 +432,7 @@ describe Ruby2JS::Filter::Vue do
     end
 
     it "should not support assigning to class variables" do
-      proc { 
+      proc {
         to_js( 'class Foo<Vue; def method(); @@x=1; end; end' )
       }.must_raise NotImplementedError
     end
@@ -636,6 +636,11 @@ describe Ruby2JS::Filter::Vue do
       js = to_js( 'class Foo<Vue; options a: b; def render; _p $options.a; end; end' )
       js.must_include '{a: b, data:'
       js.must_include '$h("p", this.$options.a)'
+    end
+
+    it "should capture and access el(for apps)" do
+      js = to_js( 'class Foo<Vue; el ".element"; end' )
+      js.must_include 'el: ".element"'
     end
 
     it "should enable a mixin to be defined" do

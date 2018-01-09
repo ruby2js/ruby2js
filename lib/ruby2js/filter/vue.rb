@@ -41,7 +41,7 @@ module Ruby2JS
       #  before:
       #    (class (const nil :Foo) (const nil :Vue) nil)
       #  after:
-      #    (casgn nil :Foo, (send nil, :Vue, :component, (:str, "foo"), 
+      #    (casgn nil :Foo, (send nil, :Vue, :component, (:str, "foo"),
       #      s(:hash)))
       def on_class(node)
         cname, inheritance, *body = node.children
@@ -69,11 +69,12 @@ module Ruby2JS
         computed = []
         setters = []
         options = []
+        el = nil
         mixins = []
 
         # insert constructor if none present
         if inheritance == s(:const, nil, :Vue)
-          unless body.any? {|statement| 
+          unless body.any? {|statement|
             statement.type == :def and statement.children.first ==:initialize}
           then
             body = body.dup
@@ -102,12 +103,12 @@ module Ruby2JS
               end
             end
 
-          elsif 
+          elsif
             statement.type == :send and statement.children[0] == cname and
             statement.children[1].to_s.end_with? '='
           then
             @vue_reactive << statement.updated(:send, [
-              s(:attr, s(:const, nil, :Vue), :util), :defineReactive, cname, 
+              s(:attr, s(:const, nil, :Vue), :util), :defineReactive, cname,
               s(:sym, statement.children[1].to_s[0..-2]),
               process(statement.children[2])])
 
@@ -120,14 +121,20 @@ module Ruby2JS
           # named values (template, props, options, mixin[s])
           if statement.type == :send and statement.children.first == nil
             if [:template, :props].include? statement.children[1]
-              hash << s(:pair, s(:sym, statement.children[1]), 
+              hash << s(:pair, s(:sym, statement.children[1]),
                 statement.children[2])
 
-            elsif 
+            elsif
               statement.children[1] == :options and
               statement.children[2].type == :hash
             then
               options += statement.children[2].children
+
+            elsif
+              statement.children[1] == :el and
+              statement.children[2].type == :str
+            then
+              el = statement.children[2]
 
             elsif statement.children[1] == :mixin or
                   statement.children[1] == :mixins
@@ -182,7 +189,7 @@ module Ruby2JS
                 uninitialized = @vue_inventory[:ivar].dup
 
                 block.children.each do |child|
-                  if child.type == :ivasgn 
+                  if child.type == :ivasgn
                     uninitialized.delete child.children.first
                   end
                 end
@@ -196,15 +203,15 @@ module Ruby2JS
                   end
 
                   pairs += uninitialized.map do |symbol|
-                    s(:pair, s(:sym, symbol.to_s[1..-1]), 
+                    s(:pair, s(:sym, symbol.to_s[1..-1]),
                       s(:attr, nil, :undefined))
                   end
 
                   block = s(:return, s(:hash, *pairs))
                 else
                   # general case: build up a hash incrementally
-                  block = s(:begin, s(:gvasgn, :$_, 
-                    s(:hash, *uninitialized.map {|sym| 
+                  block = s(:begin, s(:gvasgn, :$_,
+                    s(:hash, *uninitialized.map {|sym|
                       s(:pair, s(:sym, sym.to_s[1..-1]),
                       s(:attr, nil, :undefined))})),
                     block, s(:return, s(:gvar, :$_)))
@@ -224,7 +231,7 @@ module Ruby2JS
               @comments[pair] = @comments[statement]
               if VUE_LIFECYCLE.include? method
                 hash << pair
-              elsif not statement.is_method? 
+              elsif not statement.is_method?
                 computed << pair
               elsif method.to_s.end_with? '='
                 setters << pair
@@ -244,7 +251,7 @@ module Ruby2JS
         # add properties before that
         unless hash.any? {|pair| pair.children[0].children[0] == :props}
           unless @vue_inventory[:cvar].empty?
-            hash.unshift s(:pair, s(:sym, :props), s(:array, 
+            hash.unshift s(:pair, s(:sym, :props), s(:array,
               *@vue_inventory[:cvar].map {|sym| s(:str, sym.to_s[2..-1])}))
           end
         end
@@ -253,6 +260,9 @@ module Ruby2JS
         unless mixins.empty?
           hash.unshift s(:pair, s(:sym, :mixins), s(:array, *mixins))
         end
+
+        # add el as first, if app has
+        hash.unshift(s(:pair, s(:sym, :el), el)) if el
 
         # append methods to hash
         unless methods.empty?
@@ -263,7 +273,7 @@ module Ruby2JS
 
         # append setters to computed list
         setters.each do |setter|
-          index = computed.find_index do |pair| 
+          index = computed.find_index do |pair|
             pair.children[0].children[0].to_s ==
               setter.children[0].children[0]
           end
@@ -298,12 +308,12 @@ module Ruby2JS
           if hash_keys.any? {|key| %w(render template).include? key}
             # build component
             defn = s(:casgn, nil, cname,
-              s(:send, s(:const, nil, :Vue), :component, 
+              s(:send, s(:const, nil, :Vue), :component,
               s(:str, camel), s(:hash, *hash)))
           else
             # build app
             defn = s(:casgn, nil, cname,
-              s(:send, s(:const, nil, :Vue), :new, 
+              s(:send, s(:const, nil, :Vue), :new,
               s(:hash, *hash)))
           end
         else
@@ -312,7 +322,7 @@ module Ruby2JS
         end
 
         # append class methods (if any)
-        class_methods = body.select do |statement| 
+        class_methods = body.select do |statement|
           statement.type == :defs  and statement.children[0] == s(:self)
         end
 
@@ -327,7 +337,7 @@ module Ruby2JS
                   s(:block, s(:send , nil, :proc), method.children[2],
                    *process_all(method.children[3..-1])))
               else
-                getter = class_methods.find do |other_method| 
+                getter = class_methods.find do |other_method|
                   "#{other_method.children[1]}=" == method.children[1].to_s
                 end
 
@@ -346,7 +356,7 @@ module Ruby2JS
                 else
                   # setter only
                   s(:send, s(:const, nil, :Object), :defineProperty,
-                    s(:const, nil, cname), 
+                    s(:const, nil, cname),
                     s(:str, method.children[1].to_s[0..-2]),
                     s(:hash, s(:pair, s(:sym, :enumerable), s(:true)),
                     s(:pair, s(:sym, :configurable), s(:true)),
@@ -357,7 +367,7 @@ module Ruby2JS
               end
 
             elsif
-              class_methods.any? do |other_method| 
+              class_methods.any? do |other_method|
                 other_method.children[1].to_s == "#{method.children[1]}="
               end
             then
@@ -370,7 +380,7 @@ module Ruby2JS
                 s(:hash, s(:pair, s(:sym, :enumerable), s(:true)),
                 s(:pair, s(:sym, :configurable), s(:true)),
                 s(:pair, s(:sym, :get), s(:block, s(:send, nil, :proc),
-                  method.children[2], 
+                  method.children[2],
                   s(:autoreturn, *process_all(method.children[3..-1]))))))
             end
 
@@ -503,11 +513,11 @@ module Ruby2JS
                         left = expr.children[1]
                         right = expr.children[2] || s(:nil)
 
-                        expr = expr.updated(nil, 
+                        expr = expr.updated(nil,
                           [expr.children[0], left, right])
                       end
 
-                      hash[:class] = s(:array, 
+                      hash[:class] = s(:array,
                         *values.join(' ').split(' ').map {|str| s(:str, str)},
                         expr)
                     end
@@ -517,7 +527,7 @@ module Ruby2JS
                     hash[:class] = s(:array, expr)
                   end
                 else
-                  hash[:class] = s(:array, 
+                  hash[:class] = s(:array,
                     *values.join(' ').split(' ').map {|str| s(:str, str)})
                 end
               end
@@ -630,15 +640,15 @@ module Ruby2JS
             # test if value is assignable
             test = value
             loop do
-              break unless test and test.type == :send 
+              break unless test and test.type == :send
               break unless (test.children.length == 2 and
                 test.children.last.instance_of? Symbol and
                 not [:not, :!, :*, :+, :-].include? test.children.last) or
                 test.children[1] == :[]
-              test = test.children.first 
+              test = test.children.first
             end
 
-            if value and value.type != :cvar and (not test or 
+            if value and value.type != :cvar and (not test or
               test.is_a? Symbol or [:ivar, :cvar, :self].include? test.type)
             then
               hash[:domProps][attr] ||= value
@@ -683,9 +693,9 @@ module Ruby2JS
 
           # put attributes up front
           unless hash.empty?
-            pairs = hash.to_a.map do |k1, v1| 
+            pairs = hash.to_a.map do |k1, v1|
               next if Hash === v1 and v1.empty?
-              s(:pair, s(:str, k1.to_s), 
+              s(:pair, s(:str, k1.to_s),
                 if Parser::AST::Node === v1
                   v1
                 else
@@ -727,8 +737,8 @@ module Ruby2JS
               #   }())
               #
               @vue_apply = true
-              
-              element = node.updated :send, [nil, @vue_h, 
+
+              element = node.updated :send, [nil, @vue_h,
                 *process_all(args),
                 s(:send, s(:block, s(:send, nil, :proc),
                   s(:args, s(:shadowarg, :$_)), s(:begin,
@@ -779,7 +789,7 @@ module Ruby2JS
             element = node.updated nil, [*@vue_h,
               *process_all(node.children[2..-1])]
           else
-            element = node.updated nil, [nil, @vue_h, 
+            element = node.updated nil, [nil, @vue_h,
               *process_all(node.children[2..-1])]
           end
 
@@ -795,7 +805,7 @@ module Ruby2JS
           node.children[0] == s(:const, nil, :Vue)
         then
           # vm methods
-          node.updated nil, [s(:self), "$#{node.children[1]}", 
+          node.updated nil, [s(:self), "$#{node.children[1]}",
             *process_all(node.children[2..-1])]
 
         elsif node.children[0] and node.children[0].type == :send
@@ -898,12 +908,12 @@ module Ruby2JS
           #
           begin
             vue_apply, @vue_apply = @vue_apply, true
-            
-            element = node.updated :send, [nil, @vue_h, 
+
+            element = node.updated :send, [nil, @vue_h,
               *child.children[2..-1],
               s(:send, s(:block, s(:send, nil, :proc),
                 s(:args, s(:shadowarg, :$_)), s(:begin,
-                s(:lvasgn, :$_, s(:array)), 
+                s(:lvasgn, :$_, s(:array)),
                 process(node.children[2]),
                 s(:return, s(:lvar, :$_)))), :[])]
           ensure
@@ -976,11 +986,11 @@ module Ruby2JS
 
       # expand @= to @vue_self.=
       def on_ivasgn(node)
-        return super unless @vue_self 
+        return super unless @vue_self
         if node.children.length == 1
           s(:attr, @vue_self, "#{node.children[0].to_s[1..-1]}")
         else
-          s(:send, @vue_self, "#{node.children[0].to_s[1..-1]}=", 
+          s(:send, @vue_self, "#{node.children[0].to_s[1..-1]}=",
             process(node.children[1]))
         end
       end
@@ -990,15 +1000,15 @@ module Ruby2JS
       def on_op_asgn(node)
         return super unless @vue_self
         if node.children.first.type == :ivasgn
-          node.updated nil, [s(:attr, @vue_self, 
+          node.updated nil, [s(:attr, @vue_self,
             node.children[0].children[0].to_s[1..-1]),
             node.children[1], process(node.children[2])]
 
-        elsif 
+        elsif
           node.children.first.type == :lvasgn and
           @vue_props.include? node.children[0].children[0]
         then
-          node.updated nil, [s(:attr, s(:self), 
+          node.updated nil, [s(:attr, s(:self),
             node.children[0].children[0]),
             node.children[1], process(node.children[2])]
 
@@ -1018,7 +1028,7 @@ module Ruby2JS
       def on_pair(node)
         key, value = node.children
         return super unless Parser::AST::Node === value
-        return super unless value.type == :send and 
+        return super unless value.type == :send and
           value.children.length == 2 and
           value.children[0] == nil and
           @vue_methods.include? value.children[1]
@@ -1033,11 +1043,11 @@ module Ruby2JS
           if Parser::AST::Node === node
             if node.type == :send
               # wunderbar style calls
-              return false if node.children[0] == nil and 
+              return false if node.children[0] == nil and
                 node.children[1].to_s.start_with? '_'
 
               # Vue.createElement calls
-              return false if node.children[0] == s(:const, nil, :Vue) and 
+              return false if node.children[0] == s(:const, nil, :Vue) and
                 node.children[1] == :createElement
             end
 
