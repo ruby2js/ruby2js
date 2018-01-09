@@ -30,6 +30,16 @@ describe "ES2015 support" do
     it "should for loops" do
       to_js( 'for i in x; end' ).must_equal('for (let i of x) {}')
     end
+
+    it "should destructure assignment statements" do
+      to_js( 'a, (foo, *bar) = x' ).
+        must_equal('let [a, [foo, ...bar]] = x')
+    end
+
+    it "should destructure parameters" do
+      to_js( 'def f(a, (foo, *bar)); end' ).
+        must_equal('function f(a, [foo, ...bar]) {}')
+    end
   end
 
   describe :destructuring do
