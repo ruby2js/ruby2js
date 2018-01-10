@@ -424,7 +424,7 @@ conversions are made:
 * `def a(b=1)` becomes `function a(b=1)`
 * `def a(*b)` becomes `function a(...b)`
 * `a(*b)` becomes `a(...b)`
-* `"#{a}"` becomes `\`${a}`\`
+* `"#{a}"` becomes <code>\`${a}\`</code>
 * `lambda {|x| x}` becomes `(x) => {return x}`
 * `proc {|x| x}` becomes `(x) => {x}`
 * `a {|x|}` becomes `a((x) => {})`
