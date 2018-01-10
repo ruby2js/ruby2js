@@ -112,7 +112,7 @@ describe "ES2015 support" do
       Ruby2JS.convert(
         'Array(a)', 
         filters: [Ruby2JS::Filter::Functions], 
-        eslevel: :es2015
+        eslevel: 2015
       ).to_s.must_equal 'Array.from(a)'
     end
   end

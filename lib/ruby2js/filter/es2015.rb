@@ -4,7 +4,10 @@ module Ruby2JS
   module Filter
     module ES2015
       def process(ast)
-        @options[:eslevel] = :es2015
+        unless @options[:eslevel] and @options[:eslevel] >= 2015
+          @options[:eslevel] = 2015
+        end
+
         super
       end
     end

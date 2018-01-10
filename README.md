@@ -50,7 +50,7 @@ puts Ruby2JS.convert('"2A".to_i(16)')
 Enable ES2015 support:
 
 ```ruby
-puts Ruby2JS.convert('"#{a}"', eslevel: :es2015)
+puts Ruby2JS.convert('"#{a}"', eslevel: 2015)
 ```
 
 With [ExecJS](https://github.com/sstephenson/execjs):
@@ -410,7 +410,7 @@ the script.
 ES2015 support
 ---
 
-When option `eslevel: :es2015` is provided, the following additional
+When option `eslevel: 2015` is provided, the following additional
 conversions are made:
 
 * `"#{a}"` becomes <code>\`${a}\`</code>

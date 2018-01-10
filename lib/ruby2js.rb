@@ -41,7 +41,7 @@ module Ruby2JS
       end
 
       def es2015
-        @options[:eslevel] == :es2015
+        @options[:eslevel] >= 2015
       end
 
       def process(node)
@@ -92,6 +92,8 @@ module Ruby2JS
   end
 
   def self.convert(source, options={})
+    options[:eslevel] ||= 5
+
     if Proc === source
       file,line = source.source_location
       source = File.read(file.dup.untaint).untaint

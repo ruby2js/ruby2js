@@ -81,7 +81,7 @@ module Ruby2JS
     end
 
     def es2015
-      @eslevel == :es2015
+      @eslevel >= 2015
     end
 
     @@handlers = []

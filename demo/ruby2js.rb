@@ -67,7 +67,7 @@ _html do
       raise $load_error if $load_error
 
       options = {}
-      options[:eslevel] = :es2015 if @es2015
+      options[:eslevel] = 2015 if @es2015
 
       ruby = Ruby2JS.convert(@ruby, options)
 
