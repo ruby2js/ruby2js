@@ -76,7 +76,7 @@ module Ruby2JS
         parse receiver; put '['; parse_all(*args[0..-2], join: ', '); put '] = '
         parse args[-1]
 
-      elsif method == :** and not es2015
+      elsif method == :** and not es2016
         put 'Math.pow('
         parse receiver
         put ', '

@@ -44,6 +44,10 @@ module Ruby2JS
         @options[:eslevel] >= 2015
       end
 
+      def es2016
+        @options[:eslevel] >= 2015
+      end
+
       def process(node)
         ast, @ast = @ast, node
         replacement = super

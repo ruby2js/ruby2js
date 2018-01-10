@@ -87,12 +87,6 @@ describe "ES2015 support" do
     end
   end
 
-  describe :operator do
-    it "should parse exponential operators" do
-      to_js( '2 ** 0.5' ).must_equal '2 ** 0.5'
-    end
-  end
-
   describe :fat_arrow do
     it "should handle simple lambda expressions" do
       to_js( 'foo = lambda {|x| x*x}' ).must_equal 'let foo = (x) => x * x'
