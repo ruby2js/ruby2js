@@ -45,7 +45,11 @@ module Ruby2JS
       end
 
       def es2016
-        @options[:eslevel] >= 2015
+        @options[:eslevel] >= 2016
+      end
+
+      def es2017
+        @options[:eslevel] >= 2017
       end
 
       def process(node)

@@ -234,6 +234,11 @@ describe Ruby2JS::Filter::Functions do
       to_js( 'a.keys()' ).must_equal 'Object.keys(a)'
     end
 
+    it "should convert hash.each_key" do
+      to_js( 'h.each_key {|k,v| x+=v}' ).
+        must_equal 'Object.keys(h).forEach(function(k, v) {x += v})'
+    end
+
     it "should handle merge!" do
       to_js( 'a.merge!(b)' ).must_equal 'Object.assign(a, b)'
     end

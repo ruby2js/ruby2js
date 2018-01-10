@@ -372,6 +372,19 @@ module Ruby2JS
             :step, step])
           process node.updated(nil, [call, *node.children[1..-1]])
 
+        elsif call.children[1] == :each_key
+          process node.updated(nil, [s(:send, s(:send, s(:const, nil, :Object),
+            :keys, call.children[0]), :forEach), *node.children[1..2]])
+
+        elsif call.children[1] == :each_value
+          process node.updated(nil, [s(:send, s(:send, s(:const, nil, :Object),
+            :values, call.children[0]), :forEach), *node.children[1..2]])
+
+        elsif es2017 and call.children[1] == :each_pair
+          process node.updated(nil, [s(:send, s(:send, s(:const, nil, :Object),
+            :entries, call.children[0]), :forEach), s(:args, s(:mlhs,
+            *node.children[1].children)), node.children[2]])
+
         elsif 
           # (a..b).each {|v| ...}
           call.children[1] == :each and

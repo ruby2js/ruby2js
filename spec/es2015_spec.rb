@@ -121,6 +121,16 @@ describe "ES2015 support" do
         must_equal 'class Person {get a() {return this._a}; set a(a) {this._a = a}}'
     end
 
+    it "should parse class with attr_reader" do
+      to_js('class Person; attr_reader :a; end').
+        must_equal 'class Person {get a() {return this._a}}'
+    end
+
+    it "should parse class with attr_writer" do
+      to_js('class Person; attr_writer :a; end').
+        must_equal 'class Person {set a(a) {this._a = a}}'
+    end
+
     it "should parse class with constructor" do
       to_js('class Person; def initialize(name); @name = name; end; end').
         must_equal 'class Person {constructor(name) {this._name = name}}'

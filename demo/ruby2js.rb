@@ -22,6 +22,9 @@ begin
     'angular-resource' => 'ruby2js/filter/angular-resource',
     'angular-route' => 'ruby2js/filter/angular-route',
     'functions' => 'ruby2js/filter/functions',
+    'es2015' => 'ruby2js/filter/es2015',
+    'es2016' => 'ruby2js/filter/es2016',
+    'es2017' => 'ruby2js/filter/es2017',
     'jquery'    => 'ruby2js/filter/jquery',
     'vue'       => 'ruby2js/filter/vue',
     'minitest-jasmine' => 'ruby2js/filter/minitest-jasmine',
@@ -58,8 +61,8 @@ _html do
     _input type: 'checkbox', name: 'ast', id: 'ast', checked: !!@ast
     _label 'Show AST', for: 'ast'
 
-    _input type: 'checkbox', name: 'es2015', id: 'es2015', checked: !!@es2015
-    _label 'ES2015', for: 'es2015'
+    _input type: 'checkbox', name: 'es2017', id: 'es2017', checked: !!@es2017
+    _label 'ES2017', for: 'es2017'
   end
 
   if @ruby
@@ -67,7 +70,7 @@ _html do
       raise $load_error if $load_error
 
       options = {}
-      options[:eslevel] = 2015 if @es2015
+      options[:eslevel] = 2017 if @es2017
 
       ruby = Ruby2JS.convert(@ruby, options)
 

@@ -171,6 +171,7 @@ the script.
     * `.delete` becomes `delete target[arg]`
     * `.downcase` becomes `.toLowerCase`
     * `.each` becomes `forEach`
+    * `.each_key` becomes `Object.keys().forEach`
     * `.each_with_index` becomes `.forEach`
     * `.end_with?` becomes `.slice(-arg.length) == arg`
     * `.empty?` becomes `.length == 0`
@@ -415,10 +416,44 @@ When option `eslevel: 2015` is provided, the following additional
 conversions are made:
 
 * `"#{a}"` becomes <code>\`${a}\`</code>
-* `a ** b` becomes `a ** b`
 * `a = 1` becomes `let a = 1`
 * `A = 1` becomes `const A = 1`
 * `a, b = b, a` becomes `[a, b] = [b, a]`
+* `a, (foo, *bar) = x` becomes `let [a, [foo, ...bar]] = x`
+* `def f(a, (foo, *bar))` becomes `function f(a, [foo, ...bar])`
+* `def a(b=1)` becomes `function a(b=1)`
+* `def a(*b)` becomes `function a(...b)`
+* `a(*b)` becomes `a(...b)`
+* `"#{a}"` becomes `\`${a}`\'`
+* `lambda {|x| x}` becomes `(x) => {return x}`
+* `proc {|x| x}` becomes `(x) => {x}`
+* `a {|x|}` becomes `a((x) => {})`
+* `class Person; end` becomes `class Person {}`
+
+ES2015 class support includes constructors, super, methods, class methods,
+instance methods, instance variables, class variables, getters, setters,
+attr_accessor, attr_reader, attr_writer, etc.
+
+Additionally, the `functions` filter will provide the following conversion:
+
+* `Array(x)` becomes `Array.from(x)`
+
+ES2016 support
+---
+
+When option `eslevel: 2016` is provided, the following additional
+conversions are made:
+
+* `a ** b` becomes `a ** b`
+
+ES2017 support
+---
+
+When option `eslevel: 2017` is provided, the following additional
+conversions are made by the `functions` filter:
+
+* `.each_entry` becomes `Object.entries().forEach`
+* `.each_value` becomes `Object.values().forEach`
 
 Picking a Ruby to JS mapping tool
 ---
