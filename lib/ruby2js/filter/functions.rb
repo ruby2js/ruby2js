@@ -372,6 +372,17 @@ module Ruby2JS
             :step, step])
           process node.updated(nil, [call, *node.children[1..-1]])
 
+        elsif 
+          # (a..b).each {|v| ...}
+          call.children[1] == :each and
+          call.children[0].type == :begin and
+          call.children[0].children.length == 1 and
+          [:irange, :erange].include? call.children[0].children[0].type and
+          node.children[1].children.length == 1
+        then
+          s(:for, s(:lvasgn, node.children[1].children[0].children[0]), 
+            call.children[0].children[0], node.children[2])
+
         else
           super
         end

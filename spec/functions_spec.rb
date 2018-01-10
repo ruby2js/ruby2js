@@ -297,6 +297,13 @@ describe Ruby2JS::Filter::Functions do
         must_equal 'for (var i = 3; i >= 1; i -= 1) {p(i)}'
     end
 
+    it "should range each to for" do
+      to_js( '(1..10).each {|i| p i}' ).
+        must_equal 'for (var i = 1; i <= 10; i++) {p(i)}'
+      to_js( '(1...10).each {|i| p i}' ).
+        must_equal 'for (var i = 1; i < 10; i++) {p(i)}'
+    end
+
     it "should map step().each to for -- default" do
       to_js( '1.step(3).each {|i| p i}' ).
         must_equal 'for (var i = 1; i <= 3; i += 1) {p(i)}'

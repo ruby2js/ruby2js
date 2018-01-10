@@ -206,6 +206,7 @@ the script.
     * `[n...m]` becomes `.slice(n,m)`
     * `[n..m]` becomes `.slice(n,m+1)`
     * `[/r/, n]` becomes `.match(/r/)[n]`
+    * `(1..2).each {|i| ...}` becomes `for (var i=1 i<=2; i+=1)`
     * `"string" * length` becomes `new Array(length + 1).join("string")`
     * `.sub!` and `.gsub!` become equivalent `x = x.replace` statements
     * `.map!`, `.reverse!`, and `.select` become equivalent
