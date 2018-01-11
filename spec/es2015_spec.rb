@@ -109,6 +109,14 @@ describe "ES2015 support" do
         eslevel: 2015
       ).to_s.must_equal 'Array.from(a)'
     end
+
+    it "should handle reduce" do
+      Ruby2JS.convert(
+        'x.inject(0) {|sum, n| sum+n}', 
+        filters: [Ruby2JS::Filter::Functions], 
+        eslevel: 2015
+      ).to_s.must_equal 'x.reduce((sum, n) => sum + n, 0)'
+    end
   end
 
   describe 'object definition' do

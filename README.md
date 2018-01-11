@@ -437,6 +437,7 @@ attr_accessor, attr_reader, attr_writer, etc.
 Additionally, the `functions` filter will provide the following conversion:
 
 * `Array(x)` becomes `Array.from(x)`
+* `.inject(n) {}` becomes `.reduce(() => {}, n)`
 
 ES2016 support
 ---

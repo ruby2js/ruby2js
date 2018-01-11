@@ -380,6 +380,11 @@ module Ruby2JS
           process node.updated(nil, [s(:send, s(:send, s(:const, nil, :Object),
             :values, call.children[0]), :forEach), *node.children[1..2]])
 
+        elsif es2015 and call.children[1] == :inject
+          process node.updated(:send, [call.children[0], :reduce,
+            s(:block, s(:send, nil, :lambda), *node.children[1..2]),
+            *call.children[2..-1]])
+
         elsif es2017 and call.children[1] == :each_pair
           process node.updated(nil, [s(:send, s(:send, s(:const, nil, :Object),
             :entries, call.children[0]), :forEach), s(:args, s(:mlhs,
