@@ -109,7 +109,7 @@ module Ruby2JS
         then
           parse expr
         else
-          put "{#{@nl}"; parse body; put "#{@nl}}"
+          put "{#{@nl}"; parse body, :statement; put "#{@nl}}"
         end
         return
       end

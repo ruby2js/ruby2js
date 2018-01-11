@@ -38,6 +38,11 @@ describe "ES2015 support" do
         must_equal 'for (let v of a) {x += v}'
     end
 
+    it "should handle conditional returns in an each block" do
+      to_js_fn( 'a.each {|i| return i if true}' ).
+        must_equal 'for (let i of a) {if (true) return i}'
+    end
+
     it "should convert hash.each_value to a for...of" do
       to_js_fn( 'h.each_value {|v| x+=v}' ).
         must_equal 'for (let v of h) {x += v}'
@@ -109,7 +114,7 @@ describe "ES2015 support" do
     end
 
     it "should handle multi-statement blocks" do
-      to_js( 'foo = proc {a;b}' ).must_equal 'let foo = () => {a; b}'
+      to_js( 'foo = proc {a() ;b()}' ).must_equal 'let foo = () => {a(); b()}'
     end
   end
 
