@@ -102,9 +102,9 @@ describe Ruby2JS::Filter::Functions do
   end
     
   describe 'array functions' do
-    it "should map each to forEach" do
+    it "should map each to for statement" do
       to_js( 'a = 0; [1,2,3].each {|i| a += i}').
-        must_equal 'var a = 0; [1, 2, 3].forEach(function(i) {a += i})'
+        must_equal 'var a = 0; for (var i in [1, 2, 3]) {a += i}'
     end
 
     it "should map each_with_index to forEach" do
@@ -229,14 +229,19 @@ describe Ruby2JS::Filter::Functions do
   end
 
   describe 'hash functions' do
+    it "should map each_value to forEach" do
+      to_js( 'h.each_value {|i| a += i}').
+        must_equal 'h.forEach(function(i) {a += i})'
+    end
+
     it "should handle keys" do
       to_js( 'a.keys' ).must_equal 'a.keys'
       to_js( 'a.keys()' ).must_equal 'Object.keys(a)'
     end
 
     it "should convert hash.each_key" do
-      to_js( 'h.each_key {|k,v| x+=v}' ).
-        must_equal 'Object.keys(h).forEach(function(k, v) {x += v})'
+      to_js( 'h.each_key {|k| x+=k}' ).
+        must_equal 'for (var k in h) {x += k}'
     end
 
     it "should handle merge!" do

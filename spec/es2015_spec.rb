@@ -8,6 +8,11 @@ describe "ES2015 support" do
     Ruby2JS.convert(string, filters: [Ruby2JS::Filter::ES2015]).to_s
   end
   
+  def to_js_fn(string)
+    Ruby2JS.convert(string, 
+      filters: [Ruby2JS::Filter::ES2015, Ruby2JS::Filter::Functions]).to_s
+  end
+  
   describe :vars do
     it "should use let as the new var" do
       to_js( 'a = 1' ).must_equal('let a = 1')
@@ -20,17 +25,21 @@ describe "ES2015 support" do
     it "should handle scope" do
       to_js( 'b=0 if a==1' ).must_equal 'let b; if (a == 1) b = 0'
     end
+  end
 
+
+  describe :for do
     it "should handle for loops" do
       to_js( 'for i in 1..2; end' ).must_equal 'for (let i = 1; i <= 2; i++) {}'
     end
+
+    it "should convert hash.each_value to a for...of" do
+      to_js_fn( 'h.each_value {|v| x+=v}' ).
+        must_equal 'for (let v of h) {x += v}'
+    end
   end
 
-  describe :for do
-    it "should for loops" do
-      to_js( 'for i in x; end' ).must_equal('for (let i of x) {}')
-    end
-
+  describe :destructuring do
     it "should destructure assignment statements" do
       to_js( 'a, (foo, *bar) = x' ).
         must_equal('let [a, [foo, ...bar]] = x')
@@ -40,9 +49,7 @@ describe "ES2015 support" do
       to_js( 'def f(a, (foo, *bar)); end' ).
         must_equal('function f(a, [foo, ...bar]) {}')
     end
-  end
 
-  describe :destructuring do
     it "should handle parallel assignment" do
       to_js( 'a,b=b,a' ).must_equal('let [a, b] = [b, a]')
     end
@@ -103,19 +110,12 @@ describe "ES2015 support" do
 
   describe :array do
     it "should handle array conversions" do
-      Ruby2JS.convert(
-        'Array(a)', 
-        filters: [Ruby2JS::Filter::Functions], 
-        eslevel: 2015
-      ).to_s.must_equal 'Array.from(a)'
+      to_js_fn('Array(a)').must_equal 'Array.from(a)'
     end
 
     it "should handle reduce" do
-      Ruby2JS.convert(
-        'x.inject(0) {|sum, n| sum+n}', 
-        filters: [Ruby2JS::Filter::Functions], 
-        eslevel: 2015
-      ).to_s.must_equal 'x.reduce((sum, n) => sum + n, 0)'
+      to_js_fn('x.inject(0) {|sum, n| sum+n}').
+        must_equal 'x.reduce((sum, n) => sum + n, 0)'
     end
   end
 

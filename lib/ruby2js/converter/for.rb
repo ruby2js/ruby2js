@@ -9,7 +9,7 @@ module Ruby2JS
     #     (int 1))
     #   (...)
 
-    handle :for do |var, expression, block|
+    handle :for, :for_of do |var, expression, block|
       begin
         next_token, @next_token = @next_token, :continue
         put "for (#{es2015 ? 'let' : 'var'} "; parse var
@@ -18,7 +18,7 @@ module Ruby2JS
           (expression.type == :erange ? put(' < ') : put(' <= '))
           parse expression.children.last; put '; '; parse var; put '++'
         else
-          put (es2015 ? ' of ' : ' in '); parse expression; 
+          put (@ast.type==:for_of ? ' of ' : ' in '); parse expression; 
         end
         puts ') {'; scope block; sput '}'
       ensure
