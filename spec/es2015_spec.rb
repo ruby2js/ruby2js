@@ -33,6 +33,11 @@ describe "ES2015 support" do
       to_js( 'for i in 1..2; end' ).must_equal 'for (let i = 1; i <= 2; i++) {}'
     end
 
+    it "should convert array.each to a for...of" do
+      to_js_fn( 'a.each {|v| x+=v}' ).
+        must_equal 'for (let v of a) {x += v}'
+    end
+
     it "should convert hash.each_value to a for...of" do
       to_js_fn( 'h.each_value {|v| x+=v}' ).
         must_equal 'for (let v of h) {x += v}'

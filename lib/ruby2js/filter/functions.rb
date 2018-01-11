@@ -384,7 +384,7 @@ module Ruby2JS
             call.children[0].children[0], node.children[2])
 
         elsif 
-          call.children[1] == :each_value and 
+          [:each, :each_value].include? call.children[1] and 
           node.children[1].children.length == 1
         then
           if es2015
@@ -397,6 +397,7 @@ module Ruby2JS
           end
 
         elsif 
+          call.children[1] == :each_key and 
           [:each, :each_key].include? call.children[1] and 
           node.children[1].children.length == 1
         then
