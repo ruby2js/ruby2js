@@ -116,6 +116,22 @@ describe "ES2015 support" do
     it "should handle multi-statement blocks" do
       to_js( 'foo = proc {a() ;b()}' ).must_equal 'let foo = () => {a(); b()}'
     end
+
+    it "should treat arguments to anonymous functions as declared" do
+      to_js( 'proc {|x| x=1}' ).must_equal '(x) => {x = 1}'
+    end
+
+    it "should treat raise as a statement" do
+      to_js( 'proc {|x| raise x}' ).must_equal '(x) => {throw x}'
+    end
+
+    it "should parenthesize hash results" do
+      to_js( 'lambda {{x: 1}}' ).must_equal '() => ({x: 1})'
+    end
+
+    it "should parenthesize anonymous functions that are immediately called" do
+      to_js( 'lambda {1}[]' ).must_equal '(() => 1)()'
+    end
   end
 
   describe :array do

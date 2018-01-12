@@ -92,6 +92,7 @@ module Ruby2JS
 
       # es2015 fat arrow support
       if not name and es2015
+        @vars.merge!(vars)
         put '('; parse args; put ') => '
 
         expr = body
@@ -101,16 +102,27 @@ module Ruby2JS
         end
 
         if EXPRESSIONS.include? expr.type
-          parse expr
+          if expr.type == :send and expr.children[0..1] == [nil, :raise]
+            style = :statement
+          else
+            style = :expression
+          end
         elsif 
           expr.type == :if and expr.children[1] and expr.children[2] and
           EXPRESSIONS.include? expr.children[1].type and
           EXPRESSIONS.include? expr.children[2].type
         then
-          parse expr
+          style = :expression
+        else
+          style = :statement
+        end
+
+        if style == :expression
+          expr.type == :hash ? group(expr) : parse(expr)
         else
           put "{#{@nl}"; parse body, :statement; put "#{@nl}}"
         end
+
         return
       end
 
