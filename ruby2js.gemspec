@@ -1,6 +1,7 @@
 # -*- encoding: utf-8 -*-
 lib = File.expand_path('../lib/', __FILE__)
 $:.unshift lib unless $:.include?(lib)
+require 'ruby2js/version'
 
 Gem::Specification.new do |s|
   s.name = "ruby2js".freeze
