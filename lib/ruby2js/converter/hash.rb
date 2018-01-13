@@ -68,19 +68,40 @@ module Ruby2JS
                 end
               end
 
-              if not [:str, :sym].include? left.type and es2015
-                put '['
-                parse left
-                put ']'
-              elsif 
-                left.children.first.to_s =~ /\A[a-zA-Z_$][a-zA-Z_$0-9]*\Z/
-              then
-                put left.children.first
-              else
-                parse left
+              # check to see if es2015 anonymous function syntax can be used
+              anonfn = (es2015 and right and right.type == :block)
+              if anonfn
+                receiver, method, *statements = right.children[0].children
+                if receiver
+                  unless method == :new and receiver.children == [nil, :Proc]
+                    anonfn = false
+                  end
+                elsif not [:lambda, :proc].include? method
+                  anonfn = false
+                end
               end
 
-              put ': '; parse right
+              if 
+                anonfn and 
+                left.children.first.to_s =~ /\A[a-zA-Z_$][a-zA-Z_$0-9]*\Z/
+              then
+                @prop = left.children.first
+                parse right, :method
+              else
+		if not [:str, :sym].include? left.type and es2015
+		  put '['
+		  parse left
+		  put ']'
+		elsif 
+		  left.children.first.to_s =~ /\A[a-zA-Z_$][a-zA-Z_$0-9]*\Z/
+		then
+		  put left.children.first
+		else
+		  parse left
+		end
+
+		put ': '; parse right
+              end
             end
 
           ensure

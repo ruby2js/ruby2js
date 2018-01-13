@@ -15,7 +15,7 @@ module Ruby2JS
           node.children[2].updated(:async)])
       end
 
-      parse node
+      parse node, :method
     end
 
     def transform_defs(target, method, args, body)

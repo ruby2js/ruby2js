@@ -117,6 +117,10 @@ describe "ES2015 support" do
       to_js( 'foo = proc {a() ;b()}' ).must_equal 'let foo = () => {a(); b()}'
     end
 
+    it "should handle hashes with procs" do
+      to_js( 'foo = {x: proc {}}' ).must_equal 'let foo = {x() {}}'
+    end
+
     it "should treat arguments to anonymous functions as declared" do
       to_js( 'proc {|x| x=1}' ).must_equal '(x) => {x = 1}'
     end

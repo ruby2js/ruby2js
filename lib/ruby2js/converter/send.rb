@@ -21,13 +21,13 @@ module Ruby2JS
 
       # three ways to define anonymous functions
       if method == :new and receiver and receiver.children == [nil, :Proc]
-        return parse args.first
+        return parse args.first, @state
       elsif not receiver and [:lambda, :proc].include? method
         if method == :lambda
           return parse s(args.first.type, *args.first.children[0..-2],
-            s(:autoreturn, args.first.children[-1]))
+            s(:autoreturn, args.first.children[-1])), @state
         else
-          return parse args.first
+          return parse args.first, @state
         end
       end
 
@@ -106,7 +106,7 @@ module Ruby2JS
       elsif method =~ /=$/
         parse receiver
         put "#{ '.' if receiver }#{ method.to_s.sub(/=$/, ' =') } "
-        parse args.first
+        parse args.first, (@state == :method ? :method : :expression)
 
       elsif method == :new
         if receiver

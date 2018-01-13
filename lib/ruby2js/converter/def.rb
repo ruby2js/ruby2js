@@ -91,7 +91,7 @@ module Ruby2JS
       put 'async ' if @ast.type == :async
 
       # es2015 fat arrow support
-      if not name and es2015
+      if not name and es2015 and @state != :method
         @vars.merge!(vars)
         put '('; parse args; put ') => '
 

@@ -51,7 +51,7 @@ describe Ruby2JS::Filter::Async do
 
     it "should handle ES2015 instance methods" do
       to_js2015( 'async def o.m(x); end' ).
-        must_include 'o.m = async (x) => {}'
+        must_include 'o.m = async function(x) {}'
     end
 
     it "should handle lambda functions" do
