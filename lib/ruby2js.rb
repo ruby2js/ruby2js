@@ -14,6 +14,16 @@ module Ruby2JS
   class SyntaxError < RuntimeError
   end
 
+  @@eslevel_default = 2009 # ecmascript 5
+
+  def self.eslevel_default
+    @@eslevel_default
+  end
+
+  def self.eslevel_default=(level)
+    @@eslevel_default = level
+  end
+
   module Filter
     DEFAULTS = []
 
@@ -105,7 +115,7 @@ module Ruby2JS
   end
 
   def self.convert(source, options={})
-    options[:eslevel] ||= 5
+    options[:eslevel] ||= @@eslevel_default
 
     if Proc === source
       file,line = source.source_location
