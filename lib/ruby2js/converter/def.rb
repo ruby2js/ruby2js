@@ -92,7 +92,6 @@ module Ruby2JS
 
       # es2015 fat arrow support
       if not name and es2015 and @state != :method
-        @vars.merge!(vars)
         put '('; parse args; put ') => '
 
         expr = body
@@ -120,7 +119,7 @@ module Ruby2JS
         if style == :expression
           expr.type == :hash ? group(expr) : parse(expr)
         else
-          put "{#{@nl}"; parse body, :statement; put "#{@nl}}"
+          put "{#{@nl}"; scope body, vars; put "#{@nl}}"
         end
 
         return

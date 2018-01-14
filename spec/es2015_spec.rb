@@ -124,6 +124,14 @@ describe "ES2015 support" do
       to_js( 'proc {|x| x=1}' ).must_equal '(x) => {x = 1}'
     end
 
+    it "should treat new variables as local to the function" do
+      to_js( 'proc {|x| y=1}' ).must_equal '(x) => {let y = 1}'
+    end
+
+    it "should not redeclare visible variables" do
+      to_js( 'y=1; proc {|x| y=2}' ).must_equal 'let y = 1; (x) => {y = 2}'
+    end
+
     it "should treat raise as a statement" do
       to_js( 'proc {|x| raise x}' ).must_equal '(x) => {throw x}'
     end
