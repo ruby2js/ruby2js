@@ -40,6 +40,16 @@ module Ruby2JS
           put(index == 0 ? @nl : @sep) unless skipped
           skipped = false
 
+          # intercept async definitions
+          if es2017 and m.type == :send and m.children[0..1] == [nil, :async]
+            child = m.children[2]
+            if child.type == :def
+              m = child.updated(:async)
+            elsif child.type == :defs and child.children[0].type == :self
+              m = child.updated(:asyncs)
+            end
+          end
+
           if m.type == :def || m.type == :async
             @prop = m.children.first
 

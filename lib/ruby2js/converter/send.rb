@@ -41,6 +41,53 @@ module Ruby2JS
         end
       end
 
+      # async/await support
+      if es2017 and receiver == nil and args.length == 1
+        if method == :async
+          if args.first.type == :def
+            # async def f(x) {...}
+            return parse args.first.updated :async
+
+          elsif args.first.type == :defs
+            # async def o.m(x) {...}
+            return parse args.first.updated :asyncs
+
+          elsif args.first.type == :block
+            block = args.first
+
+            if block.children[0].children.last == :lambda
+              # async lambda {|x| ... }
+              # async -> (x) { ... }
+              return parse block.updated(:async, [nil, block.children[1],
+                s(:autoreturn, block.children[2])])
+
+            elsif block.children[0].children.last == :proc
+              # async proc {|x| ... }
+              return parse block.updated(:async, [nil, *block.children[1..-1]])
+
+            elsif
+              block.children[0].children[1] == :new and
+              block.children[0].children[0] == s(:const, nil, :Proc)
+            then
+              # async Proc.new {|x| ... }
+              return parse block.updated(:async, [nil, *block.children[1..-1]])
+            end
+          end
+
+        elsif method == :await
+          if args.first.type == :send
+            # await f(x)
+            return parse args.first.updated(:await)
+
+          elsif args.first.type == :block
+            # await f(x) { ... }
+            block = args.first
+            return parse block.updated nil, [block.children[0].updated(:await),
+              *block.children[1..-1]]
+          end
+        end
+      end
+
       op_index = operator_index method
       if op_index != -1
         target = args.first 
