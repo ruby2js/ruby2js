@@ -391,7 +391,12 @@ describe Ruby2JS do
         must_equal 'var a = 0; while (true) {a++}'
     end
     
-    it "should handle another while loop" do
+    it "should handle while loop that assigns a variable" do
+      to_js( 'while match=f(); end' ).
+        must_equal 'var match; while (match = f()) {}'
+    end
+    
+    it "should handle another while loop syntax" do
       to_js( 'a = 0; while true || false; a += 1; end' ).
         must_equal 'var a = 0; while (true || false) {a++}'
     end
