@@ -1,6 +1,5 @@
 gem 'minitest'
 require 'minitest/autorun'
-require 'ruby2js/filter/es2016'
 
 describe "ES2016 support" do
   

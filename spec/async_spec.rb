@@ -1,7 +1,6 @@
 gem 'minitest'
 require 'minitest/autorun'
 require 'ruby2js/filter/async'
-require 'ruby2js/filter/es2015'
 
 describe Ruby2JS::Filter::Async do
   
@@ -10,8 +9,8 @@ describe Ruby2JS::Filter::Async do
   end
   
   def to_js2015( string)
-    Ruby2JS.convert(string, 
-      filters: [Ruby2JS::Filter::Async, Ruby2JS::Filter::ES2015]).to_s
+    Ruby2JS.convert(string, eslevel: 2015,
+      filters: [Ruby2JS::Filter::Async]).to_s
   end
   
   describe :async do
