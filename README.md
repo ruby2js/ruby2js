@@ -9,12 +9,35 @@ Minimal yet extensible Ruby to JavaScript conversion.
 Description
 ---
 
-The base package maps Ruby syntax to JavaScript semantics.  For example,
-a Ruby Hash literal becomes a JavaScript Object literal.  Ruby symbols
-become JavaScript strings.  Ruby method calls become JavaScript function
-calls IF there are either one or more arguments passed OR parenthesis are
-used, otherwise Ruby method calls become JavaScript property accesses.
-By default, methods and procs return `undefined`.
+The base package maps Ruby syntax to JavaScript semantics.
+For example:
+
+  * a Ruby Hash literal becomes a JavaScript Object literal
+  * Ruby symbols become JavaScript strings.
+  * Ruby method calls become JavaScript function calls IF
+    there are either one or more arguments passed OR
+    parenthesis are used
+  * otherwise Ruby method calls become JavaScript property accesses.
+  * by default, methods and procs return `undefined`
+  * splats are handled (may need to try around or read transliteration_spec)
+  * ruby string interpolation is expanded into string + operations
+  * `and` and `or` become `&&` and `||`
+  * `a ** b` becomes `Math.pow(a,b)`
+  * `<< a` becomes `.push(a)`
+  * `unless` becomes `if !`
+  * `until` becomes `while !`
+  * `case` and `when` becomes `switch` and `case`
+  * ruby for loops become js for loops
+  * `(1...4).step(2){` becomes `for (var i = 1; i < 4; i += 2) {`
+  * `x.forEach { next }` becomes `x.forEach(function() {return})`
+  * `lambda {}` and `proc {}` becomes `function() {}`
+  * `class Person; end` becomes `function Person() {}`
+  * instance methods become prototype methods
+  * instance variables become underscored, `@name` becomes `this._name`
+  * self is assigned to this is if used
+  * Any block becomes and explicit argument `new Promise do; y(); end` becomes `new Promise(function() {y()})`
+  * regular expressions are mapped to js
+  * `raise` becomes `throw`
 
 Ruby attribute accessors, methods defined with no parameters and no
 parenthesis, as well as setter method definitions, are
