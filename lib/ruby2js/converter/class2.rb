@@ -117,7 +117,6 @@ module Ruby2JS
             end
 
           else
-            post << m
             skipped = true
 
             if m.type == :casgn and m.children[0] == nil
@@ -126,6 +125,8 @@ module Ruby2JS
               @rbstack.last[m.children[0]] = name
             end
           end
+
+          post << m if skipped
         end
 
         put @nl unless skipped
