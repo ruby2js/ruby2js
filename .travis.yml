@@ -1,4 +1,9 @@
 language: ruby
+
+before_install:
+  # Workaround for https://github.com/travis-ci/travis-ci/issues/8969
+  - gem update --system
+
 rvm:
   - 1.9
   - 2.0
@@ -6,4 +11,4 @@ rvm:
   - 2.2
   - 2.3
   - 2.4
-# - 2.5 # removed due to https://github.com/travis-ci/travis-ci/issues/8969
+  - 2.5
