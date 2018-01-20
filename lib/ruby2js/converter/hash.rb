@@ -71,7 +71,7 @@ module Ruby2JS
               # check to see if es2015 anonymous function syntax can be used
               anonfn = (es2015 and right and right.type == :block)
               if anonfn
-                receiver, method, *statements = right.children[0].children
+                receiver, method = right.children[0].children
                 if receiver
                   unless method == :new and receiver.children == [nil, :Proc]
                     anonfn = false

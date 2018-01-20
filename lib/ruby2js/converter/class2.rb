@@ -104,21 +104,21 @@ module Ruby2JS
 
           elsif m.type == :send and m.children.first == nil
             if m.children[1] == :attr_accessor
-              m.children[2..-1].each_with_index do |child_sym, index|
-                put @sep unless index == 0
+              m.children[2..-1].each_with_index do |child_sym, index2|
+                put @sep unless index2 == 0
                 var = child_sym.children.first
                 put "get #{var}() {#{@nl}return this._#{var}#@nl}#@sep"
                 put "set #{var}(#{var}) {#{@nl}this._#{var} = #{var}#@nl}"
               end
             elsif m.children[1] == :attr_reader
-              m.children[2..-1].each_with_index do |child_sym, index|
-                put @sep unless index == 0
+              m.children[2..-1].each_with_index do |child_sym, index2|
+                put @sep unless index2 == 0
                 var = child_sym.children.first
                 put "get #{var}() {#{@nl}return this._#{var}#@nl}"
               end
             elsif m.children[1] == :attr_writer
-              m.children[2..-1].each_with_index do |child_sym, index|
-                put @sep unless index == 0
+              m.children[2..-1].each_with_index do |child_sym, index2|
+                put @sep unless index2 == 0
                 var = child_sym.children.first
                 put "set #{var}(#{var}) {#{@nl}this._#{var} = #{var}#@nl}"
               end
