@@ -17,9 +17,6 @@ begin
   require 'ruby2js'
 
   filters = {
-    'angularrb' => 'ruby2js/filter/angularrb',
-    'angular-resource' => 'ruby2js/filter/angular-resource',
-    'angular-route' => 'ruby2js/filter/angular-route',
     'functions' => 'ruby2js/filter/functions',
     'es2015' => 'ruby2js/es2015',
     'es2016' => 'ruby2js/es2016',

@@ -367,39 +367,6 @@ the script.
     * defaults the fourth parameter of $$.post to `"json"`, allowing Ruby block
       syntax to be used for the success function.
 
-* <a id="angularrb" href="https://github.com/rubys/ruby2js/blob/master/spec/angularrb.rb">angularrb</a>
-
-    * maps Ruby `module` to `angular.module`
-    * maps `filter`, `controller`, `factory`, and `directive` to calls to
-      angular module functions.
-    * maps `use` statements to formal arguments or array values (as
-      appropriate) depending on the module function.
-    * maps `watch` statements to calls to `$scope.$watch`.
-    * tracks globals variable and constant references and adds additional
-      implicit `use` statements
-    * maps constant assignments in an angular module to a filter
-    * maps class definitions in an angular module to a filter
-    * within a controller or within a `link` method in a directive:
-        * maps `apply`, `broadcast`, `digest`, `emit`, `eval`, `evalAsync`, and
-          `parent` calls to `$scope` functions.
-        * maps `apply!`, `broadcast!`, `digest!`, `eval!`, and `evalAsync!`
-          calls to `$rootScope` functions.
-        * maps `filter` calls to '$filter` calls.
-        * maps `timeout` and `interval` calls with a block to `$timeout` and
-          `$interval` calls where the block is passed as the first parameter.
-
-* <a id="angular-route" href="https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/angular-routerb.rb">angular-route</a>
-
-    * maps `case` statements on `$routeProvider` to angular.js module
-      configuration.
-    * adds implicit module `use` of `ngRoute` when such a `case` statement
-      is encountered
-
-* <a id="angular-resource" href="https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/angular-resource.rb">angular-resource</a>
-    * maps `$resource.new` statements on `$resource` function calls.
-    * adds implicit module `use` of `ngResource` when `$resource.new` calls
-      are encountered
-
 * <a id="minitest-jasmine" href="https://github.com/rubys/ruby2js/blob/master/spec/minitest-jasmine.rb">minitest-jasmine</a>
     * maps subclasses of `Minitest::Test` to `describe` calls
     * maps `test_` methods inside subclasses of `Minitest::Test` to `it` calls
@@ -427,14 +394,6 @@ the script.
   [diskusage](https://github.com/rubys/wunderbar/blob/master/demo/diskusage.rb),
   and [wiki](https://github.com/rubys/wunderbar/blob/master/demo/wiki.rb) make
   use of the jquery filter.
-
-* [angularjs](https://github.com/rubys/wunderbar/blob/master/demo/angularjs.rb)
-  makes use of the angular filters to implement the
-  [angular.js tutorial](http://docs.angularjs.org/tutorial).  This demo
-  includes:
-    * [view](https://github.com/rubys/wunderbar/blob/master/demo/views/index._html)
-    * [partials](https://github.com/rubys/wunderbar/tree/master/demo/partials)
-    * [js](https://github.com/rubys/wunderbar/tree/master/demo/js)
 
 ES2015 support
 ---
