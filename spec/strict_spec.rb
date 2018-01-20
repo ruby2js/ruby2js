@@ -1,11 +1,10 @@
 gem 'minitest'
 require 'minitest/autorun'
-require 'ruby2js/filter/strict'
 
-describe Ruby2JS::Filter::Strict do
+describe 'use strict' do
   
   def to_js( string)
-    Ruby2JS.convert(string, filters: [Ruby2JS::Filter::Strict]).to_s
+    Ruby2JS.convert(string, strict: true, filters: []).to_s
   end
   
   describe :strict do
@@ -13,14 +12,12 @@ describe Ruby2JS::Filter::Strict do
       to_js( 'a=1' ).must_equal '"use strict"; var a = 1'
     end
 
-    it "should handle multi line scripts" do
+    it "should handle multi statement scripts" do
       to_js( 'a=1; b=1' ).must_equal '"use strict"; var a = 1; var b = 1'
     end
-  end
 
-  describe Ruby2JS::Filter::DEFAULTS do
-    it "should include Strict" do
-      Ruby2JS::Filter::DEFAULTS.must_include Ruby2JS::Filter::Strict
+    it "should handle multi line scripts" do
+      to_js( "a=1;\nb=1" ).must_equal "\"use strict\";\nvar a = 1;\nvar b = 1"
     end
   end
 end

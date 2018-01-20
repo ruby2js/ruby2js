@@ -76,6 +76,12 @@ Enable ES2015 support:
 puts Ruby2JS.convert('"#{a}"', eslevel: 2015)
 ```
 
+Enable strict support:
+
+```ruby
+puts Ruby2JS.convert('a=1', strict: true)
+```
+
 With [ExecJS](https://github.com/sstephenson/execjs):
 ```ruby
 require 'ruby2js/execjs'
@@ -168,9 +174,6 @@ Filters
 In general, making use of a filter is as simple as requiring it.  If multiple
 filters are selected, they will all be applied in parallel in one pass through
 the script.
-
-* <a id="strict" href="https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/strict.rb">strict</a>
-  adds `'use strict';` to the output.
 
 * <a id="return" href="https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/return.rb">return</a>
   adds `return` to the last expression in functions.

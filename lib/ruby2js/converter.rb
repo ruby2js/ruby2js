@@ -47,6 +47,7 @@ module Ruby2JS
       @class_name = nil
 
       @eslevel = :es5
+      @strict = false
     end
 
     def width=(width)
@@ -55,6 +56,14 @@ module Ruby2JS
 
     def convert
       parse( @ast, :statement )
+
+      if @strict
+        if @sep == '; '
+          @lines.first.unshift "\"use strict\"#@sep"
+        else
+          @lines.unshift Line.new('"use strict";')
+        end
+      end
     end
 
     def operator_index op
@@ -76,9 +85,7 @@ module Ruby2JS
       Parser::AST::Node.new(type, args)
     end
 
-    def eslevel=(value)
-      @eslevel = value
-    end
+    attr_accessor :strict, :eslevel
 
     def es2015
       @eslevel >= 2015

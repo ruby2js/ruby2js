@@ -15,6 +15,7 @@ module Ruby2JS
   end
 
   @@eslevel_default = 2009 # ecmascript 5
+  @@strict_default = false
 
   def self.eslevel_default
     @@eslevel_default
@@ -22,6 +23,14 @@ module Ruby2JS
 
   def self.eslevel_default=(level)
     @@eslevel_default = level
+  end
+
+  def self.strict_default
+    @@strict_default
+  end
+
+  def self.strict_default=(level)
+    @@strict_default = level
   end
 
   module Filter
@@ -116,6 +125,7 @@ module Ruby2JS
 
   def self.convert(source, options={})
     options[:eslevel] ||= @@eslevel_default
+    options[:strict] = @@strict_default if options[:strict] == nil
 
     if Proc === source
       file,line = source.source_location
@@ -149,6 +159,7 @@ module Ruby2JS
     ruby2js.binding = options[:binding]
     ruby2js.ivars = options[:ivars]
     ruby2js.eslevel = options[:eslevel]
+    ruby2js.strict = options[:strict]
     if ruby2js.binding and not ruby2js.ivars
       ruby2js.ivars = ruby2js.binding.eval \
         'Hash[instance_variables.map {|var| [var, instance_variable_get(var)]}]'

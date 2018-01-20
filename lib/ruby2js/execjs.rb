@@ -7,7 +7,7 @@ module Ruby2JS
   end
 
   def self.eval(source, options={})
-    ExecJS.eval(convert(source, options).to_s)
+    ExecJS.eval(convert(source, options.merge(strict: false)).to_s)
   end
 
   def self.exec(source, options={})
