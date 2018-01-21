@@ -10,14 +10,12 @@ Gem::Specification.new do |s|
   s.required_rubygems_version = Gem::Requirement.new(">= 0".freeze) if s.respond_to? :required_rubygems_version=
   s.require_paths = ["lib".freeze]
   s.authors = ["Sam Ruby".freeze]
-  s.date = "2017-11-13"
   s.description = "    The base package maps Ruby syntax to JavaScript semantics.\n    Filters may be provided to add Ruby-specific or framework specific\n    behavior.\n".freeze
   s.email = "rubys@intertwingly.net".freeze
   s.files = %w(ruby2js.gemspec README.md) + Dir.glob("{lib}/**/*")
   s.homepage = "http://github.com/rubys/ruby2js".freeze
   s.licenses = ["MIT".freeze]
   s.required_ruby_version = Gem::Requirement.new(">= 1.9.3".freeze)
-  s.rubygems_version = "2.6.14".freeze
   s.summary = "Minimal yet extensible Ruby to JavaScript conversion.".freeze
 
   if s.respond_to? :specification_version then
