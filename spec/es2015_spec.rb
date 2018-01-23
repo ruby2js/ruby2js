@@ -62,6 +62,14 @@ describe "ES2015 support" do
     it "should handle parallel assignment" do
       to_js( 'a,b=b,a' ).must_equal('let [a, b] = [b, a]')
     end
+
+    it "should handle spread operators" do
+      to_js( 'a(*b)' ).must_equal('a(...b)')
+    end
+
+    it "should implement max with spread operators" do
+      to_js_fn( '[1,2].max()' ).must_equal('Math.max(...[1, 2])')
+    end
   end
 
   describe :arguments do
