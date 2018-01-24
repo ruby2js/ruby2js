@@ -5,6 +5,8 @@ module Ruby2JS
     #   (int 1))
 
     handle :casgn do |cbase, var, value|
+      multi_assign_declarations if @state == :statement
+
       begin
         if es2015
           put "const "

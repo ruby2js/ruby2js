@@ -5,6 +5,8 @@ module Ruby2JS
     #   (int 1))
 
     handle :cvasgn do |var, expression=nil|
+      multi_assign_declarations if @state == :statement
+
       if @class_name
         parse @class_name
         put var.to_s.sub('@@', "._")

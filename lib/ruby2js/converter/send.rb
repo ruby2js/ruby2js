@@ -151,6 +151,8 @@ module Ruby2JS
         (group_target ? group(target) : parse(target))
 
       elsif method =~ /=$/
+        multi_assign_declarations if @state == :statement
+
         parse receiver
         put "#{ '.' if receiver }#{ method.to_s.sub(/=$/, ' =') } "
         parse args.first, (@state == :method ? :method : :expression)

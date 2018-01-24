@@ -21,6 +21,8 @@ module Ruby2JS
 
     GROUP_OPERATORS = [:begin, :dstr, :dsym, :and, :or]
 
+    VASGN = [:cvasgn, :ivasgn, :gvasgn, :lvasgn]
+
     attr_accessor :binding, :ivars
 
     def initialize( ast, comments, vars = {} )

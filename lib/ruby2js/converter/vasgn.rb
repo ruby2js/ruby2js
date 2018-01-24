@@ -21,8 +21,13 @@ module Ruby2JS
           end
 
           unless undecls.empty?
-            return parse s(:begin, 
-              *undecls.map {|uname| s(:lvasgn, uname)}, @ast), @state
+            if es2015
+              put 'let '
+            else
+              put 'var ' 
+            end
+            put undecls.map(&:to_s).join(', ') + @sep
+            undecls.each {|var| @vars[var] = true}
           end
         end
 
@@ -47,6 +52,40 @@ module Ruby2JS
         else
           @vars[name] ||= :implicit # console, document, ...
         end
+      end
+    end
+
+    def multi_assign_declarations
+      undecls = []
+      child = @ast
+      loop do
+        if [:send, :casgn].include? child.type
+          subchild = child.children[2]
+        else
+          subchild = child.children[1]
+        end
+
+        if subchild.type == :send
+          break unless subchild.children[1] =~ /=$/
+        else
+          break unless [:send, :cvasgn, :ivasgn, :gvasgn, :lvasgn].
+            include? subchild.type
+        end
+
+        child = subchild
+
+        if child.type == :lvasgn and not @vars.include?(child.children[0]) 
+          undecls << child.children[0]
+        end
+      end
+
+      unless undecls.empty?
+        if es2015
+          put "let "
+        else
+          put "var "
+        end
+        put "#{undecls.map(&:to_s).join(', ')}#@sep"
       end
     end
   end

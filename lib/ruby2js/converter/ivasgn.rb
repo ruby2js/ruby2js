@@ -5,6 +5,8 @@ module Ruby2JS
     #   (int 1))
 
     handle :ivasgn do |var, expression=nil|
+      multi_assign_declarations if @state == :statement
+
       put "#{ var.to_s.sub('@', 'this._') }"
       if expression
         put " = "; parse expression

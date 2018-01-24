@@ -80,7 +80,11 @@ describe Ruby2JS do
     end
 
     it "should parse chained assignment statements" do
-      to_js( "a = b = 1" ).must_equal 'var a; var b; a = b = 1'
+      to_js( "a = b = 1" ).must_equal 'var a, b; a = b = 1'
+      to_js( "x.a = b = 1" ).must_equal 'var b; x.a = b = 1'
+      to_js( "@a = b = 1" ).must_equal 'var b; this._a = b = 1'
+      to_js( "@@a = b = 1" ).must_equal 'var b; this.constructor._a = b = 1'
+      to_js( "A = b = 1" ).must_equal 'var b; var A = b = 1'
     end
 
     it "should parse op assignments" do
