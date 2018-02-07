@@ -46,7 +46,7 @@ module Ruby2JS
       engine_name "ruby2js"
 
       config.after_initialize do
-        ::Rails.application.assets.register_engine '.rbs', SprocketProcessor, mime_type: 'text/javascript', silence_deprecation: true
+        ::Rails.application.config.assets.register_engine '.rbs', SprocketProcessor, mime_type: 'text/javascript', silence_deprecation: true
       end
 
     end
