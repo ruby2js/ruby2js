@@ -45,6 +45,12 @@ mapped to
 [Object.defineProperty](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/defineProperty?redirectlocale=en-US&redirectslug=JavaScript%2FReference%2FGlobal_Objects%2FObject%2FdefineProperty),
 so avoid these if you wish to target users running IE8 or lower.
 
+While both Ruby and JavaScript have open classes, Ruby unifies the syntax for
+defining and extending an existing class, whereas JavaScript does not.  This
+means that Ruby2JS needs to be told when a class is being extended, which is
+done by prepending the `class` keyword with two plus signs, thus:
+`++class C; ...; end`.
+
 Filters may be provided to add Ruby-specific or framework specific
 behavior.  Filters are essentially macro facilities that operate on
 an AST representation of the code.

@@ -740,6 +740,26 @@ describe Ruby2JS do
     end
   end
   
+  describe 'class extensions' do
+    it 'should handle constructors' do
+      to_js('++class F; def initialize() {}; end; end').
+        must_equal '(function() {var $_ = F.prototype; ' +
+          '(F = function F() {{}}).prototype = $_})()'
+    end
+
+    it 'should handle methods' do
+      to_js('++class F; def m(); end; end').
+        must_equal 'F.prototype.m = function() {}'
+    end
+
+    it 'should handle properties' do
+      to_js('++class F; def p; 1; end; end').
+        must_equal 'Object.defineProperty(F.prototype, "p", ' +
+          '{enumerable: true, configurable: true, ' +
+          'get: function() {return 1}})'
+    end
+  end
+
   describe 'module definition' do
     it "should handle module definitions" do
       to_js( 'module A; B=1; end' ).
