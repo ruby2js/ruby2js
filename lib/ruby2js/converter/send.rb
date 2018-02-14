@@ -204,7 +204,7 @@ module Ruby2JS
           end
         elsif args.length == 1 and args.first.type == :send
           # accommodation for JavaScript like new syntax w/argument list
-          parse s(:send, s(:const, nil, args.first.children[1]), :new,
+          parse s(:send, s(:const, *args.first.children[0..1]), :new,
             *args.first.children[2..-1]), @state
         elsif args.length == 1 and args.first.type == :const
           # accommodation for JavaScript like new syntax w/o argument list

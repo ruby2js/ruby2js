@@ -788,6 +788,8 @@ describe Ruby2JS do
         must_equal 'new Promise(function() {y()})'
       to_js( 'new Promise() do; y(); end' ).
         must_equal 'new Promise(function() {y()})'
+      to_js( 'new xeogl.Model()' ).
+        must_equal 'new xeogl.Model()'
     end
   end
 
