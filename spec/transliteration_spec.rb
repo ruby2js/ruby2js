@@ -964,4 +964,10 @@ describe Ruby2JS do
         must_equal 'function F() {}; F.prototype = {get f() {return this._x}}'
     end
   end
+
+  describe 'global scope' do
+    it "should handle top level constants" do
+      to_js("::A").must_equal 'Function("return this")().A'
+    end
+  end
 end

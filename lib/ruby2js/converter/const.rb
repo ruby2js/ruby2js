@@ -7,7 +7,17 @@ module Ruby2JS
       # resolve anonymous receivers against rbstack
       receiver ||= @rbstack.map {|rb| rb[name]}.compact.last
 
-      parse receiver; put '.' if receiver; put name
+      if receiver
+        if Parser::AST::Node === receiver and receiver.type == :cbase
+          put 'Function("return this")().'
+        else
+          parse receiver
+          put '.'
+        end
+
+      end
+      
+      put name
     end
   end
 end
