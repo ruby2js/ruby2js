@@ -21,10 +21,6 @@ describe 'not implemented' do
     todo( '1...2' )
   end
 
-  it "Top-level constant" do
-    todo( '::Foo' )
-  end
-
   it "decomposition" do
     # NOTE: option {eslevel: es2015} implements this
     todo( 'def f(a, (foo, *bar)); end' )

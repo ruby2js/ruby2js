@@ -84,14 +84,16 @@ module Ruby2JS
         @ast = ast
       end
 
-      # handle all of the 'invented' ast types
+      # handle all of the 'invented/synthetic' ast types
       def on_async(node); on_def(node); end
       def on_asyncs(node); on_defs(node); end
       def on_attr(node); on_send(node); end
       def on_autoreturn(node); on_return(node); end
       def on_await(node); on_send(node); end
       def on_call(node); on_send(node); end
+      def on_class_extend(node); on_send(node); end
       def on_constructor(node); on_def(node); end
+      def on_defm(node); on_defs(node); end
       def on_defp(node); on_defs(node); end
       def on_for_of(node); on_for(node); end
       def on_in?(node); on_send(node); end

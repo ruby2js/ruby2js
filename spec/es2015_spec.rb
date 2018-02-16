@@ -310,4 +310,22 @@ describe "ES2015 support" do
         must_equal 'class C {get m() {return C.X}}; const C.X = 1'
     end
   end
+
+  describe 'class extensions' do
+    it 'should handle constructors' do
+      to_js('++class F; def initialize() {}; end; end').
+        must_equal '[(F = function F() {{}}).prototype] = [F.prototype]'
+    end
+
+    it 'should handle methods' do
+      to_js('++class F; def m(); end; end').
+        must_equal 'F.prototype.m = function() {}'
+    end
+
+    it 'should handle properties' do
+      to_js('++class F; def p; 1; end; end').
+        must_equal 'Object.defineProperty(F.prototype, "p", ' +
+          '{enumerable: true, configurable: true, get() {return 1}})'
+    end
+  end
 end

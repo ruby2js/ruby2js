@@ -131,7 +131,16 @@ module Ruby2JS
         put ')'
 
       elsif [:-@, :+@, :~, '~'].include? method
-        put method.to_s[0]; parse receiver
+        if 
+          receiver.type == :send and
+          receiver.children[1] == :+@ and
+          Parser::AST::Node === receiver.children[0] and
+          receiver.children[0].type == :class
+        then
+          parse receiver.children[0].updated(:class_extend)
+        else
+          put method.to_s[0]; parse receiver
+        end
 
       elsif method == :=~
         parse args.first; put '.test('; parse receiver; put ')'
@@ -153,7 +162,7 @@ module Ruby2JS
       elsif method =~ /=$/
         multi_assign_declarations if @state == :statement
 
-        parse receiver
+        (group_receiver ? group(receiver) : parse(receiver))
         put "#{ '.' if receiver }#{ method.to_s.sub(/=$/, ' =') } "
         parse args.first, (@state == :method ? :method : :expression)
 
@@ -195,7 +204,7 @@ module Ruby2JS
           end
         elsif args.length == 1 and args.first.type == :send
           # accommodation for JavaScript like new syntax w/argument list
-          parse s(:send, s(:const, nil, args.first.children[1]), :new,
+          parse s(:send, s(:const, *args.first.children[0..1]), :new,
             *args.first.children[2..-1]), @state
         elsif args.length == 1 and args.first.type == :const
           # accommodation for JavaScript like new syntax w/o argument list
