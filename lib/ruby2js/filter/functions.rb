@@ -112,18 +112,26 @@ module Ruby2JS
           process S(:send, target, :==, s(:nil))
 
         elsif [:start_with?, :end_with?].include? method and args.length == 1
-          if args.first.type == :str
-            length = S(:int, args.first.children.first.length)
+          if es2015
+	    if method == :start_with?
+              process S(:send, target, :startswith, *args)
+            else
+              process S(:send, target, :endswith, *args)
+            end
           else
-            length = S(:attr, *args, :length)
-          end
+	    if args.first.type == :str
+	      length = S(:int, args.first.children.first.length)
+	    else
+	      length = S(:attr, *args, :length)
+	    end
 
-          if method == :start_with?
-            process S(:send, S(:send, target, :substring, s(:int, 0), 
-              length), :==, *args)
-          else
-            process S(:send, S(:send, target, :slice, 
-              S(:send, length, :-@)), :==, *args)
+	    if method == :start_with?
+	      process S(:send, S(:send, target, :substring, s(:int, 0), 
+		length), :==, *args)
+	    else
+	      process S(:send, S(:send, target, :slice, 
+		S(:send, length, :-@)), :==, *args)
+	    end
           end
 
         elsif method == :clear and args.length == 0 and node.is_method?
