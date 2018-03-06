@@ -405,9 +405,25 @@ describe Ruby2JS do
         must_equal 'var a = 0; while (true || false) {a++}'
     end
 
-    it "should handle case statement" do
+    it "should handle simple case statement" do
       to_js( 'case a; when 1,2; puts :a; end' ).
         must_equal 'switch (a) {case 1: case 2: puts("a")}'
+    end
+
+    it "should handle case statement with irange" do
+      to_js( 'case a; when 1..2; puts :a; end' ).
+        must_equal 'switch (true) {case a >= 1 && a <= 2: puts("a")}'
+    end
+
+    it "should handle case statement with erange" do
+      to_js( 'case a; when 1...2; puts :a; end' ).
+        must_equal 'switch (true) {case a >= 1 && a < 2: puts("a")}'
+    end
+
+    it "should handle case statement with mixed values and ranges" do
+      to_js( 'case a; when 1...2, 3; puts :a; end' ).
+        must_equal 'switch (true) {case a >= 1 && a < 2: case a == 3: ' +
+          'puts("a")}'
     end
 
     it "should parse when and else clauses as statements" do
