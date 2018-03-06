@@ -67,6 +67,11 @@ describe Ruby2JS::Filter::Functions do
         must_equal 'var str = str.replace(/a/g, "b")'
     end
 
+    it 'should handle sort!' do
+      to_js( 'str.sort! {|a, b| a - b}' ).
+        must_equal 'str.sort(function(a, b) {return a - b})'
+    end
+
     it 'should handle ord and chr' do
       to_js( '"A".ord' ).must_equal '65'
       to_js( 'a.ord' ).must_equal 'a.charCodeAt(0)'

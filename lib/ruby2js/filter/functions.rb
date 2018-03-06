@@ -290,7 +290,7 @@ module Ruby2JS
           on_send call.updated nil, [*call.children[0..1], block,
             *call.children[2..-1]]
 
-        elsif [:sub, :gsub, :sub!, :gsub!].include? call.children[1]
+        elsif [:sub, :gsub, :sub!, :gsub!, :sort!].include? call.children[1]
           return super if call.children.first == nil
           block = s(:block, s(:send, nil, :proc), node.children[1],
             s(:autoreturn, *node.children[2..-1]))
