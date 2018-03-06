@@ -182,7 +182,7 @@ module Ruby2JS
       walk = proc do |ast|
         if ast.loc and ast.loc.expression
           filename = ast.loc.expression.source_buffer.name
-          if filename
+          if filename and not filename.empty?
             filename = filename.dup.untaint
             @timestamps[filename] ||= File.mtime(filename)
           end
