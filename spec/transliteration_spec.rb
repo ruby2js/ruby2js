@@ -225,6 +225,7 @@ describe Ruby2JS do
       to_js( "a === b" ).must_equal 'a === b'
       to_js( "a >= b" ).must_equal 'a >= b'
       to_js( "a > b" ).must_equal 'a > b'
+      to_js( "a <=> b" ).must_equal 'a < b ? -1 : a > b ? 1 : 0'
     end
 
     it "should parse logic operators" do

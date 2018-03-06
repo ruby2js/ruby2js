@@ -152,7 +152,8 @@ module Ruby2JS
         parse receiver; put '.push('; parse args.first; put ')'
 
       elsif method == :<=>
-        raise NotImplementedError, "use of <=>"
+        parse receiver; put ' < '; parse args.first; put ' ? -1 : '
+        parse receiver; put ' > '; parse args.first; put ' ? 1 : 0'
 
       elsif OPERATORS.flatten.include?(method) and not LOGICAL.include?(method)
         (group_receiver ? group(receiver) : parse(receiver))
