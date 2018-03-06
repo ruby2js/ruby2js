@@ -155,11 +155,11 @@ describe "ES2015 support" do
 
   describe :string do
     it "should handle start_with?" do
-      to_js_fn('a.start_with? "b"').must_equal 'a.startswith("b")'
+      to_js_fn('a.start_with? "b"').must_equal 'a.startsWith("b")'
     end
 
     it "should handle end_with?" do
-      to_js_fn('a.end_with? "b"').must_equal 'a.endswith("b")'
+      to_js_fn('a.end_with? "b"').must_equal 'a.endsWith("b")'
     end
   end
 

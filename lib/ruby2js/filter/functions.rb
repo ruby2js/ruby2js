@@ -114,9 +114,9 @@ module Ruby2JS
         elsif [:start_with?, :end_with?].include? method and args.length == 1
           if es2015
 	    if method == :start_with?
-              process S(:send, target, :startswith, *args)
+              process S(:send, target, :startsWith, *args)
             else
-              process S(:send, target, :endswith, *args)
+              process S(:send, target, :endsWith, *args)
             end
           else
 	    if args.first.type == :str
