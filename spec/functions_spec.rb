@@ -164,8 +164,16 @@ describe Ruby2JS::Filter::Functions do
         must_equal 'a.length = 0; a.push.apply(a, b)'
     end
 
-    it "should handle include?" do
+    it "should handle simple include?" do
       to_js( 'a.include? b' ).must_equal 'a.indexOf(b) != -1'
+    end
+
+    it "should handle erange include?" do
+      to_js( '(0...1).include? a' ).must_equal 'a >= 0 && a < 1'
+    end
+
+    it "should handle irange include?" do
+      to_js( '(0..5).include? a' ).must_equal 'a >= 0 && a <= 5'
     end
 
     it "should handle respond_to?" do

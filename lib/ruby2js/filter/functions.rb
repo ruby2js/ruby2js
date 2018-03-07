@@ -142,8 +142,20 @@ module Ruby2JS
              S(:send, target, :push, s(:splat, node.children[2])))
 
         elsif method == :include? and args.length == 1
-          process S(:send, S(:send, target, :indexOf, args.first), :!=,
-            s(:int, -1))
+          while target.type == :begin and target.children.length == 1
+            target = target.children.first
+          end
+
+          if target.type == :irange
+            S(:and, s(:send, args.first, :>=, target.children.first),
+              s(:send, args.first, :<=, target.children.last))
+          elsif target.type == :erange
+            S(:and, s(:send, args.first, :>=, target.children.first),
+              s(:send, args.first, :<, target.children.last))
+          else
+            process S(:send, S(:send, target, :indexOf, args.first), :!=,
+              s(:int, -1))
+          end
 
         elsif method == :respond_to? and args.length == 1
           process S(:in?, args.first, target)
