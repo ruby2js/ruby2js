@@ -13,7 +13,7 @@ module Ruby2JS
         (singleton ? put('{') : puts('{'))
 
         pairs.each_with_index do |node, index|
-          raise NotImplementedError, "kwsplat" if node.type == :kwsplat
+          raise Error.new("kwsplat", @ast) if node.type == :kwsplat
 
           (singleton ? put(', ') : put(",#@ws")) unless index == 0
 

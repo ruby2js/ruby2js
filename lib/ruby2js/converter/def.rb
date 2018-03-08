@@ -9,7 +9,7 @@ module Ruby2JS
     handle :def, :defm, :async do |name, args, body=nil|
       body ||= s(:begin)
       if name =~ /[!?]$/
-        raise NotImplementedError, "invalid method name #{ name }"
+        raise Error.new("invalid method name #{ name }", @ast)
       end
 
       vars = {}

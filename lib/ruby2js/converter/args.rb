@@ -16,7 +16,7 @@ module Ruby2JS
         parse_all(*args, join: ', ')
         put ']'
       else
-        raise NotImplementedError, "destructuring requires ES2015"
+        raise Error.new("destructuring requires ES2015", @ast)
       end
     end
   end

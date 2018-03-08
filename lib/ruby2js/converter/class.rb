@@ -145,7 +145,7 @@ module Ruby2JS
             "#{m.children[0].children.first}=", 
             s(:attr, s(:attr, name, :prototype), m.children[1].children.first))
         else
-          raise NotImplementedError, "class #{ m.type }"
+          raise Error.new("class #{ m.type }", @ast)
         end
 
         # associate comments

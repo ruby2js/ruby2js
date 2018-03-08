@@ -218,7 +218,7 @@ module Ruby2JS
           parse s(:send, s(:const, nil, args.first.children[1]), :new,
             *args.first.children[2..-1], args.last), @state
         else
-          raise NotImplementedError, "use of JavaScript keyword new"
+          raise Error.new("use of JavaScript keyword new", @ast)
         end
 
       elsif method == :raise and receiver == nil

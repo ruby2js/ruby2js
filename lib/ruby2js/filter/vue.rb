@@ -975,7 +975,7 @@ module Ruby2JS
       # prevent attempts to assign to Vue properties
       def on_cvasgn(node)
         return super unless @vue_self
-        raise NotImplementedError, "setting a Vue property"
+        raise Error.new("setting a Vue property", node)
       end
 
       # expand @ to @vue_self

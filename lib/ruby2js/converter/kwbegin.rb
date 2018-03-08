@@ -27,17 +27,17 @@ module Ruby2JS
 
       if block and block.type == :rescue
         body, *recovers, otherwise = block.children
-        raise NotImplementedError, "block else" if otherwise
+        raise Error.new("block else", @ast) if otherwise
 
         if recovers.any? {|recover| not recover.children[1]}
-          raise NotImplementedError, "recover without exception variable"
+          raise Error.new("recover without exception variable", @ast)
         end
 
         var = recovers.first.children[1]
 
         if recovers.any? {|recover| recover.children[1] != var}
-          raise NotImplementedError, 
-            "multiple recovers with different exception variables"
+          raise Error.new( 
+            "multiple recovers with different exception variables", @ast)
         end
       else
         body = block

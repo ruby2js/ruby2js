@@ -7,7 +7,7 @@ module Ruby2JS
 
     handle :super, :zsuper do |*args|
       unless @instance_method and @class_parent
-        raise NotImplementedError, "super outside of a method"
+        raise Error.new("super outside of a method", @ast)
       end
 
       # what to pass

@@ -823,7 +823,7 @@ module Ruby2JS
       # prevent attempts to assign to React properties
       def on_cvasgn(node)
         return super unless @reactMethod
-        raise NotImplementedError, "setting a React property"
+        raise Error.new("setting a React property", node)
       end
 
       # convert instance variables to state: "@x ||= y"

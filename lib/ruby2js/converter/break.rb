@@ -5,8 +5,8 @@ module Ruby2JS
     #   (int 1))
 
     handle :break do |n=nil|
-      raise NotImplementedError, "break argument #{ n.inspect }" if n
-      raise NotImplementedError, "break outside of loop" if @next_token == :return
+      raise Error.new("break argument #{ n.inspect }", @ast) if n
+      raise Error.new("break outside of loop", @ast) if @next_token == :return
       put 'break'
     end
   end
