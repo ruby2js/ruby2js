@@ -180,7 +180,11 @@ module Ruby2JS
     end
     
     def group( ast )
-      put '('; parse ast; put ')'
+      if [:dstr, :dsym].include? ast.type and es2015
+        parse ast
+      else
+        put '('; parse ast; put ')'
+      end
     end
 
     def timestamp(file)
