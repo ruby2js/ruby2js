@@ -588,18 +588,7 @@ module Ruby2JS
               end
 
               # check for normal case: only elements and text
-              simple = statements.all? do |arg|
-                # explicit call to Vue.createElement
-                next true if arg.children[1] == :createElement and
-                  arg.children[0] == s(:const, nil, :Vue)
-
-                # wunderbar style call
-                arg = arg.children.first if arg.type == :block
-                while arg.type == :send and arg.children.first != nil
-                  arg = arg.children.first
-                end
-                arg.type == :send and arg.children[1] =~ /^_/
-              end
+              simple = statements.all? {|arg| vue_element?(arg)}
 
               if simple
                 args << s(:array, *statements)
@@ -1036,20 +1025,26 @@ module Ruby2JS
           value.children[1]])]
       end
 
+      # is this a "wunderbar" style call or createElement?
+      def vue_element?(node)
+	# explicit call to Vue.createElement
+	return true if node.children[1] == :createElement and
+	  node.children[0] == s(:const, nil, :Vue)
+
+	# wunderbar style call
+	node = node.children.first if node.type == :block
+	while node.type == :send and node.children.first != nil
+	  node = node.children.first
+	end
+	node.type == :send and node.children[1].to_s.start_with? '_'
+      end
+
       # ensure that there are no "wunderbar" or "createElement" calls in
       # a set of statements.
       def vue_wunderbar_free(nodes)
         nodes.each do |node|
           if Parser::AST::Node === node
-            if node.type == :send
-              # wunderbar style calls
-              return false if node.children[0] == nil and
-                node.children[1].to_s.start_with? '_'
-
-              # Vue.createElement calls
-              return false if node.children[0] == s(:const, nil, :Vue) and
-                node.children[1] == :createElement
-            end
+            return false if vue_element?(node)
 
             # recurse
             return false unless vue_wunderbar_free(node.children)
