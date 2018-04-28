@@ -725,15 +725,33 @@ module Ruby2JS
               #     return $_
               #   }())
               #
+              @vue_apply = false
+
+              prefix = []
+              while vue_element?(complex_block.first)
+                prefix << process(complex_block.shift)
+              end
+
+              suffix = []
+              while vue_element?(complex_block.last)
+                suffix.unshift process(complex_block.pop)
+              end
+
+              result = s(:lvar, :$_)
+
+              unless suffix.empty?
+                result = s(:send, result, :concat, s(:array, *suffix))
+              end
+
               @vue_apply = true
 
               element = node.updated :send, [nil, @vue_h,
                 *process_all(args),
                 s(:send, s(:block, s(:send, nil, :proc),
                   s(:args, s(:shadowarg, :$_)), s(:begin,
-                  s(:lvasgn, :$_, s(:array)),
+                  s(:lvasgn, :$_, s(:array, *prefix)),
                   *process_all(complex_block),
-                  s(:return, s(:lvar, :$_)))), :[])]
+                  s(:return, result))), :[])]
             end
           ensure
             @vue_apply = vue_apply

@@ -197,12 +197,21 @@ describe Ruby2JS::Filter::Vue do
           '{return $h("a", options, [$h("b")])}'
     end
 
-    it "should create complex nested elements" do
+    it "should create complex nested elements - leading" do
+      result = to_js('class Foo<Vue; def render; _a {_x; _b if true}; end; end')
+
+      result.must_include 'return $h("a", function() {'
+      result.must_include 'var $_ = [$h("x")];'
+      result.must_include 'if (true) $_.push($h("b"))'
+      result.must_include 'return $_'
+    end
+
+    it "should create complex nested elements - trailing" do
       result = to_js('class Foo<Vue; def render; _a {c="c"; _b c}; end; end')
 
       result.must_include 'return $h("a", function() {'
-      result.must_include 'var $_ = []; var c = "c"; $_.push($h("b", c));'
-      result.must_include 'return $_}())'
+      result.must_include 'var $_ = []; var c = "c"'
+      result.must_include 'return $_.concat([$h("b", c)])'
     end
 
     it "should create simple elements nested within complex elements" do
@@ -222,8 +231,7 @@ describe Ruby2JS::Filter::Vue do
 
       result.must_include '$h("a", function() {'
       result.must_include 'var $_ = [];'
-      result.must_include '$_.push($h("b", c));'
-      result.must_include 'return $_'
+      result.must_include 'return $_.concat([$h("b", c)])'
       result.must_include '}())'
     end
 
@@ -268,7 +276,7 @@ describe Ruby2JS::Filter::Vue do
 
     it "should apply text nodes" do
       to_js( 'class Foo<Vue; def render; _a {text="hi"; _ text}; end; end' ).
-        must_include 'var text = "hi"; $_.push(self._v(text));'
+        must_include 'var text = "hi"; return $_.concat([self._v(text)])'
     end
 
     it "should handle arbitrary nodes" do
@@ -283,12 +291,12 @@ describe Ruby2JS::Filter::Vue do
 
     it "should apply arbitrary nodes" do
       to_js( 'class Foo<Vue; def render; _a {text="hi"; _[text]}; end; end' ).
-        must_include 'var text = "hi"; $_.push(text);'
+        must_include 'var text = "hi"; return $_.concat([text])'
     end
 
     it "should apply list of arbitrary nodes" do
       to_js( 'class Foo<Vue; def render; _a {text="hi"; _[text, text]}; end; end' ).
-        must_include 'var text = "hi"; $_.push(text, text);'
+        must_include 'var text = "hi"; return $_.concat([text, text])'
     end
   end
 
@@ -307,8 +315,7 @@ describe Ruby2JS::Filter::Vue do
       result = to_js( 'class Foo<Vue; def render; _p "a" if @a; _p "b"; end; end' )
       result.must_include '$h("span", function() {var $_ = [];'
       result.must_include 'if (self.$data.a) {$_.push($h("p", "a"))}'
-      result.must_include '$_.push($h("p", "b"));'
-      result.must_include 'return $_}'
+      result.must_include 'return $_.concat([$h("p", "b")])'
     end
 
     it "should wrap anything that is not a method or block call with a span" do
