@@ -393,15 +393,15 @@ module Ruby2JS
       # expand 'wunderbar' like method calls
       def on_send(node)
         if not @vue_h
-	  if node.children.first == s(:const, nil, :Vue)
-	    # enable React filtering within Vue class method calls or
-	    # React component calls
-	    begin
-	      vue_h, @vue_h = @vue_h, [s(:self), :$createElement]
-	      return on_send(node)
-	    ensure
-	      @vue_h = vue_h
-	    end
+          if node.children.first == s(:const, nil, :Vue)
+            # enable React filtering within Vue class method calls or
+            # React component calls
+            begin
+              vue_h, @vue_h = @vue_h, [s(:self), :$createElement]
+              return on_send(node)
+            ensure
+              @vue_h = vue_h
+            end
 
           elsif node.children.first == s(:send, s(:const, nil, :Vue), :util)
             if node.children[1] == :defineReactive
@@ -727,13 +727,22 @@ module Ruby2JS
               #
               @vue_apply = false
 
+              # gather non-element emitting statements in the front
+              prolog = []
+              while not complex_block.empty? and 
+                vue_wunderbar_free([complex_block.first]) do
+                prolog << process(complex_block.shift)
+              end
+
+              # gather element emitting statements in the front
               prefix = []
-              while vue_element?(complex_block.first)
+              while vue_element?(complex_block.first) do
                 prefix << process(complex_block.shift)
               end
 
+              # gather element emitting statements in the back
               suffix = []
-              while vue_element?(complex_block.last)
+              while vue_element?(complex_block.last) do
                 suffix.unshift process(complex_block.pop)
               end
 
@@ -745,13 +754,21 @@ module Ruby2JS
 
               @vue_apply = true
 
-              element = node.updated :send, [nil, @vue_h,
-                *process_all(args),
-                s(:send, s(:block, s(:send, nil, :proc),
-                  s(:args, s(:shadowarg, :$_)), s(:begin,
-                  s(:lvasgn, :$_, s(:array, *prefix)),
-                  *process_all(complex_block),
-                  s(:return, result))), :[])]
+              if suffix.empty? and complex_block.empty?
+                element = node.updated :send, [nil, @vue_h,
+                  *process_all(args),
+                  s(:send, s(:block, s(:send, nil, :proc),
+                    s(:args), s(:begin, *prolog,
+                    s(:return, s(:array, *prefix)))), :[])]
+              else
+                element = node.updated :send, [nil, @vue_h,
+                  *process_all(args),
+                  s(:send, s(:block, s(:send, nil, :proc),
+                    s(:args, s(:shadowarg, :$_)), s(:begin, *prolog,
+                    s(:lvasgn, :$_, s(:array, *prefix)),
+                    *process_all(complex_block),
+                    s(:return, result))), :[])]
+              end
             end
           ensure
             @vue_apply = vue_apply
@@ -1045,16 +1062,18 @@ module Ruby2JS
 
       # is this a "wunderbar" style call or createElement?
       def vue_element?(node)
-	# explicit call to Vue.createElement
-	return true if node.children[1] == :createElement and
-	  node.children[0] == s(:const, nil, :Vue)
+        return false unless node
 
-	# wunderbar style call
-	node = node.children.first if node.type == :block
-	while node.type == :send and node.children.first != nil
-	  node = node.children.first
-	end
-	node.type == :send and node.children[1].to_s.start_with? '_'
+        # explicit call to Vue.createElement
+        return true if node.children[1] == :createElement and
+          node.children[0] == s(:const, nil, :Vue)
+
+        # wunderbar style call
+        node = node.children.first if node.type == :block
+        while node.type == :send and node.children.first != nil
+          node = node.children.first
+        end
+        node.type == :send and node.children[1].to_s.start_with? '_'
       end
 
       # ensure that there are no "wunderbar" or "createElement" calls in

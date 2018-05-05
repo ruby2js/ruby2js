@@ -210,8 +210,8 @@ describe Ruby2JS::Filter::Vue do
       result = to_js('class Foo<Vue; def render; _a {c="c"; _b c}; end; end')
 
       result.must_include 'return $h("a", function() {'
-      result.must_include 'var $_ = []; var c = "c"'
-      result.must_include 'return $_.concat([$h("b", c)])'
+      result.must_include 'var c = "c"'
+      result.must_include 'return [$h("b", c)]'
     end
 
     it "should create simple elements nested within complex elements" do
@@ -230,8 +230,7 @@ describe Ruby2JS::Filter::Vue do
         'Vue.createElement("b", c)}; end; end')
 
       result.must_include '$h("a", function() {'
-      result.must_include 'var $_ = [];'
-      result.must_include 'return $_.concat([$h("b", c)])'
+      result.must_include 'return [$h("b", c)]'
       result.must_include '}())'
     end
 
@@ -276,7 +275,7 @@ describe Ruby2JS::Filter::Vue do
 
     it "should apply text nodes" do
       to_js( 'class Foo<Vue; def render; _a {text="hi"; _ text}; end; end' ).
-        must_include 'var text = "hi"; return $_.concat([self._v(text)])'
+        must_include '{var text = "hi"; return [self._v(text)]}'
     end
 
     it "should handle arbitrary nodes" do
@@ -291,12 +290,12 @@ describe Ruby2JS::Filter::Vue do
 
     it "should apply arbitrary nodes" do
       to_js( 'class Foo<Vue; def render; _a {text="hi"; _[text]}; end; end' ).
-        must_include 'var text = "hi"; return $_.concat([text])'
+        must_include '{var text = "hi"; return [text]}'
     end
 
     it "should apply list of arbitrary nodes" do
       to_js( 'class Foo<Vue; def render; _a {text="hi"; _[text, text]}; end; end' ).
-        must_include 'var text = "hi"; return $_.concat([text, text])'
+        must_include '{var text = "hi"; return [text, text]}'
     end
   end
 
