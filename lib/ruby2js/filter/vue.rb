@@ -29,12 +29,21 @@ module Ruby2JS
         @vue_methods = []
         @vue_props = []
         @vue_reactive = []
+        @vue_filter_functions = false
         super
       end
 
       def options=(options)
         super
         @vue_h ||= options[:vue_h]
+        filters = options[:filters] || Filter::DEFAULTS
+
+        if 
+          defined? Ruby2JS::Filter::Functions and
+          filters.include? Ruby2JS::Filter::Functions
+        then
+          @vue_filter_functions = true
+        end
       end
 
       # Example conversion
@@ -975,6 +984,39 @@ module Ruby2JS
               s(:args), s(:block, s(:send, send[2], :forEach),
               *node.children[1..-1]))
           end
+
+        elsif
+          node.children.first.children.last == :forEach and
+          vue_element?(node.children.last)
+        then
+          # map forEach to map
+          map = node.children.first.updated(nil, 
+            [*node.children.first.children[0..-2], :map])
+          node = node.updated(nil, [map, *node.children[1..-2],
+            s(:autoreturn, node.children[-1])])
+          begin
+            vue_apply, @vue_apply = @vue_apply, false
+            if vue_apply
+              s(:send, s(:gvar, :$_), :push, s(:splat, process(node)))
+            else
+              s(:splat, process(node))
+            end
+          ensure
+            @vue_apply = vue_apply
+          end
+        else
+          super
+        end
+      end
+
+      # convert for_of back to forEach for conversion to map
+      def on_for_of(node)
+        if vue_element?(node.children.last)
+          process node.updated(:block, [
+            s(:send, node.children[1], :forEach),
+            s(:args, s(:arg, node.children.first.children.last)),
+            node.children.last
+          ])
         else
           super
         end
@@ -1063,6 +1105,13 @@ module Ruby2JS
       # is this a "wunderbar" style call or createElement?
       def vue_element?(node)
         return false unless node
+
+        forEach = [:forEach]
+        forEach << :each if @vue_filter_functions
+
+        return true if node.type == :block and
+          forEach.include? node.children.first.children.last and 
+          vue_element?(node.children.last)
 
         # explicit call to Vue.createElement
         return true if node.children[1] == :createElement and

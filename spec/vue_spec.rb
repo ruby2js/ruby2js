@@ -248,24 +248,18 @@ describe Ruby2JS::Filter::Vue do
       result = to_js('class Foo<Vue; def render; _ul list ' +
         'do |i| _li i; end; end; end')
 
-      result.must_include '$h("ul", function() {'
-      result.must_include 'var $_ = [];'
-      result.must_include 'list.forEach(function(i) {'
-      result.must_include '{$_.push($h("li", i))}'
-      result.must_include 'return $_'
-      result.must_include '}())'
+      result.must_include '$h("ul", '
+      result.must_include 'list.map(function(i) {'
+      result.must_include '{return $h("li", i)}'
     end
 
     it "should iterate with markaby style classes/ids" do
       result = to_js('class Foo<Vue; def render; _ul.todos list ' +
         'do |i| _li i; end; end; end')
 
-      result.must_include '$h("ul", {class: ["todos"]}, function() {'
-      result.must_include 'var $_ = [];'
-      result.must_include 'list.forEach(function(i) {'
-      result.must_include '{$_.push($h("li", i))}'
-      result.must_include 'return $_'
-      result.must_include '}())'
+      result.must_include '$h("ul", {class: ["todos"]}, '
+      result.must_include 'list.map(function(i) {'
+      result.must_include '{return $h("li", i)})'
     end
 
     it "should handle text nodes" do

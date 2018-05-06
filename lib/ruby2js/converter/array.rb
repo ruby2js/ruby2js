@@ -7,7 +7,7 @@ module Ruby2JS
 
     handle :array do |*items|
       splat = items.rindex { |a| a.type == :splat }
-      if splat
+      if splat and (items.length == 1 or not es2015)
         item = items[splat].children.first
         if items.length == 1
           parse item
