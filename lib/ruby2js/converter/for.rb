@@ -11,6 +11,7 @@ module Ruby2JS
 
     handle :for, :for_of do |var, expression, block|
       begin
+        vars = @vars.dup
         next_token, @next_token = @next_token, :continue
         put "for (#{es2015 ? 'let' : 'var'} "; parse var
         if [:irange, :erange].include? expression.type
@@ -23,6 +24,7 @@ module Ruby2JS
         puts ') {'; scope block; sput '}'
       ensure
         @next_token = next_token
+        @vars = vars
       end
     end
   end

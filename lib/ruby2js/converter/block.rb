@@ -16,13 +16,15 @@ module Ruby2JS
         [:irange, :erange].include? call.children.first.children.first.type
       then
         begin
+          vars = @vars.dup
           next_token, @next_token = @next_token, :continue
 
           # convert combinations of range, step and block to a for loop
           var = args.children.first
           expression = call.children.first.children.first
           comp = (expression.type == :irange ? '<=' : '<')
-          put "for (var "; parse var; put " = "; parse expression.children.first
+          put "for (#{es2015 ? 'let' : 'var'} "; 
+          parse var; put " = "; parse expression.children.first
           put "; "; parse var; 
           if call.children[2].type == :int and call.children[2].children[0] < 0
             put " #{comp.sub('<', '>')} "; parse expression.children.last
@@ -37,6 +39,7 @@ module Ruby2JS
           sput "}"
         ensure
           @next_token = next_token
+          @vars = vars
         end
 
       elsif
