@@ -95,7 +95,7 @@ module Ruby2JS
         put '('; parse args; put ') => '
 
         expr = body
-        expr = expr.children.first if expr.type == :autoreturn
+        expr = expr.children.first while expr.type == :autoreturn
         while expr.type == :begin and expr.children.length == 1
           expr = expr.children.first
         end
