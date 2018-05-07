@@ -24,7 +24,7 @@ module Ruby2JS
         puts ') {'; scope block; sput '}'
       ensure
         @next_token = next_token
-        @vars = vars
+        @vars = vars if es2015
       end
     end
   end

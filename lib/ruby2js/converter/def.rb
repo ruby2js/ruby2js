@@ -143,7 +143,7 @@ module Ruby2JS
         mark = output_location
         scope body, vars
         if @block_this and @block_depth == 1
-          insert mark, "var self = this#{@sep}"
+          insert mark, "#{es2015 ? 'let' : 'var'} self = this#{@sep}"
           @block_this = false
         end
 

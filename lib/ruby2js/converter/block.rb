@@ -39,7 +39,7 @@ module Ruby2JS
           sput "}"
         ensure
           @next_token = next_token
-          @vars = vars
+          @vars = vars if es2015
         end
 
       elsif

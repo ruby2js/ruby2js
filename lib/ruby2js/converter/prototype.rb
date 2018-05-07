@@ -11,7 +11,10 @@ module Ruby2JS
         prototype, @prototype = @prototype, true
         mark = output_location
         parse(expr)
-        insert mark, "var self = this#{@sep}" if @block_this
+
+        if @block_this
+          insert mark, "#{es2015 ? 'let' : 'var'} self = this#{@sep}" 
+        end
       ensure
         @prototype = prototype
         @block_this, @block_depth = nil, nil
