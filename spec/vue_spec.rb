@@ -214,6 +214,12 @@ describe Ruby2JS::Filter::Vue do
       result.must_include 'return [$h("b", c)]'
     end
 
+    it "should collapse consecutive pushes" do
+      result = to_js('class Foo<Vue; def render; if true; _a; _b; end; end; end')
+
+      result.must_include '{$_.push($h("a"), $h("b"))}'
+    end
+
     it "should create simple elements nested within complex elements" do
       to_js( 'class Foo<Vue; def render; _a {_b} if true; end; end' ).
         must_include 'if (true) {$_.push($h("a", [$h("b")]))}'

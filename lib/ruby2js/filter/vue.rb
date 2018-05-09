@@ -335,10 +335,8 @@ module Ruby2JS
           statement.type == :defs  and statement.children[0] == s(:self)
         end
 
-        if class_methods.empty? and @vue_reactive.empty?
-          defn
-        else
-          s(:begin, defn, *process_all(class_methods.map {|method|
+        unless class_methods.empty? and @vue_reactive.empty?
+          defn = s(:begin, defn, *process_all(class_methods.map {|method|
             fn = if method.is_method?
               if not method.children[1].to_s.end_with? '='
                 # class method
@@ -397,6 +395,8 @@ module Ruby2JS
             fn
           }).compact, *@vue_reactive)
         end
+
+        vue_collapse_pushes(defn)
       end
 
       # expand 'wunderbar' like method calls
@@ -887,6 +887,46 @@ module Ruby2JS
         else
           super
         end
+      end
+
+      # collapse consecutive pushes into a single call to push
+      def vue_collapse_pushes(node)
+        if node.type == :begin
+          prev = nil
+          (node.children.length-1).downto(0) do |i|
+            child = node.children[i]
+            if 
+              child.type == :send and child.children[0] == s(:gvar, :$_) and
+              child.children[1] == :push
+            then
+              if prev
+                node = node.updated(nil, [*node.children[0...i],
+                  node.children[i].updated(nil, node.children[i].children +
+                    node.children[i+1].children[2..-1]),
+                  *node.children[prev+1..-1]])
+              end
+              prev = i
+            else
+              prev = nil
+            end
+          end
+        end
+
+        # recurse
+        children = node.children
+        children.each_with_index do |child, index|
+          if Parser::AST::Node === child
+            replacement = vue_collapse_pushes(child) 
+            unless replacement.equal? child
+              children = children.dup if children.frozen?
+              children[index] = replacement 
+            end
+          end
+        end
+
+        node = node.updated(nil, children) unless children.frozen?
+
+        node
       end
 
       # convert blocks to proc arguments
