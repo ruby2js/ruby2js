@@ -8,8 +8,27 @@
 #
 #   Want to run a standalone server?
 #     $ ruby ruby2js.rb --port=8080
+#
+#   Want to run from the command line?
+#     $ ruby ruby2js.rb [options] [file]
+#
+#       available options:
+#
+#         --es2015 
+#         --es2016 
+#         --es2017 
+#         --strict
+#         ---filter filter
+#         -f filter
 
 require 'wunderbar'
+
+# extract options from the argument list
+options = {}
+options[:eslevel] = 2015 if ARGV.delete('--es2015')
+options[:eslevel] = 2016 if ARGV.delete('--es2016')
+options[:eslevel] = 2017 if ARGV.delete('--es2017')
+options[:strict] = true if ARGV.delete('--strict')
 
 begin
   # support running directly from a git clone
@@ -28,17 +47,36 @@ begin
     'require'   => 'ruby2js/filter/require',
     'react'     => 'ruby2js/filter/react',
     'rubyjs'    => 'ruby2js/filter/rubyjs',
-    'strict'    => 'ruby2js/filter/strict',
     'underscore' => 'ruby2js/filter/underscore',
     'camelCase' => 'ruby2js/filter/camelCase' # should be last
   }
 
   # allow filters to be selected based on the path
   selected = env['PATH_INFO'].to_s.split('/')
+
+  # add filters from the argument list
+  while %w(-f --filter).include? ARGV[0]
+    ARGV.shift
+    selected << ARGV.shift
+  end
+
+  # require selected filters
   filters.each do |name, filter|
     require filter if selected.include?(name) or selected.include? 'all'
   end
 rescue Exception => $load_error
+end
+
+# command line support
+if not env['REQUEST_METHOD'] and not env['SERVER_PORT']
+  if ARGV.length > 0
+    options[:file] = ARGV.first
+    puts Ruby2JS.convert(File.read(ARGV.first), options).to_s
+  else
+    puts Ruby2JS.convert(STDIN.read, options).to_s
+  end  
+
+  exit
 end
 
 _html do
@@ -65,7 +103,6 @@ _html do
     _div_? do
       raise $load_error if $load_error
 
-      options = {}
       options[:eslevel] = 2017 if @es2017
 
       ruby = Ruby2JS.convert(@ruby, options)
