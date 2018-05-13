@@ -75,8 +75,9 @@ describe Ruby2JS do
     end
 
     it "should parse mass assign" do
-      to_js( "a , b = 1, 2" ).must_equal 'var a = 1; var b = 2'
+      to_js( "a, b = 1, 2" ).must_equal 'var a = 1; var b = 2'
       to_js( "a = 1, 2" ).must_equal 'var a = [1, 2]'
+      to_js( "a, b = c" ).must_equal 'var a = c[0]; var b = c[1]'
     end
 
     it "should parse chained assignment statements" do

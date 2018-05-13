@@ -45,10 +45,24 @@ module Ruby2JS
         end
         put "] = "
         parse rhs
+
+      elsif rhs.type == :array
+
+        if lhs.children.length == rhs.children.length
+          block = []
+          lhs.children.zip rhs.children.zip do |var, val| 
+            block << s(var.type, *var.children, *val)
+          end
+          parse s(:begin, *block), @state
+        else
+          raise Error.new("unmatched assignment", @ast)
+        end
+
       else
+
         block = []
-        lhs.children.zip rhs.children.zip do |var, val| 
-          block << s(var.type, *var.children, *val)
+        lhs.children.each_with_index do |var, i|
+          block << s(var.type, *var.children, s(:send, rhs, :[], s(:int, i)))
         end
         parse s(:begin, *block), @state
       end
