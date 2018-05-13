@@ -151,6 +151,10 @@ describe "ES2015 support" do
     it "should parenthesize anonymous functions that are immediately called" do
       to_js( 'lambda {1}[]' ).must_equal '(() => 1)()'
     end
+
+    it "should handle to_proc on a symbol" do
+      to_js_fn( 'a.map(&:to_i)' ).must_equal 'a.map((item) => parseInt(item))'
+    end
   end
 
   describe :string do

@@ -99,6 +99,7 @@ module Ruby2JS
         while expr.type == :begin and expr.children.length == 1
           expr = expr.children.first
         end
+        expr = expr.children.first if expr.type == :return
 
         if EXPRESSIONS.include? expr.type
           if expr.type == :send and expr.children[0..1] == [nil, :raise]
