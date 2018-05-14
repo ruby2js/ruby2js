@@ -95,6 +95,7 @@ describe "ES2015 support" do
   describe :templateLiteral do
     it "should convert interpolated strings into ES templates" do
       to_js( '"#{a}"' ).must_equal('`${a}`')
+      to_js( '"#{a}" + "#{b}"' ).must_equal('`${a}${b}`')
     end
 
     it "should escape stray ${} characters" do

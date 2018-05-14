@@ -306,6 +306,10 @@ describe Ruby2JS do
       to_js( '"#{a}#{b}".split(" ")' ).must_equal '(a + b).split(" ")'
       to_js( '"a#{b+c}"' ).must_equal '"a" + (b + c)'
     end
+
+    it "should concatenate strings" do
+      to_js( '"a"+"b"' ).must_equal '"ab"'
+    end
     
     it "should nest methods called on expressions" do
       exp = '(a + b).length'

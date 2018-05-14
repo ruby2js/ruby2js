@@ -16,6 +16,13 @@ module Ruby2JS
     handle :send, :sendw, :await, :attr, :call do |receiver, method, *args|
       ast = @ast
 
+    if 
+      args.length == 1 and method == :+
+    then
+      node = collapse_strings(ast)
+      return parse node if node != ast
+    end
+
       # strip '!' and '?' decorations
       method = method.to_s[0..-2] if method =~ /\w[!?]$/
 
@@ -285,5 +292,48 @@ module Ruby2JS
        put '...'
        parse expr
     end
+
+  # do string concatenation when possible
+  def collapse_strings(node)
+    left = node.children[0]
+    return node unless left
+    right = node.children[2]
+
+    # recursively evaluate left hand side
+    if 
+      left.type == :send and left.children.length == 3 and 
+      left.children[1] == :+
+    then
+      left = collapse_strings(left)
+    end
+
+    # recursively evaluate right hand side
+    if 
+      right.type == :send and right.children.length == 3 and 
+      right.children[1] == :+
+    then
+      right = collapse_strings(right)
+    end
+
+    # if left and right are both strings, perform concatenation
+    if [:dstr, :str].include? left.type and [:dstr, :str].include? right.type
+      if left.type == :str and right.type == :str
+        return left.updated nil, 
+          [left.children.first + right.children.first]
+      else
+        left = s(:dstr, left) if left.type == :str
+        right = s(:dstr, right) if right.type == :str
+        return left.updated(nil, left.children + right.children)
+      end
+    end
+
+    # if left and right are unchanged, return original node; otherwise
+    # return node modified to include new left and/or right hand sides.
+    if left == node.children[0] and right == node.children[2]
+      return node
+    else
+      return node.updated(nil, [left, :+, right]) 
+    end
+  end
   end
 end
