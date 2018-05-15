@@ -21,7 +21,7 @@ module Ruby2JS
         children.each do |child|
           if child.type == :str
             str = child.children.first.inspect[1..-2].gsub('${', '$\{')
-            if length > 40
+            if length > 40 and str.scan("\n").length > 3
               put str.gsub("\\n", "\n")
             else
               put str
