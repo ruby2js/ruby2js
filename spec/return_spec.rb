@@ -73,9 +73,14 @@ describe Ruby2JS::Filter::Return do
   end
 
   describe 'flow control statements' do
-    it "should handld if statements" do
+    it "should handle if statements" do
       to_js( 'lambda {|x| if false; a; elsif false; b; else c; end}' ).
         must_equal 'function(x) {if (false) {return a} else if (false) {return b} else {return c}}'
+    end
+
+    it "should handle case statements" do
+      to_js( 'lambda {|x| case false; when true; a; when false; b; else c; end}' ).
+        must_equal 'function(x) {switch (false) {case true: return a; case false: return b; default: return c}}'
     end
   end
 
