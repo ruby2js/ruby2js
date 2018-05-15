@@ -8,9 +8,6 @@ module Ruby2JS
 
     handle :def, :defm, :async do |name, args, body=nil|
       body ||= s(:begin)
-      if name =~ /[!?]$/
-        raise Error.new("invalid method name #{ name }", @ast)
-      end
 
       vars = {}
       vars.merge! @vars unless name
@@ -132,7 +129,7 @@ module Ruby2JS
           put @prop
           @prop = nil
         elsif name
-          put "function #{name}"
+          put "function #{name.to_s.sub(/[?!]$/, '')}"
         else
           put 'function'
         end

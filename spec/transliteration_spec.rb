@@ -694,6 +694,8 @@ describe Ruby2JS do
 
     it "should parse method def" do
       to_js('def method; end').must_equal 'function method() {}'
+      to_js("def question?; end").must_equal 'function question() {}'
+      to_js("def bang!; end").must_equal 'function bang() {}'
     end
     
     it "should parse singleton method and property definitions" do
