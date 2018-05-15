@@ -143,6 +143,11 @@ module Ruby2JS
       end
     end
 
+    # add a single token to the current line without checking for newline
+    def put!(string)
+      @line << Token.new(string.gsub("\r", "\n"), @ast)
+    end
+
     # add a single token to the current line and then advance to next line
     def puts(string)
       unless String === string and string.include? "\n"

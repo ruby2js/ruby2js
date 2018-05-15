@@ -107,8 +107,10 @@ describe "ES2015 support" do
     end
 
     it "should not escape newlines in long strings" do
-      to_js( "\"\#{a}\n12345678901234567890123456789012345678901\"" ).
-       must_equal("`${a}\n12345678901234567890123456789012345678901`")
+      to_js( "\"\n1234567890\n1234567890\n1234567890\n1234567890\n1\"" ).
+       must_equal("`\n1234567890\n1234567890\n1234567890\n1234567890\n1`")
+      to_js( "\"\#{a}\n1234567890\n1234567890\n1234567890\n1234567890\n1\"" ).
+       must_equal("`${a}\n1234567890\n1234567890\n1234567890\n1234567890\n1`")
     end
 
     it "should convert interpolated regular expressions into templates" do
