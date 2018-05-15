@@ -38,7 +38,8 @@ module Ruby2JS
         skipped = false
         body.each_with_index do |m, index|
           put(index == 0 ? @nl : @sep) unless skipped
-          comments(m).each {|comment| put comment}
+          comments = comments(m)
+          location = output_location
           skipped = false
 
           # intercept async definitions
@@ -137,7 +138,11 @@ module Ruby2JS
             end
           end
 
-          post << m if skipped
+          if skipped
+            post << m if skipped
+          else
+            comments.reverse.each {|comment| insert location, comment}
+          end
         end
 
         put @nl unless skipped
