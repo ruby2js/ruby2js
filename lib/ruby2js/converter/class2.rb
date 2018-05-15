@@ -38,6 +38,7 @@ module Ruby2JS
         skipped = false
         body.each_with_index do |m, index|
           put(index == 0 ? @nl : @sep) unless skipped
+          comments(m).each {|comment| put comment}
           skipped = false
 
           # intercept async definitions

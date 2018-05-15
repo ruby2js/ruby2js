@@ -110,6 +110,10 @@ describe "ES2015 support" do
       to_js( "\"\#{a}\n12345678901234567890123456789012345678901\"" ).
        must_equal("`${a}\n12345678901234567890123456789012345678901`")
     end
+
+    it "should convert interpolated regular expressions into templates" do
+      to_js( '/a#{b}c/' ).must_equal("new RegExp(`a${b}c`)")
+    end
   end
 
   describe :fat_arrow do

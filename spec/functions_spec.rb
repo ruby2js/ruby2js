@@ -57,6 +57,8 @@ describe Ruby2JS::Filter::Functions do
       to_js( 'str.gsub("a", "b")' ).must_equal 'str.replace(/a/g, "b")'
       to_js( 'str.gsub(/a/i, "b")' ).must_equal 'str.replace(/a/gi, "b")'
       to_js( 'str.gsub(/a/, "b")' ).must_equal 'str.replace(/a/g, "b")'
+      to_js( 'str.gsub(/#{a}/, "b")' ).
+        must_equal 'str.replace(new RegExp(a, "g"), "b")'
       to_js( 'str.gsub(/a/) {"x"}' ).
         must_equal 'str.replace(/a/g, function() {return "x"})'
       to_js( 'str.gsub!("a", "b")' ).

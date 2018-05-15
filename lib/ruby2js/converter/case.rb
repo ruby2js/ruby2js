@@ -47,7 +47,15 @@ module Ruby2JS
           end
 
           parse code, :statement
-          put "#{@sep}break#@sep" if other or index < whens.length-1
+          last = code
+          while last.type == :begin
+            last = last.children.last
+          end
+
+          if other or index < whens.length-1
+            put "#{@sep}" 
+            put "break#@sep" unless last.type == :return
+          end
         end
 
         (put "#{@nl}default:#@ws"; parse other, :statement) if other

@@ -904,7 +904,8 @@ describe Ruby2JS do
     end
 
     it "should handle %regular expressions" do
-      to_js( '%r{/\w+}' ).must_equal %{new RegExp("/\\\\w+")}
+      to_js( '%r{/\w+}' ).must_equal "/\\/\\w+/"
+      to_js( '%r{/a/b/c/d}' ).must_equal %{new RegExp("/a/b/c/d")}
     end
 
     it "should handle extended regular expressions" do

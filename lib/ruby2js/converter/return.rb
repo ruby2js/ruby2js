@@ -26,6 +26,7 @@ module Ruby2JS
       return if block == []
       if EXPRESSIONS.include? block.last.type 
         block.push @ast.updated(:return, [block.pop])
+
       elsif block.last.type == :if
         node = block.pop
         if node.children[1] and node.children[2] and
@@ -49,6 +50,24 @@ module Ruby2JS
           end
         end
         block.push node
+
+      elsif block.last.type == :case
+        node = block.pop
+        children = node.children.dup
+        (1...children.length).each do |i|
+          if children[i].type == :when
+            gchildren = children[i].children.dup
+            if !gchildren.empty? and EXPRESSIONS.include? gchildren.last.type
+              gchildren.push s(:return, gchildren.pop)
+              children[i] = children[i].updated(nil, gchildren)
+            else
+            end
+          elsif EXPRESSIONS.include? children[i].type
+            children[i] = children[i].updated(:return, [children[i]])
+          end
+        end
+        block.push node.updated(nil, children)
+
       elsif block.last.type == :lvasgn
         block.push s(:return, s(:lvar, block.last.children.first))
       elsif block.last.type == :ivasgn
