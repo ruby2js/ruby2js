@@ -289,6 +289,18 @@ module Ruby2JS
           # prevent chained delete methods from being converted to undef
           S(:send, target.updated(:sendw), *node.children[1..-1])
 
+        elsif es2017 and method==:entries and args.length==0 and node.is_method?
+          process node.updated(nil, [s(:const, nil, :Object), :entries, target])
+
+        elsif es2017 and method==:values and args.length==0 and node.is_method?
+          process node.updated(nil, [s(:const, nil, :Object), :values, target])
+
+        elsif es2017 and method==:rjust
+          process node.updated(nil, [target, :padStart, *args])
+
+        elsif es2017 and method==:ljust
+          process node.updated(nil, [target, :padEnd, *args])
+
         else
           super
         end

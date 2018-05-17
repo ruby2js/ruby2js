@@ -12,10 +12,28 @@ describe "ES2017 support" do
       filters: [Ruby2JS::Filter::Functions]).to_s
   end
   
+  describe :String do
+    it "should convert str.ljust" do
+      to_js_fn( 'str.ljust(n)' ).must_equal 'str.padEnd(n)'
+    end
+
+    it "should convert str.rjust" do
+      to_js_fn( 'str.rjust(n)' ).must_equal 'str.padStart(n)'
+    end
+  end
+  
   describe :Hash do
     it "should convert hash.each_pair" do
       to_js_fn( 'h.each_pair {|k,v| x+=v}' ).
         must_equal 'Object.entries(h).forEach(([k, v]) => {x += v})'
+    end
+
+    it "should convert hash.entries()" do
+      to_js_fn( 'h.entries()' ).must_equal 'Object.entries(h)'
+    end
+
+    it "should convert hash.values()" do
+      to_js_fn( 'h.values()' ).must_equal 'Object.values(h)'
     end
   end
 
