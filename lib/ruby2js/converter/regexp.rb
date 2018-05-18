@@ -31,7 +31,8 @@ module Ruby2JS
       if parts.all? {|part| part.type == :str}
         str = parts.map {|part| part.children.first}.join
         unless str.scan('/').length - str.scan("\\").length > 3
-          return put "/#{ str.gsub('/', '\\/') }/#{ opts.join }"
+          return put "/#{ str.gsub('\\/', '/').gsub('/', '\\/') }/" +
+            opts.join
         end
       end
 
