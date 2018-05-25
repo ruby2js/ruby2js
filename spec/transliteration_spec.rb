@@ -707,6 +707,11 @@ describe Ruby2JS do
       to_js('def self.prop; @prop; end; def self.prop=(prop); @prop=prop; end').
         must_equal 'Object.defineProperty(this, "prop", {enumerable: true, configurable: true, get: function() {return this._prop}, set: function(prop) {this._prop = prop}})'
     end
+
+    it "should parse nested classes" do
+      to_js('class A; class B; class C; end; end; end').
+        must_equal 'function A() {}; A.B = function() {}; A.B.C = function() {}'
+    end
     
     it "should convert self to this" do
       to_js('def method; return self.foo; end').

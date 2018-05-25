@@ -250,6 +250,11 @@ describe "ES2015 support" do
         must_equal 'class Employee extends Person {}'
     end
 
+    it "should parse nested classes" do
+      to_js('class A; class B; class C; end; end; end').
+        must_equal 'class A {}; A.B = class {}; A.B.C = class {}'
+    end
+
     it "should handle super" do
       to_js('class A; end; class B < A; def initialize(x); super; end; end').
         must_equal 'class A {}; class B extends A {constructor(x) {super(x)}}'

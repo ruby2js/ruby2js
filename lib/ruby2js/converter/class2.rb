@@ -158,6 +158,17 @@ module Ruby2JS
             parse name
             put '.prototype.'
             put m.children[1].children[0]
+          elsif m.type == :class
+            innerclass_name = m.children.first
+            if innerclass_name.children.first
+              innerclass_name = innerclass_name.updated(nil,
+                [s(:attr, innerclass_name.children[0], name),
+                 innerclass_name.children[1]])
+            else
+              innerclass_name = innerclass_name.updated(nil,
+                [name, innerclass_name.children[1]])
+            end
+            parse m.updated(nil, [innerclass_name, *m.children[1..-1]])
           else
             parse m, :statement
           end
