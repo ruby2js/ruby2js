@@ -9,6 +9,8 @@ group :development, :test do
 end
 
 group :test do
+  gem 'rails'
+
   if RUBY_VERSION =~ /^1/
     gem 'haml', '~> 4.0'
   else
