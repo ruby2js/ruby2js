@@ -125,6 +125,12 @@ module Ruby2JS
                 put "set #{var}(#{var}) {#{@nl}this._#{var} = #{var}#@nl}"
               end
             else
+              if m.children[1] == :include
+                m = m.updated(:begin, m.children[2..-1].map {|mname|
+                  s(:send, s(:const, nil, :Object), :assign,
+                  s(:attr, name, :prototype), mname)})
+              end
+
               skipped = true
             end
 
@@ -139,7 +145,7 @@ module Ruby2JS
           end
 
           if skipped
-            post << m if skipped
+            post << [m, comments] if skipped
           else
             comments.reverse.each {|comment| insert location, comment}
           end
@@ -148,8 +154,9 @@ module Ruby2JS
         put @nl unless skipped
         put '}'
 
-        post.each do |m|
+        post.each do |m, comments|
           put @sep
+          comments.each {|comment| put comment}
           if m.type == :alias
             parse name
             put '.prototype.'

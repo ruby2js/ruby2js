@@ -115,6 +115,13 @@ module Ruby2JS
                   enumerable: s(:true),
                   configurable: s(:true)})
             end
+          elsif m.children[1] == :include
+            s(:send, s(:block, s(:send, nil, :lambda), s(:args),
+              s(:begin, *m.children[2..-1].map {|modname|
+              s(:for, s(:lvasgn, :$_), modname,
+              s(:send, s(:send, name, :prototype), :[]=,
+              s(:lvar, :$_), s(:send, modname, :[], s(:lvar, :$_))))
+              })), :[])
           else
             # class method call
             s(:send, name, *m.children[1..-1])

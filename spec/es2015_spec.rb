@@ -190,6 +190,11 @@ describe "ES2015 support" do
       to_js('class Person; end').must_equal 'class Person {}'
     end
 
+    it "should parse include" do
+      to_js('class Employee; include Person; end').
+        must_equal 'class Employee {}; Object.assign(Employee.prototype, Person)'
+    end
+
     it "should parse class with attr_accessor" do
       to_js('class Person; attr_accessor :a; end').
         must_equal 'class Person {get a() {return this._a}; set a(a) {this._a = a}}'
