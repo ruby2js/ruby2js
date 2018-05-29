@@ -174,6 +174,12 @@ describe "ES2015 support" do
     end
   end
 
+  describe :hash do
+    it "should handle merge!" do
+      to_js_fn( 'a.merge!(b)' ).must_equal 'Object.assign(a, b)'
+    end
+  end
+
   describe :array do
     it "should handle array conversions" do
       to_js_fn('Array(a)').must_equal 'Array.from(a)'

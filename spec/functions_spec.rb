@@ -260,7 +260,8 @@ describe Ruby2JS::Filter::Functions do
     end
 
     it "should handle merge!" do
-      to_js( 'a.merge!(b)' ).must_equal 'Object.assign(a, b)'
+      to_js( 'a.merge!(b)' ).
+        must_equal "(function() {for (var $_ in b) {a[$_] = b[$_]}; return a})()"
     end
 
     it "should handle delete attribute (ruby style) - static" do

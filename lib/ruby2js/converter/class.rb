@@ -243,10 +243,10 @@ module Ruby2JS
           if @ast.type == :class_module
             body[start...start+methods] =
               s(:casgn, *name.children, s(:hash, *pairs.flatten))
-         else
+          else
             body[start...start+methods] =
               s(:send, name, :prototype=, s(:hash, *pairs.flatten))
-         end
+          end
         end
       end
 

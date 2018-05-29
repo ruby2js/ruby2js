@@ -32,7 +32,26 @@ module Ruby2JS
           process S(:send, s(:const, nil, :Object), :keys, target)
 
         elsif method == :merge!
-          process S(:send, s(:const, nil, :Object), :assign, target, *args)
+          if es2015
+            process S(:send, s(:const, nil, :Object), :assign, target, *args)
+          else
+            copy = []
+
+            unless
+               target.type == :send and target.children.length == 2 and
+               target.children[0] == nil
+            then
+               copy << s(:gvasgn, :$0, target)
+               target = s(:gvar, :$0)
+            end
+
+            s(:send, s(:block, s(:send, nil, :lambda), s(:args),
+              s(:begin, *copy, *args.map {|modname|
+              s(:for, s(:lvasgn, :$_), modname,
+              s(:send, target, :[]=,
+              s(:lvar, :$_), s(:send, modname, :[], s(:lvar, :$_))))
+              }, s(:return, target))), :[])
+          end
 
         elsif method == :delete and args.length == 1
           if not target
