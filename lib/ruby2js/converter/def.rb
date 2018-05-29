@@ -88,7 +88,10 @@ module Ruby2JS
       put 'async ' if @ast.type == :async
 
       # es2015 fat arrow support
-      if not name and es2015 and @state != :method and @ast.type != :defm
+      if 
+        not name and es2015 and @state != :method and @ast.type != :defm and 
+        not @prop
+      then
         put '('; parse args; put ') => '
 
         expr = body

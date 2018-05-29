@@ -6,12 +6,16 @@ module Ruby2JS
     #   (...)
 
     handle :module do |name, *body|
-      symbols = [] 
-
       while body.length == 1 and body.first.type == :begin
         body = body.first.children
       end
 
+      if body.length > 0 and body.all? {|child| child.type == :def}
+        parse @ast.updated(:class_module, [name, nil, *body])
+        return
+      end
+
+      symbols = [] 
       visibility = :public
       omit = []
 

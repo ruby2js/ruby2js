@@ -799,7 +799,7 @@ describe Ruby2JS do
       to_js( 'module A; B=1; end' ).
         must_equal 'A = function() {var B = 1; return {B: B}}()'
       to_js( 'module A; def b; return 1; end; end' ).
-        must_equal 'A = function() {function b() {return 1}; return {b: b}}()'
+        must_equal 'var A = {get b() {return 1}}'
       to_js( 'module A; class B; def initialize; @c=1; end; end; end' ).
         must_equal 'A = function() {function B() {this._c = 1}; return {B: B}}()'
     end

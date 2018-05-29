@@ -12,11 +12,11 @@ module Ruby2JS
     #       when ++class is encountered; it signals that this construct is
     #       meant to extend an already existing JavaScrpt class.
 
-    handle :class, :class_extend do |name, inheritance, *body|
-      if @ast.type == :class_extend
+    handle :class, :class_extend, :class_module do |name, inheritance, *body|
+      if @ast.type != :class
         init = nil
       else
-        if es2015 and @ast.type != :class_extend
+        if es2015
           parse @ast.updated(:class2)
           return
         end
@@ -37,6 +37,13 @@ module Ruby2JS
       body.compact!
       visible = {}
       body.map! do |m| 
+        if 
+          @ast.type == :class_module and m.type == :defs and
+          m.children.first == s(:self)
+        then
+          m = m.updated(:def, m.children[1..-1])
+        end
+
         node = if m.type == :def
           if m.children.first == :initialize
             # constructor: remove from body and overwrite init function
@@ -209,7 +216,7 @@ module Ruby2JS
 
         # collapse sequence to a single assignment
         if 
-          @ast.type == :class and
+          @ast.type != :class_extend and
           (methods > 1 or (methods == 1 and body[start].type == :prop))
         then
           pairs = body[start...start+methods].map do |node|
@@ -232,8 +239,14 @@ module Ruby2JS
             end
             replacement
           end
-          body[start...start+methods] =
-            s(:send, name, :prototype=, s(:hash, *pairs.flatten))
+
+          if @ast.type == :class_module
+            body[start...start+methods] =
+              s(:casgn, *name.children, s(:hash, *pairs.flatten))
+         else
+            body[start...start+methods] =
+              s(:send, name, :prototype=, s(:hash, *pairs.flatten))
+         end
         end
       end
 
