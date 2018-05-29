@@ -10,7 +10,15 @@
 # Using an optional filter:
 #
 #   $ echo 'require "ruby2js/filter/functions"' > config/initializers/ruby2js.rb
-
+#
+# Asset Pipeline:
+#
+#  Ruby2JS registers ".rbs" (RuBy Script) extension.
+#  You can add "ruby_thing.js.rbs" to your javascript folder
+#  and '= require ruby_thing' from other js sources.
+#
+#  (options are not yet supported, but by requiring the appropriate files
+#   as shown above, you can configure proejct wide.)
 require 'ruby2js'
 
 module Ruby2JS
@@ -24,6 +32,25 @@ module Ruby2JS
     end
 
     ActionView::Template.register_template_handler :rb, Template
+
+    class SprocketProcessor
+      def initialize( file)
+        @file = file
+      end
+      def render(context , _)
+        Ruby2JS.convert(File.read(@file)).to_s
+      end
+    end
+
+    class Engine < ::Rails::Engine
+      engine_name "ruby2js"
+
+      config.assets.configure do |env|
+        env.register_engine '.rbs', SprocketProcessor, mime_type: 'text/javascript', silence_deprecation: true
+      end
+
+    end
+
   end
 
 end
