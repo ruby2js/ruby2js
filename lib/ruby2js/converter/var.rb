@@ -5,7 +5,11 @@ module Ruby2JS
     # (gvar :$a)
 
     handle :lvar, :gvar do |var|
-      put var
+      if var == :$!
+        put '$EXCEPTION'
+      else
+        put var
+      end
     end
   end
 end

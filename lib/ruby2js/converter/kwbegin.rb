@@ -29,15 +29,16 @@ module Ruby2JS
         body, *recovers, otherwise = block.children
         raise Error.new("block else", @ast) if otherwise
 
-        if recovers.any? {|recover| not recover.children[1]}
-          raise Error.new("recover without exception variable", @ast)
-        end
-
         var = recovers.first.children[1]
 
         if recovers.any? {|recover| recover.children[1] != var}
           raise Error.new( 
             "multiple recovers with different exception variables", @ast)
+        end
+
+        if recovers[0..-2].any? {|recover| not recover.children[0]}
+          raise Error.new( 
+            "additional recovers after catchall", @ast)
         end
       else
         body = block
@@ -50,6 +51,8 @@ module Ruby2JS
       puts "try {"; parse body, :statement; sput '}'
 
       if recovers
+        var ||= s(:gvar, :$EXCEPTION)
+
         if recovers.length == 1 and not recovers.first.children.first
           # single catch with no exception named
           put " catch ("; parse var; puts ") {"
@@ -60,6 +63,7 @@ module Ruby2JS
           first = true
           recovers.each do |recover|
             exceptions, var, recovery = recover.children
+            var ||= s(:gvar, :$EXCEPTION)
 
             if exceptions
 
