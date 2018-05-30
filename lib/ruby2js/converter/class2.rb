@@ -124,6 +124,8 @@ module Ruby2JS
                 var = child_sym.children.first
                 put "set #{var}(#{var}) {#{@nl}this._#{var} = #{var}#@nl}"
               end
+            elsif [:private, :protected, :public].include? m.children[1]
+              raise Error.new("class #{m.children[1]} is not supported", @ast)
             else
               if m.children[1] == :include
                 m = m.updated(:begin, m.children[2..-1].map {|mname|

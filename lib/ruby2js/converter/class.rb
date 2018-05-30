@@ -129,6 +129,8 @@ module Ruby2JS
               s(:send, s(:send, name, :prototype), :[]=,
               s(:lvar, :$_), s(:send, modname, :[], s(:lvar, :$_))))
               })), :[])
+          elsif [:private, :protected, :public].include? m.children[1]
+            raise Error.new("class #{m.children[1]} is not supported", @ast)
           else
             # class method call
             s(:send, name, *m.children[1..-1])

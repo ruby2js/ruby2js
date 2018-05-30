@@ -26,6 +26,12 @@ describe 'not implemented' do
     todo( 'def f(a, (foo, *bar)); end' )
   end
 
+  it "class visibility modifiers" do
+    todo( 'class C; public; end' )
+    todo( 'class C; private; end' )
+    todo( 'class C; protected; end' )
+  end
+
   it "yield" do
     todo( 'yield' )
   end
