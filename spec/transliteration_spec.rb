@@ -970,15 +970,20 @@ describe Ruby2JS do
         must_equal 'try {var a} catch ($EXCEPTION) {p($EXCEPTION)}'
     end
 
-    it "catching exceptions with a type but without a variable" do
-      to_js("begin a; rescue Foo; end").
-        must_equal 'try {var a} catch ($EXCEPTION) {if ($EXCEPTION instanceof Foo) {} else {throw $EXCEPTION}}'
-    end
-
     it "should handle catching a specific exception" do
       to_js( 'begin a; rescue StandardError => e; b; end' ).
         must_equal 'try {var a} catch (e) {' +
           'if (e instanceof StandardError) {var b} else {throw e}}'
+    end
+
+    it "should handle catching a String" do
+      to_js( 'begin a; rescue String => e; b; end' ).
+        must_equal 'try {var a} catch (e) {if (typeof e == "string") {var b} else {throw e}}'
+    end
+
+    it "catching exceptions with a type but without a variable" do
+      to_js("begin a; rescue Foo; end").
+        must_equal 'try {var a} catch ($EXCEPTION) {if ($EXCEPTION instanceof Foo) {} else {throw $EXCEPTION}}'
     end
 
     it "should handle an ensure clause" do

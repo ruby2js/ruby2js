@@ -73,7 +73,11 @@ module Ruby2JS
               put  'if ('
               exceptions.children.each_with_index do |exception, index|
                 put ' || ' unless index == 0
-                parse var; put ' instanceof '; parse exception
+                if exception == s(:const, nil, :String)
+                  put 'typeof '; parse var; put ' == "string"'
+                else
+                  parse var; put ' instanceof '; parse exception
+                end
               end
               puts ') {'
             else
