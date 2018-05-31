@@ -39,6 +39,9 @@ For example:
   * Any block becomes and explicit argument `new Promise do; y(); end` becomes `new Promise(function() {y()})`
   * regular expressions are mapped to js
   * `raise` becomes `throw`
+  * expressions enclosed in backtick operators (\`\`) and `%x{}` literals are
+    evaluated in the context of the caller and the results are inserted
+    into the generated JavaScript.
 
 Ruby attribute accessors, methods defined with no parameters and no
 parenthesis, as well as setter method definitions, are
