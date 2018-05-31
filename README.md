@@ -19,7 +19,8 @@ For example:
     parenthesis are used
   * otherwise Ruby method calls become JavaScript property accesses.
   * by default, methods and procs return `undefined`
-  * splats are handled (may need to try around or read transliteration_spec)
+  * splats mapped to spread syntax when ES2015 or later is selected, and
+    to equivalents using `apply`, `concat`, `slice`, and `arguments` otherwise.
   * ruby string interpolation is expanded into string + operations
   * `and` and `or` become `&&` and `||`
   * `a ** b` becomes `Math.pow(a,b)`
