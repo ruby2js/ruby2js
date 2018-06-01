@@ -38,7 +38,8 @@ module Ruby2JS
         @file = file
       end
       def render(context , _)
-        Ruby2JS.convert(File.read(@file)).to_s
+        context = context.instance_eval { binding } unless context.is_a? Binding
+        Ruby2JS.convert(File.read(@file), binding: context).to_s
       end
     end
 
