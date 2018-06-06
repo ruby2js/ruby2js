@@ -11,7 +11,6 @@ module Ruby2JS
     handle :case do |expr, *whens, other|
       begin
         scope, @scope = @scope, false
-        mark = output_location
 
         has_range = whens.any? do |node| 
           node.children.any? {|child| [:irange, :erange].include? child.type}
@@ -61,14 +60,6 @@ module Ruby2JS
         (put "#{@nl}default:#@ws"; parse other, :statement) if other
 
         sput '}'
-
-        if scope
-          vars = @vars.select {|key, value| value == :pending}.keys
-          unless vars.empty?
-            insert mark, "#{es2015 ? 'let' : 'var'} #{vars.join(', ')}#{@sep}"
-            vars.each {|var| @vars[var] = true}
-          end
-        end
       ensure
         @scope = scope
       end

@@ -39,7 +39,7 @@ module Ruby2JS
 
       @ast, @comments, @vars = ast, comments, vars.dup
       @varstack = []
-      @scope = true
+      @scope = ast
       @rbstack = []
       @next_token = :return
 
@@ -66,7 +66,7 @@ module Ruby2JS
     end
 
     def convert
-      parse( @ast, :statement )
+      scope @ast 
 
       if @strict
         if @sep == '; '
@@ -82,11 +82,20 @@ module Ruby2JS
     end
     
     def scope( ast, args=nil )
-      scope, @scope = @scope, true
+      scope, @scope = @scope, ast
+      mark = output_location
       @varstack.push @vars
       @vars = args if args
       @vars = Hash[@vars.map {|key, value| [key, true]}]
+
       parse( ast, :statement )
+
+      # retroactively add a declaration for 'pending' variables
+      vars = @vars.select {|key, value| value == :pending}.keys
+      unless vars.empty?
+        insert mark, "#{es2015 ? 'let' : 'var'} #{vars.join(', ')}#{@sep}"
+        vars.each {|var| @vars[var] = true}
+      end
     ensure
       @vars = @varstack.pop
       @scope = scope

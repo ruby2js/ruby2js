@@ -17,7 +17,6 @@ module Ruby2JS
       if @state == :statement
         begin
           scope, @scope = @scope, false
-          mark = output_location
 
           # use short form when appropriate
           unless else_block or then_block.type == :begin
@@ -44,14 +43,6 @@ module Ruby2JS
 
             if else_block
               puts ' else {'; parse else_block, :statement; sput '}'
-            end
-          end
-
-          if scope
-            vars = @vars.select {|key, value| value == :pending}.keys
-            unless vars.empty?
-              insert mark, "#{es2015 ? 'let' : 'var'} #{vars.join(', ')}#{@sep}"
-              vars.each {|var| @vars[var] = true}
             end
           end
         ensure
