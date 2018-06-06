@@ -46,7 +46,7 @@ module Ruby2JS
         end
       ensure
         if @scope
-          @vars[name] = true
+          @vars[name] ||= true
         elsif state == :statement
           @vars[name] ||= :pending
         else
