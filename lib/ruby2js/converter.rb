@@ -40,6 +40,7 @@ module Ruby2JS
       @ast, @comments, @vars = ast, comments, vars.dup
       @varstack = []
       @scope = ast
+      @inner = nil
       @rbstack = []
       @next_token = :return
 
@@ -81,8 +82,11 @@ module Ruby2JS
       OPERATORS.index( OPERATORS.find{ |el| el.include? op } ) || -1
     end
     
+    # define a new scope; primarily determines what variables are visible and deals with hoisting of
+    # declarations
     def scope( ast, args=nil )
       scope, @scope = @scope, ast
+      inner, @inner = @inner, nil 
       mark = output_location
       @varstack.push @vars
       @vars = args if args
@@ -99,6 +103,21 @@ module Ruby2JS
     ensure
       @vars = @varstack.pop
       @scope = scope
+      @inner = inner
+    end
+
+    # handle the oddity where javascript considers there to be a scope (e.g. the body of an if statement),
+    # whereas Ruby does not.
+    def jscope( ast, args=nil )
+      @varstack.push @vars
+      @vars = args if args
+      @vars = Hash[@vars.map {|key, value| [key, true]}]
+
+      parse( ast, :statement )
+    ensure
+      pending = @vars.select {|key, value| value == :pending}
+      @vars = @varstack.pop
+      @vars.merge! pending
     end
 
     def s(type, *args)

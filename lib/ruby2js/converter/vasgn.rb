@@ -31,11 +31,15 @@ module Ruby2JS
           end
         end
 
-        if state == :statement and @scope and not @vars.include?(name) 
-          if es2015
-            var = 'let '
-          else
-            var = 'var ' 
+        hoist = false
+        if state == :statement and not @vars.include?(name) 
+          hoist = hoist?(@scope, @inner, name) if @inner
+          if not hoist
+            if es2015
+              var = 'let '
+            else
+              var = 'var '
+            end
           end
         end
 
@@ -44,8 +48,8 @@ module Ruby2JS
         else
           put "#{ var }#{ name }"
         end
-      ensure
-        if @scope
+
+        if not hoist
           @vars[name] ||= true
         elsif state == :statement
           @vars[name] ||= :pending
@@ -53,6 +57,16 @@ module Ruby2JS
           @vars[name] ||= :implicit # console, document, ...
         end
       end
+    end
+
+    # is 'name' referenced outside of inner scope?
+    def hoist?(outer, inner, name)
+      outer.children.each do |var|
+        next if var == inner
+        return true if var == name and [:lvar, :gvar].include? outer.type
+        return true if Parser::AST::Node === var and hoist?(var, inner, name)
+      end
+      return false
     end
 
     def multi_assign_declarations

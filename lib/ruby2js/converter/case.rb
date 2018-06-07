@@ -10,7 +10,7 @@ module Ruby2JS
 
     handle :case do |expr, *whens, other|
       begin
-        scope, @scope = @scope, false
+        inner, @inner = @inner, @ast
 
         has_range = whens.any? do |node| 
           node.children.any? {|child| [:irange, :erange].include? child.type}
@@ -45,7 +45,7 @@ module Ruby2JS
             end
           end
 
-          parse code, :statement
+          jscope code
           last = code
           while last.type == :begin
             last = last.children.last
@@ -57,11 +57,11 @@ module Ruby2JS
           end
         end
 
-        (put "#{@nl}default:#@ws"; parse other, :statement) if other
+        (put "#{@nl}default:#@ws"; jscope other) if other
 
         sput '}'
       ensure
-        @scope = scope
+        @inner = inner
       end
     end
   end

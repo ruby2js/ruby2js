@@ -389,11 +389,11 @@ describe Ruby2JS do
     end
     
     it "should handle basic variable scope" do
-      to_js( 'z = 1; if a; b; elsif c; d = proc do e = 1; end; end' ).
-        must_equal 'var b, d; var z = 1; if (a) {b} else if (c) {d = function() {var e = 1}}'
+      to_js( 'z = 1; if a; b; elsif c; d = proc do e = 1; end; end; z = d' ).
+        must_equal 'var d; var z = 1; if (a) {var b} else if (c) {d = function() {var e = 1}}; z = d'
 
       to_js( 'if a == 1; b = 0; c.forEach {|d| if d; b += d; end} end' ).
-        must_equal 'var b; if (a == 1) {b = 0; c.forEach(function(d) {if (d) b += d})}'
+        must_equal 'if (a == 1) {var b = 0; c.forEach(function(d) {if (d) b += d})}'
     end
     
     it "should handle while loop" do

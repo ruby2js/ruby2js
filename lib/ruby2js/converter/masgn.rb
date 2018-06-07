@@ -35,7 +35,7 @@ module Ruby2JS
         end
 
         newvars.each do |var| 
-          @vars[var.children.last] ||= (@scope ? true : :pending)
+          @vars[var.children.last] ||= (@inner ? :pending : true)
         end
 
         put '['

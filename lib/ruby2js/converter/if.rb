@@ -16,37 +16,42 @@ module Ruby2JS
 
       if @state == :statement
         begin
-          scope, @scope = @scope, false
+          inner, @inner = @inner, @ast
 
           # use short form when appropriate
           unless else_block or then_block.type == :begin
+            # "Lexical declaration cannot appear in a single-statement context"
+            if [:lvasgn, :gvasgn].include? then_block.type
+              @vars[then_block.children.first] ||= :pending
+            end
+
             put "if ("; parse condition; put ') '
-            wrap { parse then_block, :statement }
+            wrap { jscope then_block }
           else
             put "if ("; parse condition; puts ') {'
-            parse then_block, :statement
+            jscope then_block
             sput '}'
 
             while else_block and else_block.type == :if
               condition, then_block, else_block = else_block.children
               if then_block
                 put ' else if ('; parse condition; puts ') {'
-                parse then_block, :statement
+                jscope then_block
                 sput '}'
               else
                 put ' else if ('; parse s(:not, condition); puts ') {'
-                parse else_block, :statement
+                jscope else_block
                 sput '}'
                 else_block = nil
               end
             end
 
             if else_block
-              puts ' else {'; parse else_block, :statement; sput '}'
+              puts ' else {'; jscope else_block; sput '}'
             end
           end
         ensure
-          @scope = scope
+          @inner = inner
         end
       else
         else_block ||= s(:nil)
