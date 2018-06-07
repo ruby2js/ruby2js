@@ -4,7 +4,7 @@ gem 'parser'
 
 group :development, :test do
   gem 'minitest'
-  gem 'rake'
+  gem 'rake', ('~> 12.2.1' if RUBY_VERSION =~ /^1/)
   gem 'execjs'
 end
 
