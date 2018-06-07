@@ -119,6 +119,8 @@ module Ruby2JS
 
         if style == :expression
           expr.type == :hash ? group(expr) : parse(expr)
+        elsif body.type == :begin and body.children.length == 0
+          put "{}"
         else
           put "{#{@nl}"; scope body, vars; put "#{@nl}}"
         end
