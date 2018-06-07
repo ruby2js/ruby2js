@@ -45,7 +45,7 @@ module Ruby2JS
             end
           end
 
-          jscope code
+          parse code, :statement
           last = code
           while last.type == :begin
             last = last.children.last
@@ -57,7 +57,7 @@ module Ruby2JS
           end
         end
 
-        (put "#{@nl}default:#@ws"; jscope other) if other
+        (put "#{@nl}default:#@ws"; parse other, :statement) if other
 
         sput '}'
       ensure
