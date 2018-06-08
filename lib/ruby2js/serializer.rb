@@ -203,8 +203,8 @@ module Ruby2JS
     end
 
     # wrap long statements in curly braces
-    def wrap
-      puts '{'
+    def wrap(open = '{', close = '}')
+      puts open
       mark = output_location
       yield
 
@@ -212,7 +212,7 @@ module Ruby2JS
         @lines.length > mark.first+1 or
         @lines[mark.first-1].join.length + @line.join.length >= @width
       then
-        sput '}'
+        sput close
       else
         @line = @lines[mark.first-1]
         @line[-1..-1] = @lines.pop
