@@ -48,7 +48,7 @@ module Ruby2JS
         return parse s(:begin, *children)
       end
 
-      puts "try {"; parse body, :statement; sput '}'
+      puts "try {"; scope body; sput '}'
 
       if recovers
         var ||= s(:gvar, :$EXCEPTION)
@@ -56,7 +56,7 @@ module Ruby2JS
         if recovers.length == 1 and not recovers.first.children.first
           # single catch with no exception named
           put " catch ("; parse var; puts ") {"
-          parse recovers.first.children.last, :statement; sput '}'
+          scope recovers.first.children.last; sput '}'
         else
           put " catch ("; parse var; puts ') {'
 
@@ -84,7 +84,7 @@ module Ruby2JS
               puts '} else {'
             end
 
-            parse recovery, :statement; puts ''
+            scope recovery; puts ''
           end
 
           if recovers.last.children.first
@@ -95,7 +95,7 @@ module Ruby2JS
         end
       end
 
-      (puts ' finally {'; parse finally, :statement; sput '}') if finally
+      (puts ' finally {'; scope finally; sput '}') if finally
     end
   end
 end
