@@ -120,11 +120,11 @@ describe "ES2015 support" do
 
   describe :fat_arrow do
     it "should handle simple lambda expressions" do
-      to_js( 'foo = lambda {|x| x*x}' ).must_equal 'let foo = (x) => x * x'
+      to_js( 'foo = lambda {|x| x*x}' ).must_equal 'let foo = x => x * x'
     end
 
     it "should handle block parameters" do
-      to_js( 'a {|b| c}' ).must_equal 'a((b) => c)'
+      to_js( 'a {|b| c}' ).must_equal 'a(b => c)'
     end
 
     it "should handle multi-statement blocks" do
@@ -160,7 +160,7 @@ describe "ES2015 support" do
     end
 
     it "should handle to_proc on a symbol" do
-      to_js_fn( 'a.map(&:to_i)' ).must_equal 'a.map((item) => parseInt(item))'
+      to_js_fn( 'a.map(&:to_i)' ).must_equal 'a.map(item => parseInt(item))'
     end
   end
 

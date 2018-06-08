@@ -92,8 +92,6 @@ module Ruby2JS
         not name and es2015 and @state != :method and @ast.type != :defm and 
         not @prop
       then
-        put '('; parse args; put ') => '
-
         expr = body
         expr = expr.children.first while expr.type == :autoreturn
         while expr.type == :begin and expr.children.length == 1
@@ -115,6 +113,12 @@ module Ruby2JS
           style = :expression
         else
           style = :statement
+        end
+
+        if args.children.length == 1 and style == :expression
+          parse args; put ' => '
+        else
+          put '('; parse args; put ') => '
         end
 
         if style == :expression

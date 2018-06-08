@@ -64,17 +64,17 @@ describe "ES2017 support" do
 
     it "should handle lambda functions" do
       to_js( 'async lambda {|x| x}' ).
-        must_equal 'async (x) => x'
+        must_equal 'async x => x'
     end
 
     it "should handle procs" do
       to_js( 'async proc {|x| x}' ).
-        must_equal 'async (x) => x'
+        must_equal 'async x => x'
     end
 
     it "should handle arrow functions" do
       to_js( 'async -> (x) {x}' ).
-        must_equal 'async (x) => x'
+        must_equal 'async x => x'
     end
   end
 
@@ -88,7 +88,7 @@ describe "ES2017 support" do
     end
 
     it "should handle calls with blocks" do
-      to_js( 'await f(x) {|y| y}' ).must_equal 'await f(x, (y) => y)'
+      to_js( 'await f(x) {|y| y}' ).must_equal 'await f(x, y => y)'
     end
   end
 end
