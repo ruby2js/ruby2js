@@ -33,7 +33,7 @@ module Ruby2JS
 
         hoist = false
         if state == :statement and not @vars.include?(name) 
-          hoist = hoist?(@scope, @inner, name) if @inner
+          hoist = hoist?(@scope, @inner, name) if @inner and @scope != @inner
           if not hoist
             if es2015
               var = 'let '

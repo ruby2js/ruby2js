@@ -45,7 +45,7 @@ module Ruby2JS
       end
 
       if not recovers and not finally
-        return parse s(:begin, *children)
+        return scope s(:begin, *children)
       end
 
       puts "try {"; scope body; sput '}'
