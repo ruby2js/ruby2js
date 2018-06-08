@@ -55,7 +55,7 @@ describe Ruby2JS do
     end
 
     it "should parse regular expression capture groups" do
-      to_js( "$1 == 1" ).must_equal '$1 == 1'
+      to_js( "$1 == 'a'" ).must_equal 'RegExp.$1 == "a"'
     end
   end
   

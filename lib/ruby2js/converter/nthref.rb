@@ -4,7 +4,7 @@ module Ruby2JS
     # (nthref 1)
 
     handle :nth_ref do |var|
-      put "$#{var}"
+      put "RegExp.$#{var}"
     end
   end
 end
