@@ -5,6 +5,9 @@ module Ruby2JS
     module Functions
       include SEXP
 
+      # require explicit opt-in to to class => constructor mapping
+      Filter.exclude :class
+
       VAR_TO_ASSIGN = {
         lvar: :lvasgn,
         ivar: :ivasgn,
@@ -14,6 +17,7 @@ module Ruby2JS
 
       def on_send(node)
         target, method, *args = node.children
+        return super if excluded?(method)
 
         if [:max, :min].include? method and args.length == 0
           return super unless node.is_method?
@@ -320,6 +324,9 @@ module Ruby2JS
         elsif es2017 and method==:ljust
           process node.updated(nil, [target, :padEnd, *args])
 
+        elsif method == :class and args.length==0 and not node.is_method?
+          process node.updated(:attr, [target, :constructor])
+
         else
           super
         end
@@ -327,50 +334,53 @@ module Ruby2JS
 
       def on_block(node)
         call = node.children.first
-        if [:setInterval, :setTimeout].include? call.children[1]
+        method = call.children[1]
+        return super if excluded?(method)
+
+        if [:setInterval, :setTimeout].include? method
           return super unless call.children.first == nil
           block = process s(:block, s(:send, nil, :proc), *node.children[1..-1])
           on_send call.updated nil, [*call.children[0..1], block,
             *call.children[2..-1]]
 
-        elsif [:sub, :gsub, :sub!, :gsub!, :sort!].include? call.children[1]
+        elsif [:sub, :gsub, :sub!, :gsub!, :sort!].include? method
           return super if call.children.first == nil
           block = s(:block, s(:send, nil, :proc), node.children[1],
             s(:autoreturn, *node.children[2..-1]))
           process call.updated(nil, [*call.children, block])
 
-        elsif call.children[1] == :select and call.children.length == 2
+        elsif method == :select and call.children.length == 2
           call = call.updated nil, [call.children.first, :filter]
           node.updated nil, [process(call), process(node.children[1]),
             s(:autoreturn, *process_all(node.children[2..-1]))]
 
-        elsif call.children[1] == :any? and call.children.length == 2
+        elsif method == :any? and call.children.length == 2
           call = call.updated nil, [call.children.first, :some]
           node.updated nil, [process(call), process(node.children[1]),
             s(:autoreturn, *process_all(node.children[2..-1]))]
 
-        elsif call.children[1] == :all? and call.children.length == 2
+        elsif method == :all? and call.children.length == 2
           call = call.updated nil, [call.children.first, :every]
           node.updated nil, [process(call), process(node.children[1]),
             s(:autoreturn, *process_all(node.children[2..-1]))]
 
-        elsif call.children[1] == :find and call.children.length == 2
+        elsif method == :find and call.children.length == 2
           node.updated nil, [process(call), process(node.children[1]),
             s(:autoreturn, *process_all(node.children[2..-1]))]
 
-        elsif call.children[1] == :find_index and call.children.length == 2
+        elsif method == :find_index and call.children.length == 2
           call = call.updated nil, [call.children.first, :findIndex]
           node.updated nil, [process(call), process(node.children[1]),
             s(:autoreturn, *process_all(node.children[2..-1]))]
 
-        elsif call.children[1] == :map and call.children.length == 2
+        elsif method == :map and call.children.length == 2
           node.updated nil, [process(call), process(node.children[1]),
             s(:autoreturn, *process_all(node.children[2..-1]))]
 
-        elsif [:map!, :select!].include? call.children[1]
+        elsif [:map!, :select!].include? method
           # input: a.map! {expression}
           # output: a.splice(0, a.length, *a.map {expression})
-          method = (call.children[1] == :map! ? :map : :select)
+          method = (method == :map! ? :map : :select)
           target = call.children.first
           process call.updated(:send, [target, :splice, s(:splat, s(:send, 
             s(:array, s(:int, 0), s(:attr, target, :length)), :concat,
@@ -382,7 +392,7 @@ module Ruby2JS
           # output: while(true) {statements}
           S(:while, s(:true), node.children[2])
 
-        elsif call.children[1] == :delete
+        elsif method == :delete
           # restore delete methods that are prematurely mapped to undef
           result = super
 
@@ -401,18 +411,18 @@ module Ruby2JS
 
           result
 
-        elsif call.children[1] == :downto
+        elsif method == :downto
           range = s(:irange, call.children[0], call.children[2])
           call = call.updated(nil, [s(:begin, range), :step, s(:int, -1)])
           process node.updated(nil, [call, *node.children[1..-1]])
 
-        elsif call.children[1] == :upto
+        elsif method == :upto
           range = s(:irange, call.children[0], call.children[2])
           call = call.updated(nil, [s(:begin, range), :step, s(:int, 1)])
           process node.updated(nil, [call, *node.children[1..-1]])
 
         elsif 
-          call.children[1] == :each and call.children[0].type == :send and
+          method == :each and call.children[0].type == :send and
           call.children[0].children[1] == :step
         then
           # i.step(j, n).each {|v| ...}
@@ -425,7 +435,7 @@ module Ruby2JS
 
         elsif 
           # (a..b).each {|v| ...}
-          call.children[1] == :each and
+          method == :each and
           call.children[0].type == :begin and
           call.children[0].children.length == 1 and
           [:irange, :erange].include? call.children[0].children[0].type and
@@ -435,7 +445,7 @@ module Ruby2JS
             call.children[0].children[0], node.children[2])
 
         elsif 
-          [:each, :each_value].include? call.children[1] and 
+          [:each, :each_value].include? method and 
           node.children[1].children.length == 1
         then
           if es2015
@@ -448,20 +458,20 @@ module Ruby2JS
           end
 
         elsif 
-          call.children[1] == :each_key and 
-          [:each, :each_key].include? call.children[1] and 
+          method == :each_key and 
+          [:each, :each_key].include? method and 
           node.children[1].children.length == 1
         then
           process node.updated(:for, 
             [s(:lvasgn, node.children[1].children[0].children[0]),
             node.children[0].children[0], node.children[2]])
 
-        elsif es2015 and call.children[1] == :inject
+        elsif es2015 and method == :inject
           process node.updated(:send, [call.children[0], :reduce,
             s(:block, s(:send, nil, :lambda), *node.children[1..2]),
             *call.children[2..-1]])
 
-        elsif es2017 and call.children[1] == :each_pair
+        elsif es2017 and method == :each_pair
           process node.updated(nil, [s(:send, s(:send, s(:const, nil, :Object),
             :entries, call.children[0]), :forEach), s(:args, s(:mlhs,
             *node.children[1].children)), node.children[2]])

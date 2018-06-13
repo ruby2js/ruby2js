@@ -9,6 +9,7 @@ ensure
 end
 
 require 'ruby2js/converter'
+require 'ruby2js/filter'
 
 module Ruby2JS
   class SyntaxError < RuntimeError
@@ -48,6 +49,7 @@ module Ruby2JS
     end
 
     class Processor < Parser::AST::Processor
+      include Ruby2JS::Filter
       BINARY_OPERATORS = Converter::OPERATORS[2..-1].flatten
 
       def initialize(comments)
@@ -57,6 +59,14 @@ module Ruby2JS
 
       def options=(options)
         @options = options
+
+        @included = @@included
+        @excluded = @@excluded
+
+        include_all if options[:include_all]
+        include_only(options[:include_only]) if options[:include_only]
+        include(options[:include]) if options[:include]
+        exclude(options[:exclude]) if options[:exclude]
       end
 
       def es2015
@@ -148,11 +158,13 @@ module Ruby2JS
     filters = options[:filters] || Filter::DEFAULTS
 
     unless filters.empty?
+
       filter = Filter::Processor
       filters.reverse.each do |mod|
         filter = Class.new(filter) {include mod} 
       end
       filter = filter.new(comments)
+
       filter.options = options
       ast = filter.process(ast)
     end

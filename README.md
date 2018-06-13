@@ -157,6 +157,20 @@ to `forEach`, `each!` will pass through the filter.  The final code that emits
 JavaScript function calls and parameter accesses will strip off these
 suffixes.
 
+This approach works well if it is an occasional change, but if the usage is
+pervasive, most filters support options to `exclude` a list of mappings,
+for example:
+
+```ruby
+puts Ruby2JS.convert('jQuery("li").each {|index| ...}', exclude: :each)
+```
+
+Alternatively, you can change the default:
+
+```ruby
+Ruby2JS::Filter.exclude :each
+```
+
 Static transformations and runtime libraries aren't aren’t mutually exclusive.
 With enough of each, one could reproduce any functionality desired.  Just be
 forewarned, that implementing a function like `method_missing` would require a
@@ -261,6 +275,11 @@ the script.
     * New classes subclassed off of `Exception` will become subclassed off
       of `Error` instead; and default constructors will be provided
     * `loop do...end` will be replaced with `while (true) {...}`
+
+    Additionally, there is one mapping that will only be done if explicitly
+    <a href="https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter.rb">included</a>:
+
+    * `.class` becomes `.constructor`
 
 * <a id="rubyjs" href="https://github.com/rubys/ruby2js/blob/master/spec/rubyjs_spec.rb">rubyjs</a>
     * `.at()` becomes `_a.at()`
