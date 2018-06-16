@@ -28,11 +28,11 @@ module Ruby2JS
           put "; "; parse var; 
           if call.children[2].type == :int and call.children[2].children[0] < 0
             put " #{comp.sub('<', '>')} "; parse expression.children.last
-            put "; "; parse var; put " -= "
-            parse s(:int, -call.children[2].children[0])
+            put "; "; parse s(:op_asgn, var, :-, 
+              s(:int, -call.children[2].children[0])), :statement
           else
             put " #{comp} "; parse expression.children.last
-            put "; "; parse var; put " += "; parse call.children[2]
+            put "; "; parse s(:op_asgn, var, :+, call.children[2]), :statement
           end
           puts ") {"
           scope block

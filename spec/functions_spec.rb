@@ -315,12 +315,12 @@ describe Ruby2JS::Filter::Functions do
   describe 'step' do
     it "should map upto to for" do
       to_js( '1.upto(3) {|i| p i}' ).
-        must_equal 'for (var i = 1; i <= 3; i += 1) {p(i)}'
+        must_equal 'for (var i = 1; i <= 3; i++) {p(i)}'
     end
 
     it "should map downto to for" do
       to_js( '3.downto(1) {|i| p i}' ).
-        must_equal 'for (var i = 3; i >= 1; i -= 1) {p(i)}'
+        must_equal 'for (var i = 3; i >= 1; i--) {p(i)}'
     end
 
     it "should range each to for" do
@@ -332,7 +332,7 @@ describe Ruby2JS::Filter::Functions do
 
     it "should map step().each to for -- default" do
       to_js( '1.step(3).each {|i| p i}' ).
-        must_equal 'for (var i = 1; i <= 3; i += 1) {p(i)}'
+        must_equal 'for (var i = 1; i <= 3; i++) {p(i)}'
     end
 
     it "should map step().each to for -- forward" do

@@ -12,7 +12,14 @@ module Ruby2JS
       var = s(:lvar, var.children.first) if var.type == :lvasgn
       var = s(:cvar, var.children.first) if var.type == :cvasgn
 
-      if [:+, :-].include?(op) and value.type==:int and value.children==[1]
+      if 
+        [:+, :-].include?(op) and value.type==:int and 
+        (value.children==[1] or value.children==[-1])
+      then
+        if value.children.first == -1
+          op = (op == :+ ? :- : :+)
+        end
+
         if @state == :statement
           parse var; put "#{ op }#{ op }"
         else
