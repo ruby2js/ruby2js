@@ -87,6 +87,11 @@ module Ruby2JS
               then
                 @prop = left.children.first
                 parse right, :method
+              elsif
+                es2015 and left.type == :sym and right.type == :lvar and
+                left.children == right.children
+              then
+                parse right 
               else
 		if not [:str, :sym].include? left.type and es2015
 		  put '['

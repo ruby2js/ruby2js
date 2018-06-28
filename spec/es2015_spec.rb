@@ -175,6 +175,10 @@ describe "ES2015 support" do
   end
 
   describe :hash do
+    it "should handle object literals shorthands" do
+      to_js( 'a=1; {a:a}' ).must_equal 'let a = 1; {a}'
+    end
+
     it "should handle merge!" do
       to_js_fn( 'a.merge!(b)' ).must_equal 'Object.assign(a, b)'
     end
