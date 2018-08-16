@@ -26,8 +26,8 @@ describe Ruby2JS::Filter::Vue do
     end
 
     it "should convert initialize methods to data" do
-      to_js( 'class Foo<Vue; def initialize(); end; end' ).
-        must_include '{data: function() {return {}}'
+      to_js( 'class Foo<Vue; def initialize(); @a=1; end; end' ).
+        must_include '{data: function() {return {a: 1}}'
     end
 
     it "should insert an initialize method if none is present" do
@@ -80,7 +80,7 @@ describe Ruby2JS::Filter::Vue do
 
     it "should handle lifecycle methods" do
       to_js( 'class Foo<Vue; def updated; console.log "."; end; end' ).
-        must_include ', updated: function() {return console.log(".")}'
+        must_include '{updated: function() {return console.log(".")}'
     end
 
     it "should handle other methods" do
@@ -188,12 +188,12 @@ describe Ruby2JS::Filter::Vue do
 
     it "should create simple nested elements" do
       to_js( 'class Foo<Vue; def render; _a {_b}; end; end' ).
-        must_include ', render: function($h) {return $h("a", [$h("b")])}'
+        must_include '{render: function($h) {return $h("a", [$h("b")])}'
     end
 
     it "should handle options with blocks" do
       to_js( 'class Foo<Vue; def render; _a options do _b; end; end; end' ).
-        must_include ', render: function($h) ' +
+        must_include '{render: function($h) ' +
           '{return $h("a", options, [$h("b")])}'
     end
 
@@ -640,7 +640,7 @@ describe Ruby2JS::Filter::Vue do
   describe "options and mixins" do
     it "should capture and access options" do
       js = to_js( 'class Foo<Vue; options a: b; def render; _p $options.a; end; end' )
-      js.must_include '{a: b, data:'
+      js.must_include '{a: b, render:'
       js.must_include '$h("p", this.$options.a)'
     end
 
@@ -656,7 +656,7 @@ describe Ruby2JS::Filter::Vue do
 
     it "should enable a mixin to be included" do
       to_js( 'class Bar<Vue; mixin Foo; end' ).
-        must_include '{mixins: [Foo], data: '
+        must_equal 'var Bar = new Vue({mixins: [Foo]})'
     end
   end
 

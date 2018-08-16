@@ -216,6 +216,8 @@ module Ruby2JS
                       s(:attr, nil, :undefined))
                   end
 
+                  next if pairs.empty? and @comments[statement].empty?
+
                   block = s(:return, s(:hash, *pairs))
                 else
                   # general case: build up a hash incrementally
