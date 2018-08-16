@@ -623,7 +623,11 @@ module Ruby2JS
                          hash['nativeOn']['input'] ||
                          hash['nativeOn']['change']
               attr = 'value'
-              event = 'input'
+              if hash[:attrs]['type'] == s(:str, 'file')
+                event = 'change'
+              else
+                event = 'input'
+              end
             end
 
             # search for the presence of a 'onClick' attribute
