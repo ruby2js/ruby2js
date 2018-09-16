@@ -12,7 +12,7 @@ module Ruby2JS
 
   class Converter < Serializer
     attr_accessor :ast
-
+    
     LOGICAL   = :and, :not, :or
     OPERATORS = [:[], :[]=], [:not, :!], [:**], [:*, :/, :%], [:+, :-], 
       [:>>, :<<], [:&], [:^, :|], [:<=, :<, :>, :>=], [:==, :!=, :===, :"!=="],
@@ -288,6 +288,7 @@ require 'ruby2js/converter/def'
 require 'ruby2js/converter/defs'
 require 'ruby2js/converter/defined'
 require 'ruby2js/converter/dstr'
+require 'ruby2js/converter/fileline'
 require 'ruby2js/converter/for'
 require 'ruby2js/converter/hash'
 require 'ruby2js/converter/if'

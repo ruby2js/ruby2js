@@ -245,6 +245,8 @@ module Ruby2JS
           if receiver
             (group_receiver ? group(receiver) : parse(receiver))
             put ".#{ method }"
+          elsif ast.type == :attr
+            put method
           else
             parse ast.updated(:lvasgn, [method]), @state
           end

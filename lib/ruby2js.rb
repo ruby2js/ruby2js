@@ -113,6 +113,7 @@ module Ruby2JS
       def on_prototype(node); on_begin(node); end
       def on_sendw(node); on_send(node); end
       def on_undefined?(node); on_defined?(node); end
+      def on_nil(node); end
 
       # provide a method so filters can call 'super'
       def on_sym(node); node; end
@@ -195,8 +196,12 @@ module Ruby2JS
     ruby2js
   end
   
-  def self.parse(source, file=nil)
-    Parser::CurrentRuby.parse_with_comments(source.encode('utf-8'), file)
+  def self.parse(source, file=nil, line=1)
+    buffer = Parser::Source::Buffer.new(file, line)
+    buffer.source = source.encode('utf-8')
+    parser = Parser::CurrentRuby.new
+    parser.builder.emit_file_line_as_literals=false
+    parser.parse_with_comments(buffer)
   rescue Parser::SyntaxError => e
     split = source[0..e.diagnostic.location.begin_pos].split("\n")
     line, col = split.length, split.last.length

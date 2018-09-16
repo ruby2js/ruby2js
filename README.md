@@ -281,6 +281,17 @@ the script.
 
     * `.class` becomes `.constructor`
 
+* <a id="node" * href="https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/node.rb">node</a>
+
+    * `ARGV` becomes `process.argv.slice(1)`
+    * `__dir__` becomes `__dirname`
+    * `Dir.chdir` becomes `process.chdir`
+    * `Dir.pwd` becomes `process.cwd`
+    * `__FILE__` becomes `__filename`
+    * `File.read` becomes `fs.readFileSync`
+    * `IO.read` becomes `fs.readFileSync`
+    * `IO.write` becomes `fs.writeFileSync`
+
 * <a id="rubyjs" href="https://github.com/rubys/ruby2js/blob/master/spec/rubyjs_spec.rb">rubyjs</a>
     * `.at()` becomes `_a.at()`
     * `.between?()` becomes `R().between()`

@@ -41,6 +41,7 @@ begin
     'es2016' => 'ruby2js/es2016',
     'es2017' => 'ruby2js/es2017',
     'jquery'    => 'ruby2js/filter/jquery',
+    'node'      => 'ruby2js/filter/node',
     'vue'       => 'ruby2js/filter/vue',
     'minitest-jasmine' => 'ruby2js/filter/minitest-jasmine',
     'return'    => 'ruby2js/filter/return',
