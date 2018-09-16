@@ -42,15 +42,6 @@ module Ruby2JS
       end
     end
 
-    # indicate that the specified methods are not to be processed
-    def self.exclude(*methods)
-      if @@included
-        @@included -= methods.flatten
-      else
-        @@excluded += methods.flatten
-      end
-    end
-
     #
     # instance level overrides
     #
