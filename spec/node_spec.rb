@@ -24,6 +24,26 @@ describe Ruby2JS::Filter::Functions do
     end
   end
   
+  describe 'child_process' do
+    it 'should handle backtics' do
+      to_js('`echo hi`').
+        must_equal 'var child_process = require("child_process"); ' +
+          'child_process.execSync("echo hi", {encoding: "utf8"})'
+    end
+
+    it 'should handle system with single argument' do
+      to_js('system "echo hi"').
+        must_equal 'var child_process = require("child_process"); ' +
+          'child_process.execSync("echo hi", {stdio: "inherit"})'
+    end
+
+    it 'should handle system with multiple arguments' do
+      to_js('system "echo", "hi"').
+        must_equal 'var child_process = require("child_process"); ' +
+          'child_process.execFileSync("echo", ["hi"], {stdio: "inherit"})'
+    end
+  end
+
   describe 'fs' do
     it 'should handle IO.read' do
       to_js( 'IO.read("foo")' ).

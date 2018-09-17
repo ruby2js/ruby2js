@@ -283,6 +283,7 @@ the script.
 
 * <a id="node" * href="https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/node.rb">node</a>
 
+    * `` `command` `` becomes `child_process.execSync("command", {encoding: "utf8"})`
     * `ARGV` becomes `process.argv.slice(1)`
     * `__dir__` becomes `__dirname`
     * `Dir.chdir` becomes `process.chdir`
@@ -291,6 +292,7 @@ the script.
     * `File.read` becomes `fs.readFileSync`
     * `IO.read` becomes `fs.readFileSync`
     * `IO.write` becomes `fs.writeFileSync`
+    * `system` becomes `child_process.execSync(..., {stdio: "inherit"})`
 
 * <a id="rubyjs" href="https://github.com/rubys/ruby2js/blob/master/spec/rubyjs_spec.rb">rubyjs</a>
     * `.at()` becomes `_a.at()`
