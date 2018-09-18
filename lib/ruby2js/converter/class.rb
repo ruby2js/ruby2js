@@ -126,7 +126,7 @@ module Ruby2JS
             s(:send, s(:block, s(:send, nil, :lambda), s(:args),
               s(:begin, *m.children[2..-1].map {|modname|
               s(:for, s(:lvasgn, :$_), modname,
-              s(:send, s(:send, name, :prototype), :[]=,
+              s(:send, s(:attr, name, :prototype), :[]=,
               s(:lvar, :$_), s(:send, modname, :[], s(:lvar, :$_))))
               })), :[])
           elsif [:private, :protected, :public].include? m.children[1]

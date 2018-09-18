@@ -572,7 +572,7 @@ describe Ruby2JS do
 
     it "should parse include" do
       to_js('class Employee; include Person; end').
-        must_equal 'function Employee() {}; (function() {for (var $_ in Person) {Employee.prototype()[$_] = Person[$_]}})()'
+        must_equal 'function Employee() {}; (function() {for (var $_ in Person) {Employee.prototype[$_] = Person[$_]}})()'
     end
 
     it "should parse class with attr_accessor" do
