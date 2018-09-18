@@ -201,9 +201,11 @@ module Ruby2JS
       sep = @options[:join].to_s
       state = @options[:state] || :expression
 
-      args.each_with_index do |arg, index|
+      index = 0
+      args.each do |arg|
         put sep unless index == 0
         parse arg, state
+        index += 1 unless arg == s(:begin)
       end
     end
     

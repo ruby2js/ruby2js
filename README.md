@@ -287,9 +287,30 @@ the script.
     * `ARGV` becomes `process.argv.slice(1)`
     * `__dir__` becomes `__dirname`
     * `Dir.chdir` becomes `process.chdir`
+    * `Dir.entries` becomes `fs.readdirSync`
+    * `Dir.mkdir` becomes `fs.mkdirSync`
+    * `Dir.mktmpdir` becomes `fs.mkdtempSync`
     * `Dir.pwd` becomes `process.cwd`
+    * `Dir.rmdir` becomes `fs.rmdirSync`
     * `__FILE__` becomes `__filename`
+    * `File.chmod` becomes `fs.chmodSync`
+    * `File.chown` becomes `fs.chownSync`
+    * `File.cp` becomes `fs.copyFileSync`
+    * `File.exist?` becomes `fs.existsSync`
+    * `File.lchmod` becomes `fs.lchmodSync`
+    * `File.link` becomes `fs.linkSync`
+    * `File.ln` becomes `fs.linkSync`
+    * `File.lstat` becomes `fs.lstatSync`
     * `File.read` becomes `fs.readFileSync`
+    * `File.readlink` becomes `fs.readlinkSync`
+    * `File.realpath` becomes `fs.realpathSync`
+    * `File.rename` becomes `fs.renameSync`
+    * `File.stat` becomes `fs.statSync`
+    * `File.symlink` becomes `fs.symlinkSync`
+    * `File.truncate` becomes `fs.truncateSync`
+    * `File.unlink` becomes `fs.unlinkSync`
+    * `FileUtils.cp` becomes `fs.copyFileSync`
+    * `FileUtils.mkdir` becomes `fs.mkdirSync`
     * `IO.read` becomes `fs.readFileSync`
     * `IO.write` becomes `fs.writeFileSync`
     * `system` becomes `child_process.execSync(..., {stdio: "inherit"})`

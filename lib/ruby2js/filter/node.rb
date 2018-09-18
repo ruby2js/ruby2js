@@ -35,6 +35,7 @@ module Ruby2JS
         if target == nil
           if method == :__dir__ and args.length == 0
             S(:attr, nil, :__dirname)
+
           elsif method == :system
             @node_setup << :child_process
 
@@ -47,6 +48,14 @@ module Ruby2JS
               process(args.first), s(:array, *process_all(args[1..-1])),
               s(:hash, s(:pair, s(:sym, :stdio), s(:str, 'inherit'))))
             end
+
+          elsif 
+            method == :require and args.length == 1 and 
+            args.first.type == :str and 
+            %w(fileutils tmpdir).include? args.first.children.first
+          then
+            s(:begin)
+
           else
             super
           end
@@ -59,9 +68,93 @@ module Ruby2JS
             @node_setup << :fs
             s(:send, s(:attr, nil, :fs), :readFileSync, *process_all(args),
               s(:str, 'utf8'))
+
           elsif method == :write and args.length == 2
             @node_setup << :fs
             S(:send, s(:attr, nil, :fs), :writeFileSync, *process_all(args))
+
+          elsif target.children.last == :IO
+            super
+
+          elsif [:exist?, :exists?].include? method and args.length == 1
+            @node_setup << :fs
+            S(:send, s(:attr, nil, :fs), :existsSync, process(args.first))
+
+          elsif method == :readlink and args.length == 1
+            @node_setup << :fs
+            S(:send, s(:attr, nil, :fs), :readlinkSync, process(args.first))
+
+          elsif method == :realpath and args.length == 1
+            @node_setup << :fs
+            S(:send, s(:attr, nil, :fs), :realpathSync, process(args.first))
+
+          elsif method == :rename and args.length == 2
+            @node_setup << :fs
+            S(:send, s(:attr, nil, :fs), :renameSync, *process_all(args))
+
+          elsif 
+            [:chmod, :lchmod].include? method and 
+            args.length > 1 and args.first.type == :int
+          then
+            @node_setup << :fs
+
+            S(:begin, *args[1..-1].map{|file|
+              S(:send, s(:attr, nil, :fs), method.to_s + 'Sync', process(file),
+                s(:octal, *args.first.children))
+            })
+
+          elsif 
+            [:chown, :lchown].include? method and args.length > 2 and 
+            args[0].type == :int and args[1].type == :int
+          then
+            @node_setup << :fs
+
+            S(:begin, *args[2..-1].map{|file|
+              s(:send, s(:attr, nil, :fs), method.to_s + 'Sync', process(file),
+                *process_all(args[0..1]))
+            })
+
+          elsif [:ln, :link].include? method and args.length == 2
+            @node_setup << :fs
+            s(:send, s(:attr, nil, :fs), :linkSync, *process_all(args))
+            
+          elsif method == :symlink and args.length == 2
+            @node_setup << :fs
+            s(:send, s(:attr, nil, :fs), :symlinkSync, *process_all(args))
+            
+          elsif method == :truncate and args.length == 2
+            @node_setup << :fs
+            s(:send, s(:attr, nil, :fs), :truncateSync, *process_all(args))
+            
+          elsif [:stat, :lstat].include? method and args.length == 1
+            @node_setup << :fs
+            s(:send, s(:attr, nil, :fs), method.to_s + 'Sync',
+              process(args.first))
+
+          elsif method == :unlink
+            @node_setup << :fs
+            S(:begin, *args.map{|file|
+              S(:send, s(:attr, nil, :fs), :unlinkSync, process(file))
+            })
+
+
+          else
+            super
+          end
+
+        elsif 
+          target.children.last == :FileUtils and
+          target.type == :const and target.children.first == nil
+        then
+            
+          if [:cp, :copy].include? method and args.length == 2
+            @node_setup << :fs
+            s(:send, s(:attr, nil, :fs), :copyFileSync, *process_all(args))
+            
+          elsif method == :mkdir and args.length == 1
+            @node_setup << :fs
+            s(:send, s(:attr, nil, :fs), :mkdirSync, process(args.first))
+            
           else
             super
           end
@@ -74,6 +167,26 @@ module Ruby2JS
             S(:send, s(:attr, nil, :process), :chdir, *process_all(args))
           elsif method == :pwd and args.length == 0
             s(:send, s(:attr, nil, :process), :cwd)
+          elsif method == :entries
+            @node_setup << :fs
+            s(:send, s(:attr, nil, :fs), :readdirSync, *process_all(args))
+          elsif method == :mkdir and args.length == 1
+            @node_setup << :fs
+            s(:send, s(:attr, nil, :fs), :mkdirSync, process(args.first))
+          elsif method == :rmdir and args.length == 1
+            @node_setup << :fs
+            s(:send, s(:attr, nil, :fs), :rmdirSync, process(args.first))
+          elsif method == :mktmpdir and args.length <=1
+            @node_setup << :fs
+            if args.length == 0
+              prefix = s(:str, 'd')
+            elsif args.first.type == :array
+              prefix = args.first.children.first
+            else
+              prefix = args.first
+            end
+
+            s(:send, s(:attr, nil, :fs), :mkdtempSync, process(prefix))
           else
             super
           end

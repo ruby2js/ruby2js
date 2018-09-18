@@ -59,6 +59,114 @@ describe Ruby2JS::Filter::Functions do
       to_js( 'IO.write("foo", "bar")' ).
         must_equal 'var fs = require("fs"); fs.writeFileSync("foo", "bar")'
     end
+
+    it 'should handle File.chmod' do
+      to_js( 'File.chmod(0755, "foo", "bar")' ).
+        must_equal 'var fs = require("fs"); fs.chmodSync("foo", 0755); ' +
+          'fs.chmodSync("bar", 0755)'
+    end
+
+    it 'should handle File.lchmod' do
+      to_js( 'File.lchmod(0755, "foo", "bar")' ).
+        must_equal 'var fs = require("fs"); fs.lchmodSync("foo", 0755); ' +
+          'fs.lchmodSync("bar", 0755)'
+    end
+
+    it 'should handle File.chown' do
+      to_js( 'File.chown(0, 0, "foo", "bar")' ).
+        must_equal 'var fs = require("fs"); fs.chownSync("foo", 0, 0); ' +
+          'fs.chownSync("bar", 0, 0)'
+    end
+
+    it 'should handle File.lchown' do
+      to_js( 'File.lchown(0, 0, "foo", "bar")' ).
+        must_equal 'var fs = require("fs"); fs.lchownSync("foo", 0, 0); ' +
+          'fs.lchownSync("bar", 0, 0)'
+    end
+
+    it 'should handle File.exist' do
+      to_js( 'File.exist?("foo")' ).
+        must_equal 'var fs = require("fs"); fs.existsSync("foo")'
+    end
+
+    it 'should handle File.readlink' do
+      to_js( 'File.readlink("foo")' ).
+        must_equal 'var fs = require("fs"); fs.readlinkSync("foo")'
+    end
+
+    it 'should handle File.realpath' do
+      to_js( 'File.realpath("foo")' ).
+        must_equal 'var fs = require("fs"); fs.realpathSync("foo")'
+    end
+
+    it 'should handle File.rename' do
+      to_js( 'File.rename("foo", "bar")' ).
+        must_equal 'var fs = require("fs"); fs.renameSync("foo", "bar")'
+    end
+
+    it 'should handle File.link' do
+      to_js( 'File.link("foo", "bar")' ).
+        must_equal 'var fs = require("fs"); fs.linkSync("foo", "bar")'
+      to_js( 'File.ln("foo", "bar")' ).
+        must_equal 'var fs = require("fs"); fs.linkSync("foo", "bar")'
+    end
+
+    it 'should handle File.symlink' do
+      to_js( 'File.symlink("foo", "bar")' ).
+        must_equal 'var fs = require("fs"); fs.symlinkSync("foo", "bar")'
+    end
+
+    it 'should handle File.truncate' do
+      to_js( 'File.truncate("foo", 0)' ).
+        must_equal 'var fs = require("fs"); fs.truncateSync("foo", 0)'
+    end
+
+    it 'should handle File.stat' do
+      to_js( 'File.stat("foo")' ).
+        must_equal 'var fs = require("fs"); fs.statSync("foo")'
+    end
+
+    it 'should handle File.lstat' do
+      to_js( 'File.lstat("foo")' ).
+        must_equal 'var fs = require("fs"); fs.lstatSync("foo")'
+    end
+
+    it 'should handle File.unlink' do
+      to_js( 'File.unlink("foo")' ).
+        must_equal 'var fs = require("fs"); fs.unlinkSync("foo")'
+    end
+
+    it 'should handle FileUtils.cp' do
+      to_js( 'FileUtils.cp("foo", "bar")' ).
+        must_equal 'var fs = require("fs"); fs.copyFileSync("foo", "bar")'
+
+      to_js( 'FileUtils.copy("foo", "bar")' ).
+        must_equal 'var fs = require("fs"); fs.copyFileSync("foo", "bar")'
+    end
+
+    it 'should handle Dir.mkdir' do
+      to_js( 'Dir.mkdir("foo")' ).
+        must_equal 'var fs = require("fs"); fs.mkdirSync("foo")'
+      to_js( 'FileUtils.mkdir("foo")' ).
+        must_equal 'var fs = require("fs"); fs.mkdirSync("foo")'
+    end
+
+    it 'should handle Dir.rmdir' do
+      to_js( 'Dir.rmdir("foo")' ).
+        must_equal 'var fs = require("fs"); fs.rmdirSync("foo")'
+    end
+
+    it 'should handle Dir.entries' do
+      to_js( 'Dir.entries("foo")' ).
+        must_equal 'var fs = require("fs"); fs.readdirSync("foo")'
+    end
+
+    it 'should handle Dir.mktmpdir' do
+      to_js( 'Dir.mktmpdir' ).
+        must_equal 'var fs = require("fs"); fs.mkdtempSync("d")'
+      to_js( 'Dir.mktmpdir("foo")' ).
+        must_equal 'var fs = require("fs"); fs.mkdtempSync("foo")'
+    end
   end
   
   describe 'dir' do
@@ -74,6 +182,16 @@ describe Ruby2JS::Filter::Functions do
 
     it 'should handle Dir.pwd' do
       to_js( 'Dir.pwd' ).must_equal 'process.cwd()'
+    end
+  end
+
+  describe 'ruby "builtin" requires' do
+    it 'should eat fileutils requires' do
+      to_js( 'require "fileutils"' ).must_equal ''
+    end
+
+    it 'should eat tmpdir requires' do
+      to_js( 'require "tmpdir"' ).must_equal ''
     end
   end
 end

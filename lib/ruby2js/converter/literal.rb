@@ -8,5 +8,9 @@ module Ruby2JS
     handle :int, :float, :str do |value|
       put value.inspect
     end
+
+    handle :octal do |value|
+      put '0' + value.to_s(8)
+    end
   end
 end
