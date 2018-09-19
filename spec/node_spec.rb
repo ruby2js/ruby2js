@@ -179,7 +179,7 @@ describe Ruby2JS::Filter::Functions do
     end
   end
   
-  describe 'dir' do
+  describe 'process' do
     it 'should handle simple Dir.chdir' do
       to_js( 'Dir.chdir("..")' ).must_equal 'process.chdir("..")'
     end
@@ -200,6 +200,25 @@ describe Ruby2JS::Filter::Functions do
 
     it 'should handle FileUtils.pwd' do
       to_js( 'FileUtils.pwd' ).must_equal 'process.cwd()'
+    end
+
+    it 'should handle exit' do
+      to_js( 'exit' ).must_equal 'process.exit()'
+    end
+
+    it 'should handle STDIN' do
+      to_js( 'STDIN' ).must_equal 'process.stdin'
+      to_js( '$stdin' ).must_equal 'process.stdin'
+    end
+
+    it 'should handle STDOUT' do
+      to_js( 'STDOUT' ).must_equal 'process.stdout'
+      to_js( '$stdout' ).must_equal 'process.stdout'
+    end
+
+    it 'should handle STDERR' do
+      to_js( 'STDERR' ).must_equal 'process.stderr'
+      to_js( '$stderr' ).must_equal 'process.stderr'
     end
   end
 

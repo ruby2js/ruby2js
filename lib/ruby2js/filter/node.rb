@@ -36,6 +36,9 @@ module Ruby2JS
           if method == :__dir__ and args.length == 0
             S(:attr, nil, :__dirname)
 
+          elsif method == :exit and args.length <= 1
+            s(:send, s(:attr, nil, :process), :exit, *process_all(args));
+
           elsif method == :system
             @node_setup << :child_process
 
@@ -285,9 +288,28 @@ module Ruby2JS
       def on_const(node)
         if node.children == [nil, :ARGV]
           @node_setup << :ARGV
+          super
+        elsif node.children == [nil, :STDIN]
+          S(:attr, s(:attr, nil, :process), :stdin)
+        elsif node.children == [nil, :STDOUT]
+          S(:attr, s(:attr, nil, :process), :stdout)
+        elsif node.children == [nil, :STDERR]
+          S(:attr, s(:attr, nil, :process), :stderr)
+        else
+          super
         end
+      end
 
-        super
+      def on_gvar(node)
+        if node.children == [:$stdin]
+          S(:attr, s(:attr, nil, :process), :stdin)
+        elsif node.children == [:$stdout]
+          S(:attr, s(:attr, nil, :process), :stdout)
+        elsif node.children == [:$stderr]
+          S(:attr, s(:attr, nil, :process), :stderr)
+        else
+          super
+        end
       end
 
       def on_xstr(node)
