@@ -100,6 +100,8 @@ describe Ruby2JS::Filter::Functions do
     end
 
     it 'should handle File.rename' do
+      to_js( 'FileUtils.mv("foo", "bar")' ).
+        must_equal 'var fs = require("fs"); fs.renameSync("foo", "bar")'
       to_js( 'File.rename("foo", "bar")' ).
         must_equal 'var fs = require("fs"); fs.renameSync("foo", "bar")'
     end
@@ -109,10 +111,14 @@ describe Ruby2JS::Filter::Functions do
         must_equal 'var fs = require("fs"); fs.linkSync("foo", "bar")'
       to_js( 'File.ln("foo", "bar")' ).
         must_equal 'var fs = require("fs"); fs.linkSync("foo", "bar")'
+      to_js( 'FileUtils.ln("foo", "bar")' ).
+        must_equal 'var fs = require("fs"); fs.linkSync("foo", "bar")'
     end
 
     it 'should handle File.symlink' do
       to_js( 'File.symlink("foo", "bar")' ).
+        must_equal 'var fs = require("fs"); fs.symlinkSync("foo", "bar")'
+      to_js( 'FileUtils.ln_s("foo", "bar")' ).
         must_equal 'var fs = require("fs"); fs.symlinkSync("foo", "bar")'
     end
 
@@ -134,6 +140,8 @@ describe Ruby2JS::Filter::Functions do
     it 'should handle File.unlink' do
       to_js( 'File.unlink("foo")' ).
         must_equal 'var fs = require("fs"); fs.unlinkSync("foo")'
+      to_js( 'FileUtils.rm("foo")' ).
+        must_equal 'var fs = require("fs"); fs.unlinkSync("foo")'
     end
 
     it 'should handle FileUtils.cp' do
@@ -153,6 +161,8 @@ describe Ruby2JS::Filter::Functions do
 
     it 'should handle Dir.rmdir' do
       to_js( 'Dir.rmdir("foo")' ).
+        must_equal 'var fs = require("fs"); fs.rmdirSync("foo")'
+      to_js( 'FileUtils.rmdir("foo")' ).
         must_equal 'var fs = require("fs"); fs.rmdirSync("foo")'
     end
 
@@ -180,8 +190,16 @@ describe Ruby2JS::Filter::Functions do
           'foo()} finally {process.chdir($oldwd)}'
     end
 
+    it 'should handle Fileutils.cd' do
+      to_js( 'FileUtils.cd("..")' ).must_equal 'process.chdir("..")'
+    end
+
     it 'should handle Dir.pwd' do
       to_js( 'Dir.pwd' ).must_equal 'process.cwd()'
+    end
+
+    it 'should handle FileUtils.pwd' do
+      to_js( 'FileUtils.pwd' ).must_equal 'process.cwd()'
     end
   end
 

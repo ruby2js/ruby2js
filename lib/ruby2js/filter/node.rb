@@ -131,12 +131,11 @@ module Ruby2JS
             s(:send, s(:attr, nil, :fs), method.to_s + 'Sync',
               process(args.first))
 
-          elsif method == :unlink
+          elsif method == :unlink and args.length == 1
             @node_setup << :fs
             S(:begin, *args.map{|file|
               S(:send, s(:attr, nil, :fs), :unlinkSync, process(file))
             })
-
 
           else
             super
@@ -146,15 +145,83 @@ module Ruby2JS
           target.children.last == :FileUtils and
           target.type == :const and target.children.first == nil
         then
+
+          list = proc do |arg|
+            if arg.type == :array
+              arg.children
+            else
+              [arg]
+            end
+          end
             
           if [:cp, :copy].include? method and args.length == 2
             @node_setup << :fs
             s(:send, s(:attr, nil, :fs), :copyFileSync, *process_all(args))
             
+          elsif [:mv, :move].include? method and args.length == 2
+            @node_setup << :fs
+            S(:send, s(:attr, nil, :fs), :renameSync, *process_all(args))
+
           elsif method == :mkdir and args.length == 1
             @node_setup << :fs
-            s(:send, s(:attr, nil, :fs), :mkdirSync, process(args.first))
+            S(:begin, *list[args.last].map {|file|
+              s(:send, s(:attr, nil, :fs), :mkdirSync, process(file))
+            })
             
+          elsif method == :cd and args.length == 1
+            S(:send, s(:attr, nil, :process), :chdir, *process_all(args))
+
+          elsif method == :pwd and args.length == 0
+            s(:send, s(:attr, nil, :process), :cwd)
+
+          elsif method == :rmdir and args.length == 1
+            @node_setup << :fs
+            S(:begin, *list[args.last].map {|file|
+              s(:send, s(:attr, nil, :fs), :rmdirSync, process(file))
+            })
+
+          elsif method == :ln and args.length == 2
+            @node_setup << :fs
+            s(:send, s(:attr, nil, :fs), :linkSync, *process_all(args))
+            
+          elsif method == :ln_s and args.length == 2
+            @node_setup << :fs
+            s(:send, s(:attr, nil, :fs), :symlinkSync, *process_all(args))
+            
+          elsif method == :rm and args.length == 1
+            @node_setup << :fs
+            S(:begin, *list[args.last].map {|file|
+              s(:send, s(:attr, nil, :fs), :unlinkSync, process(file))
+            })
+
+          elsif 
+            method == :chmod and args.length == 2 and args.first.type == :int
+          then
+            @node_setup << :fs
+
+            S(:begin, *list[args.last].map {|file|
+              S(:send, s(:attr, nil, :fs), method.to_s + 'Sync', process(file),
+                s(:octal, *args.first.children))
+            })
+
+          elsif 
+            method == :chown and args.length == 3 and 
+            args[0].type == :int and args[1].type == :int
+          then
+            @node_setup << :fs
+
+            S(:begin, *list[args.last].map {|file|
+              s(:send, s(:attr, nil, :fs), method.to_s + 'Sync', process(file),
+                *process_all(args[0..1]))})
+
+          elsif method == :touch
+            @node_setup << :fs
+
+            S(:begin, *list[args.first].map {|file|
+              S(:send, s(:attr, nil, :fs), :closeSync,
+                s(:send, s(:attr, nil, :fs), :openSync, file,
+                s(:str, "w")))})
+
           else
             super
           end

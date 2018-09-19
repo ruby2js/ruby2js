@@ -309,8 +309,14 @@ the script.
     * `File.symlink` becomes `fs.symlinkSync`
     * `File.truncate` becomes `fs.truncateSync`
     * `File.unlink` becomes `fs.unlinkSync`
+    * `FileUtils.cd` becomes `process.chdir`
     * `FileUtils.cp` becomes `fs.copyFileSync`
+    * `FileUtils.ln` becomes `fs.linkSync`
+    * `FileUtils.ln_s` becomes `fs.symlinkSync`
     * `FileUtils.mkdir` becomes `fs.mkdirSync`
+    * `FileUtils.mv` becomes `fs.renameSync`
+    * `FileUtils.pwd` becomes `process.cwd`
+    * `FileUtils.rm` becomes `fs.unlinkSync`
     * `IO.read` becomes `fs.readFileSync`
     * `IO.write` becomes `fs.writeFileSync`
     * `system` becomes `child_process.execSync(..., {stdio: "inherit"})`
