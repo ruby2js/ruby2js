@@ -124,10 +124,10 @@ quite different if `a` is a Hash.
 
 One way to resolve this is to change the way indexing operators are evaluated,
 and to provide a runtime library that adds properties to global JavaScript
-objects to handle this.  This is the approach that [Opal](http://opalrb.org/)
+objects to handle this.  This is the approach that [Opal](http://opalrb.com/)
 takes.  It is a fine approach, with a number of benefits.  It also has some
 notable drawbacks.  For example,
-[readability](http://opalrb.org/try/#code:a%20%3D%20%22abc%22%3B%20puts%20a[-1])
+[readability](http://opalrb.com/try/#code:a%20%3D%20%22abc%22%3B%20puts%20a[-1])
 and
 [compatibility with other frameworks](https://github.com/opal/opal/issues/400).
 
@@ -520,14 +520,14 @@ Picking a Ruby to JS mapping tool
 
 If you simply want to get a job done, and would like a mature and tested
 framework, and only use one of the many integrations that
-[Opal](http://opalrb.org/) provides, then Opal is the way to go right now.
+[Opal](http://opalrb.com/) provides, then Opal is the way to go right now.
 
 ruby2js is for those that want to produce JavaScript that looks like it
 wasn’t machine generated, and want the absolute bare minimum in terms of
 limitations as to what JavaScript can be produced.
 
 [Try](http://intertwingly.net/projects/ruby2js/all) for yourself.
-[Compare](http://opalrb.org/try/#code:).
+[Compare](http://opalrb.com/try/#code:).
 
 And, of course, the right solution might be to use
 [CoffeeScript](http://coffeescript.org/) instead.
