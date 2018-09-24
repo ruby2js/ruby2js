@@ -249,6 +249,9 @@ module Ruby2JS
         elsif method == :document and args.length == 0
           S(:attr, target, :ownerDocument)
 
+        else
+          return super
+
         end
       end
     end
