@@ -238,7 +238,7 @@ module Ruby2JS
 
           elsif index.type == :regexp
             process S(:send, 
-              s(:or, S(:send, target, :match, index), s(:array)),
+              s(:or, S(:send, process(target), :match, index), s(:array)),
               :[], args[1] || s(:int, 0))
 
           elsif node.children.length != 3
