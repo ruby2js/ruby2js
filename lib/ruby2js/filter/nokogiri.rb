@@ -8,7 +8,7 @@ module Ruby2JS
       extend SEXP
 
       NOKOGIRI_SETUP = {
-        jsdom: s(:casgn, nil, :jsdom, 
+        jsdom: s(:casgn, nil, :JSDOM, 
           s(:attr, s(:send, nil, :require, s(:str, "jsdom")), :JSDOM))
       }
 
@@ -64,6 +64,18 @@ module Ruby2JS
           @nokogiri_setup << :jsdom
           S(:attr, s(:attr, s(:send, s(:const, nil, :JSDOM), :new,
             *process_all(args)), :window), :document)
+
+        elsif 
+          method == :at and 
+          args.length == 1 and args.first.type == :str
+        then
+          S(:send, target, :querySelector, process(args.first))
+
+        elsif 
+          method == :search and 
+          args.length == 1 and args.first.type == :str
+        then
+          S(:send, target, :querySelectorAll, process(args.first))
 
         elsif method === :parent and args.length == 0
           S(:attr, target, :parentNode)

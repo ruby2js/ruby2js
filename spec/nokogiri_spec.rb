@@ -11,20 +11,30 @@ describe Ruby2JS::Filter::Nokogiri do
   describe 'parse' do
     it 'should support nokogiri parse' do
       to_js( 'Nokogiri::HTML.parse "<b>"' ).
-        must_equal 'var jsdom = require("jsdom").JSDOM; ' +
+        must_equal 'var JSDOM = require("jsdom").JSDOM; ' +
         'new JSDOM("<b>").window.document'
 
       to_js( 'Nokogiri::HTML "<b>"' ).
-        must_equal 'var jsdom = require("jsdom").JSDOM; ' +
+        must_equal 'var JSDOM = require("jsdom").JSDOM; ' +
         'new JSDOM("<b>").window.document'
 
       to_js( 'Nokogiri::HTML5.parse "<b>"' ).
-        must_equal 'var jsdom = require("jsdom").JSDOM; ' +
+        must_equal 'var JSDOM = require("jsdom").JSDOM; ' +
         'new JSDOM("<b>").window.document'
 
       to_js( 'Nokogiri::HTML5 "<b>"' ).
-        must_equal 'var jsdom = require("jsdom").JSDOM; ' +
+        must_equal 'var JSDOM = require("jsdom").JSDOM; ' +
         'new JSDOM("<b>").window.document'
+    end
+  end
+
+  describe 'query' do
+    it 'should support search' do
+      to_js('doc.search("tr")').must_equal 'doc.querySelectorAll("tr")'
+    end
+    
+    it 'should support at' do
+      to_js('doc.at("tr")').must_equal 'doc.querySelector("tr")'
     end
   end
 

@@ -326,6 +326,7 @@ the script.
     * `add_next_sibling` becomes `node.parentNode.insertBefore(sibling, node.nextSibling)`
     * `add_previous_sibling` becomes `node.parentNode.insertBefore(sibling, node)`
     * `after` becomes `node.parentNode.insertBefore(sibling, node.nextSibling)`
+    * `at` becomes `querySelector`
     * `attr` becomes `getAttribute`
     * `attribute` becomes `getAttributeNode`
     * `before` becomes `node.parentNode.insertBefore(sibling, node)`
@@ -358,6 +359,7 @@ the script.
     * `processing_instruction?` becomes `node.nodeType === Node.PROCESSING_INSTRUCTION_NODE`
     * `remove_attribute` becomes `removeAttribute`
     * `root` becomes `documentElement`
+    * `search` becomes `querySelectorAll`
     * `set_attribute` becomes `setAttribute`
     * `text?` becomes `node.nodeType === Node.TEXT_NODE`
     * `text` becomes `textContent`
