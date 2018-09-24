@@ -231,4 +231,10 @@ describe Ruby2JS::Filter::Functions do
       to_js( 'require "tmpdir"' ).must_equal ''
     end
   end
+
+  describe Ruby2JS::Filter::DEFAULTS do
+    it "should include Node" do
+      Ruby2JS::Filter::DEFAULTS.must_include Ruby2JS::Filter::Node
+    end
+  end
 end

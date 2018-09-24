@@ -25,8 +25,12 @@ module Ruby2JS
         @node_setup = Set.new
         result = super
 
-        return s(:begin, *@node_setup.to_a.map {|token| NODE_SETUP[token]},
-          result)
+        if @node_setup.empty?
+          result
+        else
+          s(:begin, *@node_setup.to_a.map {|token| NODE_SETUP[token]},
+            result)
+        end
       end
 
       def on_send(node)

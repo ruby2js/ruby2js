@@ -281,7 +281,7 @@ the script.
 
     * `.class` becomes `.constructor`
 
-* <a id="node" * href="https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/node.rb">node</a>
+* <a id="node" * href="https://github.com/rubys/ruby2js/blob/master/spec/node_spec.rb">node</a>
 
     * `` `command` `` becomes `child_process.execSync("command", {encoding: "utf8"})`
     * `ARGV` becomes `process.argv.slice(1)`
@@ -320,6 +320,48 @@ the script.
     * `IO.read` becomes `fs.readFileSync`
     * `IO.write` becomes `fs.writeFileSync`
     * `system` becomes `child_process.execSync(..., {stdio: "inherit"})`
+
+* <a id="nokogiri" href="https://github.com/rubys/ruby2js/blob/master/spec/nokogiri.rb">nokogiri</a>
+    * `add_child` becomes `appendChild`
+    * `add_next_sibling` becomes `node.parentNode.insertBefore(sibling, node.nextSibling)`
+    * `add_previous_sibling` becomes `node.parentNode.insertBefore(sibling, node)`
+    * `after` becomes `node.parentNode.insertBefore(sibling, node.nextSibling)`
+    * `attr` becomes `getAttribute`
+    * `attribute` becomes `getAttributeNode`
+    * `before` becomes `node.parentNode.insertBefore(sibling, node)`
+    * `cdata?` becomes `node.nodeType === Node.CDATA_SECTION_NODE`
+    * `children` becomes `childNodes`
+    * `comment?` becomes `node.nodeType === Node.COMMENT_NODE`
+    * `content` becomes `textContent`
+    * `create_element` becomes `createElement`
+    * `document` becomes `ownerDocument`
+    * `element?` becomes `node.nodeType === Node.ELEMENT_NODE`
+    * `fragment?` becomes `node.nodeType === Node.FRAGMENT_NODE`
+    * `get_attribute` becomes `getAttribute`
+    * `has_attribute` becomes `hasAttribute`
+    * `inner_html` becomes `innerHTML`
+    * `key?` becomes `hasAttribute`
+    * `name` becomes `nextSibling`
+    * `next` becomes `nodeName`
+    * `next=` becomes `node.parentNode.insertBefore(sibling,node.nextSibling)`
+    * `next_element` becomes `nextElement`
+    * `next_sibling` becomes `nextSibling`
+    * `Nokogiri::HTML5` becomes `new JSDOM().window.document`
+    * `Nokogiri::HTML5.parse` becomes `new JSDOM().window.document`
+    * `Nokogiri::HTML` becomes `new JSDOM().window.document`
+    * `Nokogiri::HTML.parse` becomes `new JSDOM().window.document`
+    * `Nokogiri::XML::Node.new` becomes `document.createElement()`
+    * `parent` becomes `parentNode`
+    * `previous=` becomes `node.parentNode.insertBefore(sibling, node)`
+    * `previous_element` becomes `previousElement`
+    * `previous_sibling` becomes `previousSibling`
+    * `processing_instruction?` becomes `node.nodeType === Node.PROCESSING_INSTRUCTION_NODE`
+    * `remove_attribute` becomes `removeAttribute`
+    * `root` becomes `documentElement`
+    * `set_attribute` becomes `setAttribute`
+    * `text?` becomes `node.nodeType === Node.TEXT_NODE`
+    * `text` becomes `textContent`
+    * `to_html` becomes `outerHTML`
 
 * <a id="rubyjs" href="https://github.com/rubys/ruby2js/blob/master/spec/rubyjs_spec.rb">rubyjs</a>
     * `.at()` becomes `_a.at()`
