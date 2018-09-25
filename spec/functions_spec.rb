@@ -69,6 +69,13 @@ describe Ruby2JS::Filter::Functions do
         must_equal 'var str = str.replace(/a/g, "b")'
     end
 
+    it 'should handle scan' do
+      to_js( 'str.scan(/\d/)' ).must_equal 'str.match(/\d/g)'
+      to_js( 'str.scan(/(\d)(\d)/)' ).
+        must_equal 'str.match(/(\d)(\d)/g).map(function(s) {' +
+          'return s.match(/(\d)(\d)/).slice(1)})'
+    end
+
     it 'should handle sort!' do
       to_js( 'str.sort! {|a, b| a - b}' ).
         must_equal 'str.sort(function(a, b) {return a - b})'

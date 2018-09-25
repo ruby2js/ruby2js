@@ -229,7 +229,7 @@ the script.
     * `.find_index` becomes `findIndex`
     * `.first` becomes `[0]`
     * `.first(n)` becomes `.slice(0, n)`
-    * `.gsub` becomes `replace //g`
+    * `.gsub` becomes `replace(//g)`
     * `.include?` becomes `.indexOf() != -1`
     * `.inspect` becomes `JSON.stringify()`
     * `.keys` becomes `Object.keys()`
@@ -243,6 +243,7 @@ the script.
     * `puts` becomes `console.log`
     * `.replace` becomes `.length = 0; ...push.apply(*)`
     * `.respond_to?` becomes `right in left`
+    * `.scan` becomes `.match(//g)`
     * `.start_with?` becomes `.substring(0, arg.length) == arg`
     * `.upto(lim)` becomes `for (var i=num; i<=lim; i+=1)`
     * `.downto(lim)` becomes `for (var i=num; i>=lim; i-=1)`

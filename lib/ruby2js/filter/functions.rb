@@ -103,6 +103,33 @@ module Ruby2JS
             super
           end
 
+        elsif method == :scan and args.length == 1
+          arg = args.first
+          if arg.type == :str
+            arg = arg.updated(:regexp,
+              [s(:str, Regexp.escape(arg.children.first)), s(:regopt)])
+          end
+
+          pattern = arg.children.first.children.first
+          pattern = pattern.gsub(/\\./, '').gsub(/\[.*\]/, '')
+
+          if arg.type == :regexp
+            gpattern = arg.updated(:regexp, [*arg.children[0...-1],
+              s(:regopt, :g, *arg.children.last)])
+          else
+            super
+          end
+          
+          if pattern.include? '('
+            s(:block, s(:send,
+              s(:send, process(target), :match, gpattern), :map),
+              s(:args, s(:arg, :s)),
+              s(:return, s(:send, s(:send, s(:lvar, :s), :match, arg),
+              :slice, s(:int, 1))))
+          else
+            S(:send, process(target), :match, gpattern)
+          end
+
         elsif method == :gsub and args.length == 2
           before, after = args
           if before.type == :regexp
