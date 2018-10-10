@@ -124,10 +124,25 @@ module Ruby2JS
 
       elsif method == :[]
         (group_receiver ? group(receiver) : parse(receiver))
-        put '['; parse_all(*args, join: ', '); put ']'
+        if
+          args.length == 1 and [:str, :sym].include? args.first.type and
+          args.first.children.first.to_s =~ /^[a-zA-Z]\w*$/
+        then
+          put ".#{args.first.children.first}"
+        else
+          put '['; parse_all(*args, join: ', '); put ']'
+        end
 
       elsif method == :[]=
-        parse receiver; put '['; parse_all(*args[0..-2], join: ', '); put '] = '
+        parse receiver
+        if
+          args.length == 2 and [:str, :sym].include? args.first.type and
+          args.first.children.first.to_s =~ /^[a-zA-Z]\w*$/
+        then
+          put ".#{args.first.children.first} = "
+        else
+          put '['; parse_all(*args[0..-2], join: ', '); put '] = '
+        end
         parse args[-1]
 
       elsif method == :** and not es2016
