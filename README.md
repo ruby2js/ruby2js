@@ -293,6 +293,7 @@ the script.
     * `Dir.mktmpdir` becomes `fs.mkdtempSync`
     * `Dir.pwd` becomes `process.cwd`
     * `Dir.rmdir` becomes `fs.rmdirSync`
+    * `ENV` becomes `process.env`
     * `__FILE__` becomes `__filename`
     * `File.chmod` becomes `fs.chmodSync`
     * `File.chown` becomes `fs.chownSync`

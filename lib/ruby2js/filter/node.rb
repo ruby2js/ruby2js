@@ -293,6 +293,8 @@ module Ruby2JS
         if node.children == [nil, :ARGV]
           @node_setup << :ARGV
           super
+        elsif node.children == [nil, :ENV]
+          S(:attr, s(:attr, nil, :process), :env)
         elsif node.children == [nil, :STDIN]
           S(:attr, s(:attr, nil, :process), :stdin)
         elsif node.children == [nil, :STDOUT]

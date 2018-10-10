@@ -206,6 +206,10 @@ describe Ruby2JS::Filter::Functions do
       to_js( 'exit' ).must_equal 'process.exit()'
     end
 
+    it 'should handle ENV' do
+      to_js( 'ENV' ).must_equal 'process.env'
+    end
+
     it 'should handle STDIN' do
       to_js( 'STDIN' ).must_equal 'process.stdin'
       to_js( '$stdin' ).must_equal 'process.stdin'
