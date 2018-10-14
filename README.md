@@ -285,7 +285,7 @@ the script.
 * <a id="node" * href="https://github.com/rubys/ruby2js/blob/master/spec/node_spec.rb">node</a>
 
     * `` `command` `` becomes `child_process.execSync("command", {encoding: "utf8"})`
-    * `ARGV` becomes `process.argv.slice(1)`
+    * `ARGV` becomes `process.argv.slice(2)`
     * `__dir__` becomes `__dirname`
     * `Dir.chdir` becomes `process.chdir`
     * `Dir.entries` becomes `fs.readdirSync`

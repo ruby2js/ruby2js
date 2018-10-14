@@ -20,7 +20,7 @@ describe Ruby2JS::Filter::Functions do
 
   describe 'ARGV' do
     it 'should map ARGV to process.argv' do
-      to_js( 'ARGV' ).must_equal 'var ARGV = process.argv.slice(1); ARGV'
+      to_js( 'ARGV' ).must_equal 'var ARGV = process.argv.slice(2); ARGV'
     end
   end
   

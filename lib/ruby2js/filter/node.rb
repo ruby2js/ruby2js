@@ -12,7 +12,7 @@ module Ruby2JS
           s(:send, nil, :require, s(:str, "child_process"))),
         fs: s(:casgn, nil, :fs, s(:send, nil, :require, s(:str, "fs"))),
         ARGV: s(:lvasgn, :ARGV, s(:send, s(:attr, 
-          s(:attr, nil, :process), :argv), :slice, s(:int, 1)))
+          s(:attr, nil, :process), :argv), :slice, s(:int, 2)))
       }
 
       def initialize(*args)
