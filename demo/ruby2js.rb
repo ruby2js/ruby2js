@@ -36,6 +36,7 @@ begin
   require 'ruby2js'
 
   filters = {
+    'cjs'       => 'ruby2js/filter/cjs',
     'functions' => 'ruby2js/filter/functions',
     'es2015' => 'ruby2js/es2015',
     'es2016' => 'ruby2js/es2016',

@@ -503,6 +503,14 @@ the script.
     * maps `assert_operator`, `refute_operator`, `.must_be`, and `.cant_be`
        calls to `expect`...`toBeGreaterThan()` or `toBeLessThan` calls
 
+* <a id="cjs" href="https://github.com/rubys/ruby2js/blob/master/spec/cjs">cjs</a>
+    * maps `export def f` to `exports.f =`
+    * maps `export async def f` to `exports.f = async`
+    * maps `export v =` to `exports.v =`
+    * maps `export default proc` to `module.exports =`
+    * maps `export default async proc` to `module.exports = async`
+    * maps `export default` to `module.exports =`
+
 [Wunderbar](https://github.com/rubys/wunderbar) includes additional demos:
 
 * [chat](https://github.com/rubys/wunderbar/blob/master/demo/chat.rb),
