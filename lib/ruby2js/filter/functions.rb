@@ -280,17 +280,19 @@ module Ruby2JS
 
           elsif index.type == :irange
             start, finish = index.children
-            start = i.(start)
             if finish.type == :int
-              if finish.children.first == -1
-                finish = S(:attr, target, :length)
-              else
-                finish = S(:int, finish.children.first+1)
-              end
+              final = S(:int, finish.children.first+1)
             else
-              finish = S(:send, finish, :+, s(:int, 1))
+              final = S(:send, finish, :+, s(:int, 1))
             end
-            process S(:send, target, :slice, start, finish)
+
+            # No need for the last argument if it's -1
+            # This means take all to the end of array
+            if finish.children.first == -1
+              process S(:send, target, :slice, start)
+            else
+              process S(:send, target, :slice, start, final)
+            end
 
           else
             super
