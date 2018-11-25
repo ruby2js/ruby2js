@@ -276,7 +276,11 @@ module Ruby2JS
 
           elsif index.type == :erange
             start, finish = index.children
-            process S(:send, target, :slice, i.(start), i.(finish))
+            if finish.type == :int
+              process S(:send, target, :slice, i.(start), finish)
+            else
+              process S(:send, target, :slice, i.(start), i.(finish))
+            end
 
           elsif index.type == :irange
             start, finish = index.children

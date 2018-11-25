@@ -146,11 +146,13 @@ describe Ruby2JS::Filter::Functions do
       to_js( 'a[-2..-1]' ).must_equal 'a.slice(-2)'
       to_js( 'a[-4..-2]' ).must_equal 'a.slice(-4, -1)'
       to_js( 'a[-4..-3]' ).must_equal 'a.slice(-4, -2)'
+      to_js( 'a[i..j]' ).must_equal 'a.slice(i, j + 1)'
     end
 
     it "should handle exclusive ranges" do
       to_js( 'a[2...4]' ).must_equal 'a.slice(2, 4)'
-      to_js( 'a[-4...-2]' ).must_equal 'a.slice(a.length - 4, a.length - 2)'
+      to_js( 'a[-4...-2]' ).must_equal 'a.slice(a.length - 4, -2)'
+      to_js( 'a[i...j]' ).must_equal 'a.slice(i, j)'
     end
 
     it "should handle regular expression indexes" do
