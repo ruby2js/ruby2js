@@ -11,7 +11,7 @@ module Ruby2JS
         if node.children[2].type == :def
           fn = node.children[2]
           node.updated(nil, [
-	    s(:attr, nil, :exports),
+            s(:attr, nil, :exports),
             fn.children[0].to_s + '=',
             s(:block, s(:send, nil, :proc), *fn.children[1..-1])
           ])
@@ -19,7 +19,7 @@ module Ruby2JS
         elsif node.children[2].type == :lvasgn
           assign = node.children[2]
           node.updated(nil, [
-	    s(:attr, nil, :exports),
+            s(:attr, nil, :exports),
             assign.children[0].to_s + '=',
             *assign.children[1..-1]
           ])
@@ -31,7 +31,7 @@ module Ruby2JS
         then
           fn = node.children[2].children[2]
           node.updated(nil, [
-	    s(:attr, nil, :exports),
+            s(:attr, nil, :exports),
             fn.children[0].to_s + '=',
             s(:send, nil, :async,
               s(:block, s(:send, nil, :proc), *fn.children[1..-1]))
@@ -43,11 +43,11 @@ module Ruby2JS
         then
           node = node.children[2]
 
-	  node.updated(nil, [
-	    s(:attr, nil, :module),
-	    :exports=,
-	    node.children[2]
-	  ])
+          node.updated(nil, [
+            s(:attr, nil, :module),
+            :exports=,
+            node.children[2]
+          ])
 
         else
           super
@@ -66,18 +66,18 @@ module Ruby2JS
         end
 
         if send.children[2] == s(:send, nil, :proc)
-	  node.updated(:send, [
-	    s(:attr, nil, :module),
-	    :exports=,
-	    s(:block, s(:send, nil, :proc), *node.children[1..-1])
+          node.updated(:send, [
+            s(:attr, nil, :module),
+            :exports=,
+            s(:block, s(:send, nil, :proc), *node.children[1..-1])
           ])
         elsif send.children[2] == s(:send, nil, :async, s(:send, nil, :proc))
-	  node.updated(:send, [
-	    s(:attr, nil, :module),
-	    :exports=,
-	    s(:send, nil, :async,
+          node.updated(:send, [
+            s(:attr, nil, :module),
+            :exports=,
+            s(:send, nil, :async,
               s(:block, s(:send, nil, :proc), *node.children[1..-1]))
-	  ])
+          ])
         else
           super
         end
