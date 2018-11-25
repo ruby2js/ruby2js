@@ -8,6 +8,12 @@ describe Ruby2JS::Filter::CJS do
     Ruby2JS.convert(string, filters: [Ruby2JS::Filter::CJS],
       file: __FILE__, eslevel: 2017)
   end
+
+  def to_js_fn( string)
+    Ruby2JS.convert(string,
+      filters: [Ruby2JS::Filter::CJS, Ruby2JS::Filter::Functions],
+      file: __FILE__, eslevel: 2017)
+  end
   
   describe :exports do
     it "should export a simple function" do
@@ -23,6 +29,11 @@ describe Ruby2JS::Filter::CJS do
     it "should export a value" do
       to_js( 'export foo = 1' ).to_s.
         must_equal 'exports.foo = 1'
+    end
+
+    it "should convert .inspect into JSON.stringify()" do
+      to_js_fn( 'export async def f(a, b); return {input: a}.inspect; end' ).to_s.
+        must_equal 'exports.f = async (a, b) => JSON.stringify({input: a})'
     end
   end
 

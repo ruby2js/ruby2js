@@ -13,7 +13,7 @@ module Ruby2JS
           node.updated(nil, [
             s(:attr, nil, :exports),
             fn.children[0].to_s + '=',
-            s(:block, s(:send, nil, :proc), *fn.children[1..-1])
+            s(:block, s(:send, nil, :proc), *process_all(fn.children[1..-1]))
           ])
 
         elsif node.children[2].type == :lvasgn
@@ -34,7 +34,8 @@ module Ruby2JS
             s(:attr, nil, :exports),
             fn.children[0].to_s + '=',
             s(:send, nil, :async,
-              s(:block, s(:send, nil, :proc), *fn.children[1..-1]))
+              s(:block, s(:send, nil, :proc),
+              *process_all(fn.children[1..-1])))
           ])
 
         elsif 
@@ -69,14 +70,16 @@ module Ruby2JS
           node.updated(:send, [
             s(:attr, nil, :module),
             :exports=,
-            s(:block, s(:send, nil, :proc), *node.children[1..-1])
+            s(:block, s(:send, nil, :proc),
+            *process_all(node.children[1..-1]))
           ])
         elsif send.children[2] == s(:send, nil, :async, s(:send, nil, :proc))
           node.updated(:send, [
             s(:attr, nil, :module),
             :exports=,
             s(:send, nil, :async,
-              s(:block, s(:send, nil, :proc), *node.children[1..-1]))
+              s(:block, s(:send, nil, :proc),
+              *process_all(node.children[1..-1])))
           ])
         else
           super
