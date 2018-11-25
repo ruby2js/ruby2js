@@ -285,7 +285,7 @@ module Ruby2JS
               if finish.children.first == -1
                 finish = S(:attr, target, :length)
               else
-                finish = i.(S(:int, finish.children.first+1))
+                finish = S(:int, finish.children.first+1)
               end
             else
               finish = S(:send, finish, :+, s(:int, 1))
