@@ -25,9 +25,6 @@ require 'wunderbar'
 
 # extract options from the argument list
 options = {}
-options[:eslevel] = 2015 if ARGV.delete('--es2015')
-options[:eslevel] = 2016 if ARGV.delete('--es2016')
-options[:eslevel] = 2017 if ARGV.delete('--es2017')
 options[:strict] = true if ARGV.delete('--strict')
 
 begin
@@ -35,24 +32,24 @@ begin
   $:.unshift File.absolute_path('../../lib', __FILE__)
   require 'ruby2js'
 
-  filters = {
-    'cjs'       => 'ruby2js/filter/cjs',
-    'functions' => 'ruby2js/filter/functions',
-    'es2015' => 'ruby2js/es2015',
-    'es2016' => 'ruby2js/es2016',
-    'es2017' => 'ruby2js/es2017',
-    'jquery'    => 'ruby2js/filter/jquery',
-    'node'      => 'ruby2js/filter/node',
-    'nokogiri'  => 'ruby2js/filter/nokogiri',
-    'vue'       => 'ruby2js/filter/vue',
-    'minitest-jasmine' => 'ruby2js/filter/minitest-jasmine',
-    'return'    => 'ruby2js/filter/return',
-    'require'   => 'ruby2js/filter/require',
-    'react'     => 'ruby2js/filter/react',
-    'rubyjs'    => 'ruby2js/filter/rubyjs',
-    'underscore' => 'ruby2js/filter/underscore',
-    'camelCase' => 'ruby2js/filter/camelCase' # should be last
-  }
+  filters = {}
+
+  # autoregister eslevels
+  Dir["#{$:.first}/ruby2js/lib/es20*.rb"].sort.each do |file|
+    eslevel = File.basename(file, '.rb')
+    filters[eslevel] = "ruby2js/#{eslevel}"
+
+    options[:eslevel] = eslevel[/\d+/].to_i if ARGV.delete("--#{eslevel}")
+  end
+
+  # autoregister filters
+  Dir["#{$:.first}/ruby2js/filter/*.rb"].sort.each do |file|
+    filter = File.basename(file, '.rb')
+    filters[filter] = "ruby2js/filter/#{filter}"
+  end
+
+  # put camelCase last as it may interfere with other filters
+  filters['camelCase'] = filters.delete('camelCase')
 
   # allow filters to be selected based on the path
   selected = env['PATH_INFO'].to_s.split('/')
