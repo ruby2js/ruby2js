@@ -370,14 +370,13 @@ module Ruby2JS
     def range_to_array(node)
       start, finish = node.children
       if start.type == :int and start.children.first == 0
-        length = case finish.type
-        when :int
+        # Ranges which start from 0 arrays are simple
+        if finish.type == :int
           # output cleaner code if we know the value already
-          finish.children.first + (node.type == :irange ? 1 : 0)
+          length = finish.children.first + (node.type == :irange ? 1 : 0)
         else
           # If this is variable we need to fix indexing by 1 in js
-          extra = "+1" if node.type == :irange
-          "#{finish.children.last}#{extra}"
+          length = "#{finish.children.last}" + (node.type == :irange ? "+1" : "")
         end
 
         if es2015
@@ -386,7 +385,15 @@ module Ruby2JS
           return put "Array.apply(null, {length: #{length}}).map(Function.call, Number)"
         end
       else
-        raise Error.new(":irange only supports zero based ranges currently", node.children.first.children)
+        start_value = start.children.compact.first
+        finish_value = finish.children.compact.first
+        if start.type == :int and finish.type == :int
+          length = start_value - finish_value + (node.type == :irange ? 1 : 0)
+        else
+          length = "(#{finish_value}-#{start_value})" + (node.type == :irange ? "+1" : "")
+        end
+
+        return put "Array.from({length: #{length}}, (v, k) => #{start_value}+k)"
       end
     end
   end
