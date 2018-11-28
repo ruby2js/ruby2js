@@ -8,10 +8,6 @@ describe Ruby2JS::Filter::Functions do
     Ruby2JS.convert(string, filters: [Ruby2JS::Filter::Functions]).to_s
   end
 
-  def to_es2016(string)
-    Ruby2JS.convert(string, filters: [Ruby2JS::Filter::Functions], eslevel: 2016).to_s
-  end
-
   describe 'conversions' do
     it "should handle to_s" do
       to_js( 'a.to_s' ).must_equal 'a.toString()'
@@ -183,10 +179,6 @@ describe Ruby2JS::Filter::Functions do
 
     it "should handle simple include?" do
       to_js( 'a.include? b' ).must_equal 'a.indexOf(b) != -1'
-    end
-
-    it "should support includes for include? in es2016" do
-      to_es2016( 'a.include? b' ).must_equal 'a.includes(b)'
     end
 
     it "should handle erange include?" do
