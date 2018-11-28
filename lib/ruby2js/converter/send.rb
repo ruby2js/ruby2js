@@ -25,29 +25,18 @@ module Ruby2JS
 
       # :irange support
       # - currently only .to_a
-      if receiver and receiver.type == :begin and receiver.children.first.type == :irange
+      if
+        receiver and
+        receiver.type == :begin and
+        [:irange, :erange].include? receiver.children.first.type
+      then
         unless method == :to_a
           raise Error.new(":irange can only be converted to array currently", receiver.children.first)
         else
-          start, finish = receiver.children.first.children
-          if start.type == :int and start.children.first == 0
-
-            if finish.type == :int
-              length = finish.children.first+1 # output cleaner code if we know the value already
-            elsif finish.children.length == 2 and finish.children.first.nil?
-              length = "#{finish.children.last}+1"
-            end
-
-            if es2015
-              return put "[...Array(#{length}).keys()]"
-            else
-              return put "Array.apply(null, {length: #{length}}).map(Function.call, Number)"
-            end
-          else
-            raise Error.new(":irange only supports zero based ranges currently", receiver.children.first.children)
-          end
+          return irange_to_array(receiver)
         end
       end
+
       # strip '!' and '?' decorations
       method = method.to_s[0..-2] if method =~ /\w[!?]$/
 
@@ -335,47 +324,69 @@ module Ruby2JS
        parse expr
     end
 
-  # do string concatenation when possible
-  def collapse_strings(node)
-    left = node.children[0]
-    return node unless left
-    right = node.children[2]
+    # do string concatenation when possible
+    def collapse_strings(node)
+      left = node.children[0]
+      return node unless left
+      right = node.children[2]
 
-    # recursively evaluate left hand side
-    if
-      left.type == :send and left.children.length == 3 and
-      left.children[1] == :+
-    then
-      left = collapse_strings(left)
-    end
+      # recursively evaluate left hand side
+      if
+        left.type == :send and left.children.length == 3 and
+        left.children[1] == :+
+      then
+        left = collapse_strings(left)
+      end
 
-    # recursively evaluate right hand side
-    if
-      right.type == :send and right.children.length == 3 and
-      right.children[1] == :+
-    then
-      right = collapse_strings(right)
-    end
+      # recursively evaluate right hand side
+      if
+        right.type == :send and right.children.length == 3 and
+        right.children[1] == :+
+      then
+        right = collapse_strings(right)
+      end
 
-    # if left and right are both strings, perform concatenation
-    if [:dstr, :str].include? left.type and [:dstr, :str].include? right.type
-      if left.type == :str and right.type == :str
-        return left.updated nil,
-          [left.children.first + right.children.first]
+      # if left and right are both strings, perform concatenation
+      if [:dstr, :str].include? left.type and [:dstr, :str].include? right.type
+        if left.type == :str and right.type == :str
+          return left.updated nil,
+            [left.children.first + right.children.first]
+        else
+          left = s(:dstr, left) if left.type == :str
+          right = s(:dstr, right) if right.type == :str
+          return left.updated(nil, left.children + right.children)
+        end
+      end
+
+      # if left and right are unchanged, return original node; otherwise
+      # return node modified to include new left and/or right hand sides.
+      if left == node.children[0] and right == node.children[2]
+        return node
       else
-        left = s(:dstr, left) if left.type == :str
-        right = s(:dstr, right) if right.type == :str
-        return left.updated(nil, left.children + right.children)
+        return node.updated(nil, [left, :+, right])
       end
     end
 
-    # if left and right are unchanged, return original node; otherwise
-    # return node modified to include new left and/or right hand sides.
-    if left == node.children[0] and right == node.children[2]
-      return node
-    else
-      return node.updated(nil, [left, :+, right])
+    def irange_to_array(node)
+      start, finish = node.children.first.children
+      if start.type == :int and start.children.first == 0
+        length = case finish.type
+        when :int
+          # output cleaner code if we know the value already
+          finish.children.first+1
+        else
+          # If this is variable we need to fix indexing by 1 in js
+          "#{finish.children.last}+1"
+        end
+
+        if es2015
+          return put "[...Array(#{length}).keys()]"
+        else
+          return put "Array.apply(null, {length: #{length}}).map(Function.call, Number)"
+        end
+      else
+        raise Error.new(":irange only supports zero based ranges currently", node.children.first.children)
+      end
     end
-  end
   end
 end
