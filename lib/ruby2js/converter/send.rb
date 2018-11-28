@@ -393,7 +393,11 @@ module Ruby2JS
           length = "(#{finish_value}-#{start_value})" + (node.type == :irange ? "+1" : "")
         end
 
-        return put "Array.from({length: #{length}}, (v, k) => #{start_value}+k)"
+        if es2015
+          return put "Array.from({length: #{length}}, (v, k) => #{start_value}+k)"
+        else
+          return put "Array.apply(null, {length: #{length}}).map(Function.call, Number).map(x => x+#{start_value})"
+        end
       end
     end
   end
