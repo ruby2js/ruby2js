@@ -390,7 +390,7 @@ module Ruby2JS
         if start.type == :int and finish.type == :int
           length = start_value - finish_value + (node.type == :irange ? 1 : 0)
         else
-          length = "(#{finish_value}-#{start_value})" + (node.type == :irange ? "+1" : "")
+          length = "(#{finish_value}-#{start_value}" + (node.type == :irange ? "+1" : "") + ")"
         end
 
         if es2015

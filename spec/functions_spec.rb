@@ -35,22 +35,30 @@ describe Ruby2JS::Filter::Functions do
   end
 
   describe :irange do
-    it ".to_a should work" do
+    it "(0..5).to_a" do
       to_js( '(0..5).to_a' ).must_equal('Array.apply(null, {length: 6}).map(Function.call, Number)')
     end
 
-    it ".to_a should work" do
+    it "(0..a).to_a" do
       to_js( '(0..a).to_a' ).must_equal('Array.apply(null, {length: a+1}).map(Function.call, Number)')
+    end
+
+    it "(b..a).to_a" do
+      to_js( '(b..a).to_a' ).must_equal('Array.apply(null, {length: (a-b+1)}).map(Function.call, Number).map(x => x+b)')
     end
   end
 
   describe :erange do
-    it ".to_a should work" do
+    it "(0...5).to_a" do
       to_js( '(0...5).to_a' ).must_equal('Array.apply(null, {length: 5}).map(Function.call, Number)')
     end
 
-    it ".to_a should work" do
+    it "(0...a).to_a" do
       to_js( '(0...a).to_a' ).must_equal('Array.apply(null, {length: a}).map(Function.call, Number)')
+    end
+
+    it "(b...a).to_a" do
+      to_js( '(b...a).to_a' ).must_equal('Array.apply(null, {length: (a-b)}).map(Function.call, Number).map(x => x+b)')
     end
   end
 

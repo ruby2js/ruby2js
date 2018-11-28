@@ -34,6 +34,10 @@ describe "ES2015 support" do
     it "(0..a).to_a" do
       to_js( '(0..a).to_a' ).must_equal('[...Array(a+1).keys()]')
     end
+
+    it "(b...a).to_a" do
+      to_js( '(b..a).to_a' ).must_equal('Array.from({length: (a-b+1)}, (v, k) => b+k)')
+    end
   end
 
   describe :erange do
@@ -43,6 +47,10 @@ describe "ES2015 support" do
 
     it "(0...a).to_a" do
       to_js( '(0...a).to_a' ).must_equal('[...Array(a).keys()]')
+    end
+
+    it "(b...a).to_a" do
+      to_js( '(b..a).to_a' ).must_equal('Array.from({length: (a-b+1)}, (v, k) => b+k)')
     end
   end
 
