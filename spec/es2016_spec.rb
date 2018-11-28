@@ -3,8 +3,13 @@ require 'minitest/autorun'
 
 describe "ES2016 support" do
 
-  def to_js(string, filters=[])
-    Ruby2JS.convert(string, eslevel: 2016, filters: filters).to_s
+  def to_js(string)
+    Ruby2JS.convert(string, eslevel: 2016, filters: []).to_s
+  end
+
+  def to_js_fn(string)
+    Ruby2JS.convert(string, eslevel: 2016,
+      filters: [Ruby2JS::Filter::Functions]).to_s
   end
 
   describe :operator do
@@ -13,8 +18,7 @@ describe "ES2016 support" do
     end
 
     it "should support includes for include?" do
-      filters = [Ruby2JS::Filter::Functions]
-      to_js( 'a.include? b', filters).must_equal 'a.includes(b)'
+      to_js_fn( 'a.include? b' ).must_equal 'a.includes(b)'
     end
   end
 end
