@@ -33,7 +33,7 @@ module Ruby2JS
         unless method == :to_a
           raise Error.new("#{receiver.children.first.type} can only be converted to array currently", receiver.children.first)
         else
-          return irange_to_array(receiver)
+          return range_to_array(receiver.children.first)
         end
       end
 
@@ -367,16 +367,17 @@ module Ruby2JS
       end
     end
 
-    def irange_to_array(node)
-      start, finish = node.children.first.children
+    def range_to_array(node)
+      start, finish = node.children
       if start.type == :int and start.children.first == 0
         length = case finish.type
         when :int
           # output cleaner code if we know the value already
-          finish.children.first+1
+          finish.children.first + (node.type == :irange ? 1 : 0)
         else
           # If this is variable we need to fix indexing by 1 in js
-          "#{finish.children.last}+1"
+          extra = "+1" if node.type == :irange
+          "#{finish.children.last}#{extra}"
         end
 
         if es2015

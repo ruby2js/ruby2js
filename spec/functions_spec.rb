@@ -44,6 +44,16 @@ describe Ruby2JS::Filter::Functions do
     end
   end
 
+  describe :erange do
+    it ".to_a should work" do
+      to_js( '(0...5).to_a' ).must_equal('Array.apply(null, {length: 5}).map(Function.call, Number)')
+    end
+
+    it ".to_a should work" do
+      to_js( '(0...a).to_a' ).must_equal('Array.apply(null, {length: a}).map(Function.call, Number)')
+    end
+  end
+
   describe 'string functions' do
     it 'should handle sub' do
       to_js( 'str.sub("a", "b")' ).must_equal 'str.replace("a", "b")'

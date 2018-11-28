@@ -27,12 +27,22 @@ describe "ES2015 support" do
   end
 
   describe :irange do
-    it ".to_a should work" do
+    it "(0..5).to_a" do
       to_js( '(0..5).to_a' ).must_equal('[...Array(6).keys()]')
     end
 
-    it ".to_a should work" do
+    it "(0..a).to_a" do
       to_js( '(0..a).to_a' ).must_equal('[...Array(a+1).keys()]')
+    end
+  end
+
+  describe :erange do
+    it "(0...5).to_a" do
+      to_js( '(0...5).to_a' ).must_equal('[...Array(5).keys()]')
+    end
+
+    it "(0...a).to_a" do
+      to_js( '(0...a).to_a' ).must_equal('[...Array(a).keys()]')
     end
   end
 
