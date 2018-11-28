@@ -29,7 +29,7 @@ module Ruby2JS
             *args)
 
         elsif method == :call and target and target.type == :cvar
-          process S(:send, s(:attr, s(:self), :constructor), 
+          process S(:send, s(:attr, s(:self), :constructor),
             "_#{target.children.first.to_s[2..-1]}", *args)
 
         elsif method == :keys and args.length == 0 and node.is_method?
@@ -73,7 +73,7 @@ module Ruby2JS
           if es2015
             process S(:send, s(:const, nil, :Array), :from, *args)
           else
-            process S(:send, s(:attr, s(:attr, s(:const, nil, :Array), 
+            process S(:send, s(:attr, s(:attr, s(:const, nil, :Array),
               :prototype), :slice), :call, *args)
           end
 
@@ -89,14 +89,14 @@ module Ruby2JS
         elsif [:sub!, :gsub!].include? method
           method = :"#{method.to_s[0..-2]}"
           if VAR_TO_ASSIGN.keys.include? target.type
-            process S(VAR_TO_ASSIGN[target.type], target.children[0], 
+            process S(VAR_TO_ASSIGN[target.type], target.children[0],
               S(:send, target, method, *node.children[2..-1]))
           elsif target.type == :send
             if target.children[0] == nil
               process S(:lvasgn, target.children[1], S(:send,
                 S(:lvar, target.children[1]), method, *node.children[2..-1]))
             else
-              process S(:send, target.children[0], :"#{target.children[1]}=", 
+              process S(:send, target.children[0], :"#{target.children[1]}=",
                 S(:send, target, method, *node.children[2..-1]))
             end
           else
@@ -119,7 +119,7 @@ module Ruby2JS
           else
             super
           end
-          
+
           if pattern.include? '('
             s(:block, s(:send,
               s(:send, process(target), :match, gpattern), :map),
@@ -176,10 +176,10 @@ module Ruby2JS
 	    end
 
 	    if method == :start_with?
-	      process S(:send, S(:send, target, :substring, s(:int, 0), 
+	      process S(:send, S(:send, target, :substring, s(:int, 0),
 		length), :==, *args)
 	    else
-	      process S(:send, S(:send, target, :slice, 
+	      process S(:send, S(:send, target, :slice,
 		S(:send, length, :-@)), :==, *args)
 	    end
           end
@@ -255,7 +255,7 @@ module Ruby2JS
           # resolve negative literal indexes
           i = proc do |index|
             if index.type == :int and index.children.first < 0
-              process S(:send, S(:attr, target, :length), :-, 
+              process S(:send, S(:attr, target, :length), :-,
                 s(:int, -index.children.first))
             else
               index
@@ -268,7 +268,7 @@ module Ruby2JS
             super
 
           elsif index.type == :regexp
-            process S(:send, 
+            process S(:send,
               s(:or, S(:send, process(target), :match, index), s(:array)),
               :[], args[1] || s(:int, 0))
 
@@ -306,11 +306,11 @@ module Ruby2JS
             super
           end
 
-        elsif method == :reverse! and node.is_method? 
+        elsif method == :reverse! and node.is_method?
           # input: a.reverse!
           # output: a.splice(0, a.length, *a.reverse)
-          process S(:send, target, :splice, s(:int, 0), 
-            s(:attr, target, :length), s(:splat, S(:send, target, 
+          process S(:send, target, :splice, s(:int, 0),
+            s(:attr, target, :length), s(:splat, S(:send, target,
             :reverse, *node.children[2..-1])))
 
         elsif method == :each_with_index
@@ -335,7 +335,7 @@ module Ruby2JS
               S(:send, s(:const, nil, :Array), :isArray, target)
             elsif [:Arguments, :Boolean, :Date, :Error, :Function, :Number,
                 :Object, :RegExp, :String].include? parent
-              S(:send, s(:send, s(:attr, s(:attr, s(:const, nil, Object), 
+              S(:send, s(:send, s(:attr, s(:attr, s(:const, nil, Object),
                 :prototype), :toString), :call, target), :===,
                 s(:str, "[object #{parent.to_s}]"))
             else
@@ -419,7 +419,7 @@ module Ruby2JS
           # output: a.splice(0, a.length, *a.map {expression})
           method = (method == :map! ? :map : :select)
           target = call.children.first
-          process call.updated(:send, [target, :splice, s(:splat, s(:send, 
+          process call.updated(:send, [target, :splice, s(:splat, s(:send,
             s(:array, s(:int, 0), s(:attr, target, :length)), :concat,
             s(:block, s(:send, target, method, *call.children[2..-1]),
             *node.children[1..-1])))])
@@ -436,11 +436,11 @@ module Ruby2JS
           if result.children[0].type == :undef
             call = result.children[0].children[0]
             if call.type == :attr
-              call = call.updated(:send, 
+              call = call.updated(:send,
                 [call.children[0], :delete, s(:str, call.children[1])])
               result = result.updated(nil, [call, *result.children[1..-1]])
             else
-              call = call.updated(nil, 
+              call = call.updated(nil,
                 [call.children[0], :delete, *call.children[2..-1]])
               result = result.updated(nil, [call, *result.children[1..-1]])
             end
@@ -458,19 +458,19 @@ module Ruby2JS
           call = call.updated(nil, [s(:begin, range), :step, s(:int, 1)])
           process node.updated(nil, [call, *node.children[1..-1]])
 
-        elsif 
+        elsif
           method == :each and call.children[0].type == :send and
           call.children[0].children[1] == :step
         then
           # i.step(j, n).each {|v| ...}
           range = call.children[0]
           step = range.children[3] || s(:int, 1)
-          call = call.updated(nil, [s(:begin, 
+          call = call.updated(nil, [s(:begin,
             s(:irange, range.children[0], range.children[2])),
             :step, step])
           process node.updated(nil, [call, *node.children[1..-1]])
 
-        elsif 
+        elsif
           # (a..b).each {|v| ...}
           method == :each and
           call.children[0].type == :begin and
@@ -478,28 +478,28 @@ module Ruby2JS
           [:irange, :erange].include? call.children[0].children[0].type and
           node.children[1].children.length == 1
         then
-          s(:for, s(:lvasgn, node.children[1].children[0].children[0]), 
+          s(:for, s(:lvasgn, node.children[1].children[0].children[0]),
             call.children[0].children[0], node.children[2])
 
-        elsif 
-          [:each, :each_value].include? method and 
+        elsif
+          [:each, :each_value].include? method and
           node.children[1].children.length == 1
         then
           if es2015
-            process node.updated(:for_of, 
+            process node.updated(:for_of,
               [s(:lvasgn, node.children[1].children[0].children[0]),
               node.children[0].children[0], node.children[2]])
           else
-            process node.updated(nil, [s(:send, call.children[0], 
+            process node.updated(nil, [s(:send, call.children[0],
               :forEach), *node.children[1..2]])
           end
 
-        elsif 
-          method == :each_key and 
-          [:each, :each_key].include? method and 
+        elsif
+          method == :each_key and
+          [:each, :each_key].include? method and
           node.children[1].children.length == 1
         then
-          process node.updated(:for, 
+          process node.updated(:for,
             [s(:lvasgn, node.children[1].children[0].children[0]),
             node.children[0].children[0], node.children[2]])
 
@@ -523,7 +523,7 @@ module Ruby2JS
         body.compact!
 
         if inheritance == s(:const, nil, :Exception)
-          unless 
+          unless
             body.any? {|statement| statement.type == :def and
             statement.children.first == :initialize}
           then
