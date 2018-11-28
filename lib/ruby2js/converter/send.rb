@@ -36,7 +36,12 @@ module Ruby2JS
             # Zero based array
             if start.children.first == 0 and finish.children.first > 0
               # Array size is 1 bigger than the end of the range
-              return put "[...Array(#{finish.children.first + 1}).keys()]"
+              length = finish.children.first + 1
+              if es2015
+                return put "[...Array(#{length}).keys()]"
+              else
+                return put "Array.apply(null, {length: #{length}}).map(Function.call, Number)"
+              end
             else
               raise Error.new(":irange only supports zero based ranges currently", receiver.children.first.children)
             end
