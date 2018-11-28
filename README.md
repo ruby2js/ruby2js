@@ -556,6 +556,7 @@ When option `eslevel: 2016` is provided, the following additional
 conversion is made:
 
 * `a ** b` becomes `a ** b`
+* `.include?` becomes `.includes`
 
 ES2017 support
 ---
