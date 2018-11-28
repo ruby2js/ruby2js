@@ -3,11 +3,11 @@ require 'minitest/autorun'
 require 'ruby2js/filter/functions'
 
 describe Ruby2JS::Filter::Functions do
-  
-  def to_js( string)
+
+  def to_js(string)
     Ruby2JS.convert(string, filters: [Ruby2JS::Filter::Functions]).to_s
   end
-  
+
   describe 'conversions' do
     it "should handle to_s" do
       to_js( 'a.to_s' ).must_equal 'a.toString()'
@@ -114,7 +114,7 @@ describe Ruby2JS::Filter::Functions do
       to_js( '" " * indent' ).must_equal 'new Array(indent + 1).join(" ")'
     end
   end
-    
+
   describe 'array functions' do
     it "should map each to for statement" do
       to_js( 'a = 0; [1,2,3].each {|i| a += i}').
