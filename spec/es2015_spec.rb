@@ -35,7 +35,7 @@ describe "ES2015 support" do
       to_js( '(0..a).to_a' ).must_equal('[...Array(a+1).keys()]')
     end
 
-    it "(b...a).to_a" do
+    it "(b..a).to_a" do
       to_js( '(b..a).to_a' ).must_equal('Array.from({length: (a-b+1)}, (v, k) => b+k)')
     end
   end
@@ -50,7 +50,7 @@ describe "ES2015 support" do
     end
 
     it "(b...a).to_a" do
-      to_js( '(b..a).to_a' ).must_equal('Array.from({length: (a-b+1)}, (v, k) => b+k)')
+      to_js( '(b...a).to_a' ).must_equal('Array.from({length: (a-b)}, (v, k) => b+k)')
     end
   end
 
