@@ -30,25 +30,24 @@ module Ruby2JS
           raise Error.new(":irange can only be converted to array currently", receiver.children.first)
         else
           start, finish = receiver.children.first.children
-          unless start.type == :int and finish.type == :int
-            raise Error.new("Only integer values are supported in irange", receiver.children.first.children)
-          else
-            # Zero based array
-            if start.children.first == 0 and finish.children.first > 0
-              # Array size is 1 bigger than the end of the range
-              length = finish.children.first + 1
-              if es2015
-                return put "[...Array(#{length}).keys()]"
-              else
-                return put "Array.apply(null, {length: #{length}}).map(Function.call, Number)"
-              end
-            else
-              raise Error.new(":irange only supports zero based ranges currently", receiver.children.first.children)
+          if start.type == :int and start.children.first == 0
+
+            if finish.type == :int
+              length = finish.children.first+1 # output cleaner code if we know the value already
+            elsif finish.children.length == 2 and finish.children.first.nil?
+              length = "#{finish.children.last}+1"
             end
+
+            if es2015
+              return put "[...Array(#{length}).keys()]"
+            else
+              return put "Array.apply(null, {length: #{length}}).map(Function.call, Number)"
+            end
+          else
+            raise Error.new(":irange only supports zero based ranges currently", receiver.children.first.children)
           end
         end
       end
-
       # strip '!' and '?' decorations
       method = method.to_s[0..-2] if method =~ /\w[!?]$/
 

@@ -38,6 +38,10 @@ describe Ruby2JS::Filter::Functions do
     it ".to_a should work" do
       to_js( '(0..5).to_a' ).must_equal('Array.apply(null, {length: 6}).map(Function.call, Number)')
     end
+
+    it ".to_a should work" do
+      to_js( '(0..a).to_a' ).must_equal('Array.apply(null, {length: a+1}).map(Function.call, Number)')
+    end
   end
 
   describe 'string functions' do

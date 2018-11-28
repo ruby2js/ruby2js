@@ -30,6 +30,10 @@ describe "ES2015 support" do
     it ".to_a should work" do
       to_js( '(0..5).to_a' ).must_equal('[...Array(6).keys()]')
     end
+
+    it ".to_a should work" do
+      to_js( '(0..a).to_a' ).must_equal('[...Array(a+1).keys()]')
+    end
   end
 
   describe :for do
