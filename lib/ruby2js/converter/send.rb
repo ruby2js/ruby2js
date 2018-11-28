@@ -370,7 +370,7 @@ module Ruby2JS
     def range_to_array(node)
       start, finish = node.children
       if start.type == :int and start.children.first == 0
-        # Ranges which start from 0 arrays are simple
+        # Ranges which start from 0 can be achieved with more simpler code
         if finish.type == :int
           # output cleaner code if we know the value already
           length = finish.children.first + (node.type == :irange ? 1 : 0)
@@ -385,6 +385,8 @@ module Ruby2JS
           return put "Array.apply(null, {length: #{length}}).map(Function.call, Number)"
         end
       else
+        # Use .compact because the first argument is nil with variables
+        # This way the first value is always set
         start_value = start.children.compact.first
         finish_value = finish.children.compact.first
         if start.type == :int and finish.type == :int
@@ -394,9 +396,9 @@ module Ruby2JS
         end
 
         if es2015
-          return put "Array.from({length: #{length}}, (v, k) => #{start_value}+k)"
+          return put "Array.from({length: #{length}}, (v, k) => k+#{start_value})"
         else
-          return put "Array.apply(null, {length: #{length}}).map(Function.call, Number).map(x => x+#{start_value})"
+          return put "Array.apply(null, {length: #{length}}).map(Function.call, Number).map(v => v+#{start_value})"
         end
       end
     end

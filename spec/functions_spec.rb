@@ -44,7 +44,7 @@ describe Ruby2JS::Filter::Functions do
     end
 
     it "(b..a).to_a" do
-      to_js( '(b..a).to_a' ).must_equal('Array.apply(null, {length: (a-b+1)}).map(Function.call, Number).map(x => x+b)')
+      to_js( '(b..a).to_a' ).must_equal('Array.apply(null, {length: (a-b+1)}).map(Function.call, Number).map(v => v+b)')
     end
   end
 
@@ -58,7 +58,7 @@ describe Ruby2JS::Filter::Functions do
     end
 
     it "(b...a).to_a" do
-      to_js( '(b...a).to_a' ).must_equal('Array.apply(null, {length: (a-b)}).map(Function.call, Number).map(x => x+b)')
+      to_js( '(b...a).to_a' ).must_equal('Array.apply(null, {length: (a-b)}).map(Function.call, Number).map(v => v+b)')
     end
   end
 
