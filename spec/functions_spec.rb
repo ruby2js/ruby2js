@@ -3,11 +3,11 @@ require 'minitest/autorun'
 require 'ruby2js/filter/functions'
 
 describe Ruby2JS::Filter::Functions do
-  
+
   def to_js( string)
     Ruby2JS.convert(string, filters: [Ruby2JS::Filter::Functions]).to_s
   end
-  
+
   describe 'conversions' do
     it "should handle to_s" do
       to_js( 'a.to_s' ).must_equal 'a.toString()'
@@ -31,6 +31,12 @@ describe Ruby2JS::Filter::Functions do
 
     it "should handle puts" do
       to_js( 'puts "hi"' ).must_equal 'console.log("hi")'
+    end
+  end
+
+  describe :irange do
+    it ".to_a should work" do
+      to_js( '(0..5).to_a' ).must_equal('Array.apply(null, {length: 6}).map(Function.call, Number)')
     end
   end
 
@@ -114,7 +120,7 @@ describe Ruby2JS::Filter::Functions do
       to_js( '" " * indent' ).must_equal 'new Array(indent + 1).join(" ")'
     end
   end
-    
+
   describe 'array functions' do
     it "should map each to for statement" do
       to_js( 'a = 0; [1,2,3].each {|i| a += i}').

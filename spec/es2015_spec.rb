@@ -2,16 +2,16 @@ gem 'minitest'
 require 'minitest/autorun'
 
 describe "ES2015 support" do
-  
+
   def to_js(string)
     Ruby2JS.convert(string, eslevel: 2015, filters: []).to_s
   end
-  
+
   def to_js_fn(string)
-    Ruby2JS.convert(string, eslevel: 2015, 
+    Ruby2JS.convert(string, eslevel: 2015,
       filters: [Ruby2JS::Filter::Functions]).to_s
   end
-  
+
   describe :vars do
     it "should use let as the new var" do
       to_js( 'a = 1' ).must_equal('let a = 1')
@@ -26,6 +26,11 @@ describe "ES2015 support" do
     end
   end
 
+  describe :irange do
+    it ".to_a should work" do
+      to_js( '(0..5).to_a' ).must_equal('[...Array(6).keys()]')
+    end
+  end
 
   describe :for do
     it "should handle for loops" do
