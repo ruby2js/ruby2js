@@ -16,12 +16,33 @@ module Ruby2JS
     handle :send, :sendw, :await, :attr, :call do |receiver, method, *args|
       ast = @ast
 
-    if 
-      args.length == 1 and method == :+
-    then
-      node = collapse_strings(ast)
-      return parse node if node != ast
-    end
+      if
+        args.length == 1 and method == :+
+      then
+        node = collapse_strings(ast)
+        return parse node if node != ast
+      end
+
+      # :irange support
+      # - currently only .to_a
+      if receiver and receiver.type == :begin and receiver.children.first.type == :irange
+        unless method == :to_a
+          raise Error.new(":irange can only be converted to array currently", receiver.children.first)
+        else
+          start, finish = receiver.children.first.children
+          unless start.type == :int and finish.type == :int
+            raise Error.new("Only integer values are supported in irange", receiver.children.first.children)
+          else
+            # Zero based array
+            if start.children.first == 0 and finish.children.first > 0
+              # Array size is 1 bigger than the end of the range
+              return put "[...Array(#{finish.children.first + 1}).keys()]"
+            else
+              raise Error.new(":irange only supports zero based ranges currently", receiver.children.first.children)
+            end
+          end
+        end
+      end
 
       # strip '!' and '?' decorations
       method = method.to_s[0..-2] if method =~ /\w[!?]$/
@@ -39,7 +60,7 @@ module Ruby2JS
       end
 
       # call anonymous function
-      if [:call, :[]].include? method and receiver and receiver.type == :block 
+      if [:call, :[]].include? method and receiver and receiver.type == :block
         t2,m2,*args2 = receiver.children.first.children
         if not t2 and [:lambda, :proc].include? m2 and args2.length == 0
           (es2015 || @state == :statement ? group(receiver) : parse(receiver))
@@ -97,7 +118,7 @@ module Ruby2JS
 
       op_index = operator_index method
       if op_index != -1
-        target = args.first 
+        target = args.first
       end
 
       # resolve anonymous receivers against rbstack
@@ -109,12 +130,12 @@ module Ruby2JS
         group_receiver ||= GROUP_OPERATORS.include? receiver.type
         group_receiver = false if receiver.children[1] == :[]
         if receiver.type == :int and !OPERATORS.flatten.include?(method)
-          group_receiver = true 
+          group_receiver = true
         end
       end
 
       if target
-        group_target = target.type == :send && 
+        group_target = target.type == :send &&
           op_index < operator_index( target.children[1] )
         group_target ||= GROUP_OPERATORS.include? target.type
       end
@@ -153,7 +174,7 @@ module Ruby2JS
         put ')'
 
       elsif [:-@, :+@, :~, '~'].include? method
-        if 
+        if
           receiver.type == :send and
           receiver.children[1] == :+@ and
           Parser::AST::Node === receiver.children[0] and
@@ -232,7 +253,7 @@ module Ruby2JS
         elsif args.length == 1 and args.first.type == :const
           # accommodation for JavaScript like new syntax w/o argument list
           parse s(:attr, args.first, :new), @state
-        elsif 
+        elsif
           args.length == 2 and [:send, :const].include? args.first.type and
           args.last.type == :def and args.last.children.first == nil
         then
@@ -266,7 +287,7 @@ module Ruby2JS
             parse ast.updated(:lvasgn, [method]), @state
           end
         elsif args.any? {|arg| arg.type == :splat} and not es2015
-          parse s(:send, s(:attr, receiver, method), :apply, 
+          parse s(:send, s(:attr, receiver, method), :apply,
             (receiver || s(:nil)), s(:array, *args))
         else
           (group_receiver ? group(receiver) : parse(receiver))
@@ -317,16 +338,16 @@ module Ruby2JS
     right = node.children[2]
 
     # recursively evaluate left hand side
-    if 
-      left.type == :send and left.children.length == 3 and 
+    if
+      left.type == :send and left.children.length == 3 and
       left.children[1] == :+
     then
       left = collapse_strings(left)
     end
 
     # recursively evaluate right hand side
-    if 
-      right.type == :send and right.children.length == 3 and 
+    if
+      right.type == :send and right.children.length == 3 and
       right.children[1] == :+
     then
       right = collapse_strings(right)
@@ -335,7 +356,7 @@ module Ruby2JS
     # if left and right are both strings, perform concatenation
     if [:dstr, :str].include? left.type and [:dstr, :str].include? right.type
       if left.type == :str and right.type == :str
-        return left.updated nil, 
+        return left.updated nil,
           [left.children.first + right.children.first]
       else
         left = s(:dstr, left) if left.type == :str
@@ -349,7 +370,7 @@ module Ruby2JS
     if left == node.children[0] and right == node.children[2]
       return node
     else
-      return node.updated(nil, [left, :+, right]) 
+      return node.updated(nil, [left, :+, right])
     end
   end
   end
