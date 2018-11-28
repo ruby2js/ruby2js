@@ -203,8 +203,12 @@ module Ruby2JS
             S(:and, s(:send, args.first, :>=, target.children.first),
               s(:send, args.first, :<, target.children.last))
           else
+            if es2016
+              process S(:send, target, :includes, args.first)
+          else
             process S(:send, S(:send, target, :indexOf, args.first), :!=,
               s(:int, -1))
+          end
           end
 
         elsif method == :respond_to? and args.length == 1
