@@ -31,7 +31,7 @@ module Ruby2JS
         [:irange, :erange].include? receiver.children.first.type
       then
         unless method == :to_a
-          raise Error.new(":irange can only be converted to array currently", receiver.children.first)
+          raise Error.new("#{receiver.children.first.type} can only be converted to array currently", receiver.children.first)
         else
           return irange_to_array(receiver)
         end
