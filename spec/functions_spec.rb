@@ -44,7 +44,7 @@ describe Ruby2JS::Filter::Functions do
     end
 
     it "(b..a).to_a" do
-      to_js( '(b..a).to_a' ).must_equal('Array.apply(null, {length: (a-b+1)}).map(Function.call, Number).map(idx => idx+b)')
+      to_js( '(b..a).to_a' ).must_equal('Array.apply(null, {length: (a-b+1)}).map(Function.call, Number).map(function (idx) { return idx+b })')
     end
   end
 
@@ -58,11 +58,11 @@ describe Ruby2JS::Filter::Functions do
     end
 
     it "(b...a).to_a" do
-      to_js( '(b...a).to_a' ).must_equal('Array.apply(null, {length: (a-b)}).map(Function.call, Number).map(idx => idx+b)')
+      to_js( '(b...a).to_a' ).must_equal('Array.apply(null, {length: (a-b)}).map(Function.call, Number).map(function (idx) { return idx+b })')
     end
 
     it "test range which contains reserved variable idx" do
-      to_js( '(idx...i).to_a' ).must_equal('Array.apply(null, {length: (i-idx)}).map(Function.call, Number).map(i$ => i$+idx)')
+      to_js( '(idx...i).to_a' ).must_equal('Array.apply(null, {length: (i-idx)}).map(Function.call, Number).map(function (i$) { return i$+idx })')
     end
   end
 

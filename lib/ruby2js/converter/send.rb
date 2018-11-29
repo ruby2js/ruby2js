@@ -413,7 +413,7 @@ module Ruby2JS
 
           return put "Array.from({length: #{length}}, (#{blank}, #{index_var}) => #{index_var}+#{start_value})"
         else
-          return put "Array.apply(null, {length: #{length}}).map(Function.call, Number).map(#{index_var} => #{index_var}+#{start_value})"
+          return put "Array.apply(null, {length: #{length}}).map(Function.call, Number).map(function (#{index_var}) { return #{index_var}+#{start_value} })"
         end
       end
     end
