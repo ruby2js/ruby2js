@@ -404,7 +404,14 @@ module Ruby2JS
         end
 
         if es2015
-          return put "Array.from({length: #{length}}, (_, #{index_var}) => #{index_var}+#{start_value})"
+          # Use _ because it's normal convention in JS for variable which is not used at all
+          if @vars.include? :_ or start_value == :_ or finish_value == :_
+            blank = '_$'
+          else
+            blank = '_'
+          end
+
+          return put "Array.from({length: #{length}}, (#{blank}, #{index_var}) => #{index_var}+#{start_value})"
         else
           return put "Array.apply(null, {length: #{length}}).map(Function.call, Number).map(#{index_var} => #{index_var}+#{start_value})"
         end

@@ -46,6 +46,10 @@ describe "ES2015 support" do
     it "idx variable is reserved elsewhere" do
       to_js( 'idx=1;(b..a).to_a' ).must_equal('let idx = 1; Array.from({length: (a-b+1)}, (_, i$) => i$+b)')
     end
+
+    it "_ variable is used in range start" do
+      to_js( '(_..a).to_a' ).must_equal('Array.from({length: (a-_+1)}, (_$, idx) => idx+_)')
+    end
   end
 
   describe :erange do
