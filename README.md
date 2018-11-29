@@ -249,6 +249,9 @@ the script.
     * `.downto(lim)` becomes `for (var i=num; i>=lim; i-=1)`
     * `.step(lim, n).each` becomes `for (var i=num; i<=lim; i+=n)`
     * `.step(lim, -n).each` becomes `for (var i=num; i>=lim; i-=n)`
+    * `(0..a).to_a` becomes `Array.apply(null, {length: a}).map(Function.call, Number)`
+    * `(b..a).to_a` becomes `Array.apply(null, {length: (a-b+1)}).map(Function.call, Number).map(function (idx) { return idx+b })`
+    * `(b...a).to_a` becomes `Array.apply(null, {length: (a-b)}).map(Function.call, Number).map(function (idx) { return idx+b })`
     * `.strip` becomes `.trim`
     * `.sub` becomes `.replace`
     * `.to_f` becomes `parseFloat`
@@ -539,6 +542,9 @@ conversions are made:
 * `proc {|x| x}` becomes `(x) => {x}`
 * `a {|x|}` becomes `a((x) => {})`
 * `class Person; end` becomes `class Person {}`
+* `(0...a).to_a` becomes `[...Array(a).keys()]`
+* `(0..a).to_a` becomes `[...Array(a+1).keys()]`
+* `(b..a).to_a` becomes `Array.from({length: (a-b+1)}, (_, idx) => idx+b)`
 
 ES2015 class support includes constructors, super, methods, class methods,
 instance methods, instance variables, class variables, getters, setters,
