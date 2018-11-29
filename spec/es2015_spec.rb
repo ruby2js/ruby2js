@@ -36,7 +36,15 @@ describe "ES2015 support" do
     end
 
     it "(b..a).to_a" do
-      to_js( '(b..a).to_a' ).must_equal('Array.from({length: (a-b+1)}, (v, k) => k+b)')
+      to_js( '(b..a).to_a' ).must_equal('Array.from({length: (a-b+1)}, (_, idx) => idx+b)')
+    end
+
+    it "idx variable is used in range" do
+      to_js( '(idx..i).to_a' ).must_equal('Array.from({length: (i-idx+1)}, (_, i$) => i$+idx)')
+    end
+
+    it "idx variable is reserved elsewhere" do
+      to_js( 'idx=1;(b..a).to_a' ).must_equal('let idx = 1; Array.from({length: (a-b+1)}, (_, i$) => i$+b)')
     end
   end
 
@@ -50,7 +58,7 @@ describe "ES2015 support" do
     end
 
     it "(b...a).to_a" do
-      to_js( '(b...a).to_a' ).must_equal('Array.from({length: (a-b)}, (v, k) => k+b)')
+      to_js( '(b...a).to_a' ).must_equal('Array.from({length: (a-b)}, (_, idx) => idx+b)')
     end
   end
 

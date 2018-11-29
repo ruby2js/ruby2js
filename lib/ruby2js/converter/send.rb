@@ -395,10 +395,18 @@ module Ruby2JS
           length = "(#{finish_value}-#{start_value}" + (node.type == :irange ? "+1" : "") + ")"
         end
 
-        if es2015
-          return put "Array.from({length: #{length}}, (v, k) => k+#{start_value})"
+        # Avoid of using same variables in the map as used in the irange or elsewhere in this code
+        # Ruby2js only allows dollar sign in beginning of variable so i$ is safe
+        if @vars.include? :idx or start_value == :idx or finish_value == :idx
+          index_var = 'i$'
         else
-          return put "Array.apply(null, {length: #{length}}).map(Function.call, Number).map(v => v+#{start_value})"
+          index_var = 'idx'
+        end
+
+        if es2015
+          return put "Array.from({length: #{length}}, (_, #{index_var}) => #{index_var}+#{start_value})"
+        else
+          return put "Array.apply(null, {length: #{length}}).map(Function.call, Number).map(#{index_var} => #{index_var}+#{start_value})"
         end
       end
     end
