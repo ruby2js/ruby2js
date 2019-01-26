@@ -84,6 +84,9 @@ module Ruby2JS
           process node.updated :send, [nil, :parseFloat, target, *args]
 
         elsif method == :sub and args.length == 2
+          if args[1].type == :str
+            args[1] = s(:str, args[1].children.first.gsub(/\\(\d)/, "$\\1"))
+          end
           process node.updated nil, [target, :replace, *args]
 
         elsif [:sub!, :gsub!].include? method
@@ -138,6 +141,9 @@ module Ruby2JS
           elsif before.type == :str
             before = before.updated(:regexp,
               [s(:str, Regexp.escape(before.children.first)), s(:regopt, :g)])
+          end
+          if after.type == :str
+            after = s(:str, after.children.first.gsub(/\\(\d)/, "$\\1"))
           end
           process node.updated nil, [target, :replace, before, after]
 

@@ -51,6 +51,8 @@ describe Ruby2JS::Filter::Functions do
         must_equal 'var $str = $str.replace("a", "b")'
       to_js( 'str.sub!(/a/) {"x"}' ).
         must_equal 'var str = str.replace(/a/, function() {return "x"})'
+      to_js( "str.sub(/a(.)/, 'b\\1')" ).
+        must_equal 'str.replace(/a(.)/, "b$1")'
     end
 
     it 'should handle gsub and gsub!' do
@@ -67,6 +69,8 @@ describe Ruby2JS::Filter::Functions do
         must_equal 'item.str = item.str.replace(/a/g, "b")'
       to_js( 'str.gsub!(/a/, "b")' ).
         must_equal 'var str = str.replace(/a/g, "b")'
+      to_js( "str.gsub(/a(.)/, 'b\\1')" ).
+        must_equal 'str.replace(/a(.)/g, "b$1")'
     end
 
     it 'should handle scan' do
