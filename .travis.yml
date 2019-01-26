@@ -1,8 +1,8 @@
 language: ruby
 
-before_install:
-  # Workaround for https://github.com/travis-ci/travis-ci/issues/8969
-  - gem update --system
+#before_install:
+# # Workaround for https://github.com/travis-ci/travis-ci/issues/8969
+# - gem update --system
 
 rvm:
   - 1.9
