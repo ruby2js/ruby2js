@@ -35,7 +35,7 @@ begin
   filters = {}
 
   # autoregister eslevels
-  Dir["#{$:.first}/ruby2js/lib/es20*.rb"].sort.each do |file|
+  Dir["#{$:.first}/ruby2js/es20*.rb"].sort.each do |file|
     eslevel = File.basename(file, '.rb')
     filters[eslevel] = "ruby2js/#{eslevel}"
 
