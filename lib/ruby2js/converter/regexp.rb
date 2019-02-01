@@ -27,6 +27,12 @@ module Ruby2JS
         end
       end
 
+      if parts.first.type == :str and parts.first.children[0].start_with?('^')
+        opts = opts + [:m] unless opts.include? :m
+      elsif parts.last.type == :str and parts.last.children[0].end_with?('$')
+        opts = opts + [:m] unless opts.include? :m
+      end
+
       # use slash syntax if there are few embedded slashes in the regexp
       if parts.all? {|part| part.type == :str}
         str = parts.map {|part| part.children.first}.join
