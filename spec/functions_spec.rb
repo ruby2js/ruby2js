@@ -112,6 +112,7 @@ describe Ruby2JS::Filter::Functions do
 
     it 'should handle strip' do
       to_js( 'x.strip()' ).must_equal 'x.trim()'
+      to_js( 'x.strip' ).must_equal 'x.trim()'
     end
 
     it 'should handle string multiply' do
