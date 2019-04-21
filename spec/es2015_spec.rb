@@ -346,6 +346,11 @@ describe "ES2015 support" do
         must_equal 'class C {get m1() {}; get m2() {return this.m1}}'
     end
 
+    it "should prefix intra-method calls with 'this.' - reversed" do
+      to_js('class C; def m2; m1; end; def m1; end; end').
+        must_equal 'class C {get m2() {return this.m1}; get m1() {}}'
+    end
+
     it "should prefix class constants referenced in methods by class name" do
       to_js('class C; X = 1; def m; X; end; end').
         must_equal 'class C {get m() {return C.X}}; const C.X = 1'

@@ -34,6 +34,16 @@ module Ruby2JS
         class_parent, @class_parent = @class_parent, inheritance
         @rbstack.push({})
 
+        # capture method names for automatic self referencing
+        body.each_with_index do |m, index|
+          if m.type == :def
+            prop = m.children.first
+            unless prop == :initialize or prop.to_s.end_with? '='
+              @rbstack.last[prop] = s(:self)
+            end
+          end
+        end
+
         post = []
         skipped = false
         body.each_with_index do |m, index|
@@ -59,20 +69,16 @@ module Ruby2JS
               @prop = :constructor 
               m = m.updated(m.type, [@prop, *m.children[1..2]])
             elsif not m.is_method?
-              @rbstack.last[@prop] = s(:self)
               @prop = "get #{@prop}"
               m = m.updated(m.type, [*m.children[0..1], 
                 s(:autoreturn, m.children[2])])
             elsif @prop.to_s.end_with? '='
               @prop = @prop.to_s.sub('=', '').to_sym
-              @rbstack.last[@prop] = s(:self)
               m = m.updated(m.type, [@prop, *m.children[1..2]])
               @prop = "set #{@prop}"
             elsif @prop.to_s.end_with? '!'
               @prop = @prop.to_s.sub('!', '')
               m = m.updated(m.type, [@prop, *m.children[1..2]])
-            else
-              @rbstack.last[@prop] = s(:self)
             end
 
             begin
