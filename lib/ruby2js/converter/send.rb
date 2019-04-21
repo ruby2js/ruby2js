@@ -111,6 +111,9 @@ module Ruby2JS
         if receiver.type == :int and !OPERATORS.flatten.include?(method)
           group_receiver = true 
         end
+        if not receiver.is_method? and receiver.children.last == :new
+          group_receiver = true 
+        end
       end
 
       if target
@@ -221,7 +224,7 @@ module Ruby2JS
             end
           end
 
-          put "new "; parse receiver
+          put "new "; (group_receiver ? group(receiver) : parse(receiver))
           if ast.is_method?
             put '('; parse_all(*args, join: ', '); put ')'
           end

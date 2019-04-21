@@ -817,7 +817,9 @@ describe Ruby2JS do
   describe 'allocation' do
     it "should handle class new" do
       to_js( 'Date.new' ).must_equal 'new Date'
+      to_js( 'Date.new.toString()' ).must_equal '(new Date).toString()'
       to_js( 'Date.new()' ).must_equal 'new Date()'
+      to_js( 'Date.new().toString()' ).must_equal 'new Date().toString()'
 
       # support a JavaScript-like syntax too.
       to_js( 'new Date()' ).must_equal 'new Date()'
