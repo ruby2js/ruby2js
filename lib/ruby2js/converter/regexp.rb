@@ -28,9 +28,9 @@ module Ruby2JS
       end
 
       if parts.first.type == :str and parts.first.children[0].start_with?('^')
-        opts = opts + [:m] unless opts.include? :m
+        opts = opts + [:m] unless opts.include? :m or opts.include? 'm'
       elsif parts.last.type == :str and parts.last.children[0].end_with?('$')
-        opts = opts + [:m] unless opts.include? :m
+        opts = opts + [:m] unless opts.include? :m or opts.include? 'm'
       end
 
       # use slash syntax if there are few embedded slashes in the regexp

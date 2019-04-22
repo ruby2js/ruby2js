@@ -954,6 +954,15 @@ describe Ruby2JS do
     it "should handle regular expressions not tests" do
       to_js( "'abc' !~ /abc/" ).must_equal '!/abc/.test("abc")'
     end
+
+    it "should treat ^ and $ as multiline" do
+      to_js( "/^./" ).must_equal '/^./m'
+      to_js( "/.$/" ).must_equal '/.$/m'
+      to_js( "Regexp.new('^$')" ).must_equal '/^$/m'
+
+      to_js( "/^./m" ).must_equal '/^./m'
+      to_js( "Regexp.new('^$', 'm')" ).must_equal '/^$/m'
+    end
   end
 
   describe "exceptions" do
