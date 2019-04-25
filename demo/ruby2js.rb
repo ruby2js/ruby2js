@@ -17,6 +17,7 @@
 #         --es2015 
 #         --es2016 
 #         --es2017 
+#         --es2018 
 #         --strict
 #         ---filter filter
 #         -f filter
@@ -95,15 +96,15 @@ _html do
     _input type: 'checkbox', name: 'ast', id: 'ast', checked: !!@ast
     _label 'Show AST', for: 'ast'
 
-    _input type: 'checkbox', name: 'es2017', id: 'es2017', checked: !!@es2017
-    _label 'ES2017', for: 'es2017'
+    _input type: 'checkbox', name: 'es2018', id: 'es2018', checked: !!@es2018
+    _label 'ES2018', for: 'es2018'
   end
 
   if @ruby
     _div_? do
       raise $load_error if $load_error
 
-      options[:eslevel] = 2017 if @es2017
+      options[:eslevel] = 2018 if @es2018
 
       ruby = Ruby2JS.convert(@ruby, options)
 

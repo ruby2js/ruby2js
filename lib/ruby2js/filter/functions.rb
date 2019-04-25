@@ -35,6 +35,27 @@ module Ruby2JS
         elsif method == :keys and args.length == 0 and node.is_method?
           process S(:send, s(:const, nil, :Object), :keys, target)
 
+        elsif method == :merge
+          args.unshift target
+
+          if es2015
+            if es2018
+              process S(:hash, *args.map {|arg| s(:kwsplat, arg)})
+            else
+              process S(:send, s(:const, nil, :Object), :assign, s(:hash),
+                *args)
+            end
+          else
+            copy = [s(:gvasgn, :$$, s(:hash))]
+
+            s(:send, s(:block, s(:send, nil, :lambda), s(:args),
+              s(:begin, *copy, *args.map {|modname|
+              s(:for, s(:lvasgn, :$_), modname,
+              s(:send, s(:gvar, :$$), :[]=,
+              s(:lvar, :$_), s(:send, modname, :[], s(:lvar, :$_))))
+              }, s(:return, s(:gvar, :$$)))), :[])
+          end
+
         elsif method == :merge!
           if es2015
             process S(:send, s(:const, nil, :Object), :assign, target, *args)

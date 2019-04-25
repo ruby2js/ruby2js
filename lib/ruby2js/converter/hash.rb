@@ -12,10 +12,26 @@ module Ruby2JS
 
         (singleton ? put('{') : puts('{'))
 
-        pairs.each_with_index do |node, index|
-          raise Error.new("kwsplat", @ast) if node.type == :kwsplat
-
+        index = 0
+        while pairs.length > 0
+          node = pairs.shift
           (singleton ? put(', ') : put(",#@ws")) unless index == 0
+          index += 1
+
+          if node.type == :kwsplat
+            if es2018
+              if node.children.first.type == :hash
+                pairs.unshift *node.children.first.children
+                index = 0
+              else
+                puts '...'; parse node.children.first
+              end
+
+              next
+            else
+              raise Error.new("kwsplat", @ast)
+            end
+          end
 
           if not @comments[node].empty?
             (puts ''; singleton = false) if singleton

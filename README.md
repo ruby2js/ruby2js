@@ -236,6 +236,7 @@ the script.
     * `.last` becomes `[*.length-1]`
     * `.last(n)` becomes `.slice(*.length-1, *.length)`
     * `.max` becomes `Math.max.apply(Math)`
+    * `.merge` becomes `Object.assign({}, ...)`
     * `.merge!` becomes `Object.assign()`
     * `.min` becomes `Math.min.apply(Math)`
     * `.nil?` becomes `== null`
@@ -565,6 +566,14 @@ When option `eslevel: 2017` is provided, the following additional
 conversion is made by the `functions` filter:
 
 * `.each_entry` becomes `Object.entries().forEach`
+
+ES2018 support
+---
+
+When option `eslevel: 2018` is provided, the following additional
+conversion is made by the `functions` filter:
+
+* `.merge` becomes `{...a, ...b}`
 
 Picking a Ruby to JS mapping tool
 ---
