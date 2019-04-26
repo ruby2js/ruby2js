@@ -14,10 +14,11 @@
 #
 #       available options:
 #
-#         --es2015 
-#         --es2016 
-#         --es2017 
-#         --es2018 
+#         --es2015
+#         --es2016
+#         --es2017
+#         --es2018
+#         --es2019
 #         --strict
 #         ---filter filter
 #         -f filter
@@ -96,15 +97,15 @@ _html do
     _input type: 'checkbox', name: 'ast', id: 'ast', checked: !!@ast
     _label 'Show AST', for: 'ast'
 
-    _input type: 'checkbox', name: 'es2018', id: 'es2018', checked: !!@es2018
-    _label 'ES2018', for: 'es2018'
+    _input type: 'checkbox', name: 'es2020', id: 'es2020', checked: !!@es2020
+    _label 'ES2018', for: 'es2020'
   end
 
   if @ruby
     _div_? do
       raise $load_error if $load_error
 
-      options[:eslevel] = 2018 if @es2018
+      options[:eslevel] = 2020 if @es2020
 
       ruby = Ruby2JS.convert(@ruby, options)
 

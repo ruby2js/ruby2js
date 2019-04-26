@@ -67,7 +67,29 @@ module Ruby2JS
 
             if @prop == :initialize
               @prop = :constructor 
-              m = m.updated(m.type, [@prop, *m.children[1..2]])
+              statements = m.children[2..-1]
+
+              while statements.length == 1 and statements.first.type == :begin
+                statements = statements.first.children.dup
+              end
+
+              if es2020
+                while statements.length > 0 and statements.first.type == :ivasgn
+                  statement = statements.shift
+                  put '#'
+                  put statement.children.first.to_s[1..-1];
+                  put ' = '
+                  parse statement.children.last
+                  puts @sep
+                end
+              end
+
+              if statements == [] or statements == [(:super)]
+                skipped = true 
+                next
+              end
+
+              m = m.updated(m.type, [@prop, m.children[1], *statements])
             elsif not m.is_method?
               @prop = "get #{@prop}"
               m = m.updated(m.type, [*m.children[0..1], 
@@ -83,7 +105,7 @@ module Ruby2JS
 
             begin
               @instance_method = m
-              parse m
+              parse m # unless skipped
             ensure
               @instance_method = nil
             end

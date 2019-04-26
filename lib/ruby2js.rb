@@ -85,6 +85,14 @@ module Ruby2JS
         @options[:eslevel] >= 2018
       end
 
+      def es2019
+        @options[:eslevel] >= 2019
+      end
+
+      def es2020
+        @options[:eslevel] >= 2020
+      end
+
       def process(node)
         ast, @ast = @ast, node
         replacement = super

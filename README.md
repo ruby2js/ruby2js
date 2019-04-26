@@ -575,6 +575,14 @@ conversion is made by the `functions` filter:
 
 * `.merge` becomes `{...a, ...b}`
 
+ES2020 support
+---
+
+When option `eslevel: 2018` is provided, the following additional
+conversion is made:
+
+* `@x` becomes `this.#x`
+
 Picking a Ruby to JS mapping tool
 ---
 
