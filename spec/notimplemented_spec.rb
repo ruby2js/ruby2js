@@ -77,6 +77,7 @@ describe 'not implemented' do
       todo( '{ foo: 2, **bar }' )
     end
 
+    # NOTE: option {eslevel: es2015} implements this
     it "keyword argument" do
       todo( 'def f(a:nil); end' )
     end
