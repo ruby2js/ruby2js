@@ -602,6 +602,7 @@ When option `eslevel: 2018` is provided, the following additional
 conversion is made:
 
 * `@x` becomes `this.#x`
+* `@@x` becomes `ClassName.#x`
 
 Picking a Ruby to JS mapping tool
 ---

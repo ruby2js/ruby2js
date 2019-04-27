@@ -7,8 +7,8 @@ describe "ES2020 support" do
     Ruby2JS.convert(string, eslevel: 2020, filters: []).to_s
   end
   
-  describe :ClassFields do
-    it "should convert private fields to #vars" do
+  describe :InstanceFields do
+    it "should convert private fields to instance #vars" do
       to_js( 'class C; def initialize; @a=1; end; def a; @a; end; end' ).
         must_equal 'class C {#a = 1; get a() {return this.#a}}'
     end
@@ -22,6 +22,13 @@ describe "ES2020 support" do
     it "should handle multiple assignments" do
       to_js( 'class C; def initialize; @a, @b = 1, 2; end; end' ).
         must_equal 'class C {constructor() {[this.#a, this.#b] = [1, 2]}}'
+    end
+  end
+
+  describe :ClassFields do
+    it "should convert private class fields to static #vars" do
+      to_js( 'class C; @@a=1; def self.a; @@a; end; end' ).
+        must_equal 'class C {static #a = 1; static get a() {return C.#a}}'
     end
   end
 end

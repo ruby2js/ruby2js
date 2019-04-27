@@ -51,10 +51,12 @@ module Ruby2JS
         # private variable declarations
         if es2020
           ivars = Set.new
+          cvars = Set.new
 
-          # find ivars
+          # find ivars and cvars
           walk = proc do |ast|
             ivars << ast.children.first if ast.type === :ivar
+            cvars << ast.children.first if ast.type === :cvar
             ast.children.each do |child|
               walk[child] if child.is_a? Parser::AST::Node
             end
@@ -64,6 +66,18 @@ module Ruby2JS
           # process leading initializers in constructor
           while constructor.length == 1 and constructor.first.type == :begin
             constructor = constructor.first.children.dup
+          end
+
+          # emit additional class declarations
+          unless cvars.empty?
+            body.each do |m|
+              cvars.delete m.children.first if m.type == :cvasgn
+            end
+          end
+          cvars.to_a.sort.each do |cvar|
+            put(index == 0 ? @nl : @sep)
+            index += 1
+            put 'static #' + cvar.to_s[2..-1]
           end
 
           while constructor.length > 0 and constructor.first.type == :ivasgn
@@ -78,7 +92,7 @@ module Ruby2JS
             ivars.delete statement.children.first
           end
 
-          # emit additional declarations
+          # emit additional instance declarations
           ivars.to_a.sort.each do |ivar|
             put(index == 0 ? @nl : @sep)
             index += 1
@@ -193,7 +207,12 @@ module Ruby2JS
             end
 
           else
-            skipped = true
+            if m.type == :cvasgn and es2020
+              put 'static #'; put m.children[0].to_s[2..-1]; put ' = '
+              parse m.children[1]
+            else
+              skipped = true
+            end
 
             if m.type == :casgn and m.children[0] == nil
               @rbstack.last[m.children[1]] = name

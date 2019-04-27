@@ -4,14 +4,16 @@ module Ruby2JS
     # (cvar :@@a)
 
     handle :cvar do |var|
+      prefix = es2020 ? '#' : '_'
+
       @class_name ||= nil
       if @class_name
         parse @class_name
-        put var.to_s.sub('@@', "._")
+        put var.to_s.sub('@@', ".#{prefix}")
       elsif @prototype
-        put var.to_s.sub('@@', 'this._')
+        put var.to_s.sub('@@', "this.#{prefix}")
       else
-        put var.to_s.sub('@@', 'this.constructor._')
+        put var.to_s.sub('@@', "this.constructor.#{prefix}")
       end
     end
   end
