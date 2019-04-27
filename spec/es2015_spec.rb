@@ -380,10 +380,16 @@ describe "ES2015 support" do
   end
 
   describe 'keyword arguments' do
-    it 'should handle keyword arguments' do
+    it 'should handle keyword arguments in methods' do
       skip if RUBY_VERSION =~ /^(1\.9|2\.0)/
       to_js('def a(q, a:, b: 2); end').
         must_equal('function a(q, { a, b = 2 }) {}')
+    end
+
+    it 'should handle keyword arguments in blocks' do
+      skip if RUBY_VERSION =~ /^(1\.9|2\.0)/
+      to_js('proc {|q, a:, b: 2|}').
+        must_equal('(q, { a, b = 2 }) => {}')
     end
   end
 end
