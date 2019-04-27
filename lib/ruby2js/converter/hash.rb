@@ -21,7 +21,7 @@ module Ruby2JS
           if node.type == :kwsplat
             if es2018
               if node.children.first.type == :hash
-                pairs.unshift *node.children.first.children
+                pairs.unshift(*node.children.first.children)
                 index = 0
               else
                 puts '...'; parse node.children.first
