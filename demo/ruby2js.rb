@@ -98,7 +98,7 @@ _html do
     _label 'Show AST', for: 'ast'
 
     _input type: 'checkbox', name: 'es2020', id: 'es2020', checked: !!@es2020
-    _label 'ES2018', for: 'es2020'
+    _label 'ES2020', for: 'es2020'
   end
 
   if @ruby
