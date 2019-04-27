@@ -21,6 +21,7 @@ describe "ES2018 support" do
 
   describe 'keyword arguments' do
     it 'should handle keyword arguments' do
+      skip if RUBY_VERSION =~ /^(1\.9|2\.0)/
       to_js('def a(q, a:, b: 2, **r); end').
         must_equal('function a(q, { a, b = 2, ...r }) {}')
     end
