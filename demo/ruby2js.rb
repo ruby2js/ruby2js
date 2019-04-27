@@ -94,18 +94,26 @@ _html do
     _textarea @ruby, name: 'ruby', rows: 8, cols: 80
     _input type: 'submit', value: 'Convert'
 
+    _label 'ES level', for: 'eslevel'
+    _select name: 'eslevel', id: 'eslevel' do
+      _option 'default', selected: !@eslevel || @eslevel == 'default'
+      _option 2015, value: 2015, selected: @eslevel == '2015'
+      _option 2016, value: 2016, selected: @eslevel == '2016'
+      _option 2017, value: 2017, selected: @eslevel == '2017'
+      _option 2018, value: 2018, selected: @eslevel == '2018'
+      _option 2019, value: 2019, selected: @eslevel == '2019'
+      _option 2020, value: 2020, selected: @eslevel == '2020'
+    end
+
     _input type: 'checkbox', name: 'ast', id: 'ast', checked: !!@ast
     _label 'Show AST', for: 'ast'
-
-    _input type: 'checkbox', name: 'es2020', id: 'es2020', checked: !!@es2020
-    _label 'ES2020', for: 'es2020'
   end
 
   if @ruby
     _div_? do
       raise $load_error if $load_error
 
-      options[:eslevel] = 2020 if @es2020
+      options[:eslevel] = @eslevel.to_i if @eslevel
 
       ruby = Ruby2JS.convert(@ruby, options)
 
