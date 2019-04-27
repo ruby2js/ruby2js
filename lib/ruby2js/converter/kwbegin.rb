@@ -51,13 +51,27 @@ module Ruby2JS
       puts "try {"; scope body; sput '}'
 
       if recovers
-        var ||= s(:gvar, :$EXCEPTION)
 
         if recovers.length == 1 and not recovers.first.children.first
+          # find reference to exception ($!)
+          walk = proc do |ast|
+            result = ast if ast.type === :gvar and ast.children.first == :$!
+            ast.children.each do |child|
+              result ||= walk[child] if child.is_a? Parser::AST::Node
+            end
+            result
+          end
+
           # single catch with no exception named
-          put " catch ("; parse var; puts ") {"
+          if es2019 and not var and not walk[@ast]
+            puts " catch {"
+          else
+            var ||= s(:gvar, :$EXCEPTION)
+            put " catch ("; parse var; puts ") {"
+          end
           scope recovers.first.children.last; sput '}'
         else
+          var ||= s(:gvar, :$EXCEPTION)
           put " catch ("; parse var; puts ') {'
 
           first = true

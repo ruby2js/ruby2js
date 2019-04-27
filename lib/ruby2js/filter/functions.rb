@@ -388,6 +388,19 @@ module Ruby2JS
         elsif es2017 and method==:ljust
           process node.updated(nil, [target, :padEnd, *args])
 
+        elsif es2019 and method==:flatten and args.length == 0
+          process node.updated(nil, [target, :flat, s(:lvar, :Infinity)])
+
+        elsif es2019 and method==:to_h and args.length==0
+          process node.updated(nil, [s(:const, nil, :Object), :fromEntries,
+            target])
+
+        elsif es2019 and method==:rstrip
+          process node.updated(nil, [target, :trimStart, *args])
+
+        elsif es2019 and method==:lstrip
+          process node.updated(nil, [target, :trimEnd, *args])
+
         elsif method == :class and args.length==0 and not node.is_method?
           process node.updated(:attr, [target, :constructor])
 

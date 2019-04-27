@@ -575,6 +575,20 @@ conversion is made by the `functions` filter:
 
 * `.merge` becomes `{...a, ...b}`
 
+ES2019 support
+---
+
+When option `eslevel: 2018` is provided, the following additional
+conversion is made by the `functions` filter:
+
+* `.flatten` becomes `.flat(Infinity)`
+* `.lstrip` becomes `.trimEnd
+* `.rstrip` becomes `.trimStart
+* `a.to_h` becomes `Object.fromEntries(a)`
+
+Additionally, `rescue` without a variable will map to `catch` without a
+variable.
+
 ES2020 support
 ---
 
