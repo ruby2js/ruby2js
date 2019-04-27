@@ -33,21 +33,65 @@ module Ruby2JS
         class_name, @class_name = @class_name, name
         class_parent, @class_parent = @class_parent, inheritance
         @rbstack.push({})
+        constructor = []
+        index = 0
 
-        # capture method names for automatic self referencing
-        body.each_with_index do |m, index|
+        # capture constructor, method names for automatic self referencing
+        body.each do |m|
           if m.type == :def
             prop = m.children.first
-            unless prop == :initialize or prop.to_s.end_with? '='
+            if prop == :initialize
+              constructor = m.children[2..-1]
+            elsif not prop.to_s.end_with? '='
               @rbstack.last[prop] = s(:self)
             end
           end
         end
 
+        # private variable declarations
+        if es2020
+          ivars = Set.new
+
+          # find ivars
+          walk = proc do |ast|
+            ivars << ast.children.first if ast.type === :ivar
+            ast.children.each do |child|
+              walk[child] if child.is_a? Parser::AST::Node
+            end
+          end
+          walk[@ast]
+
+          # process leading initializers in constructor
+          while constructor.length == 1 and constructor.first.type == :begin
+            constructor = constructor.first.children.dup
+          end
+
+          while constructor.length > 0 and constructor.first.type == :ivasgn
+            put(index == 0 ? @nl : @sep)
+            index += 1
+            statement = constructor.shift
+            put '#'
+            put statement.children.first.to_s[1..-1]
+            put ' = '
+            parse statement.children.last
+
+            ivars.delete statement.children.first
+          end
+
+          # emit additional declarations
+          ivars.to_a.sort.each do |ivar|
+            put(index == 0 ? @nl : @sep)
+            index += 1
+            put '#' + ivar.to_s[1..-1]
+          end
+        end
+
+        # process class definition
         post = []
         skipped = false
-        body.each_with_index do |m, index|
+        body.each do |m|
           put(index == 0 ? @nl : @sep) unless skipped
+          index += 1
           comments = comments(m)
           location = output_location
           skipped = false
@@ -67,29 +111,13 @@ module Ruby2JS
 
             if @prop == :initialize
               @prop = :constructor 
-              statements = m.children[2..-1]
 
-              while statements.length == 1 and statements.first.type == :begin
-                statements = statements.first.children.dup
-              end
-
-              if es2020
-                while statements.length > 0 and statements.first.type == :ivasgn
-                  statement = statements.shift
-                  put '#'
-                  put statement.children.first.to_s[1..-1];
-                  put ' = '
-                  parse statement.children.last
-                  puts @sep
-                end
-              end
-
-              if statements == [] or statements == [(:super)]
+              if constructor == [] or constructor == [(:super)]
                 skipped = true 
                 next
               end
 
-              m = m.updated(m.type, [@prop, m.children[1], *statements])
+              m = m.updated(m.type, [@prop, m.children[1], *constructor])
             elsif not m.is_method?
               @prop = "get #{@prop}"
               m = m.updated(m.type, [*m.children[0..1], 

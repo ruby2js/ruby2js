@@ -12,5 +12,16 @@ describe "ES2020 support" do
       to_js( 'class C; def initialize; @a=1; end; def a; @a; end; end' ).
         must_equal 'class C {#a = 1; get a() {return this.#a}}'
     end
+
+    it "should handle instance variable assignments and implicit decls" do
+      to_js( 'class C; def a; @a; end; def a=(a); @a=a; end; end' ).
+        must_equal 'class C {#a; get a() {return this.#a}; ' +
+          'set a(a) {this.#a = a}}'
+    end
+
+    it "should handle multiple assignments" do
+      to_js( 'class C; def initialize; @a, @b = 1, 2; end; end' ).
+        must_equal 'class C {constructor() {[this.#a, this.#b] = [1, 2]}}'
+    end
   end
 end
