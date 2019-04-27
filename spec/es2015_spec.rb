@@ -378,4 +378,11 @@ describe "ES2015 support" do
           '{enumerable: true, configurable: true, get() {return 1}})'
     end
   end
+
+  describe 'keyword arguments' do
+    it 'should handle keyword arguments' do
+      to_js('def a(q, a:, b: 2); end').
+        must_equal('function a(q, { a, b = 2 }) {}')
+    end
+  end
 end

@@ -550,6 +550,9 @@ Additionally, the `functions` filter will provide the following conversion:
 * `Array(x)` becomes `Array.from(x)`
 * `.inject(n) {}` becomes `.reduce(() => {}, n)`
 
+Finally, keyword arguments and optional keyword arguments will be mapped to
+parameter detructuring.
+
 ES2016 support
 ---
 
@@ -574,6 +577,9 @@ When option `eslevel: 2018` is provided, the following additional
 conversion is made by the `functions` filter:
 
 * `.merge` becomes `{...a, ...b}`
+
+Additionally, rest arguments can now be used with keyword arguments and
+optional keyword arguments.
 
 ES2019 support
 ---
