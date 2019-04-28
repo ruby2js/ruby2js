@@ -34,6 +34,38 @@ describe Ruby2JS::Filter::Functions do
     end
   end
 
+  describe :irange do
+    it "(0..5).to_a" do
+      to_js( '(0..5).to_a' ).must_equal('Array.apply(null, {length: 6}).map(Function.call, Number)')
+    end
+
+    it "(0..a).to_a" do
+      to_js( '(0..a).to_a' ).must_equal('Array.apply(null, {length: a+1}).map(Function.call, Number)')
+    end
+
+    it "(b..a).to_a" do
+      to_js( '(b..a).to_a' ).must_equal('Array.apply(null, {length: (a-b+1)}).map(Function.call, Number).map(function (idx) { return idx+b })')
+    end
+  end
+
+  describe :erange do
+    it "(0...5).to_a" do
+      to_js( '(0...5).to_a' ).must_equal('Array.apply(null, {length: 5}).map(Function.call, Number)')
+    end
+
+    it "(0...a).to_a" do
+      to_js( '(0...a).to_a' ).must_equal('Array.apply(null, {length: a}).map(Function.call, Number)')
+    end
+
+    it "(b...a).to_a" do
+      to_js( '(b...a).to_a' ).must_equal('Array.apply(null, {length: (a-b)}).map(Function.call, Number).map(function (idx) { return idx+b })')
+    end
+
+    it "test range which contains reserved variable idx" do
+      to_js( '(idx...i).to_a' ).must_equal('Array.apply(null, {length: (i-idx)}).map(Function.call, Number).map(function (i$) { return i$+idx })')
+    end
+  end
+
   describe 'string functions' do
     it 'should handle sub' do
       to_js( 'str.sub("a", "b")' ).must_equal 'str.replace("a", "b")'

@@ -4,7 +4,7 @@ require 'ruby2js'
 
 describe 'not implemented' do
   # see https://github.com/whitequark/parser/blob/master/doc/AST_FORMAT.md
-  
+
   def todo(string)
     proc { Ruby2JS.convert(string, filters: []) }.must_raise NotImplementedError
   end
@@ -12,6 +12,8 @@ describe 'not implemented' do
   it "range inclusive" do
     # NOTE: for loops and filter/functions will handle the special case of array indexes
     # NOTE: filter/rubyjs implements this
+    # NOTE: .to_a is implemented in send
+
     todo( '1..2' )
   end
 

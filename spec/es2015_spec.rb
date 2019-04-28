@@ -2,16 +2,16 @@ gem 'minitest'
 require 'minitest/autorun'
 
 describe "ES2015 support" do
-  
+
   def to_js(string)
     Ruby2JS.convert(string, eslevel: 2015, filters: []).to_s
   end
-  
+
   def to_js_fn(string)
-    Ruby2JS.convert(string, eslevel: 2015, 
+    Ruby2JS.convert(string, eslevel: 2015,
       filters: [Ruby2JS::Filter::Functions]).to_s
   end
-  
+
   describe :vars do
     it "should use let as the new var" do
       to_js( 'a = 1' ).must_equal('let a = 1')
@@ -26,6 +26,45 @@ describe "ES2015 support" do
     end
   end
 
+  describe :irange do
+    it "(0..5).to_a" do
+      to_js( '(0..5).to_a' ).must_equal('[...Array(6).keys()]')
+    end
+
+    it "(0..a).to_a" do
+      to_js( '(0..a).to_a' ).must_equal('[...Array(a+1).keys()]')
+    end
+
+    it "(b..a).to_a" do
+      to_js( '(b..a).to_a' ).must_equal('Array.from({length: (a-b+1)}, (_, idx) => idx+b)')
+    end
+
+    it "idx variable is used in range" do
+      to_js( '(idx..i).to_a' ).must_equal('Array.from({length: (i-idx+1)}, (_, i$) => i$+idx)')
+    end
+
+    it "idx variable is reserved elsewhere" do
+      to_js( 'idx=1;(b..a).to_a' ).must_equal('let idx = 1; Array.from({length: (a-b+1)}, (_, i$) => i$+b)')
+    end
+
+    it "_ variable is used in range start" do
+      to_js( '(_..a).to_a' ).must_equal('Array.from({length: (a-_+1)}, (_$, idx) => idx+_)')
+    end
+  end
+
+  describe :erange do
+    it "(0...5).to_a" do
+      to_js( '(0...5).to_a' ).must_equal('[...Array(5).keys()]')
+    end
+
+    it "(0...a).to_a" do
+      to_js( '(0...a).to_a' ).must_equal('[...Array(a).keys()]')
+    end
+
+    it "(b...a).to_a" do
+      to_js( '(b...a).to_a' ).must_equal('Array.from({length: (a-b)}, (_, idx) => idx+b)')
+    end
+  end
 
   describe :for do
     it "should handle for loops" do

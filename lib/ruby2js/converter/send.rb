@@ -16,12 +16,26 @@ module Ruby2JS
     handle :send, :sendw, :await, :attr, :call do |receiver, method, *args|
       ast = @ast
 
-    if 
-      args.length == 1 and method == :+
-    then
-      node = collapse_strings(ast)
-      return parse node if node != ast
-    end
+      if
+        args.length == 1 and method == :+
+      then
+        node = collapse_strings(ast)
+        return parse node if node != ast
+      end
+
+      # :irange support
+      # - currently only .to_a
+      if
+        receiver and
+        receiver.type == :begin and
+        [:irange, :erange].include? receiver.children.first.type
+      then
+        unless method == :to_a
+          raise Error.new("#{receiver.children.first.type} can only be converted to array currently", receiver.children.first)
+        else
+          return range_to_array(receiver.children.first)
+        end
+      end
 
       # strip '!' and '?' decorations
       method = method.to_s[0..-2] if method =~ /\w[!?]$/
@@ -39,7 +53,7 @@ module Ruby2JS
       end
 
       # call anonymous function
-      if [:call, :[]].include? method and receiver and receiver.type == :block 
+      if [:call, :[]].include? method and receiver and receiver.type == :block
         t2,m2,*args2 = receiver.children.first.children
         if not t2 and [:lambda, :proc].include? m2 and args2.length == 0
           (es2015 || @state == :statement ? group(receiver) : parse(receiver))
@@ -97,7 +111,7 @@ module Ruby2JS
 
       op_index = operator_index method
       if op_index != -1
-        target = args.first 
+        target = args.first
       end
 
       # resolve anonymous receivers against rbstack
@@ -109,7 +123,7 @@ module Ruby2JS
         group_receiver ||= GROUP_OPERATORS.include? receiver.type
         group_receiver = false if receiver.children[1] == :[]
         if receiver.type == :int and !OPERATORS.flatten.include?(method)
-          group_receiver = true 
+          group_receiver = true
         end
         if not receiver.is_method? and receiver.children.last == :new
           group_receiver = true 
@@ -117,7 +131,7 @@ module Ruby2JS
       end
 
       if target
-        group_target = target.type == :send && 
+        group_target = target.type == :send &&
           op_index < operator_index( target.children[1] )
         group_target ||= GROUP_OPERATORS.include? target.type
       end
@@ -156,7 +170,7 @@ module Ruby2JS
         put ')'
 
       elsif [:-@, :+@, :~, '~'].include? method
-        if 
+        if
           receiver.type == :send and
           receiver.children[1] == :+@ and
           Parser::AST::Node === receiver.children[0] and
@@ -235,7 +249,7 @@ module Ruby2JS
         elsif args.length == 1 and args.first.type == :const
           # accommodation for JavaScript like new syntax w/o argument list
           parse s(:attr, args.first, :new), @state
-        elsif 
+        elsif
           args.length == 2 and [:send, :const].include? args.first.type and
           args.last.type == :def and args.last.children.first == nil
         then
@@ -269,7 +283,7 @@ module Ruby2JS
             parse ast.updated(:lvasgn, [method]), @state
           end
         elsif args.any? {|arg| arg.type == :splat} and not es2015
-          parse s(:send, s(:attr, receiver, method), :apply, 
+          parse s(:send, s(:attr, receiver, method), :apply,
             (receiver || s(:nil)), s(:array, *args))
         else
           (group_receiver ? group(receiver) : parse(receiver))
@@ -313,47 +327,98 @@ module Ruby2JS
        parse expr
     end
 
-  # do string concatenation when possible
-  def collapse_strings(node)
-    left = node.children[0]
-    return node unless left
-    right = node.children[2]
+    # do string concatenation when possible
+    def collapse_strings(node)
+      left = node.children[0]
+      return node unless left
+      right = node.children[2]
 
-    # recursively evaluate left hand side
-    if 
-      left.type == :send and left.children.length == 3 and 
-      left.children[1] == :+
-    then
-      left = collapse_strings(left)
-    end
+      # recursively evaluate left hand side
+      if
+        left.type == :send and left.children.length == 3 and
+        left.children[1] == :+
+      then
+        left = collapse_strings(left)
+      end
 
-    # recursively evaluate right hand side
-    if 
-      right.type == :send and right.children.length == 3 and 
-      right.children[1] == :+
-    then
-      right = collapse_strings(right)
-    end
+      # recursively evaluate right hand side
+      if
+        right.type == :send and right.children.length == 3 and
+        right.children[1] == :+
+      then
+        right = collapse_strings(right)
+      end
 
-    # if left and right are both strings, perform concatenation
-    if [:dstr, :str].include? left.type and [:dstr, :str].include? right.type
-      if left.type == :str and right.type == :str
-        return left.updated nil, 
-          [left.children.first + right.children.first]
+      # if left and right are both strings, perform concatenation
+      if [:dstr, :str].include? left.type and [:dstr, :str].include? right.type
+        if left.type == :str and right.type == :str
+          return left.updated nil,
+            [left.children.first + right.children.first]
+        else
+          left = s(:dstr, left) if left.type == :str
+          right = s(:dstr, right) if right.type == :str
+          return left.updated(nil, left.children + right.children)
+        end
+      end
+
+      # if left and right are unchanged, return original node; otherwise
+      # return node modified to include new left and/or right hand sides.
+      if left == node.children[0] and right == node.children[2]
+        return node
       else
-        left = s(:dstr, left) if left.type == :str
-        right = s(:dstr, right) if right.type == :str
-        return left.updated(nil, left.children + right.children)
+        return node.updated(nil, [left, :+, right])
       end
     end
 
-    # if left and right are unchanged, return original node; otherwise
-    # return node modified to include new left and/or right hand sides.
-    if left == node.children[0] and right == node.children[2]
-      return node
-    else
-      return node.updated(nil, [left, :+, right]) 
+    def range_to_array(node)
+      start, finish = node.children
+      if start.type == :int and start.children.first == 0
+        # Ranges which start from 0 can be achieved with more simpler code
+        if finish.type == :int
+          # output cleaner code if we know the value already
+          length = finish.children.first + (node.type == :irange ? 1 : 0)
+        else
+          # If this is variable we need to fix indexing by 1 in js
+          length = "#{finish.children.last}" + (node.type == :irange ? "+1" : "")
+        end
+
+        if es2015
+          return put "[...Array(#{length}).keys()]"
+        else
+          return put "Array.apply(null, {length: #{length}}).map(Function.call, Number)"
+        end
+      else
+        # Use .compact because the first argument is nil with variables
+        # This way the first value is always set
+        start_value = start.children.compact.first
+        finish_value = finish.children.compact.first
+        if start.type == :int and finish.type == :int
+          length = start_value - finish_value + (node.type == :irange ? 1 : 0)
+        else
+          length = "(#{finish_value}-#{start_value}" + (node.type == :irange ? "+1" : "") + ")"
+        end
+
+        # Avoid of using same variables in the map as used in the irange or elsewhere in this code
+        # Ruby2js only allows dollar sign in beginning of variable so i$ is safe
+        if @vars.include? :idx or start_value == :idx or finish_value == :idx
+          index_var = 'i$'
+        else
+          index_var = 'idx'
+        end
+
+        if es2015
+          # Use _ because it's normal convention in JS for variable which is not used at all
+          if @vars.include? :_ or start_value == :_ or finish_value == :_
+            blank = '_$'
+          else
+            blank = '_'
+          end
+
+          return put "Array.from({length: #{length}}, (#{blank}, #{index_var}) => #{index_var}+#{start_value})"
+        else
+          return put "Array.apply(null, {length: #{length}}).map(Function.call, Number).map(function (#{index_var}) { return #{index_var}+#{start_value} })"
+        end
+      end
     end
-  end
   end
 end
