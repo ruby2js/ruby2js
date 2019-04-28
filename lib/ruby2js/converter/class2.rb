@@ -216,6 +216,12 @@ module Ruby2JS
 
             if m.type == :casgn and m.children[0] == nil
               @rbstack.last[m.children[1]] = name
+
+              if es2020
+                put 'static '; put m.children[1].to_s; put ' = '
+                parse m.children[2]
+                skipped = false
+              end
             elsif m.type == :alias
               @rbstack.last[m.children[0]] = name
             end

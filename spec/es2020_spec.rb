@@ -31,4 +31,11 @@ describe "ES2020 support" do
         must_equal 'class C {static #a = 1; static get a() {return C.#a}}'
     end
   end
+
+  describe :ClassConstants do
+    it "should convert public class constants to static vars" do
+      to_js( 'class C; D=1; end' ).
+        must_equal 'class C {static D = 1}'
+    end
+  end
 end
