@@ -332,7 +332,7 @@ describe "ES2015 support" do
 
     it "should parse class with class constants" do
       to_js('class Person; ID=7; end').
-        must_equal 'class Person {}; const Person.ID = 7'
+        must_equal 'class Person {}; Person.ID = 7'
     end
 
     it "should parse class with class methods" do
@@ -357,7 +357,7 @@ describe "ES2015 support" do
 
     it "should prefix class constants referenced in methods by class name" do
       to_js('class C; X = 1; def m; X; end; end').
-        must_equal 'class C {get m() {return C.X}}; const C.X = 1'
+        must_equal 'class C {get m() {return C.X}}; C.X = 1'
     end
   end
 

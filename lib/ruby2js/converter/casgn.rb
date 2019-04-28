@@ -8,7 +8,9 @@ module Ruby2JS
       multi_assign_declarations if @state == :statement
 
       begin
-        if @state == :statement
+        cbase ||= @rbstack.map {|rb| rb[var]}.compact.last
+
+        if @state == :statement and not cbase
           if es2015
             put "const "
           else
@@ -16,7 +18,6 @@ module Ruby2JS
           end
         end
 
-        cbase ||= @rbstack.map {|rb| rb[var]}.compact.last
         (parse cbase; put '.') if cbase
 
         put "#{ var } = "; parse value
