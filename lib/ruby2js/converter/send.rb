@@ -393,7 +393,7 @@ module Ruby2JS
         start_value = start.children.compact.first
         finish_value = finish.children.compact.first
         if start.type == :int and finish.type == :int
-          length = start_value - finish_value + (node.type == :irange ? 1 : 0)
+          length = finish_value - start_value + (node.type == :irange ? 1 : 0)
         else
           length = "(#{finish_value}-#{start_value}" + (node.type == :irange ? "+1" : "") + ")"
         end
