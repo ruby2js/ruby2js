@@ -30,7 +30,10 @@ module Ruby2JS
         @vue_props = []
         @vue_reactive = []
         @vue_filter_functions = false
+
         super
+
+        @exclude_methods << @vue_methods
       end
 
       def options=(options)
@@ -92,7 +95,7 @@ module Ruby2JS
         end
 
         @vue_inventory = vue_walk(node)
-        @vue_methods = []
+        @vue_methods.clear
         @vue_props = []
         @vue_reactive = []
 
@@ -280,7 +283,7 @@ module Ruby2JS
           hash << s(:pair, s(:sym, :methods), s(:hash, *methods))
         end
 
-        @vue_methods = []
+        @vue_methods.clear
 
         # append setters to computed list
         setters.each do |setter|

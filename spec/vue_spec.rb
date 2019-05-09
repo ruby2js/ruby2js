@@ -8,6 +8,14 @@ describe Ruby2JS::Filter::Vue do
     Ruby2JS.convert(string, filters: [Ruby2JS::Filter::Vue], scope: self).to_s
   end
 
+  def to_js_fn(string)
+    Ruby2JS.convert(
+      string, 
+      filters: [Ruby2JS::Filter::Functions, Ruby2JS::Filter::Vue], 
+      scope: self
+    ).to_s
+  end
+
   describe :createApp do
     it "should create apps" do
       to_js( 'class FooBar<Vue; end' ).
@@ -91,6 +99,12 @@ describe Ruby2JS::Filter::Vue do
     it "should handle calls to methods" do
       to_js( 'class Foo<Vue; def a(); b(); end; def b(); end; end' ).
         must_include 'this.b()'
+    end
+
+    it "should give precedence to locally defined methods" do
+      to_js_fn( 'class Foo<Vue; def a(); self.merge(); end; ' +
+        'def merge(); end; end' ).
+        must_include 'this.merge()'
     end
 
     it "should handle methods as hash values" do

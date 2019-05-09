@@ -51,6 +51,7 @@ module Ruby2JS
       if @included
         not @included.include? method
       else
+        return true if @exclude_methods.flatten.include? method
         @excluded.include? method
       end
     end
