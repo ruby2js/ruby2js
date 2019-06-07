@@ -31,6 +31,8 @@ module Ruby2JS
         @vue_reactive = []
         @vue_filter_functions = false
 
+        @vue_setup = false
+
         super
 
         @exclude_methods << @vue_methods
@@ -46,6 +48,29 @@ module Ruby2JS
           filters.include? Ruby2JS::Filter::Functions
         then
           @vue_filter_functions = true
+        end
+      end
+
+      # if options[:vue_h] is set, return an array of nodes
+      def process(node)
+        return super if @vue_setup
+        @vue_setup = true
+        if @vue_h 
+          if node.type == :begin
+            begin
+              @vue_apply = true
+              process s(:send, s(:block, s(:send, nil, :proc), 
+                s(:args, s(:shadowarg, :$_)), 
+                s(:begin, s(:lvasgn, :$_, s(:array)), process(node),
+                  s(:return, s(:gvar, :$_)))), :[])
+            ensure
+              @vue_apply = nil
+            end
+          else
+            process s(:array, node)
+          end
+        else
+          process node
         end
       end
 
