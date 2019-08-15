@@ -328,7 +328,7 @@ describe Ruby2JS::Filter::Functions do
 
     it "should handle merge! with a constant hash" do
       to_js( 'a.merge!(b: 1)' ).
-        must_equal "(function() {for (var $_ in b) {a[$_] = b[$_]}; return a})()"
+        must_equal "(function() {a.b = 1; return a})()"
     end
 
     it "should handle delete attribute (ruby style) - static" do
