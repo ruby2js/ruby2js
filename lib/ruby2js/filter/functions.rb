@@ -50,9 +50,15 @@ module Ruby2JS
 
             s(:send, s(:block, s(:send, nil, :lambda), s(:args),
               s(:begin, *copy, *args.map {|modname|
-              s(:for, s(:lvasgn, :$_), modname,
-              s(:send, s(:gvar, :$$), :[]=,
-              s(:lvar, :$_), s(:send, modname, :[], s(:lvar, :$_))))
+              if modname.type == :hash
+                s(:begin, *modname.children.map {|pair|
+                    s(:send, s(:gvar, :$$), :[]=, *pair.children)
+                  })
+              else
+                s(:for, s(:lvasgn, :$_), modname,
+                s(:send, s(:gvar, :$$), :[]=,
+                s(:lvar, :$_), s(:send, modname, :[], s(:lvar, :$_))))
+              end
               }, s(:return, s(:gvar, :$$)))), :[])
           end
 
@@ -72,9 +78,15 @@ module Ruby2JS
 
             s(:send, s(:block, s(:send, nil, :lambda), s(:args),
               s(:begin, *copy, *args.map {|modname|
-              s(:for, s(:lvasgn, :$_), modname,
-              s(:send, target, :[]=,
-              s(:lvar, :$_), s(:send, modname, :[], s(:lvar, :$_))))
+              if modname.type == :hash
+                s(:begin, *modname.children.map {|pair|
+                    s(:send, target, :[]=, *pair.children)
+                  })
+              else
+                s(:for, s(:lvasgn, :$_), modname,
+                s(:send, target, :[]=,
+                s(:lvar, :$_), s(:send, modname, :[], s(:lvar, :$_))))
+              end
               }, s(:return, target))), :[])
           end
 

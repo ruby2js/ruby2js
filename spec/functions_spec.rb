@@ -307,8 +307,27 @@ describe Ruby2JS::Filter::Functions do
         must_equal 'for (var k in h) {x += k}'
     end
 
+    it "should handle merge" do
+      to_js( 'a.merge(b)' ).
+        must_equal  "(function() {var $$ = {}; " +
+          "for (var $_ in a) {$$[$_] = a[$_]}; " +
+          "for (var $_ in b) {$$[$_] = b[$_]}; return $$})()"
+    end
+
+    it "should handle merge with a constant hash" do
+      to_js( 'a.merge(b: 1)' ).
+        must_equal  "(function() {var $$ = {}; " +
+          "for (var $_ in a) {$$[$_] = a[$_]}; " +
+          "$$.b = 1; return $$})()"
+    end
+
     it "should handle merge!" do
       to_js( 'a.merge!(b)' ).
+        must_equal "(function() {for (var $_ in b) {a[$_] = b[$_]}; return a})()"
+    end
+
+    it "should handle merge! with a constant hash" do
+      to_js( 'a.merge!(b: 1)' ).
         must_equal "(function() {for (var $_ in b) {a[$_] = b[$_]}; return a})()"
     end
 
