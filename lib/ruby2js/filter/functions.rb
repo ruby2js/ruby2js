@@ -568,10 +568,22 @@ module Ruby2JS
             s(:block, s(:send, nil, :lambda), *node.children[1..2]),
             *call.children[2..-1]])
 
-        elsif es2017 and method == :each_pair
-          process node.updated(nil, [s(:send, s(:send, s(:const, nil, :Object),
-            :entries, call.children[0]), :forEach), s(:args, s(:mlhs,
-            *node.children[1].children)), node.children[2]])
+        elsif method == :each_pair and node.children[1].children.length == 2
+          if es2017
+            # Object.entries(a).forEach(([key, value]) => {})
+            process node.updated(nil, [s(:send, s(:send,
+            s(:const, nil, :Object), :entries, call.children[0]), :forEach),
+            s(:args, s(:mlhs, *node.children[1].children)), node.children[2]])
+          else
+            # Object.keys(a).forEach(function(key) {var value = a[key]; ...})
+            process node.updated(nil, [s(:send, s(:send, 
+              s(:const, nil, :Object), :keys, call.children[0]),
+              :each), s(:args, node.children[1].children[0]), 
+              s(:begin, s(:lvasgn, node.children[1].children[1].children[0],
+              s(:send, call.children[0], :[], 
+              s(:lvar, node.children[1].children[0].children[0]))),
+              node.children[2])])
+          end
 
         else
           super
