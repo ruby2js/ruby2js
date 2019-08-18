@@ -292,9 +292,10 @@ describe Ruby2JS::Filter::Functions do
   end
 
   describe 'hash functions' do
-    it "should map each_value to forEach" do
+    it "should map each_value to Object.keys().forEach, extracting values" do
       to_js( 'h.each_value {|i| a += i}').
-        must_equal 'h.forEach(function(i) {a += i})'
+        must_equal 'Object.keys(h).forEach(function($_key) {' + 
+          'var i = h[$_key]; a += i})'
     end
 
     it "should handle keys" do
