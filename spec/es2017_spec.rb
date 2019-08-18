@@ -25,7 +25,7 @@ describe "ES2017 support" do
   describe :Hash do
     it "should convert hash.each_pair" do
       to_js_fn( 'h.each_pair {|k,v| x+=v}' ).
-        must_equal 'Object.entries(h).forEach(([k, v]) => {x += v})'
+        must_equal 'for (let [k, v] of Object.entries(h)) {x += v}'
     end
 
     it "should convert hash.entries()" do

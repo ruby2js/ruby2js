@@ -76,6 +76,11 @@ describe "ES2015 support" do
         must_equal 'for (let v of a) {x += v}'
     end
 
+    it "should convert array.each multiple to a for...of" do
+      to_js_fn( 'a.each {|(v,w)| x+=v}' ).
+        must_equal 'for (let [v, w] of a) {x += v}'
+    end
+
     it "should handle conditional returns in an each block" do
       to_js_fn( 'a.each {|i| return i if true}' ).
         must_equal 'for (let i of a) {if (true) return i}'

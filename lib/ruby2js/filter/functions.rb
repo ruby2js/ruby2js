@@ -534,13 +534,24 @@ module Ruby2JS
             call.children[0].children[0], node.children[2])
 
         elsif
-          [:each, :each_value].include? method and
-          node.children[1].children.length == 1
+          [:each, :each_value].include? method
         then
           if es2015
-            process node.updated(:for_of,
-              [s(:lvasgn, node.children[1].children[0].children[0]),
-              node.children[0].children[0], node.children[2]])
+            if node.children[1].children.length > 1
+              process node.updated(:for_of,
+                [s(:mlhs, *node.children[1].children.map {|child|
+                  s(:lvasgn, child.children[0])}),
+                node.children[0].children[0], node.children[2]])
+            elsif node.children[1].children[0].type == :mlhs
+              process node.updated(:for_of,
+                [s(:mlhs, *node.children[1].children[0].children.map {|child|
+                  s(:lvasgn, child.children[0])}),
+                node.children[0].children[0], node.children[2]])
+            else
+              process node.updated(:for_of,
+                [s(:lvasgn, node.children[1].children[0].children[0]),
+                node.children[0].children[0], node.children[2]])
+            end
           elsif method == :each
             process node.updated(nil, [s(:send, call.children[0],
               :forEach), *node.children[1..2]])
@@ -572,8 +583,8 @@ module Ruby2JS
           if es2017
             # Object.entries(a).forEach(([key, value]) => {})
             process node.updated(nil, [s(:send, s(:send,
-            s(:const, nil, :Object), :entries, call.children[0]), :forEach),
-            s(:args, s(:mlhs, *node.children[1].children)), node.children[2]])
+            s(:const, nil, :Object), :entries, call.children[0]), :each),
+            node.children[1], node.children[2]])
           else
             # Object.keys(a).forEach(function(key) {var value = a[key]; ...})
             process node.updated(nil, [s(:send, s(:send, 
