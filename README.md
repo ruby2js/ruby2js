@@ -220,9 +220,9 @@ the script.
     * `.clear` becomes `.length = 0`
     * `.delete` becomes `delete target[arg]`
     * `.downcase` becomes `.toLowerCase`
-    * `.each` becomes `for (i in ...) {}`
+    * `.each` becomes `.forEach`
     * `.each_key` becomes `for (i in ...) {}`
-    * `.each_value` becomes `for (i in ...) {}`
+    * `.each_value` becomes `.forEach`
     * `.each_with_index` becomes `.forEach`
     * `.end_with?` becomes `.slice(-arg.length) == arg`
     * `.empty?` becomes `.length == 0`

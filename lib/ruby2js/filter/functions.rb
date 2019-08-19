@@ -552,17 +552,9 @@ module Ruby2JS
                 [s(:lvasgn, node.children[1].children[0].children[0]),
                 node.children[0].children[0], node.children[2]])
             end
-          elsif method == :each
+          else
             process node.updated(nil, [s(:send, call.children[0],
               :forEach), *node.children[1..2]])
-          else
-            # Object.keys(a).forEach(function($_key) {var x = a[$_key]; ...})
-            process node.updated(nil, [s(:send, s(:send, 
-              s(:const, nil, :Object), :keys, call.children[0]),
-              :forEach), s(:args, s(:arg, :$_key)), 
-              s(:begin, s(:lvasgn, node.children[1].children[0].children[0],
-              s(:send, call.children[0], :[], s(:lvar, :$_key))),
-              node.children[2])])
           end
 
         elsif
