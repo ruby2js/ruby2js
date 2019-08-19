@@ -221,7 +221,7 @@ the script.
     * `.delete` becomes `delete target[arg]`
     * `.downcase` becomes `.toLowerCase`
     * `.each` becomes `for (i in ...) {}`
-    * `.each_key` becomes `Object.keys().forEach`
+    * `.each_key` becomes `for (i in ...) {}`
     * `.each_value` becomes `for (i in ...) {}`
     * `.each_with_index` becomes `.forEach`
     * `.end_with?` becomes `.slice(-arg.length) == arg`
@@ -536,7 +536,7 @@ conversions are made:
 * `def f(a, (foo, *bar))` becomes `function f(a, [foo, ...bar])`
 * `def a(b=1)` becomes `function a(b=1)`
 * `def a(*b)` becomes `function a(...b)`
-* `.each_key` becomes `for (i of ...) {}`
+* `.each_value` becomes `for (i of ...) {}`
 * `a(*b)` becomes `a(...b)`
 * `"#{a}"` becomes <code>\`${a}\`</code>
 * `lambda {|x| x}` becomes `(x) => {return x}`
