@@ -578,10 +578,9 @@ module Ruby2JS
             s(:const, nil, :Object), :entries, call.children[0]), :each),
             node.children[1], node.children[2]])
           else
-            # Object.keys(a).forEach(function(key) {var value = a[key]; ...})
-            process node.updated(nil, [s(:send, s(:send, 
-              s(:const, nil, :Object), :keys, call.children[0]),
-              :each), s(:args, node.children[1].children[0]), 
+            # for (key in a). {var value = a[key]; ...}
+            process node.updated(:for, [s(:lvasgn,
+              node.children[1].children[0].children[0]), call.children[0],
               s(:begin, s(:lvasgn, node.children[1].children[1].children[0],
               s(:send, call.children[0], :[], 
               s(:lvar, node.children[1].children[0].children[0]))),

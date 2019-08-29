@@ -222,6 +222,7 @@ the script.
     * `.downcase` becomes `.toLowerCase`
     * `.each` becomes `.forEach`
     * `.each_key` becomes `for (i in ...) {}`
+    * `.each_pair` becomes `for (var key in item) {var value = item[key]; ...}`
     * `.each_value` becomes `.forEach`
     * `.each_with_index` becomes `.forEach`
     * `.end_with?` becomes `.slice(-arg.length) == arg`
@@ -574,7 +575,7 @@ ES2017 support
 When option `eslevel: 2017` is provided, the following additional
 conversion is made by the `functions` filter:
 
-* `.each_entry` becomes `Object.entries().forEach`
+* `.each_pair` becomes `for (let [key, value] of Object.entries()) {}'
 
 ES2018 support
 ---
@@ -590,7 +591,7 @@ optional keyword arguments.
 ES2019 support
 ---
 
-When option `eslevel: 2018` is provided, the following additional
+When option `eslevel: 2019` is provided, the following additional
 conversion is made by the `functions` filter:
 
 * `.flatten` becomes `.flat(Infinity)`
@@ -604,7 +605,7 @@ variable.
 ES2020 support
 ---
 
-When option `eslevel: 2018` is provided, the following additional
+When option `eslevel: 2020` is provided, the following additional
 conversion is made:
 
 * `@x` becomes `this.#x`
