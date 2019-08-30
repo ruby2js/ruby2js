@@ -38,4 +38,17 @@ describe "ES2020 support" do
         must_equal 'class C {static D = 1}'
     end
   end
+
+
+  unless (RUBY_VERSION.split('.').map(&:to_i) <=> [2, 3, 0]) == -1
+    describe :OptionalChaining do
+      it "should support conditional attribute references" do
+        to_js('x=a&.b').must_equal 'let x = a?.b'
+      end
+
+      it "should chain conditional attribute references" do
+        to_js('x=a&.b&.c').must_equal 'let x = a?.b?.c'
+      end
+    end
+  end
 end

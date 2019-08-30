@@ -299,27 +299,40 @@ module Ruby2JS
     end
 
     handle :csend do |receiver, method, *args|
-      node = @ast
+      if es2020
 
-      # collect up chain of conditional sends
-      stack = []
-      while node.children.first.type == :csend
-        stack << node
-        node = node.children.first
+        # optional chaining
+        parse receiver
+        put "?."
+        put method.to_s
+        put '(' if @ast.is_method?
+        args.each {|arg| parse arg}
+        put ')' if @ast.is_method?
+
+      else
+
+        node = @ast
+
+        # collect up chain of conditional sends
+        stack = []
+        while node.children.first.type == :csend
+          stack << node
+          node = node.children.first
+        end
+
+        # conditionally evaluate most nested expression
+        expr = node.updated(:send)
+        result = s(:and, node.children.first, expr)
+
+        # build up chain of conditional evaluations
+        until stack.empty?
+          node = stack.pop
+          expr = node.updated(:send, [expr, *node.children[1..-1]])
+          result = s(:and, result, expr)
+        end
+
+        parse result
       end
-
-      # conditionally evaluate most nested expression
-      expr = node.updated(:send)
-      result = s(:and, node.children.first, expr)
-
-      # build up chain of conditional evaluations
-      until stack.empty?
-        node = stack.pop
-        expr = node.updated(:send, [expr, *node.children[1..-1]])
-        result = s(:and, result, expr)
-      end
-
-      parse result
     end
 
     handle :splat do |expr|

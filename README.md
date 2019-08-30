@@ -610,6 +610,7 @@ conversion is made:
 
 * `@x` becomes `this.#x`
 * `@@x` becomes `ClassName.#x`
+* `a&.b` becomes `a?.b`
 
 Picking a Ruby to JS mapping tool
 ---
