@@ -49,6 +49,9 @@ describe "ES2020 support" do
       to_js_fn( 'str.scan(/\d/)' ).must_equal 'str.match(/\d/g)'
       to_js_fn( 'str.scan(/(\d)(\d)/)' ).
         must_equal 'Array.from(str.matchAll(/(\\d)(\\d)/g), s => s.slice(1))'
+      to_js_fn( 'str.scan(pattern)' ).
+        must_equal 'Array.from(str.matchAll(new RegExp(pattern, "g")), ' +
+          's => s.slice(1))'
     end
   end
 
