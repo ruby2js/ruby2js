@@ -606,11 +606,12 @@ ES2020 support
 ---
 
 When option `eslevel: 2020` is provided, the following additional
-conversion is made:
+conversions are made:
 
 * `@x` becomes `this.#x`
 * `@@x` becomes `ClassName.#x`
 * `a&.b` becomes `a?.b`
+* `.scan` becomes `Array.from(str.matchAll(/.../g), s => s.slice(1))`
 
 Picking a Ruby to JS mapping tool
 ---

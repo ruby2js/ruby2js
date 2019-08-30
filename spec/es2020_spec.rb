@@ -7,6 +7,11 @@ describe "ES2020 support" do
     Ruby2JS.convert(string, eslevel: 2020, filters: []).to_s
   end
   
+  def to_js_fn(string)
+    Ruby2JS.convert(string, eslevel: 2020,
+      filters: [Ruby2JS::Filter::Functions]).to_s
+  end
+
   describe :InstanceFields do
     it "should convert private fields to instance #vars" do
       to_js( 'class C; def initialize; @a=1; end; def a; @a; end; end' ).
@@ -39,6 +44,13 @@ describe "ES2020 support" do
     end
   end
 
+  describe :matchAll do
+    it 'should handle scan' do
+      to_js_fn( 'str.scan(/\d/)' ).must_equal 'str.match(/\d/g)'
+      to_js_fn( 'str.scan(/(\d)(\d)/)' ).
+        must_equal 'Array.from(str.matchAll(/(\\d)(\\d)/g), s => s.slice(1))'
+    end
+  end
 
   unless (RUBY_VERSION.split('.').map(&:to_i) <=> [2, 3, 0]) == -1
     describe :OptionalChaining do

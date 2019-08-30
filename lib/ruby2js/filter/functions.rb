@@ -146,23 +146,31 @@ module Ruby2JS
               [s(:str, Regexp.escape(arg.children.first)), s(:regopt)])
           end
 
+          return super unless arg.type == :regexp
+
           pattern = arg.children.first.children.first
           pattern = pattern.gsub(/\\./, '').gsub(/\[.*\]/, '')
 
-          if arg.type == :regexp
-            gpattern = arg.updated(:regexp, [*arg.children[0...-1],
-              s(:regopt, :g, *arg.children.last)])
-          else
-            super
-          end
+          gpattern = arg.updated(:regexp, [*arg.children[0...-1],
+            s(:regopt, :g, *arg.children.last)])
 
           if pattern.include? '('
-            s(:block, s(:send,
-              s(:send, process(target), :match, gpattern), :map),
-              s(:args, s(:arg, :s)),
-              s(:return, s(:send, s(:send, s(:lvar, :s), :match, arg),
-              :slice, s(:int, 1))))
+            if es2020
+              # Array.from(str.matchAll(/.../g), s => s.slice(1))
+              s(:send, s(:const, nil, :Array), :from,
+                s(:send, process(target), :matchAll, gpattern),
+                s(:block, s(:send, nil, :proc), s(:args, s(:arg, :s)),
+                  s(:send, s(:lvar, :s), :slice, s(:int, 1))))
+            else
+              # str.match(/.../g).map(s => s.match(/.../).slice(1))
+              s(:block, s(:send,
+                s(:send, process(target), :match, gpattern), :map),
+                s(:args, s(:arg, :s)),
+                s(:return, s(:send, s(:send, s(:lvar, :s), :match, arg),
+                :slice, s(:int, 1))))
+            end
           else
+            # str.match(/.../g)
             S(:send, process(target), :match, gpattern)
           end
 
