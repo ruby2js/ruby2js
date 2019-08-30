@@ -530,7 +530,7 @@ module Ruby2JS
           [:irange, :erange].include? call.children[0].children[0].type and
           node.children[1].children.length == 1
         then
-          s(:for, s(:lvasgn, node.children[1].children[0].children[0]),
+          process s(:for, s(:lvasgn, node.children[1].children[0].children[0]),
             call.children[0].children[0], node.children[2])
 
         elsif
