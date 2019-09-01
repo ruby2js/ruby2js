@@ -169,9 +169,12 @@ module Ruby2JS
       comments = Parser::Source::Comment.associate(ast, comments) if ast
     end
 
-    filters = options[:filters] || Filter::DEFAULTS
+    filters = (options[:filters] || Filter::DEFAULTS)
 
     unless filters.empty?
+      filters.dup.each do |filter|
+        filters = filter.reorder(filters) if filter.respond_to? :reorder
+      end
 
       filter = Filter::Processor
       filters.reverse.each do |mod|

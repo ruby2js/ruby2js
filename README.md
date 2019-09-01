@@ -516,6 +516,16 @@ the script.
     * maps `export default async proc` to `module.exports = async`
     * maps `export default` to `module.exports =`
 
+* <a id="matchAll" href="https://github.com/rubys/ruby2js/blob/master/spec/matchAll">matchAll</a>
+
+    For ES level < 2020:
+
+    * maps `str.matchAll(pattern).forEach {}` to 
+      `while (match = pattern.exec(str)) {}`
+
+    Note pattern must be a simple variable with a value of a regular
+    expression with the 'g' flag set at runtime.
+
 [Wunderbar](https://github.com/rubys/wunderbar) includes additional demos:
 
 * [chat](https://github.com/rubys/wunderbar/blob/master/demo/chat.rb),
