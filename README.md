@@ -523,8 +523,8 @@ the script.
     * maps `str.matchAll(pattern).forEach {}` to 
       `while (match = pattern.exec(str)) {}`
 
-    Note pattern must be a simple variable with a value of a regular
-    expression with the 'g' flag set at runtime.
+    Note `pattern` must be a simple variable with a value of a regular
+    expression with the `g` flag set at runtime.
 
 [Wunderbar](https://github.com/rubys/wunderbar) includes additional demos:
 
