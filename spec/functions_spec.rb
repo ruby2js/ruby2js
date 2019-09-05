@@ -145,9 +145,11 @@ describe Ruby2JS::Filter::Functions do
       to_js( 'x.end_with?("z")' ).must_equal 'x.slice(-1) == "z"'
     end
 
-    it 'should handle strip' do
+    it 'should handle strip/lstrip/rstrip' do
       to_js( 'x.strip()' ).must_equal 'x.trim()'
       to_js( 'x.strip' ).must_equal 'x.trim()'
+      to_js( 'a.lstrip()' ).must_equal 'a.replace(/^\s+/, "")'
+      to_js( 'a.rstrip()' ).must_equal 'a.replace(/\s+$/, "")'
     end
 
     it 'should handle string multiply' do

@@ -963,6 +963,12 @@ describe Ruby2JS do
       to_js( "/^./m" ).must_equal '/^./m'
       to_js( "Regexp.new('^$', 'm')" ).must_equal '/^$/m'
     end
+
+    it "should treat \A and \z as singleline" do
+      to_js( '/\A./' ).must_equal '/^./'
+      to_js( '/.\z/' ).must_equal '/.$/'
+      to_js( "Regexp.new(#{'\A\z'.inspect})" ).must_equal '/^$/'
+    end
   end
 
   describe "exceptions" do

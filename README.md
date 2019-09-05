@@ -236,6 +236,7 @@ the script.
     * `.keys` becomes `Object.keys()`
     * `.last` becomes `[*.length-1]`
     * `.last(n)` becomes `.slice(*.length-1, *.length)`
+    * `.lstrip` becomes `.replace(/^\s+/, "")`
     * `.max` becomes `Math.max.apply(Math)`
     * `.merge` becomes `Object.assign({}, ...)`
     * `.merge!` becomes `Object.assign()`
@@ -245,6 +246,7 @@ the script.
     * `puts` becomes `console.log`
     * `.replace` becomes `.length = 0; ...push.apply(*)`
     * `.respond_to?` becomes `right in left`
+    * `.rstrip` becomes `.replace(/s+$/, "")`
     * `.scan` becomes `.match(//g)`
     * `.start_with?` becomes `.substring(0, arg.length) == arg`
     * `.upto(lim)` becomes `for (var i=num; i<=lim; i+=1)`

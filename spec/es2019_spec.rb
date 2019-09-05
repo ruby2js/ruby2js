@@ -33,11 +33,11 @@ describe "ES2019 support" do
 
   describe :String do
     it "should handle lstrip" do
-      to_js_fn( 'a.lstrip()' ).must_equal 'a.trimEnd()'
+      to_js_fn( 'a.lstrip()' ).must_equal 'a.trimStart()'
     end
 
     it "should handle rstrip" do
-      to_js_fn( 'a.rstrip()' ).must_equal 'a.trimStart()'
+      to_js_fn( 'a.rstrip()' ).must_equal 'a.trimEnd()'
     end
   end
 end

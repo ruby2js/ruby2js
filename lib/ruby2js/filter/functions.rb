@@ -417,11 +417,21 @@ module Ruby2JS
           process node.updated(nil, [s(:const, nil, :Object), :fromEntries,
             target])
 
-        elsif es2019 and method==:rstrip
-          process node.updated(nil, [target, :trimStart, *args])
+        elsif method==:rstrip
+          if es2019
+            process node.updated(nil, [target, :trimEnd, *args])
+          else
+            node.updated(nil, [process(target), :replace,
+              s(:regexp, s(:str, '\s+\z') , s(:regopt)), s(:str, '')])
+          end
 
-        elsif es2019 and method==:lstrip
-          process node.updated(nil, [target, :trimEnd, *args])
+        elsif method==:lstrip and args.length == 0
+          if es2019
+            process s(:send, target, :trimStart)
+          else
+            node.updated(nil, [process(target), :replace,
+              s(:regexp, s(:str, '\A\s+') , s(:regopt)), s(:str, '')])
+          end
 
         elsif method == :class and args.length==0 and not node.is_method?
           process node.updated(:attr, [target, :constructor])
