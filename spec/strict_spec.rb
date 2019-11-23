@@ -4,7 +4,7 @@ require 'minitest/autorun'
 describe 'use strict' do
   
   def to_js( string)
-    Ruby2JS.convert(string, strict: true, filters: []).to_s
+    _(Ruby2JS.convert(string, strict: true, filters: []).to_s)
   end
   
   describe :strict do

@@ -5,7 +5,7 @@ require 'ruby2js/filter/camelCase'
 describe Ruby2JS::Filter::CamelCase do
   
   def to_js( string)
-    Ruby2JS.convert(string, filters: [Ruby2JS::Filter::CamelCase]).to_s
+    _(Ruby2JS.convert(string, filters: [Ruby2JS::Filter::CamelCase]).to_s)
   end
   
   describe :camelCase do
@@ -44,7 +44,7 @@ describe Ruby2JS::Filter::CamelCase do
 
   describe Ruby2JS::Filter::DEFAULTS do
     it "should include CamelCase" do
-      Ruby2JS::Filter::DEFAULTS.must_include Ruby2JS::Filter::CamelCase
+      _(Ruby2JS::Filter::DEFAULTS).must_include Ruby2JS::Filter::CamelCase
     end
   end
 end

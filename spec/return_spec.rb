@@ -5,7 +5,7 @@ require 'ruby2js/filter/return'
 describe Ruby2JS::Filter::Return do
   
   def to_js( string)
-    Ruby2JS.convert(string, filters: [Ruby2JS::Filter::Return]).to_s
+    _(Ruby2JS.convert(string, filters: [Ruby2JS::Filter::Return]).to_s)
   end
   
   describe :lambda do
@@ -86,7 +86,7 @@ describe Ruby2JS::Filter::Return do
 
   describe Ruby2JS::Filter::DEFAULTS do
     it "should include Return" do
-      Ruby2JS::Filter::DEFAULTS.must_include Ruby2JS::Filter::Return
+      _(Ruby2JS::Filter::DEFAULTS).must_include Ruby2JS::Filter::Return
     end
   end
 end

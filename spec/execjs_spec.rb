@@ -13,16 +13,16 @@ describe 'Ruby2JS::ExecJS' do
 
   it "should handle compile" do
     skip if @skip
-    Ruby2JS.compile('i=1').eval('i+1').must_equal 2
+    _(Ruby2JS.compile('i=1').eval('i+1')).must_equal 2
   end
 
   it "should handle eval" do
     skip if @skip
-    Ruby2JS.eval('"abc" =~ /b/', filters: []).must_equal true
+    _(Ruby2JS.eval('"abc" =~ /b/', filters: [])).must_equal true
   end
 
   it "should handle exec" do
     skip if @skip
-    Ruby2JS.exec('x=%w(a b); x << "c"; return x.pop()').must_equal 'c'
+    _(Ruby2JS.exec('x=%w(a b); x << "c"; return x.pop()')).must_equal 'c'
   end
 end

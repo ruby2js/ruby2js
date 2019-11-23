@@ -6,7 +6,8 @@ describe 'not implemented' do
   # see https://github.com/whitequark/parser/blob/master/doc/AST_FORMAT.md
 
   def todo(string)
-    proc { Ruby2JS.convert(string, filters: []) }.must_raise NotImplementedError
+    _(proc { Ruby2JS.convert(string, filters: []) }).
+      must_raise NotImplementedError
   end
 
   it "range inclusive" do

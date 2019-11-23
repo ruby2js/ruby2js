@@ -5,7 +5,7 @@ require 'ruby2js/filter/jquery'
 describe Ruby2JS::Filter::JQuery do
   
   def to_js(string)
-    Ruby2JS.convert(string, filters: [Ruby2JS::Filter::JQuery]).to_s
+    _(Ruby2JS.convert(string, filters: [Ruby2JS::Filter::JQuery]).to_s)
   end
   
   describe :gvars do
@@ -69,7 +69,7 @@ describe Ruby2JS::Filter::JQuery do
 
   describe Ruby2JS::Filter::DEFAULTS do
     it "should include JQuery" do
-      Ruby2JS::Filter::DEFAULTS.must_include Ruby2JS::Filter::JQuery
+      _(Ruby2JS::Filter::DEFAULTS).must_include Ruby2JS::Filter::JQuery
     end
   end
 end

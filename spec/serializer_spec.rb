@@ -15,54 +15,54 @@ describe 'serializer tests' do
   describe 'put' do
     it 'should put a token' do
       @serializer.put 'hi'
-      @serializer.lines.must_equal [['hi']]
+      _(@serializer.lines).must_equal [['hi']]
     end
 
     it 'should put a token with a newline' do
       @serializer.put "hi\n"
-      @serializer.lines.must_equal [['hi'], []]
+      _(@serializer.lines).must_equal [['hi'], []]
     end
 
     it 'should handle multiple newlines' do
       @serializer.put "\nhi\n"
-      @serializer.lines.must_equal [[''], ['hi'], []]
+      _(@serializer.lines).must_equal [[''], ['hi'], []]
     end
   end
 
   describe 'puts' do
     it 'should puts a token' do
       @serializer.puts 'hi'
-      @serializer.lines.must_equal [['hi'], []]
+      _(@serializer.lines).must_equal [['hi'], []]
     end
 
     it 'should embedded multiple newlines' do
       @serializer.puts "\nhi"
-      @serializer.lines.must_equal [[''], ['hi'], []]
+      _(@serializer.lines).must_equal [[''], ['hi'], []]
     end
   end
 
   describe 'sput' do
     it 'should sput a token' do
       @serializer.sput 'hi'
-      @serializer.lines.must_equal [[], ['hi']]
+      _(@serializer.lines).must_equal [[], ['hi']]
     end
 
     it 'should embedded multiple newlines' do
       @serializer.sput "hi\n"
-      @serializer.lines.must_equal [[], ['hi'], []]
+      _(@serializer.lines).must_equal [[], ['hi'], []]
     end
   end
 
   describe 'output location' do
     it 'should track output location' do
-      @serializer.output_location.must_equal [0,0]
+      _(@serializer.output_location).must_equal [0,0]
       @serializer.put 'a'
       @serializer.put 'b'
-      @serializer.output_location.must_equal [0,2]
+      _(@serializer.output_location).must_equal [0,2]
       @serializer.puts 'c'
       @serializer.put 'd'
       @serializer.put 'e'
-      @serializer.output_location.must_equal [1,2]
+      _(@serializer.output_location).must_equal [1,2]
     end
   end
 
@@ -76,8 +76,8 @@ describe 'serializer tests' do
         @serializer.put 'e'
       end
       
-      @serializer.lines.must_equal [['a']]
-      text.must_equal "bc\nde"
+      _(@serializer.lines).must_equal [['a']]
+      _(text).must_equal "bc\nde"
     end
   end
 
@@ -87,7 +87,7 @@ describe 'serializer tests' do
       @serializer.wrap do
         @serializer.put 'statement'
       end
-      @serializer.lines.must_equal [['if (condition) ', 'statement']]
+      _(@serializer.lines).must_equal [['if (condition) ', 'statement']]
     end
 
     it "should wrap long lines" do
@@ -95,7 +95,7 @@ describe 'serializer tests' do
       @serializer.wrap do
         @serializer.put 'statement-statement-statement-statement-statement'
       end
-      @serializer.lines.must_equal [
+      _(@serializer.lines).must_equal [
         ["if (condition-condition-condition-condition-condition) ", "{"],
         ["statement-statement-statement-statement-statement"],
         ["}"]
@@ -110,7 +110,7 @@ describe 'serializer tests' do
         @serializer.put 'token'
         @serializer.sput ']'
       end
-      @serializer.lines.must_equal [["[", "token", "]"]]
+      _(@serializer.lines).must_equal [["[", "token", "]"]]
     end
 
     it "shouldn't compact long lines" do
@@ -120,7 +120,7 @@ describe 'serializer tests' do
         @serializer.put 'token'
         @serializer.sput ']'
       end
-      @serializer.lines.must_equal [["["], ["token, "]*29 + ["token"], ["]"]]
+      _(@serializer.lines).must_equal [["["], ["token, "]*29 + ["token"], ["]"]]
     end
 
     it "shouldn't compact comments" do
@@ -129,7 +129,7 @@ describe 'serializer tests' do
         @serializer.put '// comment'
         @serializer.sput ']'
       end
-      @serializer.lines.must_equal [["["], ["// comment"], ["]"]]
+      _(@serializer.lines).must_equal [["["], ["// comment"], ["]"]]
     end
   end
 
@@ -143,7 +143,7 @@ describe 'serializer tests' do
       @serializer.put 'd'
       @serializer.put 'e'
       
-      @serializer.to_s.must_equal "abc\nde"
+      _(@serializer.to_s).must_equal "abc\nde"
     end
   end
 end

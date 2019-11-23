@@ -5,7 +5,8 @@ require 'ruby2js/filter/react'
 describe Ruby2JS::Filter::React do
   
   def to_js(string)
-    Ruby2JS.convert(string, filters: [Ruby2JS::Filter::React], scope: self).to_s
+    _(Ruby2JS.convert(string, filters: [Ruby2JS::Filter::React],
+      scope: self).to_s)
   end
   
   describe :createClass do
@@ -400,9 +401,9 @@ describe Ruby2JS::Filter::React do
     end
 
     it "should not support assigning to class variables" do
-      proc { 
+      _(proc { 
         to_js( 'class Foo<React; def method; @@x=1; end; end' )
-      }.must_raise NotImplementedError
+      }).must_raise NotImplementedError
     end
   end
 
@@ -493,7 +494,7 @@ describe Ruby2JS::Filter::React do
 
   describe Ruby2JS::Filter::DEFAULTS do
     it "should include React" do
-      Ruby2JS::Filter::DEFAULTS.must_include Ruby2JS::Filter::React
+      _(Ruby2JS::Filter::DEFAULTS).must_include Ruby2JS::Filter::React
     end
   end
 end

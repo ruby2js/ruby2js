@@ -6,22 +6,22 @@ require 'ruby2js/filter/functions'
 describe "matchAll support" do
   
   def to_js(string)
-    Ruby2JS.convert(string, filters: [Ruby2JS::Filter::MatchAll]).to_s
+    _(Ruby2JS.convert(string, filters: [Ruby2JS::Filter::MatchAll]).to_s)
   end
   
   def to_js_fn1(string)
-    Ruby2JS.convert(string, 
-      filters: [Ruby2JS::Filter::Functions, Ruby2JS::Filter::MatchAll]).to_s
+    _(Ruby2JS.convert(string, 
+      filters: [Ruby2JS::Filter::Functions, Ruby2JS::Filter::MatchAll]).to_s)
   end
   
   def to_js_2020(string)
-    Ruby2JS.convert(string, eslevel: 2020,
-      filters: [Ruby2JS::Filter::MatchAll]).to_s
+    _(Ruby2JS.convert(string, eslevel: 2020,
+      filters: [Ruby2JS::Filter::MatchAll]).to_s)
   end
 
   def to_js_fn2(string)
-    Ruby2JS.convert(string, 
-      filters: [Ruby2JS::Filter::MatchAll, Ruby2JS::Filter::Functions]).to_s
+    _(Ruby2JS.convert(string, 
+      filters: [Ruby2JS::Filter::MatchAll, Ruby2JS::Filter::Functions]).to_s)
   end
   
   describe "without filter functions" do
@@ -54,7 +54,7 @@ describe "matchAll support" do
 
   describe Ruby2JS::Filter::DEFAULTS do
     it "should include MatchAll" do
-      Ruby2JS::Filter::DEFAULTS.must_include Ruby2JS::Filter::MatchAll
+      _(Ruby2JS::Filter::DEFAULTS).must_include Ruby2JS::Filter::MatchAll
     end
   end
 end

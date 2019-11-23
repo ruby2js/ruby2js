@@ -5,7 +5,7 @@ require 'ruby2js/filter/functions'
 describe Ruby2JS::Filter::Functions do
 
   def to_js(string)
-    Ruby2JS.convert(string, filters: [Ruby2JS::Filter::Functions]).to_s
+    _(Ruby2JS.convert(string, filters: [Ruby2JS::Filter::Functions]).to_s)
   end
 
   describe 'conversions' do
@@ -482,7 +482,7 @@ describe Ruby2JS::Filter::Functions do
 
   describe Ruby2JS::Filter::DEFAULTS do
     it "should include Functions" do
-      Ruby2JS::Filter::DEFAULTS.must_include Ruby2JS::Filter::Functions
+      _(Ruby2JS::Filter::DEFAULTS).must_include Ruby2JS::Filter::Functions
     end
   end
 end

@@ -5,7 +5,8 @@ require 'ruby2js/filter/minitest-jasmine'
 describe Ruby2JS::Filter::MiniTestJasmine do
   
   def to_js( string, opts={} )
-    Ruby2JS.convert(string, filters: [Ruby2JS::Filter::MiniTestJasmine]).to_s
+    _(Ruby2JS.convert(string,
+      filters: [Ruby2JS::Filter::MiniTestJasmine]).to_s)
   end
   
   describe 'assertions' do

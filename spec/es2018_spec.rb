@@ -4,12 +4,12 @@ require 'minitest/autorun'
 describe "ES2018 support" do
   
   def to_js(string)
-    Ruby2JS.convert(string, eslevel: 2018, filters: []).to_s
+    _(Ruby2JS.convert(string, eslevel: 2018, filters: []).to_s)
   end
   
   def to_js_fn(string)
-    Ruby2JS.convert(string, eslevel: 2018,
-      filters: [Ruby2JS::Filter::Functions]).to_s
+    _(Ruby2JS.convert(string, eslevel: 2018,
+      filters: [Ruby2JS::Filter::Functions]).to_s)
   end
   
   describe :Hash_Spread do

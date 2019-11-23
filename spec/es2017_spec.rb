@@ -4,12 +4,12 @@ require 'minitest/autorun'
 describe "ES2017 support" do
   
   def to_js( string)
-    Ruby2JS.convert(string, eslevel: 2017, filters: []).to_s
+    _(Ruby2JS.convert(string, eslevel: 2017, filters: []).to_s)
   end
   
   def to_js_fn(string)
-    Ruby2JS.convert(string, eslevel: 2017,
-      filters: [Ruby2JS::Filter::Functions]).to_s
+    _(Ruby2JS.convert(string, eslevel: 2017,
+      filters: [Ruby2JS::Filter::Functions]).to_s)
   end
   
   describe :String do

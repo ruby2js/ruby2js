@@ -5,7 +5,7 @@ require 'ruby2js/filter/underscore'
 describe Ruby2JS::Filter::Underscore do
   
   def to_js( string)
-    Ruby2JS.convert(string, filters: [Ruby2JS::Filter::Underscore]).to_s
+    _(Ruby2JS.convert(string, filters: [Ruby2JS::Filter::Underscore]).to_s)
   end
 
   describe 'pass through direct calls to underscore' do
@@ -218,7 +218,7 @@ describe Ruby2JS::Filter::Underscore do
 
   describe Ruby2JS::Filter::DEFAULTS do
     it "should include Underscore" do
-      Ruby2JS::Filter::DEFAULTS.must_include Ruby2JS::Filter::Underscore
+      _(Ruby2JS::Filter::DEFAULTS).must_include Ruby2JS::Filter::Underscore
     end
   end
 end

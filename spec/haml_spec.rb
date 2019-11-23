@@ -12,7 +12,7 @@ describe 'HAML filter' do
     template.gsub!(/^#{template[/\A\s+/]}/, '')
 
     haml_engine = Haml::Engine.new(template)
-    output = haml_engine.render
+    output = _(haml_engine.render)
 
     output.must_include "<script type='text/javascript'>"
     output.must_include 'alert("Hello")'

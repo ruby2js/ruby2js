@@ -5,7 +5,7 @@ require 'ruby2js/filter/node'
 describe Ruby2JS::Filter::Functions do
   
   def to_js( string)
-    Ruby2JS.convert(string, filters: [Ruby2JS::Filter::Node]).to_s
+    _(Ruby2JS.convert(string, filters: [Ruby2JS::Filter::Node]).to_s)
   end
   
   describe 'globals' do
@@ -238,7 +238,7 @@ describe Ruby2JS::Filter::Functions do
 
   describe Ruby2JS::Filter::DEFAULTS do
     it "should include Node" do
-      Ruby2JS::Filter::DEFAULTS.must_include Ruby2JS::Filter::Node
+      _(Ruby2JS::Filter::DEFAULTS).must_include Ruby2JS::Filter::Node
     end
   end
 end
