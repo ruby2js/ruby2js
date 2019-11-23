@@ -304,8 +304,8 @@ describe "ES2015 support" do
     end
 
     it "should handles class getters and setters" do
-      to_js('class C; def self.a; end; def self.b; end; end').
-        must_equal 'class C {static get a() {}; static get b() {}}'
+      to_js('class C; def self.a; end; def self.b=(b); end; end').
+        must_equal 'class C {static get a() {}; static set b(b) {}}'
     end
 
     it "should parse class with inheritance" do
