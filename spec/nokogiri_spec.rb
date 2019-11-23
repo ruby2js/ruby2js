@@ -5,7 +5,7 @@ require 'ruby2js/filter/nokogiri'
 describe Ruby2JS::Filter::Nokogiri do
   
   def to_js( string)
-    Ruby2JS.convert(string, filters: [Ruby2JS::Filter::Nokogiri]).to_s
+    _(Ruby2JS.convert(string, filters: [Ruby2JS::Filter::Nokogiri]).to_s)
   end
   
   describe 'parse' do
@@ -208,7 +208,7 @@ describe Ruby2JS::Filter::Nokogiri do
 
   describe Ruby2JS::Filter::DEFAULTS do
     it "should include Nokogiri" do
-      Ruby2JS::Filter::DEFAULTS.must_include Ruby2JS::Filter::Nokogiri
+      _(Ruby2JS::Filter::DEFAULTS).must_include Ruby2JS::Filter::Nokogiri
     end
   end
 end
