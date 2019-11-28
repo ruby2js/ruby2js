@@ -1,3 +1,5 @@
+#!/usr/bin/env ruby
+#
 # Interactive demo of conversions from Ruby to JS.  Requires wunderbar.
 #
 # Installation
