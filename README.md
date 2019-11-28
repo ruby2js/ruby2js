@@ -233,7 +233,7 @@ the script.
     * `.gsub` becomes `replace(//g)`
     * `.include?` becomes `.indexOf() != -1`
     * `.inspect` becomes `JSON.stringify()`
-    * `.keys` becomes `Object.keys()`
+    * `.keys()` becomes `Object.keys()`
     * `.last` becomes `[*.length-1]`
     * `.last(n)` becomes `.slice(*.length-1, *.length)`
     * `.lstrip` becomes `.replace(/^\s+/, "")`
@@ -585,9 +585,11 @@ ES2017 support
 ---
 
 When option `eslevel: 2017` is provided, the following additional
-conversion is made by the `functions` filter:
+conversions are made by the `functions` filter:
 
-* `.each_pair` becomes `for (let [key, value] of Object.entries()) {}'
+* `.values()` becomes `Object.values()`
+* `.entries()` becomes `Object.entries()`
+* `.each_pair {}` becomes `for (let [key, value] of Object.entries()) {}'
 
 ES2018 support
 ---
