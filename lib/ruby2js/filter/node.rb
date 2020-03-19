@@ -324,7 +324,15 @@ module Ruby2JS
         children = node.children.dup
         command = children.shift
         while children.length > 0
-          command = s(:send, accumulator, :+, children.shift)
+          child = children.shift
+          if 
+            child.type == :begin and child.children.length == 1 and
+            child.children.first.type == :send and
+            child.children.first.children.first == nil
+          then
+            child = child.children.first
+          end
+          command = s(:send, command, :+, child)
         end
 
         s(:send, s(:attr, nil, :child_process), :execSync, command,

@@ -29,6 +29,9 @@ describe Ruby2JS::Filter::Functions do
       to_js('`echo hi`').
         must_equal 'var child_process = require("child_process"); ' +
           'child_process.execSync("echo hi", {encoding: "utf8"})'
+      to_js('`echo #{hi}`').
+        must_equal 'var child_process = require("child_process"); ' +
+          'child_process.execSync("echo " + hi, {encoding: "utf8"})'
     end
 
     it 'should handle system with single argument' do
