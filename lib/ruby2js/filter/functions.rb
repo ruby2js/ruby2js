@@ -607,6 +607,10 @@ module Ruby2JS
               node.children[2])])
           end
 
+        elsif method == :scan and call.children.length == 3
+          process call.updated(nil, [*call.children, s(:block,
+            s(:send, nil, :proc), *node.children[1..-1])])
+
         else
           super
         end
