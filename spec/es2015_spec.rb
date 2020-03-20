@@ -329,6 +329,11 @@ describe "ES2015 support" do
         must_equal 'class A {}; class B extends A {foo(x) {super.foo(3)}}'
     end
 
+    it "should handle class super" do
+      to_js('class A; end; class B < A; def self.foo(x); super; end; end').
+        must_equal 'class A {}; class B extends A {static foo(x) {A.foo(x)}}'
+    end
+
     it "should parse class with class variables" do
       to_js('class Person; @@count=0; end').
         must_equal 'class Person {}; Person._count = 0'

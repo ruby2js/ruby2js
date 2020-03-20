@@ -6,27 +6,33 @@ module Ruby2JS
     # (super ...)
 
     handle :super, :zsuper do |*args|
-      unless @instance_method and @class_parent
+      method = @instance_method || @class_method
+
+      unless method and @class_parent
         raise Error.new("super outside of a method", @ast)
       end
 
       # what to pass
       if @ast.type == :zsuper
-        if @instance_method.type == :method
-          args = @instance_method.children[2].children[1].children
-        elsif @instance_method.type == :prop
+        if method.type == :method
+          args = method.children[2].children[1].children
+        elsif method.type == :prop
           args = nil
         else
-          args = @instance_method.children[1].children
+          args = method.children[1].children
         end
       end
 
       if es2015
-        if @instance_method.children[0] == :constructor
+        if @class_method
+          parse @class_parent
+          put '.'
+          put method.children[0]
+        elsif method.children[0] == :constructor
           put 'super'
         else
           put 'super.'
-          put @instance_method.children[0]
+          put method.children[0]
         end
 
         put '('
@@ -36,8 +42,8 @@ module Ruby2JS
         parse @class_parent
 
         # what to call
-        if @instance_method.type != :constructor
-          puts  ".prototype.#{ @instance_method.children[1].to_s.chomp('=') }"
+        if method.type != :constructor
+          puts  ".prototype.#{ method.children[1].to_s.chomp('=') }"
         end
 
         if args

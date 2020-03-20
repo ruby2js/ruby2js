@@ -147,6 +147,7 @@ module Ruby2JS
 
             begin
               @instance_method = m
+              @class_method = nil
               parse m # unless skipped
             ensure
               @instance_method = nil
@@ -172,7 +173,13 @@ module Ruby2JS
             @prop.sub! 'static', 'static async' if m.type == :asyncs
 
             m = m.updated(:def, m.children[1..3])
-            parse m
+            begin
+              @instance_method = nil
+              @class_method = m
+              parse m # unless skipped
+            ensure
+              @instance_method = nil
+            end
 
           elsif m.type == :send and m.children.first == nil
             if m.children[1] == :attr_accessor
