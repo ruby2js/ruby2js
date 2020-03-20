@@ -57,9 +57,27 @@ module Ruby2JS
           walk = proc do |ast|
             ivars << ast.children.first if ast.type === :ivar
             cvars << ast.children.first if ast.type === :cvar
+
             ast.children.each do |child|
               walk[child] if child.is_a? Parser::AST::Node
             end
+
+	    if ast.type == :send and ast.children.first == nil
+	      if ast.children[1] == :attr_accessor
+		ast.children[2..-1].each_with_index do |child_sym, index2|
+		  ivars << :"@#{child_sym.children.first}"
+		end
+	      elsif ast.children[1] == :attr_reader
+		ast.children[2..-1].each_with_index do |child_sym, index2|
+		  ivars << :"@#{child_sym.children.first}"
+		end
+	      elsif ast.children[1] == :attr_writer
+		ast.children[2..-1].each_with_index do |child_sym, index2|
+		  ivars << :"@#{child_sym.children.first}"
+		end
+	      end
+	    end
+
           end
           walk[@ast]
 
@@ -182,24 +200,26 @@ module Ruby2JS
             end
 
           elsif m.type == :send and m.children.first == nil
+            p = es2020 ? '#' : '_'
+
             if m.children[1] == :attr_accessor
               m.children[2..-1].each_with_index do |child_sym, index2|
                 put @sep unless index2 == 0
                 var = child_sym.children.first
-                put "get #{var}() {#{@nl}return this._#{var}#@nl}#@sep"
-                put "set #{var}(#{var}) {#{@nl}this._#{var} = #{var}#@nl}"
+                put "get #{var}() {#{@nl}return this.#{p}#{var}#@nl}#@sep"
+                put "set #{var}(#{var}) {#{@nl}this.#{p}#{var} = #{var}#@nl}"
               end
             elsif m.children[1] == :attr_reader
               m.children[2..-1].each_with_index do |child_sym, index2|
                 put @sep unless index2 == 0
                 var = child_sym.children.first
-                put "get #{var}() {#{@nl}return this._#{var}#@nl}"
+                put "get #{var}() {#{@nl}return this.#{p}#{var}#@nl}"
               end
             elsif m.children[1] == :attr_writer
               m.children[2..-1].each_with_index do |child_sym, index2|
                 put @sep unless index2 == 0
                 var = child_sym.children.first
-                put "set #{var}(#{var}) {#{@nl}this._#{var} = #{var}#@nl}"
+                put "set #{var}(#{var}) {#{@nl}this.#{p}#{var} = #{var}#@nl}"
               end
             elsif [:private, :protected, :public].include? m.children[1]
               raise Error.new("class #{m.children[1]} is not supported", @ast)

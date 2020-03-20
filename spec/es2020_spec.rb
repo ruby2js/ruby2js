@@ -55,6 +55,18 @@ describe "ES2020 support" do
     end
   end
 
+  describe :attr do
+    it 'should handle attr declarations' do
+      to_js( 'class C; attr_accessor :a; end' ).
+        must_equal 'class C {#a; get a() {return this.#a}; ' + 
+          'set a(a) {this.#a = a}}'
+      to_js( 'class C; attr_reader :a; end' ).
+        must_equal 'class C {#a; get a() {return this.#a}}'
+      to_js( 'class C; attr_writer :a; end' ).
+        must_equal 'class C {#a; set a(a) {this.#a = a}}'
+    end
+  end
+
   unless (RUBY_VERSION.split('.').map(&:to_i) <=> [2, 3, 0]) == -1
     describe :OptionalChaining do
       it "should support conditional attribute references" do
