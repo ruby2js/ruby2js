@@ -956,11 +956,12 @@ describe Ruby2JS do
     end
 
     it "should treat ^ and $ as multiline" do
-      to_js( "/^./" ).must_equal '/^./m'
-      to_js( "/.$/" ).must_equal '/.$/m'
+      to_js( "/^x/" ).must_equal '/^x/m'
+      to_js( "/x$/" ).must_equal '/x$/m'
       to_js( "Regexp.new('^$')" ).must_equal '/^$/m'
 
-      to_js( "/^./m" ).must_equal '/^./m'
+      to_js( "/^./m" ).must_equal '/^./ms'
+      to_js( "/.$/m" ).must_equal '/.$/ms'
       to_js( "Regexp.new('^$', 'm')" ).must_equal '/^$/m'
     end
 
