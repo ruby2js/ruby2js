@@ -87,10 +87,10 @@ module Ruby2JS
         first = line.find {|token| !token.empty?}
         if first
           last = line[line.rindex {|token| !token.empty?}]
-          if first.start_with? '<' and last.end_with? '>'
+          if first.start_with? '<' and line.include? '>'
             indent -= @indent if first.start_with? '</'
             line.indent = indent
-            indent += @indent unless line.include? '</' or last.end_with? '/>'
+            indent += @indent unless line.include? '</' or line.include? '/>'
           else
             indent -= @indent if ')}]'.include? first[0] and indent >= @indent
             line.indent = indent
