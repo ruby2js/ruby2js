@@ -87,9 +87,15 @@ module Ruby2JS
         first = line.find {|token| !token.empty?}
         if first
           last = line[line.rindex {|token| !token.empty?}]
-          indent -= @indent if ')}]'.include? first[0] and indent >= @indent
-          line.indent = indent
-          indent += @indent if '({['.include? last[-1]
+          if first.start_with? '<' and last.end_with? '>'
+            indent -= @indent if first.start_with? '</'
+            line.indent = indent
+            indent += @indent unless line.include? '</' or last.end_with? '/>'
+          else
+            indent -= @indent if ')}]'.include? first[0] and indent >= @indent
+            line.indent = indent
+            indent += @indent if '({['.include? last[-1]
+          end
         else
           line.indent = indent
         end
@@ -136,7 +142,8 @@ module Ruby2JS
         @line << Token.new(string, @ast)
       else
         parts = string.split("\n")
-        @line << Token.new(parts.shift, @ast)
+        first = parts.shift
+        @line << Token.new(first, @ast) if first
         @lines += parts.map {|part| Line.new(Token.new(part, @ast))}
         @lines << Line.new if string.end_with?("\n")
         @line = @lines.last
