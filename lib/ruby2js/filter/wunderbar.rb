@@ -27,8 +27,8 @@ module Ruby2JS
       end
 
       def on_block(node)
-        send, args, *block = node.children
-        target, method, *attrs = send.children
+        send, _, *block = node.children
+        target, method, *_ = send.children
         while target != nil and target.type == :send and target.children.length == 2
           target, method = target.children
         end
