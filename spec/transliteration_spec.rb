@@ -114,11 +114,13 @@ describe Ruby2JS do
     
     it "should parse ternary operator" do
       to_js( 'x = true ? true : false').
-        must_equal "var x = (true ? true : false)"
+        must_equal "var x = true ? true : false"
       to_js( 'x = (true if y)').
-        must_equal "var x = (y ? true : null)"
+        must_equal "var x = y ? true : null"
       to_js( 'x = (true unless y)').
-        must_equal "var x = (!y ? true : null)"
+        must_equal "var x = !y ? true : null"
+      to_js( 'x = a + (b ? 1 : 0)').
+        must_equal "var x = a + (b ? 1 : 0)"
     end
   end
   

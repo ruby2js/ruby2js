@@ -389,7 +389,7 @@ describe Ruby2JS::Filter::Vue do
 
     it "should handle mixed strings and a conditional value" do
       to_js( 'class Foo<Vue; def render; _a.b class: ("c" if d); end; end' ).
-        must_include '$h("a", {class: ["b", (d ? "c" : null)]})'
+        must_include '$h("a", {class: ["b", d ? "c" : null]})'
     end
 
     it "should handle only a value" do

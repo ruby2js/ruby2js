@@ -55,8 +55,8 @@ module Ruby2JS
         end
       else
         else_block ||= s(:nil)
-        put '('; parse condition; put ' ? '; parse then_block
-        put ' : '; parse else_block; put ')'
+        parse condition; put ' ? '; parse then_block
+        put ' : '; parse else_block
       end
     end
   end
