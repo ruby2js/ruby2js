@@ -8,7 +8,7 @@ describe Ruby2JS::Filter::Wunderbar do
     _(Ruby2JS.convert(string, filters: [Ruby2JS::Filter::Wunderbar]).to_s)
   end
   
-  describe :wunderbar do
+  describe :jsx do
     it "should handle self enclosed values" do
       to_js( '_br' ).must_equal '<br/>'
     end
@@ -27,6 +27,16 @@ describe Ruby2JS::Filter::Wunderbar do
 
     it "should handle enclosing markaby style classes and id" do
       to_js( '_a.b.c.d! do _e; end' ).must_equal '<a id="d" class="b c"><e/></a>'
+    end
+  end
+
+  describe :logging do
+    it "should map wunderbar logging calls to console" do
+      to_js( 'Wunderbar.debug "a"' ).must_equal 'console.debug("a")'
+      to_js( 'Wunderbar.info "a"' ).must_equal 'console.info("a")'
+      to_js( 'Wunderbar.warn "a"' ).must_equal 'console.warn("a")'
+      to_js( 'Wunderbar.error "a"' ).must_equal 'console.error("a")'
+      to_js( 'Wunderbar.fatal "a"' ).must_equal 'console.error("a")'
     end
   end
 

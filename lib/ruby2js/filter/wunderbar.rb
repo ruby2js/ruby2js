@@ -8,8 +8,15 @@ module Ruby2JS
       def on_send(node)
         target, method, *attrs = node.children
 
+        if target == s(:const, nil, :Wunderbar)
+          if [:debug, :info, :warn, :error, :fatal].include? method
+            method = :error if method == :fatal
+            return node.updated(nil, [s(:const, nil, :console), method, *attrs])
+          end
+        end
+
         stack = []
-        while target != nil and target.type == :send and target.children.length == 2
+        while target!=nil and target.type==:send and target.children.length==2
           name = method.to_s
           if name.end_with? '!'
             stack << s(:hash, s(:pair, s(:sym, :id), s(:str, name[0..-2])))
@@ -29,7 +36,7 @@ module Ruby2JS
       def on_block(node)
         send, _, *block = node.children
         target, method, *_ = send.children
-        while target != nil and target.type == :send and target.children.length == 2
+        while target!=nil and target.type==:send and target.children.length==2
           target, method = target.children
         end
 
