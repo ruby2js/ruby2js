@@ -32,8 +32,10 @@ module Ruby2JS
         ''
       elsif ['case ', 'default:'].include? self[0]
         ' ' * ([0,indent-2].max) + join
-      else
+      elsif indent > 0
         ' ' * indent + join
+      else
+        join
       end
     end
   end
@@ -87,7 +89,9 @@ module Ruby2JS
         first = line.find {|token| !token.empty?}
         if first
           last = line[line.rindex {|token| !token.empty?}]
-          if first.start_with? '<' and line.include? '>'
+          if (first.start_with? '<' and line.include? '>') or
+             (last.end_with? '>' and line.include? '<')
+          then
             indent -= @indent if first.start_with? '</'
             line.indent = indent
             indent += @indent unless line.include? '</' or line.include? '/>'
