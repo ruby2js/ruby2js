@@ -1,11 +1,13 @@
 gem 'minitest'
 require 'minitest/autorun'
 require 'ruby2js/filter/wunderbar'
+require 'ruby2js/filter/functions'
 
 describe Ruby2JS::Filter::Wunderbar do
   
   def to_js( string)
-    _(Ruby2JS.convert(string, filters: [Ruby2JS::Filter::Wunderbar]).to_s)
+    _(Ruby2JS.convert(string, eslevel: 2015, 
+      filters: [Ruby2JS::Filter::Wunderbar, Ruby2JS::Filter::Functions]).to_s)
   end
   
   describe :jsx do
@@ -27,6 +29,23 @@ describe Ruby2JS::Filter::Wunderbar do
 
     it "should handle enclosing markaby style classes and id" do
       to_js( '_a.b.c.d! do _e; end' ).must_equal '<a id="d" class="b c"><e/></a>'
+    end
+  end
+
+  describe 'control structures' do
+    it "should handle if" do
+      to_js('_p {"hi" if a}').
+        must_equal '<p>{a ? "hi" : </>}</p>'
+    end
+
+    it "should handle each" do
+      to_js('_ul { a.each {|b| _li b} }').
+        must_equal '<ul>{a.map(b => <li>{b}</li>)}</ul>'
+    end
+
+    it "should handle blocks" do
+      to_js('_div {if a; _br; _br; end}').
+        must_equal '<div>{a ? <><br/><br/></> : </>}</div>'
     end
   end
 

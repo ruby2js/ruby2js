@@ -60,9 +60,14 @@ module Ruby2JS
           elsif child.type == :xnode
             parse child
           else
-            put '('
-            parse child
-            put '}'
+            begin
+              jsx, @jsx = @jsx, true
+              put '{'
+              parse child
+              put '}'
+            ensure
+              @jsx = jsx
+            end
           end
         end
 

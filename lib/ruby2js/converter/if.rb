@@ -54,7 +54,18 @@ module Ruby2JS
           @inner = inner
         end
       else
-        else_block ||= s(:nil)
+        if @jsx
+          else_block ||= s(:xnode, '')
+          if then_block.type == :begin
+            then_block = s(:xnode, '', *then_block.children)
+          end
+          if else_block.type == :begin
+            else_block = s(:xnode, '', *else_block.children)
+          end
+        else
+          else_block ||= s(:nil)
+        end
+
         parse condition; put ' ? '; parse then_block
         put ' : '; parse else_block
       end

@@ -10,6 +10,13 @@ module Ruby2JS
     #   (...)
 
     handle :for, :for_of do |var, expression, block|
+      if @jsx and @ast.type == :for_of
+        parse s(:block, s(:send, expression, :map),
+         s(:args, s(:arg, var.children[0])),
+         s(:autoreturn, block))
+        return
+      end
+
       begin
         vars = @vars.dup
         next_token, @next_token = @next_token, :continue

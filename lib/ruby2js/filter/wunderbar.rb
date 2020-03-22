@@ -1,5 +1,7 @@
 require 'ruby2js'
 
+# note: mapping of .each to .map requires both filter/functions and es2015
+
 module Ruby2JS
   module Filter
     module Wunderbar
@@ -27,7 +29,7 @@ module Ruby2JS
         end
 
         if target == nil and method.to_s.start_with? "_"
-          s(:xnode, *method.to_s[1..-1], *stack, *attrs)
+          S(:xnode, *method.to_s[1..-1], *stack, *attrs)
         else
           super
         end

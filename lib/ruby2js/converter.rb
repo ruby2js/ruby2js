@@ -57,6 +57,7 @@ module Ruby2JS
       @prototype = nil
       @class_parent = nil
       @class_name = nil
+      @jsx = false
 
       @eslevel = :es5
       @strict = false
