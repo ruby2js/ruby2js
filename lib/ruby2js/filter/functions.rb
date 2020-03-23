@@ -15,6 +15,11 @@ module Ruby2JS
         gvar: :gvasgn
       }
 
+      def initialize(*args)
+        @jsx = false
+        super
+      end
+
       def on_send(node)
         target, method, *args = node.children
         return super if excluded?(method)
@@ -556,7 +561,7 @@ module Ruby2JS
         elsif
           [:each, :each_value].include? method
         then
-          if es2015
+          if es2015 or @jsx
             if node.children[1].children.length > 1
               process node.updated(:for_of,
                 [s(:mlhs, *node.children[1].children.map {|child|

@@ -1,12 +1,20 @@
 gem 'minitest'
 require 'minitest/autorun'
 require 'ruby2js/filter/react'
+require 'ruby2js/filter/functions'
+require 'ruby2js/filter/wunderbar'
 
 describe Ruby2JS::Filter::React do
   
   def to_js(string)
     _(Ruby2JS.convert(string, filters: [Ruby2JS::Filter::React],
       scope: self).to_s)
+  end
+  
+  def to_js6(string)
+    _(Ruby2JS.convert(string, eslevel: 2015,
+      filters: [Ruby2JS::Filter::React, Ruby2JS::Filter::Functions,
+      Ruby2JS::Filter::Wunderbar], scope: self).to_s)
   end
   
   describe :createClass do
@@ -489,6 +497,40 @@ describe Ruby2JS::Filter::React do
     it "should should retain onChange functions" do
       to_js( 'class Foo<React; def render; _input checked: @x, onChange: self.change; end; end' ).
         must_include 'onChange: this.change'
+    end
+  end
+
+  describe "es6 support" do
+    it "should create classes" do
+      to_js6( 'class Foo<React; end' ).
+        must_equal 'class Foo extends React.Component {}'
+    end
+
+    it "should handle static properties" do
+      to_js6( 'class Foo<React; def self.one; 1; end; end' ).
+        must_include 'static one() {return 1}'
+    end
+  end
+
+  describe "wunderbar filter/JSX integration" do
+    it "should handle simple calls" do
+      to_js6( 'class Foo<React; def render; _br; end; end' ).
+        must_include 'render() {return <br/>}'
+    end
+
+    it "should handle multiple calls" do
+      to_js6( 'class Foo<React; def render; _br; _br; end; end' ).
+        must_include 'render() {return <><br/><br/></>}'
+    end
+
+    it "should handle if statements" do
+      to_js6( 'class Foo<React; def render; _br if @@x; end; end' ).
+        must_include '{return <>{this.props.x ? <br/> : </>}</>}'
+    end
+
+    it "should handle loops" do
+      to_js6( 'class Foo<React; def render; _ul {@@x.each {|i| _li i; }}; end; end' ).
+        must_include '<ul>{this.props.x.map(i => (<li>{i}</li>))}</ul>'
     end
   end
 

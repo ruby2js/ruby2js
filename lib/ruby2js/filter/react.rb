@@ -68,12 +68,21 @@ module Ruby2JS
         @reactApply = nil
         @reactBlock = nil
         @reactClass = nil
+        @jsx = false
         super
       end
 
       def options=(options)
         super
         @react = true if options[:react]
+        filters = options[:filters] || Filter::DEFAULTS
+
+        if 
+          defined? Ruby2JS::Filter::Wunderbar and
+          filters.include? Ruby2JS::Filter::Wunderbar
+        then
+          @jsx = true
+        end
       end
 
       # Example conversion
@@ -85,7 +94,9 @@ module Ruby2JS
       def on_class(node)
         cname, inheritance, *body = node.children
         return super unless cname.children.first == nil
-        return super unless inheritance == s(:const, nil, :React)
+        return super unless inheritance == s(:const, nil, :React) or
+          inheritance == s(:const, nil, :Vue) or
+          inheritance == s(:send, s(:const, nil, :React), :Component)
 
         # traverse down to actual list of class statements
         if body.length == 1
@@ -106,15 +117,22 @@ module Ruby2JS
           react, @react = @react, true
           reactClass, @reactClass = @reactClass, true
 
-          # automatically capture the displayName for the class
-          pairs = [s(:pair, s(:sym, :displayName),
-            s(:str, cname.children.last.to_s))]
+          pairs = []
+
+          unless es2015
+            # automatically capture the displayName for the class
+            pairs << s(:pair, s(:sym, :displayName),
+              s(:str, cname.children.last.to_s))
+          end
 
           # collect static properties/functions
           statics = []
           body.select {|child| child.type == :defs}.each do |child|
             _parent, mname, args, *block = child.children
-            if child.is_method?
+            if es2015
+              block = [s(:autoreturn, *block)] unless child.is_method?
+              pairs << s(:defs, s(:self), mname, args, *block)
+            elsif child.is_method?
               statics << s(:pair, s(:sym, mname), process(child.updated(:block,
                 [s(:send, nil, :proc), args, s(:autoreturn, *block)])))
             elsif
@@ -202,12 +220,17 @@ module Ruby2JS
 
             elsif mname == :render
               if
-                block.length != 1 or not block.last or
+                 block.length != 1 or not block.last or
                 not [:send, :block].include? block.last.type
               then
-                # wrap multi-line blocks with a 'span' element
-                block = [s(:return,
-                  s(:block, s(:send, nil, :_span), s(:args), *block))]
+                if @jsx
+                  # wrap multi-line blocks with an empty element
+                  block = [s(:return, s(:xnode, '', *process_all(block)))]
+                else
+                  # wrap multi-line blocks with a 'span' element
+                  block = [s(:return,
+                    s(:block, s(:send, nil, :_span), s(:args), *block))]
+                end
               end
 
             elsif mname == :componentWillReceiveProps
@@ -231,8 +254,12 @@ module Ruby2JS
               type = :begin if block.first.type == :return
             end
 
-            pairs << s(:pair, s(:sym, mname), child.updated(:block,
-              [s(:send, nil, :proc), args, process(s(type, *block))]))
+            if es2015
+              pairs << s(:def, mname, args,  process(s(type, *block)))
+            else
+              pairs << s(:pair, s(:sym, mname), child.updated(:block,
+                [s(:send, nil, :proc), args, process(s(type, *block))]))
+            end
 
             # retain comment
             unless @comments[child].empty?
@@ -245,9 +272,15 @@ module Ruby2JS
           @reactMethod = nil
         end
 
-        # emit a createClass statement
-        node.updated(:casgn, [nil, cname.children.last,
-          s(:send, inheritance, :createClass, s(:hash, *pairs))])
+        if es2015
+          # emit a class that extends React.Component
+          node.updated(:class, [s(:const, nil, cname.children.last),
+            s(:attr, s(:const, nil, :React), :Component), *pairs]) 
+        else
+          # emit a createClass statement
+          node.updated(:casgn, [nil, cname.children.last,
+            s(:send, s(:const, nil, :React), :createClass, s(:hash, *pairs))])
+        end
       end
 
       def on_send(node)
@@ -286,7 +319,7 @@ module Ruby2JS
           s(:send, s(:gvar, :$_), :push, s(:send, *node.children[0..1],
             *process_all(node.children[2..-1])))
 
-        elsif node.children[0] == nil and node.children[1] =~ /^_\w/
+        elsif !@jsx and node.children[0] == nil and node.children[1] =~ /^_\w/
           # map method calls starting with an underscore to React calls
           # to create an element.
           #
@@ -743,7 +776,7 @@ module Ruby2JS
         end
 
         # wunderbar style calls
-        if child.children[0] == nil and child.children[1] =~ /^_\w/
+        if !@jsx and child.children[0] == nil and child.children[1] =~ /^_\w/
           if node.children[1].children.empty?
             # append block as a standalone proc
             block = s(:block, s(:send, nil, :proc), s(:args),
