@@ -506,6 +506,11 @@ describe Ruby2JS::Filter::React do
         must_equal 'class Foo extends React.Component {}'
     end
 
+    it "should handle contructors" do
+      to_js6( 'class Foo<React; def initialize; @x=1; end; end' ).
+        must_include 'constructor() {this.state = {x: 1}}'
+    end
+
     it "should handle static properties" do
       to_js6( 'class Foo<React; def self.one; 1; end; end' ).
         must_include 'static one() {return 1}'

@@ -180,7 +180,7 @@ module Ruby2JS
               (@reactIvars[:pre] + @reactIvars[:post]).uniq
 
             if mname == :initialize
-              mname = :getInitialState
+              mname = es2015 ? :initialize : :getInitialState
 
               # extract real list of statements
               if block.length == 1
@@ -211,7 +211,9 @@ module Ruby2JS
                 anode.children.first.to_s[1..-1]), anode.children.last)})
 
               # modify block to build and/or return state
-              if block.empty?
+              if mname == :initialize
+                block.unshift(s(:send, s(:self), :state=, state))
+              elsif block.empty?
                 block = [s(:return, state)]
               else
                 block.unshift(s(:send, s(:self), :state=, state))
@@ -250,6 +252,7 @@ module Ruby2JS
 
             # add method to class
             type = (child.is_method? ? :begin : :autoreturn)
+            type = :begin if mname == :initialize
             if block.length == 1 and Parser::AST::Node === block.first
               type = :begin if block.first.type == :return
             end
