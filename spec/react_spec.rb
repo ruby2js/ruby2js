@@ -530,7 +530,7 @@ describe Ruby2JS::Filter::React do
 
     it "should handle if statements" do
       to_js6( 'class Foo<React; def render; _br if @@x; end; end' ).
-        must_include '{return <>{this.props.x ? <br/> : </>}</>}'
+        must_include '{return <>{this.props.x ? <br/> : null}</>}'
     end
 
     it "should handle loops" do

@@ -35,7 +35,7 @@ describe Ruby2JS::Filter::Wunderbar do
   describe 'control structures' do
     it "should handle if" do
       to_js('_p {"hi" if a}').
-        must_equal '<p>{a ? "hi" : </>}</p>'
+        must_equal '<p>{a ? "hi" : null}</p>'
     end
 
     it "should handle each" do
@@ -45,7 +45,7 @@ describe Ruby2JS::Filter::Wunderbar do
 
     it "should handle blocks" do
       to_js('_div {if a; _br; _br; end}').
-        must_equal '<div>{a ? <><br/><br/></> : </>}</div>'
+        must_equal '<div>{a ? <><br/><br/></> : null}</div>'
     end
   end
 
