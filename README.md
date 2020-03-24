@@ -92,6 +92,12 @@ Enable strict support:
 puts Ruby2JS.convert('a=1', strict: true)
 ```
 
+Emit strict equality comparisons:
+
+```ruby
+puts Ruby2JS.convert('a==1', comparison: :identity)
+```
+
 With [ExecJS](https://github.com/sstephenson/execjs):
 ```ruby
 require 'ruby2js/execjs'

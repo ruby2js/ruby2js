@@ -196,7 +196,13 @@ module Ruby2JS
 
       elsif OPERATORS.flatten.include?(method) and not LOGICAL.include?(method)
         (group_receiver ? group(receiver) : parse(receiver))
-        put " #{ method } "
+
+        if @comparison == :identity and [:==, :!=].include? method
+          put " #{ method }= "
+        else
+          put " #{ method } "
+        end
+
         (group_target ? group(target) : parse(target))
 
       elsif method =~ /=$/

@@ -193,6 +193,7 @@ module Ruby2JS
     ruby2js.ivars = options[:ivars]
     ruby2js.eslevel = options[:eslevel]
     ruby2js.strict = options[:strict]
+    ruby2js.comparison = options[:comparison] || :equality
     if ruby2js.binding and not ruby2js.ivars
       ruby2js.ivars = ruby2js.binding.eval \
         'Hash[instance_variables.map {|var| [var, instance_variable_get(var)]}]'

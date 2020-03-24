@@ -23,6 +23,8 @@
 #         --es2019
 #         --es2020
 #         --strict
+#         --equality
+#         --identity
 #         ---filter filter
 #         -f filter
 
@@ -31,6 +33,8 @@ require 'wunderbar'
 # extract options from the argument list
 options = {}
 options[:strict] = true if ARGV.delete('--strict')
+options[:comparison] = :equality if ARGV.delete('--equality')
+options[:comparison] = :identity if ARGV.delete('--identity')
 
 begin
   # support running directly from a git clone
