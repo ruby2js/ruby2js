@@ -154,6 +154,7 @@ module Ruby2JS
           # create a default getInitialState method if there is no such method
           # and there are references to instance variables.
           if
+            not es2015 and
             not body.any? do |child|
               child.type == :def and
               [:getInitialState, :initialize].include? child.children.first

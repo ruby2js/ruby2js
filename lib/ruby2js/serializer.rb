@@ -92,9 +92,12 @@ module Ruby2JS
           if (first.start_with? '<' and line.include? '>') or
              (last.end_with? '>' and line.include? '<')
           then
-            node = line.join[/.*(<.*)/, 1]
+            node = line.join[/.*?(<.*)/, 1]
             indent -= @indent if node.start_with? '</'
+
             line.indent = indent
+
+            node = line.join[/.*(<.*)/, 1]
             indent += @indent unless node.include? '</' or node.include? '/>'
           else
             indent -= @indent if ')}]'.include? first[0] and indent >= @indent
