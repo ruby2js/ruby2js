@@ -128,6 +128,8 @@ module Ruby2JS
       def on_undefined?(node); on_defined?(node); end
       def on_nil(node); end
       def on_xnode(node); end
+      def on_export(node); end
+      def on_import(node); end
 
       # provide a method so filters can call 'super'
       def on_sym(node); node; end
