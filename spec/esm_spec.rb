@@ -25,11 +25,12 @@ describe Ruby2JS::Filter::ESM do
 
   describe "const processing" do
     it "should create elements for HTML tags" do
-      js = to_js( 'C=1; A=[B, C, D]' )
+      js = to_js( 'C=1; A=[B, C, D]; Object.is(1,1)' )
       js.wont_include 'import A'
       js.must_include 'import B from "./b.js"'
       js.wont_include 'import C'
       js.must_include 'import D from "./d.js"'
+      js.wont_include 'import Object'
     end
   end
 

@@ -27,7 +27,7 @@ module Ruby2JS
           list = inventory.map do |name|
              if name == "React" and defined? Ruby2JS::Filter::React
                s(:import, "#{name.downcase}", s(:const, nil, name))
-             else
+             elsif name != 'Object'
                s(:import, "./#{name.downcase}.js", s(:const, nil, name))
              end
           end
@@ -38,7 +38,7 @@ module Ruby2JS
             list.push s(:export, :default, s(:const, nil, @esm_export))
           end
 
-          s(:begin, *list)
+          s(:begin, *list.compact)
         end
       end
 
