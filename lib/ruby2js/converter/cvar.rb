@@ -4,7 +4,7 @@ module Ruby2JS
     # (cvar :@@a)
 
     handle :cvar do |var|
-      prefix = es2020 ? '#' : '_'
+      prefix = es2020 ? '#$' : '_'
 
       @class_name ||= nil
       if @class_name

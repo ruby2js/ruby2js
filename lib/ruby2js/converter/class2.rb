@@ -56,7 +56,9 @@ module Ruby2JS
           # find ivars and cvars
           walk = proc do |ast|
             ivars << ast.children.first if ast.type === :ivar
+            ivars << ast.children.first if ast.type === :cvasgn
             cvars << ast.children.first if ast.type === :cvar
+            cvars << ast.children.first if ast.type === :cvasgn
 
             ast.children.each do |child|
               walk[child] if child.is_a? Parser::AST::Node
@@ -95,7 +97,7 @@ module Ruby2JS
           cvars.to_a.sort.each do |cvar|
             put(index == 0 ? @nl : @sep)
             index += 1
-            put 'static #' + cvar.to_s[2..-1]
+            put 'static #$' + cvar.to_s[2..-1]
           end
 
           while constructor.length > 0 and constructor.first.type == :ivasgn
@@ -235,7 +237,7 @@ module Ruby2JS
 
           else
             if m.type == :cvasgn and es2020
-              put 'static #'; put m.children[0].to_s[2..-1]; put ' = '
+              put 'static #$'; put m.children[0].to_s[2..-1]; put ' = '
               parse m.children[1]
             else
               skipped = true

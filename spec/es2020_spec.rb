@@ -33,7 +33,7 @@ describe "ES2020 support" do
   describe :ClassFields do
     it "should convert private class fields to static #vars" do
       to_js( 'class C; @@a=1; def self.a; @@a; end; end' ).
-        must_equal 'class C {static #a = 1; static get a() {return C.#a}}'
+        must_equal 'class C {#@a; static #$a = 1; static get a() {return C.#$a}}'
     end
   end
 
