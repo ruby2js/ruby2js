@@ -26,14 +26,14 @@ describe "ES2020 support" do
 
     it "should handle multiple assignments" do
       to_js( 'class C; def initialize; @a, @b = 1, 2; end; end' ).
-        must_equal 'class C {constructor() {[this.#a, this.#b] = [1, 2]}}'
+        must_equal 'class C {#a; #b; constructor() {[this.#a, this.#b] = [1, 2]}}'
     end
   end
 
   describe :ClassFields do
     it "should convert private class fields to static #vars" do
       to_js( 'class C; @@a=1; def self.a; @@a; end; end' ).
-        must_equal 'class C {#@a; static #$a = 1; static get a() {return C.#$a}}'
+        must_equal 'class C {static #$a = 1; static get a() {return C.#$a}}'
     end
   end
 

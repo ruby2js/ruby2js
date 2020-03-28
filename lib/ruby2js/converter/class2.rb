@@ -56,7 +56,7 @@ module Ruby2JS
           # find ivars and cvars
           walk = proc do |ast|
             ivars << ast.children.first if ast.type === :ivar
-            ivars << ast.children.first if ast.type === :cvasgn
+            ivars << ast.children.first if ast.type === :ivasgn
             cvars << ast.children.first if ast.type === :cvar
             cvars << ast.children.first if ast.type === :cvasgn
 
