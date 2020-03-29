@@ -288,6 +288,14 @@ module Ruby2JS
       end
 
       def on_send(node)
+        # convert Vue.utile.defineReactive to class fields
+        if node.children.first == s(:send, s(:const, nil, :Vue), :util)
+          if node.children[1] == :defineReactive
+            return process s(:cvasgn, node.children[2].children.first,
+              node.children[3])
+          end
+        end
+
         if not @react
           # enable React filtering within React class method calls or
           # React component calls
