@@ -13,9 +13,16 @@ module Ruby2JS
         if arg.type == :hash
           arg.children.each do |pair|
             name = pair.children[0].children[0]
-            if name == :class and attrs[name]
+
+            if defined? Ruby2JS::Filter::React
+              name = :className if name == :class
+              name = :htmlFor if name == :for
+            end
+
+            if [:class, :className].include? name and attrs[name]
               if attrs[name].type == :str and pair.children[1].type == :str
-                attrs[name] = s(:str, pair.children[1].children[0] + ' ' + attrs[name].children[0])
+                attrs[name] = s(:str, pair.children[1].children[0] + ' ' +
+                  attrs[name].children[0])
               else
                 attrs[name] = s(:send, s(:send, attrs[name], :+, 
                   s(:str, ' ')), :+, pair.children[1])

@@ -2,6 +2,7 @@ gem 'minitest'
 require 'minitest/autorun'
 require 'ruby2js/filter/wunderbar'
 require 'ruby2js/filter/functions'
+require 'ruby2js/filter/react'
 
 describe Ruby2JS::Filter::Wunderbar do
   
@@ -24,11 +25,17 @@ describe Ruby2JS::Filter::Wunderbar do
     end
 
     it "should handle markaby style classes and id" do
-      to_js( '_a.b.c.d!' ).must_equal '<a id="d" class="b c"/>'
+      to_js( '_a.b.c.d!' ).must_equal '<a id="d" className="b c"/>'
     end
 
     it "should handle enclosing markaby style classes and id" do
-      to_js( '_a.b.c.d! do _e; end' ).must_equal '<a id="d" class="b c"><e/></a>'
+      to_js( '_a.b.c.d! do _e; end' ).
+       must_equal '<a id="d" className="b c"><e/></a>'
+    end
+
+    it "should map for to htmlFOr" do
+      to_js( '_label "foo", for: "foo"' ).
+       must_equal '<label htmlFor="foo">foo</label>'
     end
   end
 
