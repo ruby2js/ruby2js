@@ -23,6 +23,18 @@ module Ruby2JS
     module React
       include SEXP
 
+      def options=(options)
+        super
+        filters = options[:filters] || Filter::DEFAULTS
+
+        if 
+          defined? Ruby2JS::Filter::Functions and
+          filters.include? Ruby2JS::Filter::Functions
+        then
+          @react_filter_functions = true
+        end
+      end
+
       # the following command can be used to generate ReactAttrs:
       # 
       #   ruby -r ruby2js/filter/react -e "Ruby2JS::Filter::React.genAttrs"
@@ -70,6 +82,7 @@ module Ruby2JS
         @reactClass = nil
         @react_props = []
         @react_methods = []
+        @react_filter_functions = false
         @jsx = false
         super
       end
@@ -248,8 +261,20 @@ module Ruby2JS
                 not [:send, :block].include? block.last.type
               then
                 if @jsx
+                  while block.length == 1 and block.first.type == :begin
+                    block = block.first.children.dup
+                  end
+
+                  # gather non-element emitting statements in the front
+                  prolog = []
+                  while not block.empty? and 
+                    react_wunderbar_free([block.first]) do
+                    prolog << process(block.shift)
+                  end
+
                   # wrap multi-line blocks with an empty element
-                  block = [s(:return, s(:xnode, '', *process_all(block)))]
+                  block = [*prolog, s(:return,
+                    s(:xnode, '', *process_all(block)))]
                 else
                   # wrap multi-line blocks with a 'span' element
                   block = [s(:return,
@@ -340,12 +365,18 @@ module Ruby2JS
           end
         end
 
+        if node.children.first == s(:const, nil, :Vue)
+          node = node.updated(nil, [s(:const, nil, :React),
+            *node.children[1..-1]])
+        end
+
         if not @react
           # enable React filtering within React class method calls or
           # React component calls
           if
             node.children.first == s(:const, nil, :React)
           then
+
             begin
               react, @react = @react, true
               return on_send(node)
@@ -557,6 +588,8 @@ module Ruby2JS
               # explicit call to React.createElement
               next true if arg.children[1] == :createElement and
                 arg.children[0] == s(:const, nil, :React)
+              next true if arg.children[1] == :createElement and
+                arg.children[0] == s(:const, nil, :Vue)
 
               # wunderbar style call
               arg = arg.children.first if arg.type == :block
@@ -962,6 +995,49 @@ module Ruby2JS
       def on_cvar(node)
         return super unless @reactMethod
         s(:attr, @reactProps, node.children.first.to_s[2..-1])
+      end
+
+      # is this a "wunderbar" style call or createElement?
+      def react_element?(node)
+        return false unless node
+
+        forEach = [:forEach]
+        forEach << :each if @react_filter_functions
+
+        return true if node.type == :block and
+          forEach.include? node.children.first.children.last and 
+          react_element?(node.children.last)
+
+        # explicit call to React.createElement
+        return true if node.children[1] == :createElement and
+          node.children[0] == s(:const, nil, :React)
+
+        # explicit call to Vue.createElement
+        return true if node.children[1] == :createElement and
+          node.children[0] == s(:const, nil, :Vue)
+
+        # wunderbar style call
+        node = node.children.first if node.type == :block
+        while node.type == :send and node.children.first != nil
+          node = node.children.first
+        end
+        node.type == :send and node.children[1].to_s.start_with? '_'
+      end
+
+      # ensure that there are no "wunderbar" or "createElement" calls in
+      # a set of statements.
+      def react_wunderbar_free(nodes)
+        nodes.each do |node|
+          if Parser::AST::Node === node
+            return false if react_element?(node)
+
+            # recurse
+            return false unless react_wunderbar_free(node.children)
+          end
+        end
+
+        # no problems found
+        return true
       end
 
       # analyze ivar usage

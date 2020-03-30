@@ -538,6 +538,11 @@ describe Ruby2JS::Filter::React do
         must_include 'render() {return <><br/><br/></>}'
     end
 
+    it "should not wrap non wunderbar calls" do
+      to_js6( 'class Foo<React; def render; x="a"; _p x; end; end' ).
+        must_include 'render() {let x = "a"; return <><p>{x}</p></>}}'
+    end
+
     it "should handle if statements" do
       to_js6( 'class Foo<React; def render; _br if @@x; end; end' ).
         must_include '{return <>{this.props.x ? <br/> : null}</>}'
