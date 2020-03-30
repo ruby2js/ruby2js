@@ -27,7 +27,7 @@ module Ruby2JS
           list = inventory.map do |name|
              if name == "React" and defined? Ruby2JS::Filter::React
                s(:import, "#{name.downcase}", s(:const, nil, name))
-             elsif name != 'Object'
+             elsif not %w(JSON Object).include? name
                s(:import, "./#{name.downcase}.js", s(:const, nil, name))
              end
           end
@@ -43,7 +43,7 @@ module Ruby2JS
       end
 
       # gather constants
-      def esm_walk(node, inventory = Set.new)
+      def esm_walk(node)
         # extract ivars and cvars
         if node.type == :const and node.children.first == nil
           @esm_include << node.children.last.to_s
@@ -62,10 +62,8 @@ module Ruby2JS
 
         # recurse
         node.children.each do |child|
-          esm_walk(child, inventory) if Parser::AST::Node === child
+          esm_walk(child) if Parser::AST::Node === child
         end
-
-        return inventory
       end
     end
 

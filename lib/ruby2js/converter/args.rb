@@ -41,7 +41,7 @@ module Ruby2JS
     end
 
     handle :mlhs do |*args|
-      if es2015
+      if es2015 or @jsx
         put '['
         parse_all(*args, join: ', ')
         put ']'

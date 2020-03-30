@@ -151,7 +151,7 @@ module Ruby2JS
                 next
               end
 
-              m = m.updated(m.type, [@prop, m.children[1], *constructor])
+              m = m.updated(m.type, [@prop, m.children[1], s(:begin, *constructor)])
             elsif not m.is_method?
               @prop = "get #{@prop}"
               m = m.updated(m.type, [*m.children[0..1], 

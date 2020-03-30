@@ -288,11 +288,17 @@ module Ruby2JS
       end
 
       def on_send(node)
-        # convert Vue.utile.defineReactive to class fields
+        # convert Vue.utile.defineReactive to class fields or assignments
         if node.children.first == s(:send, s(:const, nil, :Vue), :util)
           if node.children[1] == :defineReactive
-            return process s(:cvasgn, node.children[2].children.first,
-              node.children[3])
+            if node.children[2].type == :cvar
+              return process s(:cvasgn, node.children[2].children.first,
+                node.children[3])
+            elsif node.children[2].type == :send
+              assign = node.children[2]
+              return assign.updated(nil, [assign.children[0],
+                assign.children[1].to_s + '=', node.children[3]])
+            end
           end
         end
 
