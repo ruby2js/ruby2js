@@ -68,6 +68,8 @@ module Ruby2JS
         @reactApply = nil
         @reactBlock = nil
         @reactClass = nil
+        @react_props = []
+        @react_methods = []
         @jsx = false
         super
       end
@@ -145,6 +147,25 @@ module Ruby2JS
                 :block, [s(:send, nil, :proc), args, s(:autoreturn, *block)])})
             end
           end
+
+	  # collect instance methods (including getters and setters)
+          @react_props = []
+          @react_methods = []
+	  body.each do |statement|
+	    if statement.type == :def
+	      method = statement.children.first
+	      unless method == :initialize
+		if method.to_s.end_with? '='
+		  method = method.to_s[0..-2].to_sym
+		  @react_props << method unless @react_props.include? method
+		elsif statement.is_method?
+		  @react_methods << method unless @react_methods.include? method
+		else
+		  @react_props << method unless @react_props.include? method
+		end
+	      end
+	    end
+	  end
 
           # append statics (if any)
           unless statics.empty?
@@ -298,6 +319,23 @@ module Ruby2JS
               assign = node.children[2]
               return assign.updated(nil, [assign.children[0],
                 assign.children[1].to_s + '=', node.children[3]])
+            end
+          end
+        end
+
+        # calls to methods (including getters) defined in this class
+        if node.children[0]==nil and Symbol === node.children[1]
+          if node.is_method?
+            if @react_methods.include? node.children[1]
+              # calls to methods defined in this class
+              return node.updated nil, [s(:self), node.children[1],
+                *process_all(node.children[2..-1])]
+            end
+          else
+            if @react_props.include? node.children[1]
+              # access to properties defined in this class
+              return node.updated nil, [s(:self), node.children[1],
+                *process_all(node.children[2..-1])]
             end
           end
         end

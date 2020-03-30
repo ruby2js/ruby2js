@@ -58,6 +58,16 @@ describe Ruby2JS::Filter::React do
       to_js( 'class Foo<React; def initialize; @a+=1; end; end' ).
         must_include 'this.state = {}; this.state.a++; return this.state'
     end
+
+    it "should handle calls to methods" do
+      to_js( 'class Foo<React; def a(); b(); end; def b(); end; end' ).
+        must_include 'this.b()'
+    end
+
+    it "should NOT handle local variables" do
+      to_js( 'class Foo<React; def a(); b; end; def b(); end; end' ).
+        wont_include 'this.b()'
+    end
   end
 
   describe "Wunderbar/JSX processing" do
