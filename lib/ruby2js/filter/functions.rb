@@ -305,6 +305,9 @@ module Ruby2JS
           end
 
 
+        elsif method == :[] and target == s(:const, nil, :Hash)
+          s(:send, s(:const, nil, :Object), :fromEntries, *process_all(args))
+
         elsif method == :[]
           # resolve negative literal indexes
           i = proc do |index|
@@ -322,9 +325,15 @@ module Ruby2JS
             super
 
           elsif index.type == :regexp
-            process S(:send,
-              s(:or, S(:send, process(target), :match, index), s(:array)),
-              :[], args[1] || s(:int, 0))
+            if es2020
+              process S(:csend,
+                S(:send, process(target), :match, index),
+                :[], args[1] || s(:int, 0))
+            else
+              process S(:send,
+                s(:or, S(:send, process(target), :match, index), s(:array)),
+                :[], args[1] || s(:int, 0))
+            end
 
           elsif node.children.length != 3
             super

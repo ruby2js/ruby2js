@@ -31,6 +31,12 @@ describe "ES2019 support" do
     end
   end
 
+  describe :Hash do
+    it "should handle Hash[]" do
+      to_js_fn( 'Hash[a]' ).must_equal 'Object.fromEntries(a)'
+    end
+  end
+
   describe :String do
     it "should handle lstrip" do
       to_js_fn( 'a.lstrip()' ).must_equal 'a.trimStart()'

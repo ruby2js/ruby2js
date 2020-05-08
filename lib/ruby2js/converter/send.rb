@@ -310,10 +310,16 @@ module Ruby2JS
         # optional chaining
         parse receiver
         put "?."
-        put method.to_s
-        put '(' if @ast.is_method?
-        args.each {|arg| parse arg}
-        put ')' if @ast.is_method?
+        if method == :[]
+          put '['
+          args.each {|arg| parse arg}
+          put ']'
+        else
+          put method.to_s
+          put '(' if @ast.is_method?
+          args.each {|arg| parse arg}
+          put ')' if @ast.is_method?
+        end
 
       else
 

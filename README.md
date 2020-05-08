@@ -618,6 +618,7 @@ conversion is made by the `functions` filter:
 * `.lstrip` becomes `.trimEnd
 * `.rstrip` becomes `.trimStart
 * `a.to_h` becomes `Object.fromEntries(a)`
+* `Hash[a]` becomes `Object.fromEntries(a)`
 
 Additionally, `rescue` without a variable will map to `catch` without a
 variable.

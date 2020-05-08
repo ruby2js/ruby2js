@@ -65,6 +65,11 @@ describe "ES2020 support" do
       to_js( 'class C; attr_writer :a; end' ).
         must_equal 'class C {#a; set a(a) {this.#a = a}}'
     end
+
+    it "should handle regular expression indexes" do
+      to_js_fn( 'a[/\d+/]' ).must_equal 'a.match(/\d+/)?.[0]'
+      to_js_fn( 'a[/(\d+)/, 1]' ).must_equal 'a.match(/(\d+)/)?.[1]'
+    end
   end
 
   unless (RUBY_VERSION.split('.').map(&:to_i) <=> [2, 3, 0]) == -1
