@@ -289,6 +289,7 @@ the script.
     * New classes subclassed off of `Exception` will become subclassed off
       of `Error` instead; and default constructors will be provided
     * `loop do...end` will be replaced with `while (true) {...}`
+    * `raise Exception.new(...)` will be replaced with `throw new Error(...)`
 
     Additionally, there is one mapping that will only be done if explicitly
     <a href="https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter.rb">included</a>:

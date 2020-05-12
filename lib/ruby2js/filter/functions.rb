@@ -450,6 +450,9 @@ module Ruby2JS
         elsif method == :class and args.length==0 and not node.is_method?
           process node.updated(:attr, [target, :constructor])
 
+        elsif method == :new and target == s(:const, nil, :Exception)
+          process S(:send, s(:const, nil, :Error), :new, *args)
+
         else
           super
         end

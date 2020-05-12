@@ -471,7 +471,12 @@ describe Ruby2JS::Filter::Functions do
     end
   end
 
-  describe 'subclassing Exception' do
+  describe 'Exceptions' do
+    it 'should throw new Error' do
+      to_js( 'raise Exception.new("foo")' ). 
+        must_equal 'throw new Error("foo")'
+    end
+
     it 'should create an Exception contructor' do
       to_js( 'class E < Exception; end' ).
         must_equal 'function E(message) {this.message = message; ' +
