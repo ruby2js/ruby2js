@@ -14,6 +14,17 @@ module Ruby2JS
 
     handle :and, :or do |left, right|
       type = @ast.type
+
+
+      if es2020 and type == :and
+        node = rewrite(left, right)
+        if node.type == :csend
+          return parse right.updated(node.type, node.children)
+        else
+          left, right = node.children
+        end
+      end
+
       op_index = operator_index type
 
       lgroup   = LOGICAL.include?( left.type ) && 
@@ -49,6 +60,40 @@ module Ruby2JS
         group = true if expr and expr.type == :begin
 
         put '!'; put '(' if group; parse expr; put ')' if group
+      end
+    end
+
+    # rewrite a && a.b to a&.b
+    def rewrite(left, right)
+      if left && left.type == :and
+        left = rewrite(*left.children)
+      end
+
+      if right.type != :send
+        s(:and, left, right)
+      elsif conditionally_equals(left, right.children.first)
+        # a && a.b => a&.b
+        right.updated(:csend, [left, right.children.last])
+      elsif conditionally_equals(left.children.last, right.children.first)
+        # a && b && b.c => a && b&.c
+        left.updated(:and, [left.children.first,
+          left.children.last.updated(:csend, 
+          [left.children.last, right.children.last])])
+      else
+        s(:and, left, right)
+      end
+    end
+
+    # determine if two trees are identical, modulo conditionalilties
+    # in other words a.b == a&.b
+    def conditionally_equals(left, right)
+      if left == right
+        true
+      elsif !left or !right or left.type != :csend or right.type != :send
+        false
+      else
+        conditionally_equals(left.children.first, right.children.first) &&
+          conditionally_equals(left.children.last, right.children.last)
       end
     end
   end

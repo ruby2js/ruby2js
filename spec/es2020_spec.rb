@@ -72,8 +72,8 @@ describe "ES2020 support" do
     end
   end
 
-  unless (RUBY_VERSION.split('.').map(&:to_i) <=> [2, 3, 0]) == -1
-    describe :OptionalChaining do
+  describe :OptionalChaining do
+    unless (RUBY_VERSION.split('.').map(&:to_i) <=> [2, 3, 0]) == -1
       it "should support conditional attribute references" do
         to_js('x=a&.b').must_equal 'let x = a?.b'
       end
@@ -81,6 +81,15 @@ describe "ES2020 support" do
       it "should chain conditional attribute references" do
         to_js('x=a&.b&.c').must_equal 'let x = a?.b?.c'
       end
+    end
+
+    it "should combine conditions when it can" do
+      to_js('x=a && a.b').must_equal 'let x = a?.b'
+    end
+
+    it "should ignore unrelated ands" do
+      to_js('x=x && a && a.b && a.b.c && a.b.c.d && y').
+        must_equal 'let x = x && a?.b?.c?.d && y'
     end
   end
 end
