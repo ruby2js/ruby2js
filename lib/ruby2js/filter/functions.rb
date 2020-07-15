@@ -343,7 +343,9 @@ module Ruby2JS
 
           elsif index.type == :erange
             start, finish = index.children
-            if finish.type == :int
+            if not finish
+              process S(:send, target, :slice, start)
+            elsif finish.type == :int
               process S(:send, target, :slice, i.(start), finish)
             else
               process S(:send, target, :slice, i.(start), i.(finish))
@@ -351,7 +353,7 @@ module Ruby2JS
 
           elsif index.type == :irange
             start, finish = index.children
-            if finish.type == :int
+            if finish and finish.type == :int
               final = S(:int, finish.children.first+1)
             else
               final = S(:send, finish, :+, s(:int, 1))
@@ -359,7 +361,7 @@ module Ruby2JS
 
             # No need for the last argument if it's -1
             # This means take all to the end of array
-            if finish.children.first == -1
+            if not finish or finish.children.first == -1
               process S(:send, target, :slice, start)
             else
               process S(:send, target, :slice, start, final)
