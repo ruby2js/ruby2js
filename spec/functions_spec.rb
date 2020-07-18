@@ -210,6 +210,20 @@ describe Ruby2JS::Filter::Functions do
       to_js( 'a[/(\d+)/, 1]' ).must_equal '(a.match(/(\d+)/) || [])[1]'
     end
 
+    it "should handle regular expression index assignment" do
+      to_js( 'a[/a(b)/, 1] = "d"' ).must_equal(
+        'var a = a.replace(/(a)(b)/, function(match) {match[0] + "d"})')
+      to_js( 'a[/a(b)c/, 1] = "d"' ).must_equal(
+        'var a = a.replace(/(a)(b)(c)/, function(match) ' +
+        '{match[0] + "d" + match[2]})')
+      to_js( 'a[/(b)c/, 1] = "d"' ).must_equal(
+        'var a = a.replace(/(b)(c)/, function(match) ' +
+        '{"d" + match[1]})')
+      to_js( 'a[/^a(b)c/, 1] = "d"' ).must_equal(
+        'var a = a.replace(/^(a)(b)(c)/m, function(match) ' +
+        '{match[0] + "d" + match[2]})')
+    end
+
     it "should handle empty?" do
       to_js( 'a.empty?' ).must_equal 'a.length == 0'
     end

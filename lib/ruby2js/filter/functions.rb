@@ -1,4 +1,5 @@
 require 'ruby2js'
+require 'regexp_parser'
 
 module Ruby2JS
   module Filter
@@ -39,6 +40,79 @@ module Ruby2JS
 
         elsif method == :keys and args.length == 0 and node.is_method?
           process S(:send, s(:const, nil, :Object), :keys, target)
+
+        elsif method == :[]= and args.length == 3 and
+          args[0].type == :regexp and args[1].type == :int
+          index = args[1].children.first
+
+          parts = Regexp::Parser.parse(args[0].children.first.children.first)
+          anchor1 = anchor2 = nil
+          split = parts.index do |part|
+            part.type == :group and part.number == index
+          end
+
+          return super unless split
+
+          rewritten = parts[split].to_s
+
+          dstr = [args.last]
+          if rewritten == '()'
+            index -= 1
+            rewritten = ''
+          end
+
+          parts = parts.to_a
+
+          pre = ''
+          if parts.first.type == :anchor
+            pre = parts.shift.to_s
+            split -= 1
+          end
+
+          if split > 0
+            if split == 1 and parts.first.type == :group
+              rewritten = parts.first.to_s + rewritten
+            else
+              rewritten = '(' + parts[0 .. split - 1].join + ')' + rewritten
+              index += 1
+            end
+            dstr.unshift s(:send, s(:lvar, :match), :[], s(:int, 0))
+          end
+
+
+          post = ''
+          if parts.last.type == :anchor
+            post = parts.pop.to_s
+          end
+
+          if split + 1 < parts.length
+            if split  + 2 == parts.length and parts.last.type == :group
+              rewritten += parts.last.to_s
+            else
+              rewritten += '(' + parts[split + 1 .. -1].join + ')'
+            end
+            dstr << s(:send, s(:lvar, :match), :[], s(:int, index))
+          end
+
+          rewritten = pre + rewritten + post
+
+          regex = process s(:regexp, s(:str, rewritten), args[0].children.last)
+          block = s(:block,
+            s(:send, target, :replace, regex),
+            s(:args, s(:arg, :match)),
+            process(s(:dstr, *dstr)))
+
+          if VAR_TO_ASSIGN.keys.include? target.type
+            S(VAR_TO_ASSIGN[target.type], target.children.first, block)
+          elsif target.type == :send
+            if target.children[0] == nil
+              S(:lvasgn, target.children[1], block)
+            else
+              S(:send, target.children[0], :"#{target.children[1]}=", block)
+            end
+          else
+            super
+          end
 
         elsif method == :merge
           args.unshift target
