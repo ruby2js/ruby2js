@@ -34,14 +34,24 @@ module Ruby2JS
       end
 
       def on_block(node)
-        send, _, *block = node.children
+        send, args, *block = node.children
         target, method, *_ = send.children
         while target!=nil and target.type==:send and target.children.length==2
           target, method = target.children
         end
 
         if target == nil and method.to_s.start_with? "_"
-          process send.updated(nil, [*send.children, *process_all(block)])
+          if args.children.empty?
+            # append block as a standalone proc
+            process send.updated(nil, [*send.children, *process_all(block)])
+          else
+            # iterate over Enumerable arguments if there are args present
+            send = send.children
+            return super if send.length < 3
+            process s(:block, s(:send, *send[0..1], *send[3..-1]),
+              s(:args), s(:block, s(:send, send[2], :map),
+              *node.children[1..-1]))
+          end
         else
           super
         end

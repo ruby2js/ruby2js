@@ -24,6 +24,11 @@ describe Ruby2JS::Filter::Wunderbar do
       to_js( '_div do _br; end' ).must_equal '<div><br/></div>'
     end
 
+    it "should handle implicit iteration" do
+      to_js( '_tr(rows) {|row| _td row}' ).
+        must_equal '<tr>{rows.map(row => <td>{row}</td>)}</tr>'
+    end
+
     it "should handle markaby style classes and id" do
       to_js( '_a.b.c.d!' ).must_equal '<a id="d" className="b c"/>'
     end
@@ -33,7 +38,12 @@ describe Ruby2JS::Filter::Wunderbar do
        must_equal '<a id="d" className="b c"><e/></a>'
     end
 
-    it "should map for to htmlFOr" do
+    it "should class for to className" do
+      to_js( '_div class: "foo"' ).
+       must_equal '<div className="foo"/>'
+    end
+
+    it "should map for to htmlFor" do
       to_js( '_label "foo", for: "foo"' ).
        must_equal '<label htmlFor="foo">foo</label>'
     end
