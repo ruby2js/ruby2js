@@ -9,7 +9,7 @@ module Ruby2JS
 
     handle :block do |call, args, block|
 
-      if
+      if \
         @state == :statement and args.children.length == 1 and
         call.children.first and call.children.first.type == :begin and
         call.children[1] == :step and
@@ -42,7 +42,7 @@ module Ruby2JS
           @vars = vars if es2015
         end
 
-      elsif
+      elsif \
         call.children[0] == nil and call.children[1] == :function and
         call.children[2..-1].all? do |child|
           child.type == :lvar or (child.type == :send and

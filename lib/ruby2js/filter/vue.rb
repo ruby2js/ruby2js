@@ -43,7 +43,7 @@ module Ruby2JS
         @vue_h ||= options[:vue_h]
         filters = options[:filters] || Filter::DEFAULTS
 
-        if 
+        if \
           defined? Ruby2JS::Filter::Functions and
           filters.include? Ruby2JS::Filter::Functions
         then
@@ -140,7 +140,7 @@ module Ruby2JS
               end
             end
 
-          elsif
+          elsif \
             statement.type == :send and statement.children[0] == cname and
             statement.children[1].to_s.end_with? '='
           then
@@ -161,13 +161,13 @@ module Ruby2JS
               hash << s(:pair, s(:sym, statement.children[1]),
                 statement.children[2])
 
-            elsif
+            elsif \
               statement.children[1] == :options and
               statement.children[2].type == :hash
             then
               options += statement.children[2].children
 
-            elsif
+            elsif \
               statement.children[1] == :el and
               statement.children[2].type == :str
             then
@@ -190,7 +190,7 @@ module Ruby2JS
 
                 block = s(:begin, block) unless block and block.type == :begin
 
-                if
+                if \
                   (block.children.length != 1 and
                     not vue_wunderbar_free(block.children[0..-2])) or
 
@@ -403,7 +403,7 @@ module Ruby2JS
                 end
               end
 
-            elsif
+            elsif \
               class_methods.any? do |other_method|
                 other_method.children[1].to_s == "#{method.children[1]}="
               end
@@ -545,7 +545,7 @@ module Ruby2JS
                         *values.join(' ').split(' ').
                           map {|str| s(:pair, s(:str, str), s(:true))})
                     else
-                      if
+                      if \
                         expr.type == :if and expr.children[1] and
                         expr.children[1].type == :str
                       then
@@ -847,7 +847,7 @@ module Ruby2JS
             s(:splat, s(:array, *process_all(node.children[2..-1])))
           end
 
-        elsif
+        elsif \
           node.children[1] == :createElement and
           node.children[0] == s(:const, nil, :Vue)
         then
@@ -867,7 +867,7 @@ module Ruby2JS
             element
           end
 
-        elsif
+        elsif \
           @vue_self and VUE_METHODS.include? node.children[1] and
           node.children[0] == s(:const, nil, :Vue)
         then
@@ -929,7 +929,7 @@ module Ruby2JS
           prev = nil
           (node.children.length-1).downto(0) do |i|
             child = node.children[i]
-            if 
+            if \
               child.type == :send and child.children[0] == s(:gvar, :$_) and
               child.children[1] == :push
             then
@@ -968,7 +968,7 @@ module Ruby2JS
         child = node.children.first
 
         # map Vue.render(el, &block) to Vue.new(el: el, render: block)
-        if
+        if \
           child.children[1] == :render and
           child.children[0] == s(:const, nil, :Vue)
         then
@@ -979,7 +979,7 @@ module Ruby2JS
             block = node.children[2]
             block = s(:begin, block) unless block and block.type == :begin
 
-            if
+            if \
               block.children.length != 1 or not block.children.last or
               not [:send, :block].include? block.children.first.type
             then
@@ -999,7 +999,7 @@ module Ruby2JS
 
         return super unless @vue_h
 
-        if
+        if \
           child.children[1] == :createElement and
           child.children[0] == s(:const, nil, :Vue)
         then
@@ -1059,7 +1059,7 @@ module Ruby2JS
               *node.children[1..-1]))
           end
 
-        elsif
+        elsif \
           node.children.first.children.last == :forEach and
           vue_element?(node.children.last)
         then
@@ -1144,7 +1144,7 @@ module Ruby2JS
             node.children[0].children[0].to_s[1..-1]),
             node.children[1], process(node.children[2])]
 
-        elsif
+        elsif \
           node.children.first.type == :lvasgn and
           @vue_props.include? node.children[0].children[0]
         then

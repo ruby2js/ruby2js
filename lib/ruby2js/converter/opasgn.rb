@@ -12,7 +12,7 @@ module Ruby2JS
       var = s(:lvar, var.children.first) if var.type == :lvasgn
       var = s(:cvar, var.children.first) if var.type == :cvasgn
 
-      if 
+      if \
         [:+, :-].include?(op) and value.type==:int and 
         (value.children==[1] or value.children==[-1])
       then

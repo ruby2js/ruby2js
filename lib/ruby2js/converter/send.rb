@@ -16,7 +16,7 @@ module Ruby2JS
     handle :send, :sendw, :await, :attr, :call do |receiver, method, *args|
       ast = @ast
 
-      if
+      if \
         args.length == 1 and method == :+
       then
         node = collapse_strings(ast)
@@ -25,7 +25,7 @@ module Ruby2JS
 
       # :irange support
       # - currently only .to_a
-      if
+      if \
         receiver and
         receiver.type == :begin and
         [:irange, :erange].include? receiver.children.first.type
@@ -86,7 +86,7 @@ module Ruby2JS
               # async proc {|x| ... }
               return parse block.updated(:async, [nil, *block.children[1..-1]])
 
-            elsif
+            elsif \
               block.children[0].children[1] == :new and
               block.children[0].children[0] == s(:const, nil, :Proc)
             then
@@ -141,7 +141,7 @@ module Ruby2JS
 
       elsif method == :[]
         (group_receiver ? group(receiver) : parse(receiver))
-        if
+        if \
           args.length == 1 and [:str, :sym].include? args.first.type and
           args.first.children.first.to_s =~ /^[a-zA-Z]\w*$/
         then
@@ -152,7 +152,7 @@ module Ruby2JS
 
       elsif method == :[]=
         parse receiver
-        if
+        if \
           args.length == 2 and [:str, :sym].include? args.first.type and
           args.first.children.first.to_s =~ /^[a-zA-Z]\w*$/
         then
@@ -170,7 +170,7 @@ module Ruby2JS
         put ')'
 
       elsif [:-@, :+@, :~, '~'].include? method
-        if
+        if \
           receiver.type == :send and
           receiver.children[1] == :+@ and
           Parser::AST::Node === receiver.children[0] and
@@ -255,7 +255,7 @@ module Ruby2JS
         elsif args.length == 1 and args.first.type == :const
           # accommodation for JavaScript like new syntax w/o argument list
           parse s(:attr, args.first, :new), @state
-        elsif
+        elsif \
           args.length == 2 and [:send, :const].include? args.first.type and
           args.last.type == :def and args.last.children.first == nil
         then
@@ -359,7 +359,7 @@ module Ruby2JS
       right = node.children[2]
 
       # recursively evaluate left hand side
-      if
+      if \
         left.type == :send and left.children.length == 3 and
         left.children[1] == :+
       then
@@ -367,7 +367,7 @@ module Ruby2JS
       end
 
       # recursively evaluate right hand side
-      if
+      if \
         right.type == :send and right.children.length == 3 and
         right.children[1] == :+
       then

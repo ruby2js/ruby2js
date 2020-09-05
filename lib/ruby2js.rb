@@ -15,6 +15,9 @@ module Ruby2JS
   class SyntaxError < RuntimeError
   end
 
+  # does $SAFE work?
+  SAFE_WORKS = (RUBY_VERSION.split('.').map(&:to_i) <=> [2, 7, 0]) < 0
+
   @@eslevel_default = 2009 # ecmascript 5
   @@strict_default = false
 
@@ -159,7 +162,7 @@ module Ruby2JS
 
     if Proc === source
       file,line = source.source_location
-      source = File.read(file.dup.untaint).untaint
+      source = SAFE_WORKS ? IO.read(file.dup.untaint).untaint : IO.read(file)
       ast, comments = parse(source)
       comments = Parser::Source::Comment.associate(ast, comments) if ast
       ast = find_block( ast, line )

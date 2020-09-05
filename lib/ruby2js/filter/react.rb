@@ -23,18 +23,6 @@ module Ruby2JS
     module React
       include SEXP
 
-      def options=(options)
-        super
-        filters = options[:filters] || Filter::DEFAULTS
-
-        if 
-          defined? Ruby2JS::Filter::Functions and
-          filters.include? Ruby2JS::Filter::Functions
-        then
-          @react_filter_functions = true
-        end
-      end
-
       # the following command can be used to generate ReactAttrs:
       # 
       #   ruby -r ruby2js/filter/react -e "Ruby2JS::Filter::React.genAttrs"
@@ -92,7 +80,14 @@ module Ruby2JS
         @react = true if options[:react]
         filters = options[:filters] || Filter::DEFAULTS
 
-        if 
+        if \
+          defined? Ruby2JS::Filter::Functions and
+          filters.include? Ruby2JS::Filter::Functions
+        then
+          @react_filter_functions = true
+        end
+
+        if \
           defined? Ruby2JS::Filter::Wunderbar and
           filters.include? Ruby2JS::Filter::Wunderbar
         then
@@ -150,7 +145,7 @@ module Ruby2JS
             elsif child.is_method?
               statics << s(:pair, s(:sym, mname), process(child.updated(:block,
                 [s(:send, nil, :proc), args, s(:autoreturn, *block)])))
-            elsif
+            elsif \
               block.length == 1 and
               Converter::EXPRESSIONS.include? block.first.type
             then
@@ -187,7 +182,7 @@ module Ruby2JS
 
           # create a default getInitialState method if there is no such method
           # and there are references to instance variables.
-          if
+          if \
             not es2015 and
             not body.any? do |child|
               child.type == :def and
@@ -256,7 +251,7 @@ module Ruby2JS
               end
 
             elsif mname == :render
-              if
+              if \
                  block.length != 1 or not block.last or
                 not [:send, :block].include? block.last.type
               then
@@ -373,7 +368,7 @@ module Ruby2JS
         if not @react
           # enable React filtering within React class method calls or
           # React component calls
-          if
+          if \
             node.children.first == s(:const, nil, :React)
           then
 
@@ -398,7 +393,7 @@ module Ruby2JS
             process(node.children[2])
           end
 
-        elsif
+        elsif \
           @reactApply and node.children[1] == :createElement and
           node.children[0] == s(:const, nil, :React)
         then
@@ -464,7 +459,7 @@ module Ruby2JS
                   expr = expr.children.first
                 end
 
-                if
+                if \
                   expr.type == :if and expr.children[1] and
                   expr.children[1].type == :str
                 then
@@ -791,7 +786,7 @@ module Ruby2JS
             super
           end
 
-        elsif
+        elsif \
           node.children[0] and node.children[0].type == :self and
           node.children.length == 2 and
           node.children[1] == :componentWillReceiveProps
@@ -808,7 +803,7 @@ module Ruby2JS
         if not @react
           # enable React filtering within React class method calls or
           # React component calls
-          if
+          if \
             node.children.first == s(:const, nil, :React)
           then
             begin
@@ -835,7 +830,7 @@ module Ruby2JS
         #
         # Base Ruby2JS processing will convert the 'splat' to 'apply'
         child = node.children.first
-        if 
+        if \
           child.children[1] == :createElement and
           child.children[0] == s(:const, nil, :React)
         then
@@ -1085,7 +1080,7 @@ module Ruby2JS
           end
 
         when :send
-          if
+          if \
             child and child.type == :self and node.children.length == 2 and
             node.children[1] == :componentWillReceiveProps
           then
@@ -1098,7 +1093,7 @@ module Ruby2JS
       # Ruby 'desugars' -> to lambda, and Ruby2JS presumes that lambdas
       # return a value.
       def on_pair(node)
-        if
+        if \
           node.children[1].type == :block and
           node.children[1].children[0] == s(:send, nil, :lambda)
         then
@@ -1114,7 +1109,7 @@ module Ruby2JS
       def on_begin(node)
         node = super
         (node.children.length-2).downto(0) do |i|
-          if
+          if \
             node.children[i].type == :send and
             node.children[i].children[0] and
             node.children[i].children[0].type == :self and

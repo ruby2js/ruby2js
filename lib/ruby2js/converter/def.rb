@@ -88,7 +88,7 @@ module Ruby2JS
       put 'async ' if @ast.type == :async
 
       # es2015 fat arrow support
-      if 
+      if \
         not name and es2015 and @state != :method and @ast.type != :defm and 
         not @prop
       then
@@ -105,7 +105,7 @@ module Ruby2JS
           else
             style = :expression
           end
-        elsif 
+        elsif \
           expr.type == :if and expr.children[1] and expr.children[2] and
           EXPRESSIONS.include? expr.children[1].type and
           EXPRESSIONS.include? expr.children[2].type

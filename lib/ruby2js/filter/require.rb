@@ -17,7 +17,7 @@ module Ruby2JS
       end
 
       def on_send(node)
-        if
+        if \
           not @require_expr and # only statements
           node.children.length == 3 and
           node.children[0] == nil and
@@ -40,7 +40,7 @@ module Ruby2JS
 
             segments = basename.split(/[\/\\]/)
             if segments.all? {|path| path =~ @@valid_path and path != '..'}
-              filename.untaint 
+              filename.untaint if Ruby2JS::SAFE_WORKS
             end
 
             if not File.file? filename and File.file? filename+".rb"

@@ -37,7 +37,7 @@ module Ruby2JS
       body.compact!
       visible = {}
       body.map! do |m| 
-        if 
+        if \
           @ast.type == :class_module and m.type == :defs and
           m.children.first == s(:self)
         then
@@ -217,7 +217,7 @@ module Ruby2JS
         end
 
         # collapse sequence to a single assignment
-        if 
+        if \
           @ast.type != :class_extend and
           (methods > 1 or (methods == 1 and body[start].type == :prop))
         then

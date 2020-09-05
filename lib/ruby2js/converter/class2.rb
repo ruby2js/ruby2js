@@ -173,7 +173,7 @@ module Ruby2JS
               @instance_method = nil
             end
 
-          elsif 
+          elsif \
             [:defs, :asyncs].include? m.type and m.children.first.type == :self
           then
 

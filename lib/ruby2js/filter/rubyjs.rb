@@ -20,7 +20,7 @@ module Ruby2JS
           target = target.children.first
         end
 
-        if 
+        if \
           [:capitalize, :center, :chomp, :ljust, :lstrip, :rindex, :rjust,
             :rstrip, :scan, :swapcase, :tr].include? method
         then
@@ -28,7 +28,7 @@ module Ruby2JS
           s(:send, s(:lvar, :_s), method,
             *process_all([node.children[0], *node.children[2..-1]]))
 
-        elsif 
+        elsif \
           [:at, :compact, :compact!, :delete_at, :delete_at, :flatten, :insert,
           :reverse, :reverse!, :rotate, :rotate, :rotate!, :shift, :shuffle,
           :shuffle!, :slice, :slice!, :transpose, :union, :uniq, :uniq!]
@@ -62,14 +62,14 @@ module Ruby2JS
         method = call.children[1]
         return super if excluded?(method)
 
-        if 
+        if \
           [:collect_concat, :count, :cycle, :delete_if, :drop_while,
           :each_index, :each_slice, :each_with_index, :each_with_object,
           :find, :find_all, :flat_map, :inject, :grep, :group_by, :keep_if,
           :map, :max_by, :min_by, :one?, :partition, :reject, :reverse_each,
           :select!, :sort_by, :take_while].include? method
         then
-          if 
+          if \
             [:collect_concat, :count, :delete_if, :drop_while, :find,
             :find_all, :flat_map, :grep, :group_by, :keep_if, :map, :max_by,
             :min_by, :one?, :partition, :reject, :select!, :sort_by,

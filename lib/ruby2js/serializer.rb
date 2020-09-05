@@ -60,7 +60,7 @@ module Ruby2JS
 
     def timestamp(file)
       if file
-        file = file.dup.untaint
+        file = file.dup.untaint if Ruby2JS::SAFE_WORKS
         @timestamps[file] = File.mtime(file) if File.exist?(file)
       end
     end
@@ -116,24 +116,24 @@ module Ruby2JS
       reindent @lines
 
       (@lines.length-3).downto(0) do |i|
-        if
+        if \
           @lines[i].length == 0
         then
           @lines.delete i
-        elsif
+        elsif \
           @lines[i+1].comment? and not @lines[i].comment? and
           @lines[i].indent == @lines[i+1].indent
         then
           # before a comment
           @lines.insert i+1, Line.new
-        elsif
+        elsif \
           @lines[i].indent == @lines[i+1].indent and 
           @lines[i+1].indent < @lines[i+2].indent and
           not @lines[i].comment?
         then
           # start of indented block
           @lines.insert i+1, Line.new
-        elsif
+        elsif \
           @lines[i].indent > @lines[i+1].indent and 
           @lines[i+1].indent == @lines[i+2].indent and
           not @lines[i+2].empty?
@@ -223,7 +223,7 @@ module Ruby2JS
       mark = output_location
       yield
 
-      if
+      if \
         @lines.length > mark.first+1 or
         @lines[mark.first-1].join.length + @line.join.length >= @width
       then

@@ -56,7 +56,7 @@ module Ruby2JS
               s(:hash, s(:pair, s(:sym, :stdio), s(:str, 'inherit'))))
             end
 
-          elsif 
+          elsif \
             method == :require and args.length == 1 and 
             args.first.type == :str and 
             %w(fileutils tmpdir).include? args.first.children.first
@@ -67,7 +67,7 @@ module Ruby2JS
             super
           end
 
-        elsif 
+        elsif \
           [:File, :IO].include? target.children.last and
           target.type == :const and target.children.first == nil
         then
@@ -99,7 +99,7 @@ module Ruby2JS
             @node_setup << :fs
             S(:send, s(:attr, nil, :fs), :renameSync, *process_all(args))
 
-          elsif 
+          elsif \
             [:chmod, :lchmod].include? method and 
             args.length > 1 and args.first.type == :int
           then
@@ -110,7 +110,7 @@ module Ruby2JS
                 s(:octal, *args.first.children))
             })
 
-          elsif 
+          elsif \
             [:chown, :lchown].include? method and args.length > 2 and 
             args[0].type == :int and args[1].type == :int
           then
@@ -148,7 +148,7 @@ module Ruby2JS
             super
           end
 
-        elsif 
+        elsif \
           target.children.last == :FileUtils and
           target.type == :const and target.children.first == nil
         then
@@ -201,7 +201,7 @@ module Ruby2JS
               s(:send, s(:attr, nil, :fs), :unlinkSync, process(file))
             })
 
-          elsif 
+          elsif \
             method == :chmod and args.length == 2 and args.first.type == :int
           then
             @node_setup << :fs
@@ -211,7 +211,7 @@ module Ruby2JS
                 s(:octal, *args.first.children))
             })
 
-          elsif 
+          elsif \
             method == :chown and args.length == 3 and 
             args[0].type == :int and args[1].type == :int
           then
@@ -233,7 +233,7 @@ module Ruby2JS
             super
           end
 
-        elsif 
+        elsif \
           target.type == :const and target.children.first == nil and
           target.children.last == :Dir
         then
@@ -274,7 +274,7 @@ module Ruby2JS
         call = node.children.first
         target, method, *args = call.children
 
-        if 
+        if \
           method == :chdir and args.length == 1 and
           target.children.last == :Dir and
           target.type == :const and target.children.first == nil
@@ -325,7 +325,7 @@ module Ruby2JS
         command = children.shift
         while children.length > 0
           child = children.shift
-          if 
+          if \
             child.type == :begin and child.children.length == 1 and
             child.children.first.type == :send and
             child.children.first.children.first == nil

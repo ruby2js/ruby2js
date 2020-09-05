@@ -36,7 +36,7 @@ module Ruby2JS
         return super if excluded?(method)
 
         if target == nil
-          if 
+          if \
             method == :require and args.length == 1 and 
             args.first.type == :str and 
             %w(nokogiri nokogumbo).include? args.first.children.first
@@ -47,7 +47,7 @@ module Ruby2JS
             super
           end
 
-        elsif 
+        elsif \
           [:HTML, :HTML5].include? method and
           target == s(:const, nil, :Nokogiri)
         then
@@ -55,7 +55,7 @@ module Ruby2JS
           S(:attr, s(:attr, s(:send, s(:const, nil, :JSDOM), :new,
             *process_all(args)), :window), :document)
 
-        elsif 
+        elsif \
           method == :parse and
           target.type == :const and
           target.children.first == s(:const, nil, :Nokogiri) and
@@ -65,13 +65,13 @@ module Ruby2JS
           S(:attr, s(:attr, s(:send, s(:const, nil, :JSDOM), :new,
             *process_all(args)), :window), :document)
 
-        elsif 
+        elsif \
           method == :at and 
           args.length == 1 and args.first.type == :str
         then
           S(:send, target, :querySelector, process(args.first))
 
-        elsif 
+        elsif \
           method == :search and 
           args.length == 1 and args.first.type == :str
         then
@@ -98,25 +98,25 @@ module Ruby2JS
         elsif method === :to_html and args.length == 0
           S(:attr, target, :outerHTML)
 
-        elsif 
+        elsif \
           [:attr, :get_attribute].include? method and 
           args.length == 1 and args.first.type == :str
         then
           S(:send, target, :getAttribute, process(args.first))
 
-        elsif 
+        elsif \
           [:key?, :has_attribute].include? method and 
           args.length == 1 and args.first.type == :str
         then
           S(:send, target, :hasAttribute, process(args.first))
 
-        elsif 
+        elsif \
           method == :set_attribute and 
           args.length == 2 and args.first.type == :str
         then
           S(:send, target, :setAttribute, *process_all(args))
 
-        elsif 
+        elsif \
           method == :attribute and 
           args.length == 1 and args.first.type == :str
         then
@@ -128,7 +128,7 @@ module Ruby2JS
         elsif method == :attribute_nodes and args.length == 0
           S(:attr, target, :attributes)
 
-        elsif 
+        elsif \
           method == :new and args.length == 2 and
           target == s(:const, s(:const, s(:const, nil, :Nokogiri), :XML), :Node)
         then
@@ -172,14 +172,14 @@ module Ruby2JS
         elsif method == :add_child and args.length == 1
           S(:send, target, :appendChild, process(args.first))
 
-        elsif 
+        elsif \
           [:add_next_sibling, :next=, :after].include? method and
           args.length == 1
         then
           S(:send, s(:attr, target, :parentNode), :insertBefore,
             process(args.first), s(:attr, target, :nextSibling))
 
-        elsif 
+        elsif \
           [:add_previous_sibling, :previous=, :before].include? method and
           args.length == 1
         then
@@ -199,7 +199,7 @@ module Ruby2JS
         elsif method == :previous_element and args.length == 0
           S(:attr, target, :previousElement)
 
-        elsif 
+        elsif \
           [:previous, :previous_sibling].include? method and args.length == 0
         then
           S(:attr, target, :previousSibling)

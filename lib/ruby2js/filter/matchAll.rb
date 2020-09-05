@@ -7,7 +7,7 @@ module Ruby2JS
 
       # ensure matchAll is before Functions in the filter list
       def self.reorder(filters)
-        if
+        if \
           defined? Ruby2JS::Filter::Functions and
           filters.include? Ruby2JS::Filter::Functions
         then

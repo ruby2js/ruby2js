@@ -24,7 +24,7 @@ module Ruby2JS
             *assign.children[1..-1]
           ])
 
-        elsif 
+        elsif \
           node.children[2].type == :send and
           node.children[2].children[0..1] == [nil, :async] and
           node.children[2].children[2].type == :def
@@ -38,7 +38,7 @@ module Ruby2JS
               *process_all(fn.children[1..-1])))
           ])
 
-        elsif 
+        elsif \
           node.children[2].type == :send and
           node.children[2].children[0..1] == [nil, :default]
         then

@@ -46,7 +46,6 @@ module Ruby2JS
           index = args[1].children.first
 
           parts = Regexp::Parser.parse(args[0].children.first.children.first)
-          anchor1 = anchor2 = nil
           split = parts.index do |part|
             part.type == :group and part.number == index
           end
@@ -623,7 +622,7 @@ module Ruby2JS
           call = call.updated(nil, [s(:begin, range), :step, s(:int, 1)])
           process node.updated(nil, [call, *node.children[1..-1]])
 
-        elsif
+        elsif \
           method == :each and call.children[0].type == :send and
           call.children[0].children[1] == :step
         then
@@ -635,7 +634,7 @@ module Ruby2JS
             :step, step])
           process node.updated(nil, [call, *node.children[1..-1]])
 
-        elsif
+        elsif \
           # (a..b).each {|v| ...}
           method == :each and
           call.children[0].type == :begin and
@@ -646,7 +645,7 @@ module Ruby2JS
           process s(:for, s(:lvasgn, node.children[1].children[0].children[0]),
             call.children[0].children[0], node.children[2])
 
-        elsif
+        elsif \
           [:each, :each_value].include? method
         then
           if es2015 or @jsx
@@ -670,7 +669,7 @@ module Ruby2JS
               :forEach), *node.children[1..2]])
           end
 
-        elsif
+        elsif \
           method == :each_key and
           [:each, :each_key].include? method and
           node.children[1].children.length == 1
