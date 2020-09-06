@@ -22,9 +22,12 @@
 #         --es2018
 #         --es2019
 #         --es2020
+#         --es2021
 #         --strict
 #         --equality
 #         --identity
+#         --logical
+#         --nullish
 #         ---filter filter
 #         -f filter
 
@@ -35,6 +38,8 @@ options = {}
 options[:strict] = true if ARGV.delete('--strict')
 options[:comparison] = :equality if ARGV.delete('--equality')
 options[:comparison] = :identity if ARGV.delete('--identity')
+options[:or] = :logical if ARGV.delete('--logical')
+options[:or] = :nullish if ARGV.delete('--nullish')
 
 begin
   # support running directly from a git clone
@@ -110,6 +115,7 @@ _html do
       _option 2018, value: 2018, selected: @eslevel == '2018'
       _option 2019, value: 2019, selected: @eslevel == '2019'
       _option 2020, value: 2020, selected: @eslevel == '2020'
+      _option 2021, value: 2021, selected: @eslevel == '2021'
     end
 
     _input type: 'checkbox', name: 'ast', id: 'ast', checked: !!@ast

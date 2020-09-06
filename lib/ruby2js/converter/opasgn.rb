@@ -46,7 +46,10 @@ module Ruby2JS
       vtype = :ivar if asgn.type == :ivasgn
       vtype = :cvar if asgn.type == :cvasgn
       
-      if vtype
+      if es2021
+        op = type == :and ? '&&' : (@or == :nullish ? '??' : '||')
+        parse s(:op_asgn, asgn, op, value);
+      elsif vtype
         parse s(asgn.type, asgn.children.first, s(type, 
           s(vtype, asgn.children.first), value))
       elsif asgn.type == :send and asgn.children[1] == :[]

@@ -98,6 +98,12 @@ Emit strict equality comparisons:
 puts Ruby2JS.convert('a==1', comparison: :identity)
 ```
 
+Emit nullish coalescing operators:
+
+```ruby
+puts Ruby2JS.convert('a || 1', or: :nullish)
+```
+
 With [ExecJS](https://github.com/sstephenson/execjs):
 ```ruby
 require 'ruby2js/execjs'
@@ -635,6 +641,15 @@ conversions are made:
 * `@@x` becomes `ClassName.#x`
 * `a&.b` becomes `a?.b`
 * `.scan` becomes `Array.from(str.matchAll(/.../g), s => s.slice(1))`
+
+ES2021 support
+---
+
+When option `eslevel: 2021` is provided, the following additional
+conversions are made:
+
+* `x ||= 1` becomes `x ||= 1`
+* `x &&= 1` becomes `x &&= 1`
 
 Picking a Ruby to JS mapping tool
 ---

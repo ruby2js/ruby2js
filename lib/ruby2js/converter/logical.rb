@@ -36,7 +36,7 @@ module Ruby2JS
       rgroup = true if right.type == :begin
 
       put '(' if lgroup; parse left; put ')' if lgroup
-      put (type==:and ? ' && ' : ' || ')
+      put (type==:and ? ' && ' : ((@or == :nullish and es2020) ? ' ?? ' : ' || '))
       put '(' if rgroup; parse right; put ')' if rgroup
     end
 

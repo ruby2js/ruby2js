@@ -62,6 +62,7 @@ module Ruby2JS
       @eslevel = :es5
       @strict = false
       @comparison = :equality
+      @or = :logical
     end
 
     def width=(width)
@@ -126,7 +127,7 @@ module Ruby2JS
       Parser::AST::Node.new(type, args)
     end
 
-    attr_accessor :strict, :eslevel, :comparison
+    attr_accessor :strict, :eslevel, :comparison, :or
 
     def es2015
       @eslevel >= 2015
@@ -150,6 +151,10 @@ module Ruby2JS
 
     def es2020
       @eslevel >= 2020
+    end
+
+    def es2021
+      @eslevel >= 2021
     end
 
     @@handlers = []

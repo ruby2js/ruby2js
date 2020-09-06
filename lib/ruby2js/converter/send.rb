@@ -43,6 +43,7 @@ module Ruby2JS
       # three ways to define anonymous functions
       if method == :new and receiver and receiver.children == [nil, :Proc]
         return parse args.first, @state
+
       elsif not receiver and [:lambda, :proc].include? method
         if method == :lambda
           return parse s(args.first.type, *args.first.children[0..-2],

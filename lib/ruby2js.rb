@@ -97,6 +97,10 @@ module Ruby2JS
         @options[:eslevel] >= 2020
       end
 
+      def es2021
+        @options[:eslevel] >= 2021
+      end
+
       def process(node)
         ast, @ast = @ast, node
         replacement = super
@@ -199,6 +203,7 @@ module Ruby2JS
     ruby2js.eslevel = options[:eslevel]
     ruby2js.strict = options[:strict]
     ruby2js.comparison = options[:comparison] || :equality
+    ruby2js.or = options[:or] || :logical
     if ruby2js.binding and not ruby2js.ivars
       ruby2js.ivars = ruby2js.binding.eval \
         'Hash[instance_variables.map {|var| [var, instance_variable_get(var)]}]'

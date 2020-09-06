@@ -12,6 +12,10 @@ describe "ES2020 support" do
       filters: [Ruby2JS::Filter::Functions]).to_s)
   end
 
+  def to_js_nullish( string)
+    _(Ruby2JS.convert(string, eslevel: 2020, or: :nullish, filters: []).to_s)
+  end
+
   describe :InstanceFields do
     it "should convert private fields to instance #vars" do
       to_js( 'class C; def initialize; @a=1; end; def a; @a; end; end' ).
@@ -69,6 +73,13 @@ describe "ES2020 support" do
     it "should handle regular expression indexes" do
       to_js_fn( 'a[/\d+/]' ).must_equal 'a.match(/\d+/)?.[0]'
       to_js_fn( 'a[/(\d+)/, 1]' ).must_equal 'a.match(/(\d+)/)?.[1]'
+    end
+  end
+
+  describe "nullish coalescing operator" do
+    it "should map || operator based on :or option" do
+      to_js( 'a || b' ).must_equal 'a || b'
+      to_js_nullish( 'a || b' ).must_equal 'a ?? b'
     end
   end
 
