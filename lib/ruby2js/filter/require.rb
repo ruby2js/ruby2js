@@ -39,9 +39,6 @@ module Ruby2JS
             filename = File.join(dirname, basename)
 
             segments = basename.split(/[\/\\]/)
-            if segments.all? {|path| path =~ @@valid_path and path != '..'}
-              filename.untaint if Ruby2JS::SAFE_WORKS
-            end
 
             if not File.file? filename and File.file? filename+".rb"
               filename += '.rb'

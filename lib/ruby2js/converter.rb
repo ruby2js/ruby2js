@@ -245,7 +245,6 @@ module Ruby2JS
         if ast.loc and ast.loc.expression
           filename = ast.loc.expression.source_buffer.name
           if filename and not filename.empty?
-            filename = filename.dup.untaint if Ruby2JS::SAFE_WORKS
             @timestamps[filename] ||= File.mtime(filename)
           end
         end

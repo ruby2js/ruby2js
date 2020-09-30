@@ -60,7 +60,6 @@ module Ruby2JS
 
     def timestamp(file)
       if file
-        file = file.dup.untaint if Ruby2JS::SAFE_WORKS
         @timestamps[file] = File.mtime(file) if File.exist?(file)
       end
     end
