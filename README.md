@@ -221,7 +221,7 @@ the script.
 
 * <a id="camelCase" href="https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/camelCase.rb">camelCase</a>
   converts `underscore_case` to `camelCase`.  See
-  [camelCase_spec](https://github.com/rubys/ruby2js/blob/master/spec/camelcase_spec.rb)
+  [camelcase_spec](https://github.com/rubys/ruby2js/blob/master/spec/camelcase_spec.rb)
   for examples.
 
 * <a id="functions" href="https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/functions.rb">functions</a>
