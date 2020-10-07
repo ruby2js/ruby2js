@@ -95,6 +95,17 @@ module Ruby2JS
                 elsif not [:lambda, :proc].include? method
                   anonfn = false
                 end
+
+                # use fat arrow syntax if block contains a reference to 'this'
+                if anonfn
+                  walk = proc do |ast|
+                    anonfn = false if ast == s(:send, nil, :this)
+                    ast.children.each do |child|
+                      walk[child] if child.is_a? Parser::AST::Node
+                    end
+                  end
+                  walk[right]
+                end
               end
 
               if \

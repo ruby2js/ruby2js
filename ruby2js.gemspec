@@ -15,7 +15,7 @@ Gem::Specification.new do |s|
   s.files = %w(ruby2js.gemspec README.md) + Dir.glob("{lib}/**/*")
   s.homepage = "http://github.com/rubys/ruby2js".freeze
   s.licenses = ["MIT".freeze]
-  s.required_ruby_version = Gem::Requirement.new(">= 1.9.3".freeze)
+  s.required_ruby_version = Gem::Requirement.new(">= 2.0".freeze)
   s.summary = "Minimal yet extensible Ruby to JavaScript conversion.".freeze
 
   s.add_dependency('parser')
