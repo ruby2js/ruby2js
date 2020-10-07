@@ -181,6 +181,8 @@ describe "ES2015 support" do
         must_include '{x: () => {this}}'
       to_js( 'class T; def d; {x: proc {this}}; end; end' ).
         must_include '{x: () => this}'
+      to_js( 'class T; def d; {x: proc {@c}}; end; end' ).
+        must_include '{x: () => this._c}'
       to_js( 'class T; def d; 1; end; def c; {a: -> {d}}; end; end' ).
         must_include 'get c() {return {a: () => this.d}}'
     end

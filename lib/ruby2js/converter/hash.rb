@@ -101,6 +101,8 @@ module Ruby2JS
                   walk = proc do |ast|
                     if ast == s(:self)
                       anonfn = false
+                    elsif [:ivar, :ivasgn].include? ast.type
+                      anonfn = false
                     elsif ast.type == :send and ast.children.first == nil 
                       method = ast.children.last if ast.children.length == 2
                       if @rbstack.any? {|rb| rb[method]} or method == :this
