@@ -99,7 +99,15 @@ module Ruby2JS
                 # use fat arrow syntax if block contains a reference to 'this'
                 if anonfn
                   walk = proc do |ast|
-                    anonfn = false if ast == s(:send, nil, :this)
+                    if ast == s(:self)
+                      anonfn = false
+                    elsif ast.type == :send and ast.children.first == nil 
+                      method = ast.children.last if ast.children.length == 2
+                      if @rbstack.any? {|rb| rb[method]} or method == :this
+                        anonfn = false
+                      end
+                    end
+
                     ast.children.each do |child|
                       walk[child] if child.is_a? Parser::AST::Node
                     end
