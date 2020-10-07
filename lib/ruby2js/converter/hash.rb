@@ -97,7 +97,7 @@ module Ruby2JS
                 end
 
                 # use fat arrow syntax if block contains a reference to 'this'
-                if anonfn
+                if anonfn and @class_name
                   walk = proc do |ast|
                     if ast == s(:self)
                       anonfn = false
