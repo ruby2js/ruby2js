@@ -15,7 +15,7 @@ module Ruby2JS
 
         tagged_methods = @options[:template_literal_tags] || [:html, :css]
 
-        if tagged_methods.include?(method)
+        if tagged_methods.include?(method) && !args.empty?
           strnode = process args.first
           if strnode.type == :str
             # convert regular strings to literal strings
