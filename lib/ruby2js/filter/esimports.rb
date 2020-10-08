@@ -14,8 +14,20 @@ module Ruby2JS
         return super unless target.nil?
 
         if method == :import || method == :require
-          imports = (args[0].type == :const || args[0].type == :send) ? args[0] : args[0].children
-          s(:import, args[1].children, imports)
+          if args[0].type == :str
+            # require "file.css"
+            #   => import "file.css"
+            s(:import, args[0].children[0])
+          else
+            # require Stuff, from: "file.js"
+            #   => import Stuff from "file.js"
+            # require Stuff, as: "*", from: "file.js"
+            #   => import Stuff as * from "file.js"
+            # require [ Some, Stuff ], from: "file.js"
+            #   => import { Some, Stuff } from "file.js"
+            imports = (args[0].type == :const || args[0].type == :send) ? args[0] : args[0].children
+            s(:import, args[1].children, imports)
+          end
         elsif method == :export          
           s(:export, *process_all(args))
         else
