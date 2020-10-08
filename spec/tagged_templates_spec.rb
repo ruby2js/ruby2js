@@ -31,14 +31,21 @@ describe Ruby2JS::Filter::TaggedTemplates do
 
     it "should allow assignment" do
       to_js('styles = css("color: green")').
-        must_include("let styles = css`color: green`")
+        must_include('let styles = css`color: green`')
     end
   end
 
   describe "available tags" do
     it "should be customizable" do
       to_js_with_new_tags('value = work("some value")').
-        must_include("let value = work`some value`")
+        must_include('let value = work`some value`')
+    end
+  end
+
+  describe "targets" do
+    it "should not process unless target is nil" do
+      to_js('styles = self.css("color: green")').
+        must_include('let styles = this.css("color: green")')
     end
   end
 

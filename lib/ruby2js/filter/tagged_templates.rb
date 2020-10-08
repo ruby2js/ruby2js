@@ -11,6 +11,8 @@ module Ruby2JS
 
       def on_send(node)
         target, method, *args = node.children
+        return super unless target.nil?
+
         tagged_methods = @options[:template_literal_tags] || [:html, :css]
 
         if tagged_methods.include?(method)
