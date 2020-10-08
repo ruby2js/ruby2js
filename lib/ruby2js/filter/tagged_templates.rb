@@ -28,7 +28,7 @@ module Ruby2JS
             end
           end
 
-          S(:taglit, s(:arg, method), strnode)
+          S(:taglit, s(:sym, method), strnode)
         else
           super
         end
