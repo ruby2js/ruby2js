@@ -10,13 +10,13 @@ module Ruby2JS
       }
 
       def camelCase(symbol)
-        symbol.to_s.gsub(/(?!^)_[a-z]/) {|match| match[1].upcase}
+        symbol.to_s.gsub(/(?!^)_[a-z0-9]/) {|match| match[1].upcase}
       end
 
       def on_send(node)
         if node.children[0] == nil and WHITELIST.include? node.children[1].to_s
           super
-        elsif node.children[1] =~ /_.*\w$/
+        elsif node.children[1] =~ /_.*\w[=!?]?$/
           super S(:send , node.children[0],
             camelCase(node.children[1]), *node.children[2..-1])
         else

@@ -21,6 +21,16 @@ describe Ruby2JS::Filter::CamelCase do
       to_js( '_foo_bar(_baz_qux)' ).must_equal '_fooBar(_bazQux)'
     end
 
+    it "should handle method calls with suffixes" do
+      to_js( 'self.foo_bar!()' ).must_equal 'this.fooBar()'
+      to_js( 'self.foo_bar?' ).must_equal 'this.fooBar'
+      to_js( 'self.foo_bar = 123' ).must_equal 'this.fooBar = 123'
+    end
+
+    it "should handle numbers" do
+      to_js( '_foo_bar_123(_baz_qux_456)' ).must_equal '_fooBar123(_bazQux456)'
+    end
+
     it "should handle method definitions" do
       to_js( 'def foo_bar(baz_qux); end' ).
         must_equal 'function fooBar(bazQux) {}'
