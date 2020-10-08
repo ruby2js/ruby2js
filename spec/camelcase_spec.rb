@@ -17,6 +17,10 @@ describe Ruby2JS::Filter::CamelCase do
       to_js( 'foo_bar(baz_qux)' ).must_equal 'fooBar(bazQux)'
     end
 
+    it "should handle underscore prefixes" do
+      to_js( '_foo_bar(_baz_qux)' ).must_equal '_fooBar(_bazQux)'
+    end
+
     it "should handle method definitions" do
       to_js( 'def foo_bar(baz_qux); end' ).
         must_equal 'function fooBar(bazQux) {}'

@@ -10,7 +10,7 @@ module Ruby2JS
       }
 
       def camelCase(symbol)
-        symbol.to_s.gsub(/_[a-z]/) {|match| match[1].upcase}
+        symbol.to_s.gsub(/(?!^)_[a-z]/) {|match| match[1].upcase}
       end
 
       def on_send(node)
