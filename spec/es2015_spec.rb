@@ -142,6 +142,10 @@ describe "ES2015 support" do
       to_js( '"#{a}" + "#{b}"' ).must_equal('`${a}${b}`')
     end
 
+    it "should escape backticks in templates" do
+      to_js( '"#{a} tick`mark"' ).must_equal('`${a} tick\`mark`')
+    end
+
     it "should escape stray ${} characters" do
       to_js( '"#{a}${a}"' ).must_equal("`${a}$\\{a}`")
     end
