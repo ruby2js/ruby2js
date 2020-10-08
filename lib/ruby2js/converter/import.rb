@@ -50,7 +50,12 @@ module Ruby2JS
         put 'default '
         args[0] = args[0].children[2]
       elsif args.first.respond_to?(:type) && args.first.type == :lvasgn
-        put 'const '
+        if args[0].children[0] == :default
+          put 'default '
+          args[0] = args[0].children[1]
+        else
+          put 'const '
+        end
       end
 
       args.each_with_index do |arg, index|
