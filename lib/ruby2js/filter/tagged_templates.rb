@@ -19,7 +19,7 @@ module Ruby2JS
           strnode = process args.first
           if strnode.type == :str
             # convert regular strings to literal strings
-            strnode = strnode.updated(:dstr, [s(:str, strnode.children.first)])
+            strnode = strnode.updated(:dstr, [s(:str, strnode.children.first.chomp("\n"))])
           else
             # for literal strings, chomp a newline off the end
             if strnode.children.last.type == :str && strnode.children.last.children[0].end_with?("\n")
