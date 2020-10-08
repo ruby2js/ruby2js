@@ -14,7 +14,7 @@ module Ruby2JS
 
     EXPRESSIONS = [ :array, :float, :hash, :int, :lvar, :nil, :send, :attr,
       :str, :sym, :dstr, :dsym, :cvar, :ivar, :zsuper, :super, :or, :and,
-      :block, :const, :true, :false, :xnode ]
+      :block, :const, :true, :false, :xnode, :taglit ]
 
     handle :autoreturn do |*statements|
       return if statements == [nil]
