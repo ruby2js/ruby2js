@@ -8,13 +8,32 @@ module Ruby2JS
     handle :import do |path, *args|
       put 'import '
 
+      default_import = !args.first.is_a?(Array) && (args.first.type == :const || args.first.type == :send)
+      args = args.first if args.first.is_a?(Array)
+
+      put "{ " unless default_import
       args.each_with_index do |arg, index|
         put ', ' unless index == 0
         parse arg
       end
+      put " }" unless default_import
+
+      from_kwarg_position = 0
+      if path.is_a?(Array) && !path[0].is_a?(String) && path[0].type == :pair && path[0].children[0].children[0] == :as
+        put " as #{path[0].children[1].children[0]}"
+        from_kwarg_position = 1
+      end
 
       put ' from '
-      put path.inspect
+      if path.is_a?(Array) && !path[from_kwarg_position].is_a?(String) && path[from_kwarg_position].type == :pair
+        if path[from_kwarg_position].children[0].children[0] == :from
+          put path[from_kwarg_position].children[1].children[0].inspect
+        else
+          put '""'
+        end
+      else
+        put path.is_a?(Array) ? path[0].inspect : path.inspect
+      end
     end
 
     # (export const) 
@@ -27,6 +46,11 @@ module Ruby2JS
       if args.first == :default
         put 'default '
         args.shift
+      elsif args.first.respond_to?(:type) && args.first.children[1] == :default
+        put 'default '
+        args[0] = args[0].children[2]
+      elsif args.first.respond_to?(:type) && args.first.type == :lvasgn
+        put 'const '
       end
 
       args.each_with_index do |arg, index|
