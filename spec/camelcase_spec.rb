@@ -61,7 +61,8 @@ describe Ruby2JS::Filter::CamelCase do
     end
 
     it "should work with autoreturn filter" do
-      to_js_with_autoreturn( 'foo_bar(123) { x }' ).must_equal 'fooBar(123, function() {return x})'
+      to_js_with_autoreturn( 'foo_bar(123) {|a_b_c| x }' ).
+        must_equal 'fooBar(123, function(aBC) {return x})'
     end
   end
 
