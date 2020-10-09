@@ -73,7 +73,14 @@ module Ruby2JS
         else
           put 'const '
         end
-      elsif node.respond_to?(:type) && node.type == :array && node.children[0].respond_to?(:type) && (node.children[0].type == :const || (node.children[0].type == :hash && node.children[0].children[0].children[0].children[0] == :default ))
+      elsif node.respond_to?(:type) &&
+        node.type == :array &&
+        node.children[0].respond_to?(:type) &&
+        (
+          node.children[0].type == :const ||
+          node.children[0].type == :send ||
+          (node.children[0].type == :hash && node.children[0].children[0].children[0].children[0] == :default )
+        )
         final_export = true
         put '{ '
         node.children.each_with_index do |arg, index|
