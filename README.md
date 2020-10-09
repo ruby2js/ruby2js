@@ -304,6 +304,15 @@ the script.
 
     * `.class` becomes `.constructor`
 
+* <a id="tagged_templates" href="https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/tagged_templates.rb">tagged_templates</a>
+
+    Allows you to turn certain method calls with a string argument into tagged
+    template literals. By default it supports html and css, so you can write
+    `html "<div>#{1+2}</div>"` which converts to `` html`<div>${1+2}</div>` ``.
+    Works nicely with squiggly heredocs for multi-line templates as well. If you
+    need to configure the tag names yourself, pass a `template_literal_tags`
+    option to `convert` with an array of tag name symbols.
+
 * <a id="node" href="https://github.com/rubys/ruby2js/blob/master/spec/node_spec.rb">node</a>
 
     * `` `command` `` becomes `child_process.execSync("command", {encoding: "utf8"})`
