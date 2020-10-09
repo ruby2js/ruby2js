@@ -1,4 +1,5 @@
 require 'ruby2js'
+require 'ruby2js/es2015'
 
 module Ruby2JS
   module Filter
