@@ -8,11 +8,11 @@ module Ruby2JS
       EXPRESSIONS = [ :array, :float, :hash, :if, :int, :lvar, :nil, :send ]
 
       def on_block(node)
-        children = process_all(node.children)
+        all_children = children = process_all(node.children)
 
         children[-1] = s(:nil) if children.last == nil
 
-        node.updated nil, [*node.children[0..1],
+        node.updated nil, [*all_children[0..1],
           s(:autoreturn, *children[2..-1])]
       end
 

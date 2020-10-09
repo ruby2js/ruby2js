@@ -7,7 +7,12 @@ describe Ruby2JS::Filter::CamelCase do
   def to_js( string)
     _(Ruby2JS.convert(string, filters: [Ruby2JS::Filter::CamelCase]).to_s)
   end
-  
+
+  def to_js_with_autoreturn(string)
+    require 'ruby2js/filter/return'
+    _(Ruby2JS.convert(string, filters: [Ruby2JS::Filter::CamelCase, Ruby2JS::Filter::Return]).to_s)
+  end
+ 
   describe :camelCase do
     it "should handle variables" do
       to_js( 'foo_bar=baz_qux' ).must_equal 'var fooBar = bazQux'
@@ -53,6 +58,10 @@ describe Ruby2JS::Filter::CamelCase do
 
     it "should handle hashes" do
       to_js( '{foo_bar: 1}' ).must_equal '{fooBar: 1}'
+    end
+
+    it "should work with autoreturn filter" do
+      to_js_with_autoreturn( 'foo_bar(123) { x }' ).must_equal 'fooBar(123, function() {return x})'
     end
   end
 
