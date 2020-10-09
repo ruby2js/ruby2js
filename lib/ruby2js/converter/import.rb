@@ -23,10 +23,13 @@ module Ruby2JS
         end
         put " }" unless default_import
 
-        # should there be an as clause? e.g., import React as *
         from_kwarg_position = 0
+
+        # should there be an as clause? e.g., import React as *
         if path.is_a?(Array) && !path[0].is_a?(String) && path[0].type == :pair && path[0].children[0].children[0] == :as
           put " as #{path[0].children[1].children[0]}"
+
+          # advance to the next kwarg, aka from
           from_kwarg_position = 1
         end
 
@@ -37,6 +40,7 @@ module Ruby2JS
           if path[from_kwarg_position].children[0].children[0] == :from
             put path[from_kwarg_position].children[1].children[0].inspect
           else
+            # from is missing
             put '""'
           end
         else
@@ -53,24 +57,42 @@ module Ruby2JS
     handle :export do |*args|
       put 'export '
 
-      if args.first == :default
+      node = args.first
+      final_export = false
+
+      if node == :default
         put 'default '
         args.shift
-      elsif args.first.respond_to?(:type) && args.first.children[1] == :default
+      elsif node.respond_to?(:type) && node.children[1] == :default
         put 'default '
-        args[0] = args[0].children[2]
-      elsif args.first.respond_to?(:type) && args.first.type == :lvasgn
-        if args[0].children[0] == :default
+        args[0] = node.children[2]
+      elsif node.respond_to?(:type) && node.type == :lvasgn
+        if node.children[0] == :default
           put 'default '
-          args[0] = args[0].children[1]
+          args[0] = node.children[1]
         else
           put 'const '
         end
+      elsif node.respond_to?(:type) && node.type == :array && node.children[0].respond_to?(:type) && (node.children[0].type == :const || (node.children[0].type == :hash && node.children[0].children[0].children[0].children[0] == :default ))
+        final_export = true
+        put '{ '
+        node.children.each_with_index do |arg, index|
+          put ', ' unless index == 0
+          if arg.type == :hash && arg.children[0].children[0].children[0] == :default
+            put arg.children[0].children[1].children[1]
+            put ' as default'
+          else
+            parse arg
+          end
+        end
+        put ' }'
       end
 
-      args.each_with_index do |arg, index|
-        put ', ' unless index == 0
-        parse arg
+      unless final_export
+        args.each_with_index do |arg, index|
+          put ', ' unless index == 0
+          parse arg
+        end
       end
     end
   end
