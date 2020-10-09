@@ -1,5 +1,4 @@
 require 'ruby2js'
-require 'ruby2js/es2015'
 
 module Ruby2JS
   module Filter
@@ -12,7 +11,7 @@ module Ruby2JS
 
       def on_send(node)
         target, method, *args = node.children
-        return super unless target.nil?
+        return super unless target.nil? or Ruby2JS.eslevel_default >= 2015
 
         tagged_methods = @options[:template_literal_tags] || [:html, :css]
 
