@@ -288,6 +288,8 @@ module Ruby2JS
                 [name, innerclass_name.children[1]])
             end
             parse m.updated(nil, [innerclass_name, *m.children[1..-1]])
+          elsif m.type == :send && m.children[0] == nil
+            parse m.updated(:send, [@class_name, *m.children[1..-1]])
           else
             parse m, :statement
           end
