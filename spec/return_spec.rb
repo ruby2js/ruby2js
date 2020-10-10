@@ -82,6 +82,11 @@ describe Ruby2JS::Filter::Return do
       to_js( 'lambda {|x| case false; when true; a; when false; b; else c; end}' ).
         must_equal 'function(x) {switch (false) {case true: return a; case false: return b; default: return c}}'
     end
+
+    it "should handle case statements without else clause" do
+      to_js( 'lambda {|x| case false; when true; a; when false; b; end}' ).
+        must_equal 'function(x) {switch (false) {case true: return a; case false: return b}}'
+    end
   end
 
   describe Ruby2JS::Filter::DEFAULTS do

@@ -55,6 +55,8 @@ module Ruby2JS
         node = block.pop
         children = node.children.dup
         (1...children.length).each do |i|
+          next if children[i].nil? # case statements without else clause end with nil
+
           if children[i].type == :when
             gchildren = children[i].children.dup
             if !gchildren.empty? and EXPRESSIONS.include? gchildren.last.type
