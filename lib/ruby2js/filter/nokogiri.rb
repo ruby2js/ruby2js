@@ -7,9 +7,13 @@ module Ruby2JS
       include SEXP
       extend SEXP
 
-      NOKOGIRI_SETUP = {
+      CJS_SETUP = {
         jsdom: s(:casgn, nil, :JSDOM, 
           s(:attr, s(:send, nil, :require, s(:str, "jsdom")), :JSDOM))
+      }
+
+      ESM_SETUP = {
+        jsdom: s(:import, ["jsdom"], [s(:attr, nil, :JSDOM)])
       }
 
       def initialize(*args)
@@ -25,9 +29,9 @@ module Ruby2JS
         if @nokogiri_setup.empty?
           result
         else
+          setup = @esm ? ESM_SETUP : CJS_SETUP;
           s(:begin, 
-            *@nokogiri_setup.to_a.map {|token| NOKOGIRI_SETUP[token]},
-            result)
+            *@nokogiri_setup.to_a.map {|token| setup[token]}, result)
         end
       end
 

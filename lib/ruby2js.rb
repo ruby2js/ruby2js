@@ -56,6 +56,7 @@ module Ruby2JS
         @comments = comments
         @ast = nil
         @exclude_methods = []
+        @esm = false
       end
 
       def options=(options)

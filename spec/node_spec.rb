@@ -1,11 +1,17 @@
 gem 'minitest'
 require 'minitest/autorun'
 require 'ruby2js/filter/node'
+require 'ruby2js/filter/esm'
 
 describe Ruby2JS::Filter::Functions do
   
   def to_js( string)
     _(Ruby2JS.convert(string, filters: [Ruby2JS::Filter::Node]).to_s)
+  end
+  
+  def to_js_esm( string)
+    _(Ruby2JS.convert(string,
+      filters: [Ruby2JS::Filter::Node, Ruby2JS::Filter::ESM]).to_s)
   end
   
   describe 'globals' do
@@ -236,6 +242,19 @@ describe Ruby2JS::Filter::Functions do
 
     it 'should eat tmpdir requires' do
       to_js( 'require "tmpdir"' ).must_equal ''
+    end
+  end
+
+  describe 'esm' do
+    it 'should handle child process' do
+      to_js_esm('system "echo hi"').
+        must_equal 'import child_process from "child_process"; ' +
+          'child_process.execSync("echo hi", {stdio: "inherit"})'
+    end
+
+    it 'should handle fs' do
+      to_js_esm( 'IO.read("foo")' ).
+        must_equal 'import fs from "fs"; fs.readFileSync("foo", "utf8")'
     end
   end
 

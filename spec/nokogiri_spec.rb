@@ -1,11 +1,17 @@
 gem 'minitest'
 require 'minitest/autorun'
 require 'ruby2js/filter/nokogiri'
+require 'ruby2js/filter/esm'
 
 describe Ruby2JS::Filter::Nokogiri do
   
   def to_js( string)
     _(Ruby2JS.convert(string, filters: [Ruby2JS::Filter::Nokogiri]).to_s)
+  end
+  
+  def to_js_esm( string)
+    _(Ruby2JS.convert(string,
+      filters: [Ruby2JS::Filter::Nokogiri, Ruby2JS::Filter::ESM]).to_s)
   end
   
   describe 'parse' do
@@ -206,6 +212,13 @@ describe Ruby2JS::Filter::Nokogiri do
     end
   end
 
+  describe 'esm' do
+    it 'should support JSDOM import' do
+      to_js_esm( 'Nokogiri::HTML.parse "<b>"' ).
+        must_equal 'import { JSDOM } from "jsdom"; ' +
+        'new JSDOM("<b>").window.document'
+    end
+  end
   describe Ruby2JS::Filter::DEFAULTS do
     it "should include Nokogiri" do
       _(Ruby2JS::Filter::DEFAULTS).must_include Ruby2JS::Filter::Nokogiri

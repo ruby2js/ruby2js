@@ -7,6 +7,7 @@ module Ruby2JS
 
       def initialize(*args)
         super
+        @esm = true # signal for other filters
       end
 
       def on_send(node)

@@ -7,12 +7,19 @@ module Ruby2JS
       include SEXP
       extend SEXP
 
-      NODE_SETUP = {
+      CJS_SETUP = {
         child_process: s(:casgn, nil, :child_process, 
           s(:send, nil, :require, s(:str, "child_process"))),
         fs: s(:casgn, nil, :fs, s(:send, nil, :require, s(:str, "fs"))),
         ARGV: s(:lvasgn, :ARGV, s(:send, s(:attr, 
           s(:attr, nil, :process), :argv), :slice, s(:int, 2)))
+      }
+
+      ESM_SETUP = {
+        child_process: s(:import, ['child_process'],
+          s(:attr, nil, :child_process)),
+        fs: s(:import, ['fs'], s(:attr, nil, :fs)),
+        ARGV: CJS_SETUP[:ARGV]
       }
 
       def initialize(*args)
@@ -28,8 +35,8 @@ module Ruby2JS
         if @node_setup.empty?
           result
         else
-          s(:begin, *@node_setup.to_a.map {|token| NODE_SETUP[token]},
-            result)
+          setup = @esm ? ESM_SETUP : CJS_SETUP;
+          s(:begin, *@node_setup.to_a.map {|token| setup[token]}, result)
         end
       end
 

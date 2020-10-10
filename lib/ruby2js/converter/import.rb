@@ -12,7 +12,7 @@ module Ruby2JS
         put path.inspect
       else
         # import (x) from "file.js"
-        default_import = !args.first.is_a?(Array) && (args.first.type == :const || args.first.type == :send)
+        default_import = !args.first.is_a?(Array) && [:const, :send, :attr].include?(args.first.type)
         args = args.first if args.first.is_a?(Array)
 
         # handle the default name or { ConstA, Const B } portion
