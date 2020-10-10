@@ -313,6 +313,57 @@ the script.
     need to configure the tag names yourself, pass a `template_literal_tags`
     option to `convert` with an array of tag name symbols.
 
+* <a href="https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/esimports.rb">esimports</a>
+
+    Provides conversion of import and export statements for use with modern ES builders like Webpack.
+
+    Examples:
+
+    **import**
+
+    ```ruby
+    import "./index.scss"
+    # => import "./index.scss"
+
+    import Something, "./lib/something"
+    # => import Something from "./lib/something"
+
+    import [ LitElement, html, css ], from: "lit-element"
+    # => import { LitElement, html, css } from "lit-element"
+
+    import React, from: "react"
+    # => import React from "react"
+
+    import React, as: "*", from: "react"
+    # => import React as * from "react"
+    ```
+
+    **export**
+
+    ```ruby
+    export hash = { ab: 123 }
+    # => export const hash = {ab: 123};
+
+    export func = ->(x) { x * 10 }
+    # => export const func = x => x * 10;
+
+    export def multiply(x, y)
+      return x * y
+    end
+    # => export function multiply(x, y) {
+    #      return x * y
+    #    }
+
+    export default class MyClass
+    end
+    # => export default class MyClass {
+    #    };
+
+    # or final export statement:
+    export [ one, two, default: three ]
+    # => export { one, two, three as default }
+    ```
+
 * <a id="node" href="https://github.com/rubys/ruby2js/blob/master/spec/node_spec.rb">node</a>
 
     * `` `command` `` becomes `child_process.execSync("command", {encoding: "utf8"})`
