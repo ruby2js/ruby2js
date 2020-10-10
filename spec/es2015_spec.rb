@@ -182,7 +182,7 @@ describe "ES2015 support" do
     it "should handle hashes with procs" do
       to_js( 'foo = {x: proc {}}' ).must_equal 'let foo = {x() {}}'
       to_js( 'class T; def d; {x: proc {self}}; end; end' ).
-        must_include '{x: () => {this}}'
+        must_include '{x: () => this}'
       to_js( 'class T; def d; {x: proc {this}}; end; end' ).
         must_include '{x: () => this}'
       to_js( 'class T; def d; {x: proc {@c}}; end; end' ).
