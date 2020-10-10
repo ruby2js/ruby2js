@@ -15,6 +15,14 @@ module Ruby2JS
         return super unless target.nil?
 
         if method == :import
+          # don't do the conversion if the word import is followed by a paren
+          if node.loc.respond_to? :selector
+            selector = node.loc.selector
+            if selector and selector.source_buffer
+              return super if selector.source_buffer.source[selector.end_pos] == '('
+            end
+          end
+
           if args[0].type == :str
             # import "file.css"
             #   => import "file.css"

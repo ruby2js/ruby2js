@@ -5,7 +5,7 @@ require 'ruby2js/filter/esm'
 describe Ruby2JS::Filter::ESM do
   
   def to_js(string)
-    _(Ruby2JS.convert(string, eslevel: 2015,
+    _(Ruby2JS.convert(string, eslevel: 2017,
       filters: [Ruby2JS::Filter::ESM],
       scope: self).to_s)
   end
@@ -76,6 +76,13 @@ describe Ruby2JS::Filter::ESM do
 
       to_js("export [ A, default: B ]").
         must_include "export { A, B as default }"
+    end
+  end
+
+  describe "import as a function" do
+    it "should leave import function calls alone" do
+      to_js('X = await import("x.js")').
+        must_equal 'const X = await import("x.js")'
     end
   end
 
