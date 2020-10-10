@@ -313,6 +313,8 @@ the script.
     need to configure the tag names yourself, pass a `template_literal_tags`
     option to `convert` with an array of tag name symbols.
 
+    Note: these conversions are only done if eslevel >= 2015
+
 * <a href="https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/esm.rb">esm</a>
 
     Provides conversion of import and export statements for use with modern ES builders like Webpack.
