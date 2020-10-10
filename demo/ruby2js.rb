@@ -40,6 +40,7 @@ options[:comparison] = :equality if ARGV.delete('--equality')
 options[:comparison] = :identity if ARGV.delete('--identity')
 options[:or] = :logical if ARGV.delete('--logical')
 options[:or] = :nullish if ARGV.delete('--nullish')
+options[:include] = :class if ARGV.delete('--include-class')
 
 begin
   # support running directly from a git clone

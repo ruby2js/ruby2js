@@ -300,7 +300,7 @@ the script.
     * `raise Exception.new(...)` will be replaced with `throw new Error(...)`
 
     Additionally, there is one mapping that will only be done if explicitly
-    <a href="https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter.rb">included</a>:
+    included (pass `include: :class` as a `convert` option to enable):
 
     * `.class` becomes `.constructor`
 
