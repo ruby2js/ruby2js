@@ -330,6 +330,11 @@ describe "ES2015 support" do
         must_equal 'class Model extends Abstract {}; Model.a("b")'
     end
 
+    it "should handles static property assignments within class" do
+      to_js('class Model < Abstract; self.a = :b; end').
+        must_equal 'class Model extends Abstract {}; Model.a = "b"'
+    end
+
     it "should parse nested classes" do
       to_js('class A; class B; class C; end; end; end').
         must_equal 'class A {}; A.B = class {}; A.B.C = class {}'
