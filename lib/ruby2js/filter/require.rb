@@ -38,8 +38,6 @@ module Ruby2JS
 
             filename = File.join(dirname, basename)
 
-            segments = basename.split(/[\/\\]/)
-
             if not File.file? filename and File.file? filename+".rb"
               filename += '.rb'
             elsif not File.file? filename and File.file? filename+".js.rb"
