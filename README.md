@@ -327,6 +327,9 @@ the script.
     import "./index.scss"
     # => import "./index.scss"
 
+    import Something from "./lib/something"
+    # => import Something from "./lib/something"
+
     import Something, "./lib/something"
     # => import Something from "./lib/something"
 

@@ -22,6 +22,9 @@ describe Ruby2JS::Filter::ESM do
     end
 
     it "should handle a default import with from" do
+      to_js('import X  from "x.js"').
+        must_include 'import X from "x.js"'
+
       to_js('import X, from: "x.js"').
         must_include 'import X from "x.js"'
     end
