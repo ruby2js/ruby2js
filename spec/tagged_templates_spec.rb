@@ -49,4 +49,9 @@ describe Ruby2JS::Filter::TaggedTemplates do
     end
   end
 
+  describe Ruby2JS::Filter::DEFAULTS do
+    it "should include TaggedTemplates" do
+      _(Ruby2JS::Filter::DEFAULTS).must_include Ruby2JS::Filter::TaggedTemplates
+    end
+  end
 end

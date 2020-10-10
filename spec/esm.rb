@@ -1,12 +1,12 @@
 gem 'minitest'
 require 'minitest/autorun'
-require 'ruby2js/filter/esimports'
+require 'ruby2js/filter/esm'
 
-describe Ruby2JS::Filter::ESImports do
+describe Ruby2JS::Filter::ESM do
   
   def to_js(string)
     _(Ruby2JS.convert(string, eslevel: 2015,
-      filters: [Ruby2JS::Filter::ESImports],
+      filters: [Ruby2JS::Filter::ESM],
       scope: self).to_s)
   end
   
@@ -77,8 +77,8 @@ describe Ruby2JS::Filter::ESImports do
   end
 
   describe Ruby2JS::Filter::DEFAULTS do
-    it "should include ESImports" do
-      _(Ruby2JS::Filter::DEFAULTS).must_include Ruby2JS::Filter::ESImports
+    it "should include ESM" do
+      _(Ruby2JS::Filter::DEFAULTS).must_include Ruby2JS::Filter::ESM
     end
   end
 end
