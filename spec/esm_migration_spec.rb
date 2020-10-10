@@ -1,15 +1,15 @@
 gem 'minitest'
 require 'minitest/autorun'
-require 'ruby2js/filter/esm'
+require 'ruby2js/filter/esm_migration'
 require 'ruby2js/filter/react'
 require 'ruby2js/filter/functions'
 require 'ruby2js/filter/wunderbar'
 
-describe Ruby2JS::Filter::ESM do
+describe Ruby2JS::Filter::ESMMigration do
   
   def to_js(string)
     _(Ruby2JS.convert(string, eslevel: 2015,
-      filters: [Ruby2JS::Filter::ESM, Ruby2JS::Filter::React,
+      filters: [Ruby2JS::Filter::ESMMigration, Ruby2JS::Filter::React,
       Ruby2JS::Filter::Functions, Ruby2JS::Filter::Wunderbar],
       scope: self).to_s)
   end
@@ -35,8 +35,8 @@ describe Ruby2JS::Filter::ESM do
   end
 
   describe Ruby2JS::Filter::DEFAULTS do
-    it "should include ESM" do
-      _(Ruby2JS::Filter::DEFAULTS).must_include Ruby2JS::Filter::ESM
+    it "should include ESMMigration" do
+      _(Ruby2JS::Filter::DEFAULTS).must_include Ruby2JS::Filter::ESMMigration
     end
   end
 end
