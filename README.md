@@ -221,7 +221,8 @@ the script.
   `require` function calls in expressions are left alone.
 
 * <a id="camelCase" href="https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/camelCase.rb">camelCase</a>
-  converts `underscore_case` to `camelCase`.  See
+  converts `underscore_case` to `camelCase`. This filter should be required after
+  all other filters have been required. See
   [camelcase_spec](https://github.com/rubys/ruby2js/blob/master/spec/camelcase_spec.rb)
   for examples.
 
