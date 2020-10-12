@@ -63,9 +63,6 @@ begin
     filters[filter] = "ruby2js/filter/#{filter}"
   end
 
-  # put camelCase last as it may interfere with other filters
-  filters['camelCase'] = filters.delete('camelCase')
-
   # allow filters to be selected based on the path
   selected = env['PATH_INFO'].to_s.split('/')
 
