@@ -17,11 +17,15 @@ module Ruby2JS
         if node.children[0] == nil and WHITELIST.include? node.children[1].to_s
           super
         elsif node.children[1] =~ /_.*\w[=!?]?$/
-          super S(:send , node.children[0],
+          super S(node.type, node.children[0],
             camelCase(node.children[1]), *node.children[2..-1])
         else
           super
         end
+      end
+      
+      def on_csend(node)
+        on_send(node)
       end
 
       def on_def(node)

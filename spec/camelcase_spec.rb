@@ -12,6 +12,10 @@ describe Ruby2JS::Filter::CamelCase do
     require 'ruby2js/filter/return'
     _(Ruby2JS.convert(string, filters: [Ruby2JS::Filter::CamelCase, Ruby2JS::Filter::Return]).to_s)
   end
+
+  def to_js_2020(string)
+    _(Ruby2JS.convert(string, eslevel: 2020, filters: [Ruby2JS::Filter::CamelCase]).to_s)
+  end
  
   describe :camelCase do
     it "should handle variables" do
@@ -63,6 +67,14 @@ describe Ruby2JS::Filter::CamelCase do
     it "should work with autoreturn filter" do
       to_js_with_autoreturn( 'foo_bar(123) {|a_b_c| x }' ).
         must_equal 'fooBar(123, function(aBC) {return x})'
+    end
+
+    it "should handle lonely operator prior to ES2020" do
+      to_js( 'a_a&.b_b&.c_c' ).must_equal 'aA && aA.bB && aA.bB.cC'
+    end
+
+    it "should handle lonely operator for ES2020" do
+      to_js_2020( 'a_a&.b_b&.c_c' ).must_equal 'aA?.bB?.cC'
     end
   end
 
