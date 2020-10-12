@@ -89,7 +89,7 @@ module Ruby2JS
     def conditionally_equals(left, right)
       if left == right
         true
-      elsif !left or !right or left.type != :csend or right.type != :send
+      elsif !left.respond_to?(:type) or !left or !right or left.type != :csend or right.type != :send
         false
       else
         conditionally_equals(left.children.first, right.children.first) &&
