@@ -224,7 +224,7 @@ the script.
   converts `underscore_case` to `camelCase`. This filter should be required after
   all other filters have been required. See
   [camelcase_spec](https://github.com/rubys/ruby2js/blob/master/spec/camelcase_spec.rb)
-  for examples.
+  for examples of conversion results.
 
 * <a id="functions" href="https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/functions.rb">functions</a>
 
