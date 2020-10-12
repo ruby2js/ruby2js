@@ -8,16 +8,20 @@ module Ruby2JS
       EXPRESSIONS = [ :array, :float, :hash, :if, :int, :lvar, :nil, :send ]
 
       def on_block(node)
-        all_children = children = process_all(node.children)
+        node = super
+        return node unless node.type == :block
+        children = node.children.dup
 
         children[-1] = s(:nil) if children.last == nil
 
-        node.updated nil, [*all_children[0..1],
+        node.updated nil, [*children[0..1],
           s(:autoreturn, *children[2..-1])]
       end
 
       def on_def(node)
-        children = process_all(node.children[1..-1])
+        node = super
+        return node unless node.type == :def
+        children = node.children[1..-1]
 
         children[-1] = s(:nil) if children.last == nil
 
