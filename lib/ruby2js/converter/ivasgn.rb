@@ -7,7 +7,7 @@ module Ruby2JS
     handle :ivasgn do |var, expression=nil|
       multi_assign_declarations if @state == :statement
 
-      put "#{ var.to_s.sub('@', 'this.' + (es2020 ? '#' : '_')) }"
+      put "#{ var.to_s.sub('@', 'this.' + (underscored_private ? '_' : '#')) }"
       if expression
         put " = "; parse expression
       end

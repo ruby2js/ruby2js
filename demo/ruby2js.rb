@@ -41,6 +41,7 @@ options[:comparison] = :identity if ARGV.delete('--identity')
 options[:or] = :logical if ARGV.delete('--logical')
 options[:or] = :nullish if ARGV.delete('--nullish')
 options[:include] = :class if ARGV.delete('--include-class')
+options[:underscored_private] = true if ARGV.delete('--underscored-private')
 
 begin
   # support running directly from a git clone

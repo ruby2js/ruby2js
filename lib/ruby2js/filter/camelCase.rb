@@ -23,6 +23,9 @@ module Ruby2JS
 
         if node.children[0] == nil and WHITELIST.include? node.children[1].to_s
           node
+        elsif node.children[0] && [:ivar, :cvar].include?(node.children[0].type)
+          S(node.type, s(node.children[0].type, camelCase(node.children[0].children[0])),
+            camelCase(node.children[1]), *node.children[2..-1])
         elsif node.children[1] =~ /_.*\w[=!?]?$/
           S(node.type, node.children[0],
             camelCase(node.children[1]), *node.children[2..-1])
@@ -68,6 +71,28 @@ module Ruby2JS
         end
       end
 
+      def on_ivar(node)
+        node = super
+        return node if node.type != :ivar
+
+        if node.children[0] =~ /_.*\w$/
+          S(:ivar , camelCase(node.children[0]), *node.children[1..-1])
+        else
+          node
+        end
+      end
+
+      def on_cvar(node)
+        node = super
+        return node if node.type != :cvar
+
+        if node.children[0] =~ /_.*\w$/
+          S(:cvar , camelCase(node.children[0]), *node.children[1..-1])
+        else
+          node
+        end
+      end
+
       def on_arg(node)
         node = super
         return node if node.type != :arg
@@ -85,6 +110,28 @@ module Ruby2JS
 
         if node.children[0] =~ /_.*\w$/
           S(:lvasgn , camelCase(node.children[0]), *node.children[1..-1])
+        else
+          node
+        end
+      end
+
+      def on_ivasgn(node)
+        node = super
+        return node if node.type != :ivasgn
+
+        if node.children[0] =~ /_.*\w$/
+          S(:ivasgn , camelCase(node.children[0]), *node.children[1..-1])
+        else
+          node
+        end
+      end
+
+      def on_cvasgn(node)
+        node = super
+        return node if node.type != :cvasgn
+
+        if node.children[0] =~ /_.*\w$/
+          S(:cvasgn , camelCase(node.children[0]), *node.children[1..-1])
         else
           node
         end
