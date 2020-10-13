@@ -7,7 +7,7 @@ module Ruby2JS
     handle :cvasgn do |var, expression=nil|
       multi_assign_declarations if @state == :statement
 
-      prefix = es2020 ? '#$' : '_'
+      prefix = underscored_private ? '_' : '#$'
 
       if @class_name
         parse @class_name

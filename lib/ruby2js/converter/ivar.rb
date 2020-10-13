@@ -6,10 +6,10 @@ module Ruby2JS
     handle :ivar do |var|
       if self.ivars and self.ivars.include? var
         parse s(:hostvalue, self.ivars[var])
-      elsif es2020
-        parse s(:attr, s(:self), var.to_s.sub('@', '#'))
-      else
+      elsif underscored_private
         parse s(:attr, s(:self), var.to_s.sub('@', '_'))
+      else
+        parse s(:attr, s(:self), var.to_s.sub('@', '#'))
       end
     end
 

@@ -63,6 +63,7 @@ module Ruby2JS
       @strict = false
       @comparison = :equality
       @or = :logical
+      @underscored_private = true
     end
 
     def width=(width)
@@ -127,7 +128,7 @@ module Ruby2JS
       Parser::AST::Node.new(type, args)
     end
 
-    attr_accessor :strict, :eslevel, :comparison, :or
+    attr_accessor :strict, :eslevel, :comparison, :or, :underscored_private
 
     def es2015
       @eslevel >= 2015

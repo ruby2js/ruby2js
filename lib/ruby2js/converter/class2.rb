@@ -49,7 +49,7 @@ module Ruby2JS
         end
 
         # private variable declarations
-        if es2020
+        unless underscored_private
           ivars = Set.new
           cvars = Set.new
 
@@ -202,7 +202,7 @@ module Ruby2JS
             end
 
           elsif m.type == :send and m.children.first == nil
-            p = es2020 ? '#' : '_'
+            p = underscored_private ? '_' : '#'
 
             if m.children[1] == :attr_accessor
               m.children[2..-1].each_with_index do |child_sym, index2|
@@ -236,7 +236,7 @@ module Ruby2JS
             end
 
           else
-            if m.type == :cvasgn and es2020
+            if m.type == :cvasgn and !underscored_private
               put 'static #$'; put m.children[0].to_s[2..-1]; put ' = '
               parse m.children[1]
             else

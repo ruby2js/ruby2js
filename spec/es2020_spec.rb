@@ -6,6 +6,10 @@ describe "ES2020 support" do
   def to_js( string)
     _(Ruby2JS.convert(string, eslevel: 2020, filters: []).to_s)
   end
+
+  def to_js_underscored( string)
+    _(Ruby2JS.convert(string, eslevel: 2020, underscored_private: true, filters: []).to_s)
+  end
   
   def to_js_fn(string)
     _(Ruby2JS.convert(string, eslevel: 2020,
@@ -38,6 +42,31 @@ describe "ES2020 support" do
     it "should convert private class fields to static #vars" do
       to_js( 'class C; @@a=1; def self.a; @@a; end; end' ).
         must_equal 'class C {static #$a = 1; static get a() {return C.#$a}}'
+    end
+  end
+
+  describe :InstanceFieldsUnderscored do
+    it "should convert private fields to instance #vars" do
+      to_js_underscored( 'class C; def initialize; @a=1; end; def a; @a; end; end' ).
+        must_equal 'class C {constructor() {this._a = 1}; get a() {return this._a}}'
+    end
+
+    it "should handle instance variable assignments and implicit decls" do
+      to_js_underscored( 'class C; def a; @a; end; def a=(a); @a=a; end; end' ).
+        must_equal 'class C {get a() {return this._a}; ' +
+          'set a(a) {this._a = a}}'
+    end
+
+    it "should handle multiple assignments" do
+      to_js_underscored( 'class C; def initialize; @a, @b = 1, 2; end; end' ).
+        must_equal 'class C {constructor() {[this._a, this._b] = [1, 2]}}'
+    end
+  end
+
+  describe :ClassFieldsUnderscored do
+    it "should convert private class fields to static #vars" do
+      to_js_underscored( 'class C; @@a=1; def self.a; @@a; end; end' ).
+        must_equal 'class C {static get a() {return C._a}}; C._a = 1'
     end
   end
 

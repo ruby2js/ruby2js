@@ -203,6 +203,7 @@ module Ruby2JS
     ruby2js.strict = options[:strict]
     ruby2js.comparison = options[:comparison] || :equality
     ruby2js.or = options[:or] || :logical
+    ruby2js.underscored_private = (options[:eslevel] < 2020) || options[:underscored_private]
     if ruby2js.binding and not ruby2js.ivars
       ruby2js.ivars = ruby2js.binding.eval \
         'Hash[instance_variables.map {|var| [var, instance_variable_get(var)]}]'
