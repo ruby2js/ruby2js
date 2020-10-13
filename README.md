@@ -105,6 +105,13 @@ Emit nullish coalescing operators:
 puts Ruby2JS.convert('a || 1', or: :nullish)
 ```
 
+Emit underscored private fields (allowing subclass access):
+
+```ruby
+puts Ruby2JS.convert('class C; def initialize; @f=1; end; end',
+  eslevel: 2020, underscored_private: true)
+```
+
 With [ExecJS](https://github.com/sstephenson/execjs):
 ```ruby
 require 'ruby2js/execjs'
