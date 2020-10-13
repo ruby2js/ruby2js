@@ -38,7 +38,8 @@ module Ruby2JS
             #  => import name from "file.js"
             s(:import,
               [args[0].children[2].children[2].children[0]],
-              s(:attr, nil, args[0].children[1]))
+              process(s(:attr, nil, args[0].children[1])))
+
           else
             # import Stuff, "file.js"
             #   => import Stuff from "file.js"
@@ -48,7 +49,9 @@ module Ruby2JS
             #   => import Stuff as * from "file.js"
             # import [ Some, Stuff ], from: "file.js"
             #   => import { Some, Stuff } from "file.js"
-            imports = (args[0].type == :const || args[0].type == :send) ? args[0] : args[0].children
+            imports = (args[0].type == :const || args[0].type == :send) ?
+              process(args[0]) : 
+              process_all(args[0].children)
             s(:import, args[1].children, imports) unless args[1].nil?
           end
         elsif method == :export          

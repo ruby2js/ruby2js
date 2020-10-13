@@ -19,7 +19,7 @@ module Ruby2JS
 
       def on_send(node)
         node = super
-        return node if node.type != :send and node.type != :csend
+        return node unless [:send, :csend, :attr].include? node.type
 
         if node.children[0] == nil and WHITELIST.include? node.children[1].to_s
           node
@@ -35,6 +35,10 @@ module Ruby2JS
       end
       
       def on_csend(node)
+        on_send(node)
+      end
+
+      def on_attr(node)
         on_send(node)
       end
 
