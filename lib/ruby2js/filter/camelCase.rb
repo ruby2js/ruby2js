@@ -19,7 +19,7 @@ module Ruby2JS
 
       def on_send(node)
         node = super
-        return if node.type != :send and node.type != :csend
+        return node if node.type != :send and node.type != :csend
 
         if node.children[0] == nil and WHITELIST.include? node.children[1].to_s
           node
@@ -37,7 +37,7 @@ module Ruby2JS
 
       def on_def(node)
         node = super
-        return if node.type != :def
+        return node if node.type != :def
 
         if node.children[0] =~ /_.*\w$/
           S(:def , camelCase(node.children[0]), *node.children[1..-1])
@@ -48,7 +48,7 @@ module Ruby2JS
 
       def on_optarg(node)
         node = super
-        return if node.type != :optarg
+        return node if node.type != :optarg
 
         if node.children[0] =~ /_.*\w$/
           S(:optarg , camelCase(node.children[0]), *node.children[1..-1])
@@ -59,7 +59,7 @@ module Ruby2JS
 
       def on_lvar(node)
         node = super
-        return if node.type != :lvar
+        return node if node.type != :lvar
 
         if node.children[0] =~ /_.*\w$/
           S(:lvar , camelCase(node.children[0]), *node.children[1..-1])
@@ -70,7 +70,7 @@ module Ruby2JS
 
       def on_arg(node)
         node = super
-        return if node.type != :arg
+        return node if node.type != :arg
 
         if node.children[0] =~ /_.*\w$/
           S(:arg , camelCase(node.children[0]), *node.children[1..-1])
@@ -81,7 +81,7 @@ module Ruby2JS
 
       def on_lvasgn(node)
         node = super
-        return if node.type != :lvasgn
+        return node if node.type != :lvasgn
 
         if node.children[0] =~ /_.*\w$/
           S(:lvasgn , camelCase(node.children[0]), *node.children[1..-1])
@@ -92,7 +92,7 @@ module Ruby2JS
 
       def on_sym(node)
         node = super
-        return if node.type != :sym
+        return node if node.type != :sym
 
         if node.children[0] =~ /_.*\w$/
           S(:sym , camelCase(node.children[0]), *node.children[1..-1])
@@ -103,7 +103,7 @@ module Ruby2JS
 
       def on_defs(node)
         node = super
-        return if node.type != :defs
+        return node if node.type != :defs
 
         if node.children[1] =~ /_.*\w$/
           S(:defs , node.children[0],
