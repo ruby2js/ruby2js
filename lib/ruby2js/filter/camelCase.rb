@@ -42,114 +42,58 @@ module Ruby2JS
         on_send(node)
       end
 
-      def on_def(node)
-        node = super
-        return node if node.type != :def
+      def handle_generic_node(node, node_type)
+        return node if node.type != node_type
 
         if node.children[0] =~ /_.*\w$/
-          S(:def , camelCase(node.children[0]), *node.children[1..-1])
+          S(node_type , camelCase(node.children[0]), *node.children[1..-1])
         else
           node
         end
+      end
+
+      def on_def(node)
+        handle_generic_node(super, :def)
       end
 
       def on_optarg(node)
-        node = super
-        return node if node.type != :optarg
+        handle_generic_node(super, :optarg)
+      end
 
-        if node.children[0] =~ /_.*\w$/
-          S(:optarg , camelCase(node.children[0]), *node.children[1..-1])
-        else
-          node
-        end
+      def on_kwoptarg(node)
+        handle_generic_node(super, :kwoptarg)
       end
 
       def on_lvar(node)
-        node = super
-        return node if node.type != :lvar
-
-        if node.children[0] =~ /_.*\w$/
-          S(:lvar , camelCase(node.children[0]), *node.children[1..-1])
-        else
-          node
-        end
+        handle_generic_node(super, :lvar)
       end
 
       def on_ivar(node)
-        node = super
-        return node if node.type != :ivar
-
-        if node.children[0] =~ /_.*\w$/
-          S(:ivar , camelCase(node.children[0]), *node.children[1..-1])
-        else
-          node
-        end
+        handle_generic_node(super, :ivar)
       end
 
       def on_cvar(node)
-        node = super
-        return node if node.type != :cvar
-
-        if node.children[0] =~ /_.*\w$/
-          S(:cvar , camelCase(node.children[0]), *node.children[1..-1])
-        else
-          node
-        end
+        handle_generic_node(super, :cvar)
       end
 
       def on_arg(node)
-        node = super
-        return node if node.type != :arg
-
-        if node.children[0] =~ /_.*\w$/
-          S(:arg , camelCase(node.children[0]), *node.children[1..-1])
-        else
-          node
-        end
+        handle_generic_node(super, :arg)
       end
 
       def on_lvasgn(node)
-        node = super
-        return node if node.type != :lvasgn
-
-        if node.children[0] =~ /_.*\w$/
-          S(:lvasgn , camelCase(node.children[0]), *node.children[1..-1])
-        else
-          node
-        end
+        handle_generic_node(super, :lvasgn)
       end
 
       def on_ivasgn(node)
-        node = super
-        return node if node.type != :ivasgn
-
-        if node.children[0] =~ /_.*\w$/
-          S(:ivasgn , camelCase(node.children[0]), *node.children[1..-1])
-        else
-          node
-        end
+        handle_generic_node(super, :ivasgn)
       end
 
       def on_cvasgn(node)
-        node = super
-        return node if node.type != :cvasgn
-
-        if node.children[0] =~ /_.*\w$/
-          S(:cvasgn , camelCase(node.children[0]), *node.children[1..-1])
-        else
-          node
-        end
+        handle_generic_node(super, :cvasgn)
       end
 
       def on_sym(node)
-        node = super
-        return node if node.type != :sym
-
-        if node.children[0] =~ /_.*\w$/
-          S(:sym , camelCase(node.children[0]), *node.children[1..-1])
-        else
-          node
-        end
+        handle_generic_node(super, :sym)
       end
 
       def on_defs(node)
