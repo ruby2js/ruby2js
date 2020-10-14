@@ -278,10 +278,12 @@ the script.
     * `(b...a).to_a` becomes `Array.apply(null, {length: (a-b)}).map(Function.call, Number).map(function (idx) { return idx+b })`
     * `.strip` becomes `.trim`
     * `.sub` becomes `.replace`
+    * `.tap {|n| n}` becomes `(function(n) {n; return n})(...)`
     * `.to_f` becomes `parseFloat`
     * `.to_i` becomes `parseInt`
     * `.to_s` becomes `.to_String`
     * `.upcase` becomes `.toUpperCase`
+    * `.yield_self {|n| n}` becomes `(function(n) {return n})(...)`
     * `[-n]` becomes `[*.length-n]` for literal values of `n`
     * `[n...m]` becomes `.slice(n,m)`
     * `[n..m]` becomes `.slice(n,m+1)`

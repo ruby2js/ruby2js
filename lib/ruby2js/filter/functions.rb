@@ -703,6 +703,17 @@ module Ruby2JS
           process call.updated(nil, [*call.children, s(:block,
             s(:send, nil, :proc), *node.children[1..-1])])
 
+        elsif method == :yield_self and call.children.length == 2
+          process node.updated(:send, [s(:block, s(:send, nil, :proc),
+            node.children[1], s(:autoreturn, node.children[2])),
+            :[], call.children[0]])
+
+        elsif method == :tap and call.children.length == 2
+          process node.updated(:send, [s(:block, s(:send, nil, :proc),
+            node.children[1], s(:begin, node.children[2],
+            s(:return, s(:lvar, node.children[1].children[0].children[0])))),
+            :[], call.children[0]])
+
         else
           super
         end

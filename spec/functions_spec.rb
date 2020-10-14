@@ -507,6 +507,18 @@ describe Ruby2JS::Filter::Functions do
     end
   end
 
+  describe "tap and yield_self" do
+    it 'should handle tap' do
+      to_js( 'foo.tap {|bar| puts bar}' ). 
+        must_equal '(function(bar) {console.log(bar); return bar})(foo)'
+    end
+
+    it 'should handle yield_self' do
+      to_js( 'foo.yield_self {|n| n*n}' ). 
+        must_equal '(function(n) {return n * n})(foo)'
+    end
+  end
+
   describe Ruby2JS::Filter::DEFAULTS do
     it "should include Functions" do
       _(Ruby2JS::Filter::DEFAULTS).must_include Ruby2JS::Filter::Functions
