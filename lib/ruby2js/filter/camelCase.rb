@@ -13,8 +13,22 @@ module Ruby2JS
         attr_accessor
       }
 
+      CAPS_EXCEPTIONS = {
+        "innerHtml" => "innerHTML",
+        "innerHtml=" => "innerHTML=",
+        "outerHtml" => "outerHTML",
+        "outerHtml=" => "outerHTML=",
+        "encodeUri" => "encodeURI",
+        "encodeUriComponent" => "encodeURIComponent",
+        "decodeUri" => "decodeURI",
+        "decodeUriComponent" => "decodeURIComponent"
+      }
+
       def camelCase(symbol)
-        symbol.to_s.gsub(/(?!^)_[a-z0-9]/) {|match| match[1].upcase}
+        symbol
+          .to_s
+          .gsub(/(?!^)_[a-z0-9]/) {|match| match[1].upcase}
+          .gsub(/^(.*)$/) {|match| CAPS_EXCEPTIONS[match] || match }
       end
 
       def on_send(node)
