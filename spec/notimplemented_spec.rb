@@ -35,10 +35,6 @@ describe 'not implemented' do
     todo( 'class C; protected; end' )
   end
 
-  it "yield" do
-    todo( 'yield' )
-  end
-
   it "catching exceptions with different variables" do
     todo("begin; a; rescue StandardException => se; b; " +
       "rescue Exception => e; c; end")

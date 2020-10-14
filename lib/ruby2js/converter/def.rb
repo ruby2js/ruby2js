@@ -9,6 +9,22 @@ module Ruby2JS
     handle :def, :defm, :async do |name, args, body=nil|
       body ||= s(:begin)
 
+      add_implicit_block = false
+
+      walk = ->(node) do
+        add_implicit_block = true if node.type == :yield || (node.type == :send && node.children[1] == "_implicitBlockYield")
+        node.children.each do |child|
+          walk[child] if child.is_a? Parser::AST::Node
+        end
+      end
+      walk[body]
+
+      if add_implicit_block
+        children = args.children.dup
+        children.push s(:optarg, "_implicitBlockYield", s(:nil))
+        args = s(:args, *children)
+      end
+
       vars = {}
       vars.merge! @vars unless name
       if args and !args.children.empty?

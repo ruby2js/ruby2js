@@ -307,6 +307,7 @@ the script.
       of `Error` instead; and default constructors will be provided
     * `loop do...end` will be replaced with `while (true) {...}`
     * `raise Exception.new(...)` will be replaced with `throw new Error(...)`
+    * `block_given?` will check for the presence of optional argument `_implicitBlockYield` which is a function made accessible through the use of `yield` in a method body.
 
     Additionally, there is one mapping that will only be done if explicitly
     included (pass `include: :class` as a `convert` option to enable):
