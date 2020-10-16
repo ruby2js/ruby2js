@@ -64,6 +64,10 @@ describe Ruby2JS::Filter::CamelCase do
       to_js( '{foo_bar: 1}' ).must_equal '{fooBar: 1}'
     end
 
+    it "should preserve ivar index access" do
+      to_js( '@iv_ar[123]' ).must_equal 'this._ivAr[123]'
+    end
+
     it "should work with autoreturn filter" do
       to_js_with_autoreturn( 'foo_bar(123) {|a_b_c| x }' ).
         must_equal 'fooBar(123, function(aBC) {return x})'

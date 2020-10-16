@@ -25,10 +25,12 @@ module Ruby2JS
       }
 
       def camelCase(symbol)
-        symbol
-          .to_s
-          .gsub(/(?!^)_[a-z0-9]/) {|match| match[1].upcase}
-          .gsub(/^(.*)$/) {|match| CAPS_EXCEPTIONS[match] || match }
+        should_symbolize = symbol.is_a?(Symbol)
+        symbol = symbol
+                  .to_s
+                  .gsub(/(?!^)_[a-z0-9]/) {|match| match[1].upcase}
+                  .gsub(/^(.*)$/) {|match| CAPS_EXCEPTIONS[match] || match }
+        should_symbolize ? symbol.to_sym : symbol
       end
 
       def on_send(node)

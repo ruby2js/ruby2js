@@ -451,6 +451,11 @@ describe Ruby2JS::Filter::Functions do
         must_equal 'setInterval(function() {x()}, 100)'
     end
 
+    it "should handle snake case" do
+      to_js( 'set_interval 100 do; x(); end' ).
+        must_equal 'set_interval(function() {x()}, 100)' # to be processed by camelCase
+    end
+
     it "should handle setInterval with first parameter passed as a block" do
       to_js( 'setInterval(100) {x()}' ).
         must_equal 'setInterval(function() {x()}, 100)'

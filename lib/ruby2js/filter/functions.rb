@@ -538,7 +538,7 @@ module Ruby2JS
         method = call.children[1]
         return super if excluded?(method)
 
-        if [:setInterval, :setTimeout].include? method
+        if [:setInterval, :setTimeout, :set_interval, :set_timeout].include? method
           return super unless call.children.first == nil
           block = process s(:block, s(:send, nil, :proc), *node.children[1..-1])
           on_send call.updated nil, [*call.children[0..1], block,
