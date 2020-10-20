@@ -528,6 +528,9 @@ module Ruby2JS
         elsif method == :new and target == s(:const, nil, :Exception)
           process S(:send, s(:const, nil, :Error), :new, *args)
 
+        elsif method == :block_given? and target == nil and args.length == 0
+          process process s(:lvar, "_implicitBlockYield")
+
         else
           super
         end
