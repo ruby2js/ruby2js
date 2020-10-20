@@ -201,7 +201,7 @@ Integrations
 
 While this is a low level library suitable for DIY integration, one of the
 obvious uses of a tool that produces JavaScript is by web servers.  Ruby2JS
-includes three such integrations:
+includes several integrations:
 
 *  [CGI](https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/cgi.rb)
 *  [Sinatra](https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/sinatra.rb)
@@ -211,6 +211,9 @@ includes three such integrations:
 As you might expect, CGI is a bit sluggish.  By contrast, Sinatra and Rails
 are quite speedy as the bulk of the time is spent on the initial load of the
 required libraries.
+
+For easy integration with Webpack (and Webpacker in Rails 5+), you can use the
+[rb2js-loader](https://github.com/whitefusionhq/rb2js-loader) plugin.
 
 Filters
 ---
