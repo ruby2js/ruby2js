@@ -355,7 +355,7 @@ module Ruby2JS
             end
 
             split = buffer.source[0...pos].split("\n")
-            vlq row, col, source_index, split.length-1, split.last.to_s.length
+            vlq row, col, source_index, [split.length - 1, 0].max, split.last.to_s.length
           end
           col += token.length
         end
