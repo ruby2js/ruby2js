@@ -627,8 +627,8 @@ async support:
 * `async def` becomes `async function`
 * `async lambda` becomes `async =>`
 * `async proc` becomes `async =>`
-* `foo async do...end` becomes `foo async () => {}`
 * `async ->` becomes `async =>`
+* `foo bar, async do...end` becomes `foo(bar, async () => {})`
 
 ES2018 support
 ---
