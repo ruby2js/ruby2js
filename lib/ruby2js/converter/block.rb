@@ -9,6 +9,11 @@ module Ruby2JS
 
     handle :block do |call, args, block|
 
+      if es2017 and call.children.last == s(:send, nil, :async)
+        return parse call.updated(nil, [*call.children[0..-2],
+        s(:send, nil, :async, s(:block, s(:send, nil, :proc), args, block))])
+      end
+
       if \
         @state == :statement and args.children.length == 1 and
         call.children.first and call.children.first.type == :begin and

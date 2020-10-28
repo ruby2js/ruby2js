@@ -622,6 +622,14 @@ conversions are made by the `functions` filter:
 * `.entries()` becomes `Object.entries()`
 * `.each_pair {}` becomes `for (let [key, value] of Object.entries()) {}'
 
+async support:
+
+* `async def` becomes `async function`
+* `async lambda` becomes `async =>`
+* `async proc` becomes `async =>`
+* `foo async do...end` becomes `foo async () => {}`
+* `async ->` becomes `async =>`
+
 ES2018 support
 ---
 

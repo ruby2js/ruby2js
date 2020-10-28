@@ -72,6 +72,11 @@ describe "ES2017 support" do
         must_equal 'async x => x'
     end
 
+    it "should handle blocks" do
+      to_js( 'it "works", async do end' ).
+        must_equal 'it("works", async () => {})'
+    end
+
     it "should handle arrow functions" do
       to_js( 'async -> (x) {x}' ).
         must_equal 'async x => x'
