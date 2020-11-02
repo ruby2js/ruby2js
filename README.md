@@ -81,6 +81,12 @@ require 'ruby2js/filter/functions'
 puts Ruby2JS.convert('"2A".to_i(16)')
 ```
 
+Host variable substitution:
+
+```ruby
+ puts Ruby2JS.convert("@name", ivars: {:@name => "Joe"})
+```
+
 Enable ES2015 support:
 
 ```ruby
