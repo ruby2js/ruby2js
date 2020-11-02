@@ -3,9 +3,11 @@ require 'ruby2js/serializer'
 module Ruby2JS
   class Error < NotImplementedError
     def initialize(message, ast)
-      message += ' at ' + ast.loc.expression.source_buffer.name.to_s
-      message += ':' + ast.loc.expression.line.inspect
-      message += ':' + ast.loc.expression.column.to_s
+      if ast.loc
+        message += ' at ' + ast.loc.expression.source_buffer.name.to_s
+        message += ':' + ast.loc.expression.line.inspect
+        message += ':' + ast.loc.expression.column.to_s
+      end
       super(message)
     end
   end

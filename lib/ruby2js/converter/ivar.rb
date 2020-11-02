@@ -16,8 +16,16 @@ module Ruby2JS
     handle :hostvalue do |value|
       case value
       when Hash
-        parse s(:hash, *value.map {|key, hvalue| s(:pair, s(:hostvalue, key), 
-          s(:hostvalue, hvalue))})
+        parse s(:hash, *value.map {|key, hvalue| 
+          case key
+          when String
+            s(:pair, s(:str, key), s(:hostvalue, hvalue))
+          when Symbol
+            s(:pair, s(:sym, key), s(:hostvalue, hvalue))
+          else
+            s(:pair, s(:hostvalue, key), s(:hostvalue, hvalue))
+          end
+        })
       when Array
         parse s(:array, *value.map {|hvalue| s(:hostvalue, hvalue)})
       when String

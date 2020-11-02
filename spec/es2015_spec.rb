@@ -3,8 +3,8 @@ require 'minitest/autorun'
 
 describe "ES2015 support" do
 
-  def to_js(string)
-    _(Ruby2JS.convert(string, eslevel: 2015, filters: []).to_s)
+  def to_js( string, opts={} )
+    _(Ruby2JS.convert(string, opts.merge(eslevel: 2015, filters: [])).to_s)
   end
 
   def to_js_fn(string)
@@ -133,6 +133,11 @@ describe "ES2015 support" do
   describe :objectLiteral do
     it "should handle computed property names" do
       to_js( '{a => 1}' ).must_equal('{[a]: 1}')
+    end
+
+    it "should handle ivars" do
+      to_js( '@x', ivars: {:@x => {a:1}} ).must_equal '{a: 1}'
+      to_js( '@x', ivars: {:@x => {"a"=>1}} ).must_equal '{a: 1}'
     end
   end
 
