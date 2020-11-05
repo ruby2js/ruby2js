@@ -8,6 +8,27 @@ module Ruby2JS
       def initialize(*args)
         super
         @esm = true # signal for other filters
+        @esm_imports = nil
+      end
+
+      def options=(options)
+        super
+        @esm_autoimports = options[:autoimports]
+        return unless @esm_autoimports
+      end
+
+      def process(node)
+        return super if @esm_imports or not @esm_autoimports
+        @esm_imports = Set.new
+        result = super
+
+        if @esm_imports.empty?
+          result
+        else
+          s(:begin, *@esm_imports.to_a.map {|token|
+            s(:import, @esm_autoimports[token], s(:const, nil, token))
+          }, result)
+        end
       end
 
       def on_send(node)
@@ -56,9 +77,20 @@ module Ruby2JS
           end
         elsif method == :export          
           s(:export, *process_all(args))
+        elsif @esm_imports and args.length == 0 and @esm_autoimports[method]
+          @esm_imports.add(method)
+          super
         else
           super
         end
+      end
+
+      def on_const(node)
+        return super unless @esm_autoimports
+        if node.children.first == nil and @esm_autoimports[node.children.last]
+          @esm_imports.add(node.children.last)
+        end
+        super
       end
     end
 

@@ -4,10 +4,12 @@ require 'ruby2js/filter/esm'
 
 describe Ruby2JS::Filter::ESM do
   
-  def to_js(string)
-    _(Ruby2JS.convert(string, eslevel: 2017,
+  def to_js(string, options={})
+    _(Ruby2JS.convert(string, options.merge(
+      eslevel: 2017,
       filters: [Ruby2JS::Filter::ESM],
-      scope: self).to_s)
+      scope: self
+    )).to_s)
   end
   
   describe "imports" do
@@ -83,6 +85,18 @@ describe Ruby2JS::Filter::ESM do
     it "should leave import function calls alone" do
       to_js('X = await import("x.js")').
         must_equal 'const X = await import("x.js")'
+    end
+  end
+
+  describe "autoimports option" do
+    it "should autoimport for constants" do
+      to_js('Foo.bar', autoimports: {Foo: 'foo.js'}).
+        must_equal 'import Foo from "foo.js"; Foo.bar'
+    end
+
+    it "should autoimport for non-constants" do
+      to_js('foo.bar', autoimports: {foo: 'foo.js'}).
+        must_equal 'import foo from "foo.js"; foo.bar'
     end
   end
 
