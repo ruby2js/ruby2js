@@ -21,6 +21,8 @@ module Ruby2JS
       def on_def(node)
         node = super
         return node unless node.type == :def
+        return node if [:constructor, :initialize].include?(node.children.first)
+
         children = node.children[1..-1]
 
         children[-1] = s(:nil) if children.last == nil

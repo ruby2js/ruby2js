@@ -48,6 +48,11 @@ describe Ruby2JS::Filter::Return do
     it "should handle multi line definitions" do
       to_js( 'def f(x) x; x; end' ).must_equal 'function f(x) {x; return x}'
     end
+
+    it "should skip constructor" do
+      to_js( 'class X; def initialize(x) x; end; end' ).must_equal 'function X(x) {x}'
+      to_js( 'class X; def constructor(x) x; end; end' ).must_equal 'function X() {}; X.prototype.constructor = function(x) {x}'
+    end
   end
 
   describe 'data types' do
