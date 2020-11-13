@@ -531,6 +531,15 @@ module Ruby2JS
         elsif method == :block_given? and target == nil and args.length == 0
           process process s(:lvar, "_implicitBlockYield")
 
+        elsif method == :abs and args.length == 0
+          process S(:send, s(:const, nil, :Math), :abs, target)
+
+        elsif method == :ceil and args.length == 0
+          process S(:send, s(:const, nil, :Math), :ceil, target)
+
+        elsif method == :floor and args.length == 0
+          process S(:send, s(:const, nil, :Math), :floor, target)
+
         else
           super
         end

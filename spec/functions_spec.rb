@@ -524,6 +524,20 @@ describe Ruby2JS::Filter::Functions do
     end
   end
 
+  describe "math functions" do
+    it "should handle abs" do
+      to_js( 'a.abs' ).must_equal 'Math.abs(a)'
+    end
+
+    it "should handle ceil" do
+      to_js( 'a.ceil' ).must_equal 'Math.ceil(a)'
+    end
+
+    it "should handle floor" do
+      to_js( 'a.floor' ).must_equal 'Math.floor(a)'
+    end
+  end
+
   describe Ruby2JS::Filter::DEFAULTS do
     it "should include Functions" do
       _(Ruby2JS::Filter::DEFAULTS).must_include Ruby2JS::Filter::Functions
