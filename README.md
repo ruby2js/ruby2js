@@ -243,8 +243,10 @@ the script.
 
 * <a id="functions" href="https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/functions.rb">functions</a>
 
+    * `.abs` becomes `Math.abs()`
     * `.all?` becomes `.every`
     * `.any?` becomes `.some`
+    * `.ceil` becomes `Math.ceil()`
     * `.chr` becomes `fromCharCode`
     * `.clear` becomes `.length = 0`
     * `.delete` becomes `delete target[arg]`
@@ -259,6 +261,7 @@ the script.
     * `.find_index` becomes `findIndex`
     * `.first` becomes `[0]`
     * `.first(n)` becomes `.slice(0, n)`
+    * `.floor` becomes `Math.floor()`
     * `.gsub` becomes `replace(//g)`
     * `.include?` becomes `.indexOf() != -1`
     * `.inspect` becomes `JSON.stringify()`
