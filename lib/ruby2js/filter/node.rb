@@ -1,44 +1,21 @@
 require 'ruby2js'
 require 'set'
 
+Ruby2JS.module_default ||= :cjs
+
 module Ruby2JS
   module Filter
     module Node
       include SEXP
       extend SEXP
 
-      CJS_SETUP = {
-        child_process: s(:casgn, nil, :child_process, 
-          s(:send, nil, :require, s(:str, "child_process"))),
-        fs: s(:casgn, nil, :fs, s(:send, nil, :require, s(:str, "fs"))),
-        ARGV: s(:lvasgn, :ARGV, s(:send, s(:attr, 
+      IMPORT_CHILD_PROCESS = s(:import, ['child_process'],
+          s(:attr, nil, :child_process))
+
+      IMPORT_FS = s(:import, ['fs'], s(:attr, nil, :fs))
+
+      SETUP_ARGV = s(:lvasgn, :ARGV, s(:send, s(:attr, 
           s(:attr, nil, :process), :argv), :slice, s(:int, 2)))
-      }
-
-      ESM_SETUP = {
-        child_process: s(:import, ['child_process'],
-          s(:attr, nil, :child_process)),
-        fs: s(:import, ['fs'], s(:attr, nil, :fs)),
-        ARGV: CJS_SETUP[:ARGV]
-      }
-
-      def initialize(*args)
-        @node_setup = nil
-        super
-      end
-
-      def process(node)
-        return super if @node_setup
-        @node_setup = Set.new
-        result = super
-
-        if @node_setup.empty?
-          result
-        else
-          setup = @esm ? ESM_SETUP : CJS_SETUP;
-          s(:begin, *@node_setup.to_a.map {|token| setup[token]}, result)
-        end
-      end
 
       def on_send(node)
         target, method, *args = node.children
@@ -51,7 +28,7 @@ module Ruby2JS
             s(:send, s(:attr, nil, :process), :exit, *process_all(args));
 
           elsif method == :system
-            @node_setup << :child_process
+            prepend_list << IMPORT_CHILD_PROCESS
 
             if args.length == 1
               s(:send, s(:attr, nil, :child_process), :execSync,
@@ -79,38 +56,38 @@ module Ruby2JS
           target.type == :const and target.children.first == nil
         then
           if method == :read and args.length == 1
-            @node_setup << :fs
+            prepend_list << IMPORT_FS
             s(:send, s(:attr, nil, :fs), :readFileSync, *process_all(args),
               s(:str, 'utf8'))
 
           elsif method == :write and args.length == 2
-            @node_setup << :fs
+            prepend_list << IMPORT_FS
             S(:send, s(:attr, nil, :fs), :writeFileSync, *process_all(args))
 
           elsif target.children.last == :IO
             super
 
           elsif [:exist?, :exists?].include? method and args.length == 1
-            @node_setup << :fs
+            prepend_list << IMPORT_FS
             S(:send, s(:attr, nil, :fs), :existsSync, process(args.first))
 
           elsif method == :readlink and args.length == 1
-            @node_setup << :fs
+            prepend_list << IMPORT_FS
             S(:send, s(:attr, nil, :fs), :readlinkSync, process(args.first))
 
           elsif method == :realpath and args.length == 1
-            @node_setup << :fs
+            prepend_list << IMPORT_FS
             S(:send, s(:attr, nil, :fs), :realpathSync, process(args.first))
 
           elsif method == :rename and args.length == 2
-            @node_setup << :fs
+            prepend_list << IMPORT_FS
             S(:send, s(:attr, nil, :fs), :renameSync, *process_all(args))
 
           elsif \
             [:chmod, :lchmod].include? method and 
             args.length > 1 and args.first.type == :int
           then
-            @node_setup << :fs
+            prepend_list << IMPORT_FS
 
             S(:begin, *args[1..-1].map{|file|
               S(:send, s(:attr, nil, :fs), method.to_s + 'Sync', process(file),
@@ -121,7 +98,7 @@ module Ruby2JS
             [:chown, :lchown].include? method and args.length > 2 and 
             args[0].type == :int and args[1].type == :int
           then
-            @node_setup << :fs
+            prepend_list << IMPORT_FS
 
             S(:begin, *args[2..-1].map{|file|
               s(:send, s(:attr, nil, :fs), method.to_s + 'Sync', process(file),
@@ -129,24 +106,24 @@ module Ruby2JS
             })
 
           elsif [:ln, :link].include? method and args.length == 2
-            @node_setup << :fs
+            prepend_list << IMPORT_FS
             s(:send, s(:attr, nil, :fs), :linkSync, *process_all(args))
             
           elsif method == :symlink and args.length == 2
-            @node_setup << :fs
+            prepend_list << IMPORT_FS
             s(:send, s(:attr, nil, :fs), :symlinkSync, *process_all(args))
             
           elsif method == :truncate and args.length == 2
-            @node_setup << :fs
+            prepend_list << IMPORT_FS
             s(:send, s(:attr, nil, :fs), :truncateSync, *process_all(args))
             
           elsif [:stat, :lstat].include? method and args.length == 1
-            @node_setup << :fs
+            prepend_list << IMPORT_FS
             s(:send, s(:attr, nil, :fs), method.to_s + 'Sync',
               process(args.first))
 
           elsif method == :unlink and args.length == 1
-            @node_setup << :fs
+            prepend_list << IMPORT_FS
             S(:begin, *args.map{|file|
               S(:send, s(:attr, nil, :fs), :unlinkSync, process(file))
             })
@@ -169,15 +146,15 @@ module Ruby2JS
           end
             
           if [:cp, :copy].include? method and args.length == 2
-            @node_setup << :fs
+            prepend_list << IMPORT_FS
             s(:send, s(:attr, nil, :fs), :copyFileSync, *process_all(args))
             
           elsif [:mv, :move].include? method and args.length == 2
-            @node_setup << :fs
+            prepend_list << IMPORT_FS
             S(:send, s(:attr, nil, :fs), :renameSync, *process_all(args))
 
           elsif method == :mkdir and args.length == 1
-            @node_setup << :fs
+            prepend_list << IMPORT_FS
             S(:begin, *list[args.last].map {|file|
               s(:send, s(:attr, nil, :fs), :mkdirSync, process(file))
             })
@@ -189,21 +166,21 @@ module Ruby2JS
             s(:send, s(:attr, nil, :process), :cwd)
 
           elsif method == :rmdir and args.length == 1
-            @node_setup << :fs
+            prepend_list << IMPORT_FS
             S(:begin, *list[args.last].map {|file|
               s(:send, s(:attr, nil, :fs), :rmdirSync, process(file))
             })
 
           elsif method == :ln and args.length == 2
-            @node_setup << :fs
+            prepend_list << IMPORT_FS
             s(:send, s(:attr, nil, :fs), :linkSync, *process_all(args))
             
           elsif method == :ln_s and args.length == 2
-            @node_setup << :fs
+            prepend_list << IMPORT_FS
             s(:send, s(:attr, nil, :fs), :symlinkSync, *process_all(args))
             
           elsif method == :rm and args.length == 1
-            @node_setup << :fs
+            prepend_list << IMPORT_FS
             S(:begin, *list[args.last].map {|file|
               s(:send, s(:attr, nil, :fs), :unlinkSync, process(file))
             })
@@ -211,7 +188,7 @@ module Ruby2JS
           elsif \
             method == :chmod and args.length == 2 and args.first.type == :int
           then
-            @node_setup << :fs
+            prepend_list << IMPORT_FS
 
             S(:begin, *list[args.last].map {|file|
               S(:send, s(:attr, nil, :fs), method.to_s + 'Sync', process(file),
@@ -222,14 +199,14 @@ module Ruby2JS
             method == :chown and args.length == 3 and 
             args[0].type == :int and args[1].type == :int
           then
-            @node_setup << :fs
+            prepend_list << IMPORT_FS
 
             S(:begin, *list[args.last].map {|file|
               s(:send, s(:attr, nil, :fs), method.to_s + 'Sync', process(file),
                 *process_all(args[0..1]))})
 
           elsif method == :touch
-            @node_setup << :fs
+            prepend_list << IMPORT_FS
 
             S(:begin, *list[args.first].map {|file|
               S(:send, s(:attr, nil, :fs), :closeSync,
@@ -249,16 +226,16 @@ module Ruby2JS
           elsif method == :pwd and args.length == 0
             s(:send, s(:attr, nil, :process), :cwd)
           elsif method == :entries
-            @node_setup << :fs
+            prepend_list << IMPORT_FS
             s(:send, s(:attr, nil, :fs), :readdirSync, *process_all(args))
           elsif method == :mkdir and args.length == 1
-            @node_setup << :fs
+            prepend_list << IMPORT_FS
             s(:send, s(:attr, nil, :fs), :mkdirSync, process(args.first))
           elsif method == :rmdir and args.length == 1
-            @node_setup << :fs
+            prepend_list << IMPORT_FS
             s(:send, s(:attr, nil, :fs), :rmdirSync, process(args.first))
           elsif method == :mktmpdir and args.length <=1
-            @node_setup << :fs
+            prepend_list << IMPORT_FS
             if args.length == 0
               prefix = s(:str, 'd')
             elsif args.first.type == :array
@@ -298,7 +275,7 @@ module Ruby2JS
 
       def on_const(node)
         if node.children == [nil, :ARGV]
-          @node_setup << :ARGV
+          prepend_list << SETUP_ARGV
           super
         elsif node.children == [nil, :ENV]
           S(:attr, s(:attr, nil, :process), :env)
@@ -326,7 +303,7 @@ module Ruby2JS
       end
 
       def on_xstr(node)
-        @node_setup << :child_process
+        prepend_list << IMPORT_CHILD_PROCESS
 
         children = node.children.dup
         command = children.shift

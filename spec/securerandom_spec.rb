@@ -5,18 +5,18 @@ require 'ruby2js/filter/esm'
 
 describe Ruby2JS::Filter::SecureRandom do
   
-  def to_js( string)
-    _(Ruby2JS.convert(string, filters: [Ruby2JS::Filter::SecureRandom]).to_s)
+  def to_js_cjs( string)
+    _(Ruby2JS.convert(string, filters: [Ruby2JS::Filter::SecureRandom],
+      module: :cjs).to_s)
   end
   
   def to_js_esm( string)
-    _(Ruby2JS.convert(string,
-      filters: [Ruby2JS::Filter::SecureRandom, Ruby2JS::Filter::ESM]).to_s)
+    _(Ruby2JS.convert(string, filters: [Ruby2JS::Filter::SecureRandom]).to_s)
   end
   
   describe 'alphanumeric' do
     it 'should support cjs' do
-      to_js( 'SecureRandom.alphanumeric(10)' ).
+      to_js_cjs( 'SecureRandom.alphanumeric(10)' ).
         must_equal 'var base62_random = require("base62-random"); ' +
         'base62_random(10)'
     end

@@ -17,6 +17,7 @@ module Ruby2JS
 
   @@eslevel_default = 2009 # ecmascript 5
   @@strict_default = false
+  @@module_default = nil
 
   def self.eslevel_default
     @@eslevel_default
@@ -32,6 +33,14 @@ module Ruby2JS
 
   def self.strict_default=(level)
     @@strict_default = level
+  end
+
+  def self.module_default
+    @@module_default
+  end
+
+  def self.module_default=(module_type)
+    @@module_default = module_type
   end
 
   module Filter
@@ -52,11 +61,14 @@ module Ruby2JS
       include Ruby2JS::Filter
       BINARY_OPERATORS = Converter::OPERATORS[2..-1].flatten
 
+      attr_accessor :prepend_list
+
       def initialize(comments)
         @comments = comments
         @ast = nil
         @exclude_methods = []
         @esm = false
+        @prepend_list = Set.new
       end
 
       def options=(options)
@@ -162,6 +174,7 @@ module Ruby2JS
   def self.convert(source, options={})
     options[:eslevel] ||= @@eslevel_default
     options[:strict] = @@strict_default if options[:strict] == nil
+    options[:module] ||= @@module_default || :esm
 
     if Proc === source
       file,line = source.source_location
@@ -193,6 +206,10 @@ module Ruby2JS
 
       filter.options = options
       ast = filter.process(ast)
+
+      if filter.prepend_list
+        ast = Parser::AST::Node.new(:begin, [*filter.prepend_list.to_a, ast])
+      end
     end
 
     ruby2js = Ruby2JS::Converter.new(ast, comments)
@@ -203,6 +220,7 @@ module Ruby2JS
     ruby2js.strict = options[:strict]
     ruby2js.comparison = options[:comparison] || :equality
     ruby2js.or = options[:or] || :logical
+    ruby2js.module_type = options[:module] || :esm
     ruby2js.underscored_private = (options[:eslevel] < 2020) || options[:underscored_private]
     if ruby2js.binding and not ruby2js.ivars
       ruby2js.ivars = ruby2js.binding.eval \

@@ -7,33 +7,7 @@ module Ruby2JS
       include SEXP
       extend SEXP
 
-      CJS_SETUP = {
-        jsdom: s(:casgn, nil, :JSDOM, 
-          s(:attr, s(:send, nil, :require, s(:str, "jsdom")), :JSDOM))
-      }
-
-      ESM_SETUP = {
-        jsdom: s(:import, ["jsdom"], [s(:attr, nil, :JSDOM)])
-      }
-
-      def initialize(*args)
-        @nokogiri_setup = nil
-        super
-      end
-
-      def process(node)
-        return super if @nokogiri_setup
-        @nokogiri_setup = Set.new
-        result = super
-
-        if @nokogiri_setup.empty?
-          result
-        else
-          setup = @esm ? ESM_SETUP : CJS_SETUP;
-          s(:begin, 
-            *@nokogiri_setup.to_a.map {|token| setup[token]}, result)
-        end
-      end
+      IMPORT_JSDOM = s(:import, ["jsdom"], [s(:attr, nil, :JSDOM)])
 
       def on_send(node)
         target, method, *args = node.children
@@ -55,7 +29,7 @@ module Ruby2JS
           [:HTML, :HTML5].include? method and
           target == s(:const, nil, :Nokogiri)
         then
-          @nokogiri_setup << :jsdom
+          prepend_list << IMPORT_JSDOM
           S(:attr, s(:attr, s(:send, s(:const, nil, :JSDOM), :new,
             *process_all(args)), :window), :document)
 
@@ -65,7 +39,7 @@ module Ruby2JS
           target.children.first == s(:const, nil, :Nokogiri) and
           [:HTML, :HTML5].include? target.children.last
         then
-          @nokogiri_setup << :jsdom
+          prepend_list << IMPORT_JSDOM
           S(:attr, s(:attr, s(:send, s(:const, nil, :JSDOM), :new,
             *process_all(args)), :window), :document)
 

@@ -9,27 +9,27 @@ describe Ruby2JS::Filter::Nokogiri do
     _(Ruby2JS.convert(string, filters: [Ruby2JS::Filter::Nokogiri]).to_s)
   end
   
-  def to_js_esm( string)
-    _(Ruby2JS.convert(string,
-      filters: [Ruby2JS::Filter::Nokogiri, Ruby2JS::Filter::ESM]).to_s)
+  def to_js_cjs( string)
+    _(Ruby2JS.convert(string, module: :cjs,
+      filters: [Ruby2JS::Filter::Nokogiri]).to_s)
   end
   
   describe 'parse' do
     it 'should support nokogiri parse' do
       to_js( 'Nokogiri::HTML.parse "<b>"' ).
-        must_equal 'var JSDOM = require("jsdom").JSDOM; ' +
+        must_equal 'import { JSDOM } from "jsdom"; ' +
         'new JSDOM("<b>").window.document'
 
       to_js( 'Nokogiri::HTML "<b>"' ).
-        must_equal 'var JSDOM = require("jsdom").JSDOM; ' +
+        must_equal 'import { JSDOM } from "jsdom"; ' +
         'new JSDOM("<b>").window.document'
 
       to_js( 'Nokogiri::HTML5.parse "<b>"' ).
-        must_equal 'var JSDOM = require("jsdom").JSDOM; ' +
+        must_equal 'import { JSDOM } from "jsdom"; ' +
         'new JSDOM("<b>").window.document'
 
       to_js( 'Nokogiri::HTML5 "<b>"' ).
-        must_equal 'var JSDOM = require("jsdom").JSDOM; ' +
+        must_equal 'import { JSDOM } from "jsdom"; ' +
         'new JSDOM("<b>").window.document'
     end
   end
@@ -212,13 +212,14 @@ describe Ruby2JS::Filter::Nokogiri do
     end
   end
 
-  describe 'esm' do
+  describe 'cjs' do
     it 'should support JSDOM import' do
-      to_js_esm( 'Nokogiri::HTML.parse "<b>"' ).
-        must_equal 'import { JSDOM } from "jsdom"; ' +
+      to_js_cjs( 'Nokogiri::HTML.parse "<b>"' ).
+        must_equal 'var JSDOM = require("jsdom").JSDOM; ' +
         'new JSDOM("<b>").window.document'
     end
   end
+
   describe Ruby2JS::Filter::DEFAULTS do
     it "should include Nokogiri" do
       _(Ruby2JS::Filter::DEFAULTS).must_include Ruby2JS::Filter::Nokogiri

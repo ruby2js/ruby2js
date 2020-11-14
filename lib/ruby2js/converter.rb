@@ -130,7 +130,7 @@ module Ruby2JS
       Parser::AST::Node.new(type, args)
     end
 
-    attr_accessor :strict, :eslevel, :comparison, :or, :underscored_private
+    attr_accessor :strict, :eslevel, :module_type, :comparison, :or, :underscored_private
 
     def es2015
       @eslevel >= 2015

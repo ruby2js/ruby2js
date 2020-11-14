@@ -1,5 +1,7 @@
 require 'ruby2js'
 
+Ruby2JS.module_default = :esm
+
 module Ruby2JS
   module Filter
     module ESM

@@ -6,12 +6,12 @@ require 'ruby2js/filter/esm'
 describe Ruby2JS::Filter::Functions do
   
   def to_js( string)
-    _(Ruby2JS.convert(string, filters: [Ruby2JS::Filter::Node]).to_s)
+    _(Ruby2JS.convert(string, filters: [Ruby2JS::Filter::Node],
+    module: :cjs).to_s)
   end
   
   def to_js_esm( string)
-    _(Ruby2JS.convert(string,
-      filters: [Ruby2JS::Filter::Node, Ruby2JS::Filter::ESM]).to_s)
+    _(Ruby2JS.convert(string, filters: [Ruby2JS::Filter::Node]).to_s)
   end
   
   describe 'globals' do
