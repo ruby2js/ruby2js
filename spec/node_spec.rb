@@ -256,6 +256,13 @@ describe Ruby2JS::Filter::Functions do
       to_js_esm( 'IO.read("foo")' ).
         must_equal 'import fs from "fs"; fs.readFileSync("foo", "utf8")'
     end
+
+    it 'should put imports first' do
+      to_js_esm( 'ARGV[0] + `echo hi`' ).
+        must_equal 'import child_process from "child_process"; ' + 
+          'var ARGV = process.argv.slice(2); ' +
+          'ARGV[0] + child_process.execSync("echo hi", {encoding: "utf8"})'
+    end
   end
 
   describe Ruby2JS::Filter::DEFAULTS do

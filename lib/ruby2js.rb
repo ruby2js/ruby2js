@@ -208,7 +208,8 @@ module Ruby2JS
       ast = filter.process(ast)
 
       if filter.prepend_list
-        ast = Parser::AST::Node.new(:begin, [*filter.prepend_list.to_a, ast])
+        prepend = filter.prepend_list.sort_by {|ast| ast.type == :import ? 0 : 1}
+        ast = Parser::AST::Node.new(:begin, [*prepend, ast])
       end
     end
 
