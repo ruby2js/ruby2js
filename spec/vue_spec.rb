@@ -501,6 +501,13 @@ describe Ruby2JS::Filter::Vue do
     end
   end
 
+  describe "watch values" do
+    it 'should handle watch method' do
+      to_js( 'class Numbers<Vue; def watch; {"_data":  refreshText  , deep: true}; end; end' ).
+        must_include '{watch: {_data: refreshText, deep: true}}'
+    end
+  end
+
   describe 'Vue calls' do
     it 'should create elements outside of render methods' do
       to_js( 'Vue.createElement("span", "text")' ).

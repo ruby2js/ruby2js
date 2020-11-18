@@ -106,6 +106,7 @@ module Ruby2JS
         computed = []
         setters = []
         options = []
+        watch = nil
         el = nil
         mixins = []
 
@@ -270,6 +271,12 @@ module Ruby2JS
               @comments[pair] = @comments[statement]
               if VUE_LIFECYCLE.include? method
                 hash << pair
+              elsif method == :watch
+                watch = pair.children[1].children[2]
+                if watch.type != :hash
+                  watch = nil
+                  methods << pair
+                end
               elsif not statement.is_method?
                 computed << pair
               elsif method.to_s.end_with? '='
@@ -330,6 +337,11 @@ module Ruby2JS
         # append computed to hash
         unless computed.empty?
           hash << s(:pair, s(:sym, :computed), s(:hash, *computed))
+        end
+
+        # append watch to hash
+        if watch
+          hash << s(:pair, s(:sym, :watch), watch)
         end
 
         # convert class name to camel case
