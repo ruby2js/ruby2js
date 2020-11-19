@@ -504,7 +504,7 @@ describe Ruby2JS::Filter::Vue do
   describe "watch values" do
     it 'should handle watch method' do
       to_js( 'class Numbers<Vue; def watch; {"_data":  refreshText  , deep: true}; end; end' ).
-        must_include '{watch: {_data: refreshText, deep: true}}'
+        must_equal 'var Numbers = new Vue({watch: {_data: refreshText, deep: true}})'
     end
   end
 
