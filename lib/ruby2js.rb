@@ -209,7 +209,7 @@ module Ruby2JS
 
       if filter.prepend_list
         prepend = filter.prepend_list.sort_by {|ast| ast.type == :import ? 0 : 1}
-        ast = Parser::AST::Node.new(:begin, [*prepend, ast])
+        ast = Parser::AST::Node.new(:begin, [*prepend, ast], location: ast.location)
       end
     end
 
