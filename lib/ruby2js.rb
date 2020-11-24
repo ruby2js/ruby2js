@@ -141,6 +141,7 @@ module Ruby2JS
       def on_method(node); on_send(node); end
       def on_prop(node); on_array(node); end
       def on_prototype(node); on_begin(node); end
+      def on_send!(node); on_send(node); end
       def on_sendw(node); on_send(node); end
       def on_undefined?(node); on_defined?(node); end
       def on_nil(node); end
@@ -207,9 +208,9 @@ module Ruby2JS
       filter.options = options
       ast = filter.process(ast)
 
-      if filter.prepend_list
+      unless filter.prepend_list.empty?
         prepend = filter.prepend_list.sort_by {|ast| ast.type == :import ? 0 : 1}
-        ast = Parser::AST::Node.new(:begin, [*prepend, ast], location: ast.location)
+        ast = Parser::AST::Node.new(:begin, [*prepend, ast])
       end
     end
 
@@ -239,6 +240,8 @@ module Ruby2JS
     ruby2js.convert
 
     ruby2js.timestamp options[:file]
+
+    ruby2js.file_name = options[:file] || ast&.loc&.expression&.source_buffer&.name || ''
 
     ruby2js
   end

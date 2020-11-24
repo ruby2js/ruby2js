@@ -42,6 +42,7 @@ module Ruby2JS
 
   class Serializer
     attr_reader :timestamps
+    attr_accessor :file_name
 
     def initialize
       @sep = '; '
@@ -56,6 +57,7 @@ module Ruby2JS
       @timestamps = {}
 
       @ast = nil
+      @file_name = ''
     end
 
     def timestamp(file)
@@ -363,7 +365,7 @@ module Ruby2JS
 
       @sourcemap = {
         version: 3,
-        file: @ast.loc.expression.source_buffer.name,
+        file: @file_name,
         sources: sources.map(&:name),
         mappings: @mappings
       }

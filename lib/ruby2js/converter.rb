@@ -248,7 +248,7 @@ module Ruby2JS
         if ast.loc and ast.loc.expression
           filename = ast.loc.expression.source_buffer.name
           if filename and not filename.empty?
-            @timestamps[filename] ||= File.mtime(filename)
+            @timestamps[filename] ||= File.mtime(filename) rescue nil
           end
         end
 

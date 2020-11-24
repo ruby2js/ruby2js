@@ -31,11 +31,11 @@ module Ruby2JS
             prepend_list << IMPORT_CHILD_PROCESS
 
             if args.length == 1
-              s(:send, s(:attr, nil, :child_process), :execSync,
+              S(:send, s(:attr, nil, :child_process), :execSync,
               process(args.first),
               s(:hash, s(:pair, s(:sym, :stdio), s(:str, 'inherit'))))
             else
-              s(:send, s(:attr, nil, :child_process), :execFileSync,
+              S(:send, s(:attr, nil, :child_process), :execFileSync,
               process(args.first), s(:array, *process_all(args[1..-1])),
               s(:hash, s(:pair, s(:sym, :stdio), s(:str, 'inherit'))))
             end
@@ -57,7 +57,7 @@ module Ruby2JS
         then
           if method == :read and args.length == 1
             prepend_list << IMPORT_FS
-            s(:send, s(:attr, nil, :fs), :readFileSync, *process_all(args),
+            S(:send, s(:attr, nil, :fs), :readFileSync, *process_all(args),
               s(:str, 'utf8'))
 
           elsif method == :write and args.length == 2
@@ -111,15 +111,15 @@ module Ruby2JS
             
           elsif method == :symlink and args.length == 2
             prepend_list << IMPORT_FS
-            s(:send, s(:attr, nil, :fs), :symlinkSync, *process_all(args))
+            S(:send, s(:attr, nil, :fs), :symlinkSync, *process_all(args))
             
           elsif method == :truncate and args.length == 2
             prepend_list << IMPORT_FS
-            s(:send, s(:attr, nil, :fs), :truncateSync, *process_all(args))
+            S(:send, s(:attr, nil, :fs), :truncateSync, *process_all(args))
             
           elsif [:stat, :lstat].include? method and args.length == 1
             prepend_list << IMPORT_FS
-            s(:send, s(:attr, nil, :fs), method.to_s + 'Sync',
+            S(:send, s(:attr, nil, :fs), method.to_s + 'Sync',
               process(args.first))
 
           elsif method == :unlink and args.length == 1
@@ -163,7 +163,7 @@ module Ruby2JS
             S(:send, s(:attr, nil, :process), :chdir, *process_all(args))
 
           elsif method == :pwd and args.length == 0
-            s(:send, s(:attr, nil, :process), :cwd)
+            S(:send!, s(:attr, nil, :process), :cwd)
 
           elsif method == :rmdir and args.length == 1
             prepend_list << IMPORT_FS
@@ -173,11 +173,11 @@ module Ruby2JS
 
           elsif method == :ln and args.length == 2
             prepend_list << IMPORT_FS
-            s(:send, s(:attr, nil, :fs), :linkSync, *process_all(args))
+            S(:send, s(:attr, nil, :fs), :linkSync, *process_all(args))
             
           elsif method == :ln_s and args.length == 2
             prepend_list << IMPORT_FS
-            s(:send, s(:attr, nil, :fs), :symlinkSync, *process_all(args))
+            S(:send, s(:attr, nil, :fs), :symlinkSync, *process_all(args))
             
           elsif method == :rm and args.length == 1
             prepend_list << IMPORT_FS
@@ -224,16 +224,16 @@ module Ruby2JS
           if method == :chdir and args.length == 1
             S(:send, s(:attr, nil, :process), :chdir, *process_all(args))
           elsif method == :pwd and args.length == 0
-            s(:send, s(:attr, nil, :process), :cwd)
+            S(:send!, s(:attr, nil, :process), :cwd)
           elsif method == :entries
             prepend_list << IMPORT_FS
-            s(:send, s(:attr, nil, :fs), :readdirSync, *process_all(args))
+            S(:send, s(:attr, nil, :fs), :readdirSync, *process_all(args))
           elsif method == :mkdir and args.length == 1
             prepend_list << IMPORT_FS
-            s(:send, s(:attr, nil, :fs), :mkdirSync, process(args.first))
+            S(:send, s(:attr, nil, :fs), :mkdirSync, process(args.first))
           elsif method == :rmdir and args.length == 1
             prepend_list << IMPORT_FS
-            s(:send, s(:attr, nil, :fs), :rmdirSync, process(args.first))
+            S(:send, s(:attr, nil, :fs), :rmdirSync, process(args.first))
           elsif method == :mktmpdir and args.length <=1
             prepend_list << IMPORT_FS
             if args.length == 0
@@ -244,7 +244,7 @@ module Ruby2JS
               prefix = args.first
             end
 
-            s(:send, s(:attr, nil, :fs), :mkdtempSync, process(prefix))
+            S(:send, s(:attr, nil, :fs), :mkdtempSync, process(prefix))
           else
             super
           end
