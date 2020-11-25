@@ -98,6 +98,11 @@ describe Ruby2JS::Filter::ESM do
       to_js('foo.bar', autoimports: {foo: 'foo.js'}).
         must_equal 'import foo from "foo.js"; foo.bar'
     end
+
+    it "should handle autoimport as a proc" do
+      to_js('Foo.bar', autoimports: proc {|name| "#{name.downcase}.js"}).
+        must_equal 'import Foo from "foo.js"; Foo.bar'
+    end
   end
 
   describe Ruby2JS::Filter::DEFAULTS do
