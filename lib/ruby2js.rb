@@ -67,7 +67,6 @@ module Ruby2JS
         @comments = comments
         @ast = nil
         @exclude_methods = []
-        @esm = false
         @prepend_list = Set.new
       end
 

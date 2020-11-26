@@ -7,11 +7,6 @@ module Ruby2JS
     module ESM
       include SEXP
 
-      def initialize(*args)
-        super
-        @esm = true # signal for other filters
-      end
-
       def options=(options)
         super
         @esm_autoimports = options[:autoimports]
