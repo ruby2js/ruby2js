@@ -1,4 +1,5 @@
 pkg
 Gemfile.lock
 demo/assets
+.DS_Store
 .ruby-version
