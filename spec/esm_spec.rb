@@ -99,9 +99,24 @@ describe Ruby2JS::Filter::ESM do
         must_equal 'import foo from "foo.js"; foo.bar'
     end
 
+    it "should autoimport for functions" do
+      to_js('func(1)', autoimports: {func: 'func.js'}).
+        must_equal 'import func from "func.js"; func(1)'
+    end
+
     it "should handle autoimport as a proc" do
       to_js('Foo.bar', autoimports: proc {|name| "#{name.downcase}.js"}).
         must_equal 'import Foo from "foo.js"; Foo.bar'
+    end
+
+    it "should allow named autoimports" do
+      to_js('func(1)', autoimports: {[:func, :another] => 'func.js'}).
+        must_equal 'import { func, another } from "func.js"; func(1)'
+    end
+
+    it "should not autoimport if magic comment is present" do
+      to_js("# autoimports: false\nfunc(1)", autoimports: {[:func, :another] => 'func.js'}).
+        must_equal "// autoimports: false\nfunc(1)"
     end
   end
 
