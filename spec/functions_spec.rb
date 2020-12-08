@@ -292,6 +292,10 @@ describe Ruby2JS::Filter::Functions do
       to_js( 'a.min()' ).must_equal 'Math.min.apply(Math, a)'
     end
 
+    it "should handle sum" do
+      to_js( 'a.sum' ).must_equal 'a.reduce(function(a, b) {a + b}, 0)'
+    end
+
     it "should map .select to .filter" do
       to_js( 'a.select {|item| item > 0}' ).
         must_equal 'a.filter(function(item) {return item > 0})'

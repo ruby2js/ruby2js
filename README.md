@@ -280,6 +280,7 @@ the script.
     * `.respond_to?` becomes `right in left`
     * `.rstrip` becomes `.replace(/s+$/, "")`
     * `.scan` becomes `.match(//g)`
+    * `.sum` becomes `.reduce(function(a, b) {a + b}, 0)`
     * `.start_with?` becomes `.substring(0, arg.length) == arg`
     * `.upto(lim)` becomes `for (var i=num; i<=lim; i+=1)`
     * `.downto(lim)` becomes `for (var i=num; i>=lim; i-=1)`

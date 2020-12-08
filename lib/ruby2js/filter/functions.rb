@@ -540,6 +540,11 @@ module Ruby2JS
         elsif method == :floor and args.length == 0
           process S(:send, s(:const, nil, :Math), :floor, target)
 
+        elsif method == :sum and args.length == 0
+          process S(:send, target, :reduce, s(:block, s(:send, nil, :proc),
+            s(:args, s(:arg, :a), s(:arg, :b)),
+            s(:send, s(:lvar, :a), :+, s(:lvar, :b))), s(:int, 0))
+
         else
           super
         end
