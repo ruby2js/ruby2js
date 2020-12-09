@@ -118,6 +118,25 @@ describe Ruby2JS::Filter::ESM do
       to_js("# autoimports: false\nfunc(1)", autoimports: {[:func, :another] => 'func.js'}).
         must_equal "// autoimports: false\nfunc(1)"
     end
+
+    it "should not autoimport if explicit import is present" do
+      to_js('import Foo from "bar.js"; Foo.bar', autoimports: {Foo: 'foo.js'}).
+        must_equal 'import Foo from "bar.js"; Foo.bar'
+
+      to_js('import Foo, from: "bar.js"; Foo.bar', autoimports: {Foo: 'foo.js'}).
+        must_equal 'import Foo from "bar.js"; Foo.bar'
+    end
+
+    it "should not autoimport if imported name is redefined" do
+      to_js('class Foo;end; Foo.bar', autoimports: {Foo: 'foo.js'}).
+        must_equal 'class Foo {}; Foo.bar'
+
+      to_js('def func(x);end;func(1)', autoimports: {func: 'func.js'}).
+        must_equal 'function func(x) {}; func(1)'
+
+      to_js('func = ->(x) {};func(1)', autoimports: {func: 'func.js'}).
+        must_equal 'let func = (x) => {}; func(1)'
+    end
   end
 
   describe Ruby2JS::Filter::DEFAULTS do

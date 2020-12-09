@@ -10,6 +10,25 @@ module Ruby2JS
       def options=(options)
         super
         @esm_autoimports = options[:autoimports]
+        @explicit_tokens = Set.new
+      end
+
+      def on_class(node)
+        @explicit_tokens << node.children.first.children.last
+
+        super
+      end
+
+      def on_def(node)
+        @explicit_tokens << node.children.first
+
+        super
+      end
+
+      def on_lvasgn(node)
+        @explicit_tokens << node.children.first
+
+        super
       end
 
       def on_send(node)
@@ -38,6 +57,8 @@ module Ruby2JS
             args[0].children[2].children[2].type == :str
             # import name from "file.js"
             #  => import name from "file.js"
+            @explicit_tokens << args[0].children[1]
+
             s(:import,
               [args[0].children[2].children[2].children[0]],
               process(s(:attr, nil, args[0].children[1])))
@@ -51,9 +72,14 @@ module Ruby2JS
             #   => import Stuff as * from "file.js"
             # import [ Some, Stuff ], from: "file.js"
             #   => import { Some, Stuff } from "file.js"
-            imports = (args[0].type == :const || args[0].type == :send) ?
-              process(args[0]) : 
+            imports = if args[0].type == :const || args[0].type == :send
+              @explicit_tokens << args[0].children.last
+              process(args[0])
+            else
+              args[0].children.each {|i| @explicit_tokens << i.children.last}
               process_all(args[0].children)
+            end
+
             s(:import, args[1].children, imports) unless args[1].nil?
           end
         elsif method == :export          
@@ -81,6 +107,7 @@ module Ruby2JS
 
     def find_autoimport(token)
       return nil if @esm_autoimports.nil?
+      return nil if @explicit_tokens.include?(token)
 
       token = camelCase(token) if respond_to?(:camelCase)
 
