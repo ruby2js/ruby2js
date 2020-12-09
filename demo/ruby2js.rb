@@ -131,6 +131,7 @@ _html do
 
       if @ast
         walk = proc do |ast, indent=''|
+          next unless ast
           _div class: (ast.loc ? 'loc' : 'unloc') do
             _ "#{indent}#{ast.type}"
             if ast.children.any? {|child| Parser::AST::Node === child}
