@@ -10,6 +10,25 @@ module Ruby2JS
       def options=(options)
         super
         @esm_autoimports = options[:autoimports]
+        @esm_explicit_tokens = Set.new
+      end
+
+      def on_class(node)
+        @esm_explicit_tokens << node.children.first.children.last
+
+        super
+      end
+
+      def on_def(node)
+        @esm_explicit_tokens << node.children.first
+
+        super
+      end
+
+      def on_lvasgn(node)
+        @esm_explicit_tokens << node.children.first
+
+        super
       end
 
       def on_send(node)
@@ -38,6 +57,8 @@ module Ruby2JS
             args[0].children[2].children[2].type == :str
             # import name from "file.js"
             #  => import name from "file.js"
+            @esm_explicit_tokens << args[0].children[1]
+
             s(:import,
               [args[0].children[2].children[2].children[0]],
               process(s(:attr, nil, args[0].children[1])))
@@ -51,15 +72,20 @@ module Ruby2JS
             #   => import Stuff as * from "file.js"
             # import [ Some, Stuff ], from: "file.js"
             #   => import { Some, Stuff } from "file.js"
-            imports = (args[0].type == :const || args[0].type == :send) ?
-              process(args[0]) : 
+            imports = if args[0].type == :const || args[0].type == :send
+              @esm_explicit_tokens << args[0].children.last
+              process(args[0])
+            else
+              args[0].children.each {|i| @esm_explicit_tokens << i.children.last}
               process_all(args[0].children)
+            end
+
             s(:import, args[1].children, imports) unless args[1].nil?
           end
         elsif method == :export          
           s(:export, *process_all(args))
-        elsif target.nil? and args.length == 0 and @esm_autoimports&.[](method)
-          prepend_list << s(:import, @esm_autoimports[method], s(:const, nil, method))
+        elsif target.nil? and found_import = find_autoimport(method)
+          prepend_list << s(:import, found_import[0], found_import[1])
           super
         else
           super
@@ -67,12 +93,28 @@ module Ruby2JS
       end
 
       def on_const(node)
-        if node.children.first == nil and @esm_autoimports&.[](node.children.last)
-          token = node.children.last
-          prepend_list << s(:import, @esm_autoimports[token], s(:const, nil, token))
+        if node.children.first == nil and found_import = find_autoimport(node.children.last)
+          prepend_list << s(:import, found_import[0], found_import[1])
         end
 
         super
+      end
+
+
+    end
+
+    private
+
+    def find_autoimport(token)
+      return nil if @esm_autoimports.nil?
+      return nil if @esm_explicit_tokens.include?(token)
+
+      token = camelCase(token) if respond_to?(:camelCase)
+
+      if @esm_autoimports[token]
+        [@esm_autoimports[token], s(:const, nil, token)]
+      elsif found_key = @esm_autoimports.keys.find {|key| key.is_a?(Array) && key.include?(token)}
+        [@esm_autoimports[found_key], found_key.map {|key| s(:const, nil, key)}]
       end
     end
 

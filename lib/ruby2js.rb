@@ -61,10 +61,14 @@ module Ruby2JS
       include Ruby2JS::Filter
       BINARY_OPERATORS = Converter::OPERATORS[2..-1].flatten
 
-      attr_accessor :prepend_list
+      attr_accessor :prepend_list, :disable_autoimports
 
       def initialize(comments)
         @comments = comments
+
+        # check if magic comment is present:
+        @disable_autoimports = true if @comments.values.first&.map(&:text)&.include?("# autoimports: false")
+
         @ast = nil
         @exclude_methods = []
         @prepend_list = Set.new
@@ -209,6 +213,7 @@ module Ruby2JS
 
       unless filter.prepend_list.empty?
         prepend = filter.prepend_list.sort_by {|ast| ast.type == :import ? 0 : 1}
+        prepend.reject! {|ast| ast.type == :import} if filter.disable_autoimports
         ast = Parser::AST::Node.new(:begin, [*prepend, ast])
       end
     end
