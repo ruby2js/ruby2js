@@ -391,6 +391,56 @@ the script.
     # => export { one, two, three as default }
     ```
 
+    The esm filter also provides a way to specify "autoimports" when you run the
+    conversion. It will add the relevant import statements automatically whenever
+    a particular class or function name is referenced. These can be either default
+    or named exports. Simply provide an `autoimports` hash with one or more keys
+    to the `Ruby2JS.convert` method. Examples:
+
+    ```ruby
+    require "ruby2js/filter/esm"
+    puts Ruby2JS.convert('class MyElement < LitElement; end',
+      eslevel: 2020, autoimports: {[:LitElement] => "lit-element"})
+    ```
+
+    ```js
+    // JavaScript output:
+    import { LitElement } from "lit-element"
+    class MyElement extends LitElement {}
+    ```
+
+    ```ruby
+    require "ruby2js/filter/esm"
+    puts Ruby2JS.convert('AWN.new({position: "top-right"}).success("Hello World")',
+      eslevel: 2020, autoimports: {:AWN => "awesome-notifications"})
+    ```
+
+    ```js
+    // JavaScript output:
+    import AWN from "awesome-notifications"
+    new AWN({position: "top-right"}).success("Hello World")
+    ```
+
+    The esm filter is able to recognize if you are defining a class or function
+    within the code itself and it won't add that import statement accordingly.
+    If for some reason you wish to disable autoimports entirely on a file-by-file
+    basis (for instance when using the Webpack loader), you can add a magic comment
+    to the top of the code:
+
+    ```ruby
+    require "ruby2js/filter/esm"
+    puts Ruby2JS.convert(
+      "# autoimports: false\n" +
+      'AWN.new({position: "top-right"}).success("Hello World")',
+      eslevel: 2020, autoimports: {:AWN => "awesome-notifications"}
+    )
+    ```
+
+    ```js
+    // autoimports: false
+    new AWN({position: "top-right"}).success("Hello World")
+    ```
+
 * <a id="node" href="https://github.com/rubys/ruby2js/blob/master/spec/node_spec.rb">node</a>
 
     * `` `command` `` becomes `child_process.execSync("command", {encoding: "utf8"})`
