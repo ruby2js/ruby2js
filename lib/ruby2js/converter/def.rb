@@ -131,7 +131,7 @@ module Ruby2JS
           style = :statement
         end
 
-        if args.children.length == 1 and style == :expression
+        if args.children.length == 1 and args.children.first.type != :restarg and style == :expression
           parse args; put ' => '
         else
           put '('; parse args; put ') => '

@@ -125,6 +125,10 @@ describe "ES2015 support" do
       to_js( 'def a(*b); end' ).must_equal('function a(...b) {}')
     end
 
+    it "should handle rest parameters as only argument to a proc" do
+      to_js( 'proc {|*a| a}' ).must_equal('(...a) => a')
+    end
+
     it "should handle splat arguments" do
       to_js( 'a(*b)' ).must_equal('a(...b)')
     end
