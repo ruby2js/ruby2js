@@ -472,4 +472,39 @@ describe "ES2015 support" do
         must_equal('(q, { a, b = 2 }) => {}')
     end
   end
+
+  describe 'method_missing' do
+    it 'should handle args' do
+      to_js('class A; def method_missing(method, *args); end; end').
+        must_equal(
+          'class A$ {method_missing(method, ...args) {}}; ' +
+          'function A(...args) {' +
+            'return new Proxy(new A$(...args), {get(obj, prop) {' +
+              'if (prop in obj) {'+
+                'return obj[prop]'+
+              '} else {'+
+                'return (...args) => (obj.method_missing(prop, ...args))'+
+              '}'+
+            '}})' +
+          '}'
+        )
+    end
+
+    it 'should handle no args' do # see README for rationale
+      to_js('class A; def method_missing(method); end; end').
+        must_equal(
+          'class A$ {method_missing(method) {}}; ' +
+          'function A(...args) {' +
+            'return new Proxy(new A$(...args), {get(obj, prop) {' +
+              'if (prop in obj) {'+
+                'return obj[prop]'+
+              '} else {'+
+                'return obj.method_missing(prop)'+
+              '}'+
+            '}})' +
+          '}'
+        )
+    end
+  end
+
 end

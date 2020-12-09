@@ -9,11 +9,22 @@ module Ruby2JS
     # NOTE: this is the es2015 version of class
 
     handle :class2 do |name, inheritance, *body|
+      body.compact!
+      while body.length == 1 and body.first.type == :begin
+        body = body.first.children 
+      end
+
+      proxied = body.find do |node| 
+        node.type == :def and node.children.first == :method_missing
+      end
+
       if name.type == :const and name.children.first == nil
         put 'class '
         parse name
+        put '$' if proxied
       else
         parse name
+        put '$' if proxied
         put ' = class'
       end
 
@@ -23,11 +34,6 @@ module Ruby2JS
       end
 
       put " {"
-
-      body.compact!
-      while body.length == 1 and body.first.type == :begin
-        body = body.first.children 
-      end
 
       begin
         class_name, @class_name = @class_name, name
@@ -64,21 +70,21 @@ module Ruby2JS
               walk[child] if child.is_a? Parser::AST::Node
             end
 
-	    if ast.type == :send and ast.children.first == nil
-	      if ast.children[1] == :attr_accessor
-		ast.children[2..-1].each_with_index do |child_sym, index2|
-		  ivars << :"@#{child_sym.children.first}"
-		end
-	      elsif ast.children[1] == :attr_reader
-		ast.children[2..-1].each_with_index do |child_sym, index2|
-		  ivars << :"@#{child_sym.children.first}"
-		end
-	      elsif ast.children[1] == :attr_writer
-		ast.children[2..-1].each_with_index do |child_sym, index2|
-		  ivars << :"@#{child_sym.children.first}"
-		end
-	      end
-	    end
+            if ast.type == :send and ast.children.first == nil
+              if ast.children[1] == :attr_accessor
+                ast.children[2..-1].each_with_index do |child_sym, index2|
+                  ivars << :"@#{child_sym.children.first}"
+                end
+              elsif ast.children[1] == :attr_reader
+                ast.children[2..-1].each_with_index do |child_sym, index2|
+                  ivars << :"@#{child_sym.children.first}"
+                end
+              elsif ast.children[1] == :attr_writer
+                ast.children[2..-1].each_with_index do |child_sym, index2|
+                  ivars << :"@#{child_sym.children.first}"
+                end
+              end
+            end
 
           end
           walk[@ast]
@@ -297,6 +303,43 @@ module Ruby2JS
           else
             parse m, :statement
           end
+        end
+
+        if proxied
+          put @sep
+
+          rename = name.updated(nil, [name.children.first, name.children.last.to_s + '$'])
+
+          if proxied.children[1].children.length == 1
+            # special case: if method_missing only has on argument, call it
+            # directly (i.e., don't pass arguments).  This enables
+            # method_missing to return instance attributes (getters) as well
+            # as bound functions (methods).
+            forward = s(:send, s(:lvar, :obj), :method_missing, s(:lvar, :prop))
+          else
+            # normal case: return a function which, when called, will call
+            # method_missing with method name and arguments.
+            forward = s(:block, s(:send, nil, :proc), s(:args, s(:restarg, :args)),
+            s(:send, s(:lvar, :obj), :method_missing, s(:lvar, :prop),
+            s(:splat, s(:lvar, :args))))
+          end
+
+          proxy = s(:return, s(:send, s(:const, nil, :Proxy), :new,
+            s(:send, rename, :new, s(:splat, s(:lvar, :args))),
+            s(:hash, s(:pair, s(:sym, :get), s(:block, s(:send, nil, :proc),
+            s(:args, s(:arg, :obj), s(:arg, :prop)),
+            s(:if, s(:in?, s(:lvar, :prop), s(:lvar, :obj)),
+            s(:return, s(:send, s(:lvar, :obj), :[], s(:lvar, :prop))),
+            s(:return, forward))))))
+          )
+
+          if name.children.first == nil
+            proxy = s(:def, name.children.last, s(:args, s(:restarg, :args)), proxy)
+          else
+            proxy = s(:defs, *name.children, s(:args, s(:restarg, :args)), proxy)
+          end
+
+          parse proxy
         end
 
       ensure

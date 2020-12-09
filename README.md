@@ -198,9 +198,7 @@ Ruby2JS::Filter.exclude :each
 ```
 
 Static transformations and runtime libraries aren't aren’t mutually exclusive.
-With enough of each, one could reproduce any functionality desired.  Just be
-forewarned, that implementing a function like `method_missing` would require a
-_lot_ of work.
+With enough of each, one could reproduce any functionality desired.
 
 Integrations
 ---
@@ -610,8 +608,16 @@ Additionally, the `functions` filter will provide the following conversion:
 * `Array(x)` becomes `Array.from(x)`
 * `.inject(n) {}` becomes `.reduce(() => {}, n)`
 
-Finally, keyword arguments and optional keyword arguments will be mapped to
-parameter detructuring.
+Keyword arguments and optional keyword arguments will be mapped to
+parameter destructuring.
+
+Classes defined with a `method_missing` method will emit a `Proxy` object
+for each instance that will forward calls.  Note that in order to forward
+arguments, this proxy will return a function that will need to be called,
+making it impossible to proxy attributes/getters.  As a special accommodation,
+if the `method_missing` method is defined to only accept a single parameter
+it will be called with only the method name, and it is free to return
+either values or functions.
 
 ES2016 support
 ---
