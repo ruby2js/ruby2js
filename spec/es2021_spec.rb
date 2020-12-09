@@ -35,5 +35,10 @@ describe "ES2021 support" do
     to_js( 'self.p &&= 1').must_equal 'this.p &&= 1'
     to_js( 'a[i] &&= 1').must_equal 'a[i] &&= 1'
   end
+
+  it "should format large numbers with separators" do
+    to_js( '1000000' ).must_equal '1_000_000'
+    to_js( '1000000.000001' ).must_equal '1_000_000.000_001'
+  end
     
 end

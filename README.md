@@ -744,6 +744,7 @@ conversions are made:
 
 * `x ||= 1` becomes `x ||= 1`
 * `x &&= 1` becomes `x &&= 1`
+* `1000000.000001` becomes `1_000_000.000_001`
 
 Picking a Ruby to JS mapping tool
 ---
