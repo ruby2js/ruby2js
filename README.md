@@ -626,6 +626,9 @@ When option `eslevel: 2016` is provided, the following additional
 conversion is made:
 
 * `a ** b` becomes `a ** b`
+
+Additionally the following conversions is added to the `functions` filter:
+
 * `.include?` becomes `.includes`
 
 ES2017 support
@@ -636,7 +639,7 @@ conversions are made by the `functions` filter:
 
 * `.values()` becomes `Object.values()`
 * `.entries()` becomes `Object.entries()`
-* `.each_pair {}` becomes `for (let [key, value] of Object.entries()) {}'
+* `.each_pair {}` becomes `for (let [key, value] of Object.entries()) {}`
 
 async support:
 
@@ -664,8 +667,8 @@ When option `eslevel: 2019` is provided, the following additional
 conversion is made by the `functions` filter:
 
 * `.flatten` becomes `.flat(Infinity)`
-* `.lstrip` becomes `.trimEnd
-* `.rstrip` becomes `.trimStart
+* `.lstrip` becomes `.trimEnd`
+* `.rstrip` becomes `.trimStart`
 * `a.to_h` becomes `Object.fromEntries(a)`
 * `Hash[a]` becomes `Object.fromEntries(a)`
 
