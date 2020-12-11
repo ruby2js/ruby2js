@@ -14,6 +14,8 @@ module Ruby2JS
 
       IMPORT_FS = s(:import, ['fs'], s(:attr, nil, :fs))
 
+      IMPORT_PATH = s(:import, ['path'], s(:attr, nil, :path))
+
       SETUP_ARGV = s(:lvasgn, :ARGV, s(:send, s(:attr, 
           s(:attr, nil, :process), :argv), :slice, s(:int, 2)))
 
@@ -128,6 +130,29 @@ module Ruby2JS
               S(:send, s(:attr, nil, :fs), :unlinkSync, process(file))
             })
 
+          elsif target.children.last == :File
+            if method == :absolute_path
+              prepend_list << IMPORT_PATH
+              S(:send, s(:attr, nil, :path), :resolve,
+                *process_all(args.reverse))
+            elsif method == :absolute_path?
+              prepend_list << IMPORT_PATH
+              S(:send, s(:attr, nil, :path), :isAbsolute, *process_all(args))
+            elsif method == :basename
+              prepend_list << IMPORT_PATH
+              S(:send, s(:attr, nil, :path), :basename, *process_all(args))
+            elsif method == :dirname
+              prepend_list << IMPORT_PATH
+              S(:send, s(:attr, nil, :path), :dirname, *process_all(args))
+            elsif method == :extname
+              prepend_list << IMPORT_PATH
+              S(:send, s(:attr, nil, :path), :extname, *process_all(args))
+            elsif method == :join
+              prepend_list << IMPORT_PATH
+              S(:send, s(:attr, nil, :path), :join, *process_all(args))
+            else
+              super
+            end
           else
             super
           end
@@ -285,6 +310,16 @@ module Ruby2JS
           S(:attr, s(:attr, nil, :process), :stdout)
         elsif node.children == [nil, :STDERR]
           S(:attr, s(:attr, nil, :process), :stderr)
+        elsif node.children.first == s(:const, nil, :File)
+          if node.children.last == :SEPARATOR
+            prepend_list << IMPORT_PATH
+            S(:attr, s(:attr, nil, :path), :sep)
+          elsif node.children.last == :PATH_SEPARATOR
+            prepend_list << IMPORT_PATH
+            S(:attr, s(:attr, nil, :path), :delimiter)
+          else
+            super
+          end
         else
           super
         end

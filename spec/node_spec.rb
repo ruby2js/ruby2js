@@ -188,6 +188,48 @@ describe Ruby2JS::Filter::Functions do
     end
   end
   
+  describe 'path' do
+    it 'should handle File.absolute_path' do
+      to_js( 'File.absolute_path("foo")' ).
+        must_equal 'var path = require("path"); path.resolve("foo")'
+    end
+
+    it 'should handle File.absolute_path?' do
+      to_js( 'File.absolute_path?("foo")' ).
+        must_equal 'var path = require("path"); path.isAbsolute("foo")'
+    end
+
+    it 'should handle File.basename' do
+      to_js( 'File.basename("foo")' ).
+        must_equal 'var path = require("path"); path.basename("foo")'
+    end
+
+    it 'should handle File.dirname' do
+      to_js( 'File.dirname("foo")' ).
+        must_equal 'var path = require("path"); path.dirname("foo")'
+    end
+
+    it 'should handle File.extname' do
+      to_js( 'File.extname("foo")' ).
+        must_equal 'var path = require("path"); path.extname("foo")'
+    end
+
+    it 'should handle File.join' do
+      to_js( 'File.join("foo", "bar")' ).
+        must_equal 'var path = require("path"); path.join("foo", "bar")'
+    end
+
+    it 'should handle File::PATH_SEPARATOR' do
+      to_js( 'File::PATH_SEPARATOR' ).
+        must_equal 'var path = require("path"); path.delimiter'
+    end
+
+    it 'should handle File::SEPARATOR' do
+      to_js( 'File::SEPARATOR' ).
+        must_equal 'var path = require("path"); path.sep'
+    end
+  end
+
   describe 'process' do
     it 'should handle simple Dir.chdir' do
       to_js( 'Dir.chdir("..")' ).must_equal 'process.chdir("..")'

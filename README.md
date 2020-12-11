@@ -456,18 +456,26 @@ the script.
     * `Dir.rmdir` becomes `fs.rmdirSync`
     * `ENV` becomes `process.env`
     * `__FILE__` becomes `__filename`
+    * `File.absolute_path` becomes `path.resolve`
+    * `File.absolute_path?` becomes `path.isAbsolute`
+    * `File.basename` becomes `path.basename`
     * `File.chmod` becomes `fs.chmodSync`
     * `File.chown` becomes `fs.chownSync`
     * `File.cp` becomes `fs.copyFileSync`
+    * `File.dirname` becomes `path.dirname`
     * `File.exist?` becomes `fs.existsSync`
+    * `File.extname` becomes `path.extname`
+    * `File.join` becomes `path.join`
     * `File.lchmod` becomes `fs.lchmodSync`
     * `File.link` becomes `fs.linkSync`
     * `File.ln` becomes `fs.linkSync`
     * `File.lstat` becomes `fs.lstatSync`
+    * `File::PATH_SEPARATOR` becomes `path.delimiter`
     * `File.read` becomes `fs.readFileSync`
     * `File.readlink` becomes `fs.readlinkSync`
     * `File.realpath` becomes `fs.realpathSync`
     * `File.rename` becomes `fs.renameSync`
+    * `File::SEPARATOR` becomes `path.sep`
     * `File.stat` becomes `fs.statSync`
     * `File.symlink` becomes `fs.symlinkSync`
     * `File.truncate` becomes `fs.truncateSync`
