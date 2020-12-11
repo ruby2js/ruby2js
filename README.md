@@ -40,9 +40,6 @@ For example:
   * Any block becomes and explicit argument `new Promise do; y(); end` becomes `new Promise(function() {y()})`
   * regular expressions are mapped to js
   * `raise` becomes `throw`
-  * expressions enclosed in backtick operators (\`\`) and `%x{}` literals are
-    evaluated in the context of the caller and the results are inserted
-    into the generated JavaScript.
 
 Ruby attribute accessors, methods defined with no parameters and no
 parenthesis, as well as setter method definitions, are
@@ -85,6 +82,12 @@ Host variable substitution:
 
 ```ruby
  puts Ruby2JS.convert("@name", ivars: {:@name => "Joe"})
+```
+
+Host expression evalution -- potentially unsafe, use only if you trust
+the source being converted::
+```ruby
+ i = 7; puts Ruby2JS.convert("i = `i`", binding: binding)
 ```
 
 Enable ES2015 support:

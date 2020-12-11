@@ -1032,14 +1032,14 @@ describe Ruby2JS do
 
   describe 'execution' do
     it "should handle tic marks" do
-      to_js( '`1+2`' ).must_equal '3'
+      to_js( '`1+2`', binding: binding ).must_equal '3'
     end
 
     it "should handle execute strings" do
-      to_js( '%x(3*4)' ).must_equal '12'
+      to_js( '%x(3*4)', binding: binding ).must_equal '12'
     end
 
-    it "should handle execute strings" do
+    it "should evaluate variables using the binding" do
       foo = "console.log('hi there')"
       to_js( '%x(foo)', binding: binding ).must_equal foo
     end

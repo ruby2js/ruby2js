@@ -10,7 +10,7 @@ module Ruby2JS
       if @binding
         puts @binding.eval(str).to_s
       else
-        puts eval(str).to_s
+        raise SecurityError.new('Insecure operation, eval without binding option')
       end
     end
   end
