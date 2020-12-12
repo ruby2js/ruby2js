@@ -14,6 +14,8 @@ module Ruby2JS
 
       IMPORT_FS = s(:import, ['fs'], s(:attr, nil, :fs))
 
+      IMPORT_OS = s(:import, ['os'], s(:attr, nil, :os))
+
       IMPORT_PATH = s(:import, ['path'], s(:attr, nil, :path))
 
       SETUP_ARGV = s(:lvasgn, :ARGV, s(:send, s(:attr, 
@@ -270,6 +272,13 @@ module Ruby2JS
             end
 
             S(:send, s(:attr, nil, :fs), :mkdtempSync, process(prefix))
+          elsif method == :home and args.length == 0
+            prepend_list << IMPORT_OS
+            S(:send!, s(:attr, nil, :os), :homedir)
+          elsif method == :tmpdir and args.length == 0
+            prepend_list << IMPORT_OS
+            S(:send!, s(:attr, nil, :os), :tmpdir)
+
           else
             super
           end

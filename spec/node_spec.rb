@@ -230,6 +230,16 @@ describe Ruby2JS::Filter::Functions do
     end
   end
 
+  describe 'os' do
+    it 'should handle Dir.home' do
+      to_js( 'Dir.home' ).must_equal 'var os = require("os"); os.homedir()'
+    end
+
+    it 'should handle Dir.tmpdir' do
+      to_js( 'Dir.tmpdir' ).must_equal 'var os = require("os"); os.tmpdir()'
+    end
+  end
+
   describe 'process' do
     it 'should handle simple Dir.chdir' do
       to_js( 'Dir.chdir("..")' ).must_equal 'process.chdir("..")'

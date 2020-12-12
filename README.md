@@ -450,10 +450,12 @@ the script.
     * `__dir__` becomes `__dirname`
     * `Dir.chdir` becomes `process.chdir`
     * `Dir.entries` becomes `fs.readdirSync`
+    * `Dir.home` becomes `os.homedir()`
     * `Dir.mkdir` becomes `fs.mkdirSync`
     * `Dir.mktmpdir` becomes `fs.mkdtempSync`
     * `Dir.pwd` becomes `process.cwd`
     * `Dir.rmdir` becomes `fs.rmdirSync`
+    * `Dir.tmpdir` becomes `os.tmpdir()`
     * `ENV` becomes `process.env`
     * `__FILE__` becomes `__filename`
     * `File.absolute_path` becomes `path.resolve`
