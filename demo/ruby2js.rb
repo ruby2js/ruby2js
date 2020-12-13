@@ -94,16 +94,53 @@ end
 
 _html do
   _title 'Ruby2JS'
+
   _style %{
-    textarea {display: block}
+    svg {height: 4em; width: 4em; transition: 2s}
+    svg:hover {height: 8em; width: 8em}
+    .container.narrow-container {padding: 0; margin: 0 3%; max-width: 91%}
+    textarea.ruby {background-color: #ffeeee; margin-bottom: 0.4em}
+    pre.js {background-color: #ffffcc}
+    h2 {margin-top: 0.4em}
     .unloc {background-color: yellow}
     .loc {background-color: white}
+
+    /* below is based on bootstrap
+    https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta1/dist/css/bootstrap.min.css
+    */
+
+    :root{--bs-font-sans-serif:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans","Liberation Sans",sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol","Noto Color Emoji";--bs-font-monospace:SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
+    body{margin:0;font-family:var(--bs-font-sans-serif);font-size:1rem;font-weight:400;line-height:1.5;color:#212529;background-color:#fff;-webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent}
+    a{color:#0d6efd;text-decoration:underline}
+    a:hover{color:#0a58ca}
+    svg{vertical-align:middle}
+    label{display:inline-block}
+    input,select,textarea{margin:0;font-family:inherit;font-size:inherit;line-height:inherit}
+    select{text-transform:none}
+    select{word-wrap:normal}
+    [type=submit]{-webkit-appearance:button}
+    .container{width:100%;padding-right:var(--bs-gutter-x,.75rem);padding-left:var(--bs-gutter-x,.75rem);margin-right:auto;margin-left:auto}
+    .form-control{display:block;width:100%;padding:.375rem .75rem;font-size:1rem;font-weight:400;line-height:1.5;color:#212529;background-color:#fff;background-clip:padding-box;border:1px solid #ced4da;-webkit-appearance:none;-moz-appearance:none;appearance:none;border-radius:.25rem;transition:border-color .15s ease-in-out,box-shadow .15s ease-in-out}
+    .btn:focus{outline:0;box-shadow:0 0 0 .25rem rgba(13,110,253,.25)}
+    .btn-primary{color:#fff;background-color:#0d6efd;border-color:#0d6efd}
+    .btn-primary:hover{color:#fff;background-color:#0b5ed7;border-color:#0a58ca}
+    .btn-primary:focus{color:#fff;background-color:#0b5ed7;border-color:#0a58ca;box-shadow:0 0 0 .25rem rgba(49,132,253,.5)}
+    .btn-primary:active{color:#fff;background-color:#0a58ca;border-color:#0a53be}
+    .btn-primary:active:focus{box-shadow:0 0 0 .25rem rgba(49,132,253,.5)}
+    .btn-primary:disabled{color:#fff;background-color:#0d6efd;border-color:#0d6efd}
   }
 
-  _h1 { _a 'Ruby2JS', href: 'https://github.com/rubys/ruby2js#ruby2js' }
+  _div.container.narrow_container do
+
+  _a href: 'https://github.com/rubys/ruby2js#ruby2js' do
+    _ruby2js_logo
+    _ 'Ruby2JS'
+  end
+
   _form method: 'post' do
-    _textarea @ruby, name: 'ruby', rows: 8, cols: 80
-    _input type: 'submit', value: 'Convert'
+    _textarea.ruby.form_control @ruby, name: 'ruby', rows: 8,
+      placeholder: 'Ruby source'
+    _input.btn.btn_primary type: 'submit', value: 'Convert'
 
     _label 'ES level', for: 'eslevel'
     _select name: 'eslevel', id: 'eslevel' do
@@ -161,7 +198,55 @@ _html do
       end
 
       _h2 'JavaScript'
-      _pre ruby.to_s
+      _pre.js ruby.to_s
+    end
+    end
+  end
+end
+
+def _ruby2js_logo
+  _svg width: '100%', height: '100%', viewBox: '0 0 278 239', version: '1.1', xlink: 'http://www.w3.org/1999/xlink', space: 'preserve', 'xmlns:serif' => 'http://www.serif.com/', style: 'fill-rule:evenodd;clip-rule:evenodd;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:10;' do
+    _g transform: 'matrix(0.97805,-0.208368,0.208368,0.97805,-63.5964,16.8613)' do
+      _path d: 'M43.591,115.341L92.572,45.15L275.649,45.276L322,113.639L183.044,261.9L43.591,115.341Z', style: 'fill:rgb(201,38,19);'
+      _g.Layer1! transform: 'matrix(0.762386,0,0,0.762386,-83.8231,-163.857)' do
+	_g transform: 'matrix(1,0,0,1,1,0)' do
+	  _path d: 'M253,412.902L323.007,416.982L335.779,302.024L433.521,467.281L346.795,556.198L253,412.902Z', style: 'fill:url(#_Linear1);'
+	end
+	_g transform: 'matrix(1,0,0,1,90,0)' do
+	  _path d: 'M260.802,410.567L312.405,427.307L345.625,407.012L286.376,341.482L301.912,316.368L348.735,322.338L402.088,408.236L360.798,450.037L317.951,497.607L260.802,410.567Z', style: 'fill:url(#_Linear2);'
+	end
+      end
+      _g transform: 'matrix(1,0,0,1,-71.912,-102.1)' do
+	_path d: 'M133.132,219.333L241.936,335.629L190.73,219.333L133.132,219.333ZM205.287,219.333L255.212,345.305L306.383,219.333L205.287,219.333ZM374.878,219.333L320.94,219.333L267.853,335.345L374.878,219.333ZM211.57,207.009L302.227,207.009L256.899,159.664L211.57,207.009ZM334.854,155.614L268.834,155.614L314.068,202.862L334.854,155.614ZM176.816,155.614L198.271,204.385L244.966,155.614L176.816,155.614ZM375.017,207.009L345.969,163.438L326.802,207.009L375.017,207.009ZM137.348,207.009L184.868,207.009L166.129,164.411L137.348,207.009ZM163.588,147L348.228,147L393.912,215.526L254.956,364L116,217.43L163.588,147Z', style: 'fill:none;fill-rule:nonzero;stroke:rgb(255,248,195);stroke-width:5px;'
+      end
+      _g transform: 'matrix(0.76326,0,0,0.76326,-88.595,-169.24)' do
+	_g opacity: '0.44' do
+	  _g.j! transform: 'matrix(0.46717,0,0,0.46717,186.613,178.904)' do
+	    _path d: 'M165.65,526.474L213.863,497.296C223.164,513.788 231.625,527.74 251.92,527.74C271.374,527.74 283.639,520.13 283.639,490.53L283.639,289.23L342.842,289.23L342.842,491.368C342.842,552.688 306.899,580.599 254.457,580.599C207.096,580.599 179.605,556.07 165.65,526.469', style: 'fill:rgb(48,9,5);fill-rule:nonzero;'
+	  end
+	  _g.s! transform: 'matrix(0.46717,0,0,0.46717,185.613,178.904)' do
+	    _path d: 'M375,520.13L423.206,492.219C435.896,512.943 452.389,528.166 481.568,528.166C506.099,528.166 521.741,515.901 521.741,498.985C521.741,478.686 505.673,471.496 478.606,459.659L463.809,453.311C421.094,435.13 392.759,412.294 392.759,364.084C392.759,319.68 426.59,285.846 479.454,285.846C517.091,285.846 544.156,298.957 563.608,333.212L517.511,362.814C507.361,344.631 496.369,337.442 479.454,337.442C462.115,337.442 451.119,348.437 451.119,362.814C451.119,380.576 462.115,387.766 487.486,398.762L502.286,405.105C552.611,426.674 580.946,448.662 580.946,498.139C580.946,551.426 539.08,580.604 482.836,580.604C427.86,580.604 392.336,554.386 375,520.13', style: 'fill:rgb(47,9,5);fill-rule:nonzero;'
+	  end
+	end
+      end
+      _g transform: 'matrix(0.76326,0,0,0.76326,-91.6699,-173.159)' do
+	_g.j1! 'serif:id' => 'j', transform: 'matrix(0.46717,0,0,0.46717,186.613,178.904)' do
+	  _path d: 'M165.65,526.474L213.863,497.296C223.164,513.788 231.625,527.74 251.92,527.74C271.374,527.74 283.639,520.13 283.639,490.53L283.639,289.23L342.842,289.23L342.842,491.368C342.842,552.688 306.899,580.599 254.457,580.599C207.096,580.599 179.605,556.07 165.65,526.469', style: 'fill:rgb(247,223,30);fill-rule:nonzero;'
+	end
+	_g.s1! 'serif:id' => 's', transform: 'matrix(0.46717,0,0,0.46717,185.613,178.904)' do
+	  _path d: 'M375,520.13L423.206,492.219C435.896,512.943 452.389,528.166 481.568,528.166C506.099,528.166 521.741,515.901 521.741,498.985C521.741,478.686 505.673,471.496 478.606,459.659L463.809,453.311C421.094,435.13 392.759,412.294 392.759,364.084C392.759,319.68 426.59,285.846 479.454,285.846C517.091,285.846 544.156,298.957 563.608,333.212L517.511,362.814C507.361,344.631 496.369,337.442 479.454,337.442C462.115,337.442 451.119,348.437 451.119,362.814C451.119,380.576 462.115,387.766 487.486,398.762L502.286,405.105C552.611,426.674 580.946,448.662 580.946,498.139C580.946,551.426 539.08,580.604 482.836,580.604C427.86,580.604 392.336,554.386 375,520.13', style: 'fill:rgb(247,223,30);fill-rule:nonzero;'
+	end
+      end
+    end
+    _defs do
+      _linearGradient id: '_Linear1', x1: '0', y1: '0', x2: '1', y2: '0', gradientUnits: 'userSpaceOnUse', gradientTransform: 'matrix(110.514,-65.1883,65.1883,110.514,284.818,460.929)' do
+	_stop offset: '0', style: 'stop-color:rgb(97,18,10);stop-opacity:1'
+	_stop offset: '1', style: 'stop-color:rgb(184,34,18);stop-opacity:1'
+      end
+      _linearGradient id: '_Linear2', x1: '0', y1: '0', x2: '1', y2: '0', gradientUnits: 'userSpaceOnUse', gradientTransform: 'matrix(102.484,-65.5763,65.5763,102.484,288.352,453.55)' do
+	_stop offset: '0', style: 'stop-color:rgb(97,18,10);stop-opacity:1'
+	_stop offset: '1', style: 'stop-color:rgb(184,34,18);stop-opacity:1'
+      end
     end
   end
 end
