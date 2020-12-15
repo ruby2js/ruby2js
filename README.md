@@ -774,7 +774,7 @@ ruby2js is for those that want to produce JavaScript that looks like it
 wasn’t machine generated, and want the absolute bare minimum in terms of
 limitations as to what JavaScript can be produced.
 
-[Try](http://intertwingly.net/projects/ruby2js.cgi/all) for yourself.
+[Try](http://intertwingly.net/projects/ruby2js) for yourself.
 [Compare](http://opalrb.com/try/#code:).
 
 And, of course, the right solution might be to use

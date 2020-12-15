@@ -74,8 +74,8 @@ begin
   end
 
   # require selected filters
-  filters.each do |name, filter|
-    require filter if selected.include?(name) or selected.include? 'all'
+  selected.each do |name|
+    require filters[name] if filters.include? name
   end
 rescue Exception => $load_error
 end
@@ -94,6 +94,7 @@ end
 
 _html do
   _title 'Ruby2JS'
+  _base href: env['REQUEST_URI'][0..-env['PATH_INFO'].to_s.length]
 
   _style %{
     svg {height: 4em; width: 4em; transition: 2s}
@@ -104,6 +105,9 @@ _html do
     h2 {margin-top: 0.4em}
     .unloc {background-color: yellow}
     .loc {background-color: white}
+
+    .dropdown { position: relative; display: none; }
+    .dropdown-content { display: none; position: absolute; background-color: #f9f9f9; min-width: 160px; box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2); padding: 12px 16px; z-index: 1; }
 
     /* below is based on bootstrap
     https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta1/dist/css/bootstrap.min.css
@@ -145,18 +149,58 @@ _html do
     _label 'ES level', for: 'eslevel'
     _select name: 'eslevel', id: 'eslevel' do
       _option 'default', selected: !@eslevel || @eslevel == 'default'
-      _option 2015, value: 2015, selected: @eslevel == '2015'
-      _option 2016, value: 2016, selected: @eslevel == '2016'
-      _option 2017, value: 2017, selected: @eslevel == '2017'
-      _option 2018, value: 2018, selected: @eslevel == '2018'
-      _option 2019, value: 2019, selected: @eslevel == '2019'
-      _option 2020, value: 2020, selected: @eslevel == '2020'
-      _option 2021, value: 2021, selected: @eslevel == '2021'
+      Dir["#{$:.first}/ruby2js/es20*.rb"].sort.each do |file|
+        eslevel = File.basename(file, '.rb').sub('es', '')
+        _option eslevel, value: eslevel, selected: @eslevel == eslevel
+      end
     end
 
     _input type: 'checkbox', name: 'ast', id: 'ast', checked: !!@ast
     _label 'Show AST', for: 'ast'
+
+    _div.dropdown do
+      _button.btn.filters! 'Filters'
+      _div.dropdown_content do
+        Dir["#{$:.first}/ruby2js/filter/*.rb"].sort.each do |file|
+          filter = File.basename(file, '.rb')
+          _div do
+            _input type: 'checkbox', name: filter, checked: selected.include?(filter)
+            _span filter
+          end
+        end
+      end
+    end
   end
+  
+  _script %{
+    // determine base URL and what features are selected
+    let base = document.getElementsByTagName('base')[0].href;
+    let features = new Set(window.location.href.slice(base.length).split('/'));
+
+    // show filters dropdown (only appears if JS is enabled)
+    let filters = document.getElementById('filters');
+    filters.parentNode.style.display = 'inline-block';
+
+    // toggle filter dropdown
+    filters.addEventListener('click', event => {
+      event.preventDefault();
+      let content = filters.parentNode.querySelector('.dropdown-content');
+      if (content.style.display === 'block') {
+        content.style.display = 'none';
+      } else {
+        content.style.display = 'block';
+      }
+    });
+
+    // add/remove filters based on checkbox
+    for (let filter of filters.parentNode.querySelectorAll('input[type=checkbox]')) {
+      filter.addEventListener('click', event => {
+        let name = event.target.name;
+        if (!features.delete(name)) features.add(name);
+        history.replaceState({}, null, base + Array.from(features).join('/'));
+      });
+    }
+  }
 
   if @ruby
     _div_? do
