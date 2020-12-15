@@ -138,7 +138,7 @@ Introduction
 
 JavaScript is a language where `0` is considered `false`, strings are
 immutable, and the behaviors for operators like `==` are, at best,
-[convoluted](http://zero.milosz.ca/).
+[convoluted](https://zero.milosz.ca/).
 
 Any attempt to bridge the semantics of Ruby and JavaScript will involve
 trade-offs.  Consider the following expression:
@@ -153,10 +153,10 @@ quite different if `a` is a Hash.
 
 One way to resolve this is to change the way indexing operators are evaluated,
 and to provide a runtime library that adds properties to global JavaScript
-objects to handle this.  This is the approach that [Opal](http://opalrb.com/)
+objects to handle this.  This is the approach that [Opal](https://opalrb.com/)
 takes.  It is a fine approach, with a number of benefits.  It also has some
 notable drawbacks.  For example,
-[readability](http://opalrb.com/try/#code:a%20%3D%20%22abc%22%3B%20puts%20a[-1])
+[readability](https://opalrb.com/try/#code:a%20%3D%20%22abc%22%3B%20puts%20a[-1])
 and
 [compatibility with other frameworks](https://github.com/opal/opal/issues/400).
 
@@ -178,7 +178,7 @@ negative at runtime.
 This quickly gets into gray areas.  `each` in Ruby is a common method that
 facilitates iteration over arrays.  `forEach` is the JavaScript equivalent.
 Mapping this is fine until you start using a framework like jQuery which
-provides a function named [each](http://api.jquery.com/jQuery.each/).
+provides a function named [each](https://api.jquery.com/jQuery.each/).
 
 Fortunately, Ruby provides `?` and `!` as legal suffixes for method names,
 Ruby2js filters do an exact match, so if you select a filter that maps `each`
@@ -764,21 +764,21 @@ Picking a Ruby to JS mapping tool
 
 > dsl — A domain specific language, where code is written in one language and
 > errors are given in another.
-> -- [Devil’s Dictionary of Programming](http://programmingisterrible.com/post/65781074112/devils-dictionary-of-programming)
+> -- [Devil’s Dictionary of Programming](https://programmingisterrible.com/post/65781074112/devils-dictionary-of-programming)
 
 If you simply want to get a job done, and would like a mature and tested
 framework, and only use one of the many integrations that
-[Opal](http://opalrb.com/) provides, then Opal is the way to go right now.
+[Opal](https://opalrb.com/) provides, then Opal is the way to go right now.
 
 ruby2js is for those that want to produce JavaScript that looks like it
 wasn’t machine generated, and want the absolute bare minimum in terms of
 limitations as to what JavaScript can be produced.
 
-[Try](http://intertwingly.net/projects/ruby2js) for yourself.
-[Compare](http://opalrb.com/try/#code:).
+[Try](https://intertwingly.net/projects/ruby2js) for yourself.
+[Compare](https://opalrb.com/try/#code:).
 
 And, of course, the right solution might be to use
-[CoffeeScript](http://coffeescript.org/) instead.
+[CoffeeScript](https://coffeescript.org/) instead.
 
 License
 ---
