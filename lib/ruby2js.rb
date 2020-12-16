@@ -192,7 +192,7 @@ module Ruby2JS
       source = ast.loc.expression.source_buffer.source
     else
       ast, comments = parse( source, options[:file] )
-      comments = Parser::Source::Comment.associate(ast, comments) if ast
+      comments = ast ? Parser::Source::Comment.associate(ast, comments) : {}
     end
 
     filters = (options[:filters] || Filter::DEFAULTS)
