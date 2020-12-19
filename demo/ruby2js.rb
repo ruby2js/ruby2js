@@ -134,7 +134,6 @@ if not env['SERVER_PORT']
   end  
 
   Ruby2JS::Filter::DEFAULTS.push(*defaults)
-  return
 
 else
   # web server support
