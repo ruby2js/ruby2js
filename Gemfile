@@ -11,4 +11,5 @@ end
 
 group :test do
   gem 'haml'
+  gem 'wunderbar'
 end
