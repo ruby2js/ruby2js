@@ -68,6 +68,10 @@ def parse_request
 
   opts.on('--identity', "triple equal comparison operators") {options[:comparison] = :identity}
 
+  opts.on('--import_from_skypack', "use Skypack for internal functions import statements") do
+    options[:import_from_skypack] = true
+  end
+
   opts.on('--include METHOD,...', "have filters process METHOD(s)", Array) {|methods|
     options[:include] ||= []; options[:include].push(*methods.map(&:to_sym))
   }
@@ -82,9 +86,11 @@ def parse_request
     options[:underscored_private] = true
   end
 
-  opts.on('--import_from_skypack', "use Skypack for internal functions import statements") do
-    options[:import_from_skypack] = true
-  end
+  # shameless hack.  Instead of repeating the available options, extract them
+  # from the OptionParser.  Exclude default options and es20xx options.
+  options_available = opts.instance_variable_get(:@stack).last.list.
+    map {|opt| [opt.long.first[2..-1], opt.arg != nil]}.
+    reject {|name, arg| %w{equality logical}.include?(name) || name =~ /es20\d\d/}.to_h
 
   opts.separator('')
 
@@ -123,13 +129,13 @@ def parse_request
     $VERBOSE = verbose
   end
 
-  return options, selected
+  return options, selected, options_available
 end
 
 if not env['SERVER_PORT']
   # command line support
   defaults = Ruby2JS::Filter::DEFAULTS.dup
-  options, _ = parse_request
+  options = parse_request.first
   if ARGV.length > 0
     options[:file] = ARGV.first
     puts Ruby2JS.convert(File.read(ARGV.first), options).to_s
@@ -142,7 +148,7 @@ if not env['SERVER_PORT']
 else
   # web server support
   _html do
-    options, selected = parse_request
+    options, selected, options_available = parse_request
     _title 'Ruby2JS'
 
     base = env['REQUEST_URI'].split('?').first
@@ -161,7 +167,7 @@ else
       .loc {background-color: white}
 
       .dropdown { position: relative; display: none; }
-      .dropdown-content { display: none; position: absolute; background-color: #f9f9f9; min-width: 160px; box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2); padding: 12px 16px; z-index: 1; }
+      .dropdown-content { display: none; position: absolute; background-color: #f9f9f9; min-width: 170px; box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2); padding: 12px 16px; z-index: 1; }
 
       /* below is based on bootstrap
       https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta1/dist/css/bootstrap.min.css
@@ -189,7 +195,6 @@ else
     }
 
     _div.container.narrow_container do
-
       _a href: 'https://github.com/rubys/ruby2js#ruby2js' do
         _ruby2js_logo
         _ 'Ruby2JS'
@@ -224,36 +229,87 @@ else
             end
           end
         end
+
+        _div.dropdown do
+          _button.btn.options! 'Options'
+          _div.dropdown_content do
+            checked = options.dup
+            checked[:identity] = options[:comparison] == :identity
+            checked[:nullish] = options[:or] == :nullish
+
+            options_available.each do |option, args|
+              _div do
+                _input type: 'checkbox', name: option, checked: checked[option.to_sym],
+                  data_args: options_available[option]
+                _span option
+              end
+            end
+          end
+        end
       end
       
       _script %{
-        // determine base URL and what features are selected
+        // determine base URL and what filters and options are selected
         let base = new URL(document.getElementsByTagName('base')[0].href).pathname;
-        let features = new Set(window.location.pathname.slice(base.length).split('/'));
+        let filters = new Set(window.location.pathname.slice(base.length).split('/'));
+        filters.delete('');
+        let options = {};
+        for (let match of window.location.search.matchAll(/(\\w+)(=([^&]*))?/g)) {
+          options[match[1]] = match[3];
+        };
+        console.log(options);
 
-        // show filters dropdown (only appears if JS is enabled)
-        let filters = document.getElementById('filters');
-        filters.parentNode.style.display = 'inline-block';
+        // show dropdowns (they only appear if JS is enabled)
+        let dropdowns = document.querySelectorAll('.dropdown');
+        for (let dropdown of dropdowns) {
+          dropdown.style.display = 'inline-block';
 
-        // toggle filter dropdown
-        filters.addEventListener('click', event => {
-          event.preventDefault();
-          let content = filters.parentNode.querySelector('.dropdown-content');
-          if (content.style.display === 'block') {
-            content.style.display = 'none';
-          } else {
-            content.style.display = 'block';
-          }
-        });
+          // toggle dropdown
+          dropdown.querySelector('button').addEventListener('click', event => {
+            event.preventDefault();
+            let content = dropdown.querySelector('.dropdown-content');
+            if (content.style.display === 'block') {
+              content.style.display = 'none';
+            } else {
+              content.style.display = 'block';
+            }
+          })
+        };
 
         // add/remove filters based on checkbox
-        for (let filter of filters.parentNode.querySelectorAll('input[type=checkbox]')) {
+        let dropdown = document.getElementById('filters').parentNode;
+        for (let filter of dropdown.querySelectorAll('input[type=checkbox]')) {
           filter.addEventListener('click', event => {
             let name = event.target.name;
-            if (!features.delete(name)) features.add(name);
+            if (!filters.delete(name)) filters.add(name);
             let location = new URL(base, window.location);
-            location.pathname += Array.from(features).join('/');
+            location.pathname += Array.from(filters).join('/');
             location.search = window.location.search;
+            history.replaceState({}, null, location.toString());
+          });
+        }
+
+        // add/remove options based on checkbox
+        dropdown = document.getElementById('options').parentNode;
+        for (let option of dropdown.querySelectorAll('input[type=checkbox]')) {
+          option.addEventListener('click', event => {
+            let name = event.target.name;
+
+            if (name in options) {
+              delete options[name];
+            } else if (option.dataset.args) {
+              options[name] = prompt(name, options[name]);
+            } else {
+              options[name] = undefined;
+            };
+
+            search = [];
+            for (let [key, value] of Object.entries(options)) {
+              search.push(value === undefined ? key : `${key}=${value}`);
+            };
+
+            let location = new URL(window.location);
+            location.search = search.length == 0 ? "" : `${search.join('&')}`;
             history.replaceState({}, null, location.toString());
           });
         }
