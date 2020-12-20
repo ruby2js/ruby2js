@@ -25,13 +25,15 @@ module Ruby2JS
       private
 
       def create_or_update_import(token)
-        if found_node = prepend_list.find {|ast| ast.type == :import && ast.children.first == "@ruby2js/active-functions"}
+        af_import = @options[:import_from_skypack] ? "https://cdn.skypack.dev/@ruby2js/active-functions" : "@ruby2js/active-functions"
+
+        if found_node = prepend_list.find {|ast| ast.type == :import && ast.children.first == af_import}
           unless found_node.children.find {|child| child == token}
             prepend_list.delete found_node
             prepend_list << s(:import, found_node.children.first, found_node.children.last.push(s(:const, nil, token)))
           end
         else
-          prepend_list << s(:import, "@ruby2js/active-functions", [s(:const, nil, token)])
+          prepend_list << s(:import, af_import, [s(:const, nil, token)])
         end
       end
     end

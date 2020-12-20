@@ -82,6 +82,10 @@ def parse_request
     options[:underscored_private] = true
   end
 
+  opts.on('--import_from_skypack', "use Skypack for internal functions import statements") do
+    options[:import_from_skypack] = true
+  end
+
   opts.separator('')
 
   opts.on('--port n', Integer, 'start a webserver') do |n|
