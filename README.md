@@ -328,6 +328,20 @@ the script.
 
     * `.class` becomes `.constructor`
 
+* <a id="active_functions" href="https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/active_functions.rb">active_functions</a>
+
+    Provides functionality inspired by Rails' ActiveSupport. Works in conjunction
+    with the tiny NPM dependency `@ruby2js/active-functions` which must be added to
+    your application.
+
+    * `value.blank?` becomes `blank$(value)`
+    * `value.present?` becomes `present$(value)`
+    * `value.presence` becomes `precense$(value)`
+
+    Note: these conversions are only done if eslevel >= 2015. Import statements
+    will be added to the top of the code output automatically. By default they
+    will be `@ruby2js/active-functions`, but you can pass an `import_from_skypack: true` option to `convert` to use the Skypack CDN instead.
+
 * <a id="tagged_templates" href="https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/tagged_templates.rb">tagged_templates</a>
 
     Allows you to turn certain method calls with a string argument into tagged
