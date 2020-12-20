@@ -1,8 +1,9 @@
 {
   "name": "@ruby2js/webpack-loader",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "description": "Uses Ruby2JS to convert .js.rb files into .js files for Webpack",
   "main": "dist/cjs.js",
+  "homepage": "https://github.com/rubys/ruby2js/tree/master/packages/webpack-loader#readme",
   "repository": "https://github.com/rubys/ruby2js",
   "author": "Jared White",
   "license": "MIT",
