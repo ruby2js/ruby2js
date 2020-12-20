@@ -95,7 +95,7 @@ See the next example in the Rails section for how to write a web component based
 
 ## Source Maps
 
-By default, rb2js-loader will provide source maps if requested by Webpack. If you're having trouble debugging code and want to inspect the JS output from Ruby2JS, you can keep source maps on at the Webpack level but _turn them off_ at the rb2js-loader level in your config:
+By default, `@ruby2js/webpack-loader` will provide source maps if requested by Webpack. If you're having trouble debugging code and want to inspect the JS output from Ruby2JS, you can keep source maps on at the Webpack level but _turn them off_ at the loader level in your config:
 
 ```js
 {
