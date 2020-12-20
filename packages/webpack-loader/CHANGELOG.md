@@ -1,6 +1,9 @@
 # Changelog
 
-All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
+## 1.3.1
+
+* Renamed package to `@ruby2js/webpack-loader` and relocated package to main [Ruby2JS repository](https://github.com/rubys/ruby2js/tree/master/packages/webpack-loader).
+
 
 ## [1.2.0](https://github.com/whitefusionhq/rb2js-loader/compare/v1.0.6...v1.2.0) (2020-10-31)
 
