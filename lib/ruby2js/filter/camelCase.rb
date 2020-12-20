@@ -9,8 +9,9 @@ module Ruby2JS
     module CamelCase
       include SEXP
 
-      WHITELIST = %w{
+      ALLOWLIST = %w{
         attr_accessor
+        method_missing
       }
 
       CAPS_EXCEPTIONS = {
@@ -37,7 +38,7 @@ module Ruby2JS
         node = super
         return node unless [:send, :csend, :attr].include? node.type
 
-        if node.children[0] == nil and WHITELIST.include? node.children[1].to_s
+        if node.children[0] == nil and ALLOWLIST.include? node.children[1].to_s
           node
         elsif node.children[0] && [:ivar, :cvar].include?(node.children[0].type)
           S(node.type, s(node.children[0].type, camelCase(node.children[0].children[0])),
@@ -61,7 +62,7 @@ module Ruby2JS
       def handle_generic_node(node, node_type)
         return node if node.type != node_type
 
-        if node.children[0] =~ /_.*\w$/
+        if node.children[0] =~ /_.*\w$/ and !ALLOWLIST.include?(node.children[0].to_s)
           S(node_type , camelCase(node.children[0]), *node.children[1..-1])
         else
           node
