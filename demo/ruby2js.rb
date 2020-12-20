@@ -54,7 +54,8 @@ def parse_request
     filters[eslevel] = file
 
     opts.on("--#{eslevel}", "ECMAScript level #{eslevel}") do
-      options[:eslevel] = eslevel[/\d+/].to_i
+      @eslevel = eslevel[/\d+/]
+      options[:eslevel] = @eslevel.to_i
     end
   end
 
@@ -258,7 +259,6 @@ else
         for (let match of window.location.search.matchAll(/(\\w+)(=([^&]*))?/g)) {
           options[match[1]] = match[3];
         };
-        console.log(options);
 
         // show dropdowns (they only appear if JS is enabled)
         let dropdowns = document.querySelectorAll('.dropdown');
@@ -283,13 +283,24 @@ else
 
           search = [];
           for (let [key, value] of Object.entries(options)) {
-            search.push(value === undefined ? key : `${key}=${value}`);
+            search.push(value === undefined ? key : `${key}=${encodeURIComponent(value)}`);
           };
 
           location.search = search.length == 0 ? "" : `${search.join('&')}`;
 
           history.replaceState({}, null, location.toString());
         }
+
+        // add/remove eslevel options
+        document.getElementById('eslevel').addEventListener('change', event => {
+          let value = event.target.value;
+          if (value !== "default") options['es' + value] = undefined;
+          for (let option of event.target.querySelectorAll('option')) {
+            if (option.value === 'default' || option.value === value) continue;
+            delete options['es' + option.value];
+          };
+          updateLocation();
+        });
 
         // add/remove filters based on checkbox
         let dropdown = document.getElementById('filters').parentNode;
