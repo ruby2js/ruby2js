@@ -167,7 +167,7 @@ else
       .loc {background-color: white}
 
       .dropdown { position: relative; display: none; }
-      .dropdown-content { display: none; position: absolute; background-color: #f9f9f9; min-width: 170px; box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2); padding: 12px 16px; z-index: 1; }
+      .dropdown-content { display: none; position: absolute; background-color: #f9f9f9; min-width: 180px; box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2); padding: 12px 16px; z-index: 1; }
 
       /* below is based on bootstrap
       https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta1/dist/css/bootstrap.min.css
@@ -238,6 +238,7 @@ else
             checked[:nullish] = options[:or] == :nullish
 
             options_available.each do |option, args|
+              next if option == 'filter'
               _div do
                 _input type: 'checkbox', name: option, checked: checked[option.to_sym],
                   data_args: options_available[option]
@@ -276,16 +277,27 @@ else
           })
         };
 
+        function updateLocation() {
+          let location = new URL(base, window.location);
+          location.pathname += Array.from(filters).join('/');
+
+          search = [];
+          for (let [key, value] of Object.entries(options)) {
+            search.push(value === undefined ? key : `${key}=${value}`);
+          };
+
+          location.search = search.length == 0 ? "" : `${search.join('&')}`;
+
+          history.replaceState({}, null, location.toString());
+        }
+
         // add/remove filters based on checkbox
         let dropdown = document.getElementById('filters').parentNode;
         for (let filter of dropdown.querySelectorAll('input[type=checkbox]')) {
           filter.addEventListener('click', event => {
             let name = event.target.name;
             if (!filters.delete(name)) filters.add(name);
-            let location = new URL(base, window.location);
-            location.pathname += Array.from(filters).join('/');
-            location.search = window.location.search;
-            history.replaceState({}, null, location.toString());
+            updateLocation();
           });
         }
 
@@ -298,7 +310,7 @@ else
             if (name in options) {
               delete options[name];
             } else if (option.dataset.args) {
-              options[name] = prompt(name, options[name]);
+              options[name] = prompt(name);
             } else {
               options[name] = undefined;
             };
@@ -308,10 +320,18 @@ else
               search.push(value === undefined ? key : `${key}=${value}`);
             };
 
-            let location = new URL(window.location);
-            location.search = search.length == 0 ? "" : `${search.join('&')}`;
-            history.replaceState({}, null, location.toString());
-          });
+            updateLocation();
+          })
+        };
+
+        // allow update of option
+        for (let span of document.querySelectorAll('input[data-args] + span')) {
+          span.addEventListener('click', event => {
+            let name = span.previousElementSibling.name;
+            options[name] = prompt(name, options[name]);
+            span.previousElementSibling.checked = true;
+            updateLocation();
+          })
         }
       }
 
