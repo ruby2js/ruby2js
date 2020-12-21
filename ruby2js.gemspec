@@ -9,7 +9,7 @@ Gem::Specification.new do |s|
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0".freeze) if s.respond_to? :required_rubygems_version=
   s.require_paths = ["lib".freeze]
-  s.authors = ["Sam Ruby".freeze]
+  s.authors = ["Sam Ruby".freeze, "Jared White".freeze]
   s.description = "    The base package maps Ruby syntax to JavaScript semantics.\n    Filters may be provided to add Ruby-specific or framework specific\n    behavior.\n".freeze
   s.email = "rubys@intertwingly.net".freeze
   s.files = %w(ruby2js.gemspec README.md) + Dir.glob("{lib}/**/*")
