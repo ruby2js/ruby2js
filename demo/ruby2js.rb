@@ -25,7 +25,12 @@ require 'ruby2js'
 def parse_request
   # web/CGI query string support
   env['QUERY_STRING'].to_s.split('&').each do |opt|
-    ARGV.push(*"--#{opt}".split('=', 2))
+    key, value = opt.split('=', 2)
+    if value
+      ARGV.push("--#{key}=#{CGI.unescape(value)}")
+    else
+      ARGV.push("--#{key}")
+    end
   end
 
   # autoregister filters
@@ -339,7 +344,7 @@ else
         for (let span of document.querySelectorAll('input[data-args] + span')) {
           span.addEventListener('click', event => {
             let name = span.previousElementSibling.name;
-            options[name] = prompt(name, options[name]);
+            options[name] = prompt(name, decodeURIComponent(options[name]));
             span.previousElementSibling.checked = true;
             updateLocation();
           })
