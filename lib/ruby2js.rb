@@ -78,7 +78,6 @@ module Ruby2JS
 
       def options=(options)
         @options = options
-        @options[:foo] = @disable_autoexports
 
         @included = @@included
         @excluded = @@excluded

@@ -9,7 +9,6 @@ module Ruby2JS
 
       def options=(options)
         super
-        @options = options
         @esm_autoexports = options[:autoexports] && !@disable_autoexports
         @esm_autoimports = options[:autoimports]
         @esm_explicit_tokens = Set.new
