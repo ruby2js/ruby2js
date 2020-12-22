@@ -346,7 +346,7 @@ else
         for (let span of document.querySelectorAll('input[data-args] + span')) {
           span.addEventListener('click', event => {
             let name = span.previousElementSibling.name;
-            options[name] = prompt(name, decodeURIComponent(options[name]));
+            options[name] = prompt(name, decodeURIComponent(options[name] || ''));
             span.previousElementSibling.checked = true;
             updateLocation();
           })
