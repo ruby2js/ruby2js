@@ -336,7 +336,7 @@ the script.
 
     * `value.blank?` becomes `blank$(value)`
     * `value.present?` becomes `present$(value)`
-    * `value.presence` becomes `precense$(value)`
+    * `value.presence` becomes `presence$(value)`
 
     Note: these conversions are only done if eslevel >= 2015. Import statements
     will be added to the top of the code output automatically. By default they
