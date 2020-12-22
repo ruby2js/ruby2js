@@ -25,16 +25,22 @@ module Ruby2JS
         end
 
         list.map! do |child|
+          replacement = child
+
           if [:module, :class].include? child.type and
             child.children.first.type == :const and
             child.children.first.children.first == nil \
           then
-            s(:export, child)
+            replacement = s(:export, child)
           elsif child.type == :casgn and child.children.first == nil
-            s(:export, child)
-          else
-            child
+            replacement = s(:export, child)
           end
+
+          if replacement != child and @comments[child]
+            @comments[replacement] = @comments[child]
+          end
+
+          replacement
         end
 
         process s(:begin, *list)
