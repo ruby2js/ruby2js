@@ -88,6 +88,23 @@ describe Ruby2JS::Filter::ESM do
     end
   end
 
+  describe "autoexports option" do
+    it "should autoexport top level modules" do
+      to_js('module Foo; def bar; end; end', autoexports: true).
+        must_equal 'export const Foo = {get bar() {}}'
+    end
+
+    it "should autoexport top level classes" do
+      to_js('class Foo; def bar; end; end', autoexports: true).
+        must_equal 'export class Foo {get bar() {}}'
+    end
+
+    it "should autoexport top level constants" do
+      to_js('Foo=1', autoexports: true).
+        must_equal 'export const Foo = 1'
+    end
+  end
+
   describe "autoimports option" do
     it "should autoimport for constants" do
       to_js('Foo.bar', autoimports: {Foo: 'foo.js'}).

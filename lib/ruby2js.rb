@@ -67,7 +67,9 @@ module Ruby2JS
         @comments = comments
 
         # check if magic comment is present:
-        @disable_autoimports = true if @comments.values.first&.map(&:text)&.include?("# autoimports: false")
+        first_comment = @comments.values.first&.map(&:text)&.first
+        @disable_autoimports = first_comment&.include?(" autoimports: false")
+        @disable_autoexports = first_comment&.include?(" autoexports: false")
 
         @ast = nil
         @exclude_methods = []
@@ -76,6 +78,7 @@ module Ruby2JS
 
       def options=(options)
         @options = options
+        @options[:foo] = @disable_autoexports
 
         @included = @@included
         @excluded = @@excluded

@@ -82,7 +82,7 @@ module Ruby2JS
       elsif node.respond_to?(:type) && node.children[1] == :default
         put 'default '
         args[0] = node.children[2]
-      elsif node.respond_to?(:type) && node.type == :lvasgn
+      elsif node.respond_to?(:type) && [:lvasgn, :casgn].include?(node.type)
         if node.children[0] == :default
           put 'default '
           args[0] = node.children[1]

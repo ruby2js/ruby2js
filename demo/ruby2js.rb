@@ -51,6 +51,8 @@ def parse_request
   opts = OptionParser.new
   opts.banner = "Usage: #$0 [options] [file]"
 
+  opts.on('--autoexports', "add export statements for top level constants") {options[:autoexports] = true}
+
   opts.on('--equality', "double equal comparison operators") {options[:comparison] = :equality}
 
   # autoregister eslevels

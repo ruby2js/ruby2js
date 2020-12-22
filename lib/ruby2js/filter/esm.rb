@@ -9,8 +9,35 @@ module Ruby2JS
 
       def options=(options)
         super
+        @options = options
+        @esm_autoexports = options[:autoexports] && !@disable_autoexports
         @esm_autoimports = options[:autoimports]
         @esm_explicit_tokens = Set.new
+      end
+
+      def process(node)
+        return super unless @esm_autoexports
+        @esm_autoexports = false
+
+        list = [node]
+        while list.length == 1 and list.first.type == :begin
+          list = list.first.children.dup
+        end
+
+        list.map! do |child|
+          if [:module, :class].include? child.type and
+            child.children.first.type == :const and
+            child.children.first.children.first == nil \
+          then
+            s(:export, child)
+          elsif child.type == :casgn and child.children.first == nil
+            s(:export, child)
+          else
+            child
+          end
+        end
+
+        process s(:begin, *list)
       end
 
       def on_class(node)
