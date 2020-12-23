@@ -99,6 +99,11 @@ describe Ruby2JS::Filter::ESM do
         must_equal 'export class Foo {get bar() {}}'
     end
 
+    it "should autoexport top level methods" do
+      to_js('def f; end', autoexports: true).
+        must_equal 'export function f() {}'
+    end
+
     it "should autoexport top level constants" do
       to_js('Foo=1', autoexports: true).
         must_equal 'export const Foo = 1'

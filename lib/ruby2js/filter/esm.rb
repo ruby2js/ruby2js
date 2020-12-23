@@ -33,6 +33,8 @@ module Ruby2JS
             replacement = s(:export, child)
           elsif child.type == :casgn and child.children.first == nil
             replacement = s(:export, child)
+          elsif child.type == :def
+            replacement = s(:export, child)
           end
 
           if replacement != child and @comments[child]
@@ -132,7 +134,9 @@ module Ruby2JS
         super
       end
 
-
+      def on_export(node)
+        s(:export, *process_all(node.children))
+      end
     end
 
     private

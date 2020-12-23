@@ -407,8 +407,8 @@ the script.
     # => export { one, two, three as default }
     ```
 
-    If the "autoexports" option is `true`, all top level modules, classes, and
-    constants will automatically be exported.
+    If the "autoexports" option is `true`, all top level modules, classes, 
+    methods and constants will automatically be exported.
 
     The esm filter also provides a way to specify "autoimports" when you run the
     conversion. It will add the relevant import statements automatically whenever
