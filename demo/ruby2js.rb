@@ -149,22 +149,31 @@ def parse_request
   ARGV.push *wunderbar_options
 
   # load selected filters
-  begin
-    verbose,$VERBOSE = $VERBOSE, nil
-    Ruby2JS::Filter::DEFAULTS.clear
+  unless selected.empty?
+    options[:filters] = []
 
     selected.each do |name|
       begin
         if filters.include? name
-          load filters[name] 
+          require filters[name]
+
+          # find the module and add it to the list of filters.
+          # Note: explicit filter option is used instead of
+          # relying on Ruby2JS::Filter::DEFAULTS as the demo
+          # may be run as a server and as such DEFAULTS may
+          # contain filters from previous requests.
+          Ruby2JS::Filter::DEFAULTS.each do |mod|
+            method = mod.instance_method(mod.instance_methods.first)
+            if filters[name] == method.source_location.first
+              options[:filters] << mod
+            end
+          end
         elsif not name.empty? and name =~ /^\w+$/
           $load_error = "UNKNOWN filter: #{name}"
         end
       rescue Exception => $load_error
       end
     end
-  ensure
-    $VERBOSE = verbose
   end
 
   return options, selected, options_available
