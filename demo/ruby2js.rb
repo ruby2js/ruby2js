@@ -26,7 +26,9 @@ def parse_request
   # web/CGI query string support
   env['QUERY_STRING'].to_s.split('&').each do |opt|
     key, value = opt.split('=', 2)
-    if value
+    if key == 'ruby'
+      @ruby = CGI.unescape(value)
+    elsif value
       ARGV.push("--#{key}=#{CGI.unescape(value)}")
     else
       ARGV.push("--#{key}")
@@ -96,7 +98,7 @@ def parse_request
     end
   end
 
-  opts.on('--exclude METHOD,...', "exclude METHOD(s) from filters") {|methods|
+  opts.on('--exclude METHOD,...', "exclude METHOD(s) from filters", Array) {|methods|
     options[:exclude] ||= []; options[:exclude].push(*methods.map(&:to_sym))
   }
 
@@ -301,7 +303,7 @@ else
         filters.delete('');
         let options = {};
         for (let match of window.location.search.matchAll(/(\\w+)(=([^&]*))?/g)) {
-          options[match[1]] = match[3];
+          options[match[1]] = match[3] && decodeURIComponent(match[3]);
         };
 
         // show dropdowns (they only appear if JS is enabled)
