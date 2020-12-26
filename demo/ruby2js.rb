@@ -16,30 +16,31 @@
 #
 #       try --help for a list of supported options
 
-require 'wunderbar'
-
 # support running directly from a git clone
 $:.unshift File.absolute_path('../../lib', __FILE__)
 require 'ruby2js'
 
-def parse_request
+def parse_request(env=ENV)
+
+  # autoregister filters
+  filters = {}
+  Dir["#{$:.first}/ruby2js/filter/*.rb"].sort.each do |file|
+    filter = File.basename(file, '.rb')
+    filters[filter] = file
+  end
+
   # web/CGI query string support
   env['QUERY_STRING'].to_s.split('&').each do |opt|
     key, value = opt.split('=', 2)
-    if value
+    if key == 'ruby'
+      @ruby = CGI.unescape(value)
+    elsif value
       ARGV.push("--#{key}=#{CGI.unescape(value)}")
     else
       ARGV.push("--#{key}")
     end
   end
-
-  # autoregister filters
-  filters = {}
   selected = env['PATH_INFO'].to_s.split('/')
-  Dir["#{$:.first}/ruby2js/filter/*.rb"].sort.each do |file|
-    filter = File.basename(file, '.rb')
-    filters[filter] = file
-  end
 
   # extract options from the argument list
   options = {}
@@ -96,7 +97,7 @@ def parse_request
     end
   end
 
-  opts.on('--exclude METHOD,...', "exclude METHOD(s) from filters") {|methods|
+  opts.on('--exclude METHOD,...', "exclude METHOD(s) from filters", Array) {|methods|
     options[:exclude] ||= []; options[:exclude].push(*methods.map(&:to_sym))
   }
 
@@ -143,46 +144,46 @@ def parse_request
   begin
     opts.parse!
   rescue Exception => $load_error
-    raise unless env['SERVER_PORT']
+    raise unless defined? env and env['SERVER_PORT']
   end
 
   ARGV.push *wunderbar_options
+  require 'wunderbar'
 
   # load selected filters
-  unless selected.empty?
-    options[:filters] = []
+  options[:filters] = []
 
-    selected.each do |name|
-      begin
-        if filters.include? name
-          require filters[name]
+  selected.each do |name|
+    begin
+      if filters.include? name
+        require filters[name]
 
-          # find the module and add it to the list of filters.
-          # Note: explicit filter option is used instead of
-          # relying on Ruby2JS::Filter::DEFAULTS as the demo
-          # may be run as a server and as such DEFAULTS may
-          # contain filters from previous requests.
-          Ruby2JS::Filter::DEFAULTS.each do |mod|
-            method = mod.instance_method(mod.instance_methods.first)
-            if filters[name] == method.source_location.first
-              options[:filters] << mod
-            end
+        # find the module and add it to the list of filters.
+        # Note: explicit filter option is used instead of
+        # relying on Ruby2JS::Filter::DEFAULTS as the demo
+        # may be run as a server and as such DEFAULTS may
+        # contain filters from previous requests.
+        Ruby2JS::Filter::DEFAULTS.each do |mod|
+          method = mod.instance_method(mod.instance_methods.first)
+          if filters[name] == method.source_location.first
+            options[:filters] << mod
           end
-        elsif not name.empty? and name =~ /^\w+$/
-          $load_error = "UNKNOWN filter: #{name}"
         end
-      rescue Exception => $load_error
+      elsif not name.empty? and name =~ /^\w+$/
+        $load_error = "UNKNOWN filter: #{name}"
       end
+    rescue Exception => $load_error
     end
   end
 
   return options, selected, options_available
 end
 
+options = parse_request.first
+
 if not env['SERVER_PORT']
   # command line support
   defaults = Ruby2JS::Filter::DEFAULTS.dup
-  options = parse_request.first
   if ARGV.length > 0
     options[:file] = ARGV.first
     puts Ruby2JS.convert(File.read(ARGV.first), options).to_s
@@ -193,9 +194,29 @@ if not env['SERVER_PORT']
   Ruby2JS::Filter::DEFAULTS.push(*defaults)
 
 else
+  def walk(ast, indent='')
+    return unless ast
+    _div class: (ast.loc ? 'loc' : 'unloc') do
+      _ "#{indent}#{ast.type}"
+      if ast.children.any? {|child| Parser::AST::Node === child}
+        ast.children.each do |child|
+          if Parser::AST::Node === child
+            walk(child, "  #{indent}")
+          else
+            _div "#{indent}  #{child.inspect}"
+          end
+        end
+      else
+        ast.children.each do |child|
+          _ " #{child.inspect}"
+        end
+      end
+    end
+  end
+
   # web server support
   _html do
-    options, selected, options_available = parse_request
+    options, selected, options_available = parse_request env
     _title 'Ruby2JS'
 
     base = env['REQUEST_URI'].split('?').first
@@ -303,7 +324,7 @@ else
         filters.delete('');
         let options = {};
         for (let match of window.location.search.matchAll(/(\\w+)(=([^&]*))?/g)) {
-          options[match[1]] = match[3];
+          options[match[1]] = match[3] && decodeURIComponent(match[3]);
         };
 
         // show dropdowns (they only appear if JS is enabled)
@@ -335,6 +356,35 @@ else
           location.search = search.length == 0 ? "" : `${search.join('&')}`;
 
           history.replaceState({}, null, location.toString());
+
+          if (!document.getElementById('js')) return;
+
+          // fetch updated results
+          let ruby = document.querySelector('textarea[name=ruby]').textContent;
+          let ast = document.getElementById('ast').checked;
+          let headers = {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          }
+
+          fetch(location,
+            {method: 'POST', headers, body: JSON.stringify({ ruby, ast })}
+          ).then(response => {
+              if (!response.ok) throw new Error(response.statusText);
+              return response.json();
+            }).
+          then(json => {
+            document.querySelector('#js pre').textContent = json.js;
+
+            let parsed = document.querySelector('#parsed');
+            if (json.parsed) parsed.querySelector('pre').outerHTML = json.parsed;
+            parsed.style.display = json.parsed ? "block" : "none";
+
+            let filtered = document.querySelector('#filtered');
+            if (json.filtered) filtered.querySelector('pre').outerHTML = json.filtered;
+            filtered.style.display = json.filtered ? "block" : "none";
+          }).
+          catch(console.error);
         }
 
         // add/remove eslevel options
@@ -390,6 +440,9 @@ else
             updateLocation();
           })
         }
+
+        // refesh on "Show AST" change
+        document.getElementById('ast').addEventListener('click', updateLocation);
       }
 
       if @ruby
@@ -400,39 +453,22 @@ else
 
           ruby = Ruby2JS.convert(@ruby, options)
 
-          if @ast
-            walk = proc do |ast, indent=''|
-              next unless ast
-              _div class: (ast.loc ? 'loc' : 'unloc') do
-                _ "#{indent}#{ast.type}"
-                if ast.children.any? {|child| Parser::AST::Node === child}
-                  ast.children.each do |child|
-                    if Parser::AST::Node === child
-                      walk[child, "  #{indent}"]
-                    else
-                      _div "#{indent}  #{child.inspect}"
-                    end
-                  end
-                else
-                  ast.children.each do |child|
-                    _ " #{child.inspect}"
-                  end
-                end
-              end
-            end
+          parsed = Ruby2JS.parse(@ruby).first if @ast
 
+          _div.parsed! style: "display: #{@ast ? 'block' : 'none'}" do
             _h2 'AST'
-            parsed = Ruby2JS.parse(@ruby).first
-            _pre {walk[parsed]}
-
-            if ruby.ast != parsed
-              _h2 'filtered AST'
-              _pre {walk[ruby.ast]}
-            end
+            _pre {_ {walk(parsed)}}
           end
 
-          _h2 'JavaScript'
-          _pre.js ruby.to_s
+          _div.filtered! style: "display: #{@ast && parsed != ruby.ast ? 'block' : 'none'}" do
+            _h2 'filtered AST'
+            _pre {walk(ruby.ast)}
+          end
+
+          _div.js! do
+            _h2 'JavaScript'
+            _pre.js ruby.to_s
+          end
         end
       end
     end
@@ -484,4 +520,25 @@ else
       end
     end
   end
+
+  # html fetch support
+  _json do
+    options = parse_request(env).first
+    converted = Ruby2JS.convert(@ruby, options)
+
+    _js converted.to_s
+
+    if @ast
+      parsed = Ruby2JS.parse(@ruby).first
+      html = Wunderbar::HtmlMarkup.new(Struct.new(:params, :env).new({}, {}))
+      ast = html._pre { html._ {walk(parsed)} }
+      _parsed ast.serialize({indent: '  '}).join()
+
+      if converted.ast != parsed
+        ast = html._pre { html._ {walk(converted.ast)} }
+        _filtered ast.serialize({indent: '  '}).join()
+      end
+    end
+  end
+
 end
