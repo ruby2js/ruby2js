@@ -41,17 +41,85 @@ describe "demo" do
       to_js("x = 123", %w(--strict --es2017)).
         must_equal('"use strict"; let x = 123')
     end
-  end
 
-  describe "include" do
-    it "should work without options" do
-      to_js("x.class", %w(--filter functions)).
-        must_equal('x.class')
+    describe "exclude/include" do
+      it "should work without options" do
+        to_js("x.class; x.downcase()", %w(--filter functions)).
+          must_equal('x.class; x.toLowerCase()')
+      end
+
+      it "should work with an option once included" do
+        to_js("x.class; x.downcase()", %w(--filter functions --include class)).
+          must_equal('x.constructor; x.toLowerCase()')
+      end
+
+      it "should work with an option when all are included" do
+        to_js("x.class; x.downcase()", %w(--filter functions --include-all)).
+          must_equal('x.constructor; x.toLowerCase()')
+      end
+
+      it "should work with an option when all are included" do
+        to_js("x.class; x.downcase()", %w(--filter functions --exclude downcase)).
+          must_equal('x.class; x.downcase()')
+      end
     end
 
-    it "should work with an option" do
-      to_js("x.class", %w(--filter functions --include class)).
-        must_equal('x.constructor')
+    describe "ESM exports/imports" do
+      it "should handle automatic exports" do
+        to_js("A = 1", %w(--filter esm --autoexports)).
+          must_equal('export const A = 1')
+      end
+
+      it "should handle automatic imports" do
+        to_js("A.foo", %w(--filter esm --autoimports A)).
+          must_equal('import A from "A"; A.foo')
+      end
+    end
+
+    describe "comparison: equality/identity" do
+      it "should handle equality" do
+        to_js("A == B", %w(--equality)).
+          must_equal('A == B')
+      end
+
+      it "should handle identity" do
+        to_js("A == B", %w(--identity)).
+          must_equal('A === B')
+      end
+    end
+
+    it "should handle ivars" do
+      to_js("@x", %w(--ivars @x:fromhost)).
+        must_equal('"fromhost"')
+    end
+
+    describe "or: logical/nullish" do
+      it "should handle logical" do
+        to_js("A || B", %w(--logical)).
+          must_equal('A || B')
+      end
+
+      it "should handle nullish" do
+        to_js("A || B", %w(--es2020 --nullish)).
+          must_equal('A ?? B')
+      end
+    end
+
+    it "should handle template literal tags" do
+      to_js("color 'red'", %w(--es2015 --filter tagged_templates --template-literal-tags color)).
+        must_equal('color`red`')
+    end
+
+    describe "underscored private" do
+      it "without underscored private" do
+        to_js("class C; def initialize; @a=1; end; end", %w(--es2020)).
+          must_equal('class C {#a = 1; }')
+      end
+
+      it "with underscored private" do
+        to_js("class C; def initialize; @a=1; end; end", %w(--es2020 --underscored_private)).
+          must_equal('class C {constructor() {this._a = 1}}')
+      end
     end
   end
 end

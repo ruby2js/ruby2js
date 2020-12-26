@@ -115,11 +115,29 @@ def parse_request(env=ENV)
     options[:include] ||= []; options[:include].push(*methods.map(&:to_sym))
   }
 
+  opts.on('--include-all', "have filters include all methods") do
+    options[:include_all] = true
+  end
+
+  opts.on('--include-only METHOD,...', "have filters only process METHOD(s)", Array) {|methods|
+    options[:include_only] ||= []; options[:include_only].push(*methods.map(&:to_sym))
+  }
+
+  opts.on('--ivars @name:value,...', "set ivars") {|ivars|
+    options[:ivars] ||= {}
+    options[:ivars].merge! ivars.split(/(?:^|,)\s*(@\w+):/)[1..-1].each_slice(2).
+      map {|name, value| [name.to_sym, value]}.to_h
+  }
+
   opts.on('--logical', "use '||' for 'or' operators") {options[:or] = :logical}
 
   opts.on('--nullish', "use '??' for 'or' operators") {options[:or] = :nullish}
 
   opts.on('--strict', "strict mode") {options[:strict] = true}
+
+  opts.on('--template_literal_tags tag,...', "process TAGS as template literals", Array) {|tags|
+    options[:template_literal_tags] ||= []; options[:template_literal_tags].push(*tags.map(&:to_sym))
+  }
 
   opts.on('--underscored_private', "prefix private properties with an underscore") do
     options[:underscored_private] = true
@@ -183,15 +201,12 @@ options = parse_request.first
 
 if not env['SERVER_PORT']
   # command line support
-  defaults = Ruby2JS::Filter::DEFAULTS.dup
   if ARGV.length > 0
     options[:file] = ARGV.first
     puts Ruby2JS.convert(File.read(ARGV.first), options).to_s
   else
     puts Ruby2JS.convert($stdin.read, options).to_s
   end  
-
-  Ruby2JS::Filter::DEFAULTS.push(*defaults)
 
 else
   def walk(ast, indent='')
