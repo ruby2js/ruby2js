@@ -2,6 +2,12 @@
 
 # 3.6.0 / 2020-12-26
 
+* continued demo upgrades ([see here](https://intertwingly.net/projects/ruby2js))
+    * dropdowns and checkbox updates are applied immediately
+    * more options supported and increased test coverage
+
+# 3.6.0 / 2020-12-26
+
 * New project logos!
 * Large overhaul of the Ruby2JS Demo application ([see here](https://intertwingly.net/projects/ruby2js))
 * New `active_functions` filter which will provide methods inspired by ActiveSupport

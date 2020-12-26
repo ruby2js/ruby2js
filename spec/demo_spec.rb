@@ -106,7 +106,7 @@ describe "demo" do
     end
 
     it "should handle template literal tags" do
-      to_js("color 'red'", %w(--es2015 --filter tagged_templates --template-literal-tags color)).
+      to_js("color 'red'", %w(--es2015 --filter tagged_templates --template_literal_tags color)).
         must_equal('color`red`')
     end
 
