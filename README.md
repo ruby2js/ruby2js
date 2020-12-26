@@ -61,6 +61,22 @@ See
 [notimplemented_spec](https://github.com/rubys/ruby2js/blob/master/spec/notimplemented_spec.rb)
 for a list of Ruby features _known_ to be not implemented.
 
+Demo quick start
+---
+
+The following two commands will start a server and a launch a browser:
+
+```
+git clone https://github.com/rubys/ruby2js.git
+ruby ruby2js/demo/ruby2js.rb --port 8080
+```
+
+From the page that is loaded, enter some Ruby code into the text area
+and press the convert button.  Dropdowns are provided to change the ECMAScript
+level, filters, and options.  A checkbox is provided to show the Abstract
+Symbol Tree (AST) produced.
+
+
 Synopsis
 ---
 

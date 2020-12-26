@@ -556,4 +556,29 @@ else
     end
   end
 
+  unless env['SERVER_SOFTWARE']
+    require 'net/http'
+    Thread.new do
+      port = env['SERVER_PORT'].to_i
+
+      # wait for server to start
+      60.times do
+	sleep 0.5
+	begin
+	  status = Net::HTTP.get_response('0.0.0.0','/',port).code
+	  break if %(200 404 500).include? status
+	rescue Errno::ECONNREFUSED, Errno::ETIMEDOUT
+	end
+      end
+
+      link = "http://localhost:#{port}/"
+      if RbConfig::CONFIG['host_os'] =~ /mswin|mingw|cygwin/
+        system "start #{link}"
+      elsif RbConfig::CONFIG['host_os'] =~ /darwin/
+        system "open #{link}"
+      elsif RbConfig::CONFIG['host_os'] =~ /linux|bsd/
+        system "xdg-open #{link}"
+      end
+    end
+  end
 end
