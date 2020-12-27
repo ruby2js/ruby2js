@@ -65,7 +65,26 @@ module.exports = {
           },
         },
       },
-      
+      {
+        test: /\.js\.rb$/,
+        use: [
+          {
+            loader: "babel-loader",
+            options: {
+            presets: ["@babel/preset-env"],
+              plugins: [
+                [
+                  "@babel/plugin-transform-runtime",
+                  {
+                    helpers: false,
+                  },
+                ],
+              ],
+            }
+          },
+          "@ruby2js/webpack-loader"
+        ]
+      },
       {
         test: /\.(s[ac]|c)ss$/,
         use: [
