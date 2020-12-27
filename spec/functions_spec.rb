@@ -285,11 +285,13 @@ describe Ruby2JS::Filter::Functions do
     it "should handle max" do
       to_js( 'a.max' ).must_equal 'a.max'
       to_js( 'a.max()' ).must_equal 'Math.max.apply(Math, a)'
+      to_js( '[a,b].max()' ).must_equal 'Math.max(a, b)'
     end
 
     it "should handle min" do
       to_js( 'a.min' ).must_equal 'a.min'
       to_js( 'a.min()' ).must_equal 'Math.min.apply(Math, a)'
+      to_js( '[a,b].min()' ).must_equal 'Math.min(a, b)'
     end
 
     it "should handle sum" do

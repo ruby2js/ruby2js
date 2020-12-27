@@ -112,7 +112,7 @@ describe "ES2015 support" do
     end
 
     it "should implement max with spread operators" do
-      to_js_fn( '[1,2].max()' ).must_equal('Math.max(...[1, 2])')
+      to_js_fn( 'a.max()' ).must_equal('Math.max(...a)')
     end
   end
 

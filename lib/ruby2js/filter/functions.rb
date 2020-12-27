@@ -27,8 +27,13 @@ module Ruby2JS
 
         if [:max, :min].include? method and args.length == 0
           return super unless node.is_method?
-          process S(:send, s(:const, nil, :Math), node.children[1],
-            s(:splat, target))
+          if target.type == :array
+            process S(:send, s(:const, nil, :Math), node.children[1],
+              *target.children)
+          else
+            process S(:send, s(:const, nil, :Math), node.children[1],
+              s(:splat, target))
+          end
 
         elsif method == :call and target and target.type == :ivar
           process S(:send, s(:self), "_#{target.children.first.to_s[1..-1]}",
