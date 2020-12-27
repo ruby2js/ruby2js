@@ -19,6 +19,7 @@
 # support running directly from a git clone
 $:.unshift File.absolute_path('../../lib', __FILE__)
 require 'ruby2js'
+require 'cgi'
 
 def parse_request(env=ENV)
 
