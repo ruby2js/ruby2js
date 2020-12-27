@@ -26,13 +26,14 @@ module Ruby2JS
         return super if excluded?(method)
 
         if [:max, :min].include? method and args.length == 0
-          return super unless node.is_method?
           if target.type == :array
             process S(:send, s(:const, nil, :Math), node.children[1],
               *target.children)
-          else
+          elsif node.is_method?
             process S(:send, s(:const, nil, :Math), node.children[1],
               s(:splat, target))
+          else
+            return super
           end
 
         elsif method == :call and target and target.type == :ivar
