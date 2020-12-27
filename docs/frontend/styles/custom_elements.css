@@ -1,0 +1,39 @@
+article-author,
+article-content, /* .content */
+img-container,
+layout-columns, /* .columns */
+layout-notice,
+layout-spacer,
+main-content /* .content */ {
+  display: block;
+}
+
+ui-label {
+  display: inline;
+}
+
+sl-icon {
+  /* fix crop issues on Safari */
+  height: 1.03em;
+  width: 1.03em;
+}
+
+.button.is-small sl-icon {
+  /* fix crop issues on Safari */
+  height: 1.05em;
+  width: 1.05em;
+  top: -1px;
+}
+
+/*
+# Class names to use for these elements:
+
+button-group = .buttons
+layout-box = .box
+layout-column = .column
+layout-sidebar = .column
+nav-inner = .container
+nav-menu = .navbar-menu
+nav-section = .navbar-brand, .navbar-start, .navbar-end
+ui-icon = .icon
+*/

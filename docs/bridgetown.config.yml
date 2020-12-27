@@ -1,0 +1,14 @@
+url: "https://www.ruby2js.com"
+permalink: simple
+
+timezone: America/New_York
+
+collections:
+  docs:
+    output: true
+    permalink: /:collection/:path
+    sort_by: order
+    name: Documentation
+
+pagination:
+  enabled: true

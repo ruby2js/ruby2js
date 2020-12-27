@@ -1,0 +1,11 @@
+source "https://rubygems.org"
+git_source(:github) { |repo| "https://github.com/#{repo}.git" }
+
+gem "bridgetown", "~> 0.19.1"
+
+group :bridgetown_plugins do
+  gem "bridgetown-seo-tag", "3.0.5"
+  gem "bridgetown-feed", "~> 1.0"
+  gem "bridgetown-quick-search", "~> 1.0.3"
+  gem "bridgetown-inline-svg", "~> 1.1"
+end

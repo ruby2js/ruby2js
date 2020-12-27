@@ -1,1 +1,0 @@
-The `docs` folder will eventually house the documentation website for the project. In the meantime, it contains some branding assets.
