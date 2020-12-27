@@ -578,7 +578,11 @@ else
       elsif RbConfig::CONFIG['host_os'] =~ /darwin/
         system "open #{link}"
       elsif RbConfig::CONFIG['host_os'] =~ /linux|bsd/
-        system "xdg-open #{link}"
+        if ENV['WSLENV'] and not `which wslview`.empty?
+          system "wslview #{link}"
+        else
+          system "xdg-open #{link}"
+        end
       end
     end
   end
