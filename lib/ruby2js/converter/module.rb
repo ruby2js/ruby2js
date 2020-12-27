@@ -6,6 +6,11 @@ module Ruby2JS
     #   (...)
 
     handle :module do |name, *body|
+      if body == [nil]
+        parse @ast.updated(:casgn, [*name.children, s(:hash)])
+        return
+      end
+
       while body.length == 1 and body.first.type == :begin
         body = body.first.children
       end

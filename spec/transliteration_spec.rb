@@ -801,6 +801,11 @@ describe Ruby2JS do
   end
 
   describe 'module definition' do
+    it "should handle empty modules" do
+      to_js( 'module A; end' ).
+        must_equal 'A = {}'
+    end
+
     it "should handle module definitions" do
       to_js( 'module A; B=1; end' ).
         must_equal 'A = function() {var B = 1; return {B: B}}()'
