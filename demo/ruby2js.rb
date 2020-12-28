@@ -467,14 +467,14 @@ else
 
           options[:eslevel] = @eslevel.to_i if @eslevel
 
-          ruby = Ruby2JS.convert(@ruby, options)
-
           parsed = Ruby2JS.parse(@ruby).first if @ast
 
           _div.parsed! style: "display: #{@ast ? 'block' : 'none'}" do
             _h2 'AST'
             _pre {_ {walk(parsed)}}
           end
+
+          ruby = Ruby2JS.convert(@ruby, options)
 
           _div.filtered! style: "display: #{@ast && parsed != ruby.ast ? 'block' : 'none'}" do
             _h2 'filtered AST'
