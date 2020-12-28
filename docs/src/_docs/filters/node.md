@@ -5,7 +5,7 @@ top_section: Filters
 category: node
 ---
 
-The **Node** filter provides a number of conveneince methods and variables which make writing Node scripts feel more like traditional Ruby.
+The **Node** filter provides a number of convenience methods and variables which make writing Node scripts feel more like traditional Ruby.
 
 ## List of Transformations
 
