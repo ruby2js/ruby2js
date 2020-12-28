@@ -1,11 +1,11 @@
 ---
-order: 3
+order: 4
 title: camelCase
 top_section: Filters
 category: camelcase
 ---
 
-The <a href="https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/camelCase.rb">camelCase</a> filter converts `underscore_case` (aka "snake case") to `camelCase`.
+The **camelCase** filter converts `underscore_case` (aka "snake case") to `camelCase`.
 
 ## Examples
 
@@ -25,3 +25,7 @@ function fooBar(bazQux) {
   if (typeof bazQux === 'undefined') bazQux = null
 }
 ```
+
+{% rendercontent "docs/note", extra_margin: true %}
+More examples of how this filter works are in the [specs file](https://github.com/ruby2js/ruby2js/blob/master/spec/camelcase_spec.rb).
+{% endrendercontent %}

@@ -47,6 +47,10 @@ body > footer.footer {
   max-width: 275px;
   margin: 1rem auto;
 
+  @media (max-width: 500px) {
+    max-width: 215px;
+  }
+
   svg {
     -webkit-filter: drop-shadow(2px 4px 4px transparentize($red, 0.7));
     filter: drop-shadow(2px 4px 4px transparentize($red, 0.7));

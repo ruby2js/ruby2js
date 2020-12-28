@@ -25,6 +25,13 @@ sl-icon {
   top: -1px;
 }
 
+main-content sl-icon[name="caret-right-fill"] {
+  color: $orange;
+  vertical-align: -0.2em;
+  margin-left: 0.2em;
+  margin-right: 0.2em;
+}
+
 /*
 # Class names to use for these elements:
 

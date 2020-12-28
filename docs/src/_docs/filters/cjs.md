@@ -1,11 +1,11 @@
 ---
-order: 4
+order: 5
 title: CommonJS
 top_section: Filters
 category: cjs
 ---
 
-The <a href="https://github.com/rubys/ruby2js/blob/master/spec/cjs">cjs</a> filter maps export statements to their CommonJS counterparts.
+The **CJS** filter maps export statements to their CommonJS counterparts.
 
 * `export def f` to `exports.f =`
 * `export async def f` to `exports.f = async`
@@ -13,3 +13,7 @@ The <a href="https://github.com/rubys/ruby2js/blob/master/spec/cjs">cjs</a> filt
 * `export default proc` to `module.exports =`
 * `export default async proc` to `module.exports = async`
 * `export default` to `module.exports =`
+
+{% rendercontent "docs/note", extra_margin: true %}
+More examples of how this filter works are in the [specs file](https://github.com/ruby2js/ruby2js/blob/master/spec/cjs_spec.rb).
+{% endrendercontent %}

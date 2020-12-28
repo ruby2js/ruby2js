@@ -10,7 +10,7 @@ $white-ter: #f6f6f6;
 
 $yellow: #ffd725;
 $orange: #f88a23;
-$green: #7bdda4;
+$green: #7addcf;
 $blue: #29abe0;
 $red: #c92514;
 $red-dark: #460f0e;
@@ -54,7 +54,7 @@ footer.footer strong {
   color: white;
 }
 
-@import "custom_elements.css";
+@import "custom_elements.scss";
 
 @import "~bulma/bulma";
 @import "helpers.scss";

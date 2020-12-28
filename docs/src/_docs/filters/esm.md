@@ -1,11 +1,11 @@
 ---
-order: 5
+order: 6
 title: ESM
 top_section: Filters
 category: esm
 ---
 
-The <a href="https://github.com/rubys/ruby2js/blob/master/lib/ruby2js/filter/esm.rb">esm</a> filter provides conversion of import and export statements for use with modern ES builders like Webpack.
+The **ESM** filter provides conversion of import and export statements for use with modern ES builders like Webpack.
 
 ## Examples
 
@@ -57,7 +57,7 @@ export [ one, two, default: three ]
 # => export { one, two, three as default }
 ```
 
-If the "autoexports" option is `true`, all top level modules, classes, 
+If the `autoexports` option is `true`, all top level modules, classes, 
 methods and constants will automatically be exported.
 
 ## Autoimports
@@ -111,3 +111,7 @@ puts Ruby2JS.convert(
 // autoimports: false
 new AWN({position: "top-right"}).success("Hello World")
 ```
+
+{% rendercontent "docs/note", extra_margin: true %}
+More examples of how this filter works are in the [specs file](https://github.com/ruby2js/ruby2js/blob/master/spec/esm_spec.rb).
+{% endrendercontent %}

@@ -58,3 +58,9 @@ h2 .tag {
   letter-spacing: normal;
   font-weight: 500;
 }
+
+.functions-list {
+  li > code:first-child {
+    font-weight: bold;
+  }
+}
