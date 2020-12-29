@@ -1,5 +1,5 @@
 ---
-order: 8
+order: 15
 title: jQuery
 top_section: Filters
 category: jquery

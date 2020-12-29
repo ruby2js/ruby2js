@@ -1,5 +1,5 @@
 ---
-order: 10
+order: 17
 title: minitest-jasmine
 top_section: Filters
 category: minitest

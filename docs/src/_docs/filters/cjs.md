@@ -1,5 +1,5 @@
 ---
-order: 5
+order: 12
 title: CommonJS
 top_section: Filters
 category: cjs

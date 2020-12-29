@@ -3,4 +3,9 @@ layout: page
 title: Examples
 ---
 
-Coming soon!
+<br/><br/><br/>
+
+{:.has-text-centered}
+_Coming soon!_
+
+<br/><br/><br/>

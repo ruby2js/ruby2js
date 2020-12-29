@@ -54,6 +54,10 @@ Enable ES2015 support:
 puts Ruby2JS.convert('"#{a}"', eslevel: 2015)
 ```
 
+{% rendercontent "docs/note" %}
+[Read more information](/docs/eslevels) on how ES level options affect the JS output.
+{% endrendercontent %}
+
 Enable strict support:
 
 ```ruby
@@ -88,8 +92,10 @@ context = Ruby2JS.compile(Date.today.strftime('d = new Date(%Y, %-m-1, %-d)'))
 puts context.eval('d.getYear()')+1900
 ```
 
+{% rendercontent "docs/note", extra_margin: true %}
 Conversions can be explored interactively using the
-[demo](https://github.com/rubys/ruby2js/blob/master/demo/ruby2js.rb) provided. (**[Online Version](https://intertwingly.net/projects/ruby2js.cgi)**)
+[demo](/docs/running-the-demo) provided. (**[Online Version](https://intertwingly.net/projects/ruby2js.cgi)**)
+{% endrendercontent %}
 
 ## Create a Configuration
 

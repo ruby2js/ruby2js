@@ -9,4 +9,4 @@ tagline: an extensible Ruby to modern JavaScript transpiler
 email: your-email@example.com
 description: >- # this means to ignore newlines until "baseurl:"
   Ruby2JS is an extensible Ruby to modern JavaScript transpiler you can use in production today.
-github: rubys/ruby2js
+github: ruby2js/ruby2js

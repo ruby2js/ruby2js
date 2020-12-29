@@ -1,5 +1,5 @@
 ---
-order: 4
+order: 11
 title: camelCase
 top_section: Filters
 category: camelcase

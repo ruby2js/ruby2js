@@ -1,5 +1,5 @@
 ---
-order: 9
+order: 16
 title: matchAll
 top_section: Filters
 category: matchall

@@ -1,8 +1,8 @@
 ---
-order: 3
+order: 10
 title: ActiveFunctions
 top_section: Filters
-category: active_functions
+category: active-functions
 ---
 
 The **ActiveFunctions** filter provides functionality inspired by Rails' ActiveSupport. It works in conjunction with the tiny NPM dependency [`@ruby2js/active-functions`](https://github.com/ruby2js/ruby2js/tree/master/packages/active-functions) which must be added to your application.

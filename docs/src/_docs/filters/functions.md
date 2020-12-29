@@ -1,11 +1,15 @@
 ---
-order: 7
+order: 14
 title: Functions
 top_section: Filters
 category: functions
 ---
 
 The **Functions** filter provides a large number of convenience methods Rubyists are familar with. Statements such as `"252.3".to_i` transform into `parseInt("252.3")`, or `[1,3,5].yield_self { |arr| arr[1] }` into `(arr => arr[1])([1, 3, 5])`. Generally you will want to include this filter in your configuration unless you have specific reason not to.
+
+{% rendercontent "docs/note", title: "ES Level Enhancements" %}
+If you set the `eslevel` option to `2015` or newer, the Functions filter enables additional functionality, [documented on the ES Levels page](/docs/eslevels).
+{% endrendercontent %}
 
 ## List of Transformations
 
