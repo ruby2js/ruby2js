@@ -42,6 +42,11 @@ describe Ruby2JS::Filter::Nokogiri do
     it 'should support at' do
       to_js('doc.at("tr")').must_equal 'doc.querySelector("tr")'
     end
+
+    it 'should support chaining' do
+      to_js('document.at("#id").parent').
+        must_equal 'document.querySelector("#id").parentNode'
+    end
   end
 
   describe 'construction' do

@@ -47,40 +47,40 @@ module Ruby2JS
           method == :at and 
           args.length == 1 and args.first.type == :str
         then
-          S(:send, target, :querySelector, process(args.first))
+          S(:send, process(target), :querySelector, process(args.first))
 
         elsif \
           method == :search and 
           args.length == 1 and args.first.type == :str
         then
-          S(:send, target, :querySelectorAll, process(args.first))
+          S(:send, process(target), :querySelectorAll, process(args.first))
 
         elsif method === :parent and args.length == 0
-          S(:attr, target, :parentNode)
+          S(:attr, process(target), :parentNode)
 
         elsif method === :name and args.length == 0
-          S(:attr, target, :nodeName)
+          S(:attr, process(target), :nodeName)
 
         elsif [:text, :content].include? method and args.length == 0
-          S(:attr, target, :textContent)
+          S(:attr, process(target), :textContent)
 
         elsif method == :content= and args.length == 1
-          S(:send, target, :textContent=, *process_all(args))
+          S(:send, process(target), :textContent=, *process_all(args))
 
         elsif method === :inner_html and args.length == 0
-          S(:attr, target, :innerHTML)
+          S(:attr, process(target), :innerHTML)
 
         elsif method == :inner_html= and args.length == 1
-          S(:send, target, :innerHTML=, *process_all(args))
+          S(:send, process(target), :innerHTML=, *process_all(args))
 
         elsif method === :to_html and args.length == 0
-          S(:attr, target, :outerHTML)
+          S(:attr, process(target), :outerHTML)
 
         elsif \
           [:attr, :get_attribute].include? method and 
           args.length == 1 and args.first.type == :str
         then
-          S(:send, target, :getAttribute, process(args.first))
+          S(:send, process(target), :getAttribute, process(args.first))
 
         elsif \
           [:key?, :has_attribute].include? method and 
@@ -154,14 +154,14 @@ module Ruby2JS
           [:add_next_sibling, :next=, :after].include? method and
           args.length == 1
         then
-          S(:send, s(:attr, target, :parentNode), :insertBefore,
+          S(:send, s(:attr, process(target), :parentNode), :insertBefore,
             process(args.first), s(:attr, target, :nextSibling))
 
         elsif \
           [:add_previous_sibling, :previous=, :before].include? method and
           args.length == 1
         then
-          S(:send, s(:attr, target, :parentNode), :insertBefore,
+          S(:send, s(:attr, process(target), :parentNode), :insertBefore,
             process(args.first), target)
 
         elsif method == :prepend_child and args.length == 1
