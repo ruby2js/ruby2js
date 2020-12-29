@@ -17,7 +17,7 @@ When option `eslevel: 2015` is provided, the following additional
 conversions are made:
 
 {:.functions-list}
-* `"#{a}"` {{ caret }} <code>\`${a}\`</code>
+* `"#{a}"` {{ caret }} <code>`${a}`</code>
 * `a = 1` {{ caret }} `let a = 1`
 * `A = 1` {{ caret }} `const A = 1`
 * `a, b = b, a` {{ caret }} `[a, b] = [b, a]`
