@@ -347,6 +347,7 @@ else
         let dropdowns = document.querySelectorAll('.dropdown');
         for (let dropdown of dropdowns) {
           dropdown.style.display = 'inline-block';
+          dropdown.focus();
 
           // toggle dropdown
           dropdown.querySelector('button').addEventListener('click', event => {

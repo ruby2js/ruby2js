@@ -156,24 +156,24 @@ module Ruby2JS
             end
           end
 
-	  # collect instance methods (including getters and setters)
+          # collect instance methods (including getters and setters)
           @react_props = []
           @react_methods = []
-	  body.each do |statement|
-	    if statement.type == :def
-	      method = statement.children.first
-	      unless method == :initialize
-		if method.to_s.end_with? '='
-		  method = method.to_s[0..-2].to_sym
-		  @react_props << method unless @react_props.include? method
-		elsif statement.is_method?
-		  @react_methods << method unless @react_methods.include? method
-		else
-		  @react_props << method unless @react_props.include? method
-		end
-	      end
-	    end
-	  end
+          body.each do |statement|
+            if statement.type == :def
+              method = statement.children.first
+              unless method == :initialize
+                if method.to_s.end_with? '='
+                  method = method.to_s[0..-2].to_sym
+                  @react_props << method unless @react_props.include? method
+                elsif statement.is_method?
+                  @react_methods << method unless @react_methods.include? method
+                else
+                  @react_props << method unless @react_props.include? method
+                end
+              end
+            end
+          end
 
           # append statics (if any)
           unless statics.empty?
@@ -250,7 +250,7 @@ module Ruby2JS
                 block.push(s(:return, s(:attr, s(:self), :state)))
               end
 
-            elsif mname == :render
+            elsif mname == :render and not react_wunderbar_free(block, true)
               if \
                  block.length != 1 or not block.last or
                 not [:send, :block].include? block.last.type
@@ -993,7 +993,7 @@ module Ruby2JS
       end
 
       # is this a "wunderbar" style call or createElement?
-      def react_element?(node)
+      def react_element?(node, wunderbar_only=false)
         return false unless node
 
         forEach = [:forEach]
@@ -1001,15 +1001,17 @@ module Ruby2JS
 
         return true if node.type == :block and
           forEach.include? node.children.first.children.last and 
-          react_element?(node.children.last)
+          react_element?(node.children.last, wunderbar_only)
 
-        # explicit call to React.createElement
-        return true if node.children[1] == :createElement and
-          node.children[0] == s(:const, nil, :React)
+        unless wunderbar_only
+          # explicit call to React.createElement
+          return true if node.children[1] == :createElement and
+            node.children[0] == s(:const, nil, :React)
 
-        # explicit call to Vue.createElement
-        return true if node.children[1] == :createElement and
-          node.children[0] == s(:const, nil, :Vue)
+          # explicit call to Vue.createElement
+          return true if node.children[1] == :createElement and
+            node.children[0] == s(:const, nil, :Vue)
+        end
 
         # wunderbar style call
         node = node.children.first if node.type == :block
@@ -1021,13 +1023,13 @@ module Ruby2JS
 
       # ensure that there are no "wunderbar" or "createElement" calls in
       # a set of statements.
-      def react_wunderbar_free(nodes)
+      def react_wunderbar_free(nodes, wunderbar_only=false)
         nodes.each do |node|
           if Parser::AST::Node === node
-            return false if react_element?(node)
+            return false if react_element?(node, wunderbar_only)
 
             # recurse
-            return false unless react_wunderbar_free(node.children)
+            return false unless react_wunderbar_free(node.children, wunderbar_only)
           end
         end
 

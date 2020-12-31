@@ -70,6 +70,14 @@ describe Ruby2JS::Filter::React do
     end
   end
 
+  describe "React create element calls" do
+    it "should should be able to render using only React.createElement directly" do
+      to_js( 'class Foo<React; def render; ' +
+        'React.createElement("h1", nil, React.createElement("a", nil, href = ".")); end; end' ).
+        must_include 'return React.createElement("h1", null, React.createElement("a", null, href = "."))'
+    end
+  end
+
   describe "Wunderbar/JSX processing" do
     it "should create elements for HTML tags" do
       to_js( 'class Foo<React; def render; _a; end; end' ).
@@ -214,11 +222,6 @@ describe Ruby2JS::Filter::React do
       result.must_include 'return React.createElement.apply(React'
       result.must_include 'push(React.createElement("p", null, "a"))} else {'
       result.must_include 'push(React.createElement("p", null, "b"))};'
-    end
-
-    it "should insert a span if render method is empty" do
-      result = to_js( 'class Foo<React; def render; end; end' )
-      result.must_include 'return React.createElement("span")'
     end
   end
 
