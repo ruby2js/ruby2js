@@ -2,7 +2,7 @@ gem 'minitest'
 require 'minitest/autorun'
 require 'ruby2js/filter/react'
 require 'ruby2js/filter/functions'
-require 'ruby2js/filter/wunderbar'
+require 'ruby2js/filter/jsx'
 
 describe Ruby2JS::Filter::React do
   
@@ -14,7 +14,7 @@ describe Ruby2JS::Filter::React do
   def to_js6(string)
     _(Ruby2JS.convert(string, eslevel: 2015,
       filters: [Ruby2JS::Filter::React, Ruby2JS::Filter::Functions,
-      Ruby2JS::Filter::Wunderbar], scope: self).to_s)
+      Ruby2JS::Filter::JSX], scope: self).to_s)
   end
   
   describe :createClass do

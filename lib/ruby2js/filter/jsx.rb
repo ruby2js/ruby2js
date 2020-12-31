@@ -1,8 +1,10 @@
 require 'ruby2js'
 
+# Convert Wunderbar syntax to JSX
+
 module Ruby2JS
   module Filter
-    module Wunderbar
+    module JSX
       include SEXP
 
       def on_send(node)
@@ -58,6 +60,6 @@ module Ruby2JS
       end
     end
 
-    DEFAULTS.push Wunderbar
+    DEFAULTS.push JSX
   end
 end

@@ -1,14 +1,14 @@
 gem 'minitest'
 require 'minitest/autorun'
-require 'ruby2js/filter/wunderbar'
+require 'ruby2js/filter/jsx'
 require 'ruby2js/filter/functions'
 require 'ruby2js/filter/react'
 
-describe Ruby2JS::Filter::Wunderbar do
+describe Ruby2JS::Filter::JSX do
   
   def to_js( string)
     _(Ruby2JS.convert(string, eslevel: 2015, 
-      filters: [Ruby2JS::Filter::Wunderbar, Ruby2JS::Filter::Functions]).to_s)
+      filters: [Ruby2JS::Filter::JSX, Ruby2JS::Filter::Functions]).to_s)
   end
   
   describe :jsx do
@@ -77,8 +77,8 @@ describe Ruby2JS::Filter::Wunderbar do
   end
 
   describe Ruby2JS::Filter::DEFAULTS do
-    it "should include Wunderbar" do
-      _(Ruby2JS::Filter::DEFAULTS).must_include Ruby2JS::Filter::Wunderbar
+    it "should include JSX" do
+      _(Ruby2JS::Filter::DEFAULTS).must_include Ruby2JS::Filter::JSX
     end
   end
 end

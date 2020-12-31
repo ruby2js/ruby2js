@@ -88,8 +88,8 @@ module Ruby2JS
         end
 
         if \
-          defined? Ruby2JS::Filter::Wunderbar and
-          filters.include? Ruby2JS::Filter::Wunderbar
+          defined? Ruby2JS::Filter::JSX and
+          filters.include? Ruby2JS::Filter::JSX
         then
           @jsx = true
         end
