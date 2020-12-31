@@ -108,7 +108,7 @@ nav .search-item input {
   }
 }
 bridgetown-search-results {
-  --link-color: #0f5348;
-  --divider-color: #e6e1d7;
-  --text-color: #3e3f3a;
+  --link-color: #{$link};
+  --divider-color: var(--sl-color-gray-200);
+  --text-color: var(--sl-color-gray-700);
 }
