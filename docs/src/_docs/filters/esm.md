@@ -66,7 +66,7 @@ The esm filter also provides a way to specify "autoimports" when you run the
 conversion. It will add the relevant import statements automatically whenever
 a particular class or function name is referenced. These can be either default
 or named exports. Simply provide an `autoimports` hash with one or more keys
-to the `Ruby2JS.convert` method. Examples:
+to the `Ruby2JS.convert` method. (NOTE: use camelCase names, not snake_case.) Examples:
 
 ```ruby
 require "ruby2js/filter/esm"
