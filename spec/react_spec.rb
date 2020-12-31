@@ -210,9 +210,9 @@ describe Ruby2JS::Filter::React do
   end
 
   describe "render method" do
-    it "should wrap multiple elements with a span" do
+    it "should wrap multiple elements with a Fragment" do
       result = to_js( 'class Foo<React; def render; _h1 "a"; _p "b"; end; end' )
-      result.must_include 'return React.createElement("span", null, React'
+      result.must_include 'return React.createElement(React.Fragment, null, React'
       result.must_include ', React.createElement("h1", null, "a"),'
       result.must_include ', React.createElement("p", null, "b"))}})'
     end

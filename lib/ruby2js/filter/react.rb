@@ -62,6 +62,7 @@ module Ruby2JS
 
       ReactAttrMap = Hash[ReactAttrs.map {|name| [name.downcase, name]}]
       ReactAttrMap['for'] = 'htmlFor'
+      ReactFragment = :'_React.Fragment'
 
       def initialize(*args)
         @react = nil
@@ -271,9 +272,9 @@ module Ruby2JS
                   block = [*prolog, s(:return,
                     s(:xnode, '', *process_all(block)))]
                 else
-                  # wrap multi-line blocks with a 'span' element
+                  # wrap multi-line blocks with a React Fragment
                   block = [s(:return,
-                    s(:block, s(:send, nil, :_span), s(:args), *block))]
+                    s(:block, s(:send, nil, ReactFragment), s(:args), *block))]
                 end
               end
 
@@ -860,7 +861,15 @@ module Ruby2JS
         end
 
         # wunderbar style calls
-        if !@jsx and child.children[0] == nil and child.children[1] =~ /^_\w/
+        if child.children[0] == nil and child.children[1] == :_ and \
+          node.children[1].children.empty? and !@jsx
+
+          block = s(:block, s(:send, nil, :proc), s(:args),
+            *node.children[2..-1])
+          return on_send node.children.first.updated(:send,
+            [nil, ReactFragment, block])
+
+        elsif !@jsx and child.children[0] == nil and child.children[1] =~ /^_\w/
           if node.children[1].children.empty?
             # append block as a standalone proc
             block = s(:block, s(:send, nil, :proc), s(:args),

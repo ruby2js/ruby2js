@@ -33,6 +33,12 @@ describe Ruby2JS::Filter::JSX do
       to_js( '_a.b.c.d!' ).must_equal '<a id="d" className="b c"/>'
     end
 
+    it "should handle fragments" do
+      to_js( '_ {_h1; _h2}' ).must_equal '<><h1/><h2/></>'
+      to_js( '_(key: "x"){_h1; _h2}' ).
+        must_equal '<React.Fragment key="x"><h1/><h2/></React.Fragment>'
+    end
+
     it "should handle enclosing markaby style classes and id" do
       to_js( '_a.b.c.d! do _e; end' ).
        must_equal '<a id="d" className="b c"><e/></a>'

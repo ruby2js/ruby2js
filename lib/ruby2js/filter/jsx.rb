@@ -29,7 +29,7 @@ module Ruby2JS
         end
 
         if target == nil and method.to_s.start_with? "_"
-          S(:xnode, *method.to_s[1..-1], *stack, *process_all(attrs))
+          S(:xnode, method.to_s[1..-1], *stack, *process_all(attrs))
         else
           super
         end
@@ -44,8 +44,18 @@ module Ruby2JS
 
         if target == nil and method.to_s.start_with? "_"
           if args.children.empty?
-            # append block as a standalone proc
-            process send.updated(nil, [*send.children, *process_all(block)])
+            if method == :_
+              # Fragment
+              if send.children.length == 2
+                process send.updated(:xnode, ['', *process_all(block)])
+              else
+                process s(:xnode, 'React.Fragment', *send.children[2..-1],
+                  *process_all(block))
+              end
+            else
+              # append block as a standalone proc
+              process send.updated(nil, [*send.children, *process_all(block)])
+            end
           else
             # iterate over Enumerable arguments if there are args present
             send = send.children
