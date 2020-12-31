@@ -1,4 +1,4 @@
-Ruby2js
+Ruby2JS
 =======
 
 Minimal yet extensible Ruby to JavaScript conversion.  
