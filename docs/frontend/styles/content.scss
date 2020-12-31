@@ -1,4 +1,6 @@
 .content {
+  word-break: break-word;
+
   body.post & h3 {
     text-align: center;
     &:not(:first-child) {
