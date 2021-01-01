@@ -1,16 +1,14 @@
 # master
 
-# unreleased
+# 3.6.1 / 2020-12-31
 
+* Bugfix: ensure ActiveFunctions autoimports aren't included multiple times
+* Chained method bugfix in Nokogiri filter
 * continued demo upgrades ([see here](https://intertwingly.net/projects/ruby2js))
     * dropdowns and checkbox updates are applied immediately
     * more options supported and increased test coverage
     * auto launch a browser when --port is specified
 * no need for spread syntax for .max and .min if target is a literal array
-
-# 3.6.1 / 2020-12-31
-
-* Bugfix: ensure ActiveFunctions autoimports aren't included multiple times
 
 # 3.6.0 / 2020-12-26
 
