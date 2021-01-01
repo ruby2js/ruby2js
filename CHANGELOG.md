@@ -8,6 +8,10 @@
     * auto launch a browser when --port is specified
 * no need for spread syntax for .max and .min if target is a literal array
 
+# 3.6.1 / 2020-12-31
+
+* Bugfix: ensure ActiveFunctions autoimports aren't included multiple times
+
 # 3.6.0 / 2020-12-26
 
 * New project logos!
