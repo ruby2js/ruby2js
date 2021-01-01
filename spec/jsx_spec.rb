@@ -50,6 +50,59 @@ describe Ruby2JS::Filter::JSX do
       to_rb( '<><h1/><h2/></>' ).must_equal(
         ['_ do', '_h1', '_h2', 'end'].join("\n"))
     end
+
+    describe "errors" do
+      it "should detect invalid element name" do
+        _(assert_raises {to_rb '<<'}.message).
+          must_equal 'invalid character in element name: "<"'
+      end
+
+      it "should detect invalid character after element close" do
+        _(assert_raises {to_rb '</->'}.message).
+          must_equal 'invalid character in element: "-"'
+      end
+
+      it "should detect invalid character after void element close" do
+        _(assert_raises {to_rb '<a/a>'}.message).
+          must_equal 'invalid character in element: "/"'
+      end
+
+      it "should detect invalid attribute name" do
+        _(assert_raises {to_rb '<a b/>'}.message).
+          must_equal 'invalid character in attribute name: "/"'
+      end
+
+      it "should detect missing attribute value" do
+        _(assert_raises {to_rb '<a b>'}.message).
+          must_equal 'missing "=" after attribute "b" in element "a"'
+      end
+
+      it "should detect missing attribute value quotes" do
+        _(assert_raises {to_rb '<a b=1>'}.message).
+          must_equal 'invalid value for attribute "b" in element "a"'
+      end
+
+      it "should detect unclosed element" do
+        _(assert_raises {to_rb '<a'}.message).
+          must_equal 'unclosed element "a"'
+        _(assert_raises {to_rb '<a b'}.message).
+          must_equal 'unclosed element "a"'
+        _(assert_raises {to_rb '<a b='}.message).
+          must_equal 'unclosed element "a"'
+      end
+
+      it "should detect unclosed string" do
+        _(assert_raises {to_rb '<a b="'}.message).
+          must_equal 'unclosed quote in "a"'
+        _(assert_raises {to_rb "<a b='"}.message).
+          must_equal 'unclosed quote in "a"'
+      end
+
+      it "should detect unclosed value" do
+        _(assert_raises {to_rb '<a b={x'}.message).
+          must_equal 'unclosed value in "a"'
+      end
+    end
   end
 
   describe "ruby/wunderbar to JSX" do

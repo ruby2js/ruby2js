@@ -14,7 +14,15 @@ module Ruby2JS
     attr_name = ''
     attr_value = ''
 
+    backtrace = ''
+
     for c in string.chars
+      if c == "\n"
+        backtrace = ''
+      else
+        backtrace += c
+      end
+
       case state
       when :text
         if c == '<'
@@ -58,7 +66,7 @@ module Ruby2JS
         elsif c =~ /^\w$/
           element += c
         elsif c != ' '
-          raise SyntaxError.new('invalid character in element: "/"')
+          raise SyntaxError.new("invalid character in element: #{c.inspect}")
         end
 
       when :void
@@ -138,13 +146,30 @@ module Ruby2JS
       else
         raise RangeError.new("internal state error in JSX: #{state.inspect}")
       end
+
     end
 
     case state
     when :text
       result << "_ #{text.strip.inspect}\n" unless text.strip.empty?
+
+    when :element, :attr_name, :attr_value
+      raise SyntaxError.new("unclosed element #{element.inspect}")
+
+    when :dquote, :squote
+      raise SyntaxError.new("unclosed quote in #{element.inspect}")
+
+    when :attr_expr
+      raise SyntaxError.new("unclosed value in #{element.inspect}")
+
+    else
+      raise RangeError.new("internal state error in JSX: #{state.inspect}")
     end
 
     result.join("\n")
+
+  rescue => e
+    e.set_backtrace backtrace
+    raise e
   end
 end
