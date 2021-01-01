@@ -1,5 +1,7 @@
 import { blank$, present$, presence$ } from "../src"
 
+// Truthy Tests
+
 test ("blank undefined is true", () => {
   expect(blank$(undefined)).toBeTruthy()
 })
@@ -31,6 +33,12 @@ test ("blank Set is true", () => {
 test ("blank false literal is true", () => {
   expect(blank$(false)).toBeTruthy()
 })
+
+test ("blank NaN is true", () => {
+  expect(blank$(parseInt(""))).toBeTruthy()
+})
+
+// Falsy Tests
 
 test ("blank string value is false", () => {
   expect(blank$("Hello")).toBeFalsy()
@@ -70,6 +78,8 @@ test ("blank true value is false", () => {
   expect(blank$(true)).toBeFalsy()
 })
 
+// Present / Presence Tests
+
 test ("present undefined is false", () => {
   expect(present$({}.nothingHere)).toBeFalsy()
 })
@@ -85,32 +95,3 @@ test ("presence returns null for blank value", () => {
 test ("presence returns value for present value", () => {
   expect(presence$("abc")).toBe("abc")
 })
-
-/*
-
-console.log(blank$("Howdy"))
-console.log(blank$(3.5))
-console.log(blank$([5]))
-console.log(blank$({a: 1}))
-
-const m = new Map()
-m.foo = "bar"
-console.log(blank$(m))
-
-const s = new Set()
-s.add("bar")
-console.log(blank$(s))
-
-class Test {
-}
-
-console.log(blank$(new Test()))
-
-console.log(blank$(true))
-
-console.log("----")
-
-console.log(present$("str"))
-console.log(presence$("str"))
-console.log(presence$(""))
-*/
