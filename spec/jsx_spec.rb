@@ -1,17 +1,58 @@
 gem 'minitest'
 require 'minitest/autorun'
+require 'ruby2js/jsx'
 require 'ruby2js/filter/jsx'
 require 'ruby2js/filter/functions'
 require 'ruby2js/filter/react'
 
+# this spec handles two very different, JSX related transformations:
+#
+# * ruby/JSX to ruby/wunderbar, which is used by both filter/react and
+#   filter/vue to produce an intermediate "pure ruby" version of
+#   ruby intermixed with (X)HTML element syntax, which is subsequently
+#   converted to JS.
+#
+# * ruby/wunderbar to JSX, which is implemented by filter/JSX to enable
+#   a one way syntax conversion of wunderbar style calls to JSX syntax.
+
+
 describe Ruby2JS::Filter::JSX do
   
-  def to_js( string)
+  def to_js(string)
     _(Ruby2JS.convert(string, eslevel: 2015, 
       filters: [Ruby2JS::Filter::JSX, Ruby2JS::Filter::Functions]).to_s)
   end
+
+  def to_rb(string)
+    _(Ruby2JS.jsx2_rb(string))
+  end
   
-  describe :jsx do
+  describe "ruby/JSX to ruby/wunderbar" do
+    it "should handle self enclosed elements" do
+      to_rb( '<br/>' ).must_equal '_br'
+    end
+
+    it "should handle attributes and text" do
+      to_rb( '<a href=".">text</a>' ).must_equal(
+        ['_a href: "." do', '_ "text"', 'end'].join("\n"))
+    end
+
+    it "should handle attributes expressions" do
+      to_rb( '<img src={link}/>' ).must_equal('_img src: link')
+    end
+
+    it "should handle nested valuess" do
+      to_rb( '<div><br/></div>' ).must_equal(
+        ['_div do', '_br', 'end'].join("\n"))
+    end
+
+    it "should handle fragments" do
+      to_rb( '<><h1/><h2/></>' ).must_equal(
+        ['_ do', '_h1', '_h2', 'end'].join("\n"))
+    end
+  end
+
+  describe "ruby/wunderbar to JSX" do
     it "should handle self enclosed values" do
       to_js( '_br' ).must_equal '<br/>'
     end
