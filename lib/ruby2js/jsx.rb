@@ -13,6 +13,7 @@ module Ruby2JS
     attrs = {}
     attr_name = ''
     attr_value = ''
+    tag_stack = []
 
     backtrace = ''
 
@@ -44,6 +45,7 @@ module Ruby2JS
           end
         elsif c == '>'
           result << "_#{element} do"
+          tag_stack << element
           state = :text
           text = ''
         elsif c == ' '
@@ -60,6 +62,14 @@ module Ruby2JS
 
       when :close
         if c == '>'
+          if element == tag_stack.last
+            tag_stack.pop
+          elsif tag_stack.last
+            raise SyntaxError.new("missing close tag for: #{tag_stack.last.inspect}")
+          else
+            raise SyntaxError.new("close tag for element that is not open: #{element}")
+          end
+
           result << 'end'
           state = :text
           text = ''
@@ -97,6 +107,7 @@ module Ruby2JS
               "in element #{element.inspect}")
           elsif c == '>'
             result << "_#{element} #{attrs.map {|name, value| "#{name}: #{value}"}.join(' ')} do"
+            tag_stack << element
             state = :text
             text = ''
           end
@@ -118,18 +129,22 @@ module Ruby2JS
 
       when :dquote
         if c == '"'
-          attrs[attr_name] = attr_value.inspect
+          attrs[attr_name] = '"' + attr_value + '"'
           state = :attr_name
           attr_name = ''
+        elsif c == "\\"
+          attr_value += c + c
         else
           attr_value += c
         end
 
       when :squote
         if c == "'"
-          attrs[attr_name] = attr_value.inspect
+          attrs[attr_name] = "'" + attr_value + "'"
           state = :attr_name
           attr_name = ''
+        elsif c == "\\"
+          attr_value += c + c
         else
           attr_value += c
         end
@@ -146,7 +161,10 @@ module Ruby2JS
       else
         raise RangeError.new("internal state error in JSX: #{state.inspect}")
       end
+    end
 
+    unless tag_stack.empty?
+      raise SyntaxError.new("missing close tag for: #{tag_stack.last.inspect}")
     end
 
     case state

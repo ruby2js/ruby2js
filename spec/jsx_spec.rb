@@ -51,6 +51,15 @@ describe Ruby2JS::Filter::JSX do
         ['_ do', '_h1', '_h2', 'end'].join("\n"))
     end
 
+
+    describe "edge cases" do
+      it "should handle backslashes in attribute values" do
+        # backslashes are not escape characters in HTML context
+        to_rb( '<a b="\\"/>' ).must_equal('_a b: "\\\\"')
+        to_rb( "<a b='\\'/>" ).must_equal("_a b: '\\\\'")
+      end
+    end
+
     describe "errors" do
       it "should detect invalid element name" do
         _(assert_raises {to_rb '<<'}.message).
@@ -65,6 +74,18 @@ describe Ruby2JS::Filter::JSX do
       it "should detect invalid character after void element close" do
         _(assert_raises {to_rb '<a/a>'}.message).
           must_equal 'invalid character in element: "/"'
+      end
+
+      it "should detect an unclosed element" do
+        _(assert_raises {to_rb '<a>'}.message).
+          must_equal 'missing close tag for: "a"'
+        _(assert_raises {to_rb '<a></b>'}.message).
+          must_equal 'missing close tag for: "a"'
+      end
+
+      it "should detect a stray close element" do
+        _(assert_raises {to_rb '</a>'}.message).
+          must_equal 'close tag for element that is not open: a'
       end
 
       it "should detect invalid attribute name" do
