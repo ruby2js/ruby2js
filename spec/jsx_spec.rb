@@ -28,35 +28,44 @@ describe Ruby2JS::Filter::JSX do
   end
   
   describe "ruby/JSX to ruby/wunderbar" do
-    it "should handle self enclosed elements" do
-      to_rb( '<br/>' ).must_equal '_br'
+    describe "tags" do
+      it "should handle self enclosed elements" do
+        to_rb( '<br/>' ).must_equal '_br'
+      end
+
+      it "should handle attributes and text" do
+        to_rb( '<a href=".">text</a>' ).must_equal(
+          ['_a href: "." do', '_ "text"', 'end'].join("\n"))
+      end
+
+      it "should handle attributes expressions" do
+        to_rb( '<img src={link}/>' ).must_equal('_img src: link')
+      end
+
+      it "should handle nested valuess" do
+        to_rb( '<div><br/></div>' ).must_equal(
+          ['_div do', '_br', 'end'].join("\n"))
+      end
+
+      it "should handle fragments" do
+        to_rb( '<><h1/><h2/></>' ).must_equal(
+          ['_ do', '_h1', '_h2', 'end'].join("\n"))
+      end
     end
 
-    it "should handle attributes and text" do
-      to_rb( '<a href=".">text</a>' ).must_equal(
-        ['_a href: "." do', '_ "text"', 'end'].join("\n"))
-    end
-
-    it "should handle attributes expressions" do
-      to_rb( '<img src={link}/>' ).must_equal('_img src: link')
-    end
-
-    it "should handle nested valuess" do
-      to_rb( '<div><br/></div>' ).must_equal(
-        ['_div do', '_br', 'end'].join("\n"))
-    end
-
-    it "should handle fragments" do
-      to_rb( '<><h1/><h2/></>' ).must_equal(
-        ['_ do', '_h1', '_h2', 'end'].join("\n"))
-    end
-
-
-    describe "edge cases" do
+    describe "strings" do
       it "should handle backslashes in attribute values" do
         # backslashes are not escape characters in HTML context
         to_rb( '<a b="\\"/>' ).must_equal('_a b: "\\\\"')
         to_rb( "<a b='\\'/>" ).must_equal("_a b: '\\\\'")
+      end
+    end
+
+    describe "values" do
+      it "should handle strings in attribute values" do
+        # backslashes are not escape characters in HTML context
+        to_rb( '<a b={"{\\"}"}/>' ).must_equal('_a b: "{\"}"')
+        to_rb( "<a b={'{\\'}'}/>" ).must_equal("_a b: '{\\'}'")
       end
     end
 
@@ -122,6 +131,17 @@ describe Ruby2JS::Filter::JSX do
       it "should detect unclosed value" do
         _(assert_raises {to_rb '<a b={x'}.message).
           must_equal 'unclosed value in "a"'
+      end
+
+      it "should detect unclosed value string" do
+        _(assert_raises {to_rb '<a b={"'}.message).
+          must_equal 'unclosed quote in "a"'
+        _(assert_raises {to_rb '<a b={"\\'}.message).
+          must_equal 'unclosed quote in "a"'
+        _(assert_raises {to_rb "<a b={'"}.message).
+          must_equal 'unclosed quote in "a"'
+        _(assert_raises {to_rb "<a b={'\\'"}.message).
+          must_equal 'unclosed quote in "a"'
       end
     end
   end

@@ -27,10 +27,12 @@ module Ruby2JS
       case state
       when :text
         if c == '<'
-          result << "_ #{text.strip.inspect}" unless text.strip.empty?
+          result << "_ \"#{text.strip}\"" unless text.strip.empty?
           state = :element
           element = ''
           attrs = {}
+        elsif text == '\\'
+          text += c + c
         else
           text += c
         end
@@ -156,7 +158,33 @@ module Ruby2JS
           attr_name = ''
         else
           attr_value += c
+          state = :expr_squote if c == "'"
+          state = :expr_dquote if c == '"'
         end
+
+      when :expr_squote
+        attr_value += c
+        if c == "\\"
+          state = :expr_squote_backslash
+        elsif c == "'"
+          state = :attr_expr
+        end
+
+      when :expr_squote_backslash
+        attr_value += c
+        state = :expr_squote
+
+      when :expr_dquote
+        attr_value += c
+        if c == "\\"
+          state = :expr_dquote_backslash
+        elsif c == '"'
+          state = :attr_expr
+        end
+
+      when :expr_dquote_backslash
+        attr_value += c
+        state = :expr_dquote
 
       else
         raise RangeError.new("internal state error in JSX: #{state.inspect}")
@@ -174,7 +202,8 @@ module Ruby2JS
     when :element, :attr_name, :attr_value
       raise SyntaxError.new("unclosed element #{element.inspect}")
 
-    when :dquote, :squote
+    when :dquote, :squote, :expr_dquote, :expr_dquote_backslash, 
+      :expr_squote, :expr_squote_backslash
       raise SyntaxError.new("unclosed quote in #{element.inspect}")
 
     when :attr_expr
@@ -186,7 +215,7 @@ module Ruby2JS
 
     result.join("\n")
 
-  rescue => e
+  rescue SyntaxError => e
     e.set_backtrace backtrace
     raise e
   end
