@@ -7,6 +7,7 @@ module Ruby2JS
 
       def on_send(node)
         target, method, *args = node.children
+        return super unless args.empty?
 
         if es2015 and method == :blank?
           create_or_update_import("blank$")
