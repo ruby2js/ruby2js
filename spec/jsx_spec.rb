@@ -53,19 +53,38 @@ describe Ruby2JS::Filter::JSX do
       end
     end
 
-    describe "strings" do
+    describe "text and strings" do
       it "should handle backslashes in attribute values" do
         # backslashes are not escape characters in HTML context
         to_rb( '<a b="\\"/>' ).must_equal('_a b: "\\\\"')
         to_rb( "<a b='\\'/>" ).must_equal("_a b: '\\\\'")
       end
+
+      it "should handle backslashes in text" do
+        to_rb( 'a\\b' ).must_equal('_ "a\\\\b"')
+      end
+
+      it "should handle mixed text" do
+        to_rb( 'before <p> line 1 <br/> line 2 </p> after' ).must_equal(
+          ['_ "before"', '_p do', '_ "line 1"', '_br',
+          '_ "line 2"', 'end', '_ "after"'].join("\n"))
+      end
     end
 
     describe "values" do
+      it "should handle expressions in text" do
+        to_rb( 'hello {name}!' ).must_equal(
+          ['_ "hello "', '_ name', '_ "!"'].join("\n"))
+      end
+      
       it "should handle strings in attribute values" do
         # backslashes are not escape characters in HTML context
         to_rb( '<a b={"{\\"}"}/>' ).must_equal('_a b: "{\"}"')
         to_rb( "<a b={'{\\'}'}/>" ).must_equal("_a b: '{\\'}'")
+      end
+      
+      it "should handle interpolated strings" do
+        to_rb( '<a b={"d#{"e"}f"}/>' ).must_equal('_a b: "d#{"e"}f"')
       end
     end
 
@@ -130,7 +149,9 @@ describe Ruby2JS::Filter::JSX do
 
       it "should detect unclosed value" do
         _(assert_raises {to_rb '<a b={x'}.message).
-          must_equal 'unclosed value in "a"'
+          must_equal 'unclosed value for attribute "b" in element "a"'
+        _(assert_raises {to_rb '{x'}.message).
+          must_equal 'unclosed value in text'
       end
 
       it "should detect unclosed value string" do
