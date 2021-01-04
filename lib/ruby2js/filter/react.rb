@@ -17,6 +17,7 @@
 #  * ~"x" becomes document.querySelector("x")
 #
 require 'ruby2js'
+require 'ruby2js/jsx'
 
 module Ruby2JS
   module Filter
@@ -225,6 +226,7 @@ module Ruby2JS
               # peel off the initial set of instance variable assignment stmts
               assigns = []
               block = block.dup
+              block.shift if block.first == s(:zsuper)
               while not block.empty? and block.first.type == :ivasgn
                 node = block.shift
                 vars = [node.children.first]
@@ -243,7 +245,7 @@ module Ruby2JS
 
               # modify block to build and/or return state
               if mname == :initialize
-                block.unshift(s(:send, s(:self), :state=, state))
+                block.unshift(s(:zsuper), s(:send, s(:self), :state=, state))
               elsif block.empty?
                 block = [s(:return, state)]
               else
@@ -370,7 +372,8 @@ module Ruby2JS
           # enable React filtering within React class method calls or
           # React component calls
           if \
-            node.children.first == s(:const, nil, :React)
+            node.children.first == s(:const, nil, :React) or
+            node.children.first == s(:const, nil, :ReactDOM)
           then
 
             begin
@@ -1191,6 +1194,16 @@ module Ruby2JS
         end
 
         block
+      end
+
+      def on_xstr(node)
+       loc = node.loc
+       return super unless loc
+       source = loc.begin.source_buffer.source
+       source = source[loc.begin.end_pos...loc.end.begin_pos].strip
+       return super unless @reactClass or source.start_with? '<'
+       source = Ruby2JS.jsx2_rb(source)
+       process Ruby2JS.parse(source).first
       end
     end
 

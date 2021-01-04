@@ -447,13 +447,13 @@ describe Ruby2JS::Filter::React do
 
   describe 'react calls' do
     it 'should create elements' do
-      to_js( 'React.render _Element, document.getElementById("sidebar")' ).
+      to_js( 'ReactDOM.render _Element, document.getElementById("sidebar")' ).
         must_include 'React.createElement(Element)'
     end
 
     it 'should substitute scope instance variables / props' do
       @data = 5
-      to_js( "React.render _Element(data: @data),
+      to_js( "ReactDOM.render _Element(data: @data),
         document.getElementById('sidebar')" ).
         must_include 'React.createElement(Element, {data: 5})'
     end
@@ -521,7 +521,7 @@ describe Ruby2JS::Filter::React do
 
     it "should handle contructors" do
       to_js6( 'class Foo<React; def initialize; @x=1; end; end' ).
-        must_include 'constructor() {this.state = {x: 1}}'
+        must_include 'constructor() {super(); this.state = {x: 1}}'
     end
 
     it "should handle static properties" do
