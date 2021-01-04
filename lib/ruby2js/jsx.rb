@@ -20,12 +20,12 @@ module Ruby2JS
       @attr_name = ''
       @value = ''
       @tag_stack = []
-      @expr_stack = []
       @expr_nesting = 0
-      @expr_element = false
+      @wrap_value = true
     end
 
-    def parse(state = :text)
+    def parse(state = :text, wrap_value = true)
+      @wrap_value = wrap_value
       @state = state
       backtrace = ''
       prev = nil
@@ -56,9 +56,8 @@ module Ruby2JS
             @text += c + c
           elsif c == '{'
             @result << "_ \"#{@text}\"" unless @text.empty?
+            @result += parse_expr
             @text = ''
-            @expr_stack.push [@state, '', @attrs]
-            @state = :expr
           else
             @text += c
           end
@@ -149,8 +148,9 @@ module Ruby2JS
           elsif c == "'"
             @state = :squote
           elsif c == '{'
-            @expr_stack.push [@state, @attr_name, @attrs]
-            @state = :expr
+            @attrs[@attr_name] = parse_value
+            @state = :attr_name
+            @attr_name = ''
           else
             raise SyntaxError.new("invalid value for attribute #{@attr_name.inspect} " +
               "in element #{@element.inspect}")
@@ -184,18 +184,8 @@ module Ruby2JS
               @value += c
               @expr_nesting -= 1
             else
-              @state, @attr_name, @attrs = @expr_stack.pop
-              if @state == :attr_value
-                @attrs[@attr_name] = @value
-                @state = :attr_name
-                @attr_name = ''
-              elsif @state == :text
-                @result << (@expr_element ? @value : "_ #{@value}")
-              elsif @state == :expr_dquote_hash
-                @value += c
-              else
-                raise RangeError.new("internal state error in JSX: #{@state.inspect}")
-              end
+              @result << (@wrap_value ? "_ #{@value}" : @value)
+              return @result
             end
           elsif c == '<'
             if prev =~ /[\w\)\]\}]/
@@ -203,7 +193,7 @@ module Ruby2JS
             elsif prev == ' '
               if @stream.peek =~ /[a-zA-Z]/
                 @value += parse_element.join(';')
-                @expr_element = true
+                @wrap_value = false
               else
                 @value += c
               end
@@ -245,12 +235,8 @@ module Ruby2JS
 
         when :expr_dquote_hash
           @value += c
-          if c == '{'
-            @expr_stack.push [@state, '', @attrs]
-            @state = :expr
-          else
-            @state = :expr_dquote
-          end
+          @value += parse_value + '}' if c == '{'
+          @state = :expr_dquote
 
         else
           raise RangeError.new("internal state error in JSX: #{@state.inspect}")
@@ -272,16 +258,10 @@ module Ruby2JS
 
       when :dquote, :squote, :expr_dquote, :expr_dquote_backslash, 
         :expr_squote, :expr_squote_backslash
-        raise SyntaxError.new("unclosed quote in #{@element.inspect}")
+        raise SyntaxError.new("unclosed quote")
 
       when :expr
-        @state, @attr_name, @attrs = @expr_stack.pop
-        if @state == :attr_value
-          raise SyntaxError.new("unclosed value for attribute #{@attr_name.inspect} " +
-            "in element #{@element.inspect}")
-        else
-          raise SyntaxError.new("unclosed value in text")
-        end
+        raise SyntaxError.new("unclosed value")
 
       else
         raise RangeError.new("internal state error in JSX: #{@state.inspect}")
@@ -294,6 +274,14 @@ module Ruby2JS
     end
 
     private
+
+    def parse_value
+      self.class.new(@stream).parse(:expr, false).join(',')
+    end
+
+    def parse_expr
+      self.class.new(@stream).parse(:expr, true)
+    end
 
     def parse_element
       self.class.new(@stream).parse(:element)

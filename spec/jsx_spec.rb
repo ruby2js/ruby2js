@@ -149,27 +149,27 @@ describe Ruby2JS::Filter::JSX do
 
       it "should detect unclosed string" do
         _(assert_raises {to_rb '<a b="'}.message).
-          must_equal 'unclosed quote in "a"'
+          must_equal 'unclosed quote'
         _(assert_raises {to_rb "<a b='"}.message).
-          must_equal 'unclosed quote in "a"'
+          must_equal 'unclosed quote'
       end
 
       it "should detect unclosed value" do
         _(assert_raises {to_rb '<a b={x'}.message).
-          must_equal 'unclosed value for attribute "b" in element "a"'
+          must_equal 'unclosed value'
         _(assert_raises {to_rb '{x'}.message).
-          must_equal 'unclosed value in text'
+          must_equal 'unclosed value'
       end
 
       it "should detect unclosed value string" do
         _(assert_raises {to_rb '<a b={"'}.message).
-          must_equal 'unclosed quote in "a"'
+          must_equal 'unclosed quote'
         _(assert_raises {to_rb '<a b={"\\'}.message).
-          must_equal 'unclosed quote in "a"'
+          must_equal 'unclosed quote'
         _(assert_raises {to_rb "<a b={'"}.message).
-          must_equal 'unclosed quote in "a"'
+          must_equal 'unclosed quote'
         _(assert_raises {to_rb "<a b={'\\'"}.message).
-          must_equal 'unclosed quote in "a"'
+          must_equal 'unclosed quote'
       end
     end
   end
