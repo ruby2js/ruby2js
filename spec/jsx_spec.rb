@@ -86,6 +86,13 @@ describe Ruby2JS::Filter::JSX do
       it "should handle interpolated strings" do
         to_rb( '<a b={"d#{"e"}f"}/>' ).must_equal('_a b: "d#{"e"}f"')
       end
+      
+      it "should handle elements in expressions" do
+        to_rb( '{a && <a/>}' ).must_equal('a && _a')
+        to_rb( '{a>b ? <a/> : <b/>}' ).must_equal('a>b ? _a : _b')
+        to_rb( '{list.map {|item| <li>{item}</li>}}' ).
+          must_equal('list.map {|item| _li do;_ item;end}')
+      end
     end
 
     describe "errors" do
