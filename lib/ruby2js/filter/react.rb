@@ -637,6 +637,9 @@ module Ruby2JS
               next true if arg.children[1] == :createElement and
                 arg.children[0] == s(:const, nil, :Vue)
 
+              # JSX
+              next true if arg.type == :xstr
+
               # wunderbar style call
               arg = arg.children.first if arg.type == :block
               while arg.type == :send and arg.children.first != nil
@@ -649,7 +652,19 @@ module Ruby2JS
               if simple
                 # in the normal case, process each argument
                 reactApply, @reactApply = @reactApply, false
-                params += args.map {|arg| process(arg)}
+                args.each do |arg|
+                  arg = process(arg)
+                  if arg.type == :send and 
+                    arg.children[0] == s(:const, nil, :React) and
+                    arg.children[1] == :createElement and
+                    arg.children[2] == s(:const, nil, "React.Fragment") and
+                    arg.children[3] == s(:nil) 
+                  then
+                    params += arg.children[4..-1]
+                  else
+                    params << arg
+                  end
+                end
               else
                 reactApply, @reactApply = @reactApply, true
 
