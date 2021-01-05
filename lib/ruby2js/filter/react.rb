@@ -476,6 +476,10 @@ module Ruby2JS
               # :block arguments are inserted by on_block logic below
               block = child
 
+            elsif child.type == :splat
+              # arrays need not be expanded
+              text = child.children.first
+
             else
               # everything else added as text
               text = child
@@ -926,9 +930,18 @@ module Ruby2JS
             # iterate over Enumerable arguments if there are args present
             send = node.children.first.children
             return super if send.length < 3
-            return process s(:block, s(:send, *send[0..1], *send[3..-1]),
-              s(:args), s(:block, s(:send, send[2], :forEach),
-              *node.children[1..-1]))
+            if node.children.length == 3 and
+              node.children.last.respond_to? :type and
+              node.children.last.type == :send
+
+              return process s(:send, *send[0..1], *send[3..-1],
+                s(:splat, s(:block, s(:send, send[2], :map),
+                node.children[1], s(:return, node.children[2]))))
+            else
+              return process s(:block, s(:send, *send[0..1], *send[3..-1]),
+                s(:args), s(:block, s(:send, send[2], :forEach),
+                *node.children[1..-1]))
+            end
           end
         end
 

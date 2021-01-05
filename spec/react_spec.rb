@@ -160,25 +160,45 @@ describe Ruby2JS::Filter::React do
     end
 
     it "should iterate" do
+      # single element each iteration
       result = to_js('class Foo<React; def render; _ul list ' + 
         'do |i| _li i; end; end; end')
 
+      result.must_include 'React.createElement("ul", null,'
+      result.must_include 'list.map(function(i) {'
+      result.must_include 'return React.createElement("li", null, i)'
+
+      # multiple elements each iteration
+      result = to_js('class Foo<React; def render; _dl list ' + 
+        'do |i| _dt i.term; _dd i.defn; end; end; end')
+
       result.must_include 'React.createElement.apply(React, function() {'
-      result.must_include 'var $_ = ["ul", null];'
+      result.must_include 'var $_ = ["dl", null];'
       result.must_include 'list.forEach(function(i)'
-      result.must_include '{$_.push(React.createElement("li", null, i))}'
+      result.must_include '$_.push(React.createElement("dt", null, i.term))'
+      result.must_include '$_.push(React.createElement("dd", null, i.defn))'
       result.must_include 'return $_'
       result.must_include '}())'
     end
 
     it "should iterate with markaby style classes/ids" do
+      # single element each iteration
       result = to_js('class Foo<React; def render; _ul.todos list ' + 
         'do |i| _li i; end; end; end')
 
+      result.must_include 'React.createElement("ul", {className: "todos"},'
+      result.must_include 'list.map(function(i) {'
+      result.must_include 'return React.createElement("li", null, i)'
+
+      # multiple elements each iteration
+      result = to_js('class Foo<React; def render; _dl.terms list ' + 
+        'do |i| _dt i.term; _dd i.defn; end; end; end')
+
       result.must_include 'React.createElement.apply(React, function() {'
-      result.must_include 'var $_ = ["ul", {className: "todos"}];'
+      result.must_include 'var $_ = ["dl", {className: "terms"}];'
       result.must_include 'list.forEach(function(i)'
-      result.must_include '{$_.push(React.createElement("li", null, i))}'
+      result.must_include '$_.push(React.createElement("dt", null, i.term))'
+      result.must_include '$_.push(React.createElement("dd", null, i.defn))'
       result.must_include 'return $_'
       result.must_include '}())'
     end
