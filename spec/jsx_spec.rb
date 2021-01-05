@@ -35,11 +35,11 @@ describe Ruby2JS::Filter::JSX do
 
       it "should handle attributes and text" do
         to_rb( '<a href=".">text</a>' ).must_equal(
-          ['_a href: "." do', '_ "text"', 'end'].join("\n"))
+          ['_a(href: ".") do', '_("text")', 'end'].join("\n"))
       end
 
       it "should handle attributes expressions" do
-        to_rb( '<img src={link}/>' ).must_equal('_img src: link')
+        to_rb( '<img src={link}/>' ).must_equal('_img(src: link)')
       end
 
       it "should handle nested valuess" do
@@ -56,42 +56,43 @@ describe Ruby2JS::Filter::JSX do
     describe "text and strings" do
       it "should handle backslashes in attribute values" do
         # backslashes are not escape characters in HTML context
-        to_rb( '<a b="\\"/>' ).must_equal('_a b: "\\\\"')
-        to_rb( "<a b='\\'/>" ).must_equal("_a b: '\\\\'")
+        to_rb( '<a b="\\"/>' ).must_equal('_a(b: "\\\\")')
+        to_rb( "<a b='\\'/>" ).must_equal("_a(b: '\\\\')")
       end
 
       it "should handle backslashes in text" do
-        to_rb( 'a\\b' ).must_equal('_ "a\\\\b"')
+        to_rb( 'a\\b' ).must_equal('_("a\\\\b")')
       end
 
       it "should handle mixed text" do
         to_rb( 'before <p> line 1 <br/> line 2 </p> after' ).must_equal(
-          ['_ "before"', '_p do', '_ "line 1"', '_br',
-          '_ "line 2"', 'end', '_ "after"'].join("\n"))
+          ['_("before")', '_p do', '_("line 1")', '_br',
+          '_("line 2")', 'end', '_("after")'].join("\n"))
       end
     end
 
     describe "values" do
       it "should handle expressions in text" do
         to_rb( 'hello {name}!' ).must_equal(
-          ['_ "hello "', '_ name', '_ "!"'].join("\n"))
+          ['_("hello ")', '_(name)', '_("!")'].join("\n"))
       end
       
       it "should handle strings in attribute values" do
         # backslashes are not escape characters in HTML context
-        to_rb( '<a b={"{\\"}"}/>' ).must_equal('_a b: "{\"}"')
-        to_rb( "<a b={'{\\'}'}/>" ).must_equal("_a b: '{\\'}'")
+        to_rb( '<a b={"{\\"}"}/>' ).must_equal('_a(b: "{\"}")')
+        to_rb( "<a b={'{\\'}'}/>" ).must_equal("_a(b: '{\\'}')")
       end
       
       it "should handle interpolated strings" do
-        to_rb( '<a b={"d#{"e"}f"}/>' ).must_equal('_a b: "d#{"e"}f"')
+        to_rb( '<a b={"d#{"e"}f"}/>' ).must_equal('_a(b: "d#{"e"}f")')
       end
       
       it "should handle elements in expressions" do
         to_rb( '{a && <a/>}' ).must_equal('a && _a')
+        to_rb( '{a && <a href="."/>}' ).must_equal('a && _a(href: ".")')
         to_rb( '{a>b ? <a/> : <b/>}' ).must_equal('a>b ? _a : _b')
         to_rb( '{list.map {|item| <li>{item}</li>}}' ).
-          must_equal('list.map {|item| _li do;_ item;end}')
+          must_equal('list.map {|item| _li do;_(item);end}')
       end
     end
 

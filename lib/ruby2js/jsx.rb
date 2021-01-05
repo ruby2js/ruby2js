@@ -42,7 +42,7 @@ module Ruby2JS
         case @state
         when :text
           if c == '<'
-            @result << "_ \"#{@text.strip}\"" unless @text.strip.empty?
+            @result << "_(\"#{@text.strip}\")" unless @text.strip.empty?
             if @tag_stack.empty?
               @result += self.class.new(@stream).parse(:element)
               @state = :text
@@ -55,7 +55,7 @@ module Ruby2JS
           elsif c == '\\'
             @text += c + c
           elsif c == '{'
-            @result << "_ \"#{@text}\"" unless @text.empty?
+            @result << "_(\"#{@text}\")" unless @text.empty?
             @result += parse_expr
             @text = ''
           else
@@ -110,7 +110,7 @@ module Ruby2JS
             if @attrs.empty?
               @result << "_#{@element}"
             else
-              @result << "_#{@element} #{@attrs.map {|name, value| "#{name}: #{value}"}.join(' ')}"
+              @result << "_#{@element}(#{@attrs.map {|name, value| "#{name}: #{value}"}.join(' ')})"
             end
             return @result if @tag_stack.empty?
 
@@ -133,7 +133,7 @@ module Ruby2JS
               raise SyntaxError.new("missing \"=\" after attribute #{@attr_name.inspect} " +
                 "in element #{@element.inspect}")
             elsif c == '>'
-              @result << "_#{@element} #{@attrs.map {|name, value| "#{name}: #{value}"}.join(' ')} do"
+              @result << "_#{@element}(#{@attrs.map {|name, value| "#{name}: #{value}"}.join(' ')}) do"
               @tag_stack << @element
               @state = :text
               @text = ''
@@ -184,7 +184,7 @@ module Ruby2JS
               @value += c
               @expr_nesting -= 1
             else
-              @result << (@wrap_value ? "_ #{@value}" : @value)
+              @result << (@wrap_value ? "_(#{@value})" : @value)
               return @result
             end
           elsif c == '<'
@@ -251,7 +251,7 @@ module Ruby2JS
 
       case @state
       when :text
-        @result << "_ \"#{@text.strip}\"" unless @text.strip.empty?
+        @result << "_(\"#{@text.strip}\")" unless @text.strip.empty?
 
       when :element, :attr_name, :attr_value
         raise SyntaxError.new("unclosed element #{@element.inspect}")
