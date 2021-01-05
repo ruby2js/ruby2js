@@ -59,7 +59,7 @@ module Ruby2JS
             @result += parse_expr
             @text = ''
           else
-            @text += c
+            @text += c unless @text.empty? and c =~ /\s/
           end
 
         when :element
@@ -128,7 +128,7 @@ module Ruby2JS
             @value = ''
           elsif c == '/' and @attr_name == ''
             @state = :void
-          elsif c == ' ' or c == '>'
+          elsif c == ' ' or c == "\n" or c == '>'
             if not @attr_name.empty?
               raise SyntaxError.new("missing \"=\" after attribute #{@attr_name.inspect} " +
                 "in element #{@element.inspect}")
@@ -199,6 +199,7 @@ module Ruby2JS
               end
             else
               @value += parse_element.join(';')
+              @wrap_value = false
             end
           else
             @value += c
