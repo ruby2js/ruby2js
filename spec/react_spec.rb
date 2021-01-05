@@ -209,6 +209,14 @@ describe Ruby2JS::Filter::React do
     end
   end
 
+  describe "JSX" do
+    it "should wrap list" do
+      to_js( 'class Foo<React; def render; %x{<p/><p/>}; end; end' ).
+        must_include 'React.createElement(React.Fragment, null, ' + 
+          'React.createElement("p"), React.createElement("p"))'
+    end
+  end
+
   describe "render method" do
     it "should wrap multiple elements with a Fragment" do
       result = to_js( 'class Foo<React; def render; _h1 "a"; _p "b"; end; end' )
