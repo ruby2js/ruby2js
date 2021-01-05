@@ -223,6 +223,18 @@ module Ruby2JS
                 end
               end
 
+              # add props argument if there is a reference to a prop
+              if args.children.length == 0
+                has_cvar = lambda {|list|
+                  list.any? {|node|
+                    next unless Parser::AST::Node === node
+                    return true if node.type == :cvar
+                    has_cvar.call(node.children)
+                  }
+                }
+                args = s(:args, s(:arg, 'prop$')) if has_cvar[block]
+              end
+
               # peel off the initial set of instance variable assignment stmts
               assigns = []
               block = block.dup

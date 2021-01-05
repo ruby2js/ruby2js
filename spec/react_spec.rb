@@ -532,6 +532,11 @@ describe Ruby2JS::Filter::React do
         must_include 'constructor() {super(); this.state = {x: 1}}'
     end
 
+    it "should add props arg to contructors if needed" do
+      to_js6( 'class Foo<React; def initialize; @x=@@y; end; end' ).
+        must_include 'constructor(prop$) {super(prop$); this.state = {x: this.props.y}}'
+    end
+
     it "should handle static properties" do
       to_js6( 'class Foo<React; def self.one; 1; end; end' ).
         must_include 'static one() {return 1}'
