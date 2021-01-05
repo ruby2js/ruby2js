@@ -38,6 +38,12 @@ describe Ruby2JS::Filter::React do
         must_include 'getInitialState: function() {return {}}'
     end
 
+    it "should autobind event handlers" do
+      to_js( 'class Foo<React; def render; _a onClick: handleClick; end; ' + 
+        'def handleClick(event); end; end' ).
+        must_include 'this.handleClick = this.handleClick.bind(this)'
+    end
+
     it "should initialize, accumulate, and return state" do
       to_js( 'class Foo<React; def initialize; @a=1; b=2; @b = b; end; end' ).
         must_include 'getInitialState: function() {this.state = {a: 1}; ' +

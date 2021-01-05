@@ -108,6 +108,7 @@ module Ruby2JS
         return super unless cname.children.first == nil
         return super unless inheritance == s(:const, nil, :React) or
           inheritance == s(:const, nil, :Vue) or
+          inheritance == s(:const, s(:const, nil, :React), :Component) or
           inheritance == s(:send, s(:const, nil, :React), :Component)
 
         # traverse down to actual list of class statements
@@ -177,15 +178,37 @@ module Ruby2JS
             end
           end
 
+          # determine which instance methods need binding
+          needs_binding = []
+          scan_events = lambda do |list|
+            list.each do |node|
+              next unless Parser::AST::Node === node
+              node = process node if node.type == :xstr
+              if node.type == :hash
+                node.children.each do |pair|
+                  value = pair.children.last
+                  if value.type == :send and \
+                    @react_methods.include? value.children[1] and \
+                    [nil, s(:self), s(:send, nil, :this)].include? value.children[0]
+
+                    needs_binding << value.children[1]
+                  end
+                end
+              end
+              scan_events[node.children]
+            end
+          end
+          scan_events[body]
+
           # append statics (if any)
           unless statics.empty?
             pairs << s(:pair, s(:sym, :statics), s(:hash, *statics))
           end
 
           # create a default getInitialState method if there is no such method
-          # and there are references to instance variables.
+          # and there are either references to instance variables or there are
+          # methods that need to be bound.
           if \
-            not es2015 and
             not body.any? do |child|
               child.type == :def and
               [:getInitialState, :initialize].include? child.children.first
@@ -193,9 +216,11 @@ module Ruby2JS
           then
             @reactIvars = {pre: [], post: [], asgn: [], ref: [], cond: []}
             react_walk(node)
-            unless @reactIvars.values.flatten.empty?
+            if not es2015 and not @reactIvars.values.flatten.empty?
               body = [s(:def, :getInitialState, s(:args),
                 s(:return, s(:hash))), *body]
+            elsif not needs_binding.empty? or not @reactIvars.values.flatten.empty?
+              body = [s(:def, :initialize, s(:args)), *body]
             end
           end
 
@@ -254,6 +279,12 @@ module Ruby2JS
               # build a hash for state
               state = s(:hash, *assigns.map {|anode| s(:pair, s(:str,
                 anode.children.first.to_s[1..-1]), anode.children.last)})
+
+              # bind methods as needed
+              needs_binding.each do |method|
+                block.push(s(:send, s(:self), "#{method}=",
+                  s(:send, s(:attr, s(:self), method), :bind, s(:self))))
+              end
 
               # modify block to build and/or return state
               if mname == :initialize
