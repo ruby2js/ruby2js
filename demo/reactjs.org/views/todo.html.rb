@@ -41,6 +41,6 @@ _html do
     ReactDOM.render(
       _TodoApp,
       document.getElementById('todos-example')
-    );
+    )
   end
 end

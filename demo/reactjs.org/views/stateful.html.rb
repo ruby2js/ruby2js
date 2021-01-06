@@ -7,35 +7,31 @@ _html do
   _script crossorigin: true, src: "https://unpkg.com/react-dom@17/umd/react-dom.development.js"
 
   _script do
-		class Timer < React
-			def initialize
-				@seconds = 0
-			end
+    class Timer < React
+      def initialize
+        @seconds = 0
+      end
 
-			def tick()
+      def tick()
         @seconds += 1
-			end
+      end
 
-			def componentDidMount()
-				self.interval = setInterval(1000) {tick()}
-			end
+      def componentDidMount()
+        self.interval = setInterval(1000) {tick()}
+      end
 
-			def componentWillUnmount()
-				clearInterval(self.interval)
-			end
+      def componentWillUnmount()
+        clearInterval(self.interval)
+      end
 
-			def render
-				%x{
-					<div>
-						Seconds: {@seconds}
-					</div>
-				}
-			end
-		end
+      def render
+        React.createElement 'div', nil, 'Seconds: ', @seconds
+      end
+    end
 
-		ReactDOM.render(
-			%x(<Timer />),
-			document.getElementById('timer-example')
-		);
+    ReactDOM.render(
+      React.createElement(Timer, nil),
+      document.getElementById('timer-example')
+    )
   end
 end

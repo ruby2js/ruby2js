@@ -13,7 +13,9 @@ _html do
   _p! do
     _ 'The following demos are based on examples from '
     _a 'reactjs.org', href: 'https://reactjs.org'
-    _ '.'
+    _ '.  See the online '
+    _a 'documentation', href: 'https://www.ruby2js.com/docs/filters/react'
+    _ ' for an explanation of each demo.'
   end
 
   __

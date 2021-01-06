@@ -20,6 +20,6 @@ _html do
     ReactDOM.render(
       %x(<HelloMessage name="Taylor" />),
       document.getElementById('hello-example')
-    );
+    )
   end
 end
