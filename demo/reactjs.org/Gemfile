@@ -1,0 +1,5 @@
+source 'https://rubygems.org'
+
+gem 'ruby2js', path: File.expand_path('../..')
+gem 'wunderbar'
+gem 'sinatra'
