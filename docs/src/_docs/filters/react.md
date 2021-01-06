@@ -110,7 +110,7 @@ ReactDOM.render(
 
 Statement by statement:
 
- * For convienience, this filter will conver classes that inherit simply from
+ * For convenience, this filter will convert classes that inherit simply from
    `React` as well as `React::Component` to React components. 
 
  * JavaScript `constructor` becomes Ruby's `initialize`.  Calling defining
@@ -308,10 +308,6 @@ There is not a whole lot new in this example:
 
  * `getRawMarkup` returns a Ruby hash/JavaScript object, and is invoked via
    `getRawMarkup()`.
-
-
-
-
 
 
 {% rendercontent "docs/note", extra_margin: true %}
