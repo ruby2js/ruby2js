@@ -31,7 +31,7 @@ _html do
           defaultValue: @value
 
         _h3 "Output"
-        _div.content dangerouslySetInnerHTML: getRawMarkup()
+        _div.content dangerouslySetInnerHTML: getRawMarkup
       end
     end
 

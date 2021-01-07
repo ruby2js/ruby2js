@@ -279,7 +279,7 @@ class MarkdownEditor < React
       defaultValue: @value
 
     _h3 "Output"
-    _div.content dangerouslySetInnerHTML: getRawMarkup()
+    _div.content dangerouslySetInnerHTML: getRawMarkup
   end
 end
 
@@ -307,7 +307,7 @@ There is not a whole lot new in this example:
    for more details.
 
  * `getRawMarkup` returns a Ruby hash/JavaScript object, and is invoked via
-   `getRawMarkup()`.
+   `getRawMarkup` (i.e., no `this.` nor `()`).
 
 
 {% rendercontent "docs/note", extra_margin: true %}

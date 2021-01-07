@@ -146,7 +146,7 @@ module Ruby2JS
             end
           end
 
-          if m.type == :def || m.type == :async
+          if m.type == :def || m.type == :defm || m.type == :async
             @prop = m.children.first
 
             if @prop == :initialize

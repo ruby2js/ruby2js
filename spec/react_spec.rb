@@ -567,6 +567,24 @@ describe Ruby2JS::Filter::React do
       to_js6( 'class Foo<React; def self.one; 1; end; end' ).
         must_include 'static one() {return 1}'
     end
+
+    it "should handle calls to getters" do
+      result = to_js6( 'class Foo<React; def a(); console.log b; end; def b; end; end' )
+      result.must_include 'get b() {'
+      result.must_include 'console.log(this.b)'
+    end
+
+    it "should handle calls to setters" do
+      result = to_js6( 'class Foo<React; def a(); b=1; end; def b=(b); @b=b; end; end' )
+      result.must_include 'set b(b) {'
+      result.must_include 'this.b = 1'
+    end
+
+    it "should not treat lifecycle methods as getters" do
+      result = to_js6( 'class Foo<React; def render; _br; end; end' )
+      result.must_include 'render() {'
+      result.wont_include 'get render() {'
+    end
   end
 
   describe "wunderbar filter/JSX integration" do

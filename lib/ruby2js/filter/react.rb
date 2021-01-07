@@ -61,6 +61,10 @@ module Ruby2JS
       xlinkActuate xlinkArcrole xlinkHref xlinkRole xlinkShow xlinkTitle
       xlinkType xmlBase xmlLang xmlSpace)
 
+      ReactLifecycle = %w(render componentDidMount shouldComponentUpdate
+      getShapshotBeforeUpdate componentDidUpdate componentWillUnmount
+      componentDidCatch)
+
       ReactAttrMap = Hash[ReactAttrs.map {|name| [name.downcase, name]}]
       ReactAttrMap['for'] = 'htmlFor'
       ReactFragment = :'_React.Fragment'
@@ -346,7 +350,10 @@ module Ruby2JS
             end
 
             if es2015
-              pairs << s(:def, mname, args,  process(s(type, *block)))
+              pairs << child.updated(
+                ReactLifecycle.include?(mname.to_s) ? :defm : :def, 
+                [mname, args, process(s(type, *block))]
+              )
             else
               pairs << s(:pair, s(:sym, mname), child.updated(:block,
                 [s(:send, nil, :proc), args, process(s(type, *block))]))
@@ -966,6 +973,13 @@ module Ruby2JS
         ensure
           @reactBlock = reactBlock
         end
+      end
+
+      def on_lvasgn(node)
+        return super unless @reactClass
+        return super unless @react_props.include? node.children.first
+        node.updated(:send, [s(:self), "#{node.children.first}=",
+          node.children.last])
       end
 
       # convert global variables to refs
