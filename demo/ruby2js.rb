@@ -279,7 +279,7 @@ else
     }
 
     _div.container.narrow_container do
-      _a href: 'https://github.com/rubys/ruby2js#ruby2js' do
+      _a href: 'https://www.ruby2js.com/docs/' do
         _ruby2js_logo
         _ 'Ruby2JS'
       end
