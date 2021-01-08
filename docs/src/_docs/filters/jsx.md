@@ -1,6 +1,6 @@
 ---
 order: 16
-title: jsx
+title: JSX
 top_section: Filters
 category: jsx
 ---
