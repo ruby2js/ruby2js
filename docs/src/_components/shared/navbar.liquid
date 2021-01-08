@@ -34,7 +34,7 @@
         <a class="navbar-item {{ news_active }}" href="/blog/">News</a>
       </nav-section>
 
-      <nav-section class="navbar-end">
+      <nav-section class="navbar-end" id="nav-section-end" data-turbo-permanent>
         <nav-search class="navbar-item search-item">
           {% render "bridgetown_quick_search/search", placeholder: "Search", input_class: "input" %}
         </nav-search>
