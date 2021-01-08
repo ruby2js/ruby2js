@@ -1109,6 +1109,7 @@ module Ruby2JS
       def react_wunderbar_free(nodes, wunderbar_only=false)
         nodes.each do |node|
           if Parser::AST::Node === node
+            return false if node.type == :xstr
             return false if react_element?(node, wunderbar_only)
 
             # recurse

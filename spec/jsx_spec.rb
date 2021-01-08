@@ -175,6 +175,29 @@ describe Ruby2JS::Filter::JSX do
     end
   end
 
+  describe "React.createElement to JSX" do
+    it "should handle element, attrs, text" do
+      to_js( 'React.createElement("hr")' ).
+        must_equal '<hr/>'
+      to_js( 'React.createElement("br", nil)' ).
+        must_equal '<br/>'
+      to_js( 'React.createElement("img", {src: "x.jpg"})' ).
+        must_equal '<img src="x.jpg"/>'
+      to_js( 'React.createElement("a", {href: "."}, "text")' ).
+        must_equal '<a href=".">text</a>'
+    end
+
+    it "should handle nesting" do
+      to_js( 'React.createElement("p", nil, "text", React.createElement("br", nil), data)' ).
+        must_equal '<p>text<br/>{data}</p>'
+    end
+
+    it "should NOT handle non-constant element names" do
+      to_js( 'React.createElement(x)' ).
+        must_equal( 'React.createElement(x)' )
+    end
+  end
+
   describe "ruby/wunderbar to JSX" do
     it "should handle self enclosed values" do
       to_js( '_br' ).must_equal '<br/>'

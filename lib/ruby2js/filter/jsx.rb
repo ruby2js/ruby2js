@@ -8,12 +8,12 @@ module Ruby2JS
       include SEXP
 
       def on_send(node)
-        target, method, *attrs = node.children
+        target, method, *args = node.children
 
         if target == s(:const, nil, :Wunderbar)
           if [:debug, :info, :warn, :error, :fatal].include? method
             method = :error if method == :fatal
-            return node.updated(nil, [s(:const, nil, :console), method, *attrs])
+            return node.updated(nil, [s(:const, nil, :console), method, *args])
           end
         end
 
@@ -29,7 +29,17 @@ module Ruby2JS
         end
 
         if target == nil and method.to_s.start_with? "_"
-          S(:xnode, method.to_s[1..-1], *stack, *process_all(attrs))
+          S(:xnode, method.to_s[1..-1], *stack, *process_all(args))
+
+        elsif method == :createElement and target == s(:const, nil, :React)
+          if args.first.type == :str and \
+            (args.length == 1 or %i(nil hash).include? args[1].type)
+            attrs = (args[1]&.type != :nil && args[1]) || s(:hash)
+            S(:xnode, args[0].children.first, attrs, *process_all(args[2..-1]))
+          else
+            super
+          end
+
         else
           super
         end
