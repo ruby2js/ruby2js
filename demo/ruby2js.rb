@@ -347,17 +347,34 @@ else
         let dropdowns = document.querySelectorAll('.dropdown');
         for (let dropdown of dropdowns) {
           dropdown.style.display = 'inline-block';
-          dropdown.focus();
+          let content = dropdown.querySelector('.dropdown-content');
+          content.style.opacity = 0;
+          content.style.display = 'none';
 
           // toggle dropdown
           dropdown.querySelector('button').addEventListener('click', event => {
             event.preventDefault();
-            let content = dropdown.querySelector('.dropdown-content');
-            if (content.style.display === 'block') {
-              content.style.display = 'none';
-            } else {
-              content.style.display = 'block';
-            }
+            content.style.transition = '0s';
+            content.style.display = 'block';
+            content.style.zIndex = 0;
+            content.style.opacity = 1 - content.style.opacity;
+          });
+
+          // make dropdown disappear when mouse moves away
+          let focus = false;
+          dropdown.addEventListener('mouseover', () => {focus = true});
+          dropdown.addEventListener('mouseout', event => {
+            if (content.style.opacity == 0) return;
+            console.log('mouse out');
+            focus = false;
+            setTimeout( () => {
+              if (!focus) {
+                content.style.transition = '2s';
+                content.style.opacity = 0;
+                content.style.zIndex = -1;
+                // setTimeout( () => { content.style.transition = '0s' }, 500);
+              }
+            }, 500)
           })
         };
 
