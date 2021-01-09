@@ -1,5 +1,5 @@
 ---
-order: 2
+order: 3
 title: Webpack Setup
 top_section: Introduction
 category: webpack

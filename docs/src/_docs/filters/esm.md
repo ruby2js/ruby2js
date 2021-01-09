@@ -92,6 +92,10 @@ import AWN from "awesome-notifications"
 new AWN({position: "top-right"}).success("Hello World")
 ```
 
+The value of the `autoimports` option can be a `proc` or a `lambda` function,
+in which case it will be invoked with each token eligible for importing.  If
+this function returns `nil`, then no imports will be added.
+
 The esm filter is able to recognize if you are defining a class or function
 within the code itself and it won't add that import statement accordingly.
 If for some reason you wish to disable autoimports entirely on a file-by-file

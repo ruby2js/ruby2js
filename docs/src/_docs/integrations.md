@@ -1,5 +1,5 @@
 ---
-order: 3
+order: 4
 title: Integrations
 top_section: Introduction
 category: integrations

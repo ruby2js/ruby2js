@@ -58,6 +58,11 @@ describe "demo" do
           must_equal('x.constructor; x.toLowerCase()')
       end
 
+      it "should work with only the options that are included" do
+        to_js("x.class; x.downcase()", %w(--filter functions --include-only class)).
+          must_equal('x.constructor; x.downcase()')
+      end
+
       it "should work with an option when all are included" do
         to_js("x.class; x.downcase()", %w(--filter functions --exclude downcase)).
           must_equal('x.class; x.downcase()')

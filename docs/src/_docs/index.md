@@ -42,12 +42,6 @@ Host variable substitution:
  puts Ruby2JS.convert("@name", ivars: {:@name => "Joe"})
 ```
 
-Host expression evalution -- potentially unsafe, use only if you trust
-the source being converted::
-```ruby
- i = 7; puts Ruby2JS.convert("i = `i`", binding: binding)
-```
-
 Enable ES2015 support:
 
 ```ruby
