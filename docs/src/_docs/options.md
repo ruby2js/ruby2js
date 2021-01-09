@@ -135,7 +135,7 @@ puts Ruby2JS.convert("list.max()", include_only: [:max])
 ## IVars
 
 Instance Variables (ivars) allow you to supply data to the script.  A common
-use case is when the script is a view template.
+use case is when the script is a view template.  See also [scope](#scope).
 
 
 ```ruby
@@ -153,6 +153,17 @@ with the default being logical.
 ```ruby
 require 'ruby2js'
 puts Ruby2JS.convert("a || b", or: :nullish, eslevel: 2020)
+```
+
+## Scope
+
+Make all Instance Variables (ivars) in a given scope available to the
+script.  See also [ivars](#ivars).
+
+```ruby
+require "ruby2js"
+@x = 5
+puts Ruby2JS.convert("X = @x", scope: self)
 ```
 
 ## Strict
