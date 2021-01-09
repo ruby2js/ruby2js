@@ -3,6 +3,7 @@ require 'minitest/autorun'
 require 'ruby2js/filter/react'
 require 'ruby2js/filter/functions'
 require 'ruby2js/filter/jsx'
+require 'ruby2js/filter/esm'
 
 describe Ruby2JS::Filter::React do
   
@@ -14,7 +15,12 @@ describe Ruby2JS::Filter::React do
   def to_js6(string)
     _(Ruby2JS.convert(string, eslevel: 2015,
       filters: [Ruby2JS::Filter::React, Ruby2JS::Filter::Functions,
-      Ruby2JS::Filter::JSX], scope: self).to_s)
+      Ruby2JS::Filter::JSX]).to_s)
+  end
+  
+  def to_esm(string)
+    _(Ruby2JS.convert(string, eslevel: 2015,
+      filters: [Ruby2JS::Filter::React, Ruby2JS::Filter::ESM]).to_s)
   end
   
   describe :createClass do
@@ -611,6 +617,28 @@ describe Ruby2JS::Filter::React do
     it "should handle loops" do
       to_js6( 'class Foo<React; def render; _ul {@@x.each {|i| _li i; }}; end; end' ).
         must_include '<ul>{this.props.x.map(i => (<li>{i}</li>))}</ul>'
+    end
+  end
+
+  describe :autoimports do
+    it "should not autoimport React unless ESM is included" do
+      to_js6( 'class Foo<React; end' ).
+        wont_include 'import React from "React";'
+    end
+
+    it "should autoimport React if ESM is included" do
+      to_esm( 'class Foo<React; end' ).
+        must_include 'import React from "React";'
+    end
+
+    it "should not autoimport ReactDOM unless ESM is included" do
+      to_js( 'ReactDOM.render _h1("hello world"), document.getElementById("root")' ).
+        wont_include 'import ReactDOM from "ReactDOM";'
+    end
+
+    it "should autoimport ReactDOM if ESM is included" do
+      to_esm( 'ReactDOM.render _h1("hello world"), document.getElementById("root")' ).
+        must_include 'import ReactDOM from "ReactDOM";'
     end
   end
 

@@ -1,5 +1,7 @@
 require 'ruby2js'
 
+Ruby2JS.module_default ||= :cjs
+
 module Ruby2JS
   module Filter
     module CJS
