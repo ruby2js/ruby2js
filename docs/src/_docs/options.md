@@ -132,6 +132,18 @@ require 'ruby2js/filter/functions'
 puts Ruby2JS.convert("list.max()", include_only: [:max])
 ```
 
+## Import From Skypack
+
+Some filters, like [active_functions](filters/active_functions) will generate
+import statements.  If the `import_from_skypack` option is set, these import
+statements will make use of the [skypack](https://www.skypack.dev/) CDN.
+
+```ruby
+require 'ruby2js/filter/active_functions'
+puts Ruby2JS.convert("x.present?",
+  eslevel: 2015, import_from_skypack: true)
+```
+
 ## IVars
 
 Instance Variables (ivars) allow you to supply data to the script.  A common
@@ -200,4 +212,14 @@ an underscore instead.
 require 'ruby2js'
 puts Ruby2JS.convert('class C; def initialize; @a=1; end; end', eslevel: 2020,
   underscored_private: true)
+```
+
+## Width
+
+Ruby2JS tries, but does not guarantee, to produce output limited to 80 columns
+in width.  You can change this value with the `width` option.
+
+```ruby
+require 'ruby2js/filter/functions'
+puts Ruby2JS.convert("puts list.last unless list.empty?\n", width: 40)
 ```
