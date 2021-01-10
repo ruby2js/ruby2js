@@ -32,9 +32,9 @@ module Ruby2JS
     end
 
     def combine_properties(body)
-      for i in 0...body.length-1
+      (0...body.length-1).each do |i|
         next unless body[i] and body[i].type == :prop
-        for j in i+1...body.length
+        (i+1...body.length).each do |j|
           break unless body[j] and body[j].type == :prop
 
           if body[i].children[0] == body[j].children[0]
