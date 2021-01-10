@@ -58,7 +58,7 @@ def parse_request(env=ENV)
   opts.on('--autoimports=mappings', "automatic import mappings, without quotes") {|mappings|
     options[:autoimports] = {}
 
-    mappings.gsub! /\s+|"|'/, ''
+    mappings.gsub!(/\s+|"|'/, '')
 
     while not mappings.empty?
       if mappings =~ /^(\w+):([^,]+),?(.*)/
@@ -166,7 +166,7 @@ def parse_request(env=ENV)
     raise unless defined? env and env['SERVER_PORT']
   end
 
-  ARGV.push *wunderbar_options
+  ARGV.push(*wunderbar_options)
   require 'wunderbar'
 
   # load selected filters
