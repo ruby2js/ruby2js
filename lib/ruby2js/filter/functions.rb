@@ -782,7 +782,7 @@ module Ruby2JS
               s(:lvar, :message)), :stack))))
           end
 
-          body = [s(:begin, body)] if body.length > 1
+          body = [s(:begin, *body)] if body.length > 1
           S(:class, name, s(:const, nil, :Error), *body)
         else
           body = [s(:begin, *body)] if body.length > 1
