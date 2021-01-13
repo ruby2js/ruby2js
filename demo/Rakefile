@@ -11,7 +11,7 @@ file "#{docs}/src/demo/index.html" => ["#{docs}/src/demo", 'ruby2js.rb'] do
 end
 
 file "#{docs}/src/demo/livedemo.js" => [*opal_files, *source_files] do
-  sh "opal --compile -I ../lib -I . livedemo.opal > #{docs}/src/demo/livedemo.js"
+  sh "opal --compile -I /home/rubys/git/parser/lib -I ../lib -I . livedemo.opal > #{docs}/src/demo/livedemo.js"
 end
 
 task :default => [

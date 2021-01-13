@@ -252,6 +252,7 @@ else
       h2 {margin-top: 0.4em}
       .unloc {background-color: yellow}
       .loc {background-color: white}
+      .exception {background-color:#ff0; margin: 1em 0; padding: 1em; border: 4px solid red; border-radius: 1em}
 
       .dropdown { position: relative; display: none; }
       .dropdown-content { display: none; position: absolute; background-color: #f9f9f9; min-width: 180px; box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2); padding: 12px 16px; z-index: 1; }
