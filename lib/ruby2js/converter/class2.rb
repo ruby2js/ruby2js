@@ -300,6 +300,10 @@ module Ruby2JS
             else
               parse m.updated(:send, [@class_name, *m.children[1..-1]])
             end
+          elsif m.type == :block and m.children.first.children.first == nil
+            # class method calls passing a block
+            parse s(:block, s(:send, name, *m.children.first.children[1..-1]), 
+              *m.children[1..-1])
           else
             parse m, :statement
           end
