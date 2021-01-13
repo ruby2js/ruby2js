@@ -551,6 +551,17 @@ module Ruby2JS
             s(:args, s(:arg, :a), s(:arg, :b)),
             s(:send, s(:lvar, :a), :+, s(:lvar, :b))), s(:int, 0))
 
+        elsif method == :method_defined? and args.length >= 1
+          if args[1] and args[1].type == :false
+            process S(:send, target, :hasOwnProperty, args[0])
+          else
+            process S(:in?, args[0], target)
+          end
+
+        elsif method == :alias_method and args.length == 2
+          process S(:send, s(:attr, target, :prototype), :"#{args[0].children[0]}=",
+            s(:attr, s(:attr, target, :prototype), args[1].children[0]))
+
         else
           super
         end
@@ -737,6 +748,8 @@ module Ruby2JS
             s(:return, s(:lvar, node.children[1].children[0].children[0])))),
             :[], call.children[0]])
 
+        elsif method == :define_method and call.children.length == 3
+          process node.updated(:send, [s(:attr, call.children[0], :prototype), :"#{call.children[2].children[0]}=", s(:deff, nil, *node.children[1..-1])])
         else
           super
         end

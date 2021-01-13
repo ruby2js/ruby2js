@@ -6,7 +6,7 @@ module Ruby2JS
     #     (arg :x)
     #   (...)
 
-    handle :def, :defm, :async do |name, args, body=nil|
+    handle :def, :defm, :async, :deff do |name, args, body=nil|
       body ||= s(:begin)
 
       add_implicit_block = false
@@ -106,7 +106,7 @@ module Ruby2JS
       # es2015 fat arrow support
       if \
         not name and es2015 and @state != :method and @ast.type != :defm and 
-        not @prop
+        @ast.type != :deff and not @prop
       then
         expr = body
         expr = expr.children.first while expr.type == :autoreturn

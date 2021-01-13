@@ -8,6 +8,10 @@ describe Ruby2JS::Filter::Functions do
     _(Ruby2JS.convert(string, filters: [Ruby2JS::Filter::Functions]).to_s)
   end
 
+  def to_js_2020(string)
+    _(Ruby2JS.convert(string, eslevel: 2020, filters: [Ruby2JS::Filter::Functions]).to_s)
+  end
+
   describe 'conversions' do
     it "should handle to_s" do
       to_js( 'a.to_s' ).must_equal 'a.toString()'
@@ -541,6 +545,22 @@ describe Ruby2JS::Filter::Functions do
 
     it "should handle floor" do
       to_js( 'a.floor' ).must_equal 'Math.floor(a)'
+    end
+  end
+
+  describe "introspection and metaprogramming" do
+    it "should handle method_defined?" do
+      to_js( 'a.method_defined? :meth').must_equal '"meth" in a'
+      to_js( 'a.method_defined? :meth, true').must_equal '"meth" in a'
+      to_js( 'a.method_defined? :meth, false').must_equal 'a.hasOwnProperty("meth")'
+    end
+
+    it "should handle alias_method" do
+      to_js( 'Klass.alias_method :newname, :oldname').must_equal 'Klass.prototype.newname = Klass.prototype.oldname'
+    end
+
+    it "should handle define_method" do
+      to_js_2020( 'Klass.define_method(:newname) {|x| return x * 5 }').must_equal 'Klass.prototype.newname = function(x) {return x * 5}'
     end
   end
 
