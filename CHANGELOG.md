@@ -1,5 +1,7 @@
 # master
 
+* Support static method calls with blocks in es2015+
+
 # 3.6.1 / 2020-12-31
 
 * Bugfix: ensure ActiveFunctions autoimports aren't included multiple times
