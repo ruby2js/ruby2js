@@ -553,14 +553,19 @@ describe Ruby2JS::Filter::Functions do
       to_js( 'a.method_defined? :meth').must_equal '"meth" in a'
       to_js( 'a.method_defined? :meth, true').must_equal '"meth" in a'
       to_js( 'a.method_defined? :meth, false').must_equal 'a.hasOwnProperty("meth")'
+      to_js( 'result = a.method_defined? :meth, expr').
+        must_equal 'var result = expr ? "meth" in a : a.hasOwnProperty("meth")'
     end
 
     it "should handle alias_method" do
       to_js( 'Klass.alias_method :newname, :oldname').must_equal 'Klass.prototype.newname = Klass.prototype.oldname'
+      to_js_2020( 'class C; alias_method :c, :d; end').
+        must_equal 'class C {}; C.prototype.c = C.prototype.d'
     end
 
     it "should handle define_method" do
       to_js_2020( 'Klass.define_method(:newname) {|x| return x * 5 }').must_equal 'Klass.prototype.newname = function(x) {return x * 5}'
+      to_js_2020( 'Klass.define_method(newname) {|x| return x * 5 }').must_equal 'Klass.prototype[newname] = function(x) {return x * 5}'
     end
   end
 

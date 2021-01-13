@@ -552,14 +552,17 @@ module Ruby2JS
             s(:send, s(:lvar, :a), :+, s(:lvar, :b))), s(:int, 0))
 
         elsif method == :method_defined? and args.length >= 1
-          if args[1] and args[1].type == :false
+          if args[1] == s(:false)
             process S(:send, target, :hasOwnProperty, args[0])
-          else
+          elsif args.length == 1 or args[1] == s(:true)
             process S(:in?, args[0], target)
+          else
+            process S(:if, args[1], s(:in?, args[0], target),
+              s(:send, target, :hasOwnProperty, args[0]))
           end
 
         elsif method == :alias_method and args.length == 2
-          process S(:send, s(:attr, target, :prototype), :"#{args[0].children[0]}=",
+          process S(:send, s(:attr, target, :prototype), :[]=, args[0],
             s(:attr, s(:attr, target, :prototype), args[1].children[0]))
 
         else
@@ -749,7 +752,8 @@ module Ruby2JS
             :[], call.children[0]])
 
         elsif method == :define_method and call.children.length == 3
-          process node.updated(:send, [s(:attr, call.children[0], :prototype), :"#{call.children[2].children[0]}=", s(:deff, nil, *node.children[1..-1])])
+          process node.updated(:send, [s(:attr, call.children[0], :prototype), :[]=,
+            call.children[2], s(:deff, nil, *node.children[1..-1])])
 
         else
           super
@@ -759,6 +763,12 @@ module Ruby2JS
       def on_class(node)
         name, inheritance, *body = node.children
         body.compact!
+
+        body.each_with_index do |node, i|
+          if node.type == :send and node.children[0..1] == [nil, :alias_method]
+            body[i] = node.updated(:send, [name, *node.children[1..-1]])
+          end
+        end
 
         if inheritance == s(:const, nil, :Exception)
           unless
@@ -772,10 +782,11 @@ module Ruby2JS
               s(:lvar, :message)), :stack))))
           end
 
-          body = [s(:begin, *body)] if body.length > 1
+          body = [s(:begin, body)] if body.length > 1
           S(:class, name, s(:const, nil, :Error), *body)
         else
-          super
+          body = [s(:begin, *body)] if body.length > 1
+          super S(:class, name, inheritance, *body)
         end
       end
     end
