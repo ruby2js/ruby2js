@@ -1,0 +1,21 @@
+docs = File.expand_path('../docs', __dir__)
+source_files = Rake::FileList.new("../lib/**/*.rb")
+opal_files = Rake::FileList.new("*.opal")
+
+file "#{docs}/src/demo" do
+  mkdir "#{docs}/src/demo"
+end
+
+file "#{docs}/src/demo/index.html" => ["#{docs}/src/demo", 'ruby2js.rb'] do
+  sh "REQUEST_URI=/demo #{RbConfig.ruby} ruby2js.rb --live > #{docs}/src/demo/index.html"
+end
+
+file "#{docs}/src/demo/livedemo.js" => [*opal_files, *source_files] do
+  sh "opal --compile -I ../lib -I . livedemo.opal > #{docs}/src/demo/livedemo.js"
+end
+
+task :default => [
+  "#{docs}/src/demo/index.html",
+  "#{docs}/src/demo/livedemo.js"
+]
+

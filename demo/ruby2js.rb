@@ -20,6 +20,7 @@
 $:.unshift File.absolute_path('../../lib', __FILE__)
 require 'ruby2js'
 require 'cgi'
+require 'pathname'
 
 def parse_request(env=ENV)
 
@@ -46,6 +47,7 @@ def parse_request(env=ENV)
   # extract options from the argument list
   options = {}
   options[:include] = [:class] if ARGV.delete('--include-class')
+  @live = ARGV.delete('--live').dup
   wunderbar_options = []
 
   require 'optparse'
@@ -167,6 +169,7 @@ def parse_request(env=ENV)
   end
 
   ARGV.push(*wunderbar_options)
+  ARGV.push @live if @live
   require 'wunderbar'
 
   # load selected filters
@@ -200,7 +203,7 @@ end
 
 options = parse_request.first
 
-if not env['SERVER_PORT']
+if not env['SERVER_PORT'] and not @live
   # command line support
   if ARGV.length > 0
     options[:file] = ARGV.first
@@ -479,33 +482,33 @@ else
         document.getElementById('ast').addEventListener('click', updateLocation);
       }
 
-      if @ruby
-        _div_? do
-          raise $load_error if $load_error
+      _div_? do
+        raise $load_error if $load_error
 
-          options[:eslevel] = @eslevel.to_i if @eslevel
+        options[:eslevel] = @eslevel.to_i if @eslevel
 
-          parsed = Ruby2JS.parse(@ruby).first if @ast
+        parsed = Ruby2JS.parse(@ruby).first if @ast and @ruby
 
-          _div.parsed! style: "display: #{@ast ? 'block' : 'none'}" do
-            _h2 'AST'
-            _pre {_ {walk(parsed)}}
-          end
+        _div.parsed! style: "display: #{@ast ? 'block' : 'none'}" do
+          _h2 'AST'
+          _pre {_ {walk(parsed)}}
+        end
 
-          ruby = Ruby2JS.convert(@ruby, options)
+        ruby = Ruby2JS.convert(@ruby, options) if @ruby
 
-          _div.filtered! style: "display: #{@ast && parsed != ruby.ast ? 'block' : 'none'}" do
-            _h2 'filtered AST'
-            _pre {walk(ruby.ast)}
-          end
+        _div.filtered! style: "display: #{@ast && parsed != ruby.ast ? 'block' : 'none'}" do
+          _h2 'filtered AST'
+          _pre {walk(ruby.ast) if ruby}
+        end
 
-          _div.js! do
-            _h2 'JavaScript'
-            _pre.js ruby.to_s
-          end
+        _div.js! style: "display: #{@ruby ? 'block' : 'none'}" do
+          _h2 'JavaScript'
+          _pre.js ruby.to_s
         end
       end
     end
+
+    _script src: 'livedemo.js' if @live
   end
 
   def _ruby2js_logo
@@ -582,12 +585,12 @@ else
 
       # wait for server to start
       60.times do
-	sleep 0.5
-	begin
-	  status = Net::HTTP.get_response('0.0.0.0','/',port).code
-	  break if %(200 404 500).include? status
-	rescue Errno::ECONNREFUSED, Errno::ETIMEDOUT
-	end
+        sleep 0.5
+        begin
+          status = Net::HTTP.get_response('0.0.0.0','/',port).code
+          break if %(200 404 500).include? status
+        rescue Errno::ECONNREFUSED, Errno::ETIMEDOUT
+        end
       end
 
       link = "http://localhost:#{port}/"

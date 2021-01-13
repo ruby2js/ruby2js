@@ -12,4 +12,10 @@ end
 
 task :default => :test
 
+namespace :demo do
+  task :build do
+    Dir.chdir('demo') { sh 'rake' }
+  end
+end
+
 # Run `rake release` to release a new version of the gem.
