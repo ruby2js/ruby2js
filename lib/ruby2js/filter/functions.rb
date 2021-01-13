@@ -750,6 +750,7 @@ module Ruby2JS
 
         elsif method == :define_method and call.children.length == 3
           process node.updated(:send, [s(:attr, call.children[0], :prototype), :"#{call.children[2].children[0]}=", s(:deff, nil, *node.children[1..-1])])
+
         else
           super
         end
