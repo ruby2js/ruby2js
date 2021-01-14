@@ -1,21 +1,40 @@
 docs = File.expand_path('../docs', __dir__)
+demo = "#{docs}/src/demo"
 source_files = Rake::FileList.new("../lib/**/*.rb")
+filters = Rake::FileList.new("../lib/ruby2js/filter/*.rb")
 opal_files = Rake::FileList.new("*.opal")
 
-file "#{docs}/src/demo" do
-  mkdir "#{docs}/src/demo"
+file "filters.opal" => filters do
+  puts 'generate filters.opal'
+  content = filters.map do |file|
+    require file
+    "require #{"ruby2js/filter/#{File.basename(file, '.rb')}".inspect}"
+  end
+
+  # find each module and add it to the list of filters.
+  filters = {}
+  Ruby2JS::Filter::DEFAULTS.each do |mod|
+    method = mod.instance_method(mod.instance_methods.first)
+    name = method.source_location.first
+    filters[File.basename(name, '.rb')] = mod
+  end
+  content << "Filters = #{filters.inspect}"
+
+  IO.write "filters.opal", content.join("\n")
 end
 
-file "#{docs}/src/demo/index.html" => ["#{docs}/src/demo", 'ruby2js.rb'] do
+file "#{demo}/index.html" => 'ruby2js.rb' do
+  mkdir demo unless Dir.exist? demo
   sh "REQUEST_URI=/demo #{RbConfig.ruby} ruby2js.rb --live > #{docs}/src/demo/index.html"
 end
 
-file "#{docs}/src/demo/livedemo.js" => [*opal_files, *source_files] do
-  sh "opal --compile -I /home/rubys/git/parser/lib -I ../lib -I . livedemo.opal > #{docs}/src/demo/livedemo.js"
+file "#{demo}/livedemo.js" => [*opal_files, *source_files, 'filters.opal'] do
+  mkdir demo unless Dir.exist? demo
+  sh "opal --compile -g regexp_parser -I ../lib -I . livedemo.opal > #{docs}/src/demo/livedemo.js"
 end
 
 task :default => [
-  "#{docs}/src/demo/index.html",
-  "#{docs}/src/demo/livedemo.js"
+  "#{demo}/index.html",
+  "#{demo}/livedemo.js"
 ]
 

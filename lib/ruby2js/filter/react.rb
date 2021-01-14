@@ -35,19 +35,21 @@ module Ruby2JS
       #   ruby -r ruby2js/filter/react -e "Ruby2JS::Filter::React.genAttrs"
       #
       def self.genAttrs
-        require 'nokogumbo'
-        page = 'https://facebook.github.io/react/docs/tags-and-attributes.html'
-        doc = Nokogiri::HTML5.get(page)
+        unless RUBY_ENGINE == 'opal'
+          require 'nokogumbo'
+          page = 'https://facebook.github.io/react/docs/tags-and-attributes.html'
+          doc = Nokogiri::HTML5.get(page)
 
-        # delete contents of page prior to the list of supported attributes
-        attrs = doc.at('a[name=supported-attributes]')
-        attrs = attrs.parent while attrs and not attrs.name.start_with? 'h'
-        attrs.previous_sibling.remove while attrs and attrs.previous_sibling
+          # delete contents of page prior to the list of supported attributes
+          attrs = doc.at('a[name=supported-attributes]')
+          attrs = attrs.parent while attrs and not attrs.name.start_with? 'h'
+          attrs.previous_sibling.remove while attrs and attrs.previous_sibling
 
-        # extract attribute names with uppercase chars from code and format
-        attrs = doc.search('code').map(&:text).join(' ')
-        attrs = attrs.split(/\s+/).grep(/[A-Z]/).sort.uniq.join(' ')
-        puts "ReactAttrs = %w(#{attrs})".gsub(/(.{1,72})(\s+|\Z)/, "\\1\n")
+          # extract attribute names with uppercase chars from code and format
+          attrs = doc.search('code').map(&:text).join(' ')
+          attrs = attrs.split(/\s+/).grep(/[A-Z]/).sort.uniq.join(' ')
+          puts "ReactAttrs = %w(#{attrs})".gsub(/(.{1,72})(\s+|\Z)/, "\\1\n")
+        end
       end
 
       # list of react attributes that require special processing

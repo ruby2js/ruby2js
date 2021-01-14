@@ -7,6 +7,7 @@ gem 'sinatra'
 gem 'nokogumbo'
 gem 'execjs'
 gem 'opal', '~> 1.0'
+gem 'regexp_parser'
 
 group :demo do
   gem 'puma'

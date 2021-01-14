@@ -1,5 +1,5 @@
 require 'ruby2js'
-require 'regexp_parser'
+require 'regexp_parser' unless RUBY_ENGINE == 'opal'
 
 module Ruby2JS
   module Filter
@@ -49,6 +49,9 @@ module Ruby2JS
 
         elsif method == :[]= and args.length == 3 and
           args[0].type == :regexp and args[1].type == :int
+
+          return super if RUBY_ENGINE == 'opal'
+
           index = args[1].children.first
 
           parts = Regexp::Parser.parse(args[0].children.first.children.first)
