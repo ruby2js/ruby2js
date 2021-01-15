@@ -32,17 +32,19 @@ def parse_request(env=ENV)
   end
 
   # web/CGI query string support
+  selected = env['PATH_INFO'].to_s.split('/')
   env['QUERY_STRING'].to_s.split('&').each do |opt|
     key, value = opt.split('=', 2)
     if key == 'ruby'
       @ruby = CGI.unescape(value)
+    elsif key == 'filter'
+      selected = CGI.unescape(value).split(',')
     elsif value
       ARGV.push("--#{key}=#{CGI.unescape(value)}")
     else
       ARGV.push("--#{key}")
     end
   end
-  selected = env['PATH_INFO'].to_s.split('/')
 
   # extract options from the argument list
   options = {}
@@ -291,7 +293,7 @@ else
       _form method: 'post' do
         _textarea.ruby.form_control @ruby, name: 'ruby', rows: 8,
           placeholder: 'Ruby source'
-        _input.btn.btn_primary type: 'submit', value: 'Convert'
+        _input.btn.btn_primary type: 'submit', value: 'Convert', disabled: !!@live
 
         _label 'ES level', for: 'eslevel'
         _select name: 'eslevel', id: 'eslevel' do
@@ -338,6 +340,8 @@ else
       end
       
       _script %{
+        $live = #{!!@live};
+
         // determine base URL and what filters and options are selected
         let base = new URL(document.getElementsByTagName('base')[0].href).pathname;
         let filters = new Set(window.location.pathname.slice(base.length).split('/'));
@@ -346,6 +350,7 @@ else
         for (let match of window.location.search.matchAll(/(\\w+)(=([^&]*))?/g)) {
           options[match[1]] = match[3] && decodeURIComponent(match[3]);
         };
+        if (options.filter) options.filter.split(',').forEach(option => filters.add(option));
 
         // show dropdowns (they only appear if JS is enabled)
         let dropdowns = document.querySelectorAll('.dropdown');
@@ -368,8 +373,7 @@ else
           let focus = false;
           dropdown.addEventListener('mouseover', () => {focus = true});
           dropdown.addEventListener('mouseout', event => {
-            if (content.style.opacity == 0) return;
-            console.log('mouse out');
+            if (content.style.opacity === 0) return;
             focus = false;
             setTimeout( () => {
               if (!focus) {
@@ -384,45 +388,57 @@ else
 
         function updateLocation() {
           let location = new URL(base, window.location);
-          location.pathname += Array.from(filters).join('/');
 
-          search = [];
+          if ($live) {
+            options.filter = Array.from(filters).join(',');
+            if (filters.size === 0) delete options.filter;
+          } else {
+            location.pathname += Array.from(filters).join('/');
+          }
+
+          let search = [];
           for (let [key, value] of Object.entries(options)) {
             search.push(value === undefined ? key : `${key}=${encodeURIComponent(value)}`);
           };
 
-          location.search = search.length == 0 ? "" : `${search.join('&')}`;
+          location.search = search.length === 0 ? "" : `${search.join('&')}`;
 
           history.replaceState({}, null, location.toString());
 
-          if (!document.getElementById('js')) return;
+          if (document.getElementById('js').style.display === 'none') return;
 
-          // fetch updated results
-          let ruby = document.querySelector('textarea[name=ruby]').textContent;
-          let ast = document.getElementById('ast').checked;
-          let headers = {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          }
+          if ($live) {
+            let event = new MouseEvent('click',
+              { bubbles: true, cancelable: true, view: window });
+            document.querySelector('input[type=submit]').dispatchEvent(event);
+          } else {
+            // fetch updated results
+            let ruby = document.querySelector('textarea[name=ruby]').textContent;
+            let ast = document.getElementById('ast').checked;
+            let headers = {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            }
 
-          fetch(location,
-            {method: 'POST', headers, body: JSON.stringify({ ruby, ast })}
-          ).then(response => {
-              if (!response.ok) throw new Error(response.statusText);
-              return response.json();
+            fetch(location,
+              {method: 'POST', headers, body: JSON.stringify({ ruby, ast })}
+            ).then(response => {
+                if (!response.ok) throw new Error(response.statusText);
+                return response.json();
+              }).
+            then(json => {
+              document.querySelector('#js pre').textContent = json.js;
+
+              let parsed = document.querySelector('#parsed');
+              if (json.parsed) parsed.querySelector('pre').outerHTML = json.parsed;
+              parsed.style.display = json.parsed ? "block" : "none";
+
+              let filtered = document.querySelector('#filtered');
+              if (json.filtered) filtered.querySelector('pre').outerHTML = json.filtered;
+              filtered.style.display = json.filtered ? "block" : "none";
             }).
-          then(json => {
-            document.querySelector('#js pre').textContent = json.js;
-
-            let parsed = document.querySelector('#parsed');
-            if (json.parsed) parsed.querySelector('pre').outerHTML = json.parsed;
-            parsed.style.display = json.parsed ? "block" : "none";
-
-            let filtered = document.querySelector('#filtered');
-            if (json.filtered) filtered.querySelector('pre').outerHTML = json.filtered;
-            filtered.style.display = json.filtered ? "block" : "none";
-          }).
-          catch(console.error);
+            catch(console.error);
+          }
         }
 
         // add/remove eslevel options
@@ -458,11 +474,6 @@ else
               options[name] = prompt(name);
             } else {
               options[name] = undefined;
-            };
-
-            search = [];
-            for (let [key, value] of Object.entries(options)) {
-              search.push(value === undefined ? key : `${key}=${value}`);
             };
 
             updateLocation();
