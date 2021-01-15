@@ -20,9 +20,18 @@ def parse_options
     value = value ? $$.decodeURIComponent(value) : true
 
     case name
-    when 'filter'
-      name = 'filters'
+    when :filter
+      name = :filters
       value = value.split(',').map {|name| Filters[name]}.compact
+    when :identity
+      value = name
+      name = :comparison
+    when :nullish
+      value = name
+      name = :or
+    when /^es\d+$/
+      value = name[2..-1].to_i
+      name = :eslevel
     end
 
     options[name] = value
@@ -65,5 +74,14 @@ parse_options.each do |name, value|
     nodes.forEach do |node|
       `node.checked = true` if value.include? Filters[`node.name`]
     end
+  when :eslevel
+    $document.getElementById('eslevel').value = value.to_s
+  when :comparison
+    $document.querySelector("input[name=identity]").checked = true if value == :identity
+  when :nullish
+    $document.querySelector("input[name=or]").checked = true if value == :nullish
+  else
+    checkbox = $document.querySelector("input[name=#{name}]")
+    checkbox.checked = true if checkbox
   end
 end

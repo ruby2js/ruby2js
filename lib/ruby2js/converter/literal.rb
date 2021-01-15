@@ -20,8 +20,8 @@ module Ruby2JS
     def number_format(number)
       return number.to_s unless es2021
       parts = number.to_s.split('.')
-      parts[0].gsub!(/(\d)(?=(\d\d\d)+(?!\d))/, "\\1_")
-      parts[1].gsub!(/(\d\d\d)(?=\d)/, "\\1_") if parts[1]
+      parts[0] = parts[0].gsub(/(\d)(?=(\d\d\d)+(?!\d))/, "\\1_")
+      parts[1] = parts[1].gsub(/(\d\d\d)(?=\d)/, "\\1_") if parts[1]
       parts.join('.')
     end
   end
