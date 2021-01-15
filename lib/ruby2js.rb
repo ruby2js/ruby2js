@@ -79,8 +79,8 @@ module Ruby2JS
       def options=(options)
         @options = options
 
-        @included = @@included
-        @excluded = @@excluded
+        @included = Filter.included_methods
+        @excluded = Filter.excluded_methods
 
         include_all if options[:include_all]
         include_only(options[:include_only]) if options[:include_only]
@@ -178,6 +178,7 @@ module Ruby2JS
   end
 
   def self.convert(source, options={})
+    options = options.dup
     options[:eslevel] ||= @@eslevel_default
     options[:strict] = @@strict_default if options[:strict] == nil
     options[:module] ||= @@module_default || :esm

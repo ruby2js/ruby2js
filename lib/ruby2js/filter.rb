@@ -13,6 +13,14 @@ module Ruby2JS
     @@included = nil
     @@excluded = []
 
+    def self.included_methods
+      @@included&.dup
+    end
+
+    def self.excluded_methods
+      @@excluded&.dup
+    end
+
     # indicate that the specified methods are not to be processed
     def self.exclude(*methods)
       if @@included
