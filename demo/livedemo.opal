@@ -1,3 +1,7 @@
+# TODOS:
+#  * filter/functions.rb: require 'regexp_parser', needs YAML
+#  * filter.rb: @excluded&. -- https://github.com/opal/opal/issues/2167
+
 require 'native'
 require 'ruby2js'
 require 'patch.opal'
