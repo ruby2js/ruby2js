@@ -9,7 +9,12 @@ require 'filters.opal'
 $document = $$.document
 jsdiv = $document.querySelector('div#js')
 jspre = jsdiv.querySelector('pre')
+convert = $document.querySelector('input.btn')
+ast = $document.getElementById('ast')
+parsed = $document.getElementById('parsed')
+filtered = $document.getElementById('filtered')
 
+# convert query into options
 def parse_options
   options = {filters: []}
   search = $document[:location].search
@@ -40,35 +45,75 @@ def parse_options
   options
 end
 
-convert = $document.querySelector('input.btn')
+# convert AST into displayable form
+def walk(ast, indent='')
+  return [] unless ast
+  output = ["<div class=#{ast.loc ? 'loc' : 'unloc'}>"]
+  output << "#{indent}#{ast.type}"
 
+  if ast.children.any? {|child| child.is_a? Parser::AST::Node}
+    ast.children.each do |child|
+      if Parser::AST::Node === child
+        output += walk(child, "  #{indent}")
+      else
+        output << "<div>#{indent}  #{child.inspect}</div>"
+      end
+    end
+  else
+    ast.children.each do |child|
+      output << " #{child.inspect}"
+    end
+  end
+
+  output << '</div>'
+end
+
+# process convert button
 convert.addEventListener 'click' do |event|
   `event.preventDefault()`
 
   ruby = $document.querySelector('textarea')[:value]
   begin
-    js = Ruby2JS.convert(ruby, parse_options).to_s
+    js = Ruby2JS.convert(ruby, parse_options)
     jspre[:classList].remove 'exception'
+    show_ast = ast.checked
   rescue Ruby2JS::SyntaxError => e
-    js = e.to_s
+    js = e
     jspre[:classList].add 'exception'
   rescue => e
     js = e.inspect
     jspre[:classList].add 'exception'
   end
 
-  jspre.textContent = js
+  if ast.checked and not jspre[:classList].contains('exception')
+    raw, comments = Ruby2JS.parse(ruby)
+    parsed.querySelector('pre').innerHTML = walk(raw).join
+    parsed[:style].display = 'block'
+    if raw == js.ast
+      filtered[:style].display = 'none'
+    else
+      filtered.querySelector('pre').innerHTML = walk(js.ast).join
+      filtered[:style].display = 'block'
+    end
+  else
+    parsed[:style].display = 'none'
+    filtered[:style].display = 'none'
+  end
+
+  jspre.textContent = js.to_s
   jsdiv[:style].display = 'block'
 end
 
+# enable the convert button
 convert.disabled = false
 
+# make inputs match query
 parse_options.each do |name, value|
   case name
   when :ruby
     $document.querySelector('textarea').value = value
-    event = `new MouseEvent('click', { bubbles: true, cancelable: true, view: window })`;
-    $document.querySelector('input[type=submit]').dispatchEvent(event);
+    event = `new MouseEvent('click', { bubbles: true, cancelable: true, view: window })`
+    $document.querySelector('input[type=submit]').dispatchEvent(event)
   when :filters
     nodes = $document.getElementById(:filters)[:parentNode].querySelectorAll(:input)
     nodes.forEach do |node|
