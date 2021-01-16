@@ -1,6 +1,7 @@
 # master
 
 * Support static method calls with blocks in es2015+
+* Auto-bind instance methods referenced as properties within a class
 
 # 3.6.1 / 2020-12-31
 

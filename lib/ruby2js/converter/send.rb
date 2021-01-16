@@ -118,8 +118,13 @@ module Ruby2JS
 
       # resolve anonymous receivers against rbstack
       receiver ||= @rbstack.map {|rb| rb[method]}.compact.last
+      autobind = nil
 
       if receiver
+        if receiver.type == :autobind
+          autobind = receiver = receiver.children.first
+        end
+
         group_receiver = receiver.type == :send &&
           op_index < operator_index( receiver.children[1] ) if receiver
         group_receiver ||= GROUP_OPERATORS.include? receiver.type
@@ -281,6 +286,12 @@ module Ruby2JS
       else
         put 'await ' if @ast.type == :await
 
+        if method == :bind and receiver&.type == :send
+          if receiver.children.length == 2 and receiver.children.first == nil
+            receiver = receiver.updated(:attr) # prevent autobind
+          end
+        end
+
         if not ast.is_method? and ast.type != :send!
           if receiver
             (group_receiver ? group(receiver) : parse(receiver))
@@ -302,6 +313,10 @@ module Ruby2JS
           else
             compact { puts "("; parse_all(*args, join: ",#@ws"); sput ')' }
           end
+        end
+
+        if autobind and not ast.is_method? and ast.type != :attr
+          put '.bind('; parse(autobind); put ')'
         end
       end
     end
