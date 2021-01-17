@@ -13,7 +13,7 @@ module Ruby2JS
         inner, @inner = @inner, @ast
 
         has_range = whens.any? do |node| 
-          node.children.any? {|child| [:irange, :erange].include? child.type}
+          node.children.any? {|child| [:irange, :erange].include? child&.type}
         end
 
         if has_range
@@ -47,7 +47,7 @@ module Ruby2JS
 
           parse code, :statement
           last = code
-          while last.type == :begin
+          while last&.type == :begin
             last = last.children.last
           end
 
