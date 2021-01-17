@@ -13,6 +13,11 @@ require 'ruby2js/filter'
 
 module Ruby2JS
   class SyntaxError < RuntimeError
+    attr_reader :diagnostic
+    def initialize(message, diagnostic=nil)
+      super(message)
+      @diagnostic = diagnostic
+    end
   end
 
   @@eslevel_default = 2009 # ecmascript 5
@@ -266,7 +271,7 @@ module Ruby2JS
     line, col = split.length, split.last.length
     message = "line #{line}, column #{col}: #{e.diagnostic.message}"
     message += "\n in file #{file}" if file
-    raise Ruby2JS::SyntaxError.new(message)
+    raise Ruby2JS::SyntaxError.new(message, e.diagnostic)
   end
 
   def self.find_block(ast, line)

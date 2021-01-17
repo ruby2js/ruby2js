@@ -75,7 +75,13 @@ convert.addEventListener 'click' do |event|
     jspre[:classList].remove 'exception'
     show_ast = ast.checked
   rescue Ruby2JS::SyntaxError => e
-    js = e
+    if e.diagnostic
+      diagnostic = e.diagnostic.render.map {|line| line.sub(/^\(string\):/, '')}
+      diagnostic[-1] += '^' if e.diagnostic.location.size == 0
+      js = diagnostic.join("\n")
+    else
+      js = e
+    end
     jspre[:classList].add 'exception'
   rescue => e
     js = e.inspect
