@@ -262,10 +262,10 @@ module Ruby2JS
     buffer = Parser::Source::Buffer.new(file, line)
     buffer.source = source.encode('utf-8')
     parser = Parser::CurrentRuby.new
-    parser.builder.emit_file_line_as_literals=false
-    ast, comments = parser.parse_with_comments(buffer)
-    Parser::CurrentRuby.parse(source.encode('utf-8')) unless ast
-    [ast, comments]
+    parser.diagnostics.all_errors_are_fatal = true
+    parser.diagnostics.consumer = lambda {|diagnostic| nil}
+    parser.builder.emit_file_line_as_literals = false
+    parser.parse_with_comments(buffer)
   rescue Parser::SyntaxError => e
     split = source[0..e.diagnostic.location.begin_pos].split("\n")
     line, col = split.length, split.last.length
