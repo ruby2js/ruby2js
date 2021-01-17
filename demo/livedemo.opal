@@ -65,8 +65,26 @@ def walk(ast, indent='')
   output << '</div>'
 end
 
+# have mouseup toggle convert button between primary and success
+convert.addEventListener :mouseup do |event|
+  if convert.classList.contains('btn-primary')
+    convert.classList.remove('btn-primary')
+    convert.classList.add('btn-success')
+  else
+    convert.classList.add('btn-primary')
+    convert.classList.remove('btn-success')
+  end
+end
+
+# when convert button is success, update output on every keystroke in textarea
+$document.querySelector('textarea').addEventListener :input do
+  return if convert.classList.contains('btn-primary')
+  event = `new MouseEvent('click', { bubbles: true, cancelable: true, view: window })`
+  $document.querySelector('input[type=submit]').dispatchEvent(event)
+end
+
 # process convert button
-convert.addEventListener 'click' do |event|
+convert.addEventListener :click do |event|
   `event.preventDefault()`
 
   ruby = $document.querySelector('textarea')[:value]
