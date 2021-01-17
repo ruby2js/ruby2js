@@ -1,5 +1,5 @@
 require 'ruby2js'
-require 'regexp_parser' unless RUBY_ENGINE == 'opal'
+require 'regexp_parser/scanner'
 
 module Ruby2JS
   module Filter
@@ -50,73 +50,77 @@ module Ruby2JS
         elsif method == :[]= and args.length == 3 and
           args[0].type == :regexp and args[1].type == :int
 
-          return super if RUBY_ENGINE == 'opal'
-
           index = args[1].children.first
 
-          parts = Regexp::Parser.parse(args[0].children.first.children.first)
-          split = parts.index do |part|
-            part.type == :group and part.number == index
-          end
-
-          return super unless split
-
-          rewritten = parts[split].to_s
-
-          dstr = [args.last]
-          if rewritten == '()'
-            index -= 1
-            rewritten = ''
-          end
-
-          parts = parts.to_a
-
-          pre = ''
-          if parts.first.type == :anchor
-            pre = parts.shift.to_s
-            split -= 1
-          end
-
-          if split > 0
-            if split == 1 and parts.first.type == :group
-              rewritten = parts.first.to_s + rewritten
-            else
-              rewritten = '(' + parts[0 .. split - 1].join + ')' + rewritten
-              index += 1
+          # identify groups
+          regex = args[0].children.first.children.first
+          tokens = Regexp::Scanner.scan(regex)
+          groups = []
+          stack = []
+          tokens.each do |token|
+            next unless token[0] == :group
+            if token[1] == :capture
+              groups.push token.dup
+              return super if groups.length == index and not stack.empty?
+              stack.push groups.last
+            elsif token[1] == :close
+              stack.pop[-1]=token.last
             end
-            dstr.unshift s(:send, s(:lvar, :match), :[], s(:int, 0))
+          end
+          group = groups[index-1]
+
+          # rewrite regex
+          prepend = nil
+          append = nil
+
+          if group[4] < regex.length
+            regex = (regex[0...group[4]] + '(' + regex[group[4]..-1] + ')').
+              sub(/\$\)$/, ')$')
+            append = 2
           end
 
-
-          post = ''
-          if parts.last.type == :anchor
-            post = parts.pop.to_s
+          if group[4] - group[3] == 2
+            regex = regex[0...group[3]] + regex[group[4]..-1]
+            append = 1 if append
           end
 
-          if split + 1 < parts.length
-            if split  + 2 == parts.length and parts.last.type == :group
-              rewritten += parts.last.to_s
-            else
-              rewritten += '(' + parts[split + 1 .. -1].join + ')'
+          if group[3] > 0
+            regex = ('(' + regex[0...group[3]] + ')' + regex[group[3]..-1]).
+              sub(/^\(\^/, '^(')
+            prepend = 1
+            append += 1 if append
+          end
+
+          regex = process s(:regexp, s(:str, regex), args[0].children.last)
+
+          # 
+          if args.last.type == :str
+            str = args.last.children.first.gsub('$', '$$')
+            str = "$#{prepend}#{str}" if prepend
+            str = "#{str}$#{append}" if append
+            expr = s(:send, target, :replace, regex, s(:str, str))
+          else
+            dstr = args.last.type == :dstr ? args.last.children.dup : [args.last]
+            if prepend
+              dstr.unshift s(:send, s(:lvar, :match), :[], s(:int, prepend-1))
             end
-            dstr << s(:send, s(:lvar, :match), :[], s(:int, index))
+            if append
+              dstr << s(:send, s(:lvar, :match), :[], s(:int, append-1))
+            end
+
+            expr = s(:block,
+              s(:send, target, :replace, regex),
+              s(:args, s(:arg, :match)),
+              process(s(:dstr, *dstr)))
           end
-
-          rewritten = pre + rewritten + post
-
-          regex = process s(:regexp, s(:str, rewritten), args[0].children.last)
-          block = s(:block,
-            s(:send, target, :replace, regex),
-            s(:args, s(:arg, :match)),
-            process(s(:dstr, *dstr)))
 
           if VAR_TO_ASSIGN.keys.include? target.type
-            S(VAR_TO_ASSIGN[target.type], target.children.first, block)
+            S(VAR_TO_ASSIGN[target.type], target.children.first, expr)
           elsif target.type == :send
             if target.children[0] == nil
-              S(:lvasgn, target.children[1], block)
+              S(:lvasgn, target.children[1], expr)
             else
-              S(:send, target.children[0], :"#{target.children[1]}=", block)
+              S(:send, target.children[0], :"#{target.children[1]}=", expr)
             end
           else
             super

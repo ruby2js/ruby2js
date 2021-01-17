@@ -1,4 +1,5 @@
 require 'corelib/string/unpack'
+require 'corelib/array/pack'
 
 # https://github.com/opal/opal/blob/master/lib/opal/parser/patch.rb
 class Parser::Lexer

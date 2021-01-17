@@ -1,6 +1,3 @@
-# TODOS:
-#  * filter/functions.rb: require 'regexp_parser', needs YAML
-
 require 'native'
 require 'ruby2js'
 require 'patch.opal'

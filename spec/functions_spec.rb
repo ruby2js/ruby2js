@@ -212,16 +212,17 @@ describe Ruby2JS::Filter::Functions do
 
     it "should handle regular expression index assignment" do
       to_js( 'a[/a(b)/, 1] = "d"' ).must_equal(
-        'var a = a.replace(/(a)(b)/, function(match) {match[0] + "d"})')
+        'var a = a.replace(/(a)(b)/, "$1d")')
       to_js( 'a[/a(b)c/, 1] = "d"' ).must_equal(
-        'var a = a.replace(/(a)(b)(c)/, function(match) ' +
-        '{match[0] + "d" + match[2]})')
-      to_js( 'a[/(b)c/, 1] = "d"' ).must_equal(
-        'var a = a.replace(/(b)(c)/, function(match) ' +
-        '{"d" + match[1]})')
-      to_js( 'a[/^a(b)c/, 1] = "d"' ).must_equal(
-        'var a = a.replace(/^(a)(b)(c)/m, function(match) ' +
-        '{match[0] + "d" + match[2]})')
+        'var a = a.replace(/(a)(b)(c)/, "$1d$3")')
+      to_js( 'a[/a()c/, 1] = "d"' ).must_equal(
+        'var a = a.replace(/(a)(c)/, "$1d$2")')
+      to_js( 'a[/(b)c/, 1] = "#{d}"' ).must_equal(
+        'var a = a.replace(/(b)(c)/, ' +
+        'function(match) {d + match[1]})')
+      to_js( 'a[/^a(b)c/, 1] = d' ).must_equal(
+        'var a = a.replace(/^(a)(b)(c)/m, ' +
+        'function(match) {match[0] + d + match[2]})')
     end
 
     it "should handle empty?" do
