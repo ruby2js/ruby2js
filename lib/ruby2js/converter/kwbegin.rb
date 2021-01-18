@@ -19,7 +19,7 @@ module Ruby2JS
 
     handle :kwbegin do |*children|
       block = children.first
-      if block.type == :ensure
+      if block&.type == :ensure
         block, finally = block.children
       else
         finally = nil
