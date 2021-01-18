@@ -8,9 +8,10 @@
     "clean": "bundle exec bridgetown clean",
     "webpack-build": "webpack --mode production",
     "webpack-dev": "webpack --mode development -w",
-    "deploy": "yarn clean && yarn webpack-build && yarn build",
+    "deploy": "yarn clean && yarn webpack-build && yarn demo && yarn build",
     "sync": "node sync.js",
-    "start": "node start.js"
+    "start": "node start.js",
+    "demo": "bundle exec rake"
   },
   "devDependencies": {
     "@babel/core": "^7.9.0",
