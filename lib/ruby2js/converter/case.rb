@@ -10,6 +10,11 @@ module Ruby2JS
 
     handle :case do |expr, *whens, other|
       begin
+        if @state == :expression
+          parse s(:kwbegin, @ast), @state
+          return
+        end
+
         inner, @inner = @inner, @ast
 
         has_range = whens.any? do |node| 

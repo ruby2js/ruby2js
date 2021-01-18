@@ -64,10 +64,18 @@ module Ruby2JS
           if else_block.type == :begin
             else_block = s(:xnode, '', *else_block.children)
           end
+        else
+          if then_block.type == :begin
+            then_block = s(:kwbegin, then_block)
+          end
+
+          if else_block.type == :begin
+            else_block = s(:kwbegin, else_block)
+          end
         end
 
-        parse condition; put ' ? '; parse then_block
-        put ' : '; parse else_block
+        parse condition; put ' ? '; parse then_block, @state
+        put ' : '; parse else_block, @state
       end
     end
   end

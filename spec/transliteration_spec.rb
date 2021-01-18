@@ -387,11 +387,19 @@ describe Ruby2JS do
     end
     
     it "should parse if elsif" do
-      to_js( 'if true; 1; elsif false; 2; else; 3; end' ).must_equal 'if (true) {1} else if (false) {2} else {3}'
+      to_js( 'if true; 1; elsif false; 2; else; 3; end' ).
+        must_equal 'if (true) {1} else if (false) {2} else {3}'
     end
     
     it "should parse if elsif elsif" do
-      to_js( 'if true; 1; elsif false; 2; elsif (true or false); 3; else; nassif(); end' ).must_equal 'if (true) {1} else if (false) {2} else if (true || false) {3} else {nassif()}' 
+      to_js( 'if true; 1; elsif false; 2; elsif (true or false); 3; else; nassif(); end' ).
+        must_equal 'if (true) {1} else if (false) {2} else if (true || false) {3} else {nassif()}' 
+    end
+
+    it "should parse if as an expression" do
+      to_js( 'x = if a; b = 1; b; elsif c; x=1; x; end' ).
+        must_equal 'var x = a ? function() {var b = 1; return b}() : c ? ' +
+          'function() {var x = 1; return x}() : null' 
     end
     
     it "should handle basic variable scope" do
@@ -441,6 +449,11 @@ describe Ruby2JS do
     it "should parse when and else clauses as statements" do
       to_js( 'case 1; when 1; if true; end; else if false; end; end' ).
         must_equal 'switch (1) {case 1: if (true) null; break; default: if (false) null}'
+    end
+
+    it "should parse case expressions" do
+      to_js( 'x = case a; when true; b; else; c; end' ).
+        must_equal 'var x = function() {switch (a) {case true: return b; default: return c}}()'
     end
 
     it "should handle a for loop" do
