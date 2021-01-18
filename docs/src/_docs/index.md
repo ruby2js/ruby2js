@@ -88,7 +88,7 @@ puts context.eval('d.getYear()')+1900
 
 {% rendercontent "docs/note", extra_margin: true %}
 Conversions can be explored interactively using the
-[demo](/docs/running-the-demo) provided. (**[Online Version](https://whimsy.apache.org/ruby2js)**)
+[demo](/docs/running-the-demo) provided. (**[Online Version](/demo)**)
 {% endrendercontent %}
 
 ## Create a Configuration

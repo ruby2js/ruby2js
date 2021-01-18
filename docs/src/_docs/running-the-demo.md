@@ -5,7 +5,7 @@ top_section: Behind the Scenes
 category: demo
 ---
 
-**Ruby2JS** provides a web + CLI based demo tool you can use to try out Ruby code and see how it converts to JavaScript. (This is same tool used for the [online demo](https://whimsy.apache.org/ruby2js)).
+**Ruby2JS** provides a web + CLI based demo tool you can use to try out Ruby code and see how it converts to JavaScript. (This is same tool used for the [online demo](/demo)).
 
 ## Usage
 
