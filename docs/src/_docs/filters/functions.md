@@ -22,6 +22,7 @@ If you set the `eslevel` option to `2015` or newer, the Functions filter enables
 * `.ceil` {{ caret }} `Math.ceil()`
 * `.chr` {{ caret }} `fromCharCode`
 * `.clear` {{ caret }} `.length = 0`
+* `.define_method` {{ caret }} `klass.prototype.meth = function ...`
 * `.delete` {{ caret }} `delete target[arg]`
 * `.downcase` {{ caret }} `.toLowerCase`
 * `.each` {{ caret }} `.forEach`
@@ -45,6 +46,7 @@ If you set the `eslevel` option to `2015` or newer, the Functions filter enables
 * `.max` {{ caret }} `Math.max.apply(Math)`
 * `.merge` {{ caret }} `Object.assign({}, ...)`
 * `.merge!` {{ caret }} `Object.assign()`
+* `.method_defined?` {{ caret }} `obj.hasOwnProperty(meth)` or `meth in obj`
 * `.min` {{ caret }} `Math.min.apply(Math)`
 * `.nil?` {{ caret }} `== null`
 * `.ord` {{ caret }} `charCodeAt(0)`
@@ -97,6 +99,7 @@ If you set the `eslevel` option to `2015` or newer, the Functions filter enables
 * `loop do...end` will be replaced with `while (true) {...}`
 * `raise Exception.new(...)` will be replaced with `throw new Error(...)`
 * `block_given?` will check for the presence of optional argument `_implicitBlockYield` which is a function made accessible through the use of `yield` in a method body.
+* `alias_method` works both inside of a class definition as well as called directly on a class name (e.g. `MyClass.alias_method`)
 
 Additionally, there is one mapping that will only be done if explicitly
 included (pass `include: :class` as a `convert` option to enable):
