@@ -1033,6 +1033,11 @@ describe Ruby2JS do
     it "should handle neither a rescue nor an ensure being present" do
       to_js( 'begin a; b; end' ).must_equal 'var a; var b'
     end
+
+    it "should handle begin as an expression" do
+      to_js( 'z = begin; x = 1; x; end' ).
+        must_equal 'var z = function() {var x = 1; return x}()'
+    end
   end
 
   describe 'execution' do

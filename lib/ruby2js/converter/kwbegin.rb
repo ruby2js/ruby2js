@@ -6,7 +6,7 @@ module Ruby2JS
     #     (resbody nil nil
     #       (send nil :b)) nil)
     handle :rescue do |*statements|
-      parse_all s(:kwbegin, s(:rescue, *statements))
+      parse s(:kwbegin, s(:rescue, *statements)), @state
     end
 
     # (kwbegin
@@ -19,6 +19,13 @@ module Ruby2JS
 
     handle :kwbegin do |*children|
       block = children.first
+
+      if @state == :expression
+        parse s(:send, s(:block, s(:send, nil, :proc), s(:args),
+          s(:begin, s(:autoreturn, block))), :[])
+        return
+      end
+
       if block&.type == :ensure
         block, finally = block.children
       else
