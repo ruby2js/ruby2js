@@ -219,8 +219,9 @@ module Ruby2JS
 
         # collapse sequence to a single assignment
         if \
-          @ast.type != :class_extend and
-          (methods > 1 or (methods == 1 and body[start].type == :prop))
+          @ast.type == :class_module or
+          (@ast.type == :class and 
+            (methods > 1 or (methods == 1 and body[start].type == :prop)))
         then
           pairs = body[start...start+methods].map do |node|
             if node.type == :method
