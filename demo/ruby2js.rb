@@ -283,13 +283,6 @@ else
       .btn-primary:active{color:#fff;background-color:#0a58ca;border-color:#0a53be}
       .btn-primary:active:focus{box-shadow:0 0 0 .25rem rgba(49,132,253,.5)}
       .btn-primary:disabled{color:#fff;background-color:#0d6efd;border-color:#0d6efd}
-
-      .btn-success{color:#fff;background-color:#28a745;border-color:#28a745}
-      .btn-success:hover{color:#fff;background-color:#218838;border-color:#1e7e34}
-      .btn-success:focus{color:#fff;background-color:#218838;border-color:#1e7e34;box-shadow:0 0 0 .2rem rgba(72,180,97,.5)}
-      .btn-success:active{color:#fff;background-color:#1e7e34;border-color:#1c7430}
-      .btn-success:active:focus{box-shadow:0 0 0 .2rem rgba(72,180,97,.5)}
-      .btn-success:disabled{color:#fff;background-color:#28a745;border-color:#28a745}
     }
 
     _div.container.narrow_container do
@@ -301,7 +294,8 @@ else
       _form method: 'post' do
         _textarea.ruby.form_control @ruby, name: 'ruby', rows: 8,
           placeholder: 'Ruby source'
-        _input.btn.btn_primary type: 'submit', value: 'Convert', disabled: !!@live
+        _input.btn.btn_primary type: 'submit', value: 'Convert', 
+          style: "display: #{@live ? 'none' : 'inline'}"
 
         _label 'ES level', for: 'eslevel'
         _select name: 'eslevel', id: 'eslevel' do

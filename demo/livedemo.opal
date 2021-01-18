@@ -65,20 +65,8 @@ def walk(ast, indent='')
   output << '</div>'
 end
 
-# have mouseup toggle convert button between primary and success
-convert.addEventListener :mouseup do |event|
-  if convert.classList.contains('btn-primary')
-    convert.classList.remove('btn-primary')
-    convert.classList.add('btn-success')
-  else
-    convert.classList.add('btn-primary')
-    convert.classList.remove('btn-success')
-  end
-end
-
-# when convert button is success, update output on every keystroke in textarea
+# update output on every keystroke in textarea
 $document.querySelector('textarea').addEventListener :input do
-  return if convert.classList.contains('btn-primary')
   event = `new MouseEvent('click', { bubbles: true, cancelable: true, view: window })`
   $document.querySelector('input[type=submit]').dispatchEvent(event)
 end
@@ -124,9 +112,6 @@ convert.addEventListener :click do |event|
   jspre.textContent = js.to_s
   jsdiv[:style].display = 'block'
 end
-
-# enable the convert button
-convert.disabled = false
 
 # make inputs match query
 parse_options.each do |name, value|
