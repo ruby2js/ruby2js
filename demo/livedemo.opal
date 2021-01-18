@@ -118,8 +118,6 @@ parse_options.each do |name, value|
   case name
   when :ruby
     $document.querySelector('textarea').value = value
-    event = `new MouseEvent('click', { bubbles: true, cancelable: true, view: window })`
-    $document.querySelector('input[type=submit]').dispatchEvent(event)
   when :filters
     nodes = $document.getElementById(:filters)[:parentNode].querySelectorAll(:input)
     nodes.forEach do |node|
@@ -135,4 +133,10 @@ parse_options.each do |name, value|
     checkbox = $document.querySelector("input[name=#{name}]")
     checkbox.checked = true if checkbox
   end
+end
+
+# initial conversion if textarea is not empty
+unless $document.querySelector('textarea').value.empty?
+  event = `new MouseEvent('click', { bubbles: true, cancelable: true, view: window })`
+  $document.querySelector('input[type=submit]').dispatchEvent(event)
 end
