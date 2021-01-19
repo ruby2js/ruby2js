@@ -96,7 +96,7 @@ module Parser
           children = node.children.map do |str_node|
             if str_node.type == :str
               str_node = str_node.updated(nil, [dedenter.dedent(str_node.children.first)])
-              next nil if str.empty?
+              next nil if str_node.children.first.empty?
             else
               dedenter.interrupt
             end
