@@ -13,7 +13,7 @@ Documentation
 
 * Visit **[ruby2js.com](https://www.ruby2js.com)** for detailed setup instructions and API reference.
 
-* [Try Ruby2JS online](https://whimsy.apache.org/ruby2js)
+* [Try Ruby2JS online](https://ruby2js.com/demo)
 
 
 Synopsis
