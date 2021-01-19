@@ -19,7 +19,7 @@ def parse_options
 
   search[1..-1].split('&').each do |parameter|
     name, value = parameter.split('=', 2)
-    value = value ? $$.decodeURIComponent(value) : true
+    value = value ? $$.decodeURIComponent(value.gsub('+', ' ')) : true
 
     case name
     when :filter
