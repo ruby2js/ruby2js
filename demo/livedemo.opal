@@ -110,7 +110,7 @@ convert.addEventListener :click do |event|
   end
 
   jspre.textContent = js.to_s
-  jsdiv[:style].display = 'block'
+  jsdiv[:style].display = js.to_s.empty? ? 'none' : 'block'
 end
 
 # make inputs match query
