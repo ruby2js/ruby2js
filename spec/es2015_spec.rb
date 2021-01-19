@@ -173,6 +173,14 @@ describe "ES2015 support" do
     it "should convert interpolated regular expressions into templates" do
       to_js( '/a#{b}c/' ).must_equal("new RegExp(`a${b}c`)")
     end
+
+    it "should handle totally empty interpolation" do
+      to_js('"#{}"').must_equal '``'
+    end
+
+    it "should handle mixed empty interpolation" do
+      to_js('"x#{}y"').must_equal '`xy`'
+    end
   end
 
   describe :fat_arrow do

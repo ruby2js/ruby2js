@@ -26,7 +26,7 @@ module Ruby2JS
             else
               put str
             end
-          else
+          elsif child != s(:begin)
             put '${'
             parse child
             put '}'
@@ -40,8 +40,8 @@ module Ruby2JS
       children.each_with_index do |child, index|
         put ' + ' unless index == 0
 
-        if child.type == :begin and child.children.length == 1
-          child = child.children.first
+        if child.type == :begin and child.children.length <= 1
+          child = child.children.first || s(:str, '')
         end
 
         if child.type == :send

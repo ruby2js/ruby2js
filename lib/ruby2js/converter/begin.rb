@@ -9,6 +9,11 @@ module Ruby2JS
       state = @state
       props = false
 
+      if state == :expression and statements.empty?
+        puts 'null'
+        return
+      end
+
       statements.map! do |statement|
         case statement and statement.type
         when :defs, :defp

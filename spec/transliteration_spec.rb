@@ -352,6 +352,20 @@ describe Ruby2JS do
       to_js( ':"a#{b}c"' ).must_equal '"a" + b + "c"'
     end
   end
+
+  describe 'wow, such empty' do
+    it "should handle totally empty interpolation" do
+      to_js('"#{}"').must_equal '""'
+    end
+
+    it "should handle mixed empty interpolation" do
+      to_js('"x#{}y"').must_equal '"x" + "" + "y"'
+    end
+
+    it "should handle mixed empty parens" do
+      to_js('x = ()').must_equal 'var x = null'
+    end
+  end
   
   describe 'array push' do
     it "should convert << statements to .push calls" do
