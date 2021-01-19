@@ -40,6 +40,78 @@ class Parser::Source::Buffer
   end
 end
 
+# https://github.com/ruby2js/ruby2js/issues/94
+# https://github.com/whitequark/parser/blob/6337d7bf676f66d80e43bd9d33dc17659f8af7f3/lib/parser/lexer/dedenter.rb#L36
+class Parser::Lexer::Dedenter
+  def dedent(string)
+    original_encoding = string.encoding
+    # Prevent the following error when processing binary encoded source.
+    # "\xC0".split # => ArgumentError (invalid byte sequence in UTF-8)
+    lines = string.force_encoding(Encoding::BINARY).split("\\\n")
+    lines.map! {|s| s.force_encoding(original_encoding) }
+
+    lines.each_with_index do |line, index|
+      next if index == 0 and not @at_line_begin
+      left_to_remove = @dedent_level
+      remove = 0
+
+      line.each_char do |char|
+        break if left_to_remove <= 0
+        case char
+        when ?\s
+          remove += 1
+          left_to_remove -= 1
+        when ?\t
+          break if TAB_WIDTH * (remove / TAB_WIDTH + 1) > @dedent_level
+          remove += 1
+          left_to_remove -= TAB_WIDTH
+        else
+          # no more spaces or tabs
+          break
+        end
+      end
+
+      lines[index] = line[remove..-1]
+    end
+
+    string = lines.join
+
+    @at_line_begin = string.end_with?("\n")
+
+    string
+  end
+end
+#... also part of above patch ...
+# https://github.com/whitequark/parser/blob/a7c638b7b205db9213a56897b41a8e5620df766e/lib/parser/builders/default.rb#L388
+module Parser
+  class Builders::Default
+    def dedent_string(node, dedent_level)
+      if !dedent_level.nil?
+        dedenter = Lexer::Dedenter.new(dedent_level)
+
+        case node.type
+        when :str
+          node = node.updated(nil, [dedenter.dedent(node.children.first)])
+        when :dstr, :xstr
+          children = node.children.map do |str_node|
+            if str_node.type == :str
+              str_node = str_node.updated(nil, [dedenter.dedent(str_node.children.first)])
+              next nil if str.empty?
+            else
+              dedenter.interrupt
+            end
+            str_node
+          end
+
+          node = node.updated(nil, children.compact)
+        end
+      end
+
+      node
+    end
+  end
+end
+
 # https://github.com/whitequark/parser/issues/784
 module Parser
   class Diagnostic

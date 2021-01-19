@@ -89,7 +89,7 @@ convert.addEventListener :click do |event|
       js = e
     end
     jspre[:classList].add 'exception'
-  rescue => e
+  rescue Exception => e
     js = e.inspect
     jspre[:classList].add 'exception'
   end
