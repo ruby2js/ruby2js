@@ -120,7 +120,7 @@ module Ruby2JS
 
               if \
                 anonfn and 
-                left.children.first.to_s =~ /\A[a-zA-Z_$][a-zA-Z_$0-9]*\Z/
+                left.children.first.to_s =~ /\A[a-zA-Z_$][a-zA-Z_$0-9]*\z/
               then
                 @prop = left.children.first
                 parse right, :method
@@ -135,7 +135,7 @@ module Ruby2JS
 		  parse left
 		  put ']'
 		elsif \
-		  left.children.first.to_s =~ /\A[a-zA-Z_$][a-zA-Z_$0-9]*\Z/
+		  left.children.first.to_s =~ /\A[a-zA-Z_$][a-zA-Z_$0-9]*\z/
 		then
 		  put left.children.first
 		else
