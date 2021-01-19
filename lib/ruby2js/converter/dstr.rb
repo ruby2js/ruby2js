@@ -10,6 +10,11 @@ module Ruby2JS
     #   (...))
 
     handle :dstr, :dsym do |*children|
+      if @state == :expression and children.empty?
+        puts '""'
+        return
+      end
+
       if es2015
         # gather length of string parts; if long enough, newlines will
         # not be escaped (poor man's HEREDOC)

@@ -362,6 +362,10 @@ describe Ruby2JS do
       to_js('"x#{}y"').must_equal '"x" + "" + "y"'
     end
 
+    it "should handle empty here docs" do
+      to_js("x = <<HERE\nHERE").must_equal "var x = \"\"\n"
+    end
+
     it "should handle mixed empty parens" do
       to_js('x = ()').must_equal 'var x = null'
     end
