@@ -7,7 +7,11 @@ module Ruby2JS
 
     handle :module do |name, *body|
       if body == [nil]
-        parse @ast.updated(:casgn, [*name.children, s(:hash)])
+        if name
+          parse @ast.updated(:casgn, [*name.children, s(:hash)])
+        else
+          parse @ast.updated(:hash, [])
+        end
         return
       end
 
@@ -15,7 +19,8 @@ module Ruby2JS
         body = body.first.children
       end
 
-      if body.length > 0 and body.all? {|child| child.type == :def}
+      if body.length > 0 and body.all? {|child| child.type == :def ||
+        (es2015 and child.type == :class) || child.type == :module}
         parse @ast.updated(:class_module, [name, nil, *body])
         return
       end
@@ -55,7 +60,9 @@ module Ruby2JS
 
       body = s(:send, s(:block, s(:send, nil, :proc), s(:args),
         s(:begin, *body)), :[])
-      if name.children.first == nil
+      if not name
+        parse body
+      elsif name.children.first == nil
         parse s(:lvasgn, name.children.last, body)
       else
         parse s(:send, name.children.first, "#{name.children.last}=", body)

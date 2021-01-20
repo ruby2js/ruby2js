@@ -18,7 +18,9 @@ module Ruby2JS
         node.type == :def and node.children.first == :method_missing
       end
 
-      if name.type == :const and name.children.first == nil
+      if not name
+        put 'class'
+      elsif name.type == :const and name.children.first == nil
         put 'class '
         parse name
         put '$' if proxied

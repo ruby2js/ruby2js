@@ -160,17 +160,19 @@ module Ruby2JS
           s(:send, s(:attr, name, :prototype),
             "#{m.children[0].children.first}=", 
             s(:attr, s(:attr, name, :prototype), m.children[1].children.first))
-        elsif m.type == :class
+        elsif m.type == :class or m.type == :module
           innerclass_name = m.children.first
           if innerclass_name.children.first
             innerclass_name = innerclass_name.updated(nil,
-              [s(:attr, innerclass_name.children[0], name),
+              [s(:attr, name, innerclass_name.children[0].children.last),
               innerclass_name.children[1]])
           else
             innerclass_name = innerclass_name.updated(nil,
               [name, innerclass_name.children[1]])
           end
           m.updated(nil, [innerclass_name, *m.children[1..-1]])
+        elsif @ast.type == :class_module
+          m
         else
           raise Error.new("class #{ m.type } not supported", @ast)
         end
@@ -210,6 +212,10 @@ module Ruby2JS
             node.children[0].type == :attr and
             node.children[0].children[1] == :prototype
             methods += 1
+          elsif node.type == :class and @ast.type == :class_module and es2015
+            methods += 1 if node.children.first.children.first == name
+          elsif node.type == :module and @ast.type == :class_module
+            methods += 1 if node.children.first.children.first == name
           elsif methods == 0
             start += 1
           else
@@ -228,6 +234,12 @@ module Ruby2JS
               replacement = node.updated(:pair, [
                 s(:str, node.children[1].to_s.chomp('=')),
                 node.children[2]])
+            elsif node.type == :class and node.children.first.children.first == name
+              replacement = s(:pair, s(:sym, node.children.first.children.last),
+                s(:class, nil, nil, node.children.last))
+            elsif node.type == :module and node.children.first.children.first == name
+              replacement = s(:pair, s(:sym, node.children.first.children.last),
+                s(:module, nil, node.children.last))
             else
               replacement = node.children[1].map do |prop, descriptor|
                 node.updated(:pair, [s(:prop, prop), descriptor])
@@ -245,8 +257,12 @@ module Ruby2JS
           end
 
           if @ast.type == :class_module
-            body[start...start+methods] =
-              s(:casgn, *name.children, s(:hash, *pairs.flatten))
+            if name
+              body[start...start+methods] =
+                s(:casgn, *name.children, s(:hash, *pairs.flatten))
+            else
+              body[start...start+methods] = s(:hash, *pairs.flatten)
+            end
           else
             body[start...start+methods] =
               s(:send, name, :prototype=, s(:hash, *pairs.flatten))

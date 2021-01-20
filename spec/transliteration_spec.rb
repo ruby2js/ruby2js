@@ -852,6 +852,13 @@ describe Ruby2JS do
       to_js( 'module A; B=1; private; C=1; end' ).
         must_equal 'A = function() {var B = 1; var C = 1; return {B: B}}()'
     end
+
+    it "should handle nested modules" do
+      to_js( 'module M; module N; def f(); end; end; end' ).
+        must_equal('var M = {N: {f: function() {}}}')
+      to_js( 'module M; module N; end; module N::O; end; end' ).
+        must_equal('var M = {N: {}}; M.N.O = {}')
+    end
   end
 
   describe 'allocation' do

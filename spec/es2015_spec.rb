@@ -507,6 +507,13 @@ describe "ES2015 support" do
     end
   end
 
+  describe :module do
+    it "should handle classes nested in modules" do
+      to_js( 'module M; class C; def f(); end; end; end' ).
+        must_equal('const M = {C: class {f() {}}}')
+    end
+  end
+
   describe 'method_missing' do
     it 'should handle args' do
       to_js('class A; def method_missing(method, *args); end; end').
