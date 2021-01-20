@@ -125,8 +125,9 @@ module Ruby2JS
                 @prop = left.children.first
                 parse right, :method
               elsif \
-                es2015 and left.type == :sym and right.type == :lvar and
-                left.children == right.children
+                es2015 and left.type == :sym and (right.type == :lvar or 
+                (right.type == :send and right.children.first == nil)) and
+                left.children.last == right.children.last
               then
                 parse right 
               else
