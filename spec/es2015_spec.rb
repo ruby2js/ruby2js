@@ -493,6 +493,13 @@ describe "ES2015 support" do
     end
   end
 
+  describe 'module extensions' do
+    it 'should handle methods' do
+      to_js('++module M; def m(); end; end').
+        must_equal 'Object.assign(M, {m: function() {}})'
+    end
+  end
+
   describe 'keyword arguments' do
     it 'should handle keyword arguments in methods' do
       skip if RUBY_VERSION =~ /^(1\.9|2\.0)/

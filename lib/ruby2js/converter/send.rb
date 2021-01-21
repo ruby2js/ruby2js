@@ -181,9 +181,15 @@ module Ruby2JS
           receiver.type == :send and
           receiver.children[1] == :+@ and
           Parser::AST::Node === receiver.children[0] and
-          receiver.children[0].type == :class
+          %i(class module).include? receiver.children[0].type
         then
-          parse receiver.children[0].updated(:class_extend)
+          if receiver.children[0].type == :class
+            parse receiver.children[0].updated(:class_extend)
+          else
+            mod = receiver.children[0]
+            parse s(:send, s(:const, nil, :Object), :assign,
+              mod.children[0], mod.updated(nil, [nil, *mod.children[1..-1]]))
+          end
         else
           put method.to_s[0]; parse receiver
         end
