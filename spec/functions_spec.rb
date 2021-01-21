@@ -551,11 +551,11 @@ describe Ruby2JS::Filter::Functions do
 
   describe "introspection and metaprogramming" do
     it "should handle method_defined?" do
-      to_js( 'a.method_defined? :meth').must_equal '"meth" in a'
-      to_js( 'a.method_defined? :meth, true').must_equal '"meth" in a'
-      to_js( 'a.method_defined? :meth, false').must_equal 'a.hasOwnProperty("meth")'
+      to_js( 'a.method_defined? :meth').must_equal '"meth" in a.prototype'
+      to_js( 'a.method_defined? :meth, true').must_equal '"meth" in a.prototype'
+      to_js( 'a.method_defined? :meth, false').must_equal 'a.prototype.hasOwnProperty("meth")'
       to_js( 'result = a.method_defined? :meth, expr').
-        must_equal 'var result = expr ? "meth" in a : a.hasOwnProperty("meth")'
+        must_equal 'var result = expr ? "meth" in a.prototype : a.prototype.hasOwnProperty("meth")'
     end
 
     it "should handle alias_method" do

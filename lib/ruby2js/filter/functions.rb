@@ -560,12 +560,12 @@ module Ruby2JS
 
         elsif method == :method_defined? and args.length >= 1
           if args[1] == s(:false)
-            process S(:send, target, :hasOwnProperty, args[0])
+            process S(:send, s(:attr, target, :prototype), :hasOwnProperty, args[0])
           elsif args.length == 1 or args[1] == s(:true)
-            process S(:in?, args[0], target)
+            process S(:in?, args[0], s(:attr, target, :prototype))
           else
-            process S(:if, args[1], s(:in?, args[0], target),
-              s(:send, target, :hasOwnProperty, args[0]))
+            process S(:if, args[1], s(:in?, args[0], s(:attr, target, :prototype)),
+              s(:send, s(:attr, target, :prototype), :hasOwnProperty, args[0]))
           end
 
         elsif method == :alias_method and args.length == 2
