@@ -46,7 +46,7 @@ If you set the `eslevel` option to `2015` or newer, the Functions filter enables
 * `.max` {{ caret }} `Math.max.apply(Math)`
 * `.merge` {{ caret }} `Object.assign({}, ...)`
 * `.merge!` {{ caret }} `Object.assign()`
-* `.method_defined?` {{ caret }} `obj.hasOwnProperty(meth)` or `meth in obj`
+* `.method_defined?` {{ caret }} `klass.prototype.hasOwnProperty(meth)` or `meth in klass.prototype`
 * `.min` {{ caret }} `Math.min.apply(Math)`
 * `.nil?` {{ caret }} `== null`
 * `.ord` {{ caret }} `charCodeAt(0)`
