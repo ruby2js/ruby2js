@@ -1,4 +1,5 @@
 require 'ruby2js/serializer'
+require 'ruby2js/namespace'
 
 module Ruby2JS
   class Error < NotImplementedError
@@ -14,7 +15,7 @@ module Ruby2JS
 
   class Converter < Serializer
     attr_accessor :ast
-    
+
     LOGICAL   = :and, :not, :or
     OPERATORS = [:[], :[]=], [:not, :!], [:**], [:*, :/, :%], [:+, :-], 
       [:>>, :<<], [:&], [:^, :|], [:<=, :<, :>, :>=], [:==, :!=, :===, :"!=="],
@@ -50,6 +51,8 @@ module Ruby2JS
       @@handlers.each do |name|
         @handlers[name] = method("on_#{name}")
       end
+
+      @namespace = Namespace.new
 
       @state = nil
       @block_this = nil

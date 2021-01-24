@@ -150,6 +150,7 @@ module Ruby2JS
       def on_for_of(node); on_for(node); end
       def on_in?(node); on_send(node); end
       def on_method(node); on_send(node); end
+      def on_module_hash(node); on_module(node); end
       def on_prop(node); on_array(node); end
       def on_prototype(node); on_begin(node); end
       def on_send!(node); on_send(node); end

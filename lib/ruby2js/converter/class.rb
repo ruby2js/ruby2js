@@ -238,8 +238,9 @@ module Ruby2JS
               replacement = s(:pair, s(:sym, node.children.first.children.last),
                 s(:class, nil, nil, node.children.last))
             elsif node.type == :module and node.children.first.children.first == name
-              replacement = s(:pair, s(:sym, node.children.first.children.last),
-                s(:module, nil, node.children.last))
+              sym = node.children.first.children.last
+              replacement = s(:pair, s(:sym, sym),
+                s(:module_hash, s(:const, nil, sym), node.children.last))
             else
               replacement = node.children[1].map do |prop, descriptor|
                 node.updated(:pair, [s(:prop, prop), descriptor])
@@ -267,6 +268,15 @@ module Ruby2JS
             body[start...start+methods] =
               s(:send, name, :prototype=, s(:hash, *pairs.flatten))
           end
+
+        elsif @ast.type == :class_extend and methods > 1
+          pairs = body[start...start+methods].map do |node|
+            node.updated(:pair, [
+               s(:sym, node.children[1].to_s[0..-2]), node.children[2]])
+          end
+
+          body[start...start+methods] = s(:send, s(:const, nil, :Object),
+            :assign, body[start].children.first, s(:hash, *pairs))
         end
       end
 
