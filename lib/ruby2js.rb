@@ -135,6 +135,7 @@ module Ruby2JS
       end
 
       # handle all of the 'invented/synthetic' ast types
+      def on_assign(node); end
       def on_async(node); on_def(node); end
       def on_asyncs(node); on_defs(node); end
       def on_attr(node); on_send(node); end

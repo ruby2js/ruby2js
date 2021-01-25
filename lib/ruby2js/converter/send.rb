@@ -187,8 +187,8 @@ module Ruby2JS
             parse receiver.children[0].updated(:class_extend)
           else
             mod = receiver.children[0]
-            parse s(:send, s(:const, nil, :Object), :assign,
-              mod.children[0], mod.updated(nil, [nil, *mod.children[1..-1]]))
+            parse s(:assign, mod.children[0],
+              mod.updated(nil, [nil, *mod.children[1..-1]]))
           end
         else
           put method.to_s[0]; parse receiver

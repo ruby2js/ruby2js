@@ -275,8 +275,8 @@ module Ruby2JS
                s(:sym, node.children[1].to_s[0..-2]), node.children[2]])
           end
 
-          body[start...start+methods] = s(:send, s(:const, nil, :Object),
-            :assign, body[start].children.first, s(:hash, *pairs))
+          body[start...start+methods] =
+            s(:assign, body[start].children.first, s(:hash, *pairs))
         end
       end
 

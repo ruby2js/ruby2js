@@ -6,12 +6,16 @@ module Ruby2JS
     #   (...)
 
     handle :module, :module_hash do |name, *body|
+      extend = @namespace.enter(name)
+
       if body == [nil]
-        if @ast.type == :module
+        if @ast.type == :module and not extend
           parse @ast.updated(:casgn, [*name.children, s(:hash)])
         else
           parse @ast.updated(:hash, [])
         end
+
+        @namespace.leave
         return
       end
 
@@ -19,14 +23,12 @@ module Ruby2JS
         body = body.first.children
       end
 
-      extend = @namespace.enter(name)
-
       if body.length > 0 and body.all? {|child| child.type == :def ||
         (es2015 and child.type == :class) || child.type == :module}
 
         if extend
-          parse s(:send, s(:const, nil, :Object), :assign, name,
-            @ast.updated(:class_module, [nil, nil, *body]))
+          parse s(:assign, name, @ast.updated(:class_module, 
+            [nil, nil, *body])), :statement
         elsif @ast.type == :module_hash
           parse @ast.updated(:class_module, [nil, nil, *body])
         else
@@ -77,7 +79,7 @@ module Ruby2JS
       if not name
         parse body
       elsif extend
-        parse s(:send, s(:const, nil, :Object), :assign, name, body)
+        parse s(:assign, name, body)
       elsif name.children.first == nil
         parse s(:lvasgn, name.children.last, body)
       else

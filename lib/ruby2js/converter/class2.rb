@@ -236,8 +236,7 @@ module Ruby2JS
             else
               if m.children[1] == :include
                 m = m.updated(:begin, m.children[2..-1].map {|mname|
-                  s(:send, s(:const, nil, :Object), :assign,
-                  s(:attr, name, :prototype), mname)})
+                  s(:assign, s(:attr, name, :prototype), mname)})
               end
 
               skipped = true

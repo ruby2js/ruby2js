@@ -298,6 +298,7 @@ end
 require 'ruby2js/converter/arg'
 require 'ruby2js/converter/args'
 require 'ruby2js/converter/array'
+require 'ruby2js/converter/assign'
 require 'ruby2js/converter/begin'
 require 'ruby2js/converter/block'
 require 'ruby2js/converter/blockpass'

@@ -351,27 +351,27 @@ describe Ruby2JS::Filter::Functions do
     end
 
     it "should handle merge" do
-      to_js( 'a.merge(b)' ).
-        must_equal  "(function() {var $$ = {}; " +
+      to_js( 'a = a.merge(b)' ).
+        must_equal  "var a = function() {var $$ = {}; " +
           "for (var $_ in a) {$$[$_] = a[$_]}; " +
-          "for (var $_ in b) {$$[$_] = b[$_]}; return $$})()"
+          "for (var $_ in b) {$$[$_] = b[$_]}; return $$}()"
     end
 
     it "should handle merge with a constant hash" do
-      to_js( 'a.merge(b: 1)' ).
-        must_equal  "(function() {var $$ = {}; " +
+      to_js( 'a = a.merge(b: 1)' ).
+        must_equal  "var a = function() {var $$ = {}; " +
           "for (var $_ in a) {$$[$_] = a[$_]}; " +
-          "$$.b = 1; return $$})()"
+          "$$.b = 1; return $$}()"
     end
 
     it "should handle merge!" do
       to_js( 'a.merge!(b)' ).
-        must_equal "(function() {for (var $_ in b) {a[$_] = b[$_]}; return a})()"
+        must_equal "for (var $_ in b) {a[$_] = b[$_]}"
     end
 
     it "should handle merge! with a constant hash" do
       to_js( 'a.merge!(b: 1)' ).
-        must_equal "(function() {a.b = 1; return a})()"
+        must_equal "a.b = 1"
     end
 
     it "should handle delete attribute (ruby style) - static" do

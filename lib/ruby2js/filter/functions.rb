@@ -129,57 +129,14 @@ module Ruby2JS
         elsif method == :merge
           args.unshift target
 
-          if es2015
-            if es2018
-              process S(:hash, *args.map {|arg| s(:kwsplat, arg)})
-            else
-              process S(:send, s(:const, nil, :Object), :assign, s(:hash),
-                *args)
-            end
+          if es2018
+            process S(:hash, *args.map {|arg| s(:kwsplat, arg)})
           else
-            copy = [s(:gvasgn, :$$, s(:hash))]
-
-            s(:send, s(:block, s(:send, nil, :lambda), s(:args),
-              s(:begin, *copy, *args.map {|modname|
-              if modname.type == :hash
-                s(:begin, *modname.children.map {|pair|
-                    s(:send, s(:gvar, :$$), :[]=, *pair.children)
-                  })
-              else
-                s(:for, s(:lvasgn, :$_), modname,
-                s(:send, s(:gvar, :$$), :[]=,
-                s(:lvar, :$_), s(:send, modname, :[], s(:lvar, :$_))))
-              end
-              }, s(:return, s(:gvar, :$$)))), :[])
+            process S(:assign, s(:hash), *args)
           end
 
         elsif method == :merge!
-          if es2015
-            process S(:send, s(:const, nil, :Object), :assign, target, *args)
-          else
-            copy = []
-
-            unless
-               target.type == :send and target.children.length == 2 and
-               target.children[0] == nil
-            then
-               copy << s(:gvasgn, :$0, target)
-               target = s(:gvar, :$0)
-            end
-
-            s(:send, s(:block, s(:send, nil, :lambda), s(:args),
-              s(:begin, *copy, *args.map {|modname|
-              if modname.type == :hash
-                s(:begin, *modname.children.map {|pair|
-                    s(:send, target, :[]=, *pair.children)
-                  })
-              else
-                s(:for, s(:lvasgn, :$_), modname,
-                s(:send, target, :[]=,
-                s(:lvar, :$_), s(:send, modname, :[], s(:lvar, :$_))))
-              end
-              }, s(:return, target))), :[])
-          end
+          process S(:assign, target, *args)
 
         elsif method == :delete and args.length == 1
           if not target
