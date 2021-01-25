@@ -21,5 +21,12 @@ describe "namespace support" do
       must_equal('const M = {N: {f: function() {}}}; ' +
         'M.N.g = function() {}');
     end
+
+    it "should extend nested modules with getter" do
+      to_js( 'module M; module N; def f(); end; end; end;' +
+             'module M::N; def g; end; end').
+      must_equal('const M = {N: {f: function() {}}}; ' +
+        'Object.assign(M.N, {get g() {}})');
+    end
   end
 end
