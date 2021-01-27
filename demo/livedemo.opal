@@ -43,23 +43,44 @@ def parse_options
 end
 
 # convert AST into displayable form
-def walk(ast, indent='')
+def walk(ast, indent='', tail='', last=true)
   return [] unless ast
   output = ["<div class=#{ast.loc ? 'loc' : 'unloc'}>"]
-  output << "#{indent}#{ast.type}"
+  output << "#{indent}<span class=hidden>s(:</span>#{ast.type}"
+  output << '<span class=hidden>,</span>' unless ast.children.empty?
 
   if ast.children.any? {|child| child.is_a? Parser::AST::Node}
-    ast.children.each do |child|
+    ast.children.each_with_index do |child, index|
+      ctail = index == ast.children.length - 1 ? ')' + tail : ''
+      lastc = last && !ctail.empty?
+
       if Parser::AST::Node === child
-        output += walk(child, "  #{indent}")
+        output += walk(child, "  #{indent}", ctail, lastc)
       else
-        output << "<div>#{indent}  #{child.inspect}</div>"
+        output << "<div>#{indent}  "
+
+        if child.is_a? String and child =~ /\A[!-~]+\z/
+          output << ":#{child}"
+        else
+          output << child.inspect
+        end
+
+        output << "<span class=hidden>#{ctail}#{',' unless lastc}</span>"
+        output << ' ' if lastc
+        output << '</div>'
       end
     end
   else
-    ast.children.each do |child|
-      output << " #{child.inspect}"
+    ast.children.each_with_index do |child, index|
+      if ast.type != :str and child.is_a? String and child =~ /\A[!-~]+\z/
+        output << " :#{child}"
+      else
+        output << " #{child.inspect}"
+      end
+      output << '<span class=hidden>,</span>' unless index == ast.children.length - 1
     end
+    output << "<span class=hidden>)#{tail}#{',' unless last}</span>"
+    output << ' ' if last
   end
 
   output << '</div>'

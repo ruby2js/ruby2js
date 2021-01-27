@@ -6,6 +6,7 @@
 * Handle modules with exactly one method
 * Live demo based on Opal ([see here](https://ruby2js.com/demo))
 * Handle empty edge cases like `` `#{}` `` and `()`
+* Hidden AST syntax enables copy/paste of syntactically correct AST
 
 # 3.6.1 / 2020-12-31
 

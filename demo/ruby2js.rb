@@ -215,22 +215,34 @@ if not env['SERVER_PORT'] and not @live
   end  
 
 else
-  def walk(ast, indent='')
+  def walk(ast, indent='', tail='', last=true)
     return unless ast
     _div class: (ast.loc ? 'loc' : 'unloc') do
-      _ "#{indent}#{ast.type}"
+      _ indent
+      _span.hidden 's(:'
+      _ ast.type
+      _span.hidden ',' unless ast.children.empty?
+
       if ast.children.any? {|child| Parser::AST::Node === child}
-        ast.children.each do |child|
+        ast.children.each_with_index do |child, index|
+          ctail = index == ast.children.length - 1 ? ')' + tail : ''
           if Parser::AST::Node === child
-            walk(child, "  #{indent}")
+            walk(child, "  #{indent}", ctail, last && !ctail.empty?)
           else
-            _div "#{indent}  #{child.inspect}"
+            _div do
+              _ "#{indent}  #{child.inspect}"
+              _span.hidden "#{ctail}#{',' unless last && !ctail.empty?}"
+              _ ' ' if last && !ctail.empty?
+            end
           end
         end
       else
-        ast.children.each do |child|
+        ast.children.each_with_index do |child, index|
           _ " #{child.inspect}"
+          _span.hidden ',' unless index == ast.children.length - 1
         end
+        _span.hidden ")#{tail}#{',' unless last}"
+        _ ' ' if last
       end
     end
   end
@@ -283,6 +295,8 @@ else
       .btn-primary:active{color:#fff;background-color:#0a58ca;border-color:#0a53be}
       .btn-primary:active:focus{box-shadow:0 0 0 .25rem rgba(49,132,253,.5)}
       .btn-primary:disabled{color:#fff;background-color:#0d6efd;border-color:#0d6efd}
+
+      .loc span.hidden, .unloc span.hidden {font-size: 0}
     }
 
     _div.container.narrow_container do
