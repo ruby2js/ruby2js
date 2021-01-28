@@ -351,8 +351,8 @@ describe Ruby2JS::Filter::Functions do
     end
 
     it "should handle merge" do
-      to_js( 'a = a.merge(b)' ).
-        must_equal  "var a = function() {var $$ = {}; " +
+      to_js( 'b={}; a = a.merge(b)' ).
+        must_equal  "var b = {}; var a = function() {var $$ = {}; " +
           "for (var $_ in a) {$$[$_] = a[$_]}; " +
           "for (var $_ in b) {$$[$_] = b[$_]}; return $$}()"
     end
@@ -365,8 +365,8 @@ describe Ruby2JS::Filter::Functions do
     end
 
     it "should handle merge!" do
-      to_js( 'a.merge!(b)' ).
-        must_equal "for (var $_ in b) {a[$_] = b[$_]}"
+      to_js( 'b={}; a.merge!(b)' ).
+        must_equal "var b = {}; for (var $_ in b) {a[$_] = b[$_]}"
     end
 
     it "should handle merge! with a constant hash" do

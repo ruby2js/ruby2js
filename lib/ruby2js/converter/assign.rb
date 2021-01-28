@@ -1,3 +1,9 @@
+# Kinda like Object.assign, except it handles properties
+#
+# Note: Object.defineProperties, Object.getOwnPropertyNames, etc. technically
+#   were not part of ES5, but were implemented by IE prior to ES6, and are
+#   the only way to implement getters and setters.
+
 module Ruby2JS
   class Converter
 
@@ -9,13 +15,21 @@ module Ruby2JS
     handle :assign do |target, *args|
       collapsible = false
 
+      nonprop = proc do |node|
+        next true unless node.is_a? Parser::AST::Node
+        next true unless node.type == :def
+        next false if node.children.first.end_with? '='
+        node.is_method?
+      end
+
       collapsible = true if args.length == 1 and args.first.type == :hash and
         args.first.children.length == 1
 
       collapsible = true if args.length == 1 and args.first.type == :class_module and
-        args.first.children.length == 3 and args.first.children.last.is_method?
+        args.first.children.length == 3 and nonprop[args.first.children.last]
 
-      if es2015 and not collapsible
+      if es2015 and not collapsible and
+        args.all? {|arg| arg.children.all? {|child| nonprop[child]}}
         parse s(:send, s(:const, nil, :Object), :assign, target, *args)
       else
 
@@ -23,7 +37,7 @@ module Ruby2JS
           copy = [s(:gvasgn, :$$, target)]
           target = s(:gvar, :$$)
           shadow = [s(:shadowarg, :$$)]
-        elsif collapsible or
+        elsif collapsible or es2017 or
           (%i(send const).include? target.type and
           target.children.length == 2 and target.children[0] == nil)
         then
@@ -37,32 +51,61 @@ module Ruby2JS
 
         body = [*copy,
           *args.map {|modname|
-            if modname.type == :hash
+            if modname.type == :hash and
+              modname.children.all? {|child| nonprop[child]}
+
               s(:begin, *modname.children.map {|pair|
                   s(:send, target, :[]=, *pair.children)
                 })
+
             elsif modname.type == :class_module and
-              modname.children[2..-1].all? {|child| 
-                child.type == :def and child.is_method?
-              }
+              modname.children[2..-1].all? {|child| nonprop[child]}
 
               s(:begin, *modname.children[2..-1].map {|pair|
                   s(:send, target, :[]=, s(:sym, pair.children.first),
                   pair.updated(:defm, [nil, *pair.children[1..-1]]))
                 })
-            else
-              if modname.type == :lvar or (%i(send const).include? modname.type and
-                modname.children.length == 2 and modname.children[0] == nil)
 
-                s(:for, s(:lvasgn, :$_), modname,
-                s(:send, target, :[]=,
-                s(:lvar, :$_), s(:send, modname, :[], s(:lvar, :$_))))
+    				elsif modname.type == :lvar and not es2015
+					    s(:for, s(:lvasgn, :$_), modname,
+					    s(:send, target, :[]=,
+					    s(:lvar, :$_), s(:send, modname, :[], s(:lvar, :$_))))
+
+            else
+              if es2017
+                s(:send, s(:const, nil, :Object), :defineProperties, target, 
+                  s(:send, s(:const, nil, :Object), :getOwnPropertyDescriptors, modname))
               else
-                shadow += [s(:shadowarg, :$1)]
-                s(:begin, s(:gvasgn, :$1, modname),
-                s(:for, s(:lvasgn, :$_), s(:gvar, :$1),
-                s(:send, target, :[]=,
-                s(:lvar, :$_), s(:send, s(:gvar, :$1), :[], s(:lvar, :$_)))))
+                if modname.type == :lvar or (%i(send const).include? modname.type and
+                  modname.children.length == 2 and modname.children[0] == nil)
+
+                  object = modname
+                else
+                  shadow += [s(:shadowarg, :$1)]
+                  object = s(:gvar, :$1)
+                end
+
+                copy = s(:send,
+                  s(:const, nil, :Object), :defineProperties, target,
+                  s(:send,
+                    s(:send, s(:const, nil, :Object), :getOwnPropertyNames, object),
+                    :reduce,
+                    s(:block,
+                      s(:send, nil, :lambda),
+                      s(:args, s(:arg, :$2), s(:arg, :$3)),
+                      s(:begin,
+                        s(:send,
+                          s(:lvar, :$2), :[]=, s(:lvar, :$3),
+                          s(:send, s(:const, nil, :Object), :getOwnPropertyDescriptor,
+                            object, s(:lvar, :$3))))),
+                    s(:hash)))
+
+
+                if object.type == :gvar
+                  s(:begin, s(:gvasgn, object.children.last, modname), copy)
+                else
+                  copy
+                end
               end
             end
           }]

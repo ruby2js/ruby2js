@@ -4,7 +4,7 @@ require 'minitest/autorun'
 describe "namespace support" do
 
   def to_js(string)
-    _(Ruby2JS.convert(string, eslevel: 2015, filters: []).to_s)
+    _(Ruby2JS.convert(string, eslevel: 2017, filters: []).to_s)
   end
 
   describe "open modules" do
@@ -26,7 +26,8 @@ describe "namespace support" do
       to_js( 'module M; module N; def f(); end; end; end;' +
              'module M::N; def g; end; end').
       must_equal('const M = {N: {f: function() {}}}; ' +
-        'Object.assign(M.N, {get g() {}})');
+        'Object.defineProperties(M.N, ' +
+        'Object.getOwnPropertyDescriptors({get g() {}}))');
     end
   end
 end
