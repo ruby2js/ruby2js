@@ -18,7 +18,7 @@ module Ruby2JS
       nonprop = proc do |node|
         next true unless node.is_a? Parser::AST::Node
         next true unless node.type == :def
-        next false if node.children.first.end_with? '='
+        next false if node.children.first.to_s.end_with? '='
         node.is_method?
       end
 
