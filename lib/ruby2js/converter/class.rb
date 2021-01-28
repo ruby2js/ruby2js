@@ -225,9 +225,8 @@ module Ruby2JS
 
         # collapse sequence to a single assignment
         if \
-          @ast.type == :class_module or
-          (@ast.type == :class and 
-            (methods > 1 or (methods == 1 and body[start].type == :prop)))
+          @ast.type == :class_module or methods > 1 or 
+          body[start]&.type == :prop
         then
           pairs = body[start...start+methods].map do |node|
             if node.type == :method
@@ -264,12 +263,16 @@ module Ruby2JS
             else
               body[start...start+methods] = s(:hash, *pairs.flatten)
             end
+          elsif @ast.type == :class_extend
+            body[start...start+methods] =
+              s(:assign, body[start].children.first, s(:hash, *pairs.flatten))
           else
             body[start...start+methods] =
               s(:send, name, :prototype=, s(:hash, *pairs.flatten))
           end
 
         elsif @ast.type == :class_extend and methods > 1
+
           pairs = body[start...start+methods].map do |node|
             node.updated(:pair, [
                s(:sym, node.children[1].to_s[0..-2]), node.children[2]])

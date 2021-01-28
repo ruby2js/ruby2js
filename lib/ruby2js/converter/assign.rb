@@ -17,6 +17,7 @@ module Ruby2JS
 
       nonprop = proc do |node|
         next true unless node.is_a? Parser::AST::Node
+        next false if node.type == :pair and node.children.first.type == :prop and es2015
         next true unless node.type == :def
         next false if node.children.first.to_s.end_with? '='
         node.is_method?
@@ -52,11 +53,37 @@ module Ruby2JS
         body = [*copy,
           *args.map {|modname|
             if modname.type == :hash and
+              modname.children.all? {|pair| pair.children.first.type == :prop}
+
+              if modname.children.length == 1
+                pair = modname.children.first
+                s(:send, s(:const, nil, :Object), :defineProperty, target, 
+                  s(:sym, pair.children.first.children.last),
+                  s(:hash, *pair.children.last.map {|name, value| s(:pair,
+                  s(:sym, name), value)}))
+              else
+                pair = modname.children.first
+                s(:send, s(:const, nil, :Object), :defineProperties, target, 
+                  s(:hash, *modname.children.map {|pair| s(:pair,
+                    s(:sym, pair.children.first.children.last),
+                    s(:hash, *pair.children.last.map {|name, value| s(:pair,
+                    s(:sym, name), value)})
+                  )}))
+              end
+
+            elsif modname.type == :hash and
               modname.children.all? {|child| nonprop[child]}
 
               s(:begin, *modname.children.map {|pair|
+                if pair.children.first.type == :prop
+                  s(:send, s(:const, nil, :Object), :defineProperty, target, 
+                    s(:sym, pair.children.first.children.last),
+                    s(:hash, *pair.children.last.map {|name, value| s(:pair,
+                    s(:sym, name), value)}))
+                else
                   s(:send, target, :[]=, *pair.children)
-                })
+                end
+              })
 
             elsif modname.type == :class_module and
               modname.children[2..-1].all? {|child| nonprop[child]}
