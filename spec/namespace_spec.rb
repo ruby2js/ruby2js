@@ -30,4 +30,21 @@ describe "namespace support" do
         'Object.getOwnPropertyDescriptors({get g() {}}))');
     end
   end
+
+  describe "open classes" do
+    it "should extend classes" do
+      to_js( 'class M; def f(); end; end;' +
+             'class M; def g(); end; end').
+      must_equal('class M {f() {}}; ' +
+        'M.prototype.g = function() {}');
+    end
+
+    it "should extend nested modules with getter" do
+      to_js( 'module M; class N; def f(); end; end; end;' +
+             'class M::N; def g; end; end').
+      must_equal('const M = {N: class {f() {}}}; ' +
+        'Object.defineProperty(M.N.prototype, "g", ' +
+        '{enumerable: true, configurable: true, get() {}})');
+    end
+  end
 end

@@ -4,6 +4,10 @@ module Ruby2JS
     # (module
     #   (const nil :A)
     #   (...)
+    #
+    #   Note: modules_hash is an anonymous modules as a value in a hash; the
+    #         name has already been output so should be ignored other than
+    #         in determining the namespace.
 
     handle :module, :module_hash do |name, *body|
       extend = @namespace.enter(name)

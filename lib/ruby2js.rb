@@ -143,6 +143,7 @@ module Ruby2JS
       def on_await(node); on_send(node); end
       def on_call(node); on_send(node); end
       def on_class_extend(node); on_send(node); end
+      def on_class_hash(node); on_class(node); end
       def on_class_module(node); on_send(node); end
       def on_constructor(node); on_def(node); end
       def on_deff(node); on_def(node); end
