@@ -27,8 +27,9 @@ module Ruby2JS
         body = body.first.children
       end
 
-      if body.length > 0 and body.all? {|child| child.type == :def ||
-        (es2015 and child.type == :class) || child.type == :module}
+      if body.length > 0 and body.all? {|child| 
+        %i[def module].include? child.type or
+        (es2015 and child.type == :class and child.children[1] == nil)}
 
         if extend
           parse s(:assign, name, @ast.updated(:class_module, 

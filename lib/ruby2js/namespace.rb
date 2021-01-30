@@ -30,6 +30,16 @@ module Ruby2JS
       @seen[active].merge! props || {}
     end
 
+    def find(name)
+      name = resolve(name)
+      prefix = active
+      while prefix.pop
+        result = @seen[prefix + name]
+        return result if result
+      end
+      {}
+    end
+
     def leave()
       @active.pop
     end

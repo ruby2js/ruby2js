@@ -52,5 +52,11 @@ describe "namespace support" do
              'class C; def g; f; end; end').
       must_include 'return this.f.bind(this)'
     end
+
+    it "should bind references to methods defined in parent class" do
+      to_js( 'class C; def f(); end; end' +
+             'class D < C; def g; f; end; end').
+      must_include 'return this.f.bind(this)'
+    end
   end
 end

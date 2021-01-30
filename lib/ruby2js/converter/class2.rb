@@ -33,6 +33,7 @@ module Ruby2JS
       if inheritance
         put ' extends '
         parse inheritance
+        @rbstack.push(@namespace.find(inheritance))
       end
 
       put " {"

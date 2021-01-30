@@ -213,11 +213,12 @@ module Ruby2JS
       # merge property definitions
       combine_properties(body)
 
-      if inheritance
+      if inheritance and (@ast.type != :class_extend and !extend)
         body.unshift s(:send, name, :prototype=, 
           s(:send, s(:const, nil, :Object), :create,
             s(:attr, inheritance, :prototype))),
           s(:send, s(:attr, name, :prototype), :constructor=, name)
+        @rbstack.push(@namespace.find(inheritance))
       else
         body.compact!
 
