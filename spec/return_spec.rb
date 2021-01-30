@@ -55,6 +55,23 @@ describe Ruby2JS::Filter::Return do
     end
   end
 
+  describe :defs do
+    it "should handle no line definitions" do
+      to_js( 'class C; def self.f(x) end; end' ).
+        must_equal 'function C() {}; C.f = function(x) {return null}'
+    end
+
+    it "should handle single line definitions" do
+      to_js( 'class C; def self.f(x) x; end; end' ).
+        must_equal 'function C() {}; C.f = function(x) {return x}'
+    end
+
+    it "should handle multi line definitions" do
+      to_js( 'class C; def self.f(x) x; x; end; end' ).
+        must_equal 'function C() {}; C.f = function(x) {x; return x}'
+    end
+  end
+
   describe 'data types' do
     it "should handle integers" do
       to_js( 'lambda {|x| 1}' ).must_equal 'function(x) {return 1}'

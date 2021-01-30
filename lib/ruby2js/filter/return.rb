@@ -34,6 +34,14 @@ module Ruby2JS
       def on_deff(node)
         on_def(node)
       end
+
+      def on_defs(node)
+        node = super
+        return node unless node.type == :defs
+        children = node.children[3..-1]
+        children[-1] = s(:nil) if children.last == nil
+        node.updated nil, [*node.children[0..2], s(:autoreturn, *children)]
+      end
     end
 
     DEFAULTS.push Return
