@@ -78,8 +78,12 @@ describe Ruby2JS::Filter::Functions do
         "Class.call(this)\n};"
       js.must_include "//constructor\nfunction Constructor() {"
       js.must_include "//method\nMethod.prototype.method = function() {"
-      js.must_include "//attribute\n  get attribute() {"
-      js.must_include "//setter\n  set setter(n) {"
+      js.must_include "//attribute\n" +
+       "Object.defineProperty(\n  Attribute.prototype,\n  " +
+       '"attribute"'
+      js.must_include "//setter\n" +
+       "Object.defineProperty(\n  Setter.prototype,\n  " +
+       '"setter"'
       js.must_include "//classmethod\nClassMethod.classmethod = function() {"
       js.must_include "//classattribute\nObject.defineProperty(\n  " +
         "ClassAttribute,\n  \"classattribute\""

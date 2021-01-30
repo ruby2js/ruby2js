@@ -614,7 +614,7 @@ describe Ruby2JS do
 
     it "should parse class with attr_accessor" do
       to_js('class Person; attr_accessor :a; end').
-        must_equal 'function Person() {}; Person.prototype = {get a() {return this._a}, set a(a) {this._a = a}}'
+        must_equal 'function Person() {}; Object.defineProperty(Person.prototype, "a", {enumerable: true, configurable: true, get: function() {return this._a}, set: function(a) {this._a = a}})'
     end
 
     it "should parse class with constructor" do
@@ -629,27 +629,27 @@ describe Ruby2JS do
 
     it "should parse class with constructor and method" do
       to_js('class Person; def initialize(name); @name = name; end; def name; @name; end; end').
-        must_equal 'function Person(name) {this._name = name}; Person.prototype = {get name() {return this._name}}'
+        must_equal 'function Person(name) {this._name = name}; Object.defineProperty(Person.prototype, "name", {enumerable: true, configurable: true, get: function() {return this._name}})'
     end
 
     it "should parse class with constructor and two methods" do
       to_js('class Person; def initialize(name); @name = name; end; def name; @name; end; def reset!; @name = nil; end; end').
-        must_equal 'function Person(name) {this._name = name}; Person.prototype = {get name() {return this._name}, reset: function() {this._name = null}}'
+        must_equal 'function Person(name) {this._name = name}; Object.defineProperty(Person.prototype, "name", {enumerable: true, configurable: true, get: function() {return this._name}}); Person.prototype.reset = function() {this._name = null}'
     end
 
     it "should parse class with constructor and methods with multiple arguments" do
       to_js('class Person; def initialize(name, surname); @name, @surname = name, surname; end; def full_name; @name  + @surname; end; end').
-        must_equal 'function Person(name, surname) {this._name = name; this._surname = surname}; Person.prototype = {get full_name() {return this._name + this._surname}}'
+        must_equal 'function Person(name, surname) {this._name = name; this._surname = surname}; Object.defineProperty(Person.prototype, "full_name", {enumerable: true, configurable: true, get: function() {return this._name + this._surname}})'
     end
 
     it "should collapse multiple methods in a class" do
       to_js('class C; def a; end; def b; end; end').
-        must_equal 'function C() {}; C.prototype = {get a() {}, get b() {}}'
+        must_equal 'function C() {}; Object.defineProperties(C.prototype, {a: {enumerable: true, configurable: true, get: function() {}}, b: {enumerable: true, configurable: true, get: function() {}}})'
     end
 
     it "should collapse getters and setters in a class" do
       to_js('class C; def a; end; def a=(a); end; end').
-        must_equal 'function C() {}; C.prototype = {get a() {}, set a(a) {}}'
+        must_equal 'function C() {}; Object.defineProperty(C.prototype, "a", {enumerable: true, configurable: true, get: function() {}, set: function(a) {}})'
     end
 
     it "should collapse properties" do
@@ -685,21 +685,21 @@ describe Ruby2JS do
         must_equal 'function Person() {}; Person._count = 0; Person.prototype.offset = function(x) {return Person._count + x}'
 
       to_js('class Person; @@count=0; def count; @@count; end; end').
-        must_equal 'function Person() {}; Person._count = 0; Person.prototype = {get count() {return Person._count}}'
+        must_equal 'function Person() {}; Person._count = 0; Object.defineProperty(Person.prototype, "count", {enumerable: true, configurable: true, get: function() {return Person._count}})'
 
       to_js('class Person; @@count=0; def count(); return @@count; end; end').
         must_equal 'function Person() {}; Person._count = 0; Person.prototype.count = function() {return Person._count}'
 
       to_js('class Person; def initialize(name); @name = name; end; def name; @name; end; @@count=0; def count; return @@count; end; end').
-        must_equal 'function Person(name) {this._name = name}; Person.prototype = {get name() {return this._name}}; Person._count = 0; Object.defineProperty(Person.prototype, "count", {enumerable: true, configurable: true, get: function() {return Person._count}})'
+        must_equal 'function Person(name) {this._name = name}; Object.defineProperty(Person.prototype, "name", {enumerable: true, configurable: true, get: function() {return this._name}}); Person._count = 0; Object.defineProperty(Person.prototype, "count", {enumerable: true, configurable: true, get: function() {return Person._count}})'
 
       to_js('class Person; def initialize(name); @name = name; end; def name; @name; end; @@count=0; def count(); return @@count; end; end').
-        must_equal 'function Person(name) {this._name = name}; Person.prototype = {get name() {return this._name}}; Person._count = 0; Person.prototype.count = function() {return Person._count}'
+        must_equal 'function Person(name) {this._name = name}; Object.defineProperty(Person.prototype, "name", {enumerable: true, configurable: true, get: function() {return this._name}}); Person._count = 0; Person.prototype.count = function() {return Person._count}'
     end
 
     it "should parse instance methods with class variables" do
       to_js('class Person; def count; @@count; end; end').
-        must_equal 'function Person() {}; Person.prototype = {get count() {return Person._count}}'
+        must_equal 'function Person() {}; Object.defineProperty(Person.prototype, "count", {enumerable: true, configurable: true, get: function() {return Person._count}})'
     end
 
     it "should parse class methods with class variables" do
@@ -762,18 +762,28 @@ describe Ruby2JS do
 
     it "should prefix intra-method calls with 'this.'" do
       to_js('class C; def m1; end; def m2; m1; end; end').
-        must_equal 'function C() {}; C.prototype = ' +
-          '{get m1() {}, get m2() {return this.m1}}'
+        must_equal 'function C() {}; Object.defineProperties(C.prototype, ' +
+          '{m1: {enumerable: true, configurable: true, get: function() {}}, ' +
+          'm2: {enumerable: true, configurable: true, get: function() ' +
+          '{return this.m1}}})'
+    end
+
+    it "should prefix bind references to methods as properties" do
+      to_js('class C; def m1(); end; def m2; m1; end; end').
+        must_equal 'function C() {}; C.prototype.m1 = function() {}; ' +
+          'Object.defineProperty(C.prototype, ' +
+          '"m2", {enumerable: true, configurable: true, get: function() ' +
+          '{return this.m1.bind(this)}})'
     end
 
     it "should prefix class constants referenced in methods by class name" do
       to_js('class C; X = 1; def m; X; end; end').
-        must_equal 'function C() {}; C.X = 1; C.prototype = {get m() {return C.X}}'
+        must_equal 'function C() {}; C.X = 1; Object.defineProperty(C.prototype, "m", {enumerable: true, configurable: true, get: function() {return C.X}})'
     end
 
     it "should insert var self = this when needed" do
       to_js('class C; def m; list.each do; @ivar; end; end; end').
-        must_equal 'function C() {}; C.prototype = {get m() {var self = this; return list.each(function() {self._ivar})}}'
+        must_equal 'function C() {}; Object.defineProperty(C.prototype, "m", {enumerable: true, configurable: true, get: function() {var self = this; return list.each(function() {self._ivar})}})'
 
       to_js('class C; def m(); list.each do; @ivar; @ivar; end; end; end').
         must_equal 'function C() {}; C.prototype.m = function() {var self = this; list.each(function() {self._ivar; self._ivar})}'
@@ -841,7 +851,7 @@ describe Ruby2JS do
       to_js( 'module A; B=1; end' ).
         must_equal 'A = function() {var B = 1; return {B: B}}()'
       to_js( 'module A; def b; return 1; end; end' ).
-        must_equal 'var A = {get b() {return 1}}'
+        must_equal 'var A = {}; Object.defineProperty(A.prototype, "b", {enumerable: true, configurable: true, get: function() {return 1}})'
       to_js( 'module A; def b(); return 1; end; end' ).
         must_equal 'var A = {b: function() {return 1}}'
       to_js( 'module A; class B; def initialize; @c=1; end; end; end' ).
@@ -1107,7 +1117,7 @@ describe Ruby2JS do
 
     it "should not replace ivars in class definitions" do
       to_js( 'class F; def f; @x; end; end', ivars: {:@x => 1} ).
-        must_equal 'function F() {}; F.prototype = {get f() {return this._x}}'
+        must_equal 'function F() {}; Object.defineProperty(F.prototype, "f", {enumerable: true, configurable: true, get: function() {return this._x}})'
     end
   end
 

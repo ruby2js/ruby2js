@@ -70,15 +70,18 @@ module Ruby2JS
                 {enumerable: s(:true), configurable: s(:true),
                 set: s(:defm, nil, *m.children[1..-1])})
           else
-            visible[m.children[0]] = s(:self)
 
             if not m.is_method?
+              visible[m.children[0]] = s(:self)
+
               # property getter
               s(:prop, s(:attr, name, :prototype), m.children.first =>
                   {enumerable: s(:true), configurable: s(:true),
                   get: s(:defm, nil, m.children[1],
                     m.updated(:autoreturn, m.children[2..-1]))})
             else
+              visible[m.children[0]] = s(:autobind, s(:self))
+
               # method: add to prototype
               s(:method, s(:attr, name, :prototype),
                 :"#{m.children[0].to_s.chomp('!')}=",
@@ -222,7 +225,7 @@ module Ruby2JS
         methods = 0
         start = 0
         body.each do |node|
-          if [:method, :prop].include? node.type and 
+          if (node.type == :method or (node.type == :prop and es2015)) and
             node.children[0].type == :attr and
             node.children[0].children[1] == :prototype
             methods += 1
@@ -272,6 +275,7 @@ module Ruby2JS
           end
 
           if @ast.type == :class_module
+            start = 0 if methods == 0
             if name
               body[start...start+methods] =
                 s(:casgn, *name.children, s(:hash, *pairs.flatten))
