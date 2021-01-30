@@ -79,6 +79,7 @@ conversions are made by the `functions` filter:
 * `.values()` {{ caret }} `Object.values()`
 * `.entries()` {{ caret }} `Object.entries()`
 * `.each_pair {}` {{ caret }} `for (let [key, value] of Object.entries()) {}`
+* `include M` {{ caret }} `Object.defineProperties(..., Object.getOwnPropertyDescriptors(M))`
 
 async support:
 

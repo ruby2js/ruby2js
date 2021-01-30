@@ -237,7 +237,9 @@ module Ruby2JS
             else
               if m.children[1] == :include
                 m = m.updated(:begin, m.children[2..-1].map {|mname|
-                  s(:assign, s(:attr, name, :prototype), mname)})
+                  @namespace.defineProps @namespace.find(mname)
+                  s(:assign, s(:attr, name, :prototype), mname)
+                })
               end
 
               skipped = true

@@ -280,7 +280,10 @@ describe "ES2015 support" do
 
     it "should parse include" do
       to_js('class Employee; include Person; end').
-        must_equal 'class Employee {}; Object.assign(Employee.prototype, Person)'
+        must_equal 'class Employee {}; ' +
+        'Object.defineProperties(Employee.prototype, ' +
+        'Object.getOwnPropertyNames(Person).reduce(($2, $3) => {$2[$3] = ' +
+        'Object.getOwnPropertyDescriptor(Person, $3); return $2}, {}))'
     end
 
     it "should parse class with attr_accessor" do

@@ -96,4 +96,13 @@ describe "ES2017 support" do
       to_js( 'await f(x) {|y| y}' ).must_equal 'await f(x, y => y)'
     end
   end
+
+  describe 'object definition' do
+    it "should parse include" do
+      to_js('class Employee; include Person; end').
+        must_equal 'class Employee {}; ' +
+        'Object.defineProperties(Employee.prototype, ' +
+        'Object.getOwnPropertyDescriptors(Person))'
+    end
+  end
 end
