@@ -49,7 +49,7 @@ module Ruby2JS
       end
 
       body.compact!
-      visible = {}
+      visible = @namespace.getOwnProps
       body.map! do |m| 
         if \
           @ast.type == :class_module and m.type == :defs and
@@ -68,7 +68,7 @@ module Ruby2JS
             sym = :"#{m.children.first.to_s[0..-2]}"
             s(:prop, s(:attr, name, :prototype), sym =>
                 {enumerable: s(:true), configurable: s(:true),
-                set: s(:block, s(:send, nil, :proc), *m.children[1..-1])})
+                set: s(:defm, nil, *m.children[1..-1])})
           else
             visible[m.children[0]] = s(:self)
 
@@ -76,7 +76,7 @@ module Ruby2JS
               # property getter
               s(:prop, s(:attr, name, :prototype), m.children.first =>
                   {enumerable: s(:true), configurable: s(:true),
-                  get: s(:block, s(:send, nil, :proc), m.children[1],
+                  get: s(:defm, nil, m.children[1],
                     m.updated(:autoreturn, m.children[2..-1]))})
             else
               # method: add to prototype

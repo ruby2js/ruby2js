@@ -40,7 +40,7 @@ module Ruby2JS
       begin
         class_name, @class_name = @class_name, name
         class_parent, @class_parent = @class_parent, inheritance
-        @rbstack.push({})
+        @rbstack.push(@namespace.getOwnProps)
         constructor = []
         index = 0
 
@@ -350,7 +350,7 @@ module Ruby2JS
       ensure
         @class_name = class_name
         @class_parent = class_parent
-        @rbstack.pop
+        @namespace.defineProps @rbstack.pop
       end
     end
   end

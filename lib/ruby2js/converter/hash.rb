@@ -73,7 +73,7 @@ module Ruby2JS
               if right.type == :hash
                 right.children.each do |pair|
                   next unless Parser::AST::Node === pair.children.last
-                  if [:block, :def, :async].include? pair.children.last.type
+                  if %i[block def defm async].include? pair.children.last.type
                     if @comments[pair.children.last]
                       (puts ''; singleton = false) if singleton
                       comments(pair.children.last).each do |comment|
@@ -130,6 +130,9 @@ module Ruby2JS
                 left.children.last == right.children.last
               then
                 parse right 
+              elsif right.type == :defm and %i[sym str].include? left.type and es2015
+                @prop = left.children.first.to_s
+                parse right
               else
 		if not [:str, :sym].include? left.type and es2015
 		  put '['

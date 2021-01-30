@@ -93,10 +93,10 @@ module Ruby2JS
                   pair.updated(:defm, [nil, *pair.children[1..-1]]))
                 })
 
-    				elsif modname.type == :lvar and not es2015
-					    s(:for, s(:lvasgn, :$_), modname,
-					    s(:send, target, :[]=,
-					    s(:lvar, :$_), s(:send, modname, :[], s(:lvar, :$_))))
+            elsif modname.type == :lvar and not es2015
+              s(:for, s(:lvasgn, :$_), modname,
+              s(:send, target, :[]=,
+              s(:lvar, :$_), s(:send, modname, :[], s(:lvar, :$_))))
 
             else
               if es2017

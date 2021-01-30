@@ -496,7 +496,7 @@ describe "ES2015 support" do
   describe 'module extensions' do
     it 'should handle methods' do
       to_js('++module M; def m(); end; end').
-        must_equal 'Object.assign(M, {m: function() {}})'
+        must_equal 'Object.assign(M, {m() {}})'
     end
   end
 

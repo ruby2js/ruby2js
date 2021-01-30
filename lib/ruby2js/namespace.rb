@@ -22,8 +22,12 @@ module Ruby2JS
       previous
     end
 
-    def find(name)
-      @seen[active + resolve(name)]
+    def getOwnProps(name = nil)
+      @seen[active + resolve(name)] || {}
+    end
+
+    def defineProps(props)
+      @seen[active].merge! props || {}
     end
 
     def leave()
