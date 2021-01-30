@@ -8,7 +8,7 @@ module Ruby2JS
   class Converter
 
    # (assign
-   #   (hash)
+   #   target
    #   (hash)
    #   ...
 
@@ -38,7 +38,7 @@ module Ruby2JS
           copy = [s(:gvasgn, :$$, target)]
           target = s(:gvar, :$$)
           shadow = [s(:shadowarg, :$$)]
-        elsif collapsible or es2017 or
+        elsif collapsible or es2015 or
           (%i(send const).include? target.type and
           target.children.length == 2 and target.children[0] == nil)
         then
@@ -124,7 +124,8 @@ module Ruby2JS
                         s(:send,
                           s(:lvar, :$2), :[]=, s(:lvar, :$3),
                           s(:send, s(:const, nil, :Object), :getOwnPropertyDescriptor,
-                            object, s(:lvar, :$3))))),
+                            object, s(:lvar, :$3))),
+                        s(:return, s(:lvar, :$2)))),
                     s(:hash)))
 
 
