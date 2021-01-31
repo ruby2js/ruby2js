@@ -141,6 +141,22 @@ describe Ruby2JS::Filter::ESM do
         must_equal "// autoimports: false\nfunc(1)"
     end
 
+  describe "defs option" do
+    it "should define a method" do
+      to_js('class C < Foo; def f; x; end; end',
+          defs: {Foo: [:x]}, autoimports: {Foo: 'foo.js'}).
+        must_equal 'import Foo from "foo.js"; ' +
+         'class C extends Foo {get f() {return this.x.bind(this)}}'
+    end
+
+    it "should define a property" do
+      to_js('class C < Foo; def f; x; end; end',
+          defs: {Foo: [:@x]}, autoimports: {Foo: 'foo.js'}).
+        must_equal 'import Foo from "foo.js"; ' +
+         'class C extends Foo {get f() {return this.x}}'
+    end
+  end
+
     it "should not autoimport if explicit import is present" do
       to_js('import Foo from "bar.js"; Foo.bar', autoimports: {Foo: 'foo.js'}).
         must_equal 'import Foo from "bar.js"; Foo.bar'

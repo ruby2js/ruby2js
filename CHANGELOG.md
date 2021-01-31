@@ -2,11 +2,13 @@
 
 * Support static method calls with blocks in es2015+
 * Auto-bind instance methods referenced as properties within a class
+* New defs option to add definitions for autoimported classes/methods
+* Open classes/modules, inheritance, and module include of props/methods
 * Handle begin, if, and case as expressions
 * Handle modules with exactly one method
-* Live demo based on Opal ([see here](https://ruby2js.com/demo))
 * Handle empty edge cases like `` `#{}` `` and `()`
-* Hidden AST syntax enables copy/paste of syntactically correct AST
+* Live demo based on Opal ([see here](https://ruby2js.com/demo))
+* Demo: Hidden AST syntax enables copy/paste of syntactically correct AST
 
 # 3.6.1 / 2020-12-31
 

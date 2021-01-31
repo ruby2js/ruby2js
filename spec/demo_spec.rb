@@ -78,6 +78,16 @@ describe "demo" do
       it "should handle automatic imports" do
         to_js("A.foo", %w(--filter esm --autoimports A)).
           must_equal('import A from "A"; A.foo')
+
+        to_js("A.foo", %w(--filter esm --autoimports A:foo.js)).
+          must_equal('import A from "foo.js"; A.foo')
+      end
+
+      it "should handle module/class definitions" do
+        to_js("class C < A; def f; x; end; end",
+          %w(--filter esm --es2019 --autoimports A:a.js --defs A:[x,@y,:z],b:[q])).
+          must_equal('import A from "a.js"; ' +
+            'class C extends A {get f() {return this.x.bind(this)}}')
       end
     end
 

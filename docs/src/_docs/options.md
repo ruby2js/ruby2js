@@ -54,6 +54,18 @@ require 'ruby2js'
 puts Ruby2JS.convert('a == b', comparison: :identity)
 ```
 
+## Defs
+
+List of methods and properties for classes and modules imported via
+[autoimports](#auto-imports).  Prepend an `@` for properties.
+
+```ruby
+require 'ruby2js/filter/esm'
+puts Ruby2JS.convert('class C < A; def f; x; end; end',
+  defs: {A: [:x,:@y]}, eslevel: 2020, autoimports: {A: 'a.js'})
+```
+
+
 ## ESLevel
 
 Determine which ECMAScript level the resulting script will target.  See

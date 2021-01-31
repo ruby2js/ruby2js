@@ -64,16 +64,16 @@ def parse_request(env=ENV)
 
     mappings.gsub!(/\s+|"|'/, '')
 
-    while not mappings.empty?
-      if mappings =~ /^(\w+):([^,]+),?(.*)/
+    while mappings and not mappings.empty?
+      if mappings =~ /^(\w+):([^,]+)(,(.*))?$/
         # symbol: module
         options[:autoimports][$1.to_sym] = $2
-        mappings = $3
-      elsif mappings =~ /^\[([\w,]+)\]:([^,]+),?(.*)/
+        mappings = $4
+      elsif mappings =~ /^\[([\w,]+)\]:([^,]+)(,(.*))?$/
         # [symbol, symbol]: module
-        mname, mappings = $2, $3
+        mname, mappings = $2, $4
         options[:autoimports][$1.split(/,/).map(&:to_sym)] = mname
-      elsif mappings =~ /^(\w+)(,?(.*)|$)/
+      elsif mappings =~ /^(\w+)(,(.*))?$/
         # symbol
         options[:autoimports][$1.to_sym] = $1
         mappings = $3
@@ -86,6 +86,21 @@ def parse_request(env=ENV)
     if options[:autoimports].empty?
       # if nothing is listed, provide a mapping for everything
       options[:autoimports] = proc {|name| name.to_s}
+    end
+  }
+
+  opts.on('--defs=mappings', "class and module definitions") {|mappings|
+    options[:defs] = {}
+
+    mappings.gsub!(/\s+|"|'/, '')
+
+    while mappings =~ /^(\w+):\[(:?@?\w+(,:?@?\w+)*)\](,(.*))?$/
+      mappings = $5
+      options[:defs][$1.to_sym] = $2.gsub(':', '').split(',').map(&:to_sym)
+    end
+
+    if mappings and not mappings.empty?
+      $load_error = "unsupported defs: #{mappings}"
     end
   }
 

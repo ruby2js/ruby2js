@@ -49,8 +49,9 @@ module Ruby2JS
     end
 
     # add new props (and methods) to the current scope.
-    def defineProps(props)
-      @seen[active].merge! props || {}
+    def defineProps(props, namespace=active)
+      @seen[namespace] ||= {}
+      @seen[namespace].merge! props || {}
     end
 
     # find a named scope which may be relative to any point in the ancestry of

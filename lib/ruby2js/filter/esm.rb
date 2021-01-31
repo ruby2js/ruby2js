@@ -11,6 +11,7 @@ module Ruby2JS
         super
         @esm_autoexports = options[:autoexports] && !@disable_autoexports
         @esm_autoimports = options[:autoimports]
+        @esm_defs = options[:defs] || {}
         @esm_explicit_tokens = Set.new
       end
 
@@ -129,6 +130,20 @@ module Ruby2JS
       def on_const(node)
         if node.children.first == nil and found_import = find_autoimport(node.children.last)
           prepend_list << s(:import, found_import[0], found_import[1])
+
+          values = @esm_defs[node.children.last]
+          
+	  if values
+	    values = values.map {|value| 
+	      if value.to_s.start_with? "@" 
+		[value.to_s[1..-1].to_sym, s(:self)]
+	      else
+		[value.to_sym, s(:autobind, s(:self))]
+	      end
+	    }.to_h
+
+	    @namespace.defineProps values, [node.children.last]
+	  end
         end
 
         super
