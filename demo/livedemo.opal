@@ -1,5 +1,5 @@
 require 'native'
-require 'ruby2js'
+require 'ruby2js/demo'
 require 'patch.opal'
 require 'filters.opal'
 
@@ -16,6 +16,7 @@ def parse_options
   options = {filters: []}
   search = $document[:location].search
   return options if search == ''
+  $load_error = nil
 
   search[1..-1].split('&').each do |parameter|
     name, value = parameter.split('=', 2)
@@ -31,10 +32,16 @@ def parse_options
     when :nullish
       value = name
       name = :or
+    when :autoimports
+      value = Ruby2JS::Demo.parse_autoimports(value)
+    when :defs
+      value = Ruby2JS::Demo.parse_defs(value)
     when /^es\d+$/
       value = name[2..-1].to_i
       name = :eslevel
     end
+
+    raise ArgumentError.new($load_error) if $load_error
 
     options[name] = value
   end

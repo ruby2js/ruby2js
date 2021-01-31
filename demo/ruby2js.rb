@@ -18,7 +18,7 @@
 
 # support running directly from a git clone
 $:.unshift File.absolute_path('../../lib', __FILE__)
-require 'ruby2js'
+require 'ruby2js/demo'
 require 'cgi'
 require 'pathname'
 
@@ -60,48 +60,11 @@ def parse_request(env=ENV)
   opts.on('--autoexports', "add export statements for top level constants") {options[:autoexports] = true}
 
   opts.on('--autoimports=mappings', "automatic import mappings, without quotes") {|mappings|
-    options[:autoimports] = {}
-
-    mappings.gsub!(/\s+|"|'/, '')
-
-    while mappings and not mappings.empty?
-      if mappings =~ /^(\w+):([^,]+)(,(.*))?$/
-        # symbol: module
-        options[:autoimports][$1.to_sym] = $2
-        mappings = $4
-      elsif mappings =~ /^\[([\w,]+)\]:([^,]+)(,(.*))?$/
-        # [symbol, symbol]: module
-        mname, mappings = $2, $4
-        options[:autoimports][$1.split(/,/).map(&:to_sym)] = mname
-      elsif mappings =~ /^(\w+)(,(.*))?$/
-        # symbol
-        options[:autoimports][$1.to_sym] = $1
-        mappings = $3
-      elsif not mappings.empty?
-        $load_error = "unsupported autoimports mapping: #{mappings}"
-        mappings = ''
-      end
-    end
-
-    if options[:autoimports].empty?
-      # if nothing is listed, provide a mapping for everything
-      options[:autoimports] = proc {|name| name.to_s}
-    end
+    options[:autoimports] = Ruby2JS::Demo.parse_autoimports(mappings)
   }
 
   opts.on('--defs=mappings', "class and module definitions") {|mappings|
-    options[:defs] = {}
-
-    mappings.gsub!(/\s+|"|'/, '')
-
-    while mappings =~ /^(\w+):\[(:?@?\w+(,:?@?\w+)*)\](,(.*))?$/
-      mappings = $5
-      options[:defs][$1.to_sym] = $2.gsub(':', '').split(',').map(&:to_sym)
-    end
-
-    if mappings and not mappings.empty?
-      $load_error = "unsupported defs: #{mappings}"
-    end
+    options[:defs] = Ruby2JS::Demo.parse_defs(mappings)
   }
 
   opts.on('--equality', "double equal comparison operators") {options[:comparison] = :equality}
@@ -454,11 +417,10 @@ else
             fetch(location,
               {method: 'POST', headers, body: JSON.stringify({ ruby, ast })}
             ).then(response => {
-                if (!response.ok) throw new Error(response.statusText);
-                return response.json();
-              }).
+              return response.json();
+            }).
             then(json => {
-              document.querySelector('#js pre').textContent = json.js;
+              document.querySelector('#js pre').textContent = json.js || json.exception;
 
               let parsed = document.querySelector('#parsed');
               if (json.parsed) parsed.querySelector('pre').outerHTML = json.parsed;
@@ -604,6 +566,8 @@ else
   # html fetch support
   _json do
     options = parse_request(env).first
+    raise ArgumentError.new($load_error) if $load_error
+
     converted = Ruby2JS.convert(@ruby, options)
 
     _js converted.to_s
