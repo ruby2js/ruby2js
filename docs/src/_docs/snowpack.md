@@ -97,7 +97,7 @@ Delete `hello-world.js`.
 Create `hello-world.rb.js` with the following contents:
 
 ```
-def helloWorld
+def hello_world
   puts "Hello Ruby World!"
 end
 ```
