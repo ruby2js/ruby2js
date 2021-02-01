@@ -169,10 +169,11 @@ puts Ruby2JS.convert("X = @x", ivars: {:@x => 1})
 
 ## Or
 
-Introduced in ES2020, the [Nullish Coalescing] operator provides an alternative
-implementation of the *or* operator.  Select which version of the operator you
-want using the `or` option.  Permissible values are `:logical` and `:nullish`
-with the default being logical.
+Introduced in ES2020, the 
+[Nullish Coalescing](https://github.com/tc39/proposal-nullish-coalescing#nullish-coalescing-for-javascript)
+operator provides an alternative implementation of the *or* operator.  Select
+which version of the operator you want using the `or` option.  Permissible
+values are `:logical` and `:nullish` with the default being logical.
 
 ```ruby
 require 'ruby2js'
