@@ -5,7 +5,8 @@ top_section: Filters
 category: esm
 ---
 
-The **ESM** filter provides conversion of import and export statements for use with modern ES builders like Webpack.
+The **ESM** filter provides conversion of import and export statements for use
+with modern ES builders like Webpack and Snowpack.
 
 ## Examples
 

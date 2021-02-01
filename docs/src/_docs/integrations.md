@@ -1,5 +1,5 @@
 ---
-order: 4
+order: 5
 title: Integrations
 top_section: Introduction
 category: integrations
@@ -20,3 +20,6 @@ required libraries.
 
 For easy integration with Webpack (as well as Webpacker in Rails 5+), you can use the
 [official Webpack plugin](/docs/webpack).
+
+For easy integration with Snowpack, you can use the
+[official Snowpack plugin](/docs/snowpack).
