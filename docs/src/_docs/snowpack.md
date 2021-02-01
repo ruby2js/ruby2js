@@ -38,6 +38,10 @@ In the near future, the plugin will be pushed to npm.  For now, copy the
 plugin into your `my-first-snowpack` directory and name the file
 `ruby2js-snowpack-plugin.js`.
 
+```
+curl https://raw.githubusercontent.com/ruby2js/ruby2js/master/packages/snowpack-plugin/src/index.js -o ruby2js-snowpack-plugin.js
+```
+
 Configure the plugin by placing the following into `snowpack.config.json`:
 
 ```json
