@@ -142,8 +142,11 @@ const startServer = async () => {
   // Start server redirecting stdin and stdout to /dev/null, and inheriting
   // stderr from the parent process.  This avoids cluttering the snowpack dev
   // console window, while enabling actual errors to show through.
-  child_process.spawn('ruby', ['-e', server],
+  let child = child_process.spawn('ruby', ['-e', server],
     { stdio: ['ignore', 'ignore', 'inherit'] })
+
+  // on exit, shutdown server too
+  process.on('exit', () => child.kill('SIGINT'))
 };
 
 // async RPC version of Ruby2JS
