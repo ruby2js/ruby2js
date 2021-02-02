@@ -1,9 +1,8 @@
 Things left to be done:
 
- * Verify `snowpack build` usage
  * Verify performance/scalability.  There potentially is a very good story
-   here if snowpack transforms inputs concurrently/asyncronously as the
-   Rack server can make use of multiple processes and therefore multiple
+   here as snowpack transforms inputs concurrently/asynchronously enabling the
+   Rack server to make use of multiple processes and therefore multiple
    cores.
  * Verify robustness.  This is both recovery from errors and usability
    of error messages.

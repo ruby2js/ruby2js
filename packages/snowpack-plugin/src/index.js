@@ -33,7 +33,8 @@
 // The next biggest challenge is converting pluginOptions which is sent from
 // the JavaScript client to the Ruby server as JSON to a Ruby2JS options hash.
 //
-// 
+// Once all this is in place, the plugin itself (at the bottom of this script)
+// is very straightforward.
 
 const fsp = require('fs').promises;
 const path = require('path');
@@ -41,7 +42,8 @@ const child_process = require('child_process');
 const net = require('net');
 const http = require('http');
 
-let port = 0;
+let port;
+let waitList = [];
 
 // from https://www.npmjs.com/package/get-port
 const getAvailablePort = options => new Promise((resolve, reject) => {
@@ -143,11 +145,32 @@ const startServer = async () => {
   // stderr from the parent process.  This avoids cluttering the snowpack dev
   // console window, while enabling actual errors to show through.
   let child = child_process.spawn('ruby', ['-e', server],
-    { stdio: ['ignore', 'ignore', 'inherit'] })
+    { stdio: ['inherit', 'ignore', 'inherit'] })
 
   // on exit, shutdown server too
   process.on('exit', () => child.kill('SIGINT'))
+
+  // notify waitList when server is ready
+  testServer = limit => {
+    convert('', {}).then(result => {
+      waitList.forEach(client => client.resolve(result));
+      waitList = null;
+    }).catch(error => {
+      if (limit <= 0 || error.code !== 'ECONNREFUSED') {
+        waitList.forEach(client => client.reject(error));
+        waitList = null;
+      };
+    }).finally(() => {
+      if (limit > 0) setTimeout(() => testServer(limit - 100), 100);
+    })
+  };
+
+  // test server for ready for up to fifteen seconds
+  testServer(15000);
 };
+
+// start the server, notify waitList when ready
+startServer().catch(console.error);
 
 // async RPC version of Ruby2JS
 convert = (ruby, options) => new Promise((resolve, reject) => { 
@@ -173,26 +196,9 @@ convert = (ruby, options) => new Promise((resolve, reject) => {
   req.end();
 });
 
-// wait for server to start, or raise an exception
-waitForServer = limit => new Promise((resolve, reject) => { 
-  if (!firstRequest) return true;
-
-  testServer = async limit => {
-    try {
-      if (port) return resolve(await convert('', {}));
-    } catch(error) {
-      limit -= 100;
-      if (limit <= 0 || error.code !== 'ECONNREFUSED') return reject(error);
-    }
-    setTimeout(() => testServer(limit), 100);
-  };
-
-  return testServer(limit);
-});
-
-// start the server, track first request
-startServer().catch(console.error);
-let firstRequest = true;
+async function waitForServer() {
+  await new Promise((resolve, reject) => waitList.push({ resolve, reject }));
+}
 
 module.exports = function (snowpackConfig, pluginOptions) {
   return {
@@ -204,8 +210,7 @@ module.exports = function (snowpackConfig, pluginOptions) {
     },
 
     async load({ filePath }) {
-      if (firstRequest) await waitForServer(5000);
-      firstRequest = false;
+      if (waitList) await waitForServer();
       return await convert(await fsp.readFile(filePath, 'utf8'), pluginOptions);
     },
   };
