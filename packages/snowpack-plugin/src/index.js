@@ -134,7 +134,20 @@ const startServer = async () => {
       opts[:filters].map! {|filter| filters[filter]}
       opts[:filters].compact!
 
-      [200, textPlain, [Ruby2JS.convert(ruby, opts).to_s]]
+      begin
+        [200, textPlain, [Ruby2JS.convert(ruby, opts).to_s]]
+      rescue Ruby2JS::SyntaxError => error
+        if error.respond_to? :diagnostic and error.diagnostic
+          diagnostic = error.diagnostic.render.map {|line| line.sub(/^\\(string\\):/, '')}
+          diagnostic[-1] += '^' if error.diagnostic.location.size == 0
+          [400, textPlain, [diagnostic.join("\\n")]]
+        else
+          [400, textPlain, [error.to_s]]
+        end
+      rescue Exception => error
+        [500, textPlain, ["#{error}\\n#{error.backtrace}"]]
+      end
+
     end
 
     # start server
@@ -161,7 +174,7 @@ const startServer = async () => {
         waitList = null;
       };
     }).finally(() => {
-      if (limit > 0) setTimeout(() => testServer(limit - 100), 100);
+      if (waitList) setTimeout(() => testServer(limit - 100), 100);
     })
   };
 
@@ -188,7 +201,13 @@ convert = (ruby, options) => new Promise((resolve, reject) => {
   const req = http.request(httpOptions, response => {
     let result = [];
     response.on('data', d => result.push(d));
-    response.on('end', () => resolve(result.join()));
+    response.on('end', () => {
+      if (response.statusCode === 200) {
+        resolve(result.join())
+      } else {
+        reject(result.join())
+      }
+    })
   });
 
   req.on('error', reject);
@@ -211,7 +230,12 @@ module.exports = function (snowpackConfig, pluginOptions) {
 
     async load({ filePath }) {
       if (waitList) await waitForServer();
-      return await convert(await fsp.readFile(filePath, 'utf8'), pluginOptions);
-    },
-  };
+
+      try {
+        return await convert(await fsp.readFile(filePath, 'utf8'), pluginOptions);
+      } catch(e) {
+        throw new Error(e.toString() + "\n");
+      }
+    }
+  }
 };
