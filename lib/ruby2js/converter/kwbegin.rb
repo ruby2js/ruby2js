@@ -22,7 +22,7 @@ module Ruby2JS
 
       if @state == :expression
         parse s(:send, s(:block, s(:send, nil, :proc), s(:args),
-          s(:begin, s(:autoreturn, block))), :[])
+          s(:begin, s(:autoreturn, *children))), :[])
         return
       end
 
