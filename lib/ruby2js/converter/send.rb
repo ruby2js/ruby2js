@@ -336,7 +336,11 @@ module Ruby2JS
         end
 
         if autobind and not ast.is_method? and ast.type != :attr
-          put '.bind('; parse(autobind); put ')'
+          if @state == :statement
+            put '()'
+          else
+            put '.bind('; parse(autobind); put ')'
+          end
         end
       end
     end
