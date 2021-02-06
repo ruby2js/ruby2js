@@ -103,6 +103,7 @@ With enough of each, one could reproduce any functionality desired.
   * `x.forEach { next }` becomes `x.forEach(function() {return})`
   * `lambda {}` and `proc {}` becomes `function() {}`
   * `class Person; end` becomes `function Person() {}`
+  * `Class.new do; end` becomes `function () {}`
   * instance methods become prototype methods
   * instance variables become underscored, `@name` becomes `this._name`
   * self is assigned to this is if used

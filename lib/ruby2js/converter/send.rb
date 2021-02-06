@@ -41,6 +41,20 @@ module Ruby2JS
       # strip '!' and '?' decorations
       method = method.to_s[0..-2] if method =~ /\w[!?]$/
 
+      # anonymous class
+      if method == :new and receiver and receiver.children == [nil, :Class] and
+        args.last.type == :def and args.last.children.first == nil
+
+        parent = (args.length > 1) ? args.first : nil
+
+        if es2015
+          return parse s(:class2, nil, parent, *args.last.children[2..-1])
+        else
+          return parse s(:kwbegin, s(:class, s(:const, nil, :$$), parent,
+            *args.last.children[2..-1]), s(:const, nil, :$$))
+        end
+      end
+
       # three ways to define anonymous functions
       if method == :new and receiver and receiver.children == [nil, :Proc]
         return parse args.first, @state

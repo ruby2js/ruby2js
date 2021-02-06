@@ -496,6 +496,18 @@ describe "ES2015 support" do
     end
   end
 
+  describe 'anonymous classes' do
+    it 'should handle anonymous classes without inheritance' do
+      to_js('x = Class.new do def f(); return 1; end; end').
+        must_equal 'let x = class {f() {return 1}}'
+    end
+
+    it 'should handle anonymous classes with inheritance' do
+      to_js('x = Class.new(D) do def f(); return 1; end; end').
+        must_equal 'let x = class extends D {f() {return 1}}'
+    end
+  end
+
   describe 'module extensions' do
     it 'should handle methods' do
       to_js('++module M; def m(); end; end').

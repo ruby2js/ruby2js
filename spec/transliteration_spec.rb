@@ -841,6 +841,22 @@ describe Ruby2JS do
     end
   end
 
+  describe 'anonymous classes' do
+    it 'should handle anonymous classes without inheritance' do
+      to_js('x = Class.new do def f(); return 1; end; end').
+        must_equal 'var x = function() {function $$() {}; ' +
+         '$$.prototype.f = function() {return 1}; return $$}()'
+    end
+
+    it 'should handle anonymous classes with inheritance' do
+      to_js('x = Class.new(D) do def f(); return 1; end; end').
+        must_equal 'var x = function() {function $$() {D.call(this)}; ' +
+         '$$.prototype = Object.create(D.prototype); ' +
+         '$$.prototype.constructor = $$; ' +
+         '$$.prototype.f = function() {return 1}; return $$}()'
+    end
+  end
+
   describe 'module definition' do
     it "should handle empty modules" do
       to_js( 'module A; end' ).

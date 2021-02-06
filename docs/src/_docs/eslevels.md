@@ -32,6 +32,7 @@ conversions are made:
 * `proc {|x| x}` {{ caret }} `(x) => {x}`
 * `a {|x|}` {{ caret }} `a((x) => {})`
 * `class Person; end` {{ caret }} `class Person {}`
+* `Class.new do; end` {{ caret }} `class {}`
 * `(0...a).to_a` {{ caret }} `[...Array(a).keys()]`
 * `(0..a).to_a` {{ caret }} `[...Array(a+1).keys()]`
 * `(b..a).to_a` {{ caret }} `Array.from({length: (a-b+1)}, (_, idx) => idx+b)`
