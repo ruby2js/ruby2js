@@ -57,7 +57,9 @@ def parse_request(env=ENV)
   opts = OptionParser.new
   opts.banner = "Usage: #$0 [options] [file]"
 
-  opts.on('--autoexports', "add export statements for top level constants") {options[:autoexports] = true}
+  opts.on('--autoexports [default]', "add export statements for top level constants") {|option|
+    options[:autoexports] = option ? option.to_sym : true
+  }
 
   opts.on('--autoimports=mappings', "automatic import mappings, without quotes") {|mappings|
     options[:autoimports] = Ruby2JS::Demo.parse_autoimports(mappings)

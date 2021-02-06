@@ -83,13 +83,14 @@ const startServer = async () => {
     # indicates which ones are affected
     template = {
       autoimports: {%i[] => nil},
+      autoexports: %s{},
       comparison: %s{},
       defs: {nil => %i[]},
       exclude: %i[],
       include: %i[],
       include_only: %i[],
       or: %s{},
-      template_literal_tags: %i{},
+      template_literal_tags: %i[],
     }
 
     # process requests

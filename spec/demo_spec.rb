@@ -73,6 +73,9 @@ describe "demo" do
       it "should handle automatic exports" do
         to_js("A = 1", %w(--filter esm --autoexports)).
           must_equal('export const A = 1')
+
+        to_js("A = 1", %w(--filter esm --autoexports default)).
+          must_equal('export default A = 1')
       end
 
       it "should handle automatic imports" do
