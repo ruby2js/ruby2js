@@ -45,6 +45,16 @@ describe Ruby2JS::Filter::ESM do
       to_js('import [ X, Y, Z ], from: "xyz.js"').
         must_include 'import { X, Y, Z } from "xyz.js"'
     end
+
+    it "should default and handle multiple named imports" do
+      to_js('import X, [ Y, Z ], "xyz.js"').
+        must_include 'import X, { Y, Z } from "xyz.js"'
+    end
+
+    it "should handle default and multiple named imports with from" do
+      to_js('import X, [ Y, Z ], from: "xyz.js"').
+        must_include 'import X, { Y, Z } from "xyz.js"'
+    end
   end
 
   describe "exports" do
