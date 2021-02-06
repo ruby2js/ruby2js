@@ -110,6 +110,23 @@ describe Ruby2JS::Filter::ESM do
     end
   end
 
+  describe "autoexports option" do
+    it "should autoexport as default if there is only one export" do
+      to_js('Foo = 1', autoexports: :default).
+        must_equal 'export default Foo = 1'
+    end
+
+    it "explicit export should override autoexport as default" do
+      to_js('export Foo = 1', autoexports: :default).
+        must_equal 'export const Foo = 1'
+    end
+
+    it "should autoexport as named if there are multiple exports" do
+      to_js('Foo = 1; Bar = 1', autoexports: :default).
+        must_equal 'export const Foo = 1; export const Bar = 1'
+    end
+  end
+
   describe "autoimports option" do
     it "should autoimport for constants" do
       to_js('Foo.bar', autoimports: {Foo: 'foo.js'}).

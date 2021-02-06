@@ -9,7 +9,7 @@ module Ruby2JS
 
       def options=(options)
         super
-        @esm_autoexports = options[:autoexports] && !@disable_autoexports
+        @esm_autoexports = !@disable_autoexports && options[:autoexports]
         @esm_autoimports = options[:autoimports]
         @esm_defs = options[:defs] || {}
         @esm_explicit_tokens = Set.new
@@ -17,13 +17,13 @@ module Ruby2JS
 
       def process(node)
         return super unless @esm_autoexports
-        @esm_autoexports = false
 
         list = [node]
         while list.length == 1 and list.first.type == :begin
           list = list.first.children.dup
         end
 
+        replaced = []
         list.map! do |child|
           replacement = child
 
@@ -38,13 +38,27 @@ module Ruby2JS
             replacement = s(:export, child)
           end
 
-          if replacement != child and @comments[child]
-            @comments[replacement] = @comments[child]
+          if replacement != child
+            replaced << replacement
+            @comments[replacement] = @comments[child] if @comments[child]
           end
 
           replacement
         end
 
+        if replaced.length == 1 and @esm_autoexports == :default
+          list.map! do |child|
+            if child = replaced.first
+              replacement = s(:export, s(:send, nil, :default, *child.children))
+              @comments[replacement] = @comments[child] if @comments[child]
+              replacement
+            else
+              child
+            end
+          end
+        end
+
+        @esm_autoexports = false
         process s(:begin, *list)
       end
 

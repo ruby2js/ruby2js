@@ -9,6 +9,8 @@
 * Handle empty edge cases like `` `#{}` `` and `()`
 * Live demo based on Opal ([see here](https://ruby2js.com/demo))
 * Demo: Hidden AST syntax enables copy/paste of syntactically correct AST
+* Anonymous classes via Class.new
+* Autoexport :default option
 
 # 3.6.1 / 2020-12-31
 

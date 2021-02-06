@@ -61,6 +61,11 @@ export [ one, two, default: three ]
 If the `autoexports` option is `true`, all top level modules, classes, 
 methods and constants will automatically be exported.
 
+If the `autoexports` option is `:default`, and there is only one top level
+module, class, method or constant it will automatically be exported as
+`default`.  If there are multiple, each will be exported with none of them as
+default.
+
 ## Autoimports
 
 The esm filter also provides a way to specify "autoimports" when you run the

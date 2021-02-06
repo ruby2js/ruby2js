@@ -15,6 +15,11 @@ require 'ruby2js/filter/esm'
 puts Ruby2JS.convert("X = 1", autoexports: true)
 ```
 
+If the `autoexports` option is `:default`, and there is only one top level
+module, class, method or constant it will automatically be exported as
+`default`.  If there are multiple, each will be exported with none of them as
+default.
+
 ## Auto Imports
 
 The [ESM](esm) filter has an option to automatically import selected
