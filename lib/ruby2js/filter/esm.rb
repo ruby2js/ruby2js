@@ -121,15 +121,20 @@ module Ruby2JS
             #   => import Stuff as * from "file.js"
             # import [ Some, Stuff ], from: "file.js"
             #   => import { Some, Stuff } from "file.js"
-            imports = if args[0].type == :const || args[0].type == :send
+            # import Some, [ More, Stuff ], from: "file.js"
+            #   => import Some, { More, Stuff } from "file.js"
+            imports = []
+            if args[0].type == :const || args[0].type == :send
               @esm_explicit_tokens << args[0].children.last
-              process(args[0])
-            else
-              args[0].children.each {|i| @esm_explicit_tokens << i.children.last}
-              process_all(args[0].children)
+              imports << process(args.shift)
             end
 
-            s(:import, args[1].children, imports) unless args[1].nil?
+            if args[0].type == :array
+              args[0].children.each {|i| @esm_explicit_tokens << i.children.last}
+              imports << process_all(args.shift.children)
+            end
+
+            s(:import, args[0].children, *imports) unless args[0].nil?
           end
         elsif method == :export          
           s(:export, *process_all(args))

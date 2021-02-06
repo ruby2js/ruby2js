@@ -29,7 +29,18 @@ module Ruby2JS
       else
         # import (x) from "file.js"
         default_import = !args.first.is_a?(Array) && [:const, :send, :attr].include?(args.first.type)
+
+        if default_import and args.length > 1
+          parse args.shift
+          put ', '
+          default_import = false
+        end
+
         args = args.first if args.first.is_a?(Array)
+
+        if args.first.type == :array
+          args = args.first.children
+        end
 
         # handle the default name or { ConstA, Const B } portion
         put "{ " unless default_import

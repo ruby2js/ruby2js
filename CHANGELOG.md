@@ -11,6 +11,7 @@
 * Demo: Hidden AST syntax enables copy/paste of syntactically correct AST
 * Anonymous classes via Class.new
 * Autoexport :default option
+* Support both default and named imports on same import statement
 
 # 3.6.1 / 2020-12-31
 
