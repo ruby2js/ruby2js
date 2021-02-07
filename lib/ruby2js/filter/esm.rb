@@ -48,7 +48,7 @@ module Ruby2JS
 
         if replaced.length == 1 and @esm_autoexports == :default
           list.map! do |child|
-            if child = replaced.first
+            if child == replaced.first
               replacement = s(:export, s(:send, nil, :default, *child.children))
               @comments[replacement] = @comments[child] if @comments[child]
               replacement

@@ -163,6 +163,7 @@ module Ruby2JS
       def on_send!(node); on_send(node); end
       def on_sendw(node); on_send(node); end
       def on_undefined?(node); on_defined?(node); end
+      def on_hide(node); end
       def on_nil(node); end
       def on_xnode(node); end
       def on_export(node); end

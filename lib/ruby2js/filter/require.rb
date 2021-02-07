@@ -1,4 +1,5 @@
 require 'ruby2js'
+require 'pathname'
 
 module Ruby2JS
   module Filter
@@ -14,6 +15,11 @@ module Ruby2JS
       def initialize(*args)
         @require_expr = nil
         super
+      end
+
+      def options=(options)
+        super
+        @require_autoexports = !@disable_autoexports && options[:autoexports]
       end
 
       def on_send(node)
@@ -48,7 +54,53 @@ module Ruby2JS
             ast, comments = Ruby2JS.parse(File.read(filename), filename)
             @comments.merge! Parser::Source::Comment.associate(ast, comments)
             @comments[node] += @comments[ast]
-            process ast
+
+            children = ast.type == :begin ? ast.children : [ast]
+
+            named_exports = []
+            auto_exports = []
+            default_exports = []
+            children.each do |child|
+              if child&.type == :send and child.children[0..1] == [nil, :export]
+                child = child.children[2]
+                if child&.type == :send and child.children[0..1] == [nil, :default]
+                  child = child.children[2]
+                  target = default_exports
+                else
+                  target = named_exports
+                end
+              elsif @require_autoexports
+                target = auto_exports
+              else
+                next
+              end
+
+              if %i[class module].include? child.type and child.children[0].children[0] == nil
+                target << child.children[0].children[1]
+              elsif child.type == :casgn and child.children[0] == nil
+                target << child.children[1]
+              elsif child.type == :def
+                target << child.children[0]
+              end
+            end
+
+            if @require_autoexports == :default and auto_exports.length == 1
+              default_exports += auto_exports
+            else
+              named_exports += auto_exports
+            end
+
+            imports = []
+            imports << s(:const, nil, default_exports.first) unless default_exports.empty?
+            imports << named_exports.map {|id| s(:const, nil, id)} unless named_exports.empty?
+
+            if imports.empty?
+              process ast
+            else
+              importname = Pathname.new(filename).relative_path_from(dirname).to_s
+              prepend_list << s(:import, importname, *imports)
+              process s(:hide, ast)
+            end
           ensure
             if file2
               @options[:file2] = file2
