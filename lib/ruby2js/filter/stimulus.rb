@@ -127,7 +127,7 @@ module Ruby2JS
 
         nodes.pop unless nodes.last
 
-        node.updated(nil, [*node.children[0..1], s(:begin, *nodes)])
+        node.updated(nil, [*node.children[0..1], s(:begin, *process_all(nodes))])
       end
 
       # analyze ivar usage
