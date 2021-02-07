@@ -12,24 +12,34 @@ module Ruby2JS
           s(:pair, s(:sym, :from), s(:str, "stimulus"))],
           s(:const, nil, :Stimulus))
 
-      # Example conversion
-      #  before:
-      #    (class (const nil :Foo) (const nil :React) nil)
-      #  after:
-      #    (casgn nil :foo, (send :React :createClass (hash (sym :displayName)
-      #       (:str, "Foo"))))
+      def initialize(*args)
+        super
+        @stim_scope = []
+        @stim_subclasses = []
+      end
+
+      def on_module(node)
+        save_scope = @stim_scope
+        @stim_scope += @namespace.resolve(node.children.first)
+        super
+      ensure
+        @stim_scope = save_scope
+      end
+
       def on_class(node)
         cname, inheritance, *body = node.children
-        return super unless cname.children.first == nil
         return super unless inheritance == s(:const, nil, :Stimulus) or
           inheritance == s(:const, s(:const, nil, :Stimulus), :Controller) or
-          inheritance == s(:send, s(:const, nil, :Stimulus), :Controller)
+          inheritance == s(:send, s(:const, nil, :Stimulus), :Controller) or
+          @stim_subclasses.include? @namespace.resolve(inheritance)
 
         if inheritance == s(:const, nil, :Stimulus)
           node = node.updated(nil, [node.children.first,
             s(:const, s(:const, nil, :Stimulus), :Controller),
             *node.children[2..-1]])
         end
+
+        @stim_subclasses << @stim_scope + @namespace.resolve(cname)
 
         @stim_targets = Set.new
         @stim_values = Set.new
