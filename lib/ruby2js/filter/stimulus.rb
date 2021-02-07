@@ -49,7 +49,7 @@ module Ruby2JS
         prepend_list << STIMULUS_IMPORT
 
         nodes = node.children[2..-1]
-        if nodes.length == 1 and nodes.first.type == :begin
+        if nodes.length == 1 and nodes.first&.type == :begin
           nodes = nodes.first.children.dup
         end
 
@@ -124,6 +124,8 @@ module Ruby2JS
         props[:initialize] = s(:autobind, s(:self))
 
         nodes.unshift s(:defineProps, props)
+
+        nodes.pop unless nodes.last
 
         node.updated(nil, [*node.children[0..1], s(:begin, *nodes)])
       end

@@ -59,7 +59,7 @@ module Ruby2JS
         end
 
         node = if m.type == :def
-          if m.children.first == :initialize
+          if m.children.first == :initialize and !@rbstack.last[:initialize]
             # constructor: remove from body and overwrite init function
             init = m
             nil
@@ -191,6 +191,10 @@ module Ruby2JS
           m.updated(nil, [innerclass_name, *m.children[1..-1]])
         elsif @ast.type == :class_module
           m
+        elsif m.type == :defineProps
+          @namespace.defineProps m.children.first
+          visible.merge! m.children.first
+          nil
         else
           raise Error.new("class #{ m.type } not supported", @ast)
         end
@@ -219,7 +223,6 @@ module Ruby2JS
           s(:send, s(:const, nil, :Object), :create,
             s(:attr, inheritance, :prototype))),
           s(:send, s(:attr, name, :prototype), :constructor=, name)
-        @rbstack.push(@namespace.find(inheritance))
       else
         body.compact!
 
@@ -336,6 +339,7 @@ module Ruby2JS
 
         # add locally visible interfaces to rbstack.  See send.rb, const.rb
         @rbstack.push visible
+        @rbstack.last.merge!(@namespace.find(inheritance)) if inheritance
 
         parse s(:begin, *body.compact), :statement
       ensure
