@@ -33,7 +33,6 @@ module Ruby2JS
       if inheritance
         put ' extends '
         parse inheritance
-        @rbstack.push(@namespace.find(inheritance))
       end
 
       put " {"
@@ -42,6 +41,7 @@ module Ruby2JS
         class_name, @class_name = @class_name, name
         class_parent, @class_parent = @class_parent, inheritance
         @rbstack.push(@namespace.getOwnProps)
+        @rbstack.last.merge!(@namespace.find(inheritance)) if inheritance
         constructor = []
         index = 0
 
@@ -49,7 +49,7 @@ module Ruby2JS
         body.each do |m|
           if m.type == :def
             prop = m.children.first
-            if prop == :initialize
+            if prop == :initialize and !@rbstack.last[:initialize]
               constructor = m.children[2..-1]
             elsif not prop.to_s.end_with? '='
               @rbstack.last[prop] = m.is_method? ? s(:autobind, s(:self)) : s(:self)
@@ -152,7 +152,7 @@ module Ruby2JS
           if m.type == :def || m.type == :defm || m.type == :async
             @prop = m.children.first
 
-            if @prop == :initialize
+            if @prop == :initialize and !@rbstack.last[:initialize]
               @prop = :constructor 
 
               if constructor == [] or constructor == [(:super)]
@@ -253,6 +253,11 @@ module Ruby2JS
             parse m.updated(:lvasgn, [m.children[1].to_s.sub('=', ''),
               m.children[2]])
 
+          elsif m.type == :defineProps
+            skipped = true
+            @namespace.defineProps m.children.first
+            @rbstack.last.merge! m.children.first
+
           else
             if m.type == :cvasgn and !underscored_private
               put 'static #$'; put m.children[0].to_s[2..-1]; put ' = '
@@ -275,7 +280,7 @@ module Ruby2JS
           end
 
           if skipped
-            post << [m, comments] if skipped
+            post << [m, comments] unless m.type == :defineProps
           else
             comments.reverse.each {|comment| insert location, comment}
           end

@@ -45,7 +45,7 @@ module Ruby2JS
     # return the set of known properties (and methods) for either the current
     # scope or a named subscope.
     def getOwnProps(name = nil)
-      @seen[active + resolve(name)] || {}
+      @seen[active + resolve(name)]&.dup || {}
     end
 
     # add new props (and methods) to the current scope.
