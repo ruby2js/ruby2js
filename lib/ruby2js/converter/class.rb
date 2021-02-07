@@ -59,7 +59,7 @@ module Ruby2JS
         end
 
         node = if m.type == :def
-          if m.children.first == :initialize and !@rbstack.last[:initialize]
+          if m.children.first == :initialize and !visible[:initialize]
             # constructor: remove from body and overwrite init function
             init = m
             nil
