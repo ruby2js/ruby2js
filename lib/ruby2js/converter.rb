@@ -160,6 +160,10 @@ module Ruby2JS
       @eslevel >= 2021
     end
 
+    def es2022
+      @eslevel >= 2022
+    end
+
     @@handlers = []
     def self.handle(*types, &block)
       types.each do |type| 

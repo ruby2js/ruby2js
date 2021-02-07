@@ -130,12 +130,12 @@ describe "demo" do
 
     describe "underscored private" do
       it "without underscored private" do
-        to_js("class C; def initialize; @a=1; end; end", %w(--es2020)).
+        to_js("class C; def initialize; @a=1; end; end", %w(--es2022)).
           must_equal('class C {#a = 1; }')
       end
 
       it "with underscored private" do
-        to_js("class C; def initialize; @a=1; end; end", %w(--es2020 --underscored_private)).
+        to_js("class C; def initialize; @a=1; end; end", %w(--es2022 --underscored_private)).
           must_equal('class C {constructor() {this._a = 1}}')
       end
     end

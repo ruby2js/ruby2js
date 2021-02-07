@@ -122,6 +122,10 @@ module Ruby2JS
         @options[:eslevel] >= 2021
       end
 
+      def es2022
+        @options[:eslevel] >= 2022
+      end
+
       def process(node)
         ast, @ast = @ast, node
         replacement = super
@@ -243,7 +247,7 @@ module Ruby2JS
     ruby2js.comparison = options[:comparison] || :equality
     ruby2js.or = options[:or] || :logical
     ruby2js.module_type = options[:module] || :esm
-    ruby2js.underscored_private = (options[:eslevel] < 2020) || options[:underscored_private]
+    ruby2js.underscored_private = (options[:eslevel] < 2022) || options[:underscored_private]
 
     ruby2js.namespace = namespace
 

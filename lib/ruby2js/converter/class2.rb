@@ -245,6 +245,14 @@ module Ruby2JS
               skipped = true
             end
 
+          elsif es2022 and \
+            m.type == :send and m.children.first.type == :self and \
+            m.children[1].to_s.end_with? '='
+
+            put 'static '
+            parse m.updated(:lvasgn, [m.children[1].to_s.sub('=', ''),
+              m.children[2]])
+
           else
             if m.type == :cvasgn and !underscored_private
               put 'static #$'; put m.children[0].to_s[2..-1]; put ' = '

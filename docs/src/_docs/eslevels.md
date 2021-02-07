@@ -123,8 +123,6 @@ When option `eslevel: 2020` is provided, the following additional
 conversions are made:
 
 {:.functions-list}
-* `@x` {{ caret }} `this.#x` (unless the `underscored_private` option is set to `true`)
-* `@@x` {{ caret }} `ClassName.#x`
 * `a&.b` {{ caret }} `a?.b`
 * `.scan` {{ caret }} `Array.from(str.matchAll(/.../g), s => s.slice(1))`
 
@@ -137,3 +135,11 @@ conversions are made:
 * `x ||= 1` {{ caret }} `x ||= 1`
 * `x &&= 1` {{ caret }} `x &&= 1`
 * `1000000.000001` {{ caret }} `1_000_000.000_001`
+
+## ES2022 support
+
+{:.functions-list}
+* `@x` {{ caret }} `this.#x` (unless the `underscored_private` option is set to `true`)
+* `@@x` {{ caret }} `ClassName.#x`
+* `self.a = []` {{ caret }} `static a = []` (within a class)
+
