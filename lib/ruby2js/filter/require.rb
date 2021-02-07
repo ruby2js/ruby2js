@@ -97,7 +97,7 @@ module Ruby2JS
             if imports.empty?
               process ast
             else
-              importname = Pathname.new(filename).relative_path_from(dirname).to_s
+              importname = Pathname.new(filename).relative_path_from(Pathname.new(dirname)).to_s
               prepend_list << s(:import, importname, *imports)
               process s(:hide, ast)
             end
