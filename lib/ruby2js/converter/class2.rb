@@ -51,7 +51,9 @@ module Ruby2JS
             prop = m.children.first
             if prop == :initialize and !@rbstack.last[:initialize]
               constructor = m.children[2..-1]
-            elsif not prop.to_s.end_with? '='
+            elsif prop.to_s.end_with? '='
+              @rbstack.last[prop.to_s[0..-2].to_sym] = s(:autobind, s(:self))
+            else
               @rbstack.last[prop] = m.is_method? ? s(:autobind, s(:self)) : s(:self)
             end
           end

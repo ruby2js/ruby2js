@@ -12,6 +12,14 @@ module Ruby2JS
       var = s(:lvar, var.children.first) if var.type == :lvasgn
       var = s(:cvar, var.children.first) if var.type == :cvasgn
 
+      if var.type == :lvar
+        name = var.children.first
+        receiver = @rbstack.map {|rb| rb[name]}.compact.last
+        if receiver
+          var = s(:attr, nil, name)
+        end
+      end
+
       if \
         [:+, :-].include?(op) and value.type==:int and 
         (value.children==[1] or value.children==[-1])

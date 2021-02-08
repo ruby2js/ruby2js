@@ -768,6 +768,14 @@ describe Ruby2JS do
           '{return this.m1}}})'
     end
 
+    it "should prefix property assignments with this." do
+      to_js('class C; def a=(x); @a=x; end; def b(); a+=1; end; end').
+        must_equal 'function C() {}; ' +
+          'Object.defineProperty(C.prototype, "a", {enumerable: true, ' +
+          'configurable: true, set: function(x) {this._a = x}}); ' +
+          'C.prototype.b = function() {a++}'
+    end
+
     it "should prefix bind references to methods as properties" do
       to_js('class C; def m1(); end; def m2; m1; end; end').
         must_equal 'function C() {}; C.prototype.m1 = function() {}; ' +
