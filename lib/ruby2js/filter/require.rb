@@ -20,6 +20,7 @@ module Ruby2JS
       def options=(options)
         super
         @require_autoexports = !@disable_autoexports && options[:autoexports]
+        @require_recursive = options[:require_recursive]
       end
 
       def on_send(node)
@@ -99,7 +100,26 @@ module Ruby2JS
             else
               importname = Pathname.new(filename).relative_path_from(Pathname.new(dirname)).to_s
               prepend_list << s(:import, importname, *imports)
-              process s(:hide, ast)
+
+              save_prepend_list = prepend_list.dup
+              node = process s(:hide, ast)
+
+              if @require_recursive
+		block = node.children
+		while block.length == 1 and block.first.type == :begin
+		   block = block.first.children
+		end
+
+		block.each do |child|
+		  prepend_list << child if child&.type == :import
+		end
+              else
+                prepend_list.keep_if do |import|
+                  save_prepend_list.include? import 
+                end
+              end
+
+              node
             end
           ensure
             if file2
