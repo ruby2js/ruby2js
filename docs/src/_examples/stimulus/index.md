@@ -52,7 +52,7 @@ export default class extends Controller {
 The equivalent code using the Ruby2JS Stimulus filter:
 
 ```ruby
-class Hellocontroller < Stimulus::Controller
+class HelloController < Stimulus::Controller
   def greet()
     outputTarget.textContent =
       "Hello, #{nameTarget.value}!"
@@ -66,5 +66,5 @@ file in the right location and everything will JustWork™.
 
 In two pages, you will have this and more up and running so you can see for
 yourself, but meanwhile if you are curious as to what the generated JavaScript
-for this class would look like, copy the code from above and paste it into
-the [demo](../../demo/?es2022&filter=stimulus) page.
+for this class would look like, check out the results on the
+[live demo](../../demo/?es2022&filter=stimulus&autoexports=default&ruby=class+HelloController+%3C+Stimulus%3A%3AController%0A++def+greet%28%29%0A++++outputTarget.textContent+%3D%0A++++++%22Hello%2C+%23%7BnameTarget.value%7D%21%22%0A++end%0Aend) page.
