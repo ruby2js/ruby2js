@@ -8,6 +8,11 @@ module Ruby2JS
     #   (int 1))
 
     handle :lvasgn, :gvasgn do |name, value=nil|
+      if @ast.type == :lvasgn and value
+        receiver = @rbstack.map {|rb| rb[name]}.compact.last
+        return parse s(:attr, receiver, "#{name}=", value) if receiver
+      end
+
       state  = @state
       begin
         if value and value.type == :lvasgn and @state == :statement

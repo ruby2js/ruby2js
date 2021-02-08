@@ -141,7 +141,7 @@ module Ruby2JS
 
             if child.children[1] =~ /^(\w+)Targets?$/
               @stim_targets.add s(:str, $1)
-            elsif child.children[1] =~ /^(\w+)Value$/
+            elsif child.children[1] =~ /^(\w+)Value=?$/
               @stim_values.add s(:str, $1)
             elsif child.children[1] =~ /^(\w+)Class$/
               @stim_classes.add s(:str, $1)
@@ -150,6 +150,23 @@ module Ruby2JS
               @stim_targets.add name if $2 == 'Target'
               @stim_values.add name if $2 == 'Value'
               @stim_classes.add name if $2 == 'Class'
+            end
+
+          elsif child.type == :send and child.children.length == 3 and
+            [s(:self), s(:send, nil, :this)].include? child.children[0]
+
+            if child.children[1] =~ /^(\w+)Value=$/
+              @stim_values.add s(:str, $1)
+            end
+
+          elsif child.type == :lvasgn
+            if child.children[0] =~ /^(\w+)Value$/
+              @stim_values.add s(:str, $1)
+            end
+
+          elsif child.type == :def
+            if child.children[0] =~ /^(\w+)ValueChanged$/
+              @stim_values.add s(:str, $1)
             end
           end
 
