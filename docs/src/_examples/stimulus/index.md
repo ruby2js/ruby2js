@@ -67,4 +67,4 @@ file in the right location and everything will JustWork™.
 In two pages, you will have this and more up and running so you can see for
 yourself, but meanwhile if you are curious as to what the generated JavaScript
 for this class would look like, check out the results on the
-[live demo](../../demo/?es2022&filter=stimulus&autoexports=default&ruby=class+HelloController+%3C+Stimulus%3A%3AController%0A++def+greet%28%29%0A++++outputTarget.textContent+%3D%0A++++++%22Hello%2C+%23%7BnameTarget.value%7D%21%22%0A++end%0Aend) page.
+[live demo](../../demo/?es2022&filter=stimulus%2Cesm&autoexports=default&ruby=class%20HelloController%20%3C%20Stimulus%3A%3AController%0A%20%20def%20greet%28%29%0A%20%20%20%20outputTarget.textContent%20%3D%0A%20%20%20%20%20%20%22Hello%2C%20%23%7BnameTarget.value%7D%21%22%0A%20%20end%0Aend) page.
