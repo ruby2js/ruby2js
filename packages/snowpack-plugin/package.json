@@ -1,0 +1,16 @@
+{
+  "name": "@ruby2js/snowpack-plugin",
+  "version": "0.0.1",
+  "description": "ruby2js plugin for Snowpack",
+  "author": "Sam Ruby <rubys@intertwingly.net>",
+  "license": "MIT",
+  "main": "src/index.js",
+  "homepage": "https://github.com/ruby2js/ruby2js/tree/master/packages/snowpack-plugin#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ruby2js/ruby2js"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
