@@ -7,8 +7,8 @@ order: 1
 
 {% rendercontent "docs/note" %}
 Feeling impatient and wanting a quick start?  Feel free to jump to the
-[Installation](installation) step.  Don't worry, you can always come back
-here afterwards when you want to dive in deeper.
+[Installation](/examples/stimulus/installation) step.  Don't worry, you can
+always come back here afterwards when you want to dive in deeper.
 {% endrendercontent %}
 
 # Elevator Pitch
