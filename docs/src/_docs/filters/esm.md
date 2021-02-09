@@ -28,8 +28,11 @@ import [ LitElement, html, css ], from: "lit-element"
 import React, from: "react"
 # => import React from "react"
 
-import React, as: "*", from: "react"
-# => import React as * from "react"
+import React, [ Component ], from: "react"
+# => import React, { Component } from "react"
+
+import "*", as: React from: "react"
+# => import * as React from "react"
 ```
 
 ### export

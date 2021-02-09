@@ -8,9 +8,9 @@ module Ruby2JS
       extend  SEXP
 
       STIMULUS_IMPORT = s(:import,
-        [s(:pair, s(:sym, :as), s(:str, "*")),
+        [s(:pair, s(:sym, :as), s(:const, nil, :Stimulus)),
           s(:pair, s(:sym, :from), s(:str, "stimulus"))],
-          s(:const, nil, :Stimulus))
+          s(:str, '*'))
 
       def initialize(*args)
         super

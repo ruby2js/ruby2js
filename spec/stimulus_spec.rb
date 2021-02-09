@@ -12,19 +12,19 @@ describe Ruby2JS::Filter::Stimulus do
   describe "class aliases" do
     it "handles ruby scope syntax" do
       to_js( 'class Foo<Stimulus::Controller; end' ).
-        must_equal 'import Stimulus as * from "stimulus"; ' +
+        must_equal 'import * as Stimulus from "stimulus"; ' +
           'class Foo extends Stimulus.Controller {}'
     end
 
     it "handles JS scope syntax" do
       to_js( 'class Foo<Stimulus.Controller; end' ).
-        must_equal 'import Stimulus as * from "stimulus"; ' +
+        must_equal 'import * as Stimulus from "stimulus"; ' +
           'class Foo extends Stimulus.Controller {}'
     end
 
     it "handles shorthand" do
       to_js( 'class Foo<Stimulus; end' ).
-        must_equal 'import Stimulus as * from "stimulus"; ' +
+        must_equal 'import * as Stimulus from "stimulus"; ' +
           'class Foo extends Stimulus.Controller {}'
     end
   end

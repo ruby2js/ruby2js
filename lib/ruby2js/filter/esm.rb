@@ -93,7 +93,7 @@ module Ruby2JS
             end
           end
 
-          if args[0].type == :str
+          if args[0].type == :str and args.length == 1
             # import "file.css"
             #   => import "file.css"
             s(:import, args[0].children[0])
@@ -124,7 +124,7 @@ module Ruby2JS
             # import Some, [ More, Stuff ], from: "file.js"
             #   => import Some, { More, Stuff } from "file.js"
             imports = []
-            if args[0].type == :const || args[0].type == :send
+            if %i(const send str).include? args[0].type
               @esm_explicit_tokens << args[0].children.last
               imports << process(args.shift)
             end

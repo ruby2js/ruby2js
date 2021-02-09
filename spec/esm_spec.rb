@@ -32,8 +32,8 @@ describe Ruby2JS::Filter::ESM do
     end
 
     it "should handle a default import as start" do
-      to_js('import X, as: "*", from: "x.js"').
-        must_include 'import X as * from "x.js"'
+      to_js('import "*", as: X, from: "x.js"').
+        must_include 'import * as X from "x.js"'
     end
 
     it "should handle multiple named imports" do
@@ -46,7 +46,7 @@ describe Ruby2JS::Filter::ESM do
         must_include 'import { X, Y, Z } from "xyz.js"'
     end
 
-    it "should default and handle multiple named imports" do
+    it "should handle default and multiple named imports" do
       to_js('import X, [ Y, Z ], "xyz.js"').
         must_include 'import X, { Y, Z } from "xyz.js"'
     end

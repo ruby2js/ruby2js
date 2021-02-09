@@ -28,7 +28,7 @@ module Ruby2JS
         put path.inspect
       else
         # import (x) from "file.js"
-        default_import = !args.first.is_a?(Array) && [:const, :send, :attr].include?(args.first.type)
+        default_import = !args.first.is_a?(Array) && %i[const send attr str].include?(args.first.type)
 
         if default_import and args.length > 1
           parse args.shift
@@ -46,7 +46,11 @@ module Ruby2JS
         put "{ " unless default_import
         args.each_with_index do |arg, index|
           put ', ' unless index == 0
-          parse arg
+          if arg.type == :str
+            put arg.children.first # useful for '*'
+          else
+            parse arg
+          end
         end
         put " }" unless default_import
 
@@ -54,7 +58,7 @@ module Ruby2JS
 
         # should there be an as clause? e.g., import React as *
         if path.is_a?(Array) && !path[0].is_a?(String) && path[0].type == :pair && path[0].children[0].children[0] == :as
-          put " as #{path[0].children[1].children[0]}"
+          put " as #{path[0].children[1].children.last}"
 
           # advance to the next kwarg, aka from
           from_kwarg_position = 1
