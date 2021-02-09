@@ -118,6 +118,10 @@ module Ruby2JS
         if EXPRESSIONS.include? expr.type
           if expr.type == :send and expr.children[0..1] == [nil, :raise]
             style = :statement
+          elsif expr.type == :send and expr.children.length == 2 and
+            expr.children.first == nil and @rbstack.last and
+            @rbstack.last[expr.children[1]]&.type == :autobind
+            style = :statement
           else
             style = :expression
           end
