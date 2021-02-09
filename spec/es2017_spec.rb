@@ -81,6 +81,11 @@ describe "ES2017 support" do
       to_js( 'async -> (x) {x}' ).
         must_equal 'async x => x'
     end
+     
+    it "should auto bind async methods referenced as properties" do
+      to_js('class C; async def m1(x); end; def m2; m1; end; end').
+        must_equal 'class C {async m1(x) {}; get m2() {return this.m1.bind(this)}}'
+    end
   end
 
   describe :await do

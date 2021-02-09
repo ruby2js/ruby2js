@@ -56,6 +56,11 @@ module Ruby2JS
             else
               @rbstack.last[prop] = m.is_method? ? s(:autobind, s(:self)) : s(:self)
             end
+          elsif m.type == :send and m.children[0..1] == [nil, :async]
+            if m.children[2].type == :def
+              prop = m.children[2].children.first
+              @rbstack.last[prop] = s(:autobind, s(:self))
+            end
           end
         end
 
