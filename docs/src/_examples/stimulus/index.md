@@ -4,6 +4,13 @@ title: Introduction
 order: 1
 ---
 
+
+{% rendercontent "docs/note" %}
+Feeling impatient and wanting a quick start?  Feel free to jump to the
+[Installation](installation) step.  Don't worry, you can always come back
+here afterwards when you want to dive in deeper.
+{% endrendercontent %}
+
 # Elevator Pitch
 
 The Ruby2JS Stimulus filter is for people who both:
@@ -64,7 +71,7 @@ Notably, there are no `imports`, no `exports`, no `static targets`, and no
 `this.`.  All you need to do is follow the naming conventions and drop the
 file in the right location and everything will JustWork™.
 
-In two pages, you will have this and more up and running so you can see for
-yourself, but meanwhile if you are curious as to what the generated JavaScript
-for this class would look like, check out the results on the
+In the upcoming pages, you will have this and much, much, more up and running
+so you can see for yourself, but meanwhile if you are curious as to what the
+generated JavaScript for this class would look like, check out the results on the
 [live demo](../../demo/?es2022&filter=stimulus%2Cesm&autoexports=default&ruby=class%20HelloController%20%3C%20Stimulus%3A%3AController%0A%20%20def%20greet%28%29%0A%20%20%20%20outputTarget.textContent%20%3D%0A%20%20%20%20%20%20%22Hello%2C%20%23%7BnameTarget.value%7D%21%22%0A%20%20end%0Aend) page.
