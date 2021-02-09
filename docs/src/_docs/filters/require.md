@@ -13,6 +13,10 @@ option), then the require statement will be replaced with an `import`
 statement referencing the top level classes, modules, constants, and methods
 defined in that source.
 
+If the `require_recursive` option is specified, then all symbols defined by all
+sources referenced by the transitive closure of all requires defined by that
+source.
+
 If no exports are found, the required file is converted to JavaScript and expanded inline. 
 
 {% rendercontent "docs/note", extra_margin: true %}

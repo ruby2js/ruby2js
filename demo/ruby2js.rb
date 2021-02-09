@@ -118,6 +118,8 @@ def parse_request(env=ENV)
 
   opts.on('--nullish', "use '??' for 'or' operators") {options[:or] = :nullish}
 
+  opts.on('--require_recursive', "import all symbols defined by processing the require recursively") {options[:return_recursive] = true}
+
   opts.on('--strict', "strict mode") {options[:strict] = true}
 
   opts.on('--template_literal_tags tag,...', "process TAGS as template literals", Array) {|tags|
@@ -308,6 +310,7 @@ else
           _div.dropdown_content do
             Dir["#{$:.first}/ruby2js/filter/*.rb"].sort.each do |file|
               filter = File.basename(file, '.rb')
+              next if filter == 'require'
               _div do
                 _input type: 'checkbox', name: filter, checked: selected.include?(filter)
                 _span filter
@@ -325,6 +328,7 @@ else
 
             options_available.each do |option, args|
               next if option == 'filter'
+              next if option.start_with? 'require_'
               _div do
                 _input type: 'checkbox', name: option, checked: checked[option.to_sym],
                   data_args: options_available[option]

@@ -13,6 +13,7 @@
 * Autoexport :default option
 * Support both default and named imports on same import statement
 * requires for modules containing exports statements generate import statements
+* require_recursive option
 
 # 3.6.1 / 2020-12-31
 

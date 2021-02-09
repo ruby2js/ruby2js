@@ -185,6 +185,16 @@ require 'ruby2js'
 puts Ruby2JS.convert("a || b", or: :nullish, eslevel: 2020)
 ```
 
+## Require Recursive
+
+The `require` filter will replace `require` statements with `import` statements if the module being required exports symbols.  By default, this will be only symbols defined in the source file being referenced.  If the `require_recursive` option is specified, then `import` statements will be defined for all symbols defined in the transitive closure of all requires in that module too.
+
+```ruby
+require 'ruby2js/require'
+require 'ruby2js/esm'
+puts Ruby2JS.convert("require 'bar'", file: 'foo.rb', require_recursive: true)
+```
+
 ## Scope
 
 Make all Instance Variables (ivars) in a given scope available to the
