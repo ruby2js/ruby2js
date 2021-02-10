@@ -44,6 +44,11 @@ describe Ruby2JS::Filter::Require do
       to_js( 'require "require/test1"' ).
         must_equal 'console.log("test2"); console.log("test3")'
     end
+
+    it "should process each file only once" do
+      to_js( 'require "require/test6"' ).
+        must_equal 'console.log("test2"); console.log("test3"); console.log("test6")'
+    end
   end
   
   describe :timestamps do
@@ -64,17 +69,17 @@ describe Ruby2JS::Filter::Require do
   describe :esmimport do
     it "should handle explicit exports" do
       to_js_esm( 'require "require/test4.rb"' ).
-        must_equal 'import { Foo } from "require/test4.rb"; '
+        must_equal 'import { Foo } from "require/test4.rb"'
     end
 
     it "should handle auto exports" do
       to_js_esm_auto( 'require "require/test5.rb"' ).
-        must_equal 'import { Foo } from "require/test5.rb"; '
+        must_equal 'import { Foo } from "require/test5.rb"'
     end
 
     it "should handle auto exports default" do
       to_js_esm_autodefault( 'require "require/test5.rb"' ).
-        must_equal 'import Foo from "require/test5.rb"; '
+        must_equal 'import Foo from "require/test5.rb"'
     end
   end
 

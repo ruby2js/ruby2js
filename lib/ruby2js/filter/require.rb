@@ -14,6 +14,7 @@ module Ruby2JS
 
       def initialize(*args)
         @require_expr = nil
+        @require_seen = {}
         super
       end
 
@@ -51,10 +52,17 @@ module Ruby2JS
               filename += '.js.rb'
             end
 
-            @options[:file2] = filename
-            ast, comments = Ruby2JS.parse(File.read(filename), filename)
-            @comments.merge! Parser::Source::Comment.associate(ast, comments)
-            @comments[node] += @comments[ast]
+            realpath = File.realpath(filename)
+            if @require_seen[realpath]
+              ast = s(:hide)
+            else
+              @require_seen[realpath] = []
+
+              @options[:file2] = filename
+              ast, comments = Ruby2JS.parse(File.read(filename), filename)
+              @comments.merge! Parser::Source::Comment.associate(ast, comments)
+              @comments[node] += @comments[ast]
+            end
 
             children = ast.type == :begin ? ast.children : [ast]
 
@@ -91,13 +99,15 @@ module Ruby2JS
               named_exports += auto_exports
             end
 
-            imports = []
+            imports = @require_seen[realpath]
             imports << s(:const, nil, default_exports.first) unless default_exports.empty?
             imports << named_exports.map {|id| s(:const, nil, id)} unless named_exports.empty?
 
             if imports.empty?
               process ast
             else
+              @require_seen[realpath] = imports
+
               importname = Pathname.new(filename).relative_path_from(Pathname.new(dirname)).to_s
               prepend_list << s(:import, importname, *imports)
 
