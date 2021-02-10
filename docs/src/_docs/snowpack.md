@@ -5,17 +5,8 @@ top_section: Introduction
 category: snowpack
 ---
 
-{% rendercontent "docs/note", type: "warning", extra_margin: true %}
-**Note:** This plugin is currently in beta, and has not yet been pushed to npm.
-It will be shortly, once the beta testing is completed.
-{% endrendercontent %}
-
 The [`@ruby2js/snowpack-plugin`](https://github.com/ruby2js/ruby2js/tree/master/packages/snowpack-plugin)
 lets you compile `.rb.js` files to JavaScript via Snowpack.
-
-This guide takes you through the process of creating a Snowpack project using
-the Ruby2JS plugin.  It is based on the [Snowpack plugin
-guide](https://www.snowpack.dev/guides/plugins).
 
 Prerequisites needed to run this code:
 
@@ -33,24 +24,22 @@ For now, all you need to do is the following steps from that tutorial:
 
 ## Installing the ruby2js plugin
 
-In the near future, the plugin will be pushed to npm.  For now, copy the
-[`@ruby2js/snowpack-plugin`](https://github.com/ruby2js/ruby2js/blob/master/packages/snowpack-plugin/src/index.js)
-plugin into your `my-first-snowpack` directory and name the file
-`ruby2js-snowpack-plugin.js`.
+Install the plugin using npm or yarn:
 
 ```
-curl https://raw.githubusercontent.com/ruby2js/ruby2js/master/packages/snowpack-plugin/src/index.js -o ruby2js-snowpack-plugin.js
+$ npm install @ruby2js/snowpack-plugin
+$ yarn add @ruby2js/snowpack-plugin
 ```
 
-Configure the plugin by placing the following into `snowpack.config.json`:
+Configure the plugin by placing the following into `snowpack.config.js`:
 
-```json
-{
-  "plugins": [
+```js
+module.exports = {
+  plugins: [
     ["./ruby2js-snowpack-plugin.js", {
-      "eslevel": 2020,
-      "autoexports": true,
-      "filters": ["camelCase", "functions", "esm"]
+      eslevel: 2020,
+      autoexports: true,
+      filters: ["camelCase", "functions", "esm"]
     }]
   ]
 }
@@ -81,6 +70,7 @@ An example of all of the supported options:
   "include_only": ["max"],
   "import_from_skypack": true,
   "or": "nullish",
+  "require_recurse": true,
   "strict": true,
   "template_literal_tags": ["color"],
   "underscored_private": true,
