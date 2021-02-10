@@ -67,16 +67,16 @@ module.exports = {
 We mount two directories.  `public` which contains static resources and `src`
 which contains our logic.
 
-We are also making use of two plugins.  The first is the
+We are also making use of two plugins.  The first is
 [require-context](https://github.com/rubys/snowpack-plugin-require-context/)
 which rebuilds
 [`application.js`](https://github.com/ruby2js/stimulus-starter/blob/main/application.js#L5)
-whenever files in the directory it requires changes.  You can see the
+whenever files in the directory it specifies changes.  You can see the
 generated application by visiting `http://localhost:8080/application.js` in
 your browser.
 
 The second plugin is the one that adds Ruby2JS support to Snowpack.  A
-description of the configuration options can be found on the 
+description of the available configuration options can be found on the 
 [Ruby2JS site](https://www.ruby2js.com/docs/snowpack#installing-the-ruby2js-plugin).
 
 The option that is of most interest here is the `eslevel` option.  It is
@@ -106,9 +106,10 @@ by your browser.
 
 The generated JavaScript is functionally equivalent to the JavaScript that
 you would hand generate to perform the same function.  This means that the
-generated production bundled will be just as small as if you had coded the
+generated production bundle will be just as small as if you had coded the
 JavaScript yourself, and will be fully compatible with other JavaScript
-classes you may have.  In other words, you can freely mix and match.
+classes you may have.  In other words, you can freely mix and match
+Ruby and JavaScript implementations in the same application.
 
 For this reason, there is no lock-in.  You can start in Ruby and if you should
 ever decide to convert a class to JavaScript, feel free to check in the

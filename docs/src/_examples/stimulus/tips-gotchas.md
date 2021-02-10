@@ -19,9 +19,9 @@ but there are a few things to watch out for.
      JavaScript properties.  Following JavaScript's model of everything is a
      property would make it impossible to call a method with zero arguments.
 
-     Ruby2JS looks to the use of parenthesis to distinguish between these two
-     cases.  First, the rules of thumb, and then some of the significant
-     exceptions:
+     Ruby2JS solves this by detecting the use of parenthesis to distinguish
+     between these two cases.  First, the rules of thumb, and then some of the
+     significant exceptions:
 
      * **Always** use parenthesis on method definitions when there are zero
        arguments.
@@ -29,21 +29,19 @@ but there are a few things to watch out for.
        arguments.
      * **Never** use parenthesis on definitions of attribute reader / property
        getters.
-     * **Never** use parenthesis on calls to attribute reader / property
-       getters.
 
      If you follow these rules, you will never have a problem.  All but the
-     last example ([Content Loader])(content-loader).  Followed these rules.
+     last example ([Content Loader](content-loader)) followed these rules.
 
      The lack of strong typing in both Ruby and JavaScript makes exceptions
      difficult as type inferencing will only get you so far.  The one
      exception is the value of `this` / `self` within the definition of
-     classes, the type of which is very much known.
+     classes, the type of which is always very much known.
 
-     If you are careful on your method and accesssor definitions, then
-     references to these methods and attributes within the class can be
+     If you are careful on your method and accesssor *definitions*, then
+     *references* to these methods and attributes within the class can be
      determined at compile time, enabling the omission of parenthesis in
-     intra-class calls.
+     intra-class calls even when there are no arguments.
 
      It just so happens that Stimulus hits this sweet spot as every definition
      is a class.
@@ -55,7 +53,7 @@ but there are a few things to watch out for.
      not the case with JavaScript.  There are a few cases (attribute readers
      being an obvious example), where the need for a return statement can be
      inferred and is inserted automatically by Ruby2JS, but in general, if you
-     define a method and want to return a value, you need a return statement.
+     define a method and want to return a value, you need a `return` statement.
 
      This is not much of a problem for Stimulus as neither lifecycle methods
      nor actions are expected to return a result.

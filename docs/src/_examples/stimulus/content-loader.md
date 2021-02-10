@@ -29,7 +29,7 @@ Create a new file named `public/messages.txt` with the following contents:
 </ol>
 ```
 
-Now create a `controllers/content_loader_controller.js.rb` file with the following
+Now create a `src/controllers/content_loader_controller.js.rb` file with the following
 contents:
 
 ```ruby
@@ -71,29 +71,30 @@ View the generated
 # Commentary
 
 First, lets get a few small things out of the way.  There are two instances of
-`if` as a statement modifier in this example.  There also is now an instance
+`if` as a statement modifier in this example.  There also is an instance
 variable (`@refreshTimer`).  Both of these work just as you would expect.
 
 Next, there is the `self.values` statement at the top of the class again, but
 this time only one of the two values is present.  As the `url` is a `String`
 there is no need to add it.  In general, the Ruby2JS Stimulus filter will only
-add to but never replace the definitions you provide.
+add to -- but never replace -- the definitions you provide.
 
 More interestingly, there are two methods where Ruby blocks are used.  In both
 cases, the blocks are converted to anonymous JavaScript functions.  Within 
 the `load` action, `then` functions are passed callbacks in the form of
 blocks.  In the `startRefresh` action, the `setInterval` function is passed a
 callback.  Since the `setInterval` function is a known function, the
-`functions` filter knows to insert the block as the first argument.
+`functions` filter knows to insert the block as the first argument rather than
+the last.
 
 This is just one way these two actions can be defined.  Let's explore two
 alternatives.
 
 # Define an Async action
 
-Since `fetch` returns a `Promise`, in JavaScript you can use `async` and
-`await` to make your code cleaner.  You can do the same with Ruby2JS.  Replace
-the `load` action above with the following:
+In JavaScript you can use `async` and `await` to code that deals with
+`Promise`s cleaner.  You can do the same with Ruby2JS.  Replace the `load`
+action above with the following:
 
 ```ruby
   async def load()
@@ -139,8 +140,9 @@ Try replacing the `startRefreshing` method with the following:
 Look at the generated
 [content_loader_controller.js](http://localhost:8080/controllers/content_loader_controller.js).
 
-If you look closely, `load` is referenced twice, once in the `connect` method
-and the other in the  `startRefreshing` method, but the code generated in each
-case is different.
+Note that `load` is referenced twice, once in the `connect` method and the
+other in the  `startRefreshing` method, but the code generated in each case is
+different.  In one case, it is referenced as a statement, in the other case it
+is referenced as an expression.
 
 More on this on the next page.

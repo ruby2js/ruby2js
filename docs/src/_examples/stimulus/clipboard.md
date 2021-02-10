@@ -60,14 +60,14 @@ View the generated
 # Commentary
 
 What is notable here is the seamless access to JavaScript functionality.
-Note the `import` at the top of the file.  And the calls to the `document`,
-`element`, `event`, and `sourceTarget` objects.  The syntax for these calls is
-identical to what you would code in JavaScript.
+Note the `import` at the top of the file as well as the calls to methods on the
+`document`, `element`, `event`, and `sourceTarget` objects.  The syntax for
+these calls is identical to what you would code in JavaScript.
 
-Feel free to go wild.  Just be aware that this is an example of the
-[provide sharp knives](https://rubyonrails.org/doctrine/#provide-sharp-knives)
-doctrine.
+Feel free to go wild.  Just be aware that seemless integration with JavaScript
+is an example of the [provide sharp
+knives](https://rubyonrails.org/doctrine/#provide-sharp-knives) doctrine.
 
 Also note that Ruby2JS's Stimulus
 filter knows to only add `this.` to the `element` and `sourceTarget`
-references.
+references.  The `document`, and `event` objects are left alone.
