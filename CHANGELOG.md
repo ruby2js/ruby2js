@@ -1,5 +1,7 @@
 # master
 
+# 4.0.0 / 2021-02-10
+
 * Support static method calls with blocks in es2015+
 * Auto-bind instance methods referenced as properties within a class
 * New defs option to add definitions for autoimported classes/methods

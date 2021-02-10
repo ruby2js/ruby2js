@@ -92,13 +92,15 @@ but rest assured that it still will work.
 
 # Technical Background
 
-The Hotwired Stimulus Starter kit is based on [Babel](https://babeljs.io/) and
+The [Hotwired Stimulus Starter kit](https://github.com/hotwired/stimulus-starter) 
+is based on [Babel](https://babeljs.io/) and
 [Webpack](https://webpack.js.org/).  It uses Babel to convert a (slightly
 future) version of JavaScript to a (possibly backlevel) version of JavaScript
 that will be understood by your browser.  This is configured via a
 [plugin](https://github.com/hotwired/stimulus-starter/blob/7721a76cd89d21102de3d6ebbd5a58b77ac7c301/.babelrc#L6).
 
-The Ruby2JS Stimulus Starter kit is based on [Ruby2JS](https://www.ruby2js.com/) and
+The [Ruby2JS Stimulus Starter kit](https://github.com/ruby2js/stimulus-starter)
+is based on [Ruby2JS](https://www.ruby2js.com/) and
 [Snowpack](https://www.snowpack.dev/).  Ruby2JS fulfils the role that Babel
 plays in the Hotwired Stimulus Starter in that it converts a modern Ruby
 syntax to a (possibly backlevel) version of Javascript that will be understood
@@ -109,7 +111,7 @@ you would hand generate to perform the same function.  This means that the
 generated production bundle will be just as small as if you had coded the
 JavaScript yourself, and will be fully compatible with other JavaScript
 classes you may have.  In other words, you can freely mix and match
-Ruby and JavaScript implementations in the same application.
+Ruby and JavaScript components in the same application.
 
 For this reason, there is no lock-in.  You can start in Ruby and if you should
 ever decide to convert a class to JavaScript, feel free to check in the
