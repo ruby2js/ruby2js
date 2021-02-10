@@ -48,7 +48,7 @@ module Ruby2JS
 
         prepend_list << STIMULUS_IMPORT
 
-        nodes = node.children[2..-1]
+        nodes = body
         if nodes.length == 1 and nodes.first&.type == :begin
           nodes = nodes.first.children.dup
         end
