@@ -34,6 +34,14 @@ describe Ruby2JS::Filter::Require do
       file: __FILE__).to_s)
   end
   
+  def to_js_esm_recursive(string)
+    _(Ruby2JS.convert(string, 
+      require_recursive: true,
+      autoexports: :default,
+      filters: [Ruby2JS::Filter::Require, Ruby2JS::Filter::ESM],
+      file: __FILE__).to_s)
+  end
+  
   describe :statement do
     it "should handle require statements" do
       to_js( 'require "require/test1.rb"' ).
@@ -80,6 +88,12 @@ describe Ruby2JS::Filter::Require do
     it "should handle auto exports default" do
       to_js_esm_autodefault( 'require "require/test5.rb"' ).
         must_equal 'import Foo from "require/test5.rb"'
+    end
+
+    it "should handle require_recursive" do
+      to_js_esm_recursive( 'require "require/test7.rb"' ).
+        must_equal 'import A from "sub1/test8.rb"; ' +
+          'import B from "sub1/sub2/test9.rb"; import C from "sub1/test10.rb"'
     end
   end
 

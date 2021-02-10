@@ -15,6 +15,7 @@ module Ruby2JS
       def initialize(*args)
         @require_expr = nil
         @require_seen = {}
+        @require_relative = '.'
         super
       end
 
@@ -109,20 +110,32 @@ module Ruby2JS
               @require_seen[realpath] = imports
 
               importname = Pathname.new(filename).relative_path_from(Pathname.new(dirname)).to_s
+              importname = Pathname.new(@require_relative).join(importname).to_s
+
               prepend_list << s(:import, importname, *imports)
 
               save_prepend_list = prepend_list.dup
-              node = process s(:hide, ast)
+
+              begin
+                require_relative = @require_relative
+                @require_relative = Pathname.new(@require_relative).join(basename).parent.to_s
+                node = process s(:hide, ast)
+              ensure
+                @require_relative = require_relative
+              end
 
               if @require_recursive
-		block = node.children
-		while block.length == 1 and block.first.type == :begin
-		   block = block.first.children
-		end
+                block = node.children
+                while block.length == 1 and block.first.type == :begin
+                   block = block.first.children
+                end
 
-		block.each do |child|
-		  prepend_list << child if child&.type == :import
-		end
+                block.each do |child|
+                  if child&.type == :import
+                    puts ['rr', basename, child.inspect]
+                    prepend_list << child 
+                  end
+                end
               else
                 prepend_list.keep_if do |import|
                   save_prepend_list.include? import 
