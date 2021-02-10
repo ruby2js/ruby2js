@@ -9,6 +9,11 @@ describe Ruby2JS::Filter::Stimulus do
       filters: [Ruby2JS::Filter::Stimulus]).to_s)
   end
   
+  def to_js_skypack(string)
+    _(Ruby2JS.convert(string, eslevel: 2022, import_from_skypack: true,
+      filters: [Ruby2JS::Filter::Stimulus]).to_s)
+  end
+  
   describe "class aliases" do
     it "handles ruby scope syntax" do
       to_js( 'class Foo<Stimulus::Controller; end' ).
@@ -103,6 +108,14 @@ describe Ruby2JS::Filter::Stimulus do
     it "must inherit element property" do
       to_js( 'class Base<Stimulus; end; class Foo< Base; def clear(); element.textContent = ""; end; end' ).
         must_include 'this.element.textContent = ""'
+    end
+  end
+
+  describe "skypack" do
+    it "imports from skypack" do
+      to_js_skypack( 'class Foo<Stimulus::Controller; end' ).
+        must_equal 'import * as Stimulus from "https://cdn.skypack.dev/stimulus"; ' +
+          'class Foo extends Stimulus.Controller {}'
     end
   end
 

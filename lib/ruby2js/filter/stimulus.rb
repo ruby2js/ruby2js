@@ -12,6 +12,11 @@ module Ruby2JS
           s(:pair, s(:sym, :from), s(:str, "stimulus"))],
           s(:str, '*'))
 
+      STIMULUS_IMPORT_SKYPACK = s(:import,
+        [s(:pair, s(:sym, :as), s(:const, nil, :Stimulus)),
+          s(:pair, s(:sym, :from), s(:str, "https://cdn.skypack.dev/stimulus"))],
+          s(:str, '*'))
+
       def initialize(*args)
         super
         @stim_scope = []
@@ -46,7 +51,8 @@ module Ruby2JS
         @stim_classes = Set.new
         stim_walk(node)
 
-        prepend_list << STIMULUS_IMPORT
+        prepend_list << (@options[:import_from_skypack] ?
+          STIMULUS_IMPORT_SKYPACK : STIMULUS_IMPORT)
 
         nodes = body
         if nodes.length == 1 and nodes.first&.type == :begin
