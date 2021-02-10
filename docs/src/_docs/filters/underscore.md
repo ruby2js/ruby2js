@@ -1,5 +1,5 @@
 ---
-order: 25
+order: 26
 title: Underscore
 top_section: Filters
 category: underscore

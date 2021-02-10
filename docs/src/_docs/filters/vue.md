@@ -1,5 +1,5 @@
 ---
-order: 26
+order: 27
 next_page_order: 30
 title: Vue
 top_section: Filters
