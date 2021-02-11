@@ -1,7 +1,8 @@
 ---
 top_section: Stimulus
 title: Clipboard
-order: 4
+order: 14
+category: clipboard
 ---
 
 # Seamless integration with JavaScript

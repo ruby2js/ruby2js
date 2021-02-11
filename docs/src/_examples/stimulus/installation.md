@@ -1,7 +1,8 @@
 ---
 top_section: Stimulus
 title: Installation
-order: 2
+order: 12
+category: installation
 ---
 
 # Prerequisites

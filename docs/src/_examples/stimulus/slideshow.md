@@ -1,7 +1,8 @@
 ---
 top_section: Stimulus
 title: Slideshow
-order: 5
+order: 15
+category: slideshow
 ---
 
 # Configure when necessary

@@ -3,7 +3,7 @@
 {%- assign news_active = "" -%}
 {%- assign is_beta = "" %}
 
-{%- if page.url == "/examples/" -%}
+{%- if page.url contains "/examples/" -%}
 {%- assign examples_active = "is-active" -%}
 {%- elsif page.url contains "/docs/" -%}
 {%- assign docs_active = "is-active" -%}

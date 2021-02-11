@@ -1,7 +1,8 @@
 ---
 top_section: Stimulus
 title: Content Loader
-order: 6
+order: 16
+category: content-loader
 ---
 
 {% rendercontent "docs/note", type: "warning", extra_margin: true %}

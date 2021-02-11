@@ -1,7 +1,8 @@
 ---
 top_section: Stimulus
 title: Hello World
-order: 3
+order: 13
+category: hello-world
 ---
 
 # Diving in

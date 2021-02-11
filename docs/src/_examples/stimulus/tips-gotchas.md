@@ -1,7 +1,8 @@
 ---
 top_section: Stimulus
 title: Tips & Gotchas
-order: 7
+order: 17
+category: tips
 ---
 
 In a few short pages we have covered a lot of ground, but really we have only

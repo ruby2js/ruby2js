@@ -1,7 +1,9 @@
 ---
 top_section: Stimulus
-title: Introduction
-order: 1
+title: Stimulus Introduction
+toc_title: Introduction
+order: 11
+category: intro
 ---
 
 
