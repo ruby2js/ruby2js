@@ -28,6 +28,10 @@ file "#{demo}/index.html" => '../demo/ruby2js.rb' do
   sh "REQUEST_URI=/demo #{RbConfig.ruby} ../demo/ruby2js.rb --live > #{docs}/src/demo/index.html"
 end
 
+file "#{demo}/editor.js" => ['../demo/editor.js'] do
+  sh "yarn editor"
+end
+
 file "#{demo}/livedemo.js" => [*opal_files, *source_files, '../demo/filters.opal'] do
   mkdir demo unless Dir.exist? demo
   opal = "opal --compile -g regexp_parser -I ../lib -I . livedemo.opal"
@@ -48,6 +52,7 @@ end
 
 task :default => [
   "#{demo}/index.html",
+  "#{demo}/editor.js",
   "#{demo}/livedemo.js"
 ]
 
