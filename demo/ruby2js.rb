@@ -253,13 +253,16 @@ else
       .dropdown { position: relative; display: none; }
       .dropdown-content { display: none; position: absolute; background-color: #f9f9f9; min-width: 180px; box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2); padding: 12px 16px; z-index: 1; }
 
+      .js.editor { background-color: #ffffcc }
+      .ruby.editor { resize: vertical; overflow: auto; height: 200px; background-color: #ffeeee; margin-bottom: 5px; }
+      .ruby .cm-wrap { background-color: #ffeeee; height: 100% }
+      .js .cm-wrap { background-color: #ffffdd; height: 100% }
+      .ruby .cm-wrap .cm-content .cm-activeLine { background-color: #ffdddd; margin-right: 2px }
+      .js .cm-wrap .cm-content .cm-activeLine { background-color: #ffffcc; margin-right: 2px }
+
       /* below is based on bootstrap
       https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta1/dist/css/bootstrap.min.css
       */
-
-      .editor { resize: vertical; overflow: auto; height: 200px; background-color: #ffeeee; margin-bottom: 5px; }
-      .cm-wrap { background-color: #ffeeee; height: 100% }
-      .cm-wrap .cm-content .cm-activeLine { background-color: #ffdddd; margin-right: 2px }
 
       :root{--bs-font-sans-serif:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans","Liberation Sans",sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol","Noto Color Emoji";--bs-font-monospace:SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
       body{margin:0;font-family:var(--bs-font-sans-serif);font-size:1rem;font-weight:400;line-height:1.5;color:#212529;background-color:#fff;-webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent}

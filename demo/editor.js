@@ -1,12 +1,12 @@
-
-
-
 import {EditorView} from "@codemirror/view"
 import {StreamLanguage} from "@codemirror/stream-parser"
 import {ruby} from "@codemirror/legacy-modes/mode/ruby"
+import {javascript} from "@codemirror/lang-javascript"
 
 // following is from basicSetup, but it specifically EXCLUDES autocompletion
-// because, frankly, it is annoying.
+// because, frankly, it is annoying.  It also excludes folding partly because
+// it is only available to non-legacy languages, and partly because it isn't
+// all that useful for this use case.
 import {keymap, highlightSpecialChars, drawSelection, highlightActiveLine} from "@codemirror/view"
 import {EditorState, Prec} from "@codemirror/state"
 import {history, historyKeymap} from "@codemirror/history"
@@ -61,7 +61,7 @@ const setup = [
   lineNumbers(),
   highlightSpecialChars(),
   history(),
-  foldGutter(),
+  // foldGutter(),
   drawSelection(),
   EditorState.allowMultipleSelections.of(true),
   indentOnInput(),
@@ -77,7 +77,7 @@ const setup = [
     ...defaultKeymap,
     ...searchKeymap,
     ...historyKeymap,
-    ...foldKeymap,
+    // ...foldKeymap,
     ...commentKeymap,
     // ...completionKeymap,
     ...lintKeymap
@@ -87,12 +87,12 @@ const setup = [
 // create an editor below the textarea, then hide the textarea
 let textarea = document.querySelector('textarea.ruby');
 let editorDiv = document.createElement('div');
-editorDiv.classList.add('editor');
+editorDiv.classList.add('editor', 'ruby');
 textarea.parentNode.insertBefore(editorDiv, textarea.nextSibling);
 textarea.style.display = 'none';
 
 // create an editor below the textarea, then hide the textarea
-let editor = new EditorView({
+let rubyEditor = new EditorView({
   state: EditorState.create({
     extensions: [
       setup,  
@@ -110,16 +110,58 @@ let editor = new EditorView({
 });
 
 // focus on the editor
-editor.focus();
+rubyEditor.focus();
 
 // first submit may come from the livedemo itself; if that occurs
 // copy the textarea value into the editor
 let submit = document.querySelector('input[type=submit]');
 submit.addEventListener('click', event => {
   if (!textarea.value) return;
-  if (editor.state.doc.length) return;
+  if (rubyEditor.state.doc.length) return;
 
-  editor.dispatch({
-    changes: {from: 0, to: editor.state.doc.length, insert: textarea.value}
+  rubyEditor.dispatch({
+    changes: {from: 0, to: rubyEditor.state.doc.length, insert: textarea.value}
   })
 }, {once: true});
+
+// create another editor below the output
+let jsout = document.querySelector('#js .js');
+let outputDiv = document.createElement('div');
+outputDiv.classList.add('editor', 'js');
+jsout.parentNode.insertBefore(outputDiv, jsout.nextSibling);
+
+let jsEditor = new EditorView({
+  state: EditorState.create({
+    doc: 'content',
+    extensions: [
+      setup,  
+      javascript(),
+      EditorView.editable.of(false)
+    ]
+  }),
+  parent: outputDiv
+});
+
+const config = { attributes: true, childList: true, subtree: true };
+
+const callback = function(mutationsList, observer) {
+  for(const mutation of mutationsList) {
+    if (mutation.type === 'childList') {
+      jsEditor.dispatch({
+        changes: {from: 0, to: jsEditor.state.doc.length, insert: jsout.textContent}
+      })
+    } else if (mutation.type === 'attributes') {
+      if (jsout.classList.contains("exception")) {
+        jsout.style.display = 'block';
+        outputDiv.style.display = 'none';
+      } else {
+        jsout.style.display = 'none';
+        outputDiv.style.display = 'block';
+      }
+    }
+  }
+};
+
+const observer = new MutationObserver(callback);
+
+observer.observe(jsout, config);
