@@ -23,9 +23,26 @@ file "../demo/filters.opal" => filters do
   IO.write "../demo/filters.opal", content.join("\n")
 end
 
-file "#{demo}/index.html" => '../demo/ruby2js.rb' do
+file "#{demo}/index.erb" => '../demo/ruby2js.rb' do
+  puts "Generating #{demo}/index.erb"
   mkdir demo unless Dir.exist? demo
-  sh "REQUEST_URI=/demo #{RbConfig.ruby} ../demo/ruby2js.rb --live > #{docs}/src/demo/index.html"
+
+  begin
+    request_uri = ENV['REQUEST_URI']
+    ENV['REQUEST_URI'] = '/demo'
+    livedoc = `#{RbConfig.ruby} ../demo/ruby2js.rb --live`
+  ensure
+    if request_uri
+      ENV['REQUEST_URI'] = request_uri
+    else
+      ENV.delete 'REQUEST_URI'
+    end
+
+    style = livedoc[/<style[ >].*?<\/style>/m]
+    body = livedoc[/<body.*?>(.*?)<\/body>/m, 1]
+
+    IO.write("#{demo}/index.erb", "---\nlayout: default\n---\n" + style + body)
+  end
 end
 
 file "#{demo}/editor.js" => ['../demo/editor.js'] do
@@ -51,7 +68,7 @@ task :clean do
 end
 
 task :default => [
-  "#{demo}/index.html",
+  "#{demo}/index.erb",
   "#{demo}/editor.js",
   "#{demo}/livedemo.js"
 ]

@@ -294,9 +294,13 @@ else
     }
 
     _div.container.narrow_container do
-      _a href: 'https://www.ruby2js.com/docs/' do
-        _ruby2js_logo
-        _ 'Ruby2JS'
+      if @live
+        _h1.title.is_size_4 'Ruby'
+      else
+        _a href: 'https://www.ruby2js.com/docs/' do
+          _ruby2js_logo
+          _ 'Ruby2JS'
+        end
       end
 
       _form method: 'post' do
@@ -524,7 +528,7 @@ else
         end
 
         _div.js! style: "display: #{@ruby ? 'block' : 'none'}" do
-          _h2 'JavaScript'
+          _h2.title.is_size_4 'JavaScript'
           _pre.js ruby.to_s
         end
       end

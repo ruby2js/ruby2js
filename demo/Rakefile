@@ -23,9 +23,8 @@ file "filters.opal" => filters do
   IO.write "filters.opal", content.join("\n")
 end
 
-file "#{demo}/index.html" => 'ruby2js.rb' do
-  mkdir demo unless Dir.exist? demo
-  sh "REQUEST_URI=/demo #{RbConfig.ruby} ruby2js.rb --live > #{docs}/src/demo/index.html"
+file "#{demo}/index.erb" => 'ruby2js.rb' do
+  Dir.chdir(docs) {system "rake #{demo}/index.erb"}
 end
 
 file "#{demo}/editor.js" => ['../demo/editor.js'] do
@@ -38,7 +37,7 @@ file "#{demo}/livedemo.js" => [*opal_files, *source_files, 'filters.opal'] do
 end
 
 task :default => [
-  "#{demo}/index.html",
+  "#{demo}/index.erb",
   "#{demo}/editor.js",
   "#{demo}/livedemo.js"
 ]
