@@ -7,7 +7,7 @@ module Ruby2JS
       include SEXP
 
       # require explicit opt-in to to class => constructor mapping
-      Filter.exclude :class
+      Filter.exclude :class, :call
 
       VAR_TO_ASSIGN = {
         lvar: :lvasgn,
@@ -23,7 +23,7 @@ module Ruby2JS
 
       def on_send(node)
         target, method, *args = node.children
-        return super if excluded?(method)
+        return super if excluded?(method) and method != :call
 
         if [:max, :min].include? method and args.length == 0
           if target.type == :array
@@ -36,13 +36,10 @@ module Ruby2JS
             return super
           end
 
-        elsif method == :call and target and target.type == :ivar
-          process S(:send, s(:self), "_#{target.children.first.to_s[1..-1]}",
-            *args)
+        elsif method == :call and target and 
+          (%i[ivar cvar].include?(target.type) or not excluded?(:call))
 
-        elsif method == :call and target and target.type == :cvar
-          process S(:send, s(:attr, s(:self), :constructor),
-            "_#{target.children.first.to_s[2..-1]}", *args)
+          S(:call, process(target), nil, *process_all(args))
 
         elsif method == :keys and args.length == 0 and node.is_method?
           process S(:send, s(:const, nil, :Object), :keys, target)

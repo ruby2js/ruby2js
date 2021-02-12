@@ -21,6 +21,14 @@ describe 'Ruby2JS::Filter.exclude' do
     it "should be able to OPT IN to all mappings" do
       to_js( 'a.class', include_all: true ).must_equal 'a.constructor'
     end
+
+    it "should default to NOT mapping call to direct call" do
+      to_js( 'a.call(b)' ).must_equal 'a.call(b)'
+    end
+
+    it "should be able to OPT IN to mapping call to direct call" do
+      to_js( 'a.call(b)', include: [:call] ).must_equal 'a(b)'
+    end
   end
   
   describe 'explicit exclude - send' do

@@ -489,6 +489,11 @@ describe Ruby2JS::Filter::Functions do
         must_equal 'a.sort(function(a, b) {return a < b})'
     end
 
+    it 'should handle block arguments' do
+      to_js( 'a.sort(&b)' ).
+        must_equal 'a.sort(b)'
+    end
+
     it 'should handles loops' do
       to_js( 'loop {sleep 1; break}' ).
         must_equal 'while (true) {sleep(1); break}'
