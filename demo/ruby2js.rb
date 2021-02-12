@@ -359,9 +359,14 @@ else
         $live = #{!!@live};
 
         // determine base URL and what filters and options are selected
+        #{(@live ? %q{
+        let base = window.location.pathname;
+        let filters = new Set();
+        } : %q{
         let base = new URL(document.getElementsByTagName('base')[0].href).pathname;
         let filters = new Set(window.location.pathname.slice(base.length).split('/'));
         filters.delete('');
+        }).strip}
         let options = {};
         for (let match of window.location.search.matchAll(/(\\w+)(=([^&]*))?/g)) {
           options[match[1]] = match[3] && decodeURIComponent(match[3]);
