@@ -101,11 +101,12 @@ If you set the `eslevel` option to `2015` or newer, the Functions filter enables
 * `block_given?` will check for the presence of optional argument `_implicitBlockYield` which is a function made accessible through the use of `yield` in a method body.
 * `alias_method` works both inside of a class definition as well as called directly on a class name (e.g. `MyClass.alias_method`)
 
-Additionally, there is one mapping that will only be done if explicitly
-included (pass `include: :class` as a `convert` option to enable):
+Additionally, there is two mappings that will only be done if explicitly
+included (pass `include: [:class, :call]` as a `convert` option to enable):
 
 {:.functions-list}
 * `.class` {{ caret }} `.constructor`
+* `a.call` {{ caret }} `a()`
 
 {% rendercontent "docs/note", extra_margin: true %}
 More examples of how this filter works are in the [specs file](https://github.com/ruby2js/ruby2js/blob/master/spec/functions_spec.rb).
