@@ -240,7 +240,7 @@ else
     _base href: base
 
     _style %{
-      svg {height: 4em; width: 4em; transition: 2s}
+      svg {height: 4em; width: 4em; transition: 0.5s}
       svg:hover {height: 8em; width: 8em}
       .container.narrow-container {padding: 0; margin: 0 3%; max-width: 91%}
       textarea.ruby {background-color: #ffeeee; margin-bottom: 0.4em}
@@ -261,7 +261,8 @@ else
       .cm-wrap { background-color: #ffeeee; height: 100% }
       .cm-wrap .cm-content .cm-activeLine { background-color: #ffdddd; margin-right: 2px }
 
-      :root{--bs-font-sans-serif:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans","Liberation Sans",sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol","Noto Color Emoji";--bs-font-monospace:SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
+      :root{--bs-base-font-size: 16px;--bs-font-sans-serif:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans","Liberation Sans",sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol","Noto Color Emoji";--bs-font-monospace:SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
+      html{font-size:var(--bs-base-font-size)}
       body{margin:0;font-family:var(--bs-font-sans-serif);font-size:1rem;font-weight:400;line-height:1.5;color:#212529;background-color:#fff;-webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent}
       a{color:#0d6efd;text-decoration:underline}
       a:hover{color:#0a58ca}
@@ -369,7 +370,7 @@ else
             event.preventDefault();
             content.style.transition = '0s';
             content.style.display = 'block';
-            content.style.zIndex = 0;
+            content.style.zIndex = 1;
             content.style.opacity = 1 - content.style.opacity;
           });
 
@@ -381,10 +382,9 @@ else
             focus = false;
             setTimeout( () => {
               if (!focus) {
-                content.style.transition = '2s';
+                content.style.transition = '0.5s';
                 content.style.opacity = 0;
-                content.style.zIndex = -1;
-                // setTimeout( () => { content.style.transition = '0s' }, 500);
+                setTimeout( () => { content.style.zIndex = -1; }, 500);
               }
             }, 500)
           })
