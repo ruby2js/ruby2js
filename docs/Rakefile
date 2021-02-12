@@ -38,10 +38,15 @@ file "#{demo}/index.erb" => '../demo/ruby2js.rb' do
       ENV.delete 'REQUEST_URI'
     end
 
-    style = livedoc[/<style[ >].*?<\/style>/m]
-    body = livedoc[/<body.*?>(.*?)<\/body>/m, 1]
+    erb = [
+      "---\nlayout: default\n---\n",
+      livedoc[/<style[ >].*?<\/style>/m],
+      livedoc[/<body.*?>(.*?)<\/body>/m, 1],
+      '<script src="/demo/editor.js"></script>',
+      '<script src="/demo/livedemo.js"></script>'
+    ].join
 
-    IO.write("#{demo}/index.erb", "---\nlayout: default\n---\n" + style + body)
+    IO.write("#{demo}/index.erb", erb)
   end
 end
 

@@ -533,9 +533,6 @@ else
         end
       end
     end
-
-    _script src: 'editor.js' if @live
-    _script src: 'livedemo.js' if @live
   end
 
   def _ruby2js_logo
