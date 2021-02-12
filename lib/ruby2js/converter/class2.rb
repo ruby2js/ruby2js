@@ -206,7 +206,7 @@ module Ruby2JS
               @prop = "static #{m.children[1]}"
             end
 
-            @prop.sub! 'static', 'static async' if m.type == :asyncs
+            @prop = @prop.sub('static', 'static async') if m.type == :asyncs
 
             m = m.updated(:def, m.children[1..3])
             begin
