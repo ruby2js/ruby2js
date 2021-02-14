@@ -14,7 +14,7 @@ There are a bunch of helpful core team and community members available that shou
 
 If you're interested in commercial support for Ruby2JS installations, check out:
 
-* [Whitefusion](https://whitefusion.io)
+* [Whitefusion](https://www.whitefusion.studio)
 
 ----
 
