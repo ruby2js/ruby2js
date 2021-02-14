@@ -1,5 +1,9 @@
 # master
 
+* handle block arguments
+* filter now supports `.call`, but requires an explicit `include` option
+* require with esm now always produces relative path links
+
 # 4.0.0 / 2021-02-10
 
 * Support static method calls with blocks in es2015+

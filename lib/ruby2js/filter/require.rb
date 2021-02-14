@@ -111,6 +111,7 @@ module Ruby2JS
 
               importname = Pathname.new(filename).relative_path_from(Pathname.new(dirname)).to_s
               importname = Pathname.new(@require_relative).join(importname).to_s
+              importname = "./#{importname}" unless importname.start_with? '.'
 
               prepend_list << s(:import, importname, *imports)
 

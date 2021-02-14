@@ -77,23 +77,24 @@ describe Ruby2JS::Filter::Require do
   describe :esmimport do
     it "should handle explicit exports" do
       to_js_esm( 'require "require/test4.rb"' ).
-        must_equal 'import { Foo } from "require/test4.rb"'
+        must_equal 'import { Foo } from "./require/test4.rb"'
     end
 
     it "should handle auto exports" do
       to_js_esm_auto( 'require "require/test5.rb"' ).
-        must_equal 'import { Foo } from "require/test5.rb"'
+        must_equal 'import { Foo } from "./require/test5.rb"'
     end
 
     it "should handle auto exports default" do
       to_js_esm_autodefault( 'require "require/test5.rb"' ).
-        must_equal 'import Foo from "require/test5.rb"'
+        must_equal 'import Foo from "./require/test5.rb"'
     end
 
     it "should handle require_recursive" do
       to_js_esm_recursive( 'require "require/test7.rb"' ).
-        must_equal 'import A from "sub1/test8.rb"; ' +
-          'import B from "sub1/sub2/test9.rb"; import C from "sub1/test10.rb"'
+        must_equal 'import A from "./sub1/test8.rb"; ' +
+          'import B from "./sub1/sub2/test9.rb"; ' +
+          'import C from "./sub1/test10.rb"'
     end
   end
 
