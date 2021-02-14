@@ -418,7 +418,7 @@ else
         };
         if (options.filter) options.filter.split(',').forEach(option => filters.add(option));
 
-        function updateLocation() {
+        function updateLocation(force = false) {
           let location = new URL(base, window.location);
 
           #{(@live ? %q{
@@ -434,7 +434,7 @@ else
           };
 
           location.search = search.length === 0 ? "" : `${search.join('&')}`;
-          if (window.location.toString() == location.toString()) return;
+          if (!force && window.location.toString() == location.toString()) return;
 
           history.replaceState({}, null, location.toString());
 
@@ -490,7 +490,7 @@ else
         });
 
         document.getElementById('ast').addEventListener('sl-change', () => {
-          updateLocation();
+          updateLocation(true);
         });
 
         for (let dropdown of document.querySelectorAll('sl-dropdown')) {
