@@ -4,6 +4,7 @@
 * filter now supports `.call`, but requires an explicit `include` option
 * require with esm now always produces relative path links
 * support added for is_a? kind_of and instance_of?
+* provide default for all optional kwargs; handle undefined as default
 
 # 4.0.0 / 2021-02-10
 

@@ -30,13 +30,18 @@ module Ruby2JS
           if kw.type == :kwarg
             put kw.children.first
           elsif kw.type == :kwoptarg
-            put kw.children.first; put ' = '; parse kw.children.last
+            put kw.children.first
+            unless kw.children.last == s(:send, nil, :undefined)
+              put ' = '; parse kw.children.last
+            end
           elsif kw.type == :kwrestarg
             raise 'Rest arg requires ES2018' unless es2018
             put '...'; put kw.children.first
           end
         end
         put ' }'
+
+        put ' = {}' unless kwargs.any? {|kw| kw.type == :kwarg}
       end
     end
 
