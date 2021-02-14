@@ -251,6 +251,7 @@ else
       .loc {background-color: white}
       .loc span.hidden, .unloc span.hidden {font-size: 0}
       .container.narrow-container {padding: 0; margin: 0 3%; max-width: 91%}
+      .exception {background-color:#ff0; margin: 1em 0; padding: 1em; border: 4px solid red; border-radius: 1em}
 
       #{(@live ? %q{
       sl-menu { display: none }
@@ -262,7 +263,6 @@ else
       textarea.ruby {background-color: #ffeeee; margin-bottom: 0.4em}
       pre.js {background-color: #ffffcc}
       h2 {margin-top: 0.4em}
-      .exception {background-color:#ff0; margin: 1em 0; padding: 1em; border: 4px solid red; border-radius: 1em}
 
       .dropdown { position: relative; display: none; }
       .dropdown-content { display: none; position: absolute; background-color: #f9f9f9; min-width: 180px; box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2); padding: 12px 16px; z-index: 1; }
