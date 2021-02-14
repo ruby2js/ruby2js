@@ -914,7 +914,11 @@ describe Ruby2JS do
     end
   end
 
-  describe 'defined' do
+  describe 'typeof, defined, instance_of' do
+    it "should handle typeof" do
+      to_js( 'typeof x' ).must_equal "typeof x"
+    end
+
     it "should handle defined?" do
       to_js( 'defined? x' ).must_equal "typeof x !== 'undefined'"
       to_js( '!defined? x' ).must_equal "typeof x === 'undefined'"
@@ -922,6 +926,12 @@ describe Ruby2JS do
 
     it "should handle undef" do
       to_js( 'undef x' ).must_equal "delete x"
+    end
+
+    it "should handle is_a?, kind_of?, instance_of?" do
+      to_js( 'a.is_a? b' ).must_equal "a instanceof b"
+      to_js( 'a.kind_of? b' ).must_equal "a instanceof b"
+      to_js( 'a.instance_of? b' ).must_equal "a.constructor == b"
     end
   end
 

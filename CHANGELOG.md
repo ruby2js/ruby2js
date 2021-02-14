@@ -3,6 +3,7 @@
 * handle block arguments
 * filter now supports `.call`, but requires an explicit `include` option
 * require with esm now always produces relative path links
+* support added for is_a? kind_of and instance_of?
 
 # 4.0.0 / 2021-02-10
 

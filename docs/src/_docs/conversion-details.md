@@ -110,6 +110,9 @@ With enough of each, one could reproduce any functionality desired.
   * Any block becomes and explicit argument `new Promise do; y(); end` becomes `new Promise(function() {y()})`
   * regular expressions are mapped to js
   * `raise` becomes `throw`
+  * `.is_a?` becomes `instanceof`
+  * `.kind_of?` becomes `instanceof`
+  * `.instance_of?` becomes `.constructor ==`
 
 Ruby attribute accessors, methods defined with no parameters and no
 parenthesis, as well as setter method definitions, are
