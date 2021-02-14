@@ -7,6 +7,24 @@ module Ruby2JS
     #     (str "value")))
 
     handle :hash do |*pairs|
+      if not es2018 and pairs.any? {|pair| pair.type == :kwsplat}
+        groups = []
+        pending = []
+        while not pairs.empty?
+          pair = pairs.shift
+          if pair.type != :kwsplat
+            pending << pair
+          else
+            groups << s(:hash, *pending) unless pending.empty?
+            groups << pair.children.first
+            pending = []
+          end
+        end
+        groups << s(:hash, *pending) unless pending.empty?
+        parse s(:assign, s(:hash), *groups)
+        return
+      end
+
       compact do
         singleton = pairs.length <= 1
 
@@ -24,7 +42,7 @@ module Ruby2JS
                 pairs.unshift(*node.children.first.children)
                 index = 0
               else
-                puts '...'; parse node.children.first
+                put '...'; parse node.children.first
               end
 
               next

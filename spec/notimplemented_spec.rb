@@ -68,14 +68,6 @@ describe 'not implemented' do
   end
 
   unless RUBY_VERSION =~ /^1/
-    it "keyword splat" do
-      todo( 'foo **bar' )
-    end
-
-    it "keyword splat interpolation" do
-      todo( '{ foo: 2, **bar }' )
-    end
-
     # NOTE: option {eslevel: es2015} implements this
     it "keyword argument" do
       todo( 'def f(a:nil); end' )
