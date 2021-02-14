@@ -1,12 +1,27 @@
 import "@shoelace-style/shoelace/dist/shoelace/shoelace.css"
 import {
   setAssetPath,
+  SlButton,
+  SlCheckbox,
+  SlDialog,
+  SlDropdown,
   SlIcon,
+  SlInput,
+  SlMenu,
+  SlMenuItem,
 } from "@shoelace-style/shoelace"
 
 setAssetPath(`${location.origin}/_bridgetown/static/icons`)
-/* Define icons first: */
+
+/* Define custom elements */
+customElements.define("sl-button", SlButton)
+customElements.define("sl-checkbox", SlCheckbox)
+customElements.define("sl-dialog", SlDialog)
+customElements.define("sl-dropdown", SlDropdown)
 customElements.define("sl-icon", SlIcon)
+customElements.define("sl-input", SlInput)
+customElements.define("sl-menu", SlMenu)
+customElements.define("sl-menu-item", SlMenuItem)
 
 import "index.scss"
 

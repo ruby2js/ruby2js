@@ -147,18 +147,21 @@ parse_options.each do |name, value|
   when :ruby
     $document.querySelector('textarea').value = value
   when :filters
-    nodes = $document.getElementById(:filters)[:parentNode].querySelectorAll(:input)
+    nodes = $document.getElementById(:filters)[:parentNode].querySelectorAll('sl-menu-item')
     nodes.forEach do |node|
-      `node.checked = true` if value.include? Filters[`node.name`]
+      `node.checked = true` if value.include? Filters[`node.textContent`]
     end
   when :eslevel
-    $document.getElementById('eslevel').value = value.to_s
+    eslevel = $document.getElementById('eslevel')
+    eslevel.querySelector('sl-button').textContent = value.to_s
+    eslevel.querySelector("sl-menu-item[value='']").checked = false
+    eslevel.querySelector("sl-menu-item[value='#{value}']").checked = true
   when :comparison
-    $document.querySelector("input[name=identity]").checked = true if value == :identity
+    $document.querySelector("sl-menu-item[name=identity]").checked = true if value == :identity
   when :nullish
-    $document.querySelector("input[name=or]").checked = true if value == :nullish
+    $document.querySelector("sl-menu-item[name=or]").checked = true if value == :nullish
   else
-    checkbox = $document.querySelector("input[name=#{name}]")
+    checkbox = $document.querySelector("sl-menu-item[name=#{name}]")
     checkbox.checked = true if checkbox
   end
 end

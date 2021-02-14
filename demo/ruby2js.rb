@@ -240,19 +240,6 @@ else
     _base href: base
 
     _style %{
-      svg {height: 4em; width: 4em; transition: 0.5s}
-      svg:hover {height: 8em; width: 8em}
-      .container.narrow-container {padding: 0; margin: 0 3%; max-width: 91%}
-      textarea.ruby {background-color: #ffeeee; margin-bottom: 0.4em}
-      pre.js {background-color: #ffffcc}
-      h2 {margin-top: 0.4em}
-      .unloc {background-color: yellow}
-      .loc {background-color: white}
-      .exception {background-color:#ff0; margin: 1em 0; padding: 1em; border: 4px solid red; border-radius: 1em}
-
-      .dropdown { position: relative; display: none; }
-      .dropdown-content { display: none; position: absolute; background-color: #f9f9f9; min-width: 180px; box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2); padding: 12px 16px; z-index: 1; }
-
       .js.editor { background-color: #ffffcc }
       .ruby.editor { resize: vertical; overflow: auto; height: 200px; background-color: #ffeeee; margin-bottom: 5px; }
       .ruby .cm-wrap { background-color: #ffeeee; height: 100% }
@@ -260,13 +247,29 @@ else
       .ruby .cm-wrap .cm-content .cm-activeLine { background-color: #ffdddd; margin-right: 2px }
       .js .cm-wrap .cm-content .cm-activeLine { background-color: #ffffcc; margin-right: 2px }
 
+      .unloc {background-color: yellow}
+      .loc {background-color: white}
+      .loc span.hidden, .unloc span.hidden {font-size: 0}
+      .container.narrow-container {padding: 0; margin: 0 3%; max-width: 91%}
+
+      #{(@live ? %q{
+      sl-menu { display: none }
+      .narrow-container pre {padding: 0 1rem}
+      .narrow-container h1.title, .narrow-container h2.title {margin: 0.5rem 0}
+      } : %q{
+      svg {height: 4em; width: 4em; transition: 0.5s}
+      svg:hover {height: 8em; width: 8em}
+      textarea.ruby {background-color: #ffeeee; margin-bottom: 0.4em}
+      pre.js {background-color: #ffffcc}
+      h2 {margin-top: 0.4em}
+      .exception {background-color:#ff0; margin: 1em 0; padding: 1em; border: 4px solid red; border-radius: 1em}
+
+      .dropdown { position: relative; display: none; }
+      .dropdown-content { display: none; position: absolute; background-color: #f9f9f9; min-width: 180px; box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2); padding: 12px 16px; z-index: 1; }
+
       /* below is based on bootstrap
       https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta1/dist/css/bootstrap.min.css
       */
-
-      .editor { resize: vertical; overflow: auto; height: 200px; background-color: #ffeeee; margin-bottom: 5px; }
-      .cm-wrap { background-color: #ffeeee; height: 100% }
-      .cm-wrap .cm-content .cm-activeLine { background-color: #ffdddd; margin-right: 2px }
 
       :root{--bs-base-font-size: 16px;--bs-font-sans-serif:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans","Liberation Sans",sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol","Noto Color Emoji";--bs-font-monospace:SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
       html{font-size:var(--bs-base-font-size)}
@@ -289,17 +292,53 @@ else
       .btn-primary:active{color:#fff;background-color:#0a58ca;border-color:#0a53be}
       .btn-primary:active:focus{box-shadow:0 0 0 .25rem rgba(49,132,253,.5)}
       .btn-primary:disabled{color:#fff;background-color:#0d6efd;border-color:#0d6efd}
-
-      .loc span.hidden, .unloc span.hidden {font-size: 0}
+      }).strip}
     }
 
     _div.container.narrow_container do
       if @live
         _h1.title.is_size_4 'Ruby'
+
+        _sl_dialog.option! label: "Option" do
+          _sl_input
+          _sl_button "Close", slot: "footer", type: "primary"
+        end
       else
         _a href: 'https://www.ruby2js.com/docs/' do
           _ruby2js_logo
           _ 'Ruby2JS'
+        end
+
+        def _sl_select(&block)
+          _select(&block)
+        end
+
+        def _sl_dropdown(&block)
+          _div.dropdown(&block)
+        end
+
+        def _sl_button(text, options, &block)
+          _button.btn text, id: options[:id]
+        end
+
+        def _sl_menu(&block)
+          _div.dropdown_content(&block)
+        end
+
+        def _sl_menu_item(name, args)
+          if args.include? :checked
+            _div do
+              _input type: 'checkbox', **args
+              _span name
+            end
+          else
+            _option name, args
+          end
+        end
+
+        def _sl_checkbox(name, args)
+          _input type: 'checkbox', **args
+          _label name, for: args[:id]
         end
       end
 
@@ -309,35 +348,45 @@ else
         _input.btn.btn_primary type: 'submit', value: 'Convert', 
           style: "display: #{@live ? 'none' : 'inline'}"
 
-        _label 'ES level', for: 'eslevel'
-        _select name: 'eslevel', id: 'eslevel' do
-          _option 'default', selected: !@eslevel || @eslevel == 'default'
-          Dir["#{$:.first}/ruby2js/es20*.rb"].sort.each do |file|
-            eslevel = File.basename(file, '.rb').sub('es', '')
-            _option eslevel, value: eslevel, selected: @eslevel == eslevel
-          end
+        _label 'ESLevel:', for: 'eslevel'
+        if @live
+					_sl_dropdown.eslevel! name: 'eslevel' do
+						_sl_button @eslevel || 'default', slot: 'trigger', caret: true
+						_sl_menu do
+							_sl_menu_item 'default', checked: !@eslevel || @eslevel == 'default'
+							Dir["#{$:.first}/ruby2js/es20*.rb"].sort.each do |file|
+								eslevel = File.basename(file, '.rb').sub('es', '')
+								_sl_menu_item eslevel, value: eslevel, checked: @eslevel == eslevel
+							end
+						end
+					end
+        else
+					_select name: 'eslevel', id: 'eslevel' do
+						_option 'default', selected: !@eslevel || @eslevel == 'default'
+						Dir["#{$:.first}/ruby2js/es20*.rb"].sort.each do |file|
+							eslevel = File.basename(file, '.rb').sub('es', '')
+							_option eslevel, value: eslevel, selected: @eslevel == eslevel
+						end
+					end
         end
 
-        _input type: 'checkbox', name: 'ast', id: 'ast', checked: !!@ast
-        _label 'Show AST', for: 'ast'
+        _sl_checkbox 'Show AST', id: 'ast', name: 'ast', checked: !!@ast
 
-        _div.dropdown do
-          _button.btn.filters! 'Filters'
-          _div.dropdown_content do
+        _sl_dropdown.filters! close_on_select: 'false' do
+          _sl_button 'Filters', slot: 'trigger', caret: true
+          _sl_menu do
             Dir["#{$:.first}/ruby2js/filter/*.rb"].sort.each do |file|
               filter = File.basename(file, '.rb')
               next if filter == 'require'
-              _div do
-                _input type: 'checkbox', name: filter, checked: selected.include?(filter)
-                _span filter
-              end
+              _sl_menu_item filter, name: filter,
+                checked: selected.include?(filter)
             end
           end
         end
 
-        _div.dropdown do
-          _button.btn.options! 'Options'
-          _div.dropdown_content do
+        _sl_dropdown.options! close_on_select: 'false' do
+          _sl_button 'Options', slot: 'trigger', caret: true
+          _sl_menu do
             checked = options.dup
             checked[:identity] = options[:comparison] == :identity
             checked[:nullish] = options[:or] == :nullish
@@ -345,19 +394,15 @@ else
             options_available.each do |option, args|
               next if option == 'filter'
               next if option.start_with? 'require_'
-              _div do
-                _input type: 'checkbox', name: option, checked: checked[option.to_sym],
-                  data_args: options_available[option]
-                _span option
-              end
+              _sl_menu_item option, name: option,
+                checked: checked[option.to_sym],
+                data_args: options_available[option]
             end
           end
         end
       end
       
       _script %{
-        $live = #{!!@live};
-
         // determine base URL and what filters and options are selected
         #{(@live ? %q{
         let base = window.location.pathname;
@@ -372,6 +417,132 @@ else
           options[match[1]] = match[3] && decodeURIComponent(match[3]);
         };
         if (options.filter) options.filter.split(',').forEach(option => filters.add(option));
+
+        function updateLocation() {
+          let location = new URL(base, window.location);
+
+          #{(@live ? %q{
+          options.filter = Array.from(filters).join(',');
+          if (filters.size === 0) delete options.filter;
+          } : %q{
+          location.pathname += Array.from(filters).join('/');
+          }).strip}
+
+          let search = [];
+          for (let [key, value] of Object.entries(options)) {
+            search.push(value === undefined ? key : `${key}=${encodeURIComponent(value)}`);
+          };
+
+          location.search = search.length === 0 ? "" : `${search.join('&')}`;
+          if (window.location.toString() == location.toString()) return;
+
+          history.replaceState({}, null, location.toString());
+
+          if (document.getElementById('js').style.display === 'none') return;
+
+          #{(@live ? %q{
+          // update JavaScript
+          let event = new MouseEvent('click',
+            { bubbles: true, cancelable: true, view: window });
+          document.querySelector('input[type=submit]').dispatchEvent(event);
+          } : %q{
+          // fetch updated results
+          let ruby = document.querySelector('textarea[name=ruby]').textContent;
+          let ast = document.getElementById('ast').checked;
+          let headers = {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          }
+
+          fetch(location,
+            {method: 'POST', headers, body: JSON.stringify({ ruby, ast })}
+          ).then(response => {
+            return response.json();
+          }).
+          then(json => {
+            document.querySelector('#js pre').textContent = json.js || json.exception;
+
+            let parsed = document.querySelector('#parsed');
+            if (json.parsed) parsed.querySelector('pre').outerHTML = json.parsed;
+            parsed.style.display = json.parsed ? "block" : "none";
+
+            let filtered = document.querySelector('#filtered');
+            if (json.filtered) filtered.querySelector('pre').outerHTML = json.filtered;
+            filtered.style.display = json.filtered ? "block" : "none";
+          }).
+          catch(console.error);
+          }).strip}
+        }
+
+        #{(@live ? %q{
+        optionDialog = document.getElementById('option');
+        optionInput = optionDialog.querySelector('sl-input');
+        optionClose = optionDialog.querySelector('sl-button[slot="footer"]');
+
+        optionDialog.addEventListener('sl-initial-focus', () => {
+          event.preventDefault();
+          optionInput.setFocus({ preventScroll: true });
+        });
+
+        optionClose.addEventListener('click', () => {
+          options[optionDialog.label] = optionInput.value;
+          optionDialog.hide();
+        });
+
+        document.getElementById('ast').addEventListener('sl-change', () => {
+          updateLocation();
+        });
+
+        for (let dropdown of document.querySelectorAll('sl-dropdown')) {
+          let menu = dropdown.querySelector('sl-menu');
+          dropdown.addEventListener('sl-show', () => {
+            menu.style.display = 'block';
+          }, {once: true});
+
+          menu.addEventListener('sl-select', event => {
+            let item = event.detail.item;
+
+            if (dropdown.id == 'options') {
+              item.checked = !item.checked;
+              let name = item.textContent;
+
+              if (name in options) {
+                delete options[name]
+              } else if (item.dataset.args) {
+                event.target.parentNode.hide();
+                dialog = document.getElementById('option');
+                dialog.label = name;
+                dialog.querySelector('sl-input').value = options[name] || '';
+                dialog.show();
+              } else {
+                options[name] = undefined
+              };
+
+            } else if (dropdown.id == 'filters') {
+
+              item.checked = !item.checked;
+              let name = item.textContent;
+              if (!filters.delete(name)) filters.add(name);
+
+            } else if (dropdown.id == 'eslevel') {
+
+              let button = event.target.parentNode.querySelector('sl-button');
+              let value = item.textContent;
+              if (value !== "default") options['es' + value] = undefined;
+              for (let option of event.target.querySelectorAll('sl-menu-item')) {
+                option.checked = (option === item);
+                if (option.value === 'default' || option.value === value) continue;
+                delete options['es' + option.value];
+              };
+              button.textContent = value;
+
+            };
+
+            updateLocation();
+          })
+        }
+
+        } : %q{
 
         // show dropdowns (they only appear if JS is enabled)
         let dropdowns = document.querySelectorAll('.dropdown');
@@ -406,60 +577,6 @@ else
           })
         };
 
-        function updateLocation() {
-          let location = new URL(base, window.location);
-
-          if ($live) {
-            options.filter = Array.from(filters).join(',');
-            if (filters.size === 0) delete options.filter;
-          } else {
-            location.pathname += Array.from(filters).join('/');
-          }
-
-          let search = [];
-          for (let [key, value] of Object.entries(options)) {
-            search.push(value === undefined ? key : `${key}=${encodeURIComponent(value)}`);
-          };
-
-          location.search = search.length === 0 ? "" : `${search.join('&')}`;
-
-          history.replaceState({}, null, location.toString());
-
-          if (document.getElementById('js').style.display === 'none') return;
-
-          if ($live) {
-            let event = new MouseEvent('click',
-              { bubbles: true, cancelable: true, view: window });
-            document.querySelector('input[type=submit]').dispatchEvent(event);
-          } else {
-            // fetch updated results
-            let ruby = document.querySelector('textarea[name=ruby]').textContent;
-            let ast = document.getElementById('ast').checked;
-            let headers = {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json'
-            }
-
-            fetch(location,
-              {method: 'POST', headers, body: JSON.stringify({ ruby, ast })}
-            ).then(response => {
-              return response.json();
-            }).
-            then(json => {
-              document.querySelector('#js pre').textContent = json.js || json.exception;
-
-              let parsed = document.querySelector('#parsed');
-              if (json.parsed) parsed.querySelector('pre').outerHTML = json.parsed;
-              parsed.style.display = json.parsed ? "block" : "none";
-
-              let filtered = document.querySelector('#filtered');
-              if (json.filtered) filtered.querySelector('pre').outerHTML = json.filtered;
-              filtered.style.display = json.filtered ? "block" : "none";
-            }).
-            catch(console.error);
-          }
-        }
-
         // add/remove eslevel options
         document.getElementById('eslevel').addEventListener('change', event => {
           let value = event.target.value;
@@ -472,7 +589,7 @@ else
         });
 
         // add/remove filters based on checkbox
-        let dropdown = document.getElementById('filters').parentNode;
+        let dropdown = document.getElementById('filters');
         for (let filter of dropdown.querySelectorAll('input[type=checkbox]')) {
           filter.addEventListener('click', event => {
             let name = event.target.name;
@@ -482,7 +599,7 @@ else
         }
 
         // add/remove options based on checkbox
-        dropdown = document.getElementById('options').parentNode;
+        dropdown = document.getElementById('options');
         for (let option of dropdown.querySelectorAll('input[type=checkbox]')) {
           option.addEventListener('click', event => {
             let name = event.target.name;
@@ -511,6 +628,7 @@ else
 
         // refesh on "Show AST" change
         document.getElementById('ast').addEventListener('click', updateLocation);
+        }).strip}
       }
 
       _div_? do
@@ -521,14 +639,14 @@ else
         parsed = Ruby2JS.parse(@ruby).first if @ast and @ruby
 
         _div.parsed! style: "display: #{@ast ? 'block' : 'none'}" do
-          _h2 'AST'
+          _h2.title.is_size_6 'AST'
           _pre {_ {walk(parsed)}}
         end
 
         ruby = Ruby2JS.convert(@ruby, options) if @ruby
 
         _div.filtered! style: "display: #{@ast && parsed != ruby.ast ? 'block' : 'none'}" do
-          _h2 'filtered AST'
+          _h2.title.is_size_6 'filtered AST'
           _pre {walk(ruby.ast) if ruby}
         end
 
