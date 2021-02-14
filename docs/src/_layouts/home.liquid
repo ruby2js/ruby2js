@@ -3,11 +3,6 @@ layout: default
 ---
 
 {% rendercontent "shared/page_layout" %}
-  {% if bridgetown.version contains "beta" %}
-    <layout-notice class="mb-12 has-text-centered">
-      <em>You’re looking at the beta site for the latest pre-release of Bridgetown.</em> <a href="https://www.bridgetownrb.com" class="has-text-weight-bold">Switch to the current production site.</a>
-    </layout-notice>
-  {% endif %}
   {% rendercontent "shared/box" %}
     <img-container class="ruby2js-logo">{% svg images/ruby2js-square.svg %}</img-container>
 
