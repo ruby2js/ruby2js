@@ -233,7 +233,10 @@ module.exports = function (snowpackConfig, pluginOptions) {
       if (waitList) await waitForServer();
 
       try {
-        return await convert(await fsp.readFile(filePath, 'utf8'), pluginOptions);
+        return await convert(
+          await fsp.readFile(filePath, 'utf8'),
+          { ...pluginOptions, file: filePath }
+        );
       } catch(e) {
         throw new Error(e.toString() + "\n");
       }
