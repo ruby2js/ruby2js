@@ -171,3 +171,33 @@ unless $document.querySelector('textarea').value.empty?
   event = `new MouseEvent('click', { bubbles: true, cancelable: true, view: window })`
   $document.querySelector('input[type=submit]').dispatchEvent(event)
 end
+
+# fixup options:
+#   * map filter names to filter modules
+#   * parse autoimports, defs
+def Ruby2JS.options(hash)
+  hash = `Opal.hash(hash || {})`
+
+  hash[:filters] ||= []
+  hash[:filters] = hash[:filters].split(/,\s*/) if hash[:filters].is_a? String
+  hash[:filters].map! {|name| Filters[name]}
+  hash[:filters].compact!
+
+  if hash[:autoimports].is_a? String
+    hash[:autoimports] = Ruby2JS::Demo.parse_autoimports(hash[:autoimports])
+  end
+
+  if hash[:defs].is_a? String
+    hash[:defs] = Ruby2JS::Demo.parse_defs(hash[:defs])
+  end
+
+  hash
+end
+
+# export convert function
+$$.Ruby2JS = Ruby2JS
+`Ruby2JS.convert = (string, options) => Ruby2JS.$convert(string, Ruby2JS.$options(options ))`
+`Ruby2JS.parse = (string, options) => Ruby2JS.$parse(string, Ruby2JS.$options(options))`
+
+# advertise that the function is available
+$document[:body].dispatchEvent(`new CustomEvent('Ruby2JS-ready')`)

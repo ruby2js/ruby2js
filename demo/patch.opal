@@ -1,3 +1,7 @@
+# silence YAML warning
+`Opal.modules["yaml"] = function() {}`
+
+# add core libraries
 require 'corelib/string/unpack'
 require 'corelib/array/pack'
 
