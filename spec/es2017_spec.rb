@@ -65,21 +65,29 @@ describe "ES2017 support" do
     it "should handle lambda functions" do
       to_js( 'async lambda {|x| x}' ).
         must_equal 'async x => x'
+      to_js( 'async lambda {|x| x}[]' ).
+        must_equal '(async x => x)()'
     end
 
     it "should handle procs" do
       to_js( 'async proc {|x| x}' ).
         must_equal 'async x => x'
+      to_js( 'async proc {|x| x}[]' ).
+        must_equal '(async x => x)()'
     end
 
     it "should handle blocks" do
       to_js( 'it "works", async do end' ).
         must_equal 'it("works", async () => {})'
+      to_js( 'async {x=1}[]' ).
+        must_equal '(async () => {let x = 1})()'
     end
 
     it "should handle arrow functions" do
       to_js( 'async -> (x) {x}' ).
         must_equal 'async x => x'
+      to_js( 'async -> () {x}[]' ).
+        must_equal '(async () => x)()'
     end
      
     it "should auto bind async methods referenced as properties" do

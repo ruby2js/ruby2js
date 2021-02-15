@@ -60,7 +60,7 @@ module Ruby2JS
         return parse args.first, @state
 
       elsif not receiver and [:lambda, :proc].include? method
-        if method == :lambda
+        if method == :lambda and @state != :statement
           return parse s(args.first.type, *args.first.children[0..-2],
             s(:autoreturn, args.first.children[-1])), @state
         else
@@ -75,6 +75,9 @@ module Ruby2JS
           (es2015 || @state == :statement ? group(receiver) : parse(receiver))
           put '('; parse_all(*args, join: ', '); put ')'
           return
+        elsif not t2 and m2 == :async and args2.length == 0
+          put '('; parse receiver; put ')()'
+          return
         end
       end
 
@@ -88,6 +91,15 @@ module Ruby2JS
           elsif args.first.type == :defs
             # async def o.m(x) {...}
             return parse args.first.updated :asyncs
+
+          elsif args.first.type == :send  and 
+            args.first.children.first.type == :block and 
+            args.first.children.last == :[]
+
+            put '(async '
+            parse args.first.children.first, :statement
+            put ')()'
+            return
 
           elsif args.first.type == :block
             block = args.first
