@@ -31,14 +31,19 @@ file "#{demo}/editor.js" => ['../demo/editor.js'] do
   Dir.chdir(docs) {sh "yarn editor"}
 end
 
-file "#{demo}/livedemo.js" => [*opal_files, *source_files, 'filters.opal'] do
+file "#{demo}/livedemo.js" => 'livedemo.js.rb' do
+  Dir.chdir(docs) {system "rake #{demo}/index.erb"}
+end
+
+file "#{demo}/ruby2js.js" => [*opal_files, *source_files, 'filters.opal'] do
   mkdir demo unless Dir.exist? demo
-  sh "opal --compile -g regexp_parser -I ../lib -I . livedemo.opal > #{docs}/src/demo/livedemo.js"
+  sh "opal --compile -g regexp_parser -I ../lib -I . ruby2js.opal > #{docs}/src/demo/ruby2js.js"
 end
 
 task :default => [
   "#{demo}/index.erb",
   "#{demo}/editor.js",
-  "#{demo}/livedemo.js"
+  "#{demo}/livedemo.js",
+  "#{demo}/ruby2js.js"
 ]
 

@@ -41,9 +41,11 @@ file "#{demo}/index.erb" => '../demo/ruby2js.rb' do
     erb = [
       "---\nlayout: default\n---\n",
       livedoc[/<style[ >].*?<\/style>/m],
-      livedoc[/<body.*?>(.*?)<\/body>/m, 1],
+      livedoc[/<body.*?>(.*?)<\/body>/m, 1].
+        sub(/<script.*?<\/script>/m, ''),
+      '<script src="/demo/livedemo.js" asyn></script>',
       '<script src="/demo/editor.js" async></script>',
-      '<script src="/demo/livedemo.js" defer></script>'
+      '<script src="/demo/ruby2js.js" defer></script>'
     ].join("\n")
 
     IO.write("#{demo}/index.erb", erb)
@@ -54,10 +56,14 @@ file "#{demo}/editor.js" => ['../demo/editor.js'] do
   sh "yarn editor"
 end
 
-file "#{demo}/livedemo.js" => [*opal_files, *source_files, '../demo/filters.opal'] do
+file "#{demo}/livedemo.js" => ['../demo/livedemo.js.rb'] do
+  sh "#{RbConfig.ruby} ../demo/ruby2js.rb --filter functions --es2020 ../demo/livedemo.js.rb > #{demo}/livedemo.js"
+end
+
+file "#{demo}/ruby2js.js" => [*opal_files, *source_files, '../demo/filters.opal'] do
   mkdir demo unless Dir.exist? demo
-  opal = "opal --compile -g regexp_parser -I ../lib -I . livedemo.opal"
-  target = "#{docs}/src/demo/livedemo.js"
+  opal = "opal --compile -g regexp_parser -I ../lib -I . ruby2js.opal"
+  target = "#{docs}/src/demo/ruby2js.js"
   terser = "#{__dir__}/node_modules/.bin/terser"
   Dir.chdir '../demo' do
     if File.exist? terser
@@ -75,6 +81,7 @@ end
 task :default => [
   "#{demo}/index.erb",
   "#{demo}/editor.js",
-  "#{demo}/livedemo.js"
+  "#{demo}/livedemo.js",
+  "#{demo}/ruby2js.js"
 ]
 
