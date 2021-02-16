@@ -84,84 +84,37 @@ const setup = [
   ])
 ]
 
-// create an editor below the textarea, then hide the textarea
-let textarea = document.querySelector('textarea.ruby');
-let editorDiv = document.createElement('div');
-editorDiv.classList.add('editor', 'ruby');
-textarea.parentNode.insertBefore(editorDiv, textarea.nextSibling);
-textarea.style.display = 'none';
+window.CodeMirror = class {
+  static rubyEditor(parent, notify=null) {
+    return new EditorView({
+      state: EditorState.create({
+        extensions: [
+          setup,  
+          StreamLanguage.define(ruby),
+          EditorView.updateListener.of(update => {
+            if (notify && update.docChanged) {
+              notify(update.state.doc.toString())
+            }
+          })
+        ]
+      }),
+      parent
+    })
+  } 
 
-// create an editor below the textarea, then hide the textarea
-let rubyEditor = new EditorView({
-  state: EditorState.create({
-    extensions: [
-      setup,  
-      StreamLanguage.define(ruby),
-      EditorView.updateListener.of(update => {
-        if (update.docChanged) {
-          textarea.value = update.state.doc.toString();
-          let event = new MouseEvent('click', { bubbles: true, cancelable: true, view: window });
-          document.querySelector('input[type=submit]').dispatchEvent(event)
-        }
-      })
-    ]
-  }),
-  parent: editorDiv
-});
-
-// focus on the editor
-rubyEditor.focus();
-
-// first submit may come from the livedemo itself; if that occurs
-// copy the textarea value into the editor
-let submit = document.querySelector('input[type=submit]');
-submit.addEventListener('click', event => {
-  if (!textarea.value) return;
-  if (rubyEditor.state.doc.length) return;
-
-  rubyEditor.dispatch({
-    changes: {from: 0, to: rubyEditor.state.doc.length, insert: textarea.value}
-  })
-}, {once: true});
-
-// create another editor below the output
-let jsout = document.querySelector('#js .js');
-let outputDiv = document.createElement('div');
-outputDiv.classList.add('editor', 'js');
-jsout.parentNode.insertBefore(outputDiv, jsout.nextSibling);
-
-let jsEditor = new EditorView({
-  state: EditorState.create({
-    doc: 'content',
-    extensions: [
-      setup,  
-      javascript(),
-      EditorView.editable.of(false)
-    ]
-  }),
-  parent: outputDiv
-});
-
-const config = { attributes: true, childList: true, subtree: true };
-
-const callback = function(mutationsList, observer) {
-  for(const mutation of mutationsList) {
-    if (mutation.type === 'childList') {
-      jsEditor.dispatch({
-        changes: {from: 0, to: jsEditor.state.doc.length, insert: jsout.textContent}
-      })
-    } else if (mutation.type === 'attributes') {
-      if (jsout.classList.contains("exception")) {
-        jsout.style.display = 'block';
-        outputDiv.style.display = 'none';
-      } else {
-        jsout.style.display = 'none';
-        outputDiv.style.display = 'block';
-      }
-    }
+  static jsEditor(parent) {
+    return new EditorView({
+      state: EditorState.create({
+        doc: 'content',
+        extensions: [
+          setup,  
+          javascript(),
+          EditorView.editable.of(false)
+        ]
+      }),
+      parent
+    })
   }
-};
+}
 
-const observer = new MutationObserver(callback);
-
-observer.observe(jsout, config);
+document.body.dispatchEvent(new CustomEvent('CodeMirror-ready'))

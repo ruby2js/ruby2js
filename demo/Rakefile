@@ -32,7 +32,7 @@ file "#{demo}/editor.js" => ['../demo/editor.js'] do
 end
 
 file "#{demo}/livedemo.js" => 'livedemo.js.rb' do
-  Dir.chdir(docs) {system "rake #{demo}/index.erb"}
+  Dir.chdir(docs) {system "rake #{demo}/livedemo.js"}
 end
 
 file "#{demo}/ruby2js.js" => [*opal_files, *source_files, 'filters.opal'] do

@@ -169,6 +169,8 @@ module Ruby2JS
         group_target ||= GROUP_OPERATORS.include? target.type
       end
 
+      put 'await ' if @ast.type == :await
+
       if method == :!
         parse s(:not, receiver)
 
@@ -325,8 +327,6 @@ module Ruby2JS
         parse s(:send, s(:attr, receiver, :constructor), :==, args.first)
 
       else
-        put 'await ' if @ast.type == :await
-
         if method == :bind and receiver&.type == :send
           if receiver.children.length == 2 and receiver.children.first == nil
             receiver = receiver.updated(:attr) # prevent autobind

@@ -54,7 +54,7 @@ async {
 
   document.querySelectorAll('sl-dropdown').each do |dropdown|
     menu = dropdown.querySelector('sl-menu')
-    dropdown.addEventListener 'sl-show', -> () {
+    dropdown.addEventListener 'sl-show', -> {
       menu.style.display = 'block'
     }, once: true
 
@@ -62,42 +62,109 @@ async {
       item = event.detail.item
 
       if dropdown.id == 'options'
-	item.checked = !item.checked
-	name = item.textContent
+        item.checked = !item.checked
+        name = item.textContent
 
-	if options.include? name
-	  options.delete(name)
-	elsif item.dataset.args
-	  event.target.parentNode.hide()
-	  dialog = document.getElementById('option')
-	  dialog.label = name
-	  dialog.querySelector('sl-input').value = options[name] || ''
-	  dialog.show()
-	else
-	  options[name] = undefined
-	end
+        if options.include? name
+          options.delete(name)
+        elsif item.dataset.args
+          event.target.parentNode.hide()
+          dialog = document.getElementById('option')
+          dialog.label = name
+          dialog.querySelector('sl-input').value = options[name] || ''
+          dialog.show()
+        else
+          options[name] = undefined
+        end
 
       elsif dropdown.id == 'filters'
 
-	item.checked = !item.checked
-	name = item.textContent
+        item.checked = !item.checked
+        name = item.textContent
         filters.add(name) unless filters.delete!(name)
 
       elsif dropdown.id == 'eslevel'
 
-	button = event.target.parentNode.querySelector('sl-button')
-	value = item.textContent
+        button = event.target.parentNode.querySelector('sl-button')
+        value = item.textContent
         options['es' + value] = undefined if value != "default"
-	event.target.querySelectorAll('sl-menu-item').each do |option|
-	  option.checked = (option == item)
-	  next if option.value == 'default' || option.value == value
-	  options.delete('es' + option.value)
-	end
-	button.textContent = value
+        event.target.querySelectorAll('sl-menu-item').each do |option|
+          option.checked = (option == item)
+          next if option.value == 'default' || option.value == value
+          options.delete('es' + option.value)
+        end
+        button.textContent = value
 
       end
 
       updateLocation()
     end
   end
+
+  ###################################################################################
+
+  await Promise.new(->(resolve, reject) {
+    if defined? CodeMirror
+      resolve()
+    else
+      document.body.addEventListener 'CodeMirror-ready', resolve, once: true
+    end
+  })
+
+  # create an editor below the textarea, then hide the textarea
+  textarea = document.querySelector('textarea.ruby')
+  editorDiv = document.createElement('div')
+  editorDiv.classList.add('editor', 'ruby')
+  textarea.parentNode.insertBefore(editorDiv, textarea.nextSibling)
+  textarea.style.display = 'none'
+
+  # create an editor below the textarea, then hide the textarea
+  rubyEditor = CodeMirror.rubyEditor(editorDiv) do |value|
+    textarea.value = value
+    event = MouseEvent.new 'click', bubbles: true, cancelable: true, view: window
+    document.querySelector('input[type=submit]').dispatchEvent(event)
+  end
+
+  # focus on the editor
+  rubyEditor.focus()
+
+  # first submit may come from the livedemo itself; if that occurs
+  # copy the textarea value into the editor
+  submit = document.querySelector('input[type=submit]')
+  submit.addEventListener 'click', -> {
+    return unless textarea.value
+    return unless rubyEditor.state.doc.empty?
+
+    rubyEditor.dispatch(
+      changes: {from: 0, to: rubyEditor.state.doc.length, insert: textarea.value}
+    )
+  }, once: true
+
+  # create another editor below the output
+  jsout = document.querySelector('#js .js')
+  outputDiv = document.createElement('div')
+  outputDiv.classList.add('editor', 'js')
+  jsout.parentNode.insertBefore(outputDiv, jsout.nextSibling)
+
+  jsEditor = CodeMirror.jsEditor(outputDiv)
+
+  observer = MutationObserver.new do |mutationsList, observer|
+    mutationsList.each do |mutation|
+      if mutation.type == 'childList'
+        jsEditor.dispatch(
+          changes: {from: 0, to: jsEditor.state.doc.length, insert: jsout.textContent}
+        )
+      elsif mutation.type == 'attributes'
+        if jsout.classList.contains? "exception"
+          jsout.style.display = 'block'
+          outputDiv.style.display = 'none'
+        else
+          jsout.style.display = 'none'
+          outputDiv.style.display = 'block'
+        end
+      end
+    end
+  end
+
+  observer.observe(jsout, attributes: true, childList: true, subtree: true)
 }[]
