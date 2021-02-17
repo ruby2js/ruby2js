@@ -343,60 +343,65 @@ else
       end
 
       _form method: 'post' do
-        _textarea.ruby.form_control @ruby, name: 'ruby', rows: 8,
-          placeholder: 'Ruby source'
-        _input.btn.btn_primary type: 'submit', value: 'Convert', 
-          style: "display: #{@live ? 'none' : 'inline'}"
-
-        _label 'ESLevel:', for: 'eslevel'
-        if @live
-					_sl_dropdown.eslevel! name: 'eslevel' do
-						_sl_button @eslevel || 'default', slot: 'trigger', caret: true
-						_sl_menu do
-							_sl_menu_item 'default', checked: !@eslevel || @eslevel == 'default'
-							Dir["#{$:.first}/ruby2js/es20*.rb"].sort.each do |file|
-								eslevel = File.basename(file, '.rb').sub('es', '')
-								_sl_menu_item eslevel, value: eslevel, checked: @eslevel == eslevel
-							end
-						end
-					end
-        else
-					_select name: 'eslevel', id: 'eslevel' do
-						_option 'default', selected: !@eslevel || @eslevel == 'default'
-						Dir["#{$:.first}/ruby2js/es20*.rb"].sort.each do |file|
-							eslevel = File.basename(file, '.rb').sub('es', '')
-							_option eslevel, value: eslevel, selected: @eslevel == eslevel
-						end
-					end
+        _div data_target: @live && 'ruby' do
+          _textarea.ruby.form_control @ruby, name: 'ruby', rows: 8,
+            placeholder: 'Ruby source'
         end
 
-        _sl_checkbox 'Show AST', id: 'ast', name: 'ast', checked: !!@ast
+        _div data_target: @live && 'options' do
+          _input.btn.btn_primary type: 'submit', value: 'Convert', 
+            style: "display: #{@live ? 'none' : 'inline'}"
 
-        _sl_dropdown.filters! close_on_select: 'false' do
-          _sl_button 'Filters', slot: 'trigger', caret: true
-          _sl_menu do
-            Dir["#{$:.first}/ruby2js/filter/*.rb"].sort.each do |file|
-              filter = File.basename(file, '.rb')
-              next if filter == 'require'
-              _sl_menu_item filter, name: filter,
-                checked: selected.include?(filter)
+          _label 'ESLevel:', for: 'eslevel'
+          if @live
+            _sl_dropdown.eslevel! name: 'eslevel' do
+              _sl_button @eslevel || 'default', slot: 'trigger', caret: true
+              _sl_menu do
+                _sl_menu_item 'default', checked: !@eslevel || @eslevel == 'default'
+                Dir["#{$:.first}/ruby2js/es20*.rb"].sort.each do |file|
+                  eslevel = File.basename(file, '.rb').sub('es', '')
+                  _sl_menu_item eslevel, value: eslevel, checked: @eslevel == eslevel
+                end
+              end
+            end
+          else
+            _select name: 'eslevel', id: 'eslevel' do
+              _option 'default', selected: !@eslevel || @eslevel == 'default'
+              Dir["#{$:.first}/ruby2js/es20*.rb"].sort.each do |file|
+                eslevel = File.basename(file, '.rb').sub('es', '')
+                _option eslevel, value: eslevel, selected: @eslevel == eslevel
+              end
             end
           end
-        end
 
-        _sl_dropdown.options! close_on_select: 'false' do
-          _sl_button 'Options', slot: 'trigger', caret: true
-          _sl_menu do
-            checked = options.dup
-            checked[:identity] = options[:comparison] == :identity
-            checked[:nullish] = options[:or] == :nullish
+          _sl_checkbox 'Show AST', id: 'ast', name: 'ast', checked: !!@ast
 
-            options_available.each do |option, args|
-              next if option == 'filter'
-              next if option.start_with? 'require_'
-              _sl_menu_item option, name: option,
-                checked: checked[option.to_sym],
-                data_args: options_available[option]
+          _sl_dropdown.filters! close_on_select: 'false' do
+            _sl_button 'Filters', slot: 'trigger', caret: true
+            _sl_menu do
+              Dir["#{$:.first}/ruby2js/filter/*.rb"].sort.each do |file|
+                filter = File.basename(file, '.rb')
+                next if filter == 'require'
+                _sl_menu_item filter, name: filter,
+                  checked: selected.include?(filter)
+              end
+            end
+          end
+
+          _sl_dropdown.options! close_on_select: 'false' do
+            _sl_button 'Options', slot: 'trigger', caret: true
+            _sl_menu do
+              checked = options.dup
+              checked[:identity] = options[:comparison] == :identity
+              checked[:nullish] = options[:or] == :nullish
+
+              options_available.each do |option, args|
+                next if option == 'filter'
+                next if option.start_with? 'require_'
+                _sl_menu_item option, name: option,
+                  checked: checked[option.to_sym],
+                  data_args: options_available[option]
+              end
             end
           end
         end
@@ -650,7 +655,7 @@ else
           _pre {walk(ruby.ast) if ruby}
         end
 
-        _div.js! style: "display: #{@ruby ? 'block' : 'none'}" do
+        _div.js! data_controller: @live && 'js', style: "display: #{@ruby ? 'block' : 'none'}" do
           _h2.title.is_size_4 'JavaScript'
           _pre.js ruby.to_s
         end

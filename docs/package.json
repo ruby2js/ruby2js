@@ -44,6 +44,7 @@
     "@shoelace-style/shoelace": "^2.0.0-beta.25",
     "animated-scroll-to": "^2.0.12",
     "bridgetown-quick-search": "1.0.5",
-    "bulma": "^0.9.1"
+    "bulma": "^0.9.1",
+    "stimulus": "^2.0.0"
   }
 }

@@ -57,7 +57,9 @@ file "#{demo}/editor.js" => ['../demo/editor.js'] do
 end
 
 file "#{demo}/livedemo.js" => ['../demo/livedemo.js.rb'] do
-  sh "#{RbConfig.ruby} ../demo/ruby2js.rb --filter functions --es2020 ../demo/livedemo.js.rb > #{demo}/livedemo.js"
+  sh "#{RbConfig.ruby} ../demo/ruby2js.rb --filter stimulus --filter functions --es2020 ../demo/livedemo.js.rb | " +
+    "npx rollup -f iife --context window -p @rollup/plugin-node-resolve | " +
+    "npx terser > #{demo}/livedemo.js"
 end
 
 file "#{demo}/ruby2js.js" => [*opal_files, *source_files, '../demo/filters.opal'] do

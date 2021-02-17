@@ -138,33 +138,53 @@ async {
     )
   }, once: true
 
-  # create another editor below the output
-  jsout = document.querySelector('#js .js')
-  outputDiv = document.createElement('div')
-  outputDiv.classList.add('editor', 'js')
-  jsout.parentNode.insertBefore(outputDiv, jsout.nextSibling)
+  ###################################################################################
 
-  jsEditor = CodeMirror.jsEditor(outputDiv)
-
-  observer = MutationObserver.new do |mutationsList, observer|
-    mutationsList.each do |mutation|
-      if mutation.type == 'childList'
-        jsEditor.dispatch(
-          changes: {from: 0, to: jsEditor.state.doc.length, insert: jsout.textContent}
-        )
-      elsif mutation.type == 'attributes'
-        if jsout.classList.contains? "exception"
-          jsout.style.display = 'block'
-          outputDiv.style.display = 'none'
-        else
-          jsout.style.display = 'none'
-          outputDiv.style.display = 'block'
-        end
+  class DemoController < Stimulus::Controller
+    def findController(element: nil, type: nil)
+      return application.controllers.find do |controller|
+        (not element or controller.element == element) and
+        (not type or controller.is_a? type)
       end
     end
   end
 
-  observer.observe(jsout, attributes: true, childList: true, subtree: true)
+  class JSController < DemoController
+    def connect()
+      # create another editor below the output
+      jsout = element.querySelector('.js')
+      outputDiv = document.createElement('div')
+      outputDiv.classList.add('editor', 'js')
+      jsout.parentNode.insertBefore(outputDiv, jsout.nextSibling)
+
+      jsEditor = CodeMirror.jsEditor(outputDiv)
+
+      # for now, watch for changes in the js
+      # TODO: replace with direct method calls to this controller
+      observer = MutationObserver.new do |mutationsList, observer|
+        mutationsList.each do |mutation|
+          if mutation.type == 'childList'
+            jsEditor.dispatch(
+              changes: {from: 0, to: jsEditor.state.doc.length, insert: jsout.textContent}
+            )
+          elsif mutation.type == 'attributes'
+            if jsout.classList.contains? "exception"
+              jsout.style.display = 'block'
+              outputDiv.style.display = 'none'
+            else
+              jsout.style.display = 'none'
+              outputDiv.style.display = 'block'
+            end
+          end
+        end
+      end
+
+      observer.observe(jsout, attributes: true, childList: true, subtree: true)
+    end
+  end
+
+  application = Stimulus::Application.start()
+  application.register("js", JSController)
 
   ###################################################################################
 
@@ -305,7 +325,6 @@ async {
 
   # make inputs match query
   parse_options().each_pair do |name, value|
-    puts [name, value]
     case name
     when :ruby
       document.querySelector('textarea').value = value
