@@ -42,6 +42,8 @@ end
 $$.Ruby2JS = Ruby2JS
 `Ruby2JS.convert = (string, options) => Ruby2JS.$convert(string, Ruby2JS.$options(options ))`
 `Ruby2JS.parse = (string, options) => Ruby2JS.$parse(string, Ruby2JS.$options(options))`
+node = Parser::AST::Node; `Ruby2JS.AST = {Node: node}`
+`Ruby2JS.nil = nil`
 
 # advertise that the function is available
 $$.document[:body].dispatchEvent(`new CustomEvent('Ruby2JS-ready')`)
