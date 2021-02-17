@@ -1,7 +1,5 @@
 async {
 
-  application = Stimulus::Application.start()
-
   class DemoController < Stimulus::Controller
     def findController(element: nil, type: nil)
       return application.controllers.find do |controller|
@@ -9,7 +7,60 @@ async {
         (not type or controller.is_a? type)
       end
     end
+
+    def ruby2js_ready
+      Promise.new do |resolve, reject|
+        if defined? Ruby2JS
+          resolve()
+        else
+          document.body.addEventListener 'Ruby2JS-ready', resolve, once: true
+        end
+      end
+    end
+
+    def codemirror_ready
+      Promise.new do |resolve, reject|
+        if defined? CodeMirror
+          resolve()
+        else
+          document.body.addEventListener 'CodeMirror-ready', resolve, once: true
+        end
+      end
+    end
+
+    # convert query into options
+    def parse_options()
+      options = {filters: []}
+      search = document.location.search
+      return options if search == ''
+
+      search[1..-1].split('&').each do |parameter|
+        name, value = parameter.split('=', 2)
+        value = value ? decodeURIComponent(value.gsub('+', ' ')) : true
+
+        if name == :filter
+          name = :filters
+          value = [] if value == true
+        elsif name == :identity
+          value = name
+          name = :comparison
+        elsif name == :nullish
+          value = name
+          name = :or
+        elsif name =~ /^es\d+$/
+          value = name[2..-1].to_i
+          name = :eslevel
+        end
+
+        options[name] = value
+      end
+
+      return options
+    end
+
   end
+
+  ###################################################################################
 
   class OptionsController < DemoController
     def connect()
@@ -141,20 +192,12 @@ async {
     end
   end
 
-  application.register("options", OptionsController)
-
   ###################################################################################
 
-  await Promise.new(->(resolve, reject) {
-    if defined? CodeMirror
-      resolve()
-    else
-      document.body.addEventListener 'CodeMirror-ready', resolve, once: true
-    end
-  })
-
   class RubyController < DemoController
-    def connect()
+    async def connect()
+      await codemirror_ready
+
       # create an editor below the textarea, then hide the textarea
       textarea = document.querySelector('textarea.ruby')
       editorDiv = document.createElement('div')
@@ -182,11 +225,121 @@ async {
           changes: {from: 0, to: rubyEditor.state.doc.length, insert: textarea.value}
         )
       }, once: true
+
+      # update output on every keystroke in textarea
+      document.querySelector('textarea').addEventListener :input do
+        event = MouseEvent.new('click', bubbles: true, cancelable: true, view: window)
+        document.querySelector('input[type=submit]').dispatchEvent(event)
+      end
+
+      # process convert button
+      document.querySelector('input.btn').addEventListener :click do |event|
+        event.preventDefault()
+        convert() if defined? Ruby2JS
+      end
+
+      # initial conversion if textarea is not empty
+      unless document.querySelector('textarea').value.empty?
+        event = MouseEvent.new(:click, bubbles: true, cancelable: true, view: window)
+        document.querySelector('input[type=submit]').dispatchEvent(event)
+      end
+    end
+
+    def convert()
+      ast = document.getElementById('ast')
+      jsdiv = document.querySelector('div#js')
+      jspre = jsdiv.querySelector('pre')
+
+      ruby = document.querySelector('textarea').value
+      js = show_ast = nil
+      begin
+        js = Ruby2JS.convert(ruby, parse_options())
+        jspre.classList.remove 'exception'
+        show_ast = ast.checked
+      rescue SyntaxError => e
+        js = e.diagnostic || e
+        jspre.classList.add 'exception'
+      rescue => e
+        js = e.inspect
+        jspre.classList.add 'exception'
+      end
+
+      if ast.checked and not jspre.classList.contains('exception')
+        raw, comments = Ruby2JS.parse(ruby)
+        trees = [walk(raw).join(''), walk(js.ast).join('')]
+
+        parsed = document.getElementById('parsed')
+        filtered = document.getElementById('filtered')
+        parsed.querySelector('pre').innerHTML = trees[0]
+        parsed.style.display = 'block'
+        if trees[0] == trees[1]
+          filtered.style.display = 'none'
+        else
+          filtered.querySelector('pre').innerHTML = trees[1]
+          filtered.style.display = 'block'
+        end
+      else
+        parsed.style.display = 'none'
+        filtered.style.display = 'none'
+      end
+
+      jspre.textContent = js.to_s
+      jsdiv.style.display = js.to_s.empty? ? 'none' : 'block'
+    end
+
+    # convert AST into displayable form
+    def walk(ast, indent='', tail='', last=true)
+      return [] unless ast
+      output = ["<div class=#{ast.location == Ruby2JS.nil ? 'unloc' : 'loc'}>"]
+      output << "#{indent}<span class=hidden>s(:</span>#{ast.type}"
+      output << '<span class=hidden>,</span>' unless ast.children.empty?
+
+      if ast.children.any? {|child| child.is_a? Ruby2JS::AST::Node}
+        ast.children.each_with_index do |child, index|
+          ctail = index == ast.children.length - 1 ? ')' + tail : ''
+          lastc = last && !ctail.empty?
+
+          if child.is_a? Ruby2JS::AST::Node
+            output.push *walk(child, "  #{indent}", ctail, lastc)
+          else
+            output << "<div>#{indent}  "
+
+            if child.is_a? String and child =~ /\A[!-~]+\z/
+              output << ":#{child}"
+            else
+              output << child == Ruby2JS.nil ? 'nil' : child.inspect
+            end
+
+            output << "<span class=hidden>#{ctail}#{',' unless lastc}</span>"
+            output << ' ' if lastc
+            output << '</div>'
+          end
+        end
+      else
+        ast.children.each_with_index do |child, index|
+          if ast.type != :str and child.is_a? String and child =~ /\A[!-~]+\z/
+            output << " :#{child}"
+          else
+            output << " #{child == Ruby2JS.nil ? 'nil' : child.inspect}"
+          end
+          output << '<span class=hidden>,</span>' unless index == ast.children.length - 1
+        end
+        output << "<span class=hidden>)#{tail}#{',' unless last}</span>"
+        output << ' ' if last
+      end
+
+      output << '</div>'
+
+      return output
     end
   end
 
+  ###################################################################################
+
   class JSController < DemoController
-    def connect()
+    async def connect()
+      await codemirror_ready
+
       # create another editor below the output
       jsout = element.querySelector('.js')
       outputDiv = document.createElement('div')
@@ -219,150 +372,11 @@ async {
     end
   end
 
-  application.register("js", JSController)
-  application.register("ruby", RubyController)
-
   ###################################################################################
 
-  await Promise.new(->(resolve, reject) {
-    if defined? Ruby2JS
-      resolve()
-    else
-      document.body.addEventListener 'Ruby2JS-ready', resolve, once: true
-    end
-  })
-
-  # convert query into options
-  def parse_options()
-    options = {filters: []}
-    search = document.location.search
-    return options if search == ''
-
-    search[1..-1].split('&').each do |parameter|
-      name, value = parameter.split('=', 2)
-      value = value ? decodeURIComponent(value.gsub('+', ' ')) : true
-
-      if name == :filter
-        name = :filters
-        value = [] if value == true
-      elsif name == :identity
-        value = name
-        name = :comparison
-      elsif name == :nullish
-        value = name
-        name = :or
-      elsif name =~ /^es\d+$/
-        value = name[2..-1].to_i
-        name = :eslevel
-      end
-
-      options[name] = value
-    end
-
-    return options
-  end
-
-  # convert AST into displayable form
-  def walk(ast, indent='', tail='', last=true)
-    return [] unless ast
-    output = ["<div class=#{ast.location == Ruby2JS.nil ? 'unloc' : 'loc'}>"]
-    output << "#{indent}<span class=hidden>s(:</span>#{ast.type}"
-    output << '<span class=hidden>,</span>' unless ast.children.empty?
-
-    if ast.children.any? {|child| child.is_a? Ruby2JS::AST::Node}
-      ast.children.each_with_index do |child, index|
-        ctail = index == ast.children.length - 1 ? ')' + tail : ''
-        lastc = last && !ctail.empty?
-
-        if child.is_a? Ruby2JS::AST::Node
-          output.push *walk(child, "  #{indent}", ctail, lastc)
-        else
-          output << "<div>#{indent}  "
-
-          if child.is_a? String and child =~ /\A[!-~]+\z/
-            output << ":#{child}"
-          else
-            output << child == Ruby2JS.nil ? 'nil' : child.inspect
-          end
-
-          output << "<span class=hidden>#{ctail}#{',' unless lastc}</span>"
-          output << ' ' if lastc
-          output << '</div>'
-        end
-      end
-    else
-      ast.children.each_with_index do |child, index|
-        if ast.type != :str and child.is_a? String and child =~ /\A[!-~]+\z/
-          output << " :#{child}"
-        else
-          output << " #{child == Ruby2JS.nil ? 'nil' : child.inspect}"
-        end
-        output << '<span class=hidden>,</span>' unless index == ast.children.length - 1
-      end
-      output << "<span class=hidden>)#{tail}#{',' unless last}</span>"
-      output << ' ' if last
-    end
-
-    output << '</div>'
-
-    return output
-  end
-
-  # update output on every keystroke in textarea
-  document.querySelector('textarea').addEventListener :input do
-    event = MouseEvent.new('click', bubbles: true, cancelable: true, view: window)
-    document.querySelector('input[type=submit]').dispatchEvent(event)
-  end
-
-  # process convert button
-  document.querySelector('input.btn').addEventListener :click do |event|
-    event.preventDefault()
-
-    ast = document.getElementById('ast')
-    jsdiv = document.querySelector('div#js')
-    jspre = jsdiv.querySelector('pre')
-
-    ruby = document.querySelector('textarea').value
-    js = show_ast = nil
-    begin
-      js = Ruby2JS.convert(ruby, parse_options())
-      jspre.classList.remove 'exception'
-      show_ast = ast.checked
-    rescue SyntaxError => e
-      js = e.diagnostic || e
-      jspre.classList.add 'exception'
-    rescue => e
-      js = e.inspect
-      jspre.classList.add 'exception'
-    end
-
-    if ast.checked and not jspre.classList.contains('exception')
-      raw, comments = Ruby2JS.parse(ruby)
-      trees = [walk(raw).join(''), walk(js.ast).join('')]
-
-      parsed = document.getElementById('parsed')
-      filtered = document.getElementById('filtered')
-      parsed.querySelector('pre').innerHTML = trees[0]
-      parsed.style.display = 'block'
-      if trees[0] == trees[1]
-        filtered.style.display = 'none'
-      else
-        filtered.querySelector('pre').innerHTML = trees[1]
-        filtered.style.display = 'block'
-      end
-    else
-      parsed.style.display = 'none'
-      filtered.style.display = 'none'
-    end
-
-    jspre.textContent = js.to_s
-    jsdiv.style.display = js.to_s.empty? ? 'none' : 'block'
-  end
-
-  # initial conversion if textarea is not empty
-  unless document.querySelector('textarea').value.empty?
-    event = MouseEvent.new(:click, bubbles: true, cancelable: true, view: window)
-    document.querySelector('input[type=submit]').dispatchEvent(event)
-  end
+  application = Stimulus::Application.start()
+  application.register("options", OptionsController)
+  application.register("ruby", RubyController)
+  application.register("js", JSController)
 
 }[]
