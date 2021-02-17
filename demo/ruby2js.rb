@@ -409,14 +409,9 @@ else
       
       _script %{
         // determine base URL and what filters and options are selected
-        #{(@live ? %q{
-        let base = window.location.pathname;
-        let filters = new Set();
-        } : %q{
         let base = new URL(document.getElementsByTagName('base')[0].href).pathname;
         let filters = new Set(window.location.pathname.slice(base.length).split('/'));
         filters.delete('');
-        }).strip}
         let options = {};
         for (let match of window.location.search.matchAll(/(\\w+)(=([^&]*))?/g)) {
           options[match[1]] = match[3] && decodeURIComponent(match[3]);
@@ -425,13 +420,7 @@ else
 
         function updateLocation(force = false) {
           let location = new URL(base, window.location);
-
-          #{(@live ? %q{
-          options.filter = Array.from(filters).join(',');
-          if (filters.size === 0) delete options.filter;
-          } : %q{
           location.pathname += Array.from(filters).join('/');
-          }).strip}
 
           let search = [];
           for (let [key, value] of Object.entries(options)) {
@@ -445,12 +434,6 @@ else
 
           if (document.getElementById('js').style.display === 'none') return;
 
-          #{(@live ? %q{
-          // update JavaScript
-          let event = new MouseEvent('click',
-            { bubbles: true, cancelable: true, view: window });
-          document.querySelector('input[type=submit]').dispatchEvent(event);
-          } : %q{
           // fetch updated results
           let ruby = document.querySelector('textarea[name=ruby]').textContent;
           let ast = document.getElementById('ast').checked;
@@ -476,78 +459,7 @@ else
             filtered.style.display = json.filtered ? "block" : "none";
           }).
           catch(console.error);
-          }).strip}
         }
-
-        #{(@live ? %q{
-        optionDialog = document.getElementById('option');
-        optionInput = optionDialog.querySelector('sl-input');
-        optionClose = optionDialog.querySelector('sl-button[slot="footer"]');
-
-        optionDialog.addEventListener('sl-initial-focus', () => {
-          event.preventDefault();
-          optionInput.setFocus({ preventScroll: true });
-        });
-
-        optionClose.addEventListener('click', () => {
-          options[optionDialog.label] = optionInput.value;
-          optionDialog.hide();
-        });
-
-        document.getElementById('ast').addEventListener('sl-change', () => {
-          updateLocation(true);
-        });
-
-        for (let dropdown of document.querySelectorAll('sl-dropdown')) {
-          let menu = dropdown.querySelector('sl-menu');
-          dropdown.addEventListener('sl-show', () => {
-            menu.style.display = 'block';
-          }, {once: true});
-
-          menu.addEventListener('sl-select', event => {
-            let item = event.detail.item;
-
-            if (dropdown.id == 'options') {
-              item.checked = !item.checked;
-              let name = item.textContent;
-
-              if (name in options) {
-                delete options[name]
-              } else if (item.dataset.args) {
-                event.target.parentNode.hide();
-                dialog = document.getElementById('option');
-                dialog.label = name;
-                dialog.querySelector('sl-input').value = options[name] || '';
-                dialog.show();
-              } else {
-                options[name] = undefined
-              };
-
-            } else if (dropdown.id == 'filters') {
-
-              item.checked = !item.checked;
-              let name = item.textContent;
-              if (!filters.delete(name)) filters.add(name);
-
-            } else if (dropdown.id == 'eslevel') {
-
-              let button = event.target.parentNode.querySelector('sl-button');
-              let value = item.textContent;
-              if (value !== "default") options['es' + value] = undefined;
-              for (let option of event.target.querySelectorAll('sl-menu-item')) {
-                option.checked = (option === item);
-                if (option.value === 'default' || option.value === value) continue;
-                delete options['es' + option.value];
-              };
-              button.textContent = value;
-
-            };
-
-            updateLocation();
-          })
-        }
-
-        } : %q{
 
         // show dropdowns (they only appear if JS is enabled)
         let dropdowns = document.querySelectorAll('.dropdown');
@@ -633,7 +545,6 @@ else
 
         // refesh on "Show AST" change
         document.getElementById('ast').addEventListener('click', updateLocation);
-        }).strip}
       }
 
       _div_? do
