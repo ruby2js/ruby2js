@@ -11,7 +11,6 @@
     "deploy": "yarn clean && yarn webpack-build && yarn demo && yarn build",
     "sync": "node sync.js",
     "start": "node start.js",
-    "editor": "cat ../demo/editor.js | rollup -f iife -o src/demo/editor.js -p @rollup/plugin-node-resolve",
     "demo": "bundle exec rake"
   },
   "devDependencies": {

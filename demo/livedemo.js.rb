@@ -199,7 +199,7 @@ async {
       await codemirror_ready
 
       # create an editor below the textarea, then hide the textarea
-      textarea = document.querySelector('textarea.ruby')
+      textarea = element.querySelector('textarea.ruby')
       editorDiv = document.createElement('div')
       editorDiv.classList.add('editor', 'ruby')
       textarea.parentNode.insertBefore(editorDiv, textarea.nextSibling)

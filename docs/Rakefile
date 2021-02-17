@@ -4,6 +4,9 @@ source_files = Rake::FileList.new("../lib/**/*.rb")
 filters = Rake::FileList.new("../lib/ruby2js/filter/*.rb")
 opal_files = Rake::FileList.new("../demo/*.opal")
 
+terser = "#{__dir__}/node_modules/.bin/terser"
+terser = "cat" if ENV['NODE_ENV'] == 'development' or !File.exist? terser
+
 file "../demo/filters.opal" => filters do
   puts 'generate filters.opal'
   content = filters.map do |file|
@@ -53,26 +56,23 @@ file "#{demo}/index.erb" => '../demo/ruby2js.rb' do
 end
 
 file "#{demo}/editor.js" => ['../demo/editor.js'] do
-  sh "yarn editor"
+  sh "cat ../demo/editor.js | " +
+    "npx rollup -f iife -p @rollup/plugin-node-resolve |" +
+    "#{terser} > src/demo/editor.js"
 end
 
 file "#{demo}/livedemo.js" => ['../demo/livedemo.js.rb'] do
   sh "#{RbConfig.ruby} ../demo/ruby2js.rb --filter stimulus --filter functions --es2020 ../demo/livedemo.js.rb | " +
     "npx rollup -f iife --context window -p @rollup/plugin-node-resolve | " +
-    "npx terser > #{demo}/livedemo.js"
+    "#{terser} > #{demo}/livedemo.js"
 end
 
 file "#{demo}/ruby2js.js" => [*opal_files, *source_files, '../demo/filters.opal'] do
   mkdir demo unless Dir.exist? demo
   opal = "opal --compile -g regexp_parser -I ../lib -I . ruby2js.opal"
   target = "#{docs}/src/demo/ruby2js.js"
-  terser = "#{__dir__}/node_modules/.bin/terser"
   Dir.chdir '../demo' do
-    if File.exist? terser
-      sh "#{opal} | #{terser} > #{target}"
-    else
-      sh "#{opal} > #{target}"
-    end
+    sh "#{opal} | #{terser} > #{target}"
   end
 end
 

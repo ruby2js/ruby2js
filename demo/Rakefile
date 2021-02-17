@@ -1,3 +1,5 @@
 # Convenience file, allowing Rake to be run from this directory
+# pass NODE_ENV=development to disable 'terse'
+ENV['NODE_ENV'] = 'development'
 Dir.chdir File.expand_path('../docs', __dir__)
 load 'Rakefile'
