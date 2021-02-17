@@ -1,104 +1,147 @@
 async {
-  # determine base URL and what filters and options are selected
-  base = window.location.pathname
-  filters = new Set()
-  options = {}
-  window.location.search.scan(/(\w+)(=([^&]*))?/).each do |match|
-    options[match[0]] = match[2] && decodeURIComponent(match[2])
-  end
-  if options.filter
-    options.filter.split(',').each {|option| filters.add(option)}
-  end
 
-  updateLocation = -> (force = false) do
-    location = URL.new(base, window.location)
+  application = Stimulus::Application.start()
 
-    options.filter = Array(filters).join(',')
-    options.delete(:filter) if filters.size == 0
-
-    search = []
-    options.each_pair do |key, value|
-      search << (value == undefined ? key : "#{key}=#{encodeURIComponent(value)}")
+  class DemoController < Stimulus::Controller
+    def findController(element: nil, type: nil)
+      return application.controllers.find do |controller|
+        (not element or controller.element == element) and
+        (not type or controller.is_a? type)
+      end
     end
-
-    location.search = search.empty? ? "" : "#{search.join('&')}"
-    return if !force && window.location.to_s == location.to_s
-
-    history.replaceState({}, null, location.to_s)
-
-    return if document.getElementById('js').style.display == 'none'
-
-    # update JavaScript
-    event = MouseEvent.new(:click, bubbles: true, cancelable: true, view: window)
-    document.querySelector('input[type=submit]').dispatchEvent(event)
   end
 
-  optionDialog = document.getElementById('option')
-  optionInput = optionDialog.querySelector('sl-input')
-  optionClose = optionDialog.querySelector('sl-button[slot="footer"]')
-
-  optionDialog.addEventListener 'sl-initial-focus' do
-    event.preventDefault()
-    optionInput.setFocus(preventScroll: true)
-  end
-
-  optionClose.addEventListener 'click' do
-    options[optionDialog.label] = optionInput.value
-    optionDialog.hide()
-  end
-
-  document.getElementById('ast').addEventListener 'sl-change' do
-    updateLocation(true)
-  end
-
-  document.querySelectorAll('sl-dropdown').each do |dropdown|
-    menu = dropdown.querySelector('sl-menu')
-    dropdown.addEventListener 'sl-show', -> {
-      menu.style.display = 'block'
-    }, once: true
-
-    menu.addEventListener 'sl-select' do |event|
-      item = event.detail.item
-
-      if dropdown.id == 'options'
-        item.checked = !item.checked
-        name = item.textContent
-
-        if options.respond_to? name
-          options.delete(name)
-        elsif item.dataset.args
-          event.target.parentNode.hide()
-          dialog = document.getElementById('option')
-          dialog.label = name
-          dialog.querySelector('sl-input').value = options[name] || ''
-          dialog.show()
-        else
-          options[name] = undefined
-        end
-
-      elsif dropdown.id == 'filters'
-
-        item.checked = !item.checked
-        name = item.textContent
-        filters.add(name) unless filters.delete!(name)
-
-      elsif dropdown.id == 'eslevel'
-
-        button = event.target.parentNode.querySelector('sl-button')
-        value = item.textContent
-        options['es' + value] = undefined if value != "default"
-        event.target.querySelectorAll('sl-menu-item').each do |option|
-          option.checked = (option == item)
-          next if option.value == 'default' || option.value == value
-          options.delete('es' + option.value)
-        end
-        button.textContent = value
-
+  class OptionsController < DemoController
+    def connect()
+      # determine base URL and what filters and options are selected
+      @filters = new Set()
+      @options = {}
+      window.location.search.scan(/(\w+)(=([^&]*))?/).each do |match|
+        @options[match[0]] = match[2] && decodeURIComponent(match[2])
+      end
+      if @options.filter
+        @options.filter.split(',').each {|option| @filters.add(option)}
       end
 
-      updateLocation()
+      optionDialog = document.getElementById('option')
+      optionInput = optionDialog.querySelector('sl-input')
+      optionClose = optionDialog.querySelector('sl-button[slot="footer"]')
+
+      optionDialog.addEventListener 'sl-initial-focus' do
+        event.preventDefault()
+        optionInput.setFocus(preventScroll: true)
+      end
+
+      optionClose.addEventListener 'click' do
+        @options[optionDialog.label] = optionInput.value
+        optionDialog.hide()
+      end
+
+      document.getElementById('ast').addEventListener 'sl-change' do
+        updateLocation(true)
+      end
+
+      document.querySelectorAll('sl-dropdown').each do |dropdown|
+        menu = dropdown.querySelector('sl-menu')
+        dropdown.addEventListener 'sl-show', -> {
+          menu.style.display = 'block'
+        }, once: true
+
+        menu.addEventListener 'sl-select' do |event|
+          item = event.detail.item
+
+          if dropdown.id == 'options'
+            item.checked = !item.checked
+            name = item.textContent
+
+            if @options.respond_to? name
+              @options.delete(name)
+            elsif item.dataset.args
+              event.target.parentNode.hide()
+              dialog = document.getElementById('option')
+              dialog.label = name
+              dialog.querySelector('sl-input').value = @options[name] || ''
+              dialog.show()
+            else
+              @options[name] = undefined
+            end
+
+          elsif dropdown.id == 'filters'
+
+            item.checked = !item.checked
+            name = item.textContent
+            @filters.add(name) unless @filters.delete!(name)
+
+          elsif dropdown.id == 'eslevel'
+
+            button = event.target.parentNode.querySelector('sl-button')
+            value = item.textContent
+            @options['es' + value] = undefined if value != "default"
+            event.target.querySelectorAll('sl-menu-item').each do |option|
+              option.checked = (option == item)
+              next if option.value == 'default' || option.value == value
+              @options.delete('es' + option.value)
+            end
+            button.textContent = value
+
+          end
+
+          updateLocation()
+        end
+
+        # make inputs match query
+        parse_options().each_pair do |name, value|
+          case name
+          when :ruby
+            document.querySelector('textarea').value = value
+          when :filters
+            nodes = document.getElementById(:filters).parentNode.querySelectorAll('sl-menu-item')
+            nodes.forEach do |node|
+              node.checked = true if value.include? node.textContent
+            end
+          when :eslevel
+            eslevel = document.getElementById('eslevel')
+            eslevel.querySelector('sl-button').textContent = value.to_s
+            eslevel.querySelector("sl-menu-item[value='']").checked = false
+            eslevel.querySelector("sl-menu-item[value='#{value}']").checked = true
+          when :comparison
+            document.querySelector("sl-menu-item[name=identity]").checked = true if value == :identity
+          when :nullish
+            document.querySelector("sl-menu-item[name=or]").checked = true if value == :nullish
+          else
+            checkbox = document.querySelector("sl-menu-item[name=#{name}]")
+            checkbox.checked = true if checkbox
+          end
+        end
+      end
+    end
+
+    def updateLocation(force = false)
+      base = window.location.pathname
+      location = URL.new(base, window.location)
+
+      @options.filter = Array(@filters).join(',')
+      @options.delete(:filter) if @filters.size == 0
+
+      search = []
+      @options.each_pair do |key, value|
+        search << (value == undefined ? key : "#{key}=#{encodeURIComponent(value)}")
+      end
+
+      location.search = search.empty? ? "" : "#{search.join('&')}"
+      return if !force && window.location.to_s == location.to_s
+
+      history.replaceState({}, null, location.to_s)
+
+      return if document.getElementById('js').style.display == 'none'
+
+      # update JavaScript
+      event = MouseEvent.new(:click, bubbles: true, cancelable: true, view: window)
+      document.querySelector('input[type=submit]').dispatchEvent(event)
     end
   end
+
+  application.register("options", OptionsController)
 
   ###################################################################################
 
@@ -110,42 +153,35 @@ async {
     end
   })
 
-  # create an editor below the textarea, then hide the textarea
-  textarea = document.querySelector('textarea.ruby')
-  editorDiv = document.createElement('div')
-  editorDiv.classList.add('editor', 'ruby')
-  textarea.parentNode.insertBefore(editorDiv, textarea.nextSibling)
-  textarea.style.display = 'none'
+  class RubyController < DemoController
+    def connect()
+      # create an editor below the textarea, then hide the textarea
+      textarea = document.querySelector('textarea.ruby')
+      editorDiv = document.createElement('div')
+      editorDiv.classList.add('editor', 'ruby')
+      textarea.parentNode.insertBefore(editorDiv, textarea.nextSibling)
+      textarea.style.display = 'none'
 
-  # create an editor below the textarea, then hide the textarea
-  rubyEditor = CodeMirror.rubyEditor(editorDiv) do |value|
-    textarea.value = value
-    event = MouseEvent.new 'click', bubbles: true, cancelable: true, view: window
-    document.querySelector('input[type=submit]').dispatchEvent(event)
-  end
-
-  # focus on the editor
-  rubyEditor.focus()
-
-  # first submit may come from the livedemo itself; if that occurs
-  # copy the textarea value into the editor
-  document.querySelector('input[type=submit]').addEventListener 'click', -> {
-    return unless textarea.value
-    return unless rubyEditor.state.doc.empty?
-
-    rubyEditor.dispatch(
-      changes: {from: 0, to: rubyEditor.state.doc.length, insert: textarea.value}
-    )
-  }, once: true
-
-  ###################################################################################
-
-  class DemoController < Stimulus::Controller
-    def findController(element: nil, type: nil)
-      return application.controllers.find do |controller|
-        (not element or controller.element == element) and
-        (not type or controller.is_a? type)
+      # create an editor below the textarea, then hide the textarea
+      rubyEditor = CodeMirror.rubyEditor(editorDiv) do |value|
+        textarea.value = value
+        event = MouseEvent.new 'click', bubbles: true, cancelable: true, view: window
+        document.querySelector('input[type=submit]').dispatchEvent(event)
       end
+
+      # focus on the editor
+      rubyEditor.focus()
+
+      # first submit may come from the livedemo itself; if that occurs
+      # copy the textarea value into the editor
+      document.querySelector('input[type=submit]').addEventListener 'click', -> {
+        return unless textarea.value
+        return unless rubyEditor.state.doc.empty?
+
+        rubyEditor.dispatch(
+          changes: {from: 0, to: rubyEditor.state.doc.length, insert: textarea.value}
+        )
+      }, once: true
     end
   end
 
@@ -183,8 +219,8 @@ async {
     end
   end
 
-  application = Stimulus::Application.start()
   application.register("js", JSController)
+  application.register("ruby", RubyController)
 
   ###################################################################################
 
@@ -195,13 +231,6 @@ async {
       document.body.addEventListener 'Ruby2JS-ready', resolve, once: true
     end
   })
-
-  jsdiv = document.querySelector('div#js')
-  jspre = jsdiv.querySelector('pre')
-  convert = document.querySelector('input.btn')
-  ast = document.getElementById('ast')
-  parsed = document.getElementById('parsed')
-  filtered = document.getElementById('filtered')
 
   # convert query into options
   def parse_options()
@@ -286,8 +315,12 @@ async {
   end
 
   # process convert button
-  convert.addEventListener :click do |event|
+  document.querySelector('input.btn').addEventListener :click do |event|
     event.preventDefault()
+
+    ast = document.getElementById('ast')
+    jsdiv = document.querySelector('div#js')
+    jspre = jsdiv.querySelector('pre')
 
     ruby = document.querySelector('textarea').value
     js = show_ast = nil
@@ -306,6 +339,9 @@ async {
     if ast.checked and not jspre.classList.contains('exception')
       raw, comments = Ruby2JS.parse(ruby)
       trees = [walk(raw).join(''), walk(js.ast).join('')]
+
+      parsed = document.getElementById('parsed')
+      filtered = document.getElementById('filtered')
       parsed.querySelector('pre').innerHTML = trees[0]
       parsed.style.display = 'block'
       if trees[0] == trees[1]
@@ -321,31 +357,6 @@ async {
 
     jspre.textContent = js.to_s
     jsdiv.style.display = js.to_s.empty? ? 'none' : 'block'
-  end
-
-  # make inputs match query
-  parse_options().each_pair do |name, value|
-    case name
-    when :ruby
-      document.querySelector('textarea').value = value
-    when :filters
-      nodes = document.getElementById(:filters).parentNode.querySelectorAll('sl-menu-item')
-      nodes.forEach do |node|
-        node.checked = true if value.include? node.textContent
-      end
-    when :eslevel
-      eslevel = document.getElementById('eslevel')
-      eslevel.querySelector('sl-button').textContent = value.to_s
-      eslevel.querySelector("sl-menu-item[value='']").checked = false
-      eslevel.querySelector("sl-menu-item[value='#{value}']").checked = true
-    when :comparison
-      document.querySelector("sl-menu-item[name=identity]").checked = true if value == :identity
-    when :nullish
-      document.querySelector("sl-menu-item[name=or]").checked = true if value == :nullish
-    else
-      checkbox = document.querySelector("sl-menu-item[name=#{name}]")
-      checkbox.checked = true if checkbox
-    end
   end
 
   # initial conversion if textarea is not empty

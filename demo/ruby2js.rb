@@ -343,12 +343,12 @@ else
       end
 
       _form method: 'post' do
-        _div data_target: @live && 'ruby' do
+        _div data_controller: @live && 'ruby' do
           _textarea.ruby.form_control @ruby, name: 'ruby', rows: 8,
             placeholder: 'Ruby source'
         end
 
-        _div data_target: @live && 'options' do
+        _div data_controller: @live && 'options' do
           _input.btn.btn_primary type: 'submit', value: 'Convert', 
             style: "display: #{@live ? 'none' : 'inline'}"
 
