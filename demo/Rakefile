@@ -1,4 +1,10 @@
 # Convenience file, allowing Rake to be run from this directory
+task :watch do
+  Dir.chdir __dir__ do
+    sh 'ls *.opal livedemo.js.rb ruby2js.rb | entr rake'
+  end
+end
+
 # pass NODE_ENV=development to disable 'terse'
 ENV['NODE_ENV'] = 'development'
 Dir.chdir File.expand_path('../docs', __dir__)

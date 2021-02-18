@@ -1,6 +1,59 @@
 async {
 
+  # This superclass is intended for Stimulus controllers that not only
+  # connect to Stimulus, but pair with each other.  Subclasses of
+  # DemoController don't define connect methods, instead they define 
+  # setup methods.  Subclasses that initiate pairing also define target and
+  # pair methods.  A findController method is defined to help find targets.
+  #
+  # Examples: OptionsController sends options to RubyControllers.
+  # RubyControllers send scripts to JSControllers.
+  #
+  # codemirror_ready and ruby2js_ready methods can be used to wait for these
+  # scripts to load before proceeding.
+  #
   class DemoController < Stimulus::Controller
+    # subclasses are expected to override this method
+    def setup()
+    end
+
+    # if subclasses override this, they need to call super
+    async def connect()
+      await setup()
+      pair(target) if target
+
+      application.controllers.select do |controller|
+        controller.pair(self) if controller.target == self
+      end
+    end
+
+    # override this method in classes that initiate pairing
+    def target
+      @target = nil
+    end
+
+    # logic to be executed when the second half of the pair connects to
+    # Stimulus, independent of the order of the connection to Stimulus.
+    def pair(target)
+    end
+
+    # logic to be executed when the second half of the pair disconnects.
+    # Stimulus may reuse controller objects, so a controller needs to
+    # return to a state where they seek out new targets
+    def unpair()
+      @target = nil
+    end
+
+    # if subclasses override this method, they need to call super
+    def disconnect()
+      application.controllers.select do |controller|
+        controller.unpair() if controller.target == self
+      end
+    end
+
+    # utility method, primarily to be used by target attribute accessors.
+    # As the name indicates, it will find a controller that is either
+    # connected to a given element or of a given type, or both.
     def findController(element: nil, type: nil)
       return application.controllers.find do |controller|
         (not element or controller.element == element) and
@@ -8,12 +61,7 @@ async {
       end
     end
 
-    def findInverses(type: nil)
-      return application.controllers.select do |controller|
-        (!type or controller.is_a? type) and controller.target == self
-      end
-    end
-
+    # wait for ruby2js.js to load and Ruby2JS to be defined.
     def ruby2js_ready
       Promise.new do |resolve, reject|
         if defined? Ruby2JS
@@ -24,6 +72,7 @@ async {
       end
     end
 
+    # wait for codemirror.js to load and CodeMirror to be defined.
     def codemirror_ready
       Promise.new do |resolve, reject|
         if defined? CodeMirror
@@ -35,7 +84,10 @@ async {
     end
   end
 
-  ###################################################################################
+  #############################################################################
+
+  # control all of the drop-downs and checkboxes: ESLevel, AST?, Filters,
+  # Options.
 
   class OptionsController < DemoController
     def target
@@ -43,7 +95,12 @@ async {
         element: document.querySelector(element.dataset.target)
     end
 
-    def connect()
+    def pair(target)
+      target.options = options = parse_options()
+      target.contents = options.ruby if options.ruby
+    end
+
+    def setup()
       # determine base URL and what filters and options are selected
       @filters = new Set()
       @options = {}
@@ -124,30 +181,26 @@ async {
 
       # make inputs match query
       parse_options().each_pair do |name, value|
-	case name
-	when :ruby
-	  document.querySelector('textarea').value = value
-	when :filters
-	  nodes = document.getElementById(:filters).parentNode.querySelectorAll('sl-menu-item')
-	  nodes.forEach do |node|
-	    node.checked = true if value.include? node.textContent
-	  end
-	when :eslevel
-	  eslevel = document.getElementById('eslevel')
-	  eslevel.querySelector('sl-button').textContent = value.to_s
-	  eslevel.querySelector("sl-menu-item[value='']").checked = false
-	  eslevel.querySelector("sl-menu-item[value='#{value}']").checked = true
-	when :comparison
-	  document.querySelector("sl-menu-item[name=identity]").checked = true if value == :identity
-	when :nullish
-	  document.querySelector("sl-menu-item[name=or]").checked = true if value == :nullish
-	else
-	  checkbox = document.querySelector("sl-menu-item[name=#{name}]")
-	  checkbox.checked = true if checkbox
-	end
+        case name
+        when :filters
+          nodes = document.getElementById(:filters).parentNode.querySelectorAll('sl-menu-item')
+          nodes.forEach do |node|
+            node.checked = true if value.include? node.textContent
+          end
+        when :eslevel
+          eslevel = document.getElementById('eslevel')
+          eslevel.querySelector('sl-button').textContent = value.to_s
+          eslevel.querySelector("sl-menu-item[value='']").checked = false
+          eslevel.querySelector("sl-menu-item[value='#{value}']").checked = true
+        when :comparison
+          document.querySelector("sl-menu-item[name=identity]").checked = true if value == :identity
+        when :nullish
+          document.querySelector("sl-menu-item[name=or]").checked = true if value == :nullish
+        else
+          checkbox = document.querySelector("sl-menu-item[name=#{name}]")
+          checkbox.checked = true if checkbox
+        end
       end
-
-      target.options = parse_options() if target
     end
 
     def updateLocation()
@@ -207,6 +260,7 @@ async {
 
   ###################################################################################
 
+  # control the Ruby editor.
   class RubyController < DemoController
     def target
       @target ||= findController type: JSController,
@@ -223,14 +277,9 @@ async {
       convert()
     end
 
-    async def connect()
+    async def setup()
       @ast = false
       @options ||= {}
-
-      # race condition: options controller may be ready first
-      findInverses(type: OptionsController).each do |controller|
-        options = controller.parse_options()
-      end
 
       await codemirror_ready
 
@@ -250,52 +299,54 @@ async {
       # focus on the editor
       @rubyEditor.focus()
 
-      if textarea.value
-        @rubyEditor.dispatch(
-          changes: {from: 0, to: @rubyEditor.state.doc.length, insert: textarea.value}
-        )
-      end
+      # set initial contents from text area 
+      contents = textarea.value if textarea.value
+
+      # do an initial conversion as soon as Ruby2JS comes online
+      await ruby2js_ready
+
+      convert()
     end
 
+    # update editor contents from another source
+    def contents=(script)
+      @rubyEditor.dispatch(
+         changes: {from: 0, to: @rubyEditor.state.doc.length, insert: script}
+      )
+
+      convert()
+    end
+
+    # convert ruby to JS, sending results to target Controller
     def convert()
       return unless target and @rubyEditor and defined? Ruby2JS
-      jsdiv = document.querySelector('div#js')
-      jspre = jsdiv.querySelector('pre')
+      parsed = document.getElementById('parsed')
+      filtered = document.getElementById('filtered')
+
+      parsed.style.display = 'none'
+      filtered.style.display = 'none'
 
       ruby = @rubyEditor.state.doc.to_s
-      js = nil
       begin
         js = Ruby2JS.convert(ruby, @options)
-        jspre.classList.remove 'exception'
-      rescue SyntaxError => e
-        js = e.diagnostic || e
-        jspre.classList.add 'exception'
-      rescue => e
-        js = e.inspect
-        jspre.classList.add 'exception'
-      end
+        target.content = js.to_s
 
-      if @ast and not jspre.classList.contains('exception')
-        raw, comments = Ruby2JS.parse(ruby)
-        trees = [walk(raw).join(''), walk(js.ast).join('')]
+        if @ast
+          raw, comments = Ruby2JS.parse(ruby)
+          trees = [walk(raw).join(''), walk(js.ast).join('')]
 
-        parsed = document.getElementById('parsed')
-        filtered = document.getElementById('filtered')
-        parsed.querySelector('pre').innerHTML = trees[0]
-        parsed.style.display = 'block'
-        if trees[0] == trees[1]
-          filtered.style.display = 'none'
-        else
-          filtered.querySelector('pre').innerHTML = trees[1]
-          filtered.style.display = 'block'
+          parsed.querySelector('pre').innerHTML = trees[0]
+          parsed.style.display = 'block'
+          if trees[0] != trees[1]
+            filtered.querySelector('pre').innerHTML = trees[1]
+            filtered.style.display = 'block'
+          end
         end
-      else
-        parsed.style.display = 'none'
-        filtered.style.display = 'none'
+      rescue SyntaxError => e
+        target.exception = e.diagnostic || e
+      rescue => e
+        target.exception = e.to_s + e.stack
       end
-
-      jspre.textContent = js.to_s
-      jsdiv.style.display = js.to_s.empty? ? 'none' : 'block'
     end
 
     # convert AST into displayable form
@@ -345,45 +396,50 @@ async {
     end
   end
 
-  ###################################################################################
+  #############################################################################
 
+  # control the JS (read-only) editor.
   class JSController < DemoController
-    async def connect()
+    async def setup()
       await codemirror_ready
 
       # create another editor below the output
-      jsout = element.querySelector('.js')
-      outputDiv = document.createElement('div')
-      outputDiv.classList.add('editor', 'js')
-      jsout.parentNode.insertBefore(outputDiv, jsout.nextSibling)
+      @jsout = element.querySelector('.js')
+      @outputDiv = document.createElement('div')
+      @outputDiv.classList.add('editor', 'js')
+      @jsout.parentNode.insertBefore(@outputDiv, @jsout.nextSibling)
 
-      jsEditor = CodeMirror.jsEditor(outputDiv)
+      @jsEditor = CodeMirror.jsEditor(@outputDiv)
 
-      # for now, watch for changes in the js
-      # TODO: replace with direct method calls to this controller
-      observer = MutationObserver.new do |mutationsList, observer|
-        mutationsList.each do |mutation|
-          if mutation.type == 'childList'
-            jsEditor.dispatch(
-              changes: {from: 0, to: jsEditor.state.doc.length, insert: jsout.textContent}
-            )
-          elsif mutation.type == 'attributes'
-            if jsout.classList.contains? "exception"
-              jsout.style.display = 'block'
-              outputDiv.style.display = 'none'
-            else
-              jsout.style.display = 'none'
-              outputDiv.style.display = 'block'
-            end
-          end
-        end
-      end
+      @jspre = element.querySelector('pre')
 
-      observer.observe(jsout, attributes: true, childList: true, subtree: true)
+      element.style.display = 'block'
+    end
+
+    # update contents
+    def content=(script)
+      return unless @jsEditor
+
+      @jsEditor.dispatch(
+        changes: {from: 0, to: @jsEditor.state.doc.length, insert: script}
+      )
+
+      @jspre.classList.remove 'exception'
+      @jsout.style.display = 'none'
+      @outputDiv.style.display = 'block'
+    end
+
+    # display an error
+    def exception=(message)
+      return unless @jsEditor
+      @jspre.textContent = message
+      @jspre.classList.add 'exception'
+      @jsout.style.display = 'block'
+      @outputDiv.style.display = 'none'
     end
   end
 
-  ###################################################################################
+  #############################################################################
 
   application = Stimulus::Application.start()
   application.register("options", OptionsController)
