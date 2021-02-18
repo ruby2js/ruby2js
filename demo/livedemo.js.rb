@@ -8,6 +8,12 @@ async {
       end
     end
 
+    def findControllers(type)
+      return application.controllers.select do |controller|
+        controller.is_a? type
+      end
+    end
+
     def ruby2js_ready
       Promise.new do |resolve, reject|
         if defined? Ruby2JS
@@ -27,42 +33,16 @@ async {
         end
       end
     end
-
-    # convert query into options
-    def parse_options()
-      options = {filters: []}
-      search = document.location.search
-      return options if search == ''
-
-      search[1..-1].split('&').each do |parameter|
-        name, value = parameter.split('=', 2)
-        value = value ? decodeURIComponent(value.gsub('+', ' ')) : true
-
-        if name == :filter
-          name = :filters
-          value = [] if value == true
-        elsif name == :identity
-          value = name
-          name = :comparison
-        elsif name == :nullish
-          value = name
-          name = :or
-        elsif name =~ /^es\d+$/
-          value = name[2..-1].to_i
-          name = :eslevel
-        end
-
-        options[name] = value
-      end
-
-      return options
-    end
-
   end
 
   ###################################################################################
 
   class OptionsController < DemoController
+    def target
+      @target ||= findController type: RubyController,
+        element: document.querySelector(element.dataset.target)
+    end
+
     def connect()
       # determine base URL and what filters and options are selected
       @filters = new Set()
@@ -88,8 +68,9 @@ async {
         optionDialog.hide()
       end
 
-      document.getElementById('ast').addEventListener 'sl-change' do
-        updateLocation(true)
+      ast = document.getElementById('ast')
+      ast.addEventListener 'sl-change' do
+        target.ast = ast.checked if target
       end
 
       document.querySelectorAll('sl-dropdown').each do |dropdown|
@@ -139,35 +120,37 @@ async {
 
           updateLocation()
         end
-
-        # make inputs match query
-        parse_options().each_pair do |name, value|
-          case name
-          when :ruby
-            document.querySelector('textarea').value = value
-          when :filters
-            nodes = document.getElementById(:filters).parentNode.querySelectorAll('sl-menu-item')
-            nodes.forEach do |node|
-              node.checked = true if value.include? node.textContent
-            end
-          when :eslevel
-            eslevel = document.getElementById('eslevel')
-            eslevel.querySelector('sl-button').textContent = value.to_s
-            eslevel.querySelector("sl-menu-item[value='']").checked = false
-            eslevel.querySelector("sl-menu-item[value='#{value}']").checked = true
-          when :comparison
-            document.querySelector("sl-menu-item[name=identity]").checked = true if value == :identity
-          when :nullish
-            document.querySelector("sl-menu-item[name=or]").checked = true if value == :nullish
-          else
-            checkbox = document.querySelector("sl-menu-item[name=#{name}]")
-            checkbox.checked = true if checkbox
-          end
-        end
       end
+
+      # make inputs match query
+      parse_options().each_pair do |name, value|
+	case name
+	when :ruby
+	  document.querySelector('textarea').value = value
+	when :filters
+	  nodes = document.getElementById(:filters).parentNode.querySelectorAll('sl-menu-item')
+	  nodes.forEach do |node|
+	    node.checked = true if value.include? node.textContent
+	  end
+	when :eslevel
+	  eslevel = document.getElementById('eslevel')
+	  eslevel.querySelector('sl-button').textContent = value.to_s
+	  eslevel.querySelector("sl-menu-item[value='']").checked = false
+	  eslevel.querySelector("sl-menu-item[value='#{value}']").checked = true
+	when :comparison
+	  document.querySelector("sl-menu-item[name=identity]").checked = true if value == :identity
+	when :nullish
+	  document.querySelector("sl-menu-item[name=or]").checked = true if value == :nullish
+	else
+	  checkbox = document.querySelector("sl-menu-item[name=#{name}]")
+	  checkbox.checked = true if checkbox
+	end
+      end
+
+      target.options = parse_options() if target
     end
 
-    def updateLocation(force = false)
+    def updateLocation()
       base = window.location.pathname
       location = URL.new(base, window.location)
 
@@ -180,22 +163,70 @@ async {
       end
 
       location.search = search.empty? ? "" : "#{search.join('&')}"
-      return if !force && window.location.to_s == location.to_s
+      return if window.location.to_s == location.to_s
 
       history.replaceState({}, null, location.to_s)
 
       return if document.getElementById('js').style.display == 'none'
 
       # update JavaScript
-      event = MouseEvent.new(:click, bubbles: true, cancelable: true, view: window)
-      document.querySelector('input[type=submit]').dispatchEvent(event)
+      target.options = parse_options() if target
     end
+
+    # convert query into options
+    def parse_options()
+      options = {filters: []}
+      search = document.location.search
+      return options if search == ''
+
+      search[1..-1].split('&').each do |parameter|
+        name, value = parameter.split('=', 2)
+        value = value ? decodeURIComponent(value.gsub('+', ' ')) : true
+
+        if name == :filter
+          name = :filters
+          value = [] if value == true
+        elsif name == :identity
+          value = name
+          name = :comparison
+        elsif name == :nullish
+          value = name
+          name = :or
+        elsif name =~ /^es\d+$/
+          value = name[2..-1].to_i
+          name = :eslevel
+        end
+
+        options[name] = value
+      end
+
+      return options
+    end
+
   end
 
   ###################################################################################
 
   class RubyController < DemoController
+    def ast=(value)
+      @ast = value
+      convert()
+    end
+
+    def options=(value)
+      @options = value
+      convert()
+    end
+
     async def connect()
+      @ast = false
+      @options ||= {}
+
+      # race condition: options controller may be ready first
+      findControllers(OptionsController).each do |controller|
+        @options = controller.parse_options() if controller.target == self
+      end
+
       await codemirror_ready
 
       # create an editor below the textarea, then hide the textarea
@@ -235,7 +266,7 @@ async {
       # process convert button
       document.querySelector('input.btn').addEventListener :click do |event|
         event.preventDefault()
-        convert() if defined? Ruby2JS
+        convert()
       end
 
       # initial conversion if textarea is not empty
@@ -246,16 +277,15 @@ async {
     end
 
     def convert()
-      ast = document.getElementById('ast')
+      return unless defined? Ruby2JS
       jsdiv = document.querySelector('div#js')
       jspre = jsdiv.querySelector('pre')
 
       ruby = document.querySelector('textarea').value
-      js = show_ast = nil
+      js = nil
       begin
-        js = Ruby2JS.convert(ruby, parse_options())
+        js = Ruby2JS.convert(ruby, @options)
         jspre.classList.remove 'exception'
-        show_ast = ast.checked
       rescue SyntaxError => e
         js = e.diagnostic || e
         jspre.classList.add 'exception'
@@ -264,7 +294,7 @@ async {
         jspre.classList.add 'exception'
       end
 
-      if ast.checked and not jspre.classList.contains('exception')
+      if @ast and not jspre.classList.contains('exception')
         raw, comments = Ruby2JS.parse(ruby)
         trees = [walk(raw).join(''), walk(js.ast).join('')]
 
