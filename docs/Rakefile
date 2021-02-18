@@ -43,12 +43,9 @@ file "#{demo}/index.erb" => '../demo/ruby2js.rb' do
 
     erb = [
       "---\nlayout: default\n---\n",
-      livedoc[/<style[ >].*?<\/style>/m],
       livedoc[/<body.*?>(.*?)<\/body>/m, 1].
+        sub(/<style.*?<\/style>/m, '').
         sub(/<script.*?<\/script>/m, ''),
-      '<script src="/demo/livedemo.js" asyn></script>',
-      '<script src="/demo/editor.js" async></script>',
-      '<script src="/demo/ruby2js.js" defer></script>'
     ].join("\n")
 
     IO.write("#{demo}/index.erb", erb)

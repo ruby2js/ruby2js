@@ -190,7 +190,7 @@ async {
         when :eslevel
           eslevel = document.getElementById('eslevel')
           eslevel.querySelector('sl-button').textContent = value.to_s
-          eslevel.querySelector("sl-menu-item[value='']").checked = false
+          eslevel.querySelectorAll("sl-menu-item").each {|item| item.checked = false}
           eslevel.querySelector("sl-menu-item[value='#{value}']").checked = true
         when :comparison
           document.querySelector("sl-menu-item[name=identity]").checked = true if value == :identity
@@ -310,9 +310,14 @@ async {
 
     # update editor contents from another source
     def contents=(script)
-      @rubyEditor.dispatch(
-         changes: {from: 0, to: @rubyEditor.state.doc.length, insert: script}
-      )
+      if @rubyEditor
+        @rubyEditor.dispatch(
+           changes: {from: 0, to: @rubyEditor.state.doc.length, insert: script}
+        )
+      else
+        textarea = element.querySelector('textarea.ruby')
+        textarea.value = script if textarea
+      end
 
       convert()
     end

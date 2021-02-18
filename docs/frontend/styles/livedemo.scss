@@ -1,0 +1,85 @@
+// read-only JSEditor
+.js {
+  &.editor { 
+    background-color: #ffffcc
+  }
+
+  .cm-wrap {
+     background-color: #ffffdd;
+     height: 100%;
+
+    .cm-content .cm-activeLine {
+      background-color: #ffffcc;
+    }
+  }
+
+  &.exception {
+    background-color:#ff0;
+    margin: 1em 0;
+    padding: 1em;
+    border: 4px solid red;
+    border-radius: 1em;
+  }
+}
+
+// exception output
+
+// Ruby editor
+.ruby {
+  &.editor {
+    resize: vertical;
+    overflow: auto;
+    background-color: #ffeeee;
+    margin-bottom: 5px;
+  }
+
+  .cm-wrap {
+    background-color: #ffeeee;
+    height: 100%;
+
+    .cm-content .cm-activeLine {
+      background-color: #ffdddd;
+      margin-right: 2px;
+    }
+  }
+}
+
+// AST output
+#parsed, #filtered {
+  .unloc {
+    background-color: yellow;
+  }
+
+  .loc {
+    background-color: white;
+  }
+
+  .unloc, .loc {
+    span.hidden {
+      font-size: 0;
+    }
+  }
+}
+
+// demo page specific formatting
+.container.narrow-container {
+  padding: 0;
+  margin: 0 3%;
+  max-width: 91%;
+
+  .ruby.editor {
+    height: 200px;
+  }
+
+  pre {
+    padding: 0 1rem;
+  }
+
+  h1.title, h2.title {
+    margin: 0.5rem;
+  }
+
+  sl-menu {
+    display: none;
+  }
+}
