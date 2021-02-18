@@ -1,7 +1,8 @@
 // read-only JSEditor
 .js {
   &.editor { 
-    background-color: #ffffcc
+    background-color: #ffffcc;
+    margin-bottom: 1em;
   }
 
   .cm-wrap {
@@ -30,7 +31,7 @@
     resize: vertical;
     overflow: auto;
     background-color: #ffeeee;
-    margin-bottom: 5px;
+    margin-bottom: 1em;
   }
 
   .cm-wrap {
@@ -68,7 +69,11 @@
   max-width: 91%;
 
   .ruby.editor {
-    height: 200px;
+    height: 10rem;
+  }
+
+  .options {
+    text-align: center;
   }
 
   pre {
@@ -76,7 +81,7 @@
   }
 
   h1.title, h2.title {
-    margin: 0.5rem;
+    margin: 1rem;
   }
 
   sl-menu {

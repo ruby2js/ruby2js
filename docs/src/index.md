@@ -17,6 +17,11 @@ layout: home
 
 For example:
 
+<div data-controller="ruby" data-options='{
+  "eslevel": 2020,
+  "filters": ["functions", "camelCase", "return"]
+}'></div>
+
 ```ruby
 class MyClass
   def my_method(str)
@@ -27,6 +32,8 @@ end
 ```
 
 will get converted to:
+
+<div data-controller="js"></div>
 
 ```js
 class MyClass {

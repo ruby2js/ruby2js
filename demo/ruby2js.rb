@@ -348,7 +348,7 @@ else
             placeholder: 'Ruby source'
         end
 
-        _div data_controller: @live && 'options' do
+        _div.options data_controller: @live && 'options' do
           _input.btn.btn_primary type: 'submit', value: 'Convert', 
             style: "display: #{@live ? 'none' : 'inline'}"
 

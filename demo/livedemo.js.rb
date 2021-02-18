@@ -281,26 +281,41 @@ async {
       @ast = false
       @options ||= {}
 
+      # parse options provided (if any)
+      if element.dataset.options
+        begin
+          options = JSON.parse(element.dataset.options)
+        rescue => e
+          puts e.message
+        end
+      end
+
       await codemirror_ready
 
-      # create an editor below the textarea, then hide the textarea
-      textarea = element.querySelector('textarea.ruby')
+      # create an editor
       editorDiv = document.createElement('div')
       editorDiv.classList.add('editor', 'ruby')
-      textarea.parentNode.insertBefore(editorDiv, textarea.nextSibling)
-      textarea.style.display = 'none'
-
-      # create an editor below the textarea, then hide the textarea
       @rubyEditor = CodeMirror.rubyEditor(editorDiv) do |value|
-        textarea.value = value
         convert()
+      end
+      element.appendChild(editorDiv)
+
+      # set initial contents from text area, then hide the textarea
+      textarea = element.querySelector('textarea')
+      if textarea
+        contents = textarea.value if textarea.value
+        textarea.style.display = 'none'
+      end
+
+      # set initial contents from markdown code area, then hide the code
+      nextSibling = element.nextElementSibling
+      if nextSibling.classList.contains('language-ruby')
+        contents = nextSibling.textContent.rstrip()
+        nextSibling.style.display = 'none'
       end
 
       # focus on the editor
       @rubyEditor.focus()
-
-      # set initial contents from text area 
-      contents = textarea.value if textarea.value
 
       # do an initial conversion as soon as Ruby2JS comes online
       await ruby2js_ready
@@ -328,15 +343,15 @@ async {
       parsed = document.getElementById('parsed')
       filtered = document.getElementById('filtered')
 
-      parsed.style.display = 'none'
-      filtered.style.display = 'none'
+      parsed.style.display = 'none' if parsed
+      filtered.style.display = 'none' if filtered
 
       ruby = @rubyEditor.state.doc.to_s
       begin
         js = Ruby2JS.convert(ruby, @options)
-        target.content = js.to_s
+        target.contents = js.to_s
 
-        if @ast
+        if @ast and parsed and filtered
           raw, comments = Ruby2JS.parse(ruby)
           trees = [walk(raw).join(''), walk(js.ast).join('')]
 
@@ -409,20 +424,33 @@ async {
       await codemirror_ready
 
       # create another editor below the output
-      @jsout = element.querySelector('.js')
       @outputDiv = document.createElement('div')
       @outputDiv.classList.add('editor', 'js')
-      @jsout.parentNode.insertBefore(@outputDiv, @jsout.nextSibling)
+      element.appendChild(@outputDiv)
 
       @jsEditor = CodeMirror.jsEditor(@outputDiv)
 
-      @jspre = element.querySelector('pre')
+      @jspre = element.querySelector('pre.js')
+      if @jspre
+        contents = @jspre.value
+      else
+        @jspre = document.createElement('pre')
+        @jspre.classList.add 'js'
+        element.appendChild(@jspre)
+
+        # set initial contents from markdown code area, then hide the code
+        nextSibling = element.nextElementSibling
+        if nextSibling.classList.contains('language-js')
+          contents = nextSibling.textContent.rstrip()
+          nextSibling.style.display = 'none'
+        end
+      end
 
       element.style.display = 'block'
     end
 
     # update contents
-    def content=(script)
+    def contents=(script)
       return unless @jsEditor
 
       @jsEditor.dispatch(
@@ -430,7 +458,7 @@ async {
       )
 
       @jspre.classList.remove 'exception'
-      @jsout.style.display = 'none'
+      @jspre.style.display = 'none'
       @outputDiv.style.display = 'block'
     end
 
@@ -439,7 +467,7 @@ async {
       return unless @jsEditor
       @jspre.textContent = message
       @jspre.classList.add 'exception'
-      @jsout.style.display = 'block'
+      @jspre.style.display = 'block'
       @outputDiv.style.display = 'none'
     end
   end
