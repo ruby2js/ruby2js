@@ -8,9 +8,9 @@ async {
       end
     end
 
-    def findControllers(type)
+    def findInverses(type: nil)
       return application.controllers.select do |controller|
-        controller.is_a? type
+        (!type or controller.is_a? type) and controller.target == self
       end
     end
 
@@ -208,6 +208,11 @@ async {
   ###################################################################################
 
   class RubyController < DemoController
+    def target
+      @target ||= findController type: JSController,
+        element: document.querySelector(element.dataset.target)
+    end
+
     def ast=(value)
       @ast = value
       convert()
@@ -223,8 +228,8 @@ async {
       @options ||= {}
 
       # race condition: options controller may be ready first
-      findControllers(OptionsController).each do |controller|
-        @options = controller.parse_options() if controller.target == self
+      findInverses(type: OptionsController).each do |controller|
+        options = controller.parse_options()
       end
 
       await codemirror_ready
@@ -237,51 +242,27 @@ async {
       textarea.style.display = 'none'
 
       # create an editor below the textarea, then hide the textarea
-      rubyEditor = CodeMirror.rubyEditor(editorDiv) do |value|
+      @rubyEditor = CodeMirror.rubyEditor(editorDiv) do |value|
         textarea.value = value
-        event = MouseEvent.new 'click', bubbles: true, cancelable: true, view: window
-        document.querySelector('input[type=submit]').dispatchEvent(event)
-      end
-
-      # focus on the editor
-      rubyEditor.focus()
-
-      # first submit may come from the livedemo itself; if that occurs
-      # copy the textarea value into the editor
-      document.querySelector('input[type=submit]').addEventListener 'click', -> {
-        return unless textarea.value
-        return unless rubyEditor.state.doc.empty?
-
-        rubyEditor.dispatch(
-          changes: {from: 0, to: rubyEditor.state.doc.length, insert: textarea.value}
-        )
-      }, once: true
-
-      # update output on every keystroke in textarea
-      document.querySelector('textarea').addEventListener :input do
-        event = MouseEvent.new('click', bubbles: true, cancelable: true, view: window)
-        document.querySelector('input[type=submit]').dispatchEvent(event)
-      end
-
-      # process convert button
-      document.querySelector('input.btn').addEventListener :click do |event|
-        event.preventDefault()
         convert()
       end
 
-      # initial conversion if textarea is not empty
-      unless document.querySelector('textarea').value.empty?
-        event = MouseEvent.new(:click, bubbles: true, cancelable: true, view: window)
-        document.querySelector('input[type=submit]').dispatchEvent(event)
+      # focus on the editor
+      @rubyEditor.focus()
+
+      if textarea.value
+        @rubyEditor.dispatch(
+          changes: {from: 0, to: @rubyEditor.state.doc.length, insert: textarea.value}
+        )
       end
     end
 
     def convert()
-      return unless defined? Ruby2JS
+      return unless target and @rubyEditor and defined? Ruby2JS
       jsdiv = document.querySelector('div#js')
       jspre = jsdiv.querySelector('pre')
 
-      ruby = document.querySelector('textarea').value
+      ruby = @rubyEditor.state.doc.to_s
       js = nil
       begin
         js = Ruby2JS.convert(ruby, @options)
