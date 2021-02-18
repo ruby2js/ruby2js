@@ -10,7 +10,7 @@ layout: home
 
 <button-group class="buttons is-centered mb-10">
   <a href="/docs" class="button is-info is-large has-mixed-case">Get Started</a>
-  <a href="/demo" class="button is-warning is-large has-mixed-case" target="_blank">Try It Online!</a>
+  <a href="/demo" class="button is-warning is-large has-mixed-case">Try It Online!</a>
 </button-group>
 
 **Ruby2JS** is for Ruby developers who want to produce JavaScript that looks hand-crafted, rather than machine generated. You can convert Ruby-like syntax and semantics as cleanly and “natively” as possible. This means that (most of the time) you’ll get a line-by-line, 1:1 correlation between your source code and the JS output.

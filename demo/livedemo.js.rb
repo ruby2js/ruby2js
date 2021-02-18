@@ -17,7 +17,8 @@ async {
     def setup()
     end
 
-    # if subclasses override this, they need to call super
+    # if subclasses override this, they need to call super.  Most should
+    # just override setup instead.
     async def connect()
       await setup()
       pair(target) if target
@@ -44,8 +45,15 @@ async {
       @target = nil
     end
 
-    # if subclasses override this method, they need to call super
+    # subclasses can override this method
+    def teardown()
+    end
+
+    # if subclasses override this method, they need to call super.
+    # Generally, it is best to override teardown instead.
     def disconnect()
+      teardown()
+
       application.controllers.select do |controller|
         controller.unpair() if controller.target == self
       end
@@ -414,6 +422,11 @@ async {
 
       return output
     end
+
+    # remove editor on disconnect
+    def teardown()
+      element.querySelector('.editor.ruby').remove()
+    end
   end
 
   #############################################################################
@@ -469,6 +482,11 @@ async {
       @jspre.classList.add 'exception'
       @jspre.style.display = 'block'
       @outputDiv.style.display = 'none'
+    end
+
+    # remove editor on disconnect
+    def teardown()
+      element.querySelector('.editor.js').remove()
     end
   end
 
