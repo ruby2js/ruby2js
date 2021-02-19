@@ -11,6 +11,8 @@ module Ruby2JS
 
       ALLOWLIST = %w{
         attr_accessor
+        attr_reader
+        attr_writer
         method_missing
       }
 
