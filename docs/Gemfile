@@ -14,5 +14,5 @@ end
 group :demo do
   gem 'rake'
   gem 'wunderbar'
-  gem 'opal', '~> 1.0'
+  gem 'opal', '~> 1.0.5'
 end
