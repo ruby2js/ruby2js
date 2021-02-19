@@ -153,12 +153,7 @@ module Ruby2JS
             end
           end
         else
-          begin
-            require_expr, @require_expr = @require_expr, true
-            super
-          ensure
-            @require_expr = require_expr
-          end
+          super
         end
       end
 

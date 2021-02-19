@@ -9,6 +9,9 @@ import {
   SlInput,
   SlMenu,
   SlMenuItem,
+  SlTab,
+  SlTabGroup,
+  SlTabPanel,
 } from "@shoelace-style/shoelace"
 
 setAssetPath(`${location.origin}/_bridgetown/static/icons`)
@@ -22,6 +25,9 @@ customElements.define("sl-icon", SlIcon)
 customElements.define("sl-input", SlInput)
 customElements.define("sl-menu", SlMenu)
 customElements.define("sl-menu-item", SlMenuItem)
+customElements.define("sl-tab", SlTab)
+customElements.define("sl-tab-group", SlTabGroup)
+customElements.define("sl-tab-panel", SlTabPanel)
 
 import "index.scss"
 

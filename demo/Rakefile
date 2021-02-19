@@ -1,7 +1,7 @@
 # Convenience file, allowing Rake to be run from this directory
 task :watch do
   Dir.chdir __dir__ do
-    sh 'ls *.opal livedemo.js.rb ruby2js.rb | entr rake'
+    sh 'ls *.opal livedemo.js.rb ruby2js.rb controllers/*_controller.js.rb | entr rake'
   end
 end
 

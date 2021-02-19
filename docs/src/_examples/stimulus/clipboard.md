@@ -36,6 +36,11 @@ Add the following to your `public/index.html`:
 Now create a `src/controllers/clipboard_controller.js.rb` file with the following
 contents:
 
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["esm", "stimulus"]
+}'></div>
+
 ```ruby
 import "../clipboard.css"
 

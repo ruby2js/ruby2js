@@ -3,6 +3,7 @@ demo = "#{docs}/src/demo"
 source_files = Rake::FileList.new("../lib/**/*.rb")
 filters = Rake::FileList.new("../lib/ruby2js/filter/*.rb")
 opal_files = Rake::FileList.new("../demo/*.opal")
+controller_files = Rake::FileList.new("../demo/controllers/*_controller.js.rb")
 
 terser = "#{__dir__}/node_modules/.bin/terser"
 terser = "cat" if ENV['NODE_ENV'] == 'development' or !File.exist? terser
@@ -58,8 +59,8 @@ file "#{demo}/editor.js" => ['../demo/editor.js'] do
     "#{terser} > src/demo/editor.js"
 end
 
-file "#{demo}/livedemo.js" => ['../demo/livedemo.js.rb'] do
-  sh "#{RbConfig.ruby} ../demo/ruby2js.rb --filter stimulus --filter functions --es2020 ../demo/livedemo.js.rb | " +
+file "#{demo}/livedemo.js" => ['../demo/livedemo.js.rb', *controller_files] do
+  sh "#{RbConfig.ruby} ../demo/ruby2js.rb --filter require --filter stimulus --filter functions --es2020 ../demo/livedemo.js.rb | " +
     "npx rollup -f iife --context window -p @rollup/plugin-node-resolve | " +
     "#{terser} > #{demo}/livedemo.js"
 end
