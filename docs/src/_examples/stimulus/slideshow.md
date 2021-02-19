@@ -24,6 +24,12 @@ Add the following to your `public/index.html`:
 Now create a `src/controllers/slideshow_controller.js.rb` file with the following
 contents:
 
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "autoexports": "default",
+  "filters": ["esm", "functions", "stimulus"]
+}'></div>
+
 ```ruby
 class SlideShowController < Stimulus::Controller
   self.values = { index: Number }

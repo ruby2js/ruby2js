@@ -20,6 +20,12 @@ following to your `public/index.html` file.
 Now create a `src/controllers/hello_controller.js.rb` file with the following
 contents:
 
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "autoexports": "default",
+  "filters": ["esm", "stimulus"]
+}'></div>
+
 ```ruby
 class HelloController < Stimulus::Controller
   def connect()

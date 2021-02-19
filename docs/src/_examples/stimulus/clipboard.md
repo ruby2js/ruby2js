@@ -38,6 +38,7 @@ contents:
 
 <div data-controller="combo" data-options='{
   "eslevel": 2022,
+  "autoexports": "default",
   "filters": ["esm", "stimulus"]
 }'></div>
 

@@ -33,6 +33,12 @@ Create a new file named `public/messages.txt` with the following contents:
 Now create a `src/controllers/content_loader_controller.js.rb` file with the following
 contents:
 
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "autoexports": "default",
+  "filters": ["esm", "functions", "stimulus"]
+}'></div>
+
 ```ruby
 class ContentLoaderController < Stimulus::Controller
   self.values = { refreshInterval: Number }

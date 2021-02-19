@@ -60,6 +60,12 @@ export default class extends Controller {
 
 The equivalent code using the Ruby2JS Stimulus filter:
 
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "autoexports": "default",
+  "filters": ["esm", "stimulus"]
+}'></div>
+
 ```ruby
 class HelloController < Stimulus::Controller
   def greet()
