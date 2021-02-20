@@ -224,6 +224,7 @@ module Ruby2JS
               m.children[2..-1].each_with_index do |child_sym, index2|
                 put @sep unless index2 == 0
                 var = child_sym.children.first
+                @rbstack.last[var] = s(:self)
                 put "get #{var}() {#{@nl}return this.#{p}#{var}#@nl}#@sep"
                 put "set #{var}(#{var}) {#{@nl}this.#{p}#{var} = #{var}#@nl}"
               end
@@ -231,12 +232,14 @@ module Ruby2JS
               m.children[2..-1].each_with_index do |child_sym, index2|
                 put @sep unless index2 == 0
                 var = child_sym.children.first
+                @rbstack.last[var] = s(:self)
                 put "get #{var}() {#{@nl}return this.#{p}#{var}#@nl}"
               end
             elsif m.children[1] == :attr_writer
               m.children[2..-1].each_with_index do |child_sym, index2|
                 put @sep unless index2 == 0
                 var = child_sym.children.first
+                @rbstack.last[var] = s(:self)
                 put "set #{var}(#{var}) {#{@nl}this.#{p}#{var} = #{var}#@nl}"
               end
             elsif [:private, :protected, :public].include? m.children[1]

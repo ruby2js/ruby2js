@@ -1,5 +1,10 @@
 # control the JS (read-only) editor.
 class JSController < DemoController
+  def source
+    @source ||= findController type: RubyController,
+      element: document.querySelector(element.dataset.target)
+  end
+
   async def setup()
     await codemirror_ready
 

@@ -57,3 +57,6 @@ editor.
       AST?, Filers, and Options.  The results are sent to the RubyController.
 
     * `JSController` manages the JS read-only editor.
+
+    * `ComboController` manages a tabbed view containing a `RubyController`
+      and a `JSController`.

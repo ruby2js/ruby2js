@@ -114,6 +114,7 @@ module Ruby2JS
           if m.children[1] == :attr_accessor
             m.children[2..-1].map do |child_sym|
               var = child_sym.children.first
+              visible[var] = s(:self)
               s(:prop, s(:attr, name, :prototype), var =>
                   {enumerable: s(:true), configurable: s(:true),
                   get: s(:block, s(:send, nil, :proc), s(:args), 
@@ -124,6 +125,7 @@ module Ruby2JS
           elsif m.children[1] == :attr_reader
             m.children[2..-1].map do |child_sym|
               var = child_sym.children.first
+              visible[var] = s(:self)
               s(:prop, s(:attr, name, :prototype), var =>
                   {get: s(:block, s(:send, nil, :proc), s(:args), 
                     s(:return, s(:ivar, :"@#{var}"))),
@@ -133,6 +135,7 @@ module Ruby2JS
           elsif m.children[1] == :attr_writer
             m.children[2..-1].map do |child_sym|
               var = child_sym.children.first
+              visible[var] = s(:self)
               s(:prop, s(:attr, name, :prototype), var =>
                   {set: s(:block, s(:send, nil, :proc), s(:args, s(:arg, var)), 
                     s(:ivasgn, :"@#{var}", s(:lvar, var))),

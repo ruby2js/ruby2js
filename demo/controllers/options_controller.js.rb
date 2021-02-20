@@ -2,12 +2,8 @@
 # Options.
 
 class OptionsController < DemoController
-  def target
-    @target ||= findController type: RubyController,
-      element: document.querySelector(element.dataset.target)
-  end
-
   def pair(target)
+    super
     target.options = options = parse_options()
     target.contents = options.ruby if options.ruby
   end
@@ -39,7 +35,7 @@ class OptionsController < DemoController
 
     ast = document.getElementById('ast')
     ast.addEventListener 'sl-change' do
-      target.ast = ast.checked if target
+      targets.each {|target| target.ast = ast.checked}
     end
 
     document.querySelectorAll('sl-dropdown').each do |dropdown|
@@ -135,7 +131,7 @@ class OptionsController < DemoController
     return if document.getElementById('js').style.display == 'none'
 
     # update JavaScript
-    target.options = parse_options() if target
+    targets.each {|target| target.options = parse_options()}
   end
 
   # convert query into options

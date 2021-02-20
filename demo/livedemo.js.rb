@@ -3,8 +3,9 @@ async {
   # This superclass is intended for Stimulus controllers that not only
   # connect to Stimulus, but pair with each other.  Subclasses of
   # DemoController don't define connect methods, instead they define 
-  # setup methods.  Subclasses that initiate pairing also define target and
-  # pair methods.  A findController method is defined to help find targets.
+  # setup methods.  Subclasses that initiate pairing define source methods.
+  # Subclasses that expect to be targets define pair methods.  A
+  # findController method is defined to help find sources.
   #
   # Examples: OptionsController sends options to RubyControllers.
   # RubyControllers send scripts to JSControllers.
@@ -13,6 +14,8 @@ async {
   # scripts to load before proceeding.
   #
   class DemoController < Stimulus::Controller
+    attr_reader :source, :targets
+
     # subclasses are expected to override this method
     def setup()
     end
@@ -20,29 +23,35 @@ async {
     # if subclasses override this, they need to call super.  Most should
     # just override setup instead.
     async def connect()
+      @targets = Set.new()
       await setup()
-      pair(target) if target
+      source.pair(self) if source
 
       application.controllers.select do |controller|
-        controller.pair(self) if controller.target == self
+        if controller.source == self
+          controller.targets.add self
+          controller.pair(self) 
+        end
       end
     end
 
     # override this method in classes that initiate pairing
-    def target
-      @target = nil
+    def source
+      @source = nil
     end
 
     # logic to be executed when the second half of the pair connects to
     # Stimulus, independent of the order of the connection to Stimulus.
-    def pair(target)
+    def pair(component)
+      @targets.add component
     end
 
     # logic to be executed when the second half of the pair disconnects.
     # Stimulus may reuse controller objects, so a controller needs to
-    # return to a state where they seek out new targets
-    def unpair()
-      @target = nil
+    # return to a state where they seek out new sources
+    def unpair(component)
+      @targets.delete component
+      @source = nil if @source == component
     end
 
     # subclasses can override this method
@@ -52,11 +61,13 @@ async {
     # if subclasses override this method, they need to call super.
     # Generally, it is best to override teardown instead.
     def disconnect()
-      teardown()
+      controller.unpair(self) if controller == @source
 
       application.controllers.select do |controller|
-        controller.unpair() if controller.target == self
+        controller.unpair(self) if controller.targets.has(self)
       end
+
+      teardown()
     end
 
     # utility method, primarily to be used by target attribute accessors.

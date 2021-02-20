@@ -1,7 +1,7 @@
 # control the Ruby editor.
 class RubyController < DemoController
-  def target
-    @target ||= findController type: JSController,
+  def source
+    @source ||= findController type: OptionsController,
       element: document.querySelector(element.dataset.target)
   end
 
@@ -47,7 +47,6 @@ class RubyController < DemoController
 
     # set initial contents from markdown code area, then hide the code
     nextSibling = element.nextElementSibling
-    puts 'ruby next: ', nextSibling
     if nextSibling and nextSibling.classList.contains('language-ruby')
       contents = nextSibling.textContent.rstrip()
       nextSibling.style.display = 'none'
@@ -78,7 +77,7 @@ class RubyController < DemoController
 
   # convert ruby to JS, sending results to target Controller
   def convert()
-    return unless target and @rubyEditor and defined? Ruby2JS
+    return unless targets.size > 0 and @rubyEditor and defined? Ruby2JS
     parsed = document.getElementById('parsed')
     filtered = document.getElementById('filtered')
 
@@ -88,7 +87,7 @@ class RubyController < DemoController
     ruby = @rubyEditor.state.doc.to_s
     begin
       js = Ruby2JS.convert(ruby, @options)
-      target.contents = js.to_s
+      targets.each {|target| target.contents = js.to_s}
 
       if @ast and parsed and filtered
         raw, comments = Ruby2JS.parse(ruby)
