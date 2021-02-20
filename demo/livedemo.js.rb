@@ -42,6 +42,7 @@ async {
 
     # logic to be executed when the second half of the pair connects to
     # Stimulus, independent of the order of the connection to Stimulus.
+    # if subclasses override this method, they need to call super.
     def pair(component)
       @targets.add component
     end
@@ -58,10 +59,11 @@ async {
     def teardown()
     end
 
+    # unpair all partners (sources and targets)
     # if subclasses override this method, they need to call super.
     # Generally, it is best to override teardown instead.
     def disconnect()
-      controller.unpair(self) if controller == @source
+      @source.unpair(self) if @source
 
       application.controllers.select do |controller|
         controller.unpair(self) if controller.targets.has(self)
