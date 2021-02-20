@@ -15,6 +15,11 @@ class RubyController < DemoController
     convert()
   end
 
+  def pair(controller)
+    super
+    convert()
+  end
+
   async def setup()
     @ast = false
     @options ||= {}

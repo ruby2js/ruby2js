@@ -140,7 +140,7 @@ Try replacing the `startRefreshing` method with the following:
 
 ```ruby
   def startRefreshing()
-    refreshTimer = setInterval(load, refreshIntervalValue)
+    @refreshTimer = setInterval(load, refreshIntervalValue)
   end
 ```
 
