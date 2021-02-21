@@ -16,7 +16,7 @@ class EvalController < DemoController
   # update contents
   def contents=(script)
     # remove previous script (if any)
-    @script&.remove()
+    @script.remove() if @script
 
     # wrap script in a IIFE (Immediately Invoked Function Expression) in order
     # to avoid polluting the window environment.
