@@ -2,7 +2,7 @@
 class JSController < DemoController
   def source
     @source ||= findController type: RubyController,
-      element: document.querySelector(element.dataset.target)
+      element: document.querySelector(element.dataset.source)
   end
 
   async def setup()

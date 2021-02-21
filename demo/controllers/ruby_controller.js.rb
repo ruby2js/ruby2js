@@ -2,7 +2,7 @@
 class RubyController < DemoController
   def source
     @source ||= findController type: OptionsController,
-      element: document.querySelector(element.dataset.target)
+      element: document.querySelector(element.dataset.source)
   end
 
   def ast=(value)
