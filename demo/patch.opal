@@ -4,6 +4,7 @@
 # add core libraries
 require 'corelib/string/unpack'
 require 'corelib/array/pack'
+require 'opal-parser'
 
 # https://github.com/opal/opal/blob/master/lib/opal/parser/patch.rb
 class Parser::Lexer

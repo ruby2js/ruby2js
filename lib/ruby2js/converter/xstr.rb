@@ -5,9 +5,8 @@ module Ruby2JS
     #   (str 'a'))
 
     handle :xstr do |*children|
-      str = eval capture { parse_all(*children) }
-
       if @binding
+        str = eval capture { parse_all(*children) }
         puts @binding.eval(str).to_s
       else
         raise SecurityError.new('Insecure operation, eval without binding option')

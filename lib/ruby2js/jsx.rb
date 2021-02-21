@@ -11,7 +11,7 @@ module Ruby2JS
 
   class JsxParser
     def initialize(stream)
-      @stream = stream
+      @stream = stream.respond_to?(:next) ? stream : OpalEnumerator.new(stream)
       @state = :text
       @text = ''
       @result = []
@@ -286,6 +286,24 @@ module Ruby2JS
 
     def parse_element
       self.class.new(@stream).parse(:element)
+    end
+  end
+
+  # Opal's enumerator doesn't currently support next and peek methods.
+  # Build a wrapper that adds those methods.
+  class OpalEnumerator
+    def initialize(stream)
+      @stream = stream.to_a
+    end
+
+    def next
+      raise StopIteration.new if @stream.empty?
+      @stream.shift
+    end
+
+    def peek
+      raise StopIteration.new if @stream.empty?
+      @stream.first
     end
   end
 end

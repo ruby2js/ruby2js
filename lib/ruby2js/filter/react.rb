@@ -222,7 +222,7 @@ module Ruby2JS
               scan_events[node.children]
             end
           end
-          scan_events[body]
+          scan_events[body] unless es2015
 
           # append statics (if any)
           unless statics.empty?
@@ -323,7 +323,7 @@ module Ruby2JS
             elsif mname == :render and not react_wunderbar_free(block, true)
               if \
                  block.length != 1 or not block.last or
-                not [:send, :block].include? block.last.type
+                not %i[send block xstr].include? block.last.type
               then
                 if @jsx
                   while block.length == 1 and block.first.type == :begin

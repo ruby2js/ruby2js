@@ -2,6 +2,7 @@
 top_section: Stimulus
 title: Tips & Gotchas
 order: 17
+next_page_order: 21
 category: tips
 ---
 

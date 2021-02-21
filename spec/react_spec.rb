@@ -47,7 +47,7 @@ describe Ruby2JS::Filter::React do
     it "should autobind event handlers" do
       to_js( 'class Foo<React; def render; _a onClick: handleClick; end; ' + 
         'def handleClick(event); end; end' ).
-        must_include 'this.handleClick = this.handleClick.bind(this)'
+        must_include '{onClick: this.handleClick.bind(this)}'
     end
 
     it "should initialize, accumulate, and return state" do
