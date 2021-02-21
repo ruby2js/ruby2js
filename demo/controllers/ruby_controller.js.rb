@@ -106,9 +106,9 @@ class RubyController < DemoController
         end
       end
     rescue SyntaxError => e
-      target.exception = e.diagnostic || e
+      targets.each {|target| target.exception = e.diagnostic || e}
     rescue => e
-      target.exception = e.to_s + e.stack
+      targets.each {|target| target.exception = e.to_s + e.stack}
     end
   end
 
