@@ -10,5 +10,5 @@ rackup
 ... and then visit [http://localhost:9292/](http://localhost:9292/).
 
 See the online
-[documentation](https://www.ruby2js.com/docs/filters/react) for an
+[documentation](https://www.ruby2js.com/examples/react/) for an
 explanation of each demo.

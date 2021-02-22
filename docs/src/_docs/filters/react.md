@@ -29,6 +29,11 @@ the following transformations are applied:
        primarliy in that expressions are in Ruby syntax.
      * [Wunderbar](https://github.com/rubys/wunderbar#readme) syntax.
 
+ * When using either JSX-like or Wunderbar syntaxes, sequences of elements
+   will automatically be wrapped in 
+   [React Fragments](https://reactjs.org/docs/fragments.html) when they occur
+   in places where a single element is required.
+
  * `onChange` functions are automatically generated for
    [controlled components](https://reactjs.org/docs/forms.html#controlled-components).
 

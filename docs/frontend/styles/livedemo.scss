@@ -23,8 +23,6 @@
   }
 }
 
-// exception output
-
 // Ruby editor
 .ruby {
   &.editor {
@@ -43,6 +41,12 @@
       margin-right: 2px;
     }
   }
+}
+
+// Demo results
+.demo-results {
+  border: 1px solid black;
+  padding: 0.5rem;
 }
 
 // AST output

@@ -107,6 +107,7 @@ describe "ES2017 support" do
 
     it "should handle calls with blocks" do
       to_js( 'await f(x) {|y| y}' ).must_equal 'await f(x, y => y)'
+      to_js( 'await f(x) do |y| y; end' ).must_equal 'await f(x, y => y)'
     end
   end
 

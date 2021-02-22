@@ -82,6 +82,10 @@ module Ruby2JS
       end
 
       # async/await support
+      # map "await x do...end" to "await x {...}" due to precedence rules
+      if method == :await and es2017 and receiver == nil and args.length == 2 and args[1].type == :def
+        args = [s(:block, args.first, *args.last.children[1..-1])]
+      end
       if es2017 and receiver == nil and args.length == 1
         if method == :async
           if args.first.type == :def

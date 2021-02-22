@@ -33,6 +33,16 @@ ReactDOM.render(
 )
 ```
 
+<template id="hello-template">
+  <div id="hello-example"></div>
+</template>
+
+### Results
+
+<div data-controller="eval" data-html="#hello-template"></div>
+
+### Commentary
+
 This example has a near one-to-one correspondence to the JavaScript example on
 the ReactJS site, just with less curly braces, more `end` statements, and no
 semicolons.
@@ -40,12 +50,15 @@ semicolons.
 The one notable difference is the `%x()` notation.  Because (X)HTML notation
 is not valid Ruby syntax, it needs to be wrapped.
 
-The expression inside the `%x()` notation is JSX-like, but there are notable
-differences.  Any expressions inside curly braces evaluated as Ruby using the
+The expression inside the `%x()` notation is *JSX-like*, but there are notable
+differences.  Any expressions inside curly braces will be evaluated as Ruby using the
 same filters and options as the rest of the code, so feel free to substitute
-`self` for `this` in the example above.  The elements are executed as
+`self` for `this` in the example above.  Also HTML elements are executed as
 statements rather than evaluated as expressions.  Taken together, that means
-that you can code true `if`, `elsif`, 'else', and `end` statements instead of
-nesting `?` and `:' operators.  Or use `case` statements.  And proper loops
+that you can code true `if`, `elsif`, `else`, and `end` statements instead of
+nesting `?` and `:` operators.  Or use `case` statements.  And proper loops
 instead of `map` methods.  All the while not having to worry about limiting
 expressions to a single value.
+
+Try adding `<h1>Hello Message</h1>` to the above example.  Look at how the
+generated JavaScript changes as a result.
