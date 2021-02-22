@@ -47,6 +47,17 @@ ReactDOM.render(
 );
 ```
 
+### Results
+
+<template id="markdown-template">
+  <style>textarea {display: block; width: 100%}</style>
+  <div id="markdown-example"></div>
+</template>
+
+<div data-controller="eval" data-html="#markdown-template"></div>
+
+### Commentary
+
 There is not a whole lot new in this example:
 
  * setting an adhoc property on a React component is done via `self.name=`
@@ -57,10 +68,10 @@ There is not a whole lot new in this example:
    the JavaScript syntax of `new Remarkable()`.
 
  * In this case, a `handleChange` method is provided and referenced as an
-   `onChange` handler.  This is necessary as a `onChange` handler is only
-   necessary and therefore automatically provided by the **react** filter when
-   a `value` attribute is provided on a `textarea`, not when a `defaultValue`
-   is provided.  See the React document for
+   `onChange` handler.  An `onChange` handler is only automatically provided
+   by the **react** filter when a `value` attribute is provided on a
+   `textarea`, not when a `defaultValue` is provided.  See the React document
+   for
    [Uncontrolled Components](https://reactjs.org/docs/uncontrolled-components.html)
    for more details.
 

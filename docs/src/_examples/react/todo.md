@@ -52,14 +52,25 @@ ReactDOM.render(
 )
 ```
 
+### Results
+
+<template id="todos-template">
+  <style>input {display: block; width: 100%}</style>
+  <div id="todos-example"></div>
+</template>
+
+<div data-controller="eval" data-html="#todos-template"></div>
+
+### Commentary
+
 Notable:
 
- * The `initialize` method does not have to worry about setting up `props` or
-   initializing the `this.state` property.  More importantly, it does not have
-   to `bind` methods that are called as event handlers.  All of this mindless
-   administrivia is taken care of for you, allowing you to focus on your
-   application logic, resulting in code that better expresses the developer's
-   intent.
+ * Again, The `initialize` method does not have to worry about setting up
+   `props` or initializing the `this.state` property.  More importantly, it
+   does not have to `bind` methods that are called as event handlers.  All of
+   this mindless administrivia is taken care of for you, allowing you to focus
+   on your application logic, resulting in code that better expresses the
+   developer's intent.
 
  * This `render` method uses a third method to define the HTML result, based
    on the approach the [Wunderbar](https://github.com/rubys/wunderbar#readme)
@@ -93,7 +104,7 @@ Notable:
 
    Taken together, the result is often much more compact and easier to read
    without all the angle brackets and curly braces.  It also involves a lot
-   less context switches to read as it is all Ruby.
+   less mental context switches to read as it is all Ruby.
 
  * In this example, there is no need to code a `handleChange` method at all,
    nor to bind it.  The reason for this is the in React, `input` elements are

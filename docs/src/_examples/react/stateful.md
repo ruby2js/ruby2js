@@ -49,12 +49,22 @@ ReactDOM.render(
 )
 ```
 
+### Results
+
+<template id="timer-template">
+  <div id="timer-example"></div>
+</template>
+
+<div data-controller="eval" data-html="#timer-template"></div>
+
+### Commentary
+
 Statement by statement:
 
  * For convenience, this filter will convert classes that inherit simply from
    `React` as well as `React::Component` to React components. 
 
- * JavaScript `constructor` becomes Ruby's `initialize`.  Calling defining
+ * JavaScript `constructor` becomes Ruby's `initialize`.  Defining
    a `props` argument and calling `super` is optional, and will be done for
    you automatically if necessary (in this example, `props` is not needed).
    Defining initial values is done by instance variable assignment rather than

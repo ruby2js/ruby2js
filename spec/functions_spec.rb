@@ -260,6 +260,7 @@ describe Ruby2JS::Filter::Functions do
 
     it "should handle respond_to?" do
       to_js( 'a.respond_to? b' ).must_equal 'b in a'
+      to_js( '!a.respond_to? b' ).must_equal '!(b in a)'
     end
 
     it "should handle any?" do

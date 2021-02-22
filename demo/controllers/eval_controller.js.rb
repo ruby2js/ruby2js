@@ -2,7 +2,7 @@ class EvalController < DemoController
   SCRIPTS = {
     React: "https://unpkg.com/react@17/umd/react.production.min.js",
     ReactDOM: "https://unpkg.com/react-dom@17/umd/react-dom.production.min.js",
-    Remarkable: "https://cdn.jsdelivr.net/remarkable/2.0.1/remarkable.min.js"
+    Remarkable: "https://cdnjs.cloudflare.com/ajax/libs/remarkable/2.0.1/remarkable.min.js"
   }
 
   def source
@@ -35,24 +35,22 @@ class EvalController < DemoController
     @script.remove() if @script
 
     # load all dependencies
-		SCRIPTS.each_pair do |name, src|
-			await Promise.new do |resolve, reject|
-				if not content =~ /\b#{name}\./
-					resolve()
-				elsif window.respond_to? name
-					resolve()
-				else
-				  script = document.createElement('script')
-					script.src = src
-					script.async = true
-					script.crossorigin = true
+    SCRIPTS.each_pair do |name, src|
+      if content =~ /\b#{name}\b/ and not window.respond_to? name
+        await Promise.new do |resolve, reject|
+          script = document.createElement('script')
+          script.src = src
+          script.async = true
+          script.crossorigin = true
 
-					script.addEventListener(:error, reject)
-					script.addEventListener(:load, resolve)
-					document.head.appendChild(script)
-				end
-			end
-		end
+          script.addEventListener(:error, reject)
+          script.addEventListener(:load, resolve)
+          document.head.appendChild(script)
+        end
+
+        window.Remarkable = remarkable.Remarkable if name == 'Remarkable'
+      end
+    end
 
     # wrap script in a IIFE (Immediately Invoked Function Expression) in order
     # to avoid polluting the window environment.

@@ -190,7 +190,7 @@ module Ruby2JS
         end
 
       elsif method == :[]=
-        parse receiver
+        (group_receiver ? group(receiver) : parse(receiver))
         if \
           args.length == 2 and [:str, :sym].include? args.first.type and
           args.first.children.first.to_s =~ /^[a-zA-Z]\w*$/

@@ -33,11 +33,11 @@ ReactDOM.render(
 )
 ```
 
+### Results
+
 <template id="hello-template">
   <div id="hello-example"></div>
 </template>
-
-### Results
 
 <div data-controller="eval" data-html="#hello-template"></div>
 

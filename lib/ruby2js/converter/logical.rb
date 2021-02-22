@@ -57,7 +57,7 @@ module Ruby2JS
       else
         group   = LOGICAL.include?( expr.type ) && 
           operator_index( :not ) < operator_index( expr.type )
-        group = true if expr and expr.type == :begin
+        group = true if expr and %i[begin in?].include? expr.type
 
         put '!'; put '(' if group; parse expr; put ')' if group
       end
