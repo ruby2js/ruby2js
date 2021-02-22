@@ -58,7 +58,16 @@ class EvalController < DemoController
     # to avoid polluting the window environment.
     @script = document.createElement('script')
     if @div.shadowRoot
-      @script.textContent = "(document => {#{content}})(document.getElementById('#{@div.id}').shadowRoot)"
+      @script.textContent = "(document => {
+        if (document.lastElementChild?.classList?.contains('exception')) document.lastElementChild.remove();
+        try { #{content} } catch (error) {
+          let div = window.document.createElement('div');
+          div.textContent = error.toString();
+          div.classList.add('exception');
+          div.style = 'background-color:#ff0;margin: 1em 0;padding: 1em;border: 4px solid red;border-radius: 1em'
+          document.appendChild(div);
+        }
+      })(document.getElementById('#{@div.id}').shadowRoot)"
     else
       @script.textContent = "(() => {#{content}})()"
     end
