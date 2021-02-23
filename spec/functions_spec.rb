@@ -112,11 +112,11 @@ describe Ruby2JS::Filter::Functions do
     it 'should handle scan' do
       to_js( 'str.scan(/\d/)' ).must_equal 'str.match(/\d/g)'
       to_js( 'str.scan(/(\d)(\d)/)' ).
-        must_equal 'str.match(/(\d)(\d)/g).map(function(s) {' +
+        must_equal '(str.match(/(\d)(\d)/g) || []).map(function(s) {' +
           'return s.match(/(\d)(\d)/).slice(1)})'
       to_js( 'str.scan(pattern)' ).
-        must_equal 'str.match(new RegExp(pattern, "g")).map(function(s) {' +
-          'return s.match(pattern).slice(1)})'
+        must_equal '(str.match(new RegExp(pattern, "g")) || []).' +
+          'map(function(s) {return s.match(pattern).slice(1)})'
     end
 
     it 'should handle sort!' do

@@ -210,10 +210,10 @@ module Ruby2JS
                 s(:block, s(:send, nil, :proc), s(:args, s(:arg, :s)),
                   s(:send, s(:lvar, :s), :slice, s(:int, 1))))
             else
-              # str.match(/.../g).map(s => s.match(/.../).slice(1))
+              # (str.match(/.../g) || []).map(s => s.match(/.../).slice(1))
               s(:block, s(:send,
-                s(:send, process(target), :match, gpattern), :map),
-                s(:args, s(:arg, :s)),
+                s(:or, s(:send, process(target), :match, gpattern), s(:array)),
+                :map), s(:args, s(:arg, :s)),
                 s(:return, s(:send, s(:send, s(:lvar, :s), :match, arg),
                 :slice, s(:int, 1))))
             end
