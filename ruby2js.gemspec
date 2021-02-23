@@ -19,5 +19,5 @@ Gem::Specification.new do |s|
   s.summary = "Minimal yet extensible Ruby to JavaScript conversion.".freeze
 
   s.add_dependency('parser')
-  s.add_dependency('regexp_parser')
+  s.add_dependency('regexp_parser', '~> 2.0.3')
 end
