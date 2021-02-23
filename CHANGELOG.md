@@ -1,10 +1,13 @@
 # master
 
+# 4.0.1 / 2021-02-23
+
 * handle block arguments
 * filter now supports `.call`, but requires an explicit `include` option
 * require with esm now always produces relative path links
 * support added for is_a? kind_of and instance_of?
 * provide default for all optional kwargs; handle undefined as default
+* pin version of regexp_parser pending resolution of #101
 
 # 4.0.0 / 2021-02-10
 
