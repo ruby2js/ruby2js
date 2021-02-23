@@ -1,7 +1,7 @@
 source 'https://rubygems.org'
 
 gem 'parser'
-gem 'regexp_parser', '~>2.0.3'
+gem 'regexp_parser'
 
 group :development, :test do
   gem 'minitest'
