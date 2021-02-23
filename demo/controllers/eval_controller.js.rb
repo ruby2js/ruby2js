@@ -28,6 +28,13 @@ class EvalController < DemoController
 
     # add div to document
     element.appendChild(@div)
+
+    # set up listener for script failures
+    @pending = nil
+    window.addEventListener :error do |event|
+      @pending.reject(event.error) if @pending
+      @pending = nil
+    end
   end
 
   async def load(content)
@@ -56,22 +63,35 @@ class EvalController < DemoController
     # to avoid polluting the window environment.
     @script = document.createElement('script')
     if @div.shadowRoot
-      @script.textContent = "(document => {
-        if (document.lastElementChild?.classList?.contains('exception')) document.lastElementChild.remove();
-        try { #{content} } catch (error) {
-          let div = window.document.createElement('div');
-          div.textContent = error.toString();
-          div.classList.add('exception');
-          div.style = 'background-color:#ff0;margin: 1em 0;padding: 1em;border: 4px solid red;border-radius: 1em'
-          document.appendChild(div);
-        }
-      })(document.getElementById('#{@div.id}').shadowRoot)"
+      @script.textContent = 
+        "(document => {#{content}})(document.getElementById('#{@div.id}').shadowRoot)"
     else
       @script.textContent = "(() => {#{content}})()"
     end
 
     # append script to the div
-    @div.appendChild(@script)
+    begin
+      # remove previous exceptions
+      if element.lastElementChild&.classList&.contains('exception')
+        element.lastElementChild.remove()
+      end
+
+      # run the script; throwing an error if either @script.onerror or
+      # an error event is sent to the window (see above).  The latter
+      # handles syntax errors in the script itself.
+      await Promise.new do |resolve, reject|
+        @pending = { resolve: resolve, reject: reject }
+        @script.onerror = -> (event) {@pending.resolve(event.error) if @pending; @pending = nil}
+        @script.onload = -> (event) {@pending.resolve() if @pending; @pending = nil}
+        @div.appendChild(@script)
+      end
+    rescue => error
+      # display exceptions
+      div = document.createElement('div')
+      div.textContent = error
+      div.classList.add('exception')
+      element.appendChild(div)
+    end
   end
 
   # update contents

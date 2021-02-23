@@ -13,14 +13,14 @@
       background-color: #ffffcc;
     }
   }
+}
 
-  &.exception {
-    background-color:#ff0;
-    margin: 1em 0;
-    padding: 1em;
-    border: 4px solid red;
-    border-radius: 1em;
-  }
+.js.exception, .demo-results + .exception {
+  background-color:#ff0;
+  margin: 1em 0;
+  padding: 1em;
+  border: 4px solid red;
+  border-radius: 1em;
 }
 
 // Ruby editor
