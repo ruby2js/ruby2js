@@ -5,9 +5,9 @@ filters = Rake::FileList.new("../lib/ruby2js/filter/*.rb")
 opal_files = Rake::FileList.new("../demo/*.opal")
 controller_files = Rake::FileList.new("../demo/controllers/*_controller.js.rb")
 
+require 'bundler/setup'
 require 'regexp_parser'
 regexp_parser_path = File.dirname(Gem.find_files_from_load_path('regexp_parser').first)
-
 
 terser = "#{__dir__}/node_modules/.bin/terser"
 terser = "cat" if ENV['NODE_ENV'] == 'development' or !File.exist? terser
