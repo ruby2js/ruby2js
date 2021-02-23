@@ -1,5 +1,7 @@
 # master
 
+* next within a block can return a value
+
 # 4.0.1 / 2021-02-23
 
 * handle block arguments

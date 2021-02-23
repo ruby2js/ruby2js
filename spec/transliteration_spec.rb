@@ -505,6 +505,7 @@ describe Ruby2JS do
 
     it "should handle next as return" do
       to_js( 'x.forEach { next }' ).must_equal 'x.forEach(function() {return})'
+      to_js( 'x.map {|i| next i}' ).must_equal 'x.map(function(i) {return i})'
     end
 
     it "should handle next as continue" do
