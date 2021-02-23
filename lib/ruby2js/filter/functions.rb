@@ -1,4 +1,5 @@
 require 'ruby2js'
+require 'regexp_parser/error'
 require 'regexp_parser/scanner'
 
 module Ruby2JS
