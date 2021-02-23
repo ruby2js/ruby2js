@@ -31,7 +31,7 @@ class Timer < React
   end
 
   def componentDidMount()
-    self.interval = setInterval(tick, 1000)
+    self.interval = setInterval(tick, 1_000)
   end
 
   def componentWillUnmount()
@@ -82,7 +82,7 @@ Statement by statement:
 
  * The `componentWillUnmount` lifecycle method will cancel the timer.
 
- * The `render` method display the number of seconds within an HTML `div`
+ * The `render` method outputs the number of seconds within an HTML `div`
    element.  With React.js, the use of JSX is optional and you can directly
    code calls to `React.createElement`, and this works in Ruby2JS too.
 
