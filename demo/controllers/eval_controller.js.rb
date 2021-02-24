@@ -49,10 +49,13 @@ class EvalController < DemoController
     # add div to document
     element.appendChild(@div)
 
-    # set up listener for script failures
+    # set up listener for script failures.  Ensure every error is only
+    # reported once (I'm looking at you, Safari)
     @pending = nil
+    @timestamp = 0
     window.addEventListener :error do |event|
-      @pending.reject(event.error) if @pending
+      @pending.reject(event.error) if @pending and event.timestamp != @timestamp
+      @timestamp = event.timestamp
       @pending = nil
     end
   end
@@ -111,6 +114,18 @@ class EvalController < DemoController
         "(document => {#{content}})(document.getElementById('#{@div.id}').shadowRoot)"
     else
       @script.textContent = "(() => {#{content}})()"
+    end
+
+    # if a script is currently loading, wait before proceeding
+    if @pending
+      await Promise.new do |resolve, reject|
+        interval = setInterval(100) do
+          unless @pending
+            clearInterval interval
+            resolve()
+          end
+        end
+      end
     end
 
     # append script to the div
