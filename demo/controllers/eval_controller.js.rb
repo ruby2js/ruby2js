@@ -115,11 +115,6 @@ class EvalController < DemoController
 
     # append script to the div
     begin
-      # remove previous exceptions
-      Array(element.querySelectorAll('.exception')).each do |exception|
-        exception.remove() 
-      end
-
       # run the script; throwing an error if either @script.onerror or
       # an error event is sent to the window (see above).  The latter
       # handles syntax errors in the script itself.
@@ -129,8 +124,13 @@ class EvalController < DemoController
         @script.onload = -> (event) {@pending.resolve() if @pending; @pending = nil}
         @div.appendChild(@script)
       end
+
+      # remove previous exceptions
+      Array(element.querySelectorAll('.exception')).each do |exception|
+        exception.remove()
+      end
     rescue => error
-      # display exceptions
+      # display exception
       div = element.querySelector('.exception') || document.createElement('div')
       div.textContent = error
       div.classList.add('exception')
