@@ -70,10 +70,28 @@ class ContentLoaderController < Stimulus::Controller
 end
 ```
 
-View the results in your browser.  Modify the `messages.html` file and see it
-update in your browser within 5 seconds.
-View the generated
+### Results
+
+<p data-controller="eval" data-html=".language-html"></p>
+
+If you are running the stimulus-starter on your machine, view the results in
+your browser.  Modify the `messages.txt` file and see it update in your
+browser within 5 seconds.  View the generated
 [content_loader_controller.js](http://localhost:8080/controllers/content_loader_controller.js).
+
+If you are viewing this on the Ruby2JS.com site, modifying `messages.txt`
+isn't possible, you can open your browser's developer tools and
+see the request and responses going back and forth.  One thing that you will
+see that **does** change with every response is the date header.  You can
+modify the code above to display this header:
+
+```ruby
+def load()
+  fetch(urlValue).then {|response|
+    element.innerHTML = response.headers.get('Date')
+  }
+end
+```
 
 # Commentary
 

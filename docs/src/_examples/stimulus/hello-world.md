@@ -23,7 +23,7 @@ contents:
 <div data-controller="combo" data-options='{
   "eslevel": 2022,
   "autoexports": "default",
-  "filters": ["esm", "stimulus"]
+  "filters": ["esm", "stimulus", "functions"]
 }'></div>
 
 ```ruby
@@ -42,8 +42,15 @@ class HelloController < Stimulus::Controller
 end
 ```
 
-View the results in your browser.  Modify the source and see the browser
-update.  View the generated
+### Results
+
+<p data-controller="eval" data-html="div.language-html"></p>
+
+Once again, enter your name and press the **Greet** button.  Check your
+browser's console log.
+
+If you have installed the stimulus starter, view the results in your browser.
+Modify the source and see the browser update.  View the generated
 [hello_controller.js](http://localhost:8080/controllers/hello_controller.js).
 
 # Commentary

@@ -16,12 +16,32 @@ class EvalController < DemoController
     shadow = @div.attachShadow(mode: :open)
     @script = nil
 
+    # copy missing document functions to shadow
+    for prop in document
+      next unless typeof document[prop] == 'function'
+      next if shadow.respond_to? prop
+      shadow[prop] = ->(*args) {document[prop].call(document, *args)}
+    end
+
+    # add css (if any) to shadow
+    css = document.querySelector(element.dataset.css)
+    if css
+      style = document.createElement('style')
+      style.textContent = css.textContent
+      shadow.appendChild(style)
+    end
+
+    # add html (if any) to shadow; handling both templates and markdown code
     html = document.querySelector(element.dataset.html)
     if html
       @div.classList.add 'demo-results'
       div = document.createElement('div')
-      html.content.childNodes.each do |node|
-        div.appendChild node.cloneNode(true)
+      if html.content
+        html.content.childNodes.each do |node|
+          div.appendChild node.cloneNode(true)
+        end
+      else
+        div.innerHTML = html.textContent
       end
       shadow.appendChild(div)
     end
@@ -39,7 +59,10 @@ class EvalController < DemoController
 
   async def load(content)
     # remove previous script (if any)
-    @script.remove() if @script
+    if @script
+      stop_application()
+      @script.remove()
+    end
 
     # load all dependencies
     SCRIPTS.each_pair do |name, src|
@@ -69,12 +92,12 @@ class EvalController < DemoController
     end
 
     unless controllers.empty?
-      content += ";\n\nwindow.application = Stimulus.Application.start(document.firstElementChild)"
+      content += ";\n\nwindow.application = Stimulus.Application.start(document.lastElementChild)"
     end
 
     controllers.each do |controller|
       name = controller.sub(/Controller$/, '').
-        gsub(/[a-z][A-Z]/) {|match| "#{match[1]}-#{match[1]}"}.downcase()
+        gsub(/[a-z][A-Z]/) {|match| "#{match[0]}-#{match[1]}"}.downcase()
       content += ";\nwindow.application.register(#{name.inspect}, #{controller})"
     end
 
@@ -123,13 +146,19 @@ class EvalController < DemoController
   end
 
   def teardown()
-    # remove div from document
+    stop_application()
     @div.remove()
+  end
 
-    # stop and remove stimulus application
-    if windows.application
-      windows.application.stop()
-      delete windows.application
+  # stop and remove stimulus application
+  def stop_application()
+    if window.application
+      window.application.controllers.each do |controller|
+        controller.disconnect()
+      end
+
+      window.application.stop()
+      delete window.application
     end
   end
 end

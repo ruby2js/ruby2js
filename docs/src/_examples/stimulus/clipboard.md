@@ -52,7 +52,7 @@ class ClipboardController < Stimulus::Controller
     end
   end
 
-  def copy()
+  def copy(event)
     event.preventDefault()
     sourceTarget.select()
     document.execCommand("copy")
@@ -60,9 +60,11 @@ class ClipboardController < Stimulus::Controller
 end
 ```
 
-View the results in your browser.  Click a copy button, and see it in action.
-View the generated
-[clipboard_controller.js](http://localhost:8080/controllers/clipboard_controller.js).
+### Results
+
+<p data-controller="eval" data-html=".language-html" data-css=".language-css"></p>
+
+Click a copy button, and see it in action.  Paste the results elsewhere.
 
 # Commentary
 

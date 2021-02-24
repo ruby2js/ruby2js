@@ -31,7 +31,7 @@ contents:
 }'></div>
 
 ```ruby
-class SlideShowController < Stimulus::Controller
+class SlideshowController < Stimulus::Controller
   self.values = { index: Number }
 
   def next()
@@ -54,9 +54,11 @@ class SlideShowController < Stimulus::Controller
 end
 ```
 
-View the results in your browser.  Click the *next* and *previous* button, and
-see it in action.  View the generated
-[slideshow_controller.js](http://localhost:8080/controllers/slideshow_controller.js).
+### Results
+
+<p data-controller="eval" data-html=".language-html"></p>
+
+Click the arrow buttons, and see the slides change.
 
 # Commentary
 
