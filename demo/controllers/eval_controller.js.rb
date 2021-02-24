@@ -59,6 +59,25 @@ class EvalController < DemoController
       end
     end
 
+    # Stimulus support: remove imports, start application, register controllers
+    content.gsub! /^import .*;\n\s*/, ''
+
+    controllers = []
+    content.gsub! /^export (default )?(class (\w+) extends Stimulus.Controller)/ do
+      controllers << $3
+      next $2
+    end
+
+    unless controllers.empty?
+      content += ";\n\nwindow.application = Stimulus.Application.start(document.firstElementChild)"
+    end
+
+    controllers.each do |controller|
+      name = controller.sub(/Controller$/, '').
+        gsub(/[a-z][A-Z]/) {|match| "#{match[1]}-#{match[1]}"}.downcase()
+      content += ";\nwindow.application.register(#{name.inspect}, #{controller})"
+    end
+
     # wrap script in a IIFE (Immediately Invoked Function Expression) in order
     # to avoid polluting the window environment.
     @script = document.createElement('script')
@@ -106,6 +125,12 @@ class EvalController < DemoController
   def teardown()
     # remove div from document
     @div.remove()
+
+    # stop and remove stimulus application
+    if windows.application
+      windows.application.stop()
+      delete windows.application
+    end
   end
 end
 

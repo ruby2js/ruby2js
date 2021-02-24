@@ -1,8 +1,9 @@
 ---
 top_section: React
 order: 21
+toc_title: Introduction
 title: React Introduction
-category: intro
+category: react intro
 ---
 
 The **React** filter enables you to build [React](https://reactjs.org/) components.

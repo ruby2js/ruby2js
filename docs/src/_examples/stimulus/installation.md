@@ -15,6 +15,12 @@ Before you get started, make sure that you have:
     Ruby syntax.
   * Ruby and bundler installed.
 
+{% rendercontent "docs/note" %}
+Feeling impatient and wanting a quick start?  Feel free to jump to the
+[Hello World](hello-world) step.  Don't worry, you can always come back here
+afterwards when you want to dive in deeper.
+{% endrendercontent %}
+
 # Installation
 
 The process here is pretty much the same as the one described in the Stimulus
