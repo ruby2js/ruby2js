@@ -10,6 +10,8 @@ class RubyController < DemoController
     convert()
   end
 
+  attr_reader :options
+
   def options=(value)
     @options = value
     convert()

@@ -58,6 +58,8 @@ class EvalController < DemoController
   end
 
   async def load(content)
+    first_load = !@script
+
     # remove previous script (if any)
     if @script
       stop_application()
@@ -114,8 +116,8 @@ class EvalController < DemoController
     # append script to the div
     begin
       # remove previous exceptions
-      if element.lastElementChild&.classList&.contains('exception')
-        element.lastElementChild.remove()
+      Array(element.querySelectorAll('.exception')).each do |exception|
+        exception.remove() 
       end
 
       # run the script; throwing an error if either @script.onerror or
@@ -129,10 +131,15 @@ class EvalController < DemoController
       end
     rescue => error
       # display exceptions
-      div = document.createElement('div')
+      div = element.querySelector('.exception') || document.createElement('div')
       div.textContent = error
       div.classList.add('exception')
       element.appendChild(div)
+
+      # downgrade eslevel if the script doesn't load the first time
+      if first_load and @source&.options&.eslevel == 2022
+        @source.options = {**@source.options, eslevel: 2021}
+      end
     end
   end
 
