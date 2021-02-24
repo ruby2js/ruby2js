@@ -115,6 +115,11 @@ class EvalController < DemoController
 
     # append script to the div
     begin
+      # remove previous exceptions
+      Array(element.querySelectorAll('.exception')).each do |exception|
+        exception.remove()
+      end
+
       # run the script; throwing an error if either @script.onerror or
       # an error event is sent to the window (see above).  The latter
       # handles syntax errors in the script itself.
@@ -122,10 +127,13 @@ class EvalController < DemoController
         @pending = { resolve: resolve, reject: reject }
         @script.onerror = -> (event) {@pending.resolve(event.error) if @pending; @pending = nil}
         @script.onload = -> (event) {@pending.resolve() if @pending; @pending = nil}
+
+        # safari doesn't run onload handlers for inline scripts
+        setTimeout(5_000) {@pending.resolve() if @pending; @pending = nil}
         @div.appendChild(@script)
       end
 
-      # remove previous exceptions
+      # remove previous exceptions again to handle race conditions
       Array(element.querySelectorAll('.exception')).each do |exception|
         exception.remove()
       end
