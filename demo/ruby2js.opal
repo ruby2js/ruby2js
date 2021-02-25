@@ -38,12 +38,25 @@ class Ruby2JS::SyntaxError
   end
 end
 
-# export convert function
-$$.Ruby2JS = Ruby2JS
-`Ruby2JS.convert = (string, options) => Ruby2JS.$convert(string, Ruby2JS.$options(options ))`
-`Ruby2JS.parse = (string, options) => Ruby2JS.$parse(string, Ruby2JS.$options(options))`
-node = Parser::AST::Node; `Ruby2JS.AST = {Node: node}`
-`Ruby2JS.nil = nil`
+# Make convert, parse, and AST.Node, nil available to JavaScript
+`Ruby2JS = {
+  convert(string, options) {
+    return Opal.Ruby2JS.$convert(string, Opal.Ruby2JS.$options(options))
+  },
+
+  parse(string, options) {
+    return Opal.Ruby2JS.$parse(string, Opal.Ruby2JS.$options(options))
+  },
+
+  AST: {Node: Opal.Parser.AST.Node},
+
+  nil: Opal.nil
+}`
 
 # advertise that the function is available
-$$.document[:body].dispatchEvent(`new CustomEvent('Ruby2JS-ready')`)
+if `typeof module !== 'undefined'`
+  `module.exports = Ruby2JS`
+elsif $$.document and $$.document[:body]
+  $$.Ruby2JS = `Ruby2JS`
+  $$.document[:body].dispatchEvent(`new CustomEvent('Ruby2JS-ready')`)
+end

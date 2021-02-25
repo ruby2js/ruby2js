@@ -71,7 +71,7 @@ end
 
 file "#{demo}/ruby2js.js" => [*opal_files, *source_files, '../demo/filters.opal'] do
   mkdir demo unless Dir.exist? demo
-  opal = "opal --compile -I #{regexp_parser_path} -I ../lib -I . ruby2js.opal"
+  opal = "opal --compile -E -I #{regexp_parser_path} -I ../lib -I . ruby2js.opal"
   target = "#{docs}/src/demo/ruby2js.js"
   Dir.chdir '../demo' do
     sh "#{opal} | #{terser} > #{target}"
