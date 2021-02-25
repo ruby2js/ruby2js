@@ -1,8 +1,12 @@
 # Convenience file, allowing Rake to be run from this directory
 task :watch do
   Dir.chdir __dir__ do
-    sh 'ls *.opal livedemo.js.rb ruby2js.rb controllers/*_controller.js.rb | entr rake'
+    sh 'ls *.opal livedemo.js.rb ruby2js.rb controllers/*_controller.js.rb | entr rake test'
   end
+end
+
+task :test => :default do
+  sh "node #{__dir__}/nodetest.js"
 end
 
 # pass NODE_ENV=development to disable 'terse'
