@@ -1,6 +1,6 @@
 docs = File.expand_path(__dir__)
 demo = "#{docs}/src/demo"
-source_files = Rake::FileList.new("../lib/**/*.rb")
+source_files = Rake::FileList.new("../lib/**/*.rb", "../lib/ruby2js.rb")
 filters = Rake::FileList.new("../lib/ruby2js/filter/*.rb")
 opal_files = Rake::FileList.new("../demo/*.opal")
 controller_files = Rake::FileList.new("../demo/controllers/*_controller.js.rb")
