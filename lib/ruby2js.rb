@@ -279,7 +279,7 @@ module Ruby2JS
   
   def self.parse(source, file=nil, line=1)
     buffer = Parser::Source::Buffer.new(file, line)
-    buffer.source = source.encode('utf-8')
+    buffer.source = source.encode('UTF-8')
     parser = Parser::CurrentRuby.new
     parser.diagnostics.all_errors_are_fatal = true
     parser.diagnostics.consumer = lambda {|diagnostic| nil}

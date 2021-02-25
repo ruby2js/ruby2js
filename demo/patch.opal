@@ -258,10 +258,3 @@ module Racc
     end
   end
 end
-
-# Workaround for https://github.com/opal/opal/issues/2181
-class String
-  def encode(encoding)
-    String.new(`Opal.enc(self, encoding)`, encoding)
-  end
-end
