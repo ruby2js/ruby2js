@@ -11,8 +11,9 @@ least, it isn't something I was able to readily find with Google searches.
 
 First, let's gets some standard stuff out of the way.  The
 [Ruby2JS.com](https://ruby2js.com) is built using the
-[Bridgetown](https://www.bridgetownrb.com/) static site generator.  [Opal](opal)
-is used to generate the bulk of the scripts to be executed.  [HTTP
+[Bridgetown](https://www.bridgetownrb.com/) static site generator.
+[Opal](https://opalrb.com/) is used to generate the bulk of the scripts to be
+executed.  [HTTP
 caching](https://developer.mozilla.org/en-US/docs/Web/HTTP/Caching) ensures
 that these scripts are only downloaded when they change.  [Turbo](Turbo)
 ensures that these scripts are only loaded once per site visit.
