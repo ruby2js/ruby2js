@@ -18,3 +18,17 @@ assert.strictEqual(
 assert.strictEqual(
   to_js('foo.empty?', {filters: ['functions']}),
   'foo.length == 0');
+
+let ast = Ruby2JS.convert('String', {file: 'a.rb'}).ast
+assert.strictEqual(ast.constructor, Ruby2JS.AST.Node)
+assert.strictEqual(ast.type, "const")
+assert.strictEqual(ast.children.length, 2)
+assert.strictEqual(ast.children[0], Ruby2JS.nil)
+assert.strictEqual(ast.children[1], "String")
+
+let sourcemap = Ruby2JS.convert('a=1', {file: 'a.rb'}).sourcemap
+assert.strictEqual(sourcemap.version, 3)
+assert.strictEqual(sourcemap.file, 'a.rb')
+// assert.strictEqual(sourcemap.sources, ['a.rb'])
+// assert.strictEqual(sourcemap.mappings, 'QAAE')
+

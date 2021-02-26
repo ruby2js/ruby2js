@@ -39,7 +39,7 @@ class Ruby2JS::SyntaxError
 end
 
 # Make convert, parse, and AST.Node, nil available to JavaScript
-`Ruby2JS = {
+`var Ruby2JS = {
   convert(string, options) {
     return Opal.Ruby2JS.$convert(string, Opal.Ruby2JS.$options(options))
   },
@@ -53,10 +53,16 @@ end
   nil: Opal.nil
 }`
 
+# Define a getter for sourcemap
+`Object.defineProperty(Opal.Ruby2JS.Serializer.$$prototype, "sourcemap",
+  {get() { return this.$sourcemap().$$smap }})`
+
 # advertise that the function is available
-if `typeof module !== 'undefined'`
+if `typeof module !== 'undefined' && module.parent`
   `module.exports = Ruby2JS`
-elsif $$.document and $$.document[:body]
+else
   $$.Ruby2JS = `Ruby2JS`
-  $$.document[:body].dispatchEvent(`new CustomEvent('Ruby2JS-ready')`)
+  if $$.document and $$.document[:body]
+    $$.document[:body].dispatchEvent(`new CustomEvent('Ruby2JS-ready')`)
+  end
 end
