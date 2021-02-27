@@ -31,4 +31,5 @@ assert.strictEqual(sourcemap.version, 3)
 assert.strictEqual(sourcemap.file, 'a.rb')
 // assert.strictEqual(sourcemap.sources, ['a.rb'])
 // assert.strictEqual(sourcemap.mappings, 'QAAE')
+console.log(sourcemap)
 

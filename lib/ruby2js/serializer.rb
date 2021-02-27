@@ -303,11 +303,11 @@ module Ruby2JS
     def vlq(*mark)
       if @mark[0] == mark[0]
         return if @mark[-3..-1] == mark[-3..-1]
-        @mappings << ',' unless @mappings == ''
+        @mappings += ',' unless @mappings == ''
       end
 
       while @mark[0] < mark[0]
-        @mappings << ';'
+        @mappings += ';'
         @mark[0] += 1
         @mark[1] = 0
       end
@@ -332,11 +332,11 @@ module Ruby2JS
             digit = data & 0b11111
             data >>= 5
             digit |= 0b100000 if data > 0
-            encoded << BASE64[digit]
+            encoded += BASE64[digit]
           end while data > 0
         end
 
-        @mappings << encoded
+        @mappings += encoded
       end
     end
 

@@ -258,3 +258,12 @@ module Racc
     end
   end
 end
+
+# https://github.com/opal/opal/issues/2185
+`Opal.Ruby2JS.Token.$new0 = Opal.Ruby2JS.Token.$new;
+Opal.Ruby2JS.Token.$new = function(str, ast) {
+  token = Opal.Ruby2JS.Token.$new0(str);
+  token.ast = ast;
+  if (ast) token.loc = ast.$location();
+  return token;
+}`
