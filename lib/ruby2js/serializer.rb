@@ -322,14 +322,19 @@ module Ruby2JS
           data = diff << 1
         end
 
-        encoded = ''
+        if data <= 0b11111
+          # workaround https://github.com/opal/opal/issues/575
+          encoded = BASE64[data]
+        else
+          encoded = ''
 
-        begin
-          digit = data & 0b11111
-          data >>= 5
-          digit |= 0b100000 if data > 0
-          encoded << BASE64[digit]
-        end while data > 0
+          begin
+            digit = data & 0b11111
+            data >>= 5
+            digit |= 0b100000 if data > 0
+            encoded << BASE64[digit]
+          end while data > 0
+        end
 
         @mappings << encoded
       end
