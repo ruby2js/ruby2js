@@ -28,7 +28,7 @@ module Ruby2JS
         else
           put (@ast.type==:for_of ? ' of ' : ' in '); parse expression; 
         end
-        puts ') {'; scope block; sput '}'
+        puts ') {'; redoable block; sput '}'
       ensure
         @next_token = next_token
         @vars = vars if es2015

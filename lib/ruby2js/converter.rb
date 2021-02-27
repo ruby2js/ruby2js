@@ -66,6 +66,7 @@ module Ruby2JS
       @comparison = :equality
       @or = :logical
       @underscored_private = true
+      @redoable = false
     end
 
     def width=(width)
@@ -243,6 +244,34 @@ module Ruby2JS
       end
     end
 
+    def redoable(block)
+      save_redoable = @redoable
+
+      has_redo = proc do |node|
+        node.children.any? do |child|
+          next false unless child.is_a? Parser::AST::Node
+          next true if child.type == :redo
+          next false if %i[for while while_post until until_post].include? child.type
+          has_redo[child]
+        end
+      end
+
+      @redoable = has_redo[@ast]
+
+      if @redoable
+        put es2015 ? 'let ' : 'var '
+        put "redo$#@sep"
+        puts 'do {'
+        put "redo$ = false#@sep"
+        scope block
+        put "#@nl} while(redo$)"
+      else
+        scope block
+      end
+    ensure
+      @redoable = save_redoable
+    end
+
     def timestamp(file)
       super
 
@@ -335,6 +364,7 @@ require 'ruby2js/converter/nil'
 require 'ruby2js/converter/nthref'
 require 'ruby2js/converter/opasgn'
 require 'ruby2js/converter/prototype'
+require 'ruby2js/converter/redo'
 require 'ruby2js/converter/regexp'
 require 'ruby2js/converter/return'
 require 'ruby2js/converter/self'

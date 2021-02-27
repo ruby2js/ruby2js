@@ -44,10 +44,6 @@ describe 'not implemented' do
     todo("begin; a; rescue => e; b; else; c; end")
   end
 
-  it "redo" do
-    todo("redo")
-  end
-
   it "retry" do
     todo("retry")
   end

@@ -2,6 +2,7 @@
 
 * next within a block can return a value
 * handle scans that return zero results with ESLevel < 2020
+* redo
 
 # 4.0.1 / 2021-02-23
 

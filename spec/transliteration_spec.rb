@@ -443,6 +443,12 @@ describe Ruby2JS do
         must_equal 'var a = 0; while (true || false) {a++}'
     end
 
+    if "should handle a redo within a loop"
+      to_js( 'while true do redo; end' ).
+        must_equal 'while (true) {var redo$; do {redo$ = false; ' +
+          'redo$ = true; continue} while(redo$)}'
+    end
+
     it "should handle simple case statement" do
       to_js( 'case a; when 1,2; puts :a; end' ).
         must_equal 'switch (a) {case 1: case 2: puts("a")}'
