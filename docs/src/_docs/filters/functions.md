@@ -51,6 +51,7 @@ If you set the `eslevel` option to `2015` or newer, the Functions filter enables
 * `.nil?` {{ caret }} `== null`
 * `.ord` {{ caret }} `charCodeAt(0)`
 * `puts` {{ caret }} `console.log`
+* `rand` {{ caret }} `Math.random`
 * `.replace` {{ caret }} `.length = 0; ...push.apply(*)`
 * `.respond_to?` {{ caret }} `right in left`
 * `.rstrip` {{ caret }} `.replace(/s+$/, "")`

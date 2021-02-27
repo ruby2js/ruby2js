@@ -508,6 +508,36 @@ module Ruby2JS
         elsif method == :floor and args.length == 0
           process S(:send, s(:const, nil, :Math), :floor, target)
 
+        elsif method == :rand and target == nil
+          if args.length == 0
+            process S(:send!, s(:const, nil, :Math), :random)
+          elsif %i[irange erange].include? args.first.type
+            range = args.first
+            multiplier = s(:send, range.children.last, :-, range.children.first)
+            if range.children.all? {|child| child.type == :int}
+              multiplier = s(:int, range.children.last.children.last - range.children.first.children.last)
+              multiplier = s(:int, multiplier.children.first + 1) if range.type == :irange
+            elsif range.type == :irange
+              if multiplier.children.last.type == :int
+                diff = multiplier.children.last.children.last - 1
+                multiplier = s(:send, *multiplier.children[0..1], s(:int, diff))
+                multiplier = multiplier.children.first if diff == 0
+                multiplier = s(:send, multiplier.children[0], :+, s(:int, -diff)) if diff < 0
+              else
+                multiplier = s(:send, multiplier, :+, s(:int, 1))
+              end
+            end
+            raw = s(:send, s(:send, s(:const, nil, :Math), :random), :*, multiplier)
+            if range.children.first != s(:int, 0)
+              raw = s(:send, raw, :+, range.children.first)
+            end
+            process S(:send, nil, :parseInt, raw)
+          else
+            process S(:send, nil, :parseInt,
+              s(:send, s(:send, s(:const, nil, :Math), :random),
+              :*, args.first))
+          end
+
         elsif method == :sum and args.length == 0
           process S(:send, target, :reduce, s(:block, s(:send, nil, :proc),
             s(:args, s(:arg, :a), s(:arg, :b)),

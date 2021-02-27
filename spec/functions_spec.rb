@@ -300,6 +300,14 @@ describe Ruby2JS::Filter::Functions do
       to_js( '[a,b].min' ).must_equal 'Math.min(a, b)'
     end
 
+    it "should handle min" do
+      to_js( 'rand' ).must_equal 'Math.random()'
+      to_js( 'rand(50)' ).must_equal 'parseInt(Math.random() * 50)'
+      to_js( 'rand(0..n)' ).must_equal 'parseInt(Math.random() * (n + 1))'
+      to_js( 'rand(1..n)' ).must_equal 'parseInt(Math.random() * n + 1)'
+      to_js( 'rand(n...m)' ).must_equal 'parseInt(Math.random() * (m - n) + n)'
+    end
+
     it "should handle sum" do
       to_js( 'a.sum' ).must_equal 'a.reduce(function(a, b) {a + b}, 0)'
     end
