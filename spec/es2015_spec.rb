@@ -518,27 +518,27 @@ describe "ES2015 support" do
   describe 'keyword arguments' do
     it 'should handle keyword arguments in methods' do
       to_js('def a(q, a:, b: 2); end').
-        must_equal('function a(q, { a, b = 2 }) {}')
+        must_equal('function a(q, { a, b=2 }) {}')
     end
 
     it 'should handle all optional keyword arguments in methods' do
       to_js('def a(q, a: 1, b: 2); end').
-        must_equal('function a(q, { a = 1, b = 2 } = {}) {}')
+        must_equal('function a(q, { a=1, b=2 } = {}) {}')
     end
 
     it 'should keyword arguments defaulting to undefined in methods' do
       to_js('def a(q, a: undefined, b: 2); end').
-        must_equal('function a(q, { a, b = 2 } = {}) {}')
+        must_equal('function a(q, { a, b=2 } = {}) {}')
     end
 
     it 'should handle keyword arguments in blocks' do
       to_js('proc {|q, a:, b: 2|}').
-        must_equal('(q, { a, b = 2 }) => {}')
+        must_equal('(q, { a, b=2 }) => {}')
     end
 
     it 'should handle all optional keyword arguments in blocks' do
       to_js('proc {|q, a: 1, b: 2|}').
-        must_equal('(q, { a = 1, b = 2 } = {}) => {}')
+        must_equal('(q, { a=1, b=2 } = {}) => {}')
     end
   end
 
