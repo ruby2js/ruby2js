@@ -5,12 +5,6 @@
 
 Snowpack plugiplugin to compile [Ruby2JS](https://www.ruby2js.com) (`.js.rb`) files to JavaScript.
 
-Dependencies needed to run this code:
-
-  * Node.js and Snowpack
-  * Ruby installed and available in your PATH as `ruby`
-  * Both ruby2js and rack, either installed as gems or in your RUBYLIB path
-
 ## Documentation
 
 * Visit **[ruby2js.com](https://www.ruby2js.com/docs/snowpack)** for detailed setup instructions and examples.

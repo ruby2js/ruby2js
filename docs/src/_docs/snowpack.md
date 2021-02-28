@@ -8,13 +8,6 @@ category: snowpack
 The [`@ruby2js/snowpack-plugin`](https://github.com/ruby2js/ruby2js/tree/master/packages/snowpack-plugin)
 lets you compile `.rb.js` files to JavaScript via Snowpack.
 
-Prerequisites needed to run this code:
-
-  * Node.js
-  * Ruby installed and available in your PATH as `ruby`
-  * Both ruby2js and rack, either installed as gems or in your RUBYLIB path
-
-
 For testing, [create a new, example Snowpack project](https://www.snowpack.dev/tutorials/getting-started).
 For now, all you need to do is the following steps from that tutorial:
 
@@ -36,7 +29,7 @@ Configure the plugin by placing the following into `snowpack.config.js`:
 ```js
 module.exports = {
   plugins: [
-    ["./ruby2js-snowpack-plugin.js", {
+    ["@ruby2js/snowpack-plugin", {
       eslevel: 2020,
       autoexports: true,
       filters: ["camelCase", "functions", "esm"]
@@ -64,7 +57,7 @@ An example of all of the supported options:
   "defs": {"A": ["x", "@y"]},
   "eslevel": 2021,
   "exclude": ["each"],
-  "filters": "functions",
+  "filters": ["functions"],
   "include": ["class"],
   "include_all": true,
   "include_only": ["max"],

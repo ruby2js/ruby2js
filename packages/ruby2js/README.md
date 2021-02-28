@@ -21,7 +21,7 @@ An example of all supported options:
   defs: {A: ["x", "@y"]},
   eslevel: 2021,
   exclude: ["each"],
-  filters: "functions",
+  filters: ["functions"],
   include: ["class"],
   include_all: true,
   include_only: ["max"],

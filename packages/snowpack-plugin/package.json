@@ -1,6 +1,6 @@
 {
   "name": "@ruby2js/snowpack-plugin",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "ruby2js plugin for Snowpack",
   "author": "Sam Ruby <rubys@intertwingly.net>",
   "license": "MIT",
@@ -12,5 +12,8 @@
   },
   "publishConfig": {
     "access": "public"
+  },
+  "dependencies": {
+    "@ruby2js/ruby2js": "^0.0.1"
   }
 }
