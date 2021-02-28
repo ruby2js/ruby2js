@@ -23,13 +23,11 @@ afterwards when you want to dive in deeper.
 
 # Installation
 
-The process here is pretty much the same as the one described in the Stimulus
-handbook, with the addition of a `bundle install` step:
+The process here is the same as the one described in the Stimulus handbook:
 
 ```shell
 $ git clone https://github.com/ruby2js/stimulus-starter.git
 $ cd stimulus-starter
-$ bundle install
 $ yarn install
 $ yarn start
 ```
