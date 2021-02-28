@@ -9,8 +9,8 @@ require 'bundler/setup'
 require 'regexp_parser'
 regexp_parser_path = File.dirname(Gem.find_files_from_load_path('regexp_parser').first)
 
-terser = "#{__dir__}/node_modules/.bin/terser"
-terser = "cat" if ENV['NODE_ENV'] == 'development' or !File.exist? terser
+terser = "#{__dir__}/node_modules/.bin/terser --compress --mangle"
+terser = "cat" if ENV['NODE_ENV'] == 'development'
 
 file "../demo/filters.opal" => filters do
   puts 'generate filters.opal'
