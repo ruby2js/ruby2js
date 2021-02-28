@@ -96,7 +96,7 @@ class RubyController < DemoController
       js = Ruby2JS.convert(ruby, @options)
       targets.each {|target| target.contents = js.to_s}
 
-      if @ast and parsed and filtered
+      if ruby != '' and @ast and parsed and filtered
         raw, comments = Ruby2JS.parse(ruby)
         trees = [walk(raw).join(''), walk(js.ast).join('')]
 
@@ -117,7 +117,7 @@ class RubyController < DemoController
   # convert AST into displayable form
   def walk(ast, indent='', tail='', last=true)
     return [] unless ast
-    output = ["<div class=#{ast.location == Ruby2JS.nil ? 'unloc' : 'loc'}>"]
+    output = ["<div class=#{Ruby2JS.nil == ast.location ? 'unloc' : 'loc'}>"]
     output << "#{indent}<span class=hidden>s(:</span>#{ast.type}"
     output << '<span class=hidden>,</span>' unless ast.children.empty?
 
@@ -147,7 +147,7 @@ class RubyController < DemoController
         if ast.type != :str and child.is_a? String and child =~ /\A[!-~]+\z/
           output << " :#{child}"
         else
-          output << " #{child == Ruby2JS.nil ? 'nil' : child.inspect}"
+          output << " #{Ruby2JS.nil == child ? 'nil' : child.inspect}"
         end
         output << '<span class=hidden>,</span>' unless index == ast.children.length - 1
       end

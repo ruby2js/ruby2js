@@ -29,7 +29,7 @@ assert.strictEqual(ast.children[1], "String")
 let sourcemap = Ruby2JS.convert('a=1', {file: 'a.rb'}).sourcemap
 assert.strictEqual(sourcemap.version, 3)
 assert.strictEqual(sourcemap.file, 'a.rb')
-// assert.strictEqual(sourcemap.sources, ['a.rb'])
-// assert.strictEqual(sourcemap.mappings, 'QAAE')
-console.log(sourcemap)
+assert.strictEqual(sourcemap.sources.length, 1)
+assert.strictEqual(sourcemap.sources[0], 'a.rb')
+assert.strictEqual(sourcemap.mappings, 'QAAE')
 
