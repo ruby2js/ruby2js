@@ -85,7 +85,6 @@ module Ruby2JS
         @react_props = []
         @react_methods = []
         @react_filter_functions = false
-        @react_imports = false
         @jsx = false
         super
       end
@@ -100,15 +99,6 @@ module Ruby2JS
           filters.include? Ruby2JS::Filter::Functions
         then
           @react_filter_functions = true
-        end
-
-        if \
-          (defined? Ruby2JS::Filter::ESM and
-          filters.include? Ruby2JS::Filter::ESM) or
-          (defined? Ruby2JS::Filter::CJS and
-          filters.include? Ruby2JS::Filter::CJS)
-        then
-          @react_imports = true
         end
 
         if \
@@ -133,7 +123,7 @@ module Ruby2JS
           inheritance == s(:const, s(:const, nil, :React), :Component) or
           inheritance == s(:send, s(:const, nil, :React), :Component)
 
-        prepend_list << REACT_IMPORTS[:React] if @react_imports
+        prepend_list << REACT_IMPORTS[:React] if modules_enabled?
 
         # traverse down to actual list of class statements
         if body.length == 1
@@ -445,7 +435,7 @@ module Ruby2JS
             node.children.first == s(:const, nil, :React) or
             node.children.first == s(:const, nil, :ReactDOM)
           then
-            if @react_imports
+            if modules_enabled?
               prepend_list << REACT_IMPORTS[node.children.first.children.last]
             end
 

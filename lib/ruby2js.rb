@@ -92,6 +92,17 @@ module Ruby2JS
         include_only(options[:include_only]) if options[:include_only]
         include(options[:include]) if options[:include]
         exclude(options[:exclude]) if options[:exclude]
+
+        filters = options[:filters] || []
+        @modules_enabled =
+          (defined? Ruby2JS::Filter::ESM and
+          filters.include? Ruby2JS::Filter::ESM) or
+          (defined? Ruby2JS::Filter::CJS and
+          filters.include? Ruby2JS::Filter::CJS)
+      end
+
+      def modules_enabled?
+        @modules_enabled
       end
 
       def es2015

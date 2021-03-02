@@ -51,8 +51,10 @@ module Ruby2JS
         @stim_classes = Set.new
         stim_walk(node)
 
-        prepend_list << (@options[:import_from_skypack] ?
-          STIMULUS_IMPORT_SKYPACK : STIMULUS_IMPORT)
+        if modules_enabled?
+          prepend_list << (@options[:import_from_skypack] ?
+            STIMULUS_IMPORT_SKYPACK : STIMULUS_IMPORT)
+        end
 
         nodes = body
         if nodes.length == 1 and nodes.first&.type == :begin

@@ -9,28 +9,30 @@ describe Ruby2JS::Filter::Stimulus do
       filters: [Ruby2JS::Filter::Stimulus]).to_s)
   end
   
+  def to_js_esm(string)
+    _(Ruby2JS.convert(string, eslevel: 2022,
+      filters: [Ruby2JS::Filter::Stimulus, Ruby2JS::Filter::ESM]).to_s)
+  end
+  
   def to_js_skypack(string)
     _(Ruby2JS.convert(string, eslevel: 2022, import_from_skypack: true,
-      filters: [Ruby2JS::Filter::Stimulus]).to_s)
+      filters: [Ruby2JS::Filter::Stimulus, Ruby2JS::Filter::ESM]).to_s)
   end
   
   describe "class aliases" do
     it "handles ruby scope syntax" do
       to_js( 'class Foo<Stimulus::Controller; end' ).
-        must_equal 'import * as Stimulus from "stimulus"; ' +
-          'class Foo extends Stimulus.Controller {}'
+        must_equal 'class Foo extends Stimulus.Controller {}'
     end
 
     it "handles JS scope syntax" do
       to_js( 'class Foo<Stimulus.Controller; end' ).
-        must_equal 'import * as Stimulus from "stimulus"; ' +
-          'class Foo extends Stimulus.Controller {}'
+        must_equal 'class Foo extends Stimulus.Controller {}'
     end
 
     it "handles shorthand" do
       to_js( 'class Foo<Stimulus; end' ).
-        must_equal 'import * as Stimulus from "stimulus"; ' +
-          'class Foo extends Stimulus.Controller {}'
+        must_equal 'class Foo extends Stimulus.Controller {}'
     end
   end
 
@@ -111,7 +113,13 @@ describe Ruby2JS::Filter::Stimulus do
     end
   end
 
-  describe "skypack" do
+  describe "modules" do
+    it "imports from Stimulus" do
+      to_js_esm( 'class Foo<Stimulus::Controller; end' ).
+        must_equal 'import * as Stimulus from "stimulus"; ' +
+          'class Foo extends Stimulus.Controller {}'
+    end
+
     it "imports from skypack" do
       to_js_skypack( 'class Foo<Stimulus::Controller; end' ).
         must_equal 'import * as Stimulus from "https://cdn.skypack.dev/stimulus"; ' +
