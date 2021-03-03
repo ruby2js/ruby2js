@@ -72,6 +72,7 @@ end
 **Note**: the `find_javascript_files_in_tree` method above is a (hopefully
 temporary) monkey patch to make stimulus_rails aware of sprocket
 transformations that produce JavaScript.
+See [stimulus-rails issue #54](https://github.com/hotwired/stimulus-rails/issues/54) for status.
 {% endrendercontent %}
 
 ## Write some HTML and a matching Stimulus controller
