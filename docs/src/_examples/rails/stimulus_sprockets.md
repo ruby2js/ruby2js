@@ -125,7 +125,7 @@ Start your server:
 ./bin/rails server
 ```
 
-Visit <http://localhost:3000/stimulus/greeter>.  What you should see:
+Visit <http://localhost:3000/greeter/hello>.  What you should see:
 
 <p data-controller="eval" data-html="div.language-html"></p>
 
