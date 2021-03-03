@@ -6,7 +6,9 @@ task :watch do
 end
 
 task :test => :default do
-  sh "node #{__dir__}/nodetest.js"
+  Dir.chdir __dir__ do
+    sh "node nodetest.js"
+  end
 end
 
 # pass NODE_ENV=development to disable 'terse'
