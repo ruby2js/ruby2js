@@ -93,7 +93,7 @@ module Ruby2JS
         include(options[:include]) if options[:include]
         exclude(options[:exclude]) if options[:exclude]
 
-        filters = options[:filters] || []
+        filters = options[:filters] || DEFAULTS
         @modules_enabled =
           (defined? Ruby2JS::Filter::ESM and
           filters.include? Ruby2JS::Filter::ESM) or
