@@ -119,7 +119,7 @@ Visit <http://localhost:3000/greeter/hello>.  What you should see:
 
 <p data-controller="eval" data-html="div.language-html"></p>
 
-Make a change to `app/assets/javascripts/controllers/hello_controller.js.rb`
+Make a change to `app/javascripts/controllers/hello_controller.js.rb`
 and see the results.
 
 In case you are curious, the JavaScript that Ruby2JS returned back to webpack
