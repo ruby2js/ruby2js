@@ -64,7 +64,7 @@ file "#{demo}/editor.js" => ['../demo/editor.js'] do
 end
 
 file "#{demo}/livedemo.js" => ['../demo/livedemo.js.rb', *controller_files] do
-  sh "#{RbConfig.ruby} ../demo/ruby2js.rb --filter require --filter stimulus --filter functions --identity --es2019 ../demo/livedemo.js.rb | " +
+  sh "#{RbConfig.ruby} ../demo/ruby2js.rb --filter esm --filter require --filter stimulus --filter functions --identity --es2019 ../demo/livedemo.js.rb | " +
     "npx rollup -f iife --context window -p @rollup/plugin-node-resolve | " +
     "#{terser} > #{demo}/livedemo.js"
 end
