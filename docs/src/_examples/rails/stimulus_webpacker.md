@@ -58,6 +58,12 @@ environment.loaders.append('rb2js', {
 module.exports = environment
 ```
 
+Add `.js.rb` to `config/webpacker.yml` in the `default`.`extensions` section:
+
+```
+    - .js.rb
+```
+
 Add `(\.rb)?` to the `require.context` line in
 `app/javascript/controllers/index.js`:
 
