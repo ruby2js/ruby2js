@@ -60,6 +60,7 @@ module Ruby2JS
       @class_parent = nil
       @class_name = nil
       @jsx = false
+      @autobind = true
 
       @eslevel = :es5
       @strict = false

@@ -153,6 +153,7 @@ module Ruby2JS
       if receiver
         if receiver.type == :autobind
           autobind = receiver = receiver.children.first
+          autobind = nil unless @autobind
         end
 
         group_receiver = receiver.type == :send &&

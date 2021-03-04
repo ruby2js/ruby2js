@@ -15,17 +15,19 @@ module Ruby2JS
 
         tagged_methods = @options[:template_literal_tags] || [:html, :css]
 
-        if tagged_methods.include?(method) && !args.empty?
+        if tagged_methods.include?(method) && args.length == 1
           strnode = process args.first
           if strnode.type == :str
             # convert regular strings to literal strings
             strnode = strnode.updated(:dstr, [s(:str, strnode.children.first.chomp("\n"))])
-          else
+          elsif strnode.type == :dstr
             # for literal strings, chomp a newline off the end
             if strnode.children.last.type == :str && strnode.children.last.children[0].end_with?("\n")
              children = [*strnode.children.take(strnode.children.length - 1), s(:str, strnode.children.last.children[0].chomp)]
              strnode = s(:dstr, *children)
             end
+          else
+            return super
           end
 
           S(:taglit, s(:sym, method), strnode)

@@ -1,5 +1,7 @@
 # master
 
+* don't autobind instance methods within tagged literals
+
 # 4.0.2 / 2021-03-02
 
 * next within a block can return a value

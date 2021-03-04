@@ -6,8 +6,15 @@ module Ruby2JS
    #   (dstr)
 
     handle :taglit do |tag, *children|
-      put tag.children.first
-      parse_all(*children, join: '')
+      begin
+        # disable autobinding in tag literals
+        save_autobind, @autobind = @autobind, false
+      
+        put tag.children.first
+        parse_all(*children, join: '')
+      ensure
+        @autobind = save_autobind
+      end
     end
   end
 end

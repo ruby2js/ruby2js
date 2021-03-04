@@ -25,7 +25,8 @@ module Ruby2JS
         put '`'
         children.each do |child|
           if child.type == :str
-            str = child.children.first.inspect[1..-2].gsub('${', '$\{').gsub('`', '\\\`')
+            str = child.children.first.inspect[1..-2].
+              gsub('${', '$\{').gsub('`', '\\\`').gsub(/(?<!\\)\\"/, '"')
             if heredoc
               put! str.gsub("\\n", "\n")
             else

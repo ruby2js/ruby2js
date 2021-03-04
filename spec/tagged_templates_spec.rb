@@ -47,6 +47,13 @@ describe Ruby2JS::Filter::TaggedTemplates do
     end
   end
 
+  describe "autobind" do
+    it "should not autobind methods" do
+      to_js('class C; def click(event); end; def render; html "<div @click=\"#{click}\"></div>"; end; end').
+        must_include('{return html`<div @click="${this.click}"></div>`')
+    end
+  end
+
   describe "targets" do
     it "should not process unless target is nil" do
       to_js('styles = self.css("color: green")').
