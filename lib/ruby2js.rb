@@ -180,7 +180,7 @@ module Ruby2JS
       def on_xnode(node); end
       def on_export(node); end
       def on_import(node); end
-      def on_taglit(node); end
+      def on_taglit(node); on_pair(node); end
 
       # provide a method so filters can call 'super'
       def on_sym(node); node; end

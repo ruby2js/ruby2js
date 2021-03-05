@@ -63,6 +63,12 @@ file "#{demo}/editor.js" => ['../demo/editor.js'] do
     "#{terser} > src/demo/editor.js"
 end
 
+file "#{demo}/litelement.js" => ['../demo/litelement.js'] do
+  sh "cat ../demo/litelement.js | " +
+    "npx rollup -f iife -p @rollup/plugin-node-resolve |" +
+    "#{terser} > src/demo/litelement.js"
+end
+
 file "#{demo}/livedemo.js" => ['../demo/livedemo.js.rb', *controller_files] do
   sh "#{RbConfig.ruby} ../demo/ruby2js.rb --filter esm --filter require --filter stimulus --filter functions --identity --es2019 ../demo/livedemo.js.rb | " +
     "npx rollup -f iife --context window -p @rollup/plugin-node-resolve | " +
@@ -85,6 +91,7 @@ end
 task :default => [
   "#{demo}/index.erb",
   "#{demo}/editor.js",
+  "#{demo}/litelement.js",
   "#{demo}/livedemo.js",
   "#{demo}/ruby2js.js"
 ]

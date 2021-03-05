@@ -120,6 +120,6 @@ async {
   application.register("combo", ComboController)
   application.register("eval", EvalController)
 
-  window.Stimulus = Stimulus
+  globalThis.Stimulus = Stimulus
 
 }[]

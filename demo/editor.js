@@ -84,7 +84,7 @@ const setup = [
   ])
 ]
 
-window.CodeMirror = class {
+globalThis.CodeMirror = class {
   static rubyEditor(parent, notify=null) {
     return new EditorView({
       state: EditorState.create({

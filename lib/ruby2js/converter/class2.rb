@@ -156,7 +156,7 @@ module Ruby2JS
             end
           end
 
-          if m.type == :def || m.type == :defm || m.type == :async
+          if %i[def defm deff async].include? m.type
             @prop = m.children.first
 
             if @prop == :initialize and !@rbstack.last[:initialize]
@@ -190,11 +190,11 @@ module Ruby2JS
             end
 
           elsif \
-            [:defs, :asyncs].include? m.type and m.children.first.type == :self
+            [:defs, :defp, :asyncs].include? m.type and m.children.first.type == :self
           then
 
             @prop = "static #{m.children[1]}"
-            if not m.is_method?
+            if m.type == :defp or not m.is_method?
               @prop = "static get #{m.children[1]}"
               m = m.updated(m.type, [*m.children[0..2], 
                 s(:autoreturn, m.children[3])])

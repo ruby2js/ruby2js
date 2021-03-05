@@ -44,6 +44,7 @@
     "animated-scroll-to": "^2.0.12",
     "bridgetown-quick-search": "1.0.5",
     "bulma": "^0.9.1",
+    "lit-element": "^2.4.0",
     "stimulus": "^2.0.0"
   }
 }
