@@ -1,5 +1,6 @@
 class EvalController < DemoController
   SCRIPTS = {
+    LitElement: "/demo/litelement.js",
     React: "https://unpkg.com/react@17/umd/react.production.min.js",
     ReactDOM: "https://unpkg.com/react-dom@17/umd/react-dom.production.min.js",
     Remarkable: "https://cdnjs.cloudflare.com/ajax/libs/remarkable/2.0.1/remarkable.min.js"
@@ -93,7 +94,7 @@ class EvalController < DemoController
     controllers = []
     content.gsub! /^export (default )?(class (\w+) extends Stimulus.Controller)/ do
       controllers << $3
-      next $2
+      $2
     end
 
     unless controllers.empty?

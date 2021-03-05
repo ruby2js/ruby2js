@@ -8,7 +8,7 @@ module Ruby2JS
 
       LITELEMENT_IMPORT = s(:import,
         [s(:pair, s(:sym, :from), s(:str, "lit-element"))],
-        [s(:const, nil, :LitElement), s(:send, nil, :css), s(:send, nil, :html)]) 
+        [s(:const, nil, :LitElement), s(:attr, nil, :css), s(:attr, nil, :html)]) 
 
       def initialize(node)
         super
