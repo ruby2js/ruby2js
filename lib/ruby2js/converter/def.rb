@@ -142,7 +142,13 @@ module Ruby2JS
         end
 
         if style == :expression
-          expr.type == :hash ? group(expr) : wrap('(', ')') { parse(expr) }
+          if expr.type == :taglit
+            parse expr
+          elsif expr.type == :hash
+            group(expr)
+          else
+            wrap('(', ')') { parse(expr) }
+          end
         elsif body.type == :begin and body.children.length == 0
           put "{}"
         else
