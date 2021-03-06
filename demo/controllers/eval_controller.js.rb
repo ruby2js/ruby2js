@@ -94,7 +94,7 @@ class EvalController < DemoController
     controllers = []
     content.gsub! /^export (default )?(class (\w+) extends Stimulus.Controller)/ do
       controllers << $3
-      $2
+      next $2
     end
 
     unless controllers.empty?
