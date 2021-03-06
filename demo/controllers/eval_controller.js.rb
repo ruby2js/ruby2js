@@ -12,9 +12,9 @@ class EvalController < DemoController
   end
 
   def setup()
-    @div = document.createElement('div')
-    @div.id = 'd' + Date.now() + Math.random().toString().slice(2)
-    shadow = @div.attachShadow(mode: :open)
+    @demo = document.createElement('div')
+    @demo.id = 'd' + Date.now() + Math.random().toString().slice(2)
+    shadow = @demo.attachShadow(mode: :open)
     @script = nil
 
     # copy missing document functions to shadow
@@ -35,7 +35,7 @@ class EvalController < DemoController
     # add html (if any) to shadow; handling both templates and markdown code
     html = document.querySelector(element.dataset.html)
     if html
-      @div.classList.add 'demo-results'
+      @demo.classList.add 'demo-results'
       div = document.createElement('div')
       if html.content
         html.content.childNodes.each do |node|
@@ -48,7 +48,7 @@ class EvalController < DemoController
     end
 
     # add div to document
-    element.appendChild(@div)
+    element.appendChild(@demo)
 
     # set up listener for script failures.  Ensure every error is only
     # reported once (I'm looking at you, Safari)
@@ -70,31 +70,13 @@ class EvalController < DemoController
       @script.remove()
     end
 
-    # load all dependencies
-    SCRIPTS.each_pair do |name, src|
-      if content =~ /\b#{name}\b/ and not window.respond_to? name
-        await Promise.new do |resolve, reject|
-          script = document.createElement('script')
-          script.src = src
-          script.async = true
-          script.crossorigin = true
-
-          script.addEventListener(:error, reject)
-          script.addEventListener(:load, resolve)
-          document.head.appendChild(script)
-        end
-
-        window.Remarkable = remarkable.Remarkable if name == 'Remarkable'
-      end
-    end
-
     # Stimulus support: remove imports, start application, register controllers
     content.gsub! /^import .*;\n\s*/, ''
 
     controllers = []
     content.gsub! /^export (default )?(class (\w+) extends Stimulus.Controller)/ do
       controllers << $3
-      next $2
+      $2
     end
 
     unless controllers.empty?
@@ -107,16 +89,6 @@ class EvalController < DemoController
       content += ";\nwindow.application.register(#{name.inspect}, #{controller})"
     end
 
-    # wrap script in a IIFE (Immediately Invoked Function Expression) in order
-    # to avoid polluting the window environment.
-    @script = document.createElement('script')
-    if @div.shadowRoot
-      @script.textContent = 
-        "(document => {#{content}})(document.getElementById('#{@div.id}').shadowRoot)"
-    else
-      @script.textContent = "(() => {#{content}})()"
-    end
-
     # if a script is currently loading, wait before proceeding
     if @pending
       await Promise.new do |resolve, reject|
@@ -126,6 +98,65 @@ class EvalController < DemoController
             resolve()
           end
         end
+      end
+    end
+
+    # customElements can't be undefined, so create an iframe to contain
+    # the definition
+    if content.include? 'customElements.define'
+      # construct the iframe element
+      iframe = document.createElement('iframe')
+      iframe.id = @demo.id
+      iframe.classList.add *@demo.classList
+      iframe.height = @demo.height
+
+      # extract HTML from previous element
+      if @demo.shadowRoot
+        html = @demo.shadowRoot.innerHTML
+      elsif @demo.contentWindow
+        html = @demo.contentWindow.document.body.innerHTML
+      else
+        html = ''
+      end
+
+      # insert into document
+      @demo.parentNode.replaceChild(iframe, @demo)
+      iwindow = iframe.contentWindow
+      iwindow.document.body.innerHTML = html
+      iwindow.document.body.id = iframe.id
+
+      owner = iwindow.document.head
+      @demo = iframe
+    else
+      iwindow = window
+      owner = @demo
+    end
+
+    # wrap script in a IIFE (Immediately Invoked Function Expression) in order
+    # to avoid polluting the window environment.
+    @script = iwindow.document.createElement('script')
+    if @demo.shadowRoot
+      @script.textContent = 
+        "(document => {#{content}})(document.getElementById('#{@demo.id}').shadowRoot)"
+    else
+      @script.textContent = "(() => {#{content}})()"
+    end
+
+    # load all dependencies
+    SCRIPTS.each_pair do |name, src|
+      if content =~ /\b#{name}\b/ and not iwindow.respond_to? name
+        await Promise.new do |resolve, reject|
+          script = document.createElement('script')
+          script.src = src
+          script.async = true
+          script.crossorigin = true
+
+          script.addEventListener(:error, reject)
+          script.addEventListener(:load, resolve)
+          iwindow.document.head.appendChild(script)
+        end
+
+        iwindow.Remarkable = remarkable.Remarkable if name == 'Remarkable'
       end
     end
 
@@ -145,9 +176,12 @@ class EvalController < DemoController
         @script.onload = -> (event) {@pending.resolve() if @pending; @pending = nil}
 
         # safari doesn't run onload handlers for inline scripts
-        setTimeout(5_000) {@pending.resolve() if @pending; @pending = nil}
-        @div.appendChild(@script)
+        setTimeout(2_000) {@pending.resolve() if @pending; @pending = nil}
+        owner.appendChild(@script)
       end
+
+      # resize iframe to accomodate content
+      iframe.height = iwindow.document.body.scrollHeight + 20 if iframe
 
       # remove previous exceptions again to handle race conditions
       Array(element.querySelectorAll('.exception')).each do |exception|
@@ -178,7 +212,7 @@ class EvalController < DemoController
 
   def teardown()
     stop_application()
-    @div.remove()
+    @demo.remove()
   end
 
   # stop and remove stimulus application

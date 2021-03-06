@@ -47,6 +47,9 @@
 .demo-results {
   border: 1px solid black;
   padding: 0.5rem;
+  width: 100%;
+  resize: vertical;
+  overflow: auto;
 }
 
 // AST output
