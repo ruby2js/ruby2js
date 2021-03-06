@@ -122,6 +122,9 @@ class EvalController < DemoController
       # insert into document
       @demo.parentNode.replaceChild(iframe, @demo)
       iwindow = iframe.contentWindow
+      await Promise.new do |resolve, reject|
+        iwindow.addEventListener :DOMContentLoaded, resolve
+      end
       iwindow.document.body.innerHTML = html
       iwindow.document.body.id = iframe.id
 
