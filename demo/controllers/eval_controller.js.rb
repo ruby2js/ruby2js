@@ -59,6 +59,20 @@ class EvalController < DemoController
       @timestamp = event.timestamp
       @pending = nil
     end
+
+    # listener for frame events
+    window.addEventListener :message do |event|
+      console.log(event.data)
+      if event.data == 'load'
+        @pending.resolve() if @pending
+        @pending = nil
+      elsif event.data.error
+        @pending.reject(event.data.error) if @pending
+        @pending = nil
+      elsif event.data.resize
+        @demo.height = event.data.resize
+      end
+    end
   end
 
   async def load(content)
@@ -101,73 +115,7 @@ class EvalController < DemoController
       end
     end
 
-    # customElements can't be undefined, so create an iframe to contain
-    # the definition
-    if content.include? 'customElements.define'
-      # construct the iframe element
-      iframe = document.createElement('iframe')
-      iframe.id = @demo.id
-      iframe.classList.add *@demo.classList
-      iframe.height = @demo.height
-
-      # extract HTML from previous element
-      if @demo.shadowRoot
-        html = @demo.shadowRoot.innerHTML
-      elsif @demo.contentWindow
-        html = @demo.contentWindow.document.body.innerHTML
-      else
-        html = ''
-      end
-
-      # insert into document
-      @demo.parentNode.replaceChild(iframe, @demo)
-      iwindow = iframe.contentWindow
-      iwindow.document.body.innerHTML = html
-      iwindow.document.body.id = iframe.id
-
-      # firefox overwrites the body with the srcdoc after load so restore it.
-      # setting srcdoc confuses Chrome, so we don't do that either.
-      iwindow.addEventListener :DOMContentLoaded do
-        iwindow.document.body.innerHTML = html
-        iwindow.document.body.id = iframe.id
-      end
-
-      owner = iwindow.document.head
-      @demo = iframe
-    else
-      iwindow = window
-      owner = @demo
-    end
-
-    # wrap script in a IIFE (Immediately Invoked Function Expression) in order
-    # to avoid polluting the window environment.
-    @script = iwindow.document.createElement('script')
-    if @demo.shadowRoot
-      @script.textContent = 
-        "(document => {#{content}})(document.getElementById('#{@demo.id}').shadowRoot)"
-    else
-      @script.textContent = "(() => {#{content}})()"
-    end
-
-    # load all dependencies
-    SCRIPTS.each_pair do |name, src|
-      if content =~ /\b#{name}\b/ and not iwindow.respond_to? name
-        await Promise.new do |resolve, reject|
-          script = document.createElement('script')
-          script.src = src
-          script.async = true
-          script.crossorigin = true
-
-          script.addEventListener(:error, reject)
-          script.addEventListener(:load, resolve)
-          iwindow.document.head.appendChild(script)
-        end
-
-        iwindow.Remarkable = remarkable.Remarkable if name == 'Remarkable'
-      end
-    end
-
-    # append script to the div
+    # append script to the demo
     begin
       # remove previous exceptions
       Array(element.querySelectorAll('.exception')).each do |exception|
@@ -177,23 +125,23 @@ class EvalController < DemoController
       # run the script; throwing an error if either @script.onerror or
       # an error event is sent to the window (see above).  The latter
       # handles syntax errors in the script itself.
-      await Promise.new do |resolve, reject|
+      await Promise.new async do |resolve, reject|
         @pending = { resolve: resolve, reject: reject }
-        @script.onerror = -> (event) {@pending.resolve(event.error) if @pending; @pending = nil}
-        @script.onload = -> (event) {@pending.resolve() if @pending; @pending = nil}
 
         # safari doesn't run onload handlers for inline scripts
         setTimeout(2_000) {@pending.resolve() if @pending; @pending = nil}
-        owner.appendChild(@script)
-      end
 
-      # resize iframe to accomodate content
-      iframe.height = iwindow.document.body.scrollHeight + 20 if iframe
+        if content.include? 'customElements.define'
+          await load_iframe(content)
+        else
+          await load_shadow(content)
+        end
+      end
 
       # remove previous exceptions again to handle race conditions
-      Array(element.querySelectorAll('.exception')).each do |exception|
-        exception.remove()
-      end
+      # Array(element.querySelectorAll('.exception')).each do |exception|
+      #   exception.remove()
+      # end
     rescue => error
       # display exception
       div = element.querySelector('.exception') || document.createElement('div')
@@ -206,6 +154,99 @@ class EvalController < DemoController
         @source.options = {**@source.options, eslevel: 2021}
       end
     end
+  end
+
+  # Add script to the shadow element.  A shadow element provides some
+  # encapsulation, but will share scripts that were previously loaded.
+  # Also means that there is no need to replace the HTML.
+  async def load_shadow(content)
+    # load all dependencies
+    SCRIPTS.each_pair do |name, src|
+      if content =~ /\b#{name}\b/ and not window.respond_to? name
+        await Promise.new do |resolve, reject|
+          script = document.createElement('script')
+          script.src = src
+          script.async = true
+          script.crossorigin = true
+
+          script.addEventListener(:error, reject)
+          script.addEventListener(:load, resolve)
+          document.head.appendChild(script)
+        end
+
+        window.Remarkable = remarkable.Remarkable if name == 'Remarkable'
+      end
+    end
+
+    @script = window.document.createElement('script')
+    @script.textContent = "(document => {
+      #{content};
+      window.postMessage('load', '*')
+    })(document.getElementById('#{@demo.id}').shadowRoot)"
+    @demo.appendChild(@script)
+  end
+
+  # Add script to an iframe.  All scripts and custom elements need to be
+  # reloaded.  Also repaints the HTML.  This is needed as there is no way to
+  # unregister a custom element.
+  async def load_iframe(content)
+    # extract HTML from previous element
+    if @demo.shadowRoot
+      html = @demo.shadowRoot.innerHTML
+    elsif @demo.contentWindow and @demo.contentWindow.document.body
+      html = @demo.contentWindow.document.body.innerHTML
+    else
+      html = ''
+    end
+
+    # create a new document
+    idoc = document.implementation.createHTMLDocument()
+    idoc.body.innerHTML = html
+    idoc.body.id = @demo.id
+
+    # add the error watcher
+    script = idoc.createElement('script')
+    script.textContent = <<~JAVASCRIPT
+      window.addEventListener('error', event => {
+        window.parent.postMessage({resize: 10}, '*');
+        window.parent.postMessage({error: event.error.message}, '*');
+      });
+    JAVASCRIPT
+    idoc.head.appendChild(script)
+
+    # load all dependencies
+    SCRIPTS.each_pair do |name, src|
+      if content =~ /\b#{name}\b/
+        script = idoc.createElement('script')
+        script.src = src
+        script.crossorigin = true
+        idoc.head.appendChild(script)
+      end
+    end
+
+    # add the script
+    script = idoc.createElement('script')
+    script.textContent = <<~JAVASCRIPT
+      #{content};
+
+      window.addEventListener('load', () => {
+        let height = document.documentElement.scrollHeight + 20;
+        window.parent.postMessage({resize: height});
+        window.parent.postMessage('load', '*');
+      })
+    JAVASCRIPT
+    idoc.head.appendChild(script)
+
+    # construct the iframe element
+    iframe = document.createElement('iframe')
+    iframe.srcdoc = '<!DOCTYPE html>' + idoc.documentElement.outerHTML
+    iframe.id = @demo.id
+    iframe.classList.add *@demo.classList
+    iframe.height = @demo.height
+
+    # insert into document
+    @demo.parentNode.replaceChild(iframe, @demo)
+    @demo = iframe
   end
 
   # update contents
