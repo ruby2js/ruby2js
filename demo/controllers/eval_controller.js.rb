@@ -12,42 +12,11 @@ class EvalController < DemoController
   end
 
   def setup()
-    @demo = document.createElement('div')
-    @demo.id = 'd' + Date.now() + Math.random().toString().slice(2)
-    shadow = @demo.attachShadow(mode: :open)
     @script = nil
 
-    # copy missing document functions to shadow
-    for prop in document
-      next unless typeof document[prop] == 'function'
-      next if shadow.respond_to? prop
-      shadow[prop] = ->(*args) {document[prop].call(document, *args)}
-    end
-
-    # add css (if any) to shadow
-    css = document.querySelector(element.dataset.css)
-    if css
-      style = document.createElement('style')
-      style.textContent = css.textContent
-      shadow.appendChild(style)
-    end
-
-    # add html (if any) to shadow; handling both templates and markdown code
-    html = document.querySelector(element.dataset.html)
-    if html
-      @demo.classList.add 'demo-results'
-      div = document.createElement('div')
-      if html.content
-        html.content.childNodes.each do |node|
-          div.appendChild node.cloneNode(true)
-        end
-      else
-        div.innerHTML = html.textContent
-      end
-      shadow.appendChild(div)
-    end
-
     # add div to document
+    @demo = document.createElement('div')
+    @demo.id = 'd' + Date.now() + Math.random().toString().slice(2)
     element.appendChild(@demo)
 
     # set up listener for script failures.  Ensure every error is only
@@ -60,9 +29,8 @@ class EvalController < DemoController
       @pending = nil
     end
 
-    # listener for frame events
+    # listener for iframe events
     window.addEventListener :message do |event|
-      console.log(event.data)
       if event.data == 'load'
         @pending.resolve() if @pending
         @pending = nil
@@ -75,6 +43,7 @@ class EvalController < DemoController
     end
   end
 
+  # load a script into the results
   async def load(content)
     first_load = !@script
 
@@ -128,10 +97,10 @@ class EvalController < DemoController
       await Promise.new async do |resolve, reject|
         @pending = { resolve: resolve, reject: reject }
 
-        # safari doesn't run onload handlers for inline scripts
-        setTimeout(2_000) {@pending.resolve() if @pending; @pending = nil}
+        # just in case we don't get notified...
+        setTimeout(5_000) {@pending.resolve() if @pending; @pending = nil}
 
-        if content.include? 'customElements.define'
+        if content.include? 'customElements.define' or @demo.nodeName == 'IFRAME'
           await load_iframe(content)
         else
           await load_shadow(content)
@@ -144,10 +113,10 @@ class EvalController < DemoController
       # end
     rescue => error
       # display exception
-      div = element.querySelector('.exception') || document.createElement('div')
-      div.textContent = error
-      div.classList.add('exception')
-      element.appendChild(div)
+      pre = element.querySelector('.exception') || document.createElement('pre')
+      pre.textContent = error
+      pre.classList.add('exception')
+      element.appendChild(pre)
 
       # downgrade eslevel if the script doesn't load the first time
       if first_load and @source&.options&.eslevel == 2022
@@ -156,10 +125,48 @@ class EvalController < DemoController
     end
   end
 
+  def load_html(container)
+    # add css (if any) to container
+    css = document.querySelector(element.dataset.css)
+    if css
+      style = document.createElement('style')
+      style.textContent = css.textContent
+      container.appendChild(style)
+    end
+
+    # add html (if any) to container; handling both templates and markdown code
+    html = document.querySelector(element.dataset.html)
+    if html
+      @demo.classList.add 'demo-results'
+      div = document.createElement('div')
+      if html.content
+        html.content.childNodes.each do |node|
+          div.appendChild node.cloneNode(true)
+        end
+      else
+        div.innerHTML = html.textContent
+      end
+      container.appendChild(div)
+    end
+  end
+
   # Add script to the shadow element.  A shadow element provides some
   # encapsulation, but will share scripts that were previously loaded.
   # Also means that there is no need to replace the HTML.
   async def load_shadow(content)
+    unless @demo.shadowRoot
+      # create shadow with HTML, CSS
+      shadow = @demo.attachShadow(mode: :open)
+      load_html(shadow)
+
+      # copy missing document functions to shadow
+      for prop in document
+        next unless typeof document[prop] == 'function'
+        next if shadow.respond_to? prop
+        shadow[prop] = ->(*args) {document[prop].call(document, *args)}
+      end
+    end
+
     # load all dependencies
     SCRIPTS.each_pair do |name, src|
       if content =~ /\b#{name}\b/ and not window.respond_to? name
@@ -190,18 +197,9 @@ class EvalController < DemoController
   # reloaded.  Also repaints the HTML.  This is needed as there is no way to
   # unregister a custom element.
   async def load_iframe(content)
-    # extract HTML from previous element
-    if @demo.shadowRoot
-      html = @demo.shadowRoot.innerHTML
-    elsif @demo.contentWindow and @demo.contentWindow.document.body
-      html = @demo.contentWindow.document.body.innerHTML
-    else
-      html = ''
-    end
-
     # create a new document
     idoc = document.implementation.createHTMLDocument()
-    idoc.body.innerHTML = html
+    load_html(idoc.body)
     idoc.body.id = @demo.id
 
     # add the error watcher
@@ -225,8 +223,8 @@ class EvalController < DemoController
     end
 
     # add the script
-    script = idoc.createElement('script')
-    script.textContent = <<~JAVASCRIPT
+    @script = idoc.createElement('script')
+    @script.textContent = <<~JAVASCRIPT
       #{content};
 
       window.addEventListener('load', () => {
@@ -235,7 +233,7 @@ class EvalController < DemoController
         window.parent.postMessage('load', '*');
       })
     JAVASCRIPT
-    idoc.head.appendChild(script)
+    idoc.head.appendChild(@script)
 
     # construct the iframe element
     iframe = document.createElement('iframe')
@@ -254,8 +252,9 @@ class EvalController < DemoController
     load(script)
   end
 
-  # ignore errors
+  # post syntax errors
   def exception=(message)
+    window.postMessage({error: message}, '*');
   end
 
   def teardown()
