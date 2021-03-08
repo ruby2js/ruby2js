@@ -623,22 +623,22 @@ describe Ruby2JS::Filter::React do
   describe :autoimports do
     it "should not autoimport React unless ESM is included" do
       to_js6( 'class Foo<React; end' ).
-        wont_include 'import React from "React";'
+        wont_include 'import React from "react";'
     end
 
     it "should autoimport React if ESM is included" do
       to_esm( 'class Foo<React; end' ).
-        must_include 'import React from "React";'
+        must_include 'import React from "react";'
     end
 
     it "should not autoimport ReactDOM unless ESM is included" do
       to_js( 'ReactDOM.render _h1("hello world"), document.getElementById("root")' ).
-        wont_include 'import ReactDOM from "ReactDOM";'
+        wont_include 'import ReactDOM from "react-dom";'
     end
 
     it "should autoimport ReactDOM if ESM is included" do
       to_esm( 'ReactDOM.render _h1("hello world"), document.getElementById("root")' ).
-        must_include 'import ReactDOM from "ReactDOM";'
+        must_include 'import ReactDOM from "react-dom";'
     end
   end
 
