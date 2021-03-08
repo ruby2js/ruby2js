@@ -1,5 +1,7 @@
 language: ruby
 
+cache: bundler
+
 #before_install:
 # # Workaround for https://github.com/travis-ci/travis-ci/issues/8969
 # - gem update --system
