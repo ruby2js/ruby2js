@@ -26,8 +26,8 @@ module Ruby2JS
       extend  SEXP
 
       REACT_IMPORTS = {
-        React: s(:import, ['React'], s(:attr, nil, :React)),
-        ReactDOM: s(:import, ['ReactDOM'], s(:attr, nil, :ReactDOM))
+        React: s(:import, ['react'], s(:attr, nil, :React)),
+        ReactDOM: s(:import, ['react-dom'], s(:attr, nil, :ReactDOM))
       }
 
       # the following command can be used to generate ReactAttrs:
