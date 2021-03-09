@@ -25,72 +25,17 @@ rails new ruby2js-litelement
 cd ruby2js-litelement
 ```
 
-## Install Lit-element
+Add the following line to your `Gemfile`:
 
-Install `lit-element`:
-
-```
-yarn add lit-element
+```ruby
+gem 'ruby2js', require: 'ruby2js/rails'
 ```
 
-Make a directory for the elements you will be creating:
+Run the following commands:
 
-```
-mkdir app/javascript/elements
-```
-
-Place the following in `app/javascript/elements/index.js` to load the elements:
-
-```
-function importAll(r) { r.keys().forEach(r) }
-importAll(require.context("elements", true, /_elements?\.js(\.rb)?$/)
-```
-
-Add the following line to `app/javascript/packs/application.js` to load the
-index:
- 
-```javascript
-import "elements"
-```
-
-## Add and configure Ruby2JS
-
-Run `yarn add @ruby2js/webpack-loader`.
-
-Replace the contents of `config/webpack/environment.js` with:
-
-```javascript
-const { environment } = require('@rails/webpacker')
-
-const babelOptions = environment.loaders.get('babel').use[0].options
-
-// Insert rb2js loader at the end of list
-environment.loaders.append('rb2js', {
-  test: /\.js\.rb$/,
-  use: [
-    {
-      loader: "babel-loader",
-      options: {...babelOptions}
-    },
-
-    {
-      loader: "@ruby2js/webpack-loader",
-      options: {
-        autoexports: "default",
-        eslevel: 2021,
-        filters: ['esm', 'functions', 'lit-element']
-      }
-    },
-  ]
-})
-
-module.exports = environment
-```
-
-Add `.js.rb` to `config/webpacker.yml` in the `default`.`extensions` section:
-
-```
-    - .js.rb
+```sh
+./bin/bundle install
+./bin/rails ruby2js:install:litelement
 ```
 
 ## Write some HTML and a matching Stimulus controller
