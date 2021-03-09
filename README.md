@@ -3,7 +3,6 @@ Ruby2JS
 
 Minimal yet extensible Ruby to JavaScript conversion.  
 
-[![Build Status](https://travis-ci.org/rubys/ruby2js.svg)](https://travis-ci.org/rubys/ruby2js)
 [![Gem Version](https://badge.fury.io/rb/ruby2js.svg)](https://badge.fury.io/rb/ruby2js)
 [![Gitter](https://badges.gitter.im/ruby2js/community.svg)](https://gitter.im/ruby2js/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
 
