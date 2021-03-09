@@ -175,7 +175,7 @@ def parse_request(env=ENV)
             options[:filters] << mod
           end
         end
-      elsif not name.empty? and name =~ /^\w+$/
+      elsif not name.empty? and name =~ /^[-\w+]$/
         $load_error = "UNKNOWN filter: #{name}"
       end
     rescue Exception => $load_error

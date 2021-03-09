@@ -98,8 +98,8 @@ Add the following to `app/views/greeter/hello.html.erb`:
 </div>
 ```
 
-Remove `app/assets/javascripts/controllers/hello_controller.js`, and create
-`app/assets/javascripts/controllers/hello_controller.js.rb` with the following
+Remove `app/assets/javascript/controllers/hello_controller.js`, and create
+`app/assets/javascript/controllers/hello_controller.js.rb` with the following
 contents:
 
 <div data-controller="ruby" data-options='{
@@ -134,7 +134,7 @@ should match the following:
 
 <div data-controller="js"></div>
 
-Make a change to `app/assets/javascripts/controllers/hello_controller.js.rb`
+Make a change to `app/assets/javascript/controllers/hello_controller.js.rb`
 and see the results.
 
 {% rendercontent "docs/note" %}

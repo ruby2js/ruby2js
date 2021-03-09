@@ -58,6 +58,7 @@ def Ruby2JS.options(hash)
 
   hash[:filters] ||= []
   hash[:filters] = hash[:filters].split(/,\s*/) if hash[:filters].is_a? String
+`require('fs').writeFileSync("/home/rubys/tmp/filters", JSON.stringify(hash.$$smap))`
   hash[:filters] = hash[:filters].map {|name| Filters[name]}
   hash[:filters].compact!
 

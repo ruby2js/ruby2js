@@ -101,7 +101,7 @@ Generate a Rails controller:
 ./bin/rails generate controller Demo run
 ```
 
-Create `app/javascripts/elements/my_element_element.js.rb` with the following
+Create `app/javascript/elements/my_element_element.js.rb` with the following
 contents:
 
 <div data-controller="combo" data-options='{

@@ -94,8 +94,8 @@ Add the following to `app/views/greeter/hello.html.erb`:
 </div>
 ```
 
-Remove `app/javascripts/controllers/hello_controller.js`, and create
-`app/javascripts/controllers/hello_controller.js.rb` with the following
+Remove `app/javascript/controllers/hello_controller.js`, and create
+`app/javascript/controllers/hello_controller.js.rb` with the following
 contents:
 
 <div data-controller="ruby" data-options='{
@@ -125,7 +125,7 @@ Visit <http://localhost:3000/greeter/hello>.  What you should see:
 
 <p data-controller="eval" data-html="div.language-html"></p>
 
-Make a change to `app/javascripts/controllers/hello_controller.js.rb`
+Make a change to `app/javascript/controllers/hello_controller.js.rb`
 and see the results.
 
 In case you are curious, the JavaScript that Ruby2JS returned back to webpack

@@ -31,7 +31,7 @@ file "../demo/filters.opal" => filters do
   IO.write "../demo/filters.opal", content.join("\n")
 end
 
-file "#{demo}/index.erb" => '../demo/ruby2js.rb' do
+file "#{demo}/index.erb" => [*filters, '../demo/ruby2js.rb'] do
   puts "Generating #{demo}/index.erb"
   mkdir demo unless Dir.exist? demo
 
