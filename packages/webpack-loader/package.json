@@ -1,6 +1,6 @@
 {
   "name": "@ruby2js/webpack-loader",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Uses Ruby2JS to convert .js.rb files into .js files for Webpack",
   "main": "dist/cjs.js",
   "homepage": "https://github.com/rubys/ruby2js/tree/master/packages/webpack-loader#readme",
@@ -33,7 +33,7 @@
     "del-cli": "^3.0.1"
   },
   "dependencies": {
-    "@ruby2js/ruby2js": "^0.0.2",
+    "@ruby2js/ruby2js": ">= 0.0.3",
     "loader-utils": "^2.0.0"
   },
   "peerDependencies": {
