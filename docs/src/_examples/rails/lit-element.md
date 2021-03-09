@@ -91,7 +91,7 @@ class MyElement < LitElement
   end
 
   def clickHandler(event)
-    console.log(event.target)
+    puts event.target
     @myBool = !@myBool
   end
 end
