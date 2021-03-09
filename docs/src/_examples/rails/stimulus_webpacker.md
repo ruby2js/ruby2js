@@ -12,63 +12,18 @@ rails new stimulus-webpacker
 cd stimulus-webpacker
 ```
 
-## Install Stimulus support
-
-Add the [stimulus-rails](https://github.com/hotwired/stimulus-rails) gem to your `Gemfile`:
+Add the following lines to your `Gemfile`:
 
 ```ruby
+gem 'ruby2js', require: 'ruby2js/rails'
 gem 'stimulus-rails'
 ```
 
-Run `./bin/bundle install`
+Run the following commands:
 
-Run `./bin/rails stimulus:install`
-
-## Add and configure Ruby2JS
-
-Run `yarn add @ruby2js/webpack-loader`.
-
-Replace the contents of `config/webpack/environment.js` with:
-
-```javascript
-const { environment } = require('@rails/webpacker')
-
-const babelOptions = environment.loaders.get('babel').use[0].options
-
-// Insert rb2js loader at the end of list
-environment.loaders.append('rb2js', {
-  test: /\.js\.rb$/,
-  use: [
-    {
-      loader: "babel-loader",
-      options: {...babelOptions}
-    },
-
-    {
-      loader: "@ruby2js/webpack-loader",
-      options: {
-        autoexports: "default",
-        eslevel: 2022,
-        filters: ['esm', 'functions', 'stimulus']
-      }
-    },
-  ]
-})
-
-module.exports = environment
-```
-
-Add `.js.rb` to `config/webpacker.yml` in the `default`.`extensions` section:
-
-```
-    - .js.rb
-```
-
-Add `(\.rb)?` to the `require.context` line in
-`app/javascript/controllers/index.js`:
-
-```javascript
-const context = require.context("controllers", true, /_controller\.js(\.rb)?$/)
+```sh
+./bin/bundle install
+./bin/rails ruby2js:install:stimulus:webpacker
 ```
 
 ## Write some HTML and a matching Stimulus controller
