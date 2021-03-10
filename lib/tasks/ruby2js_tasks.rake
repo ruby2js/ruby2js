@@ -12,6 +12,12 @@ namespace :ruby2js do
       template 'install/litelement.rb'
     end
 
+    desc "Install Ruby2JS with React support"
+    task :react do
+      template 'install/react.rb'
+      Rake::Task['webpacker:install:react'].invoke
+    end
+
     namespace :stimulus do
       desc "Install Ruby2JS with Stimulus Sprockets support"
       task :sprockets => :"stimulus:install:asset_pipeline" do
@@ -22,6 +28,15 @@ namespace :ruby2js do
       task :webpacker => :"stimulus:install" do
         template 'install/stimulus-webpacker.rb'
       end
+    end
+  end
+end
+
+namespace :webpacker do
+  namespace :install do
+    desc "Install everything needed for Ruby2JS"
+    task :ruby2js do
+      template 'install/webpacker.rb'
     end
   end
 end

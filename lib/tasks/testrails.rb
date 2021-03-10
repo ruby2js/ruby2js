@@ -18,7 +18,7 @@ install = File.basename(source, '.md').gsub('_', ':').gsub('-', '')
 # extract instructions from markdown source
 source = IO.read(source)
 gen = %r{\./bin/rails generate .*}.match(source)
-html = /.*`(.*?)`.*?```html\n(.*?)```/m.match(source)
+html = /.*`(.*?)`.*?```(?:html|erb)\n(.*?)```/m.match(source)
 ruby = /.*`(.*?)`.*?```ruby\n(.*?)```/m.match(source)
 link = %r{<(http://localhost:3000/.*?)>}.match(source)
 
