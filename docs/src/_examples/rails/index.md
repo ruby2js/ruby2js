@@ -3,7 +3,7 @@ top_section: Rails
 order: 31
 toc_title: Introduction
 title: Rails Introduction
-category: react intro
+category: rails intro
 ---
 
 Webpacker is installed by default in Rails 6.0 and up.  The following steps
