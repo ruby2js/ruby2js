@@ -1,5 +1,9 @@
 # master
 
+# 4.0.4 / 2021-03-10
+
+* add install tasks for Webpacker (naked) and React
+
 # 4.0.3 / 2021-03-09
 
 * don't autobind instance methods within tagged literals
