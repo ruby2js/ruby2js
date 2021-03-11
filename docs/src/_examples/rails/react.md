@@ -30,7 +30,7 @@ Run the following commands:
 ./bin/rails ruby2js:install:react
 ```
 
-## Write some HTML and a matching Stimulus controller
+## Write some HTML and a matching React Component
 
 Generate a Rails controller:
 

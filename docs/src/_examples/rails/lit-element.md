@@ -38,7 +38,7 @@ Run the following commands:
 ./bin/rails ruby2js:install:litelement
 ```
 
-## Write some HTML and a matching Stimulus controller
+## Write some HTML and a matching Custom Element
 
 Generate a Rails controller:
 
