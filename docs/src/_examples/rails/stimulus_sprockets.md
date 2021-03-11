@@ -1,9 +1,17 @@
 ---
 top_section: Rails
-order: 31
+order: 32
 title: Stimulus Sprockets
 category: stimulus sprockets
 ---
+
+This example is based on the [Stimulus site](https://reactjs.org/), but based on
+Ruby2JS instead and hosted by Ruby on Rails.  It also uses the
+Sprockets/asset-pipeline instead of Webpacker.  The Rails Guides have more
+information on how [Sprockets is different than
+Webpacker](https://edgeguides.rubyonrails.org/webpacker.html#how-is-webpacker-different-from-sprockets-questionmark).
+
+## Create a Project
 
 Start a new project:
 

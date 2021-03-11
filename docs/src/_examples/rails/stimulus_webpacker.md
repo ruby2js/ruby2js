@@ -1,9 +1,14 @@
 ---
 top_section: Rails
-order: 32
+order: 33
 title: Stimulus Webpacker
 category: stimulus webpacker
 ---
+
+This example is based on the [Stimulus site](https://reactjs.org/), but based on
+Ruby2JS instead and hosted by Ruby on Rails.  It uses Webpacker.
+
+## Create a Project
 
 Start a new project:
 

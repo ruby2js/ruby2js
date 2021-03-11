@@ -1,6 +1,6 @@
 ---
 top_section: Rails
-order: 33
+order: 34
 title: LitElement
 category: lit-element
 ---

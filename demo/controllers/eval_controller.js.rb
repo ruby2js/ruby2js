@@ -144,7 +144,7 @@ class EvalController < DemoController
           div.appendChild node.cloneNode(true)
         end
       else
-        div.innerHTML = html.textContent.gsub! /^<%=.*?%>\s*/m, ''
+        div.innerHTML = html.textContent.gsub /^<%=.*?%>\s*/m, ''
 
       end
       container.appendChild(div)
