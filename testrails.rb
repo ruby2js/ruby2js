@@ -2,11 +2,13 @@
 require 'json'
 
 source = ARGV[0]
-home = File.expand_path('../..', __dir__)
+home = File.expand_path(__dir__)
 
 if not source
   puts 'Usage: '
-  Dir['../../docs/src/_examples/rails/*.md'].sort.each do |file|
+  Dir.chdir home
+  Dir["docs/src/_examples/rails/*.md"].sort.each do |file|
+    next if File.basename(file) == 'index.md'
     puts "  #{$PROGRAM_NAME} #{file}"
   end
   exit 1

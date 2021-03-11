@@ -1,5 +1,9 @@
 # master
 
+# 4.0.5 / 2021-03-11
+
+* move testrails directory outside of the gem
+
 # 4.0.4 / 2021-03-10
 
 * add install tasks for Webpacker (naked) and React
