@@ -30,6 +30,9 @@ module Ruby2JS
         ReactDOM: s(:import, ['react-dom'], s(:attr, nil, :ReactDOM))
       }
 
+      PREACT_IMPORT = s(:import, [s(:pair, s(:sym, :as), s(:str, "Preact")),
+        s(:pair, s(:sym, :from), s(:str, "preact"))], s(:str, "*"))
+
       # the following command can be used to generate ReactAttrs:
       # 
       #   ruby -r ruby2js/filter/react -e "Ruby2JS::Filter::React.genAttrs"
@@ -118,12 +121,23 @@ module Ruby2JS
       def on_class(node)
         cname, inheritance, *body = node.children
         return super unless cname.children.first == nil
-        return super unless inheritance == s(:const, nil, :React) or
-          inheritance == s(:const, nil, :Vue) or
+
+        if inheritance == s(:const, nil, :React) or
           inheritance == s(:const, s(:const, nil, :React), :Component) or
           inheritance == s(:send, s(:const, nil, :React), :Component)
 
-        prepend_list << REACT_IMPORTS[:React] if modules_enabled?
+          react = :React
+          prepend_list << REACT_IMPORTS[:React] if modules_enabled?
+
+        elsif inheritance == s(:const, nil, :Preact) or
+          inheritance == s(:const, s(:const, nil, :Preact), :Component) or
+          inheritance == s(:send, s(:const, nil, :Preact), :Component)
+
+          react = :Preact
+          prepend_list << PREACT_IMPORT if modules_enabled?
+        else
+          return super
+        end
 
         # traverse down to actual list of class statements
         if body.length == 1
@@ -141,12 +155,14 @@ module Ruby2JS
         end
 
         begin
-          react, @react = @react, true
+          react, @react = @react, react
           reactClass, @reactClass = @reactClass, true
 
           pairs = []
 
-          unless es2015
+          createClass = (@react == :React and not es2015)
+
+          if createClass
             # automatically capture the displayName for the class
             pairs << s(:pair, s(:sym, :displayName),
               s(:str, cname.children.last.to_s))
@@ -156,7 +172,7 @@ module Ruby2JS
           statics = []
           body.select {|child| child.type == :defs}.each do |child|
             _parent, mname, args, *block = child.children
-            if es2015
+            if not createClass
               block = [s(:autoreturn, *block)] unless child.is_method?
               pairs << s(:defs, s(:self), mname, args, *block)
             elsif child.is_method?
@@ -212,7 +228,7 @@ module Ruby2JS
               scan_events[node.children]
             end
           end
-          scan_events[body] unless es2015
+          scan_events[body] if createClass
 
           # append statics (if any)
           unless statics.empty?
@@ -230,7 +246,7 @@ module Ruby2JS
           then
             @reactIvars = {pre: [], post: [], asgn: [], ref: [], cond: []}
             react_walk(node)
-            if not es2015 and not @reactIvars.values.flatten.empty?
+            if createClass and not @reactIvars.values.flatten.empty?
               body = [s(:def, :getInitialState, s(:args),
                 s(:return, s(:hash))), *body]
             elsif not needs_binding.empty? or not @reactIvars.values.flatten.empty?
@@ -251,7 +267,7 @@ module Ruby2JS
               (@reactIvars[:pre] + @reactIvars[:post]).uniq
 
             if mname == :initialize
-              mname = es2015 ? :initialize : :getInitialState
+              mname = createClass ? :getInitialState : :initialize 
 
               # extract real list of statements
               if block.length == 1
@@ -359,14 +375,14 @@ module Ruby2JS
               type = :begin if block.first.type == :return
             end
 
-            if es2015
+            if createClass
+              pairs << s(:pair, s(:sym, mname), child.updated(:block,
+                [s(:send, nil, :proc), args, process(s(type, *block))]))
+            else
               pairs << child.updated(
                 ReactLifecycle.include?(mname.to_s) ? :defm : :def, 
                 [mname, args, process(s(type, *block))]
               )
-            else
-              pairs << s(:pair, s(:sym, mname), child.updated(:block,
-                [s(:send, nil, :proc), args, process(s(type, *block))]))
             end
 
             # retain comment
@@ -374,38 +390,24 @@ module Ruby2JS
               @comments[pairs.last] = @comments[child]
             end
           end
+
+          if createClass
+            # emit a createClass statement
+            node.updated(:casgn, [nil, cname.children.last,
+              s(:send, s(:const, nil, :React), :createClass, s(:hash, *pairs))])
+          else
+            # emit a class that extends React.Component
+            node.updated(:class, [s(:const, nil, cname.children.last),
+              s(:attr, s(:const, nil, @react), :Component), *pairs])
+          end
         ensure
           @react = react
           @reactClass = reactClass
           @reactMethod = nil
         end
-
-        if es2015
-          # emit a class that extends React.Component
-          node.updated(:class, [s(:const, nil, cname.children.last),
-            s(:attr, s(:const, nil, :React), :Component), *pairs]) 
-        else
-          # emit a createClass statement
-          node.updated(:casgn, [nil, cname.children.last,
-            s(:send, s(:const, nil, :React), :createClass, s(:hash, *pairs))])
-        end
       end
 
       def on_send(node)
-        # convert Vue.utile.defineReactive to class fields or assignments
-        if node.children.first == s(:send, s(:const, nil, :Vue), :util)
-          if node.children[1] == :defineReactive
-            if node.children[2].type == :cvar
-              return process s(:cvasgn, node.children[2].children.first,
-                node.children[3])
-            elsif node.children[2].type == :send
-              assign = node.children[2]
-              return assign.updated(nil, [assign.children[0],
-                assign.children[1].to_s + '=', node.children[3]])
-            end
-          end
-        end
-
         # calls to methods (including getters) defined in this class
         if node.children[0]==nil and Symbol === node.children[1]
           if node.is_method?
@@ -423,16 +425,12 @@ module Ruby2JS
           end
         end
 
-        if node.children.first == s(:const, nil, :Vue)
-          node = node.updated(nil, [s(:const, nil, :React),
-            *node.children[1..-1]])
-        end
-
         if not @react
           # enable React filtering within React class method calls or
           # React component calls
           if \
             node.children.first == s(:const, nil, :React) or
+            node.children.first == s(:const, nil, :Preact) or
             node.children.first == s(:const, nil, :ReactDOM)
           then
             if modules_enabled?
@@ -654,8 +652,6 @@ module Ruby2JS
               # explicit call to React.createElement
               next true if arg.children[1] == :createElement and
                 arg.children[0] == s(:const, nil, :React)
-              next true if arg.children[1] == :createElement and
-                arg.children[0] == s(:const, nil, :Vue)
 
               # JSX
               next true if arg.type == :xstr
@@ -717,8 +713,13 @@ module Ruby2JS
           params.pop if params.last == s(:nil)
 
           # construct element using params
-          element = node.updated(:send, [s(:const, nil, :React),
-            :createElement, *params])
+          if @react == :Preact
+            element = node.updated(:send, [s(:const, nil, :Preact),
+              :h, *params])
+          else
+            element = node.updated(:send, [s(:const, nil, :React),
+              :createElement, *params])
+          end
 
           if @reactApply
             # if apply is set, emit code that pushes result
@@ -1117,10 +1118,6 @@ module Ruby2JS
           # explicit call to React.createElement
           return true if node.children[1] == :createElement and
             node.children[0] == s(:const, nil, :React)
-
-          # explicit call to Vue.createElement
-          return true if node.children[1] == :createElement and
-            node.children[0] == s(:const, nil, :Vue)
         end
 
         # wunderbar style call
