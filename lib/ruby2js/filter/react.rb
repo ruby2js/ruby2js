@@ -27,11 +27,12 @@ module Ruby2JS
 
       REACT_IMPORTS = {
         React: s(:import, ['react'], s(:attr, nil, :React)),
-        ReactDOM: s(:import, ['react-dom'], s(:attr, nil, :ReactDOM))
+        ReactDOM: s(:import, ['react-dom'], s(:attr, nil, :ReactDOM)),
+        Preact: s(:import,
+          [s(:pair, s(:sym, :as), s(:const, nil, :Preact)),
+            s(:pair, s(:sym, :from), s(:str, "preact"))],
+            s(:str, '*'))
       }
-
-      PREACT_IMPORT = s(:import, [s(:pair, s(:sym, :as), s(:str, "Preact")),
-        s(:pair, s(:sym, :from), s(:str, "preact"))], s(:str, "*"))
 
       # the following command can be used to generate ReactAttrs:
       # 
@@ -78,7 +79,6 @@ module Ruby2JS
 
       ReactAttrMap = Hash[ReactAttrs.map {|name| [name.downcase, name]}]
       ReactAttrMap['for'] = 'htmlFor'
-      ReactFragment = :'_React.Fragment'
 
       def initialize(*args)
         @react = nil
@@ -134,7 +134,7 @@ module Ruby2JS
           inheritance == s(:send, s(:const, nil, :Preact), :Component)
 
           react = :Preact
-          prepend_list << PREACT_IMPORT if modules_enabled?
+          prepend_list << REACT_IMPORTS[:Preact] if modules_enabled?
         else
           return super
         end
@@ -173,8 +173,7 @@ module Ruby2JS
           body.select {|child| child.type == :defs}.each do |child|
             _parent, mname, args, *block = child.children
             if not createClass
-              block = [s(:autoreturn, *block)] unless child.is_method?
-              pairs << s(:defs, s(:self), mname, args, *block)
+              pairs << child
             elsif child.is_method?
               statics << s(:pair, s(:sym, mname), process(child.updated(:block,
                 [s(:send, nil, :proc), args, s(:autoreturn, *block)])))
@@ -349,7 +348,7 @@ module Ruby2JS
                 else
                   # wrap multi-line blocks with a React Fragment
                   block = [s(:return,
-                    s(:block, s(:send, nil, ReactFragment), s(:args), *block))]
+                    s(:block, s(:send, nil, :"_#{@react}.Fragment"), s(:args), *block))]
                 end
               end
 
@@ -438,7 +437,8 @@ module Ruby2JS
             end
 
             begin
-              react, @react = @react, true
+              react = @react
+              @react = (node.children.first.children.last == :Preact ? :Preact : :React)
               return on_send(node)
             ensure
               @react = react
@@ -459,8 +459,10 @@ module Ruby2JS
           end
 
         elsif \
-          @reactApply and node.children[1] == :createElement and
-          node.children[0] == s(:const, nil, :React)
+          (@reactApply and node.children[1] == :createElement and
+          node.children[0] == s(:const, nil, :React)) or
+          (@reactApply and node.children[1] == :h and
+          node.children[0] == s(:const, nil, :Preact))
         then
           # push results of explicit calls to React.createElement
           s(:send, s(:gvar, :$_), :push, s(:send, *node.children[0..1],
@@ -652,6 +654,10 @@ module Ruby2JS
               # explicit call to React.createElement
               next true if arg.children[1] == :createElement and
                 arg.children[0] == s(:const, nil, :React)
+
+              # explicit call to Preact.h
+              next true if arg.children[1] == :h and
+                arg.children[0] == s(:const, nil, :Preact)
 
               # JSX
               next true if arg.type == :xstr
@@ -918,8 +924,10 @@ module Ruby2JS
         # Base Ruby2JS processing will convert the 'splat' to 'apply'
         child = node.children.first
         if \
-          child.children[1] == :createElement and
-          child.children[0] == s(:const, nil, :React)
+          (child.children[1] == :createElement and
+          child.children[0] == s(:const, nil, :React)) or
+          (child.children[1] == :h and
+          child.children[0] == s(:const, nil, :Preact))
         then
           begin
             reactApply, @reactApply = @reactApply, true
@@ -953,7 +961,7 @@ module Ruby2JS
           block = s(:block, s(:send, nil, :proc), s(:args),
             *node.children[2..-1])
           return on_send node.children.first.updated(:send,
-            [nil, ReactFragment, block])
+            [nil, :"_#{@react}.Fragment", block])
 
         elsif !@jsx and child.children[0] == nil and child.children[1] =~ /^_\w/
           if node.children[1].children.empty?
@@ -1021,7 +1029,7 @@ module Ruby2JS
           ivar = node.children.first.to_s
           if @reactBlock
             return s(:send, s(:self), :setState, s(:hash, s(:pair,
-              s(:lvar, ivar[1..-1]), process(s(:lvasgn, "$#{ivar[1..-1]}",
+              s(:str, ivar[1..-1]), process(s(:lvasgn, "$#{ivar[1..-1]}",
               *node.children[1..-1])))))
           else
             return s(:lvasgn, "$#{ivar[1..-1]}",
@@ -1076,7 +1084,7 @@ module Ruby2JS
         if @reactMethod and @reactIvars[:capture].include? var
           if @reactBlock
             s(:send, s(:self), :setState, s(:hash, s(:pair,
-              s(:lvar, var[1..-1]), process(s(node.type,
+              s(:str, var[1..-1]), process(s(node.type,
               s(:lvasgn, "$#{var[1..-1]}"), *node.children[1..-1])))))
           else
             process s(node.type, s(:lvasgn, "$#{var[1..-1]}"),
@@ -1118,6 +1126,10 @@ module Ruby2JS
           # explicit call to React.createElement
           return true if node.children[1] == :createElement and
             node.children[0] == s(:const, nil, :React)
+
+          # explicit call to Preact.h
+          return true if node.children[1] == :h and
+            node.children[0] == s(:const, nil, :Preact)
         end
 
         # wunderbar style call
@@ -1277,7 +1289,7 @@ module Ruby2JS
         # update ivars that are set and later referenced
         unless @reactIvars[:post].empty?
           updates = @reactIvars[:post].uniq.sort.reverse.map do |ivar|
-            s(:pair, s(:lvar, ivar.to_s[1..-1]),
+            s(:pair, s(:str, ivar.to_s[1..-1]),
               s(:lvar, "$#{ivar.to_s[1..-1]}"))
           end
           update = s(:send, s(:self), :setState, s(:hash, *updates))
