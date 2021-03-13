@@ -537,19 +537,19 @@ describe 'Ruby2JS::Filter::Preact' do
   end
 
   describe "controlled components" do
-    it "should should automatically create onChange value functions" do
+    it "should should automatically create onInput value functions" do
       to_js( 'class Foo<Preact; def render; _input value: @x; end; end' ).
-        must_include 'onChange: event => this.setState({x: event.target.value})'
+        must_include 'onInput: event => this.setState({x: event.target.value})'
     end
 
-    it "should should automatically create onChange checked functions" do
+    it "should should automatically create onInput checked functions" do
       to_js( 'class Foo<Preact; def render; _input checked: @x; end; end' ).
-        must_include 'onChange: () => this.setState({x: !this.state.x})'
+        must_include 'onInput: () => this.setState({x: !this.state.x})'
     end
 
-    it "should should retain onChange functions" do
-      to_js( 'class Foo<Preact; def render; _input checked: @x, onChange: self.change; end; end' ).
-        must_include 'onChange: this.change'
+    it "should should retain onInput functions" do
+      to_js( 'class Foo<Preact; def render; _input checked: @x, onInput: self.change; end; end' ).
+        must_include 'onInput: this.change'
     end
   end
 

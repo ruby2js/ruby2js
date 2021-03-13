@@ -559,13 +559,15 @@ module Ruby2JS
               ['value', :value].include? pair.children.first.children.first
             end
 
+            event = (@react == :Preact ? :onInput : :onChange)
+
             # search for the presence of a 'onChange' attribute
             onChange = pairs.find_index do |pair|
-              ['onChange', :onChange].include? pair.children.first.children[0]
+              pair.children.first.children[0].to_s == event.to_s
             end
 
             if value and pairs[value].children.last.type == :ivar and !onChange
-              pairs << s(:pair, s(:sym, :onChange),
+              pairs << s(:pair, s(:sym, event),
                 s(:block, s(:send, nil, :proc), s(:args, s(:arg, :event)),
                 s(:ivasgn, pairs[value].children.last.children.first,
                 s(:attr, s(:attr, s(:lvar, :event), :target), :value))))
@@ -578,7 +580,7 @@ module Ruby2JS
               end
 
               if checked and pairs[checked].children.last.type == :ivar
-                pairs << s(:pair, s(:sym, :onChange),
+                pairs << s(:pair, s(:sym, event),
                   s(:block, s(:send, nil, :proc), s(:args),
                   s(:ivasgn, pairs[checked].children.last.children.first,
                   s(:send, pairs[checked].children.last, :!))))
