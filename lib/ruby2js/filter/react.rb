@@ -474,6 +474,17 @@ module Ruby2JS
           s(:send, s(:gvar, :$_), :push, s(:send, *node.children[0..1],
             *process_all(node.children[2..-1])))
 
+        elsif \
+          @react == :Preact and node.children[1] == :h and node.children[0] == nil
+        then
+          if @reactApply
+            # push results of explicit calls to Preact.h
+            s(:send, s(:gvar, :$_), :push, s(:send, s(:const, nil, :Preact), :h,
+              *process_all(node.children[2..-1])))
+          else
+            node.updated(nil, [s(:const, nil, :Preact), :h, *process_all(node.children[2..-1])])
+          end
+
         elsif !@jsx and node.children[0] == nil and node.children[1] =~ /^_\w/
           # map method calls starting with an underscore to React calls
           # to create an element.
@@ -696,6 +707,10 @@ module Ruby2JS
               # explicit call to Preact.h
               next true if arg.children[1] == :h and
                 arg.children[0] == s(:const, nil, :Preact)
+
+              # explicit call to h
+              next true if arg.children[1] == :h and
+                arg.children[0] == nil
 
               # JSX
               next true if arg.type == :xstr
@@ -970,7 +985,8 @@ module Ruby2JS
           (child.children[1] == :createElement and
           child.children[0] == s(:const, nil, :React)) or
           (child.children[1] == :h and
-          child.children[0] == s(:const, nil, :Preact))
+          (child.children[0] == s(:const, nil, :Preact) or
+          child.children[0] == nil))
         then
           begin
             reactApply, @reactApply = @reactApply, true
@@ -983,11 +999,13 @@ module Ruby2JS
             @reactApply = reactApply
           end
 
+          target = child.children[0] || s(:const, nil, :Preact)
+
           if reactApply
             return child.updated(:send, [s(:gvar, :$_), :push, 
-              s(:send, *child.children[0..1], *params)])
+              s(:send, target, child.children[1], *params)])
           else
-            return child.updated(:send, [*child.children[0..1], *params])
+            return child.updated(:send, [target, child.children[1], *params])
           end
         end
 
@@ -1173,6 +1191,10 @@ module Ruby2JS
           # explicit call to Preact.h
           return true if node.children[1] == :h and
             node.children[0] == s(:const, nil, :Preact)
+
+          # explicit call to h
+          return true if node.children[1] == :h and
+            node.children[0] == nil
         end
 
         # wunderbar style call

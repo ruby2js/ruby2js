@@ -83,6 +83,12 @@ describe 'Ruby2JS::Filter::Preact' do
   end
 
   describe "Preact create element calls" do
+    it "should should be able to render using only h directly" do
+      to_js( 'class Foo<Preact; def render; ' +
+        'h("h1", nil, h("a", nil, href = ".")); end; end' ).
+        must_include 'return Preact.h("h1", null, Preact.h("a", null, href = "."))'
+    end
+
     it "should should be able to render using only Preact.h directly" do
       to_js( 'class Foo<Preact; def render; ' +
         'Preact.h("h1", nil, Preact.h("a", nil, href = ".")); end; end' ).
@@ -113,8 +119,7 @@ describe 'Ruby2JS::Filter::Preact' do
 
     it "should handle options with blocks" do
       to_js( 'class Foo<Preact; def render; _a options do _b; end; end; end' ).
-        must_include ' Preact.h("a", options, ' +
-          'Preact.h("b"))'
+        must_include ' Preact.h("a", options, Preact.h("b"))'
     end
 
     unless RUBY_VERSION =~ /^1/
@@ -125,8 +130,7 @@ describe 'Ruby2JS::Filter::Preact' do
 
       it "should handle **options with blocks" do
         to_js('class Foo<Preact; def render; _a **options do _b; end; end; end').
-          must_include ' Preact.h("a", options, ' +
-            'Preact.h("b"))'
+          must_include ' Preact.h("a", options, Preact.h("b"))'
       end
     end
 
@@ -141,9 +145,22 @@ describe 'Ruby2JS::Filter::Preact' do
     end
 
     it "should treat explicit calls to Preact.h as simple" do
-      to_js( 'class Foo<Preact; def render; _a {Preact.h("b")}; ' +
-        'end; end' ).
+      to_js( 'class Foo<Preact; def render; _a {h("b")}; end; end' ).
         must_include ' Preact.h("a", null, Preact.h("b"))'
+
+      to_js( 'class Foo<Preact; def render; _a {Preact.h("b")}; end; end' ).
+        must_include ' Preact.h("a", null, Preact.h("b"))'
+    end
+
+    it "should push results of explicit calls to h" do
+      result = to_js('class Foo<Preact; def render; _a {c="c"; ' +
+        'h("b", null, c)}; end; end')
+
+      result.must_include 'Preact.h(...(() => {'
+      result.must_include 'let $_ = ["a", null];'
+      result.must_include '$_.push(Preact.h("b", null, c));'
+      result.must_include 'return $_'
+      result.must_include '})())'
     end
 
     it "should push results of explicit calls to Preact.h" do
@@ -155,6 +172,13 @@ describe 'Ruby2JS::Filter::Preact' do
       result.must_include '$_.push(Preact.h("b", null, c));'
       result.must_include 'return $_'
       result.must_include '})())'
+    end
+
+    it "should handle call with blocks to h" do
+      result = to_js( 'class Foo<Preact; def render; h("a") {_b}; end; end' )
+      result.must_include 'Preact.h(...(() => {'
+      result.must_include 'let $_ = ["a"];'
+      result.must_include '$_.push(Preact.h("b")'
     end
 
     it "should handle call with blocks to Preact.h" do
