@@ -192,7 +192,7 @@ describe 'Ruby2JS::Filter::Preact' do
       result = to_js('class Foo<Preact; def render; _ul.todos list ' + 
         'do |i| _li i; end; end; end')
 
-      result.must_include 'Preact.h("ul", {className: "todos"},'
+      result.must_include 'Preact.h("ul", {class: "todos"},'
       result.must_include 'list.map(i => ('
       result.must_include 'Preact.h("li", null, i)'
 
@@ -201,7 +201,7 @@ describe 'Ruby2JS::Filter::Preact' do
         'do |i| _dt i.term; _dd i.defn; end; end; end')
 
       result.must_include 'return Preact.h(...(() => {'
-      result.must_include 'let $_ = ["dl", {className: "terms"}];'
+      result.must_include 'let $_ = ["dl", {class: "terms"}];'
       result.must_include 'list.forEach((i) =>'
       result.must_include '$_.push(Preact.h("dt", null, i.term))'
       result.must_include '$_.push(Preact.h("dd", null, i.defn))'
@@ -268,42 +268,42 @@ describe 'Ruby2JS::Filter::Preact' do
   describe "class attributes" do
     it "should handle class attributes" do
       to_js( 'class Foo<Preact; def render; _a class: "b"; end; end' ).
-        must_include 'Preact.h("a", {className: "b"})'
+        must_include 'Preact.h("a", {class: "b"})'
     end
 
     it "should handle className attributes" do
       to_js( 'class Foo<Preact; def render; _a className: "b"; end; end' ).
-        must_include 'Preact.h("a", {className: "b"})'
+        must_include 'Preact.h("a", {class: "b"})'
     end
 
     it "should handle markaby syntax" do
       to_js( 'class Foo<Preact; def render; _a.b.c href: "d"; end; end' ).
-        must_include 'Preact.h("a", {className: "b c", href: "d"})'
+        must_include 'Preact.h("a", {class: "b c", href: "d"})'
     end
 
     it "should handle mixed strings" do
       to_js( 'class Foo<Preact; def render; _a.b class: "c"; end; end' ).
-        must_include 'Preact.h("a", {className: "b c"})'
+        must_include 'Preact.h("a", {class: "b c"})'
     end
 
     it "should handle mixed strings and a value" do
       to_js( 'class Foo<Preact; def render; _a.b class: c; end; end' ).
-        must_include 'Preact.h("a", {className: "b " + (c || "")})'
+        must_include 'Preact.h("a", {class: "b " + (c || "")})'
     end
 
     it "should handle mixed strings and a conditional value" do
       to_js( 'class Foo<Preact; def render; _a.b class: ("c" if d); end; end' ).
-        must_include 'Preact.h("a", {className: "b " + (d ? "c" : "")})'
+        must_include 'Preact.h("a", {class: "b " + (d ? "c" : "")})'
     end
 
     it "should handle only a value" do
       to_js( 'class Foo<Preact; def render; _a class: c; end; end' ).
-        must_include 'Preact.h("a", {className: c})'
+        must_include 'Preact.h("a", {class: c})'
     end
 
     it "should handle a constant string" do
       to_js( 'class Foo<Preact; def render; _a class: "x"; end; end' ).
-        must_include 'Preact.h("a", {className: "x"})'
+        must_include 'Preact.h("a", {class: "x"})'
     end
   end
 
@@ -313,14 +313,29 @@ describe 'Ruby2JS::Filter::Preact' do
         must_include 'Preact.h("a", {id: "b", href: "c"})'
     end
 
-    it "should map for attributes to htmlFor" do
-      to_js( 'class Foo<Preact; def render; _a for: "b"; end; end' ).
-        must_include 'Preact.h("a", {htmlFor: "b"})'
+    it "should map htmlFor attributes to for" do
+      to_js( 'class Foo<Preact; def render; _a htmlFor: "b"; end; end' ).
+        must_include 'Preact.h("a", {for: "b"})'
     end
 
-    it "should map case insensitive attributes to javascript properties" do
+    it "should map leave for attributes alone" do
+      to_js( 'class Foo<Preact; def render; _a for: "b"; end; end' ).
+        must_include 'Preact.h("a", {for: "b"})'
+    end
+
+    it "should NOT map case insensitive attributes to javascript properties" do
       to_js( 'class Foo<Preact; def render; _input tabindex: 1; end; end' ).
-        must_include 'Preact.h("input", {tabIndex: 1})'
+        must_include 'Preact.h("input", {tabindex: 1})'
+    end
+
+    it "should map tabIndex attributes to tabindex" do
+      to_js( 'class Foo<Preact; def render; _svg tabIndex: 0; end; end' ).
+        must_include 'Preact.h("svg", {tabindex: 0})'
+    end
+
+    it "should map input onChange attributes to onInput" do
+      to_js( 'class Foo<Preact; def render; _input onChange: foo; end; end' ).
+        must_include 'Preact.h("input", {onInput: foo})'
     end
 
     it "should map style string attributes to hashes" do

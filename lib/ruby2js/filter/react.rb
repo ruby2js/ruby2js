@@ -80,6 +80,12 @@ module Ruby2JS
       ReactAttrMap = Hash[ReactAttrs.map {|name| [name.downcase, name]}]
       ReactAttrMap['for'] = 'htmlFor'
 
+      PreactAttrMap = {
+        htmlFor: 'for',
+        onDoubleClick: 'onDblClick',
+        tabIndex: 'tabindex'
+      }
+
       def initialize(*args)
         @react = nil
         @reactApply = nil
@@ -549,7 +555,12 @@ module Ruby2JS
             else
               value = s(:str, values.join(' '))
             end
-            pairs.unshift s(:pair, s(:sym, :className), value)
+
+            if @react == :Preact
+              pairs.unshift s(:pair, s(:sym, :class), value)
+            else
+              pairs.unshift s(:pair, s(:sym, :className), value)
+            end
           end
 
           # support controlled form components
@@ -561,9 +572,22 @@ module Ruby2JS
 
             event = (@react == :Preact ? :onInput : :onChange)
 
-            # search for the presence of a 'onChange' attribute
+
+            # search for the presence of a onInput/onChange attribute
             onChange = pairs.find_index do |pair|
               pair.children.first.children[0].to_s == event.to_s
+            end
+
+            if event == :onInput and not onChange
+              # search for the presence of a 'onChange' attribute
+              onChange = pairs.find_index do |pair|
+                pair.children.first.children[0].to_s == 'onChange'
+              end
+
+              if onChange
+                pairs[onChange] = s(:pair, s(:sym, event),
+                  pairs[onChange].children.last)
+              end
             end
 
             if value and pairs[value].children.last.type == :ivar and !onChange
@@ -588,13 +612,25 @@ module Ruby2JS
             end
           end
 
-          # replace attribute names with case-sensitive javascript properties
-          pairs.each_with_index do |pair, index|
-            next if pair.type == :kwsplat
-            name = pair.children.first.children.first.downcase
-            if ReactAttrMap[name] and name.to_s != ReactAttrMap[name]
-              pairs[index] = pairs[index].updated(nil, 
-                [s(:str, ReactAttrMap[name]), pairs[index].children.last])
+          if @react == :Preact
+            # replace selected Reactisms with native HTML
+            pairs.each_with_index do |pair, index|
+              next if pair.type == :kwsplat
+              name = pair.children.first.children.first.to_sym
+              if PreactAttrMap[name]
+                pairs[index] = pairs[index].updated(nil, 
+                  [s(:str, PreactAttrMap[name]), pairs[index].children.last])
+              end
+            end
+          else
+            # replace attribute names with case-sensitive javascript properties
+            pairs.each_with_index do |pair, index|
+              next if pair.type == :kwsplat
+              name = pair.children.first.children.first.downcase
+              if ReactAttrMap[name] and name.to_s != ReactAttrMap[name]
+                pairs[index] = pairs[index].updated(nil, 
+                  [s(:str, ReactAttrMap[name]), pairs[index].children.last])
+              end
             end
           end
 
@@ -855,8 +891,13 @@ module Ruby2JS
             while node != child
               if node.children[1] !~ /!$/
                 # convert method name to hash {className: name} pair
-                pair = s(:pair, s(:sym, :className),
-                  s(:str, node.children[1].to_s.gsub('_','-')))
+                if @react == :Preact
+                  pair = s(:pair, s(:sym, :class),
+                    s(:str, node.children[1].to_s.gsub('_','-')))
+                else
+                  pair = s(:pair, s(:sym, :className),
+                    s(:str, node.children[1].to_s.gsub('_','-')))
+                end
               else
                 # convert method name to hash {id: name} pair
                 pair = s(:pair, s(:sym, :id),
