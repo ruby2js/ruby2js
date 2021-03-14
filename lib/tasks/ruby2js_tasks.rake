@@ -12,6 +12,11 @@ namespace :ruby2js do
       template 'install/litelement.rb'
     end
 
+    desc "Install Ruby2JS with Preact support"
+    task :preact do
+      template 'install/preact.rb'
+    end
+
     desc "Install Ruby2JS with React support"
     task :react do
       template 'install/react.rb'

@@ -1,6 +1,7 @@
 class EvalController < DemoController
   SCRIPTS = {
     LitElement: "/demo/litelement.js",
+    Preact: "https://cdn.jsdelivr.net/npm/preact/dist/preact.min.js",
     React: "https://unpkg.com/react@17/umd/react.production.min.js",
     ReactDOM: "https://unpkg.com/react-dom@17/umd/react-dom.production.min.js",
     Remarkable: "https://cdnjs.cloudflare.com/ajax/libs/remarkable/2.0.1/remarkable.min.js"
@@ -183,6 +184,7 @@ class EvalController < DemoController
         end
 
         window.Remarkable = remarkable.Remarkable if name == 'Remarkable'
+        window.Preact = preact if name == 'Preact'
       end
     end
 

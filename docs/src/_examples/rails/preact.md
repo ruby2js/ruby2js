@@ -1,20 +1,20 @@
 ---
 top_section: Rails
-order: 35
-title: React
-category: react-element
+order: 36
+title: Preact
+category: preact
 ---
 
-This example is based on the [React site](https://reactjs.org/), but based on
-Ruby2JS instead and hosted by Ruby on Rails.
+With a few small changes, the [React demo](./react) can be adapted to use
+[Preact](https://preactjs.com/) instead
 
 ## Create a Project
 
 Start a new project:
 
 ```
-rails new ruby2js-react
-cd ruby2js-react
+rails new ruby2js-preact
+cd ruby2js-preact
 ```
 
 Add the following line to your `Gemfile`:
@@ -27,7 +27,7 @@ Run the following commands:
 
 ```sh
 ./bin/bundle install
-./bin/rails ruby2js:install:react
+./bin/rails ruby2js:install:preact
 ```
 
 ## Write some HTML and a matching React Component
@@ -47,7 +47,7 @@ contents:
 }'></div>
 
 ```ruby
-class Timer < React
+class Timer < Preact
   def initialize
     @seconds = 0
   end
@@ -65,12 +65,12 @@ class Timer < React
   end
 
   def render
-    React.createElement 'div', nil, 'Seconds: ', @seconds
+    h 'div', nil, 'Seconds: ', @seconds
   end
 end
 
-ReactDOM.render(
-  React.createElement(Timer),
+Preact.render(
+  h(Timer),
   document.getElementById('timer-example')
 )
 ```

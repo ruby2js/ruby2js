@@ -1,5 +1,8 @@
 # master
 
+* ES2021 support for replaceAll
+* Preact support added to the React filter
+
 # 4.0.5 / 2021-03-11
 
 * move testrails directory outside of the gem

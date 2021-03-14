@@ -7,7 +7,7 @@ category: react
 
 The **React** filter enables you to build [React](https://reactjs.org/) components.
 
-When a class definition is encountered that derives from React::Controller,
+When a class definition is encountered that derives from `React::Controller`,
 the following transformations are applied:
 
  * An `import` statement for React will be generated
@@ -26,7 +26,7 @@ the following transformations are applied:
  * Three different HTML rendering syntaxes are supported:
      * `React.createElement` calls.
      * A JSX-like syntax, wrapped in `%x{...}`.  This differs from JSX
-       primarliy in that expressions are in Ruby syntax.
+       primarily in that expressions are in Ruby syntax.
      * [Wunderbar](https://github.com/rubys/wunderbar#readme) syntax.
 
  * When using either JSX-like or Wunderbar syntaxes, sequences of elements
@@ -43,5 +43,6 @@ the following transformations are applied:
 For more information, see the [examples provided](../../examples/react).
 
 {% rendercontent "docs/note", extra_margin: true %}
-More examples of how this filter works are in the [specs file](https://github.com/ruby2js/ruby2js/blob/master/spec/react_spec.rb).
+More examples of how this filter works are in the
+[specs file](https://github.com/ruby2js/ruby2js/blob/master/spec/react_spec.rb).
 {% endrendercontent %}
