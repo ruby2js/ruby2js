@@ -7,6 +7,11 @@ describe "ES2021 support" do
     _(Ruby2JS.convert(string, eslevel: 2021, filters: []).to_s)
   end
 
+  def to_js_fn( string)
+    _(Ruby2JS.convert(string, eslevel: 2021,
+      filters: [Ruby2JS::Filter::Functions]).to_s)
+  end
+
   def to_js_nullish( string)
     _(Ruby2JS.convert(string, eslevel: 2021, or: :nullish, filters: []).to_s)
   end
@@ -38,6 +43,11 @@ describe "ES2021 support" do
   it "should format large numbers with separators" do
     to_js( '1000000' ).must_equal '1_000_000'
     to_js( '1000000.000001' ).must_equal '1_000_000.000_001'
+  end
+
+  it "should convert gsub to replaceAll" do
+    to_js_fn( 'x.gsub("a", "b")' ).must_equal 'x.replaceAll("a", "b")'
+    to_js_fn( 'x.gsub(/a/, "b")' ).must_equal 'x.replaceAll(/a/g, "b")'
   end
     
 end

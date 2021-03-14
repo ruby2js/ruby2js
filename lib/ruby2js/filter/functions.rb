@@ -227,14 +227,19 @@ module Ruby2JS
           if before.type == :regexp
             before = before.updated(:regexp, [*before.children[0...-1],
               s(:regopt, :g, *before.children.last)])
-          elsif before.type == :str
+          elsif before.type == :str and not es2021
             before = before.updated(:regexp,
               [s(:str, Regexp.escape(before.children.first)), s(:regopt, :g)])
           end
           if after.type == :str
             after = s(:str, after.children.first.gsub(/\\(\d)/, "$\\1"))
           end
-          process node.updated nil, [target, :replace, before, after]
+
+          if es2021
+            process node.updated nil, [target, :replaceAll, before, after]
+          else
+            process node.updated nil, [target, :replace, before, after]
+          end
 
         elsif method == :ord and args.length == 0
           if target.type == :str

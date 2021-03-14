@@ -135,6 +135,7 @@ conversions are made:
 * `x ||= 1` {{ caret }} `x ||= 1`
 * `x &&= 1` {{ caret }} `x &&= 1`
 * `1000000.000001` {{ caret }} `1_000_000.000_001`
+* `'.gsub' {{ caret }} `.replaceAll`
 
 ## ES2022 support
 
