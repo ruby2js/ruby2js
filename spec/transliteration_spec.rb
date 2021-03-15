@@ -670,6 +670,8 @@ describe Ruby2JS do
     end
 
     it "should handle super" do
+      to_js('class A; def initialize(x); end; end; class B < A; end').
+        must_equal 'function A(x) {}; function B(x) {A.call(this, x)}; B.prototype = Object.create(A.prototype); B.prototype.constructor = B'
       to_js('class A; end; class B < A; def initialize(x); super; end; end').
         must_equal 'function A() {}; function B(x) {A.call(this, x)}; B.prototype = Object.create(A.prototype); B.prototype.constructor = B'
       to_js('class A; end; class B < A; def initialize(x); super(3); end; end').

@@ -532,7 +532,7 @@ describe Ruby2JS::Filter::Functions do
     it 'should create an Exception contructor' do
       to_js( 'class E < Exception; end' ).
         must_equal 'function E(message) {this.message = message; ' +
-          'this.name = "E"; this.stack = Error(message).stack()}; ' +
+          'this.name = "E"; this.stack = Error(message).stack}; ' +
           'E.prototype = Object.create(Error.prototype); E.prototype.constructor = E'
     end
   end

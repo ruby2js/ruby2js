@@ -36,7 +36,8 @@ module Ruby2JS
         end
 
         if inheritance
-          init = s(:def, :initialize, s(:args), s(:super))
+          parent = @namespace.find(inheritance)&.[](:constructor)
+          init = s(:def, :initialize, parent || s(:args), s(:zsuper))
         else
           init = s(:def, :initialize, s(:args), nil)
         end
@@ -313,7 +314,7 @@ module Ruby2JS
       # prepend constructor
       if init
         constructor = init.updated(:constructor, [name, *init.children[1..-1]])
-        @comments[constructor] = @comments[init] unless @comments[init].empty?
+        visible[:constructor] = init.children[1]
 
         if @ast.type == :class_extend or extend
           if es2015
@@ -329,6 +330,7 @@ module Ruby2JS
           end
         end
 
+        @comments[constructor] = @comments[init] unless @comments[init].empty?
         body.unshift constructor
       end
 
@@ -349,7 +351,7 @@ module Ruby2JS
         self.ivars = ivars
         @class_name = class_name
         @class_parent = class_parent
-        @rbstack.pop
+        @namespace.defineProps @rbstack.pop
         @namespace.leave unless @ast.type == :class_module
       end
     end

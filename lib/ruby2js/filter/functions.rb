@@ -772,10 +772,10 @@ module Ruby2JS
             body.any? {|statement| statement.type == :def and
             statement.children.first == :initialize}
           then
-            body.unshift S(:def, :initialize, s(:args, s(:arg, :message)),
-              s(:begin, S(:send, s(:self), :message=, s(:lvar, :message)),
-              S(:send, s(:self), :name=, s(:sym, name.children[1])),
-              S(:send, s(:self), :stack=, s(:send, s(:send, nil, :Error,
+            body.unshift s(:def, :initialize, s(:args, s(:arg, :message)),
+              s(:begin, s(:send, s(:self), :message=, s(:lvar, :message)),
+              s(:send, s(:self), :name=, s(:sym, name.children[1])),
+              s(:send, s(:self), :stack=, s(:attr, s(:send, nil, :Error,
               s(:lvar, :message)), :stack))))
           end
 

@@ -30,7 +30,7 @@ Run the following commands:
 ./bin/rails ruby2js:install:preact
 ```
 
-## Write some HTML and a matching React Component
+## Write some HTML and a matching Preact Component
 
 Generate a Rails controller:
 

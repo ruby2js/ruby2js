@@ -99,7 +99,6 @@ module Ruby2JS
           end
           walk[@ast]
 
-          # process leading initializers in constructor
           while constructor.length == 1 and constructor.first.type == :begin
             constructor = constructor.first.children.dup
           end
@@ -116,6 +115,7 @@ module Ruby2JS
             put 'static #$' + cvar.to_s[2..-1]
           end
 
+          # process leading initializers in constructor
           while constructor.length > 0 and constructor.first.type == :ivasgn
             put(index == 0 ? @nl : @sep)
             index += 1
