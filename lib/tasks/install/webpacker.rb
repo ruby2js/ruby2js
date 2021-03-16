@@ -27,40 +27,25 @@ insert_into_file Rails.root.join("config/webpacker.yml").to_s,
 # install webpack loader
 run "yarn add @ruby2js/webpack-loader #{@yarn_add}"
 
-# default config
-config = <<~CONFIG
-  // Insert rb2js loader at the end of list
-  environment.loaders.append('rb2js', {
-    test: /\.js\.rb$/,
-    use: [
-      {
-        loader: "babel-loader",
-        options: environment.loaders.get('babel').use[0].options
-      },
+target = Rails.root.join("config/webpack/loaders/ruby2js.js").to_s
 
-      {
-        loader: "@ruby2js/webpack-loader",
-        options: {
-          autoexports: "default",
-          eslevel: 2021,
-          filters: ["esm", "functions"]
-        }
-      },
-    ]
-  })
-CONFIG
+# default config
+if not File.exist? target
+  # may be called via eval, or directly.  Resolve source either way.
+  source_paths.unshift __dir__
+  source_paths.unshift File.dirname(caller.first)
+  directory "config/webpack/loaders", File.dirname(target)
+end
+
+# load config
+insert_into_file Rails.root.join("config/webpack/environment.js").to_s,
+  "environment.loaders.prepend('ruby2js', require('./loaders/ruby2js'))\n"
 
 # read current configuration
-target = Rails.root.join("config/webpack/environment.js").to_s
 before = IO.read(target)
 
-# extract indentation and options either from the current configuration or the
-# default configuration.
-if before.include? '@ruby2js/webpack-loader'
-  match = /^(\s*)options: (\{.*?\n\1\})/m.match(before)
-else
-  match = /^(\s*)options: (\{.*?\n\1\})/m.match(config)
-end
+# extract indentation and options
+match = /^(\s*)options: (\{.*?\n\1\})/m.match(before)
 
 # evaluate base options.  Here it is handy that Ruby's syntax for hashes is
 # fairly close to JavaScript's object literals.  May run into problems in the
@@ -90,8 +75,6 @@ replacement =  Ruby2JS.convert(merged.inspect + "\n").to_s.
   gsub(/^/, match[1]).strip
 
 # Update configuration
-if before.include? '@ruby2js/webpack-loader'
+unless before.include? replacement
   gsub_file target, match[2].to_s, replacement
-else
-  append_to_file target, "\n" + config.sub(match[2], replacement)
 end
