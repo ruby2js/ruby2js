@@ -1,5 +1,7 @@
 # master
 
+# 4.1.0 / 2021-03-17
+
 * ES2021 support for replaceAll
 * Preact support added to the React filter
 
