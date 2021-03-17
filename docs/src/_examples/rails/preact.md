@@ -94,3 +94,9 @@ Start your server:
 Visit <http://localhost:3000/demo/run>.  What you should see:
 
 <p data-controller="eval" data-html="div.language-erb"></p>
+
+{% rendercontent "docs/note" %}
+**Note**: While the `h` method is handy, the same JSX-like and wunderbar
+syntaxes supported by the React filter can be used with Preact.  See the
+[React examples](../react/) for details.
+{% endrendercontent %}
