@@ -103,10 +103,10 @@ module Ruby2JS
           child.type == :def and child.children.first == :initialize
         }
         if initialize and nodes[initialize].children.length == 3
-          statements = nodes[initialize].children[2].children
+          statements = nodes[initialize].children[2..-1]
 
-          if statements.length == 1 and statements.children.first.type == :begin
-            statements = statements.children 
+          if statements.length == 1 and statements.first.type == :begin
+            statements = statements.first.children 
           end
 
           unless statements.any? {|statement| %i[super zuper].include?  statement.type}
@@ -175,12 +175,14 @@ module Ruby2JS
       def le_walk(node)
         node.children.each do |child|
           next unless Parser::AST::Node === child
-          le_walk(child)
 
           if child.type == :ivar
             @le_props[child.children.first] ||= nil
-          elsif child.type == :ivasgn
-            @le_props[child.children.first] = case child.children.last.type
+          elsif child.type == :ivasgn || child.type == :op_asgn
+            prop = child.children.first
+            prop = prop.children.first if child.type == :op_asgn
+
+            @le_props[prop] = case child.children.last.type
               when :str, :dstr
                 :String
               when :array
@@ -190,8 +192,10 @@ module Ruby2JS
               when :true, :false
                 :Boolean
               else
-                @le_props[child.children.first] || :Object
+                @le_props[prop] || :Object
             end
+          else
+            le_walk(child)
           end
         end
       end
