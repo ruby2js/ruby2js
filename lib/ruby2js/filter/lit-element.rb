@@ -22,8 +22,17 @@ module Ruby2JS
 
       def on_ivasgn(node)
         return super unless @le_props&.include?(node.children.first)
+        return super unless node.children.length > 1
         s(:send, s(:self), node.children.first.to_s[1..-1]+'=',
           process(node.children[1]))
+      end
+
+      def on_op_asgn(node)
+        return super unless node.children.first.type == :ivasgn
+        var = node.children.first.children.first
+        return super unless @le_props&.include?(var)
+        super node.updated(nil, [s(:attr, s(:attr, nil, :this),
+          var.to_s[1..-1]), *node.children[1..-1]])
       end
 
       def on_class(node)
@@ -174,13 +183,14 @@ module Ruby2JS
       # analyze ivar usage
       def le_walk(node)
         node.children.each do |child|
-          next unless Parser::AST::Node === child
+          next unless child.is_a? Parser::AST::Node
 
           if child.type == :ivar
             @le_props[child.children.first] ||= nil
           elsif child.type == :ivasgn || child.type == :op_asgn
             prop = child.children.first
-            prop = prop.children.first if child.type == :op_asgn
+            prop = prop.children.first if prop.type == :ivasgn
+            next unless prop.is_a? Symbol
 
             @le_props[prop] = case child.children.last.type
               when :str, :dstr

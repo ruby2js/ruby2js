@@ -90,7 +90,7 @@ module Ruby2JS
             end
           end
 
-        elsif m.type == :defs and m.children.first == s(:self)
+        elsif %i(defs defp).include? m.type and m.children.first == s(:self)
           if m.children[1] =~ /=$/
             # class property setter
             s(:prop, name, m.children[1].to_s[0..-2] =>
