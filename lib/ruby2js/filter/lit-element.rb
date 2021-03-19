@@ -189,8 +189,10 @@ module Ruby2JS
             @le_props[child.children.first] ||= nil
           elsif child.type == :ivasgn || child.type == :op_asgn
             prop = child.children.first
-            prop = prop.children.first if prop.type == :ivasgn
-            next unless prop.is_a? Symbol
+            unless prop.is_a? Symbol
+              prop = prop.children.first if prop.type == :ivasgn
+              next unless prop.is_a? Symbol
+            end
 
             @le_props[prop] = case child.children.last.type
               when :str, :dstr
