@@ -13,11 +13,6 @@ describe Ruby2JS::Filter::LitElement do
     _(Ruby2JS.convert(string, eslevel: 2021,
       filters: [Ruby2JS::Filter::LitElement, Ruby2JS::Filter::ESM]).to_s)
   end
-  
-  def to_js_skypack(string)
-    _(Ruby2JS.convert(string, eslevel: 2021, import_from_skypack: true,
-      filters: [Ruby2JS::Filter::LitElement, Ruby2JS::Filter::ESM]).to_s)
-  end
 
   describe "properties" do
     it "should handle string properties" do
@@ -66,6 +61,23 @@ describe Ruby2JS::Filter::LitElement do
         must_include '${x ? html`<br/>` : html`<hr/>`}'
       to_js('class C < LitElement; def render; %{<ul>#{x.map {|item| "<li>#{item}</li>"}}</ul>}; end; end').
         must_include '${x.map(item => html`<li>${item}</li>`)}'
+    end
+  end
+
+  describe "no autobind" do
+    it "should disable autobind" do
+      to_js('class C < LitElement; ' +
+        'def render; %{<a @click="#{clickHandler}">link</a>}; end; ' + 
+        'def clickHandler(event); console.log(event); end; end').
+        must_include 'html`<a @click="${this.clickHandler}">link</a>`'
+    end
+  end
+
+  describe "modules" do
+    it "imports from lit-element" do
+      to_js_esm( 'class Foo<LitElement; end' ).
+        must_equal 'import { LitElement, css, html } from "lit-element"; ' +
+          'class Foo extends LitElement {}'
     end
   end
 

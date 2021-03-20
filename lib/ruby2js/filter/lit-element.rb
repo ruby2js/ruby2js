@@ -75,7 +75,7 @@ module Ruby2JS
 
         # render of a string is converted to a taglit :html
         render = nodes.find_index {|child| 
-          child.type == :def and child.children.first == :render
+          child&.type == :def and child.children.first == :render
         }
         if render and %i[str dstr].include?(nodes[render].children[2].type)
           nodes[render] = nodes[render].updated(:deff,
@@ -85,7 +85,7 @@ module Ruby2JS
 
         # self.styles returning string is converted to a taglit :css
         styles = nodes.find_index {|child| 
-          child.type == :defs and child.children[0..1] == [s(:self), :styles]
+          child&.type == :defs and child.children[0..1] == [s(:self), :styles]
         }
         if styles and %i[str dstr].include?(nodes[styles].children[3].type)
           string = nodes[styles].children[3]
@@ -109,7 +109,7 @@ module Ruby2JS
 
         # insert super calls into initializer
         initialize = nodes.find_index {|child| 
-          child.type == :def and child.children.first == :initialize
+          child&.type == :def and child.children.first == :initialize
         }
         if initialize and nodes[initialize].children.length == 3
           statements = nodes[initialize].children[2..-1]

@@ -1,5 +1,5 @@
 ---
-order: 18
+order: 19
 kitle: minitest-jasmine
 top_section: Filters
 category: minitest

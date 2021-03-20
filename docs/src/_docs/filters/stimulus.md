@@ -1,16 +1,17 @@
 ---
-order: 24
+order: 25
 title: Stimulus
 top_section: Filters
-category: stimulu`
+category: stimulus
 ---
 
 The **Stimulus** filter makes it easier to build [Stimulus](https://stimulus.hotwire.dev/) controllers.
 
 When a class definition is encountered that derives from
-`Stimulus::Controller`, the following tranformations are applied:
+`Stimulus::Controller`, the following transformations are applied:
 
- * an `import` statement for Stimulus will be generated.
+ * an `import` statement for Stimulus will be generated if the [esm](./esm)
+   filter is also applied.
 
  * `initialize` methods are **not** mapped to constructors.
 

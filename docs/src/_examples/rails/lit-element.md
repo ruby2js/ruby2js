@@ -7,14 +7,8 @@ category: lit-element
 
 This example is based on the 
 [LitElement tutorial](https://lit-element.polymer-project.org/try/style), but
-based on Ruby2JS instead and hosted by Ruby on Rails.
-
-Notable differences from the original JavaScript:
-
-  * No need for `static get properties`.
-  * No need for `this.`.
-  * No need to identify which strings are `css` and which are `html`.
-  * No need to code a call to `super()`.
+based on Ruby2JS instead and hosted by Ruby on Rails.  See the
+[lit-element filter](../../docs/filters/lit-element) for more details.
 
 ## Create a Project
 
