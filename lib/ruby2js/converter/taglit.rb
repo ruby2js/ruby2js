@@ -10,8 +10,12 @@ module Ruby2JS
         # disable autobinding in tag literals
         save_autobind, @autobind = @autobind, false
       
-        put tag.children.first
-        parse_all(*children, join: '')
+        if es2015
+          put tag.children.first
+          parse_all(*children, join: '')
+        else
+          parse @ast.updated(:send, [nil, tag.children.last, *children])
+        end
       ensure
         @autobind = save_autobind
       end

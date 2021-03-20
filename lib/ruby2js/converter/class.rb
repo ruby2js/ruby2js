@@ -59,7 +59,7 @@ module Ruby2JS
           m = m.updated(:def, m.children[1..-1])
         end
 
-        node = if m.type == :def or m.type == :defm
+        node = if %i(def defm deff).include? m.type
           if m.children.first == :initialize and !visible[:initialize]
             # constructor: remove from body and overwrite init function
             init = m

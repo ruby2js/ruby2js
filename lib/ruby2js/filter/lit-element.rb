@@ -77,7 +77,7 @@ module Ruby2JS
         render = nodes.find_index {|child| 
           child&.type == :def and child.children.first == :render
         }
-        if render and %i[str dstr].include?(nodes[render].children[2].type)
+        if render and %i[str dstr].include?(nodes[render].children[2]&.type)
           nodes[render] = nodes[render].updated(:deff,
             [*nodes[render].children[0..1],
             s(:autoreturn, html_wrap(nodes[render].children[2]))])
@@ -87,7 +87,7 @@ module Ruby2JS
         styles = nodes.find_index {|child| 
           child&.type == :defs and child.children[0..1] == [s(:self), :styles]
         }
-        if styles and %i[str dstr].include?(nodes[styles].children[3].type)
+        if styles and %i[str dstr].include?(nodes[styles].children[3]&.type)
           string = nodes[styles].children[3]
           string = s(:dstr, string) if string.type == :str
           children = string.children.dup
