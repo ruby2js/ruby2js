@@ -40,8 +40,6 @@ export default {
 import { nodeResolve } from '@rollup/plugin-node-resolve';
 import ruby2js from '@ruby2js/rollup-plugin';
 
-const env = process.env.NODE_ENV || 'development';
-
 export default {
   input: 'index.js.rb',
 
@@ -105,8 +103,6 @@ export default {
 ```javascript
 import { nodeResolve } from '@rollup/plugin-node-resolve';
 import ruby2js from '@ruby2js/rollup-plugin';
-
-const env = process.env.NODE_ENV || 'development';
 
 export default {
   input: 'index.js.rb',
