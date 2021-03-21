@@ -12,7 +12,8 @@ yarn add -D @ruby2js/rollup-plugin
 
 ## Usage (basic)
 
-```js
+```javascript
+// rollup.config.js
 import ruby2js from '@ruby2js/rollup-plugin';
 
 export default {
@@ -34,7 +35,8 @@ export default {
 
 ## Usage (lit-element)
 
-```
+```javascript
+// rollup.config.js
 import { nodeResolve } from '@rollup/plugin-node-resolve';
 import ruby2js from '@ruby2js/rollup-plugin';
 
@@ -61,7 +63,7 @@ export default {
 
 ## Usage (react)
 
-```js
+```javascript
 // rollup.config.js
 import { nodeResolve } from '@rollup/plugin-node-resolve';
 import commonjs from '@rollup/plugin-commonjs';
@@ -100,7 +102,7 @@ export default {
 
 ## Usage (stimulus)
 
-```
+```javascript
 import { nodeResolve } from '@rollup/plugin-node-resolve';
 import ruby2js from '@ruby2js/rollup-plugin';
 
