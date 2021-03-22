@@ -30,8 +30,8 @@ function register(config) {
           return condition.test(name)
         } else if (typeof condition === 'function') {
           return condition(name)
-        })
-      }
+        }
+      })
     }
   } else if (config.ignore) {
     if (config.ignore instanceof RegExp) {
@@ -44,8 +44,8 @@ function register(config) {
           return condition.test(name)
         } else if (typeof condition === 'function') {
           return condition(name)
-        })
-      }
+        }
+      })
     }
   }
 

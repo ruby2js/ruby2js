@@ -147,7 +147,7 @@ module Ruby2JS
           node.updated(nil, [
             s(:attr, nil, :module),
             :exports=,
-            node.children[2]
+            process(node.children[2])
           ])
 
         else
