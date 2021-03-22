@@ -1,0 +1,20 @@
+{
+  "name": "@ruby2js/register",
+  "version": "0.0.1",
+  "description": "The require hook will bind itself to node's require and automatically compile files on the fly.",
+  "author": "Sam Ruby <rubys@intertwingly.net>",
+  "license": "MIT",
+  "main": "index.js",
+  "homepage": "https://github.com/ruby2js/ruby2js/tree/master/packages/register#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ruby2js/ruby2js"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@ruby2js/ruby2js": ">= 0.1.0",
+    "pirates": "^4.0.1"
+  }
+}
