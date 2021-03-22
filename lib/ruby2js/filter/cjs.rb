@@ -7,6 +7,59 @@ module Ruby2JS
     module CJS
       include SEXP
 
+      def options=(options)
+        super
+        @cjs_autoexports = !@disable_autoexports && options[:autoexports]
+      end
+
+      def process(node)
+        return super unless @cjs_autoexports
+
+        list = [node]
+        while list.length == 1 and list.first.type == :begin
+          list = list.first.children.dup
+        end
+
+        replaced = []
+        list.map! do |child|
+          replacement = child
+
+          if [:module, :class].include? child.type and
+            child.children.first.type == :const and
+            child.children.first.children.first == nil \
+          then
+            replacement = s(:send, nil, :export, child)
+          elsif child.type == :casgn and child.children.first == nil
+            replacement = s(:send, nil, :export, child)
+          elsif child.type == :def
+            replacement = s(:send, nil, :export, child)
+          end
+
+          if replacement != child
+            replaced << replacement
+            @comments[replacement] = @comments[child] if @comments[child]
+          end
+
+          replacement
+        end
+
+        if replaced.length == 1 and @cjs_autoexports == :default
+          list.map! do |child|
+            if child == replaced.first
+              replacement = s(:send, nil, :export, s(:send, nil, :default,
+                *child.children[2..-1]))
+              @comments[replacement] = @comments[child] if @comments[child]
+              replacement
+            else
+              child
+            end
+          end
+        end
+
+        @cjs_autoexports = false
+        process s(:begin, *list)
+      end
+
       def on_send(node)
         return super unless node.children[1] == :export
 
@@ -56,6 +109,18 @@ module Ruby2JS
               s(:block, s(:send, s(:const, nil, :Class), :new,
               assign.children[1]), s(:args), 
               *process_all(assign.children[2..-1]))
+            ])
+          end
+
+        elsif node.children[2].type == :module
+          assign = node.children[2]
+          if assign.children[0].children[0] != nil
+            node
+          else
+            node.updated(nil, [
+              s(:attr, nil, :exports),
+              assign.children[0].children[1].to_s + '=',
+              s(:class_module, nil, nil, *process_all(assign.children[1..-1]))
             ])
           end
 

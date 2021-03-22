@@ -1,7 +1,7 @@
 # master
 
 * fix a number of lit-element filter edge cases
-* more cjs export suppor: constants, classes
+* more cjs export support: constants, classes, modules, autoexports
 
 # 4.1.0 / 2021-03-17
 

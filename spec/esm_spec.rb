@@ -120,7 +120,7 @@ describe Ruby2JS::Filter::ESM do
     end
   end
 
-  describe "autoexports option" do
+  describe "autoexports default option" do
     it "should autoexport as default if there is only one export" do
       to_js('Foo = 1', autoexports: :default).
         must_equal 'export default Foo = 1'

@@ -4,12 +4,12 @@ require 'ruby2js/filter/cjs'
 
 describe Ruby2JS::Filter::CJS do
   
-  def to_js( string)
-    _(Ruby2JS.convert(string, filters: [Ruby2JS::Filter::CJS],
-      file: __FILE__, eslevel: 2017).to_s)
+  def to_js(string, options= {})
+    _(Ruby2JS.convert(string, options.merge(filters: [Ruby2JS::Filter::CJS],
+      file: __FILE__, eslevel: 2017)).to_s)
   end
 
-  def to_js_fn( string)
+  def to_js_fn(string)
     _(Ruby2JS.convert(string,
       filters: [Ruby2JS::Filter::CJS, Ruby2JS::Filter::Functions],
       file: __FILE__, eslevel: 2017).to_s)
@@ -46,6 +46,11 @@ describe Ruby2JS::Filter::CJS do
         must_equal 'exports.C = class extends D {}'
     end
 
+    it "should export a module" do
+      to_js( 'export module C; def x; 42; end; end' ).
+        must_equal 'exports.C = {get x() {return 42}}'
+    end
+
     it "should convert .inspect into JSON.stringify()" do
       to_js_fn( 'export async def f(a, b); return {input: a}.inspect; end' ).
         must_equal 'exports.f = async (a, b) => JSON.stringify({input: a})'
@@ -66,6 +71,45 @@ describe Ruby2JS::Filter::CJS do
     it "should export a value" do
       to_js( 'export default 1' ).
         must_equal 'module.exports = 1'
+    end
+  end
+
+  describe "autoexports option" do
+    it "should autoexport top level modules" do
+      to_js('module Foo; def bar; end; end', autoexports: true).
+        must_equal 'exports.Foo = {get bar() {}}'
+    end
+
+    it "should autoexport top level classes" do
+      to_js('class Foo; def bar; end; end', autoexports: true).
+        must_equal 'exports.Foo = class {get bar() {}}'
+    end
+
+    it "should autoexport top level methods" do
+      to_js('def f; end', autoexports: true).
+        must_equal 'exports.f = () => {}'
+    end
+
+    it "should autoexport top level constants" do
+      to_js('Foo=1', autoexports: true).
+        must_equal 'exports.Foo = 1'
+    end
+  end
+
+  describe "autoexports default option" do
+    it "should autoexport as default if there is only one export" do
+      to_js('Foo = 1', autoexports: :default).
+        must_equal 'module.exports = Foo = 1'
+    end
+
+    it "explicit export should override autoexport as default" do
+      to_js('export Foo = 1', autoexports: :default).
+        must_equal 'exports.Foo = 1'
+    end
+
+    it "should autoexport as named if there are multiple exports" do
+      to_js('Foo = 1; Bar = 1', autoexports: :default).
+        must_equal 'exports.Foo = 1; exports.Bar = 1'
     end
   end
 
