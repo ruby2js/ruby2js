@@ -31,6 +31,21 @@ describe Ruby2JS::Filter::CJS do
         must_equal 'exports.foo = 1'
     end
 
+    it "should export a constant" do
+      to_js( 'export Foo = 1' ).
+        must_equal 'exports.Foo = 1'
+    end
+
+    it "should export a class" do
+      to_js( 'export class C; end' ).
+        must_equal 'exports.C = class {}'
+    end
+
+    it "should export a subclass" do
+      to_js( 'export class C < D; end' ).
+        must_equal 'exports.C = class extends D {}'
+    end
+
     it "should convert .inspect into JSON.stringify()" do
       to_js_fn( 'export async def f(a, b); return {input: a}.inspect; end' ).
         must_equal 'exports.f = async (a, b) => JSON.stringify({input: a})'

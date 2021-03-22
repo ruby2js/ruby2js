@@ -1,5 +1,8 @@
 # master
 
+* fix a number of lit-element filter edge cases
+* more cjs export suppor: constants, classes
+
 # 4.1.0 / 2021-03-17
 
 * ES2021 support for replaceAll

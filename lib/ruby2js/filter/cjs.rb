@@ -23,8 +23,41 @@ module Ruby2JS
           node.updated(nil, [
             s(:attr, nil, :exports),
             assign.children[0].to_s + '=',
-            *assign.children[1..-1]
+            *process_all(assign.children[1..-1])
           ])
+
+        elsif node.children[2].type == :casgn
+          assign = node.children[2]
+          if assign.children[0] == nil
+            node.updated(nil, [
+              s(:attr, nil, :exports),
+              assign.children[1].to_s + '=',
+              *process_all(assign.children[2..-1])
+            ])
+          else
+            node
+          end
+
+        elsif node.children[2].type == :class
+          assign = node.children[2]
+          if assign.children[0].children[0] != nil
+            node
+          elsif assign.children[1] == nil
+            node.updated(nil, [
+              s(:attr, nil, :exports),
+              assign.children[0].children[1].to_s + '=',
+              s(:block, s(:send, s(:const, nil, :Class), :new),
+              s(:args), *process_all(assign.children[2..-1]))
+            ])
+          else
+            node.updated(nil, [
+              s(:attr, nil, :exports),
+              assign.children[0].children[1].to_s + '=',
+              s(:block, s(:send, s(:const, nil, :Class), :new,
+              assign.children[1]), s(:args), 
+              *process_all(assign.children[2..-1]))
+            ])
+          end
 
         elsif \
           node.children[2].type == :send and
