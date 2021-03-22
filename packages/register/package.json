@@ -1,6 +1,6 @@
 {
   "name": "@ruby2js/register",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "The require hook will bind itself to node's require and automatically compile files on the fly.",
   "author": "Sam Ruby <rubys@intertwingly.net>",
   "license": "MIT",
