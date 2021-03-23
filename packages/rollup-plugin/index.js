@@ -8,7 +8,7 @@ module.exports = options => {
     transform(code, id) {
       if (!extensions.includes(extname(id))) return;
 
-      js = Ruby2JS.convert(code, options);
+      js = Ruby2JS.convert(code, {...options, file: id});
 
       return {
         code: js.toString(),
