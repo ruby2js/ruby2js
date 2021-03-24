@@ -25,7 +25,7 @@ describe 'Ruby2JS::Filter::Preact' do
   
   describe :createClass do
     it "should create classes" do
-      to_js( 'class Foo<Preact; end' ).
+      to_js( 'class Foo<Preact::Component; end' ).
         must_equal 'class Foo extends Preact.Component {}'
     end
 
@@ -35,12 +35,12 @@ describe 'Ruby2JS::Filter::Preact' do
     end
 
     it "should convert initialize methods to getInitialState" do
-      to_js( 'class Foo<Preact; def initialize(); end; end' ).
+      to_js( 'class Foo<Preact::Component; def initialize(); end; end' ).
         must_include 'constructor() {super(); this.state = {}}'
     end
 
     it "should create default getInitialState methods" do
-      to_js( 'class Foo<Preact; def foo(); @i=1; end; end' ).
+      to_js( 'class Foo<Preact::Component; def foo(); @i=1; end; end' ).
         must_include 'constructor() {super(); this.state = {}}'
     end
 
@@ -51,18 +51,18 @@ describe 'Ruby2JS::Filter::Preact' do
     end
 
     it "should initialize, accumulate, and return state" do
-      to_js( 'class Foo<Preact; def initialize; @a=1; b=2; @b = b; end; end' ).
+      to_js( 'class Foo<Preact::Component; def initialize; @a=1; b=2; @b = b; end; end' ).
         must_include 'constructor() {super(); this.state = {a: 1}; ' +
           'let b = 2; this.state.b = b}'
     end
 
     it "should collapse instance variable assignments into a return" do
-      to_js( 'class Foo<Preact; def initialize; @a=1; @b=2; end; end' ).
+      to_js( 'class Foo<Preact::Component; def initialize; @a=1; @b=2; end; end' ).
         must_include 'constructor() {super(); this.state = {a: 1, b: 2}}'
     end
 
     it "should handle parallel instance variable assignments" do
-      to_js( 'class Foo<Preact; def initialize; @a=@b=1; end; end' ).
+      to_js( 'class Foo<Preact::Component; def initialize; @a=@b=1; end; end' ).
         must_include 'constructor() {super(); this.state = {a: 1, b: 1}}'
     end
 
@@ -234,7 +234,7 @@ describe 'Ruby2JS::Filter::Preact' do
     end
 
     it "should handle text nodes" do
-      to_js( 'class Foo<Preact; def render; _a {_ @text}; end; end' ).
+      to_js( 'class Foo<Preact::Component; def render; _a {_ @text}; end; end' ).
         must_include 'return Preact.h("a", null, this.state.text)'
     end
 
@@ -244,12 +244,12 @@ describe 'Ruby2JS::Filter::Preact' do
     end
 
     it "should handle arbitrary nodes" do
-      to_js( 'class Foo<Preact; def render; _a {_[@text]}; end; end' ).
+      to_js( 'class Foo<Preact::Component; def render; _a {_[@text]}; end; end' ).
         must_include 'return Preact.h("a", null, this.state.text)'
     end
 
     it "should handle lists of arbitrary nodes" do
-      to_js( 'class Foo<Preact; def render; _a {_[@text, @text]}; end; end' ).
+      to_js( 'class Foo<Preact::Component; def render; _a {_[@text, @text]}; end; end' ).
         must_include 'return Preact.h(' +
           '"a", null, ...[this.state.text, this.state.text])'
     end
@@ -428,52 +428,52 @@ describe 'Ruby2JS::Filter::Preact' do
     end
 
     it "should map instance variables to state" do
-      to_js( 'class Foo<Preact; def method; @x; end; end' ).
+      to_js( 'class Foo<Preact::Component; def method; @x; end; end' ).
         must_include 'this.state.x'
     end
 
     it "should map setting instance variables to setState" do
-      to_js( 'class Foo<Preact; def method; @x=1; end; end' ).
+      to_js( 'class Foo<Preact::Component; def method; @x=1; end; end' ).
         must_include 'this.setState({x: 1})'
     end
 
     it "should map parallel instance variables to setState" do
-      to_js( 'class Foo<Preact; def method(); @x=@y=1; end; end' ).
+      to_js( 'class Foo<Preact::Component; def method(); @x=@y=1; end; end' ).
         must_include 'this.setState({x: 1, y: 1})'
     end
 
     it "should map consecutive instance variables to setState" do
-      to_js( 'class Foo<Preact; def method(); @x=1; @y=2; end; end' ).
+      to_js( 'class Foo<Preact::Component; def method(); @x=1; @y=2; end; end' ).
         must_include 'this.setState({x: 1, y: 2})'
     end
 
     it "should create temporary variables when needed" do
-      to_js( 'class Foo<Preact; def f; @a+=1; b=@a; end; end' ).
+      to_js( 'class Foo<Preact::Component; def f; @a+=1; b=@a; end; end' ).
         must_include 'let $a = this.state.a; $a++; let b = $a; ' +
           'return this.setState({a: $a})'
     end
 
     it "should create temporary variables when conditionals are involved" do
-      to_js( 'class Foo<Preact; def f; @a+=1 if 1; b=@a; end; end' ).
+      to_js( 'class Foo<Preact::Component; def f; @a+=1 if 1; b=@a; end; end' ).
         must_include 'let $a = this.state.a; if (1) {$a++}; let b = $a; ' +
           'return this.setState({a: $a})'
     end
 
     it "should create temporary variables when blocks are involved" do
-      to_js( 'class Foo<Preact; def f; foo {@a=1}; b=@a; end; end' ).
+      to_js( 'class Foo<Preact::Component; def f; foo {@a=1}; b=@a; end; end' ).
         must_include 'foo(() => (this.setState({a: $a = 1}))); '
           'let b = $a; return this.setState({a: $a})'
     end
 
     it "should create temporary variables when blocks+opasgn are involved" do
-      to_js( 'class Foo<Preact; def f; foo {@a+=1}; b=@a; end; end' ).
+      to_js( 'class Foo<Preact::Component; def f; foo {@a+=1}; b=@a; end; end' ).
         must_include 'let $a = this.state.a; ' +
           'foo(() => (this.setState({a: ++$a}))); let b = $a; ' +
           'return this.setState({a: $a})'
     end
 
     it "shouldn't produce temporary variables for inline event handlers" do
-      js = to_js( 'class F < Preact; def render; _input value: @draft; ' +
+      js = to_js( 'class F < Preact::Component; def render; _input value: @draft; ' +
         '_button "Cancel", onClick:-> {@draft = @base}; ' +
         '_button "Save", disabled: @draft == @base; end; end' )
       js.must_include 'this.setState({draft: event.target.value})'
@@ -483,13 +483,13 @@ describe 'Ruby2JS::Filter::Preact' do
     end
 
     it "should treat singleton method definitions as a separate scope" do
-      js = to_js( 'class F < Preact; def m(); def x.a; @i=1; end; @i; end; end' )
+      js = to_js( 'class F < Preact::Component; def m(); def x.a; @i=1; end; @i; end; end' )
       js.must_include 'this.setState({i: 1})'
       js.must_include 'this.state.i'
     end
 
     it "should generate code to handle instance vars within singleton method" do
-      js = to_js('class F < Preact; def m(); def x.a; @i=1; @i+1; end; end; end')
+      js = to_js('class F < Preact::Component; def m(); def x.a; @i=1; @i+1; end; end; end')
       js.must_include '$i = 1'
       js.must_include '$i + 1'
       js.must_include 'this.setState({i: $i}'
@@ -509,7 +509,7 @@ describe 'Ruby2JS::Filter::Preact' do
 
   describe "method calls" do
     it "should handle ivars" do
-      to_js( 'class Foo<Preact; def method; @x.(); end; end' ).
+      to_js( 'class Foo<Preact::Component; def method; @x.(); end; end' ).
         must_include 'this.state.x()'
     end
 
@@ -540,17 +540,17 @@ describe 'Ruby2JS::Filter::Preact' do
 
   describe "react statics" do
     it "should handle static properties" do
-      to_js( 'class Foo<Preact; def self.one; 1; end; end' ).
+      to_js( 'class Foo<Preact::Component; def self.one; 1; end; end' ).
         must_include '{static get one() {return 1}}'
     end
 
     it "should handle computed static properties" do
-      to_js( 'class Foo<Preact; def self.one; return 1; end; end' ).
+      to_js( 'class Foo<Preact::Component; def self.one; return 1; end; end' ).
         must_include '{static get one() {return 1}}'
     end
 
     it "should handle static methods" do
-      to_js( 'class Foo<Preact; def self.one(); return 1; end; end' ).
+      to_js( 'class Foo<Preact::Component; def self.one(); return 1; end; end' ).
         must_include '{static one() {return 1}}'
     end
   end
@@ -563,13 +563,13 @@ describe 'Ruby2JS::Filter::Preact' do
     end
 
     it "should should insert props arg on componentWillReceiveProps" do
-      to_js( 'class Foo<Preact; def componentWillReceiveProps();' +
+      to_js( 'class Foo<Preact::Component; def componentWillReceiveProps();' +
         '@foo = @@foo; end; end' ).
         must_include 'componentWillReceiveProps($$props) {this.setState({foo: $$props.foo})}'
     end
 
     it "should should use props arg on componentWillReceiveProps" do
-      to_js( 'class Foo<Preact; def componentWillReceiveProps(props);' +
+      to_js( 'class Foo<Preact::Component; def componentWillReceiveProps(props);' +
         '@foo = @@foo; end; end' ).
         must_include 'componentWillReceiveProps(props) {this.setState({foo: props.foo})}'
     end
@@ -577,12 +577,12 @@ describe 'Ruby2JS::Filter::Preact' do
 
   describe "controlled components" do
     it "should should automatically create onInput value functions" do
-      to_js( 'class Foo<Preact; def render; _input value: @x; end; end' ).
+      to_js( 'class Foo<Preact::Component; def render; _input value: @x; end; end' ).
         must_include 'onInput: event => this.setState({x: event.target.value})'
     end
 
     it "should should automatically create onInput checked functions" do
-      to_js( 'class Foo<Preact; def render; _input checked: @x; end; end' ).
+      to_js( 'class Foo<Preact::Component; def render; _input checked: @x; end; end' ).
         must_include 'onInput: () => this.setState({x: !this.state.x})'
     end
 
@@ -594,17 +594,17 @@ describe 'Ruby2JS::Filter::Preact' do
 
   describe "es6 support" do
     it "should create classes" do
-      to_js( 'class Foo<Preact; end' ).
+      to_js( 'class Foo<Preact::Component; end' ).
         must_equal 'class Foo extends Preact.Component {}'
     end
 
     it "should handle contructors" do
-      to_js( 'class Foo<Preact; def initialize; @x=1; end; end' ).
+      to_js( 'class Foo<Preact::Component; def initialize; @x=1; end; end' ).
         must_include 'constructor() {super(); this.state = {x: 1}}'
     end
 
     it "should add props arg to contructors if needed" do
-      to_js( 'class Foo<Preact; def initialize; @x=@@y; end; end' ).
+      to_js( 'class Foo<Preact::Component; def initialize; @x=@@y; end; end' ).
         must_include 'constructor(prop$) {super(prop$); this.state = {x: this.props.y}}'
     end
 
@@ -626,7 +626,7 @@ describe 'Ruby2JS::Filter::Preact' do
     end
 
     it "should not treat lifecycle methods as getters" do
-      result = to_js( 'class Foo<Preact; def render; _br; end; end' )
+      result = to_js( 'class Foo<Preact::Component; def render; _br; end; end' )
       result.must_include 'render() {'
       result.wont_include 'get render() {'
     end
@@ -634,17 +634,17 @@ describe 'Ruby2JS::Filter::Preact' do
 
   describe "wunderbar filter/JSX integration" do
     it "should handle simple calls" do
-      to_jsx( 'class Foo<Preact; def render; _br; end; end' ).
+      to_jsx( 'class Foo<Preact::Component; def render; _br; end; end' ).
         must_include 'render() {return <br/>}'
     end
 
     it "should handle multiple calls" do
-      to_jsx( 'class Foo<Preact; def render; _br; _br; end; end' ).
+      to_jsx( 'class Foo<Preact::Component; def render; _br; _br; end; end' ).
         must_include 'render() {return <><br/><br/></>}'
     end
 
     it "should not wrap non wunderbar calls" do
-      to_jsx( 'class Foo<Preact; def render; x="a"; _p x; end; end' ).
+      to_jsx( 'class Foo<Preact::Component; def render; x="a"; _p x; end; end' ).
         must_include 'render() {let x = "a"; return <><p>{x}</p></>}}'
     end
 
@@ -654,7 +654,7 @@ describe 'Ruby2JS::Filter::Preact' do
     end
 
     it "should handle loops" do
-      to_jsx( 'class Foo<Preact; def render; _ul {@@x.each {|i| _li i; }}; end; end' ).
+      to_jsx( 'class Foo<Preact::Component; def render; _ul {@@x.each {|i| _li i; }}; end; end' ).
         must_include '<ul>{this.props.x.map(i => (<li>{i}</li>))}</ul>'
     end
   end

@@ -555,17 +555,17 @@ describe Ruby2JS::Filter::React do
 
   describe "es6 support" do
     it "should create classes" do
-      to_js6( 'class Foo<React; end' ).
+      to_js6( 'class Foo<React::Component; end' ).
         must_equal 'class Foo extends React.Component {}'
     end
 
     it "should handle contructors" do
-      to_js6( 'class Foo<React; def initialize; @x=1; end; end' ).
+      to_js6( 'class Foo<React::Component; def initialize; @x=1; end; end' ).
         must_include 'constructor() {super(); this.state = {x: 1}}'
     end
 
     it "should add props arg to contructors if needed" do
-      to_js6( 'class Foo<React; def initialize; @x=@@y; end; end' ).
+      to_js6( 'class Foo<React::Component; def initialize; @x=@@y; end; end' ).
         must_include 'constructor(prop$) {super(prop$); this.state = {x: this.props.y}}'
     end
 
@@ -587,7 +587,7 @@ describe Ruby2JS::Filter::React do
     end
 
     it "should not treat lifecycle methods as getters" do
-      result = to_js6( 'class Foo<React; def render; _br; end; end' )
+      result = to_js6( 'class Foo<React::Component; def render; _br; end; end' )
       result.must_include 'render() {'
       result.wont_include 'get render() {'
     end
@@ -595,27 +595,27 @@ describe Ruby2JS::Filter::React do
 
   describe "wunderbar filter/JSX integration" do
     it "should handle simple calls" do
-      to_js6( 'class Foo<React; def render; _br; end; end' ).
+      to_js6( 'class Foo<React::Component; def render; _br; end; end' ).
         must_include 'render() {return <br/>}'
     end
 
     it "should handle multiple calls" do
-      to_js6( 'class Foo<React; def render; _br; _br; end; end' ).
+      to_js6( 'class Foo<React::Component; def render; _br; _br; end; end' ).
         must_include 'render() {return <><br/><br/></>}'
     end
 
     it "should not wrap non wunderbar calls" do
-      to_js6( 'class Foo<React; def render; x="a"; _p x; end; end' ).
+      to_js6( 'class Foo<React::Component; def render; x="a"; _p x; end; end' ).
         must_include 'render() {let x = "a"; return <><p>{x}</p></>}}'
     end
 
     it "should handle if statements" do
-      to_js6( 'class Foo<React; def render; _br if @@x; end; end' ).
+      to_js6( 'class Foo<React::Component; def render; _br if @@x; end; end' ).
         must_include '{return <>{this.props.x ? <br/> : null}</>}'
     end
 
     it "should handle loops" do
-      to_js6( 'class Foo<React; def render; _ul {@@x.each {|i| _li i; }}; end; end' ).
+      to_js6( 'class Foo<React::Component; def render; _ul {@@x.each {|i| _li i; }}; end; end' ).
         must_include '<ul>{this.props.x.map(i => (<li>{i}</li>))}</ul>'
     end
   end

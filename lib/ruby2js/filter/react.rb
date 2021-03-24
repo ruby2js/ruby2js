@@ -31,7 +31,8 @@ module Ruby2JS
         Preact: s(:import,
           [s(:pair, s(:sym, :as), s(:const, nil, :Preact)),
             s(:pair, s(:sym, :from), s(:str, "preact"))],
-            s(:str, '*'))
+            s(:str, '*')),
+        PreactHook: s(:import, ["preact/hooks"], [s(:attr, nil, :useState)])
       }
 
       # the following command can be used to generate ReactAttrs:
@@ -181,8 +182,8 @@ module Ruby2JS
             if not createClass
               pairs << child
             elsif child.is_method?
-              statics << s(:pair, s(:sym, mname), process(child.updated(:block,
-                [s(:send, nil, :proc), args, s(:autoreturn, *block)])))
+              statics << s(:pair, s(:sym, mname), child.updated(:block,
+                [s(:send, nil, :proc), args, s(:autoreturn, *block)]))
             elsif \
               block.length == 1 and
               Converter::EXPRESSIONS.include? block.first.type
@@ -239,6 +240,31 @@ module Ruby2JS
           unless statics.empty?
             pairs << s(:pair, s(:sym, :statics), s(:hash, *statics))
           end
+
+          # determine if this class can be emitted as a hook
+          hook = (es2015 and inheritance.children.first == nil)
+          body.each do |statement|
+            if statement.type == :def
+              method = statement.children.first
+              if method == :initialize
+                children = statement.children[2..-1]
+                children.pop unless children.last
+                while children.length == 1 and children.first.type == :begin
+                  children = children.first.children 
+                end
+                hook = false if children.any? {|child| child.type != :ivasgn}
+              elsif method != :render and ReactLifecycle.include? method.to_s
+                hook = false
+              elsif not statement.is_method?
+                hook = false
+              elsif method.to_s.end_with? '='
+                hook = false
+              end
+            elsif statement.type == :defs
+              hook = false
+            end
+          end
+          @reactClass = :hook if hook
 
           # create a default getInitialState method if there is no such method
           # and there are either references to instance variables or there are
@@ -400,6 +426,43 @@ module Ruby2JS
             # emit a createClass statement
             node.updated(:casgn, [nil, cname.children.last,
               s(:send, s(:const, nil, :React), :createClass, s(:hash, *pairs))])
+          elsif hook
+            initialize = pairs.find_index {|node| node.type == :def and node.children.first == :initialize}
+
+            hash = {}
+            if initialize
+              hash = pairs.delete_at(initialize)
+              hash = hash.children.last while %i(def begin send).include? hash&.type
+              hash = s(:hash) unless hash&.type == :hash
+              hash = hash.children.map {|pair|
+                [pair.children.first.children.first, pair.children.last]
+              }.to_h
+            end 
+
+            (@reactIvars[:asgn] + @reactIvars[:ref]).uniq.each do |symbol|
+              hash[symbol.to_s[1..-1]] ||= s(:nil)
+            end
+
+            hash.sort.each do |var, value|
+              if @react == :Preact 
+                hooker = nil
+                prepend_list << REACT_IMPORTS[:PreactHook] if modules_enabled?
+              else
+                hooker = s(:const, nil, :React)
+              end
+
+              setter = 'set' + var[0].upcase + var[1..-1]
+              pairs.unshift(s(:masgn, s(:mlhs, s(:lvasgn, var), 
+                s(:lvasgn, setter)), s(:send, hooker, :useState, value)))
+            end
+
+            render = pairs.find_index {|node| node.type == :defm and node.children.first == :render}
+            if render
+              render = pairs.delete_at(render)
+              pairs.push s(:autoreturn, render.children.last)
+            end
+
+            node.updated(:def, [cname.children.last, s(:args), s(:begin, *pairs)])
           else
             # emit a class that extends React.Component
             node.updated(:class, [s(:const, nil, cname.children.last),
@@ -1074,7 +1137,10 @@ module Ruby2JS
       # convert instance variables to state
       def on_ivar(node)
         return super unless @reactClass
-        if @reactMethod and @reactIvars[:capture].include? node.children.first
+
+        if @reactClass == :hook
+          node.updated(:lvar, [node.children.first.to_s[1..-1]])
+        elsif @reactMethod and @reactIvars[:capture].include? node.children.first
           node.updated(:lvar, ["$#{node.children.first[1..-1]}"])
         else
           node.updated(:attr, [s(:attr, s(:self), :state),
@@ -1085,6 +1151,12 @@ module Ruby2JS
       # convert instance variable assignments to setState calls
       def on_ivasgn(node)
         return super unless @react
+
+        if @reactClass == :hook
+          var = node.children.first.to_s[1..-1]
+          return node.updated(:send, [nil, 'set' + var[0].upcase + var[1..-1],
+          node.children.last])
+        end
 
         if @reactMethod and @reactIvars[:capture].include? node.children.first
           ivar = node.children.first.to_s
@@ -1142,7 +1214,11 @@ module Ruby2JS
         return super unless @react
         return super unless node.children.first.type == :ivasgn
         var = node.children.first.children.first
-        if @reactMethod and @reactIvars[:capture].include? var
+        if @reactClass == :hook
+          var = node.children.first.children.first.to_s[1..-1]
+          node.updated(:send, [nil, 'set' + var[0].upcase + var[1..-1],
+            s(:send, s(:lvar, var), *node.children[1..-1])])
+        elsif @reactMethod and @reactIvars[:capture].include? var
           if @reactBlock
             s(:send, s(:self), :setState, s(:hash, s(:pair,
               s(:str, var[1..-1]), process(s(node.type,
