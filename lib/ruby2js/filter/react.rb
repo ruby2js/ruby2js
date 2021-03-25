@@ -76,7 +76,7 @@ module Ruby2JS
 
       ReactLifecycle = %w(render componentDidMount shouldComponentUpdate
       getShapshotBeforeUpdate componentDidUpdate componentWillUnmount
-      componentDidCatch)
+      componentDidCatch componentWillReceiveProps)
 
       ReactAttrMap = Hash[ReactAttrs.map {|name| [name.downcase, name]}]
       ReactAttrMap['for'] = 'htmlFor'
@@ -253,7 +253,9 @@ module Ruby2JS
                   children = children.first.children 
                 end
                 hook = false if children.any? {|child| child.type != :ivasgn}
-              elsif method != :render and ReactLifecycle.include? method.to_s
+              elsif method == :render
+                nil
+              elsif ReactLifecycle.include? method.to_s
                 hook = false
               elsif not statement.is_method?
                 hook = false
@@ -264,7 +266,12 @@ module Ruby2JS
               hook = false
             end
           end
-          @reactClass = :hook if hook
+
+          if hook
+            @reactClass = :hook
+            @react_props = []
+            @react_methods = []
+          end
 
           # create a default getInitialState method if there is no such method
           # and there are either references to instance variables or there are
@@ -289,13 +296,18 @@ module Ruby2JS
           body.select {|child| child.type == :def}.each do |child|
             mname, args, *block = child.children
             @reactMethod = mname
-            @reactProps = child.updated(:attr, [s(:self), :props])
+
+            if @reactClass == :hook
+              @reactProps = s(:lvar, :"prop$")
+            else
+              @reactProps = child.updated(:attr, [s(:self), :props])
+            end
 
             # analyze ivar usage
             @reactIvars = {pre: [], post: [], asgn: [], ref: [], cond: []}
             react_walk(child) unless mname == :initialize
-            @reactIvars[:capture] =
-              (@reactIvars[:pre] + @reactIvars[:post]).uniq
+            @reactIvars[:capture] = (@reactIvars[:pre] + @reactIvars[:post]).uniq
+            @reactIvars[:pre] = @reactIvars[:post] = [] if @reactClass == :hook
 
             if mname == :initialize
               mname = createClass ? :getInitialState : :initialize 
@@ -443,7 +455,7 @@ module Ruby2JS
               hash[symbol.to_s[1..-1]] ||= s(:nil)
             end
 
-            hash.sort.each do |var, value|
+            hash.sort.reverse.each do |var, value|
               if @react == :Preact 
                 hooker = nil
                 prepend_list << REACT_IMPORTS[:PreactHook] if modules_enabled?
@@ -462,7 +474,16 @@ module Ruby2JS
               pairs.push s(:autoreturn, render.children.last)
             end
 
-            node.updated(:def, [cname.children.last, s(:args), s(:begin, *pairs)])
+            has_cvar = lambda {|list|
+              list.any? {|node|
+                next unless Parser::AST::Node === node
+                return true if node.type == :cvar
+                has_cvar.call(node.children)
+              }
+            }
+            args = has_cvar[node.children] ? s(:args, s(:arg, 'prop$')) : s(:args)
+
+            node.updated(:def, [cname.children.last, args, s(:begin, *pairs)])
           else
             # emit a class that extends React.Component
             node.updated(:class, [s(:const, nil, cname.children.last),
@@ -1131,6 +1152,7 @@ module Ruby2JS
       # convert global variables to refs
       def on_gvar(node)
         return super unless @reactClass
+        return super if @reactClass == :hook
         s(:attr, s(:attr, s(:self), :refs), node.children.first.to_s[1..-1])
       end
 
@@ -1155,7 +1177,7 @@ module Ruby2JS
         if @reactClass == :hook
           var = node.children.first.to_s[1..-1]
           return node.updated(:send, [nil, 'set' + var[0].upcase + var[1..-1],
-          node.children.last])
+            process(node.children.last)])
         end
 
         if @reactMethod and @reactIvars[:capture].include? node.children.first
@@ -1406,6 +1428,7 @@ module Ruby2JS
           @reactIvars = {pre: [], post: [], asgn: [], ref: [], cond: []}
           react_walk(node.children.last)
           @reactIvars[:capture] = (@reactIvars[:pre] + @reactIvars[:post]).uniq
+          @reactIvars[:pre] = @reactIvars[:post] = [] if @reactClass == :hook
           node = super
           block = react_process_ivars([node.children.last.dup])
           node.updated(nil, [*node.children[0..-2], s(:begin, *block)])

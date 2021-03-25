@@ -45,7 +45,7 @@ describe 'Ruby2JS::Filter::Preact' do
     end
 
     it "should autobind event handlers" do
-      to_js( 'class Foo<Preact; def render; _a onClick: handleClick; end; ' + 
+      to_js( 'class Foo<Preact::Component; def render; _a onClick: handleClick; end; ' + 
         'def handleClick(event); end; end' ).
         must_include 'onClick: this.handleClick.bind(this)'
     end
@@ -72,7 +72,7 @@ describe 'Ruby2JS::Filter::Preact' do
     end
 
     it "should handle calls to methods" do
-      to_js( 'class Foo<Preact; def a(); b(); end; def b(); end; end' ).
+      to_js( 'class Foo<Preact::Component; def a(); b(); end; def b(); end; end' ).
         must_include 'this.b()'
     end
 
@@ -109,7 +109,7 @@ describe 'Ruby2JS::Filter::Preact' do
 
     it "should create elements with attributes and text" do
       to_js( 'class Foo<Preact; def render; _a "name", href: "link"; end; end' ).
-        must_include 'return Preact.h("a", {href: "link"}, "name")}}'
+        must_include 'return Preact.h("a", {href: "link"}, "name")}'
     end
 
     it "should create simple nested elements" do
@@ -230,7 +230,7 @@ describe 'Ruby2JS::Filter::Preact' do
       result.must_include '$_.push(Preact.h("dt", null, i.term))'
       result.must_include '$_.push(Preact.h("dd", null, i.defn))'
       result.must_include 'return $_'
-      result.must_include '})())}}'
+      result.must_include '})())}'
     end
 
     it "should handle text nodes" do
@@ -278,7 +278,7 @@ describe 'Ruby2JS::Filter::Preact' do
       result = to_js( 'class Foo<Preact; def render; _h1 "a"; _p "b"; end; end' )
       result.must_include 'return Preact.h(Preact.Fragment, null, '
       result.must_include ', Preact.h("h1", null, "a"),'
-      result.must_include ', Preact.h("p", null, "b"))}}'
+      result.must_include ', Preact.h("p", null, "b"))}'
     end
 
     it "should wrap anything that is not a method or block call with a span" do
@@ -524,7 +524,7 @@ describe 'Ruby2JS::Filter::Preact' do
     end
   end
 
-  describe 'react calls' do
+  describe 'preact calls' do
     it 'should create elements' do
       to_js( 'Preact.render _Element, document.getElementById("sidebar")' ).
         must_include 'Preact.h(Element)'
@@ -538,19 +538,19 @@ describe 'Ruby2JS::Filter::Preact' do
     end
   end
 
-  describe "react statics" do
+  describe "preact statics" do
     it "should handle static properties" do
-      to_js( 'class Foo<Preact::Component; def self.one; 1; end; end' ).
+      to_js( 'class Foo<Preact; def self.one; 1; end; end' ).
         must_include '{static get one() {return 1}}'
     end
 
     it "should handle computed static properties" do
-      to_js( 'class Foo<Preact::Component; def self.one; return 1; end; end' ).
+      to_js( 'class Foo<Preact; def self.one; return 1; end; end' ).
         must_include '{static get one() {return 1}}'
     end
 
     it "should handle static methods" do
-      to_js( 'class Foo<Preact::Component; def self.one(); return 1; end; end' ).
+      to_js( 'class Foo<Preact; def self.one(); return 1; end; end' ).
         must_include '{static one() {return 1}}'
     end
   end
@@ -563,13 +563,13 @@ describe 'Ruby2JS::Filter::Preact' do
     end
 
     it "should should insert props arg on componentWillReceiveProps" do
-      to_js( 'class Foo<Preact::Component; def componentWillReceiveProps();' +
+      to_js( 'class Foo<Preact; def componentWillReceiveProps();' +
         '@foo = @@foo; end; end' ).
         must_include 'componentWillReceiveProps($$props) {this.setState({foo: $$props.foo})}'
     end
 
     it "should should use props arg on componentWillReceiveProps" do
-      to_js( 'class Foo<Preact::Component; def componentWillReceiveProps(props);' +
+      to_js( 'class Foo<Preact; def componentWillReceiveProps(props);' +
         '@foo = @@foo; end; end' ).
         must_include 'componentWillReceiveProps(props) {this.setState({foo: props.foo})}'
     end
@@ -649,7 +649,7 @@ describe 'Ruby2JS::Filter::Preact' do
     end
 
     it "should handle if statements" do
-      to_jsx( 'class Foo<Preact; def render; _br if @@x; end; end' ).
+      to_jsx( 'class Foo<Preact::Component; def render; _br if @@x; end; end' ).
         must_include '{return <>{this.props.x ? <br/> : null}</>}'
     end
 
@@ -662,7 +662,7 @@ describe 'Ruby2JS::Filter::Preact' do
   describe :autoimports do
     it "should not autoimport Preact unless ESM is included" do
       to_js( 'class Foo<Preact; end' ).
-        wont_include 'import Preact from "react";'
+        wont_include 'import * as Preact from "preact";'
     end
 
     it "should autoimport Preact if ESM is included" do
