@@ -1,6 +1,6 @@
 {
   "name": "@ruby2js/vite-plugin",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "ruby2js plugin for vite",
   "author": "Sam Ruby <rubys@intertwingly.net>",
   "license": "MIT",
