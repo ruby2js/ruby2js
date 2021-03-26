@@ -1,8 +1,8 @@
 ---
 order: 22
-title: React
+title: Preact
 top_section: Filters
-category: react
+category: preact
 ---
 
 Due to implementing a nearly identical API, there is no separate Preact
