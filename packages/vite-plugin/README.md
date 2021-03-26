@@ -1,4 +1,4 @@
-# @ruby2js/rollup-plugin
+# @ruby2js/vite-plugin
 
 Integration between Vite and Ruby2JS
 
