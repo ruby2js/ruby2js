@@ -1,7 +1,10 @@
 # master
 
+# 4.1.1 / 2021-03-26
+
 * fix a number of lit-element filter edge cases
 * more cjs export support: constants, classes, modules, autoexports
+* React/Preact hooks
 
 # 4.1.0 / 2021-03-17
 
