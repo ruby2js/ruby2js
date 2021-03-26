@@ -1,18 +1,37 @@
-const Ruby2JS = require('@ruby2js/ruby2js');
-const { extname } = require('path');
+const Ruby2JS = require('@ruby2js/rollup-plugin');
+const btoa = require('btoa');
 
 module.exports = options => {
-  let extensions = options.extensions || ['.rb'];
+  options = {...options};
+  let refresh = options.refresh || {};
+  delete options.refresh;
+
+  let ruby2js = Ruby2JS(options);
 
   return {
-    transform(code, id) {
-      if (!extensions.includes(extname(id))) return;
+    ...refresh,
 
-      js = Ruby2JS.convert(code, {...options, file: id});
+    transform(code, id, ssr) {
+      let js = ruby2js.transform(code, id);
 
-      return {
-        code: js.toString(),
-        map: js.sourcemap
+      if (refresh.transform) {
+
+        if (js) {
+          code = js.code + 
+            "\n//# sourceMappingURL=data:application/json;base64," +
+            btoa(JSON.stringify(js.map));
+
+          if (id.endsWith('.rb')) id = id.slice(0, -3);
+          if (!id.endsWith('.js')) id += '.js';
+        }
+
+        let output = refresh.transform(code, id, ssr)
+        return output
+
+      } else {
+
+        return js
+
       }
     }
   }
