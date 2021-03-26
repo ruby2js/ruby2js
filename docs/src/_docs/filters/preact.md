@@ -9,9 +9,9 @@ Due to implementing a nearly identical API, there is no separate Preact
 filter.  Instead, the **React** filter also enables you to build
 [Preact](https://preactjs.com/) components.
 
-When a class definition is encountered that derives from `Preact::Controller`,
-all of the transformations defined by the [React filter](./react) will be
-applied with the following differences:
+When a class definition is encountered that derives from either `Preact` or
+`Preact::Controller`, all of the transformations defined by the [React
+filter](./react) will be applied with the following differences:
 
  * An `import` statement for Preact will be generated
 

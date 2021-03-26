@@ -46,3 +46,34 @@ For more information, see the [examples provided](../../examples/react).
 More examples of how this filter works are in the
 [specs file](https://github.com/ruby2js/ruby2js/blob/master/spec/react_spec.rb).
 {% endrendercontent %}
+
+## Hooks
+
+[React hooks](https://reactjs.org/docs/hooks-intro.html) are an alternate
+mechanism for expressing React components.  Components expressed as hooks tend
+to be smaller than the equivalent code expressed as JavaScript classes.
+Perhaps the most important difference is that at this time,
+[React refresh](https://www.npmjs.com/package/react-refresh) will only update
+hooks in a running application without losing state.  The most notable
+limitation of hooks is that you [can't use the `ref` attribute on
+hooks](https://reactjs.org/docs/refs-and-the-dom.html#refs-and-function-components).
+
+To enable hooks, change your component from inheriting from `React::Component`
+to `React`.  If this is done, a React hook will be generated if all of the
+following conditions are met:
+
+  * No class/static methods (`def self.`)
+  * No use of 
+    [React lifecycle methods](https://reactjs.org/docs/react-component.html#the-component-lifecycle)
+    other than `render`.
+  * No attribute accessors (getters/setters)
+
+If any of these conditions are not met, a class inheriting from
+`React.component` will be emitted instead.  This means that you can code both
+classes and hooks using the same syntax.
+
+{% rendercontent "docs/note", extra_margin: true %}
+More examples of how this filter works with hooks are in the
+[specs file](https://github.com/ruby2js/ruby2js/blob/master/spec/hook_spec.rb).
+{% endrendercontent %}
+
