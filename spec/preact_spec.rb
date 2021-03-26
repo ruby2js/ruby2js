@@ -67,7 +67,7 @@ describe 'Ruby2JS::Filter::Preact' do
     end
 
     it "should handle operator assignments on state values" do
-      to_js( 'class Foo<Preact; def initialize; @a+=1; end; end' ).
+      to_js( 'class Foo<Preact::Component; def initialize; @a+=1; end; end' ).
         must_include 'super(); this.state = {}; this.state.a++'
     end
 

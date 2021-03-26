@@ -31,6 +31,10 @@ describe 'Ruby2JS::Filter::Hooks' do
     it "should call useState for instance variables" do
       to_js( 'class Foo<React; def foo(); @i=1; end; end' ).
         must_include 'let [i, setI] = React.useState(null)'
+      to_js( 'class Foo<React; def initialize(); @i=1; end; end' ).
+        must_include 'let [i, setI] = React.useState(1)'
+      to_js( 'class Foo<React; def initialize(); @i=1 if @@i; end; end' ).
+        must_include 'let [i, setI] = React.useState(null)'
     end
 
     it "should not autobind event handlers" do

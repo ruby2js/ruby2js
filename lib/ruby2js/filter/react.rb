@@ -92,6 +92,7 @@ module Ruby2JS
         @reactApply = nil
         @reactBlock = nil
         @reactClass = nil
+        @reactMethod = nil
         @react_props = []
         @react_methods = []
         @react_filter_functions = false
@@ -243,7 +244,9 @@ module Ruby2JS
 
           # determine if this class can be emitted as a hook
           hook = (es2015 and inheritance.children.first == nil)
-          body.each do |statement|
+          hookinit = nil
+          useState = []
+          body.each_with_index do |statement, index|
             if statement.type == :def
               method = statement.children.first
               if method == :initialize
@@ -252,7 +255,7 @@ module Ruby2JS
                 while children.length == 1 and children.first.type == :begin
                   children = children.first.children 
                 end
-                hook = false if children.any? {|child| child.type != :ivasgn}
+                hookinit = index if children.any? {|child| child.type != :ivasgn}
               elsif method == :render
                 nil
               elsif ReactLifecycle.include? method.to_s
@@ -271,6 +274,12 @@ module Ruby2JS
             @reactClass = :hook
             @react_props = []
             @react_methods = []
+
+            if hookinit
+              body = body.dup
+              hookinit = body.delete_at(hookinit)
+              pairs.unshift process hookinit.children[2]
+            end
           end
 
           # create a default getInitialState method if there is no such method
@@ -284,6 +293,12 @@ module Ruby2JS
           then
             @reactIvars = {pre: [], post: [], asgn: [], ref: [], cond: []}
             react_walk(node)
+
+            if hook
+              react_walk(hookinit) if hookinit
+              useState = (@reactIvars[:asgn] + @reactIvars[:ref]).uniq
+            end
+
             if createClass and not @reactIvars.values.flatten.empty?
               body = [s(:def, :getInitialState, s(:args),
                 s(:return, s(:hash))), *body]
@@ -451,7 +466,7 @@ module Ruby2JS
               }.to_h
             end 
 
-            (@reactIvars[:asgn] + @reactIvars[:ref]).uniq.each do |symbol|
+            useState.each do |symbol|
               hash[symbol.to_s[1..-1]] ||= s(:nil)
             end
 
