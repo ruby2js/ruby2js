@@ -54,7 +54,15 @@ console.log((new MyClass).myMethod("pizza"))
 
 Filters may be provided to add Ruby-specific or framework specific behavior. Filters are essentially macro facilities that operate on an AST (Abstract Syntax Tree) representation of the code.
 
-Ruby2JS can be used to write backend code for execution by Node, or for the frontend in a variety of configurations [including Webpack](/docs/webpack). Our installation guide will help you get set up in no time.
+Ruby2JS can be used to write back-end code for execution by
+[Node](https://www.npmjs.com/package/@ruby2js/register), or for the front-end in a variety of configurations
+including 
+[Rails](/examples/rails/),
+[Rollup](https://www.npmjs.com/package/@ruby2js/rollup-plugin),
+[Snowpack](https://www.npmjs.com/package/@ruby2js/snowpack-plugin),
+[Vite](https://www.npmjs.com/package/@ruby2js/vite-plugin), and
+[Webpack](https://www.npmjs.com/package/@ruby2js/webpack-loader).
+Our examples and installation instructions will help you get set up in no time.
 
 A note about this site: many of the examples are interactive.  If you change
 the Ruby code above, the JavaScript code below it will be updated to match.
