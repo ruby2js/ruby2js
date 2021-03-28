@@ -1,4 +1,11 @@
-Example usage:
+# @ruby2js/ruby2js
+
+[![npm][npm]][npm-url]
+[![node][node]][node-url]
+
+Ruby2JS is an extensible Ruby to modern JavaScript transpiler.
+
+## Example usage
 
 ```javascript
 import { Ruby2JS } from '@ruby2js/ruby2js';
@@ -34,3 +41,35 @@ An example of all supported options:
   width: 40
 }
 ```
+
+## Documentation
+
+* Visit **[ruby2js.com](https://www.ruby2js.com/)** for detailed instructions and examples.
+
+## Testing
+
+```
+git clone https://github.com/ruby2js/ruby2js.git
+cd ruby2js/packages/ruby2js
+bundle install
+yarn install
+yarn build
+yarn test
+```
+
+## Contributing
+
+1. Fork it (https://github.com/ruby2js/ruby2js/fork)
+2. Create your feature branch (`git checkout -b my-new-feature`)
+3. Commit your changes (`git commit -am 'Add some feature'`)
+4. Push to the branch (`git push origin my-new-feature`)
+5. Create a new Pull Request
+
+## License
+
+MIT
+
+[npm]: https://img.shields.io/npm/v/@ruby2js/ruby2js.svg
+[npm-url]: https://npmjs.com/package/@ruby2js/ruby2js
+[node]: https://img.shields.io/node/v/@ruby2js/ruby2js.svg
+[node-url]: https://nodejs.org

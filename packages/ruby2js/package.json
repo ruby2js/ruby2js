@@ -7,6 +7,9 @@
     "Jared White"
   ],
   "license": "MIT",
+  "engines": {
+    "node": ">= 10.13.0"
+  },
   "main": "ruby2js.js",
   "module": "ruby2js.mjs",
   "homepage": "https://www.ruby2js.com/",
