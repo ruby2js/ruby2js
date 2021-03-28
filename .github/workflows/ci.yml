@@ -44,4 +44,6 @@ jobs:
         working-directory: packages/ruby2js
     
     - name: Run tests
+      with:
+        working-directory: packages
       run: bundle exec rake test
