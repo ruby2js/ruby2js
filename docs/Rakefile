@@ -11,7 +11,7 @@ require 'bundler/setup'
 require 'regexp_parser'
 regexp_parser_path = File.dirname(Gem.find_files_from_load_path('regexp_parser').first)
 
-terser = "#{__dir__}/node_modules/.bin/terser --compress --mangle"
+terser = "npx terser --compress --mangle"
 terser = "cat" if ENV['NODE_ENV'] == 'development'
 
 file "#{root}/demo/filters.opal" => filters do
