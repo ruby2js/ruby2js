@@ -11,7 +11,7 @@
   "module": "ruby2js.mjs",
   "homepage": "https://www.ruby2js.com/",
   "scripts": {
-    "build": "ruby -r regexp_parser -e 'Dir.chdir %(../../demo); system *(%w(opal --compile -E -I ../lib -I . -I) + [File.dirname(Gem.find_files_from_load_path(%(regexp_parser)).first), %(ruby2js.opal) ])' | npx terser --compress --mangle > ruby2js.js"
+    "build": "BUNDLE_GEMFILE=../../docs/Gemfile bundle exec rake -f ../../docs/Rakefile ruby2js.js"
   },
   "devDependencies": {
     "terser": "^5.6.0"

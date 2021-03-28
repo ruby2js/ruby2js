@@ -1,9 +1,11 @@
 docs = File.expand_path(__dir__)
-demo = "#{docs}/src/demo"
-source_files = Rake::FileList.new("../lib/**/*.rb", "../lib/ruby2js.rb")
-filters = Rake::FileList.new("../lib/ruby2js/filter/*.rb")
-opal_files = Rake::FileList.new("../demo/*.opal")
-controller_files = Rake::FileList.new("../demo/controllers/*_controller.js.rb")
+dest = "#{docs}/src/demo"
+root = File.expand_path('..', docs)
+demo = "#{root}/demo"
+source_files = Rake::FileList.new("#{root}/lib/**/*.rb", "#{root}/lib/ruby2js.rb")
+filters = Rake::FileList.new("#{root}/lib/ruby2js/filter/*.rb")
+opal_files = Rake::FileList.new("#{root}/demo/*.opal")
+controller_files = Rake::FileList.new("#{root}/demo/controllers/*_controller.js.rb")
 
 require 'bundler/setup'
 require 'regexp_parser'
@@ -12,7 +14,7 @@ regexp_parser_path = File.dirname(Gem.find_files_from_load_path('regexp_parser')
 terser = "#{__dir__}/node_modules/.bin/terser --compress --mangle"
 terser = "cat" if ENV['NODE_ENV'] == 'development'
 
-file "../demo/filters.opal" => filters do
+file "#{root}/demo/filters.opal" => filters do
   puts 'generate filters.opal'
   content = filters.map do |file|
     require file
@@ -28,17 +30,17 @@ file "../demo/filters.opal" => filters do
   end
   content << "Filters = #{filters.inspect}"
 
-  IO.write "../demo/filters.opal", content.join("\n")
+  IO.write "#{root}/demo/filters.opal", content.join("\n")
 end
 
-file "#{demo}/index.erb" => [*filters, '../demo/ruby2js.rb'] do
-  puts "Generating #{demo}/index.erb"
-  mkdir demo unless Dir.exist? demo
+file "#{dest}/index.erb" => [*filters, "#{root}/demo/ruby2js.rb"] do
+  puts "Generating #{dest}/index.erb"
+  mkdir dest unless Dir.exist? dest
 
   begin
     request_uri = ENV['REQUEST_URI']
     ENV['REQUEST_URI'] = '/demo'
-    livedoc = `#{RbConfig.ruby} ../demo/ruby2js.rb --live`
+    livedoc = `#{RbConfig.ruby} #{root}/demo/ruby2js.rb --live`
   ensure
     if request_uri
       ENV['REQUEST_URI'] = request_uri
@@ -53,46 +55,54 @@ file "#{demo}/index.erb" => [*filters, '../demo/ruby2js.rb'] do
         sub(/<script.*?<\/script>/m, ''),
     ].join("\n")
 
-    IO.write("#{demo}/index.erb", erb)
+    IO.write("#{dest}/index.erb", erb)
   end
 end
 
-file "#{demo}/editor.js" => ['../demo/editor.js'] do
-  sh "cat ../demo/editor.js | " +
+file "#{dest}/editor.js" => ["#{root}/demo/editor.js"] do
+  sh "cat #{root}/demo/editor.js | " +
     "npx rollup -f iife -p @rollup/plugin-node-resolve |" +
     "#{terser} > src/demo/editor.js"
 end
 
-file "#{demo}/litelement.js" => ['../demo/litelement.js'] do
-  sh "cat ../demo/litelement.js | " +
+file "#{dest}/litelement.js" => ["#{root}/demo/litelement.js"] do
+  sh "cat #{root}/demo/litelement.js | " +
     "npx rollup -f iife -p @rollup/plugin-node-resolve |" +
     "#{terser} > src/demo/litelement.js"
 end
 
-file "#{demo}/livedemo.js" => ['../demo/livedemo.js.rb', *controller_files] do
-  sh "#{RbConfig.ruby} ../demo/ruby2js.rb --filter esm --filter require --filter stimulus --filter functions --identity --es2019 ../demo/livedemo.js.rb | " +
+file "#{dest}/livedemo.js" => ["#{root}/demo/livedemo.js.rb", *controller_files] do
+  sh "#{RbConfig.ruby} #{root}/demo/ruby2js.rb --filter esm --filter require --filter stimulus --filter functions --identity --es2019 #{root}/demo/livedemo.js.rb | " +
     "npx rollup -f iife --context window -p @rollup/plugin-node-resolve | " +
-    "#{terser} > #{demo}/livedemo.js"
+    "#{terser} > #{dest}/livedemo.js"
 end
 
-file "#{demo}/ruby2js.js" => [*opal_files, *source_files, '../demo/filters.opal'] do
-  mkdir demo unless Dir.exist? demo
-  opal = "opal --compile -E -I #{regexp_parser_path} -I ../lib -I . ruby2js.opal"
-  target = "#{docs}/src/demo/ruby2js.js"
-  Dir.chdir '../demo' do
+deps = [*opal_files, *source_files, "#{root}/demo/filters.opal"]
+opal = "opal --compile -E -I #{regexp_parser_path} -I #{root}/lib -I #{demo} #{demo}/ruby2js.opal"
+
+file "#{dest}/ruby2js.js" => deps do
+  mkdir dest unless Dir.exist? dest
+  Dir.chdir dest do
+    sh "#{opal} | #{terser} > #{dest}/ruby2js.js"
+  end
+end
+
+file "ruby2js.js" => deps do
+  target = File.expand_path('ruby2js.js')
+  Dir.chdir docs do
     sh "#{opal} | #{terser} > #{target}"
   end
 end
 
 task :clean do
-  rm_rf demo
+  rm_rf "#{docs}/src/demo"
 end
 
 task :default => [
-  "#{demo}/index.erb",
-  "#{demo}/editor.js",
-  "#{demo}/litelement.js",
-  "#{demo}/livedemo.js",
-  "#{demo}/ruby2js.js"
+  "#{dest}/index.erb",
+  "#{dest}/editor.js",
+  "#{dest}/litelement.js",
+  "#{dest}/livedemo.js",
+  "#{dest}/ruby2js.js"
 ]
 
