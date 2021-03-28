@@ -7,7 +7,7 @@ on:
   pull_request:
 
 jobs:
-  test:
+  gem-test:
     strategy:
       fail-fast: false
       matrix:
@@ -22,6 +22,26 @@ jobs:
       with:
         ruby-version: ${{ matrix.ruby }}
         bundler-cache: true
+    
+    - name: Run tests
+      run: bundle exec rake test
+
+  package-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+      
+    - name: Set up Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        working-directory: packages
+        ruby-version: ${{ matrix.ruby }}
+        bundler-cache: true
+
+    - uses: bahmutov/npm-install@v1
+      with:
+        working-directory: packages/ruby2js
     
     - name: Run tests
       run: bundle exec rake test

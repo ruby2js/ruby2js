@@ -1,0 +1,8 @@
+task :test do
+  Dir.chdir 'ruby2js' do
+    sh 'yarn build'
+    sh 'yarn test'
+  end
+end
+
+task :default => :test
