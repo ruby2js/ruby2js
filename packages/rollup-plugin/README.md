@@ -1,5 +1,8 @@
 # @ruby2js/rollup-plugin
 
+[![npm][npm]][npm-url]
+[![node][node]][node-url]
+
 Integration between Rollup and Ruby2JS
 
 ## Installation
@@ -9,6 +12,13 @@ npm install --save-dev @ruby2js/rollup-plugin
 # or
 yarn add -D @ruby2js/rollup-plugin
 ```
+## Documentation
+
+* Visit **[ruby2js.com](https://www.ruby2js.com/)** for detailed instructions and examples.
+
+Below are some example configurations using some popular libraries.  Other
+than the differences in filters, the differences are to make the library
+themselves work with rollup.
 
 ## Usage (basic)
 
@@ -124,3 +134,29 @@ export default {
   ]
 }
 ```
+
+## Testing
+
+```
+git clone https://github.com/ruby2js/ruby2js.git
+cd ruby2js/packages/rollup-plugin
+yarn install
+yarn test
+```
+
+## Contributing
+
+1. Fork it (https://github.com/ruby2js/ruby2js/fork)
+2. Create your feature branch (`git checkout -b my-new-feature`)
+3. Commit your changes (`git commit -am 'Add some feature'`)
+4. Push to the branch (`git push origin my-new-feature`)
+5. Create a new Pull Request
+
+## License
+
+MIT
+
+[npm]: https://img.shields.io/npm/v/@ruby2js/ruby2js.svg
+[npm-url]: https://npmjs.com/package/@ruby2js/ruby2js
+[node]: https://img.shields.io/node/v/@ruby2js/ruby2js.svg
+[node-url]: https://nodejs.org
