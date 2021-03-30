@@ -41,7 +41,9 @@ describe('ruby2js package', () => {
     assert.strictEqual(sourcemap.file, 'a.rb')
     assert.strictEqual(sourcemap.sources.length, 1)
     assert.strictEqual(sourcemap.sources[0], 'a.rb')
-    assert.strictEqual(sourcemap.mappings, 'QAAE')
+    assert.strictEqual(sourcemap.names.length, 1)
+    assert.strictEqual(sourcemap.names[0], 'a')
+    assert.strictEqual(sourcemap.mappings, 'AAAAA,QAAE')
   });
 });
 
