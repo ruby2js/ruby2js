@@ -1,5 +1,8 @@
 # master
 
+* sourcemap: add names; add missing first token; 
+   fix first column of every line
+
 # 4.1.1 / 2021-03-26
 
 * fix a number of lit-element filter edge cases

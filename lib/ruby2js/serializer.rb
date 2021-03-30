@@ -300,22 +300,29 @@ module Ruby2JS
     BASE64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
 
     # https://docs.google.com/document/d/1U1RGAehQwRypUTovF1KRlpiOFze0b-_2gc6fAH0KY0k/edit
+    # http://sokra.github.io/source-map-visualization/
     def vlq(*mark)
-      if @mark[0] == mark[0]
-        return if @mark[-3..-1] == mark[-3..-1]
-        @mappings += ',' unless @mappings == ''
+      if !@mark
+        diffs = mark
+        @mark = [0, 0, 0, 0, 0, 0]
+      else
+        if @mark[0] == mark[0]
+          return if @mark[4] == mark[4] and @mark[3] == mark[3]
+          @mappings += ',' unless @mappings == ''
+        end
+
+        diffs = mark.zip(@mark).map {|a,b| a-b}
       end
 
       while @mark[0] < mark[0]
         @mappings += ';'
         @mark[0] += 1
-        @mark[1] = 0
+        diffs[1] = mark[1] 
       end
 
-      diffs = mark.zip(@mark).map {|a,b| a-b}
-      @mark = mark
+      @mark[0...mark.length] = mark
 
-      diffs[1..4].each do |diff|
+      diffs[1..-1].each do |diff|
         if diff < 0
           data = (-diff << 1) + 1
         else
@@ -345,7 +352,8 @@ module Ruby2JS
 
       @mappings = ''
       sources = []
-      @mark = [0, 0, 0, 0, 0]
+      names = []
+      @mark = nil
 
       @lines.each_with_index do |line, row|
         col = line.indent
@@ -361,8 +369,30 @@ module Ruby2JS
               sources << buffer
             end
 
-            split = buffer.source[0...pos].split("\n")
-            vlq row, col, source_index, [split.length - 1, 0].max, split.last.to_s.length
+            line = buffer.line_for_position(pos) - 1
+            column = buffer.column_for_position(pos)
+
+            name = nil
+            if %i{lvasgn lvar}.include? token.ast.type
+              name = token.ast.children.first
+            elsif %i{casgn const}.include? token.ast.type 
+              if token.ast.children.first == nil
+                name = token.ast.children[1]
+              end
+            end
+
+            if name
+              index = names.find_index(name)
+
+              unless index
+                index = names.length
+                names << name
+              end
+
+              vlq row, col, source_index, line, column, index
+            else
+              vlq row, col, source_index, line, column
+            end
           end
           col += token.length
         end
@@ -372,6 +402,7 @@ module Ruby2JS
         version: 3,
         file: @file_name,
         sources: sources.map(&:name),
+        names: names.map(&:to_s),
         mappings: @mappings
       }
     end
