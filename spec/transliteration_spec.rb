@@ -962,6 +962,12 @@ describe Ruby2JS do
         to_js('x=a&.b&.c').must_equal 'var x = a && a.b && a.b.c'
       end
     end
+
+    unless (RUBY_VERSION.split('.').map(&:to_i) <=> [3, 0, 0]) == -1
+      it "should support => operator" do
+        to_js('0 => x').must_equal 'var x = 0'
+      end
+    end
   end
   
   describe 'whitespace' do
