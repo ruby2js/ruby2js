@@ -323,13 +323,13 @@ module Ruby2JS
         put 'typeof '; parse args.first
 
       elsif ast.children[1] == :is_a? and receiver and args.length == 1
-        parse receiver; put ' instanceof '; parse args.first
+        put '('; parse receiver; put ' instanceof '; parse args.first; put ')'
 
       elsif ast.children[1] == :kind_of? and receiver and args.length == 1
-        parse receiver; put ' instanceof '; parse args.first
+        put '('; parse receiver; put ' instanceof '; parse args.first; put ')'
 
       elsif ast.children[1] == :instance_of? and receiver and args.length == 1
-        parse s(:send, s(:attr, receiver, :constructor), :==, args.first)
+        put '('; parse s(:send, s(:attr, receiver, :constructor), :==, args.first); put ')'
 
       else
         if method == :bind and receiver&.type == :send

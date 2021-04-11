@@ -14,6 +14,9 @@ module Ruby2JS
         attr_reader
         attr_writer
         method_missing
+        is_a?
+        kind_of?
+        instance_of?
       }
 
       CAPS_EXCEPTIONS = {
@@ -28,6 +31,8 @@ module Ruby2JS
       }
 
       def camelCase(symbol)
+        return symbol if ALLOWLIST.include?(symbol.to_s)
+
         should_symbolize = symbol.is_a?(Symbol)
         symbol = symbol
                   .to_s

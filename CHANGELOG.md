@@ -1,5 +1,7 @@
 # master
 
+* Fix bugs related to is_a? and instance_of?
+
 # 4.1.2 / 2021-04-11
 
 * support => as a right side assignment operator
