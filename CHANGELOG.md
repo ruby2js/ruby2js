@@ -1,5 +1,8 @@
 # master
 
+# 4.1.2 / 2021-04-11
+
+* support => as a right side assignment operator
 * sourcemap: add names; add missing first token; 
    fix first column of every line
 
