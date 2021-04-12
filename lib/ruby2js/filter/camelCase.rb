@@ -116,6 +116,14 @@ module Ruby2JS
         handle_generic_node(super, :cvasgn)
       end
 
+      def on_match_pattern(node)
+        handle_generic_node(super, :match_pattern)
+      end
+
+      def on_match_var(node)
+        handle_generic_node(super, :match_var)
+      end
+
       def on_sym(node)
         handle_generic_node(super, :sym)
       end

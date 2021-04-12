@@ -90,6 +90,12 @@ describe Ruby2JS::Filter::CamelCase do
     it "should not mess with allowed method names" do
       to_js( 'x.is_a?(String)' ).must_equal '(x instanceof String)'
     end
+
+    unless (RUBY_VERSION.split('.').map(&:to_i) <=> [3, 0, 0]) == -1
+      it "should handle the => operator" do
+        to_js('a_bcd => x_yz').must_equal 'var xYz = aBcd'
+      end
+    end
   end
 
   describe Ruby2JS::Filter::DEFAULTS do
