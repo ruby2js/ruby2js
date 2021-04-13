@@ -267,3 +267,16 @@ Opal.Ruby2JS.Token.$new = function(str, ast) {
   if (ast) token.loc = ast.$location();
   return token;
 }`
+
+# https://github.com/opal/opal/issues/2195
+module Parser
+  class Builders::Default
+    def check_lvar_name(name, loc)
+      if name =~ /^[_a-z][_\w]*$/
+        # OK
+      else
+        diagnostic :error, :lvar_name, { name: name }, loc
+      end
+    end
+  end
+end

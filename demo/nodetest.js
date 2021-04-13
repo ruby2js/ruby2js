@@ -19,6 +19,10 @@ assert.strictEqual(
   to_js('foo.empty?', {filters: ['functions']}),
   'foo.length == 0');
 
+assert.strictEqual(
+  to_js('1 => foo'),
+  'var foo = 1');
+
 let ast = Ruby2JS.convert('String', {file: 'a.rb'}).ast
 assert.strictEqual(ast.constructor, Ruby2JS.AST.Node)
 assert.strictEqual(ast.type, "const")
