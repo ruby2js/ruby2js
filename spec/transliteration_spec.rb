@@ -938,9 +938,13 @@ describe Ruby2JS do
     end
 
     it "should handle is_a?, kind_of?, instance_of?" do
-      to_js( 'a.is_a? b' ).must_equal "a instanceof b"
-      to_js( 'a.kind_of? b' ).must_equal "a instanceof b"
-      to_js( 'a.instance_of? b' ).must_equal "a.constructor == b"
+      to_js( 'a.is_a? b' ).must_equal "(a instanceof b)"
+      to_js( 'a.kind_of? b' ).must_equal "(a instanceof b)"
+      to_js( 'a.instance_of? b' ).must_equal "(a.constructor == b)"
+
+      to_js( 'x unless a.is_a? b' ).must_equal "if (!(a instanceof b)) var x"
+      to_js( 'x unless a.kind_of? b' ).must_equal "if (!(a instanceof b)) var x"
+      to_js( 'x unless a.instance_of? b' ).must_equal "if (!(a.constructor == b)) var x"
     end
   end
 
