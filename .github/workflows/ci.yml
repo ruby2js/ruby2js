@@ -47,6 +47,10 @@ jobs:
       with:
         working-directory: packages/rollup-plugin
 
+    - uses: bahmutov/npm-install@v1
+      with:
+        working-directory: packages/webpack-loader
+
     - name: Run tests
       run: bundle exec rake test
       working-directory: packages
