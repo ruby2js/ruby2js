@@ -1,6 +1,7 @@
 // minimal sanity test to verify usage of Ruby2JS under Node
 
 const assert = require('assert');
+const fs = require('fs');
 const Ruby2JS = require('../ruby2js.js');
 
 function to_js(string, options={}) {
@@ -8,6 +9,9 @@ function to_js(string, options={}) {
 }
 
 describe('ruby2js package', () => {
+  // clear any options loaded by prior tests
+  Ruby2JS.load_options();
+
   it('does a basic conversion', () => {
     assert.strictEqual(
       to_js('foo = 1'),
@@ -46,4 +50,44 @@ describe('ruby2js package', () => {
     assert.strictEqual(sourcemap.mappings, 'AAAAA,QAAE')
   });
 });
+
+describe('ruby2js external options', () => {
+  it('supports rb2js.config.rb', async () => {
+    try {
+      fs.writeFileSync(`rb2js.config.rb`, `
+        require "ruby2js/filter/functions"
+        module Ruby2JS
+          class Loader
+            def self.options
+              {eslevel: 2021}
+            end
+          end
+        end
+      `);
+
+      Ruby2JS.load_options()
+    } finally {
+      fs.unlinkSync(`rb2js.config.rb`)
+    }
+
+    assert.strictEqual(
+      to_js('puts "0x2A = #{"2A".to_i(16)}"'),
+      'console.log(`0x2A = ${parseInt("2A", 16)}`)'
+    )
+  });
+
+  it('supports RUBY2JS_OPTIONS environment variable', async () => {
+    try {
+      process.env.RUBY2JS_OPTIONS = '{"eslevel": 2021, "filters": ["functions"]}';
+      Ruby2JS.load_options()
+    } finally {
+      delete process.env.RUBY2JS_OPTIONS
+    }
+
+    assert.strictEqual(
+      to_js('puts "0x2A = #{"2A".to_i(16)}"'),
+      'console.log(`0x2A = ${parseInt("2A", 16)}`)'
+    )
+  });
+})
 

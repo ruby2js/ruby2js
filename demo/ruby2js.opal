@@ -10,45 +10,52 @@ module Ruby2JS
   def self.default_options
     @default_options
   end
+
+  def self.load_options
+    @default_options = {}
+
+    %x{ 
+      if (typeof require === 'function' && typeof process === 'object') {
+        // load rb2js.config.rb for default options
+        try {
+          const child_process = require('child_process');
+          const fs = require('fs');
+
+          const config_file = `${process.cwd()}/rb2js.config.rb`;
+
+          if (fs.existsSync(config_file)) {
+            let options = JSON.parse(child_process.execSync(`ruby -e "${`
+              require '${config_file}'
+              require 'json'
+
+              puts({ filters: Ruby2JS::Filter::DEFAULTS.map {|mod|
+                method = mod.instance_method(mod.instance_methods.first)
+                File.basename(method.source_location.first, '.rb')
+              }, **Ruby2JS::Loader.options}.to_json)
+            `}"`, {encoding: 'utf8'}));
+
+            Opal.Ruby2JS.default_options['$merge!'](Opal.hash(options))
+          }
+        } catch(error) {
+          // error already appears on STDERR, no further recovery is required
+        }
+
+        // parse RUBY2JS_OPTIONS environment variable for default options
+        try {
+          let options = process.env['RUBY2JS_OPTIONS'];
+          if (options) {
+            Opal.Ruby2JS.default_options['$merge!'](Opal.hash(JSON.parse(options)))
+          }
+        } catch(error) {
+          console.error(`Error parsing RUBY2JS_OPTIONS: ${error.message}`) 
+        }
+      }
+    }
+  end
+
+  load_options
 end
 
-%x{ 
-  if (typeof require === 'function' && typeof process === 'object') {
-    // load rb2js.config.rb for default options
-    try {
-      const child_process = require('child_process');
-      const fs = require('fs');
-
-      const config_file = `${process.cwd()}/rb2js.config.rb`;
-
-      if (fs.existsSync(config_file)) {
-        let options = JSON.parse(child_process.execSync(`ruby -e "${`
-          require '${config_file}'
-          require 'json'
-
-          puts({ filters: Ruby2JS::Filter::DEFAULTS.map {|mod|
-            method = mod.instance_method(mod.instance_methods.first)
-            File.basename(method.source_location.first, '.rb')
-          }, **Ruby2JS::Loader.options}.to_json)
-        `}"`, {encoding: 'utf8'}));
-
-        Opal.Ruby2JS.default_options['$merge!'](Opal.hash(options))
-      }
-    } catch(error) {
-      // error already appears on STDERR, no further recovery is required
-    }
-
-    // parse RUBY2JS_OPTIONS environment variable for default options
-    try {
-      let options = process.env['RUBY2JS_OPTIONS'];
-      if (options) {
-        Opal.Ruby2JS.default_options['$merge!'](Opal.hash(JSON.parse(options)))
-      }
-    } catch(error) {
-      console.error(`Error parsing RUBY2JS_OPTIONS: ${error.message}`) 
-    }
-  }
-}
 
 # fixup options:
 #   * map filter names to filter modules
@@ -97,7 +104,9 @@ end
 
   AST: {Node: Opal.Parser.AST.Node},
 
-  nil: Opal.nil
+  nil: Opal.nil,
+
+  load_options: Opal.Ruby2JS.$load_options
 }`
 
 # Define a getter for sourcemap

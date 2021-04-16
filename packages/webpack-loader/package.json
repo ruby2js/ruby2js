@@ -16,6 +16,7 @@
   },
   "scripts": {
     "start": "yarn run build -- -w",
+    "test": "mocha",
     "clean": "del-cli dist && del-cli _ruby2js_build",
     "prebuild": "yarn run clean",
     "buildruby": "bundle exec ./build_source.rb",
@@ -30,7 +31,10 @@
     "@babel/core": "^7.9.6",
     "@babel/preset-env": "^7.9.6",
     "cross-env": "^7.0.2",
-    "del-cli": "^3.0.1"
+    "del-cli": "^3.0.1",
+    "memfs": "^3.2.2",
+    "mocha": "^8.3.2",
+    "webpack": "^5.33.2"
   },
   "dependencies": {
     "@ruby2js/ruby2js": ">= 0.0.3",

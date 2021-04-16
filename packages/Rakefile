@@ -1,10 +1,18 @@
 task :test do
   Dir.chdir 'ruby2js' do
+    sh 'yarn install' unless File.exist? 'yarn.lock'
     sh 'yarn build'
     sh 'yarn test'
   end
 
   Dir.chdir 'rollup-plugin' do
+    sh 'yarn install' unless File.exist? 'yarn.lock'
+    sh 'yarn test'
+  end
+
+  Dir.chdir 'webpack-loader' do
+    sh 'yarn install' unless File.exist? 'yarn.lock'
+    sh 'yarn prepare-release'
     sh 'yarn test'
   end
 end

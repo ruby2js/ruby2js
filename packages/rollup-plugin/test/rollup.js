@@ -1,5 +1,5 @@
 const assert = require('assert');
-const rollup = require('rollup');
+const { rollup } = require('rollup');
 const Ruby2JS = require('../index.js');
 
 process.chdir(__dirname);
@@ -10,7 +10,7 @@ describe('@ruby2js/rollup-plugin', function() {
   it('runs code through ruby2js', async () => {
     let input = "./main.js.rb";
 
-    let bundle = await rollup.rollup({
+    let bundle = await rollup({
       input,
 
       plugins: [
