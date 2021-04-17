@@ -7,13 +7,93 @@ Webpack loader to compile [Ruby2JS](https://www.ruby2js.com) (`.js.rb`) files to
 
 **Fun fact:** this loader itself is written in Ruby and compiles via Ruby2JS + Babel. 😁
 
+## Installation
+
+```bash
+npm install --save-dev @ruby2js/webpack-loader
+# or
+yarn add -D @ruby2js/webpack-loader
+```
+
 ## Documentation
 
-* Visit **[ruby2js.com](https://www.ruby2js.com/docs/webpack)** for detailed setup instructions and examples.
+* Visit **[ruby2js.com](https://www.ruby2js.com/)** for detailed instructions and examples.
+Users of Ruby on Rails may wish to start with the [Rails
+introduction](https://www.ruby2js.com/examples/rails/) which describes how to
+use the rake tasks provided to get up and running quickly.
+
+## Configuration
+
+There are multiple ways to configure webpack (e.g., `webpack.config.js`,
+command line options, or using the
+[node interface](https://webpack.js.org/api/node/).  Ruby2JS options can be
+placed inline within this configuration, or separately in a `rb2js.config.rb`
+file or provided via a `RUBY2JS_OPTIONS` environment variable.  Examples of
+each are provided below:
+
+### `webpack.config.js`
+
+```javascript
+module.exports = {
+  entry: "./main.js.rb",
+
+  output: {
+    path: __dirname,
+    filename: "main.[contenthash].js"
+  },
+
+  resolve: {
+    extensions: [".rb.js", ".rb"]
+  },
+
+  module: {
+    rules: [
+      {
+        test: /\.js\.rb$/,
+        use: [
+          {
+            loader: '@ruby2js/webpack-loader',
+            options: {
+              eslevel: 2021,
+              filters: ['functions']
+            }
+          },
+        ]
+      },
+    ]
+  }
+}
+```
+
+### `rb2js.config.rb`
+
+```ruby
+require "ruby2js/filter/functions"
+
+module Ruby2JS
+  class Loader
+    def self.options
+      {eslevel: 2021}
+    end
+  end
+end
+```
+
+### `RUBY2JS_OPTIONS` environment variable
+
+```
+export RUBY2JS_OPTIONS='{"eslevel": 2021, "filters": ["functions"]}'
+```
 
 ## Testing
 
-_To be continued…_
+```
+git clone https://github.com/ruby2js/ruby2js.git
+cd ruby2js/packages/webpack-loader
+yarn install
+yarn prepare-release
+yarn test
+```
 
 ## Contributing
 

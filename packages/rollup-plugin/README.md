@@ -12,6 +12,7 @@ npm install --save-dev @ruby2js/rollup-plugin
 # or
 yarn add -D @ruby2js/rollup-plugin
 ```
+
 ## Documentation
 
 * Visit **[ruby2js.com](https://www.ruby2js.com/)** for detailed instructions and examples.
