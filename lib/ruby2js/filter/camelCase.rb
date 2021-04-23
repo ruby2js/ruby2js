@@ -104,6 +104,10 @@ module Ruby2JS
         handle_generic_node(super, :arg)
       end
 
+      def on_kwarg(node)
+        handle_generic_node(super, :kwarg)
+      end
+
       def on_lvasgn(node)
         handle_generic_node(super, :lvasgn)
       end

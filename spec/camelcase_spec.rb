@@ -81,6 +81,10 @@ describe Ruby2JS::Filter::CamelCase do
       to_js_2020( 'a_a&.b_b&.c_c' ).must_equal 'aA?.bB?.cC'
     end
 
+    it "should handle kwargs" do
+      to_js_2020( 'def meth(arg_one:, arg_two:);end ').must_equal 'function meth({ argOne, argTwo }) {}'
+    end
+
     it "should intelligently handle common exceptions such as innerHTML" do
       to_js( 'x.inner_html' ).must_equal 'x.innerHTML'
       to_js( 'x.inner_html=""' ).must_equal 'x.innerHTML = ""'

@@ -1,5 +1,7 @@
 # master
 
+* Add camelCase support for keyword arguments (aka destructured object arg)
+
 # 4.1.3 / 2021-04-11
 
 * Add camelCase support for => assignment operator
