@@ -1,5 +1,7 @@
 # master
 
+# 4.1.4 / 2021-05-08
+
 * Add camelCase support for keyword arguments (aka destructured object arg)
 
 # 4.1.3 / 2021-04-11
