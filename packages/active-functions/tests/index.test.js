@@ -1,4 +1,4 @@
-import { blank$, present$, presence$ } from "../src"
+import { blank$, present$, presence$, chomp$, deletePrefix$, deleteSuffix$ } from "../src"
 
 // Truthy Tests
 
@@ -94,4 +94,33 @@ test ("presence returns null for blank value", () => {
 
 test ("presence returns value for present value", () => {
   expect(presence$("abc")).toBe("abc")
+})
+
+// Chomp / Delete tests
+
+test ("chomp with no argument", () => {
+  expect(chomp$("st\nring\r\n")).toBe("st\nring")
+  expect(chomp$("st\nring\n")).toBe("st\nring")
+  expect(chomp$("st\nring")).toBe("st\nring")
+  expect(chomp$("\nst\nring\n\n")).toBe("\nst\nring\n")
+})
+
+test ("chomp with argument", () => {
+  expect(chomp$("st\nring", "ing")).toBe("st\nr")
+  expect(chomp$("st\nrin+g", "in+g")).toBe("st\nr")
+  expect(chomp$("from [a-z]+", "[a-z]+")).toBe("from ")
+})
+
+test ("delete_prefix", () => {
+  expect(deletePrefix$("\nst\nring", "\n")).toBe("st\nring")
+  expect(deletePrefix$("st\nring", "st\n")).toBe("ring")
+  expect(deletePrefix$("[a-z]+ and beyond", "[a-z]+")).toBe(" and beyond")
+  expect(deletePrefix$("[a-z]+[a-z]+ and beyond", "[a-z]+")).toBe("[a-z]+ and beyond")
+  expect(deletePrefix$("[a-z]+[a-z]+ and beyond[a-z]+", "[a-z]+")).toBe("[a-z]+ and beyond[a-z]+")
+})
+
+test ("delete_suffix", () => {
+  expect(deleteSuffix$("st\nring", "ing")).toBe("st\nr")
+  expect(deleteSuffix$("st\nrin+g", "in+g")).toBe("st\nr")
+  expect(deleteSuffix$("from [a-z]+", "[a-z]+")).toBe("from ")
 })

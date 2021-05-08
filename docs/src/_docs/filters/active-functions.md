@@ -5,15 +5,22 @@ top_section: Filters
 category: active-functions
 ---
 
-The **ActiveFunctions** filter provides functionality inspired by Rails' ActiveSupport. It works in conjunction with the tiny NPM dependency [`@ruby2js/active-functions`](https://github.com/ruby2js/ruby2js/tree/master/packages/active-functions) which must be added to your application.
+The **ActiveFunctions** filter provides functionality inspired by (but not limited to) Rails' ActiveSupport. It works in conjunction with the tiny NPM dependency [`@ruby2js/active-functions`](https://github.com/ruby2js/ruby2js/tree/master/packages/active-functions) which must be added to your application.
 
 {% rendercontent "docs/note", type: "warning" %}
 Note: this filter is currently under active (😏) development with more functions to come!
 {% endrendercontent %}
 
-* `value.blank?` becomes `blank$(value)`
-* `value.present?` becomes `present$(value)`
-* `value.presence` becomes `presence$(value)`
+{% capture caret %}<sl-icon name="caret-right-fill"></sl-icon>{% endcapture %}
+
+{:.functions-list}
+* `value.blank?` {{ caret }} `blank$(value)`
+* `value.present?` {{ caret }} `present$(value)`
+* `value.presence` {{ caret }} `presence$(value)`
+* `value.chomp` {{ caret }} `chomp$(value)`
+* `value.chomp(suffix)` {{ caret }} `chomp$(value, suffix)`
+* `value.delete_prefix(prefix)` {{ caret }} `delete_prefix$(value, prefix)`
+* `value.delete_suffix(sufffix)` {{ caret }} `delete_suffix$(value, suffix)`
 
 Note: these conversions are only done if `eslevel` >= 2015. Import statements
 will be added to the top of the code output automatically. By default they

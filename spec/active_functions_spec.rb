@@ -27,4 +27,26 @@ describe Ruby2JS::Filter::ActiveFunctions do
       to_js( 'val.present?' ).must_equal 'import { present$ } from "@ruby2js/active-functions"; present$(val)'
     end
   end
+
+  describe 'chomp' do
+    it "should convert val.chomp to chomp$(val)" do
+      to_js( 'val.chomp' ).must_equal 'import { chomp$ } from "@ruby2js/active-functions"; chomp$(val)'
+    end
+
+    it "should convert val.chomp(suffix) to chomp$(val, suffix)" do
+      to_js( 'val.chomp(suffix)' ).must_equal 'import { chomp$ } from "@ruby2js/active-functions"; chomp$(val, suffix)'
+    end
+  end
+
+  describe 'delete_prefix' do
+    it "should convert val.delete_prefix('str') to deletePrefix$(val, 'str')" do
+      to_js( 'val.delete_prefix(\'str\')' ).must_equal 'import { deletePrefix$ } from "@ruby2js/active-functions"; deletePrefix$(val, "str")'
+    end
+  end
+
+  describe 'delete_suffix' do
+    it "should convert val.delete_suffix('str') to deleteSuffix$(val, 'str')" do
+      to_js( 'val.delete_suffix(\'str\')' ).must_equal 'import { deleteSuffix$ } from "@ruby2js/active-functions"; deleteSuffix$(val, "str")'
+    end
+  end
 end

@@ -7,7 +7,6 @@ module Ruby2JS
 
       def on_send(node)
         target, method, *args = node.children
-        return super unless args.empty?
 
         if es2015 and method == :blank?
           create_or_update_import("blank$")
@@ -18,6 +17,15 @@ module Ruby2JS
         elsif es2015 and method == :presence
           create_or_update_import("presence$")
           process node.updated :send, [nil, "presence$", target]
+        elsif es2015 and method == :chomp
+          create_or_update_import("chomp$")
+          process node.updated :send, [nil, "chomp$", target, *args]
+        elsif es2015 and method == :delete_prefix
+          create_or_update_import("deletePrefix$")
+          process node.updated :send, [nil, "deletePrefix$", target, *args]
+        elsif es2015 and method == :delete_suffix
+          create_or_update_import("deleteSuffix$")
+          process node.updated :send, [nil, "deleteSuffix$", target, *args]
         else
           super
         end
