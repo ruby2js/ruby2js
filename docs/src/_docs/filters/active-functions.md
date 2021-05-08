@@ -20,7 +20,7 @@ Note: this filter is currently under active (😏) development with more functio
 * `value.chomp` {{ caret }} `chomp$(value)`
 * `value.chomp(suffix)` {{ caret }} `chomp$(value, suffix)`
 * `value.delete_prefix(prefix)` {{ caret }} `delete_prefix$(value, prefix)`
-* `value.delete_suffix(sufffix)` {{ caret }} `delete_suffix$(value, suffix)`
+* `value.delete_suffix(suffix)` {{ caret }} `delete_suffix$(value, suffix)`
 
 Note: these conversions are only done if `eslevel` >= 2015. Import statements
 will be added to the top of the code output automatically. By default they
