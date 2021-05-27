@@ -1,5 +1,7 @@
 # master
 
+* Add chomp, delete_prefix, and delete_suffix support via ActiveFunctions
+
 # 4.1.4 / 2021-05-08
 
 * Add camelCase support for keyword arguments (aka destructured object arg)
