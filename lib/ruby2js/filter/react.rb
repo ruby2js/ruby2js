@@ -1492,7 +1492,13 @@ module Ruby2JS
        source = Ruby2JS.jsx2_rb(source)
        ast =  Ruby2JS.parse(source).first
        ast = s(:block, s(:send, nil, :_), s(:args), ast) if ast.type == :begin
-       process ast
+
+       begin
+         react, @react = @react, @react || :react
+         process ast
+       ensure
+         @react = react
+       end
       end
     end
 

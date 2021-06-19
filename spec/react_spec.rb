@@ -247,6 +247,11 @@ describe Ruby2JS::Filter::React do
         must_include 'React.createElement(React.Fragment, null, ' + 
           'React.createElement("p"), React.createElement("p"))'
     end
+
+    it "should handle stateless components" do
+      to_js( 'Button = ->(x) { %x(<button>{x}</button>)}' ).
+        must_equal 'var Button = function(x) {return React.createElement("button", null, x)}'
+    end
   end
 
   describe "render method" do

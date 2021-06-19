@@ -1,6 +1,7 @@
 # master
 
 * Add chomp, delete_prefix, and delete_suffix support via ActiveFunctions
+* Support React stateless components
 
 # 4.1.4 / 2021-05-08
 
