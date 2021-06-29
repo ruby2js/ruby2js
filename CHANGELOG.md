@@ -1,5 +1,6 @@
 # master
 
+* Fix camelCase bug on methods ending in ? or !
 * Add chomp, delete_prefix, and delete_suffix support via ActiveFunctions
 * Support React stateless components
 

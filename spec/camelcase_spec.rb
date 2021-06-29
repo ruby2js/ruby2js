@@ -43,6 +43,10 @@ describe Ruby2JS::Filter::CamelCase do
     it "should handle method definitions" do
       to_js( 'def foo_bar(baz_qux); end' ).
         must_equal 'function fooBar(bazQux) {}'
+      to_js( 'def foo_zar?(baz_qux); end' ).
+        must_equal 'function fooZar(bazQux) {}'
+      to_js( 'def foo_zar!(baz_qux); end' ).
+        must_equal 'function fooZar(bazQux) {}'
     end
 
     it "should handle optional arguments" do
