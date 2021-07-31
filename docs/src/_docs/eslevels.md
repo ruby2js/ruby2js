@@ -144,3 +144,8 @@ conversions are made:
 * `@@x` {{ caret }} `ClassName.#x`
 * `self.a = []` {{ caret }} `static a = []` (within a class)
 
+When the `filter` function is enabled, the following additional conversions are
+made:
+
+* `x[-2]` {{ caret }} `x.at(-2)`
+* `x.last` {{ caret }} `x.at(-1)`
