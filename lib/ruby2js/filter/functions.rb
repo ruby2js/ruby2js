@@ -341,7 +341,11 @@ module Ruby2JS
 
         elsif method == :last
           if node.children.length == 2
-            process on_send S(:send, target, :[], s(:int, -1))
+            if es2022
+              process S(:send, target, :at, s(:int, -1))
+            else
+              process on_send S(:send, target, :[], s(:int, -1))
+            end
           elsif node.children.length == 3
             process S(:send, target, :slice,
               s(:send, s(:attr, target, :length), :-, node.children[2]),
@@ -358,8 +362,12 @@ module Ruby2JS
           # resolve negative literal indexes
           i = proc do |index|
             if index.type == :int and index.children.first < 0
-              process S(:send, S(:attr, target, :length), :-,
-                s(:int, -index.children.first))
+              if es2022
+                return process S(:send, target, :at, index)
+              else
+                process S(:send, S(:attr, target, :length), :-,
+                  s(:int, -index.children.first))
+              end
             else
               index
             end

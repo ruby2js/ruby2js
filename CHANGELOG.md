@@ -3,6 +3,7 @@
 * Fix camelCase bug on methods ending in ? or !
 * Add chomp, delete_prefix, and delete_suffix support via ActiveFunctions
 * Support React stateless components
+* es2022 at method support
 
 # 4.1.4 / 2021-05-08
 

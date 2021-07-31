@@ -1,5 +1,6 @@
 gem 'minitest'
 require 'minitest/autorun'
+require 'ruby2js/filter/functions'
 
 describe "ES2022 support" do
   
@@ -15,6 +16,12 @@ describe "ES2022 support" do
     _(Ruby2JS.convert(string, eslevel: 2022, or: :nullish, filters: []).to_s)
   end
   
+  def to_js_fn(string)
+    _(Ruby2JS.convert(string,
+      filters: [Ruby2JS::Filter::CJS, Ruby2JS::Filter::Functions],
+      eslevel: 2022).to_s)
+  end
+
 # describe :ClassFields do
 #   it "should convert class fields to static vars" do
 #     to_js( 'class C; self.var = []; end' ).
@@ -98,6 +105,16 @@ describe "ES2022 support" do
         must_equal 'class C {#a; get a() {return this.#a}}'
       to_js( 'class C; attr_writer :a; end' ).
         must_equal 'class C {#a; set a(a) {this.#a = a}}'
+    end
+  end
+
+  describe :at do
+    it 'should handle negative indexes' do
+      to_js_fn('x[-2]').must_equal('x.at(-2)')
+    end
+
+    it 'should handle calls to last' do
+      to_js_fn('x.last').must_equal('x.at(-1)')
     end
   end
 end
