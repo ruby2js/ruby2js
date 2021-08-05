@@ -63,6 +63,9 @@ describe "ES2020 support" do
     it "should ignore unrelated ands" do
       to_js('x=x && a && a.b && a.b.c && a.b.c.d && y').
         must_equal 'let x = x && a?.b?.c?.d && y'
+
+      to_js('foo() if bar and bar != @bar').
+        must_equal 'if (bar && bar != this._bar) foo()'
     end
   end
 end

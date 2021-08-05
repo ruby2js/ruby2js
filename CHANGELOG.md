@@ -4,6 +4,7 @@
 * Add chomp, delete_prefix, and delete_suffix support via ActiveFunctions
 * Support React stateless components
 * es2022 at method support
+* fix es2020 bug where operators were converted to optional chaining
 
 # 4.1.4 / 2021-05-08
 

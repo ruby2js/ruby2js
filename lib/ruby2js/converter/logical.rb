@@ -69,7 +69,7 @@ module Ruby2JS
         left = rewrite(*left.children)
       end
 
-      if right.type != :send
+      if right.type != :send or OPERATORS.flatten.include? right.children[1]
         s(:and, left, right)
       elsif conditionally_equals(left, right.children.first)
         # a && a.b => a&.b
