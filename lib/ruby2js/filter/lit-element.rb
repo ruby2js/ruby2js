@@ -36,7 +36,7 @@ module Ruby2JS
       end
 
       def on_class(node)
-        cname, inheritance, *body = node.children
+        _, inheritance, *body = node.children
         return super unless inheritance == s(:const, nil, :LitElement)
 
         @le_props = {}
