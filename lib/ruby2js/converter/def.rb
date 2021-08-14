@@ -169,7 +169,9 @@ module Ruby2JS
           put 'function'
         end
 
-        put '('; parse args; put ") {#{nl}"
+        put '('
+        parse s(:args, *args.children.select {|arg| arg.type != :shadowarg})
+        put ") {#{nl}"
 
         next_token, @next_token = @next_token, :return
         @block_depth += 1 if @block_depth

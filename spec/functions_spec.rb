@@ -367,10 +367,19 @@ describe Ruby2JS::Filter::Functions do
     end
 
     it "should handle merge with a constant hash" do
+      # simple LHS
       to_js( 'a = a.merge(b: 1)' ).
         must_equal  "var a = function() {var $$ = {}; " +
           "for (var $_ in a) {$$[$_] = a[$_]}; " +
           "$$.b = 1; return $$}()"
+
+      # computed LHS
+      to_js( 'a.b.merge(b: 1)' ).
+        must_equal  "function() {var $$ = {}; " +
+          "var $1 = a.b; Object.defineProperties($$, " +
+          "Object.getOwnPropertyNames($1).reduce(function($2, $3) {" +
+          "$2[$3] = Object.getOwnPropertyDescriptor($1, $3); return $2}, " +
+          "{})); $$.b = 1}()"
     end
 
     it "should handle merge!" do
