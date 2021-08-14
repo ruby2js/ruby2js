@@ -1,10 +1,13 @@
-# master
+# master 
+
+# 4.1.5 / 2021-08-14
 
 * Fix camelCase bug on methods ending in ? or !
 * Add chomp, delete_prefix, and delete_suffix support via ActiveFunctions
 * Support React stateless components
 * es2022 at method support
 * fix es2020 bug where operators were converted to optional chaining
+* fix es5 merge regression with complex LHS
 
 # 4.1.4 / 2021-05-08
 
