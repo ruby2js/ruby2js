@@ -58,6 +58,8 @@ describe "ES2020 support" do
 
     it "should combine conditions when it can" do
       to_js('x=a && a.b').must_equal 'let x = a?.b'
+      to_js('x=a && a.b(c)').must_equal 'let x = a?.b(c)'
+      to_js('x && a && a.b(c)').must_equal 'x && a?.b(c)'
     end
 
     it "should ignore unrelated ands" do

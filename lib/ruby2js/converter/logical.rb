@@ -73,12 +73,12 @@ module Ruby2JS
         s(:and, left, right)
       elsif conditionally_equals(left, right.children.first)
         # a && a.b => a&.b
-        right.updated(:csend, [left, right.children.last])
+        right.updated(:csend, [left, *right.children[1..-1]])
       elsif conditionally_equals(left.children.last, right.children.first)
         # a && b && b.c => a && b&.c
         left.updated(:and, [left.children.first,
           left.children.last.updated(:csend, 
-          [left.children.last, right.children.last])])
+          [left.children.last, *right.children[1..-1]])])
       else
         s(:and, left, right)
       end
