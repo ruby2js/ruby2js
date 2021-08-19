@@ -1,5 +1,7 @@
 # master 
 
+# 4.1.6 / 2021-08-19
+
 * Fix es2020 optional chaining optimization when arguments are present
 
 # 4.1.5 / 2021-08-14
