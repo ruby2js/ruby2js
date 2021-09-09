@@ -3,7 +3,7 @@ require 'minitest/autorun'
 require 'ruby2js/filter/underscore'
 
 describe Ruby2JS::Filter::Underscore do
-  
+
   def to_js( string)
     _(Ruby2JS.convert(string, filters: [Ruby2JS::Filter::Underscore]).to_s)
   end
@@ -14,7 +14,7 @@ describe Ruby2JS::Filter::Underscore do
         must_equal '_.where(plays, {author: "Shakespeare", year: 1611})'
     end
   end
-  
+
   describe 'pluck' do
     it "should map 'map' block-pass to 'pluck'" do
       to_js( 'x.map(&:foo)' ).must_equal '_.pluck(x, "foo")'
@@ -213,6 +213,26 @@ describe Ruby2JS::Filter::Underscore do
     it "should map reduce: block-pass to _.reduce" do
       to_js( 'a.reduce(&:+)' ).
         must_equal '_.reduce(_.rest(a), function(memo, item) {return memo + item}, a[0])'
+    end
+  end
+
+  describe 'take, drop' do
+    it "should map take: number to _.take" do
+      to_js( 'a.take(5)' ).must_equal '_.take(a, 5)'
+    end
+
+    it "should map drop: number to _.drop" do
+      to_js( 'a.drop(5)' ).must_equal '_.drop(a, 5)'
+    end
+  end
+
+  describe 'min, max' do
+    it "should map min to _.min" do
+      to_js( 'a.min' ).must_equal '_.min(a)'
+    end
+
+    it "should map max to _.max" do
+      to_js( 'a.max' ).must_equal '_.max(a)'
     end
   end
 

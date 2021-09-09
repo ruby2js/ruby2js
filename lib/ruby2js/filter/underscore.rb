@@ -18,6 +18,14 @@ module Ruby2JS
           else
             super
           end
+        elsif [:take, :drop].include? method
+          if node.is_method?
+            process S(:send, s(:lvar, :_), method, node.children[0], node.children[2])
+          else
+            super
+          end
+        elsif [:min, :max].include? method and node.children.length == 2
+          process S(:send, s(:lvar, :_), method, node.children[0])
         elsif method == :sample and  node.children.length <= 3
           process S(:send, s(:lvar, :_), :sample, node.children[0],
             *node.children[2..-1])
@@ -62,14 +70,14 @@ module Ruby2JS
         elsif method == :reduce
           if node.children.length == 3 and node.children[2].type == :sym
             # input: a.reduce(:+)
-            # output: _.reduce(_.rest(a), 
+            # output: _.reduce(_.rest(a),
             #                  proc {|memo, item| return memo+item},
             #                  a[0])
-            process S(:send, s(:lvar, :_), :reduce, 
+            process S(:send, s(:lvar, :_), :reduce,
               s(:send, s(:lvar, :_), :rest, node.children.first),
-              s(:block, s(:send, nil, :proc), 
+              s(:block, s(:send, nil, :proc),
                 s(:args, s(:arg, :memo), s(:arg, :item)),
-                s(:autoreturn, s(:send, s(:lvar, :memo), 
+                s(:autoreturn, s(:send, s(:lvar, :memo),
                   node.children[2].children.first, s(:lvar, :item)))),
                 s(:send, node.children.first, :[], s(:int, 0)))
           elsif node.children.last.type == :block_pass
@@ -79,9 +87,9 @@ module Ruby2JS
             # input: a.reduce(n, :+)
             # output: _.reduce(a, proc {|memo, item| return memo+item}, n)
             process S(:send, s(:lvar, :_), :reduce, node.children.first,
-              s(:block, s(:send, nil, :proc), 
+              s(:block, s(:send, nil, :proc),
                 s(:args, s(:arg, :memo), s(:arg, :item)),
-                s(:autoreturn, s(:send, s(:lvar, :memo), 
+                s(:autoreturn, s(:send, s(:lvar, :memo),
                 node.children[3].children.first, s(:lvar, :item)))),
                 node.children[2])
           else
@@ -93,8 +101,8 @@ module Ruby2JS
           # input: a.compact!
           # output: a.splice(0, a.length, *a.compact)
           target = node.children.first
-          process S(:send, target, :splice, s(:int, 0), 
-            s(:attr, target, :length), s(:splat, s(:send, target, 
+          process S(:send, target, :splice, s(:int, 0),
+            s(:attr, target, :length), s(:splat, s(:send, target,
             :"#{method.to_s[0..-2]}", *node.children[2..-1])))
         else
           super
@@ -111,14 +119,14 @@ module Ruby2JS
           # output: _.sortBy {return expression}
           method = method.to_s.sub(/\_by$/,'By').to_sym
           process S(:block, s(:send, s(:lvar, :_), method,
-            call.children.first), node.children[1], 
+            call.children.first), node.children[1],
             s(:autoreturn, node.children[2]))
         elsif [:find, :reject].include? method
           if call.children.length == 2
             # input: a.find {|item| item > 0}
             # output: _.find(a) {|item| return item > 0}
-            process S(:block, s(:send, s(:lvar, :_), method, 
-              call.children.first), node.children[1], 
+            process S(:block, s(:send, s(:lvar, :_), method,
+              call.children.first), node.children[1],
               s(:autoreturn, node.children[2]))
           else
             super
@@ -127,25 +135,25 @@ module Ruby2JS
         elsif method == :times and call.children.length == 2
           # input: 5.times {|i| console.log i}
           # output: _.find(5) {|i| console.log(i)}
-          process S(:block, s(:send, s(:lvar, :_), method, 
+          process S(:block, s(:send, s(:lvar, :_), method,
             call.children.first), node.children[1], node.children[2])
 
         elsif method == :reduce
           if call.children.length == 2
             # input: a.reduce {|memo, item| memo+item}
-            # output: _.reduce(_.rest(a), 
+            # output: _.reduce(_.rest(a),
             #                  proc {|memo, item| return memo+item},
             #                  a[0])
-            process S(:call, s(:lvar, :_), :reduce, 
+            process S(:call, s(:lvar, :_), :reduce,
               s(:send, s(:lvar, :_), :rest, call.children.first),
-              s(:block, s(:send, nil, :proc), 
+              s(:block, s(:send, nil, :proc),
                 node.children[1], s(:autoreturn, node.children[2])),
                 s(:send, call.children.first, :[], s(:int, 0)))
           elsif call.children.length == 3
             # input: a.reduce(n) {|memo, item| memo+item}
             # output: _.reduce(a, proc {|memo, item| return memo+item}, n)
             process S(:call, s(:lvar, :_), :reduce, call.children.first,
-              s(:block, s(:send, nil, :proc), 
+              s(:block, s(:send, nil, :proc),
                 node.children[1], s(:autoreturn, node.children[2])),
                 call.children[2])
           end
@@ -155,7 +163,7 @@ module Ruby2JS
           # output: a.splice(0, a.length, *a.map {expression})
           method = :"#{method.to_s[0..-2]}"
           target = call.children.first
-          process S(:call, target, :splice, s(:splat, s(:send, s(:array, 
+          process S(:call, target, :splice, s(:splat, s(:send, s(:array,
             s(:int, 0), s(:attr, target, :length)), :concat,
             s(:block, s(:send, target, method, *call.children[2..-1]),
             *node.children[1..-1]))))
