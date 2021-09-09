@@ -236,6 +236,12 @@ describe Ruby2JS::Filter::Underscore do
     end
   end
 
+  describe 'each_slice' do
+    it "should map each_slice: number to _.chunk" do
+      to_js( 'a.each_slice(7)' ).must_equal '_.chunk(a, 7)'
+    end
+  end
+
   describe Ruby2JS::Filter::DEFAULTS do
     it "should include Underscore" do
       _(Ruby2JS::Filter::DEFAULTS).must_include Ruby2JS::Filter::Underscore

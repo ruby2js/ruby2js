@@ -18,12 +18,10 @@ module Ruby2JS
           else
             super
           end
-        elsif [:take, :drop].include? method
-          if node.is_method?
-            process S(:send, s(:lvar, :_), method, node.children[0], node.children[2])
-          else
-            super
-          end
+        elsif [:take, :drop].include? method and node.is_method?
+          process S(:send, s(:lvar, :_), method, node.children[0], node.children[2])
+        elsif method == :each_slice and node.is_method?
+          process S(:send, s(:lvar, :_), :chunk, node.children[0], node.children[2])
         elsif [:min, :max].include? method and node.children.length == 2
           process S(:send, s(:lvar, :_), method, node.children[0])
         elsif method == :sample and  node.children.length <= 3
