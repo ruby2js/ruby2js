@@ -41,6 +41,11 @@ The **Underscore** filter maps relevant Ruby methods to their [Underscore.js](ht
 * `.zip()` {{ caret }} `_.zip()`
 * `(n...m)` {{ caret }} `_.range(n, m)`
 * `(n..m)` {{ caret }} `_.range(n, m+1)`
+* `n.take(m)` {{ caret }} `_.take(n, m)`
+* `n.drop(m)` {{ caret }} `_.drop(n, m)`
+* `.min` {{ caret }} `_.min()`
+* `.max` {{ caret }} `_.max()`
+* `n.each_slice(m)` {{ caret }} `_.chunk(n, m)`
 
 ## Additional Features
 
