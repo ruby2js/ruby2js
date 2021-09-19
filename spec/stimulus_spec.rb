@@ -116,13 +116,13 @@ describe Ruby2JS::Filter::Stimulus do
   describe "modules" do
     it "imports from Stimulus" do
       to_js_esm( 'class Foo<Stimulus::Controller; end' ).
-        must_equal 'import * as Stimulus from "stimulus"; ' +
+        must_equal 'import * as Stimulus from "@hotwired/stimulus"; ' +
           'class Foo extends Stimulus.Controller {}'
     end
 
     it "imports from skypack" do
       to_js_skypack( 'class Foo<Stimulus::Controller; end' ).
-        must_equal 'import * as Stimulus from "https://cdn.skypack.dev/stimulus"; ' +
+        must_equal 'import * as Stimulus from "https://cdn.skypack.dev/@hotwired/stimulus"; ' +
           'class Foo extends Stimulus.Controller {}'
     end
   end

@@ -9,12 +9,12 @@ module Ruby2JS
 
       STIMULUS_IMPORT = s(:import,
         [s(:pair, s(:sym, :as), s(:const, nil, :Stimulus)),
-          s(:pair, s(:sym, :from), s(:str, "stimulus"))],
+          s(:pair, s(:sym, :from), s(:str, "@hotwired/stimulus"))],
           s(:str, '*'))
 
       STIMULUS_IMPORT_SKYPACK = s(:import,
         [s(:pair, s(:sym, :as), s(:const, nil, :Stimulus)),
-          s(:pair, s(:sym, :from), s(:str, "https://cdn.skypack.dev/stimulus"))],
+          s(:pair, s(:sym, :from), s(:str, "https://cdn.skypack.dev/@hotwired/stimulus"))],
           s(:str, '*'))
 
       def initialize(*args)
