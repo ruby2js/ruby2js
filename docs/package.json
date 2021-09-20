@@ -40,11 +40,11 @@
     "webpack-manifest-plugin": "^2.1.0"
   },
   "dependencies": {
+    "@hotwired/stimulus": "^3.0.0-beta.2",
     "@shoelace-style/shoelace": "^2.0.0-beta.25",
     "animated-scroll-to": "^2.0.12",
     "bridgetown-quick-search": "1.0.5",
     "bulma": "^0.9.1",
-    "lit-element": "^2.4.0",
-    "stimulus": "^2.0.0"
+    "lit-element": "^2.4.0"
   }
 }
