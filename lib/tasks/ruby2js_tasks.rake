@@ -1,4 +1,6 @@
-Thor::Actions::WARNINGS[:unchanged_no_flag] = 'unchanged'
+if defined? Thor
+  Thor::Actions::WARNINGS[:unchanged_no_flag] = 'unchanged'
+end
 
 def template(location)
   system "#{RbConfig.ruby} #{Rails.root.join("bin")}/rails app:template " + 
@@ -24,9 +26,9 @@ namespace :ruby2js do
     end
 
     namespace :stimulus do
-      desc "Install Ruby2JS with Stimulus Sprockets support"
-      task :sprockets => :"stimulus:install:asset_pipeline" do
-        template 'install/stimulus-sprockets.rb'
+      desc "Install Ruby2JS with Stimulus Rollup support"
+      task :rollup do
+        template 'install/stimulus-rollup.rb'
       end
 
       desc "Install Ruby2JS with Stimulus Webpacker support"

@@ -1,5 +1,23 @@
-create_file Rails.root.join('config/initializers/ruby2js.rb').to_s,
-  <<~CONFIG
+# install rollup plugin
+run "yarn add @ruby2js/rollup-plugin"
+
+# configure rollup for ruby2js with stimulus filters
+insert_into_file Rails.root.join("rollup.config.js").to_s,
+  "import ruby2js from '@ruby2js/rollup-plugin';\n",
+  after: /import resolve from .*\n/
+
+insert_into_file Rails.root.join("rollup.config.js").to_s,
+  <<-CONFIG, after: "resolve()\n"
+    ,ruby2js({
+      eslevel: 2020,
+      autoexports: 'default',
+      filters: ['stimulus', 'esm', 'functions']
+    })
+  CONFIG
+
+# monkey patch stimulus:manifest:update to find .rb.js controllers too
+append_to_file Rails.root.join('config/application.rb').to_s,
+  "\n" + <<~'CONFIG'
     require 'stimulus/manifest'
 
     module Stimulus::Manifest

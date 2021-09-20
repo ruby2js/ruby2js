@@ -1,5 +1,10 @@
 # master 
 
+* take, drop, min, max, each_slice added to underscore filter
+* import stimulus => import @hotwired/stimulus
+* rails stimulus rake tasks and instructions were update to match
+  the latest hotwired/stimulus-rails changes
+
 # 4.1.6 / 2021-08-19
 
 * Fix es2020 optional chaining optimization when arguments are present

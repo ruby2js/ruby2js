@@ -1,4 +1,4 @@
-#!/bin/env ruby
+#!/usr/bin/env ruby
 require 'json'
 
 source = ARGV[0]
@@ -23,16 +23,29 @@ gen = %r{\./bin/rails generate .*}.match(source)
 html = /.*`(.*?)`.*?```(?:html|erb)\n(.*?)```/m.match(source)
 ruby = /.*`(.*?)`.*?```ruby\n(.*?)```/m.match(source)
 link = %r{<(http://localhost:3000/.*?)>}.match(source)
+rails = /Rails Version: (\d[.\w]*)/i.match(source)
+opts = source[/rails new [-\w]+(.*)/, 1]
+run = /## Try it out!\n.*?```\n(.*?)```/m.match(source)
+
+# match the version of rails to the example
+if rails
+  installed = `gem list '^rails$'`.scan(/\d[.\w]+/)
+  version = installed.find {|version| version.start_with? rails[1]}
+  rails "Rails version #{version} is not installed" unless version
+  rails = "rails _#{version}_"
+else
+  rails = 'rails'
+end
 
 # Create a rails app
 system 'rm -rf testrails'
-system 'rails new testrails'
+system "#{rails} new testrails#{opts}"
 Dir.chdir 'testrails'
 system './bin/spring stop'
 
 # install ruby2js and dependencies
 add = ["gem 'ruby2js', path: #{home.inspect}, require: 'ruby2js/rails'"]
-add << "gem 'stimulus-rails'" if install.include? 'stimulus'
+add << "gem 'stimulus-rails'" if install.include? 'stimulus_webpacker'
 IO.write 'Gemfile', "\n" + add.join("\n"), mode: 'a'
 system './bin/bundle install'
 system "./bin/rails ruby2js:install:#{install}"
@@ -85,4 +98,6 @@ Thread.new do
 end
 
 # start server
-system './bin/rails server'
+(run ? run[1].split("\n") : ['./bin/rails server']).each do |cmd|
+  system cmd
+end

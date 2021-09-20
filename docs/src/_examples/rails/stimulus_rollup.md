@@ -1,37 +1,37 @@
 ---
 top_section: Rails
 order: 32
-title: Stimulus Sprockets
-category: stimulus sprockets
+title: Stimulus Rollup
+category: stimulus rollup
 ---
 
-This example is based on the [Stimulus site](https://reactjs.org/), but based on
-Ruby2JS instead and hosted by Ruby on Rails.  It also uses the
-Sprockets/asset-pipeline instead of Webpacker.  The Rails Guides have more
-information on how [Sprockets is different than
-Webpacker](https://edgeguides.rubyonrails.org/webpacker.html#how-is-webpacker-different-from-sprockets-questionmark).
+{% rendercontent "docs/note" %}
+**This example is based on Rails Version: 7**
+{% endrendercontent %}
+
+This example makes use of the new jsbundling-rails support included in Rails
+7.
 
 ## Create a Project
 
 Start a new project:
 
 ```
-rails new stimulus-sprockets
-cd stimulus-sprockets
+rails new stimulus-rollup -j rollup
+cd stimulus-rollup
 ```
 
-Add the following lines to your `Gemfile`:
+Add the following line to your `Gemfile`:
 
 ```ruby
 gem 'ruby2js', require: 'ruby2js/rails'
-gem 'stimulus-rails'
 ```
 
 Run the following commands:
 
 ```sh
 ./bin/bundle install
-./bin/rails ruby2js:install:stimulus:sprockets
+./bin/rails ruby2js:install:stimulus:rollup
 ```
 
 ## Write some HTML and a matching Stimulus controller
@@ -57,8 +57,8 @@ Add the following to `app/views/greeter/hello.html.erb`:
 </div>
 ```
 
-Remove `app/assets/javascripts/controllers/hello_controller.js`, and create
-`app/assets/javascripts/controllers/hello_controller.js.rb` with the following
+Remove `app/javascript/controllers/hello_controller.js`, and create
+`app/javascript/controllers/hello_controller.js.rb` with the following
 contents:
 
 <div data-controller="ruby" data-options='{
@@ -78,9 +78,16 @@ end
 
 ## Try it out!
 
-Start your server:
+As you created a new controller, you will need to update the stimulus
+manifest.  You will also need to build and bundle your change (this can be done with a
+`--watch` parameter to automatically be run every time a controller changes).
+Finally you will need to start your server.
+
+This can be accomplished with the following three commands:
 
 ```
+./bin/rails stimulus:manifest:update
+yarn build
 ./bin/rails server
 ```
 
@@ -94,7 +101,8 @@ should match the following:
 <div data-controller="js"></div>
 
 Make a change to `app/assets/javascript/controllers/hello_controller.js.rb`
-and see the results.
+and see the results.  Make sure you either have `yarn build --watch` running,
+or you have rerun `yarn build` manually.
 
 {% rendercontent "docs/note" %}
 **Note**: The assignment to `HelloController.targets` at the bottom of the
@@ -103,6 +111,5 @@ above differs from most Stimulus examples you may have seen.  This is due to
 being only a stage 3 proposal right now and
 [not yet supported](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Classes/static#browser_compatibility)
 on all major browsers.  If your browser supports it, feel free to change
-`2020` to `2022` in `config/initializers/ruby2js.rb` and restart your rails
-server.
+`2020` to `2022` in `./rollup.config.js` and rerun `yarn build`.
 {% endrendercontent %}

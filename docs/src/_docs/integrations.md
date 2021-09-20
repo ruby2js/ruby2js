@@ -7,7 +7,7 @@ category: integrations
 
 # Ruby back-ends servers
 
-* [Rails](https://www.ruby2js.com/examples/rails/) integration is provided
+* [Rails](../examples/rails/) integration is provided
    for both WebPacker and Sprockets.  Rake tasks are provided to assist with
    the configuration.
 

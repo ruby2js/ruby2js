@@ -5,6 +5,10 @@ title: Stimulus Webpacker
 category: stimulus webpacker
 ---
 
+{% rendercontent "docs/note" %}
+**This example is based on Rails Version: 6**
+{% endrendercontent %}
+
 This example is based on the [Stimulus site](https://reactjs.org/), but based on
 Ruby2JS instead and hosted by Ruby on Rails.  It uses Webpacker.
 
