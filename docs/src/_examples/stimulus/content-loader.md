@@ -5,12 +5,6 @@ order: 16
 category: content-loader
 ---
 
-{% rendercontent "docs/note", type: "warning", extra_margin: true %}
-**Warning:** If you are using Firefox, go back to the
-[Installation](installation) page and lower the `eslevel` to `2021` or lower
-and restart your server before proceeding.
-{% endrendercontent %}
-
 # Deeper JavaScript integration
 
 Add the following to your `public/index.html`:

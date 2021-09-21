@@ -32,9 +32,9 @@ $ yarn install
 $ yarn start
 ```
 
-If you are using Google Chrome, Mozilla Firefox, or Microsoft Edge, you should
+If you are using Google Chrome, Safari, Mozilla Firefox, or Microsoft Edge, you should
 see a browser window with the words **It works!** displayed.  If you are using
-Apple Safari or another browser, you may need to tweak the configuration, see
+another browser, you may need to tweak the configuration, see
 below.
 
 {% rendercontent "docs/note" %}
@@ -86,8 +86,8 @@ description of the available configuration options can be found on the
 
 The option that is of most interest here is the `eslevel` option.  It is
 currently set to 2022, meaning that it enables some JavaScript features which
-are not yet standardized and/or widely deployed.  This explains why this code
-doesn't yet work on Safari.  Feel free to change this value to 2021 (or lower)
+are not yet standardized and/or widely deployed.
+Feel free to change this value to 2021 (or lower)
 and restart the server by pressing control-C and then executing `yarn start`
 again.
 
