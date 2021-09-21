@@ -1,5 +1,7 @@
 # master 
 
+# 4.1.7 / 2021-09-20
+
 * take, drop, min, max, each_slice added to underscore filter
 * import stimulus => import @hotwired/stimulus
 * rails stimulus rake tasks and instructions were update to match
