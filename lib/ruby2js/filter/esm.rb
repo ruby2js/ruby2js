@@ -13,15 +13,29 @@ module Ruby2JS
         @esm_autoimports = options[:autoimports]
         @esm_defs = options[:defs] || {}
         @esm_explicit_tokens = Set.new
+        @esm_top = nil
+
+        # don't convert requires if Require filter is included
+        filters = options[:filters] || Filter::DEFAULTS
+        if \
+          defined? Ruby2JS::Filter::Require and
+          filters.include? Ruby2JS::Filter::Require
+        then
+          @esm_top = []
+        end
       end
 
       def process(node)
-        return super unless @esm_autoexports
+        return super if @esm_top
 
         list = [node]
         while list.length == 1 and list.first.type == :begin
           list = list.first.children.dup
         end
+
+        @esm_top = list
+
+        return super unless @esm_autoexports
 
         replaced = []
         list.map! do |child|
@@ -84,7 +98,7 @@ module Ruby2JS
         target, method, *args = node.children
         return super unless target.nil?
 
-        if method == :import
+        if method == :import or (method == :require and @esm_top&.include? @ast)
           # don't do the conversion if the word import is followed by a paren
           if node.loc.respond_to? :selector
             selector = node.loc.selector
@@ -98,7 +112,7 @@ module Ruby2JS
             #   => import "file.css"
             s(:import, args[0].children[0])
           elsif args.length == 1 and \
-             args[0].type == :send and \
+            args[0].type == :send and \
             args[0].children[0].nil? and \
             args[0].children[2].type == :send and \
             args[0].children[2].children[0].nil? and \
@@ -152,17 +166,17 @@ module Ruby2JS
 
           values = @esm_defs[node.children.last]
           
-	  if values
-	    values = values.map {|value| 
-	      if value.to_s.start_with? "@" 
-		[value.to_s[1..-1].to_sym, s(:self)]
-	      else
-		[value.to_sym, s(:autobind, s(:self))]
-	      end
-	    }.to_h
+          if values
+            values = values.map {|value| 
+              if value.to_s.start_with? "@" 
+                [value.to_s[1..-1].to_sym, s(:self)]
+              else
+                [value.to_sym, s(:autobind, s(:self))]
+              end
+            }.to_h
 
-	    @namespace.defineProps values, [node.children.last]
-	  end
+            @namespace.defineProps values, [node.children.last]
+          end
         end
 
         super

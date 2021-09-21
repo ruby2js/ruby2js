@@ -57,6 +57,13 @@ describe Ruby2JS::Filter::ESM do
     end
   end
 
+  describe "require" do
+    it "should handle top level requires" do
+      to_js('require "./foo.js"').
+        must_include 'import "./foo.js"'
+    end
+  end
+
   describe "exports" do
     it "should handle a default class" do
       to_js("export default class X < Y\nend").

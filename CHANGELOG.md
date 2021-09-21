@@ -1,5 +1,7 @@
 # master 
 
+* esm filter: convert top level requires into imports
+
 # 4.1.7 / 2021-09-20
 
 * take, drop, min, max, each_slice added to underscore filter
