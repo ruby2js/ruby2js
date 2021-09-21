@@ -62,7 +62,7 @@ Remove `app/javascript/controllers/hello_controller.js`, and create
 contents:
 
 <div data-controller="ruby" data-options='{
-  "eslevel": 2020,
+  "eslevel": 2022,
   "autoexports": "default",
   "filters": ["esm", "stimulus", "functions"]
 }'></div>
@@ -103,13 +103,3 @@ should match the following:
 Make a change to `app/assets/javascript/controllers/hello_controller.js.rb`
 and see the results.  Make sure you either have `yarn build --watch` running,
 or you have rerun `yarn build` manually.
-
-{% rendercontent "docs/note" %}
-**Note**: The assignment to `HelloController.targets` at the bottom of the
-above differs from most Stimulus examples you may have seen.  This is due to
-[Static Public Fields](https://github.com/tc39/proposal-static-class-features#static-public-fields)
-being only a stage 3 proposal right now and
-[not yet supported](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Classes/static#browser_compatibility)
-on all major browsers.  If your browser supports it, feel free to change
-`2020` to `2022` in `./rollup.config.js` and rerun `yarn build`.
-{% endrendercontent %}

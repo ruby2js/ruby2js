@@ -15,7 +15,8 @@ insert_into_file Rails.root.join("rollup.config.js").to_s,
     })
   CONFIG
 
-# monkey patch stimulus:manifest:update to find .rb.js controllers too
+# monkey patch stimulus:manifest:update to find .rb.js controllers too.
+# See https://github.com/hotwired/stimulus-rails/issues/76
 append_to_file Rails.root.join('config/application.rb').to_s,
   "\n" + <<~'CONFIG'
     require 'stimulus/manifest'
