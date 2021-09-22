@@ -11,6 +11,7 @@ category: stimulus webpacker
 
 This example is based on the [Stimulus site](https://reactjs.org/), but based on
 Ruby2JS instead and hosted by Ruby on Rails.  It uses Webpacker.
+See the [stimulus filter](../../docs/filters/stimulus) for more details.
 
 ## Create a Project
 

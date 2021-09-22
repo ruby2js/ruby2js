@@ -5,6 +5,10 @@ title: LitElement
 category: lit-element
 ---
 
+{% rendercontent "docs/note" %}
+**This example is based on Rails Version: 6**
+{% endrendercontent %}
+
 This example is based on the 
 [LitElement tutorial](https://lit-element.polymer-project.org/try/style), but
 based on Ruby2JS instead and hosted by Ruby on Rails.  See the
