@@ -22,8 +22,8 @@ import Something from "./lib/something"
 import Something, "./lib/something"
 # => import Something from "./lib/something"
 
-import [ LitElement, html, css ], from: "lit-element"
-# => import { LitElement, html, css } from "lit-element"
+import [ LitElement, html, css ], from: "lit"
+# => import { LitElement, html, css } from "lit"
 
 import React, from: "react"
 # => import React from "react"
@@ -80,12 +80,12 @@ to the `Ruby2JS.convert` method. (NOTE: use camelCase names, not snake_case.) Ex
 ```ruby
 require "ruby2js/filter/esm"
 puts Ruby2JS.convert('class MyElement < LitElement; end',
-  eslevel: 2020, autoimports: {[:LitElement] => "lit-element"})
+  eslevel: 2020, autoimports: {[:LitElement] => "lit"})
 ```
 
 ```js
 // JavaScript output:
-import { LitElement } from "lit-element"
+import { LitElement } from "lit"
 class MyElement extends LitElement {}
 ```
 

@@ -93,7 +93,7 @@ You'll need to edit your Webpack config so it can use the `@ruby2js/webpack-load
 
 Now wherever you save your `.js` files, you can write `.js.rb` files which will be converted to Javascript and processed through Babel. You'll probably have a main `index.js` file already, so you can simply import the Ruby files from there and elsewhere. You'll have to include the full extension in the import statement, i.e. `import MyClass from "./lib/my_class.js.rb"`.
 
-See the next example in the Rails section for how to write a web component based on open standards using [LitElement](https://lit-element.polymer-project.org).
+See the next example in the Rails section for how to write a web component based on open standards using [LitElement](https://lit.dev/).
 
 ## Source Maps
 
@@ -147,7 +147,7 @@ environment.loaders.append('rb2js', {
 
 Now, by way of example, let's create a wrapper component around the [Duet Date Picker](https://duetds.github.io/date-picker/) component we can use to customize the picker component and handle change events.
 
-First, run `yarn add lit-element @duetds/date-picker` to add the Javascript dependencies.
+First, run `yarn add lit @duetds/date-picker` to add the Javascript dependencies.
 
 Next, in `app/javascript/packs/application.js`, add:
 
@@ -183,12 +183,14 @@ And the Rails view template: `app/components/date_picker_component.html.erb`:
 <app-date-picker identifier="<%= @identifier %>" value="<%= @date.strftime("%Y-%m-%d") %>"></app-date-picker>
 ```
 
-Hey, what's all this custom element stuff? Well that's what we're going to define now! Let's use Ruby to write a web component using the [LitElement library](https://lit-element.polymer-project.org).
+Hey, what's all this custom element stuff? Well that's what we're going to
+define now! Let's use Ruby to write a web component using the
+[LitElement library](https://lit.dev/).
 
 Simply create `app/components/date_picker_element.js.rb`:
 
 ```ruby
-import [ LitElement, html ], from: "lit-element"
+import [ LitElement, html ], from: "lit"
 import [ DuetDatePicker ], from: "@duetds/date-picker/custom-element"
 import "@duetds/date-picker/dist/duet/themes/default.css"
 

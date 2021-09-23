@@ -29,7 +29,7 @@ See [the ESM filter](filters/esm#autoimports) for details.
 ```ruby
 require 'ruby2js/filter/esm'
 puts Ruby2JS.convert('class MyElement < LitElement; end',
-  eslevel: 2020, autoimports: {[:LitElement] => 'lit-element'})
+  eslevel: 2020, autoimports: {[:LitElement] => 'lit'})
 ```
 
 ## Binding

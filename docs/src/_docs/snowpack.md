@@ -52,7 +52,7 @@ An example of all of the supported options:
 ```json
 {
   "autoexports": true,
-  "autoimports": {"[:LitElement]": "lit-element"},
+  "autoimports": {"[:LitElement]": "lit"},
   "comparison": "identity",
   "defs": {"A": ["x", "@y"]},
   "eslevel": 2021,
