@@ -1,6 +1,8 @@
 # master 
 
 * esm filter: convert top level requires into imports
+* lit filter: updates from polymer LitElement to Lit v2.
+  added: customElements, es2022 syntax for properties
 
 # 4.1.7 / 2021-09-20
 

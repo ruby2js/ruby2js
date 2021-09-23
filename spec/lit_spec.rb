@@ -76,6 +76,13 @@ describe Ruby2JS::Filter::Lit do
     end
   end
 
+  describe "decorators" do
+    it "should handle customElement calls" do
+      to_js('class C < LitElement; customElement "c-element"; end').
+        must_include 'customElements.define("c-element", C)'
+    end
+  end
+
   describe "auto HTML and CSS" do
     it "should handle self.styles" do
       to_js('class C < LitElement; def self.styles; %{.red {color: red}}; end; end').

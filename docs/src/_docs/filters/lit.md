@@ -18,7 +18,7 @@ When a class definition is encountered that derives from
    with either an underscore (`_`) or a hash (`#`).  
 
  * References to instance variables will cause entries to be added to the
-   `static get properties` function if not already present, and simple type
+   `static properties` property if not already present, and simple type
    inferencing will be used to determine the type.
 
  * `self.style` methods that return a string will have that string mapped to a
@@ -30,6 +30,8 @@ When a class definition is encountered that derives from
 
  * Methods referenced within HTML literals are not automatically bound, but
    will be automatically prefixed with `this.`.
+
+ * `customElement` calls are converts to `customElements.define` calls.
 
  * If `super` is not called by the `initialize` function, a call to `super`
    will be added.

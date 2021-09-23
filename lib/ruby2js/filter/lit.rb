@@ -36,7 +36,7 @@ module Ruby2JS
       end
 
       def on_class(node)
-        _, inheritance, *body = node.children
+        class_name, inheritance, *body = node.children
         return super unless inheritance == s(:const, nil, :LitElement)
 
         @le_props = {}
@@ -78,6 +78,16 @@ module Ruby2JS
               [*nodes[values].children[0..-2], s(:hash,
               *le_props.map{|name, value| s(:pair, name, value)})])
           end
+        end
+
+        # customElement is converted to customElements.define
+        customElement = nodes.find_index {|child| 
+          child&.type == :send and child.children[0..1] == [nil, :customElement]
+        }
+        if customElement and nodes[customElement].children.length == 3
+          nodes[customElement] = nodes[customElement].updated(nil,
+            [s(:attr, nil, :customElements), :define,
+            nodes[customElement].children.last, class_name])
         end
 
         # render of a string is converted to a taglit :html
