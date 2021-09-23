@@ -17,6 +17,7 @@ terser = "cat" if ENV['NODE_ENV'] == 'development'
 file "#{root}/demo/filters.opal" => filters do
   puts 'generate filters.opal'
   content = filters.map do |file|
+    next if File.basename(file) == 'lit-element.rb'
     require file
     "require #{"ruby2js/filter/#{File.basename(file, '.rb')}".inspect}"
   end
@@ -30,7 +31,7 @@ file "#{root}/demo/filters.opal" => filters do
   end
   content << "Filters = #{filters.inspect}"
 
-  IO.write "#{root}/demo/filters.opal", content.join("\n")
+  IO.write "#{root}/demo/filters.opal", content.compact.join("\n")
 end
 
 file "#{dest}/index.erb" => [*filters, "#{root}/demo/ruby2js.rb"] do
