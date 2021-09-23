@@ -68,6 +68,70 @@ IO.write html[1], html[2], mode: 'a+' if html
 IO.write ruby[1], ruby[2], mode: 'w' if ruby
 File.unlink ruby[1].chomp('.rb') if File.exist? ruby[1].chomp('.rb')
 
+if ARGV.include? '-w' or ARGV.include? '--watch'
+  require 'listen'
+
+  ruby2js = File.realpath(__dir__)
+
+  # extract config
+  if File.exist? "#{ruby2js}/testrails/rollup.config.js"
+    config = IO.read("#{ruby2js}/testrails/rollup.config.js")
+    config = config[/ruby2js\((\{.*?\})\)/m, 1]
+  elsif File.exist? "#{ruby2js}/testrails/config/webpack/loaders/ruby2js.js"
+    config = IO.read("#{ruby2js}/testrails/config/webpack/loaders/ruby2js.js")
+    config = config[/@ruby2js.*?options:\s*(\{.*?\})\s*\}\s*\]/m, 1]
+  else
+    config = {}
+  end
+
+  # convert to Ruby2JS options
+  config = eval config
+  filters = config.delete(:filters)
+  eslevel = config.delete(:eslevel)
+  opts = config.map{|name, value| "--#{name}=#{value}"}.join(' ')
+  opts += " --es#{eslevel}" if eslevel
+  opts += " --filter=#{filters.join(',')}" if filters
+
+  # watch for changes
+  controllers = "#{ruby2js}/testrails/app/javascript/controllers"
+  elements = "#{ruby2js}/testrails/app/javascript/elements"
+  listener = Listen.to(*Dir[controllers, elements]) do |mod, add, rem|
+    (mod + add).each do |file|
+      source = File.basename(file)
+      next unless source.end_with? '.js.rb'
+      target = source.sub('.rb', '')
+
+      cmd = "#{ruby2js}/demo/ruby2js.rb #{opts} <#{source} >#{target}"
+      system "cd #{File.dirname(file)}; #{cmd}"
+
+      # replace .rb reference in index with .js
+      if File.exist? "#{controllers}/index.js"
+        index = IO.read("#{controllers}/index.js")
+        if index.include? source
+          index.gsub! source, target
+          IO.write("#{controllers}/index.js", index)
+        end
+      end
+    end
+  end
+
+  # remove .rb from require.context call
+  if File.exist? "#{elements}/index.js"
+    index = IO.read("#{elements}/index.js")
+    if index.include? '(\\.rb)?'
+      index.gsub! '(\\.rb)?', ''
+      IO.write("#{elements}/index.js", index)
+    end
+  end
+
+  listener.start
+
+  # update everything
+  Dir["#{controllers}/*.rb", "#{elements}/*.rb"].each do |file|
+    system "touch #{file}"
+  end
+end
+
 # launch browser once server is up and running
 require 'net/http'
 Thread.new do

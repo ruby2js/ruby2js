@@ -1,5 +1,5 @@
-@ruby2js_options = {filters: ['lit-element']}
-@yarn_add='lit-element'
+@ruby2js_options = {filters: ['lit']}
+@yarn_add='lit'
 eval IO.read "#{__dir__}/webpacker.rb"
 
 directory File.expand_path("app/javascript/elements", __dir__),

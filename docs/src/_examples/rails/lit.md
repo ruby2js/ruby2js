@@ -1,8 +1,8 @@
 ---
 top_section: Rails
 order: 34
-title: LitElement
-category: lit-element
+title: Lit
+category: lit
 ---
 
 {% rendercontent "docs/note" %}
@@ -12,7 +12,7 @@ category: lit-element
 This example is based on the 
 [LitElement tutorial](https://lit-element.polymer-project.org/try/style), but
 based on Ruby2JS instead and hosted by Ruby on Rails.  See the
-[lit-element filter](../../docs/filters/lit-element) for more details.
+[lit filter](../../docs/filters/lit) for more details.
 
 ## Create a Project
 
@@ -33,7 +33,7 @@ Run the following commands:
 
 ```sh
 ./bin/bundle install
-./bin/rails ruby2js:install:litelement
+./bin/rails ruby2js:install:lit-webpacker
 ```
 
 ## Write some HTML and a matching Custom Element

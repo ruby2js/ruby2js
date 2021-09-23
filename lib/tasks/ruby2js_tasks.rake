@@ -11,7 +11,7 @@ namespace :ruby2js do
   namespace :install do
     desc "Install Ruby2JS with LitElement support"
     task :litelement do
-      template 'install/litelement.rb'
+      template 'install/lit-webpacker.rb'
     end
 
     desc "Install Ruby2JS with Preact support"
@@ -34,6 +34,18 @@ namespace :ruby2js do
       desc "Install Ruby2JS with Stimulus Webpacker support"
       task :webpacker => :"stimulus:install" do
         template 'install/stimulus-webpacker.rb'
+      end
+    end
+
+    namespace :lit do
+      desc "Install Ruby2JS with Lit Rollup support"
+      task :rollup do
+        template 'install/lit-rollup.rb'
+      end
+
+      desc "Install Ruby2JS with Lit Webpacker support"
+      task :webpacker do
+        template 'install/lit-webpacker.rb'
       end
     end
   end

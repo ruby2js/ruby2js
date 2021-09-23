@@ -2,16 +2,16 @@ gem 'minitest'
 require 'minitest/autorun'
 require 'ruby2js/filter/lit-element'
 
-describe Ruby2JS::Filter::LitElement do
+describe Ruby2JS::Filter::Lit do
   
   def to_js(string)
     _(Ruby2JS.convert(string, eslevel: 2021,
-      filters: [Ruby2JS::Filter::LitElement]).to_s)
+      filters: [Ruby2JS::Filter::Lit]).to_s)
   end
   
   def to_js_esm(string)
     _(Ruby2JS.convert(string, eslevel: 2021,
-      filters: [Ruby2JS::Filter::LitElement, Ruby2JS::Filter::ESM]).to_s)
+      filters: [Ruby2JS::Filter::Lit, Ruby2JS::Filter::ESM]).to_s)
   end
 
   describe "properties" do
@@ -76,14 +76,14 @@ describe Ruby2JS::Filter::LitElement do
   describe "modules" do
     it "imports from lit-element" do
       to_js_esm( 'class Foo<LitElement; end' ).
-        must_equal 'import { LitElement, css, html } from "lit-element"; ' +
+        must_equal 'import { LitElement, css, html } from "lit"; ' +
           'class Foo extends LitElement {}'
     end
   end
 
   describe Ruby2JS::Filter::DEFAULTS do
-    it "should include LitElement" do
-      _(Ruby2JS::Filter::DEFAULTS).must_include Ruby2JS::Filter::LitElement
+    it "should include Lit" do
+      _(Ruby2JS::Filter::DEFAULTS).must_include Ruby2JS::Filter::Lit
     end
   end
 end

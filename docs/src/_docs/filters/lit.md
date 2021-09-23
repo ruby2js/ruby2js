@@ -1,12 +1,12 @@
 ---
 order: 17
-title: Lit-Element
+title: Lit
 top_section: Filters
 category: litelement
 ---
 
-The **Lit-Element** filter makes it easier to build
-[LitElement](https://lit-element.polymer-project.org/) controllers.
+The **Lit** filter makes it easier to build
+[LitElement](https://lit.dev/) web components.
 
 When a class definition is encountered that derives from
 `LitElement`, the following transformations are applied:
@@ -34,10 +34,10 @@ When a class definition is encountered that derives from
  * If `super` is not called by the `initialize` function, a call to `super`
    will be added.
 
-For more information, see the [Rails example](../../examples/rails/lit-element).
+For more information, see the [Rails example](../../examples/rails/lit).
 
 {% rendercontent "docs/note", extra_margin: true %}
 More examples of how this filter works are in the
-[specs file](https://github.com/ruby2js/ruby2js/blob/master/spec/litelement_spec.rb).
+[specs file](https://github.com/ruby2js/ruby2js/blob/master/spec/lit_spec.rb).
 {% endrendercontent %}
 
