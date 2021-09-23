@@ -52,23 +52,30 @@ module Ruby2JS
         # insert/update static get properties() {}
         unless @le_props.empty?
           values = nodes.find_index {|child| 
-            child.type == :defs and child.children[0..1] == [s(:self), :properties]
+            (child.type == :defs and child.children[0..1] == [s(:self), :properties]) or
+            (child.type == :send and child.children[0..1] == [s(:self), :properties=])
           }
 
           if values == nil
-            nodes.unshift s(:defp, s(:self), :properties, s(:args), s(:return, 
-              s(:hash, *@le_props.map {|name, type| s(:pair, s(:str, name.to_s[1..-1]), 
-              s(:hash, s(:pair, s(:sym, :type), s(:const, nil, type || :String))))})))
-          elsif nodes[values].children[3].type == :hash
+            if es2022
+              nodes.unshift s(:casgn, nil, :properties, 
+                s(:hash, *@le_props.map {|name, type| s(:pair, s(:str, name.to_s[1..-1]), 
+                s(:hash, s(:pair, s(:sym, :type), s(:const, nil, type || :String))))}))
+            else
+              nodes.unshift s(:defp, s(:self), :properties, s(:args), s(:return, 
+                s(:hash, *@le_props.map {|name, type| s(:pair, s(:str, name.to_s[1..-1]), 
+                s(:hash, s(:pair, s(:sym, :type), s(:const, nil, type || :String))))})))
+            end
+          elsif nodes[values].children.last.type == :hash
             le_props = @le_props.map {|name, type| 
               [s(:sym, name.to_s[1..-1].to_sym), 
               s(:hash, s(:pair, s(:sym, :type), s(:const, nil, type || :String)))]
             }.to_h.merge(
-              nodes[values].children[3].children.map {|pair| pair.children}.to_h
+              nodes[values].children.last.children.map {|pair| pair.children}.to_h
             )
 
             nodes[values] = nodes[values].updated(nil,
-              [*nodes[values].children[0..2], s(:hash,
+              [*nodes[values].children[0..-2], s(:hash,
               *le_props.map{|name, value| s(:pair, name, value)})])
           end
         end

@@ -9,12 +9,17 @@ describe Ruby2JS::Filter::Lit do
       filters: [Ruby2JS::Filter::Lit]).to_s)
   end
   
+  def to_js22(string)
+    _(Ruby2JS.convert(string, eslevel: 2022,
+      filters: [Ruby2JS::Filter::Lit]).to_s)
+  end
+  
   def to_js_esm(string)
     _(Ruby2JS.convert(string, eslevel: 2021,
       filters: [Ruby2JS::Filter::Lit, Ruby2JS::Filter::ESM]).to_s)
   end
 
-  describe "properties" do
+  describe "properties <= 2021" do
     it "should handle string properties" do
       a = to_js('class C < LitElement; def initialize; @a = "x"; end; end')
       a.must_include 'static get properties() {return {a: {type: String}}}'
@@ -45,6 +50,29 @@ describe Ruby2JS::Filter::Lit do
 
       to_js('class C < LitElement; def clickHandler(); @toggle = !@toggle; end; end').
         must_include 'clickHandler() {this.toggle = !this.toggle}}'
+    end
+  end
+
+  describe "properties >= es2022" do
+    it "should handle string properties" do
+      a = to_js22('class C < LitElement; def initialize; @a = "x"; end; end')
+      a.must_include 'static properties = {a: {type: String}}'
+    end
+
+    it "should merge properties" do
+      a = to_js22('class C < LitElement; self.properties = {b: {type: Number}}; def initialize; @a = "x"; end; end')
+      a.must_include 'static properties = {a: {type: String}, b: {type: Number}}'
+
+      a = to_js22('class C < LitElement; def self.properties; {b: {type: Number}}; end; def initialize; @a = "x"; end; end')
+      a.must_include 'static get properties() {return {a: {type: String}, b: {type: Number}}}'
+    end
+
+    it "should override properties" do
+      a = to_js22('class C < LitElement; def self.properties; {a: {type: Number}}; end; def initialize; @a = "x"; @b = "x"; end; end')
+      a.must_include 'static get properties() {return {a: {type: Number}, b: {type: String}}}'
+
+      a = to_js22('class C < LitElement; def self.properties; return {a: {type: Number}}; end; def initialize; @a = "x"; @b = "x"; end; end')
+      a.must_include 'static get properties() {return {a: {type: Number}}}'
     end
   end
 
