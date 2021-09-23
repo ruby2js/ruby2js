@@ -228,6 +228,25 @@ module Ruby2JS
           end
         end
       end
+
+      def on_send(node)
+        target, method, *args = node.children
+
+        return super if target
+        return super unless %i{query queryAll queryAsync}.include? method
+        return super unless args.length == 1
+
+        result = s(:send, s(:attr, s(:self), :renderRoot),
+          (method == :query ? 'querySelector' : 'querySelectorAll'),
+          args.first)
+
+        if method == :queryAsync
+          result = s(:block, s(:send, s(:attr, s(:self), :updateComplete),
+            :then), s(:args), result)
+        end
+
+        result
+      end
     end
 
     DEFAULTS.push Lit

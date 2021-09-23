@@ -81,6 +81,21 @@ describe Ruby2JS::Filter::Lit do
       to_js('class C < LitElement; customElement "c-element"; end').
         must_include 'customElements.define("c-element", C)'
     end
+
+    it "should handle query calls" do
+      to_js('class C < LitElement; def foo; query(".foo"); end; end').
+        must_include 'return this.renderRoot.querySelector(".foo")'
+    end
+
+    it "should handle queryAll calls" do
+      to_js('class C < LitElement; def foo; queryAll(".foo"); end; end').
+        must_include 'return this.renderRoot.querySelectorAll(".foo")'
+    end
+
+    it "should handle queryAsync calls" do
+      to_js('class C < LitElement; def foo; queryAsync(".foo"); end; end').
+        must_include 'return this.updateComplete.then(() => (this.renderRoot.querySelectorAll(".foo")))'
+    end
   end
 
   describe "auto HTML and CSS" do
