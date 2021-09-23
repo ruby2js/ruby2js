@@ -142,7 +142,18 @@ module Ruby2JS
           end
         end
 
-        props = @le_props.keys.map {|prop| [prop.to_sym, s(:self)]}.to_h
+        # props/methods inherited from LitElement
+        props = {
+          hasUpdated: s(:self),
+          performUpdate: s(:autobind, s(:self)),
+          renderRoot: s(:self),
+          requestUpdate: s(:autobind, s(:self)),
+          shadowRoot: s(:self),
+          updateComplete: s(:self),
+        }
+
+        # local props
+        props.merge! @le_props.keys.map {|prop| [prop.to_sym, s(:self)]}.to_h
 
         nodes.unshift s(:defineProps, props)
 

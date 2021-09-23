@@ -4,6 +4,8 @@
 * lit filter: updates from polymer LitElement to Lit v2.
   added: customElements, es2022 syntax for properties,
   query, queryAll, queryAsync
+  inherited methods: performUpdate, requestUpdate
+  inherited properties: hasUpdated, renderRoot, shadowRoot, updateComplete
 
 # 4.1.7 / 2021-09-20
 

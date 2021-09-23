@@ -114,6 +114,13 @@ describe Ruby2JS::Filter::Lit do
     end
   end
 
+  describe "methods/properties inherited from LitElement" do
+    it 'should handle performUpdate method and hasUpdated property' do
+      to_js('class C < LitElement; def foo; performUpdate() unless hasUpdated; end; end').
+        must_include 'if (!this.hasUpdated) {return this.performUpdate()}'
+    end
+  end
+
   describe "no autobind" do
     it "should disable autobind" do
       to_js('class C < LitElement; ' +
