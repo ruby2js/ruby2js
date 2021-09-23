@@ -31,6 +31,12 @@ When a class definition is encountered that derives from
  * Methods referenced within HTML literals are not automatically bound, but
    will be automatically prefixed with `this.`.
 
+ * LitElement inheritance will also automatically prefix inherited properties
+   and methods with `this.`, and will autobind inherited methods when
+   referenced without any parameters or parenthesis.
+     * methods: `performUpdate`,`requestUpdate`
+     * properties: `hasUpdated`, `renderRoot`, `shadowRoot`, `updateComplete`
+
  * `customElement` calls are converted to `customElements.define` calls.
 
  * `query`, `queryAll`, and `queryAsync` calls are converted to corresponding
