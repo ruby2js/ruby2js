@@ -247,7 +247,7 @@ module Ruby2JS
         return super unless %i{query queryAll queryAsync}.include? method
         return super unless args.length == 1
 
-        result = s(:send, s(:attr, s(:self), :renderRoot),
+        result = s(:csend, s(:attr, s(:self), :renderRoot),
           (method == :query ? 'querySelector' : 'querySelectorAll'),
           args.first)
 
