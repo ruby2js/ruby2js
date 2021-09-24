@@ -102,6 +102,10 @@ describe Ruby2JS::Filter::Lit do
     it "should handle self.styles" do
       to_js('class C < LitElement; def self.styles; %{.red {color: red}}; end; end').
         must_include 'css`.red {color: red}`'
+      to_js('class C < LitElement; self.styles = %{.red {color: red}}; end').
+        must_include 'css`.red {color: red}`'
+      to_js('class C < LitElement; @styles = %{.red {color: red}}; end').
+        must_include 'css`.red {color: red}`'
     end
 
     it "should handle render" do

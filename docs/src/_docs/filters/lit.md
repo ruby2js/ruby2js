@@ -21,8 +21,10 @@ When a class definition is encountered that derives from
    `static properties` property if not already present, and simple type
    inferencing will be used to determine the type.
 
- * `self.style` methods that return a string will have that string mapped to a
-   `css` literal string.
+ * `@styles` assignments, `self.styles` assignments and `self.styles` methods
+   that return a string will have that string mapped to a
+   `css` literal string.  These are three alternate syntaxes to specifying
+   [static styles](https://lit.dev/docs/components/styles/).
 
  * `render` methods that return a string will have that string mapped to a
    `html` literal string if that string starts with a less than sign.  This

@@ -102,10 +102,12 @@ module Ruby2JS
 
         # self.styles returning string is converted to a taglit :css
         styles = nodes.find_index {|child| 
-          child&.type == :defs and child.children[0..1] == [s(:self), :styles]
+          (child&.type == :ivasgn and child.children[0] == :@styles) or
+          (child&.type == :defs and child.children[0..1] == [s(:self), :styles]) or
+          (child&.type == :send and child.children[0..1] == [s(:self), :styles=])
         }
-        if styles and %i[str dstr].include?(nodes[styles].children[3]&.type)
-          string = nodes[styles].children[3]
+        if styles and %i[str dstr].include?(nodes[styles].children.last&.type)
+          string = nodes[styles].children.last
           string = s(:dstr, string) if string.type == :str
           children = string.children.dup
 
@@ -118,10 +120,16 @@ module Ruby2JS
             children << s(:str, children.pop.children.first.chomp)
           end
 
-          nodes[styles] = nodes[styles].updated(nil,
-            [*nodes[styles].children[0..2],
-            s(:autoreturn, s(:taglit, s(:sym, :css),
-            s(:dstr, *children)))])
+          if es2022
+            nodes[styles] = nodes[styles].updated(:casgn,
+              [nil, :styles, s(:taglit, s(:sym, :css),
+              s(:dstr, *children))])
+          else
+            nodes[styles] = nodes[styles].updated(:defp,
+              [s(:self), :properties, s(:args),
+              s(:autoreturn, s(:taglit, s(:sym, :css),
+              s(:dstr, *children)))])
+          end
         end
 
         # insert super calls into initializer
