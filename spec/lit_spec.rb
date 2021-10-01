@@ -130,6 +130,12 @@ describe Ruby2JS::Filter::Lit do
       a.must_include 'return html`<p>x</p>`'
       a.must_include 'return html`<i>${str}</i>`'
     end
+
+    it "should avoid methods which return html in a variable" do
+      a = to_js('class C < LitElement; def partial; str = "<i>str</i>"; str; end; def render; %{<p>x</p>}; end; end')
+      a.must_include 'return html`<p>x</p>`'
+      a.must_include 'let str = "<i>str</i>"; return str}'
+    end
   end
 
   describe "methods/properties inherited from LitElement" do
