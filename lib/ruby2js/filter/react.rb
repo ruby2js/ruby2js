@@ -41,9 +41,16 @@ module Ruby2JS
       #
       def self.genAttrs
         unless RUBY_ENGINE == 'opal'
-          require 'nokogumbo'
-          page = 'https://facebook.github.io/react/docs/tags-and-attributes.html'
-          doc = Nokogiri::HTML5.get(page)
+          require 'nokogiri'
+          require 'uri'
+          require 'net/http'
+
+          page = 'https://reactjs.org/docs/dom-elements.html'
+          uri = URI.parse(page)
+          http = Net::HTTP.new(uri.host, uri.port)
+          http.use_ssl = true
+          data = http.get(uri.request_uri).body
+          doc = Nokogiri::HTML5::Document.parse(data)
 
           # delete contents of page prior to the list of supported attributes
           attrs = doc.at('a[name=supported-attributes]')
@@ -51,7 +58,7 @@ module Ruby2JS
           attrs.previous_sibling.remove while attrs and attrs.previous_sibling
 
           # extract attribute names with uppercase chars from code and format
-          attrs = doc.search('code').map(&:text).join(' ')
+          attrs = doc.search('div[data-language=text] pre code').map(&:text).join(' ')
           attrs = attrs.split(/\s+/).grep(/[A-Z]/).sort.uniq.join(' ')
           puts "ReactAttrs = %w(#{attrs})".gsub(/(.{1,72})(\s+|\Z)/, "\\1\n")
         end

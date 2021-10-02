@@ -6,6 +6,7 @@ group :development, :test do
   gem 'minitest'
   gem 'rake'
   gem 'execjs'
+  gem 'nokogiri'
 end
 
 group :test do
