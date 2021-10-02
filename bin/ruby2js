@@ -1,0 +1,4 @@
+#!/usr/bin/env ruby
+
+load File.expand_path('../demo/ruby2js.rb', __dir__)
+

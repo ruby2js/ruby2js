@@ -1,5 +1,5 @@
 ---
-order: 7
+order: 8
 next_page_order: 10
 top_section: Introduction
 category: community

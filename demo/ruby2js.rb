@@ -1,6 +1,8 @@
 #!/usr/bin/env ruby
 #
-# Interactive demo of conversions from Ruby to JS.  Requires wunderbar.
+# Interactive demo of conversions from Ruby to JS.
+
+# --port and --install options require wunderbar.
 #
 # Installation
 # ----
@@ -154,7 +156,7 @@ def parse_request(env=ENV)
 
   ARGV.push(*wunderbar_options)
   ARGV.push @live if @live
-  require 'wunderbar'
+  require 'wunderbar' unless wunderbar_options.empty?
 
   # load selected filters
   options[:filters] = []
@@ -187,7 +189,7 @@ end
 
 options = parse_request.first
 
-if not env['SERVER_PORT'] and not @live
+if (not defined? Wunderbar or not env['SERVER_PORT']) and not @live
   # command line support
   if ARGV.length > 0
     options[:file] = ARGV.first
