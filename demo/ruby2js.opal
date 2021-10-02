@@ -56,24 +56,30 @@ module Ruby2JS
   load_options
 end
 
-
-# fixup options:
-#   * map filter names to filter modules
-#   * parse autoimports, defs
 def Ruby2JS.options(hash)
-  hash = default_options.merge(`Opal.hash(hash || {})`)
+  hash = default_options.merge(Hash.new(hash || {}))
 
   hash[:filters] ||= []
   hash[:filters] = hash[:filters].split(/,\s*/) if hash[:filters].is_a? String
   hash[:filters] = hash[:filters].map {|name| Filters[name]}
   hash[:filters].compact!
 
-  if hash[:autoimports].is_a? String
-    hash[:autoimports] = Ruby2JS::Demo.parse_autoimports(hash[:autoimports])
+  if hash[:autoimports]
+    if Opal.native?(hash[:autoimports])
+      # convert to an Opal hash and process stringified symbol keys
+      hash[:autoimports] = Ruby2JS::Demo.parse_stringified_symbol_keys(Hash.new(hash[:autoimports]))
+    elsif hash[:autoimports].is_a?(String)
+      hash[:autoimports] = Ruby2JS::Demo.parse_autoimports(hash[:autoimports])
+    end
   end
 
-  if hash[:defs].is_a? String
-    hash[:defs] = Ruby2JS::Demo.parse_defs(hash[:defs])
+  if hash[:defs]
+    if Opal.native?(hash[:defs])
+      # convert to an Opal hash and process stringified symbol values
+      hash[:defs] = Ruby2JS::Demo.parse_stringified_symbol_values(Hash.new(hash[:defs]))
+    elsif hash[:defs].is_a?(String)
+      hash[:defs] = Ruby2JS::Demo.parse_defs(hash[:defs])
+    end
   end
 
   hash

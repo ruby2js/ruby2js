@@ -3,6 +3,34 @@ require 'ruby2js'
 
 module Ruby2JS
   module Demo
+    # convert {"[:foo, :Bar]" => "wee"} to {[:foo, :Bar] => "wee"}
+    def self.parse_stringified_symbol_keys(mapping_hash)
+      updated_mappings = {}
+
+      mapping_hash.each do |k, v|
+        next updated_mappings[k] = v unless k.is_a?(String) && k.start_with?("[:")
+      
+        new_k = k.tr("[]", "").split(",").map! {|str| str.strip.delete_prefix(":").to_sym }.map(&:to_sym)
+        updated_mappings[new_k] = v
+      end
+
+      updated_mappings
+    end
+
+    # convert {"Foo" => "[:bar, :Baz]"} to {"Foo" => [:bar, :Baz]}
+    def self.parse_stringified_symbol_values(mapping_hash)
+      updated_mappings = {}
+
+      mapping_hash.each do |k, v|
+        next updated_mappings[k] = v unless v.is_a?(String) && v.start_with?("[:")
+      
+        new_v = v.tr("[]", "").split(",").map! {|str| str.strip.delete_prefix(":").to_sym }.map(&:to_sym)
+        updated_mappings[k] = new_v
+      end
+
+      updated_mappings
+    end
+
     def self.parse_autoimports(mappings)
       autoimports = {}
 
