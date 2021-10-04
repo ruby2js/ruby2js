@@ -17,13 +17,14 @@ module Ruby2JS
 
       def on_ivar(node)
         return super unless @le_props&.include?(node.children.first)
-        s(:attr, s(:self), node.children.first.to_s[1..-1])
+        process s(:attr, s(:self), node.children.first.to_s[1..-1])
       end
 
       def on_ivasgn(node)
         return super unless @le_props&.include?(node.children.first)
         return super unless node.children.length > 1
-        s(:send, s(:self), node.children.first.to_s[1..-1]+'=',
+
+        process s(:send, s(:self), node.children.first.to_s[1..-1]+'=',
           process(node.children[1]))
       end
 
@@ -58,13 +59,13 @@ module Ruby2JS
 
           if values == nil
             if es2022
-              nodes.unshift s(:casgn, nil, :properties, 
-                s(:hash, *@le_props.map {|name, type| s(:pair, s(:str, name.to_s[1..-1]), 
-                s(:hash, s(:pair, s(:sym, :type), s(:const, nil, type || :String))))}))
-            else
-              nodes.unshift s(:defp, s(:self), :properties, s(:args), s(:return, 
-                s(:hash, *@le_props.map {|name, type| s(:pair, s(:str, name.to_s[1..-1]), 
+              nodes.unshift process(s(:casgn, nil, :properties, 
+                s(:hash, *@le_props.map {|name, type| s(:pair, s(:sym, name.to_s[1..-1]), 
                 s(:hash, s(:pair, s(:sym, :type), s(:const, nil, type || :String))))})))
+            else
+              nodes.unshift process(s(:defp, s(:self), :properties, s(:args), s(:return, 
+                s(:hash, *@le_props.map {|name, type| s(:pair, s(:sym, name.to_s[1..-1]), 
+                s(:hash, s(:pair, s(:sym, :type), s(:const, nil, type || :String))))}))))
             end
           elsif nodes[values].children.last.type == :hash
             le_props = @le_props.map {|name, type| 

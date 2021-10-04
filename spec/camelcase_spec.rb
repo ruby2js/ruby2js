@@ -1,6 +1,8 @@
 gem 'minitest'
 require 'minitest/autorun'
 require 'ruby2js/filter/camelCase'
+require 'ruby2js/filter/lit'
+require 'ruby2js/filter/return'
 
 describe Ruby2JS::Filter::CamelCase do
   
@@ -15,6 +17,13 @@ describe Ruby2JS::Filter::CamelCase do
 
   def to_js_2020(string)
     _(Ruby2JS.convert(string, eslevel: 2020, filters: [Ruby2JS::Filter::CamelCase]).to_s)
+  end
+
+
+  def to_js_with_lit(string)
+    require 'ruby2js/filter/lit'
+    _(Ruby2JS.convert(string, eslevel: 2021,
+      filters: [Ruby2JS::Filter::CamelCase, Ruby2JS::Filter::Lit]).to_s)
   end
  
   describe :camelCase do
@@ -103,6 +112,12 @@ describe Ruby2JS::Filter::CamelCase do
       it "should handle the => operator" do
         to_js('a_bcd => x_yz').must_equal 'var xYz = aBcd'
       end
+    end
+
+    it "should handle Lit element properties" do
+      a = to_js_with_lit('class C < LitElement; def initialize; @a_b_c = foo_bar; end; def foo_bar; "y" + @a_b_c || "x"; end; end')
+      a.must_include 'static get properties() {return {aBC: {type: Object}}}'
+      a.must_include 'constructor() {super(); this.aBC = this.fooBar}'
     end
   end
 
