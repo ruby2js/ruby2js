@@ -109,6 +109,6 @@ nav .search-item input {
 }
 bridgetown-search-results {
   --link-color: #{$link};
-  --divider-color: var(--sl-color-gray-200);
-  --text-color: var(--sl-color-gray-700);
+  --divider-color: rgb(var(--sl-color-gray-200));
+  --text-color: rgb(var(--sl-color-gray-700));
 }

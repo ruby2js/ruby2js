@@ -51,6 +51,13 @@ describe Ruby2JS::Filter::Lit do
       to_js('class C < LitElement; def clickHandler(); @toggle = !@toggle; end; end').
         must_include 'clickHandler() {this.toggle = !this.toggle}}'
     end
+
+    it "should not handle underscored ivars" do
+      a = to_js('class C < LitElement; def initialize; @_a = []; end; def fn(); @_b; end; end')
+      a.wont_include 'static get properties()'
+      a.must_include 'constructor() {super(); this.__a = []}'
+      a.must_include 'fn() {this.__b'
+    end
   end
 
   describe "properties >= es2022" do
@@ -109,12 +116,25 @@ describe Ruby2JS::Filter::Lit do
     end
 
     it "should handle render" do
-      to_js('class C < LitElement; def render; %{<p>x</p>}; end; end').
-        must_include 'html`<p>x</p>`'
+      a = to_js('class C < LitElement; def render; %{<p>x</p>}; end; end')
+      a.must_include '{render() {'
+      a.must_include 'html`<p>x</p>`'
       to_js('class C < LitElement; def render; %{<p>#{x ? "<br/>" : "<hr/>"}</p>}; end; end').
         must_include '${x ? html`<br/>` : html`<hr/>`}'
-      to_js('class C < LitElement; def render; %{<ul>#{x.map {|item| "<li>#{item}</li>"}}</ul>}; end; end').
-        must_include '${x.map(item => html`<li>${item}</li>`)}'
+      to_js('class C < LitElement; def render; x = [1,2]; %{<ul>#{x.map {|item| "<li>#{item}</li>"}}</ul>}; end; end').
+        must_include '{render() {let x = [1, 2]; return html`<ul>${x.map(item => html`<li>${item}</li>`)}'
+    end
+
+    it "should handle get methods which return html" do
+      a = to_js('class C < LitElement; def partial; str = "i"; %{<i>#{str}</i>}; end; def render; %{<p>x</p>}; end; end')
+      a.must_include 'return html`<p>x</p>`'
+      a.must_include 'return html`<i>${str}</i>`'
+    end
+
+    it "should avoid methods which return html in a variable" do
+      a = to_js('class C < LitElement; def partial; str = "<i>str</i>"; str; end; def render; %{<p>x</p>}; end; end')
+      a.must_include 'return html`<p>x</p>`'
+      a.must_include 'let str = "<i>str</i>"; return str}'
     end
   end
 

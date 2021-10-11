@@ -1,6 +1,6 @@
-import "@shoelace-style/shoelace/dist/shoelace/shoelace.css"
+import "@shoelace-style/shoelace/dist/themes/light.css"
 import {
-  setAssetPath,
+  setBasePath,
   SlButton,
   SlCheckbox,
   SlDialog,
@@ -14,7 +14,7 @@ import {
   SlTabPanel,
 } from "@shoelace-style/shoelace"
 
-setAssetPath(`${location.origin}/_bridgetown/static/icons`)
+setBasePath(`${location.origin}/_bridgetown/static`)
 
 /* Define custom elements */
 customElements.define("sl-button", SlButton)

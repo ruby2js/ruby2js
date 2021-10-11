@@ -17,13 +17,14 @@ module Ruby2JS
 
       def on_ivar(node)
         return super unless @le_props&.include?(node.children.first)
-        s(:attr, s(:self), node.children.first.to_s[1..-1])
+        process s(:attr, s(:self), node.children.first.to_s[1..-1])
       end
 
       def on_ivasgn(node)
         return super unless @le_props&.include?(node.children.first)
         return super unless node.children.length > 1
-        s(:send, s(:self), node.children.first.to_s[1..-1]+'=',
+
+        process s(:send, s(:self), node.children.first.to_s[1..-1]+'=',
           process(node.children[1]))
       end
 
@@ -58,13 +59,13 @@ module Ruby2JS
 
           if values == nil
             if es2022
-              nodes.unshift s(:casgn, nil, :properties, 
-                s(:hash, *@le_props.map {|name, type| s(:pair, s(:str, name.to_s[1..-1]), 
-                s(:hash, s(:pair, s(:sym, :type), s(:const, nil, type || :String))))}))
-            else
-              nodes.unshift s(:defp, s(:self), :properties, s(:args), s(:return, 
-                s(:hash, *@le_props.map {|name, type| s(:pair, s(:str, name.to_s[1..-1]), 
+              nodes.unshift process(s(:casgn, nil, :properties, 
+                s(:hash, *@le_props.map {|name, type| s(:pair, s(:sym, name.to_s[1..-1]), 
                 s(:hash, s(:pair, s(:sym, :type), s(:const, nil, type || :String))))})))
+            else
+              nodes.unshift process(s(:defp, s(:self), :properties, s(:args), s(:return, 
+                s(:hash, *@le_props.map {|name, type| s(:pair, s(:sym, name.to_s[1..-1]), 
+                s(:hash, s(:pair, s(:sym, :type), s(:const, nil, type || :String))))}))))
             end
           elsif nodes[values].children.last.type == :hash
             le_props = @le_props.map {|name, type| 
@@ -82,7 +83,7 @@ module Ruby2JS
 
         # customElement is converted to customElements.define
         customElement = nodes.find_index {|child| 
-          child&.type == :send and child.children[0..1] == [nil, :customElement]
+          child&.type == :send and (child.children[0..1] == [nil, :customElement] || child.children[0..1] == [nil, :custom_element])
         }
         if customElement and nodes[customElement].children.length == 3
           nodes[customElement] = nodes[customElement].updated(nil,
@@ -94,7 +95,7 @@ module Ruby2JS
         render = nodes.find_index {|child| 
           child&.type == :def and child.children.first == :render
         }
-        if render and %i[str dstr].include?(nodes[render].children[2]&.type)
+        if render and %i[str dstr begin if block].include?(nodes[render].children[2]&.type)
           nodes[render] = nodes[render].updated(:deff,
             [*nodes[render].children[0..1],
             s(:autoreturn, html_wrap(nodes[render].children[2]))])
@@ -126,7 +127,7 @@ module Ruby2JS
               s(:dstr, *children))])
           else
             nodes[styles] = nodes[styles].updated(:defp,
-              [s(:self), :properties, s(:args),
+              [s(:self), :styles, s(:args),
               s(:autoreturn, s(:taglit, s(:sym, :css),
               s(:dstr, *children)))])
           end
@@ -173,6 +174,8 @@ module Ruby2JS
       end
 
       def html_wrap(node)
+        return node unless node.is_a?(Parser::AST::Node)
+
         if node.type == :str and node.children.first.strip.start_with? '<'
           s(:taglit, s(:sym, :html), s(:dstr, node))
         elsif node.type == :dstr
@@ -216,12 +219,24 @@ module Ruby2JS
         end
       end
 
+      def on_def(node)
+        node = super
+        return node if [:constructor, :initialize].include?(node.children.first)
+
+        children = node.children[1..-1]
+
+        node.updated nil, [node.children[0], children.first,
+          *(children[1..-1].map {|child| html_wrap(child) })]
+      end
+
       # analyze ivar usage
       def le_walk(node)
         node.children.each do |child|
           next unless child.is_a? Parser::AST::Node
 
           if child.type == :ivar
+            next if child.children.first.to_s.start_with?("@_")
+
             @le_props[child.children.first] ||= nil
           elsif child.type == :ivasgn || child.type == :op_asgn
             prop = child.children.first
@@ -229,6 +244,8 @@ module Ruby2JS
               prop = prop.children.first if prop.type == :ivasgn
               next unless prop.is_a? Symbol
             end
+
+            next if prop.to_s.start_with?("@_")
 
             @le_props[prop] = case child.children.last.type
               when :str, :dstr
