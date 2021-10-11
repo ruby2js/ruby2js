@@ -32,8 +32,8 @@ module.exports = {
     new CopyPlugin({
       patterns: [
         {
-          from: path.resolve(__dirname, 'node_modules/@shoelace-style/shoelace/dist/shoelace/icons'),
-          to: path.resolve(__dirname, 'output/_bridgetown/static/icons')
+          from: path.resolve(__dirname, 'node_modules/@shoelace-style/shoelace/dist/assets'),
+          to: path.resolve(__dirname, 'output/_bridgetown/static/assets')
         }
       ]
     }),
