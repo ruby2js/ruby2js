@@ -122,8 +122,11 @@ describe Ruby2JS::Filter::Functions do
     it 'should handle sort!' do
       to_js( 'str.sort! {|a, b| a - b}' ).
         must_equal 'str.sort(function(a, b) {return a - b})'
-      to_js( 'str.sort! { _1 - _2}' ).
-        must_equal 'str.sort(function(_1, _2) {return _1 - _2})'
+
+      unless (RUBY_VERSION.split('.').map(&:to_i) <=> [2, 7, 0]) == -1
+        to_js( 'str.sort! { _1 - _2}' ).
+          must_equal 'str.sort(function(_1, _2) {return _1 - _2})'
+      end
     end
 
     it 'should handle ord and chr' do
