@@ -607,6 +607,13 @@ describe Ruby2JS do
       to_js('a=1; b=function(a,c) {return a + c}').
         must_equal 'var a = 1; var b = function(a, c) {return a + c}'
     end
+
+    unless (RUBY_VERSION.split('.').map(&:to_i) <=> [2, 7, 0]) == -1
+      it "should handle numbered parameters" do
+        to_js( 'lambda { _1 + _2 }').
+          must_equal 'function(_1, _2) {return _1 + _2}'
+      end
+    end
   end
 
   describe 'object definition' do

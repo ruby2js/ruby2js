@@ -1,5 +1,7 @@
 # master 
 
+* support numbered parameters (numblocks)
+
 # 4.2.0 / 2021-10-11
 
 * Additional lit filter updates (PR #141)

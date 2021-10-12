@@ -69,5 +69,19 @@ module Ruby2JS
         parse s(@ast.children[0].type, *call.children, function), @state
       end
     end
+
+    # (numblock
+    #   (send nil :x)
+    #   1
+    #   (lvar :_1))
+
+    handle :numblock do |call, count, block|
+      parse s(:block,
+        call,
+        s(:args, *((1..count).map {|i| s(:arg, "_#{i}")})),
+        block
+      )
+    end
+
   end
 end
