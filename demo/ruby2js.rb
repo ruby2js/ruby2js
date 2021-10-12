@@ -199,6 +199,8 @@ if (not defined? Wunderbar or not env['SERVER_PORT']) and not @live
   end  
 
 else
+  require 'wunderbar'
+
   def walk(ast, indent='', tail='', last=true)
     return unless ast
     _div class: (ast.loc ? 'loc' : 'unloc') do
