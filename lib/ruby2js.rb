@@ -185,6 +185,17 @@ module Ruby2JS
       # provide a method so filters can call 'super'
       def on_sym(node); node; end
 
+      # convert numbered parameters block to a normal block
+      def on_numblock(node)
+        call, count, block = node.children
+
+        process s(:block,
+          call,
+          s(:args, *((1..count).map {|i| s(:arg, "_#{i}")})),
+          block
+        )
+      end
+
       # convert map(&:symbol) to a block
       def on_send(node)
         if node.children.length > 2 and node.children.last.type == :block_pass
