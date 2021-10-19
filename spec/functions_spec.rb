@@ -341,6 +341,11 @@ describe Ruby2JS::Filter::Functions do
       to_js( 'Array(foo)' ).
         must_equal 'Array.prototype.slice.call(foo)'
     end
+
+    it "should map Array.new with two args to fill" do
+      to_js_2020( 'Array.new(5, 1)').
+        must_equal 'new Array(5).fill(1)'
+    end
   end
 
   describe 'hash functions' do

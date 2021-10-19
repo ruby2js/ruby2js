@@ -570,6 +570,13 @@ module Ruby2JS
           process S(:send, s(:attr, target, :prototype), :[]=, args[0],
             s(:attr, s(:attr, target, :prototype), args[1].children[0]))
 
+        elsif method == :new and args.length == 2 and target == s(:const, nil, :Array)
+          if es2015
+            s(:send, S(:send, target, :new, args.first), :fill, args.last)
+          else
+            super
+          end
+
         else
           super
         end

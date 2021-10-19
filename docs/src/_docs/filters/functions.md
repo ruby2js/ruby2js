@@ -48,6 +48,7 @@ If you set the `eslevel` option to `2015` or newer, the Functions filter enables
 * `.merge!` {{ caret }} `Object.assign()`
 * `.method_defined?` {{ caret }} `klass.prototype.hasOwnProperty(meth)` or `meth in klass.prototype`
 * `.min` {{ caret }} `Math.min.apply(Math)`
+* `.new(size,default)` {{ caret }} `== .new(size).fill(default)`
 * `.nil?` {{ caret }} `== null`
 * `.ord` {{ caret }} `charCodeAt(0)`
 * `puts` {{ caret }} `console.log`

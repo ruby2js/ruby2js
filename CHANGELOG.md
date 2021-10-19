@@ -1,6 +1,7 @@
 # master 
 
 * support numbered parameters (numblocks)
+* Array.new(size, default) => new Array(size).fill(default)
 
 # 4.2.0 / 2021-10-11
 
