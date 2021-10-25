@@ -71,7 +71,8 @@ If you set the `eslevel` option to `2015` or newer, the Functions filter enables
 * `.tap {|n| n}` {{ caret }} `(function(n) {n; return n})(...)`
 * `.to_f` {{ caret }} `parseFloat`
 * `.to_i` {{ caret }} `parseInt`
-* `.to_s` {{ caret }} `.to_String`
+* `.to_s` {{ caret }} `.toString`
+* `.to_json` {{ caret }} `JSON.stringify(obj)`
 * `.upcase` {{ caret }} `.toUpperCase`
 * `.yield_self {|n| n}` {{ caret }} `(function(n) {return n})(...)`
 * `[-n]` {{ caret }} `[*.length-n]` for literal values of `n`

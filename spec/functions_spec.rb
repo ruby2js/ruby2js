@@ -36,6 +36,18 @@ describe Ruby2JS::Filter::Functions do
     it "should handle puts" do
       to_js( 'puts "hi"' ).must_equal 'console.log("hi")'
     end
+
+    it "should handle to_json" do
+      to_js( 'obj.to_json' ).must_equal 'JSON.stringify(obj)'
+    end
+
+    it "should handle to_json with replacer" do
+      to_js( 'obj.to_json(replacer)' ).must_equal 'JSON.stringify(obj, replacer)'
+    end
+
+    it "should handle to_json with space argument" do
+      to_js( 'obj.to_json(nil, "\t")' ).must_equal 'JSON.stringify(obj, null, "\t")'
+    end
   end
 
   describe :irange do

@@ -162,6 +162,9 @@ module Ruby2JS
         elsif method == :to_f
           process node.updated :send, [nil, :parseFloat, target, *args]
 
+        elsif method == :to_json
+          process node.updated :send, [s(:const, nil, :JSON), :stringify, target, *args]
+
         elsif method == :sub and args.length == 2
           if args[1].type == :str
             args[1] = s(:str, args[1].children.first.gsub(/\\(\d)/, "$\\1"))
