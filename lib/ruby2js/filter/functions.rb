@@ -506,6 +506,12 @@ module Ruby2JS
               s(:regexp, s(:str, '\A\s+') , s(:regopt)), s(:str, '')])
           end
 
+        elsif method == :index
+          process node.updated(nil, [target, :indexOf, *args])
+
+        elsif method == :rindex
+          process node.updated(nil, [target, :lastIndexOf, *args])
+
         elsif method == :class and args.length==0 and not node.is_method?
           process node.updated(:attr, [target, :constructor])
 
@@ -625,6 +631,11 @@ module Ruby2JS
           call = call.updated nil, [call.children.first, :findIndex]
           node.updated nil, [process(call), process(node.children[1]),
             s(:autoreturn, *process_all(node.children[2..-1]))]
+
+        elsif method == :index and call.children.length == 2
+            call = call.updated nil, [call.children.first, :findIndex]
+            node.updated nil, [process(call), process(node.children[1]),
+              s(:autoreturn, *process_all(node.children[2..-1]))]
 
         elsif method == :map and call.children.length == 2
           node.updated nil, [process(call), process(node.children[1]),

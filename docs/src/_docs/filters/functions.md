@@ -38,6 +38,7 @@ If you set the `eslevel` option to `2015` or newer, the Functions filter enables
 * `.floor` {{ caret }} `Math.floor()`
 * `.gsub` {{ caret }} `replace(//g)`
 * `.include?` {{ caret }} `.indexOf() != -1`
+* `.index` {{ caret }} `indexOf` (when using arg) or `findIndex` (when using block)
 * `.inspect` {{ caret }} `JSON.stringify()`
 * `.keys()` {{ caret }} `Object.keys()`
 * `.last` {{ caret }} `[*.length-1]`
@@ -55,6 +56,7 @@ If you set the `eslevel` option to `2015` or newer, the Functions filter enables
 * `rand` {{ caret }} `Math.random`
 * `.replace` {{ caret }} `.length = 0; ...push.apply(*)`
 * `.respond_to?` {{ caret }} `right in left`
+* `.rindex` {{ caret }} `.lastIndexOf`
 * `.rstrip` {{ caret }} `.replace(/s+$/, "")`
 * `.scan` {{ caret }} `.match(//g)`
 * `.sum` {{ caret }} `.reduce(function(a, b) {a + b}, 0)`

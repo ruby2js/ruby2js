@@ -1,5 +1,6 @@
 # master 
 
+* functions filter: index and rindex
 * functions filter: obj.to_json => JSON.stringify(obj)
 * support numbered parameters (numblocks)
 * Array.new(size, default) => new Array(size).fill(default)

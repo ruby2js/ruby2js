@@ -300,6 +300,21 @@ describe Ruby2JS::Filter::Functions do
         must_equal 'a.findIndex(function(i) {return i < 0})'
     end
 
+    it "should handle index with block" do
+      to_js( 'a.index {|i| i<0}' ).
+        must_equal 'a.findIndex(function(i) {return i < 0})'
+    end
+
+    it "should handle index with arg" do
+      to_js( 'a.index("abc")' ).
+        must_equal 'a.indexOf("abc")'
+    end
+
+    it "should handle rindex" do
+      to_js( 'a.rindex("abc")' ).
+        must_equal 'a.lastIndexOf("abc")'
+    end
+
     it "should handle all?" do
       to_js( 'a.all? {|i| i==0}' ).
         must_equal 'a.every(function(i) {return i == 0})'
