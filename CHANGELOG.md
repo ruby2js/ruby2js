@@ -1,5 +1,7 @@
 # master 
 
+# 4.2.1 / 2021-11-12
+
 * functions filter: index, rindex, and round
 * functions filter: obj.to_json => JSON.stringify(obj)
 * support numbered parameters (numblocks)
