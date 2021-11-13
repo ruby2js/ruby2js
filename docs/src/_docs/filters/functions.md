@@ -57,6 +57,7 @@ If you set the `eslevel` option to `2015` or newer, the Functions filter enables
 * `.replace` {{ caret }} `.length = 0; ...push.apply(*)`
 * `.respond_to?` {{ caret }} `right in left`
 * `.rindex` {{ caret }} `.lastIndexOf`
+* `.round` {{ caret }} `Math.round()`
 * `.rstrip` {{ caret }} `.replace(/s+$/, "")`
 * `.scan` {{ caret }} `.match(//g)`
 * `.sum` {{ caret }} `.reduce(function(a, b) {a + b}, 0)`

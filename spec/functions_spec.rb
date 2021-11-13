@@ -600,6 +600,10 @@ describe Ruby2JS::Filter::Functions do
       to_js( 'a.abs' ).must_equal 'Math.abs(a)'
     end
 
+    it "should handle round" do
+      to_js( 'a.round' ).must_equal 'Math.round(a)'
+    end
+
     it "should handle ceil" do
       to_js( 'a.ceil' ).must_equal 'Math.ceil(a)'
     end

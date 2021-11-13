@@ -524,6 +524,9 @@ module Ruby2JS
         elsif method == :abs and args.length == 0
           process S(:send, s(:const, nil, :Math), :abs, target)
 
+        elsif method == :round and args.length == 0
+          process S(:send, s(:const, nil, :Math), :round, target)
+
         elsif method == :ceil and args.length == 0
           process S(:send, s(:const, nil, :Math), :ceil, target)
 
