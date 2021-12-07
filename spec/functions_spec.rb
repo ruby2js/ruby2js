@@ -310,6 +310,11 @@ describe Ruby2JS::Filter::Functions do
         must_equal 'a.indexOf("abc")'
     end
 
+    it "should NOT handle index as a property" do
+      to_js( 'a.index' ).
+        must_equal 'a.index'
+    end
+
     it "should handle rindex" do
       to_js( 'a.rindex("abc")' ).
         must_equal 'a.lastIndexOf("abc")'

@@ -506,10 +506,10 @@ module Ruby2JS
               s(:regexp, s(:str, '\A\s+') , s(:regopt)), s(:str, '')])
           end
 
-        elsif method == :index
+        elsif method == :index and node.is_method?
           process node.updated(nil, [target, :indexOf, *args])
 
-        elsif method == :rindex
+        elsif method == :rindex and node.is_method?
           process node.updated(nil, [target, :lastIndexOf, *args])
 
         elsif method == :class and args.length==0 and not node.is_method?

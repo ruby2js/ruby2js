@@ -1,5 +1,9 @@
 # master 
 
+# 4.2.2 / 2021-12-07
+
+* leave index as a property alone
+
 # 4.2.1 / 2021-11-12
 
 * functions filter: index, rindex, and round
