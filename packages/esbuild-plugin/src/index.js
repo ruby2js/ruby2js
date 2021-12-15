@@ -11,15 +11,14 @@ module.exports = (options = {}) => ({
     build.onLoad({ filter: options.buildFilter }, async (args) => {
       const code = await fs.readFile(args.path, 'utf8')
       js = Ruby2JS.convert(code, { ...options, file: args.path })
+      const output = js.toString()
 
       const smap = js.sourcemap
-      const rubyCode = await fs.readFile(smap.sources[0], 'utf8')
-      smap.sourcesContent = [rubyCode]
-      smap.sources[0] = path.basename(smap.sources[0])
+      smap.sourcesContent = [code]
+      smap.sources[0] = path.basename(args.path)
 
-      const output = js.toString() + convert.fromObject(smap).toComment()
       return {
-        contents: output,
+        contents: output + convert.fromObject(smap).toComment(),
         loader: 'js'
       }
     })
