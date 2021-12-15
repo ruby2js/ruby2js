@@ -1,0 +1,23 @@
+{
+  "name": "@ruby2js/esbuild-plugin",
+  "version": "0.0.1",
+  "description": "ruby2js plugin for esbuild",
+  "contributors": [
+    "Jared White",
+    "Sam Ruby"
+  ],
+  "license": "MIT",
+  "main": "src/index.js",
+  "homepage": "https://github.com/ruby2js/ruby2js/tree/master/packages/esbuild-plugin#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ruby2js/ruby2js"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@ruby2js/ruby2js": ">0.0.1",
+    "convert-source-map": "^1.8.0"
+  }
+}
