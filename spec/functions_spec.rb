@@ -173,8 +173,13 @@ describe Ruby2JS::Filter::Functions do
       to_js( 'a.rstrip()' ).must_equal 'a.replace(/\s+$/, "")'
     end
 
+    it 'should handle chars' do
+      to_js_2020( 'str.chars' ).must_equal 'Array.from(str)'
+    end
+
     it 'should handle string multiply' do
       to_js( '" " * indent' ).must_equal 'new Array(indent + 1).join(" ")'
+      to_js_2020( '" " * indent' ).must_equal '" ".repeat(indent)'
     end
   end
 

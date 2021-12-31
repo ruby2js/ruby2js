@@ -442,8 +442,12 @@ module Ruby2JS
           S(:send, s(:const, nil, :JSON), :stringify, process(target))
 
         elsif method == :* and target.type == :str
-          process S(:send, s(:send, s(:const, nil, :Array), :new,
-            s(:send, args.first, :+, s(:int, 1))), :join, target)
+          if es2015
+            process S(:send, target, :repeat, args.first)
+          else
+            process S(:send, s(:send, s(:const, nil, :Array), :new,
+              s(:send, args.first, :+, s(:int, 1))), :join, target)
+          end
 
         elsif [:is_a?, :kind_of?].include? method and args.length == 1
           if args[0].type == :const
@@ -585,6 +589,13 @@ module Ruby2JS
         elsif method == :new and args.length == 2 and target == s(:const, nil, :Array)
           if es2015
             s(:send, S(:send, target, :new, args.first), :fill, args.last)
+          else
+            super
+          end
+
+        elsif method == :chars and args.length == 0
+          if es2015
+            S(:send, s(:const, nil, :Array), :from, target)
           else
             super
           end

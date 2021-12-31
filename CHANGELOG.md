@@ -1,5 +1,8 @@
 # master 
 
+* functions filter: chars
+* functions filter: `"string" * length` => `"string".repeat(length)` for ES2015+
+
 # 4.2.2 / 2021-12-07
 
 * leave index as a property alone
