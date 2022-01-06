@@ -36,6 +36,7 @@ conversions are made:
 * `(0...a).to_a` {{ caret }} `[...Array(a).keys()]`
 * `(0..a).to_a` {{ caret }} `[...Array(a+1).keys()]`
 * `(b..a).to_a` {{ caret }} `Array.from({length: (a-b+1)}, (_, idx) => idx+b)`
+* `hash => {a:, b:}` {{ caret }} `let { a, b } = hash`
 
 ES2015 class support includes constructors, super, methods, class methods,
 instance methods, instance variables, class variables, getters, setters,

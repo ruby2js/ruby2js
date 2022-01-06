@@ -117,7 +117,7 @@ describe "ES2015 support" do
 
     unless (RUBY_VERSION.split('.').map(&:to_i) <=> [3, 0, 0]) == -1
       it "should support => operator with simple destructuring" do
-        to_js('hash => {a:, b:}').must_equal 'let {a, b} = hash'
+        to_js('hash => {a:, b:}').must_equal 'let { a, b } = hash'
       end
     end
   end
