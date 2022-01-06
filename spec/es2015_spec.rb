@@ -114,6 +114,12 @@ describe "ES2015 support" do
     it "should implement max with spread operators" do
       to_js_fn( 'a.max()' ).must_equal('Math.max(...a)')
     end
+
+    unless (RUBY_VERSION.split('.').map(&:to_i) <=> [3, 0, 0]) == -1
+      it "should support => operator with simple destructuring" do
+        to_js('hash => {a:, b:}').must_equal 'let {a, b} = hash'
+      end
+    end
   end
 
   describe :arguments do

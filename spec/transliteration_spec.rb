@@ -975,7 +975,7 @@ describe Ruby2JS do
     end
 
     unless (RUBY_VERSION.split('.').map(&:to_i) <=> [3, 0, 0]) == -1
-      it "should support => operator" do
+      it "should support => operator with simple left hand sides" do
         to_js('0 => x').must_equal 'var x = 0'
       end
     end
