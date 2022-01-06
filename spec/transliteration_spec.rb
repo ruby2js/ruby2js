@@ -978,6 +978,10 @@ describe Ruby2JS do
       it "should support => operator with simple left hand sides" do
         to_js('0 => x').must_equal 'var x = 0'
       end
+
+      it "should support => operator with simple destructuring" do
+        to_js('hash => {a:, b:}').must_equal 'var a = hash.a; var b = hash.b'
+      end
     end
   end
   

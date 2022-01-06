@@ -10,10 +10,18 @@ module Ruby2JS
           put ' } = '
           parse value
         else
-          raise Error.new("destructuring requires es2015")
+          name.children.each_with_index do |child, index|
+            put @sep unless index == 0
+            put 'var '
+            put child.children[0].to_s
+            put ' = '
+            parse value
+            put '.'
+            put child.children[0].to_s
+          end
         end
       else
-        raise Error.new("complex match patterns are not supported")
+        raise Error.new("complex match patterns are not supported", @ast)
       end
     end
   end
