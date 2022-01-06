@@ -69,7 +69,7 @@ module Ruby2JS
       def handle_generic_node(node, node_type)
         return node if node.type != node_type
 
-        if node.children[0] =~ /_.*[?!\w]$/ and !ALLOWLIST.include?(node.children[0].to_s)
+        if node.children[0].to_s =~ /_.*[?!\w]$/ and !ALLOWLIST.include?(node.children[0].to_s)
           S(node_type , camelCase(node.children[0]), *node.children[1..-1])
         else
           node
