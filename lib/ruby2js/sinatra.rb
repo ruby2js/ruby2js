@@ -38,6 +38,6 @@ Tilt.register 'rb', Ruby2JSTemplate
 helpers do
   def ruby2js(*args)
     content_type 'application/javascript'
-    render('rb', *args)
+    render('rb', *args).to_s
   end
 end
