@@ -20,6 +20,7 @@ If you set the `eslevel` option to `2015` or newer, the Functions filter enables
 * `.all?` {{ caret }} `.every`
 * `.any?` {{ caret }} `.some`
 * `.ceil` {{ caret }} `Math.ceil()`
+* `.chars` {{ caret }} `Array.from()`
 * `.chr` {{ caret }} `fromCharCode`
 * `.clear` {{ caret }} `.length = 0`
 * `.define_method` {{ caret }} `klass.prototype.meth = function ...`
@@ -84,7 +85,7 @@ If you set the `eslevel` option to `2015` or newer, the Functions filter enables
 * `[/r/, n]` {{ caret }} `.match(/r/)[n]`
 * `[/r/, n]=` {{ caret }} `.replace(/r/, ...)`
 * `(1..2).each {|i| ...}` {{ caret }} `for (var i=1 i<=2; i+=1)`
-* `"string" * length` {{ caret }} `new Array(length + 1).join("string")`
+* `"string" * length` {{ caret }} `new Array(length + 1).join("string")` or `"string".repeat(length)` for ES2015+
 * `@foo.call(args)` {{ caret }} `this._foo(args)`
 * `@@foo.call(args)` {{ caret }} `this.constructor._foo(args)`
 * `Array(x)` {{ caret }} `Array.prototype.slice.call(x)`
