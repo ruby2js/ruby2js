@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## Fixed
+
+- Ensure Nokogiri filter's `create_element` uses `textContent` instead of `content`
+
 ## [5.0.0] - 2022-05-14
 
 ### Added

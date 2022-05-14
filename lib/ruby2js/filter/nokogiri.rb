@@ -125,7 +125,7 @@ module Ruby2JS
                     *process_all(pair.children))
                 end
               elsif arg.type == :str
-                init << s(:send, s(:gvar, :$_), :content=, process(arg))
+                init << s(:send, s(:gvar, :$_), :textContent=, process(arg))
               else
                 return super
               end
