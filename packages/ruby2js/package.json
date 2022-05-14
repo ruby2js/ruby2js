@@ -17,7 +17,7 @@
     "ruby2js"
   ],
   "scripts": {
-    "build": "rm ruby2js.js && bundle exec rake -f ../../docs/Rakefile ruby2js.js",
+    "build": "rm -f -- ruby2js.js && bundle exec rake -f ../../docs/Rakefile ruby2js.js",
     "test": "mocha"
   },
   "devDependencies": {
