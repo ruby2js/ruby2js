@@ -6,7 +6,37 @@ category: litelement
 ---
 
 The **Lit** filter makes it easier to build
-[LitElement](https://lit.dev/) web components.
+[LitElement](https://lit.dev/) web components. Here's an example of a component
+from Lit's documentation, rewritten in Ruby2JS (and you can inspect the compiled
+output to see nearly identical code.)
+
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "autoexports": "default",
+  "filters": ["esm", "lit", "functions"]
+}'></div>
+
+```ruby
+class SimpleGreeting < LitElement
+  self.styles = <<~CSS
+    p { color: blue }
+  CSS
+
+  custom_element "simple-greeting"
+
+  def initialize
+    @name = "Somebody"
+  end
+
+  def render
+    <<~HTML
+      <p>Hello, #{name}!</p>
+    HTML
+  end
+end
+```
+
+## List of Transformations
 
 When a class definition is encountered that derives from
 `LitElement`, the following transformations are applied:
