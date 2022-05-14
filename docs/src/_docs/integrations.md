@@ -44,7 +44,7 @@ filter and [autoexports](/docs/options#auto-exports) and
 
 # Web Components
 
-Filters are available for [jQuery](/docs/filters/jquery), [litElement](/docs/filters/litelement),
+Filters are available for [jQuery](/docs/filters/jquery), [Lit](/docs/filters/lit),
 [React](/docs/filters/react), and [Stimulus](/docs/filters/stimulus).  The
 [React](/docs/filters/react) filter also supports Preact.
 
