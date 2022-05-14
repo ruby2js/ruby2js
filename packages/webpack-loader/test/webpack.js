@@ -51,6 +51,14 @@ describe('@ruby2js/webpack-loader', function() {
     const output = stats.toJson({ source: true }).modules[0].source;
 
     assert.deepStrictEqual(stats.compilation.errors, []);
-    assert.strictEqual(output, 'console.log(`0x2A = ${parseInt("2A", 16)}`)');
+    assert.strictEqual(output, 'console.log(`0x2A = ${parseInt("2A", 16)}`);' +
+`
+
+class Emojis {
+  get output() {
+    return "Emoji 😂"
+  }
+}`
+    );
   })
 })

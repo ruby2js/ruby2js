@@ -962,9 +962,9 @@
     fastq "^1.6.0"
 
 "@ruby2js/ruby2js@>= 0.0.3":
-  version "0.2.1"
-  resolved "https://registry.yarnpkg.com/@ruby2js/ruby2js/-/ruby2js-0.2.1.tgz#0b3036e88305e1c671eb00b65006bc04e52e1a4d"
-  integrity sha512-WYMhAgY2m74xbMa6tHNSUU+uCS3EA4GDZfbhEafnYtJyMsxGszpKqkrjB+9hf6FePQoMX+x4jfXM73AUgkFg7A==
+  version "5.0.0"
+  resolved "https://registry.yarnpkg.com/@ruby2js/ruby2js/-/ruby2js-5.0.0.tgz#f9bad775796a56bb034431bf5e6201fc6525c42a"
+  integrity sha512-bqlOgwJMlI4277PSawgxW1AXzlfE1wd4Ic3V/rkrT96N9k8c+o7PojhhXbUextyuATS1ad1JisIfq0eFvcsFDw==
 
 "@types/eslint-scope@^3.7.3":
   version "3.7.3"

@@ -7,7 +7,7 @@ group :development, :test do
   gem 'rake'
   gem 'execjs'
   gem 'nokogiri'
-  gem 'opal', '~> 1.5'
+  gem 'opal', '1.1.1'
 end
 
 group :test do

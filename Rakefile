@@ -30,11 +30,13 @@ namespace :packages do
 
     Dir.chdir 'packages/rollup-plugin' do
       sh 'yarn install' unless File.exist? 'yarn.lock'
+      sh 'cp ../ruby2js/ruby2js.js node_modules/@ruby2js/ruby2js/ruby2js.js'
       sh 'yarn test'
     end
 
     Dir.chdir 'packages/webpack-loader' do
       sh 'yarn install' unless File.exist? 'yarn.lock'
+      sh 'cp ../ruby2js/ruby2js.js node_modules/@ruby2js/ruby2js/ruby2js.js'
       sh 'yarn prepare-release'
       sh 'yarn test'
     end
