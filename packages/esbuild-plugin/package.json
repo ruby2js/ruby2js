@@ -1,11 +1,14 @@
 {
   "name": "@ruby2js/esbuild-plugin",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "ruby2js plugin for esbuild",
   "contributors": [
     "Jared White",
     "Sam Ruby"
   ],
+  "engines": {
+    "node": ">= 12"
+  },
   "license": "MIT",
   "main": "src/index.js",
   "homepage": "https://github.com/ruby2js/ruby2js/tree/master/packages/esbuild-plugin#readme",

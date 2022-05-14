@@ -1,3 +1,7 @@
+# @ruby2js/register
+
+[![npm][npm]][npm-url]
+
 One of the ways you can use Ruby2JS is through the require hook. The require
 hook will bind itself to node's `require` and automatically compile files on
 the fly. This is equivalent to Babel's
@@ -72,3 +76,6 @@ require("@ruby2js/register")({
    `@ruby2js/register` does _not_ support compiling native Node.js ES modules
    on the fly, since currently there is no stable API for intercepting ES
    modules loading.
+
+[npm]: https://img.shields.io/npm/v/@ruby2js/register.svg
+[npm-url]: https://npmjs.com/package/@ruby2js/register
