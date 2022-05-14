@@ -1,6 +1,6 @@
 {
   "name": "@ruby2js/ruby2js",
-  "version": "5.0.0",
+  "version": "5.0.1",
   "description": "Ruby to Javascript transpiler",
   "contributors": [
     "Sam Ruby",
