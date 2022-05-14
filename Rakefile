@@ -28,6 +28,12 @@ namespace :packages do
       sh 'yarn test'
     end
 
+    Dir.chdir 'packages/esbuild-plugin' do
+      sh 'yarn install' unless File.exist? 'yarn.lock'
+      sh 'cp ../ruby2js/ruby2js.js node_modules/@ruby2js/ruby2js/ruby2js.js'
+      sh 'yarn test'
+    end
+
     Dir.chdir 'packages/rollup-plugin' do
       sh 'yarn install' unless File.exist? 'yarn.lock'
       sh 'cp ../ruby2js/ruby2js.js node_modules/@ruby2js/ruby2js/ruby2js.js'

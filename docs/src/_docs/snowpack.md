@@ -3,7 +3,10 @@ order: 4
 title: Snowpack Setup
 top_section: Introduction
 category: snowpack
+hide_in_toc: true
 ---
+
+
 
 The [`@ruby2js/snowpack-plugin`](https://github.com/ruby2js/ruby2js/tree/master/packages/snowpack-plugin)
 lets you compile `.rb.js` files to JavaScript via Snowpack.
@@ -38,38 +41,7 @@ module.exports = {
 }
 ```
 
-Note that [Ruby2JS options](options) are expressed in JSON format instead of
-as a Ruby Hash.  The following rules will help explain the conversions
-necessary:
-
-  * use strings for symbols
-  * for `functions`, specify string names not module names
-  * for `autoimports`, specify keys as strings, even if key is an array
-  * not supported: `binding`, `ivars`, `scope`
-
-An example of all of the supported options:
-
-```json
-{
-  "autoexports": true,
-  "autoimports": {"[:LitElement]": "lit"},
-  "comparison": "identity",
-  "defs": {"A": ["x", "@y"]},
-  "eslevel": 2021,
-  "exclude": ["each"],
-  "filters": ["functions"],
-  "include": ["class"],
-  "include_all": true,
-  "include_only": ["max"],
-  "import_from_skypack": true,
-  "or": "nullish",
-  "require_recurse": true,
-  "strict": true,
-  "template_literal_tags": ["color"],
-  "underscored_private": true,
-  "width": 40
-}
-```
+See [Ruby2JS Options](https://www.ruby2js.com/docs/options) docs for a list of available options.
 
 Restart the snowpack server to pick up the configuration changes.
 

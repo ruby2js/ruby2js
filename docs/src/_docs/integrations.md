@@ -5,11 +5,12 @@ top_section: Introduction
 category: integrations
 ---
 
-# Ruby back-ends servers
+# Ruby back-end servers
 
 * [Rails](../examples/rails/) integration is provided
-   for both WebPacker and Sprockets.  Rake tasks are provided to assist with
-   the configuration.
+   for both Webpacker and Sprockets.  Rake tasks are provided to assist with
+   the configuration. If you're using the new [jsbundling](https://github.com/rails/jsbundling-rails)
+   Rails 7 plugin, you'll likely want to look at the front-end bundling instructions below.
 
 * [Sinatra](https://github.com/ruby2js/ruby2js/blob/master/lib/ruby2js/sinatra.rb)
   views may be used to produce JavaScript from Ruby, enabled by
@@ -26,10 +27,7 @@ category: integrations
 
 # JavaScript front-end build tools
 
-Plugins are available for both
-[Snowpack](https://www.npmjs.com/package/@ruby2js/snowpack-plugin) and
-[Vite](https://www.npmjs.com/package/@ruby2js/vite-plugin).  These plugins
-support Hot Module Replacement and Refresh.  The [ESM](/docs/filters/esm)
+A plugins is available for [Vite](https://www.npmjs.com/package/@ruby2js/vite-plugin) which supports Hot Module Replacement and Refresh.  The [ESM](/docs/filters/esm)
 filter lets you author `import` and `export` statements, and the
 [autoexports](/docs/options#auto-exports) and
 [autoimports](/docs/options#auto-imports) options can often relieve you of the
@@ -37,8 +35,9 @@ need to do so.
 
 # JavaScript bundlers
 
-A [Rollup](https://www.npmjs.com/package/@ruby2js/rollup-plugin) plugin and
-a [Webpack](https://www.npmjs.com/package/@ruby2js/webpack-loader) loader are
+An [esbuild](https://www.npmjs.com/package/@ruby2js/esbuild-plugin) plugin,
+[Rollup](https://www.npmjs.com/package/@ruby2js/rollup-plugin) plugin,
+and a [Webpack](https://www.npmjs.com/package/@ruby2js/webpack-loader) loader are
 available.  Again, the [ESM](/docs/filters/esm)
 filter and [autoexports](/docs/options#auto-exports) and
 [autoimports](/docs/options#auto-imports) options are useful with bundlers.

@@ -6,6 +6,10 @@ title: Rails Introduction
 category: rails intro
 ---
 
+{% rendercontent "docs/note" %}
+**Updated documentation for Rails 7 will be coming soon. Keep reading for Rails 6.**
+{% endrendercontent %}
+
 Webpacker is installed by default in Rails 6.0 and up.  The following steps
 will install Ruby2js and configure webpacker to use it:
 

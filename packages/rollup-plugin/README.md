@@ -16,6 +16,7 @@ yarn add -D @ruby2js/rollup-plugin
 ## Documentation
 
 * Visit **[ruby2js.com](https://www.ruby2js.com/)** for detailed instructions and examples.
+* See [Ruby2JS Options](https://www.ruby2js.com/docs/options) docs for a list of available options.
 
 Below are some example configurations using some popular libraries.  Other
 than the differences in filters, the differences are to make the library

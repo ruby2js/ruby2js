@@ -17,7 +17,7 @@ or manually install the `ruby2js` gem:
 gem install ruby2js
 ```
 
-If you'd like to use Ruby2JS with Webpack, [read these additional instructions](/docs/webpack).
+If you'd like to use Ruby2JS with Node-based build tools, [read these additional instructions](/docs/integrations).
 
 ## Basic Usage
 {:.mb-8}

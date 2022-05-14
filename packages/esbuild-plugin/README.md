@@ -3,15 +3,67 @@
 [![npm][npm]][npm-url]
 [![node][node]][node-url]
 
-An esbuild plugin to compile [Ruby2JS](https://www.ruby2js.com) (`.js.rb`) files to JavaScript.
+An [esbuild](https://esbuild.github.io) plugin to compile [Ruby2JS](https://www.ruby2js.com) (`.js.rb`) files to JavaScript.
+
+## Installation
+
+```bash
+npm install --save-dev @ruby2js/esbuild-plugin
+# or
+yarn add -D @ruby2js/esbuild-plugin
+```
 
 ## Documentation
 
-* Visit **[ruby2js.com](https://www.ruby2js.com/docs/esbuild)** for detailed setup instructions and examples.
+esbuild doesn't have a configuration format per se, so you'll need to create a JavaScript file which uses esbuild's Build API if you don't have one already.
+
+Here's an example of a simple one you might use in a Rails app:
+
+```js
+// esbuild.config.js
+const path = require("path")
+
+const watch = process.argv.includes("--watch")
+const minify = process.argv.includes("--minify")
+
+require("esbuild").build({
+  entryPoints: ["application.js"],
+  bundle: true,
+  outdir: path.join(process.cwd(), "app/assets/builds"),
+  absWorkingDir: path.join(process.cwd(), "app/javascript"),
+  publicPath: "/assets",
+  watch,
+  minify,
+  plugins: [],
+}).catch(() => process.exit(1))
+```
+
+However your esbuild configuration is set up, you'll need to add the `ruby2js` plugin to your plugins array:
+
+```js
+const ruby2js = require("@ruby2js/esbuild-plugin")
+
+// later in the build config:
+  plugins: [
+    ruby2js({
+      eslevel: 2020,
+      filters: ["functions", "esm"]
+    })
+  ]
+```
+
+Then simply run the config script (aka `yarn node esbuild.config.js`) to compile your Ruby2JS files to a JavaScript output bundle.
+
+See [Ruby2JS Options](https://www.ruby2js.com/docs/options) docs for a list of available options.
 
 ## Testing
 
-_To be continued…_
+```
+git clone https://github.com/ruby2js/ruby2js.git
+cd ruby2js/packages/esbuild-plugin
+yarn install
+yarn test
+```
 
 ## Contributing
 

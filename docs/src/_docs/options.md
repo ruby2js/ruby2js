@@ -5,6 +5,10 @@ top_section: Introduction
 category: options
 ---
 
+Ruby2JS provides quite a few options to help you configure your transpilation process.
+
+{% toc %}
+
 ## Auto Exports
 
 The [ESM](esm) filter has an option to automatically export all top
@@ -250,4 +254,39 @@ in width.  You can change this value with the `width` option.
 ```ruby
 require 'ruby2js/filter/functions'
 puts Ruby2JS.convert("puts list.last unless list.empty?\n", width: 40)
+```
+
+## Configuring JavaScript Packages
+
+When configuring the Node version of Ruby2JS, note that the options are expressed in JSON format instead of
+as a Ruby Hash.  The following rules will help explain the conversions
+necessary:
+
+  * use strings for symbols
+  * for `functions`, specify string names not module names
+  * for `autoimports`, specify keys as strings, even if key is an array
+  * not supported: `binding`, `ivars`, `scope`
+
+An example of all of the supported options:
+
+```json
+{
+  "autoexports": true,
+  "autoimports": {"[:LitElement]": "lit"},
+  "comparison": "identity",
+  "defs": {"A": ["x", "@y"]},
+  "eslevel": 2021,
+  "exclude": ["each"],
+  "filters": ["functions"],
+  "include": ["class"],
+  "include_all": true,
+  "include_only": ["max"],
+  "import_from_skypack": true,
+  "or": "nullish",
+  "require_recurse": true,
+  "strict": true,
+  "template_literal_tags": ["color"],
+  "underscored_private": true,
+  "width": 40
+}
 ```

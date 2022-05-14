@@ -51,3 +51,5 @@ export default defineConfig({
   ]
 })
 ```
+
+See [Ruby2JS Options](https://www.ruby2js.com/docs/options) docs for a list of available options.
