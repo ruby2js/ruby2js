@@ -45,6 +45,8 @@ An example of all supported options:
 ## Documentation
 
 * Visit **[ruby2js.com](https://www.ruby2js.com/)** for detailed instructions and examples.
+* Read the main monorepo [CHANGELOG](https://github.com/ruby2js/ruby2js/blob/master/CHANGELOG.md)
+  for information on what's new in this package.
 
 ## Testing
 

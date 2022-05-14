@@ -7,7 +7,7 @@ Minimal yet extensible Ruby to JavaScript conversion.
 [![Gitter](https://badges.gitter.im/ruby2js/community.svg)](https://gitter.im/ruby2js/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
 
 
-Documentation
+## Documentation
 ---
 
 * Visit **[ruby2js.com](https://www.ruby2js.com)** for detailed setup instructions and API reference.
@@ -15,8 +15,8 @@ Documentation
 * [Try Ruby2JS online](https://ruby2js.com/demo)
 
 
-Synopsis
----
+## Synopsis
+
 
 Basic:
 
@@ -44,9 +44,17 @@ Enable ES2015 support:
 puts Ruby2JS.convert('"#{a}"', eslevel: 2015)
 ```
 
+## Testing
 
-License
----
+1. Run `bundle install`
+2. Run `bundle exec rake test_all`
+
+## Release Process for Maintainers
+
+1. Update the version in both `packages/ruby2js/package.json` and `lib/ruby2js/version`, ensuring they match.
+2. Run `bundle exec rake release_core`
+
+## License
 
 (The MIT License)
 

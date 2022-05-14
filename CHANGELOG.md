@@ -1,20 +1,38 @@
-# master 
+# Changelog
 
-* functions filter: chars
-* functions filter: `"string" * length` => `"string".repeat(length)` for ES2015+
+All notable changes to this project will be documented in this file.
 
-# 4.2.2 / 2021-12-07
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+## [5.0.0] - 2022-05-14
+
+### Added
+
+- Support for Ruby 3.1's shorthand hash syntax: `hash => {a:, b:}` => `let {a, b} = hash`
+- functions filter: chars
+- functions filter: `"string" * length` => `"string".repeat(length)` for ES2015+
+
+### Changed
+
+- Improvements to the monorepo to ensure both the Ruby and the Node compiler versions always match
+  and can get tested and released simultaneously. (Run `bundle exec rake release_core`.)
+- Ruby 2.7 is now the minimum supported version of Ruby.
+
+## [4.2.2] - 2021-12-07
 
 * leave index as a property alone
 
-# 4.2.1 / 2021-11-12
+## [4.2.1] - 2021-11-12
 
 * functions filter: index, rindex, and round
 * functions filter: obj.to_json => JSON.stringify(obj)
 * support numbered parameters (numblocks)
 * Array.new(size, default) => new Array(size).fill(default)
 
-# 4.2.0 / 2021-10-11
+## [4.2.0] - 2021-10-11
 
 * Additional lit filter updates (PR #141)
   * Allow snake case custom_element in addition to customElement
@@ -31,18 +49,18 @@
   inherited methods: performUpdate, requestUpdate
   inherited properties: hasUpdated, renderRoot, shadowRoot, updateComplete
 
-# 4.1.7 / 2021-09-20
+## [4.1.7] - 2021-09-20
 
 * take, drop, min, max, each_slice added to underscore filter
 * import stimulus => import @hotwired/stimulus
 * rails stimulus rake tasks and instructions were update to match
   the latest hotwired/stimulus-rails changes
 
-# 4.1.6 / 2021-08-19
+## [4.1.6] - 2021-08-19
 
 * Fix es2020 optional chaining optimization when arguments are present
 
-# 4.1.5 / 2021-08-14
+## [4.1.5] - 2021-08-14
 
 * Fix camelCase bug on methods ending in ? or !
 * Add chomp, delete_prefix, and delete_suffix support via ActiveFunctions
@@ -51,46 +69,46 @@
 * fix es2020 bug where operators were converted to optional chaining
 * fix es5 merge regression with complex LHS
 
-# 4.1.4 / 2021-05-08
+## [4.1.4] - 2021-05-08
 
 * Add camelCase support for keyword arguments (aka destructured object arg)
 
-# 4.1.3 / 2021-04-11
+## [4.1.3] - 2021-04-11
 
 * Add camelCase support for => assignment operator
 * Fix bugs related to is_a? and instance_of?
 
-# 4.1.2 / 2021-04-11
+## [4.1.2] - 2021-04-11
 
 * support => as a right side assignment operator
 * sourcemap: add names; add missing first token; 
    fix first column of every line
 
-# 4.1.1 / 2021-03-26
+## [4.1.1] - 2021-03-26
 
 * fix a number of lit-element filter edge cases
 * more cjs export support: constants, classes, modules, autoexports
 * React/Preact hooks
 
-# 4.1.0 / 2021-03-17
+## [4.1.0] - 2021-03-17
 
 * ES2021 support for replaceAll
 * Preact support added to the React filter
 
-# 4.0.5 / 2021-03-11
+## [4.0.5] - 2021-03-11
 
 * move testrails directory outside of the gem
 
-# 4.0.4 / 2021-03-10
+## [4.0.4] - 2021-03-10
 
 * add install tasks for Webpacker (naked) and React
 
-# 4.0.3 / 2021-03-09
+## [4.0.3] - 2021-03-09
 
 * don't autobind instance methods within tagged literals
 * rails install tasks
 
-# 4.0.2 / 2021-03-02
+## [4.0.2] - 2021-03-02
 
 * next within a block can return a value
 * handle scans that return zero results with ESLevel < 2020
@@ -98,7 +116,7 @@
 * add rand to filter functions
 * sprockets support
 
-# 4.0.1 / 2021-02-23
+## [4.0.1] - 2021-02-23
 
 * handle block arguments
 * filter now supports `.call`, but requires an explicit `include` option
@@ -107,7 +125,7 @@
 * provide default for all optional kwargs; handle undefined as default
 * pin version of regexp_parser pending resolution of #101
 
-# 4.0.0 / 2021-02-10
+## [4.0.0] - 2021-02-10
 
 * Support static method calls with blocks in es2015+
 * Auto-bind instance methods referenced as properties within a class
@@ -124,7 +142,7 @@
 * requires for modules containing exports statements generate import statements
 * require_recursive option
 
-# 3.6.1 / 2020-12-31
+## [3.6.1] - 2020-12-31
 
 * Bugfix: ensure ActiveFunctions autoimports aren't included multiple times
 * Chained method bugfix in Nokogiri filter
@@ -134,7 +152,7 @@
     * auto launch a browser when --port is specified
 * no need for spread syntax for .max and .min if target is a literal array
 
-# 3.6.0 / 2020-12-26
+## [3.6.0] - 2020-12-26
 
 * New project logos!
 * Large overhaul of the Ruby2JS Demo application ([see here](https://intertwingly.net/projects/ruby2js))
