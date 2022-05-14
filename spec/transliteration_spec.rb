@@ -17,15 +17,9 @@ describe Ruby2JS do
       to_js( "Constant" ).must_equal 'Constant'
 
       unicode = to_js( '"\u2620"' )
-
-      # ruby 2.4.2 support
-      if unicode.include? '\u'
-        unicode.must_equal "\"\\u2620\""
-      else
-        unicode.must_equal "\"\u2620\""
-      end
+      unicode.must_equal "\"\u2620\""
     end
-    
+
     it "should parse simple hash" do
       to_js( "{}" ).must_equal '{}'
       to_js( "{ a: :b }" ).must_equal '{a: "b"}'

@@ -3,15 +3,11 @@
 [![npm][npm]][npm-url]
 [![node][node]][node-url]
 
+**Deprecated.** You may want to consider switching to the [Vite](https://github.com/ruby2js/ruby2js/tree/master/packages/vite-plugin) or [esbuild](https://github.com/ruby2js/ruby2js/tree/master/packages/esbuild-plugin) plugins instead.
+
+----
+
 Snowpack plugiplugin to compile [Ruby2JS](https://www.ruby2js.com) (`.js.rb`) files to JavaScript.
-
-## Documentation
-
-* Visit **[ruby2js.com](https://www.ruby2js.com/docs/snowpack)** for detailed setup instructions and examples.
-
-## Testing
-
-_To be continued…_
 
 ## Contributing
 

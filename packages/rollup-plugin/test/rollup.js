@@ -23,6 +23,6 @@ describe('@ruby2js/rollup-plugin', function() {
     let js = await bundle.generate({sourcemap: true, format: 'es'});
 
     assert.strictEqual('console.log(parseInt("2A", 16));\n', js.output[0].code);
-    assert.strictEqual('YAAK,eAAU,EAAV,CAAL', js.output[0].map.mappings);
+    assert.strictEqual('OAAA,CAAK,GAAA,CAAA,QAAA,CAAA,IAAA,EAAU,EAAV,CAAL', js.output[0].map.mappings);
   })
 })

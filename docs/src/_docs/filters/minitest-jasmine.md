@@ -1,6 +1,6 @@
 ---
 order: 19
-kitle: minitest-jasmine
+title: minitest-jasmine
 top_section: Filters
 category: minitest
 ---
