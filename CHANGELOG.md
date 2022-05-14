@@ -7,8 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.0.1] - 2022-05-14
+
 ## Fixed
 
+- Revert back to Opal 1.1.1 for compilation
+  Any newer version of Opal results in compilation errors when emoji (and perhaps other unicode chars) are present in code
 - Ensure Nokogiri filter's `create_element` uses `textContent` instead of `content`
 
 ## [5.0.0] - 2022-05-14
