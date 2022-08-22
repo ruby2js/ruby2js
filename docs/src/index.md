@@ -60,7 +60,6 @@ including
 [Rails](/examples/rails/),
 [esbuild](https://www.npmjs.com/package/@ruby2js/esbuild-plugin),
 [Rollup](https://www.npmjs.com/package/@ruby2js/rollup-plugin),
-[Snowpack](https://www.npmjs.com/package/@ruby2js/snowpack-plugin),
 [Vite](https://www.npmjs.com/package/@ruby2js/vite-plugin), and
 [Webpack](https://www.npmjs.com/package/@ruby2js/webpack-loader).
 Our examples and installation instructions will help you get set up in no time.
