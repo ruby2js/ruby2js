@@ -29,7 +29,7 @@ file "#{root}/demo/filters.opal" => filters do
     name = method.source_location.first
     filters[File.basename(name, '.rb')] = mod
   end
-  content << "Filters = #{filters.inspect}"
+  content << "Ruby2JS::Filter.registered_filters.merge!(#{filters.inspect})"
 
   IO.write "#{root}/demo/filters.opal", content.compact.join("\n")
 end
