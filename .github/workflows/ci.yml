@@ -45,5 +45,6 @@ jobs:
         cache: 'yarn'
         cache-dependency-path: 'packages/**/yarn.lock'
 
+    - run: cd packages/ruby2js && yarn install
     - name: Run tests
       run: bundle exec rake packages:test
