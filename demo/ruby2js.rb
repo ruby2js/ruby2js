@@ -27,11 +27,7 @@ require 'pathname'
 def parse_request(env=ENV)
 
   # autoregister filters
-  filters = {}
-  Dir["#{$:.first}/ruby2js/filter/*.rb"].sort.each do |file|
-    filter = File.basename(file, '.rb')
-    filters[filter] = file
-  end
+  filters = Ruby2JS::Filter.autoregister($:.first)
 
   # web/CGI query string support
   selected = env['PATH_INFO'].to_s.split('/')
@@ -58,6 +54,8 @@ def parse_request(env=ENV)
 
   opts = OptionParser.new
   opts.banner = "Usage: #$0 [options] [file]"
+
+  opts.on('--preset', "use sane defaults (modern eslevel & common filters)") {options[:preset] = true}
 
   opts.on('--autoexports [default]', "add export statements for top level constants") {|option|
     options[:autoexports] = option ? option.to_sym : true
@@ -159,30 +157,7 @@ def parse_request(env=ENV)
   require 'wunderbar' unless wunderbar_options.empty?
 
   # load selected filters
-  options[:filters] = []
-
-  selected.each do |name|
-    begin
-      if filters.include? name
-        require filters[name]
-
-        # find the module and add it to the list of filters.
-        # Note: explicit filter option is used instead of
-        # relying on Ruby2JS::Filter::DEFAULTS as the demo
-        # may be run as a server and as such DEFAULTS may
-        # contain filters from previous requests.
-        Ruby2JS::Filter::DEFAULTS.each do |mod|
-          method = mod.instance_method(mod.instance_methods.first)
-          if filters[name] == method.source_location.first
-            options[:filters] << mod
-          end
-        end
-      elsif not name.empty? and name =~ /^[-\w+]$/
-        $load_error = "UNKNOWN filter: #{name}"
-      end
-    rescue Exception => $load_error
-    end
-  end
+  options[:filters] = Ruby2JS::Filter.require_filters(selected)
 
   return options, selected, options_available
 end

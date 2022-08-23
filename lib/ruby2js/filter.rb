@@ -5,10 +5,66 @@
 
 module Ruby2JS
   module Filter
+    def self.registered_filters
+      @@registered_filters ||= {}
+    end
+
+    def self.autoregister(lib_dir = File.expand_path("..", __dir__))
+      Dir["#{lib_dir}/ruby2js/filter/*.rb"].sort.each do |file|
+        filter = File.basename(file, '.rb')
+        registered_filters[filter] = file
+      end
+
+      registered_filters
+    end
+
+    def self.require_filters(filters)
+      mods = []
+      filters.each do |name|
+        if name.is_a?(Module)
+          mods << name
+          next
+        end
+
+        name = name.to_s
+
+        if registered_filters[name].is_a?(Module)
+          mods << registered_filters[name]
+          next
+        end
+
+        begin
+          if registered_filters.include? name
+            require registered_filters[name]
+    
+            # find the module and add it to the list of filters.
+            # Note: explicit filter option is used instead of
+            # relying on Ruby2JS::Filter::DEFAULTS as the demo
+            # may be run as a server and as such DEFAULTS may
+            # contain filters from previous requests.
+            Ruby2JS::Filter::DEFAULTS.each do |mod|
+              method = mod.instance_method(mod.instance_methods.first)
+              if registered_filters[name] == method.source_location.first
+                mods << mod
+              end
+            end
+          elsif not name.empty? and name =~ /^[-\w+]$/
+            $load_error = "UNKNOWN filter: #{name}"
+          end
+        rescue Exception => $load_error
+        end
+      end
+
+      mods
+    end
 
     #
     # module level defaults
     #
+
+    def self.require_preset
+      [:esm, :functions, :return, :tagged_templates]
+    end
 
     @@included = nil
     @@excluded = []

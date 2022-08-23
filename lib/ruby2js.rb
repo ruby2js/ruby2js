@@ -22,6 +22,7 @@ module Ruby2JS
   end
 
   @@eslevel_default = 2009 # ecmascript 5
+  @@eslevel_preset_default = 2021
   @@strict_default = false
   @@module_default = nil
 
@@ -218,7 +219,12 @@ module Ruby2JS
   end
 
   def self.convert(source, options={})
+    Filter.autoregister unless RUBY_ENGINE == 'opal'
     options = options.dup
+    if options[:preset]
+      options[:eslevel] ||= @@eslevel_preset_default
+      options[:filters] = Filter.require_preset + Array(options[:filters]).uniq
+    end
     options[:eslevel] ||= @@eslevel_default
     options[:strict] = @@strict_default if options[:strict] == nil
     options[:module] ||= @@module_default || :esm
@@ -240,7 +246,7 @@ module Ruby2JS
 
     namespace = Namespace.new
 
-    filters = (options[:filters] || Filter::DEFAULTS)
+    filters = Filter.require_filters(options[:filters] || Filter::DEFAULTS)
 
     unless filters.empty?
       filters.dup.each do |filter|

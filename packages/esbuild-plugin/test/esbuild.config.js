@@ -16,8 +16,7 @@ require("esbuild").build({
   minify,
   plugins: [
     ruby2js({
-      eslevel: 2020,
-      filters: ["functions", "esm"]
+      preset: true
     })
   ],
 }).catch(() => process.exit(1))
