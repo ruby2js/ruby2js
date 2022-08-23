@@ -10,6 +10,7 @@ npm-debug.log*
 /local
 /reports
 /node_modules
+yarn.lock
 .DS_Store
 Thumbs.db
 .idea
