@@ -22,6 +22,7 @@ namespace :packages do
   # TODO: add tests and support for Vite and esbuild
   desc "Build & test the Node version of Ruby2JS plus frontend bundling packages"
   task :test do
+
     Dir.chdir 'packages/ruby2js' do
       sh 'yarn install' unless File.exist? 'yarn.lock'
       sh 'yarn build'
@@ -29,20 +30,23 @@ namespace :packages do
     end
 
     Dir.chdir 'packages/esbuild-plugin' do
+      npm_root = `npm root`.strip
       sh 'yarn install' unless File.exist? 'yarn.lock'
-      sh 'cp ../ruby2js/ruby2js.js node_modules/@ruby2js/ruby2js/ruby2js.js'
+      sh "cp ../ruby2js/ruby2js.js #{npm_root}/@ruby2js/ruby2js/ruby2js.js"
       sh 'yarn test'
     end
 
     Dir.chdir 'packages/rollup-plugin' do
+      npm_root = `npm root`.strip
       sh 'yarn install' unless File.exist? 'yarn.lock'
-      sh 'cp ../ruby2js/ruby2js.js node_modules/@ruby2js/ruby2js/ruby2js.js'
+      sh "cp ../ruby2js/ruby2js.js #{npm_root}/@ruby2js/ruby2js/ruby2js.js"
       sh 'yarn test'
     end
 
     Dir.chdir 'packages/webpack-loader' do
+      npm_root = `npm root`.strip
       sh 'yarn install' unless File.exist? 'yarn.lock'
-      sh 'cp ../ruby2js/ruby2js.js node_modules/@ruby2js/ruby2js/ruby2js.js'
+      sh "cp ../ruby2js/ruby2js.js #{npm_root}/@ruby2js/ruby2js/ruby2js.js"
       sh 'yarn prepare-release'
       sh 'yarn test'
     end
