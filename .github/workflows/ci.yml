@@ -38,17 +38,11 @@ jobs:
         ruby-version: 2.7
         bundler-cache: true
 
-    - uses: bahmutov/npm-install@v1
-      with:
-        working-directory: packages/ruby2js
-
-    - uses: bahmutov/npm-install@v1
-      with:
-        working-directory: packages/rollup-plugin
-
-    - uses: bahmutov/npm-install@v1
-      with:
-        working-directory: packages/webpack-loader
+    - name: Set up Node
+      uses: actions/setup-node@v2
+        with:
+          node-version: '18'
+          cache: 'yarn'
 
     - name: Run tests
       run: bundle exec rake packages:test
