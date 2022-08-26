@@ -16,7 +16,6 @@ module.exports = {
   output: {
     path: path.resolve(__dirname, "output", "_bridgetown", "static", "js"),
     filename: "all.[contenthash].js",
-    hashFunction: "sha256",
   },
   resolve: {
     extensions: [".js", ".jsx"],
