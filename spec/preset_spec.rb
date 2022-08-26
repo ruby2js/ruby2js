@@ -31,4 +31,16 @@ describe "preset option" do
         must_equal 'a.map(item => parseInt(item))'
     end
   end
+
+  describe :options do
+    it 'should handle equality comparisons' do
+      to_js( 'x = str == "abc" ? str : nil' ).
+        must_equal 'let x = str === "abc" ? str : null'
+    end
+
+    it 'should underscore instance variables' do
+      to_js( 'class A; def b(); @c = 1; end; end;' ).
+        must_equal 'class A {b() {this._c = 1; return this._c}}'
+    end
+  end
 end

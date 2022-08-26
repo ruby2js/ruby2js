@@ -5,6 +5,8 @@
 
 module Ruby2JS
   module Filter
+    PRESET_FILTERS = [:esm, :functions, :return]
+
     def self.registered_filters
       @@registered_filters ||= {}
     end
@@ -57,10 +59,6 @@ module Ruby2JS
     #
     # module level defaults
     #
-
-    def self.require_preset
-      [:esm, :functions, :return, :tagged_templates]
-    end
 
     @@included = nil
     @@excluded = []

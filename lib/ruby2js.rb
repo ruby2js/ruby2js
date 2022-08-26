@@ -223,7 +223,9 @@ module Ruby2JS
     options = options.dup
     if options[:preset]
       options[:eslevel] ||= @@eslevel_preset_default
-      options[:filters] = Filter.require_preset + Array(options[:filters]).uniq
+      options[:filters] = Filter::PRESET_FILTERS + Array(options[:filters]).uniq
+      options[:comparison] ||= :identity
+      options[:underscored_private] = true unless options[:underscored_private] == false
     end
     options[:eslevel] ||= @@eslevel_default
     options[:strict] = @@strict_default if options[:strict] == nil
