@@ -18,6 +18,7 @@ module Ruby2JS
       registered_filters
     end
 
+    # TODO: better document this code path
     def self.require_filters(filters)
       mods = []
       filters.each do |name|
@@ -37,11 +38,6 @@ module Ruby2JS
           if registered_filters.include? name
             require registered_filters[name]
     
-            # find the module and add it to the list of filters.
-            # Note: explicit filter option is used instead of
-            # relying on Ruby2JS::Filter::DEFAULTS as the demo
-            # may be run as a server and as such DEFAULTS may
-            # contain filters from previous requests.
             Ruby2JS::Filter::DEFAULTS.each do |mod|
               method = mod.instance_method(mod.instance_methods.first)
               if registered_filters[name] == method.source_location.first
