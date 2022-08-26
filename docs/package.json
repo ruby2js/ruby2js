@@ -6,7 +6,7 @@
     "build": "bundle exec bridgetown build",
     "serve": "bundle exec bridgetown serve",
     "clean": "bundle exec bridgetown clean",
-    "webpack-build": "OPENSSL_CONF=./openssl.cnf webpack --mode production",
+    "webpack-build": "webpack --mode production",
     "webpack-dev": "webpack --mode development -w",
     "deploy": "yarn clean && yarn webpack-build && yarn demo && yarn build",
     "sync": "node sync.js",
