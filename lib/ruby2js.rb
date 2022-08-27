@@ -8,6 +8,7 @@ ensure
   $VERBOSE = old_verbose
 end
 
+require 'ruby2js/configuration_dsl' unless RUBY_ENGINE == 'opal'
 require 'ruby2js/converter'
 require 'ruby2js/filter'
 require 'ruby2js/namespace'
@@ -221,6 +222,17 @@ module Ruby2JS
   def self.convert(source, options={})
     Filter.autoregister unless RUBY_ENGINE == 'opal'
     options = options.dup
+
+    unless RUBY_ENGINE == 'opal'
+      unless options.key?(:config_file) || !File.exist?("config/ruby2js.rb")
+        options[:config_file] ||= "config/ruby2js.rb"
+      end
+
+      if options[:config_file]
+        options = ConfigurationDSL.load_from_file(options[:config_file], options).to_h
+      end
+    end
+
     if options[:preset]
       options[:eslevel] ||= @@eslevel_preset_default
       options[:filters] = Filter::PRESET_FILTERS + Array(options[:filters]).uniq
