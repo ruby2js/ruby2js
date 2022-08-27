@@ -263,6 +263,7 @@ module Ruby2JS
     filters = Filter.require_filters(options[:filters] || Filter::DEFAULTS)
 
     unless filters.empty?
+      filter_options = options.merge({ filters: filters })
       filters.dup.each do |filter|
         filters = filter.reorder(filters) if filter.respond_to? :reorder
       end
@@ -273,7 +274,7 @@ module Ruby2JS
       end
       filter = filter.new(comments)
 
-      filter.options = options
+      filter.options = filter_options
       filter.namespace = namespace
       ast = filter.process(ast)
 
