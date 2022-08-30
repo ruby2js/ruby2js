@@ -94,6 +94,10 @@ def parse_request(env=ENV)
     selected.push(*names)
   end
 
+  opts.on('--filepath [PATH]', "supply a path if stdin is related to a source file") do |filepath|
+    options[:file] = filepath
+  end
+
   opts.on('--identity', "triple equal comparison operators") {options[:comparison] = :identity}
 
   opts.on('--import_from_skypack', "use Skypack for internal functions import statements") do

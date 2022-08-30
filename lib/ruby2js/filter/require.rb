@@ -91,6 +91,16 @@ module Ruby2JS
                 target << child.children[1]
               elsif child.type == :def
                 target << child.children[0]
+              elsif child.type == :const
+                target << child.children[1]
+              elsif child.type == :array
+                child.children.each do |export_statement|
+                  if export_statement.type == :const
+                    target << export_statement.children[1]
+                  elsif export_statement.type == :hash
+                    default_exports << export_statement.children[0].children[1].children[1]
+                  end
+                end
               end
             end
 

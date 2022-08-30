@@ -77,7 +77,7 @@ describe Ruby2JS::Filter::Require do
   describe :esmimport do
     it "should handle explicit exports" do
       to_js_esm( 'require "require/test4.rb"' ).
-        must_equal 'import { Foo } from "./require/test4.rb"'
+        must_equal 'import Whoa, { Foo } from "./require/test4.rb"'
     end
 
     it "should handle auto exports" do
