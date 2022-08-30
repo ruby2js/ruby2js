@@ -91,6 +91,8 @@ module Ruby2JS
                 target << child.children[1]
               elsif child.type == :def
                 target << child.children[0]
+              elsif child.type == :send && child.children[1] == :async
+                target << child.children[2].children[0]
               elsif child.type == :const
                 target << child.children[1]
               elsif child.type == :array
@@ -109,6 +111,12 @@ module Ruby2JS
             else
               named_exports += auto_exports
             end
+            default_exports.map! { _1.to_s.sub(/[?!]/, '').then do |name|
+              respond_to?(:camelCase) ? camelCase(name) : name.to_sym
+            end }
+            named_exports.map! { _1.to_s.sub(/[?!]/, '').then do |name|
+              respond_to?(:camelCase) ? camelCase(name) : name.to_sym
+            end }
 
             imports = @require_seen[realpath]
             imports << s(:const, nil, default_exports.first) unless default_exports.empty?
