@@ -132,6 +132,10 @@ module Ruby2JS
         handle_generic_node(super, :sym)
       end
 
+      def on_assign(node)
+        S(:assign , node.children[0], *node.children[1..-1].map{ process _1 })
+      end
+
       def on_defs(node)
         node = super
         return node if node.type != :defs
