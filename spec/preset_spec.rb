@@ -4,8 +4,12 @@ require 'ruby2js'
 
 describe "preset option" do
 
-  def to_js( string)
+  def to_js(string)
     _(Ruby2JS.convert(string, preset: true).to_s)
+  end
+
+  def to_js_basic(string)
+    _(Ruby2JS.convert(string).to_s)
   end
 
   # random tests just to santity check…see return_spec.rb for the full suite
@@ -41,6 +45,28 @@ describe "preset option" do
     it 'should underscore instance variables' do
       to_js( 'class A; def b(); @c = 1; end; end;' ).
         must_equal 'class A {b() {this._c = 1; return this._c}}'
+    end
+  end
+
+  describe :magic_comments do
+    it 'should allow preset option' do
+      to_js_basic( %(# ruby2js: preset\nclass A; def b(); @c = 1; end; end;) ).
+        must_equal %(// ruby2js: preset\nclass A {\n  b() {\n    this._c = 1;\n    return this._c\n  }\n})
+    end
+
+    it 'should allow filters' do
+      to_js_basic( %(# ruby2js: preset, filters: camelCase\nclass A; def b_x(); @c_z = 1; end; end;) ).
+        must_equal %(// ruby2js: preset, filters: camelCase\nclass A {\n  bX() {\n    this._cZ = 1;\n    return this._cZ\n  }\n})
+    end
+
+    it 'should allow eslevel' do
+      to_js_basic( %(# ruby2js: preset, eslevel: 2022\nx.last) ).
+        must_equal %(// ruby2js: preset, eslevel: 2022\nx.at(-1))
+    end
+
+    it 'should allow for disabling filters' do
+      to_js_basic( %(# ruby2js: preset, disable_filters: return\nclass A; def b(); @c = 1; end; end;) ).
+        must_equal %(// ruby2js: preset, disable_filters: return\nclass A {\n  b() {\n    this._c = 1\n  }\n})
     end
   end
 end
