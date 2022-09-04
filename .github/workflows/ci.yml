@@ -1,10 +1,12 @@
 name: CI Test
 
 on:
-  schedule:
-    - cron: '0 0 * * 5'
-  push:
   pull_request:
+    branches:
+      - "*"
+  push:
+    branches:
+      - master
 
 jobs:
   gem-test:
