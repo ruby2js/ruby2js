@@ -19,7 +19,7 @@ namespace :demo do
 end
 
 namespace :packages do
-  # TODO: add tests and support for Vite and esbuild
+  # TODO: add tests and support for Vite
   desc "Build & test the Node version of Ruby2JS plus frontend bundling packages"
   task :test do
 
@@ -30,9 +30,7 @@ namespace :packages do
     end
 
     Dir.chdir 'packages/esbuild-plugin' do
-      npm_root = `npm root`.strip
       sh 'yarn install' unless File.exist? 'yarn.lock'
-      sh "cp ../ruby2js/ruby2js.js #{npm_root}/@ruby2js/ruby2js/ruby2js.js"
       sh 'yarn test'
     end
 
