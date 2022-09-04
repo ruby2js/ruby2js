@@ -23,6 +23,7 @@ $:.unshift File.absolute_path('../../lib', __FILE__)
 require 'ruby2js/demo'
 require 'cgi'
 require 'pathname'
+require 'json'
 
 def parse_request(env=ENV)
 
@@ -138,6 +139,10 @@ def parse_request(env=ENV)
     options[:underscored_private] = true
   end
 
+  opts.on("--sourcemap", "Provide a JSON object with the code and sourcemap") do
+    @provide_sourcemap = true
+  end
+
   # shameless hack.  Instead of repeating the available options, extract them
   # from the OptionParser.  Exclude default options and es20xx options.
   options_available = opts.instance_variable_get(:@stack).last.list.
@@ -176,9 +181,29 @@ if (not defined? Wunderbar or not env['SERVER_PORT']) and not @live
   # command line support
   if ARGV.length > 0
     options[:file] = ARGV.first
-    puts Ruby2JS.convert(File.read(ARGV.first), options).to_s
+    conv = Ruby2JS.convert(File.read(ARGV.first), options)
+    if @provide_sourcemap
+      puts(
+        {
+          code: conv.to_s,
+          sourcemap: conv.sourcemap,
+        }.to_json
+      )
+    else
+      puts conv.to_s
+    end
   else
-    puts Ruby2JS.convert($stdin.read, options).to_s
+    conv = Ruby2JS.convert($stdin.read, options)
+    if @provide_sourcemap
+      puts(
+        {
+          code: conv.to_s,
+          sourcemap: conv.sourcemap,
+        }.to_json
+      )
+    else
+      puts conv.to_s
+    end
   end  
 
 else
