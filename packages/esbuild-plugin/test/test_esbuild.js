@@ -1,24 +1,28 @@
 const assert = require('assert')
 const fs = require('fs').promises
 
-describe('@ruby2js/esbuild-plugin', function() {
+function timeout(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+describe('@ruby2js/esbuild-plugin', function () {
   this.timeout(5000);
 
-  it('runs code through ruby2js', () => {
+  it('runs code through ruby2js', async () => {
     require("./esbuild.config.js")
 
-    setTimeout(async () => {
-      const code = await fs.readFile(
-        "app/assets/builds/application.js",
-        { encoding: "utf-8"}
-      )
+    await timeout(1000)
 
-      assert.strictEqual(
+    const code = await fs.readFile(
+      "app/assets/builds/application.js",
+      { encoding: "utf-8" }
+    )
+
+    assert.strictEqual(
       `(() => {
-        // main.js.rb
-        console.log(parseInt("2A", 16));
-      })();
-      `, code)
-    }, 1000)
+  // main.js.rb
+  console.log(parseInt("2A", 16));
+})();
+`, code)
   })
 })

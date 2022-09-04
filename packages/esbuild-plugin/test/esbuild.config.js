@@ -16,7 +16,7 @@ require("esbuild").build({
   minify,
   plugins: [
     ruby2js({
-      preset: true
+      extraArgs: ["--preset"]
     })
   ],
 }).catch(() => process.exit(1))
