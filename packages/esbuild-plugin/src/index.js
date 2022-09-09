@@ -39,7 +39,7 @@ const ruby2js = (options = {}) => ({
       extraArgs.push("--sourcemap")
     }
     if (typeof options.extraArgs !== undefined) {
-      extraArgs = [...extraArgs, ...options.extraArgs]
+      extraArgs = [...extraArgs, ...(options.extraArgs || [])]
     }
 
     build.onLoad({ filter: options.buildFilter }, async (args) => {
