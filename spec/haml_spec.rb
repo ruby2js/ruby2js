@@ -1,21 +1,45 @@
+gem 'minitest'
+require 'minitest/autorun'
+require 'ruby2js/filter/functions'
+
 require 'haml'
 require 'ruby2js/haml'
 
 describe 'HAML filter' do
   it 'should convert ruby to javascript' do
-    template = %{
+    haml = %{
        :ruby2js
          alert 'Hello'
     }
 
     # unindent template so that the first line starts in column 1
-    template.gsub!(/^#{template[/\A\s+/]}/, '')
+    # As in, it is valid haml
+    haml.gsub!(/^#{haml[/\A\s+/]}/, '')
 
-    haml_engine = Haml::Engine.new(template)
-    output = _(haml_engine.render)
+    #copied from from haml tests, module RenderHelper
 
-    output.must_include "<script type='text/javascript'>"
-    output.must_include 'alert("Hello")'
-    output.must_include '</script>'
+    output = Haml::Template.new({}) { haml }.render(Object.new, {})
+
+    _(output).must_include "<script type='text/javascript'>"
+    _(output).must_include 'alert("Hello")'
+    _(output).must_include '</script>'
   end
+
+  it 'should convert ruby with interpolation to javascript' do
+    haml = %{
+       :ruby2js
+         alert HASH{2 + 2}
+    }
+
+    # unindent template so that the first line starts in column 1
+    # As in, it is valid haml
+    haml.gsub!(/^#{haml[/\A\s+/]}/, '')
+    haml.gsub!("HASH", "#") #stop ruby interpreteting the 2 + 2
+
+    #copied from from haml tests, module RenderHelper
+    output = Haml::Template.new({}) { haml }.render(Object.new, {})
+
+    _(output).must_include 'alert(4)'
+  end
+
 end
