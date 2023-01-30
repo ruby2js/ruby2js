@@ -8,6 +8,7 @@ ensure
   $VERBOSE = old_verbose
 end
 
+require 'ruby2js/configuration_dsl' unless RUBY_ENGINE == 'opal'
 require 'ruby2js/converter'
 require 'ruby2js/filter'
 require 'ruby2js/namespace'
@@ -68,15 +69,10 @@ module Ruby2JS
       include Ruby2JS::Filter
       BINARY_OPERATORS = Converter::OPERATORS[2..-1].flatten
 
-      attr_accessor :prepend_list, :disable_autoimports, :namespace
+      attr_accessor :prepend_list, :disable_autoimports, :disable_autoexports, :namespace
 
       def initialize(comments)
         @comments = comments
-
-        # check if magic comment is present:
-        first_comment = @comments.values.first&.map(&:text)&.first
-        @disable_autoimports = first_comment&.include?(" autoimports: false")
-        @disable_autoexports = first_comment&.include?(" autoexports: false")
 
         @ast = nil
         @exclude_methods = []
@@ -218,18 +214,10 @@ module Ruby2JS
     end
   end
 
+  # TODO: this method has gotten long and unwieldy!
   def self.convert(source, options={})
     Filter.autoregister unless RUBY_ENGINE == 'opal'
     options = options.dup
-    if options[:preset]
-      options[:eslevel] ||= @@eslevel_preset_default
-      options[:filters] = Filter::PRESET_FILTERS + Array(options[:filters]).uniq
-      options[:comparison] ||= :identity
-      options[:underscored_private] = true unless options[:underscored_private] == false
-    end
-    options[:eslevel] ||= @@eslevel_default
-    options[:strict] = @@strict_default if options[:strict] == nil
-    options[:module] ||= @@module_default || :esm
 
     if Proc === source
       file,line = source.source_location
@@ -246,11 +234,54 @@ module Ruby2JS
       comments = ast ? Parser::Source::Comment.associate(ast, comments) : {}
     end
 
+    # check if magic comment is present
+    first_comment = comments.values.first&.map(&:text)&.first
+    if first_comment
+      if first_comment.include?(" ruby2js: preset")
+        options[:preset] = true
+        if first_comment.include?("filters: ")
+          options[:filters] = first_comment.match(%r(filters:\s*?([^\s]+)\s?.*$))[1].split(",").map(&:to_sym)
+        end
+        if first_comment.include?("eslevel: ")
+          options[:eslevel] = first_comment.match(%r(eslevel:\s*?([^\s]+)\s?.*$))[1].to_i
+        end
+        if first_comment.include?("disable_filters: ")
+          options[:disable_filters] = first_comment.match(%r(disable_filters:\s*?([^\s]+)\s?.*$))[1].split(",").map(&:to_sym)
+        end
+      end
+      disable_autoimports = first_comment.include?(" autoimports: false")
+      disable_autoexports = first_comment.include?(" autoexports: false")
+    end
+
+    unless RUBY_ENGINE == 'opal'
+      unless options.key?(:config_file) || !File.exist?("config/ruby2js.rb")
+        options[:config_file] ||= "config/ruby2js.rb"
+      end
+
+      if options[:config_file]
+        options = ConfigurationDSL.load_from_file(options[:config_file], options).to_h
+      end
+    end
+
+    if options[:preset]
+      options[:eslevel] ||= @@eslevel_preset_default
+      options[:filters] = Filter::PRESET_FILTERS + Array(options[:filters]).uniq
+      if options[:disable_filters]
+        options[:filters] -= options[:disable_filters]
+      end
+      options[:comparison] ||= :identity
+      options[:underscored_private] = true unless options[:underscored_private] == false
+    end
+    options[:eslevel] ||= @@eslevel_default
+    options[:strict] = @@strict_default if options[:strict] == nil
+    options[:module] ||= @@module_default || :esm
+
     namespace = Namespace.new
 
     filters = Filter.require_filters(options[:filters] || Filter::DEFAULTS)
 
     unless filters.empty?
+      filter_options = options.merge({ filters: filters })
       filters.dup.each do |filter|
         filters = filter.reorder(filters) if filter.respond_to? :reorder
       end
@@ -261,7 +292,9 @@ module Ruby2JS
       end
       filter = filter.new(comments)
 
-      filter.options = options
+      filter.disable_autoimports = disable_autoimports
+      filter.disable_autoexports = disable_autoexports
+      filter.options = filter_options
       filter.namespace = namespace
       ast = filter.process(ast)
 

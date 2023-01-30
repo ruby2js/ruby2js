@@ -1,6 +1,6 @@
 {
   "name": "@ruby2js/esbuild-plugin",
-  "version": "0.0.3",
+  "version": "1.0.0",
   "description": "ruby2js plugin for esbuild",
   "contributors": [
     "Jared White",
@@ -28,7 +28,6 @@
     "access": "public"
   },
   "dependencies": {
-    "@ruby2js/ruby2js": ">0.0.1",
     "convert-source-map": "^1.8.0"
   },
   "devDependencies": {

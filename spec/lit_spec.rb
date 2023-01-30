@@ -15,8 +15,7 @@ describe Ruby2JS::Filter::Lit do
   end
   
   def to_js_esm(string)
-    _(Ruby2JS.convert(string, eslevel: 2021,
-      filters: [Ruby2JS::Filter::Lit, Ruby2JS::Filter::ESM]).to_s)
+    _(Ruby2JS.convert(string, eslevel: 2021, filters: [:lit, :esm]).to_s)
   end
 
   describe "properties <= 2021" do
