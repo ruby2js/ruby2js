@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Create a preset option to set sane default behavior [#178]
+- New configuration DSL and per-file magic comments [#182]
+- esbuild: change to use Ruby platform for Ruby2JS compilation [#183]
+- fix haml filter and update spec to include interpolation [#198]
+
 ## [5.0.1] - 2022-05-14
 
 ## Fixed
