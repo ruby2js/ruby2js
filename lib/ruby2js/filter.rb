@@ -5,6 +5,56 @@
 
 module Ruby2JS
   module Filter
+    PRESET_FILTERS = [:esm, :functions, :return]
+
+    def self.registered_filters
+      @@registered_filters ||= {}
+    end
+
+    def self.autoregister(lib_dir = File.expand_path("..", __dir__))
+      Dir["#{lib_dir}/ruby2js/filter/*.rb"].sort.each do |file|
+        filter = File.basename(file, '.rb')
+        registered_filters[filter] = file
+      end
+
+      registered_filters
+    end
+
+    # TODO: better document this code path
+    def self.require_filters(filters)
+      mods = []
+      filters.each do |name|
+        if name.is_a?(Module)
+          mods << name
+          next
+        end
+
+        name = name.to_s
+
+        if registered_filters[name].is_a?(Module)
+          mods << registered_filters[name]
+          next
+        end
+
+        begin
+          if registered_filters.include? name
+            require registered_filters[name]
+    
+            Ruby2JS::Filter::DEFAULTS.each do |mod|
+              method = mod.instance_method(mod.instance_methods.first)
+              if registered_filters[name] == method.source_location.first
+                mods << mod
+              end
+            end
+          elsif not name.empty? and name =~ /^[-\w+]$/
+            $load_error = "UNKNOWN filter: #{name}"
+          end
+        rescue Exception => $load_error
+        end
+      end
+
+      mods
+    end
 
     #
     # module level defaults

@@ -23,15 +23,12 @@ $:.unshift File.absolute_path('../../lib', __FILE__)
 require 'ruby2js/demo'
 require 'cgi'
 require 'pathname'
+require 'json'
 
 def parse_request(env=ENV)
 
   # autoregister filters
-  filters = {}
-  Dir["#{$:.first}/ruby2js/filter/*.rb"].sort.each do |file|
-    filter = File.basename(file, '.rb')
-    filters[filter] = file
-  end
+  filters = Ruby2JS::Filter.autoregister($:.first)
 
   # web/CGI query string support
   selected = env['PATH_INFO'].to_s.split('/')
@@ -58,6 +55,12 @@ def parse_request(env=ENV)
 
   opts = OptionParser.new
   opts.banner = "Usage: #$0 [options] [file]"
+
+  opts.on('--preset', "use sane defaults (modern eslevel & common filters)") {options[:preset] = true}
+
+  opts.on('-C', '--config [FILE]', "configuration file to use (default is config/ruby2js.rb)") {|filename|
+    options[:config_file] = filename
+  }
 
   opts.on('--autoexports [default]', "add export statements for top level constants") {|option|
     options[:autoexports] = option ? option.to_sym : true
@@ -90,6 +93,10 @@ def parse_request(env=ENV)
 
   opts.on('-f', '--filter NAME,...', "process using NAME filter(s)", Array) do |names|
     selected.push(*names)
+  end
+
+  opts.on('--filepath [PATH]', "supply a path if stdin is related to a source file") do |filepath|
+    options[:file] = filepath
   end
 
   opts.on('--identity', "triple equal comparison operators") {options[:comparison] = :identity}
@@ -132,6 +139,10 @@ def parse_request(env=ENV)
     options[:underscored_private] = true
   end
 
+  opts.on("--sourcemap", "Provide a JSON object with the code and sourcemap") do
+    @provide_sourcemap = true
+  end
+
   # shameless hack.  Instead of repeating the available options, extract them
   # from the OptionParser.  Exclude default options and es20xx options.
   options_available = opts.instance_variable_get(:@stack).last.list.
@@ -159,30 +170,7 @@ def parse_request(env=ENV)
   require 'wunderbar' unless wunderbar_options.empty?
 
   # load selected filters
-  options[:filters] = []
-
-  selected.each do |name|
-    begin
-      if filters.include? name
-        require filters[name]
-
-        # find the module and add it to the list of filters.
-        # Note: explicit filter option is used instead of
-        # relying on Ruby2JS::Filter::DEFAULTS as the demo
-        # may be run as a server and as such DEFAULTS may
-        # contain filters from previous requests.
-        Ruby2JS::Filter::DEFAULTS.each do |mod|
-          method = mod.instance_method(mod.instance_methods.first)
-          if filters[name] == method.source_location.first
-            options[:filters] << mod
-          end
-        end
-      elsif not name.empty? and name =~ /^[-\w+]$/
-        $load_error = "UNKNOWN filter: #{name}"
-      end
-    rescue Exception => $load_error
-    end
-  end
+  options[:filters] = Ruby2JS::Filter.require_filters(selected)
 
   return options, selected, options_available
 end
@@ -193,9 +181,29 @@ if (not defined? Wunderbar or not env['SERVER_PORT']) and not @live
   # command line support
   if ARGV.length > 0
     options[:file] = ARGV.first
-    puts Ruby2JS.convert(File.read(ARGV.first), options).to_s
+    conv = Ruby2JS.convert(File.read(ARGV.first), options)
+    if @provide_sourcemap
+      puts(
+        {
+          code: conv.to_s,
+          sourcemap: conv.sourcemap,
+        }.to_json
+      )
+    else
+      puts conv.to_s
+    end
   else
-    puts Ruby2JS.convert($stdin.read, options).to_s
+    conv = Ruby2JS.convert($stdin.read, options)
+    if @provide_sourcemap
+      puts(
+        {
+          code: conv.to_s,
+          sourcemap: conv.sourcemap,
+        }.to_json
+      )
+    else
+      puts conv.to_s
+    end
   end  
 
 else
