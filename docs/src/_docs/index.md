@@ -77,15 +77,6 @@ puts Ruby2JS.convert('class C; def initialize; @f=1; end; end',
   eslevel: 2020, underscored_private: true)
 ```
 
-With [ExecJS](https://github.com/sstephenson/execjs):
-```ruby
-require 'ruby2js/execjs'
-require 'date'
-
-context = Ruby2JS.compile(Date.today.strftime('d = new Date(%Y, %-m-1, %-d)'))
-puts context.eval('d.getYear()')+1900
-```
-
 {% rendercontent "docs/note", extra_margin: true %}
 Conversions can be explored interactively using the
 [demo](/docs/running-the-demo) provided. (**[Online Version](/demo)**)

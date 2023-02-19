@@ -10,7 +10,7 @@ Minimal yet extensible Ruby to JavaScript conversion.
 
 * Visit **[ruby2js.com](https://www.ruby2js.com)** for detailed setup instructions and API reference.
 
-* [Try Ruby2JS online](https://ruby2js.com/demo)
+* [Try Ruby2JS online](https://ruby2js.com/demo?preset=true)
 
 
 ## Synopsis

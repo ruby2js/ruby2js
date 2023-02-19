@@ -1,9 +1,13 @@
 ---
-order: 22
+order: 37
 title: Preact
-top_section: Filters
+top_section: Deprecations
 category: preact
 ---
+
+{% rendercontent "docs/note", type: "warning" %}
+This filter has been deprecated and will be removed in Ruby2JS 6.0.
+{% endrendercontent %}
 
 Due to implementing a nearly identical API, there is no separate Preact
 filter.  Instead, the **React** filter also enables you to build

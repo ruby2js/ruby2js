@@ -3,7 +3,12 @@ order: 3
 title: Webpack Setup
 top_section: Introduction
 category: webpack
+hide_in_toc: true
 ---
+
+{% rendercontent "docs/note", type: "warning" %}
+This package is no longer supported. We recommend that you use esbuild for frontend compilation and bundling.
+{% endrendercontent %}
 
 The [`@ruby2js/webpack-loader`](https://github.com/ruby2js/ruby2js/tree/master/packages/webpack-loader) lets you compile `.rb.js` files to JavaScript via Webpack.
 

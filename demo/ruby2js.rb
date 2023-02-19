@@ -26,7 +26,6 @@ require 'pathname'
 require 'json'
 
 def parse_request(env=ENV)
-
   # autoregister filters
   filters = Ruby2JS::Filter.autoregister($:.first)
 
@@ -340,11 +339,11 @@ else
         def _sl_menu_item(name, args)
           if args.include? :checked
             _div do
-              _input type: 'checkbox', **args
+              _input type: 'checkbox', **args.reject { |k| k == :type }
               _span name
             end
           else
-            _option name, args
+            _option name, args.reject { |k| k == :type }
           end
         end
 
@@ -356,7 +355,7 @@ else
 
       _form method: 'post' do
         _div data_controller: @live && 'ruby' do
-          _textarea.ruby.form_control @ruby, name: 'ruby', rows: 8,
+          _textarea.ruby.form_control @ruby || 'puts "Hello world!"', name: 'ruby', rows: 8,
             placeholder: 'Ruby source'
         end
 
@@ -364,15 +363,17 @@ else
           _input.btn.btn_primary type: 'submit', value: 'Convert', 
             style: "display: #{@live ? 'none' : 'inline'}"
 
+          _sl_checkbox 'Use Preset', id: 'preset', name: 'preset', checked: options[:preset] ? !!options[:preset] : true
+
           _label 'ESLevel:', for: 'eslevel'
           if @live
             _sl_dropdown.eslevel! name: 'eslevel' do
               _sl_button @eslevel || 'default', slot: 'trigger', caret: true
               _sl_menu do
-                _sl_menu_item 'default', checked: !@eslevel || @eslevel == 'default'
+                _sl_menu_item 'default', type: "checkbox", checked: !@eslevel || @eslevel == 'default'
                 Dir["#{$:.first}/ruby2js/es20*.rb"].sort.each do |file|
                   eslevel = File.basename(file, '.rb').sub('es', '')
-                  _sl_menu_item eslevel, value: eslevel, checked: @eslevel == eslevel
+                  _sl_menu_item eslevel, type: "checkbox", value: eslevel, checked: @eslevel == eslevel
                 end
               end
             end
@@ -394,7 +395,7 @@ else
               Dir["#{$:.first}/ruby2js/filter/*.rb"].sort.each do |file|
                 filter = File.basename(file, '.rb')
                 next if filter == 'require'
-                _sl_menu_item filter, name: filter,
+                _sl_menu_item filter, type: "checkbox", name: filter,
                   checked: selected.include?(filter)
               end
             end
@@ -408,9 +409,10 @@ else
               checked[:nullish] = options[:or] == :nullish
 
               options_available.each do |option, args|
+                next if option == 'preset'
                 next if option == 'filter'
                 next if option.start_with? 'require_'
-                _sl_menu_item option, name: option,
+                _sl_menu_item option, type: "checkbox", name: option,
                   checked: checked[option.to_sym],
                   data_args: options_available[option]
               end

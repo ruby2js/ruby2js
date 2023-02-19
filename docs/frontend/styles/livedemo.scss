@@ -79,8 +79,17 @@
     height: 10rem;
   }
 
-  .options {
-    text-align: center;
+  [data-controller="options"] {
+    display: flex;
+    gap: 0.8rem;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  [for="eslevel"] {
+    position: relative;
+    right: -0.35em;
   }
 
   pre {

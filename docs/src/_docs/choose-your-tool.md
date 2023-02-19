@@ -20,7 +20,7 @@ framework, and only use one of the many integrations that
 wasn’t machine generated, and want the absolute bare minimum in terms of
 limitations as to what JavaScript can be produced.
 
-[Try](/demo) for yourself.  
+[Try](/demo?preset=true) for yourself.  
 [Compare with Opal](https://opalrb.com/try/#code:).
 
 And, of course, the right solution might be to use

@@ -1,9 +1,13 @@
 ---
-order: 15
+order: 33
 title: jQuery
-top_section: Filters
+top_section: Deprecations
 category: jquery
 ---
+
+{% rendercontent "docs/note", type: "warning" %}
+This filter has been deprecated and will be removed in Ruby2JS 6.0.
+{% endrendercontent %}
 
 The **jQuery** filter enhances the interaction between Ruby syntax and common jQuery functionality:
 

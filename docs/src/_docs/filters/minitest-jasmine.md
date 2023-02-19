@@ -1,9 +1,13 @@
 ---
-order: 19
+order: 36
 title: minitest-jasmine
-top_section: Filters
+top_section: Deprecations
 category: minitest
 ---
+
+{% rendercontent "docs/note", type: "warning" %}
+This filter has been deprecated and will be removed in Ruby2JS 6.0.
+{% endrendercontent %}
 
 The **minitest-jasmine** filter is for users of the [Jasmine](https://jasmine.github.io) behavior-driven test framework. It: 
 

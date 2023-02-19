@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-class TagsBuilder < SiteBuilder
+class Builders::Tags < SiteBuilder
   def build
     liquid_tag "toc", :toc_template
     helper "toc", :toc_template

@@ -38,6 +38,13 @@ class OptionsController < DemoController
       targets.each {|target| target.ast = ast.checked}
     end
 
+    preset = document.getElementById('preset')
+    @options["preset"] = true if preset.checked
+    preset.addEventListener 'sl-change' do
+      preset.checked ? @options["preset"] = true : @options.delete("preset")
+      updateLocation()
+    end
+
     document.querySelectorAll('sl-dropdown').each do |dropdown|
       menu = dropdown.querySelector('sl-menu')
       dropdown.addEventListener 'sl-show', -> {
@@ -48,7 +55,6 @@ class OptionsController < DemoController
         item = event.detail.item
 
         if dropdown.id == 'options'
-          item.checked = !item.checked
           name = item.textContent
 
           if @options.respond_to? name
@@ -65,7 +71,6 @@ class OptionsController < DemoController
 
         elsif dropdown.id == 'filters'
 
-          item.checked = !item.checked
           name = item.textContent
           @filters.add(name) unless @filters.delete!(name)
 
@@ -104,6 +109,8 @@ class OptionsController < DemoController
         document.querySelector("sl-menu-item[name=identity]").checked = true if value == :identity
       when :nullish
         document.querySelector("sl-menu-item[name=or]").checked = true if value == :nullish
+      when :preset
+        document.querySelector("sl-checkbox#preset").checked = true
       else
         checkbox = document.querySelector("sl-menu-item[name=#{name}]")
         checkbox.checked = true if checkbox

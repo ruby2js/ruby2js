@@ -1,3 +1,5 @@
+# TODO: This feature is deprecated.
+#
 # Example usage:
 #
 #   sinatra.rb:

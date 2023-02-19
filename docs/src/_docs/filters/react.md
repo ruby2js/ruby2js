@@ -1,9 +1,13 @@
 ---
-order: 22
+order: 38
 title: React
-top_section: Filters
+top_section: Deprecations
 category: react
 ---
+
+{% rendercontent "docs/note", type: "warning" %}
+This filter has been deprecated and will be removed in Ruby2JS 6.0.
+{% endrendercontent %}
 
 The **React** filter enables you to build [React](https://reactjs.org/) components.
 

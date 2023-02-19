@@ -1,3 +1,5 @@
+# TODO: this feature is deprecated.
+
 require 'ruby2js'
 
 module Ruby2JS

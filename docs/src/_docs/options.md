@@ -210,19 +210,6 @@ require "ruby2js"
 puts Ruby2JS.convert("X = @x", scope: self)
 ```
 
-## Strict
-
-Inserts `"use strict"` at the top of the output, causing the resulting script
-to be run in 
-[strict mode](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Strict_mode).
-Typically this option is used in combination with setting [eslevel](eslevel)
-to a value of `2015` or greater.
-
-```ruby
-require 'ruby2js'
-puts Ruby2JS.convert("undefined = 5", strict: true)
-```
-
 ## Template Literal Tags
 
 The [Tagged Templates](filters/tagged-templates) filter will convert method

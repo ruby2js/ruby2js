@@ -36,3 +36,5 @@ yarn-debug.log*
 
 # demo
 src/demo
+
+src/shoelace-assets

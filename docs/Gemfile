@@ -1,18 +1,19 @@
 source "https://rubygems.org"
 git_source(:github) { |repo| "https://github.com/#{repo}.git" }
 
-gem "bridgetown", "~> 0.21"
+gem "bridgetown", "~> 1.2"
 gem "ruby2js", path: "../"
 
-group :bridgetown_plugins do
-  gem "bridgetown-seo-tag", "~> 4.0"
-  gem "bridgetown-feed", "~> 2.0"
-  gem "bridgetown-quick-search", "1.1.2"
-  gem "bridgetown-inline-svg", "~> 1.1"
-end
+gem "bridgetown-seo-tag", "~> 6.0"
+gem "bridgetown-feed", "~> 3.0"
+gem "bridgetown-quick-search", "~> 2.0"
 
 group :demo do
   gem 'rake'
   gem 'wunderbar'
   gem 'opal', '1.1.1'
 end
+
+gem "puma", "~> 6.0"
+
+gem "bridgetown-svg-inliner", "~> 2.0"

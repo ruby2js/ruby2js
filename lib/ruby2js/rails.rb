@@ -1,3 +1,5 @@
+# TODO: This feature is deprecated.
+
 require 'rails'
 require_relative './sprockets'
 

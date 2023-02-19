@@ -1,9 +1,13 @@
 ---
-order: 16
+order: 34
 title: JSX
-top_section: Filters
+top_section: Deprecations
 category: jsx
 ---
+
+{% rendercontent "docs/note", type: "warning" %}
+This filter has been deprecated and will be removed in Ruby2JS 6.0.
+{% endrendercontent %}
 
 The **jsx** filter will convert the types of scripts suitable for processing
 by the [react](react) filter into JSX.

@@ -3,9 +3,9 @@
 [![npm][npm]][npm-url]
 [![node][node]][node-url]
 
-Webpack loader to compile [Ruby2JS](https://www.ruby2js.com) (`.js.rb`) files to JavaScript.
+**This package is deprecated and will no longer be supported in future versions of Ruby2JS.**
 
-**Fun fact:** this loader itself is written in Ruby and compiles via Ruby2JS + Babel. 😁
+Webpack loader to compile [Ruby2JS](https://www.ruby2js.com) (`.js.rb`) files to JavaScript.
 
 ## Installation
 

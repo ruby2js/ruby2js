@@ -6,12 +6,12 @@ timezone: America/New_York
 collections:
   docs:
     output: true
-    permalink: /:collection/:path
+    permalink: /:collection/:path.*
     sort_by: order
     name: Documentation
   examples:
     output: true
-    permalink: /:collection/:path
+    permalink: /:collection/:path.*
     sort_by: order
     name: Examples
 

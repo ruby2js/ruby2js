@@ -6,7 +6,7 @@ categories: updates
 author: rubys
 ---
 
-Check it out [here](https://www.ruby2js.com/demo).
+Check it out [here](https://www.ruby2js.com/demo?preset=true).
 
 Because the conversion from Ruby to JavaScript is fast and runs right in your
 browser, this demo will update the converted output keystroke-by-keystroke as

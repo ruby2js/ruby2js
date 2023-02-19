@@ -1,9 +1,13 @@
 ---
-order: 27
+order: 40
 title: Underscore
-top_section: Filters
+top_section: Deprecations
 category: underscore
 ---
+
+{% rendercontent "docs/note", type: "warning" %}
+This filter has been deprecated and will be removed in Ruby2JS 6.0.
+{% endrendercontent %}
 
 The **Underscore** filter maps relevant Ruby methods to their [Underscore.js](https://underscorejs.org) library equivalents.
 

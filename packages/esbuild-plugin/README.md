@@ -13,6 +13,8 @@ npm install --save-dev @ruby2js/esbuild-plugin
 yarn add -D @ruby2js/esbuild-plugin
 ```
 
+You will also need Ruby installed and the Ruby2JS gem present in your project's Gemfile.
+
 ## Documentation
 
 esbuild doesn't have a configuration format per se, so you'll need to create a JavaScript file which uses esbuild's Build API if you don't have one already.
@@ -45,14 +47,13 @@ const ruby2js = require("@ruby2js/esbuild-plugin")
 
 // later in the build config:
   plugins: [
-    ruby2js({
-      eslevel: 2020,
-      filters: ["functions", "esm"]
-    })
+    ruby2js()
   ]
 ```
 
 Then simply run the config script (aka `yarn node esbuild.config.js`) to compile your Ruby2JS files to a JavaScript output bundle.
+
+The Ruby2JS build process will look for a `config/ruby2js.rb` file to set configuration options. Alternatively, you can use a "magic comment" such as `# ruby2js: preset` at the top of `.rb.js` files to use the standard preset configuration.
 
 See [Ruby2JS Options](https://www.ruby2js.com/docs/options) docs for a list of available options.
 

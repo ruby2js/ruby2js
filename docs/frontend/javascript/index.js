@@ -1,42 +1,26 @@
-import "@shoelace-style/shoelace/dist/themes/light.css"
-import {
-  setBasePath,
-  SlButton,
-  SlCheckbox,
-  SlDialog,
-  SlDropdown,
-  SlIcon,
-  SlInput,
-  SlMenu,
-  SlMenuItem,
-  SlTab,
-  SlTabGroup,
-  SlTabPanel,
-} from "@shoelace-style/shoelace"
+// Example Shoelace components. Mix 'n' match however you like!
+import "@shoelace-style/shoelace/dist/components/button/button.js"
+import "@shoelace-style/shoelace/dist/components/checkbox/checkbox.js"
+import "@shoelace-style/shoelace/dist/components/dialog/dialog.js"
+import "@shoelace-style/shoelace/dist/components/dropdown/dropdown.js"
+import "@shoelace-style/shoelace/dist/components/icon/icon.js"
+import "@shoelace-style/shoelace/dist/components/input/input.js"
+import "@shoelace-style/shoelace/dist/components/menu/menu.js"
+import "@shoelace-style/shoelace/dist/components/menu-item/menu-item.js"
+import "@shoelace-style/shoelace/dist/components/tab/tab.js"
+import "@shoelace-style/shoelace/dist/components/tab-group/tab-group.js"
+import "@shoelace-style/shoelace/dist/components/tab-panel/tab-panel.js"
 
-setBasePath(`${location.origin}/_bridgetown/static`)
-
-/* Define custom elements */
-customElements.define("sl-button", SlButton)
-customElements.define("sl-checkbox", SlCheckbox)
-customElements.define("sl-dialog", SlDialog)
-customElements.define("sl-dropdown", SlDropdown)
-customElements.define("sl-icon", SlIcon)
-customElements.define("sl-input", SlInput)
-customElements.define("sl-menu", SlMenu)
-customElements.define("sl-menu-item", SlMenuItem)
-customElements.define("sl-tab", SlTab)
-customElements.define("sl-tab-group", SlTabGroup)
-customElements.define("sl-tab-panel", SlTabPanel)
+// Use the public icons folder:
+import { setBasePath } from "@shoelace-style/shoelace/dist/utilities/base-path.js"
+setBasePath("/shoelace-assets")
 
 import "index.scss"
 
-// Import all javascript files from src/_components
-const componentsContext = require.context("bridgetownComponents", true, /.js$/)
-componentsContext.keys().forEach(componentsContext)
+import components from "bridgetownComponents/**/*.{js,jsx,js.rb,css}"
 
 import animateScrollTo from "animated-scroll-to"
-import "bridgetown-quick-search"
+import "bridgetown-quick-search/dist"
 import { toggleMenuIcon, addHeadingAnchors } from "./lib/functions.js.rb"
 
 document.addEventListener('turbo:load', () => {

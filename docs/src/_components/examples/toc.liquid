@@ -1,10 +1,3 @@
----
-name: Table of Contents
-description: Shows in the sidebar of the Documentation layout
-variables:
-  site: [object, Site liquid drop]
-  page: [object, Page liquid drop]
----
 <nav>
   <ul>
   {% assign current_section = "" %}
@@ -18,7 +11,7 @@ variables:
       {% assign active = "has-text-weight-bold" %}
     {% endif %}
     {% unless doc_page.hide_in_toc %}
-      <li><a href="{{ doc_page.url | replace: '/index', '/' }}" class="{{ active }}">{{ doc_page.toc_title | default: doc_page.title }}</a></li>
+      <li><a href="{{ doc_page.relative_url | replace: '/index', '/' }}" class="{{ active }}">{{ doc_page.toc_title | default: doc_page.title }}</a></li>
     {% endunless %}
   {% endfor %}
   </ul>

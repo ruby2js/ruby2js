@@ -1,3 +1,5 @@
+# ruby2js: preset, filters: camelCase
+
 export toggle_menu_icon = ->(button) do
   button.query_selector_all(".icon").each do |item|
     item.class_list.toggle "not-shown"

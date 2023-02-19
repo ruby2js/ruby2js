@@ -1,7 +1,7 @@
 ---
-order: 18
+order: 35
 title: matchAll
-top_section: Filters
+top_section: Deprecations
 category: matchall
 ---
 

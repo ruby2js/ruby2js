@@ -1,10 +1,13 @@
 ---
-order: 28
-next_page_order: 30
+order: 41
 title: Vue
-top_section: Filters
+top_section: Deprecations
 category: vue
 ---
+
+{% rendercontent "docs/note", type: "warning" %}
+This filter has been deprecated and will be removed in Ruby2JS 6.0.
+{% endrendercontent %}
 
 The **Vue** filter enables you to build [Vue.js](https://vuejs.org/) components.
 

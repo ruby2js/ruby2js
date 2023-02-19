@@ -6,7 +6,9 @@ category: snowpack
 hide_in_toc: true
 ---
 
-
+{% rendercontent "docs/note", type: "warning" %}
+This package is no longer supported. We recommend that you use esbuild for frontend compilation and bundling.
+{% endrendercontent %}
 
 The [`@ruby2js/snowpack-plugin`](https://github.com/ruby2js/ruby2js/tree/master/packages/snowpack-plugin)
 lets you compile `.rb.js` files to JavaScript via Snowpack.

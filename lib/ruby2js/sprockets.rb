@@ -1,4 +1,6 @@
 # frozen_string_literal: true
+# TODO: This feature is deprecated.
+
 require 'sprockets/source_map_utils'
 require 'ruby2js'
 require 'ruby2js/version'

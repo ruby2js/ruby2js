@@ -1,3 +1,5 @@
+# TODO: This feature is deprecated.
+
 # A filter to support usage of React.  Overview of translations provided:
 #   * classes that inherit from React are converted to React.createClass
 #     calls.

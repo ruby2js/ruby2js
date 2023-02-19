@@ -5,6 +5,10 @@ top_section: Introduction
 category: integrations
 ---
 
+{% rendercontent "docs/note", type: "warning" %}
+Heads up: we're in the process of consolidating our supported tech stack. Going forward we'll primarily focus on frontend code compiled via esbuild, which can work in Rails, Bridgetown, and other web projects. (And of course you can build more elaborate solutions using the [CLI](/docs/cli) or direct Ruby API.)
+{% endrendercontent %}
+
 # Ruby back-end servers
 
 * [Rails](../examples/rails/) integration is provided

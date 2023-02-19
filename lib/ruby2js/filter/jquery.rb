@@ -1,3 +1,5 @@
+# TODO: This feature is deprecated.
+
 require 'ruby2js'
 #
 # Jquery functions are either invoked using jQuery() or, more commonly, $().

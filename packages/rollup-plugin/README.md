@@ -3,6 +3,8 @@
 [![npm][npm]][npm-url]
 [![node][node]][node-url]
 
+**This package is deprecated and will no longer be supported in future versions of Ruby2JS.**
+
 Integration between Rollup and Ruby2JS
 
 ## Installation

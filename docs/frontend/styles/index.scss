@@ -1,4 +1,5 @@
-
+/* Import the base Shoelace stylesheet: */
+@import "@shoelace-style/shoelace/dist/themes/light.css";
 
 $grey-darker: #2a2a26;
 $grey-dark: #3e3e3e;
@@ -64,7 +65,7 @@ footer.footer strong {
 @import "syntax.scss";
 @import "typography.scss";
 
-@import "docs/note.scss";
-@import "shared/navbar.scss";
+@import "../../src/_components/docs/note.scss";
+@import "../../src/_components/shared/navbar.scss";
 
 @import "livedemo.scss";
