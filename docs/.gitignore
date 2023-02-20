@@ -35,6 +35,6 @@ yarn-debug.log*
 .yarn-integrity
 
 # demo
-src/demo
+#src/demo
 
 src/shoelace-assets
