@@ -1,6 +1,6 @@
 const build = require("./config/esbuild.defaults.js")
 
-const ruby2js = require("../packages/esbuild-plugin/src/index.js")
+const ruby2js = require("@ruby2js/esbuild-plugin")
 
 // Update this if you need to configure a destination folder other than `output`
 const outputFolder = "output"

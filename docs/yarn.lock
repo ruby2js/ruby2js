@@ -426,6 +426,13 @@
     estree-walker "^1.0.1"
     picomatch "^2.2.2"
 
+"@ruby2js/esbuild-plugin@^1.0.0":
+  version "1.0.0"
+  resolved "https://registry.yarnpkg.com/@ruby2js/esbuild-plugin/-/esbuild-plugin-1.0.0.tgz#6ba798a4bc4e59a899ceb503c1ff9af9e6183582"
+  integrity sha512-bP9+kf1VrRxKux1nKi+NfLOE2STl6ea0Ym9C1QFDIR1fpqDyLKSyhVrDYMYRAk6ZxGIyKS/JfbcQB+e35v6qgQ==
+  dependencies:
+    convert-source-map "^1.8.0"
+
 "@shoelace-style/animations@^1.1.0":
   version "1.1.0"
   resolved "https://registry.yarnpkg.com/@shoelace-style/animations/-/animations-1.1.0.tgz#17539abafd6dcbf2a79e089e1593175e9f7835b5"
@@ -569,10 +576,10 @@ caniuse-lite@^1.0.30001426, caniuse-lite@^1.0.30001449:
   optionalDependencies:
     fsevents "~2.3.2"
 
-convert-source-map@^2.0.0:
-  version "2.0.0"
-  resolved "https://registry.yarnpkg.com/convert-source-map/-/convert-source-map-2.0.0.tgz#4b560f649fc4e918dd0ab75cf4961e8bc882d82a"
-  integrity sha512-Kvp459HrV2FEJ1CAsi1Ku+MY3kasH19TFykTz2xWmMeq6bk2NU3XXvfJ+Q61m0xktWwt+1HSYf3JZsTms3aRJg==
+convert-source-map@^1.8.0:
+  version "1.9.0"
+  resolved "https://registry.yarnpkg.com/convert-source-map/-/convert-source-map-1.9.0.tgz#7faae62353fb4213366d0ca98358d22e8368b05f"
+  integrity sha512-ASFBup0Mz1uyiIjANan1jzLQami9z1PoYSZCiiYW2FczPbenXc45FZdBZLzOT+r6+iciuEModtmCti+hjaAk0A==
 
 crelt@^1.0.5:
   version "1.0.5"
