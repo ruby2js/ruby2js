@@ -1,6 +1,10 @@
-require "bridgetown"
+begin
+  require "bridgetown"
 
-Bridgetown.load_tasks
+  Bridgetown.load_tasks
+rescue LoadError => e
+  puts "Warning: Bridgetown gem not available in this environment. (OK when compiling JS packages)"
+end
 
 #
 # Standard set of tasks, which you can customize if you wish:

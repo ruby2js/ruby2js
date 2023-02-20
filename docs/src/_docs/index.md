@@ -29,11 +29,16 @@ require 'ruby2js'
 puts Ruby2JS.convert("a={age:3}\na.age+=1")
 ```
 
-With filter:
+With our recommended "preset" configuration:
 
 ```ruby
-require 'ruby2js/filter/functions'
-puts Ruby2JS.convert('"2A".to_i(16)')
+puts Ruby2JS.convert("a={age:3}\na.age+=1", preset: true)
+```
+
+With just the functions filter:
+
+```ruby
+puts Ruby2JS.convert('"2A".to_i(16)', filters: [:functions])
 ```
 
 Host variable substitution:
@@ -42,23 +47,17 @@ Host variable substitution:
  puts Ruby2JS.convert("@name", ivars: {:@name => "Joe"})
 ```
 
-Enable ES2015 support:
+Enable ES2021 support (default with the preset configuration):
 
 ```ruby
-puts Ruby2JS.convert('"#{a}"', eslevel: 2015)
+puts Ruby2JS.convert('"#{a}"', eslevel: 2020)
 ```
 
 {% rendercontent "docs/note" %}
 [Read more information](/docs/eslevels) on how ES level options affect the JS output.
 {% endrendercontent %}
 
-Enable strict support:
-
-```ruby
-puts Ruby2JS.convert('a=1', strict: true)
-```
-
-Emit strict equality comparisons:
+Emit strict equality comparisons (aka `==` becomes `===`):
 
 ```ruby
 puts Ruby2JS.convert('a==1', comparison: :identity)
@@ -79,65 +78,7 @@ puts Ruby2JS.convert('class C; def initialize; @f=1; end; end',
 
 {% rendercontent "docs/note", extra_margin: true %}
 Conversions can be explored interactively using the
-[demo](/docs/running-the-demo) provided. (**[Online Version](/demo)**)
+[demo](/docs/running-the-demo) provided. (**[Try It Online](/demo?preset=true)**)
 {% endrendercontent %}
 
-## Create a Configuration
-
-There are a number of [configuration options](/docs/options) available for both the converter itself as well as any filters you choose to add.
-
-If you find yourself needing a centralized location to specify these options for your project, create an `rb2js.config.rb` file in your project root. Example:
-
-```ruby
-require "ruby2js/filter/functions"
-require "ruby2js/filter/camelCase"
-require "ruby2js/filter/return"
-require "ruby2js/filter/esm"
-require "ruby2js/filter/tagged_templates"
-
-require "json"
-
-module Ruby2JS
-  class Loader
-    def self.options
-      # Change the options for your configuration here:
-      {
-        eslevel: 2021,
-        include: :class,
-        underscored_private: true
-      }
-    end
-
-    def self.process(source)
-      Ruby2JS.convert(source, self.options).to_s
-    end
-
-    def self.process_with_source_map(source)
-      conv = Ruby2JS.convert(source, self.options)
-      {
-        code: conv.to_s,
-        sourceMap: conv.sourcemap
-      }.to_json
-    end
-  end
-end
-```
-
-Then you can simply require this file from inside your project.
-
-```ruby
-# some_other_script.rb
-
-require_relative "./rb2js.config"
-
-ruby_code = <<~RUBY
-  export toggle_menu_icon = ->(button) do
-    button.query_selector_all(".icon").each do |item|
-      item.class_list.toggle "not-shown"
-    end
-    button.query_selector(".icon:not(.not-shown)").class_list.add("shown")
-  end
-RUBY
-
-js_code = Ruby2JS::Loader.process(ruby_code)
-```
+Continue to the next page to learn all about how to use the "preset" configuration or build your own.

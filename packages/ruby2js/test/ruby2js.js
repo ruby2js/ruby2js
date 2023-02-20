@@ -76,6 +76,27 @@ describe('ruby2js external options', () => {
     )
   });
 
+  // it('supports config/ruby2js.rb', async () => {
+  //   try {
+  //     fs.mkdirSync("config", { recursive: true })
+  //     fs.writeFileSync(`config/ruby2js.rb`, `
+  //       filter :functions
+  //       eslevel 2021
+  //       private_field_ivars
+  //     `);
+
+  //     Ruby2JS.load_options()
+  //   } finally {
+  //     fs.unlinkSync(`config/ruby2js.rb`)
+  //     fs.rmdirSync("config")
+  //   }
+
+  //   assert.strictEqual(
+  //     to_js('puts "0x2A = #{"2A".to_i(16)}"; class Bar; def whoa(); @foo = 123; end; end'),
+  //     'console.log(`0x2A = ${parseInt("2A", 16)}`)'
+  //   )
+  // });
+
   it('supports RUBY2JS_OPTIONS environment variable', async () => {
     try {
       process.env.RUBY2JS_OPTIONS = '{"eslevel": 2021, "filters": ["functions"]}';

@@ -5,6 +5,10 @@ top_section: Deprecations
 category: matchall
 ---
 
+{% rendercontent "docs/note", type: "warning" %}
+This filter has been deprecated and will be removed in Ruby2JS 6.0.
+{% endrendercontent %}
+
 For ES level < 2020:
 
 * maps `str.matchAll(pattern).forEach {}` to 

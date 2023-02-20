@@ -40,14 +40,6 @@ namespace :packages do
       sh "cp ../ruby2js/ruby2js.js #{npm_root}/@ruby2js/ruby2js/ruby2js.js"
       sh 'yarn test'
     end
-
-    Dir.chdir 'packages/webpack-loader' do
-      npm_root = `npm root`.strip
-      sh 'yarn install' unless File.exist? 'yarn.lock'
-      sh "cp ../ruby2js/ruby2js.js #{npm_root}/@ruby2js/ruby2js/ruby2js.js"
-      sh 'yarn prepare-release'
-      sh 'yarn test'
-    end
   end
 end
 

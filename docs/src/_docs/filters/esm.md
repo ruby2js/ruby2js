@@ -108,8 +108,7 @@ this function returns `nil`, then no imports will be added.
 The esm filter is able to recognize if you are defining a class or function
 within the code itself and it won't add that import statement accordingly.
 If for some reason you wish to disable autoimports entirely on a file-by-file
-basis (for instance when using the Webpack loader), you can add a magic comment
-to the top of the code:
+basis, you can add a magic comment to the top of the code:
 
 ```ruby
 require "ruby2js/filter/esm"

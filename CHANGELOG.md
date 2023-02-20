@@ -5,8 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [5.1.0] - 2023-02-20
 
+- Many filters and other project features deprecated for future maintainability (see [blog announcement](https://www.ruby2js.com/updates/future-of-ruby2js/)).
+- The Vite and Rollup JS packages are looking for a new maintainer. Please let us know in the [community GitHub Discussions](https://github.com/ruby2js/ruby2js/discussions) if you'd like to contribute.
+- The Node version of Ruby2JS will require minimum version 14
 - Create a preset option to set sane default behavior [#178]
 - New configuration DSL and per-file magic comments [#182]
 - esbuild: change to use Ruby platform for Ruby2JS compilation [#183]

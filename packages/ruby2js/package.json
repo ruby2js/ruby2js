@@ -1,6 +1,6 @@
 {
   "name": "@ruby2js/ruby2js",
-  "version": "5.0.1",
+  "version": "5.1.0",
   "description": "Ruby to Javascript transpiler",
   "contributors": [
     "Sam Ruby",
@@ -8,7 +8,7 @@
   ],
   "license": "MIT",
   "engines": {
-    "node": ">= 10.13.0"
+    "node": ">= 14"
   },
   "main": "ruby2js.js",
   "module": "ruby2js.mjs",

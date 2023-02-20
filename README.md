@@ -20,26 +20,7 @@ Basic:
 
 ```ruby
 require 'ruby2js'
-puts Ruby2JS.convert("a={age:3}\na.age+=1")
-```
-
-With filter:
-
-```ruby
-require 'ruby2js/filter/functions'
-puts Ruby2JS.convert('"2A".to_i(16)')
-```
-
-Host variable substitution:
-
-```ruby
- puts Ruby2JS.convert("@name", ivars: {:@name => "Joe"})
-```
-
-Enable ES2015 support:
-
-```ruby
-puts Ruby2JS.convert('"#{a}"', eslevel: 2015)
+puts Ruby2JS.convert("a={age:3}\na.age+=1", preset: true)
 ```
 
 ## Testing

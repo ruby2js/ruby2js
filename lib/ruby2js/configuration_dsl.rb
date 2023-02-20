@@ -18,7 +18,8 @@ module Ruby2JS
     end
 
     def remove_filter(name)
-      @options[:filters]&.reject! { _1 == name }
+      @options[:disable_filters] ||= []
+      @options[:disable_filters] << name
     end
 
     def eslevel(level)
@@ -58,10 +59,6 @@ module Ruby2JS
       @options[:or] = :nullish
     end
 
-    def use_strict(bool = true)
-      @options[:strict] = bool
-    end
-
     def autoimport(identifier = nil, file = nil, &block)
       if block
         @options[:autoimports] = block
@@ -74,9 +71,21 @@ module Ruby2JS
       @options[:autoimports][identifier] = file
     end
 
+    def autoimport_defs(value)
+      @options[:defs] = value
+    end
+
+    def autoexports(value)
+      @options[:autoexports] = value
+    end
+
     def include_method(method_name)
       @options[:include] ||= []
       @options[:include] << method_name unless @options[:include].include?(method_name)
+    end
+
+    def template_literal_tags(tags)
+      @options[:template_literal_tags] = tags
     end
 
     def to_h

@@ -1,6 +1,6 @@
 # @ruby2js/vite-plugin
 
-**This package is deprecated and will no longer be supported in future versions of Ruby2JS.**
+**This package is looking for a new maintainer! Please let us know in the [community GitHub Discussions](https://github.com/ruby2js/ruby2js/discussions) if you'd like to contribute.**
 
 Integration between Vite and Ruby2JS
 

@@ -6,7 +6,7 @@ category: integrations
 ---
 
 {% rendercontent "docs/note", type: "warning" %}
-Heads up: we're in the process of consolidating our supported tech stack. Going forward we'll primarily focus on frontend code compiled via esbuild, which can work in Rails, Bridgetown, and other web projects. (And of course you can build more elaborate solutions using the [CLI](/docs/cli) or direct Ruby API.)
+Heads up: we're in the process of consolidating our supported tech stack. Going forward we'll primarily focus on [frontend code compiled via esbuild](https://github.com/ruby2js/ruby2js/tree/master/packages/esbuild-plugin), which can work in Rails, Bridgetown, and other web projects. (And of course you can build more elaborate solutions using the [CLI](/docs/cli) or direct Ruby API.) [Read the announcement for further details.](/updates/future-of-ruby2js/)
 {% endrendercontent %}
 
 # Ruby back-end servers
