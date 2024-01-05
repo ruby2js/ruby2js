@@ -2,6 +2,7 @@ source 'https://rubygems.org'
 
 gem 'rake'
 gem 'wunderbar', '>= 0.23.0'
+gem 'rack', '~> 2.2'
 gem 'ruby2js', path: File.expand_path('..', __dir__)
 gem 'sinatra'
 gem 'nokogumbo'

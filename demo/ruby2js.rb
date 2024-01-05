@@ -57,9 +57,11 @@ def parse_request(env=ENV)
 
   opts.on('--preset', "use sane defaults (modern eslevel & common filters)") {options[:preset] = true}
 
-  opts.on('-C', '--config [FILE]', "configuration file to use (default is config/ruby2js.rb)") {|filename|
-    options[:config_file] = filename
-  }
+  unless env['QUERY_STRING']
+    opts.on('-C', '--config [FILE]', "configuration file to use (default is config/ruby2js.rb)") {|filename|
+      options[:config_file] = filename
+    }
+  end
 
   opts.on('--autoexports [default]', "add export statements for top level constants") {|option|
     options[:autoexports] = option ? option.to_sym : true
