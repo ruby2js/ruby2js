@@ -60,6 +60,7 @@ module Ruby2JS
         Parser::AST::Node.new type, args
       end
 
+      # update existing node
       def S(type, *args)
         @ast.updated(type, args)
       end

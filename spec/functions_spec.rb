@@ -156,6 +156,10 @@ describe Ruby2JS::Filter::Functions do
       to_js( 'x.upcase()' ).must_equal 'x.toUpperCase()'
     end
 
+    it "should handle chained methods" do
+      to_js( 'x.strip.downcase ').must_equal 'x.trim().toLowerCase()'
+    end
+
     it 'should handle start_with?' do
       to_js( 'x.start_with?(y)' ).must_equal 'x.substring(0, y.length) == y'
       to_js( 'x.start_with?("z")' ).must_equal 'x.substring(0, 1) == "z"'

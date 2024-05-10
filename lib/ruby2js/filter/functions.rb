@@ -266,25 +266,25 @@ module Ruby2JS
 
         elsif [:start_with?, :end_with?].include? method and args.length == 1
           if es2015
-	    if method == :start_with?
+            if method == :start_with?
               process S(:send, target, :startsWith, *args)
             else
               process S(:send, target, :endsWith, *args)
             end
           else
-	    if args.first.type == :str
-	      length = S(:int, args.first.children.first.length)
-	    else
-	      length = S(:attr, *args, :length)
-	    end
+            if args.first.type == :str
+              length = S(:int, args.first.children.first.length)
+            else
+              length = S(:attr, *args, :length)
+            end
 
-	    if method == :start_with?
-	      process S(:send, S(:send, target, :substring, s(:int, 0),
-		length), :==, *args)
-	    else
-	      process S(:send, S(:send, target, :slice,
-		S(:send, length, :-@)), :==, *args)
-	    end
+            if method == :start_with?
+              process S(:send, S(:send, target, :substring, s(:int, 0),
+                length), :==, *args)
+            else
+              process S(:send, S(:send, target, :slice,
+                S(:send, length, :-@)), :==, *args)
+            end
           end
 
         elsif method == :clear and args.length == 0 and node.is_method?
@@ -321,10 +321,10 @@ module Ruby2JS
           process S(:send, target, :forEach, *args)
 
         elsif method == :downcase and args.length == 0
-          process S(:send, target, :toLowerCase)
+          process s(:send, target, :toLowerCase)
 
         elsif method == :upcase and args.length == 0
-          process S(:send, target, :toUpperCase)
+          process s(:send, target, :toUpperCase)
 
         elsif method == :strip and args.length == 0
           process s(:send, target, :trim)
