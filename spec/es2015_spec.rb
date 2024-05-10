@@ -373,14 +373,17 @@ describe "ES2015 support" do
     end
 
     it "should handle super" do
-      to_js('class A; end; class B < A; def initialize(x); super; end; end').
+      class_definition = 'class A; end; class B < A;'
+      to_js(class_definition + ' def initialize(x); super; end; end').
         must_equal 'class A {}; class B extends A {constructor(x) {super(x)}}'
-      to_js('class A; end; class B < A; def initialize(x); super(3); end; end').
+      to_js(class_definition + ' def initialize(x); super(3); end; end').
         must_equal 'class A {}; class B extends A {constructor(x) {super(3)}}'
-      to_js('class A; end; class B < A; def foo(x); super; end; end').
+      to_js(class_definition + ' def foo(x); super; end; end').
         must_equal 'class A {}; class B extends A {foo(x) {super.foo(x)}}'
-      to_js('class A; end; class B < A; def foo(x); super(3); end; end').
+      to_js(class_definition + ' def foo(x); super(3); end; end').
         must_equal 'class A {}; class B extends A {foo(x) {super.foo(3)}}'
+      to_js(class_definition + ' def _render(force = false, options = {}); super; end; end').
+        must_equal 'class A {}; class B extends A {_render(force=false, options={}) {super._render(force, options)}}'
     end
 
     it "should handle class super" do

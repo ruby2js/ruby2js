@@ -36,7 +36,10 @@ module Ruby2JS
         end
 
         put '('
-        parse s(:args, *args)
+        cleaned_args = args.map do |arg| # FIX: #212
+          arg.type == :optarg ? s(:arg, arg.children[0]) : arg
+        end
+        parse s(:args, *cleaned_args)
         put ')'
       else
         parse @class_parent
