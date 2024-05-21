@@ -224,7 +224,7 @@ module Ruby2JS
       file,line = source.source_location
       source = IO.read(file)
       ast, comments = parse(source)
-      comments = Parser::Source::Comment.associate(ast, comments) if ast
+      comments = Parser::Source::Comment.associate_by_identity(ast, comments) if ast
       ast = find_block( ast, line )
       options[:file] ||= file
     elsif Parser::AST::Node === source
@@ -232,7 +232,7 @@ module Ruby2JS
       source = ast.loc.expression.source_buffer.source
     else
       ast, comments = parse( source, options[:file] )
-      comments = ast ? Parser::Source::Comment.associate(ast, comments) : {}
+      comments = ast ? Parser::Source::Comment.associate_by_identity(ast, comments) : {}
     end
 
     # check if magic comment is present

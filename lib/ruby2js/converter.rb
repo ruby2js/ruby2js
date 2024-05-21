@@ -203,12 +203,32 @@ module Ruby2JS
       end
     end
 
+    def get_comments(ast)
+      result = []
+
+      if Parser::AST::Node === ast
+        ast.children.each do |child|
+          comment = @comments[child]
+          result << comment.map {|c| c.text }.first if comment&.size > 0
+          more = get_comments(child)
+          result += more if more.size > 0
+        end  
+      end
+
+      return result
+    end
+
     def parse(ast, state=:expression)
       oldstate, @state = @state, state
       oldast, @ast = @ast, ast
       return unless ast
 
       handler = @handlers[ast.type]
+
+      if state == :statement
+        @comment = get_comments(ast).first&.strip
+        @pragma = $1.downcase if @comment =~ /#\s+Pragma:\s*([^\s]+)/i
+      end
 
       unless handler
         raise Error.new("unknown AST type #{ ast.type }", ast)
