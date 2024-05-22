@@ -227,7 +227,7 @@ module Ruby2JS
 
       if state == :statement
         @comment = get_comments(ast).first&.strip
-        @pragma = $1.downcase if @comment =~ /#\s+Pragma:\s*([^\s]+)/i
+        @pragma = @comment =~ /#\s+Pragma:\s*([^\s]+)/i ? $1.downcase : nil
       end
 
       unless handler
