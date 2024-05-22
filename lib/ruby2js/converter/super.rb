@@ -24,23 +24,29 @@ module Ruby2JS
       end
 
       if es2015
+        add_args = true
+
         if @class_method
           parse @class_parent
           put '.'
           put method.children[0]
+          add_args = method.is_method?
         elsif method.children[0] == :constructor
           put 'super'
         else
           put 'super.'
           put method.children[0]
+          add_args = method.is_method?
         end
 
-        put '('
-        cleaned_args = args.map do |arg| # FIX: #212
-          arg.type == :optarg ? s(:arg, arg.children[0]) : arg
+        if add_args
+          put '('
+          cleaned_args = args.map do |arg| # FIX: #212
+            arg.type == :optarg ? s(:arg, arg.children[0]) : arg
+          end
+          parse s(:args, *cleaned_args)
+          put ')'
         end
-        parse s(:args, *cleaned_args)
-        put ')'
       else
         parse @class_parent
 

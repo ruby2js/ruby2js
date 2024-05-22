@@ -15,6 +15,12 @@ module Ruby2JS
     handle :and, :or do |left, right|
       type = @ast.type
 
+      default_or = ' || '
+
+      if es2020
+        # Override '||' and use '??'
+        default_or = ' ?? ' if @pragma == '??'
+      end
 
       if es2020 and type == :and
         node = rewrite(left, right)
@@ -36,7 +42,7 @@ module Ruby2JS
       rgroup = true if right.type == :begin
 
       put '(' if lgroup; parse left; put ')' if lgroup
-      put (type==:and ? ' && ' : ((@or == :nullish and es2020) ? ' ?? ' : ' || '))
+      put (type==:and ? ' && ' : ((@or == :nullish and es2020) ? ' ?? ' : default_or))
       put '(' if rgroup; parse right; put ')' if rgroup
     end
 
