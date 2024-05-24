@@ -19,6 +19,11 @@ describe "ES2018 support" do
     end
   end
 
+  it "should handle super getter merge" do
+    to_js_fn('class A; end; class B < A; def self.foo; super.merge(o: 1); end; end').
+      must_equal 'class A {}; class B extends A {static get foo() {return {...A.foo, o: 1}}}'
+  end
+
   describe 'keyword arguments' do
     it 'should handle rest arguments with keyword arguments in methods' do
       skip if RUBY_VERSION =~ /^(1\.9|2\.0)/
