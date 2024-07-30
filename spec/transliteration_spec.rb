@@ -364,12 +364,16 @@ describe Ruby2JS do
       to_js('x = ()').must_equal 'var x = null'
     end
   end
-  
+
   describe 'array push' do
     it "should convert << statements to .push calls" do
       to_js( 'a << b' ).must_equal 'a.push(b)'
     end
-    
+
+    it "should convert multiple << statements to multiple .push calls" do
+      to_js( 'a << b << c << d << e' ).must_equal 'a.push(b); a.push(c); a.push(d); a.push(e)'
+    end
+
     it "should leave << expressions alone" do
       to_js( 'y = a << b' ).must_equal 'var y = a << b'
     end
