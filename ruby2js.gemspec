@@ -21,5 +21,5 @@ Gem::Specification.new do |s|
   s.executables << 'ruby2js'
 
   s.add_dependency('parser')
-  s.add_dependency('regexp_parser', '~> 2.1.1')
+  s.add_dependency('regexp_parser', '~> 2.9')
 end
