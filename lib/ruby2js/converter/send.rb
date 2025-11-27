@@ -235,7 +235,7 @@ module Ruby2JS
 
       elsif method == :<<
         if @state == :statement
-          # Handle chained << operations by converting them to push() method calls
+          # Handle chained << operations by converting to a single push() call
           current = receiver
           operations = [args.first]
 
@@ -245,11 +245,13 @@ module Ruby2JS
             current = current.children[0]
           end
 
-          # Generate a series of push() calls for each operation in the chain
-          operations.each do |arg|
-            parse current ; put '.push(' ; parse arg ; put ')'
-            put '; ' unless arg == operations.last
+          # Generate a single push() call with multiple arguments
+          parse current; put '.push('
+          operations.each_with_index do |arg, index|
+            put ', ' if index > 0
+            parse arg
           end
+          put ')'
         else
           # If not in statement context, fall back to original behavior
           group_receiver ? group(receiver) : parse(receiver)
