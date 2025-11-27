@@ -175,20 +175,22 @@ module Ruby2JS
     end
 
     # extract comments that either precede or are included in the node.
-    # remove from the list this node may appear later in the tree.
+    # remove from the list so this node's comments won't appear again later in the tree.
     def comments(ast)
+      comment_list, comment_key = find_comment_entry(ast)
+
       if ast.loc and ast.loc.respond_to? :expression
         expression = ast.loc.expression
 
-        list = @comments[ast].select do |comment|
+        list = comment_list.select do |comment|
           expression.source_buffer == comment.loc.expression.source_buffer and
           comment.loc.expression.begin_pos < expression.end_pos
         end
       else
-        list = @comments[ast]
+        list = comment_list
       end
 
-      @comments[ast] -= list
+      @comments[comment_key] -= list
 
       list.map do |comment|
         if comment.text.start_with? '=begin'
@@ -203,6 +205,72 @@ module Ruby2JS
       end
     end
 
+    private
+
+    # Find comments for an AST node using multiple lookup strategies:
+    # 1. Direct lookup by object identity
+    # 2. Location-based lookup (for nodes recreated by filters with same location)
+    # 3. First-child location lookup (for synthetic nodes wrapping real content)
+    # Returns [comment_list, comment_key] where comment_key is used for removal
+    def find_comment_entry(ast)
+      # First try direct lookup by object identity
+      comment_list = @comments[ast]
+      return [comment_list, ast] unless comment_list.empty?
+
+      # If ast has location info, try location-based lookup
+      # This handles cases where filters created new nodes with same location
+      if ast.loc && ast.loc.respond_to?(:expression) && ast.loc.expression
+        expression = ast.loc.expression
+        @comments.each do |key, value|
+          next if key == :_raw || value.empty?
+          next unless key.respond_to?(:loc) && key.loc&.respond_to?(:expression)
+          key_expr = key.loc.expression
+          next unless key_expr
+          if key_expr.source_buffer == expression.source_buffer &&
+             key_expr.begin_pos == expression.begin_pos &&
+             key_expr.end_pos == expression.end_pos
+            return [value, key]
+          end
+        end
+      end
+
+      # For synthetic nodes (no location), try to find comments via first child with location
+      if !ast.loc || !ast.loc.respond_to?(:expression) || !ast.loc.expression
+        first_loc = find_first_location(ast)
+        if first_loc
+          @comments.each do |key, value|
+            next if key == :_raw || value.empty?
+            next unless key.respond_to?(:loc) && key.loc&.respond_to?(:expression)
+            key_expr = key.loc.expression
+            next unless key_expr && key_expr.source_buffer == first_loc.source_buffer
+            # If the key starts at or near where our content starts, use its comments
+            if key_expr.begin_pos <= first_loc.begin_pos + 1
+              return [value, key]
+            end
+          end
+        end
+        # If no first_loc (empty synthetic node), don't try to find comments
+      end
+
+      [[], ast]
+    end
+
+    # Find the first source location in an AST tree (depth-first)
+    def find_first_location(ast)
+      return nil unless ast.respond_to?(:children)
+      if ast.loc && ast.loc.respond_to?(:expression) && ast.loc.expression
+        return ast.loc.expression
+      end
+      ast.children.each do |child|
+        next unless child.is_a?(Parser::AST::Node)
+        loc = find_first_location(child)
+        return loc if loc
+      end
+      nil
+    end
+
+    public
+
     def parse(ast, state=:expression)
       oldstate, @state = @state, state
       oldast, @ast = @ast, ast
@@ -214,7 +282,7 @@ module Ruby2JS
         raise Error.new("unknown AST type #{ ast.type }", ast)
       end
 
-      if state == :statement and not @comments[ast].empty?
+      if state == :statement
         comments(ast).each {|comment| puts comment.chomp}
       end
 
@@ -296,6 +364,7 @@ module Ruby2JS
   end
 end
 
+# Add is_method? to Parser::AST::Node for distinguishing method calls from property access
 module Parser
   module AST
     class Node

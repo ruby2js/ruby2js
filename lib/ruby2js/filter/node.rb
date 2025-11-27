@@ -370,6 +370,19 @@ module Ruby2JS
       def on___FILE__(node)
         s(:attr, nil, :__filename)
       end
+
+      # Handle __FILE__ from Prism::Translation::Parser which produces :str nodes
+      def on_str(node)
+        # Prism converts __FILE__ to s(:str, filename) where filename matches buffer name
+        if node.loc&.expression
+          source = node.loc.expression.source
+          buffer_name = node.loc.expression.source_buffer.name
+          if source == '__FILE__' && node.children.first == buffer_name
+            return s(:attr, nil, :__filename)
+          end
+        end
+        super
+      end
     end
 
     DEFAULTS.push Node

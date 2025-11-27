@@ -82,6 +82,15 @@ module Ruby2JS
       end
 
       def on_send(node)
+        # :attr nodes with :~ method come from consecutive tilde handling
+        # Pass them through to the converter which handles :attr
+        if node.type == :attr
+          return node.updated(nil, [
+            node.children[0] ? process(node.children[0]) : nil,
+            *node.children[1..-1]
+          ])
+        end
+
         if [:call, :[]].include? node.children[1] and node.children.first
           # map $$.call(..), $$.(..), and $$[...] to $(...)
           target = process(node.children.first)
@@ -122,7 +131,10 @@ module Ruby2JS
             #    (send (send (send (send nil :a) :b) :c) :~)
             #   after:
             #    (send (send (send nil "$" (send nil :a)) :b) :c)
-            if tnode.type == :send and tnode.children[0]
+            if tnode.type == :attr
+              # :attr nodes created by consecutive tilde handling should pass through
+              tnode
+            elsif tnode.type == :send and tnode.children[0]
               stopProps = true if tnode.children[1] == :[]
               if tnode.children[1] == :~ and tnode.children[0].children[1] == :~
                 # consecutive tildes
