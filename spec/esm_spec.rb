@@ -125,6 +125,11 @@ describe Ruby2JS::Filter::ESM do
       to_js('Foo=1', autoexports: true).
         must_equal 'export const Foo = 1'
     end
+
+    it "should autoexport modules with constants" do
+      to_js('module Foo; BAR = 1; def baz; BAR; end; end', autoexports: true).
+        must_include 'export const Foo = '
+    end
   end
 
   describe "autoexports default option" do

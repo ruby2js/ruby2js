@@ -104,6 +104,19 @@ module Ruby2JS
         else
           put 'const '
         end
+      elsif node.respond_to?(:type) && node.type == :module
+        # Check if module will go through IIFE path (has non-def/module children)
+        body = node.children[1..-1]
+        while body.length == 1 and body.first.respond_to?(:type) and body.first.type == :begin
+          body = body.first.children
+        end
+        uses_iife = body.length > 0 && !body.all? { |child|
+          child.respond_to?(:type) && (
+            %i[def module].include?(child.type) ||
+            (es2015 && child.type == :class && child.children[1] == nil)
+          )
+        }
+        put 'const ' if uses_iife
       elsif node.respond_to?(:type) &&
         node.type == :array &&
         node.children[0].respond_to?(:type) &&
