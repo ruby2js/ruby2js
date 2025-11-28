@@ -14,7 +14,7 @@
     "@codemirror/stream-parser": "^0.17.1",
     "@rollup/plugin-node-resolve": "^11.1.1",
     "@ruby2js/esbuild-plugin": "^1.0.0",
-    "esbuild": "^0.15.12",
+    "esbuild": "^0.25.0",
     "glob": "^8.0.1",
     "postcss": "^8.4.12",
     "postcss-flexbugs-fixes": "^5.0.2",
