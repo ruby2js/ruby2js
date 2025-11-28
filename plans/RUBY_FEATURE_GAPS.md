@@ -1,6 +1,6 @@
 # Ruby Feature Gaps Plan
 
-## Status: Planning
+## Status: Stages 0-2 Complete
 
 This plan identifies Ruby language features not currently supported by Ruby2JS and evaluates which should be implemented.
 
@@ -269,26 +269,17 @@ end
 
 ### 12. Endless Method Definition (Ruby 3.0+)
 
-**Current state:** Partially works but has a bug - missing `return` statement.
+**Status:** ✅ IMPLEMENTED
 
 **Example:**
 ```ruby
 def square(x) = x * x
 ```
 
-**Current output (buggy):**
-```javascript
-function square(x) {x * x}  // Missing return!
-```
-
-**Expected output:**
+**Output:**
 ```javascript
 function square(x) {return x * x}
 ```
-
-**Priority:** High - Bug fix needed
-**Complexity:** Low - Just need to add return for endless methods
-**Recommendation:** Fix the missing return statement
 
 ### 13. Anonymous Block Forwarding (Ruby 3.1+)
 
@@ -304,9 +295,7 @@ end
 
 ### 14. Argument Forwarding (`...`) (Ruby 2.7+)
 
-**Node type:** `forward_args`, `forwarded_args`
-
-**Current state:** NOT IMPLEMENTED - Raises "unknown AST type forwarded_args"
+**Status:** ✅ IMPLEMENTED
 
 **Example:**
 ```ruby
@@ -315,28 +304,24 @@ def wrapper(...)
 end
 ```
 
-**JavaScript equivalent:**
+**Output:**
 ```javascript
 function wrapper(...args) {
-  wrapped(...args);
+  wrapped(...args)
 }
 ```
 
-**Priority:** Medium - Useful for delegation
-**Complexity:** Low - Direct mapping to JS rest/spread
-**Recommendation:** Implement; straightforward conversion
-
 ## Priority Summary
 
-| Feature | Priority | Complexity | Recommendation |
-|---------|----------|------------|----------------|
-| Endless method return (BUG) | **High** | Low | Fix immediately |
-| Argument forwarding (`...`) | Medium | Low | Implement |
-| `retry` | Medium | Medium | Implement |
-| Multiple rescue types | Medium | Medium | Implement |
-| Pattern matching (basic) | Medium | High | Implement hash/array patterns |
+| Feature | Priority | Complexity | Status |
+|---------|----------|------------|--------|
+| Endless method return | **High** | Low | ✅ Implemented |
+| Argument forwarding (`...`) | Medium | Low | ✅ Implemented |
+| `retry` | Medium | Medium | ✅ Already implemented |
+| Multiple rescue types | Medium | Medium | ✅ Already implemented |
+| Pattern matching (basic) | Medium | High | Pending - Stage 3 |
 | Ranges as values | Low | Medium | Document limitation |
-| `else` in rescue | Low | Low | Implement with rescue |
+| `else` in rescue | Low | Low | Pending |
 | Top-level `alias` | Low | Low | Skip |
 | Regex back-refs | Low | High | Skip |
 | Anonymous block forwarding | Low | Medium | Defer |
@@ -347,27 +332,22 @@ function wrapper(...args) {
 
 ## Implementation Stages
 
-### Stage 0: Bug Fixes
+### Stage 0: Bug Fixes ✅ COMPLETE
 
-1. **Endless method return statement** - Missing `return` in `def foo(x) = expr`
+1. **Endless method return statement** - Fixed missing `return` in `def foo(x) = expr`
 
-**Rationale:** This is a bug in existing functionality.
+### Stage 1: Modern Ruby Syntax ✅ COMPLETE
 
-### Stage 1: Modern Ruby Syntax (Low-hanging Fruit)
+1. **Argument forwarding (`...`)** - Added `forward_args` and `forwarded_args` handlers
 
-1. **Argument forwarding (`...`)** - `forward_args` and `forwarded_args` node types
-   - In args: generate `...args`
-   - In send: generate `...args`
+### Stage 2: Error Handling Improvements ✅ ALREADY IMPLEMENTED
 
-**Rationale:** Simple implementation, useful feature.
-
-### Stage 2: Error Handling Improvements
-
+These features were already implemented:
 1. Multiple rescue clauses with different exception types
-2. `else` clause in begin/rescue
-3. `retry` statement
+2. `retry` statement
 
-**Rationale:** These are interrelated and improve real-world error handling.
+Still pending:
+- `else` clause in begin/rescue
 
 ### Stage 3: Pattern Matching (Basic)
 

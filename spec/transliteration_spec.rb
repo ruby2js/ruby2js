@@ -758,7 +758,26 @@ describe Ruby2JS do
       to_js("def question?; end").must_equal 'function question() {}'
       to_js("def bang!; end").must_equal 'function bang() {}'
     end
-    
+
+    it "should parse endless method definitions (Ruby 3.0+)" do
+      to_js('def square(x) = x * x').
+        must_equal 'function square(x) {return x * x}'
+      to_js('def add(a, b) = a + b').
+        must_equal 'function add(a, b) {return a + b}'
+    end
+
+    it "should parse endless singleton method definitions" do
+      to_js('def self.double(x) = x * 2').
+        must_equal 'this.double = function(x) {return x * 2}'
+    end
+
+    it "should parse argument forwarding (Ruby 2.7+)" do
+      to_js('def wrapper(...); wrapped(...); end').
+        must_equal 'function wrapper(...args) {wrapped(...args)}'
+      to_js('def forward(...); a(...); b(...); end').
+        must_equal 'function forward(...args) {a(...args); b(...args)}'
+    end
+
     it "should parse singleton method and property definitions" do
       to_js('def self.method(); end').must_equal 'this.method = function() {}'
       to_js('def self.prop; @prop; end').

@@ -8,6 +8,13 @@ module Ruby2JS
     # NOTE: defp and asyncs are only produced by filters
 
     handle :defs, :defp, :asyncs do |target, method, args, body|
+      # Detect endless method (def self.foo(x) = expr) and wrap body in autoreturn
+      # Endless methods have loc.assignment (the =) but no loc.end
+      if @ast.loc and @ast.loc.respond_to?(:assignment) and @ast.loc.assignment and
+         @ast.loc.respond_to?(:end) and @ast.loc.end.nil?
+        body = s(:autoreturn, body)
+      end
+
       node = transform_defs(target, method, args, body)
 
       if node.type == :send and @ast.type == :asyncs

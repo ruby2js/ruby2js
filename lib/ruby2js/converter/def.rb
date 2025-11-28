@@ -9,6 +9,13 @@ module Ruby2JS
     handle :def, :defm, :async, :deff do |name, args, body=nil|
       body ||= s(:begin)
 
+      # Detect endless method (def foo(x) = expr) and wrap body in autoreturn
+      # Endless methods have loc.assignment (the =) but no loc.end
+      if @ast.loc and @ast.loc.respond_to?(:assignment) and @ast.loc.assignment and
+         @ast.loc.respond_to?(:end) and @ast.loc.end.nil?
+        body = s(:autoreturn, body)
+      end
+
       add_implicit_block = false
 
       walk = ->(node) do
@@ -170,7 +177,11 @@ module Ruby2JS
         end
 
         put '('
-        parse s(:args, *args.children.select {|arg| arg.type != :shadowarg})
+        if args.type == :forward_args
+          parse args
+        else
+          parse s(:args, *args.children.select {|arg| arg.type != :shadowarg})
+        end
         put ") {#{nl}"
 
         next_token, @next_token = @next_token, :return

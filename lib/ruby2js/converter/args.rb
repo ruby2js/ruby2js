@@ -54,5 +54,14 @@ module Ruby2JS
         raise Error.new("destructuring requires ES2015", @ast)
       end
     end
+
+    # Ruby 2.7+ argument forwarding: def foo(...) / bar(...)
+    handle :forward_args do
+      put '...args'
+    end
+
+    handle :forwarded_args do
+      put '...args'
+    end
   end
 end
