@@ -2,10 +2,12 @@
 .git
 .gitignore
 
-# Build artifacts
+# Build artifacts (regenerated during build)
 docs/output
 docs/.bridgetown-cache
 docs/node_modules
+docs/src/demo
+docs/src/shoelace-assets
 
 # Development files
 README.md

@@ -272,7 +272,10 @@ module.exports = async (outputFolder, esbuildOptions) => {
   esbuildOptions.plugins.push(bridgetownPreset(outputFolder))
 
   // esbuild, take it away!
-  require("esbuild").build({
+  const esbuild = require("esbuild")
+  const isWatch = process.argv.includes("--watch")
+
+  const buildOptions = {
     bundle: true,
     loader: {
       ".jpg": "file",
@@ -286,7 +289,6 @@ module.exports = async (outputFolder, esbuildOptions) => {
     },
     resolveExtensions: [".tsx", ".ts", ".jsx", ".js", ".css", ".scss", ".sass", ".json", ".js.rb"],
     nodePaths: ["frontend/javascript", "frontend/styles"],
-    watch: process.argv.includes("--watch"),
     minify: process.argv.includes("--minify"),
     sourcemap: true,
     target: "es2016",
@@ -296,5 +298,14 @@ module.exports = async (outputFolder, esbuildOptions) => {
     publicPath: "/_bridgetown/static",
     metafile: true,
     ...esbuildOptions,
-  }).catch(() => process.exit(1))
+  }
+
+  if (isWatch) {
+    // Use context API for watch mode (esbuild 0.17+)
+    esbuild.context(buildOptions).then(ctx => {
+      ctx.watch()
+    }).catch(() => process.exit(1))
+  } else {
+    esbuild.build(buildOptions).catch(() => process.exit(1))
+  }
 }

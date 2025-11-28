@@ -12,18 +12,26 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# Copy the entire repo (needed because docs/Gemfile references ruby2js via path: "../")
-COPY . .
-
-# Install Ruby dependencies for the main gem
+# Copy gemspec and Gemfiles first for better layer caching
+COPY ruby2js.gemspec Gemfile Gemfile.lock ./
+COPY lib/ruby2js/version.rb lib/ruby2js/version.rb
 RUN bundle install
 
-# Install docs dependencies
+# Copy docs yarn dependencies and install
+COPY docs/package.json docs/yarn.lock ./docs/
 WORKDIR /app/docs
-RUN bundle install
 RUN yarn install
 
+# Now copy the rest of the source code
+WORKDIR /app
+COPY . .
+
+# Install docs bundle (needs full ruby2js source for path: "../")
+WORKDIR /app/docs
+RUN bundle install
+
 # Build the demo assets and static site
+# The esbuild ruby2js plugin runs `bundle exec ruby2js`
 RUN bundle exec rake
 RUN bundle exec rake deploy
 
