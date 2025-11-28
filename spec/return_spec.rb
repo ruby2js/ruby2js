@@ -111,6 +111,27 @@ describe Ruby2JS::Filter::Return do
     end
   end
 
+  describe 'Class.new' do
+    def to_js_es2015(string)
+      _(Ruby2JS.convert(string, eslevel: 2015, filters: [Ruby2JS::Filter::Return]).to_s)
+    end
+
+    it "should not mangle Class.new blocks" do
+      to_js_es2015( 'kls = Class.new do; def foo; 42; end; end' ).
+        must_equal 'let kls = class {get foo() {return 42}}'
+    end
+
+    it "should not mangle Class.new with inheritance" do
+      to_js_es2015( 'kls = Class.new(Parent) do; def foo; 42; end; end' ).
+        must_equal 'let kls = class extends Parent {get foo() {return 42}}'
+    end
+
+    it "should not mangle Class.new with multiple methods" do
+      to_js_es2015( 'kls = Class.new do; def foo; 1; end; def bar; 2; end; end' ).
+        must_equal 'let kls = class {get foo() {return 1}; get bar() {return 2}}'
+    end
+  end
+
   describe Ruby2JS::Filter::DEFAULTS do
     it "should include Return" do
       _(Ruby2JS::Filter::DEFAULTS).must_include Ruby2JS::Filter::Return
