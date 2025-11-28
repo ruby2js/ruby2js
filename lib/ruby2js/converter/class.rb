@@ -330,7 +330,10 @@ module Ruby2JS
           end
         end
 
-        @comments[constructor] = @comments[init] unless @comments[init].empty?
+        unless @comments[init].empty?
+          @comments[constructor] = @comments[init]
+          @comments[init] = []  # prevent duplicate output
+        end
         body.unshift constructor
       end
 

@@ -1,11 +1,38 @@
-begin
-  # silence warnings, see 
-  # https://github.com/whitequark/parser/issues/346#issuecomment-317617695
-  # https://github.com/bbatsov/rubocop/issues/1819#issuecomment-95280926
-  old_verbose, $VERBOSE = $VERBOSE, nil
+# Determine which parser to use:
+# - RUBY2JS_PARSER=prism   - force Prism (requires Ruby 3.3+)
+# - RUBY2JS_PARSER=parser  - force whitequark parser gem
+# - unset                  - auto-detect (Prism if available, else parser gem)
+#
+# Note: Opal always uses the parser gem (no Prism support in browser)
+if RUBY_ENGINE == 'opal'
   require 'parser/current'
-ensure
-  $VERBOSE = old_verbose
+  RUBY2JS_PARSER = :parser
+else
+  case ENV['RUBY2JS_PARSER']
+  when 'prism'
+    require 'prism'
+    require 'prism/translation/parser'
+    require 'parser/current'
+    RUBY2JS_PARSER = :prism
+  when 'parser'
+    old_verbose, $VERBOSE = $VERBOSE, nil
+    require 'parser/current'
+    $VERBOSE = old_verbose
+    RUBY2JS_PARSER = :parser
+  else
+    # Auto-detect: try Prism first, fall back to parser gem
+    begin
+      require 'prism'
+      require 'prism/translation/parser'
+      require 'parser/current'
+      RUBY2JS_PARSER = :prism
+    rescue LoadError
+      old_verbose, $VERBOSE = $VERBOSE, nil
+      require 'parser/current'
+      $VERBOSE = old_verbose
+      RUBY2JS_PARSER = :parser
+    end
+  end
 end
 
 require 'ruby2js/configuration_dsl' unless RUBY_ENGINE == 'opal'
@@ -57,16 +84,17 @@ module Ruby2JS
     module SEXP
       # construct an AST Node
       def s(type, *args)
-        Parser::AST::Node.new type, args
+        Parser::AST::Node.new(type, args)
       end
 
-      # update existing node
+      # For compatibility - some code uses S() to update @ast
       def S(type, *args)
         @ast.updated(type, args)
       end
     end
 
-    class Processor < Parser::AST::Processor
+    # Processor walks Ruby2JS AST and dispatches to on_<type> methods
+    class Processor
       include Ruby2JS::Filter
       BINARY_OPERATORS = Converter::OPERATORS[2..-1].flatten
 
@@ -74,7 +102,6 @@ module Ruby2JS
 
       def initialize(comments)
         @comments = comments
-
         @ast = nil
         @exclude_methods = []
         @prepend_list = Set.new
@@ -135,12 +162,19 @@ module Ruby2JS
         @options[:eslevel] >= 2022
       end
 
+      # Process a node by dispatching to on_<type> method
       def process(node)
-        ast, @ast = @ast, node
-        replacement = super
+        return node unless node.is_a?(Parser::AST::Node)
 
-        if replacement != node and @comments[node]
-          @comments[replacement] = @comments[node]
+        ast, @ast = @ast, node
+
+        # Dispatch to handler method
+        handler = "on_#{node.type}"
+        if respond_to?(handler)
+          replacement = send(handler, node)
+        else
+          # Default: process children
+          replacement = process_children(node)
         end
 
         replacement
@@ -148,8 +182,38 @@ module Ruby2JS
         @ast = ast
       end
 
+      # Process all children of a node, returning updated node if any changed
+      def process_children(node)
+        return node unless node.is_a?(Parser::AST::Node)
+
+        new_children = node.children.map do |child|
+          if child.is_a?(Parser::AST::Node)
+            process(child)
+          else
+            child
+          end
+        end
+
+        if new_children != node.children
+          node.updated(nil, new_children)
+        else
+          node
+        end
+      end
+
+      # Helper to create nodes
+      def s(type, *children)
+        Parser::AST::Node.new(type, children)
+      end
+
+      # Process all children of a node (like process_children but returns array)
+      def process_all(nodes)
+        return [] if nodes.nil?
+        nodes.map { |node| process(node) }
+      end
+
       # handle all of the 'invented/synthetic' ast types
-      def on_assign(node); end
+      def on_assign(node); process_children(node); end
       def on_async(node); on_def(node); end
       def on_asyncs(node); on_defs(node); end
       def on_attr(node); on_send(node); end
@@ -172,16 +236,48 @@ module Ruby2JS
       def on_send!(node); on_send(node); end
       def on_sendw(node); on_send(node); end
       def on_undefined?(node); on_defined?(node); end
-      def on_defineProps(node); end
+      def on_defineProps(node); process_children(node); end
       def on_hide(node); on_begin(node); end
-      def on_nil(node); end
-      def on_xnode(node); end
-      def on_export(node); end
-      def on_import(node); end
+      def on_xnode(node); process_children(node); end
+      def on_export(node); process_children(node); end
+      def on_import(node); process_children(node); end
       def on_taglit(node); on_pair(node); end
 
-      # provide a method so filters can call 'super'
+      # Default handlers that process children
+      def on_nil(node); node; end
       def on_sym(node); node; end
+      def on_int(node); node; end
+      def on_float(node); node; end
+      def on_str(node); node; end
+      def on_true(node); node; end
+      def on_false(node); node; end
+      def on_self(node); node; end
+
+      # Handlers that process children by default
+      %i[
+        lvar ivar cvar gvar const
+        lvasgn ivasgn cvasgn gvasgn casgn
+        send csend block def defs class module
+        if case when while until for
+        and or not
+        array hash pair splat kwsplat
+        args arg optarg restarg kwarg kwoptarg kwrestarg blockarg
+        return break next redo retry
+        begin kwbegin rescue resbody ensure
+        masgn mlhs
+        op_asgn and_asgn or_asgn
+        regexp regopt
+        dstr dsym xstr
+        yield super zsuper
+        defined? alias undef
+        irange erange
+        sclass
+        match_pattern match_var
+      ].each do |type|
+        define_method("on_#{type}") do |node|
+          process_children(node)
+        end unless method_defined?("on_#{type}")
+      end
 
       # convert numbered parameters block to a normal block
       def on_numblock(node)
@@ -189,30 +285,37 @@ module Ruby2JS
 
         process s(:block,
           call,
-          s(:args, *((1..count).map {|i| s(:arg, "_#{i}")})),
+          s(:args, *((1..count).map {|i| s(:arg, :"_#{i}")})),
           block
         )
       end
 
       # convert map(&:symbol) to a block
       def on_send(node)
-        if node.children.length > 2 and node.children.last.type == :block_pass
-          method = node.children.last.children.first.children.last
-          # preserve csend type for optional chaining
-          call_type = node.type == :csend ? :csend : :send
-          if BINARY_OPERATORS.include? method
-            return on_block s(:block, s(call_type, *node.children[0..-2]),
-              s(:args, s(:arg, :a), s(:arg, :b)), s(:return,
-              process(s(:send, s(:lvar, :a), method, s(:lvar, :b)))))
-          elsif node.children.last.children.first.type == :sym
-            return on_block s(:block, s(call_type, *node.children[0..-2]),
-              s(:args, s(:arg, :item)), s(:return,
-              process(s(:attr, s(:lvar, :item), method))))
-          else
-            super
+        node = process_children(node)
+        return node unless node.is_a?(AST::Node) && [:send, :csend].include?(node.type)
+
+        if node.children.length > 2 and
+           node.children.last.is_a?(AST::Node) and
+           node.children.last.type == :block_pass
+          block_pass = node.children.last
+          if block_pass.children.first.is_a?(AST::Node) &&
+             block_pass.children.first.type == :sym
+            method = block_pass.children.first.children.first
+            # preserve csend type for optional chaining
+            call_type = node.type == :csend ? :csend : :send
+            if BINARY_OPERATORS.include?(method)
+              return on_block s(:block, s(call_type, *node.children[0..-2]),
+                s(:args, s(:arg, :a), s(:arg, :b)), s(:return,
+                process(s(:send, s(:lvar, :a), method, s(:lvar, :b)))))
+            else
+              return on_block s(:block, s(call_type, *node.children[0..-2]),
+                s(:args, s(:arg, :item)), s(:return,
+                process(s(:attr, s(:lvar, :item), method))))
+            end
           end
         end
-        super
+        node
       end
 
       def on_csend(node)
@@ -221,43 +324,42 @@ module Ruby2JS
     end
   end
 
-  # TODO: this method has gotten long and unwieldy!
   def self.convert(source, options={})
     Filter.autoregister unless RUBY_ENGINE == 'opal'
     options = options.dup
 
     if Proc === source
-      file,line = source.source_location
+      file, line = source.source_location
       source = IO.read(file)
       ast, comments = parse(source)
-      comments = Parser::Source::Comment.associate(ast, comments) if ast
-      ast = find_block( ast, line )
+      ast = find_block(ast, line)
       options[:file] ||= file
     elsif Parser::AST::Node === source
       ast, comments = source, {}
-      source = ast.loc.expression.source_buffer.source
+      source = ""
     else
-      ast, comments = parse( source, options[:file] )
-      comments = ast ? Parser::Source::Comment.associate(ast, comments) : {}
+      ast, comments = parse(source, options[:file])
     end
 
     # check if magic comment is present
-    first_comment = comments.values.first&.map(&:text)&.first
+    raw_comments = comments[:_raw] || []
+    first_comment = raw_comments.first
     if first_comment
-      if first_comment.include?(" ruby2js: preset")
+      comment_text = first_comment.respond_to?(:text) ? first_comment.text : first_comment.to_s
+      if comment_text.include?(" ruby2js: preset")
         options[:preset] = true
-        if first_comment.include?("filters: ")
-          options[:filters] = first_comment.match(%r(filters:\s*?([^\s]+)\s?.*$))[1].split(",").map(&:to_sym)
+        if comment_text.include?("filters: ")
+          options[:filters] = comment_text.match(%r(filters:\s*?([^\s]+)\s?.*$))[1].split(",").map(&:to_sym)
         end
-        if first_comment.include?("eslevel: ")
-          options[:eslevel] = first_comment.match(%r(eslevel:\s*?([^\s]+)\s?.*$))[1].to_i
+        if comment_text.include?("eslevel: ")
+          options[:eslevel] = comment_text.match(%r(eslevel:\s*?([^\s]+)\s?.*$))[1].to_i
         end
-        if first_comment.include?("disable_filters: ")
-          options[:disable_filters] = first_comment.match(%r(disable_filters:\s*?([^\s]+)\s?.*$))[1].split(",").map(&:to_sym)
+        if comment_text.include?("disable_filters: ")
+          options[:disable_filters] = comment_text.match(%r(disable_filters:\s*?([^\s]+)\s?.*$))[1].split(",").map(&:to_sym)
         end
       end
-      disable_autoimports = first_comment.include?(" autoimports: false")
-      disable_autoexports = first_comment.include?(" autoexports: false")
+      disable_autoimports = comment_text.include?(" autoimports: false")
+      disable_autoexports = comment_text.include?(" autoexports: false")
     end
 
     unless RUBY_ENGINE == 'opal'
@@ -295,7 +397,7 @@ module Ruby2JS
 
       filter = Filter::Processor
       filters.reverse.each do |mod|
-        filter = Class.new(filter) {include mod} 
+        filter = Class.new(filter) { include mod }
       end
       filter = filter.new(comments)
 
@@ -305,9 +407,25 @@ module Ruby2JS
       filter.namespace = namespace
       ast = filter.process(ast)
 
+      # Re-associate comments with filtered AST (filters may create new node objects)
+      # This may fail if the AST contains synthetic nodes without location info,
+      # in which case we fall back to the original (possibly stale) comments hash
+      raw_comments = comments[:_raw]
+      if raw_comments && !raw_comments.empty?
+        begin
+          new_comments = Parser::Source::Comment.associate(ast, raw_comments)
+          comments.clear
+          comments.merge!(new_comments)
+          comments[:_raw] = raw_comments
+        rescue NoMethodError
+          # Synthetic nodes without location info cause associate to fail
+          # Keep original comments hash, which may not associate properly
+        end
+      end
+
       unless filter.prepend_list.empty?
-        prepend = filter.prepend_list.sort_by {|ast| ast.type == :import ? 0 : 1}
-        prepend.reject! {|ast| ast.type == :import} if filter.disable_autoimports
+        prepend = filter.prepend_list.sort_by { |ast| ast.type == :import ? 0 : 1 }
+        prepend.reject! { |ast| ast.type == :import } if filter.disable_autoimports
         ast = Parser::AST::Node.new(:begin, [*prepend, ast])
       end
     end
@@ -330,8 +448,8 @@ module Ruby2JS
         'Hash[instance_variables.map {|var| [var, instance_variable_get(var)]}]'
     elsif options[:scope] and not ruby2js.ivars
       scope = options.delete(:scope)
-      ruby2js.ivars = Hash[scope.instance_variables.map {|var|
-        [var, scope.instance_variable_get(var)]}]
+      ruby2js.ivars = Hash[scope.instance_variables.map { |var|
+        [var, scope.instance_variable_get(var)] }]
     end
 
     ruby2js.width = options[:width] if options[:width]
@@ -342,35 +460,79 @@ module Ruby2JS
 
     ruby2js.timestamp options[:file]
 
-    ruby2js.file_name = options[:file] || ast&.loc&.expression&.source_buffer&.name || ''
+    ruby2js.file_name = options[:file] || ''
 
     ruby2js
   end
-  
+
   def self.parse(source, file=nil, line=1)
+    if RUBY2JS_PARSER == :prism
+      parse_with_prism(source, file, line)
+    else
+      parse_with_parser(source, file, line)
+    end
+  end
+
+  # Parse using Prism's translation layer (Ruby 3.3+)
+  def self.parse_with_prism(source, file=nil, line=1)
+    buffer = Parser::Source::Buffer.new(file || '(string)')
+    buffer.source = source.encode('UTF-8')
+
+    parser = Prism::Translation::Parser.new
+    begin
+      ast, comments = parser.parse_with_comments(buffer)
+    rescue Parser::SyntaxError => e
+      raise Ruby2JS::SyntaxError.new(e.message, e.diagnostic)
+    end
+
+    # Associate comments with AST nodes (same format as parser gem)
+    comments_hash = Parser::Source::Comment.associate(ast, comments)
+
+    # Store raw comments for filters that may need them (e.g., for magic comments)
+    comments_hash[:_raw] = comments
+
+    [ast, comments_hash]
+  end
+
+  # Parse using whitequark parser gem (Ruby < 3.3 or when Prism unavailable)
+  def self.parse_with_parser(source, file=nil, line=1)
     buffer = Parser::Source::Buffer.new(file, line)
     buffer.source = source.encode('UTF-8')
+
     parser = Parser::CurrentRuby.new
     parser.diagnostics.all_errors_are_fatal = true
     parser.diagnostics.consumer = lambda {|diagnostic| nil}
     parser.builder.emit_file_line_as_literals = false
-    parser.parse_with_comments(buffer)
-  rescue Parser::SyntaxError => e
-    split = source[0..e.diagnostic.location.begin_pos].split("\n")
-    line, col = split.length, split.last.length
-    message = "line #{line}, column #{col}: #{e.diagnostic.message}"
-    message += "\n in file #{file}" if file
-    raise Ruby2JS::SyntaxError.new(message, e.diagnostic)
+
+    begin
+      ast, comments = parser.parse_with_comments(buffer)
+    rescue Parser::SyntaxError => e
+      split = source[0..e.diagnostic.location.begin_pos].split("\n")
+      line, col = split.length, split.last.length
+      message = "line #{line}, column #{col}: #{e.diagnostic.message}"
+      message += "\n in file #{file}" if file
+      raise Ruby2JS::SyntaxError.new(message, e.diagnostic)
+    end
+
+    # Associate comments with AST nodes
+    comments_hash = ast ? Parser::Source::Comment.associate(ast, comments) : {}
+
+    # Store raw comments for filters that may need them
+    comments_hash[:_raw] = comments
+
+    [ast, comments_hash]
   end
 
   def self.find_block(ast, line)
-    if ast.type == :block and ast.loc.expression.line == line
+    return nil unless ast.is_a?(Parser::AST::Node)
+
+    if ast.type == :block && ast.loc&.expression&.line == line
       return ast.children.last
     end
 
     ast.children.each do |child|
-      if Parser::AST::Node === child
-        block = find_block child, line
+      if child.is_a?(Parser::AST::Node)
+        block = find_block(child, line)
         return block if block
       end
     end

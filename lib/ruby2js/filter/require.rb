@@ -63,8 +63,9 @@ module Ruby2JS
 
               @options[:file2] = filename
               ast, comments = Ruby2JS.parse(File.read(filename), filename)
-              @comments.merge! Parser::Source::Comment.associate(ast, comments)
-              @comments[node] += @comments[ast]
+              # comments is already a hash with associated comments, merge it directly
+              @comments.merge!(comments) { |key, old, new| old + new }
+              @comments[node] += @comments[ast] if @comments[ast]
             end
 
             children = ast.type == :begin ? ast.children : [ast]

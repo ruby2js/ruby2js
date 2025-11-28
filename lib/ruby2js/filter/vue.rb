@@ -437,6 +437,9 @@ module Ruby2JS
           }).compact, *@vue_reactive)
         end
 
+        # Copy class-level comments to the generated definition
+        @comments[defn] = @comments[node] unless @comments[node].empty?
+
         vue_collapse_pushes(defn)
       end
 
