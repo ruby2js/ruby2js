@@ -1154,6 +1154,16 @@ describe Ruby2JS do
         must_equal 'function foo() {try {x()} catch (e) {y(e)}}'
     end
 
+    it "should handle implicit ensure in methods" do
+      to_js( 'def foo; x(); ensure; y(); end' ).
+        must_equal 'function foo() {try {x()} finally {y()}}'
+    end
+
+    it "should handle implicit rescue and ensure in methods" do
+      to_js( 'def foo; x(); rescue => e; y(e); ensure; z(); end' ).
+        must_equal 'function foo() {try {x()} catch (e) {y(e)} finally {z()}}'
+    end
+
     it "should handle neither a rescue nor an ensure being present" do
       to_js( 'begin a; b; end' ).must_equal 'var a; var b'
     end
