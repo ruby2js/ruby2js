@@ -966,6 +966,10 @@ describe Ruby2JS do
       it "should chain conditional attribute references" do
         to_js('x=a&.b&.c').must_equal 'var x = a && a.b && a.b.c'
       end
+
+      it "should handle method args with conditional chaining" do
+        to_js('x=a&.b(c, d)').must_equal 'var x = a && a.b(c, d)'
+      end
     end
 
     unless (RUBY_VERSION.split('.').map(&:to_i) <=> [3, 0, 0]) == -1

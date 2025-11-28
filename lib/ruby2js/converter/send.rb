@@ -379,12 +379,12 @@ module Ruby2JS
         put "?."
         if method == :[]
           put '['
-          args.each {|arg| parse arg}
+          parse_all(*args, join: ', ')
           put ']'
         else
           put method.to_s
           put '(' if @ast.is_method?
-          args.each {|arg| parse arg}
+          parse_all(*args, join: ', ')
           put ')' if @ast.is_method?
         end
 
