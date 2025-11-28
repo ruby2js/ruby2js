@@ -1,0 +1,101 @@
+---
+layout: default
+---
+
+
+    <div class="container narrow-container">
+      <h1 class="title is-size-4">Ruby</h1>
+      <sl-dialog id="option" label="Option">
+        <sl-input></sl-input>
+        <sl-button slot="footer" type="primary">Close</sl-button>
+      </sl-dialog>
+      <form method="post">
+        <div data-controller="ruby">
+          <textarea class="ruby form-control" name="ruby" rows="8" placeholder="Ruby source">puts "Hello world!"</textarea>
+        </div>
+        <div class="options" data-controller="options">
+          <input class="btn btn-primary" type="submit" value="Convert" style="display: none"/>
+          <sl-checkbox id="preset" name="preset" checked="checked">Use Preset</sl-checkbox>
+          <label for="eslevel">ESLevel:</label>
+          <sl-dropdown id="eslevel" name="eslevel">
+            <sl-button slot="trigger" caret="caret">default</sl-button>
+            <sl-menu>
+              <sl-menu-item type="checkbox" checked="checked">default</sl-menu-item>
+              <sl-menu-item type="checkbox" value="2015">2015</sl-menu-item>
+              <sl-menu-item type="checkbox" value="2016">2016</sl-menu-item>
+              <sl-menu-item type="checkbox" value="2017">2017</sl-menu-item>
+              <sl-menu-item type="checkbox" value="2018">2018</sl-menu-item>
+              <sl-menu-item type="checkbox" value="2019">2019</sl-menu-item>
+              <sl-menu-item type="checkbox" value="2020">2020</sl-menu-item>
+              <sl-menu-item type="checkbox" value="2021">2021</sl-menu-item>
+              <sl-menu-item type="checkbox" value="2022">2022</sl-menu-item>
+            </sl-menu>
+          </sl-dropdown>
+          <sl-checkbox id="ast" name="ast">Show AST</sl-checkbox>
+          <sl-dropdown id="filters" close-on-select="false">
+            <sl-button slot="trigger" caret="caret">Filters</sl-button>
+            <sl-menu>
+              <sl-menu-item type="checkbox" name="active_functions">active_functions</sl-menu-item>
+              <sl-menu-item type="checkbox" name="camelCase">camelCase</sl-menu-item>
+              <sl-menu-item type="checkbox" name="cjs">cjs</sl-menu-item>
+              <sl-menu-item type="checkbox" name="esm">esm</sl-menu-item>
+              <sl-menu-item type="checkbox" name="functions">functions</sl-menu-item>
+              <sl-menu-item type="checkbox" name="jquery">jquery</sl-menu-item>
+              <sl-menu-item type="checkbox" name="jsx">jsx</sl-menu-item>
+              <sl-menu-item type="checkbox" name="lit-element">lit-element</sl-menu-item>
+              <sl-menu-item type="checkbox" name="lit">lit</sl-menu-item>
+              <sl-menu-item type="checkbox" name="matchAll">matchAll</sl-menu-item>
+              <sl-menu-item type="checkbox" name="minitest-jasmine">minitest-jasmine</sl-menu-item>
+              <sl-menu-item type="checkbox" name="node">node</sl-menu-item>
+              <sl-menu-item type="checkbox" name="nokogiri">nokogiri</sl-menu-item>
+              <sl-menu-item type="checkbox" name="react">react</sl-menu-item>
+              <sl-menu-item type="checkbox" name="return">return</sl-menu-item>
+              <sl-menu-item type="checkbox" name="securerandom">securerandom</sl-menu-item>
+              <sl-menu-item type="checkbox" name="stimulus">stimulus</sl-menu-item>
+              <sl-menu-item type="checkbox" name="tagged_templates">tagged_templates</sl-menu-item>
+              <sl-menu-item type="checkbox" name="underscore">underscore</sl-menu-item>
+              <sl-menu-item type="checkbox" name="vue">vue</sl-menu-item>
+            </sl-menu>
+          </sl-dropdown>
+          <sl-dropdown id="options" close-on-select="false">
+            <sl-button slot="trigger" caret="caret">Options</sl-button>
+            <sl-menu>
+              <sl-menu-item type="checkbox" name="config" data-args="data-args">config</sl-menu-item>
+              <sl-menu-item type="checkbox" name="autoexports" data-args="data-args">autoexports</sl-menu-item>
+              <sl-menu-item type="checkbox" name="autoimports" data-args="data-args">autoimports</sl-menu-item>
+              <sl-menu-item type="checkbox" name="defs" data-args="data-args">defs</sl-menu-item>
+              <sl-menu-item type="checkbox" name="exclude" data-args="data-args">exclude</sl-menu-item>
+              <sl-menu-item type="checkbox" name="filepath" data-args="data-args">filepath</sl-menu-item>
+              <sl-menu-item type="checkbox" name="identity">identity</sl-menu-item>
+              <sl-menu-item type="checkbox" name="import_from_skypack">import_from_skypack</sl-menu-item>
+              <sl-menu-item type="checkbox" name="include" data-args="data-args">include</sl-menu-item>
+              <sl-menu-item type="checkbox" name="include-all">include-all</sl-menu-item>
+              <sl-menu-item type="checkbox" name="include-only" data-args="data-args">include-only</sl-menu-item>
+              <sl-menu-item type="checkbox" name="ivars" data-args="data-args">ivars</sl-menu-item>
+              <sl-menu-item type="checkbox" name="nullish">nullish</sl-menu-item>
+              <sl-menu-item type="checkbox" name="strict">strict</sl-menu-item>
+              <sl-menu-item type="checkbox" name="template_literal_tags" data-args="data-args">template_literal_tags</sl-menu-item>
+              <sl-menu-item type="checkbox" name="underscored_private">underscored_private</sl-menu-item>
+              <sl-menu-item type="checkbox" name="sourcemap">sourcemap</sl-menu-item>
+            </sl-menu>
+          </sl-dropdown>
+        </div>
+      </form>
+      
+
+      <div>
+        <div id="parsed" style="display: none">
+          <h2 class="title is-size-6">AST</h2>
+          <pre></pre>
+        </div>
+        <div id="filtered" style="display: none">
+          <h2 class="title is-size-6">filtered AST</h2>
+          <pre></pre>
+        </div>
+        <div id="js" data-controller="js" style="display: none">
+          <h2 class="title is-size-4">JavaScript</h2>
+          <pre class="js"></pre>
+        </div>
+      </div>
+    </div>
+  
