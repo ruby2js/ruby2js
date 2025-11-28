@@ -54,6 +54,10 @@ describe "ES2020 support" do
       it "should support conditional indexing" do
         to_js('x=a&.[](b)').must_equal 'let x = a?.[b]'
       end
+
+      it "should handle method args with conditional chaining" do
+        to_js('x=a&.b&.c(d, e)').must_equal 'let x = a?.b?.c(d, e)'
+      end
     end
 
     it "should combine conditions when it can" do
