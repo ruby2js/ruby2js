@@ -1,0 +1,73 @@
+PATH
+  remote: .
+  specs:
+    ruby2js (5.1.2)
+      parser
+      regexp_parser (~> 2.9)
+
+GEM
+  remote: https://rubygems.org/
+  specs:
+    ast (2.4.3)
+    base64 (0.3.0)
+    execjs (2.10.0)
+    haml (7.0.2)
+      temple (>= 0.8.2)
+      thor
+      tilt
+    json (2.16.0)
+    minitest (5.26.2)
+    nokogiri (1.18.10-aarch64-linux-gnu)
+      racc (~> 1.4)
+    nokogiri (1.18.10-aarch64-linux-musl)
+      racc (~> 1.4)
+    nokogiri (1.18.10-arm-linux-gnu)
+      racc (~> 1.4)
+    nokogiri (1.18.10-arm-linux-musl)
+      racc (~> 1.4)
+    nokogiri (1.18.10-arm64-darwin)
+      racc (~> 1.4)
+    nokogiri (1.18.10-x86_64-darwin)
+      racc (~> 1.4)
+    nokogiri (1.18.10-x86_64-linux-gnu)
+      racc (~> 1.4)
+    nokogiri (1.18.10-x86_64-linux-musl)
+      racc (~> 1.4)
+    opal (1.8.2)
+      ast (>= 2.3.0)
+      parser (~> 3.0, >= 3.0.3.2)
+    parser (3.3.10.0)
+      ast (~> 2.4.1)
+      racc
+    racc (1.8.1)
+    rake (13.3.1)
+    regexp_parser (2.11.3)
+    temple (0.10.4)
+    thor (1.4.0)
+    tilt (2.6.1)
+    wunderbar (1.6.0)
+      json
+
+PLATFORMS
+  aarch64-linux-gnu
+  aarch64-linux-musl
+  arm-linux-gnu
+  arm-linux-musl
+  arm64-darwin
+  x86_64-darwin
+  x86_64-linux-gnu
+  x86_64-linux-musl
+
+DEPENDENCIES
+  base64
+  execjs
+  haml
+  minitest
+  nokogiri
+  opal (~> 1.8)
+  rake
+  ruby2js!
+  wunderbar
+
+BUNDLED WITH
+   2.7.2

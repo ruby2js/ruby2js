@@ -1,8 +1,6 @@
 pkg
-Gemfile.lock
 demo/assets
 demo/filters.opal
 .DS_Store
 testrails
 node_modules
-yarn.lock
