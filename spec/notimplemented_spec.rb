@@ -35,6 +35,11 @@ describe 'not implemented' do
     todo( 'class C; protected; end' )
   end
 
+  it "pattern matching" do
+    todo("case x; in {a:}; a; end")  # case_match
+    todo("x in [a, b]")              # match_pattern_p (in operator)
+  end
+
   it "flip-flops" do
     todo("if a..b; end")
   end

@@ -319,7 +319,7 @@ function wrapper(...args) {
 | Argument forwarding (`...`) | Medium | Low | ✅ Implemented |
 | `retry` | Medium | Medium | ✅ Already implemented |
 | Multiple rescue types | Medium | Medium | ✅ Already implemented |
-| Pattern matching (basic) | Medium | High | Pending - Stage 3 |
+| Pattern matching (basic) | Medium | High | Deferred - explicitly not implemented |
 | Ranges as values | Low | Medium | Document limitation |
 | `else` in rescue | Low | Low | ✅ Implemented |
 | Top-level `alias` | Low | Low | Skip |
