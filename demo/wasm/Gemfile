@@ -1,0 +1,6 @@
+# Gemfile for ruby.wasm browser build
+source "https://rubygems.org"
+
+gem "js"
+gem "ruby_wasm"
+gem "ruby2js", path: "../.."

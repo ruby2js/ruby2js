@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Ruby2JS ruby.wasm Proof of Concept</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 800px; margin: 2em auto; padding: 0 1em; }
+    pre { background: #f5f5f5; padding: 1em; overflow-x: auto; }
+    .loading { color: #666; }
+    .success { color: green; }
+    .error { color: red; }
+    #output { margin-top: 1em; }
+  </style>
+</head>
+<body>
+  <h1>Ruby2JS + ruby.wasm Proof of Concept</h1>
+
+  <p id="status" class="loading">Loading ruby.wasm...</p>
+
+  <div id="output"></div>
+
+  <!-- Load ruby.wasm from CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@ruby/3.4-wasm-wasi@2.7.2/dist/browser.script.iife.js"></script>
+
+  <script type="text/ruby">
+    require "js"
+
+    def log(message)
+      JS.global[:console].log(message)
+      output = JS.global[:document].getElementById("output")
+      div = JS.global[:document].createElement("div")
+      div[:innerHTML] = message
+      output.appendChild(div)
+    end
+
+    def update_status(message, css_class)
+      status = JS.global[:document].getElementById("status")
+      status[:textContent] = message
+      status[:className] = css_class
+    end
+
+    begin
+      update_status("ruby.wasm loaded! Testing Ruby2JS...", "loading")
+
+      # First, let's see what's available
+      log("<h3>Step 1: Check ruby.wasm environment</h3>")
+      log("<pre>Ruby version: #{RUBY_VERSION}</pre>")
+      log("<pre>Ruby platform: #{RUBY_PLATFORM}</pre>")
+
+      # Try to require ruby2js
+      log("<h3>Step 2: Attempt to load Ruby2JS</h3>")
+
+      # The challenge: Ruby2JS source files aren't available in the WASM filesystem
+      # Let's see what happens when we try to require it
+      begin
+        require "ruby2js"
+        log("<pre class='success'>Ruby2JS loaded successfully!</pre>")
+
+        log("<h3>Step 3: Test conversion</h3>")
+        result = Ruby2JS.convert('puts "Hello from Ruby2JS!"')
+        log("<pre class='success'>Input: puts \"Hello from Ruby2JS!\"</pre>")
+        log("<pre class='success'>Output: #{result}</pre>")
+
+        update_status("Success! Ruby2JS works in ruby.wasm", "success")
+      rescue LoadError => e
+        log("<pre class='error'>LoadError: #{e.message}</pre>")
+        log("<p>This is expected - Ruby2JS needs to be bundled into the WASM or loaded via virtual filesystem.</p>")
+        update_status("Ruby2JS not available (expected - needs bundling)", "error")
+      end
+
+    rescue => e
+      log("<pre class='error'>Error: #{e.class}: #{e.message}</pre>")
+      log("<pre>#{e.backtrace.join("\n")}</pre>")
+      update_status("Error occurred", "error")
+    end
+  </script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+# Build artifacts
+build/
+rubies/
+node_modules/
+*.wasm
+*.tgz
+
+# Bundler
+Gemfile.lock
+Gemfile.base
+Gemfile.full
+
+# npm
+package-lock.json

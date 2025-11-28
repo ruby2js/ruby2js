@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Ruby2JS + Ruby 4.0 + Prism PoC</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 800px; margin: 2em auto; padding: 0 1em; }
+    pre { background: #f5f5f5; padding: 1em; overflow-x: auto; }
+    .loading { color: #666; }
+    .success { color: green; }
+    .error { color: red; }
+    #output { margin-top: 1em; }
+    #timing { margin-top: 1em; font-size: 0.9em; color: #666; }
+  </style>
+</head>
+<body>
+  <h1>Ruby2JS + Ruby 4.0 + Prism PoC</h1>
+  <p>Using pre-built Ruby 4.0.0dev WASM with packed gems (41MB)</p>
+
+  <p id="status" class="loading">Loading ruby.wasm...</p>
+  <div id="timing"></div>
+  <div id="output"></div>
+
+  <script type="module">
+    import { DefaultRubyVM } from "https://cdn.jsdelivr.net/npm/@ruby/wasm-wasi@2.7.2-2025-11-28-a/dist/browser/+esm";
+
+    const startTime = performance.now();
+    const timing = document.getElementById('timing');
+    const status = document.getElementById('status');
+    const output = document.getElementById('output');
+
+    function log(message) {
+      console.log(message);
+      const div = document.createElement('div');
+      div.innerHTML = message;
+      output.appendChild(div);
+    }
+
+    function updateStatus(message, cssClass) {
+      status.textContent = message;
+      status.className = cssClass;
+    }
+
+    function updateTiming(label) {
+      const elapsed = ((performance.now() - startTime) / 1000).toFixed(2);
+      timing.innerHTML += `<div>${label}: ${elapsed}s</div>`;
+    }
+
+    try {
+      updateStatus('Fetching ruby2js-4.0.wasm (41MB)...', 'loading');
+      const response = await fetch('./ruby2js-4.0.wasm');
+      updateTiming('Fetch started');
+
+      updateStatus('Compiling WebAssembly...', 'loading');
+      const module = await WebAssembly.compileStreaming(response);
+      updateTiming('WASM compiled');
+
+      updateStatus('Initializing Ruby VM...', 'loading');
+      const { vm } = await DefaultRubyVM(module);
+      updateTiming('Ruby VM initialized');
+
+      // Test Ruby version
+      log('<h3>Step 1: Ruby Environment</h3>');
+      const rubyVersion = vm.eval('RUBY_VERSION').toString();
+      log(`<pre>Ruby version: ${rubyVersion}</pre>`);
+
+      const rubyDesc = vm.eval('RUBY_DESCRIPTION').toString();
+      log(`<pre>Description: ${rubyDesc}</pre>`);
+
+      const prismVersion = vm.eval('require "prism"; Prism::VERSION').toString();
+      log(`<pre>Prism version: ${prismVersion}</pre>`);
+
+      // Load Ruby2JS with monkey-patched require
+      log('<h3>Step 2: Load Ruby2JS</h3>');
+
+      vm.eval(`
+        $VERBOSE = nil  # Suppress warnings
+        def gem(*args); end
+
+        $PACKED_PATHS = ['/gems/ruby2js', '/gems/parser/lib', '/gems/racc/lib', '/gems/ast/lib']
+        $LOADED_PACKED = {}
+
+        module Kernel
+          alias :original_require :require
+          alias :original_require_relative :require_relative
+
+          def require(name)
+            name = name.sub(/\\.rb$/, '')
+            return false if $LOADED_PACKED[name]
+
+            $PACKED_PATHS.each do |base|
+              path = "#{base}/#{name}.rb"
+              if File.exist?(path)
+                $LOADED_PACKED[name] = true
+                eval(File.read(path), TOPLEVEL_BINDING, path)
+                return true
+              end
+            end
+
+            original_require(name)
+          end
+
+          def require_relative(name)
+            caller_path = caller_locations(1, 1).first.path
+            dir = File.dirname(caller_path)
+            full_path = File.join(dir, name + '.rb')
+
+            return false if $LOADED_PACKED[full_path]
+
+            if File.exist?(full_path)
+              $LOADED_PACKED[full_path] = true
+              eval(File.read(full_path), TOPLEVEL_BINDING, full_path)
+              return true
+            end
+
+            original_require_relative(name)
+          end
+        end
+
+        ENV['RUBY2JS_PARSER'] = 'prism'
+        require 'ruby2js'
+      `);
+      const parser = vm.eval('RUBY2JS_PARSER').toString();
+      log(`<pre class="success">Ruby2JS loaded! Parser: ${parser}</pre>`);
+      updateTiming('Ruby2JS loaded');
+
+      // Test conversion
+      log('<h3>Step 3: Test Conversion</h3>');
+
+      const testCases = [
+        'puts "Hello from Ruby 4.0!"',
+        'x = [1, 2, 3].map { |n| n * 2 }',
+        'class Foo; def bar; @x = 1; end; end',
+        '[1, 2, 3].map { _1 * 2 }',
+      ];
+
+      for (const ruby of testCases) {
+        const js = vm.eval(`Ruby2JS.convert(${JSON.stringify(ruby)}).to_s`).toString();
+        log(`<pre><b>Ruby:</b> ${ruby}\n<b>JS:</b> ${js}</pre>`);
+      }
+
+      updateTiming('Conversions complete');
+      updateStatus('Success! Ruby2JS works with Ruby 4.0 + Prism', 'success');
+
+    } catch (error) {
+      console.error(error);
+      log(`<pre class="error">Error: ${error.message}\n${error.stack}</pre>`);
+      updateStatus('Error occurred', 'error');
+    }
+  </script>
+</body>
+</html>
