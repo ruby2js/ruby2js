@@ -34,7 +34,6 @@ yarn-debug.log*
 # Yarn Integrity file
 .yarn-integrity
 
-# demo (checked in for Render deployment - regenerate with bundle exec rake)
-#src/demo
-
+# Generated assets (regenerate with bundle exec rake)
+src/demo
 src/shoelace-assets
