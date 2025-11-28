@@ -127,12 +127,22 @@ module Ruby2JS
         )
         final_export = true
         put '{ '
-        node.children.each_with_index do |arg, index|
-          put ', ' unless index == 0
-          if arg.type == :hash && arg.children[0].children[0].children[0] == :default
-            put arg.children[0].children[1].children[1]
-            put ' as default'
+        first = true
+        node.children.each do |arg|
+          if arg.type == :hash
+            # Handle alias exports: four: alias1 => four as alias1
+            arg.children.each do |pair|
+              put ', ' unless first
+              first = false
+              key = pair.children[0].children[0]  # :sym node -> symbol
+              value = pair.children[1]            # the alias target
+              parse value
+              put ' as '
+              put key.to_s
+            end
           else
+            put ', ' unless first
+            first = false
             parse arg
           end
         end
