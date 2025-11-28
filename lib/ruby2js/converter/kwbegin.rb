@@ -36,15 +36,14 @@ module Ruby2JS
         body, *recovers, otherwise = block.children
         raise Error.new("block else", @ast) if otherwise
 
-        var = recovers.first.children[1]
+        # Collect all unique exception variables used across rescue clauses
+        exception_vars = recovers.map {|r| r.children[1]}.compact.uniq
 
-        if recovers.any? {|recover| recover.children[1] != var}
-          raise Error.new( 
-            "multiple recovers with different exception variables", @ast)
-        end
+        # Use a common catch variable - prefer the first named one, or $EXCEPTION
+        var = exception_vars.first
 
         if recovers[0..-2].any? {|recover| not recover.children[0]}
-          raise Error.new( 
+          raise Error.new(
             "additional recovers after catchall", @ast)
         end
       else
@@ -78,13 +77,12 @@ module Ruby2JS
           end
           scope recovers.first.children.last; sput '}'
         else
-          var ||= s(:gvar, :$EXCEPTION)
-          put " catch ("; parse var; puts ') {'
+          catch_var = var || s(:gvar, :$EXCEPTION)
+          put " catch ("; parse catch_var; puts ') {'
 
           first = true
           recovers.each do |recover|
-            exceptions, var, recovery = recover.children
-            var ||= s(:gvar, :$EXCEPTION)
+            exceptions, recover_var, recovery = recover.children
 
             if exceptions
 
@@ -95,9 +93,9 @@ module Ruby2JS
               exceptions.children.each_with_index do |exception, index|
                 put ' || ' unless index == 0
                 if exception == s(:const, nil, :String)
-                  put 'typeof '; parse var; put ' == "string"'
+                  put 'typeof '; parse catch_var; put ' == "string"'
                 else
-                  parse var; put ' instanceof '; parse exception
+                  parse catch_var; put ' instanceof '; parse exception
                 end
               end
               puts ') {'
@@ -105,11 +103,16 @@ module Ruby2JS
               puts '} else {'
             end
 
+            # If this rescue clause uses a different variable, add an assignment
+            if recover_var and recover_var != catch_var
+              put 'var '; parse recover_var; put ' = '; parse catch_var; puts @sep
+            end
+
             scope recovery; puts ''
           end
 
           if recovers.last.children.first
-            puts "} else {"; put 'throw '; parse var; puts ''
+            puts "} else {"; put 'throw '; parse catch_var; puts ''
           end
 
           puts '}'; put '}'

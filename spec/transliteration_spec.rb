@@ -1149,6 +1149,16 @@ describe Ruby2JS do
         must_equal 'try {var a} catch (e) {var b} finally {var c}'
     end
 
+    it "should handle multiple rescue clauses with different variables" do
+      to_js( 'begin; a; rescue FooError => foo; b(foo); rescue BarError => bar; c(bar); end' ).
+        must_equal 'try {var a} catch (foo) {if (foo instanceof FooError) {b(foo)} else if (foo instanceof BarError) {var bar = foo; c(bar)} else {throw foo}}'
+    end
+
+    it "should handle multiple rescue clauses with mixed variable usage" do
+      to_js( 'begin; a; rescue FooError => e; b(e); rescue BarError; c; end' ).
+        must_equal 'try {var a} catch (e) {if (e instanceof FooError) {b(e)} else if (e instanceof BarError) {var c} else {throw e}}'
+    end
+
     it "should handle implicit begin in methods" do
       to_js( 'def foo; x(); rescue => e; y(e); end' ).
         must_equal 'function foo() {try {x()} catch (e) {y(e)}}'

@@ -35,11 +35,6 @@ describe 'not implemented' do
     todo( 'class C; protected; end' )
   end
 
-  it "catching exceptions with different variables" do
-    todo("begin; a; rescue StandardException => se; b; " +
-      "rescue Exception => e; c; end")
-  end
-
   it "else clauses in begin...end" do
     todo("begin; a; rescue => e; b; else; c; end")
   end
