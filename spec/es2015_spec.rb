@@ -386,6 +386,11 @@ describe "ES2015 support" do
         must_equal 'class A {}; class B extends A {_render(force=false, options={}) {super._render(force, options)}}'
     end
 
+    it "should handle super getter" do
+      to_js('class A; end; class B < A; def self.foo; super; end; end').
+        must_equal 'class A {}; class B extends A {static get foo() {return A.foo}}'
+    end
+
     it "should handle class super" do
       to_js('class A; end; class B < A; def self.foo(x); super; end; end').
         must_equal 'class A {}; class B extends A {static foo(x) {A.foo(x)}}'
