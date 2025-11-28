@@ -7,9 +7,56 @@ module Ruby2JS
     #   (...))
 
     handle :if do |condition, then_block, else_block|
+      # Pattern: a = b if a.nil?  =>  a ??= b (ES2021+)
+      # Pattern: a.nil? ? b : a   =>  a ?? b  (ES2020+)
+      if condition.type == :send and condition.children[1] == :nil? and
+         condition.children[2..-1].empty?
+
+        tested = condition.children[0]
+
+        # Pattern: a = b if a.nil?  =>  a ??= b
+        if es2021 and then_block and not else_block
+          asgn = then_block
+          if asgn.type == :lvasgn and tested.type == :lvar and
+             asgn.children[0] == tested.children[0]
+            # a = b if a.nil?  =>  a ??= b
+            return parse s(:op_asgn, s(:lvasgn, tested.children[0]), '??', asgn.children[1])
+          elsif asgn.type == :ivasgn and tested.type == :ivar and
+                asgn.children[0] == tested.children[0]
+            # @a = b if @a.nil?  =>  @a ??= b
+            return parse s(:op_asgn, s(:ivasgn, tested.children[0]), '??', asgn.children[1])
+          elsif asgn.type == :cvasgn and tested.type == :cvar and
+                asgn.children[0] == tested.children[0]
+            # @@a = b if @@a.nil?  =>  @@a ??= b
+            return parse s(:op_asgn, s(:cvasgn, tested.children[0]), '??', asgn.children[1])
+          elsif asgn.type == :send and asgn.children[1].to_s.end_with?('=') and
+                asgn.children[1] != :[]= and
+                tested.type == :send and
+                asgn.children[0] == tested.children[0] and
+                asgn.children[1].to_s.chomp('=') == tested.children[1].to_s
+            # self.a = b if self.a.nil?  =>  self.a ??= b
+            parse tested; put ' ??= '; parse asgn.children[2]
+            return
+          elsif asgn.type == :send and asgn.children[1] == :[]= and
+                tested.type == :send and tested.children[1] == :[] and
+                asgn.children[0] == tested.children[0] and
+                asgn.children[2] == tested.children[2]
+            # a[i] = b if a[i].nil?  =>  a[i] ??= b
+            parse tested; put ' ??= '; parse asgn.children[3]
+            return
+          end
+        end
+
+        # Pattern: a.nil? ? b : a  =>  a ?? b
+        if es2020 and then_block and else_block and else_block == tested
+          parse tested; put ' ?? '; parse then_block
+          return
+        end
+      end
+
       # return parse not condition if else_block and no then_block
       if else_block and not then_block
-        return parse(s(:if, s(:not, condition), else_block, nil), @state) 
+        return parse(s(:if, s(:not, condition), else_block, nil), @state)
       end
 
       then_block ||= s(:nil)

@@ -126,6 +126,7 @@ conversions are made:
 {:.functions-list}
 * `a&.b` {{ caret }} `a?.b`
 * `.scan` {{ caret }} `Array.from(str.matchAll(/.../g), s => s.slice(1))`
+* `a.nil? ? b : a` {{ caret }} `a ?? b`
 
 ## ES2021 support
 
@@ -135,8 +136,14 @@ conversions are made:
 {:.functions-list}
 * `x ||= 1` {{ caret }} `x ||= 1`
 * `x &&= 1` {{ caret }} `x &&= 1`
+* `x = y if x.nil?` {{ caret }} `x ??= y`
 * `1000000.000001` {{ caret }} `1_000_000.000_001`
 * `'.gsub' {{ caret }} `.replaceAll`
+
+The `x = y if x.nil?` pattern provides an idiomatic Ruby way to express
+nullish assignment. This is useful when you want nullish semantics (only
+assign if `nil`) rather than the falsy semantics of `||=` (which also
+triggers on `false`).
 
 ## ES2022 support
 

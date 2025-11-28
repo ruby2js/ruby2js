@@ -49,5 +49,13 @@ describe "ES2021 support" do
     to_js_fn( 'x.gsub("a", "b")' ).must_equal 'x.replaceAll("a", "b")'
     to_js_fn( 'x.gsub(/a/, "b")' ).must_equal 'x.replaceAll(/a/g, "b")'
   end
-    
+
+  it "should convert 'a = b if a.nil?' to nullish assignment" do
+    to_js( 'a = b if a.nil?' ).must_equal 'a ??= b'
+    to_js( '@a = b if @a.nil?' ).must_equal 'this._a ??= b'
+    to_js( '@@a = b if @@a.nil?' ).must_equal 'this.constructor._a ??= b'
+    to_js( 'self.foo = b if self.foo.nil?' ).must_equal 'this.foo ??= b'
+    to_js( 'a[i] = b if a[i].nil?' ).must_equal 'a[i] ??= b'
+  end
+
 end
