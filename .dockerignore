@@ -1,0 +1,28 @@
+# Git
+.git
+.gitignore
+
+# Build artifacts
+docs/output
+docs/.bridgetown-cache
+docs/node_modules
+
+# Development files
+README.md
+CHANGELOG.md
+.github
+plans
+
+# Test files
+spec
+test
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db

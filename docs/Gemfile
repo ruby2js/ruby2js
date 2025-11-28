@@ -11,7 +11,8 @@ gem "bridgetown-quick-search", "~> 2.0"
 group :demo do
   gem 'rake'
   gem 'wunderbar'
-  gem 'opal', '1.1.1'
+  gem 'opal', '~> 1.8'
+  gem 'base64' # Required for Opal on Ruby 3.4+
 end
 
 gem "puma", "~> 6.0"
