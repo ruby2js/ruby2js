@@ -670,6 +670,25 @@ module Ruby2JS
           # output: while(true) {statements}
           S(:while, s(:true), node.children[2])
 
+        elsif method == :times and call.children.length == 2
+          # input: n.times { |i| ... }
+          # output: for (let i = 0; i < n; i++) { ... }
+          count = call.children[0]
+
+          # If no block variable provided, create a dummy one
+          if node.children[1].children.empty?
+            args = s(:args, s(:arg, :_))
+          else
+            args = node.children[1]
+          end
+
+          # Convert to range iteration: (0...n).each { |var| body }
+          process node.updated(nil, [
+            s(:send, s(:begin, s(:erange, s(:int, 0), count)), :each),
+            args,
+            node.children[2]
+          ])
+
         elsif method == :delete
           # restore delete methods that are prematurely mapped to undef
           result = super
