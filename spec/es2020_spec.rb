@@ -95,5 +95,17 @@ describe "ES2020 support" do
       to_js('foo() if bar and bar != @bar').
         must_equal 'if (bar && bar != this._bar) foo()'
     end
+
+    unless (RUBY_VERSION.split('.').map(&:to_i) <=> [2, 3, 0]) == -1
+      it "should convert methods after optional chaining" do
+        to_js_fn('filter.subTypes&.include?(item.subType)').
+          must_equal 'filter.subTypes?.includes(item.subType)'
+      end
+
+      it "should convert proc symbols after optional chaining" do
+        to_js_fn('a&.map(&:to_i)').
+          must_equal 'a?.map(item => parseInt(item))'
+      end
+    end
   end
 end
