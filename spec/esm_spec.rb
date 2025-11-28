@@ -95,6 +95,9 @@ describe Ruby2JS::Filter::ESM do
 
       to_js("export [ A, default: B ]").
         must_include "export { A, B as default }"
+
+      to_js("export [one, two, three, four: alias1, five: alias2]").
+        must_include "export { one, two, three, alias1 as four, alias2 as five }"
     end
   end
 
