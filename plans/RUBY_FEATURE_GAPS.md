@@ -321,7 +321,7 @@ function wrapper(...args) {
 | Multiple rescue types | Medium | Medium | ✅ Already implemented |
 | Pattern matching (basic) | Medium | High | Pending - Stage 3 |
 | Ranges as values | Low | Medium | Document limitation |
-| `else` in rescue | Low | Low | Pending |
+| `else` in rescue | Low | Low | ✅ Implemented |
 | Top-level `alias` | Low | Low | Skip |
 | Regex back-refs | Low | High | Skip |
 | Anonymous block forwarding | Low | Medium | Defer |
@@ -340,14 +340,14 @@ function wrapper(...args) {
 
 1. **Argument forwarding (`...`)** - Added `forward_args` and `forwarded_args` handlers
 
-### Stage 2: Error Handling Improvements ✅ ALREADY IMPLEMENTED
+### Stage 2: Error Handling Improvements ✅ COMPLETE
 
 These features were already implemented:
 1. Multiple rescue clauses with different exception types
 2. `retry` statement
 
-Still pending:
-- `else` clause in begin/rescue
+Newly implemented:
+- `else` clause in begin/rescue - uses a `$no_exception` flag to track success
 
 ### Stage 3: Pattern Matching (Basic)
 

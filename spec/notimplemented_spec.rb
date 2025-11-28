@@ -35,10 +35,6 @@ describe 'not implemented' do
     todo( 'class C; protected; end' )
   end
 
-  it "else clauses in begin...end" do
-    todo("begin; a; rescue => e; b; else; c; end")
-  end
-
   it "flip-flops" do
     todo("if a..b; end")
   end

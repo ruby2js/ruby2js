@@ -34,7 +34,6 @@ module Ruby2JS
 
       if block and block.type == :rescue
         body, *recovers, otherwise = block.children
-        raise Error.new("block else", @ast) if otherwise
 
         # Collect all unique exception variables used across rescue clauses
         exception_vars = recovers.map {|r| r.children[1]}.compact.uniq
@@ -67,7 +66,14 @@ module Ruby2JS
       # If retry is used, wrap in while(true) loop
       puts "while (true) {#{@nl}" if uses_retry
 
+      # If else clause exists, we need a flag to track if no exception occurred
+      if otherwise
+        puts "#{es2015 ? 'let' : 'var'} $no_exception = false#{@sep}"
+      end
+
       puts "try {"; scope body
+      # Set flag at end of try block if else clause exists
+      puts "#{@sep}$no_exception = true" if otherwise
       # Add break after try body when using retry (to exit loop on success)
       puts "#{@sep}break" if uses_retry
       sput '}'
@@ -136,6 +142,11 @@ module Ruby2JS
       end
 
       (puts ' finally {'; scope finally; sput '}') if finally
+
+      # Execute else clause if no exception occurred
+      if otherwise
+        put "#{@sep}if ($no_exception) {#{@nl}"; scope otherwise; sput '}'
+      end
 
       # Close while loop if using retry
       sput '}' if uses_retry
