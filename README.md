@@ -23,10 +23,26 @@ require 'ruby2js'
 puts Ruby2JS.convert("a={age:3}\na.age+=1", preset: true)
 ```
 
-## Testing
+## Contributing
+
+### Running Tests
 
 1. Run `bundle install`
 2. Run `bundle exec rake test_all`
+
+### Running the Website Locally
+
+The [ruby2js.com](https://www.ruby2js.com) website (including the live demo) can be run locally from the `docs` folder:
+
+```sh
+cd docs
+bundle install
+yarn install
+bundle exec rake            # build demo assets (Opal-compiled ruby2js, etc.)
+bin/bridgetown start        # run the site's dev server
+```
+
+The site will be available at `http://localhost:4000`. The live demo uses [Opal](https://opalrb.com) to run ruby2js entirely in the browser.
 
 ## Release Process for Maintainers
 
