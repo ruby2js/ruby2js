@@ -22,6 +22,17 @@ module Ruby2JS
         super
       end
 
+      def on_csend(node)
+        # process csend (safe navigation) nodes the same as send nodes
+        # so method names get converted (e.g., include? -> includes)
+        # then restore the csend type if needed
+        result = on_send(node)
+        if result&.type == :send and node.type == :csend
+          result = result.updated(:csend)
+        end
+        result
+      end
+
       def on_send(node)
         target, method, *args = node.children
         return super if excluded?(method) and method != :call
