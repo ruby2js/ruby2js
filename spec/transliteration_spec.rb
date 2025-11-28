@@ -934,6 +934,13 @@ describe Ruby2JS do
       to_js( 'typeof x' ).must_equal "typeof x"
     end
 
+    it "should handle negation of typeof comparisons" do
+      to_js( 'return unless typeof x == "number"' ).
+        must_equal 'if (typeof x != "number") return'
+      to_js( 'return if typeof x != "number"' ).
+        must_equal 'if (typeof x != "number") return'
+    end
+
     it "should handle defined?" do
       to_js( 'defined? x' ).must_equal "typeof x !== 'undefined'"
       to_js( '!defined? x' ).must_equal "typeof x === 'undefined'"
