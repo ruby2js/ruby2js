@@ -6,6 +6,8 @@
 docs/output
 docs/.bridgetown-cache
 docs/node_modules
+docs/src/demo
+docs/src/shoelace-assets
 
 # Development files
 README.md
