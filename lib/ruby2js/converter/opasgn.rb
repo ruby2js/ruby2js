@@ -54,8 +54,15 @@ module Ruby2JS
       vtype = :ivar if asgn.type == :ivasgn
       vtype = :cvar if asgn.type == :cvasgn
       
-      if es2021
-        op = type == :and ? '&&' : (@or == :nullish ? '??' : '||')
+      if es2020
+        default_or = '||'
+
+        if @pragma == '??'
+          # Override '||' and use '??'
+          default_or = '??'
+        end
+
+        op = type == :and ? '&&' : (@or == :nullish ? '??' : default_or)
         parse s(:op_asgn, asgn, op, value);
       elsif vtype
         parse s(asgn.type, asgn.children.first, s(type, 
