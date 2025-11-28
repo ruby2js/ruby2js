@@ -57,8 +57,8 @@ module Ruby2JS
           end
 
           if other or index < whens.length-1
-            put "#{@sep}" 
-            put "break#@sep" unless last.type == :return
+            put "#{@sep}"
+            put "break#@sep" unless last&.type == :return
           end
         end
 
