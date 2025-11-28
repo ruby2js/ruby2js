@@ -1,34 +1,74 @@
-Ruby2JS
-=======
+# Ruby2JS
 
-Minimal yet extensible Ruby to JavaScript conversion.  
+Minimal yet extensible Ruby to JavaScript conversion.
 
 [![Gem Version](https://badge.fury.io/rb/ruby2js.svg)](https://badge.fury.io/rb/ruby2js)
+[![CI](https://github.com/ruby2js/ruby2js/actions/workflows/ci.yml/badge.svg)](https://github.com/ruby2js/ruby2js/actions/workflows/ci.yml)
 
-## Documentation
----
+**[Documentation](https://www.ruby2js.com)** | **[Live Demo](https://ruby2js.com/demo?preset=true)**
 
-* Visit **[ruby2js.com](https://www.ruby2js.com)** for detailed setup instructions and API reference.
+## Installation
 
-* [Try Ruby2JS online](https://ruby2js.com/demo?preset=true)
+```ruby
+# Gemfile
+gem 'ruby2js'
+```
 
+Or install directly:
 
-## Synopsis
+```sh
+gem install ruby2js
+```
 
+## Examples
 
-Basic:
+Ruby2JS converts Ruby syntax to clean, readable JavaScript:
+
+```ruby
+# Ruby                              # JavaScript
+a = { age: 3 }                      # let a = {age: 3}
+a.age += 1                          # a.age++
+
+items.map { |x| x * 2 }             # items.map(x => x * 2)
+
+class Dog < Animal                  # class Dog extends Animal {
+  def bark                          #   bark() {
+    puts "woof!"                    #     console.log("woof!")
+  end                               #   }
+end                                 # }
+```
+
+## Quick Start
 
 ```ruby
 require 'ruby2js'
-puts Ruby2JS.convert("a={age:3}\na.age+=1", preset: true)
+
+puts Ruby2JS.convert("a = {age: 3}; a.age += 1", preset: true)
+# => let a = {age: 3}; a.age++
 ```
+
+### Command Line
+
+```sh
+ruby2js --preset file.rb
+echo "puts 'hello'" | ruby2js --preset
+```
+
+## Features
+
+- **[Filters](https://www.ruby2js.com/docs/filters)** - Transform Ruby methods to JavaScript equivalents (e.g., `.each` → `.forEach`)
+- **[ES Level Support](https://www.ruby2js.com/docs/eslevels)** - Target specific JavaScript versions (ES5 through ES2022+)
+- **[Framework Integrations](https://www.ruby2js.com/docs/integrations)** - Rails, Stimulus, React, Lit, and more
+- **[Live Demo](https://ruby2js.com/demo?preset=true)** - Try it in your browser (runs entirely client-side via Opal)
 
 ## Contributing
 
 ### Running Tests
 
-1. Run `bundle install`
-2. Run `bundle exec rake test_all`
+```sh
+bundle install
+bundle exec rake test_all
+```
 
 ### Running the Website Locally
 
@@ -42,7 +82,7 @@ bundle exec rake            # build demo assets (Opal-compiled ruby2js, etc.)
 bin/bridgetown start        # run the site's dev server
 ```
 
-The site will be available at `http://localhost:4000`. The live demo uses [Opal](https://opalrb.com) to run ruby2js entirely in the browser.
+The site will be available at `http://localhost:4000`.
 
 ## Release Process for Maintainers
 
@@ -51,25 +91,6 @@ The site will be available at `http://localhost:4000`. The live demo uses [Opal]
 
 ## License
 
-(The MIT License)
+MIT License - Copyright (c) 2009, 2025 Macario Ortega, Sam Ruby, Jared White
 
-Copyright (c) 2009, 2020 Macario Ortega, Sam Ruby, Jared White
-
-Permission is hereby granted, free of charge, to any person obtaining
-a copy of this software and associated documentation files (the
-'Software'), to deal in the Software without restriction, including
-without limitation the rights to use, copy, modify, merge, publish,
-distribute, sublicense, and/or sell copies of the Software, and to
-permit persons to whom the Software is furnished to do so, subject to
-the following conditions:
-
-The above copyright notice and this permission notice shall be
-included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
-SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+See [LICENSE](LICENSE) for details.
