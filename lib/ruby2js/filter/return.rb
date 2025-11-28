@@ -10,6 +10,14 @@ module Ruby2JS
       def on_block(node)
         node = super
         return node unless node.type == :block
+
+        # Don't wrap Class.new blocks - they contain method definitions, not return values
+        call = node.children.first
+        if call.type == :send and call.children[0]&.type == :const and
+           call.children[0].children == [nil, :Class] and call.children[1] == :new
+          return node
+        end
+
         children = node.children.dup
 
         children[-1] = s(:nil) if children.last == nil
