@@ -29,10 +29,10 @@ describe "ES2024 support" do
         must_equal 'Object.groupBy(people, p => p.age > 30 ? "senior" : "junior")'
     end
 
-    it "should not convert group_by without ES2024" do
-      # Without ES2024, group_by should pass through unchanged
+    it "should use reduce fallback without ES2024" do
+      # Without ES2024, group_by uses reduce
       to_js_2023('a.group_by { |x| x.category }').
-        must_equal 'a.group_by(x => x.category)'
+        must_equal 'a.reduce(($acc, x) => {let $key = x.category; ($acc[$key] = $acc[$key] || []).push(x); return $acc}, {})'
     end
   end
 end

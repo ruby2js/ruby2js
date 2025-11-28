@@ -624,6 +624,23 @@ describe Ruby2JS::Filter::Functions do
     end
   end
 
+  describe "sort_by, max_by, min_by" do
+    it "should handle sort_by" do
+      to_js( 'a.sort_by { |x| x.name }' ).
+        must_equal 'a.slice().sort(function(x_a, x_b) {if (x_a.name < x_b.name) {return -1} else if (x_a.name > x_b.name) {return 1} else {return 0}})'
+    end
+
+    it "should handle max_by" do
+      to_js( 'a.max_by { |x| x.score }' ).
+        must_equal 'a.reduce(function(a, b) {return a.score >= b.score ? a : b})'
+    end
+
+    it "should handle min_by" do
+      to_js( 'a.min_by { |x| x.score }' ).
+        must_equal 'a.reduce(function(a, b) {return a.score <= b.score ? a : b})'
+    end
+  end
+
   describe "math functions" do
     it "should handle abs" do
       to_js( 'a.abs' ).must_equal 'Math.abs(a)'

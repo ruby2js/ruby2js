@@ -656,12 +656,151 @@ module Ruby2JS
           node.updated nil, [process(call), process(node.children[1]),
             s(:autoreturn, *process_all(node.children[2..-1]))]
 
-        elsif method == :group_by and call.children.length == 2 and es2024
-          # array.group_by { |x| x.category } => Object.groupBy(array, x => x.category)
+        elsif method == :group_by and call.children.length == 2
+          # array.group_by { |x| x.category }
           target = call.children.first
-          callback = s(:block, s(:send, nil, :proc), node.children[1],
-            s(:autoreturn, *node.children[2..-1]))
-          process s(:send, s(:const, nil, :Object), :groupBy, target, callback)
+          args = node.children[1]
+          block_body = node.children[2]
+          arg_name = args.children.first.children.first
+
+          if es2024
+            # ES2024+: Object.groupBy(array, x => x.category)
+            callback = s(:block, s(:send, nil, :proc), node.children[1],
+              s(:autoreturn, *node.children[2..-1]))
+            process s(:send, s(:const, nil, :Object), :groupBy, target, callback)
+          else
+            # Pre-ES2024: array.reduce((acc, x) => { const key = ...; (acc[key] = acc[key] || []).push(x); return acc }, {})
+            # Build: (acc[key] = acc[key] || []).push(item)
+            acc_key = s(:send, s(:lvar, :$acc), :[], s(:lvar, :$key))
+            acc_key_or_empty = s(:or, acc_key, s(:array))
+            assign_and_push = s(:send,
+              s(:send, s(:lvar, :$acc), :[]=, s(:lvar, :$key), acc_key_or_empty),
+              :push, s(:lvar, arg_name))
+
+            # Build the reduce block body
+            reduce_body = s(:begin,
+              s(:lvasgn, :$key, block_body),
+              assign_and_push,
+              s(:return, s(:lvar, :$acc)))
+
+            reduce_block = s(:block,
+              s(:send, nil, :proc),
+              s(:args, s(:arg, :$acc), s(:arg, arg_name)),
+              reduce_body)
+
+            process s(:send, target, :reduce, reduce_block, s(:hash))
+          end
+
+        elsif method == :sort_by and call.children.length == 2
+          # array.sort_by { |x| x.name } => array.slice().sort((a, b) => ...)
+          # With ES2023+: array.toSorted((a, b) => ...)
+          target = call.children.first
+          args = node.children[1]
+          block_body = node.children[2]
+
+          # Create two argument names for the comparison function
+          arg_name = args.children.first.children.first
+          arg_a = :"#{arg_name}_a"
+          arg_b = :"#{arg_name}_b"
+
+          # Build the block body substituted with the two argument names
+          block_a = process_all([block_body]).first
+          block_b = process_all([block_body]).first
+
+          # Replace references to the block argument with arg_a and arg_b
+          def replace_lvar(node, old_name, new_name)
+            return node unless node.is_a?(Parser::AST::Node)
+            if node.type == :lvar && node.children.first == old_name
+              node.updated(nil, [new_name])
+            else
+              node.updated(nil, node.children.map { |c| replace_lvar(c, old_name, new_name) })
+            end
+          end
+
+          key_a = replace_lvar(block_body, arg_name, arg_a)
+          key_b = replace_lvar(block_body, arg_name, arg_b)
+
+          # Build comparison: key_a < key_b ? -1 : key_a > key_b ? 1 : 0
+          comparison = s(:if,
+            s(:send, key_a, :<, key_b),
+            s(:int, -1),
+            s(:if,
+              s(:send, key_a, :>, key_b),
+              s(:int, 1),
+              s(:int, 0)))
+
+          compare_block = s(:block,
+            s(:send, nil, :proc),
+            s(:args, s(:arg, arg_a), s(:arg, arg_b)),
+            s(:autoreturn, comparison))
+
+          if es2023
+            # Use toSorted for ES2023+
+            process s(:send, target, :toSorted, compare_block)
+          else
+            # Use slice().sort() for older versions
+            process s(:send, s(:send, target, :slice), :sort, compare_block)
+          end
+
+        elsif method == :max_by and call.children.length == 2
+          # array.max_by { |x| x.score } => array.reduce((a, b) => key(a) > key(b) ? a : b)
+          target = call.children.first
+          args = node.children[1]
+          block_body = node.children[2]
+
+          arg_name = args.children.first.children.first
+
+          def replace_lvar(node, old_name, new_name)
+            return node unless node.is_a?(Parser::AST::Node)
+            if node.type == :lvar && node.children.first == old_name
+              node.updated(nil, [new_name])
+            else
+              node.updated(nil, node.children.map { |c| replace_lvar(c, old_name, new_name) })
+            end
+          end
+
+          key_a = replace_lvar(block_body, arg_name, :a)
+          key_b = replace_lvar(block_body, arg_name, :b)
+
+          # Build: a, b => key(a) >= key(b) ? a : b
+          comparison = s(:if, s(:send, key_a, :>=, key_b), s(:lvar, :a), s(:lvar, :b))
+
+          reduce_block = s(:block,
+            s(:send, nil, :proc),
+            s(:args, s(:arg, :a), s(:arg, :b)),
+            s(:autoreturn, comparison))
+
+          process s(:send, target, :reduce, reduce_block)
+
+        elsif method == :min_by and call.children.length == 2
+          # array.min_by { |x| x.score } => array.reduce((a, b) => key(a) <= key(b) ? a : b)
+          target = call.children.first
+          args = node.children[1]
+          block_body = node.children[2]
+
+          arg_name = args.children.first.children.first
+
+          def replace_lvar(node, old_name, new_name)
+            return node unless node.is_a?(Parser::AST::Node)
+            if node.type == :lvar && node.children.first == old_name
+              node.updated(nil, [new_name])
+            else
+              node.updated(nil, node.children.map { |c| replace_lvar(c, old_name, new_name) })
+            end
+          end
+
+          key_a = replace_lvar(block_body, arg_name, :a)
+          key_b = replace_lvar(block_body, arg_name, :b)
+
+          # Build: a, b => key(a) <= key(b) ? a : b
+          comparison = s(:if, s(:send, key_a, :<=, key_b), s(:lvar, :a), s(:lvar, :b))
+
+          reduce_block = s(:block,
+            s(:send, nil, :proc),
+            s(:args, s(:arg, :a), s(:arg, :b)),
+            s(:autoreturn, comparison))
+
+          process s(:send, target, :reduce, reduce_block)
 
         elsif method == :find_index and call.children.length == 2
           call = call.updated nil, [call.children.first, :findIndex]

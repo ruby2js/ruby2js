@@ -37,6 +37,7 @@ If you set the `eslevel` option to `2015` or newer, the Functions filter enables
 * `.first` {{ caret }} `[0]`
 * `.first(n)` {{ caret }} `.slice(0, n)`
 * `.floor` {{ caret }} `Math.floor()`
+* `.group_by {}` {{ caret }} `Object.groupBy()` (ES2024+) or `.reduce()` fallback
 * `.gsub` {{ caret }} `replace(//g)`
 * `.include?` {{ caret }} `.indexOf() != -1`
 * `.index` {{ caret }} `indexOf` (when using arg) or `findIndex` (when using block)
@@ -46,10 +47,12 @@ If you set the `eslevel` option to `2015` or newer, the Functions filter enables
 * `.last(n)` {{ caret }} `.slice(*.length-1, *.length)`
 * `.lstrip` {{ caret }} `.replace(/^\s+/, "")`
 * `.max` {{ caret }} `Math.max.apply(Math)`
+* `.max_by {}` {{ caret }} `.reduce()`
 * `.merge` {{ caret }} `Object.assign({}, ...)`
 * `.merge!` {{ caret }} `Object.assign()`
 * `.method_defined?` {{ caret }} `klass.prototype.hasOwnProperty(meth)` or `meth in klass.prototype`
 * `.min` {{ caret }} `Math.min.apply(Math)`
+* `.min_by {}` {{ caret }} `.reduce()`
 * `.new(size,default)` {{ caret }} `== .new(size).fill(default)`
 * `.nil?` {{ caret }} `== null`
 * `.ord` {{ caret }} `charCodeAt(0)`
@@ -61,6 +64,7 @@ If you set the `eslevel` option to `2015` or newer, the Functions filter enables
 * `.round` {{ caret }} `Math.round()`
 * `.rstrip` {{ caret }} `.replace(/s+$/, "")`
 * `.scan` {{ caret }} `.match(//g)`
+* `.sort_by {}` {{ caret }} `.toSorted()` (ES2023+) or `.slice().sort()` fallback
 * `.sum` {{ caret }} `.reduce(function(a, b) {a + b}, 0)`
 * `.times` {{ caret }} `for (let i = 0; i < n; i++)`
 * `.start_with?` {{ caret }} `.substring(0, arg.length) == arg` or `.startsWith(arg)` for ES2015+

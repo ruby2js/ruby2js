@@ -161,7 +161,23 @@ made:
 
 ## ES2023 support
 
-ES2023 adds array methods like `findLast()`, `findLastIndex()`, and immutable array methods like `toReversed()`, `toSorted()`, and `toSpliced()`. These are not currently mapped from Ruby methods due to type ambiguity.
+When option `eslevel: 2023` is provided, the following additional
+conversion is made by the `functions` filter:
+
+{:.functions-list}
+* `.sort_by {}` {{ caret }} `.toSorted()`
+
+Ruby's `sort_by` method uses ES2023's non-mutating `toSorted()`:
+
+```ruby
+# Ruby
+people.sort_by { |p| p.age }
+
+# JavaScript (ES2023)
+people.toSorted((p_a, p_b) => p_a.age < p_b.age ? -1 : p_a.age > p_b.age ? 1 : 0)
+```
+
+For older ES levels, `sort_by` uses `slice().sort()` to avoid mutating the original array.
 
 ## ES2024 support
 
@@ -180,6 +196,8 @@ people.group_by { |p| p.age }
 # JavaScript (ES2024)
 Object.groupBy(people, p => p.age)
 ```
+
+For older ES levels, `group_by` uses a `reduce()` fallback to build the grouped object.
 
 ## ES2025 support
 
