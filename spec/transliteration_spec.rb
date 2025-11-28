@@ -474,6 +474,11 @@ describe Ruby2JS do
         must_equal 'var x = function() {switch (a) {case true: return b; default: return c}}()'
     end
 
+    it "should handle empty when blocks" do
+      to_js( 'case a; when 1; when 2; b; end' ).
+        must_equal 'switch (a) {case 1: ; break; case 2: var b}'
+    end
+
     it "should handle a for loop" do
       to_js( 'a = {}; b = {}; for i in a; b[i] = a[i]; end' ).
         must_equal 'var a = {}; var b = {}; for (var i in a) {b[i] = a[i]}'
