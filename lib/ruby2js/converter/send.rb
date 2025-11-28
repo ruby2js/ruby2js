@@ -233,8 +233,30 @@ module Ruby2JS
       elsif method == :!~
         put '!'; parse args.first; put '.test('; parse receiver; put ')'
 
-      elsif method == :<< and args.length == 1 and @state == :statement
-        parse receiver; put '.push('; parse args.first; put ')'
+      elsif method == :<<
+        if @state == :statement
+          # Handle chained << operations by converting to a single push() call
+          current = receiver
+          operations = [args.first]
+
+          # Traverse the AST to collect all chained << operations
+          while current.type == :send && current.children[1] == :<<
+            operations.unshift(current.children[2])
+            current = current.children[0]
+          end
+
+          # Generate a single push() call with multiple arguments
+          parse current; put '.push('
+          operations.each_with_index do |arg, index|
+            put ', ' if index > 0
+            parse arg
+          end
+          put ')'
+        else
+          # If not in statement context, fall back to original behavior
+          group_receiver ? group(receiver) : parse(receiver)
+          put " << " ; group_target ? group(args.first) : parse(args.first)
+        end
 
       elsif method == :<=>
         parse receiver; put ' < '; parse args.first; put ' ? -1 : '
