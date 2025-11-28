@@ -12,6 +12,33 @@ module Ruby2JS
     # Note: not handled below
     #   (...))
 
+    # Comparison operators that indicate a boolean context
+    COMPARISON_OPS = [:<, :<=, :>, :>=, :==, :!=, :===, :'!==', :=~, :!~]
+
+    # Check if a node represents a boolean expression (comparison, boolean literal, etc.)
+    def boolean_expression?(node)
+      return false unless node
+
+      case node.type
+      when :true, :false
+        true
+      when :send
+        # Check for comparison operators
+        method = node.children[1]
+        return true if COMPARISON_OPS.include?(method)
+        # Check for predicate methods (ending with ?)
+        return true if method.to_s.end_with?('?')
+        false
+      when :and, :or, :not
+        true
+      when :begin
+        # Check the inner expression
+        node.children.length == 1 && boolean_expression?(node.children.first)
+      else
+        false
+      end
+    end
+
     handle :and, :or do |left, right|
       type = @ast.type
 
@@ -27,16 +54,21 @@ module Ruby2JS
 
       op_index = operator_index type
 
-      lgroup   = LOGICAL.include?( left.type ) && 
+      lgroup   = LOGICAL.include?( left.type ) &&
         op_index < operator_index( left.type )
       lgroup = true if left and left.type == :begin
 
-      rgroup = LOGICAL.include?( right.type ) && 
+      rgroup = LOGICAL.include?( right.type ) &&
         op_index < operator_index( right.type )
       rgroup = true if right.type == :begin
 
       put '(' if lgroup; parse left; put ')' if lgroup
-      put (type==:and ? ' && ' : ((@or == :nullish and es2020) ? ' ?? ' : ' || '))
+
+      # Use || instead of ?? in boolean contexts even when nullish option is set
+      use_nullish = @or == :nullish && es2020 &&
+        !boolean_expression?(left) && !boolean_expression?(right)
+
+      put (type==:and ? ' && ' : (use_nullish ? ' ?? ' : ' || '))
       put '(' if rgroup; parse right; put ')' if rgroup
     end
 
