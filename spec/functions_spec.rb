@@ -568,6 +568,21 @@ describe Ruby2JS::Filter::Functions do
         must_equal 'while (true) {sleep(1); break}'
     end
 
+    it 'should handle times with block variable' do
+      to_js( '3.times { |i| console.log(i) }' ).
+        must_equal 'for (var i = 0; i < 3; i++) {console.log(i)}'
+    end
+
+    it 'should handle times without block variable' do
+      to_js( '3.times { console.log("hi") }' ).
+        must_equal 'for (var _ = 0; _ < 3; _++) {console.log("hi")}'
+    end
+
+    it 'should handle times with variable count' do
+      to_js( 'n.times { |i| console.log(i) }' ).
+        must_equal 'for (var i = 0; i < n; i++) {console.log(i)}'
+    end
+
     it 'should handles inspect' do
       to_js( 'a.inspect' ).must_equal 'JSON.stringify(a)'
     end

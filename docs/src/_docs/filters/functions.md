@@ -62,6 +62,7 @@ If you set the `eslevel` option to `2015` or newer, the Functions filter enables
 * `.rstrip` {{ caret }} `.replace(/s+$/, "")`
 * `.scan` {{ caret }} `.match(//g)`
 * `.sum` {{ caret }} `.reduce(function(a, b) {a + b}, 0)`
+* `.times` {{ caret }} `for (let i = 0; i < n; i++)`
 * `.start_with?` {{ caret }} `.substring(0, arg.length) == arg` or `.startsWith(arg)` for ES2015+
 * `.upto(lim)` {{ caret }} `for (var i=num; i<=lim; i+=1)`
 * `.downto(lim)` {{ caret }} `for (var i=num; i>=lim; i-=1)`
@@ -104,6 +105,7 @@ If you set the `eslevel` option to `2015` or newer, the Functions filter enables
 * New classes subclassed off of `Exception` will become subclassed off
   of `Error` instead; and default constructors will be provided
 * `loop do...end` will be replaced with `while (true) {...}`
+* `n.times do...end` and `n.times { |i| ... }` will be replaced with `for` loops
 * `raise Exception.new(...)` will be replaced with `throw new Error(...)`
 * `block_given?` will check for the presence of optional argument `_implicitBlockYield` which is a function made accessible through the use of `yield` in a method body.
 * `alias_method` works both inside of a class definition as well as called directly on a class name (e.g. `MyClass.alias_method`)
