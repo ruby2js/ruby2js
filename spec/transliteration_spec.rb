@@ -959,6 +959,12 @@ describe Ruby2JS do
       to_js( 'x unless a.kind_of? b' ).must_equal "if (!(a instanceof b)) var x"
       to_js( 'x unless a.instance_of? b' ).must_equal "if (!(a.constructor == b)) var x"
     end
+
+    it "should handle is_a?, kind_of?, instance_of? with safe navigation" do
+      to_js( 'a&.is_a? b' ).must_equal "a && (a instanceof b)"
+      to_js( 'a&.kind_of? b' ).must_equal "a && (a instanceof b)"
+      to_js( 'a&.instance_of? b' ).must_equal "a && (a.constructor == b)"
+    end
   end
 
   describe 'attribute access' do

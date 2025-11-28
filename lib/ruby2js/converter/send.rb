@@ -372,6 +372,17 @@ module Ruby2JS
     end
 
     handle :csend do |receiver, method, *args|
+      # is_a?, kind_of?, instance_of? cannot use optional chaining because
+      # they need to be converted to instanceof/constructor checks
+      if [:is_a?, :kind_of?, :instance_of?].include?(method) and args.length == 1
+        # Convert to: receiver && (receiver instanceof/constructor check)
+        # Output directly to avoid rewrite() converting back to csend
+        parse receiver
+        put ' && '
+        parse @ast.updated(:send)
+        return
+      end
+
       if es2020
 
         # optional chaining
