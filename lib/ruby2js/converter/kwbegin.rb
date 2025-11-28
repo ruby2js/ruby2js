@@ -46,15 +46,31 @@ module Ruby2JS
           raise Error.new(
             "additional recovers after catchall", @ast)
         end
+
+        # Check if any rescue body contains a retry statement
+        has_retry = nil
+        has_retry = lambda do |node|
+          next false unless node.is_a?(Parser::AST::Node)
+          next true if node.type == :retry
+          node.children.any? { |child| has_retry[child] }
+        end
+        uses_retry = recovers.any? { |recover| has_retry[recover.children.last] }
       else
         body = block
+        uses_retry = false
       end
 
       if not recovers and not finally
         return scope s(:begin, *children)
       end
 
-      puts "try {"; scope body; sput '}'
+      # If retry is used, wrap in while(true) loop
+      puts "while (true) {#{@nl}" if uses_retry
+
+      puts "try {"; scope body
+      # Add break after try body when using retry (to exit loop on success)
+      puts "#{@sep}break" if uses_retry
+      sput '}'
 
       if recovers
 
@@ -120,6 +136,9 @@ module Ruby2JS
       end
 
       (puts ' finally {'; scope finally; sput '}') if finally
+
+      # Close while loop if using retry
+      sput '}' if uses_retry
     end
   end
 end

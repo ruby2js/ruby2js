@@ -1174,6 +1174,16 @@ describe Ruby2JS do
         must_equal 'function foo() {try {x()} catch (e) {y(e)} finally {z()}}'
     end
 
+    it "should handle retry in rescue block" do
+      to_js( 'begin; a; rescue; retry; end' ).
+        must_equal 'while (true) {try {var a; break} catch ($EXCEPTION) {continue}}'
+    end
+
+    it "should handle retry with exception type" do
+      to_js( 'begin; a; rescue StandardError; retry; end' ).
+        must_equal 'while (true) {try {var a; break} catch ($EXCEPTION) {if ($EXCEPTION instanceof StandardError) {continue} else {throw $EXCEPTION}}}'
+    end
+
     it "should handle neither a rescue nor an ensure being present" do
       to_js( 'begin a; b; end' ).must_equal 'var a; var b'
     end
