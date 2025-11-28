@@ -1,5 +1,7 @@
 gem 'minitest'
 require 'minitest/autorun'
+require 'ruby2js'
+require 'ruby2js/filter/functions'
 
 describe "ES2020 support" do
   
@@ -38,6 +40,26 @@ describe "ES2020 support" do
     it "should map || operator based on :or option" do
       to_js( 'a || b' ).must_equal 'a || b'
       to_js_nullish( 'a || b' ).must_equal 'a ?? b'
+    end
+
+    it "should use || instead of ?? in boolean contexts" do
+      # Comparison operators should preserve ||
+      to_js_nullish( '(a == 1) || (b == 2)' ).must_equal '(a == 1) || (b == 2)'
+      to_js_nullish( 'a > 5 || b < 3' ).must_equal 'a > 5 || b < 3'
+
+      # Predicate methods should preserve ||
+      to_js_nullish( 'a.empty? || b.nil?' ).must_equal 'a.empty || b.nil'
+
+      # Boolean literals should preserve ||
+      to_js_nullish( 'a || true' ).must_equal 'a || true'
+      to_js_nullish( 'false || b' ).must_equal 'false || b'
+
+      # Mixed boolean context should preserve ||
+      to_js_nullish( 'a > 5 || b' ).must_equal 'a > 5 || b'
+      to_js_nullish( 'a || b < 3' ).must_equal 'a || b < 3'
+
+      # Non-boolean contexts should use ??
+      to_js_nullish( 'x = a || b' ).must_equal 'let x = a ?? b'
     end
   end
 
