@@ -31,7 +31,7 @@ You can also configure additional filters plus eslevel, and disable preset filte
 ```
 # ruby2js: preset, filters: camelCase
 
-# ruby2js: preset, eslevel: 2022
+# ruby2js: preset, eslevel: 2025
 
 # ruby2js: preset, disable_filters: return
 ```

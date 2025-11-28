@@ -1,6 +1,6 @@
 # ECMAScript Updates Plan
 
-## Status: Planning
+## Status: Implemented (Stage 2 Complete)
 
 This plan documents ECMAScript features added since ES2022 (the last version Ruby2JS explicitly supports) and identifies which are relevant for Ruby2JS to implement.
 

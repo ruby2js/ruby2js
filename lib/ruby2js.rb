@@ -162,6 +162,18 @@ module Ruby2JS
         @options[:eslevel] >= 2022
       end
 
+      def es2023
+        @options[:eslevel] >= 2023
+      end
+
+      def es2024
+        @options[:eslevel] >= 2024
+      end
+
+      def es2025
+        @options[:eslevel] >= 2025
+      end
+
       # Process a node by dispatching to on_<type> method
       def process(node)
         return node unless node.is_a?(Parser::AST::Node)

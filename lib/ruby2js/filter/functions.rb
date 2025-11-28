@@ -533,6 +533,10 @@ module Ruby2JS
         elsif method == :new and target == s(:const, nil, :Exception)
           process S(:send, s(:const, nil, :Error), :new, *args)
 
+        elsif method == :escape and target == s(:const, nil, :Regexp) and es2025
+          # Regexp.escape(str) => RegExp.escape(str)
+          process S(:send, s(:const, nil, :RegExp), :escape, *args)
+
         elsif method == :block_given? and target == nil and args.length == 0
           process process s(:lvar, "_implicitBlockYield")
 
@@ -651,6 +655,13 @@ module Ruby2JS
         elsif method == :find and call.children.length == 2
           node.updated nil, [process(call), process(node.children[1]),
             s(:autoreturn, *process_all(node.children[2..-1]))]
+
+        elsif method == :group_by and call.children.length == 2 and es2024
+          # array.group_by { |x| x.category } => Object.groupBy(array, x => x.category)
+          target = call.children.first
+          callback = s(:block, s(:send, nil, :proc), node.children[1],
+            s(:autoreturn, *node.children[2..-1]))
+          process s(:send, s(:const, nil, :Object), :groupBy, target, callback)
 
         elsif method == :find_index and call.children.length == 2
           call = call.updated nil, [call.children.first, :findIndex]

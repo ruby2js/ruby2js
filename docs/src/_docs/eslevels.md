@@ -152,8 +152,49 @@ triggers on `false`).
 * `@@x` {{ caret }} `ClassName.#x`
 * `self.a = []` {{ caret }} `static a = []` (within a class)
 
-When the `filter` function is enabled, the following additional conversions are
+When the `functions` filter is enabled, the following additional conversions are
 made:
 
+{:.functions-list}
 * `x[-2]` {{ caret }} `x.at(-2)`
 * `x.last` {{ caret }} `x.at(-1)`
+
+## ES2023 support
+
+ES2023 adds array methods like `findLast()`, `findLastIndex()`, and immutable array methods like `toReversed()`, `toSorted()`, and `toSpliced()`. These are not currently mapped from Ruby methods due to type ambiguity.
+
+## ES2024 support
+
+When option `eslevel: 2024` is provided, the following additional
+conversion is made by the `functions` filter:
+
+{:.functions-list}
+* `.group_by {}` {{ caret }} `Object.groupBy()`
+
+Ruby's `group_by` method maps directly to ES2024's `Object.groupBy()`:
+
+```ruby
+# Ruby
+people.group_by { |p| p.age }
+
+# JavaScript (ES2024)
+Object.groupBy(people, p => p.age)
+```
+
+## ES2025 support
+
+When option `eslevel: 2025` is provided, the following additional
+conversion is made by the `functions` filter:
+
+{:.functions-list}
+* `Regexp.escape()` {{ caret }} `RegExp.escape()`
+
+Ruby's `Regexp.escape` method maps directly to ES2025's `RegExp.escape()`:
+
+```ruby
+# Ruby
+Regexp.escape("hello.world")
+
+# JavaScript (ES2025)
+RegExp.escape("hello.world")
+```
