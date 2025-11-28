@@ -1,3 +1,5 @@
+# backtick_javascript: true
+
 require 'native'
 require 'ruby2js/demo'
 require 'patch.opal'
@@ -116,8 +118,15 @@ end
 }`
 
 # Define a getter for sourcemap
+# In Opal 1.8+, Ruby Hashes are JavaScript Maps, so convert to plain object
 `Object.defineProperty(Opal.Ruby2JS.Serializer.$$prototype, "sourcemap",
-  {get() { return this.$sourcemap().$$smap }})`
+  {get() {
+    const map = this.$sourcemap();
+    if (map instanceof Map) {
+      return Object.fromEntries(map);
+    }
+    return map.$$smap || map;
+  }})`
 
 # advertise that the function is available
 if `typeof module !== 'undefined' && module.parent`

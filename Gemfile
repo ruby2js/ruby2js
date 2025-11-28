@@ -7,7 +7,8 @@ group :development, :test do
   gem 'rake'
   gem 'execjs'
   gem 'nokogiri'
-  gem 'opal', '1.1.1'
+  gem 'opal', '~> 1.8'
+  gem 'base64' # Required for Opal on Ruby 3.4+
 end
 
 group :test do

@@ -1,3 +1,5 @@
+# backtick_javascript: true
+
 # silence YAML warning
 `Opal.modules["yaml"] = function() {}`
 
@@ -18,6 +20,12 @@ class Parser::Lexer
       @source_pts = source.unpack('U*')
     else
       @source_pts = nil
+    end
+
+    # Since parser v3.2.1 Parser::Lexer has @strings
+    if @strings
+      @strings.source_buffer = @source_buffer
+      @strings.source_pts = @source_pts
     end
   end
 end
@@ -277,6 +285,12 @@ module Parser
       else
         diagnostic :error, :lvar_name, { name: name }, loc
       end
+    end
+
+    # string_value raises on invalid UTF-8 strings, like "\x80",
+    # otherwise it's the same as value.
+    def string_value(token)
+      value(token)
     end
   end
 end
