@@ -6,7 +6,9 @@ module Ruby2JS
     def visit_if_node(node)
       condition = visit(node.predicate)
       then_body = visit(node.statements)
-      else_body = visit(node.subsequent)
+      # Ruby 3.3 uses .consequent, Ruby 3.4+ uses .subsequent
+      else_clause = node.respond_to?(:subsequent) ? node.subsequent : node.consequent
+      else_body = visit(else_clause)
 
       sl(node, :if, condition, then_body, else_body)
     end

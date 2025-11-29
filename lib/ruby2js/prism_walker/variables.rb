@@ -80,7 +80,9 @@ module Ruby2JS
     # Constant path: A::B::C
     def visit_constant_path_node(node)
       parent = node.parent ? visit(node.parent) : s(:cbase)
-      sl(node, :const, parent, node.name)
+      # Ruby 3.3 uses .child, Ruby 3.4+ uses .name
+      name = node.respond_to?(:name) ? node.name : node.child.name
+      sl(node, :const, parent, name)
     end
 
     # Constant path write: A::B = 1
