@@ -1214,7 +1214,7 @@ describe Ruby2JS do
     end
 
     it "should handle neither a rescue nor an ensure being present" do
-      to_js( 'begin a; b; end' ).must_equal 'var a; var b'
+      to_js( 'begin a; b; end' ).must_equal '{var a; var b}'
     end
 
     it "should handle else clause in begin/rescue" do

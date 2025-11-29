@@ -60,7 +60,11 @@ module Ruby2JS
       end
 
       if not recovers and not finally
-        return scope s(:begin, *children)
+        # Wrap in a JavaScript block to create scope
+        puts '{'
+        scope s(:begin, *children)
+        sput '}'
+        return
       end
 
       # If retry is used, wrap in while(true) loop
