@@ -156,6 +156,150 @@ class PrismWalker {
     )
   };
 
+  visitUnlessNode(node) {
+    // Parser gem represents unless as: if(condition, else_body, then_body)
+    // Note: JS Prism uses camelCase: elseClause
+    return this.s(
+      "if",
+      this.visit(node.predicate),
+      this.visit(node.elseClause),
+      this.visit(node.statements)
+    )
+  };
+
+  visitElseNode(node) {
+    return this.visit(node.statements)
+  };
+
+  visitWhileNode(node) {
+    return this.s(
+      "while",
+      this.visit(node.predicate),
+      this.visit(node.statements)
+    )
+  };
+
+  visitUntilNode(node) {
+    return this.s(
+      "until",
+      this.visit(node.predicate),
+      this.visit(node.statements)
+    )
+  };
+
+  visitCaseNode(node) {
+    // Note: JS Prism uses camelCase: elseClause
+    return this.s(
+      "case",
+      this.visit(node.predicate),
+      ...this.visit_all(node.conditions),
+      this.visit(node.elseClause)
+    )
+  };
+
+  visitWhenNode(node) {
+    return this.s(
+      "when",
+      ...this.visit_all(node.conditions),
+      this.visit(node.statements)
+    )
+  };
+
+  visitForNode(node) {
+    return this.s(
+      "for",
+      this.visit(node.index),
+      this.visit(node.collection),
+      this.visit(node.statements)
+    )
+  };
+
+  visitReturnNode(node) {
+    let args;
+
+    if (node.arguments_) {
+      args = this.visit_all(node.arguments_.arguments_);
+
+      return args.length == 1 ? this.s("return", args[0]) : this.s(
+        "return",
+        this.s("array", ...args)
+      )
+    } else {
+      return this.s("return")
+    }
+  };
+
+  visitBreakNode(node) {
+    let args;
+
+    if (node.arguments_) {
+      args = this.visit_all(node.arguments_.arguments_);
+      return this.s("break", ...args)
+    } else {
+      return this.s("break")
+    }
+  };
+
+  visitNextNode(node) {
+    let args;
+
+    if (node.arguments_) {
+      args = this.visit_all(node.arguments_.arguments_);
+      return this.s("next", ...args)
+    } else {
+      return this.s("next")
+    }
+  };
+
+  // === Operators ===
+  visitAndNode(node) {
+    return this.s("and", this.visit(node.left), this.visit(node.right))
+  };
+
+  visitOrNode(node) {
+    return this.s("or", this.visit(node.left), this.visit(node.right))
+  };
+
+  visitRangeNode(node) {
+    // JS Prism: detect exclusive range by operator length (... = 3, .. = 2)
+    let is_exclusive = node.operatorLoc.length == 3;
+    let type = is_exclusive ? "erange" : "irange";
+    return this.s(type, this.visit(node.left), this.visit(node.right))
+  };
+
+  // === Strings ===
+  visitInterpolatedStringNode(node) {
+    let parts = node.parts.map(part => (
+      part.constructor.name == "StringNode" ? this.s(
+        "str",
+        part.unescaped.value
+      ) : this.visit(part)
+    ));
+
+    return this.s("dstr", ...parts)
+  };
+
+  visitEmbeddedStatementsNode(node) {
+    let body;
+
+    if (node.statements == null) {
+      return this.s("begin")
+    } else {
+      body = node.statements.body;
+
+      return body.length == 1 ? this.visit(body[0]) : this.s(
+        "begin",
+        ...this.visit_all(body)
+      )
+    }
+  };
+
+  // === Other ===
+  visitParenthesesNode(node) {
+    // Just visit the body - parentheses are for grouping
+    return this.visit(node.body)
+  };
+
   visitStatementsNode(node) {
     let children = this.visit_all(node.body);
 
@@ -172,6 +316,19 @@ class PrismWalker {
 
 class Converter {
   constructor() {
+    // Binary operators that map directly
+    this._binaryOps = {
+      '+': '+', '-': '-', '*': '*', '/': '/', '%': '%',
+      '==': '===', '!=': '!==', '<': '<', '>': '>', '<=': '<=', '>=': '>=',
+      '<<': '<<', '>>': '>>', '&': '&', '|': '|', '^': '^',
+      '**': '**'
+    };
+
+    // Unary operators
+    this._unaryOps = {
+      '!': '!', '-@': '-', '+@': '+', '~': '~'
+    };
+
     this._handlers = {
       'int': node => node.children[0].toString(),
       'float': node => node.children[0].toString(),
@@ -195,7 +352,28 @@ class Converter {
       'args': node => node.children.map(c => this.convert(c)).join(', '),
       'arg': node => node.children[0].toString(),
       'optarg': node => node.children[0].toString() + '=' + this.convert(node.children[1]),
-      'restarg': node => '...' + node.children[0].toString()
+      'restarg': node => '...' + node.children[0].toString(),
+
+      // Logical operators
+      'and': node => '(' + this.convert(node.children[0]) + ' && ' + this.convert(node.children[1]) + ')',
+      'or': node => '(' + this.convert(node.children[0]) + ' || ' + this.convert(node.children[1]) + ')',
+
+      // Control flow
+      'while': node => this.convertWhile(node),
+      'until': node => this.convertUntil(node),
+      'for': node => this.convertFor(node),
+      'case': node => this.convertCase(node),
+      'when': node => this.convertWhen(node),
+      'return': node => node.children.length > 0 ? 'return ' + this.convert(node.children[0]) : 'return',
+      'break': () => 'break',
+      'next': () => 'continue',
+
+      // Ranges
+      'irange': node => this.convertRange(node, true),
+      'erange': node => this.convertRange(node, false),
+
+      // String interpolation
+      'dstr': node => this.convertDstr(node)
     };
   }
 
@@ -209,16 +387,43 @@ class Converter {
   convertSend(node) {
     const [receiver, methodName, ...args] = node.children;
     const argsStr = args.map(a => this.convert(a)).join(', ');
+    const method = methodName.toString();
+
+    // Handle binary operators
+    if (this._binaryOps[method] && args.length === 1) {
+      return '(' + this.convert(receiver) + ' ' + this._binaryOps[method] + ' ' + this.convert(args[0]) + ')';
+    }
+
+    // Handle unary operators
+    if (this._unaryOps[method] && args.length === 0 && receiver) {
+      return this._unaryOps[method] + this.convert(receiver);
+    }
 
     // Handle puts → console.log
-    if (receiver == null && methodName === 'puts') {
+    if (receiver == null && method === 'puts') {
       return 'console.log(' + argsStr + ')';
     }
 
+    // Handle p → console.log (for debugging)
+    if (receiver == null && method === 'p') {
+      return 'console.log(' + argsStr + ')';
+    }
+
+    // Handle array/hash access: a[0]
+    if (method === '[]') {
+      return this.convert(receiver) + '[' + argsStr + ']';
+    }
+
+    // Handle array/hash assignment: a[0] = x
+    if (method === '[]=') {
+      const [index, value] = args;
+      return this.convert(receiver) + '[' + this.convert(index) + '] = ' + this.convert(value);
+    }
+
     if (receiver == null) {
-      return methodName.toString() + '(' + argsStr + ')';
+      return method + '(' + argsStr + ')';
     } else {
-      return this.convert(receiver) + '.' + methodName.toString() + '(' + argsStr + ')';
+      return this.convert(receiver) + '.' + method + '(' + argsStr + ')';
     }
   }
 
@@ -236,6 +441,76 @@ class Converter {
       result += ' else {\\n  ' + this.convert(elseBody) + '\\n}';
     }
     return result;
+  }
+
+  convertWhile(node) {
+    const [cond, body] = node.children;
+    return 'while (' + this.convert(cond) + ') {\\n  ' + (body ? this.convert(body) : '') + '\\n}';
+  }
+
+  convertUntil(node) {
+    const [cond, body] = node.children;
+    return 'while (!(' + this.convert(cond) + ')) {\\n  ' + (body ? this.convert(body) : '') + '\\n}';
+  }
+
+  convertFor(node) {
+    const [variable, collection, body] = node.children;
+    const varName = this.convert(variable);
+    return 'for (let ' + varName + ' of ' + this.convert(collection) + ') {\\n  ' + (body ? this.convert(body) : '') + '\\n}';
+  }
+
+  convertCase(node) {
+    const [predicate, ...rest] = node.children;
+    const elseBody = rest.pop(); // last child is else clause
+    const whens = rest;
+
+    let result = 'switch (' + this.convert(predicate) + ') {\\n';
+    for (const when of whens) {
+      result += this.convert(when);
+    }
+    if (elseBody) {
+      result += '  default:\\n    ' + this.convert(elseBody) + ';\\n    break;\\n';
+    }
+    result += '}';
+    return result;
+  }
+
+  convertWhen(node) {
+    const conditions = node.children.slice(0, -1);
+    const body = node.children[node.children.length - 1];
+    let result = '';
+    for (const cond of conditions) {
+      result += '  case ' + this.convert(cond) + ':\\n';
+    }
+    result += '    ' + (body ? this.convert(body) : '') + ';\\n    break;\\n';
+    return result;
+  }
+
+  convertRange(node, inclusive) {
+    const [left, right] = node.children;
+    // For now, generate a simple array comprehension-like helper
+    // In real implementation, this would use a range helper function
+    const start = this.convert(left);
+    const end = this.convert(right);
+    if (inclusive) {
+      return 'Array.from({length: ' + end + ' - ' + start + ' + 1}, (_, i) => ' + start + ' + i)';
+    } else {
+      return 'Array.from({length: ' + end + ' - ' + start + '}, (_, i) => ' + start + ' + i)';
+    }
+  }
+
+  convertDstr(node) {
+    // Convert interpolated string to template literal
+    const parts = node.children.map(child => {
+      if (child.type === 'str') {
+        // Escape backticks and ${} in literal parts
+        return child.children[0].replace(/`/g, '\\\\`').replace(/\\$/g, '\\\\$');
+      } else {
+        // Interpolated expression
+        return '${' + this.convert(child) + '}';
+      }
+    });
+    return '`' + parts.join('') + '`';
   }
 }
 
