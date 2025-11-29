@@ -1,5 +1,6 @@
 // Auto-generated from Ruby PrismWalker
 // Filter order: return, selfhost, functions
+// Converter written directly in JS
 
 // Node class for AST representation
 class Node {
@@ -103,9 +104,11 @@ class PrismWalker {
   };
 
   // === Calls ===
+  // Note: In JS Prism, arguments is accessed via arguments_ (underscore)
+  // and the actual args array is arguments_.arguments_
   visitCallNode(node) {
     let receiver = this.visit(node.receiver);
-    let args = node.arguments ? this.visit_all(node.arguments.arguments) : [];
+    let args = node.arguments_ ? this.visit_all(node.arguments_.arguments_) : [];
     return this.s("send", receiver, node.name, ...args)
   };
 
@@ -167,9 +170,79 @@ class PrismWalker {
   }
 }
 
+class Converter {
+  constructor() {
+    this._handlers = {
+      'int': node => node.children[0].toString(),
+      'float': node => node.children[0].toString(),
+      'str': node => JSON.stringify(node.children[0]),
+      'sym': node => JSON.stringify(node.children[0]),
+      'nil': () => 'null',
+      'true': () => 'true',
+      'false': () => 'false',
+      'self': () => 'this',
+      'lvar': node => node.children[0].toString(),
+      'ivar': node => 'this._' + node.children[0].toString().replace(/^@/, ''),
+      'lvasgn': node => 'let ' + node.children[0].toString() + ' = ' + this.convert(node.children[1]),
+      'ivasgn': node => 'this._' + node.children[0].toString().replace(/^@/, '') + ' = ' + this.convert(node.children[1]),
+      'array': node => '[' + node.children.map(c => this.convert(c)).join(', ') + ']',
+      'hash': node => '{' + node.children.map(c => this.convert(c)).join(', ') + '}',
+      'pair': node => this.convert(node.children[0]) + ': ' + this.convert(node.children[1]),
+      'send': node => this.convertSend(node),
+      'def': node => this.convertDef(node),
+      'begin': node => node.children.map(c => this.convert(c)).join(';\\n'),
+      'if': node => this.convertIf(node),
+      'args': node => node.children.map(c => this.convert(c)).join(', '),
+      'arg': node => node.children[0].toString(),
+      'optarg': node => node.children[0].toString() + '=' + this.convert(node.children[1]),
+      'restarg': node => '...' + node.children[0].toString()
+    };
+  }
+
+  convert(node) {
+    if (node == null) return 'null';
+    const handler = this._handlers[node.type];
+    if (handler) return handler(node);
+    return '/* unknown: ' + node.type + ' */';
+  }
+
+  convertSend(node) {
+    const [receiver, methodName, ...args] = node.children;
+    const argsStr = args.map(a => this.convert(a)).join(', ');
+
+    // Handle puts → console.log
+    if (receiver == null && methodName === 'puts') {
+      return 'console.log(' + argsStr + ')';
+    }
+
+    if (receiver == null) {
+      return methodName.toString() + '(' + argsStr + ')';
+    } else {
+      return this.convert(receiver) + '.' + methodName.toString() + '(' + argsStr + ')';
+    }
+  }
+
+  convertDef(node) {
+    const [name, args, body] = node.children;
+    const argsStr = this.convert(args);
+    const bodyStr = body ? this.convert(body) : '';
+    return 'function ' + name.toString() + '(' + argsStr + ') {\\n  return ' + bodyStr + ';\\n}';
+  }
+
+  convertIf(node) {
+    const [cond, thenBody, elseBody] = node.children;
+    let result = 'if (' + this.convert(cond) + ') {\\n  ' + (thenBody ? this.convert(thenBody) : '') + '\\n}';
+    if (elseBody) {
+      result += ' else {\\n  ' + this.convert(elseBody) + '\\n}';
+    }
+    return result;
+  }
+}
+
+
 // Array.compact polyfill
 Array.prototype.compact = function() {
   return this.filter(x => x != null);
 };
 
-export { Node, s, PrismWalker };
+export { Node, s, PrismWalker, Converter };

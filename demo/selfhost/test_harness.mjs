@@ -33,6 +33,14 @@ String.prototype.must_equal = function(expected) {
   }
 };
 
+// Add must_include to String prototype
+String.prototype.must_include = function(expected) {
+  const actual = this.toString();
+  if (!actual.includes(expected)) {
+    throw new Error(`Expected string to include: ${JSON.stringify(expected)}\n       Got: ${JSON.stringify(actual)}`);
+  }
+};
+
 export function printResults() {
   console.log(`\n${'='.repeat(60)}`);
   console.log(`Results: ${results.passed} passed, ${results.failed} failed`);
