@@ -120,11 +120,13 @@ end</textarea>
     The converter handles basic patterns: literals, variables, arrays, hashes,
     method calls (<code>puts</code> → <code>console.log</code>), and simple method definitions.
     <br><br>
-    <strong>Bundle size:</strong> ~2.7MB (vs 24MB with Opal)
+    <strong>Total size:</strong> ~2.8MB (prism WASM + WASI shim + walker/converter JS) vs ~24MB (Opal + parser gem + Ruby2JS)
   </div>
 
   <script type="module">
-    import { loadPrism } from "https://esm.sh/@ruby/prism@1.4.0";
+    // Browser requires WASI shim and manual WebAssembly setup
+    import { WASI } from "https://unpkg.com/@bjorn3/browser_wasi_shim@0.3.0/dist/index.js";
+    import { parsePrism } from "https://unpkg.com/@ruby/prism@1.4.0/src/parsePrism.js";
 
     // Inline the transpiled walker and converter
     // (In production, this would be bundled separately)
@@ -298,11 +300,26 @@ end</textarea>
     const button = document.getElementById('convert');
     const status = document.getElementById('status');
 
-    let parse;
+    let prismExports;
 
     async function init() {
       try {
-        parse = await loadPrism();
+        // Compile WebAssembly module
+        status.textContent = 'Loading WebAssembly module...';
+        const wasm = await WebAssembly.compileStreaming(
+          fetch("https://unpkg.com/@ruby/prism@1.4.0/src/prism.wasm")
+        );
+
+        // Initialize WASI
+        status.textContent = 'Initializing WASI...';
+        const wasi = new WASI([], [], []);
+        const instance = await WebAssembly.instantiate(wasm, {
+          wasi_snapshot_preview1: wasi.wasiImport
+        });
+        wasi.initialize(instance);
+
+        prismExports = instance.exports;
+
         button.disabled = false;
         button.textContent = 'Convert →';
         status.className = 'success';
@@ -310,7 +327,13 @@ end</textarea>
       } catch (e) {
         status.className = 'error';
         status.textContent = 'Error loading Prism: ' + e.message;
+        console.error(e);
       }
+    }
+
+    // Wrapper to match Node.js API
+    function parse(code) {
+      return parsePrism(prismExports, code);
     }
 
     function convert() {
