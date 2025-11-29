@@ -1,10 +1,47 @@
 # Self-Hosting Plan: Ruby2JS in JavaScript
 
-## Status: In Progress
+## Status: Proof of Concept Complete
 
 This plan explores transpiling Ruby2JS itself to JavaScript, enabling it to run entirely in the browser with the `@ruby/prism` npm package for parsing.
 
-**Related:** [PRISM_WALKER.md](./PRISM_WALKER.md) - The prism walker is now complete and provides direct AST translation.
+**Related:**
+- [PRISM_WALKER.md](./PRISM_WALKER.md) - The prism walker is now complete and provides direct AST translation.
+- [demo/selfhost/](../demo/selfhost/) - Working proof-of-concept with browser demo.
+
+## Proof of Concept Results
+
+A working end-to-end demo is available at `demo/selfhost/browser_demo.html`:
+
+```
+Ruby Source → @ruby/prism (WASM) → PrismWalker (transpiled) → Converter → JavaScript
+```
+
+**What works:**
+- Browser demo converting Ruby to JavaScript (~2.8MB total vs 24MB with Opal)
+- PrismWalker successfully transpiled from Ruby using the `selfhost` filter
+- 27 JavaScript tests passing (14 walker + 13 pipeline)
+- 18 Ruby tests for the selfhost filter
+
+**What the minimal converter supports:**
+- Literals: integers, floats, strings, symbols, nil, booleans
+- Variables: local and instance, read and write
+- Collections: arrays, hashes
+- Method calls with `puts` → `console.log` mapping
+- Method definitions with optional/rest parameters
+- Basic if/else control flow
+
+**What it doesn't support (requires full implementation):**
+- Classes, modules
+- Loops, case/when, exception handling
+- Blocks, lambdas, procs
+- Operators (+, -, &&, ||, etc.)
+- Most method mappings (60+ handlers, 23 filters in full Ruby2JS)
+
+**Key learnings:**
+1. The `selfhost` filter handles most Ruby2JS patterns well
+2. `method(:name)` references and no-arg methods (→ getters) need manual handling
+3. JS Prism has API differences: `arguments_`, `unescaped.value`
+4. Browser requires WASI shim for WebAssembly
 
 ## Current Architecture
 
@@ -136,32 +173,37 @@ The `PrismWalker` class (`lib/ruby2js/prism_walker.rb`) now provides direct AST 
 
 **See:** [PRISM_WALKER.md](./PRISM_WALKER.md) for full details.
 
-### Phase 2: Transpile to JavaScript (IN PROGRESS)
+### Phase 2: Proof of Concept ✅ COMPLETE
 
-**Goal:** Working Ruby2JS in JavaScript.
+**Goal:** Demonstrate end-to-end pipeline working in browser.
 
-1. Create `selfhost` filter for transpiling Ruby2JS to JavaScript:
-   - S-expression handling: `s(:type, ...)` → `s('type', ...)`
-   - Symbol-to-string in AST contexts: `node.type == :str` → `node.type === 'str'`
+**Completed:**
+1. ✅ Created `selfhost` filter (`lib/ruby2js/filter/selfhost.rb`):
+   - `s(:type, ...)` → `s('type', ...)` (symbols to strings)
+   - `node.type == :sym` → `node.type === 'string'`
    - `handle :type do ... end` → handler registration
-   - Parser class mappings
+   - `case node.type; when :sym` → switch with string cases
+   - `class Foo < Prism::Visitor` → self-dispatch visitor pattern
+   - `visit_*_node` → `visitCamelCaseNode` method names
+   - `.compact` → `.filter(x => x != null)`
 
-   (Named `selfhost` rather than `ruby2js` to clarify its purpose and avoid confusion for new users)
-2. Set up build environment (esbuild/rollup)
-3. Use Ruby2JS (with new filter) to transpile itself:
-   - PrismWalker (AST translation)
-   - Ruby2JS::Node (AST node class)
-   - Core converter and serializer
-   - Selected filters
-4. Integrate `@ruby/prism` npm package
-5. Create browser bundle
-6. Test against spec suite (adapted for JS)
+2. ✅ Transpiled PrismWalker to JavaScript using selfhost filter
 
-**Estimated effort:** 4-6 weeks
+3. ✅ Created minimal converter (hand-written JS due to `method(:name)` pattern issues)
 
-**Success criteria:** `puts "Hello"` → `console.log("Hello")` works in browser.
+4. ✅ Integrated @ruby/prism with WASI shim for browser
 
-**Note:** The `selfhost` filter uses opt-in patterns (explicit `s()` calls, `Parser::AST::Node` references) to avoid false positives. This is the same approach as the explicit type wrappers in ECMASCRIPT_UPDATES.md.
+5. ✅ Browser demo working at `demo/selfhost/browser_demo.html`
+
+6. ✅ Test suite: 27 JS tests passing, 18 Ruby filter tests passing
+
+**Success criteria met:** `puts "Hello"` → `console.log("Hello")` works in browser.
+
+**Learnings for full implementation:**
+- The selfhost filter works well for most patterns
+- Some Ruby patterns need manual JS: `method(:name)`, no-arg methods becoming getters
+- Filter order matters: `[:return, :selfhost, :functions]`
+- JS Prism API differences must be handled in walker code, not transpilation
 
 ### Phase 2.5: Evaluate Selfhost Filter for Reuse
 
@@ -175,20 +217,47 @@ During self-hosting development, some transformations were added to `selfhost` t
 - Move reusable transformations to appropriate filters (functions, etc.)
 - Keep selfhost focused on Ruby2JS-specific patterns only
 
-### Phase 3: Filter Support (JavaScript)
+### Phase 3: Full Converter Implementation
 
-**Goal:** Support commonly-used filters in browser.
+**Goal:** Feature parity with Ruby2JS core converter.
 
-Priority filters:
-1. `functions` - Core method mappings
-2. `esm` - ES modules
-3. `camelCase` - Naming conventions
-4. `return` - Auto-return
+The proof-of-concept handles ~5% of Ruby2JS functionality. Full implementation requires:
 
-Lower priority (as needed):
-5. `react` / `stimulus` / `lit` - Framework-specific
+| Component | Lines | Effort | Notes |
+|-----------|-------|--------|-------|
+| Core converter | ~3,500 | 2-3 weeks | 60+ handlers, state management |
+| Serializer | ~300 | 3-5 days | Indentation, line wrapping |
+| Essential filters | ~1,500 | 1-2 weeks | functions, esm, return, camelCase |
+| Additional filters | ~5,000 | 2-4 weeks | As needed (react, stimulus, etc.) |
+| Testing & debugging | - | 2-3 weeks | Adapt 1,345 specs to JS |
+| **Total** | ~10,000 | **6-9 weeks** | For ~80% feature parity |
 
-**Estimated effort:** 2-4 weeks
+**Specific challenges:**
+
+1. **State management** - The converter tracks scope, variables, class context, etc.
+   ```ruby
+   @vars, @ivars, @scope, @namespace, @block_depth, @class_name, ...
+   ```
+
+2. **Handler registration** - Uses `handle :type do ... end` pattern (selfhost handles this)
+
+3. **Method references** - `method(:foo)` doesn't transpile cleanly; may need refactoring
+
+4. **Operator precedence** - Complex logic for parenthesization
+
+5. **ES level switching** - Different output for ES5 vs ES2015+ (classes, arrow functions, etc.)
+
+**Incremental approach:**
+
+Rather than full parity, consider shipping incrementally:
+
+| Milestone | Coverage | Effort |
+|-----------|----------|--------|
+| Literals + variables | ~20% | Done (PoC) |
+| + operators, control flow | ~40% | 1-2 weeks |
+| + classes, modules | ~60% | 2-3 weeks |
+| + functions filter | ~75% | 1-2 weeks |
+| + remaining filters | ~90% | 2-4 weeks |
 
 ### Phase 4: Demo Integration
 
@@ -202,7 +271,18 @@ Lower priority (as needed):
 
 **Estimated effort:** 2-3 weeks
 
-### Total Estimated Effort: 8-13 weeks (reduced from 11-18 with Phase 1 complete)
+### Total Estimated Effort
+
+| Phase | Status | Effort |
+|-------|--------|--------|
+| Phase 1: Prism Walker | ✅ Complete | - |
+| Phase 2: Proof of Concept | ✅ Complete | - |
+| Phase 2.5: Filter cleanup | Pending | 1-2 days |
+| Phase 3: Full converter | Pending | 6-9 weeks |
+| Phase 4: Demo integration | Pending | 2-3 weeks |
+| **Total remaining** | | **8-12 weeks** |
+
+For a "lite" version (~75% coverage), estimate **4-6 weeks**.
 
 ## Technical Challenges
 
@@ -308,18 +388,28 @@ Ruby2JS specs use Minitest with `describe`/`it` blocks and `must_equal` assertio
 
 **Current implementation:** `demo/selfhost/test_harness.mjs` provides the shim. Transpiled specs run with Node.js and produce familiar Minitest-style output.
 
-## Size Estimates
+## Size Comparison
 
-| Component | Estimated JS Size (minified) |
-|-----------|------------------------------|
-| @ruby/prism WASM | ~800KB |
-| @ruby/prism JS | ~50KB |
-| AST Adapter | ~20KB |
-| Ruby2JS Core | ~100KB |
-| Filters (core) | ~80KB |
-| **Total** | **~1MB** |
+**Measured from proof-of-concept:**
 
-Compare to current: **24MB** (Opal-based)
+| Component | Size |
+|-----------|------|
+| @ruby/prism WASM | ~2.7MB |
+| WASI shim | ~50KB |
+| Walker + Converter JS | ~15KB |
+| **Total (PoC)** | **~2.8MB** |
+
+**Projected for full implementation:**
+
+| Component | Estimated Size |
+|-----------|----------------|
+| @ruby/prism WASM | ~2.7MB |
+| WASI shim | ~50KB |
+| Full converter (minified) | ~150KB |
+| Core filters (minified) | ~100KB |
+| **Total (full)** | **~3MB** |
+
+**Compare to current Opal-based:** **~24MB** (~8x larger)
 
 ## Alternative: ruby.wasm
 
