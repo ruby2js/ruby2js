@@ -1,10 +1,10 @@
 # Self-Hosting Plan: Ruby2JS in JavaScript
 
-## Status: Research/Planning
+## Status: In Progress
 
 This plan explores transpiling Ruby2JS itself to JavaScript, enabling it to run entirely in the browser with the `@ruby/prism` npm package for parsing.
 
-**Related:** This expands on "Option B: Fork Translation Layer" from [PRISM_MIGRATION.md](./PRISM_MIGRATION.md), taking it further to enable self-hosting in JavaScript.
+**Related:** [PRISM_WALKER.md](./PRISM_WALKER.md) - The prism walker is now complete and provides direct AST translation.
 
 ## Current Architecture
 
@@ -123,47 +123,20 @@ This approach:
 
 ## Implementation Phases
 
-### Phase 1: Fork Translation Layer (Ruby)
+### Phase 1: Prism Walker ✅ COMPLETE
 
 **Goal:** Remove `parser` gem dependency while maintaining compatibility.
 
-1. Vendor `Prism::Translation::Parser` into `lib/ruby2js/prism/`
-   - `compiler.rb` (~2000 lines) - AST translation
-   - `builder.rb` (~60 lines) - Node construction helpers
-2. Create minimal stubs for parser gem classes:
-   - `Parser::AST::Node` - Already have `is_method?` extension
-   - `Parser::Source::Buffer` - Source text container
-   - `Parser::Source::Range` - Location info
-   - `Parser::Source::Comment` - Comment handling
-3. Remove unused features from vendored code:
-   - Lexer token generation
-   - Diagnostic handling
-   - Version-specific parsers (2.7, 3.0, etc.)
-4. Fix known issues:
-   - Comment association for synthetic nodes
-   - `__FILE__` handling differences
-5. Run full test suite with vendored translation layer
+The `PrismWalker` class (`lib/ruby2js/prism_walker.rb`) now provides direct AST translation:
+- ~100 visitor methods translating Prism nodes to Parser-compatible format
+- `Ruby2JS::Node` class with Parser::AST::Node compatibility
+- Comment extraction and association
+- Sourcemap support via shared source buffer
+- All 1345 tests pass on Ruby 3.4+
 
-**Estimated effort:** 2-3 weeks
+**See:** [PRISM_WALKER.md](./PRISM_WALKER.md) for full details.
 
-**Success criteria:** All 1302 tests pass using vendored translation layer, no `parser` gem loaded.
-
-### Phase 2: Simplify for Ruby2JS Needs (Ruby)
-
-**Goal:** Reduce translation layer to only what Ruby2JS uses.
-
-1. Identify which node types Ruby2JS actually handles
-2. Remove translation code for unused node types
-3. Simplify child extraction where possible
-4. Optimize hot paths
-5. Add any Ruby2JS-specific enhancements
-6. Document the simplified mapping
-
-**Estimated effort:** 1-2 weeks
-
-**Success criteria:** Vendored code reduced by 30-50%, tests still pass.
-
-### Phase 3: Transpile to JavaScript
+### Phase 2: Transpile to JavaScript (IN PROGRESS)
 
 **Goal:** Working Ruby2JS in JavaScript.
 
@@ -176,7 +149,8 @@ This approach:
    (Named `selfhost` rather than `ruby2js` to clarify its purpose and avoid confusion for new users)
 2. Set up build environment (esbuild/rollup)
 3. Use Ruby2JS (with new filter) to transpile itself:
-   - Vendored translation layer
+   - PrismWalker (AST translation)
+   - Ruby2JS::Node (AST node class)
    - Core converter and serializer
    - Selected filters
 4. Integrate `@ruby/prism` npm package
@@ -189,7 +163,7 @@ This approach:
 
 **Note:** The `selfhost` filter uses opt-in patterns (explicit `s()` calls, `Parser::AST::Node` references) to avoid false positives. This is the same approach as the explicit type wrappers in ECMASCRIPT_UPDATES.md.
 
-### Phase 4: Filter Support (JavaScript)
+### Phase 3: Filter Support (JavaScript)
 
 **Goal:** Support commonly-used filters in browser.
 
@@ -204,7 +178,7 @@ Lower priority (as needed):
 
 **Estimated effort:** 2-4 weeks
 
-### Phase 5: Demo Integration
+### Phase 4: Demo Integration
 
 **Goal:** Replace Opal-based demo with self-hosted version.
 
@@ -216,7 +190,7 @@ Lower priority (as needed):
 
 **Estimated effort:** 2-3 weeks
 
-### Total Estimated Effort: 11-18 weeks
+### Total Estimated Effort: 8-13 weeks (reduced from 11-18 with Phase 1 complete)
 
 ## Technical Challenges
 
