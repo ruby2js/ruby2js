@@ -27,6 +27,7 @@ module Ruby2JS
       # Transform Prism::Visitor subclass
       # - Remove inheritance
       # - Add self-dispatch visit() method
+      # - Remove user-defined visit method (we generate our own)
       def on_class(node)
         name, superclass, body = node.children
 
@@ -37,6 +38,17 @@ module Ruby2JS
            superclass.children[1] == :Visitor
 
           @prism_visitor_class = true
+
+          # Filter out user-defined visit method before processing
+          # (we generate our own self-dispatch visit method)
+          if body&.type == :begin
+            filtered_children = body.children.reject do |child|
+              child&.type == :def && child.children[0] == :visit
+            end
+            body = s(:begin, *filtered_children)
+          elsif body&.type == :def && body.children[0] == :visit
+            body = nil
+          end
 
           # Process body
           processed_body = process(body)
@@ -97,6 +109,18 @@ module Ruby2JS
           return s(:def, camel_name, process(args), process(body))
         end
 
+        super
+      end
+
+      # Remove super() calls inside Prism::Visitor subclasses
+      # (since there's no superclass in the generated JS)
+      def on_super(node)
+        return nil if @prism_visitor_class
+        super
+      end
+
+      def on_zsuper(node)
+        return nil if @prism_visitor_class
         super
       end
 

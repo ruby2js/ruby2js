@@ -151,5 +151,38 @@ describe Ruby2JS::Filter::Selfhost do
       # Method name still converted (could be intentional visitor pattern)
       result.must_include 'visitSomethingNode'
     end
+
+    it 'should remove super() calls inside Prism::Visitor' do
+      code = <<~RUBY
+        class MyWalker < Prism::Visitor
+          def initialize(source)
+            @source = source
+            super()
+          end
+        end
+      RUBY
+      result = to_js(code, eslevel: 2015)
+      result.wont_include 'super'
+      result.must_include 'this._source = source'
+    end
+
+    it 'should skip user-defined visit method' do
+      code = <<~RUBY
+        class MyWalker < Prism::Visitor
+          def visit(node)
+            return nil if node.nil?
+            super
+          end
+
+          def visit_integer_node(node)
+            node
+          end
+        end
+      RUBY
+      result = to_js(code, eslevel: 2015).to_s
+      # Should have exactly one visit method (the generated one)
+      _(result.scan(/visit\(node\)/).length).must_equal 1
+      _(result).must_include 'visitIntegerNode'
+    end
   end
 end
