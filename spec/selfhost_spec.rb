@@ -90,4 +90,66 @@ describe Ruby2JS::Filter::Selfhost do
       result.must_include 'case "float"'
     end
   end
+
+  describe 'Prism::Visitor subclass' do
+    it 'should remove Prism::Visitor inheritance' do
+      code = <<~RUBY
+        class MyWalker < Prism::Visitor
+          def visit_integer_node(node)
+            node.value
+          end
+        end
+      RUBY
+      result = to_js(code, eslevel: 2015)
+      result.wont_include '< Prism'
+      result.wont_include 'extends'
+    end
+
+    it 'should generate self-dispatch visit method' do
+      code = <<~RUBY
+        class MyWalker < Prism::Visitor
+          def visit_integer_node(node)
+            node.value
+          end
+        end
+      RUBY
+      result = to_js(code, eslevel: 2015)
+      result.must_include 'visit(node)'
+      result.must_include 'node.constructor.name'
+      result.must_include 'method.call(this, node)'
+    end
+
+    it 'should convert visit_*_node methods to camelCase' do
+      code = <<~RUBY
+        class MyWalker < Prism::Visitor
+          def visit_integer_node(node)
+            s(:int, node.value)
+          end
+
+          def visit_string_node(node)
+            s(:str, node.unescaped)
+          end
+        end
+      RUBY
+      result = to_js(code, eslevel: 2015)
+      result.must_include 'visitIntegerNode'
+      result.must_include 'visitStringNode'
+      result.wont_include 'visit_integer_node'
+      result.wont_include 'visit_string_node'
+    end
+
+    it 'should not affect non-Prism::Visitor classes' do
+      code = <<~RUBY
+        class MyClass < BaseClass
+          def visit_something_node(node)
+            node
+          end
+        end
+      RUBY
+      result = to_js(code, eslevel: 2015)
+      result.must_include 'extends BaseClass'
+      # Method name still converted (could be intentional visitor pattern)
+      result.must_include 'visitSomethingNode'
+    end
+  end
 end
