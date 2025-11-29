@@ -77,7 +77,7 @@ module Ruby2JS
             cvars << ast.children.first if ast.type === :cvasgn
 
             ast.children.each do |child|
-              walk[child] if child.is_a? Parser::AST::Node
+              walk[child] if child.respond_to?(:type) && child.respond_to?(:children)
             end
 
             if ast.type == :send and ast.children.first == nil
@@ -168,7 +168,7 @@ module Ruby2JS
               end
 
               m = m.updated(m.type, [@prop, m.children[1], s(:begin, *constructor)])
-            elsif not m.is_method?
+            elsif not m.is_method? and !%i[defm deff].include?(m.type)
               @prop = "get #{@prop}"
               m = m.updated(m.type, [*m.children[0..1], 
                 s(:autoreturn, m.children[2])])

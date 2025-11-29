@@ -141,7 +141,7 @@ module Ruby2JS
       # analyze ivar usage
       def stim_walk(node)
         node.children.each do |child|
-          next unless Parser::AST::Node === child
+          next unless Ruby2JS.ast_node?(child)
           stim_walk(child)
 
           if child.type == :send and child.children.length == 2 and

@@ -3,10 +3,17 @@ require 'ruby2js/serializer'
 module Ruby2JS
   class Error < NotImplementedError
     def initialize(message, ast)
-      if ast.loc
-        message += ' at ' + ast.loc.expression.source_buffer.name.to_s
-        message += ':' + ast.loc.expression.line.inspect
-        message += ':' + ast.loc.expression.column.to_s
+      loc = ast.loc
+      if loc
+        if loc.respond_to?(:expression) && loc.expression
+          # Parser gem location
+          message += ' at ' + loc.expression.source_buffer.name.to_s
+          message += ':' + loc.expression.line.inspect
+          message += ':' + loc.expression.column.to_s
+        elsif loc.is_a?(Hash) && loc[:start_offset]
+          # Ruby2JS::Node location (prism-direct)
+          message += ' at offset ' + loc[:start_offset].to_s
+        end
       end
       super(message)
     end
@@ -129,7 +136,11 @@ module Ruby2JS
     end
 
     def s(type, *args)
-      Parser::AST::Node.new(type, args)
+      if defined?(Parser::AST::Node)
+        Parser::AST::Node.new(type, args)
+      else
+        Ruby2JS::Node.new(type, args)
+      end
     end
 
     attr_accessor :strict, :eslevel, :module_type, :comparison, :or, :underscored_private
@@ -202,7 +213,9 @@ module Ruby2JS
         list = comment_list
       end
 
-      @comments[comment_key] -= list
+      if @comments.key?(comment_key) && @comments[comment_key]
+        @comments[comment_key] -= list
+      end
 
       list.map do |comment|
         if comment.text.start_with? '=begin'
@@ -227,14 +240,14 @@ module Ruby2JS
     def find_comment_entry(ast)
       # First try direct lookup by object identity
       comment_list = @comments[ast]
-      return [comment_list, ast] unless comment_list.empty?
+      return [comment_list, ast] if comment_list && !comment_list.empty?
 
       # If ast has location info, try location-based lookup
       # This handles cases where filters created new nodes with same location
       if ast.loc && ast.loc.respond_to?(:expression) && ast.loc.expression
         expression = ast.loc.expression
         @comments.each do |key, value|
-          next if key == :_raw || value.empty?
+          next if key == :_raw || value.nil? || value.empty?
           next unless key.respond_to?(:loc) && key.loc&.respond_to?(:expression)
           key_expr = key.loc.expression
           next unless key_expr
@@ -251,7 +264,7 @@ module Ruby2JS
         first_loc = find_first_location(ast)
         if first_loc
           @comments.each do |key, value|
-            next if key == :_raw || value.empty?
+            next if key == :_raw || value.nil? || value.empty?
             next unless key.respond_to?(:loc) && key.loc&.respond_to?(:expression)
             key_expr = key.loc.expression
             next unless key_expr && key_expr.source_buffer == first_loc.source_buffer
@@ -274,7 +287,7 @@ module Ruby2JS
         return ast.loc.expression
       end
       ast.children.each do |child|
-        next unless child.is_a?(Parser::AST::Node)
+        next unless child.respond_to?(:type) && child.respond_to?(:children)
         loc = find_first_location(child)
         return loc if loc
       end
@@ -330,7 +343,7 @@ module Ruby2JS
 
       has_redo = proc do |node|
         node.children.any? do |child|
-          next false unless child.is_a? Parser::AST::Node
+          next false unless child.respond_to?(:type) && child.respond_to?(:children)
           next true if child.type == :redo
           next false if %i[for while while_post until until_post].include? child.type
           has_redo[child]
@@ -359,7 +372,7 @@ module Ruby2JS
       return unless file
 
       walk = proc do |ast|
-        if ast.loc and ast.loc.expression
+        if ast.loc and ast.loc.respond_to?(:expression) and ast.loc.expression
           filename = ast.loc.expression.source_buffer.name
           if filename and not filename.empty?
             @timestamps[filename] ||= File.mtime(filename) rescue nil
@@ -367,7 +380,7 @@ module Ruby2JS
         end
 
         ast.children.each do |child|
-          walk[child] if child.is_a? Parser::AST::Node
+          walk[child] if child.respond_to?(:type) && child.respond_to?(:children)
         end
       end
 
@@ -377,29 +390,32 @@ module Ruby2JS
 end
 
 # Add is_method? to Parser::AST::Node for distinguishing method calls from property access
-module Parser
-  module AST
-    class Node
-      def is_method?
-        return false if type == :attr
-        return true if type == :call
-        return true unless loc
+# Only do this if the Parser gem has been loaded
+if defined?(Parser::AST::Node) && Parser::AST::Node.ancestors.include?(AST::Node)
+  module Parser
+    module AST
+      class Node
+        def is_method?
+          return false if type == :attr
+          return true if type == :call
+          return true unless loc
 
-        if loc.respond_to? :selector
-          return true if children.length > 2
-          selector = loc.selector
-        elsif type == :defs
-          return true if children[1] =~ /[!?]$/
-          return true if children[2].children.length > 0
-          selector = loc.name
-        elsif type == :def
-          return true if children[0] =~ /[!?]$/
-          return true if children[1].children.length > 0
-          selector = loc.name
+          if loc.respond_to? :selector
+            return true if children.length > 2
+            selector = loc.selector
+          elsif type == :defs
+            return true if children[1] =~ /[!?]$/
+            return true if children[2].children.length > 0
+            selector = loc.name
+          elsif type == :def
+            return true if children[0] =~ /[!?]$/
+            return true if children[1].children.length > 0
+            selector = loc.name
+          end
+
+          return true unless selector and selector.source_buffer
+          selector.source_buffer.source[selector.end_pos] == '('
         end
-
-        return true unless selector and selector.source_buffer
-        selector.source_buffer.source[selector.end_pos] == '('
       end
     end
   end

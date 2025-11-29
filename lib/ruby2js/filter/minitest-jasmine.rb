@@ -12,8 +12,11 @@ module Ruby2JS
         super
       end
 
-      RELOPS = [:<, :<=, :==, :>=, :>].
-        map {|sym| Parser::AST::Node.new :sym, [sym]}
+      RELOPS_SYMS = [:<, :<=, :==, :>=, :>]
+
+      def relops
+        @relops ||= RELOPS_SYMS.map { |sym| s(:sym, sym) }
+      end
 
       def on_class(node)
         name, inheritance, *body = node.children
@@ -67,7 +70,7 @@ module Ruby2JS
       def on_send(node)
         target, method, *args = node.children
         if target
-          if method==:must_be && args.length==2 && RELOPS.include?(args[0])
+          if method==:must_be && args.length==2 && relops.include?(args[0])
             process s(:send, nil, :assert_operator, target, *args)
           elsif method==:must_be_close_to && [1,2].include?(args.length)
             process s(:send, nil, :assert_in_delta, target, *args)
@@ -82,7 +85,7 @@ module Ruby2JS
           elsif method==:must_match && args.length == 1
             process s(:send, nil, :assert_match, args.first, target)
 
-          elsif method==:cant_be && args.length==2 && RELOPS.include?(args[0])
+          elsif method==:cant_be && args.length==2 && relops.include?(args[0])
             process s(:send, nil, :refute_operator, target, *args)
           elsif method==:cant_be_close_to && [1,2].include?(args.length)
             process s(:send, nil, :refute_in_delta, target, *args)
@@ -103,7 +106,7 @@ module Ruby2JS
 
         else
           if method == :assert and args.length == 1
-            process s(:send, s(:send, nil, :expect, args.first), :toBeTruthy)
+            process s(:send!, s(:send, nil, :expect, args.first), :toBeTruthy)
           elsif method == :assert_equal and args.length == 2
             if [:str, :int, :float].include? args.first.type
               process s(:send, s(:send, nil, :expect, args.last), :toBe,
@@ -123,7 +126,7 @@ module Ruby2JS
             process s(:send, s(:send, nil, :expect, args.last), :toMatch,
               args.first)
           elsif method == :assert_nil and args.length == 1
-            process s(:send, s(:send, nil, :expect, args.first), :toBeNull)
+            process s(:send!, s(:send, nil, :expect, args.first), :toBeNull)
           elsif method==:assert_operator && args.length==3 && args[1].type==:sym
             if args[1].children.first == :<
               process s(:send, s(:send, nil, :expect, args.first),
@@ -144,7 +147,7 @@ module Ruby2JS
             end
 
           elsif method == :refute and args.length == 1
-            process s(:send, s(:send, nil, :expect, args.first), :toBeFalsy)
+            process s(:send!, s(:send, nil, :expect, args.first), :toBeFalsy)
           elsif method == :refute_equal and args.length == 2
             if [:str, :int, :float].include? args.first.type
               process s(:send, s(:attr, s(:send, nil, :expect, args.last), 
@@ -164,7 +167,7 @@ module Ruby2JS
             process s(:send, s(:attr, s(:send, nil, :expect, args.last), 
               :not), :toMatch, args.first)
           elsif method == :refute_nil and args.length == 1
-            process s(:send, s(:attr, s(:send, nil, :expect, args.first), 
+            process s(:send!, s(:attr, s(:send, nil, :expect, args.first),
               :not), :toBeNull)
           elsif method==:refute_operator && args.length==3 && args[1].type==:sym
             if args[1].children.first == :<=

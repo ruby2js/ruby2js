@@ -174,7 +174,7 @@ module Ruby2JS
       end
 
       def html_wrap(node)
-        return node unless node.is_a?(Parser::AST::Node)
+        return node unless Ruby2JS.ast_node?(node)
 
         if node.type == :str and node.children.first.strip.start_with? '<'
           s(:taglit, s(:sym, :html), s(:dstr, node))
@@ -232,7 +232,7 @@ module Ruby2JS
       # analyze ivar usage
       def le_walk(node)
         node.children.each do |child|
-          next unless child.is_a? Parser::AST::Node
+          next unless Ruby2JS.ast_node?(child)
 
           if child.type == :ivar
             next if child.children.first.to_s.start_with?("@_")

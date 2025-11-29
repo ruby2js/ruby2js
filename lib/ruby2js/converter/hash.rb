@@ -51,7 +51,8 @@ module Ruby2JS
             end
           end
 
-          if not @comments[node].empty?
+          node_comments = @comments[node]
+          if node_comments && !node_comments.empty?
             (puts ''; singleton = false) if singleton
             comments(node).each {|comment| put comment}
           end
@@ -67,7 +68,8 @@ module Ruby2JS
 
             if left.type == :prop
               if right[:get]
-                unless @comments[right[:get]].empty?
+                get_comments = @comments[right[:get]]
+                unless get_comments.nil? || get_comments.empty?
                   (puts ''; singleton = false) if singleton
                   comments(right[:get]).each {|comment| put comment}
                 end
@@ -78,7 +80,8 @@ module Ruby2JS
               end
 
               if right[:set]
-                unless @comments[right[:set]].empty?
+                set_comments = @comments[right[:set]]
+                unless set_comments.nil? || set_comments.empty?
                   (puts ''; singleton = false) if singleton
                   comments(right[:set]).each {|comment| put comment}
                 end
@@ -90,11 +93,12 @@ module Ruby2JS
               # hoist get/set comments to definition of property
               if right.type == :hash
                 right.children.each do |pair|
-                  next unless Parser::AST::Node === pair.children.last
-                  if %i[block def defm async].include? pair.children.last.type
-                    if @comments[pair.children.last]
+                  pair_child = pair.children.last
+                  next unless pair_child.respond_to?(:type) && pair_child.respond_to?(:children)
+                  if %i[block def defm async].include? pair_child.type
+                    if @comments[pair_child]
                       (puts ''; singleton = false) if singleton
-                      comments(pair.children.last).each do |comment|
+                      comments(pair_child).each do |comment|
                         put comment
                       end
                     end
@@ -129,7 +133,7 @@ module Ruby2JS
                     end
 
                     ast.children.each do |child|
-                      walk[child] if child.is_a? Parser::AST::Node
+                      walk[child] if child.respond_to?(:type) && child.respond_to?(:children)
                     end
                   end
                   walk[right]

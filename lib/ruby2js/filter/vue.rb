@@ -250,7 +250,8 @@ module Ruby2JS
                       s(:attr, nil, :undefined))
                   end
 
-                  next if pairs.empty? and @comments[statement].empty?
+                  statement_comments = @comments[statement]
+                  next if pairs.empty? and (statement_comments.nil? || statement_comments.empty?)
 
                   block = s(:return, s(:hash, *pairs))
                 else
@@ -438,7 +439,8 @@ module Ruby2JS
         end
 
         # Copy class-level comments to the generated definition
-        @comments[defn] = @comments[node] unless @comments[node].empty?
+        node_comments = @comments[node]
+        @comments[defn] = node_comments unless node_comments.nil? || node_comments.empty?
 
         vue_collapse_pushes(defn)
       end
@@ -488,8 +490,10 @@ module Ruby2JS
         #   @x(a,b,c)
         if @vue_self and node.children[1] == :call
           if [:ivar, :gvar, :cvar].include? node.children.first.type
-            return process(s(:send, node.children.first, nil,
-              *node.children[2..-1]))
+            # Preserve is_method? flag when transforming @x.() to @x()
+            new_node = node.updated(:send, [node.children.first, nil,
+              *node.children[2..-1]])
+            return process(new_node)
           else
             return super
           end
@@ -742,7 +746,7 @@ module Ruby2JS
             pairs = hash.to_a.map do |k1, v1|
               next if Hash === v1 and v1.empty?
               s(:pair, s(:str, k1.to_s),
-                if Parser::AST::Node === v1
+                if Ruby2JS.ast_node?(v1)
                   v1
                 else
                   s(:hash, *v1.map {|k2, v2| s(:pair, s(:str, k2.to_s), v2)})
@@ -963,11 +967,11 @@ module Ruby2JS
         # recurse
         children = node.children
         children.each_with_index do |child, index|
-          if Parser::AST::Node === child
-            replacement = vue_collapse_pushes(child) 
+          if Ruby2JS.ast_node?(child)
+            replacement = vue_collapse_pushes(child)
             unless replacement.equal? child
               children = children.dup if children.frozen?
-              children[index] = replacement 
+              children[index] = replacement
             end
           end
         end
@@ -1181,7 +1185,7 @@ module Ruby2JS
       # instance methods as hash values (e.g., onClick: method)
       def on_pair(node)
         key, value = node.children
-        return super unless Parser::AST::Node === value
+        return super unless Ruby2JS.ast_node?(value)
         return super unless value.type == :send and
           value.children.length == 2 and
           value.children[0] == nil and
@@ -1217,7 +1221,7 @@ module Ruby2JS
       # a set of statements.
       def vue_wunderbar_free(nodes)
         nodes.each do |node|
-          if Parser::AST::Node === node
+          if Ruby2JS.ast_node?(node)
             return false if vue_element?(node)
 
             # recurse
@@ -1254,7 +1258,7 @@ module Ruby2JS
 
         # recurse
         node.children.each do |child|
-          vue_walk(child, inventory) if Parser::AST::Node === child
+          vue_walk(child, inventory) if Ruby2JS.ast_node?(child)
         end
 
         return inventory

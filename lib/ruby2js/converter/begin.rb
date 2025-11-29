@@ -45,9 +45,10 @@ module Ruby2JS
           if body[i].children[0] == body[j].children[0]
             # relocate property comment to first method
             [body[i], body[j]].each do |node|
-              unless @comments[node].empty?
-                node.children[1].values.first.each do |key, value| 
-                  if [:get, :set].include? key and Parser::AST::Node === value
+              node_comments = @comments[node]
+              if node_comments && !node_comments.empty?
+                node.children[1].values.first.each do |key, value|
+                  if [:get, :set].include?(key) && value.respond_to?(:type) && value.respond_to?(:children)
                     @comments[value] = @comments[node]
                     break
                   end

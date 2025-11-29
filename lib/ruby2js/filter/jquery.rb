@@ -156,9 +156,12 @@ module Ruby2JS
                   tnode.updated nil, rewrite
                 elsif domprops.include? method.to_s
                   method = :readOnly if method.to_s == 'readonly'
-                  s(:send, rewrite[0], :prop, s(:sym, method), *rewrite[2..-1]) 
+                  # Use :send! to force method call output (with parens)
+                  s(:send!, rewrite[0], :prop, s(:sym, method), *rewrite[2..-1])
                 else
-                  s(:send, *rewrite)
+                  # Use :send! to force method call output (with parens)
+                  # This is needed for jQuery-style method chaining
+                  s(:send!, *rewrite)
                 end
               end
             elsif tnode.type == :block

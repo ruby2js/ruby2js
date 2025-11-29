@@ -17,6 +17,16 @@ module Ruby2JS
         gvar: :gvasgn
       }
 
+      # Helper to replace local variable references in an AST node
+      def replace_lvar(node, old_name, new_name)
+        return node unless Ruby2JS.ast_node?(node)
+        if node.type == :lvar && node.children.first == old_name
+          node.updated(nil, [new_name])
+        else
+          node.updated(nil, node.children.map { |c| replace_lvar(c, old_name, new_name) })
+        end
+      end
+
       def initialize(*args)
         @jsx = false
         super
@@ -332,13 +342,13 @@ module Ruby2JS
           process S(:send, target, :forEach, *args)
 
         elsif method == :downcase and args.length == 0
-          process s(:send, target, :toLowerCase)
+          process s(:send!, target, :toLowerCase)
 
         elsif method == :upcase and args.length == 0
-          process s(:send, target, :toUpperCase)
+          process s(:send!, target, :toUpperCase)
 
         elsif method == :strip and args.length == 0
-          process s(:send, target, :trim)
+          process s(:send!, target, :trim)
 
         elsif node.children[0..1] == [nil, :puts]
           process S(:send, s(:attr, nil, :console), :log, *args)
@@ -515,7 +525,7 @@ module Ruby2JS
 
         elsif method==:lstrip and args.length == 0
           if es2019
-            process s(:send, target, :trimStart)
+            process s(:send!, target, :trimStart)
           else
             node.updated(nil, [process(target), :replace,
               s(:regexp, s(:str, '\A\s+') , s(:regopt)), s(:str, '')])
@@ -703,20 +713,7 @@ module Ruby2JS
           arg_a = :"#{arg_name}_a"
           arg_b = :"#{arg_name}_b"
 
-          # Build the block body substituted with the two argument names
-          block_a = process_all([block_body]).first
-          block_b = process_all([block_body]).first
-
           # Replace references to the block argument with arg_a and arg_b
-          def replace_lvar(node, old_name, new_name)
-            return node unless node.is_a?(Parser::AST::Node)
-            if node.type == :lvar && node.children.first == old_name
-              node.updated(nil, [new_name])
-            else
-              node.updated(nil, node.children.map { |c| replace_lvar(c, old_name, new_name) })
-            end
-          end
-
           key_a = replace_lvar(block_body, arg_name, arg_a)
           key_b = replace_lvar(block_body, arg_name, arg_b)
 
@@ -739,7 +736,8 @@ module Ruby2JS
             process s(:send, target, :toSorted, compare_block)
           else
             # Use slice().sort() for older versions
-            process s(:send, s(:send, target, :slice), :sort, compare_block)
+            # Use :send! for slice to force method call output
+            process s(:send, s(:send!, target, :slice), :sort, compare_block)
           end
 
         elsif method == :max_by and call.children.length == 2
@@ -749,16 +747,6 @@ module Ruby2JS
           block_body = node.children[2]
 
           arg_name = args.children.first.children.first
-
-          def replace_lvar(node, old_name, new_name)
-            return node unless node.is_a?(Parser::AST::Node)
-            if node.type == :lvar && node.children.first == old_name
-              node.updated(nil, [new_name])
-            else
-              node.updated(nil, node.children.map { |c| replace_lvar(c, old_name, new_name) })
-            end
-          end
-
           key_a = replace_lvar(block_body, arg_name, :a)
           key_b = replace_lvar(block_body, arg_name, :b)
 
@@ -779,16 +767,6 @@ module Ruby2JS
           block_body = node.children[2]
 
           arg_name = args.children.first.children.first
-
-          def replace_lvar(node, old_name, new_name)
-            return node unless node.is_a?(Parser::AST::Node)
-            if node.type == :lvar && node.children.first == old_name
-              node.updated(nil, [new_name])
-            else
-              node.updated(nil, node.children.map { |c| replace_lvar(c, old_name, new_name) })
-            end
-          end
-
           key_a = replace_lvar(block_body, arg_name, :a)
           key_b = replace_lvar(block_body, arg_name, :b)
 

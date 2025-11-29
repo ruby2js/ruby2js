@@ -228,7 +228,7 @@ module Ruby2JS
           needs_binding = []
           scan_events = lambda do |list|
             list.each do |node|
-              next unless Parser::AST::Node === node
+              next unless Ruby2JS.ast_node?(node)
               node = process node if node.type == :xstr
               if node.type == :hash
                 node.children.each do |pair|
@@ -349,7 +349,7 @@ module Ruby2JS
               if args.children.length == 0
                 has_cvar = lambda {|list|
                   list.any? {|node|
-                    next unless Parser::AST::Node === node
+                    next unless Ruby2JS.ast_node?(node)
                     return true if node.type == :cvar
                     has_cvar.call(node.children)
                   }
@@ -425,7 +425,7 @@ module Ruby2JS
                 args = s(:args, s(:arg, :"$$props"))
                 comments = @comments[child]
                 child = child.updated(:def, [mname, args, *block])
-                @comments[child] = comments unless comments.empty?
+                @comments[child] = comments unless comments.nil? || comments.empty?
                 @reactProps = s(:lvar, :"$$props")
               else
                 @reactProps = s(:lvar, args.children.first.children.last)
@@ -438,7 +438,7 @@ module Ruby2JS
             # add method to class
             type = (child.is_method? ? :begin : :autoreturn)
             type = :begin if mname == :initialize
-            if block.length == 1 and Parser::AST::Node === block.first
+            if block.length == 1 and Ruby2JS.ast_node?(block.first)
               type = :begin if block.first.type == :return
             end
 
@@ -453,8 +453,9 @@ module Ruby2JS
             end
 
             # retain comment
-            unless @comments[child].empty?
-              @comments[pairs.last] = @comments[child]
+            child_comments = @comments[child]
+            unless child_comments.nil? || child_comments.empty?
+              @comments[pairs.last] = child_comments
             end
           end
 
@@ -500,7 +501,7 @@ module Ruby2JS
 
             has_cvar = lambda {|list|
               list.any? {|node|
-                next unless Parser::AST::Node === node
+                next unless Ruby2JS.ast_node?(node)
                 return true if node.type == :cvar
                 has_cvar.call(node.children)
               }
@@ -915,8 +916,10 @@ module Ruby2JS
         #   @x(a,b,c)
         elsif node.children[1] == :call
           if [:ivar, :gvar, :cvar].include? node.children.first.type
-            return process(s(:send, node.children.first, nil,
-              *node.children[2..-1]))
+            # Preserve is_method? flag when transforming @x.() to @x()
+            new_node = node.updated(:send, [node.children.first, nil,
+              *node.children[2..-1]])
+            return process(new_node)
           else
             return super
           end
@@ -1331,7 +1334,7 @@ module Ruby2JS
       # a set of statements.
       def react_wunderbar_free(nodes, wunderbar_only=false)
         nodes.each do |node|
-          if Parser::AST::Node === node
+          if Ruby2JS.ast_node?(node)
             return false if node.type == :xstr
             return false if react_element?(node, wunderbar_only)
 
@@ -1355,7 +1358,7 @@ module Ruby2JS
         base = @reactIvars[:asgn].dup if [:if, :case].include? node.type
 
         node.children.each do |child|
-          react_walk(child) if Parser::AST::Node === child
+          react_walk(child) if Ruby2JS.ast_node?(child)
         end
 
         child = node.children.first
@@ -1429,7 +1432,7 @@ module Ruby2JS
             node.children[i+1].children[0].type == :self and
             node.children[i+1].children[1] == :setState and
             node.children[i+1].children[2].type == :hash and
-            @comments[node.children[i+1]].empty?
+            (@comments[node.children[i+1]].nil? || @comments[node.children[i+1]].empty?)
           then
             pairs = node.children[i].children[2].children +
                    node.children[i+1].children[2].children

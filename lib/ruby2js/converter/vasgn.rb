@@ -69,7 +69,7 @@ module Ruby2JS
       outer.children.each do |var|
         next if var == inner
         return true if var == name and [:lvar, :gvar].include? outer.type
-        return true if Parser::AST::Node === var and hoist?(var, inner, name)
+        return true if var.respond_to?(:type) && var.respond_to?(:children) && hoist?(var, inner, name)
       end
       return false
     end

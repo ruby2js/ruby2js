@@ -101,9 +101,11 @@ module Ruby2JS
           # input: a.compact!
           # output: a.splice(0, a.length, *a.compact)
           target = node.children.first
+          inner_method = :"#{method.to_s[0..-2]}"
+          # Nodes without location info default to is_method? = true
           process S(:send, target, :splice, s(:int, 0),
-            s(:attr, target, :length), s(:splat, s(:send, target,
-            :"#{method.to_s[0..-2]}", *node.children[2..-1])))
+            s(:attr, target, :length), s(:splat,
+              s(:send, target, inner_method, *node.children[2..-1])))
         else
           super
         end

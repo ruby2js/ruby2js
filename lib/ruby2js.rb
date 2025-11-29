@@ -1,7 +1,8 @@
 # Determine which parser to use:
-# - RUBY2JS_PARSER=prism   - force Prism (requires Ruby 3.3+)
-# - RUBY2JS_PARSER=parser  - force whitequark parser gem
-# - unset                  - auto-detect (Prism if available, else parser gem)
+# - RUBY2JS_PARSER=prism       - use direct Prism walker (default, no parser gem dependency)
+# - RUBY2JS_PARSER=translation - use Prism via Translation::Parser (requires parser gem)
+# - RUBY2JS_PARSER=parser      - force whitequark parser gem
+# - unset                      - auto-detect (Prism walker if available, else parser gem)
 #
 # Note: Opal always uses the parser gem (no Prism support in browser)
 if RUBY_ENGINE == 'opal'
@@ -11,20 +12,23 @@ else
   case ENV['RUBY2JS_PARSER']
   when 'prism'
     require 'prism'
+    require 'ruby2js/prism_walker'
+    RUBY2JS_PARSER = :prism
+  when 'translation'
+    require 'prism'
     require 'prism/translation/parser'
     require 'parser/current'
-    RUBY2JS_PARSER = :prism
+    RUBY2JS_PARSER = :translation
   when 'parser'
     old_verbose, $VERBOSE = $VERBOSE, nil
     require 'parser/current'
     $VERBOSE = old_verbose
     RUBY2JS_PARSER = :parser
   else
-    # Auto-detect: try Prism first, fall back to parser gem
+    # Auto-detect: try Prism walker first, fall back to parser gem
     begin
       require 'prism'
-      require 'prism/translation/parser'
-      require 'parser/current'
+      require 'ruby2js/prism_walker'
       RUBY2JS_PARSER = :prism
     rescue LoadError
       old_verbose, $VERBOSE = $VERBOSE, nil
@@ -78,18 +82,32 @@ module Ruby2JS
     @@module_default = module_type
   end
 
+  # Check if object is an AST node (works with both Parser::AST::Node and Ruby2JS::Node)
+  def self.ast_node?(obj)
+    obj.respond_to?(:type) && obj.respond_to?(:children) && obj.respond_to?(:updated)
+  end
+
   module Filter
     DEFAULTS = []
 
     module SEXP
       # construct an AST Node
       def s(type, *args)
-        Parser::AST::Node.new(type, args)
+        if defined?(Parser::AST::Node)
+          Parser::AST::Node.new(type, args)
+        else
+          Ruby2JS::Node.new(type, args)
+        end
       end
 
       # For compatibility - some code uses S() to update @ast
       def S(type, *args)
         @ast.updated(type, args)
+      end
+
+      # Check if object is an AST node (works with both Parser::AST::Node and Ruby2JS::Node)
+      def ast_node?(obj)
+        Ruby2JS.ast_node?(obj)
       end
     end
 
@@ -105,6 +123,11 @@ module Ruby2JS
         @ast = nil
         @exclude_methods = []
         @prepend_list = Set.new
+      end
+
+      # Check if object is an AST node (works with both Parser::AST::Node and Ruby2JS::Node)
+      def ast_node?(obj)
+        Ruby2JS.ast_node?(obj)
       end
 
       def options=(options)
@@ -176,7 +199,7 @@ module Ruby2JS
 
       # Process a node by dispatching to on_<type> method
       def process(node)
-        return node unless node.is_a?(Parser::AST::Node)
+        return node unless ast_node?(node)
 
         ast, @ast = @ast, node
 
@@ -196,10 +219,10 @@ module Ruby2JS
 
       # Process all children of a node, returning updated node if any changed
       def process_children(node)
-        return node unless node.is_a?(Parser::AST::Node)
+        return node unless ast_node?(node)
 
         new_children = node.children.map do |child|
-          if child.is_a?(Parser::AST::Node)
+          if ast_node?(child)
             process(child)
           else
             child
@@ -215,7 +238,11 @@ module Ruby2JS
 
       # Helper to create nodes
       def s(type, *children)
-        Parser::AST::Node.new(type, children)
+        if defined?(Parser::AST::Node)
+          Parser::AST::Node.new(type, children)
+        else
+          Ruby2JS::Node.new(type, children)
+        end
       end
 
       # Process all children of a node (like process_children but returns array)
@@ -266,10 +293,11 @@ module Ruby2JS
       def on_self(node); node; end
 
       # Handlers that process children by default
+      # Note: send and csend are explicitly defined below with special handling
       %i[
         lvar ivar cvar gvar const
         lvasgn ivasgn cvasgn gvasgn casgn
-        send csend block def defs class module
+        block def defs class module
         if case when while until for
         and or not
         array hash pair splat kwsplat
@@ -305,13 +333,13 @@ module Ruby2JS
       # convert map(&:symbol) to a block
       def on_send(node)
         node = process_children(node)
-        return node unless node.is_a?(AST::Node) && [:send, :csend].include?(node.type)
+        return node unless ast_node?(node) && [:send, :csend].include?(node.type)
 
         if node.children.length > 2 and
-           node.children.last.is_a?(AST::Node) and
+           ast_node?(node.children.last) and
            node.children.last.type == :block_pass
           block_pass = node.children.last
-          if block_pass.children.first.is_a?(AST::Node) &&
+          if ast_node?(block_pass.children.first) &&
              block_pass.children.first.type == :sym
             method = block_pass.children.first.children.first
             # preserve csend type for optional chaining
@@ -346,7 +374,8 @@ module Ruby2JS
       ast, comments = parse(source)
       ast = find_block(ast, line)
       options[:file] ||= file
-    elsif Parser::AST::Node === source
+    elsif source.respond_to?(:type) && source.respond_to?(:children)
+      # AST node passed directly (Parser::AST::Node or Ruby2JS::Node)
       ast, comments = source, {}
       source = ""
     else
@@ -425,10 +454,19 @@ module Ruby2JS
       raw_comments = comments[:_raw]
       if raw_comments && !raw_comments.empty?
         begin
-          new_comments = Parser::Source::Comment.associate(ast, raw_comments)
-          comments.clear
-          comments.merge!(new_comments)
-          comments[:_raw] = raw_comments
+          if defined?(Parser::Source::Comment)
+            new_comments = Parser::Source::Comment.associate(ast, raw_comments)
+          else
+            # For prism-direct, use our own association method
+            new_comments = associate_comments(ast, raw_comments)
+          end
+          # Only update if we found associations; otherwise keep original
+          # (transformed AST may lack location info entirely)
+          if new_comments && !new_comments.empty?
+            comments.clear
+            comments.merge!(new_comments)
+            comments[:_raw] = raw_comments
+          end
         rescue NoMethodError
           # Synthetic nodes without location info cause associate to fail
           # Keep original comments hash, which may not associate properly
@@ -438,7 +476,11 @@ module Ruby2JS
       unless filter.prepend_list.empty?
         prepend = filter.prepend_list.sort_by { |ast| ast.type == :import ? 0 : 1 }
         prepend.reject! { |ast| ast.type == :import } if filter.disable_autoimports
-        ast = Parser::AST::Node.new(:begin, [*prepend, ast])
+        if defined?(Parser::AST::Node)
+          ast = Parser::AST::Node.new(:begin, [*prepend, ast])
+        else
+          ast = Ruby2JS::Node.new(:begin, [*prepend, ast])
+        end
       end
     end
 
@@ -478,15 +520,48 @@ module Ruby2JS
   end
 
   def self.parse(source, file=nil, line=1)
-    if RUBY2JS_PARSER == :prism
+    case RUBY2JS_PARSER
+    when :prism
       parse_with_prism(source, file, line)
+    when :translation
+      parse_with_translation(source, file, line)
     else
       parse_with_parser(source, file, line)
     end
   end
 
-  # Parse using Prism's translation layer (Ruby 3.3+)
+  # Parse using Prism directly with our custom walker (default, no parser gem dependency)
   def self.parse_with_prism(source, file=nil, line=1)
+    source = source.encode('UTF-8')
+
+    result = Prism.parse(source, filepath: file || '(string)')
+
+    if result.failure?
+      # Get first error
+      error = result.errors.first
+      loc = error.location
+      message = "line #{loc.start_line}, column #{loc.start_column}: #{error.message}"
+      message += "\n in file #{file}" if file
+      raise Ruby2JS::SyntaxError.new(message)
+    end
+
+    walker = Ruby2JS::PrismWalker.new(source, file)
+    ast = walker.visit(result.value)
+
+    # Convert Prism comments to wrapper objects, using shared source_buffer for matching
+    raw_comments = result.comments.map do |comment|
+      PrismComment.new(comment, source, walker.source_buffer)
+    end
+
+    # Associate comments with AST nodes
+    comments_hash = associate_comments(ast, raw_comments)
+    comments_hash[:_raw] = raw_comments
+
+    [ast, comments_hash]
+  end
+
+  # Parse using Prism's Translation::Parser layer (requires parser gem)
+  def self.parse_with_translation(source, file=nil, line=1)
     buffer = Parser::Source::Buffer.new(file || '(string)')
     buffer.source = source.encode('UTF-8')
 
@@ -504,6 +579,165 @@ module Ruby2JS
     comments_hash[:_raw] = comments
 
     [ast, comments_hash]
+  end
+
+  # Associate comments with AST nodes (similar to Parser::Source::Comment.associate)
+  # Each comment attaches to the first eligible node that starts at or after the comment ends.
+  # This mimics Parser gem behavior which skips :begin nodes for preceding comments.
+  def self.associate_comments(ast, comments)
+    return {} if comments.empty? || ast.nil?
+
+    # Collect all nodes with their start positions and depth
+    # Skip :begin nodes for comment association (matching Parser gem behavior)
+    nodes_by_pos = []
+    collect_nodes = lambda do |node, depth = 0|
+      return unless node.respond_to?(:loc) && node.loc
+      start_pos = if node.loc.respond_to?(:start_offset)
+        node.loc.start_offset
+      elsif node.loc.respond_to?(:expression) && node.loc.expression
+        node.loc.expression.begin_pos
+      elsif node.loc.is_a?(Hash) && node.loc[:start_offset]
+        node.loc[:start_offset]
+      end
+
+      # Skip :begin nodes for comment association (Parser gem skips these)
+      nodes_by_pos << [start_pos, depth, node] if start_pos && node.type != :begin
+
+      node.children.each do |child|
+        collect_nodes.call(child, depth + 1) if child.respond_to?(:type) && child.respond_to?(:children)
+      end
+    end
+    collect_nodes.call(ast)
+
+    # Sort nodes by start position, then by depth (shallower first for same position)
+    nodes_by_pos.sort_by! { |pos, depth, _| [pos, depth] }
+
+    # Associate each comment with the first eligible node that starts at or after comment ends
+    result = {}
+    comments.each do |comment|
+      comment_end = comment.location.end_offset
+
+      # Find nodes that start at or after comment ends
+      candidates = nodes_by_pos.select { |pos, _, _| pos >= comment_end }
+      next if candidates.empty?
+
+      # Get minimum position
+      min_pos = candidates.first[0]
+
+      # Among nodes at minimum position, pick the first one (shallower due to sorting)
+      node = candidates.find { |pos, _, _| pos == min_pos }&.last
+      next unless node
+
+      result[node] ||= []
+      result[node] << comment
+    end
+
+    result
+  end
+
+  # Wrapper class for Prism comments to provide compatible interface
+  class PrismComment
+    attr_reader :text, :location
+    alias loc location  # Parser gem uses .loc, Prism wrapper uses .location
+
+    def initialize(prism_comment, source, source_buffer = nil)
+      @text = source[prism_comment.location.start_offset...prism_comment.location.end_offset]
+      @location = PrismLocation.new(prism_comment.location, source, source_buffer)
+    end
+
+    def to_s
+      @text
+    end
+  end
+
+  # Wrapper for Prism location to provide line/column info
+  class PrismLocation
+    attr_reader :expression
+
+    def initialize(prism_loc, source, source_buffer = nil)
+      @prism_loc = prism_loc
+      @source = source
+      @source_buffer = source_buffer || PrismSourceBuffer.new(source)
+      @expression = PrismSourceRange.new(@source_buffer, prism_loc.start_offset, prism_loc.end_offset)
+    end
+
+    def line
+      @prism_loc.start_line
+    end
+
+    def column
+      @prism_loc.start_column
+    end
+
+    def start_offset
+      @prism_loc.start_offset
+    end
+
+    def end_offset
+      @prism_loc.end_offset
+    end
+  end
+
+  # Minimal source buffer for Prism locations (provides source for comment lookup)
+  class PrismSourceBuffer
+    attr_reader :source, :name
+
+    def initialize(source, name = nil)
+      @source = source
+      @name = name || ''
+      # Build line offset table for line_for_position
+      @line_offsets = [0]
+      source.each_char.with_index do |char, i|
+        @line_offsets << (i + 1) if char == "\n"
+      end
+    end
+
+    # For equality comparison in comment association
+    def ==(other)
+      other.is_a?(PrismSourceBuffer) && @source.object_id == other.source.object_id
+    end
+    alias eql? ==
+
+    def hash
+      @source.object_id.hash
+    end
+
+    # Return line number (1-based) for a character position
+    def line_for_position(pos)
+      @line_offsets.bsearch_index { |offset| offset > pos } || @line_offsets.length
+    end
+
+    # Return column number (0-based) for a character position
+    def column_for_position(pos)
+      line_idx = (@line_offsets.bsearch_index { |offset| offset > pos } || @line_offsets.length) - 1
+      pos - @line_offsets[line_idx]
+    end
+  end
+
+  # Minimal source range for Prism locations (provides begin_pos/end_pos for comment lookup)
+  class PrismSourceRange
+    attr_reader :source_buffer, :begin_pos, :end_pos
+
+    def initialize(source_buffer, begin_pos, end_pos)
+      @source_buffer = source_buffer
+      @begin_pos = begin_pos
+      @end_pos = end_pos
+    end
+
+    # Return the source text for this range (like Parser::Source::Range#source)
+    def source
+      @source_buffer.source[@begin_pos...@end_pos]
+    end
+
+    # Return line number (1-based) for start of range
+    def line
+      @source_buffer.line_for_position(@begin_pos)
+    end
+
+    # Return column number (0-based) for start of range
+    def column
+      @source_buffer.column_for_position(@begin_pos)
+    end
   end
 
   # Parse using whitequark parser gem (Ruby < 3.3 or when Prism unavailable)
@@ -536,14 +770,25 @@ module Ruby2JS
   end
 
   def self.find_block(ast, line)
-    return nil unless ast.is_a?(Parser::AST::Node)
+    return nil unless ast.respond_to?(:type) && ast.respond_to?(:children)
 
-    if ast.type == :block && ast.loc&.expression&.line == line
-      return ast.children.last
+    if ast.type == :block
+      loc = ast.loc
+      # Handle both Parser::AST::Node locations and our simpler hash format
+      node_line = if loc.respond_to?(:expression)
+        loc.expression&.line
+      elsif loc.is_a?(Hash) && loc[:start_offset]
+        # For prism-direct, we'd need to convert offset to line
+        # For now, skip this comparison - this is mainly used for Proc parsing
+        nil
+      else
+        nil
+      end
+      return ast.children.last if node_line == line
     end
 
     ast.children.each do |child|
-      if child.is_a?(Parser::AST::Node)
+      if child.respond_to?(:type) && child.respond_to?(:children)
         block = find_block(child, line)
         return block if block
       end

@@ -8,6 +8,40 @@ This plan outlines an incremental approach to replacing `Prism::Translation::Par
 
 **Related:** [SELF_HOSTING.md](./SELF_HOSTING.md)
 
+## Current Status (Phase 4 COMPLETE)
+
+**Phase 1 is complete.** The prism-direct walker is implemented and functional.
+
+**Phase 4 is complete.** All tests pass with `prism-direct`.
+
+- ✅ `Ruby2JS::Node` class created with Parser::AST::Node compatibility
+- ✅ `PrismWalker` with ~100 visitor methods implemented
+- ✅ All visitor modules created (literals, variables, collections, calls, blocks, control_flow, definitions, operators, exceptions, strings, regexp, misc)
+- ✅ Integration with `RUBY2JS_PARSER=prism-direct` environment variable
+- ✅ Backward compatibility maintained (whitequark parser and Prism::Translation::Parser still pass all tests)
+- ✅ Match pattern support (`=>` operator) implemented
+- ✅ **Location-based `is_method?` detection** - matches Parser gem behavior exactly
+- ✅ Endless method support (`def foo(x) = expr`)
+- ✅ Node equality (`==`) for AST comparison
+- ✅ **Comment extraction and association** - matches Parser gem behavior
+- ✅ **Sourcemap generation** - shared source buffer for consistent location tracking
+
+**Test Results:**
+- Default parser (Prism::Translation::Parser): **1345 runs, 2551 assertions, 0 failures, 0 errors, 0 skips**
+- prism-direct walker: **1345 runs, 2549 assertions, 0 failures, 0 errors, 2 skips**
+  - The 2 skipped tests pass live Proc/lambda objects which require line number support (deferred to Phase 5)
+
+**Usage:**
+```bash
+# Default (no env var needed - prism walker is now the default)
+ruby your_script.rb
+
+# Explicit parser selection:
+RUBY2JS_PARSER=prism ruby your_script.rb        # Direct Prism walker (default)
+RUBY2JS_PARSER=translation ruby your_script.rb  # Prism::Translation::Parser
+RUBY2JS_PARSER=parser ruby your_script.rb       # whitequark parser gem
+```
+
 ## Why a Walker Instead of a Custom Builder?
 
 The existing `Prism::Translation::Parser` uses a Compiler (2234 lines) that calls a Builder (~100 methods). Two approaches were considered:
@@ -63,11 +97,13 @@ The existing `Prism::Translation::Parser` uses a Compiler (2234 lines) that call
 
 ## Implementation Phases
 
-### Phase 1: Minimal Walker + transliteration_spec.rb
+### Phase 1: Minimal Walker + transliteration_spec.rb ✅ COMPLETE
 
-**Goal:** Get `spec/transliteration_spec.rb` (262 tests) passing with the new walker.
+**Goal:** Get `spec/transliteration_spec.rb` (222 tests) passing with the new walker.
 
 This spec tests only converters (no filters), making it the ideal starting point.
+
+**Status:** ✅ Complete. All 222 tests pass (2 skipped for prism-direct pending line number support in Phase 5).
 
 #### 1.1 Create Minimal Node Class
 
@@ -287,10 +323,10 @@ end
 
 ```bash
 RUBY2JS_PARSER=prism-direct bundle exec ruby -Ilib -Ispec spec/transliteration_spec.rb
-# 262 tests, 0 failures
+# 222 runs, 331 assertions, 0 failures, 0 errors, 2 skips
 ```
 
-**Estimated effort:** 3-5 days
+**Status:** ✅ Complete. Walker is fully functional and integrated.
 
 ### Phase 2: Selfhost Filter for Walker
 
@@ -417,9 +453,61 @@ Same 262 test cases pass in both Ruby and JavaScript.
 
 **Estimated effort:** 2-3 days
 
-### Phase 4: Extend to Full Test Suite
+### Phase 4: Extend to Full Test Suite - COMPLETE ✅
 
 **Goal:** Get remaining specs passing with `prism-direct`.
+
+**Final Status:**
+- Full test suite: **1345 runs, 0 failures, 0 errors, 2 skips**
+- Baseline (parser gem): **1345 runs, 0 failures, 0 errors, 0 skips**
+
+**Completed (Phase 4.1 - Parser Compatibility):**
+- ✅ Fixed `Parser::AST::Node` type checking - replaced with `Ruby2JS.ast_node?` duck typing
+- ✅ Added `Ruby2JS.ast_node?` module-level helper and `ast_node?` method to SEXP module
+- ✅ Updated filters: functions.rb, react.rb, vue.rb, stimulus.rb, lit.rb
+- ✅ Fixed minitest-jasmine.rb to use lazy node creation
+- ✅ Fixed `@comments[node].empty?` nil checks throughout codebase
+- ✅ Added `defined?(Parser::Source::Comment)` check before calling `associate()`
+- ✅ Added `respond_to?(:expression)` guards in serializer.rb and converter.rb
+
+**Completed (Phase 4.2 - is_method? Refactoring):**
+
+Refactored `is_method?` to use location-based detection, matching Parser gem behavior exactly:
+
+- ✅ Created `SendLocation` class with `selector` providing `source_buffer` and `end_pos`
+- ✅ Created `DefLocation` class with `name` providing `source_buffer` and `end_pos`
+- ✅ Updated `Ruby2JS::Node.is_method?` to check for `(` after selector in source
+- ✅ Added `send_node()` helper for creating send/csend nodes with proper location
+- ✅ Added `def_node()` helper for creating def/defs nodes with proper location
+- ✅ Added `send_with_loc()` helper for compound assignments (||=, &&=, +=, etc.)
+- ✅ Fixed `.()` implicit call syntax (no `message_loc` means always a method call)
+- ✅ Removed `is_method` flag from `Ruby2JS::Node` (now computed from location)
+- ✅ Simplified `S()` helper (no longer needs workarounds)
+- ✅ Simplified underscore.rb filter (no longer needs special node creation)
+
+**Completed (Phase 4.3 - AST Node Fixes):**
+- ✅ Fixed lambda nodes to produce `(:send nil :lambda)` instead of `(:lambda)`
+- ✅ Added `visit_source_file_node` for `__FILE__` keyword
+- ✅ Added `visit_source_line_node` for `__LINE__` keyword
+- ✅ Added `visit_source_encoding_node` for `__ENCODING__` keyword
+- ✅ Fixed multiline string detection (check source lines, not escape sequences)
+
+**Completed (Phase 4.4 - Location Compatibility):**
+- ✅ Created `XStrLocation` class for xstr nodes (needed by React filter)
+- ✅ Created `FakeSourceBuffer` and `FakeSourceRange` for Parser API compatibility
+
+**Completed (Phase 4.5 - Comments):**
+- ✅ Implemented comment extraction from Prism's `result.comments`
+- ✅ Created `PrismComment` wrapper class with Parser-compatible interface
+- ✅ Created `associate_comments()` method matching Parser gem behavior
+- ✅ Skip `:begin` nodes for comment association (matches Parser::Source::Comment.associate)
+- ✅ Shared `source_buffer` between AST nodes and comments for correct `==` comparison
+- ✅ Store comments in format compatible with existing `@comments` hash usage
+
+**Completed (Phase 4.6 - Sourcemaps):**
+- ✅ Created shared `PrismSourceBuffer` in walker for all location objects
+- ✅ Updated location classes to use shared source_buffer for sourcemap generation
+- ✅ All 5 sourcemap tests now pass
 
 #### 4.1 Add Filter Support
 
@@ -442,7 +530,7 @@ RUBY2JS_PARSER=prism-direct bundle exec rake test
 # 1345 tests, 0 failures (or close)
 ```
 
-**Estimated effort:** 3-5 days
+**Estimated effort:** 3-5 days (additional work beyond Phase 4.0)
 
 ### Phase 5: Location Support (Lazy Approach)
 
@@ -830,25 +918,30 @@ The walker must implement ~24 additional visitor methods just for operator assig
 
 **Mitigation:** The selfhost filter must transform property accesses when generating JavaScript. This is a known, bounded transformation.
 
-### 2. `is_method?` Implementation (Low Risk)
+### 2. `is_method?` Implementation (RESOLVED)
 
-**Issue:** Ruby2JS uses `is_method?` extensively (20+ call sites) to distinguish `foo` (property access) from `foo()` (method call). The current implementation checks source text position.
+**Issue:** Ruby2JS uses `is_method?` extensively (20+ call sites) to distinguish `foo` (property access) from `foo()` (method call).
 
-**Good news:** Prism provides `opening_loc` which is non-nil only when parentheses are present. The new implementation is cleaner:
+**Resolution:** Implemented location-based detection matching Parser gem behavior exactly:
 
 ```ruby
-class Node
-  attr_accessor :is_method
+# SendLocation provides selector with source_buffer and end_pos
+class SendLocation
+  attr_reader :selector  # FakeSourceRange with source_buffer access
+end
 
-  def is_method?
-    return true if @is_method
-    return true if children.length > 2  # has arguments beyond receiver+method
-    false
-  end
+# Ruby2JS::Node.is_method? checks for '(' after selector
+def is_method?
+  return false if type == :attr
+  return true if type == :call
+  return true unless loc
+  return true if children.length > 2  # has arguments
+  return true unless selector&.source_buffer
+  selector.source_buffer.source[selector.end_pos] == '('
 end
 ```
 
-The walker sets `is_method` based on `node.opening_loc.present?` when creating `:send` nodes.
+The walker uses `send_node()`, `def_node()`, and `send_with_loc()` helpers to create nodes with proper location info. No `is_method` flag needed - it's computed from source position like the Parser gem.
 
 ### 3. `Parser::AST::Node` Type Checks (Low Risk)
 
@@ -943,17 +1036,17 @@ Only 6 tests depend on source maps. This can be Phase 5.
 | Risk | Severity | Status |
 |------|----------|--------|
 | JS/Ruby API naming | Medium | Handled by selfhost filter |
-| `is_method?` | Low | Cleaner implementation possible |
-| Type checks | Low | Alias or duck typing |
-| Node creation | Low | Use existing `s()` helper |
-| Comments | Medium | Offset-based matching |
-| Source maps | Medium | Lazy computation (Phase 5) |
+| `is_method?` | Low | ✅ **RESOLVED** - Location-based detection implemented |
+| Type checks | Low | ✅ **RESOLVED** - Duck typing with `ast_node?` |
+| Node creation | Low | ✅ **RESOLVED** - Use existing `s()` helper |
+| Comments | Medium | Offset-based matching (remaining work) |
+| Source maps | Medium | Lazy computation (remaining work) |
 | Version compat | Low | Pin versions |
 | Missing nodes | Very Low | Not used by Ruby2JS |
 | Selfhost complexity | Medium | Incremental approach |
 | No fallback | Accepted | Test early and often |
 
-**Overall Assessment:** No blocking risks identified. Main work is implementing ~100 visitor methods. All risks have clear mitigations.
+**Overall Assessment:** Core risks resolved. Remaining work is comment extraction and sourcemap support (20 failing tests). All 100+ visitor methods implemented and working.
 
 ## Next Steps After Completion
 

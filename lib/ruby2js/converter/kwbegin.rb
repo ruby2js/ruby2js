@@ -49,7 +49,7 @@ module Ruby2JS
         # Check if any rescue body contains a retry statement
         has_retry = nil
         has_retry = lambda do |node|
-          next false unless node.is_a?(Parser::AST::Node)
+          next false unless node.respond_to?(:type) && node.respond_to?(:children)
           next true if node.type == :retry
           node.children.any? { |child| has_retry[child] }
         end
@@ -89,7 +89,7 @@ module Ruby2JS
           walk = proc do |ast|
             result = ast if ast.type === :gvar and ast.children.first == :$!
             ast.children.each do |child|
-              result ||= walk[child] if child.is_a? Parser::AST::Node
+              result ||= walk[child] if child.respond_to?(:type) && child.respond_to?(:children)
             end
             result
           end

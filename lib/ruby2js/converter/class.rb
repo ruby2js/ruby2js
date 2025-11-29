@@ -96,11 +96,8 @@ module Ruby2JS
             s(:prop, name, m.children[1].to_s[0..-2] =>
                 {enumerable: s(:true), configurable: s(:true),
                 set: s(:def, nil, *m.children[2..-1])})
-          elsif m.children[2].children.length == 0 and
-            m.children[1] !~ /!/ and m.loc and m.loc.name and
-            m.loc.name.source_buffer.source[m.loc.name.end_pos] != '('
-
-            # class property getter
+          elsif !m.is_method?
+            # class property getter (no parens, no args, name not ending in !)
             s(:prop, name, m.children[1].to_s =>
                 {enumerable: s(:true), configurable: s(:true),
                 get: s(:block, s(:send, nil, :proc), m.children[2],
@@ -330,8 +327,9 @@ module Ruby2JS
           end
         end
 
-        unless @comments[init].empty?
-          @comments[constructor] = @comments[init]
+        init_comments = @comments[init]
+        unless init_comments.nil? || init_comments.empty?
+          @comments[constructor] = init_comments
           @comments[init] = []  # prevent duplicate output
         end
         body.unshift constructor

@@ -210,11 +210,12 @@ module Ruby2JS
         put ')'
 
       elsif [:-@, :+@, :~, '~'].include? method
+        child0 = receiver.children[0]
         if \
           receiver.type == :send and
           receiver.children[1] == :+@ and
-          Parser::AST::Node === receiver.children[0] and
-          %i(class module).include? receiver.children[0].type
+          child0.respond_to?(:type) && child0.respond_to?(:children) and
+          %i(class module).include? child0.type
         then
           if receiver.children[0].type == :class
             parse receiver.children[0].updated(:class_extend)
@@ -318,8 +319,10 @@ module Ruby2JS
           end
         elsif args.length == 1 and args.first.type == :send
           # accommodation for JavaScript like new syntax w/argument list
-          parse s(:send, s(:const, *args.first.children[0..1]), :new,
-            *args.first.children[2..-1]), @state
+          # Preserve is_method? from the original Date() call by using updated
+          new_node = args.first.updated(:send,
+            [s(:const, *args.first.children[0..1]), :new, *args.first.children[2..-1]])
+          parse new_node, @state
         elsif args.length == 1 and args.first.type == :const
           # accommodation for JavaScript like new syntax w/o argument list
           parse s(:attr, args.first, :new), @state
@@ -360,7 +363,8 @@ module Ruby2JS
           end
         end
 
-        if not ast.is_method? and ast.type != :send!
+        # :send!, :call, and :await force method call output (with parens)
+        if not ast.is_method? and ![:send!, :call, :await].include?(ast.type)
           if receiver
             (group_receiver ? group(receiver) : parse(receiver))
             put ".#{ method }"

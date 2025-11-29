@@ -374,7 +374,8 @@ module Ruby2JS
       # Handle __FILE__ from Prism::Translation::Parser which produces :str nodes
       def on_str(node)
         # Prism converts __FILE__ to s(:str, filename) where filename matches buffer name
-        if node.loc&.expression
+        # Only check if location has expression method (Parser::AST::Node style)
+        if node.loc.respond_to?(:expression) && node.loc.expression
           source = node.loc.expression.source
           buffer_name = node.loc.expression.source_buffer.name
           if source == '__FILE__' && node.children.first == buffer_name
