@@ -1,8 +1,11 @@
 # Determine which parser to use:
-# - RUBY2JS_PARSER=prism       - use direct Prism walker (default, no parser gem dependency)
+# - RUBY2JS_PARSER=prism       - use direct Prism walker (Ruby 3.4+, no parser gem dependency)
 # - RUBY2JS_PARSER=translation - use Prism via Translation::Parser (requires parser gem)
 # - RUBY2JS_PARSER=parser      - force whitequark parser gem
-# - unset                      - auto-detect (Prism walker if available, else parser gem)
+# - unset                      - auto-detect based on Ruby version:
+#                                Ruby 3.4+: Prism walker (direct)
+#                                Ruby 3.3:  Prism translation layer
+#                                Ruby <3.3: parser gem
 #
 # Note: Opal always uses the parser gem (no Prism support in browser)
 if RUBY_ENGINE == 'opal'
@@ -25,12 +28,35 @@ else
     $VERBOSE = old_verbose
     RUBY2JS_PARSER = :parser
   else
-    # Auto-detect: try Prism walker first, fall back to parser gem
-    begin
-      require 'prism'
-      require 'ruby2js/prism_walker'
-      RUBY2JS_PARSER = :prism
-    rescue LoadError
+    # Auto-detect based on Ruby version
+    # Ruby 3.4+: use direct Prism walker (stable API)
+    # Ruby 3.3: use Prism translation layer (handles API differences)
+    # Ruby <3.3: use parser gem
+    ruby_version = Gem::Version.new(RUBY_VERSION)
+    if ruby_version >= Gem::Version.new('3.4')
+      begin
+        require 'prism'
+        require 'ruby2js/prism_walker'
+        RUBY2JS_PARSER = :prism
+      rescue LoadError
+        old_verbose, $VERBOSE = $VERBOSE, nil
+        require 'parser/current'
+        $VERBOSE = old_verbose
+        RUBY2JS_PARSER = :parser
+      end
+    elsif ruby_version >= Gem::Version.new('3.3')
+      begin
+        require 'prism'
+        require 'prism/translation/parser'
+        require 'parser/current'
+        RUBY2JS_PARSER = :translation
+      rescue LoadError
+        old_verbose, $VERBOSE = $VERBOSE, nil
+        require 'parser/current'
+        $VERBOSE = old_verbose
+        RUBY2JS_PARSER = :parser
+      end
+    else
       old_verbose, $VERBOSE = $VERBOSE, nil
       require 'parser/current'
       $VERBOSE = old_verbose

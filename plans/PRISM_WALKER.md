@@ -4,20 +4,20 @@
 
 This plan outlines an incremental approach to replacing `Prism::Translation::Parser` with a direct walker that translates Prism's native AST to Parser-compatible AST nodes. This is a prerequisite for self-hosting Ruby2JS in JavaScript.
 
-**Goal:** Enable `RUBY2JS_PARSER=prism-direct` to use a new walker that bypasses the parser gem entirely, producing compatible AST nodes for Ruby2JS converters.
+**Goal:** Enable `RUBY2JS_PARSER=prism` to use a new walker that bypasses the parser gem entirely, producing compatible AST nodes for Ruby2JS converters.
 
 **Related:** [SELF_HOSTING.md](./SELF_HOSTING.md)
 
 ## Current Status (Phase 4 COMPLETE)
 
-**Phase 1 is complete.** The prism-direct walker is implemented and functional.
+**Phase 1 is complete.** The prism walker is implemented and functional.
 
-**Phase 4 is complete.** All tests pass with `prism-direct`.
+**Phase 4 is complete.** All tests pass with prism walker on Ruby 3.4+.
 
 - ✅ `Ruby2JS::Node` class created with Parser::AST::Node compatibility
 - ✅ `PrismWalker` with ~100 visitor methods implemented
 - ✅ All visitor modules created (literals, variables, collections, calls, blocks, control_flow, definitions, operators, exceptions, strings, regexp, misc)
-- ✅ Integration with `RUBY2JS_PARSER=prism-direct` environment variable
+- ✅ Integration with `RUBY2JS_PARSER=prism` environment variable
 - ✅ Backward compatibility maintained (whitequark parser and Prism::Translation::Parser still pass all tests)
 - ✅ Match pattern support (`=>` operator) implemented
 - ✅ **Location-based `is_method?` detection** - matches Parser gem behavior exactly
@@ -27,20 +27,31 @@ This plan outlines an incremental approach to replacing `Prism::Translation::Par
 - ✅ **Sourcemap generation** - shared source buffer for consistent location tracking
 
 **Test Results:**
-- Default parser (Prism::Translation::Parser): **1345 runs, 2551 assertions, 0 failures, 0 errors, 0 skips**
-- prism-direct walker: **1345 runs, 2549 assertions, 0 failures, 0 errors, 2 skips**
+- Ruby 3.4+ with prism walker: **1345 runs, 2549 assertions, 0 failures, 0 errors, 2 skips**
   - The 2 skipped tests pass live Proc/lambda objects which require line number support (deferred to Phase 5)
+- Ruby 3.3 with translation layer: **1345 runs, 2551 assertions, 0 failures, 0 errors, 0 skips**
+- All parsers (parser, translation): **0 failures, 0 errors**
+
+**Parser Selection by Ruby Version:**
+
+| Ruby Version | Default Parser | Notes |
+|-------------|----------------|-------|
+| Ruby 3.4+   | `prism` (direct walker) | Stable Prism API, no parser gem dependency |
+| Ruby 3.3    | `translation` (Prism::Translation::Parser) | Handles Prism API differences internally |
+| Ruby < 3.3  | `parser` (whitequark) | Traditional parser gem |
 
 **Usage:**
 ```bash
-# Default (no env var needed - prism walker is now the default)
+# Default (auto-detects based on Ruby version)
 ruby your_script.rb
 
 # Explicit parser selection:
-RUBY2JS_PARSER=prism ruby your_script.rb        # Direct Prism walker (default)
+RUBY2JS_PARSER=prism ruby your_script.rb        # Direct Prism walker (Ruby 3.4+ recommended)
 RUBY2JS_PARSER=translation ruby your_script.rb  # Prism::Translation::Parser
 RUBY2JS_PARSER=parser ruby your_script.rb       # whitequark parser gem
 ```
+
+**Note:** The prism walker is designed for Ruby 3.4+'s Prism API. Using `RUBY2JS_PARSER=prism` on Ruby 3.3 is not fully supported due to Prism API differences between versions.
 
 ## Why a Walker Instead of a Custom Builder?
 
