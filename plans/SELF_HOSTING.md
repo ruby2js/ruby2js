@@ -281,6 +281,21 @@ Ruby regexes need translation to JavaScript:
 
 Current Ruby2JS generates source maps. This would need reimplementation for the JS version.
 
+### 6. Test Strategy
+
+Ruby2JS specs use Minitest with `describe`/`it` blocks and `must_equal` assertions. These can be transpiled to JavaScript.
+
+**Options considered:**
+
+| Approach | Pros | Cons |
+|----------|------|------|
+| Minitest shim | Tests transpile directly; zero dependencies; ~40 lines | Missing features (skip, async, better diffs) |
+| Mocha/Jest/Vitest | Battle-tested; watch mode; IDE integration | Need assertion transform; another dependency |
+
+**Recommendation:** Use a minimal Minitest-compatible shim (`describe`, `it`, `must_equal`) for now. The test structure is already compatible with standard JS frameworks—only assertions differ. If better debugging or async support is needed later, add a filter to convert `must_equal` → `expect().toBe()` and switch to Vitest.
+
+**Current implementation:** `demo/selfhost/test_harness.mjs` provides the shim. Transpiled specs run with Node.js and produce familiar Minitest-style output.
+
 ## Size Estimates
 
 | Component | Estimated JS Size (minified) |
