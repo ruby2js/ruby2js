@@ -176,6 +176,14 @@ module Ruby2JS
           end
         end
 
+        # Handle .compact → .filter(x => x != null)
+        if method == :compact && args.empty?
+          return s(:send, process(target), :filter,
+            s(:block, s(:send, nil, :proc),
+              s(:args, s(:arg, :x)),
+              s(:send, s(:lvar, :x), :!=, s(:nil))))
+        end
+
         super
       end
 

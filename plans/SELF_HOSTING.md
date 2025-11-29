@@ -163,6 +163,18 @@ The `PrismWalker` class (`lib/ruby2js/prism_walker.rb`) now provides direct AST 
 
 **Note:** The `selfhost` filter uses opt-in patterns (explicit `s()` calls, `Parser::AST::Node` references) to avoid false positives. This is the same approach as the explicit type wrappers in ECMASCRIPT_UPDATES.md.
 
+### Phase 2.5: Evaluate Selfhost Filter for Reuse
+
+**Goal:** Move general-purpose transformations from `selfhost` to `functions`.
+
+During self-hosting development, some transformations were added to `selfhost` that are actually general-purpose:
+- `.compact` → `.filter(x => x != null)` - useful for any Ruby→JS conversion
+
+**Action items:**
+- Review selfhost filter for other general-purpose transformations
+- Move reusable transformations to appropriate filters (functions, etc.)
+- Keep selfhost focused on Ruby2JS-specific patterns only
+
 ### Phase 3: Filter Support (JavaScript)
 
 **Goal:** Support commonly-used filters in browser.
