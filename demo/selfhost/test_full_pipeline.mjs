@@ -176,6 +176,75 @@ describe("full pipeline - ranges", () => {
   });
 });
 
+describe("full pipeline - classes", () => {
+  it("should convert simple class", () => {
+    const result = convert("class Foo; end");
+    result.must_include("class Foo");
+  });
+
+  it("should convert class with inheritance", () => {
+    const result = convert("class Foo < Bar; end");
+    result.must_include("class Foo extends Bar");
+  });
+
+  it("should convert initialize to constructor", () => {
+    const result = convert("class Foo; def initialize(x); @x = x; end; end");
+    result.must_include("constructor(x)");
+    result.must_include("this._x = x");
+  });
+
+  it("should convert methods", () => {
+    const result = convert("class Foo; def bar; 42; end; end");
+    result.must_include("bar()");
+    result.must_include("return 42");
+  });
+
+  it("should convert attr_accessor", () => {
+    const result = convert("class Foo; attr_accessor :name; end");
+    result.must_include("get name()");
+    result.must_include("set name(value)");
+    result.must_include("this._name");
+  });
+
+  it("should convert attr_reader", () => {
+    const result = convert("class Foo; attr_reader :name; end");
+    result.must_include("get name()");
+  });
+});
+
+describe("full pipeline - modules", () => {
+  it("should convert module to object", () => {
+    const result = convert("module Foo; def bar; 42; end; end");
+    result.must_include("const Foo = {");
+    result.must_include("bar()");
+  });
+});
+
+describe("full pipeline - constants", () => {
+  it("should convert constant assignment", () => {
+    const result = convert("FOO = 42");
+    result.must_include("const FOO = 42");
+  });
+
+  it("should convert constant reference", () => {
+    const result = convert("x = Foo::Bar");
+    result.must_include("Foo.Bar");
+  });
+});
+
+describe("full pipeline - blocks", () => {
+  it("should convert blocks to arrow functions", () => {
+    const result = convert("items.each { |x| puts x }");
+    result.must_include("=>");
+    result.must_include("console.log(x)");
+  });
+
+  it("should convert lambda", () => {
+    const result = convert("f = lambda { |x| x + 1 }");
+    result.must_include("=>");
+  });
+});
+
 // Run and report
 const success = printResults();
 process.exit(success ? 0 : 1);

@@ -106,10 +106,21 @@ class PrismWalker {
   // === Calls ===
   // Note: In JS Prism, arguments is accessed via arguments_ (underscore)
   // and the actual args array is arguments_.arguments_
+  // Blocks are attached to CallNode via .block property
   visitCallNode(node) {
+    let block_params, block_body;
     let receiver = this.visit(node.receiver);
     let args = node.arguments_ ? this.visit_all(node.arguments_.arguments_) : [];
-    return this.s("send", receiver, node.name, ...args)
+    let call = this.s("send", receiver, node.name, ...args);
+
+    // Check for attached block
+    if (node.block) {
+      block_params = this.visit(node.block.parameters) || this.s("args");
+      block_body = this.visit(node.block.body);
+      return this.s("block", call, block_params, block_body)
+    } else {
+      return call
+    }
   };
 
   // === Definitions ===
@@ -294,10 +305,104 @@ class PrismWalker {
     }
   };
 
+  // === Classes and Modules ===
+  visitClassNode(node) {
+    // JS Prism uses camelCase: constantPath, superclass
+    let name = this.visit(node.constantPath);
+    let superclass = this.visit(node.superclass);
+    let body = this.visit(node.body);
+    return this.s("class", name, superclass, body)
+  };
+
+  visitModuleNode(node) {
+    let name = this.visit(node.constantPath);
+    let body = this.visit(node.body);
+    return this.s("module", name, body)
+  };
+
+  visitSingletonClassNode(node) {
+    // class << self; ... end
+    let expr = this.visit(node.expression);
+    let body = this.visit(node.body);
+    return this.s("sclass", expr, body)
+  };
+
+  // Constants
+  visitConstantReadNode(node) {
+    return this.s("const", null, node.name)
+  };
+
+  visitConstantPathNode(node) {
+    // Foo::Bar
+    let parent = this.visit(node.parent);
+    return this.s("const", parent, node.name)
+  };
+
+  visitConstantWriteNode(node) {
+    return this.s("casgn", null, node.name, this.visit(node.value))
+  };
+
+  visitConstantPathWriteNode(node) {
+    let target = this.visit(node.target);
+
+    return this.s(
+      "casgn",
+      target.children[0],
+      target.children[1],
+      this.visit(node.value)
+    )
+  };
+
+  // === Blocks ===
+  visitBlockNode(node) {
+    let call = this.visit(node.call);
+    let params = this.visit(node.parameters) || this.s("args");
+    let body = this.visit(node.body);
+    return this.s("block", call, params, body)
+  };
+
+  visitBlockParametersNode(node) {
+    let params = [];
+
+    if (node.parameters) {
+      for (let p of node.parameters.requireds) {
+        params.push(this.visit(p))
+      };
+
+      for (let p of node.parameters.optionals) {
+        params.push(this.visit(p))
+      };
+
+      if (node.parameters.rest) params.push(this.visit(node.parameters.rest))
+    };
+
+    return this.s("args", ...params)
+  };
+
+  visitLambdaNode(node) {
+    let params = this.visit(node.parameters) || this.s("args");
+    let body = this.visit(node.body);
+    return this.s("block", this.s("send", null, "lambda"), params, body)
+  };
+
   // === Other ===
   visitParenthesesNode(node) {
     // Just visit the body - parentheses are for grouping
     return this.visit(node.body)
+  };
+
+  visitSplatNode(node) {
+    return this.s("splat", this.visit(node.expression))
+  };
+
+  visitKeywordHashNode(node) {
+    // Used in method arguments: foo(a: 1, b: 2)
+    return this.s("hash", ...this.visit_all(node.elements))
+  };
+
+  visitAssocSplatNode(node) {
+    // **hash
+    return this.s("kwsplat", this.visit(node.value))
   };
 
   visitStatementsNode(node) {
@@ -373,7 +478,19 @@ class Converter {
       'erange': node => this.convertRange(node, false),
 
       // String interpolation
-      'dstr': node => this.convertDstr(node)
+      'dstr': node => this.convertDstr(node),
+
+      // Classes and modules
+      'class': node => this.convertClass(node),
+      'module': node => this.convertModule(node),
+      'sclass': node => this.convertSclass(node),
+      'const': node => this.convertConst(node),
+      'casgn': node => this.convertCasgn(node),
+
+      // Blocks
+      'block': node => this.convertBlock(node),
+      'splat': node => '...' + this.convert(node.children[0]),
+      'kwsplat': node => '...' + this.convert(node.children[0])
     };
   }
 
@@ -511,6 +628,163 @@ class Converter {
       }
     });
     return '`' + parts.join('') + '`';
+  }
+
+  convertConst(node) {
+    const [parent, name] = node.children;
+    if (parent) {
+      return this.convert(parent) + '.' + name.toString();
+    }
+    return name.toString();
+  }
+
+  convertCasgn(node) {
+    const [parent, name, value] = node.children;
+    const fullName = parent ? this.convert(parent) + '.' + name.toString() : name.toString();
+    return 'const ' + fullName + ' = ' + this.convert(value);
+  }
+
+  convertClass(node) {
+    const [nameNode, superclassNode, body] = node.children;
+    const name = this.convert(nameNode);
+    const superclass = superclassNode ? this.convert(superclassNode) : null;
+
+    let result = 'class ' + name;
+    if (superclass) {
+      result += ' extends ' + superclass;
+    }
+    result += ' {\\n';
+
+    // Process body - look for initialize and other methods
+    if (body) {
+      result += this.convertClassBody(body);
+    }
+
+    result += '}';
+    return result;
+  }
+
+  convertClassBody(body) {
+    if (body.type === 'begin') {
+      return body.children.map(child => this.convertClassMember(child)).join('\\n');
+    } else {
+      return this.convertClassMember(body);
+    }
+  }
+
+  convertClassMember(node) {
+    if (node.type === 'def') {
+      return this.convertMethod(node);
+    } else if (node.type === 'send') {
+      // Handle attr_accessor, attr_reader, attr_writer
+      const [receiver, method, ...args] = node.children;
+      if (receiver == null && (method === 'attr_accessor' || method === 'attr_reader' || method === 'attr_writer')) {
+        return this.convertAttr(method, args);
+      }
+    }
+    return '  ' + this.convert(node);
+  }
+
+  convertMethod(node) {
+    const [name, args, body] = node.children;
+    const methodName = name.toString();
+    const argsStr = this.convert(args);
+
+    // Initialize becomes constructor
+    if (methodName === 'initialize') {
+      let bodyStr = body ? this.convertMethodBody(body, false) : '';
+      return '  constructor(' + argsStr + ') {\\n' + bodyStr + '  }';
+    }
+
+    // Regular method
+    let bodyStr = body ? this.convertMethodBody(body, true) : '';
+    return '  ' + methodName + '(' + argsStr + ') {\\n' + bodyStr + '  }';
+  }
+
+  convertMethodBody(body, addReturn) {
+    if (body.type === 'begin') {
+      const statements = body.children.map((c, i) => {
+        const isLast = i === body.children.length - 1;
+        const stmt = this.convert(c);
+        if (addReturn && isLast) {
+          return '    return ' + stmt + ';';
+        }
+        return '    ' + stmt + ';';
+      });
+      return statements.join('\\n') + '\\n';
+    } else {
+      const stmt = this.convert(body);
+      if (addReturn) {
+        return '    return ' + stmt + ';\\n';
+      }
+      return '    ' + stmt + ';\\n';
+    }
+  }
+
+  convertAttr(type, args) {
+    const result = [];
+    for (const arg of args) {
+      const name = arg.children[0].toString();
+      if (type === 'attr_reader' || type === 'attr_accessor') {
+        result.push('  get ' + name + '() { return this._' + name + '; }');
+      }
+      if (type === 'attr_writer' || type === 'attr_accessor') {
+        result.push('  set ' + name + '(value) { this._' + name + ' = value; }');
+      }
+    }
+    return result.join('\\n');
+  }
+
+  convertModule(node) {
+    const [nameNode, body] = node.children;
+    const name = this.convert(nameNode);
+
+    // Convert module to object with methods
+    let result = 'const ' + name + ' = {\\n';
+    if (body) {
+      if (body.type === 'begin') {
+        const members = body.children.map(child => {
+          if (child.type === 'def') {
+            const [methodName, args, methodBody] = child.children;
+            const argsStr = this.convert(args);
+            const bodyStr = methodBody ? this.convert(methodBody) : 'null';
+            return '  ' + methodName.toString() + '(' + argsStr + ') { return ' + bodyStr + '; }';
+          }
+          return '  ' + this.convert(child);
+        });
+        result += members.join(',\\n') + '\\n';
+      } else if (body.type === 'def') {
+        const [methodName, args, methodBody] = body.children;
+        const argsStr = this.convert(args);
+        const bodyStr = methodBody ? this.convert(methodBody) : 'null';
+        result += '  ' + methodName.toString() + '(' + argsStr + ') { return ' + bodyStr + '; }\\n';
+      }
+    }
+    result += '}';
+    return result;
+  }
+
+  convertSclass(node) {
+    const [expr, body] = node.children;
+    // class << self is for static methods - return as comment for now
+    return '/* class << ' + this.convert(expr) + ' */';
+  }
+
+  convertBlock(node) {
+    const [call, args, body] = node.children;
+    const argsStr = this.convert(args);
+    const bodyStr = body ? this.convert(body) : 'null';
+
+    // Check if this is a lambda
+    if (call.type === 'send' && call.children[1] === 'lambda') {
+      return '((' + argsStr + ') => ' + bodyStr + ')';
+    }
+
+    // Regular block - convert to method call with arrow function
+    const callStr = this.convert(call);
+    // Remove trailing () if present, then add arrow function
+    const baseCall = callStr.replace(/\\(\\)$/, '');
+    return baseCall + '((' + argsStr + ') => ' + bodyStr + ')';
   }
 }
 

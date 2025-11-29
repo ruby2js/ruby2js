@@ -104,10 +104,20 @@ class PrismWalker < Prism::Visitor
 
   # Note: In JS Prism, arguments is accessed via arguments_ (underscore)
   # and the actual args array is arguments_.arguments_
+  # Blocks are attached to CallNode via .block property
   def visit_call_node(node)
     receiver = visit(node.receiver)
     args = node.arguments_ ? visit_all(node.arguments_.arguments_) : []
-    s(:send, receiver, node.name, *args)
+    call = s(:send, receiver, node.name, *args)
+
+    # Check for attached block
+    if node.block
+      block_params = visit(node.block.parameters) || s(:args)
+      block_body = visit(node.block.body)
+      s(:block, call, block_params, block_body)
+    else
+      call
+    end
   end
 
   # === Definitions ===
@@ -247,11 +257,95 @@ class PrismWalker < Prism::Visitor
     end
   end
 
+  # === Classes and Modules ===
+
+  def visit_class_node(node)
+    # JS Prism uses camelCase: constantPath, superclass
+    name = visit(node.constantPath)
+    superclass = visit(node.superclass)
+    body = visit(node.body)
+    s(:class, name, superclass, body)
+  end
+
+  def visit_module_node(node)
+    name = visit(node.constantPath)
+    body = visit(node.body)
+    s(:module, name, body)
+  end
+
+  def visit_singleton_class_node(node)
+    # class << self; ... end
+    expr = visit(node.expression)
+    body = visit(node.body)
+    s(:sclass, expr, body)
+  end
+
+  # Constants
+  def visit_constant_read_node(node)
+    s(:const, nil, node.name)
+  end
+
+  def visit_constant_path_node(node)
+    # Foo::Bar
+    parent = visit(node.parent)
+    s(:const, parent, node.name)
+  end
+
+  def visit_constant_write_node(node)
+    s(:casgn, nil, node.name, visit(node.value))
+  end
+
+  def visit_constant_path_write_node(node)
+    target = visit(node.target)
+    s(:casgn, target.children[0], target.children[1], visit(node.value))
+  end
+
+  # === Blocks ===
+
+  def visit_block_node(node)
+    call = visit(node.call)
+    params = visit(node.parameters) || s(:args)
+    body = visit(node.body)
+    s(:block, call, params, body)
+  end
+
+  def visit_block_parameters_node(node)
+    params = []
+    if node.parameters
+      node.parameters.requireds.each { |p| params << visit(p) }
+      node.parameters.optionals.each { |p| params << visit(p) }
+      if node.parameters.rest
+        params << visit(node.parameters.rest)
+      end
+    end
+    s(:args, *params)
+  end
+
+  def visit_lambda_node(node)
+    params = visit(node.parameters) || s(:args)
+    body = visit(node.body)
+    s(:block, s(:send, nil, :lambda), params, body)
+  end
+
   # === Other ===
 
   def visit_parentheses_node(node)
     # Just visit the body - parentheses are for grouping
     visit(node.body)
+  end
+
+  def visit_splat_node(node)
+    s(:splat, visit(node.expression))
+  end
+
+  def visit_keyword_hash_node(node)
+    # Used in method arguments: foo(a: 1, b: 2)
+    s(:hash, *visit_all(node.elements))
+  end
+
+  def visit_assoc_splat_node(node)
+    # **hash
+    s(:kwsplat, visit(node.value))
   end
 
   def visit_statements_node(node)
@@ -334,7 +428,19 @@ class Converter {
       'erange': node => this.convertRange(node, false),
 
       // String interpolation
-      'dstr': node => this.convertDstr(node)
+      'dstr': node => this.convertDstr(node),
+
+      // Classes and modules
+      'class': node => this.convertClass(node),
+      'module': node => this.convertModule(node),
+      'sclass': node => this.convertSclass(node),
+      'const': node => this.convertConst(node),
+      'casgn': node => this.convertCasgn(node),
+
+      // Blocks
+      'block': node => this.convertBlock(node),
+      'splat': node => '...' + this.convert(node.children[0]),
+      'kwsplat': node => '...' + this.convert(node.children[0])
     };
   }
 
@@ -472,6 +578,163 @@ class Converter {
       }
     });
     return '`' + parts.join('') + '`';
+  }
+
+  convertConst(node) {
+    const [parent, name] = node.children;
+    if (parent) {
+      return this.convert(parent) + '.' + name.toString();
+    }
+    return name.toString();
+  }
+
+  convertCasgn(node) {
+    const [parent, name, value] = node.children;
+    const fullName = parent ? this.convert(parent) + '.' + name.toString() : name.toString();
+    return 'const ' + fullName + ' = ' + this.convert(value);
+  }
+
+  convertClass(node) {
+    const [nameNode, superclassNode, body] = node.children;
+    const name = this.convert(nameNode);
+    const superclass = superclassNode ? this.convert(superclassNode) : null;
+
+    let result = 'class ' + name;
+    if (superclass) {
+      result += ' extends ' + superclass;
+    }
+    result += ' {\\n';
+
+    // Process body - look for initialize and other methods
+    if (body) {
+      result += this.convertClassBody(body);
+    }
+
+    result += '}';
+    return result;
+  }
+
+  convertClassBody(body) {
+    if (body.type === 'begin') {
+      return body.children.map(child => this.convertClassMember(child)).join('\\n');
+    } else {
+      return this.convertClassMember(body);
+    }
+  }
+
+  convertClassMember(node) {
+    if (node.type === 'def') {
+      return this.convertMethod(node);
+    } else if (node.type === 'send') {
+      // Handle attr_accessor, attr_reader, attr_writer
+      const [receiver, method, ...args] = node.children;
+      if (receiver == null && (method === 'attr_accessor' || method === 'attr_reader' || method === 'attr_writer')) {
+        return this.convertAttr(method, args);
+      }
+    }
+    return '  ' + this.convert(node);
+  }
+
+  convertMethod(node) {
+    const [name, args, body] = node.children;
+    const methodName = name.toString();
+    const argsStr = this.convert(args);
+
+    // Initialize becomes constructor
+    if (methodName === 'initialize') {
+      let bodyStr = body ? this.convertMethodBody(body, false) : '';
+      return '  constructor(' + argsStr + ') {\\n' + bodyStr + '  }';
+    }
+
+    // Regular method
+    let bodyStr = body ? this.convertMethodBody(body, true) : '';
+    return '  ' + methodName + '(' + argsStr + ') {\\n' + bodyStr + '  }';
+  }
+
+  convertMethodBody(body, addReturn) {
+    if (body.type === 'begin') {
+      const statements = body.children.map((c, i) => {
+        const isLast = i === body.children.length - 1;
+        const stmt = this.convert(c);
+        if (addReturn && isLast) {
+          return '    return ' + stmt + ';';
+        }
+        return '    ' + stmt + ';';
+      });
+      return statements.join('\\n') + '\\n';
+    } else {
+      const stmt = this.convert(body);
+      if (addReturn) {
+        return '    return ' + stmt + ';\\n';
+      }
+      return '    ' + stmt + ';\\n';
+    }
+  }
+
+  convertAttr(type, args) {
+    const result = [];
+    for (const arg of args) {
+      const name = arg.children[0].toString();
+      if (type === 'attr_reader' || type === 'attr_accessor') {
+        result.push('  get ' + name + '() { return this._' + name + '; }');
+      }
+      if (type === 'attr_writer' || type === 'attr_accessor') {
+        result.push('  set ' + name + '(value) { this._' + name + ' = value; }');
+      }
+    }
+    return result.join('\\n');
+  }
+
+  convertModule(node) {
+    const [nameNode, body] = node.children;
+    const name = this.convert(nameNode);
+
+    // Convert module to object with methods
+    let result = 'const ' + name + ' = {\\n';
+    if (body) {
+      if (body.type === 'begin') {
+        const members = body.children.map(child => {
+          if (child.type === 'def') {
+            const [methodName, args, methodBody] = child.children;
+            const argsStr = this.convert(args);
+            const bodyStr = methodBody ? this.convert(methodBody) : 'null';
+            return '  ' + methodName.toString() + '(' + argsStr + ') { return ' + bodyStr + '; }';
+          }
+          return '  ' + this.convert(child);
+        });
+        result += members.join(',\\n') + '\\n';
+      } else if (body.type === 'def') {
+        const [methodName, args, methodBody] = body.children;
+        const argsStr = this.convert(args);
+        const bodyStr = methodBody ? this.convert(methodBody) : 'null';
+        result += '  ' + methodName.toString() + '(' + argsStr + ') { return ' + bodyStr + '; }\\n';
+      }
+    }
+    result += '}';
+    return result;
+  }
+
+  convertSclass(node) {
+    const [expr, body] = node.children;
+    // class << self is for static methods - return as comment for now
+    return '/* class << ' + this.convert(expr) + ' */';
+  }
+
+  convertBlock(node) {
+    const [call, args, body] = node.children;
+    const argsStr = this.convert(args);
+    const bodyStr = body ? this.convert(body) : 'null';
+
+    // Check if this is a lambda
+    if (call.type === 'send' && call.children[1] === 'lambda') {
+      return '((' + argsStr + ') => ' + bodyStr + ')';
+    }
+
+    // Regular block - convert to method call with arrow function
+    const callStr = this.convert(call);
+    // Remove trailing () if present, then add arrow function
+    const baseCall = callStr.replace(/\\(\\)$/, '');
+    return baseCall + '((' + argsStr + ') => ' + bodyStr + ')';
   }
 }
 JS
