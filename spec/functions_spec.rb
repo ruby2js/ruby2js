@@ -685,4 +685,34 @@ describe Ruby2JS::Filter::Functions do
       _(Ruby2JS::Filter::DEFAULTS).must_include Ruby2JS::Filter::Functions
     end
   end
+
+  describe "explicit inclusion of methods" do
+    def to_js_include(string, methods)
+      _(Ruby2JS.convert(string, eslevel: 2017, include: methods, filters: [Ruby2JS::Filter::Functions]).to_s)
+    end
+
+    def to_js_include_all(string)
+      _(Ruby2JS.convert(string, eslevel: 2017, include_all: true, filters: [Ruby2JS::Filter::Functions]).to_s)
+    end
+
+    it "should convert keys without parens when explicitly included" do
+      to_js_include( 'a.keys', [:keys] ).must_equal 'Object.keys(a)'
+    end
+
+    it "should convert max without parens when explicitly included" do
+      to_js_include( 'a.max', [:max] ).must_equal 'Math.max(...a)'
+    end
+
+    it "should convert index without parens when explicitly included" do
+      to_js_include( 'a.index', [:index] ).must_equal 'a.indexOf'
+    end
+
+    it "should convert values without parens when include_all is true" do
+      to_js_include_all( 'a.values' ).must_equal 'Object.values(a)'
+    end
+
+    it "should convert clear without parens when include_all is true" do
+      to_js_include_all( 'a.clear' ).must_equal 'a.length = 0'
+    end
+  end
 end

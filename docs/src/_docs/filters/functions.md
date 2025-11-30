@@ -114,8 +114,36 @@ If you set the `eslevel` option to `2015` or newer, the Functions filter enables
 * `block_given?` will check for the presence of optional argument `_implicitBlockYield` which is a function made accessible through the use of `yield` in a method body.
 * `alias_method` works both inside of a class definition as well as called directly on a class name (e.g. `MyClass.alias_method`)
 
-Additionally, there is two mappings that will only be done if explicitly
-included (pass `include: [:class, :call]` as a `convert` option to enable):
+## Methods Requiring Parentheses
+
+Some Ruby method names like `keys`, `values`, `index`, `max`, etc. could also be
+property accesses in JavaScript (e.g., on DOM nodes). To avoid incorrect
+transformations, these methods are only converted when called with parentheses:
+
+```ruby
+a.keys     # => a.keys (no conversion - could be property access)
+a.keys()   # => Object.keys(a) (converted - clearly a method call)
+```
+
+The following methods require parentheses for automatic conversion:
+`keys`, `values`, `entries`, `index`, `rindex`, `clear`, `reverse!`, `max`, `min`
+
+To force conversion even without parentheses, explicitly include the method:
+
+```ruby
+Ruby2JS.convert('a.keys', include: [:keys])  # => Object.keys(a)
+```
+
+Or use `include_all: true` to enable conversion for all such methods:
+
+```ruby
+Ruby2JS.convert('a.keys', include_all: true)  # => Object.keys(a)
+```
+
+## Methods Requiring Explicit Inclusion
+
+The following mappings will only be done if explicitly included
+(pass `include: [:class, :call]` as a `convert` option to enable):
 
 {:.functions-list}
 * `.class` {{ caret }} `.constructor`
