@@ -85,7 +85,7 @@ module Ruby2JS
 
               # method: add to prototype
               s(:method, s(:attr, name, :prototype),
-                :"#{m.children[0].to_s.chomp('!')}=",
+                :"#{m.children[0].to_s.chomp('!').chomp('?')}=",
                 s(:defm, nil, *m.children[1..-1]))
             end
           end

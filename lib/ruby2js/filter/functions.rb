@@ -625,6 +625,17 @@ module Ruby2JS
             super
           end
 
+        elsif method == :method and target == nil and args.length == 1
+          # method(:name) => this.name.bind(this) or this[name].bind(this)
+          name_arg = args.first
+          if name_arg.type == :sym
+            # method(:foo) => this.foo.bind(this)
+            process S(:send, s(:attr, s(:self), name_arg.children.first), :bind, s(:self))
+          else
+            # method(name) => this[name].bind(this)
+            process S(:send, s(:send, s(:self), :[], name_arg), :bind, s(:self))
+          end
+
         else
           super
         end

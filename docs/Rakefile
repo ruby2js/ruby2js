@@ -92,11 +92,26 @@ file "#{dest}/index.erb" => [*filters, "#{root}/demo/ruby2js.rb"] do
       ENV.delete 'REQUEST_URI'
     end
 
+    body = livedoc[/<body.*?>(.*?)<\/body>/m, 1].
+      sub(/<style.*?<\/style>/m, '').
+      sub(/<script.*?<\/script>/m, '')
+
+    # Add link to self-hosted demo at the bottom
+    selfhost_link = <<~HTML
+      <div style="text-align: center; margin-top: 2rem; padding: 1rem; background: #f8f9fa; border-radius: 4px;">
+        <a href="/demo/selfhost/" style="color: #0d6efd;">
+          Try the Self-Hosted Preview &rarr;
+        </a>
+        <span style="color: #666; font-size: 0.85em; margin-left: 0.5rem;">
+          (experimental, ~8x smaller)
+        </span>
+      </div>
+    HTML
+
     erb = [
       "---\nlayout: default\n---\n",
-      livedoc[/<body.*?>(.*?)<\/body>/m, 1].
-        sub(/<style.*?<\/style>/m, '').
-        sub(/<script.*?<\/script>/m, ''),
+      body,
+      selfhost_link
     ].join("\n")
 
     IO.write("#{dest}/index.erb", erb)
@@ -142,11 +157,34 @@ task :clean do
   rm_rf "#{docs}/src/demo"
 end
 
+# Selfhost demo - copy source files from demo/selfhost/
+selfhost_dir = "#{dest}/selfhost"
+selfhost_source = "#{root}/demo/selfhost"
+
+# Map source files to destination names (browser_demo.html -> index.html)
+selfhost_file_map = {
+  'browser_demo.html' => 'index.html',
+  'selfhost_converter.mjs' => 'selfhost_converter.mjs',
+  'transpiled_walker.mjs' => 'transpiled_walker.mjs'
+}
+
+directory dest
+directory selfhost_dir => dest
+
+selfhost_file_map.each do |src, dst|
+  file "#{selfhost_dir}/#{dst}" => [selfhost_dir, "#{selfhost_source}/#{src}"] do
+    cp "#{selfhost_source}/#{src}", "#{selfhost_dir}/#{dst}"
+  end
+end
+
+task :selfhost => selfhost_file_map.values.map { |f| "#{selfhost_dir}/#{f}" }
+
 task :default => [
   "#{dest}/index.erb",
   "#{dest}/editor.js",
   "#{dest}/litelement.js",
   "#{dest}/livedemo.js",
-  "#{dest}/ruby2js.js"
+  "#{dest}/ruby2js.js",
+  :selfhost
 ]
 

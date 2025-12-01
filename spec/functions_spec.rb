@@ -678,6 +678,11 @@ describe Ruby2JS::Filter::Functions do
       to_js_2020( 'Klass.define_method(:newname) {|x| return x * 5 }').must_equal 'Klass.prototype.newname = function(x) {return x * 5}'
       to_js_2020( 'Klass.define_method(newname) {|x| return x * 5 }').must_equal 'Klass.prototype[newname] = function(x) {return x * 5}'
     end
+
+    it "should handle method(:name)" do
+      to_js( 'method(:foo)' ).must_equal 'this.foo.bind(this)'
+      to_js( 'method(name)' ).must_equal 'this[name].bind(this)'
+    end
   end
 
   describe Ruby2JS::Filter::DEFAULTS do

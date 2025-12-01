@@ -654,6 +654,11 @@ describe Ruby2JS do
         must_equal 'function Person(name) {this._name = name}; Object.defineProperty(Person.prototype, "name", {enumerable: true, configurable: true, get: function() {return this._name}}); Person.prototype.reset = function() {this._name = null}'
     end
 
+    it "should strip ? from predicate method names in prototype" do
+      to_js('class Person; def valid?; @name != nil; end; end').
+        must_equal 'function Person() {}; Person.prototype.valid = function() {this._name != null}'
+    end
+
     it "should parse class with constructor and methods with multiple arguments" do
       to_js('class Person; def initialize(name, surname); @name, @surname = name, surname; end; def full_name; @name  + @surname; end; end').
         must_equal 'function Person(name, surname) {this._name = name; this._surname = surname}; Object.defineProperty(Person.prototype, "full_name", {enumerable: true, configurable: true, get: function() {return this._name + this._surname}})'
@@ -1233,6 +1238,21 @@ describe Ruby2JS do
     it "should handle else clause with ensure" do
       to_js( 'begin; a; rescue; b; else; c; ensure; d; end' ).
         must_equal 'var $no_exception = false; try {var a; $no_exception = true} catch ($EXCEPTION) {var b} finally {var d}; if ($no_exception) {var c}'
+    end
+
+    it "should hoist variables declared in try that are used in finally" do
+      to_js( 'begin; x = 1; rescue; y; ensure; z(x); end', eslevel: 2015 ).
+        must_equal '{let x; try {x = 1} catch ($EXCEPTION) {let y} finally {z(x)}}'
+    end
+
+    it "should not hoist variables already declared" do
+      to_js( 'x = 0; begin; x = 1; ensure; z(x); end', eslevel: 2015 ).
+        must_equal 'let x = 0; try {x = 1} finally {z(x)}'
+    end
+
+    it "should not hoist variables not used in finally" do
+      to_js( 'begin; x = 1; ensure; z(); end', eslevel: 2015 ).
+        must_equal 'try {let x = 1} finally {z()}'
     end
 
     it "should handle begin as an expression" do

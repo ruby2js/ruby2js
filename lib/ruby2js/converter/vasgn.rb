@@ -9,8 +9,14 @@ module Ruby2JS
 
     handle :lvasgn, :gvasgn do |name, value=nil|
       if @ast.type == :lvasgn and value
-        receiver = @rbstack.map {|rb| rb[name]}.compact.last
-        return parse s(:attr, receiver, "#{name}=", value) if receiver
+        # Only treat as setter if name is NOT already a local variable
+        # and not marked as :masgn (from parallel assignment like `scope, @scope = ...`)
+        # This handles cases where `scope` should be a new local var, not a call to self.scope=
+        # Skip setter lookup if: already a real local var, or marked from parallel assignment
+        unless @vars[name] == true || @vars[name] == :masgn
+          receiver = @rbstack.map {|rb| rb[name]}.compact.last
+          return parse s(:attr, receiver, "#{name}=", value) if receiver
+        end
       end
 
       state  = @state
@@ -37,7 +43,9 @@ module Ruby2JS
         end
 
         hoist = false
-        if state == :statement and not @vars.include?(name) 
+        # Treat :masgn marker as "not yet declared" for purposes of adding let/var
+        is_declared = @vars.include?(name) && @vars[name] != :masgn
+        if state == :statement and not is_declared
           hoist = hoist?(@scope, @inner, name) if @inner and @scope != @inner
           if not hoist
             if es2015
