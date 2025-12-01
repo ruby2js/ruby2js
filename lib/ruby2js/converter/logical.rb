@@ -42,6 +42,26 @@ module Ruby2JS
     handle :and, :or do |left, right|
       type = @ast.type
 
+      # Use Ruby-style truthiness when truthy option is enabled
+      if @truthy
+        @need_truthy_helpers << :T
+        if type == :or
+          @need_truthy_helpers << :ror
+          put '$ror('
+          parse left
+          put ', () => '
+          parse right
+          put ')'
+        else
+          @need_truthy_helpers << :rand
+          put '$rand('
+          parse left
+          put ', () => '
+          parse right
+          put ')'
+        end
+        return
+      end
 
       if es2020 and type == :and
         node = rewrite(left, right)

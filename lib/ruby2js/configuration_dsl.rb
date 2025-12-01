@@ -59,6 +59,10 @@ module Ruby2JS
       @options[:or] = :nullish
     end
 
+    def truthy(bool = true)
+      @options[:truthy] = bool
+    end
+
     def autoimport(identifier = nil, file = nil, &block)
       if block
         @options[:autoimports] = block

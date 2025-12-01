@@ -1,0 +1,106 @@
+gem 'minitest'
+require 'minitest/autorun'
+require 'ruby2js'
+
+describe "truthy option" do
+
+  def to_js(string, eslevel: 2021)
+    _(Ruby2JS.convert(string, eslevel: eslevel, truthy: true).to_s)
+  end
+
+  def to_js_default(string, eslevel: 2021)
+    _(Ruby2JS.convert(string, eslevel: eslevel).to_s)
+  end
+
+  describe 'helper injection' do
+    it "should inject $T and $ror helpers for ||" do
+      to_js('a || b').must_include 'const $T=v=>v!==false&&v!=null'
+      to_js('a || b').must_include 'const $ror=(a,b)=>$T(a)?a:b()'
+    end
+
+    it "should inject $T and $rand helpers for &&" do
+      to_js('a && b').must_include 'const $T=v=>v!==false&&v!=null'
+      to_js('a && b').must_include 'const $rand=(a,b)=>$T(a)?b():a'
+    end
+
+    it "should not inject helpers when truthy option is disabled" do
+      to_js_default('a || b').wont_include '$T'
+      to_js_default('a || b').wont_include '$ror'
+      to_js_default('a || b').wont_include '$rand'
+    end
+  end
+
+  describe '|| operator' do
+    it "should convert || to $ror call" do
+      to_js('a || b').must_include '$ror(a, () => b)'
+    end
+
+    it "should handle chained || operators" do
+      to_js('a || b || c').must_include '$ror($ror(a, () => b), () => c)'
+    end
+
+    it "should handle method calls" do
+      to_js('foo.bar || baz').must_include '$ror(foo.bar, () => baz)'
+    end
+  end
+
+  describe '&& operator' do
+    it "should convert && to $rand call" do
+      to_js('a && b').must_include '$rand(a, () => b)'
+    end
+
+    it "should handle chained && operators" do
+      to_js('a && b && c').must_include '$rand($rand(a, () => b), () => c)'
+    end
+  end
+
+  describe 'mixed operators' do
+    it "should handle && and || together" do
+      to_js('a && b || c').must_include '$ror($rand(a, () => b), () => c)'
+    end
+
+    it "should include all helpers when both operators used" do
+      to_js('a && b || c').must_include '$T'
+      to_js('a && b || c').must_include '$ror'
+      to_js('a && b || c').must_include '$rand'
+    end
+  end
+
+  describe '||= operator' do
+    it "should convert ||= to assignment with $ror" do
+      to_js('a ||= b').must_include 'a = $ror(a, () => b)'
+    end
+
+    it "should inject $ror helper for ||=" do
+      to_js('a ||= b').must_include 'const $ror'
+    end
+  end
+
+  describe '&&= operator' do
+    it "should convert &&= to assignment with $rand" do
+      to_js('a &&= b').must_include 'a = $rand(a, () => b)'
+    end
+
+    it "should inject $rand helper for &&=" do
+      to_js('a &&= b').must_include 'const $rand'
+    end
+  end
+
+  describe 'no truthy option' do
+    it "should use standard || without truthy option" do
+      to_js_default('a || b').must_equal 'a || b'
+    end
+
+    it "should use standard && without truthy option" do
+      to_js_default('a && b').must_equal 'a && b'
+    end
+
+    it "should use ||= operator without truthy option" do
+      to_js_default('a ||= b').must_equal 'a ||= b'
+    end
+
+    it "should use &&= operator without truthy option" do
+      to_js_default('a &&= b').must_equal 'a &&= b'
+    end
+  end
+end

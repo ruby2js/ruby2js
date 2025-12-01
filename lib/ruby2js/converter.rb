@@ -73,6 +73,8 @@ module Ruby2JS
       @strict = false
       @comparison = :equality
       @or = :logical
+      @truthy = false
+      @need_truthy_helpers = Set.new
       @underscored_private = true
       @redoable = false
     end
@@ -82,13 +84,28 @@ module Ruby2JS
     end
 
     def convert
-      scope @ast 
+      scope @ast
 
       if @strict
         if @sep == '; '
           @lines.first.unshift "\"use strict\"#@sep"
         else
           @lines.unshift Line.new('"use strict";')
+        end
+      end
+
+      # Inject truthy helpers if needed
+      unless @need_truthy_helpers.empty?
+        helpers = []
+        helpers << 'const $T=v=>v!==false&&v!=null' if @need_truthy_helpers.include?(:T)
+        helpers << 'const $ror=(a,b)=>$T(a)?a:b()' if @need_truthy_helpers.include?(:ror)
+        helpers << 'const $rand=(a,b)=>$T(a)?b():a' if @need_truthy_helpers.include?(:rand)
+
+        helper_line = helpers.join('; ')
+        if @sep == '; '
+          @lines.first.unshift "#{helper_line}#@sep"
+        else
+          @lines.unshift Line.new(helper_line + ';')
         end
       end
     end
@@ -143,7 +160,7 @@ module Ruby2JS
       end
     end
 
-    attr_accessor :strict, :eslevel, :module_type, :comparison, :or, :underscored_private
+    attr_accessor :strict, :eslevel, :module_type, :comparison, :or, :truthy, :underscored_private
 
     def es2015
       @eslevel >= 2015
