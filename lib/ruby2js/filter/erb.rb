@@ -9,6 +9,7 @@ module Ruby2JS
       def initialize(*args)
         @erb_ivars = Set.new
         @erb_bufvar = nil
+        @erb_block_var = nil  # Track current block variable (e.g., 'f' in form_for)
         super
       end
 
@@ -78,14 +79,20 @@ module Ruby2JS
       end
 
       # Handle buffer concatenation: _erbout.<< "str" or _erbout.<<(expr)
+      # Also handle _buf.append= for block expressions from Ruby2JS::Erubi
       def on_send(node)
         target, method, *args = node.children
 
-        # Check if this is buffer concatenation
+        # Check if this is buffer concatenation via << or append=
         if @erb_bufvar && target&.type == :lvar &&
-           target.children.first == @erb_bufvar && method == :<<
+           target.children.first == @erb_bufvar &&
+           (method == :<< || method == :append=)
 
           arg = args.first
+
+          # Handle block attached to append= (e.g., form_for do |f| ... end)
+          # This is handled in on_block, so just return nil here to skip
+          return nil if arg.nil? && method == :append=
 
           # Handle .freeze calls - strip them
           if arg&.type == :send && arg.children[1] == :freeze
@@ -115,6 +122,44 @@ module Ruby2JS
           return process(target)
         end
 
+        # Strip .to_s calls on buffer (final return)
+        if method == :to_s && args.empty? && target&.type == :lvar &&
+           target.children.first == @erb_bufvar
+          return process(target)
+        end
+
+        super
+      end
+
+      # Handle block expressions like form_for, which produce:
+      # _buf.append= form_for @user do |f| ... end
+      def on_block(node)
+        return super unless @erb_bufvar
+
+        send_node = node.children[0]
+        block_args = node.children[1]
+        block_body = node.children[2]
+
+        # Check if this is _buf.append= with a block helper call
+        if send_node.type == :send
+          target, method, helper_call = send_node.children
+
+          if target&.type == :lvar && target.children.first == @erb_bufvar &&
+             method == :append= && helper_call&.type == :send
+
+            helper_name = helper_call.children[1]
+
+            # Handle form_for and similar block helpers
+            if helper_name == :form_for
+              return process_form_for(helper_call, block_args, block_body)
+            end
+
+            # Generic block helper - just process the body
+            # This handles link_to with blocks, content_tag, etc.
+            return process_block_helper(helper_name, helper_call, block_args, block_body)
+          end
+        end
+
         super
       end
 
@@ -129,6 +174,80 @@ module Ruby2JS
       end
 
       private
+
+      # Process form_for block into JavaScript
+      # Generates a form tag and processes the block body with a form builder
+      def process_form_for(helper_call, block_args, block_body)
+        # Extract the model from form_for @model
+        model_node = helper_call.children[2]
+        model_name = model_node.children.first.to_s.delete_prefix('@') if model_node&.type == :ivar
+
+        # Get the block parameter name (usually 'f')
+        block_param = block_args.children.first&.children&.first
+
+        # Track the block variable so we can handle f.text_field, etc.
+        old_block_var = @erb_block_var
+        @erb_block_var = block_param
+
+        # Build the form output
+        statements = []
+
+        # Add opening form tag
+        form_attrs = model_name ? " data-model=\"#{model_name}\"" : ""
+        statements << s(:op_asgn, s(:lvasgn, @erb_bufvar), :+,
+                       s(:str, "<form#{form_attrs}>"))
+
+        # Process block body
+        if block_body
+          if block_body.type == :begin
+            block_body.children.each do |child|
+              processed = process(child)
+              statements << processed if processed
+            end
+          else
+            processed = process(block_body)
+            statements << processed if processed
+          end
+        end
+
+        # Add closing form tag
+        statements << s(:op_asgn, s(:lvasgn, @erb_bufvar), :+,
+                       s(:str, "</form>"))
+
+        @erb_block_var = old_block_var
+
+        # Return a begin node with all statements
+        s(:begin, *statements.compact)
+      end
+
+      # Process generic block helpers
+      def process_block_helper(helper_name, helper_call, block_args, block_body)
+        # Get the block parameter if any
+        block_param = block_args.children.first&.children&.first
+
+        old_block_var = @erb_block_var
+        @erb_block_var = block_param
+
+        statements = []
+
+        # Process block body
+        if block_body
+          if block_body.type == :begin
+            block_body.children.each do |child|
+              processed = process(child)
+              statements << processed if processed
+            end
+          else
+            processed = process(block_body)
+            statements << processed if processed
+          end
+        end
+
+        @erb_block_var = old_block_var
+
+        return nil if statements.empty?
+        statements.length == 1 ? statements.first : s(:begin, *statements.compact)
+      end
 
       # Recursively collect all instance variables in the AST
       def collect_ivars(node)

@@ -135,18 +135,58 @@ The filter performs these transformations:
 | `_erbout.<<((@var).to_s)` | `_erbout += String(var)` |
 | `@title` | `title` (from destructured parameter) |
 
+## Using Ruby2JS::Erubi for Block Helpers
+
+Ruby's standard ERB generates invalid syntax when block-based helpers like `form_for` are used with `<%= %>` tags. Ruby2JS provides a custom Erubi engine that handles these cases correctly:
+
+```ruby
+require "ruby2js"
+require "ruby2js/erubi"
+require "ruby2js/filter/erb"
+require "ruby2js/filter/functions"
+
+template = '<%= form_for @user do |f| %><%= f.text_field :name %><% end %>'
+src = Ruby2JS::Erubi.new(template).src
+
+puts Ruby2JS.convert(src, filters: [:erb, :functions], eslevel: 2015)
+```
+
+```javascript
+// Output:
+function render({ user }) {
+  let _buf = "";
+  _buf += form_for(user, (f) => {
+    _buf += String(f.text_field("name"))
+  });
+  return _buf
+}
+```
+
+The `Ruby2JS::Erubi` engine:
+- Detects block expressions (ending with `do |...|` or `{`)
+- Generates parseable Ruby code that preserves block structure
+- Works with `form_for`, `link_to` with blocks, `content_tag`, and similar helpers
+
+{% rendercontent "docs/note", title: "Helper Functions Required" %}
+When using block helpers like `form_for`, you'll need to provide JavaScript implementations of those helpers. The transpiled code calls them as functions, e.g., `form_for(user, (f) => {...})`.
+{% endrendercontent %}
+
 ## Limitations
 
 {% rendercontent "docs/note", type: "warning", title: "Instance Variables Only" %}
-This filter can only handle templates that depend solely on instance variables (`@var`). Templates that call Rails methods or helper functions directly will not work correctly in JavaScript.
+This filter can only handle templates that depend solely on instance variables (`@var`). Templates that call Rails methods or helper functions directly will not work correctly in JavaScript without corresponding JavaScript implementations.
 {% endrendercontent %}
 
 Common scenarios that require attention:
 
-- **Helper methods** like `link_to`, `image_tag`, `form_for`, etc. won't be available in JavaScript. Either:
+- **Helper methods** like `link_to`, `image_tag`, etc. won't be available in JavaScript. Either:
   - Move the URL/path computation to the controller and pass it as an instance variable
   - Implement the helper function in JavaScript
   - Transpile the helper using Ruby2JS
+
+- **Block helpers** like `form_for` require:
+  - Using `Ruby2JS::Erubi` instead of standard ERB
+  - Providing JavaScript implementations of the helper functions
 
 - **Rails methods** called directly in templates (though rare) won't work. Move the logic to the controller and pass results as instance variables.
 

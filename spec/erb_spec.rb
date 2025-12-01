@@ -2,11 +2,17 @@ gem 'minitest'
 require 'minitest/autorun'
 require 'ruby2js/filter/erb'
 require 'ruby2js/filter/functions'
+require 'ruby2js/erubi'
 
 describe Ruby2JS::Filter::Erb do
 
   def to_js(string, eslevel: 2015)
     _(Ruby2JS.convert(string, filters: [Ruby2JS::Filter::Erb, Ruby2JS::Filter::Functions], eslevel: eslevel).to_s)
+  end
+
+  def erb_to_js(template, eslevel: 2015)
+    src = Ruby2JS::Erubi.new(template).src
+    _(Ruby2JS.convert(src, filters: [Ruby2JS::Filter::Erb, Ruby2JS::Filter::Functions], eslevel: eslevel).to_s)
   end
 
   describe 'ERB output' do
@@ -75,6 +81,29 @@ describe Ruby2JS::Filter::Erb do
       result = to_js(erb_src)
       result.must_include 'function render()'
       result.must_include 'return _erbout'
+    end
+  end
+
+  describe 'Ruby2JS::Erubi' do
+    it "should compile simple ERB templates" do
+      result = erb_to_js('<h1><%= @title %></h1>')
+      result.must_include 'function render({ title })'
+      result.must_include '_buf += "<h1>"'
+      result.must_include 'String(title)'
+    end
+
+    it "should handle block expressions like form_for" do
+      result = erb_to_js('<%= form_for @user do |f| %><%= f.text_field :name %><% end %>')
+      result.must_include 'function render({ user })'
+      # The form_for block should be converted to a function call
+      result.must_include 'form_for(user'
+      result.must_include 'f.text_field'
+    end
+
+    it "should handle mixed static and dynamic content" do
+      result = erb_to_js('<div class="container"><%= @content %></div>')
+      result.must_include 'container'
+      result.must_include 'String(content)'
     end
   end
 

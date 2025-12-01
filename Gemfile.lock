@@ -10,6 +10,7 @@ GEM
   specs:
     ast (2.4.3)
     base64 (0.3.0)
+    erubi (1.13.1)
     execjs (2.10.0)
     haml (7.0.2)
       temple (>= 0.8.2)
@@ -60,6 +61,7 @@ PLATFORMS
 
 DEPENDENCIES
   base64
+  erubi
   execjs
   haml
   minitest
