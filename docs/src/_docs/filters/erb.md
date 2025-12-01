@@ -134,6 +134,8 @@ The filter performs these transformations:
 | `_erbout.<< "str".freeze` | `_erbout += "str"` |
 | `_erbout.<<((@var).to_s)` | `_erbout += String(var)` |
 | `@title` | `title` (from destructured parameter) |
+| `raw(html)` | `html` (pass-through) |
+| `str.html_safe` | `str` (pass-through) |
 
 ## Using Ruby2JS::Erubi for Block Helpers
 

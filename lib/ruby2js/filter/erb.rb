@@ -154,6 +154,18 @@ module Ruby2JS
           return process_form_builder_method(method, args)
         end
 
+        # Handle html_safe - just return the receiver (no-op in JavaScript)
+        # "string".html_safe -> "string"
+        if method == :html_safe && args.empty? && target
+          return process(target)
+        end
+
+        # Handle raw() helper - returns the argument as-is (no-op in JavaScript)
+        # raw(html) -> html
+        if method == :raw && target.nil? && args.length == 1
+          return process(args.first)
+        end
+
         super
       end
 

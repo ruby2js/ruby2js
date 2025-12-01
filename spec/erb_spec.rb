@@ -84,6 +84,30 @@ describe Ruby2JS::Filter::Erb do
     end
   end
 
+  describe 'html_safe and raw' do
+    it "should strip html_safe calls" do
+      erb_src = '_erbout = +\'\'; _erbout.<<(( @content.html_safe ).to_s); _erbout'
+      result = to_js(erb_src)
+      result.must_include 'String(content)'
+      result.wont_include 'html_safe'
+      result.wont_include 'htmlSafe'
+    end
+
+    it "should strip raw() helper calls" do
+      erb_src = '_erbout = +\'\'; _erbout.<<(( raw(@html) ).to_s); _erbout'
+      result = to_js(erb_src)
+      result.must_include 'String(html)'
+      result.wont_include 'raw'
+    end
+
+    it "should handle raw with string literal" do
+      erb_src = '_erbout = +\'\'; _erbout.<<(( raw("<b>bold</b>") ).to_s); _erbout'
+      result = to_js(erb_src)
+      result.must_include '<b>bold</b>'
+      result.wont_include 'raw'
+    end
+  end
+
   describe 'Ruby2JS::Erubi' do
     it "should compile simple ERB templates" do
       result = erb_to_js('<h1><%= @title %></h1>')
