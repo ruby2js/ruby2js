@@ -42,11 +42,12 @@ ES2015 class support includes constructors, super, methods, class methods,
 instance methods, instance variables, class variables, getters, setters,
 attr_accessor, attr_reader, attr_writer, etc.
 
-Additionally, the `functions` filter will provide the following conversion:
+Additionally, the `functions` filter will provide the following conversions:
 
 {:.functions-list}
 * `Array(x)` {{ caret }} `Array.from(x)`
 * `.inject(n) {}` {{ caret }} `.reduce(() => {}, n)`
+* `a[0..2] = v` {{ caret }} `a.splice(0, 3, ...v)`
 
 Keyword arguments and optional keyword arguments will be mapped to
 parameter destructuring.
