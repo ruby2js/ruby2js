@@ -157,9 +157,31 @@ task :clean do
   rm_rf "#{docs}/src/demo"
 end
 
-# Selfhost demo - copy source files from demo/selfhost/
+task :clobber => :clean do
+  rm_f "#{root}/demo/selfhost/selfhost_converter.mjs"
+  rm_f "#{root}/demo/selfhost/transpiled_walker.mjs"
+end
+
+# Selfhost demo - generate and copy source files
 selfhost_dir = "#{dest}/selfhost"
 selfhost_source = "#{root}/demo/selfhost"
+
+directory dest
+directory selfhost_dir => dest
+
+# Generate selfhost_converter.mjs from Ruby source
+file "#{selfhost_source}/selfhost_converter.mjs" => source_files do
+  Dir.chdir(root) do
+    sh "bundle exec ruby lib/ruby2js/selfhost.rb --esm > demo/selfhost/selfhost_converter.mjs"
+  end
+end
+
+# Generate transpiled_walker.mjs from Ruby source
+file "#{selfhost_source}/transpiled_walker.mjs" => ["#{selfhost_source}/transpile_walker.rb", *source_files] do
+  Dir.chdir(selfhost_source) do
+    sh "ruby transpile_walker.rb > transpiled_walker.mjs"
+  end
+end
 
 # Map source files to destination names (browser_demo.html -> index.html)
 selfhost_file_map = {
@@ -167,9 +189,6 @@ selfhost_file_map = {
   'selfhost_converter.mjs' => 'selfhost_converter.mjs',
   'transpiled_walker.mjs' => 'transpiled_walker.mjs'
 }
-
-directory dest
-directory selfhost_dir => dest
 
 selfhost_file_map.each do |src, dst|
   file "#{selfhost_dir}/#{dst}" => [selfhost_dir, "#{selfhost_source}/#{src}"] do
