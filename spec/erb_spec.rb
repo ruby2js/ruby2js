@@ -95,15 +95,42 @@ describe Ruby2JS::Filter::Erb do
     it "should handle block expressions like form_for" do
       result = erb_to_js('<%= form_for @user do |f| %><%= f.text_field :name %><% end %>')
       result.must_include 'function render({ user })'
-      # The form_for block should be converted to a function call
-      result.must_include 'form_for(user'
-      result.must_include 'f.text_field'
+      # The form_for block should generate HTML form tags (escaped in JS string)
+      result.must_include 'data-model'
+      result.must_include '</form>'
+      # Form builder methods should generate HTML inputs
+      result.must_include 'type='
+      result.must_include 'user[name]'
     end
 
     it "should handle mixed static and dynamic content" do
       result = erb_to_js('<div class="container"><%= @content %></div>')
       result.must_include 'container'
       result.must_include 'String(content)'
+    end
+
+    it "should handle form builder label method" do
+      result = erb_to_js('<%= form_for @user do |f| %><%= f.label :email %><% end %>')
+      result.must_include 'user_email'
+      result.must_include '>Email</label>'
+    end
+
+    it "should handle various input types" do
+      result = erb_to_js('<%= form_for @user do |f| %><%= f.email_field :email %><%= f.password_field :password %><% end %>')
+      result.must_include 'type=\\"email\\"'
+      result.must_include 'type=\\"password\\"'
+    end
+
+    it "should handle textarea" do
+      result = erb_to_js('<%= form_for @post do |f| %><%= f.text_area :body %><% end %>')
+      result.must_include '<textarea'
+      result.must_include 'post[body]'
+    end
+
+    it "should handle submit with custom label" do
+      result = erb_to_js('<%= form_for @user do |f| %><%= f.submit "Create Account" %><% end %>')
+      result.must_include 'type=\\"submit\\"'
+      result.must_include 'Create Account'
     end
   end
 
