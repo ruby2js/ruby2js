@@ -4,3 +4,14 @@ demo/filters.opal
 .DS_Store
 testrails
 node_modules
+
+# Selfhost generated outputs (regenerated during build)
+demo/selfhost/selfhost_converter.mjs
+demo/selfhost/transpiled_walker.mjs
+
+# Editor swap files
+*.swp
+*.swo
+
+# Local config
+mise.toml

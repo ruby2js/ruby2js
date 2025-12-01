@@ -28,3 +28,10 @@ test
 # OS files
 .DS_Store
 Thumbs.db
+
+# Selfhost generated outputs (regenerated during Docker build)
+demo/selfhost/selfhost_converter.mjs
+demo/selfhost/transpiled_walker.mjs
+
+# Local config
+mise.toml

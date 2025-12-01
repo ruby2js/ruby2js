@@ -100,19 +100,33 @@ The actual Ruby2JS converter (~60 handlers) has been transpiled to JavaScript us
 - `visit` and `visit_parameters` added to SELF_METHODS for proper `this.` prefix
 - `module Ruby2JS` wrapper stripped when containing only class reopenings
 
-### Phase 5: Demo Integration (In Progress)
+### Phase 5: Demo Integration ✅ COMPLETE
 
-**Completed:**
 - Browser demo loads Prism WASM
 - Walker translates Prism AST
 - Converter produces JavaScript output
 - Vertical whitespace enabled (newlines, separators)
 
-**Remaining:**
-- Add implicit return handling
-- Preserve comments from source
-- Add indentation support
-- Test more Ruby constructs
+### Phase 6: Test-Driven Completion (In Progress)
+
+Now that proof-of-concept is complete, we're taking a systematic spec-by-spec approach:
+
+**Strategy:**
+1. Self-host each test spec (starting with `transliteration_spec`)
+2. Run it, accept initial failures
+3. Iterate: fix issues, reduce failure count
+4. Once spec passes, move to next spec
+5. Replace scaffolding with self-hosted code as we go
+
+**Spec Order (tentative, by dependency):**
+1. `transliteration_spec` - Core conversion without filters
+2. `es20xx_spec` files - ES version targeting
+3. Filter specs (functions, esm, camelCase, etc.)
+4. Integration specs
+
+**Current Status:**
+- [ ] `transliteration_spec` - Not started
+- [ ] Other specs - Not started
 
 ## Regenerating the Self-Hosted Converter
 
@@ -140,23 +154,23 @@ python3 -m http.server 8080
 
 ## Next Steps
 
-### Short-term
+### Immediate: Test-Driven Iteration
 
-1. **Implicit returns** - Wrap method body last expression in autoreturn
-2. **Comment preservation** - Extract comments from Prism and pass to converter
-3. **Indentation** - Use `_indent` value in output formatting
-4. **More testing** - Classes, modules, loops, exception handling
+1. **Self-host `transliteration_spec`** - Create JS test runner for this spec
+2. **Run and capture failures** - Establish baseline failure count
+3. **Fix one issue at a time** - Each fix should reduce failures
+4. **Track progress** - Document which tests pass/fail
 
-### Medium-term
+### After transliteration_spec passes
 
-1. **Transpile filters** - functions, esm, camelCase, return filters
-2. **Source maps** - Map generated JS back to Ruby source
-3. **Error handling** - User-friendly error messages
+1. **ES level specs** - `es2015_spec`, `es2020_spec`, etc.
+2. **Filter specs** - One filter at a time
 
 ### Long-term
 
 1. **Replace ruby2js.com demo** - Use self-hosted version instead of Opal
 2. **npm package** - Publish as `@ruby2js/browser` or similar
+3. **Source maps** - Map generated JS back to Ruby source
 
 ## Technical Notes
 
@@ -234,7 +248,8 @@ flow through to the browser version on rebuild.
 - [x] Bundle size < 3MB (achieved ~2.9MB vs 24MB)
 - [x] Basic Ruby converts to JavaScript in browser
 - [ ] Parse + convert "Hello World" in < 100ms
-- [ ] Pass 80%+ of existing test cases
+- [ ] Pass `transliteration_spec` (__ / __ tests)
+- [ ] Pass `es20xx_spec` files
 - [ ] Support `functions`, `esm`, `camelCase` filters
 - [ ] Works in Chrome, Firefox, Safari (latest)
 
