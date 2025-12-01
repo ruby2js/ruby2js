@@ -246,6 +246,13 @@ describe Ruby2JS::Filter::Functions do
       to_js( 'a.slice!(2)' ).must_equal 'a.splice(2, 1)'
     end
 
+    it "should handle slice! with variable range endpoints" do
+      to_js( 'a.slice!(x..-1)' ).must_equal 'a.splice(x)'
+      to_js( 'a.slice!(x..y)' ).must_equal 'a.splice(x, y - x + 1)'
+      to_js( 'a.slice!(x...y)' ).must_equal 'a.splice(x, y - x)'
+      to_js( 'a.slice!(mark.first + 1..-1)' ).must_equal 'a.splice(mark[0] + 1)'
+    end
+
     it "should handle range assignment" do
       to_js_2015( 'a[0..2] = v' ).must_equal 'a.splice(0, 2 - 0 + 1, ...v)'
       to_js_2015( 'a[0...2] = v' ).must_equal 'a.splice(0, 2 - 0, ...v)'

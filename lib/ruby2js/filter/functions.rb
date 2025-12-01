@@ -487,30 +487,30 @@ module Ruby2JS
             # output: a.splice(start)
             start, finish = arg.children
             if finish&.type == :int && finish.children.first == -1
-              process S(:send, target, :splice, start)
+              process S(:send, target, :splice, process(start))
             else
               # input: a.slice!(start..finish)
               # output: a.splice(start, finish - start + 1)
-              len = S(:send, S(:send, finish, :-, start), :+, s(:int, 1))
-              process S(:send, target, :splice, start, len)
+              len = S(:send, S(:send, process(finish), :-, process(start)), :+, s(:int, 1))
+              process S(:send, target, :splice, process(start), len)
             end
           elsif arg.type == :erange
             # input: a.slice!(start...finish)
             # output: a.splice(start, finish - start)
             start, finish = arg.children
             if finish
-              len = S(:send, finish, :-, start)
-              process S(:send, target, :splice, start, len)
+              len = S(:send, process(finish), :-, process(start))
+              process S(:send, target, :splice, process(start), len)
             else
-              process S(:send, target, :splice, start)
+              process S(:send, target, :splice, process(start))
             end
           else
             # input: a.slice!(index) or a.slice!(start, length)
             # output: a.splice(index, 1) or a.splice(start, length)
             if args.length == 1
-              process S(:send, target, :splice, arg, s(:int, 1))
+              process S(:send, target, :splice, process(arg), s(:int, 1))
             else
-              process S(:send, target, :splice, *args)
+              process S(:send, target, :splice, *process_all(args))
             end
           end
 

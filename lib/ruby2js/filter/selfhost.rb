@@ -350,6 +350,7 @@ module Ruby2JS
         include? key? has_key? member? start_with? end_with? match?
         between? zero? positive? negative? even? odd? integer? float?
         any? all? none? one? many?
+        slice! map! select! reverse! gsub! sub! compact!
       ].freeze
 
       # Rename methods ending in ? or ! to valid JS identifiers
@@ -372,6 +373,18 @@ module Ruby2JS
         else
           name
         end
+      end
+
+      # Check if a node (or any descendant) contains a break statement
+      # Used to decide if we need to convert forEach to a for loop
+      def contains_break?(node)
+        return false unless node.respond_to?(:type)
+        return true if node.type == :break
+
+        # Don't descend into nested blocks/lambdas - their breaks are local
+        return false if [:block, :lambda].include?(node.type)
+
+        node.children.any? { |child| contains_break?(child) }
       end
 
       # Also handle singleton methods (def self.foo)
@@ -819,6 +832,55 @@ module Ruby2JS
                   s(:nil))))),
             :[])
           return iife
+        end
+
+        # Handle array.each_with_index do |item, index| ... end with break
+        # JavaScript's forEach can't be broken, so convert to while loop when break is present
+        # array.each_with_index { |item, index| ...; break if cond } →
+        #   { let index = 0; while (index < array.length) { let item = array[index]; ...; index++ } }
+        if call.type == :send && call.children[1] == :each_with_index && contains_break?(body)
+          target = call.children[0]
+          item_var = block_args.children[0]&.children&.first
+          index_var = block_args.children[1]&.children&.first || :_idx
+
+          # Use while loop since Ruby2JS doesn't have C-style for loop AST node
+          # { let index = 0; while (index < array.length) { let item = array[index]; body; index++ } }
+          processed_target = process(target)
+          init = s(:lvasgn, index_var, s(:int, 0))
+          condition = s(:send, s(:lvar, index_var), :<, s(:send, processed_target, :length))
+          increment = s(:op_asgn, s(:lvasgn, index_var), :+, s(:int, 1))
+
+          if item_var
+            item_assign = s(:lvasgn, item_var, s(:send, processed_target, :[], s(:lvar, index_var)))
+            loop_body = s(:begin, item_assign, process(body), increment)
+          else
+            loop_body = s(:begin, process(body), increment)
+          end
+
+          while_loop = s(:while, condition, loop_body)
+          return s(:kwbegin, s(:begin, init, while_loop))
+        end
+
+        # Handle n.downto(m) do |i| ... end → { let i = n; while (i >= m) { ...; i-- } }
+        # The functions filter has issues with downto when combined with selfhost filter
+        # due to state issues with the block converter.
+        # Generate a while loop wrapped in a block scope for proper variable isolation.
+        if call.type == :send && call.children[1] == :downto
+          start = call.children[0]
+          finish = call.children[2]
+          block_var = block_args.children[0].children[0]
+
+          # Create: begin
+          #   let i = start
+          #   while (i >= finish) { body; i-- }
+          # end
+          # Use a block scope to isolate the loop variable
+          init = s(:lvasgn, block_var, process(start))
+          decrement = s(:op_asgn, s(:lvasgn, block_var), :-, s(:int, 1))
+          condition = s(:send, s(:lvar, block_var), :>=, process(finish))
+          loop_body = s(:begin, process(body), decrement)
+          while_loop = s(:while, condition, loop_body)
+          return s(:kwbegin, s(:begin, init, while_loop))
         end
 
         if call.type == :send && call.children[0].nil? && call.children[1] == :handle
