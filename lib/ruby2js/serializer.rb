@@ -6,7 +6,7 @@ module Ruby2JS
     def initialize(string, ast)
       @string = string.to_s
       @ast = ast
-      @loc = ast.location if ast
+      @loc = ast.location if ast && ast.respond_to?(:location)
     end
 
     def to_s

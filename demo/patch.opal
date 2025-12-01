@@ -272,7 +272,7 @@ end
 Opal.Ruby2JS.Token.$new = function(str, ast) {
   token = Opal.Ruby2JS.Token.$new0(str);
   token.ast = ast;
-  if (ast) token.loc = ast.$location();
+  if (ast && typeof ast.$location === 'function' && !ast.$location.$$stub) token.loc = ast.$location();
   return token;
 }`
 
