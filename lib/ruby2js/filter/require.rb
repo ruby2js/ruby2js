@@ -65,7 +65,9 @@ module Ruby2JS
               ast, comments = Ruby2JS.parse(File.read(filename), filename)
               # comments is already a hash with associated comments, merge it directly
               @comments.merge!(comments) { |key, old, new| old + new }
-              @comments[node] += @comments[ast] if @comments[ast]
+              if @comments[ast]
+                @comments[node] = (@comments[node] || []) + @comments[ast]
+              end
             end
 
             children = ast.type == :begin ? ast.children : [ast]
