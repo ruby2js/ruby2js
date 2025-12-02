@@ -10,6 +10,24 @@ module Ruby2JS
       # require explicit opt-in to to class => constructor mapping
       Filter.exclude :class, :call
 
+      # Methods that convert only when is_method? is true (parentheses present)
+      # OR when explicitly included via include: option.
+      REQUIRE_PARENS = %i[keys values entries index rindex clear reverse! max min]
+
+      # Check if a REQUIRE_PARENS method should convert:
+      # - Always convert if node.is_method? (has parentheses)
+      # - Also convert if explicitly included via include: option
+      def parens_or_included?(node, method)
+        return true if node.is_method?
+        # Check if method was explicitly included via include: option
+        explicitly_included?(method)
+      end
+
+      # Check if a method was explicitly included via the include: or include_all: option
+      def explicitly_included?(method)
+        @options[:include_all] || @options[:include]&.include?(method)
+      end
+
       VAR_TO_ASSIGN = {
         lvar: :lvasgn,
         ivar: :ivasgn,
@@ -51,7 +69,7 @@ module Ruby2JS
           if target.type == :array
             process S(:send, s(:const, nil, :Math), node.children[1],
               *target.children)
-          elsif node.is_method?
+          elsif parens_or_included?(node, method)
             process S(:send, s(:const, nil, :Math), node.children[1],
               s(:splat, target))
           else
@@ -63,7 +81,7 @@ module Ruby2JS
 
           S(:call, process(target), nil, *process_all(args))
 
-        elsif method == :keys and args.length == 0 and node.is_method?
+        elsif method == :keys and args.length == 0 and parens_or_included?(node, method)
           process S(:send, s(:const, nil, :Object), :keys, target)
 
         elsif method == :[]= and args.length == 3 and
@@ -339,7 +357,7 @@ module Ruby2JS
             end
           end
 
-        elsif method == :clear and args.length == 0 and node.is_method?
+        elsif method == :clear and args.length == 0 and parens_or_included?(node, method)
           process S(:send, target, :length=, s(:int, 0))
 
         elsif method == :replace and args.length == 1
@@ -514,7 +532,7 @@ module Ruby2JS
             end
           end
 
-        elsif method == :reverse! and node.is_method?
+        elsif method == :reverse! and parens_or_included?(node, method)
           # input: a.reverse!
           # output: a.splice(0, a.length, *a.reverse)
           process S(:send, target, :splice, s(:int, 0),
@@ -561,10 +579,10 @@ module Ruby2JS
           # prevent chained delete methods from being converted to undef
           S(:send, target.updated(:sendw), *node.children[1..-1])
 
-        elsif es2017 and method==:entries and args.length==0 and node.is_method?
+        elsif es2017 and method==:entries and args.length==0 and parens_or_included?(node, method)
           process node.updated(nil, [s(:const, nil, :Object), :entries, target])
 
-        elsif es2017 and method==:values and args.length==0 and node.is_method?
+        elsif es2017 and method==:values and args.length==0 and parens_or_included?(node, method)
           process node.updated(nil, [s(:const, nil, :Object), :values, target])
 
         elsif es2017 and method==:rjust
@@ -596,10 +614,10 @@ module Ruby2JS
               s(:regexp, s(:str, '\A\s+') , s(:regopt)), s(:str, '')])
           end
 
-        elsif method == :index and node.is_method?
+        elsif method == :index and parens_or_included?(node, method)
           process node.updated(nil, [target, :indexOf, *args])
 
-        elsif method == :rindex and node.is_method?
+        elsif method == :rindex and parens_or_included?(node, method)
           process node.updated(nil, [target, :lastIndexOf, *args])
 
         elsif method == :class and args.length==0 and not node.is_method?
