@@ -300,16 +300,19 @@ puts Ruby2JS.convert("a || b", or: :nullish, eslevel: 2020)
 
 Ruby and JavaScript have different definitions of truthiness. In Ruby, only `false` and `nil` are falsy - all other values (including `0`, `""`, and `NaN`) are truthy. In JavaScript, `false`, `null`, `undefined`, `0`, `""`, and `NaN` are all falsy.
 
-The `truthy` option makes the `||`, `&&`, `||=`, and `&&=` operators use Ruby-style truthiness semantics. When enabled, helper functions are injected to preserve Ruby behavior.
+The `truthy` option controls how the `||`, `&&`, `||=`, and `&&=` operators handle truthiness:
+
+- `truthy: :ruby` - Use Ruby-style truthiness (only `false` and `nil` are falsy)
+- `truthy: :js` - Use standard JavaScript truthiness (explicit, same as default)
 
 ```ruby
 # Configuration
 
-truthy
+truthy :ruby
 ```
 
 ```ruby
-puts Ruby2JS.convert("a || b", truthy: true)
+puts Ruby2JS.convert("a || b", truthy: :ruby)
 ```
 
 This outputs:
@@ -318,16 +321,16 @@ This outputs:
 const $T=v=>v!==false&&v!=null; const $ror=(a,b)=>$T(a)?a:b(); $ror(a, () => b)
 ```
 
-With this option enabled:
+With `truthy: :ruby` enabled:
 
-| Ruby Expression | Without `truthy` | With `truthy` |
-|-----------------|------------------|---------------|
+| Ruby Expression | `truthy: :js` (default) | `truthy: :ruby` |
+|-----------------|-------------------------|-----------------|
 | `0 \|\| 42` | `42` (JS: 0 is falsy) | `0` (Ruby: 0 is truthy) |
 | `"" \|\| "fallback"` | `"fallback"` (JS: "" is falsy) | `""` (Ruby: "" is truthy) |
 | `0 && 42` | `0` (JS: 0 is falsy) | `42` (Ruby: 0 is truthy) |
 
 {% rendercontent "docs/note", type: "warning", title: "Performance Consideration" %}
-The truthy option adds small helper functions and wraps expressions in function calls to preserve short-circuit evaluation. This has minimal performance impact but does increase code size slightly.
+The `truthy: :ruby` option adds small helper functions and wraps expressions in function calls to preserve short-circuit evaluation. This has minimal performance impact but does increase code size slightly.
 {% endrendercontent %}
 
 ## Scope
@@ -413,7 +416,7 @@ An example of all of the supported options:
   "require_recurse": true,
   "preset": true,
   "template_literal_tags": ["color"],
-  "truthy": true,
+  "truthy": "ruby",
   "underscored_private": true,
   "width": 40
 }

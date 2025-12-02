@@ -128,6 +128,8 @@ def parse_request(env=ENV)
 
   opts.on('--nullish', "use '??' for 'or' operators") {options[:or] = :nullish}
 
+  opts.on('--truthy MODE', "truthy semantics: 'ruby' or 'js'") {|mode| options[:truthy] = mode.to_sym}
+
   opts.on('--require_recursive', "import all symbols defined by processing the require recursively") {options[:require_recursive] = true}
 
   opts.on('--strict', "strict mode") {options[:strict] = true}

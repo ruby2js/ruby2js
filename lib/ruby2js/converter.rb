@@ -73,7 +73,7 @@ module Ruby2JS
       @strict = false
       @comparison = :equality
       @or = :logical
-      @truthy = false
+      @truthy = :js
       @need_truthy_helpers = Set.new
       @underscored_private = true
       @redoable = false

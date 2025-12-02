@@ -54,8 +54,8 @@ module Ruby2JS
       vtype = :ivar if asgn.type == :ivasgn
       vtype = :cvar if asgn.type == :cvasgn
 
-      # With truthy option, expand to full assignment using truthy helpers
-      if @truthy && vtype
+      # With truthy: :ruby option, expand to full assignment using truthy helpers
+      if @truthy == :ruby && vtype
         # a ||= b  =>  a = $ror(a, () => b)
         # a &&= b  =>  a = $rand(a, () => b)
         @need_truthy_helpers << :T
@@ -68,7 +68,7 @@ module Ruby2JS
         return
       end
 
-      if es2021 && !@truthy
+      if es2021 && @truthy != :ruby
         op = type == :and ? '&&' : (@or == :nullish ? '??' : '||')
         parse s(:op_asgn, asgn, op, value);
       elsif vtype

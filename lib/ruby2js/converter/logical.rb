@@ -42,8 +42,8 @@ module Ruby2JS
     handle :and, :or do |left, right|
       type = @ast.type
 
-      # Use Ruby-style truthiness when truthy option is enabled
-      if @truthy
+      # Use Ruby-style truthiness when truthy: :ruby option is enabled
+      if @truthy == :ruby
         @need_truthy_helpers << :T
         if type == :or
           @need_truthy_helpers << :ror
