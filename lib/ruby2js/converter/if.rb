@@ -72,21 +72,37 @@ module Ruby2JS
               @vars[then_block.children.first] ||= :pending
             end
 
-            put "if ("; parse condition; put ') '
+            put "if ("
+            saved_boolean_context, @boolean_context = @boolean_context, true
+            parse condition
+            @boolean_context = saved_boolean_context
+            put ') '
             wrap { jscope then_block }
           else
-            put "if ("; parse condition; puts ') {'
+            put "if ("
+            saved_boolean_context, @boolean_context = @boolean_context, true
+            parse condition
+            @boolean_context = saved_boolean_context
+            puts ') {'
             jscope then_block
             sput '}'
 
             while else_block and else_block.type == :if
               condition, then_block, else_block = else_block.children
               if then_block
-                put ' else if ('; parse condition; puts ') {'
+                put ' else if ('
+                saved_boolean_context, @boolean_context = @boolean_context, true
+                parse condition
+                @boolean_context = saved_boolean_context
+                puts ') {'
                 jscope then_block
                 sput '}'
               else
-                put ' else if ('; parse s(:not, condition); puts ') {'
+                put ' else if ('
+                saved_boolean_context, @boolean_context = @boolean_context, true
+                parse s(:not, condition)
+                @boolean_context = saved_boolean_context
+                puts ') {'
                 jscope else_block
                 sput '}'
                 else_block = nil
@@ -121,7 +137,10 @@ module Ruby2JS
           end
         end
 
-        parse condition; put ' ? '; parse then_block, @state
+        saved_boolean_context, @boolean_context = @boolean_context, true
+        parse condition
+        @boolean_context = saved_boolean_context
+        put ' ? '; parse then_block, @state
         put ' : '; parse else_block, @state
       end
     end

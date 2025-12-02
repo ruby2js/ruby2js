@@ -22,7 +22,11 @@ module Ruby2JS
           end
         end
 
-        put 'while ('; parse condition; puts ') {'; redoable block; sput '}'
+        put 'while ('
+        saved_boolean_context, @boolean_context = @boolean_context, true
+        parse condition
+        @boolean_context = saved_boolean_context
+        puts ') {'; redoable block; sput '}'
       ensure
         @next_token = next_token
       end

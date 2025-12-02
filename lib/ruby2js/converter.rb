@@ -74,6 +74,7 @@ module Ruby2JS
       @comparison = :equality
       @or = :logical
       @truthy = :js
+      @boolean_context = false
       @need_truthy_helpers = Set.new
       @underscored_private = true
       @redoable = false
