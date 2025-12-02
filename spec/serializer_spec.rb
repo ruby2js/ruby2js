@@ -4,6 +4,11 @@ require 'ruby2js'
 
 class TestSerializer < Ruby2JS::Serializer
   attr_accessor :lines
+
+  # Helper to convert lines to arrays for comparison
+  def lines_as_arrays
+    @lines.map(&:to_a)
+  end
 end
 
 describe 'serializer tests' do
@@ -15,41 +20,41 @@ describe 'serializer tests' do
   describe 'put' do
     it 'should put a token' do
       @serializer.put 'hi'
-      _(@serializer.lines).must_equal [['hi']]
+      _(@serializer.lines_as_arrays).must_equal [['hi']]
     end
 
     it 'should put a token with a newline' do
       @serializer.put "hi\n"
-      _(@serializer.lines).must_equal [['hi'], []]
+      _(@serializer.lines_as_arrays).must_equal [['hi'], []]
     end
 
     it 'should handle multiple newlines' do
       @serializer.put "\nhi\n"
-      _(@serializer.lines).must_equal [[''], ['hi'], []]
+      _(@serializer.lines_as_arrays).must_equal [[''], ['hi'], []]
     end
   end
 
   describe 'puts' do
     it 'should puts a token' do
       @serializer.puts 'hi'
-      _(@serializer.lines).must_equal [['hi'], []]
+      _(@serializer.lines_as_arrays).must_equal [['hi'], []]
     end
 
     it 'should embedded multiple newlines' do
       @serializer.puts "\nhi"
-      _(@serializer.lines).must_equal [[''], ['hi'], []]
+      _(@serializer.lines_as_arrays).must_equal [[''], ['hi'], []]
     end
   end
 
   describe 'sput' do
     it 'should sput a token' do
       @serializer.sput 'hi'
-      _(@serializer.lines).must_equal [[], ['hi']]
+      _(@serializer.lines_as_arrays).must_equal [[], ['hi']]
     end
 
     it 'should embedded multiple newlines' do
       @serializer.sput "hi\n"
-      _(@serializer.lines).must_equal [[], ['hi'], []]
+      _(@serializer.lines_as_arrays).must_equal [[], ['hi'], []]
     end
   end
 
@@ -75,8 +80,8 @@ describe 'serializer tests' do
         @serializer.put 'd'
         @serializer.put 'e'
       end
-      
-      _(@serializer.lines).must_equal [['a']]
+
+      _(@serializer.lines_as_arrays).must_equal [['a']]
       _(text).must_equal "bc\nde"
     end
   end
@@ -87,7 +92,7 @@ describe 'serializer tests' do
       @serializer.wrap do
         @serializer.put 'statement'
       end
-      _(@serializer.lines).must_equal [['if (condition) ', 'statement']]
+      _(@serializer.lines_as_arrays).must_equal [['if (condition) ', 'statement']]
     end
 
     it "should wrap long lines" do
@@ -95,7 +100,7 @@ describe 'serializer tests' do
       @serializer.wrap do
         @serializer.put 'statement-statement-statement-statement-statement'
       end
-      _(@serializer.lines).must_equal [
+      _(@serializer.lines_as_arrays).must_equal [
         ["if (condition-condition-condition-condition-condition) ", "{"],
         ["statement-statement-statement-statement-statement"],
         ["}"]
@@ -110,7 +115,7 @@ describe 'serializer tests' do
         @serializer.put 'token'
         @serializer.sput ']'
       end
-      _(@serializer.lines).must_equal [["[", "token", "]"]]
+      _(@serializer.lines_as_arrays).must_equal [["[", "token", "]"]]
     end
 
     it "shouldn't compact long lines" do
@@ -120,7 +125,7 @@ describe 'serializer tests' do
         @serializer.put 'token'
         @serializer.sput ']'
       end
-      _(@serializer.lines).must_equal [["["], ["token, "]*29 + ["token"], ["]"]]
+      _(@serializer.lines_as_arrays).must_equal [["["], ["token, "]*29 + ["token"], ["]"]]
     end
 
     it "shouldn't compact comments" do
@@ -129,7 +134,7 @@ describe 'serializer tests' do
         @serializer.put '// comment'
         @serializer.sput ']'
       end
-      _(@serializer.lines).must_equal [["["], ["// comment"], ["]"]]
+      _(@serializer.lines_as_arrays).must_equal [["["], ["// comment"], ["]"]]
     end
   end
 

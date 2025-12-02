@@ -54,9 +54,12 @@ server {
     gzip on;
     gzip_types text/plain text/css application/json application/javascript text/xml application/xml text/javascript;
 
-    # Clean URLs - serve index.html from directories
+    # Strip trailing slashes (redirect /docs/ to /docs)
+    rewrite ^/(.*)/$ /$1 permanent;
+
+    # Clean URLs - serve index.html from directories, or .html files
     location / {
-        try_files $uri $uri/ $uri/index.html =404;
+        try_files $uri $uri/index.html $uri.html /index.html;
     }
 
     # Cache static assets

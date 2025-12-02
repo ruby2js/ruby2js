@@ -8,6 +8,10 @@ describe Ruby2JS::Filter::Functions do
     _(Ruby2JS.convert(string, filters: [Ruby2JS::Filter::Functions]).to_s)
   end
 
+  def to_js_2015(string)
+    _(Ruby2JS.convert(string, eslevel: 2015, filters: [Ruby2JS::Filter::Functions]).to_s)
+  end
+
   def to_js_2020(string)
     _(Ruby2JS.convert(string, eslevel: 2020, filters: [Ruby2JS::Filter::Functions]).to_s)
   end
@@ -233,6 +237,26 @@ describe Ruby2JS::Filter::Functions do
       unless (RUBY_VERSION.split('.').map(&:to_i) <=> [2, 6, 0]) == -1
         to_js( 'a[i...]' ).must_equal 'a.slice(i)'
       end
+    end
+
+    it "should handle slice! with ranges" do
+      to_js( 'a.slice!(1..-1)' ).must_equal 'a.splice(1)'
+      to_js( 'a.slice!(1..3)' ).must_equal 'a.splice(1, 3 - 1 + 1)'
+      to_js( 'a.slice!(1...3)' ).must_equal 'a.splice(1, 3 - 1)'
+      to_js( 'a.slice!(2)' ).must_equal 'a.splice(2, 1)'
+    end
+
+    it "should handle slice! with variable range endpoints" do
+      to_js( 'a.slice!(x..-1)' ).must_equal 'a.splice(x)'
+      to_js( 'a.slice!(x..y)' ).must_equal 'a.splice(x, y - x + 1)'
+      to_js( 'a.slice!(x...y)' ).must_equal 'a.splice(x, y - x)'
+      to_js( 'a.slice!(mark.first + 1..-1)' ).must_equal 'a.splice(mark[0] + 1)'
+    end
+
+    it "should handle range assignment" do
+      to_js_2015( 'a[0..2] = v' ).must_equal 'a.splice(0, 2 - 0 + 1, ...v)'
+      to_js_2015( 'a[0...2] = v' ).must_equal 'a.splice(0, 2 - 0, ...v)'
+      to_js_2015( 'a[1..-1] = v' ).must_equal 'a.splice(1, a.length - 1, ...v)'
     end
 
     it "should handle regular expression indexes" do
@@ -677,6 +701,11 @@ describe Ruby2JS::Filter::Functions do
     it "should handle define_method" do
       to_js_2020( 'Klass.define_method(:newname) {|x| return x * 5 }').must_equal 'Klass.prototype.newname = function(x) {return x * 5}'
       to_js_2020( 'Klass.define_method(newname) {|x| return x * 5 }').must_equal 'Klass.prototype[newname] = function(x) {return x * 5}'
+    end
+
+    it "should handle method(:name)" do
+      to_js( 'method(:foo)' ).must_equal 'this.foo.bind(this)'
+      to_js( 'method(name)' ).must_equal 'this[name].bind(this)'
     end
   end
 

@@ -163,6 +163,37 @@ module Ruby2JS
             super
           end
 
+        elsif method == :[]= and args.length == 2 and
+          %i[irange erange].include?(args[0].type)
+          # input: arr[start..finish] = value or arr[start...finish] = value
+          # output: arr.splice(start, length, ...value)
+          range = args[0]
+          value = args[1]
+          start, finish = range.children
+
+          if range.type == :erange
+            # exclusive range: start...finish
+            if finish
+              len = S(:send, finish, :-, start)
+            else
+              # no finish means to end of array
+              len = S(:send, s(:attr, target, :length), :-, start)
+            end
+          else
+            # inclusive range: start..finish
+            if finish&.type == :int && finish.children.first == -1
+              # start..-1 means from start to end
+              len = S(:send, s(:attr, target, :length), :-, start)
+            elsif finish
+              len = S(:send, S(:send, finish, :-, start), :+, s(:int, 1))
+            else
+              len = S(:send, s(:attr, target, :length), :-, start)
+            end
+          end
+
+          # Spread the value if it's an array-like
+          process S(:send, target, :splice, start, len, s(:splat, value))
+
         elsif method == :merge
           args.unshift target
 
@@ -467,6 +498,40 @@ module Ruby2JS
             super
           end
 
+        elsif method == :slice! and args.length == 1
+          arg = args.first
+          if arg.type == :irange
+            # input: a.slice!(start..-1)
+            # output: a.splice(start)
+            start, finish = arg.children
+            if finish&.type == :int && finish.children.first == -1
+              process S(:send, target, :splice, process(start))
+            else
+              # input: a.slice!(start..finish)
+              # output: a.splice(start, finish - start + 1)
+              len = S(:send, S(:send, process(finish), :-, process(start)), :+, s(:int, 1))
+              process S(:send, target, :splice, process(start), len)
+            end
+          elsif arg.type == :erange
+            # input: a.slice!(start...finish)
+            # output: a.splice(start, finish - start)
+            start, finish = arg.children
+            if finish
+              len = S(:send, process(finish), :-, process(start))
+              process S(:send, target, :splice, process(start), len)
+            else
+              process S(:send, target, :splice, process(start))
+            end
+          else
+            # input: a.slice!(index) or a.slice!(start, length)
+            # output: a.splice(index, 1) or a.splice(start, length)
+            if args.length == 1
+              process S(:send, target, :splice, process(arg), s(:int, 1))
+            else
+              process S(:send, target, :splice, *process_all(args))
+            end
+          end
+
         elsif method == :reverse! and parens_or_included?(node, method)
           # input: a.reverse!
           # output: a.splice(0, a.length, *a.reverse)
@@ -641,6 +706,17 @@ module Ruby2JS
             S(:send, s(:const, nil, :Array), :from, target)
           else
             super
+          end
+
+        elsif method == :method and target == nil and args.length == 1
+          # method(:name) => this.name.bind(this) or this[name].bind(this)
+          name_arg = args.first
+          if name_arg.type == :sym
+            # method(:foo) => this.foo.bind(this)
+            process S(:send, s(:attr, s(:self), name_arg.children.first), :bind, s(:self))
+          else
+            # method(name) => this[name].bind(this)
+            process S(:send, s(:send, s(:self), :[], name_arg), :bind, s(:self))
           end
 
         else

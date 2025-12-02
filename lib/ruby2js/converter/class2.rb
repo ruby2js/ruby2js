@@ -11,8 +11,14 @@ module Ruby2JS
     handle :class2 do |name, inheritance, *body|
       body.compact!
       while body.length == 1 and body.first.type == :begin
-        body = body.first.children 
+        body = body.first.children
       end
+
+      # Flatten any nested :begin nodes in the body
+      # (e.g., from multi-type handle blocks in selfhost filter)
+      body = body.flat_map do |m|
+        m&.type == :begin ? m.children : m
+      end.compact
 
       proxied = body.find do |node| 
         node.type == :def and node.children.first == :method_missing
@@ -179,6 +185,9 @@ module Ruby2JS
             elsif @prop.to_s.end_with? '!'
               @prop = @prop.to_s.sub('!', '')
               m = m.updated(m.type, [@prop, *m.children[1..2]])
+            elsif @prop.to_s.end_with? '?'
+              @prop = @prop.to_s.sub('?', '')
+              m = m.updated(m.type, [@prop, *m.children[1..2]])
             end
 
             begin
@@ -203,6 +212,10 @@ module Ruby2JS
             elsif @prop.to_s.end_with? '!'
               m = m.updated(m.type, [m.children[0],
                 m.children[1].to_s.sub('!', ''), *m.children[2..3]])
+              @prop = "static #{m.children[1]}"
+            elsif @prop.to_s.end_with? '?'
+              m = m.updated(m.type, [m.children[0],
+                m.children[1].to_s.sub('?', ''), *m.children[2..3]])
               @prop = "static #{m.children[1]}"
             end
 

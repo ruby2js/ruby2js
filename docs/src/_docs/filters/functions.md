@@ -87,6 +87,8 @@ If you set the `eslevel` option to `2015` or newer, the Functions filter enables
 * `[-n]` {{ caret }} `[*.length-n]` for literal values of `n`
 * `[n...m]` {{ caret }} `.slice(n,m)`
 * `[n..m]` {{ caret }} `.slice(n,m+1)`
+* `[n..m] = v` {{ caret }} `.splice(n, m-n+1, ...v)` (ES2015+ for spread syntax)
+* `.slice!(n..m)` {{ caret }} `.splice(n, m-n+1)`
 * `[/r/, n]` {{ caret }} `.match(/r/)[n]`
 * `[/r/, n]=` {{ caret }} `.replace(/r/, ...)`
 * `(1..2).each {|i| ...}` {{ caret }} `for (var i=1 i<=2; i+=1)`

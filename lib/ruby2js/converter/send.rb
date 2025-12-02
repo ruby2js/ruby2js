@@ -363,8 +363,9 @@ module Ruby2JS
           end
         end
 
-        # :send!, :call, and :await force method call output (with parens)
-        if not ast.is_method? and ![:send!, :call, :await].include?(ast.type)
+        # :send! and :call force method call output (with parens)
+        # :await preserves is_method? from the underlying node via updated()
+        if not ast.is_method? and ![:send!, :call].include?(ast.type)
           if receiver
             (group_receiver ? group(receiver) : parse(receiver))
             put ".#{ method }"

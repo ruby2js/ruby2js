@@ -14,4 +14,5 @@ end
 group :test do
   gem 'haml'
   gem 'wunderbar'
+  gem 'erubi'
 end

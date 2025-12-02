@@ -28,7 +28,7 @@ module Ruby2JS
 
       def on_def(node)
         node = super
-        return node unless node.type == :def or node.type == :deff
+        return node unless node.type == :def or node.type == :deff or node.type == :defm
         return node if [:constructor, :initialize].include?(node.children.first)
 
         children = node.children[1..-1]
@@ -40,6 +40,10 @@ module Ruby2JS
       end
 
       def on_deff(node)
+        on_def(node)
+      end
+
+      def on_defm(node)
         on_def(node)
       end
 

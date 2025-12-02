@@ -1,5 +1,6 @@
 gem 'minitest'
 require 'minitest/autorun'
+require 'ruby2js'
 
 describe "ES2015 support" do
 
@@ -105,6 +106,23 @@ describe "ES2015 support" do
 
     it "should handle parallel assignment" do
       to_js( 'a,b=b,a' ).must_equal('let [a, b] = [b, a]')
+    end
+
+    it "should not treat new local vars in parallel assignment as setters" do
+      # When a class has a setter method (scope=), a new local var named 'scope'
+      # in parallel assignment should still be a local var, not call the setter
+      code = <<~RUBY
+        class Foo
+          attr_accessor :scope
+          def bar
+            scope, @scope = @scope, value
+          end
+        end
+      RUBY
+      result = to_js(code)
+      # 'scope' should be declared as local var, not call the setter
+      result.must_include 'let scope ='
+      result.wont_include 'this.scope ='
     end
 
     it "should handle spread operators" do
@@ -325,6 +343,16 @@ describe "ES2015 support" do
     it "should parse class with constructor and two methods" do
       to_js('class Person; def initialize(name); @name = name; end; def name; @name; end; def reset!; @name = nil; end; end').
         must_equal 'class Person {constructor(name) {this._name = name}; get name() {return this._name}; reset() {this._name = null}}'
+    end
+
+    it "should strip ? from predicate method names" do
+      to_js('class Person; def valid?; @name != nil; end; end').
+        must_equal 'class Person {valid() {this._name != null}}'
+    end
+
+    it "should strip ? from static predicate method names" do
+      to_js('class Person; def self.valid?; true; end; end').
+        must_equal 'class Person {static valid() {true}}'
     end
 
     it "should parse class with constructor and methods with multiple arguments" do

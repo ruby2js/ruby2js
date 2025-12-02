@@ -1,42 +1,155 @@
 module Ruby2JS
-  class Token < String
-    attr_accessor :loc
-    attr_accessor :ast
+  # Token wraps a string with AST location info for sourcemaps
+  class Token
+    attr_accessor :loc, :ast
 
     def initialize(string, ast)
-      super(string.to_s)
+      @string = string.to_s
       @ast = ast
-      @loc = ast.location if ast
-    end
-  end
-
-  class Line < Array
-    attr_accessor :indent
-
-    def initialize(*args)
-      super(args)
-      @indent = 0
+      @loc = ast.location if ast && ast.respond_to?(:location)
     end
 
-    def comment?
-      first = find {|token| !token.empty?}
-      first and first.start_with? '//'
+    def to_s
+      @string
+    end
+
+    def to_str
+      @string
+    end
+
+    def length
+      @string.length
     end
 
     def empty?
-      all? {|line| line.empty?}
+      @string.empty?
+    end
+
+    def start_with?(*args)
+      @string.start_with?(*args)
+    end
+
+    def end_with?(*args)
+      @string.end_with?(*args)
+    end
+
+    def [](index)
+      @string[index]
+    end
+  end
+
+  # Line holds tokens for a single output line
+  class Line
+    attr_accessor :indent
+
+    def initialize(*tokens)
+      @tokens = tokens
+      @indent = 0
+    end
+
+    def <<(token)
+      @tokens << token
+      self
+    end
+
+    def push(*tokens)
+      @tokens.push(*tokens)
+      self
+    end
+
+    def pop
+      @tokens.pop
+    end
+
+    def first
+      @tokens.first
+    end
+
+    def last
+      @tokens.last
+    end
+
+    def length
+      @tokens.length
+    end
+
+    def [](index)
+      @tokens[index]
+    end
+
+    def []=(index, value)
+      @tokens[index] = value
+    end
+
+    def find(&block)
+      @tokens.find(&block)
+    end
+
+    def rindex(&block)
+      @tokens.rindex(&block)
+    end
+
+    def each(&block)
+      @tokens.each(&block)
+    end
+
+    def each_with_index(&block)
+      @tokens.each_with_index(&block)
+    end
+
+    def map(&block)
+      @tokens.map(&block)
+    end
+
+    def include?(item)
+      @tokens.any? { |t| t.to_s == item.to_s }
+    end
+
+    def insert(index, *items)
+      @tokens.insert(index, *items)
+    end
+
+    def slice!(range)
+      @tokens.slice!(range)
+    end
+
+    def unshift(*items)
+      @tokens.unshift(*items)
+      self
+    end
+
+    def to_a
+      @tokens.map(&:to_s)
+    end
+
+    def join(sep = '')
+      @tokens.map(&:to_s).join(sep)
+    end
+
+    def comment?
+      first_token = find { |token| !token.empty? }
+      first_token && first_token.start_with?('//')
+    end
+
+    def empty?
+      @tokens.all? { |token| token.empty? }
     end
 
     def to_s
       if empty?
         ''
-      elsif ['case ', 'default:'].include? self[0]
-        ' ' * ([0,indent-2].max) + join
+      elsif ['case ', 'default:'].include?(@tokens[0].to_s)
+        ' ' * ([0, indent - 2].max) + join
       elsif indent > 0
         ' ' * indent + join
       else
         join
       end
+    end
+
+    # For array-like concatenation: work += line
+    def to_ary
+      @tokens
     end
   end
 
@@ -68,7 +181,7 @@ module Ruby2JS
 
     def uptodate?
       return false if @timestamps.empty?
-      return @timestamps.all? {|file, mtime| File.mtime(file) == mtime}
+      return @timestamps.all? { |file, mtime| File.mtime(file) == mtime }
     end
 
     def mtime
@@ -87,23 +200,22 @@ module Ruby2JS
     def reindent(lines)
       indent = 0
       lines.each do |line|
-        first = line.find {|token| !token.empty?}
+        first = line.find { |token| !token.empty? }
         if first
-          last = line[line.rindex {|token| !token.empty?}]
-          if (first.start_with? '<' and line.include? '>') or
-             (last.end_with? '>' and line.include? '<')
-          then
+          last = line[line.rindex { |token| !token.empty? }]
+          if (first.start_with?('<') && line.include?('>')) ||
+             (last.end_with?('>') && line.include?('<'))
             node = line.join[/.*?(<.*)/, 1]
-            indent -= @indent if node.start_with? '</'
+            indent -= @indent if node.start_with?('</')
 
             line.indent = indent
 
             node = line.join[/.*(<.*)/, 1]
-            indent += @indent unless node.include? '</' or node.include? '/>'
+            indent += @indent unless node.include?('</') || node.include?('/>')
           else
-            indent -= @indent if ')}]'.include? first[0] and indent >= @indent
+            indent -= @indent if ')}]'.include?(first[0]) && indent >= @indent
             line.indent = indent
-            indent += @indent if '({['.include? last[-1]
+            indent += @indent if '({['.include?(last[-1])
           end
         else
           line.indent = indent
@@ -116,44 +228,36 @@ module Ruby2JS
       return if @indent == 0
       reindent @lines
 
-      (@lines.length-3).downto(0) do |i|
-        if \
-          @lines[i].length == 0
-        then
-          @lines.delete i
-        elsif \
-          @lines[i+1].comment? and not @lines[i].comment? and
-          @lines[i].indent == @lines[i+1].indent
-        then
+      (@lines.length - 3).downto(0) do |i|
+        if @lines[i].length == 0
+          @lines.delete(i)
+        elsif @lines[i + 1].comment? && !@lines[i].comment? &&
+              @lines[i].indent == @lines[i + 1].indent
           # before a comment
-          @lines.insert i+1, Line.new
-        elsif \
-          @lines[i].indent == @lines[i+1].indent and 
-          @lines[i+1].indent < @lines[i+2].indent and
-          not @lines[i].comment?
-        then
+          @lines.insert(i + 1, Line.new)
+        elsif @lines[i].indent == @lines[i + 1].indent &&
+              @lines[i + 1].indent < @lines[i + 2]&.indent.to_i &&
+              !@lines[i].comment?
           # start of indented block
-          @lines.insert i+1, Line.new
-        elsif \
-          @lines[i].indent > @lines[i+1].indent and 
-          @lines[i+1].indent == @lines[i+2].indent and
-          not @lines[i+2].empty?
-        then
+          @lines.insert(i + 1, Line.new)
+        elsif @lines[i].indent > @lines[i + 1].indent &&
+              @lines[i + 1].indent == @lines[i + 2]&.indent.to_i &&
+              !@lines[i + 2]&.empty?
           # end of indented block
-          @lines.insert i+2, Line.new
+          @lines.insert(i + 2, Line.new)
         end
       end
     end
 
     # add a single token to the current line
     def put(string)
-      unless String === string and string.include? "\n"
+      unless String === string && string.include?("\n")
         @line << Token.new(string, @ast)
       else
         parts = string.split("\n")
         first = parts.shift
         @line << Token.new(first, @ast) if first
-        @lines += parts.map {|part| Line.new(Token.new(part, @ast))}
+        parts.each { |part| @lines << Line.new(Token.new(part, @ast)) }
         @lines << Line.new if string.end_with?("\n")
         @line = @lines.last
       end
@@ -166,7 +270,7 @@ module Ruby2JS
 
     # add a single token to the current line and then advance to next line
     def puts(string)
-      unless String === string and string.include? "\n"
+      unless String === string && string.include?("\n")
         @line << Token.new(string, @ast)
       else
         put string
@@ -178,7 +282,7 @@ module Ruby2JS
 
     # advance to next line and then add a single token to the current line
     def sput(string)
-      unless String === string and string.include? "\n"
+      unless String === string && string.include?("\n")
         @line = Line.new(Token.new(string, @ast))
         @lines << @line
       else
@@ -190,7 +294,7 @@ module Ruby2JS
 
     # current location: [line number, token number]
     def output_location
-      [@lines.length-1, @line.length]
+      [@lines.length - 1, @line.length]
     end
 
     # insert a line into the output
@@ -206,16 +310,16 @@ module Ruby2JS
     def capture(&block)
       mark = output_location
       block.call
-      lines = @lines.slice!(mark.first+1..-1)
+      lines = @lines.slice!(mark.first + 1..-1) || []
       @line = @lines.last
 
       if lines.empty?
-        lines = [@line.slice!(mark.last..-1)]
+        lines = [@line.slice!(mark.last..-1) || []]
       elsif @line.length != mark.last
-        lines.unshift @line.slice!(mark.last..-1)
+        lines.unshift(@line.slice!(mark.last..-1) || [])
       end
 
-      lines.map(&:join).join(@ws)
+      lines.map { |l| l.respond_to?(:join) ? l.join : l.map(&:to_s).join }.join(@ws)
     end
 
     # wrap long statements in curly braces
@@ -224,14 +328,14 @@ module Ruby2JS
       mark = output_location
       yield
 
-      if \
-        @lines.length > mark.first+1 or
-        @lines[mark.first-1].join.length + @line.join.length >= @width
-      then
+      if @lines.length > mark.first + 1 ||
+         @lines[mark.first - 1].join.length + @line.join.length >= @width
         sput close
       else
-        @line = @lines[mark.first-1]
-        @line[-1..-1] = @lines.pop
+        @line = @lines[mark.first - 1]
+        @line.pop  # remove the open brace
+        popped = @lines.pop
+        @line.push(*popped.to_ary)
       end
     end
 
@@ -246,19 +350,23 @@ module Ruby2JS
       # split of the last argument or value
       work = []
       len = 0
-      trail = split = nil
+      trail = nil
+      split = nil
       slice = @lines[mark.first..-1]
       reindent(slice)
       slice.each_with_index do |line, index|
-        line << "" if line.empty?
-        if line.first.start_with? '//'
+        line << Token.new('', nil) if line.empty?
+        if line.first.start_with?('//')
           len += @width # comments are a deal breaker
         else
-          (work.push ' '; len += 1) if trail == line.indent and @indent > 0
-          len += line.map(&:length).inject(&:+)
-          work += line
+          if trail == line.indent && @indent > 0
+            work.push(Token.new(' ', nil))
+            len += 1
+          end
+          len += line.map(&:length).inject(0, &:+)
+          work.push(*line.to_ary)
 
-          if trail == @indent and line.indent == @indent
+          if trail == @indent && line.indent == @indent
             split = [len, work.length, index]
             break if len >= @width - 10
           end
@@ -268,15 +376,17 @@ module Ruby2JS
 
       if len < @width - 10
         # full collapse
-        @lines[mark.first..-1] = [Line.new(*work)]
+        @lines.slice!(mark.first..-1)
+        @lines << Line.new(*work)
         @line = @lines.last
-      elsif split and split[0] < @width-10
-        if slice[split[2]].indent < slice[split[2]+1].indent
+      elsif split && split[0] < @width - 10
+        if slice[split[2]].indent < slice[split[2] + 1]&.indent.to_i
           # collapse all but the last argument (typically a hash or function)
           close = slice.pop
-          slice[-1].push(*close)
-          @lines[mark.first] = Line.new(*work[0..split[1]-1])
-          @lines[mark.first+1..-1] = slice[split[2]+1..-1]
+          slice[-1].push(*close.to_ary)
+          @lines[mark.first] = Line.new(*work[0..split[1] - 1])
+          @lines.slice!(mark.first + 1..-1)
+          slice[split[2] + 1..-1]&.each { |line| @lines << line }
           @line = @lines.last
         end
       end
@@ -284,17 +394,13 @@ module Ruby2JS
 
     # return the output as a string
     def to_s
-      return @str if (@str ||= nil)
+      return @str if @str
       respace
-      @lines.map(&:to_s).join(@nl)
+      @str = @lines.map(&:to_s).join(@nl)
     end
 
     def to_str
       @str ||= to_s
-    end
-
-    def +(value)
-      to_s+value
     end
 
     BASE64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
@@ -307,17 +413,17 @@ module Ruby2JS
         @mark = [0, 0, 0, 0, 0, 0]
       else
         if @mark[0] == mark[0]
-          return if @mark[4] == mark[4] and @mark[3] == mark[3]
+          return if @mark[4] == mark[4] && @mark[3] == mark[3]
           @mappings += ',' unless @mappings == ''
         end
 
-        diffs = mark.zip(@mark).map {|a,b| a-b}
+        diffs = mark.zip(@mark).map { |a, b| a - b }
       end
 
       while @mark[0] < mark[0]
         @mappings += ';'
         @mark[0] += 1
-        diffs[1] = mark[1] 
+        diffs[1] = mark[1]
       end
 
       @mark[0...mark.length] = mark
@@ -363,22 +469,20 @@ module Ruby2JS
 
             buffer = token.loc.expression.source_buffer
             source_index = sources.index(buffer)
-            if not source_index
+            unless source_index
               source_index = sources.length
               timestamp buffer.name
               sources << buffer
             end
 
-            line = buffer.line_for_position(pos) - 1
+            line_num = buffer.line_for_position(pos) - 1
             column = buffer.column_for_position(pos)
 
             name = nil
-            if %i{lvasgn lvar}.include? token.ast.type
+            if %i[lvasgn lvar].include?(token.ast.type)
               name = token.ast.children.first
-            elsif %i{casgn const}.include? token.ast.type 
-              if token.ast.children.first == nil
-                name = token.ast.children[1]
-              end
+            elsif %i[casgn const].include?(token.ast.type)
+              name = token.ast.children[1] if token.ast.children.first.nil?
             end
 
             if name
@@ -389,9 +493,9 @@ module Ruby2JS
                 names << name
               end
 
-              vlq row, col, source_index, line, column, index
+              vlq row, col, source_index, line_num, column, index
             else
-              vlq row, col, source_index, line, column
+              vlq row, col, source_index, line_num, column
             end
           end
           col += token.length

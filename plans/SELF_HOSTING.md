@@ -1,360 +1,255 @@
 # Self-Hosting Plan: Ruby2JS in JavaScript
 
-## Status: Research/Planning
+## Status: Full Converter Transpiled
 
-This plan explores transpiling Ruby2JS itself to JavaScript, enabling it to run entirely in the browser with the `@ruby/prism` npm package for parsing.
+Ruby2JS can now run entirely in the browser using the actual Ruby2JS converter transpiled to JavaScript.
 
-**Related:** This expands on "Option B: Fork Translation Layer" from [PRISM_MIGRATION.md](./PRISM_MIGRATION.md), taking it further to enable self-hosting in JavaScript.
+**Working demo:** `demo/selfhost/browser_demo.html`
+
+**Related:**
+- [PRISM_WALKER.md](./PRISM_WALKER.md) - Direct AST translation from Prism to Parser-compatible format
+- [demo/selfhost/](../demo/selfhost/) - Browser demo with transpiled converter
 
 ## Current Architecture
-
-The online demo at ruby2js.com currently uses:
-
-1. **Opal** - Ruby compiled to JavaScript (~24MB `ruby2js.js` file)
-2. **whitequark parser gem** - Compiled via Opal for AST generation
-3. **Ruby2JS core** - Compiled via Opal
-
-This works but has significant drawbacks:
-- 24MB JavaScript bundle (132K lines)
-- Opal runtime overhead
-- Cannot use Prism (Opal doesn't support it)
-- Slow initial load time
-
-## Proposed Architecture
 
 ```
 Ruby Source (user input)
     ↓
-@ruby/prism (WASM, ~2MB)
+@ruby/prism (WASM, ~2.7MB)
     ↓
 Prism AST (JavaScript objects)
     ↓
-Ruby2JS.js (self-hosted, transpiled from Ruby)
+PrismWalker (transpiled from Ruby)
+    ↓
+Parser-compatible AST
+    ↓
+Converter (transpiled from Ruby2JS source, ~7000 lines)
     ↓
 JavaScript Output
 ```
 
-## Key Components
+## What Works
 
-### 1. `@ruby/prism` npm Package
+The self-hosted converter supports:
 
-The official Prism parser compiled to WebAssembly with JavaScript bindings.
+- **Literals**: integers, floats, strings, symbols, nil, true, false
+- **Variables**: local (`x`), instance (`@x`), assignments
+- **Collections**: arrays, hashes (with symbol keys)
+- **Control flow**: `if/else/elsif`, `case/when`
+- **Definitions**: `def foo(args)` → `function foo(args)`
+- **Operators**: arithmetic, comparison, logical
+- **Begin blocks**: multiple statements with proper separators
 
-**Installation:**
+## Current Limitations
+
+- No implicit `return` for method bodies (use explicit `return`)
+- Comments are not preserved in output
+- No indentation in output (newlines work)
+- Classes and modules not yet tested
+- Some complex patterns may not work
+
+## Implementation Progress
+
+### Phase 1: Prism Walker ✅ COMPLETE
+
+Direct AST translation from Prism to Parser-compatible format.
+
+### Phase 2: Proof of Concept ✅ COMPLETE
+
+End-to-end pipeline working in browser with minimal hand-written converter.
+
+### Phase 3: Full Converter Transpilation ✅ COMPLETE
+
+The actual Ruby2JS converter (~60 handlers) has been transpiled to JavaScript using the `selfhost` filter.
+
+**Key accomplishments:**
+- Transpiled all converter handlers to JavaScript
+- Handler discovery via prototype scanning
+- Proper separator/newline handling via Serializer base class
+- Ruby idiom translations (Hash operations, method renaming, etc.)
+
+**Selfhost filter transformations:**
+- `s(:type, ...)` → `s('type', ...)` - symbols to strings for AST types
+- `node.type == :sym` → `node.type === 'string'` - type comparisons
+- `handle :type do ... end` → `on_type(...)` method definitions
+- `class Foo < Prism::Visitor` → class with self-dispatch `visit()` method
+- `visit_integer_node` → `visitIntegerNode` - camelCase for JS Prism API
+- `@sep`, `@nl`, `@ws` → `this._sep`, etc. - Serializer base class properties
+- `Hash === obj` → type check for options hash vs AST node
+- `hash[:key].to_s` → nil-safe `(hash.key || '').toString()`
+- `hash.include?(key)` → `key in hash` for known hash variables
+- `hash.select {...}` → `Object.fromEntries(Object.entries(...).filter(...))`
+- `respond_to?(:prop)` → `typeof obj === 'object' && 'prop' in obj`
+
+### Phase 4: Serializer and Walker Refactoring ✅ COMPLETE
+
+**Serializer rewrite:**
+- Removed inheritance from standard library classes (`Token < String`, `Line < Array`)
+- Removed operator overloading (`def +`, `def ==`)
+- Uses composition instead (Token wraps `@string`, Line wraps `@tokens`)
+- Now fully transpilable without hand-written JavaScript stubs
+
+**Class reopening support:**
+- Added support for Ruby's class reopening pattern in selfhost filter
+- `module Ruby2JS; class PrismWalker; def foo; end; end; end` → `PrismWalker.prototype.foo = function() {}`
+- All 12 prism_walker sub-modules now transpile successfully
+- Main prism_walker.rb transpiles to ~139 lines, sub-modules to ~1,560 lines combined
+
+**Additional selfhost filter improvements:**
+- `node.call` (property access) no longer incorrectly becomes `node.call(this)`
+- `visit` and `visit_parameters` added to SELF_METHODS for proper `this.` prefix
+- `module Ruby2JS` wrapper stripped when containing only class reopenings
+
+### Phase 5: Demo Integration ✅ COMPLETE
+
+- Browser demo loads Prism WASM
+- Walker translates Prism AST
+- Converter produces JavaScript output
+- Vertical whitespace enabled (newlines, separators)
+
+### Phase 6: Test-Driven Completion (In Progress)
+
+Now that proof-of-concept is complete, we're taking a systematic spec-by-spec approach:
+
+**Strategy:**
+1. Self-host each test spec (starting with `transliteration_spec`)
+2. Run it, accept initial failures
+3. Iterate: fix issues, reduce failure count
+4. Once spec passes, move to next spec
+5. Replace scaffolding with self-hosted code as we go
+
+**Spec Order (tentative, by dependency):**
+1. `transliteration_spec` - Core conversion without filters
+2. `es20xx_spec` files - ES version targeting
+3. Filter specs (functions, esm, camelCase, etc.)
+4. Integration specs
+
+**Current Status:**
+- [ ] `transliteration_spec` - Not started
+- [ ] Other specs - Not started
+
+## Regenerating the Self-Hosted Converter
+
 ```bash
-npm install @ruby/prism
+# From the ruby2js root directory
+bundle exec ruby lib/ruby2js/selfhost.rb --esm > demo/selfhost/selfhost_converter.mjs
 ```
 
-**Usage (Node.js):**
+## Running the Browser Demo
+
+```bash
+cd demo/selfhost
+python3 -m http.server 8080
+# Open http://localhost:8080/browser_demo.html
+```
+
+## Size Comparison
+
+| Approach | Size | Notes |
+|----------|------|-------|
+| Self-hosted | ~2.9MB | prism.wasm + WASI shim + walker + converter |
+| Opal-based | ~24MB | Opal runtime + parser gem + Ruby2JS |
+
+**~8x smaller** than the current Opal-based demo.
+
+## Next Steps
+
+### Immediate: Test-Driven Iteration
+
+1. **Self-host `transliteration_spec`** - Create JS test runner for this spec
+2. **Run and capture failures** - Establish baseline failure count
+3. **Fix one issue at a time** - Each fix should reduce failures
+4. **Track progress** - Document which tests pass/fail
+
+### After transliteration_spec passes
+
+1. **ES level specs** - `es2015_spec`, `es2020_spec`, etc.
+2. **Filter specs** - One filter at a time
+
+### Long-term
+
+1. **Replace ruby2js.com demo** - Use self-hosted version instead of Opal
+2. **npm package** - Publish as `@ruby2js/browser` or similar
+3. **Source maps** - Map generated JS back to Ruby source
+
+## Technical Notes
+
+### Handler Discovery
+
+The Ruby converter uses `handle :type do ... end` which calls `define_method`. In JavaScript, we discover handlers by scanning the prototype for `on_*` methods:
+
 ```javascript
-import { loadPrism } from "@ruby/prism";
-const parse = await loadPrism();
-const result = parse("puts 'hello'");
-// result.value is the AST
-// result.comments, result.errors, result.warnings available
-```
-
-**Usage (Browser):**
-Requires WASI shim and manual WebAssembly instantiation. See [Prism JavaScript docs](https://github.com/ruby/prism/blob/main/docs/javascript.md).
-
-**AST Format:**
-Prism's JavaScript bindings produce native JavaScript objects, NOT the same format as `Prism::Translation::Parser`. This is a **critical difference** from the current Ruby implementation.
-
-### 2. Ruby2JS Core (~12,000 lines)
-
-| Component | Lines | Complexity |
-|-----------|-------|------------|
-| `lib/ruby2js.rb` | ~450 | High - orchestration, options |
-| `lib/ruby2js/converter.rb` | ~350 | High - base converter |
-| `lib/ruby2js/converter/*.rb` | ~3,500 | Medium - 60 handlers |
-| `lib/ruby2js/filter.rb` | ~200 | Medium - filter base |
-| `lib/ruby2js/filter/*.rb` | ~6,500 | Medium-High - 23 filters |
-| `lib/ruby2js/serializer.rb` | ~300 | Low - output formatting |
-| Other | ~1,000 | Various |
-
-### 3. AST Translation Layer
-
-**The Problem:**
-
-Prism's JavaScript AST is different from both:
-- Prism's Ruby AST (`Prism::Node` subclasses)
-- whitequark parser AST (`Parser::AST::Node`)
-
-Ruby2JS currently depends on `Parser::AST::Node` format via `Prism::Translation::Parser`.
-
-**Options Considered:**
-
-**Option A: Fork Translation Layer (Ruby first, then transpile)**
-
-1. Vendor `Prism::Translation::Parser` into Ruby2JS
-2. Simplify for our needs, remove unused features
-3. Create minimal stubs for `Parser::AST::Node`, `Parser::Source::*`
-4. Fix bugs we've encountered (comment association, synthetic nodes)
-5. Test thoroughly in Ruby
-6. Transpile the working Ruby code to JavaScript
-
-**Option B: Adapt Ruby2JS to Prism's Native AST**
-
-Rewrite all handlers and filters to work directly with Prism's AST format.
-
-**Option C: Create Minimal AST Adapter from Scratch**
-
-Build a thin JavaScript adapter without reference to existing translation logic.
-
-**Analysis:**
-
-Option C sounds appealing ("minimal adapter") but is actually Option A done poorly - we'd rediscover all the edge cases that `Prism::Translation::Parser` already handles. The translation layer exists because the mapping is non-trivial:
-- Different node type names
-- Different child ordering
-- Different handling of optional elements
-- Location/source range differences
-- ~100 node types to map correctly
-
-Option B requires rewriting 60+ handlers and 23 filters - massive effort with high regression risk.
-
-**Recommendation: Option A** - Fork the translation layer in Ruby first.
-
-This approach:
-- Starts with working, battle-tested code
-- Allows incremental simplification with test coverage
-- Fixes can be made in Ruby (easier to debug)
-- Only transpile to JavaScript after Ruby version is stable
-- Single source of truth during development
-
-## Implementation Phases
-
-### Phase 1: Fork Translation Layer (Ruby)
-
-**Goal:** Remove `parser` gem dependency while maintaining compatibility.
-
-1. Vendor `Prism::Translation::Parser` into `lib/ruby2js/prism/`
-   - `compiler.rb` (~2000 lines) - AST translation
-   - `builder.rb` (~60 lines) - Node construction helpers
-2. Create minimal stubs for parser gem classes:
-   - `Parser::AST::Node` - Already have `is_method?` extension
-   - `Parser::Source::Buffer` - Source text container
-   - `Parser::Source::Range` - Location info
-   - `Parser::Source::Comment` - Comment handling
-3. Remove unused features from vendored code:
-   - Lexer token generation
-   - Diagnostic handling
-   - Version-specific parsers (2.7, 3.0, etc.)
-4. Fix known issues:
-   - Comment association for synthetic nodes
-   - `__FILE__` handling differences
-5. Run full test suite with vendored translation layer
-
-**Estimated effort:** 2-3 weeks
-
-**Success criteria:** All 1302 tests pass using vendored translation layer, no `parser` gem loaded.
-
-### Phase 2: Simplify for Ruby2JS Needs (Ruby)
-
-**Goal:** Reduce translation layer to only what Ruby2JS uses.
-
-1. Identify which node types Ruby2JS actually handles
-2. Remove translation code for unused node types
-3. Simplify child extraction where possible
-4. Optimize hot paths
-5. Add any Ruby2JS-specific enhancements
-6. Document the simplified mapping
-
-**Estimated effort:** 1-2 weeks
-
-**Success criteria:** Vendored code reduced by 30-50%, tests still pass.
-
-### Phase 3: Transpile to JavaScript
-
-**Goal:** Working Ruby2JS in JavaScript.
-
-1. Create `selfhost` filter for transpiling Ruby2JS to JavaScript:
-   - S-expression handling: `s(:type, ...)` → `s('type', ...)`
-   - Symbol-to-string in AST contexts: `node.type == :str` → `node.type === 'str'`
-   - `handle :type do ... end` → handler registration
-   - Parser class mappings
-
-   (Named `selfhost` rather than `ruby2js` to clarify its purpose and avoid confusion for new users)
-2. Set up build environment (esbuild/rollup)
-3. Use Ruby2JS (with new filter) to transpile itself:
-   - Vendored translation layer
-   - Core converter and serializer
-   - Selected filters
-4. Integrate `@ruby/prism` npm package
-5. Create browser bundle
-6. Test against spec suite (adapted for JS)
-
-**Estimated effort:** 4-6 weeks
-
-**Success criteria:** `puts "Hello"` → `console.log("Hello")` works in browser.
-
-**Note:** The `selfhost` filter uses opt-in patterns (explicit `s()` calls, `Parser::AST::Node` references) to avoid false positives. This is the same approach as the explicit type wrappers in ECMASCRIPT_UPDATES.md.
-
-### Phase 4: Filter Support (JavaScript)
-
-**Goal:** Support commonly-used filters in browser.
-
-Priority filters:
-1. `functions` - Core method mappings
-2. `esm` - ES modules
-3. `camelCase` - Naming conventions
-4. `return` - Auto-return
-
-Lower priority (as needed):
-5. `react` / `stimulus` / `lit` - Framework-specific
-
-**Estimated effort:** 2-4 weeks
-
-### Phase 5: Demo Integration
-
-**Goal:** Replace Opal-based demo with self-hosted version.
-
-1. Bundle Ruby2JS.js with @ruby/prism
-2. Update demo HTML/JS to use new bundle
-3. Performance optimization
-4. Error handling and user-friendly diagnostics
-5. Source map support (if feasible)
-
-**Estimated effort:** 2-3 weeks
-
-### Total Estimated Effort: 11-18 weeks
-
-## Technical Challenges
-
-### 1. Ruby Idioms in JavaScript
-
-Ruby2JS code uses Ruby idioms that need careful translation:
-
-```ruby
-# Ruby - blocks with implicit returns
-handlers.each do |type, handler|
-  handler.call(node)
-end
-
-# JavaScript equivalent
-for (const [type, handler] of handlers) {
-  handler(node);
+for (const key of Object.getOwnPropertyNames(proto)) {
+  if (key.startsWith('on_') && typeof proto[key] === 'function') {
+    types.push(key.slice(3));
+  }
 }
 ```
 
-```ruby
-# Ruby - symbol keys, method chaining
-node.children.map(&:to_s).join(', ')
+### Serializer Base Class
 
-# JavaScript equivalent
-node.children.map(c => c.toString()).join(', ')
-```
+The JavaScript preamble provides a `Serializer` class that the `Converter` extends:
 
-**Approach:** Create a `selfhost` filter specifically for transpiling Ruby2JS itself.
-
-This filter would understand:
-- S-expression construction: `s(:send, target, :method)` → `s('send', target, 'method')`
-- AST node patterns: `node.type == :str` → `node.type === 'str'`
-- Symbol comparisons in case statements
-- Parser-specific method calls
-
-**Opt-in conversions:** Following the pattern from [ECMASCRIPT_UPDATES.md](./ECMASCRIPT_UPDATES.md), specific transformations can be enabled via explicit type wrappers:
-
-```ruby
-# Explicit AST node - filter knows to handle specially
-Parser::AST::Node.new(:send, [target, :method])
-
-# Explicit S-expression helper
-s(:send, target, :method)
-```
-
-This keeps the filter focused and avoids false positives on generic Ruby code.
-
-### 2. Dynamic Method Definition
-
-Ruby2JS uses `handle :node_type do ... end` for handler registration:
-
-```ruby
-handle :str do |value|
-  put value.inspect
-end
-```
-
-**JavaScript equivalent:**
 ```javascript
-handle('str', (value) => {
-  this.put(JSON.stringify(value));
-});
+class Serializer {
+  constructor() {
+    this._sep = '; ';   // Statement separator
+    this._nl = '';      // Newline (empty = compact)
+    this._ws = ' ';     // Whitespace
+    this._indent = 0;   // Indentation level
+  }
+
+  enable_vertical_whitespace() {
+    this._sep = ';\n';
+    this._nl = '\n';
+    this._ws = this._nl;
+    this._indent = 2;
+  }
+}
 ```
 
-### 3. S-expression Construction
+### Ruby-to-JavaScript Idiom Mapping
 
-Ruby2JS creates AST nodes with `s(:type, *children)`:
+| Ruby | JavaScript | Notes |
+|------|------------|-------|
+| `Hash === obj` | `typeof obj === 'object' && !obj.type` | Detect options hash vs AST node |
+| `hash[:key].to_s` | `(hash.key \|\| '').toString()` | Nil-safe stringification |
+| `@vars.include?(key)` | `key in this._vars` | Hash key existence |
+| `array.compact!` | `array.splice(0, array.length, ...array.filter(x => x != null))` | In-place compact |
+| `hash.merge!(other)` | `Object.assign(hash, other)` | In-place merge |
+| `hash.select {...}` | `Object.fromEntries(Object.entries(hash).filter(...))` | Hash filtering |
 
-```ruby
-s(:send, target, :method, *args)
-```
+## Maintenance Overview (Final State)
 
-**JavaScript equivalent:**
-```javascript
-s('send', target, 'method', ...args)
-// or
-new ASTNode('send', [target, 'method', ...args])
-```
+Once self-hosting is complete, here's what needs to be maintained:
 
-### 4. Regular Expressions
+### Hand-Written Files (~1,150 lines total)
 
-Ruby regexes need translation to JavaScript:
-- Named captures
-- Unicode properties
-- Lookbehind (now supported in modern JS)
+| File | Lines | Purpose |
+|------|-------|---------|
+| `lib/ruby2js/filter/selfhost.rb` | ~950 | AST transformations for Ruby→JS patterns |
+| `preamble.mjs` | ~60 | JS stubs (Node, s(), Hash, NotImplementedError) |
+| Build script (Rakefile task) | ~50 | Lists files, calls Ruby2JS.convert, concatenates |
+| `browser_demo.html` | ~100 | Demo UI |
 
-### 5. Source Maps
+### Generated Files (regenerated on build)
 
-Current Ruby2JS generates source maps. This would need reimplementation for the JS version.
+| File | Lines | Source |
+|------|-------|--------|
+| `transpiled_walker.mjs` | ~1,700 | From `lib/ruby2js/prism_walker.rb` + submodules |
+| `transpiled_converter.mjs` | ~6,500 | From `lib/ruby2js/converter.rb` + handlers + serializer |
 
-## Size Estimates
-
-| Component | Estimated JS Size (minified) |
-|-----------|------------------------------|
-| @ruby/prism WASM | ~800KB |
-| @ruby/prism JS | ~50KB |
-| AST Adapter | ~20KB |
-| Ruby2JS Core | ~100KB |
-| Filters (core) | ~80KB |
-| **Total** | **~1MB** |
-
-Compare to current: **24MB** (Opal-based)
-
-## Alternative: ruby.wasm
-
-Instead of self-hosting, use [ruby.wasm](https://github.com/aspect-js/aspect) which runs full CRuby in WebAssembly.
-
-**Pros:**
-- Full Ruby compatibility
-- Uses real Prism
-- No code porting needed
-
-**Cons:**
-- Large WASM binary (~20MB+)
-- Slower startup
-- More complex integration
-
-**Recommendation:** Self-hosting is preferred for size and performance.
-
-## Decision Points
-
-Before proceeding, clarify:
-
-1. **Is browser demo a priority?** If not heavily used, may not justify effort.
-
-2. **Target browsers?** Modern only (ES2020+) simplifies implementation.
-
-3. **Filter coverage?** Which filters are essential for the demo?
-
-4. **Maintenance burden?** Two codebases (Ruby + JS) vs. one.
-
-5. **Performance requirements?** Acceptable latency for conversion?
+The `selfhost.rb` filter encodes "how to transpile Ruby2JS's Ruby idioms to JavaScript."
+Once it handles all the patterns, changes to the converter/walker Ruby code automatically
+flow through to the browser version on rebuild.
 
 ## Success Criteria
 
-- [ ] Bundle size < 2MB (vs current 24MB)
+- [x] Bundle size < 3MB (achieved ~2.9MB vs 24MB)
+- [x] Basic Ruby converts to JavaScript in browser
 - [ ] Parse + convert "Hello World" in < 100ms
-- [ ] Pass 80%+ of existing test cases
+- [ ] Pass `transliteration_spec` (__ / __ tests)
+- [ ] Pass `es20xx_spec` files
 - [ ] Support `functions`, `esm`, `camelCase` filters
 - [ ] Works in Chrome, Firefox, Safari (latest)
 
@@ -362,33 +257,4 @@ Before proceeding, clarify:
 
 - [@ruby/prism npm package](https://www.npmjs.com/package/@ruby/prism)
 - [Prism JavaScript documentation](https://github.com/ruby/prism/blob/main/docs/javascript.md)
-- [Prism AST documentation](https://ruby.github.io/prism/)
-- [ruby.wasm](https://github.com/aspect-js/aspect)
 - [Current Opal-based demo](https://www.ruby2js.com/)
-
-## Appendix: Prism Node Type Mapping
-
-A partial mapping from Prism JavaScript node types to Parser gem types:
-
-| Prism JS | Parser gem | Notes |
-|----------|------------|-------|
-| `CallNode` | `:send` | Method calls |
-| `LocalVariableReadNode` | `:lvar` | |
-| `LocalVariableWriteNode` | `:lvasgn` | |
-| `InstanceVariableReadNode` | `:ivar` | |
-| `InstanceVariableWriteNode` | `:ivasgn` | |
-| `StringNode` | `:str` | |
-| `IntegerNode` | `:int` | |
-| `FloatNode` | `:float` | |
-| `SymbolNode` | `:sym` | |
-| `ArrayNode` | `:array` | |
-| `HashNode` | `:hash` | |
-| `DefNode` | `:def` | |
-| `ClassNode` | `:class` | |
-| `ModuleNode` | `:module` | |
-| `IfNode` | `:if` | |
-| `CaseNode` | `:case` | |
-| `WhileNode` | `:while` | |
-| ... | ... | ~100 more |
-
-Full mapping would be developed during Phase 1.

@@ -67,6 +67,41 @@ module Ruby2JS
         return
       end
 
+      # Find variables declared in try that are used in finally
+      # These need to be hoisted before the try block
+      # We wrap in a block scope to avoid changing variable visibility
+      hoisted_any = false
+      if finally
+        # Collect lvasgn names from body
+        try_vars = Set.new
+        find_lvasgns = proc do |node|
+          next unless node.respond_to?(:type) && node.respond_to?(:children)
+          try_vars << node.children[0] if node.type == :lvasgn
+          node.children.each { |c| find_lvasgns[c] }
+        end
+        find_lvasgns[body]
+
+        # Collect lvar names from finally
+        finally_vars = Set.new
+        find_lvars = proc do |node|
+          next unless node.respond_to?(:type) && node.respond_to?(:children)
+          finally_vars << node.children[0] if node.type == :lvar
+          node.children.each { |c| find_lvars[c] }
+        end
+        find_lvars[finally]
+
+        # Hoist variables that appear in both (but not already declared)
+        hoisted = (try_vars & finally_vars).reject { |var| @vars[var] }
+        if hoisted.any?
+          hoisted_any = true
+          puts '{'  # Open block scope to contain hoisted vars
+          hoisted.each do |var|
+            put "#{es2015 ? 'let' : 'var'} #{var}#{@sep}"
+            @vars[var] = true
+          end
+        end
+      end
+
       # If retry is used, wrap in while(true) loop
       puts "while (true) {#{@nl}" if uses_retry
 
@@ -154,6 +189,9 @@ module Ruby2JS
 
       # Close while loop if using retry
       sput '}' if uses_retry
+
+      # Close block scope if we hoisted variables
+      sput '}' if hoisted_any
     end
   end
 end
