@@ -1,12 +1,12 @@
 source "https://rubygems.org"
 git_source(:github) { |repo| "https://github.com/#{repo}.git" }
 
-gem "bridgetown", "~> 1.2"
+gem "bridgetown", "~> 2.0"
 gem "ruby2js", path: "../"
 
-gem "bridgetown-seo-tag", "~> 6.0"
-gem "bridgetown-feed", "~> 3.0"
-gem "bridgetown-quick-search", "~> 2.0"
+gem "bridgetown-seo-tag", "~> 7.0"
+gem "bridgetown-feed", "~> 4.0"
+gem "bridgetown-quick-search", "~> 3.0"
 
 group :demo do
   gem 'rake'

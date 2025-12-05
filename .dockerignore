@@ -2,36 +2,35 @@
 .git
 .gitignore
 
-# Build artifacts (regenerated during build)
+# Bridgetown dev/cache
+docs/tmp
 docs/output
 docs/.bridgetown-cache
+docs/.bridgetown-metadata
+
+# Dependencies (reinstalled in container)
 docs/node_modules
-docs/src/demo
-docs/src/shoelace-assets
+docs/vendor
 
-# Development files
-README.md
-CHANGELOG.md
-.github
-plans
+# Environment/secrets
+.env
+.env.*
 
-# Test files
-spec
-test
-
-# IDE
-.vscode
-.idea
+# Editor/OS files
+.DS_Store
 *.swp
 *.swo
+.idea
+.vscode
 
-# OS files
-.DS_Store
-Thumbs.db
+# Logs
+*.log
+yarn-error.log
+yarn-debug.log*
 
-# Selfhost generated outputs (regenerated during Docker build)
-demo/selfhost/selfhost_converter.mjs
-demo/selfhost/transpiled_walker.mjs
+# Test artifacts
+spec/
+test/
 
-# Local config
-mise.toml
+# Plans/docs not needed for build
+plans/

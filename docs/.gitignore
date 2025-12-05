@@ -1,5 +1,6 @@
 # Bridgetown
 output
+tmp
 .bridgetown-cache
 .bridgetown-metadata
 .bridgetown-webpack
