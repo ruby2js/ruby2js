@@ -55,6 +55,9 @@ server {
     gzip on;
     gzip_types text/plain text/css application/json application/javascript text/xml application/xml text/javascript;
 
+    # Upgrade insecure requests - fixes mixed content when behind HTTPS proxy
+    add_header Content-Security-Policy "upgrade-insecure-requests" always;
+
     # Strip trailing slashes (redirect /docs/ to /docs)
     rewrite ^/(.*)/$ /$1 permanent;
 
