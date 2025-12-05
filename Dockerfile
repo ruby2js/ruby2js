@@ -5,6 +5,7 @@ FROM ruby:3.4-slim AS builder
 RUN apt-get update && apt-get install -y \
     build-essential \
     git \
+    libyaml-dev \
     nodejs \
     npm \
     && npm install -g yarn \
