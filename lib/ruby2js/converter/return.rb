@@ -12,7 +12,7 @@ module Ruby2JS
       end
     end
 
-    EXPRESSIONS = [ :array, :float, :hash, :int, :lvar, :nil, :send, :attr,
+    EXPRESSIONS = [ :array, :float, :hash, :int, :lvar, :nil, :send, :send!, :attr,
       :str, :sym, :dstr, :dsym, :cvar, :ivar, :zsuper, :super, :or, :and,
       :block, :const, :true, :false, :xnode, :taglit, :self,
       :op_asgn, :and_asgn, :or_asgn, :taglit, :gvar, :csend, :call ]
