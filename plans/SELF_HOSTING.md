@@ -170,8 +170,21 @@ cd demo/selfhost && node transliteration_spec.mjs
 4. Integration specs
 
 **Current Status:**
-- [ ] `transliteration_spec` - Not started
+- [x] `transliteration_spec` - Transpiled to JavaScript, test harness created
+- [ ] Fix remaining runtime errors (lexical declaration in single-statement context)
+- [ ] Establish baseline pass/fail count
 - [ ] Other specs - Not started
+
+**Issues Found and Fixed (Dogfooding Success!):**
+These improvements to Ruby2JS were discovered by attempting to transpile specs:
+- `empty?` with safe navigation (`a&.empty?`) produced invalid JS `a?.length?.==(0)` → Fixed
+- `define_method` without receiver in class body wasn't supported → Fixed in functions filter
+- `define_method(name, block_var)` form wasn't supported → Fixed in functions filter
+- Private fields (`#field`) can't be accessed from prototype methods → Added `underscored_private` option
+- `handle :type do ... end` macro wasn't being processed → Added to selfhost filter
+
+**Remaining Issue:**
+- Lexical declarations (`let`, `const`) in single-statement `if` context produce invalid JS
 
 ## Regenerating the Self-Hosted Converter
 
