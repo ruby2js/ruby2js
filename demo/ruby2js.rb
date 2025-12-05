@@ -416,9 +416,11 @@ else
                 next if option == 'preset'
                 next if option == 'filter'
                 next if option.start_with? 'require_'
+                # truthy defaults to :ruby in demo, no prompt needed
+                show_args = option == 'truthy' ? false : options_available[option]
                 _sl_menu_item option, type: "checkbox", name: option,
                   checked: checked[option.to_sym],
-                  data_args: options_available[option]
+                  data_args: show_args
               end
             end
           end
