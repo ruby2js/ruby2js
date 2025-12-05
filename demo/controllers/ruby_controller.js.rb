@@ -59,6 +59,9 @@ class RubyController < DemoController
       nextSibling.style.display = 'none'
     end
 
+    # populate editor with initial contents
+    self.contents = contents if contents
+
     # focus on the editor
     @rubyEditor.focus()
 
