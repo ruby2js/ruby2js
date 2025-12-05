@@ -51,6 +51,14 @@ module Ruby2JS
       end
 
       def on_csend(node)
+        target, method, *args = node.children
+
+        # Handle empty? specially for csend - we want obj?.length === 0
+        # not obj.length?.==(0)
+        if method == :empty? and args.length == 0 and not excluded?(method)
+          return process S(:send, S(:csend, target, :length), :==, s(:int, 0))
+        end
+
         # process csend (safe navigation) nodes the same as send nodes
         # so method names get converted (e.g., include? -> includes)
         # then restore the csend type if needed

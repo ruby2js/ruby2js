@@ -8,6 +8,13 @@
 # - handle :type do ... end → handler registration
 # - class Foo < Prism::Visitor → class with self-dispatch visit() method
 #
+# For spec files (when :selfhost_spec option is set):
+# - gem(...) calls → removed
+# - require 'minitest/autorun' → import from test_harness.mjs
+# - require 'ruby2js' → import self-hosted converter
+# - _(...) wrapper → just returns the inner value
+# - describe Ruby2JS → describe("Ruby2JS", ...)
+#
 # This is NOT a general-purpose filter. It's specifically designed
 # for transpiling Ruby2JS itself to JavaScript.
 
@@ -49,6 +56,7 @@ module Ruby2JS
         @prism_visitor_class = false
         @selfhost_require_whitelist = nil
         @inside_ruby2js_module = false  # Track if we're inside module Ruby2JS
+        @selfhost_spec = false  # Track if we're transpiling a spec file
       end
 
       # Classes that use Ruby's class reopening pattern.
@@ -59,10 +67,13 @@ module Ruby2JS
       # Classes to remove from transpilation entirely.
       # Source mapping helpers (SimpleLocation, etc.) are not needed in browser.
       # They provide Parser::Source::Buffer compatibility for sourcemaps.
+      # Token and Line are provided as hand-written JS stubs in the preamble
+      # because they use Ruby patterns that don't transpile (def [], def empty?, etc.)
       REMOVED_CLASSES = %i[
         SimpleLocation FakeSourceBuffer FakeSourceRange
         XStrLocation SendLocation DefLocation
         PrismSourceBuffer PrismSourceRange
+        Token Line Serializer Error
       ].freeze
 
       # Legacy name for compatibility
@@ -73,6 +84,8 @@ module Ruby2JS
         # Whitelist of require paths to keep (others are stripped)
         # If nil, all requires are stripped
         @selfhost_require_whitelist = options[:selfhost_require]
+        # Enable spec mode for transpiling test files
+        @selfhost_spec = options[:selfhost_spec]
       end
 
       # Transform Prism::Visitor subclass
@@ -191,29 +204,36 @@ module Ruby2JS
         # Get the class name as a symbol (e.g., :PrismWalker)
         class_sym = class_name.children[1]
 
-        # Extract all method definitions from the body
+        # Extract all method definitions and handle blocks from the body
         methods = []
-        if body.type == :begin
-          body.children.each do |child|
-            next unless child
-            if child.type == :def
-              methods << child
-            elsif child.type == :begin
-              # Nested begin blocks from handle macro expansion
-              child.children.each { |c| methods << c if c&.type == :def }
+        handle_blocks = []
+
+        collect_items = ->(child) {
+          return unless child
+          if child.type == :def
+            methods << child
+          elsif child.type == :block
+            # Check if it's a handle block: handle :type do |value| ... end
+            send_node = child.children[0]
+            if send_node.type == :send && send_node.children[0].nil? && send_node.children[1] == :handle
+              handle_blocks << child
             end
+          elsif child.type == :begin
+            # Nested begin blocks from handle macro expansion
+            child.children.each { |c| collect_items.call(c) }
           end
-        elsif body.type == :def
-          methods << body
+        }
+
+        if body.type == :begin
+          body.children.each { |child| collect_items.call(child) }
+        else
+          collect_items.call(body)
         end
 
-        return nil if methods.empty?
+        assignments = []
 
-        # Convert each method to a prototype assignment:
-        # PrismWalker.prototype.methodName = function(args) { body }
-        assignments = methods.map do |method|
-          method_name, args, method_body = method.children
-
+        # Process regular method definitions
+        methods.each do |method|
           # Process the method through on_def to handle visit_*_node naming, etc.
           processed_method = process(method)
           next unless processed_method
@@ -223,15 +243,36 @@ module Ruby2JS
             p_name, p_args, p_body = processed_method.children
           else
             # handle macro may have produced a begin with multiple defs
-            next process(method)
+            assignments << process(method)
+            next
           end
 
           # Build: ClassName.prototype.methodName = function(args) { body }
-          # Using :send with := for assignment
           proto = s(:attr, s(:const, nil, class_sym), :prototype)
           func = s(:block, s(:send, nil, :proc), p_args || s(:args), p_body)
-          s(:send, proto, :"#{p_name}=", func)
-        end.compact
+          assignments << s(:send, proto, :"#{p_name}=", func)
+        end
+
+        # Process handle blocks: handle :type do |value| ... end
+        # Convert to: Converter.prototype.on_type = function(value) { ... }
+        handle_blocks.each do |block|
+          send_node, args, block_body = block.children
+          types = send_node.children[2..-1]  # Get all type symbols
+
+          # Process args to rename reserved words like 'var' -> 'var_'
+          processed_args = args ? process(args) : s(:args)
+
+          types.each do |type_node|
+            next unless type_node.type == :sym
+            type_name = type_node.children[0]
+            method_name = :"on_#{type_name}"
+
+            # Build: ClassName.prototype.on_type = function(args) { body }
+            proto = s(:attr, s(:const, nil, class_sym), :prototype)
+            func = s(:block, s(:send, nil, :proc), processed_args, process(block_body))
+            assignments << s(:send, proto, :"#{method_name}=", func)
+          end
+        end
 
         return nil if assignments.empty?
         return assignments.first if assignments.length == 1
@@ -448,6 +489,18 @@ module Ruby2JS
       # s(:send, ...) → s('send', ...)
       def on_send(node)
         target, method, *args = node.children
+
+        # Spec mode: Remove gem() calls
+        if @selfhost_spec && target.nil? && method == :gem
+          return nil
+        end
+
+        # Spec mode: Convert _(...) wrapper to just the inner expression
+        # In Minitest: _(value).must_equal(expected) - _() is an expectation wrapper
+        # We just want the value to flow through
+        if @selfhost_spec && target.nil? && method == :_ && args.length == 1
+          return process(args.first)
+        end
 
         # Remove private/protected/public visibility modifiers (no-op in JS)
         if target.nil? && [:private, :protected, :public].include?(method) && args.empty?

@@ -283,6 +283,10 @@ describe Ruby2JS::Filter::Functions do
       to_js( 'a.empty?' ).must_equal 'a.length == 0'
     end
 
+    it "should handle empty? with safe navigation" do
+      to_js_2020( 'a&.empty?' ).must_equal 'a?.length == 0'
+    end
+
     it "should handle nil?" do
       to_js( 'a.nil?' ).must_equal 'a == null'
     end
