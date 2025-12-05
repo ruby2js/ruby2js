@@ -408,6 +408,14 @@ module Ruby2JS
       ast, comments = parse(source, options[:file])
     end
 
+    # return empty result for empty source
+    if ast.nil?
+      ruby2js = Converter.new(ast, comments)
+      ruby2js.eslevel = options[:eslevel] || @@eslevel_default
+      ruby2js.file_name = options[:file] || ''
+      return ruby2js
+    end
+
     # check if magic comment is present
     raw_comments = comments[:_raw] || []
     first_comment = raw_comments.first
