@@ -705,6 +705,14 @@ describe Ruby2JS::Filter::Functions do
     it "should handle define_method" do
       to_js_2020( 'Klass.define_method(:newname) {|x| return x * 5 }').must_equal 'Klass.prototype.newname = function(x) {return x * 5}'
       to_js_2020( 'Klass.define_method(newname) {|x| return x * 5 }').must_equal 'Klass.prototype[newname] = function(x) {return x * 5}'
+      # define_method without receiver inside class body
+      to_js_2020( 'class Klass; define_method(:foo) {|x| x + 1}; end').
+        must_equal 'class Klass {}; Klass.prototype.foo = function(x) {x + 1}'
+      # define_method with block variable (inside method body)
+      to_js_2020( 'define_method(:foo, myblock)').
+        must_equal 'this.constructor.prototype.foo = myblock'
+      to_js_2020( 'define_method(name, myblock)').
+        must_equal 'this.constructor.prototype[name] = myblock'
     end
 
     it "should handle method(:name)" do

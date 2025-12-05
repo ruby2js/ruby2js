@@ -98,13 +98,6 @@ module Ruby2JS
       // Ruby Hash class stub (used for type checking in parse_all)
       class Hash {}
 
-      // Ruby define_method stub - adds a method to Converter prototype
-      function define_method(name, block) {
-        if (block) {
-          Converter.prototype[name] = block;
-        }
-      }
-
       // Token - wraps a string with AST location info
       // Hand-written because Ruby's def empty? doesn't transpile to valid JS
       class Token {

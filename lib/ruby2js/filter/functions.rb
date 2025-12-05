@@ -92,6 +92,13 @@ module Ruby2JS
         elsif method == :keys and args.length == 0 and parens_or_included?(node, method)
           process S(:send, s(:const, nil, :Object), :keys, target)
 
+        # define_method(name, block_var) inside a method body
+        # -> this.constructor.prototype[name] = block_var
+        elsif method == :define_method and target.nil? and args.length == 2
+          process S(:send,
+            s(:attr, s(:attr, s(:self), :constructor), :prototype),
+            :[]=, args[0], args[1])
+
         elsif method == :[]= and args.length == 3 and
           args[0].type == :regexp and args[1].type == :int
 
@@ -1051,7 +1058,8 @@ module Ruby2JS
             s(:return, s(:lvar, node.children[1].children[0].children[0])))),
             :[], call.children[0]])
 
-        elsif method == :define_method and call.children.length == 3
+        elsif method == :define_method and call.children.length == 3 and call.children[0]
+          # Requires explicit receiver (receiver is added by on_class for calls without one)
           process node.updated(:send, [s(:attr, call.children[0], :prototype), :[]=,
             call.children[2], s(:deff, nil, *node.children[1..-1])])
 
@@ -1064,9 +1072,17 @@ module Ruby2JS
         name, inheritance, *body = node.children
         body.compact!
 
-        body.each_with_index do |node, i|
-          if node.type == :send and node.children[0..1] == [nil, :alias_method]
-            body[i] = node.updated(:send, [name, *node.children[1..-1]])
+        body.each_with_index do |child, i|
+          # alias_method without receiver -> add class name as receiver
+          if child.type == :send and child.children[0..1] == [nil, :alias_method]
+            body[i] = child.updated(:send, [name, *child.children[1..-1]])
+          # define_method without receiver -> add class name as receiver
+          elsif child.type == :block
+            call = child.children.first
+            if call.type == :send and call.children[0..1] == [nil, :define_method]
+              new_call = call.updated(:send, [name, *call.children[1..-1]])
+              body[i] = child.updated(:block, [new_call, *child.children[1..-1]])
+            end
           end
         end
 
