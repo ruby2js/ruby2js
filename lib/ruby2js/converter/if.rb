@@ -6,6 +6,18 @@ module Ruby2JS
     #   (...)
     #   (...))
 
+    # Parse a condition, wrapping with $T() if truthy: :ruby and not already boolean
+    def parse_condition(condition)
+      saved_boolean_context, @boolean_context = @boolean_context, true
+      if @truthy == :ruby && !boolean_expression?(condition)
+        @need_truthy_helpers << :T
+        put '$T('; parse condition; put ')'
+      else
+        parse condition
+      end
+      @boolean_context = saved_boolean_context
+    end
+
     handle :if do |condition, then_block, else_block|
       # Pattern: a = b if a.nil?  =>  a ??= b (ES2021+)
       # Pattern: a.nil? ? b : a   =>  a ?? b  (ES2020+)
@@ -73,16 +85,12 @@ module Ruby2JS
             end
 
             put "if ("
-            saved_boolean_context, @boolean_context = @boolean_context, true
-            parse condition
-            @boolean_context = saved_boolean_context
+            parse_condition condition
             put ') '
             wrap { jscope then_block }
           else
             put "if ("
-            saved_boolean_context, @boolean_context = @boolean_context, true
-            parse condition
-            @boolean_context = saved_boolean_context
+            parse_condition condition
             puts ') {'
             jscope then_block
             sput '}'
@@ -91,17 +99,13 @@ module Ruby2JS
               condition, then_block, else_block = else_block.children
               if then_block
                 put ' else if ('
-                saved_boolean_context, @boolean_context = @boolean_context, true
-                parse condition
-                @boolean_context = saved_boolean_context
+                parse_condition condition
                 puts ') {'
                 jscope then_block
                 sput '}'
               else
                 put ' else if ('
-                saved_boolean_context, @boolean_context = @boolean_context, true
-                parse s(:not, condition)
-                @boolean_context = saved_boolean_context
+                parse_condition s(:not, condition)
                 puts ') {'
                 jscope else_block
                 sput '}'
@@ -137,9 +141,7 @@ module Ruby2JS
           end
         end
 
-        saved_boolean_context, @boolean_context = @boolean_context, true
-        parse condition
-        @boolean_context = saved_boolean_context
+        parse_condition condition
         put ' ? '; parse then_block, @state
         put ' : '; parse else_block, @state
       end

@@ -160,6 +160,8 @@ class OptionsController < DemoController
       elsif name == :nullish
         value = name
         name = :or
+      elsif name == :truthy
+        value = :ruby
       elsif name =~ /^es\d+$/
         value = name[2..-1].to_i
         name = :eslevel

@@ -84,6 +84,11 @@ def Ruby2JS.options(hash)
     end
   end
 
+  # Convert truthy option to symbol if it's a string
+  if hash[:truthy].is_a?(String)
+    hash[:truthy] = hash[:truthy].to_sym
+  end
+
   hash
 end
 
