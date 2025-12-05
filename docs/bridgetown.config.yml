@@ -4,7 +4,7 @@ permalink: simple
 timezone: America/New_York
 
 # Disable ERB processing in markdown files (they contain code examples with ERB syntax)
-template_engine: none
+template_engine: liquid
 
 collections:
   docs:
