@@ -10,6 +10,25 @@ Ruby2JS can now run entirely in the browser using the actual Ruby2JS converter t
 - [PRISM_WALKER.md](./PRISM_WALKER.md) - Direct AST translation from Prism to Parser-compatible format
 - [demo/selfhost/](../demo/selfhost/) - Browser demo with transpiled converter
 
+## Motivation: Dogfooding Ruby2JS
+
+The primary goal of self-hosting is **dogfooding** - using Ruby2JS to transpile itself. This serves two purposes:
+
+1. **Produce a browser demo** - A lightweight (~3MB) alternative to the Opal-based demo (~24MB)
+
+2. **Discover Ruby2JS limitations** - Ruby2JS likely cannot fully transpile a project of its own
+   size and complexity yet. Self-hosting reveals which Ruby patterns, idioms, and language
+   features Ruby2JS doesn't handle well (or at all), driving improvements to the converter.
+
+By attempting to transpile the Ruby2JS codebase (converter, walker, serializer, specs), we
+identify gaps like:
+- Ruby idioms that don't have JS equivalents
+- Missing AST node handlers
+- Edge cases in existing handlers
+- Patterns that need new selfhost filter transformations
+
+Each failure found during self-hosting is an opportunity to improve Ruby2JS itself.
+
 ## Current Architecture
 
 ```
@@ -109,16 +128,42 @@ The actual Ruby2JS converter (~60 handlers) has been transpiled to JavaScript us
 
 ### Phase 6: Test-Driven Completion (In Progress)
 
-Now that proof-of-concept is complete, we're taking a systematic spec-by-spec approach:
+Now that proof-of-concept is complete, we're taking a systematic spec-by-spec approach.
+
+**Key Insight:** Use Ruby2JS itself to transpile the Ruby spec files to JavaScript, then run
+those transpiled specs against the self-hosted converter. This validates the self-hosted
+converter using the same tests that validate the Ruby implementation.
+
+**Dogfooding Benefits:** The spec files are real-world Ruby code. Attempting to transpile them
+will reveal Ruby2JS limitations - patterns it can't handle, missing features, edge cases.
+Each transpilation failure or runtime error is a bug report for Ruby2JS itself.
 
 **Strategy:**
-1. Self-host each test spec (starting with `transliteration_spec`)
-2. Run it, accept initial failures
-3. Iterate: fix issues, reduce failure count
-4. Once spec passes, move to next spec
-5. Replace scaffolding with self-hosted code as we go
+1. **Transpile spec to JS** - Use `Ruby2JS.convert(spec_file)` to generate JavaScript tests
+2. **Create test runner** - A minimal harness providing `describe`, `it`, `must_equal`, etc.
+3. **Run transpiled tests** - Execute against self-hosted converter, accept initial failures
+4. **Categorize failures** - Distinguish between:
+   - Transpilation failures (Ruby2JS can't convert the spec code)
+   - Runtime failures (transpiled code crashes)
+   - Test failures (converter output doesn't match expected)
+5. **Iterate** - Fix issues in Ruby2JS core, filters, or selfhost filter
+6. **Track progress** - Document pass/fail counts in this file
 
-**Spec Order (tentative, by dependency):**
+**Workflow for each spec:**
+```bash
+# 1. Transpile the Ruby spec to JavaScript
+bundle exec ruby -r ruby2js -e "
+  puts Ruby2JS.convert(File.read('spec/transliteration_spec.rb'),
+    eslevel: 2022,
+    filters: [:esm, :functions]
+  )
+" > demo/selfhost/transliteration_spec.mjs
+
+# 2. Run the transpiled tests
+cd demo/selfhost && node transliteration_spec.mjs
+```
+
+**Spec Order (by dependency):**
 1. `transliteration_spec` - Core conversion without filters
 2. `es20xx_spec` files - ES version targeting
 3. Filter specs (functions, esm, camelCase, etc.)
@@ -156,10 +201,10 @@ python3 -m http.server 8080
 
 ### Immediate: Test-Driven Iteration
 
-1. **Self-host `transliteration_spec`** - Create JS test runner for this spec
+1. **Transpile `transliteration_spec.rb`** - Use Ruby2JS to convert spec to JavaScript
 2. **Run and capture failures** - Establish baseline failure count
-3. **Fix one issue at a time** - Each fix should reduce failures
-4. **Track progress** - Document which tests pass/fail
+3. **Fix one issue at a time** - Each fix to selfhost filter should reduce failures
+4. **Track progress** - Document pass/fail counts in this file
 
 ### After transliteration_spec passes
 
