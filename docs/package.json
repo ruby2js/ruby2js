@@ -8,10 +8,10 @@
     "esbuild-dev": "yarn shoelace:copy-assets && node esbuild.config.js --watch"
   },
   "devDependencies": {
-    "@codemirror/basic-setup": "^0.17.1",
-    "@codemirror/lang-javascript": "^0.17.1",
-    "@codemirror/legacy-modes": "^0.17.1",
-    "@codemirror/stream-parser": "^0.17.1",
+    "codemirror": "^6.0.0",
+    "@codemirror/lang-javascript": "^6.0.0",
+    "@codemirror/legacy-modes": "^6.0.0",
+    "@codemirror/language": "^6.0.0",
     "@rollup/plugin-node-resolve": "^11.1.1",
     "@ruby2js/esbuild-plugin": "^1.0.0",
     "esbuild": "^0.25.0",
