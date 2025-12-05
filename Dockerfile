@@ -32,6 +32,7 @@ RUN bundle install
 
 # Build the demo assets and static site
 # The esbuild ruby2js plugin runs `bundle exec ruby2js`
+ENV BRIDGETOWN_ENV=production
 RUN bundle exec rake
 RUN bundle exec rake deploy
 
