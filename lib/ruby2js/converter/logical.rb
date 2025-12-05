@@ -74,20 +74,22 @@ module Ruby2JS
         end
 
         @need_truthy_helpers << :T
+        thunk_start = es2015 ? '() => ' : 'function() {return '
+        thunk_end = es2015 ? '' : '}'
         if type == :or
           @need_truthy_helpers << :ror
           put '$ror('
           parse left
-          put ', () => '
+          put ", #{thunk_start}"
           parse right
-          put ')'
+          put "#{thunk_end})"
         else
           @need_truthy_helpers << :rand
           put '$rand('
           parse left
-          put ', () => '
+          put ", #{thunk_start}"
           parse right
-          put ')'
+          put "#{thunk_end})"
         end
         return
       end

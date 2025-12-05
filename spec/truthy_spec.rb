@@ -18,13 +18,13 @@ describe "truthy option" do
 
   describe 'truthy: :ruby helper injection' do
     it "should inject $T and $ror helpers for ||" do
-      to_js_ruby('a || b').must_include 'const $T=v=>v!==false&&v!=null'
-      to_js_ruby('a || b').must_include 'const $ror=(a,b)=>$T(a)?a:b()'
+      to_js_ruby('a || b').must_include 'let $T = (v) => v !== false && v != null'
+      to_js_ruby('a || b').must_include 'let $ror = (a, b) => $T(a) ? a : b()'
     end
 
     it "should inject $T and $rand helpers for &&" do
-      to_js_ruby('a && b').must_include 'const $T=v=>v!==false&&v!=null'
-      to_js_ruby('a && b').must_include 'const $rand=(a,b)=>$T(a)?b():a'
+      to_js_ruby('a && b').must_include 'let $T = (v) => v !== false && v != null'
+      to_js_ruby('a && b').must_include 'let $rand = (a, b) => $T(a) ? b() : a'
     end
 
     it "should not inject helpers when truthy option is disabled" do
@@ -76,7 +76,7 @@ describe "truthy option" do
     end
 
     it "should inject $ror helper for ||=" do
-      to_js_ruby('a ||= b').must_include 'const $ror'
+      to_js_ruby('a ||= b').must_include 'let $ror'
     end
   end
 
@@ -86,7 +86,7 @@ describe "truthy option" do
     end
 
     it "should inject $rand helper for &&=" do
-      to_js_ruby('a &&= b').must_include 'const $rand'
+      to_js_ruby('a &&= b').must_include 'let $rand'
     end
   end
 

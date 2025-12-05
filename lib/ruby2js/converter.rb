@@ -98,15 +98,23 @@ module Ruby2JS
       # Inject truthy helpers if needed
       unless @need_truthy_helpers.empty?
         helpers = []
-        helpers << 'const $T=v=>v!==false&&v!=null' if @need_truthy_helpers.include?(:T)
-        helpers << 'const $ror=(a,b)=>$T(a)?a:b()' if @need_truthy_helpers.include?(:ror)
-        helpers << 'const $rand=(a,b)=>$T(a)?b():a' if @need_truthy_helpers.include?(:rand)
 
-        helper_line = helpers.join('; ')
-        if @sep == '; '
-          @lines.first.unshift "#{helper_line}#@sep"
+        if es2015
+          helpers << 'let $T = (v) => v !== false && v != null' if @need_truthy_helpers.include?(:T)
+          helpers << 'let $ror = (a, b) => $T(a) ? a : b()' if @need_truthy_helpers.include?(:ror)
+          helpers << 'let $rand = (a, b) => $T(a) ? b() : a' if @need_truthy_helpers.include?(:rand)
         else
-          @lines.unshift Line.new(helper_line + ';')
+          helpers << 'var $T = function(v) {return v !== false && v != null}' if @need_truthy_helpers.include?(:T)
+          helpers << 'var $ror = function(a, b) {return $T(a) ? a : b()}' if @need_truthy_helpers.include?(:ror)
+          helpers << 'var $rand = function(a, b) {return $T(a) ? b() : a}' if @need_truthy_helpers.include?(:rand)
+        end
+
+        if @sep == '; '
+          @lines.first.unshift helpers.join(@sep) + @sep
+        else
+          helpers.reverse.each do |helper|
+            @lines.unshift Line.new(helper + ';')
+          end
         end
       end
     end
