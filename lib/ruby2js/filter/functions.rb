@@ -973,7 +973,7 @@ module Ruby2JS
         elsif node.children[0..1] == [s(:send, nil, :loop), s(:args)]
           # input: loop {statements}
           # output: while(true) {statements}
-          S(:while, s(:true), node.children[2])
+          S(:while, s(:true), process(node.children[2]))
 
         elsif method == :times and call.children.length == 2
           # input: n.times { |i| ... }

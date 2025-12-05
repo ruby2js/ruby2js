@@ -62,7 +62,14 @@ module Ruby2JS
       'lib/ruby2js/converter/until.rb',
       'lib/ruby2js/converter/regexp.rb',
       'lib/ruby2js/converter/dstr.rb',
-      'lib/ruby2js/converter/xstr.rb'
+      'lib/ruby2js/converter/xstr.rb',
+      'lib/ruby2js/converter/const.rb',
+      'lib/ruby2js/converter/super.rb',
+      'lib/ruby2js/converter/blockpass.rb',
+      'lib/ruby2js/converter/next.rb',
+      'lib/ruby2js/converter/break.rb',
+      'lib/ruby2js/converter/ensure.rb',
+      'lib/ruby2js/converter/nthref.rb'
     ].freeze
 
     # Filters to apply, in order
