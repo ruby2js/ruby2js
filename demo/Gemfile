@@ -5,7 +5,7 @@ gem 'wunderbar', '>= 0.23.0'
 gem 'rack', '~> 2.2'
 gem 'ruby2js', path: File.expand_path('..', __dir__)
 gem 'sinatra'
-gem 'nokogumbo'
+gem 'nokogiri'  # includes HTML5 parsing (formerly nokogumbo)
 gem 'execjs'
 gem 'opal', '~> 1.0'
 gem 'regexp_parser'
