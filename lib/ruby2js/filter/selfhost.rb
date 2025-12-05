@@ -470,6 +470,15 @@ module Ruby2JS
         super
       end
 
+      # Handle bare class constant references: GROUP_OPERATORS -> Converter.GROUP_OPERATORS
+      def on_const(node)
+        parent, name = node.children
+        if parent.nil? && CLASS_CONSTANTS.include?(name)
+          return s(:attr, s(:const, nil, :Converter), name)
+        end
+        super
+      end
+
       # Methods from Serializer (and Converter itself) that should be called as this.method()
       # when called without an explicit receiver in Ruby (bare method calls)
       # Note: s and sl are handled specially below for symbol conversion
@@ -486,6 +495,11 @@ module Ruby2JS
       SELF_PROPERTIES = %i[
         es2015 es2016 es2017 es2018 es2019 es2020 es2021 es2022 es2023
         underscored_private
+      ].freeze
+
+      # Class constants that need Converter. prefix when referenced bare
+      CLASS_CONSTANTS = %i[
+        LOGICAL OPERATORS INVERT_OP GROUP_OPERATORS VASGN
       ].freeze
 
       # Convert symbols to strings in s() calls
