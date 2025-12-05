@@ -49,7 +49,20 @@ module Ruby2JS
       'lib/ruby2js/converter/for.rb',
       'lib/ruby2js/converter/logical.rb',
       'lib/ruby2js/converter/return.rb',
-      'lib/ruby2js/converter/masgn.rb'
+      'lib/ruby2js/converter/masgn.rb',
+      'lib/ruby2js/converter/class.rb',
+      'lib/ruby2js/converter/block.rb',
+      'lib/ruby2js/converter/case.rb',
+      'lib/ruby2js/converter/kwbegin.rb',
+      'lib/ruby2js/converter/casgn.rb',
+      'lib/ruby2js/converter/cvar.rb',
+      'lib/ruby2js/converter/cvasgn.rb',
+      'lib/ruby2js/converter/opasgn.rb',
+      'lib/ruby2js/converter/while.rb',
+      'lib/ruby2js/converter/until.rb',
+      'lib/ruby2js/converter/regexp.rb',
+      'lib/ruby2js/converter/dstr.rb',
+      'lib/ruby2js/converter/xstr.rb'
     ].freeze
 
     # Filters to apply, in order

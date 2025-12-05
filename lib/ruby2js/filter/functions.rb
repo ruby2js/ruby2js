@@ -899,6 +899,63 @@ module Ruby2JS
             node.updated nil, [process(call), process(node.children[1]),
               s(:autoreturn, *process_all(node.children[2..-1]))]
 
+        elsif \
+          # (a..b).map { |i| ... }
+          method == :map and
+          call.children[0].type == :begin and
+          call.children[0].children.length == 1 and
+          [:irange, :erange].include?(call.children[0].children[0].type) and
+          node.children[1].children.length == 1
+        then
+          range = call.children[0].children[0]
+          start_node = range.children[0]
+          end_node = range.children[1]
+          arg_name = node.children[1].children[0].children[0]
+          block_body = node.children[2]
+
+          # Calculate length: end - start + 1 for irange, end - start for erange
+          if start_node.type == :int && start_node.children[0] == 0
+            # (0..n) or (0...n) - length is just end+1 or end
+            length = range.type == :irange ?
+              s(:send, end_node, :+, s(:int, 1)) :
+              end_node
+          elsif start_node.type == :int && end_node.type == :int
+            # Both are literals - compute length
+            len_val = end_node.children[0] - start_node.children[0]
+            len_val += 1 if range.type == :irange
+            length = s(:int, len_val)
+          elsif start_node.type == :int && start_node.children[0] == 1 && range.type == :irange
+            # (1..n) - length is just n
+            length = end_node
+          else
+            # General case: end - start + 1 (irange) or end - start (erange)
+            length = s(:send, end_node, :-, start_node)
+            length = s(:send, length, :+, s(:int, 1)) if range.type == :irange
+          end
+
+          # If starting from 0, use simpler form: Array.from({length}, (_, i) => ...)
+          if start_node.type == :int && start_node.children[0] == 0
+            callback = s(:block, s(:send, nil, :proc),
+              s(:args, s(:arg, :_), s(:arg, arg_name)),
+              s(:autoreturn, block_body))
+            process s(:send, s(:const, nil, :Array), :from,
+              s(:hash, s(:pair, s(:sym, :length), length)),
+              callback)
+          else
+            # General case: need to offset the index
+            # Array.from({length}, (_, $i) => { let i = $i + start; return ... })
+            temp_var = :"$#{arg_name}"
+            callback_body = s(:begin,
+              s(:lvasgn, arg_name, s(:send, s(:lvar, temp_var), :+, start_node)),
+              s(:autoreturn, block_body))
+            callback = s(:block, s(:send, nil, :proc),
+              s(:args, s(:arg, :_), s(:arg, temp_var)),
+              callback_body)
+            process s(:send, s(:const, nil, :Array), :from,
+              s(:hash, s(:pair, s(:sym, :length), length)),
+              callback)
+          end
+
         elsif method == :map and call.children.length == 2
           node.updated nil, [process(call), process(node.children[1]),
             s(:autoreturn, *process_all(node.children[2..-1]))]

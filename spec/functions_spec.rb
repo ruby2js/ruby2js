@@ -327,6 +327,25 @@ describe Ruby2JS::Filter::Functions do
         must_equal 'a.map(function(i) {return i + 1})'
     end
 
+    it "should handle range.map starting from 0" do
+      to_js_2020( '(0..5).map {|i| i*2}' ).
+        must_equal 'Array.from({length: 5 + 1}, (_, i) => i * 2)'
+      to_js_2020( '(0...n).map {|i| i*2}' ).
+        must_equal 'Array.from({length: n}, (_, i) => i * 2)'
+    end
+
+    it "should handle range.map starting from 1" do
+      to_js_2020( '(1..5).map {|i| i*2}' ).
+        must_equal 'Array.from({length: 5}, (_, $i) => {let i = $i + 1; return i * 2})'
+      to_js_2020( '(1..n).map {|i| i*2}' ).
+        must_equal 'Array.from({length: n}, (_, $i) => {let i = $i + 1; return i * 2})'
+    end
+
+    it "should handle range.map with general start" do
+      to_js_2020( '(a..b).map {|i| i*2}' ).
+        must_equal 'Array.from({length: b - a + 1}, (_, $i) => {let i = $i + a; return i * 2})'
+    end
+
     it "should handle find" do
       to_js( 'a.find {|i| i<0}' ).
         must_equal 'a.find(function(i) {return i < 0})'

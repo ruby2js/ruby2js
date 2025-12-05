@@ -248,8 +248,10 @@ module Ruby2JS
           end
 
           # Build: ClassName.prototype.methodName = function(args) { body }
+          # Use :defm (method) with nil name to get regular function expression
+          # instead of arrow function (which doesn't bind 'this')
           proto = s(:attr, s(:const, nil, class_sym), :prototype)
-          func = s(:block, s(:send, nil, :proc), p_args || s(:args), p_body)
+          func = s(:defm, nil, p_args || s(:args), p_body)
           assignments << s(:send, proto, :"#{p_name}=", func)
         end
 
@@ -259,8 +261,41 @@ module Ruby2JS
           send_node, args, block_body = block.children
           types = send_node.children[2..-1]  # Get all type symbols
 
-          # Process args to rename reserved words like 'var' -> 'var_'
-          processed_args = args ? process(args) : s(:args)
+          # Check for middle-rest pattern: |a, *b, c| which is invalid in JS
+          restarg_index = args&.children&.find_index { |a| a.type == :restarg }
+          if restarg_index && restarg_index < args.children.length - 1
+            # Transform |a, *b, c| into |...args| with destructuring
+            args_before_rest = args.children[0...restarg_index]
+            rest_name = args.children[restarg_index].children.first || :_rest
+            args_after_rest = args.children[(restarg_index + 1)..]
+
+            processed_args = s(:args, s(:restarg, :$args))
+
+            pre_stmts = []
+            if args_before_rest.any?
+              before_vars = args_before_rest.map { |a| s(:lvasgn, a.children.first) }
+              mlhs = s(:mlhs, *before_vars, s(:splat, s(:lvasgn, :"$rest")))
+              pre_stmts << s(:masgn, mlhs, s(:lvar, :$args))
+            else
+              pre_stmts << s(:lvasgn, :"$rest", s(:lvar, :$args))
+            end
+
+            args_after_rest.reverse.each do |arg|
+              name = arg.children.first
+              pre_stmts << s(:lvasgn, name, s(:send, s(:lvar, :"$rest"), :pop))
+            end
+            pre_stmts << s(:lvasgn, rest_name, s(:lvar, :"$rest"))
+
+            processed_body = if block_body.type == :begin
+              s(:begin, *pre_stmts, *block_body.children.map { |c| process(c) })
+            else
+              s(:begin, *pre_stmts, process(block_body))
+            end
+          else
+            # Process args to rename reserved words like 'var' -> 'var_'
+            processed_args = args ? process(args) : s(:args)
+            processed_body = process(block_body)
+          end
 
           types.each do |type_node|
             next unless type_node.type == :sym
@@ -272,7 +307,7 @@ module Ruby2JS
             # Build: ClassName.prototype.on_type = function(args) { body }
             # Use :deff to generate regular function (not arrow) to preserve `this` binding
             proto = s(:attr, s(:const, nil, class_sym), :prototype)
-            func = s(:deff, nil, processed_args, process(block_body))
+            func = s(:deff, nil, processed_args, processed_body)
             assignments << s(:send, proto, :"#{method_name}=", func)
           end
         end
@@ -366,7 +401,12 @@ module Ruby2JS
         name, value = node.children
         if JS_RESERVED_WORDS.include?(name)
           new_name = :"#{name}_"
-          return s(:lvasgn, new_name, process(value))
+          # Handle both standalone lvasgn (with value) and mlhs entries (no value)
+          if value
+            return s(:lvasgn, new_name, process(value))
+          else
+            return s(:lvasgn, new_name)
+          end
         end
         super
       end
@@ -488,6 +528,7 @@ module Ruby2JS
         put puts sput to_s output_location capture wrap compact enable_vertical_whitespace
         parse parse_all scope jscope insert timestamp comments
         visit visit_parameters multi_assign_declarations number_format operator_index
+        parse_condition collapse_strings
       ].freeze
 
       # Properties that need this. prefix but are accessed as getters (no parentheses)
@@ -528,6 +569,16 @@ module Ruby2JS
         # Remove private/protected/public visibility modifiers (no-op in JS)
         if target.nil? && [:private, :protected, :public].include?(method) && args.empty?
           return nil
+        end
+
+        # Wrap raise in IIFE to allow it in expression context (ternary operators)
+        # raise Error.new("msg") → (() => { throw new Error("msg") })()
+        # In JavaScript, throw is a statement, not an expression
+        if target.nil? && method == :raise && args.length == 1
+          # Create: (() => { throw arg })()
+          throw_stmt = s(:send, nil, :raise, process(args.first))
+          arrow_fn = s(:block, s(:send, nil, :proc), s(:args), throw_stmt)
+          return s(:send, arrow_fn, :[])
         end
 
         # Convert bare calls to known methods into this.method() calls
@@ -962,9 +1013,52 @@ module Ruby2JS
         if call.type == :send && call.children[0].nil? && call.children[1] == :handle
           types = call.children[2..]
 
-          # Process block args and body
-          processed_args = process(block_args)
-          processed_body = process(body)
+          # Check for middle-rest pattern: |a, *b, c| which is invalid in JS
+          # JS requires rest parameter to be last
+          restarg_index = block_args.children.find_index { |a| a.type == :restarg }
+          if restarg_index && restarg_index < block_args.children.length - 1
+            # Transform |a, *b, c| into |...args| with destructuring
+            # let [a, ...rest] = args; let c = rest.pop(); let b = rest;
+            args_before_rest = block_args.children[0...restarg_index]
+            rest_name = block_args.children[restarg_index].children.first || :_rest
+            args_after_rest = block_args.children[(restarg_index + 1)..]
+
+            # New args: (...$args)
+            processed_args = s(:args, s(:restarg, :$args))
+
+            # Build destructuring: let [a, ...rest] = $args
+            # Then: let c = rest.pop(); let b = rest;
+            pre_stmts = []
+
+            # First extract the args before rest
+            if args_before_rest.any?
+              before_vars = args_before_rest.map { |a| s(:lvasgn, a.children.first) }
+              mlhs = s(:mlhs, *before_vars, s(:splat, s(:lvasgn, :"$rest")))
+              pre_stmts << s(:masgn, mlhs, s(:lvar, :$args))
+            else
+              pre_stmts << s(:lvasgn, :"$rest", s(:lvar, :$args))
+            end
+
+            # Extract args after rest (from the end)
+            args_after_rest.reverse.each do |arg|
+              name = arg.children.first
+              pre_stmts << s(:lvasgn, name, s(:send, s(:lvar, :"$rest"), :pop))
+            end
+
+            # Assign the rest to the original rest variable
+            pre_stmts << s(:lvasgn, rest_name, s(:lvar, :"$rest"))
+
+            # Prepend to body
+            processed_body = if body.type == :begin
+              s(:begin, *pre_stmts, *body.children.map { |c| process(c) })
+            else
+              s(:begin, *pre_stmts, process(body))
+            end
+          else
+            # Process block args and body normally
+            processed_args = process(block_args)
+            processed_body = process(body)
+          end
 
           # Create method definitions for each type
           # handle :foo, :bar do |x| ... end  →  def on_foo(x) ... end; def on_bar(x) ... end

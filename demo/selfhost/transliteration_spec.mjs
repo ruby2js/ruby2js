@@ -19,7 +19,8 @@ function convert(rubyCode, opts = {}) {
   const ast = walker.visit(result.value);
   const converter = new Converter(ast, new Map());
   // Default to ES5 (no let/const) to match Ruby transliteration_spec defaults
-  converter.eslevel = opts.eslevel || 5;
+  // ES5 = 2009 in the eslevel system
+  converter.eslevel = opts.eslevel || 2009;
   converter.convert();
   return converter.to_s();
 }

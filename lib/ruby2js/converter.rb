@@ -69,7 +69,7 @@ module Ruby2JS
       @jsx = false
       @autobind = true
 
-      @eslevel = :es5
+      @eslevel = 2009 # ES5
       @strict = false
       @comparison = :equality
       @or = :logical

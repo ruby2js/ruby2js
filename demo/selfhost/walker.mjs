@@ -3,9 +3,23 @@
 
 // Simple AST node class (equivalent to Ruby2JS::Node)
 class Node {
-  constructor(type, children = []) {
+  constructor(type, children = [], properties = {}) {
     this.type = type;
     this.children = Object.freeze(children);
+    this.location = properties.location || null;
+    // Store is_method flag if provided, otherwise null means "use default behavior"
+    this._is_method = properties.is_method !== undefined ? properties.is_method : null;
+  }
+
+  // Check if this is a method call (has parentheses)
+  // Returns true for method calls foo(), false for property access foo
+  // Without location info, defaults to true (like Ruby's Node.is_method?)
+  is_is_method() {
+    if (this.type === 'attr') return false;
+    if (this.type === 'call') return true;
+    if (this._is_method !== null) return this._is_method;
+    // Without location info, default to true
+    return true;
   }
 
   toString() {

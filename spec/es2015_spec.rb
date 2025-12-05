@@ -108,6 +108,23 @@ describe "ES2015 support" do
       to_js( 'a,b=b,a' ).must_equal('let [a, b] = [b, a]')
     end
 
+    it "should handle middle splat destructuring" do
+      # Ruby allows *rest in any position, JS only at end
+      # For middle splat like (*a, b = arr), we use temp var with shift/pop
+      to_js( '*a, b = arr' ).
+        must_equal('let $masgn_temp = arr.slice(); let b = $masgn_temp.pop(); let a = $masgn_temp')
+    end
+
+    it "should handle middle splat with multiple tail elements" do
+      to_js( '*a, b, c = arr' ).
+        must_equal('let $masgn_temp = arr.slice(); let c = $masgn_temp.pop(); let b = $masgn_temp.pop(); let a = $masgn_temp')
+    end
+
+    it "should handle middle splat with head and tail elements" do
+      to_js( 'x, *a, b = arr' ).
+        must_equal('let $masgn_temp = arr.slice(); let x = $masgn_temp.shift(); let b = $masgn_temp.pop(); let a = $masgn_temp')
+    end
+
     it "should not treat new local vars in parallel assignment as setters" do
       # When a class has a setter method (scope=), a new local var named 'scope'
       # in parallel assignment should still be a local var, not call the setter
@@ -204,6 +221,17 @@ describe "ES2015 support" do
 
     it "should handle mixed empty interpolation" do
       to_js('"x#{}y"').must_equal '`xy`'
+    end
+
+    it "should coalesce null for if without else in interpolation" do
+      # Ruby: "#{x if y}" returns "" when y is false (nil.to_s == "")
+      # JS: x if y without else returns null, which stringifies to "null"
+      # Fix: wrap (x ?? "") to match Ruby behavior
+      to_js( '"#{x if y}"' ).must_equal('`${(y ? x : null ?? "")}`')
+    end
+
+    it "should not coalesce for if with else in interpolation" do
+      to_js( '"#{x ? y : z}"' ).must_equal('`${x ? y : z}`')
     end
   end
 

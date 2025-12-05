@@ -25,12 +25,66 @@ module Ruby2JS
       # If mixed local and non-local, fall through to non-destructuring path
       use_destructuring = es2015 && !(has_lvasgn && has_non_lvasgn)
 
-      if use_destructuring
+      # Check for middle-splat: *a, b = arr - JS doesn't allow [...a, b]
+      # Need to handle this specially: b = arr.pop(); a = arr.slice() or similar
+      splat_index = lhs.children.find_index { |c| c.type == :splat }
+      has_middle_splat = splat_index && splat_index < lhs.children.length - 1
+
+      if has_middle_splat && use_destructuring
+        # Transform: *a, b, c = arr
+        # Into: let $temp = arr.slice(); let c = $temp.pop(); let b = $temp.pop(); let a = $temp;
+        before_splat = lhs.children[0...splat_index]
+        splat_var = lhs.children[splat_index].children.first
+        after_splat = lhs.children[(splat_index + 1)..]
+
+        # Get the variable name from the splat
+        splat_name = splat_var.type == :lvasgn ? splat_var.children.first : nil
+
+        # Generate temp variable and slice
+        temp_var = :$masgn_temp
+        block = []
+
+        # Mark all vars as :masgn so they get let declarations
+        before_splat.each do |var|
+          var_name = var.children.first
+          @vars[var_name] = :masgn unless @vars.include?(var_name)
+        end
+        after_splat.each do |var|
+          var_name = var.children.first
+          @vars[var_name] = :masgn unless @vars.include?(var_name)
+        end
+        if splat_name
+          @vars[splat_name] = :masgn unless @vars.include?(splat_name)
+        end
+
+        # First assign rhs to temp (sliced if it's an array/call)
+        actual_rhs = rhs.type == :splat ? rhs.children.first : rhs
+        block << s(:lvasgn, temp_var, s(:send!, actual_rhs, :slice))
+
+        # Assign any vars before the splat from the front
+        before_splat.each do |var|
+          var_name = var.children.first
+          block << s(:lvasgn, var_name, s(:send, s(:lvar, temp_var), :shift))
+        end
+
+        # Pop vars after the splat from the end (in reverse order)
+        after_splat.reverse.each do |var|
+          var_name = var.children.first
+          block << s(:lvasgn, var_name, s(:send, s(:lvar, temp_var), :pop))
+        end
+
+        # Assign remaining temp to the splat variable
+        if splat_name
+          block << s(:lvasgn, splat_name, s(:lvar, temp_var))
+        end
+
+        parse s(:begin, *block), @state
+      elsif use_destructuring
         walk = lambda do |node|
           results = []
           node.children.each do |var|
             if var.type == :lvasgn
-              results << var 
+              results << var
             elsif var.type == :mlhs or var.type == :splat
               results += walk[var]
             end
@@ -43,13 +97,13 @@ module Ruby2JS
 
         if newvars.length > 0
           if vars == newvars
-            put 'let ' 
+            put 'let '
           else
             put "let #{newvars.map {|var| var.children.last}.join(', ')}#{@sep}"
           end
         end
 
-        newvars.each do |var| 
+        newvars.each do |var|
           @vars[var.children.last] ||= (@inner ? :pending : true)
         end
 
@@ -59,7 +113,13 @@ module Ruby2JS
           parse child
         end
         put "] = "
-        parse rhs
+        # When rhs is a splat on an array variable, unwrap it
+        # Ruby: a, b = *arr → JS: [a, b] = arr (not ...arr)
+        if rhs.type == :splat
+          parse rhs.children.first
+        else
+          parse rhs
+        end
 
       elsif rhs.type == :array
 
