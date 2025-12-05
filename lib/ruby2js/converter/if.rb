@@ -6,6 +6,18 @@ module Ruby2JS
     #   (...)
     #   (...))
 
+    # Parse a condition, wrapping with $T() if truthy: :ruby and not already boolean
+    def parse_condition(condition)
+      saved_boolean_context, @boolean_context = @boolean_context, true
+      if @truthy == :ruby && !boolean_expression?(condition)
+        @need_truthy_helpers << :T
+        put '$T('; parse condition; put ')'
+      else
+        parse condition
+      end
+      @boolean_context = saved_boolean_context
+    end
+
     handle :if do |condition, then_block, else_block|
       # Pattern: a = b if a.nil?  =>  a ??= b (ES2021+)
       # Pattern: a.nil? ? b : a   =>  a ?? b  (ES2020+)
@@ -72,21 +84,29 @@ module Ruby2JS
               @vars[then_block.children.first] ||= :pending
             end
 
-            put "if ("; parse condition; put ') '
+            put "if ("
+            parse_condition condition
+            put ') '
             wrap { jscope then_block }
           else
-            put "if ("; parse condition; puts ') {'
+            put "if ("
+            parse_condition condition
+            puts ') {'
             jscope then_block
             sput '}'
 
             while else_block and else_block.type == :if
               condition, then_block, else_block = else_block.children
               if then_block
-                put ' else if ('; parse condition; puts ') {'
+                put ' else if ('
+                parse_condition condition
+                puts ') {'
                 jscope then_block
                 sput '}'
               else
-                put ' else if ('; parse s(:not, condition); puts ') {'
+                put ' else if ('
+                parse_condition s(:not, condition)
+                puts ') {'
                 jscope else_block
                 sput '}'
                 else_block = nil
@@ -121,7 +141,8 @@ module Ruby2JS
           end
         end
 
-        parse condition; put ' ? '; parse then_block, @state
+        parse_condition condition
+        put ' ? '; parse then_block, @state
         put ' : '; parse else_block, @state
       end
     end

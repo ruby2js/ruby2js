@@ -53,12 +53,26 @@ module Ruby2JS
       vtype = :lvar if asgn.type == :lvasgn
       vtype = :ivar if asgn.type == :ivasgn
       vtype = :cvar if asgn.type == :cvasgn
-      
-      if es2021
+
+      # With truthy: :ruby option, expand to full assignment using truthy helpers
+      if @truthy == :ruby && vtype
+        # a ||= b  =>  a = $ror(a, () => b)
+        # a &&= b  =>  a = $rand(a, () => b)
+        @need_truthy_helpers << :T
+        helper = type == :or ? :ror : :rand
+        @need_truthy_helpers << helper
+        parse s(asgn.type, asgn.children.first,
+          s(:send, nil, :"$#{helper}",
+            s(vtype, asgn.children.first),
+            s(:block, s(:send, nil, :lambda), s(:args), value)))
+        return
+      end
+
+      if es2021 && @truthy != :ruby
         op = type == :and ? '&&' : (@or == :nullish ? '??' : '||')
         parse s(:op_asgn, asgn, op, value);
       elsif vtype
-        parse s(asgn.type, asgn.children.first, s(type, 
+        parse s(asgn.type, asgn.children.first, s(type,
           s(vtype, asgn.children.first), value))
       elsif asgn.type == :send and asgn.children[1] == :[]
         parse s(:send, asgn.children.first, :[]=,

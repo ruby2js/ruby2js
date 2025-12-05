@@ -73,6 +73,9 @@ module Ruby2JS
       @strict = false
       @comparison = :equality
       @or = :logical
+      @truthy = :js
+      @boolean_context = false
+      @need_truthy_helpers = Set.new
       @underscored_private = true
       @redoable = false
     end
@@ -82,13 +85,36 @@ module Ruby2JS
     end
 
     def convert
-      scope @ast 
+      scope @ast
 
       if @strict
         if @sep == '; '
           @lines.first.unshift "\"use strict\"#@sep"
         else
           @lines.unshift Line.new('"use strict";')
+        end
+      end
+
+      # Inject truthy helpers if needed
+      unless @need_truthy_helpers.empty?
+        helpers = []
+
+        if es2015
+          helpers << 'let $T = (v) => v !== false && v != null' if @need_truthy_helpers.include?(:T)
+          helpers << 'let $ror = (a, b) => $T(a) ? a : b()' if @need_truthy_helpers.include?(:ror)
+          helpers << 'let $rand = (a, b) => $T(a) ? b() : a' if @need_truthy_helpers.include?(:rand)
+        else
+          helpers << 'var $T = function(v) {return v !== false && v != null}' if @need_truthy_helpers.include?(:T)
+          helpers << 'var $ror = function(a, b) {return $T(a) ? a : b()}' if @need_truthy_helpers.include?(:ror)
+          helpers << 'var $rand = function(a, b) {return $T(a) ? b() : a}' if @need_truthy_helpers.include?(:rand)
+        end
+
+        if @sep == '; '
+          @lines.first.unshift helpers.join(@sep) + @sep
+        else
+          helpers.reverse.each do |helper|
+            @lines.unshift Line.new(helper + ';')
+          end
         end
       end
     end
@@ -143,7 +169,7 @@ module Ruby2JS
       end
     end
 
-    attr_accessor :strict, :eslevel, :module_type, :comparison, :or, :underscored_private
+    attr_accessor :strict, :eslevel, :module_type, :comparison, :or, :truthy, :underscored_private
 
     def es2015
       @eslevel >= 2015

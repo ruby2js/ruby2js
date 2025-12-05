@@ -22,7 +22,9 @@ module Ruby2JS
           end
         end
 
-        put 'while ('; parse condition; puts ') {'; redoable block; sput '}'
+        put 'while ('
+        parse_condition condition
+        puts ') {'; redoable block; sput '}'
       ensure
         @next_token = next_token
       end

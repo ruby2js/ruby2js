@@ -33,6 +33,7 @@ Usage: ruby2js [options] [file]
         --ivars @name:value,...      set ivars
         --logical                    use '||' for 'or' operators
         --nullish                    use '??' for 'or' operators
+        --truthy MODE                truthy semantics: 'ruby' or 'js'
         --require_recursive          import all symbols defined by processing the require recursively
         --strict                     strict mode
         --template_literal_tags tag,...

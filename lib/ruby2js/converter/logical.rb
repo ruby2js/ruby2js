@@ -42,6 +42,57 @@ module Ruby2JS
     handle :and, :or do |left, right|
       type = @ast.type
 
+      # Use Ruby-style truthiness when truthy: :ruby option is enabled
+      if @truthy == :ruby
+        # In boolean context, we can optimize: use $T(a) || $T(b) instead of $ror/$rand
+        # This preserves short-circuit evaluation and is simpler than the helper functions
+        if @boolean_context
+          @need_truthy_helpers << :T
+          op_index = operator_index type
+          lgroup = LOGICAL.include?(left.type) && op_index < operator_index(left.type)
+          lgroup = true if left and left.type == :begin
+          rgroup = LOGICAL.include?(right.type) && op_index < operator_index(right.type)
+          rgroup = true if right.type == :begin
+
+          # Check if child is an and/or (possibly wrapped in begin node)
+          # If so, don't wrap with $T since it will output $T itself
+          left_inner = left.type == :begin && left.children.length == 1 ? left.children.first : left
+          right_inner = right.type == :begin && right.children.length == 1 ? right.children.first : right
+
+          if [:and, :or].include?(left_inner.type)
+            put '(' if lgroup; parse left; put ')' if lgroup
+          else
+            put '$T('; put '(' if lgroup; parse left; put ')' if lgroup; put ')'
+          end
+          put(type == :and ? ' && ' : ' || ')
+          if [:and, :or].include?(right_inner.type)
+            put '(' if rgroup; parse right; put ')' if rgroup
+          else
+            put '$T('; put '(' if rgroup; parse right; put ')' if rgroup; put ')'
+          end
+          return
+        end
+
+        @need_truthy_helpers << :T
+        thunk_start = es2015 ? '() => ' : 'function() {return '
+        thunk_end = es2015 ? '' : '}'
+        if type == :or
+          @need_truthy_helpers << :ror
+          put '$ror('
+          parse left
+          put ", #{thunk_start}"
+          parse right
+          put "#{thunk_end})"
+        else
+          @need_truthy_helpers << :rand
+          put '$rand('
+          parse left
+          put ", #{thunk_start}"
+          parse right
+          put "#{thunk_end})"
+        end
+        return
+      end
 
       if es2020 and type == :and
         node = rewrite(left, right)

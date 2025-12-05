@@ -59,6 +59,11 @@ module Ruby2JS
       @options[:or] = :nullish
     end
 
+    def truthy(mode = :ruby)
+      # Accept :ruby, :js, or true (legacy, treated as :ruby)
+      @options[:truthy] = mode
+    end
+
     def autoimport(identifier = nil, file = nil, &block)
       if block
         @options[:autoimports] = block
