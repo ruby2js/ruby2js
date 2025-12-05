@@ -477,8 +477,8 @@ module Ruby2JS
       # Note: es20XX methods are getters in JS, not in this list - they become this.esXXXX (no parens)
       SELF_METHODS = %i[
         put puts sput to_s output_location capture wrap compact enable_vertical_whitespace
-        parse scope jscope insert timestamp comments
-        visit visit_parameters multi_assign_declarations
+        parse parse_all scope jscope insert timestamp comments
+        visit visit_parameters multi_assign_declarations number_format operator_index
       ].freeze
 
       # Properties that need this. prefix but are accessed as getters (no parentheses)
@@ -492,6 +492,12 @@ module Ruby2JS
       # s(:send, ...) → s('send', ...)
       def on_send(node)
         target, method, *args = node.children
+
+        # Convert Set.new to empty array (Set methods become array methods)
+        # Ruby Set#include?/<</#empty? map to Array includes/push/length==0
+        if target&.type == :const && target.children == [nil, :Set] && method == :new
+          return s(:array)
+        end
 
         # Spec mode: Remove gem() calls
         if @selfhost_spec && target.nil? && method == :gem
