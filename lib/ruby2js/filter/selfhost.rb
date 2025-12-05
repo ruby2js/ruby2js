@@ -265,11 +265,14 @@ module Ruby2JS
           types.each do |type_node|
             next unless type_node.type == :sym
             type_name = type_node.children[0]
-            method_name = :"on_#{type_name}"
+            # Rename types with ! or ? for valid JS (send! -> send_bang)
+            renamed_type = rename_method(type_name)
+            method_name = :"on_#{renamed_type}"
 
             # Build: ClassName.prototype.on_type = function(args) { body }
+            # Use :deff to generate regular function (not arrow) to preserve `this` binding
             proto = s(:attr, s(:const, nil, class_sym), :prototype)
-            func = s(:block, s(:send, nil, :proc), processed_args, process(block_body))
+            func = s(:deff, nil, processed_args, process(block_body))
             assignments << s(:send, proto, :"#{method_name}=", func)
           end
         end
@@ -475,7 +478,7 @@ module Ruby2JS
       SELF_METHODS = %i[
         put puts sput to_s output_location capture wrap compact enable_vertical_whitespace
         parse scope jscope insert timestamp comments
-        visit visit_parameters
+        visit visit_parameters multi_assign_declarations
       ].freeze
 
       # Properties that need this. prefix but are accessed as getters (no parentheses)
