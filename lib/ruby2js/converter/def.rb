@@ -142,9 +142,9 @@ module Ruby2JS
       parse value 
     end
 
-    handle :restarg do |name|
+    handle :restarg do |name=nil|
       put '...'
-      put name
+      put name if name
     end
   end
 end

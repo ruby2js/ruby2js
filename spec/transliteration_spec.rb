@@ -69,9 +69,9 @@ describe Ruby2JS do
     end
 
     it "should parse mass assign" do
-      to_js( "a, b = 1, 2" ).must_equal 'let a = 1; var b = 2'
+      to_js( "a, b = 1, 2" ).must_equal 'let [a, b] = [1, 2]'
       to_js( "a = 1, 2" ).must_equal 'let a = [1, 2]'
-      to_js( "a, b = c" ).must_equal 'let a = c[0]; var b = c[1]'
+      to_js( "a, b = c" ).must_equal 'let [a, b] = c'
     end
 
     it "should parse chained assignment statements" do
@@ -79,7 +79,7 @@ describe Ruby2JS do
       to_js( "x.a = b = 1" ).must_equal 'let b; x.a = b = 1'
       to_js( "@a = b = 1" ).must_equal 'let b; this._a = b = 1'
       to_js( "@@a = b = 1" ).must_equal 'let b; this.constructor._a = b = 1'
-      to_js( "A = b = 1" ).must_equal 'let b; var A = b = 1'
+      to_js( "A = b = 1" ).must_equal 'let b; const A = b = 1'
     end
 
     it "should parse op assignments" do
@@ -185,32 +185,32 @@ describe Ruby2JS do
   describe "splat" do
     it "should pass splat" do
       to_js( "console.log 'a', 'b', *%w(c d e)" ).
-        must_equal 'console.log.apply(console, ["a", "b"].concat(["c", "d", "e"]))'
+        must_equal 'console.log("a", "b", ...["c", "d", "e"])'
     end
 
     it "should optimize splat as only arg" do
       to_js( "console.log *%w(a b c d e)" ).
-        must_equal 'console.log.apply(console, ["a", "b", "c", "d", "e"])'
+        must_equal 'console.log(...["a", "b", "c", "d", "e"])'
     end
 
     it "should receive splat" do
       to_js( "def f(a,*b); return b; end" ).
-        must_equal "function f(a) {var b = Array.prototype.slice.call(arguments, 1); return b}"
+        must_equal "function f(a, ...b) {return b}"
     end
 
     it "should receive unnamed splat" do
       to_js( "def f(a,*); return a; end" ).
-        must_equal "function f(a) {return a}"
+        must_equal "function f(a, ...) {return a}"
     end
 
     it "should receive splat and block" do
       to_js( "def f(a,*args, &block); end" ).
-        must_equal "function f(a) {var args = Array.prototype.slice.call(arguments, 2, arguments.length - 1); var block = arguments[arguments.length - 1]; if (arguments.length <= 1) {block = null} else if (typeof block !== \"function\") {args.push(block); block = null}}"
+        must_equal "function f(a, ...args, block) {}"
     end
 
     it "should handle splats in array literals" do
       to_js( "[*a,1,2,*b,3,4,*c]" ).
-        must_equal "a.concat([1, 2]).concat(b).concat([3, 4]).concat(c)"
+        must_equal "[...a, 1, 2, ...b, 3, 4, ...c]"
     end
   end
   
@@ -302,9 +302,9 @@ describe Ruby2JS do
     end
     
     it "nest expressions when needed in string interpolation" do
-      to_js( '"#{a}#{b}".length' ).must_equal '(a + b).length'
-      to_js( '"#{a}#{b}".split(" ")' ).must_equal '(a + b).split(" ")'
-      to_js( '"a#{b+c}"' ).must_equal '"a" + (b + c)'
+      to_js( '"#{a}#{b}".length' ).must_equal '`${a}${b}`.length'
+      to_js( '"#{a}#{b}".split(" ")' ).must_equal '`${a}${b}`.split(" ")'
+      to_js( '"a#{b+c}"' ).must_equal '`a${b + c}`'
     end
 
     it "should concatenate strings" do
@@ -325,35 +325,35 @@ describe Ruby2JS do
 
     it "should handle function calls" do
       to_js( 'a = lambda {|x| return x+1}; a.(nil, 1)').
-        must_equal 'let a = function(x) {return x + 1}; a.call(null, 1)'
+        must_equal 'let a = x => x + 1; a.call(null, 1)'
     end
   end
   
   describe 'string concat' do
     # it "should eval" do
-    #   to_js('eval( "hi" )').must_equal 'eval("hi")'
+    #   to_js('eval( "hi" )').must_equal 'eval(\"hi\")'
     # end
     
     it "should parse string " do
-      to_js( '"time is #{ Time.now() }, say #{ hello }"' ).must_equal '"time is " + Time.now() + ", say " + hello'
+      to_js( '"time is #{ Time.now() }, say #{ hello }"' ).must_equal '`time is ${Time.now()}, say ${hello}`'
     end
     
     it "should parse string" do
-      to_js( '"time is #{ Time.now() }"' ).must_equal '"time is " + Time.now()'
+      to_js( '"time is #{ Time.now() }"' ).must_equal '`time is ${Time.now()}`'
     end
     
     it "should parse interpolated symbols" do
-      to_js( ':"a#{b}c"' ).must_equal '"a" + b + "c"'
+      to_js( ':"a#{b}c"' ).must_equal '`a${b}c`'
     end
   end
 
   describe 'wow, such empty' do
     it "should handle totally empty interpolation" do
-      to_js('"#{}"').must_equal '""'
+      to_js('"#{}"').must_equal '``'
     end
 
     it "should handle mixed empty interpolation" do
-      to_js('"x#{}y"').must_equal '"x" + "" + "y"'
+      to_js('"x#{}y"').must_equal '`xy`'
     end
 
     it "should handle empty here docs" do
@@ -414,16 +414,16 @@ describe Ruby2JS do
 
     it "should parse if as an expression" do
       to_js( 'x = if a; b = 1; b; elsif c; x=1; x; end' ).
-        must_equal 'let x = a ? function() {var b = 1; return b}() : c ? ' +
-          'function() {var x = 1; return x}() : null' 
+        must_equal 'let x = a ? (() => {let b = 1; return b})() : c ? ' +
+          '(() => {let x = 1; return x})() : null'
     end
     
     it "should handle basic variable scope" do
       to_js( 'z = 1; if a; b; elsif c; d = proc do e = 1; end; end; z = d' ).
-        must_equal 'let d; var z = 1; if (a) {var b} else if (c) {d = function() {var e = 1}}; z = d'
+        must_equal 'let d; let z = 1; if (a) {let b} else if (c) {d = () => {let e = 1}}; z = d'
 
       to_js( 'if a == 1; b = 0; c.forEach {|d| if d; b += d; end} end' ).
-        must_equal 'if (a == 1) {var b = 0; c.forEach(function(d) {if (d) b += d})}'
+        must_equal 'if (a == 1) {let b = 0; c.forEach((d) => {if (d) b += d})}'
     end
     
     it "should handle while loop" do
@@ -443,7 +443,7 @@ describe Ruby2JS do
 
     it "should handle a redo within a loop" do
       to_js( 'while true do redo; end' ).
-        must_equal 'while (true) {var redo$; do {redo$ = false; ' +
+        must_equal 'while (true) {let redo$; do {redo$ = false; ' +
           'redo$ = true; continue} while(redo$)}'
     end
 
@@ -475,37 +475,37 @@ describe Ruby2JS do
 
     it "should parse case expressions" do
       to_js( 'x = case a; when true; b; else; c; end' ).
-        must_equal 'let x = function() {switch (a) {case true: return b; default: return c}}()'
+        must_equal 'let x = (() => {switch (a) {case true: return b; default: return c}})()'
     end
 
     it "should handle empty when blocks" do
       to_js( 'case a; when 1; when 2; b; end' ).
-        must_equal 'switch (a) {case 1: ; break; case 2: var b}'
+        must_equal 'switch (a) {case 1: ; break; case 2: let b}'
     end
 
     it "should handle a for loop" do
       to_js( 'a = {}; b = {}; for i in a; b[i] = a[i]; end' ).
-        must_equal 'let a = {}; var b = {}; for (var i in a) {b[i] = a[i]}'
+        must_equal 'let a = {}; let b = {}; for (let i in a) {b[i] = a[i]}'
     end
 
     it "should handle a for loop with an inclusive range" do
       to_js( 'a = 0; for i in 1..3; a += i; end' ).
-        must_equal 'let a = 0; for (var i = 1; i <= 3; i++) {a += i}'
+        must_equal 'let a = 0; for (let i = 1; i <= 3; i++) {a += i}'
     end
 
     it "should handle a for loop with an exclusive range" do
       to_js( 'a = 0; for i in 1...4; a += i; end' ).
-        must_equal 'let a = 0; for (var i = 1; i < 4; i++) {a += i}'
+        must_equal 'let a = 0; for (let i = 1; i < 4; i++) {a += i}'
     end
 
     it "should handle a stepped range with an inclusive range" do
       to_js( 'a = 0; (1..3).step(2) {|i| a += i}' ).
-        must_equal 'let a = 0; for (var i = 1; i <= 3; i += 2) {a += i}'
+        must_equal 'let a = 0; for (let i = 1; i <= 3; i += 2) {a += i}'
     end
 
     it "should handle a stepped range with an exclusive range" do
       to_js( 'a = 0; (1...4).step(2) {|i| a += i}' ).
-        must_equal 'let a = 0; for (var i = 1; i < 4; i += 2) {a += i}'
+        must_equal 'let a = 0; for (let i = 1; i < 4; i += 2) {a += i}'
     end
 
     it "should handle break" do
@@ -513,8 +513,8 @@ describe Ruby2JS do
     end
 
     it "should handle next as return" do
-      to_js( 'x.forEach { next }' ).must_equal 'x.forEach(function() {return})'
-      to_js( 'x.map {|i| next i}' ).must_equal 'x.map(function(i) {return i})'
+      to_js( 'x.forEach { next }' ).must_equal 'x.forEach(() => {return})'
+      to_js( 'x.map {|i| next i}' ).must_equal 'x.map((i) => {return i})'
     end
 
     it "should handle next as continue" do
@@ -554,7 +554,7 @@ describe Ruby2JS do
     
     it "should parse lambda" do
       to_js( 'lambda {}').must_equal '() => {}'
-      to_js( 'y = lambda {|x| x + 1}').must_equal 'let y = function(x) {return x + 1}'
+      to_js( 'y = lambda {|x| x + 1}').must_equal 'let y = x => x + 1'
     end
 
     it "should parse proc" do
@@ -562,200 +562,199 @@ describe Ruby2JS do
     end
 
     it "should support calls to anonymous functions" do
-      to_js( 'proc {}[]').must_equal '(function() {})()'
+      to_js( 'proc {}[]').must_equal '(() => {})()'
     end
 
     it "should handle basic variable scope" do
-      to_js( 'a = 1; lambda { a = 2; b = 1}').must_equal 'let a = 1; function() {a = 2; var b = 1}'
+      to_js( 'a = 1; lambda { a = 2; b = 1}').must_equal 'let a = 1; () => {a = 2; let b = 1}'
     end
 
     it "should handle shadow args" do
-      to_js( 'a = 1; lambda {|;a| a = 2}').must_equal 'let a = 1; function() {var a = 2}'
+      to_js( 'a = 1; lambda {|;a| a = 2}').must_equal 'let a = 1; () => {let a = 2}'
     end
 
     it "named functions aren't closures" do
       to_js( 'a = 1; def f; a = 2; b = 1; end').
-        must_equal 'let a = 1; function f() {var a = 2; var b = 1}'
+        must_equal 'let a = 1; function f() {let a = 2; let b = 1}'
     end
 
     it "should handle one argument" do
       to_js( 'lambda { |a| return a + 1 }').
-        must_equal 'function(a) {return a + 1}'
+        must_equal 'a => a + 1'
     end
     
     it "should handle arguments" do
       to_js( 'lambda { |a,b| return a + b }').
-        must_equal 'function(a, b) {return a + b}'
+        must_equal '(a, b) => a + b'
     end
     
     it "should pass functions" do
-      to_js( 'run("task"){ |task| do_run task}').must_equal 'run("task", function(task) {do_run(task)})'
+      to_js( 'run("task"){ |task| do_run task}').must_equal 'run("task", task => do_run(task))'
     end
     
     it "should handle variable scope" do
       to_js('a = 1; lambda {|b| c = 0; a = b - c }; lambda { |b| c = 1; a = b + c }').
-        must_equal 'let a = 1; function(b) {var c = 0; a = b - c}; function(b) {var c = 1; a = b + c}'
+        must_equal 'let a = 1; (b) => {let c = 0; a = b - c}; (b) => {let c = 1; a = b + c}'
     end
     
     it "should really handle variable scope" do
       to_js('a, d = 1, 2; lambda {|b| c = 0; a = b - c * d}; lambda { |b| c = 1; a = b + c * d}').
-        must_equal 'let a = 1; var d = 2; function(b) {var c = 0; a = b - c * d}; function(b) {var c = 1; a = b + c * d}'
+        must_equal 'let [a, d] = [1, 2]; (b) => {let c = 0; a = b - c * d}; (b) => {let c = 1; a = b + c * d}'
     end
     
     it "should parse with explicit return" do
-      to_js('Proc.new {return nil}').must_equal 'function() {return null}'
+      to_js('Proc.new {return nil}').must_equal '() => null'
     end
 
     it "should passthrough function definitions" do
       to_js('a=1; b=function(a,c) {return a + c}').
-        must_equal 'let a = 1; var b = function(a, c) {return a + c}'
+        must_equal 'let a = 1; let b = (a, c) => a + c'
     end
 
     unless (RUBY_VERSION.split('.').map(&:to_i) <=> [2, 7, 0]) == -1
       it "should handle numbered parameters" do
         to_js( 'lambda { _1 + _2 }').
-          must_equal 'function(_1, _2) {return _1 + _2}'
+          must_equal '(_1, _2) => _1 + _2'
       end
     end
   end
 
   describe 'object definition' do
     it "should parse class" do
-      to_js('class Person; end').must_equal 'function Person() {}'
+      to_js('class Person; end').must_equal 'class Person {}'
     end
 
     it "should parse include" do
       to_js('class Employee; include Person; end').
-        must_equal 'function Employee() {}; (function() {for (var $_ in Person) {Employee.prototype[$_] = Person[$_]}})()'
+        must_equal 'class Employee {}; (() => {let $0 = Employee.prototype; return Object.defineProperties($0, Object.getOwnPropertyDescriptors(Person))})()'
     end
 
     it "should parse class with attr_accessor" do
       to_js('class Person; attr_accessor :a; end').
-        must_equal 'function Person() {}; Object.defineProperty(Person.prototype, "a", {enumerable: true, configurable: true, get: function() {return this._a}, set: function(a) {this._a = a}})'
+        must_equal 'class Person {get a() {return this._a}; set a(a) {this._a = a}}'
     end
 
     it "should parse class with constructor" do
       to_js('class Person; def initialize(name); @name = name; end; end').
-        must_equal 'function Person(name) {this._name = name}'
+        must_equal 'class Person {constructor(name) {this._name = name}}'
     end
 
     it "should parse a nested class with constructor" do
       to_js('class A::Person; def initialize(name); @name = name; end; end').
-        must_equal 'A.Person = function(name) {this._name = name}'
+        must_equal 'A.Person = class {constructor(name) {this._name = name}}'
     end
 
     it "should parse class with constructor and method" do
       to_js('class Person; def initialize(name); @name = name; end; def name; @name; end; end').
-        must_equal 'function Person(name) {this._name = name}; Object.defineProperty(Person.prototype, "name", {enumerable: true, configurable: true, get: function() {return this._name}})'
+        must_equal 'class Person {constructor(name) {this._name = name}; get name() {return this._name}}'
     end
 
     it "should parse class with constructor and two methods" do
       to_js('class Person; def initialize(name); @name = name; end; def name; @name; end; def reset!; @name = nil; end; end').
-        must_equal 'function Person(name) {this._name = name}; Object.defineProperty(Person.prototype, "name", {enumerable: true, configurable: true, get: function() {return this._name}}); Person.prototype.reset = function() {this._name = null}'
+        must_equal 'class Person {constructor(name) {this._name = name}; get name() {return this._name}; reset() {this._name = null}}'
     end
 
     it "should strip ? from predicate method names in prototype" do
       to_js('class Person; def valid?; @name != nil; end; end').
-        must_equal 'function Person() {}; Person.prototype.valid = function() {this._name != null}'
+        must_equal 'class Person {valid() {this._name != null}}'
     end
 
     it "should parse class with constructor and methods with multiple arguments" do
       to_js('class Person; def initialize(name, surname); @name, @surname = name, surname; end; def full_name; @name  + @surname; end; end').
-        must_equal 'function Person(name, surname) {this._name = name; this._surname = surname}; Object.defineProperty(Person.prototype, "full_name", {enumerable: true, configurable: true, get: function() {return this._name + this._surname}})'
+        must_equal 'class Person {constructor(name, surname) {[this._name, this._surname] = [name, surname]}; get full_name() {return this._name + this._surname}}'
     end
 
     it "should collapse multiple methods in a class" do
       to_js('class C; def a; end; def b; end; end').
-        must_equal 'function C() {}; Object.defineProperties(C.prototype, {a: {enumerable: true, configurable: true, get: function() {}}, b: {enumerable: true, configurable: true, get: function() {}}})'
+        must_equal 'class C {get a() {}; get b() {}}'
     end
 
     it "should collapse getters and setters in a class" do
       to_js('class C; def a; end; def a=(a); end; end').
-        must_equal 'function C() {}; Object.defineProperty(C.prototype, "a", {enumerable: true, configurable: true, get: function() {}, set: function(a) {}})'
+        must_equal 'class C {get a() {}; set a(a) {}}'
     end
 
     it "should collapse properties" do
       to_js('class C; def self.a; end; def self.b; end; end').
-        must_equal 'function C() {}; Object.defineProperties(C, {a: {enumerable: true, configurable: true, get: function() {}}, b: {enumerable: true, configurable: true, get: function() {}}})'
+        must_equal 'class C {static get a() {}; static get b() {}}'
     end
 
     it "should parse class with inheritance" do
       to_js('class Employee < Person; end').
-        must_equal 'function Employee() {Person.call(this)}; Employee.prototype = Object.create(Person.prototype); Employee.prototype.constructor = Employee'
+        must_equal 'class Employee extends Person {}'
     end
 
     it "should handle super" do
       to_js('class A; def initialize(x); end; end; class B < A; end').
-        must_equal 'function A(x) {}; function B(x) {A.call(this, x)}; B.prototype = Object.create(A.prototype); B.prototype.constructor = B'
+        must_equal 'class A {constructor(x) {}}; class B extends A {}'
       to_js('class A; end; class B < A; def initialize(x); super; end; end').
-        must_equal 'function A() {}; function B(x) {A.call(this, x)}; B.prototype = Object.create(A.prototype); B.prototype.constructor = B'
+        must_equal 'class A {}; class B extends A {constructor(x) {super(x)}}'
       to_js('class A; end; class B < A; def initialize(x); super(3); end; end').
-        must_equal 'function A() {}; function B(x) {A.call(this, 3)}; B.prototype = Object.create(A.prototype); B.prototype.constructor = B'
+        must_equal 'class A {}; class B extends A {constructor(x) {super(3)}}'
       to_js('class A; end; class B < A; def foo(x); super; end; end').
-        must_equal 'function A() {}; function B() {A.call(this)}; B.prototype = Object.create(A.prototype); B.prototype.constructor = B; B.prototype.foo = function(x) {A.prototype.foo.call(this, x)}'
+        must_equal 'class A {}; class B extends A {foo(x) {super.foo(x)}}'
       to_js('class A; end; class B < A; def foo(x); super(3); end; end').
-        must_equal 'function A() {}; function B() {A.call(this)}; B.prototype = Object.create(A.prototype); B.prototype.constructor = B; B.prototype.foo = function(x) {A.prototype.foo.call(this, 3)}'
+        must_equal 'class A {}; class B extends A {foo(x) {super.foo(3)}}'
     end
 
     it "should parse class with class variables" do
       to_js('class Person; @@count=0; end').
-        must_equal 'function Person() {}; Person._count = 0'
+        must_equal 'class Person {}; Person._count = 0'
       to_js('class Person; @@count={}; @@count[1]=1; end').
-        must_equal 'function Person() {}; Person._count = {}; Person._count[1] = 1'
+        must_equal 'class Person {}; Person._count = {}; Person._count[1] = 1'
     end
 
     it "should parse class with instance variables, properties and methods" do
       to_js('class Person; @@count=0; def offset(x); return @@count+x; end; end').
-        must_equal 'function Person() {}; Person._count = 0; Person.prototype.offset = function(x) {return Person._count + x}'
+        must_equal 'class Person {offset(x) {return Person._count + x}}; Person._count = 0'
 
       to_js('class Person; @@count=0; def count; @@count; end; end').
-        must_equal 'function Person() {}; Person._count = 0; Object.defineProperty(Person.prototype, "count", {enumerable: true, configurable: true, get: function() {return Person._count}})'
+        must_equal 'class Person {get count() {return Person._count}}; Person._count = 0'
 
       to_js('class Person; @@count=0; def count(); return @@count; end; end').
-        must_equal 'function Person() {}; Person._count = 0; Person.prototype.count = function() {return Person._count}'
+        must_equal 'class Person {count() {return Person._count}}; Person._count = 0'
 
       to_js('class Person; def initialize(name); @name = name; end; def name; @name; end; @@count=0; def count; return @@count; end; end').
-        must_equal 'function Person(name) {this._name = name}; Object.defineProperty(Person.prototype, "name", {enumerable: true, configurable: true, get: function() {return this._name}}); Person._count = 0; Object.defineProperty(Person.prototype, "count", {enumerable: true, configurable: true, get: function() {return Person._count}})'
+        must_equal 'class Person {constructor(name) {this._name = name}; get name() {return this._name}; get count() {return Person._count}}; Person._count = 0'
 
       to_js('class Person; def initialize(name); @name = name; end; def name; @name; end; @@count=0; def count(); return @@count; end; end').
-        must_equal 'function Person(name) {this._name = name}; Object.defineProperty(Person.prototype, "name", {enumerable: true, configurable: true, get: function() {return this._name}}); Person._count = 0; Person.prototype.count = function() {return Person._count}'
+        must_equal 'class Person {constructor(name) {this._name = name}; get name() {return this._name}; count() {return Person._count}}; Person._count = 0'
     end
 
     it "should parse instance methods with class variables" do
       to_js('class Person; def count; @@count; end; end').
-        must_equal 'function Person() {}; Object.defineProperty(Person.prototype, "count", {enumerable: true, configurable: true, get: function() {return Person._count}})'
+        must_equal 'class Person {get count() {return Person._count}}'
     end
 
     it "should parse class methods with class variables" do
       to_js('class Person; def self.count(); return @@count; end; end').
-        must_equal 'function Person() {}; Person.count = function() {return Person._count}'
+        must_equal 'class Person {static count() {return Person._count}}'
 
       to_js('class Person; def self.count; @@count; end; end').
-        must_equal 'function Person() {}; Object.defineProperty(Person, "count", {enumerable: true, configurable: true, get: function() {return Person._count}})'
+        must_equal 'class Person {static get count() {return Person._count}}'
 
       to_js('class Person; def self.count=(count); @@count=count; end; end').
-        must_equal 'function Person() {}; Object.defineProperty(Person, "count", {enumerable: true, configurable: true, set: function(count) {Person._count = count}})'
+        must_equal 'class Person {static set count(count) {Person._count = count}}'
     end
 
     it "should parse constructor methods with class variables" do
       to_js('class Person; def initialize; @@count+=1; end; end').
-        must_equal 'function Person() {Person._count++}'
+        must_equal 'class Person {constructor() {Person._count++}}'
     end
 
     it "should parse class with class constants" do
       to_js('class Person; ID=7; end').
-        must_equal 'function Person() {}; Person.ID = 7'
+        must_equal 'class Person {}; Person.ID = 7'
     end
 
     it "should parse class with class methods" do
       to_js('class Person; def self.search(name); end; end').
-        must_equal 'function Person() {}; Person.search = function(name) {}'
+        must_equal 'class Person {static search(name) {}}'
     end
 
     it "should parse class with alias" do
       to_js('class Person; def f(name); end; alias :g :f; end').
-        must_equal 'function Person() {}; Person.prototype.f = ' +
-          'function(name) {}; Person.prototype.g = Person.prototype.f'
+        must_equal 'class Person {f(name) {}; }; Person.prototype.g = Person.prototype.f'
     end
 
     it "should parse method def" do
@@ -786,16 +785,16 @@ describe Ruby2JS do
     it "should parse singleton method and property definitions" do
       to_js('def self.method(); end').must_equal 'this.method = function() {}'
       to_js('def self.prop; @prop; end').
-        must_equal 'Object.defineProperty(this, "prop", {enumerable: true, configurable: true, get: function() {return this._prop}})'
+        must_equal 'Object.defineProperty(this, "prop", {enumerable: true, configurable: true, get() {return this._prop}})'
       to_js('def self.prop=(prop); @prop=prop; end').
-        must_equal 'Object.defineProperty(this, "prop", {enumerable: true, configurable: true, set: function(prop) {this._prop = prop}})'
+        must_equal 'Object.defineProperty(this, "prop", {enumerable: true, configurable: true, set(prop) {this._prop = prop}})'
       to_js('def self.prop; @prop; end; def self.prop=(prop); @prop=prop; end').
-        must_equal 'Object.defineProperty(this, "prop", {enumerable: true, configurable: true, get: function() {return this._prop}, set: function(prop) {this._prop = prop}})'
+        must_equal 'Object.defineProperty(this, "prop", {enumerable: true, configurable: true, get() {return this._prop}, set(prop) {this._prop = prop}})'
     end
 
     it "should parse nested classes" do
       to_js('class A; class B; class C; end; end; end').
-        must_equal 'function A() {}; A.B = function() {}; A.B.C = function() {}'
+        must_equal 'class A {}; A.B = class {}; A.B.C = class {}'
     end
     
     it "should convert self to this" do
@@ -805,51 +804,42 @@ describe Ruby2JS do
 
     it "should prefix intra-method calls with 'this.'" do
       to_js('class C; def m1; end; def m2; m1; end; end').
-        must_equal 'function C() {}; Object.defineProperties(C.prototype, ' +
-          '{m1: {enumerable: true, configurable: true, get: function() {}}, ' +
-          'm2: {enumerable: true, configurable: true, get: function() ' +
-          '{return this.m1}}})'
+        must_equal 'class C {get m1() {}; get m2() {return this.m1}}'
     end
 
     it "should prefix property assignments with this." do
       to_js('class C; def a=(x); @a=x; end; def b(); a+=1; end; end').
-        must_equal 'function C() {}; ' +
-          'Object.defineProperty(C.prototype, "a", {enumerable: true, ' +
-          'configurable: true, set: function(x) {this._a = x}}); ' +
-          'C.prototype.b = function() {a++}'
+        must_equal 'class C {set a(x) {this._a = x}; b() {this.a++}}'
     end
 
     it "should prefix bind references to methods as properties" do
       to_js('class C; def m1(); end; def m2; m1; end; end').
-        must_equal 'function C() {}; C.prototype.m1 = function() {}; ' +
-          'Object.defineProperty(C.prototype, ' +
-          '"m2", {enumerable: true, configurable: true, get: function() ' +
-          '{return this.m1.bind(this)}})'
+        must_equal 'class C {m1() {}; get m2() {return this.m1.bind(this)}}'
     end
 
     it "should prefix class constants referenced in methods by class name" do
       to_js('class C; X = 1; def m; X; end; end').
-        must_equal 'function C() {}; C.X = 1; Object.defineProperty(C.prototype, "m", {enumerable: true, configurable: true, get: function() {return C.X}})'
+        must_equal 'class C {get m() {return C.X}}; C.X = 1'
     end
 
     it "should insert var self = this when needed" do
       to_js('class C; def m; list.each do; @ivar; end; end; end').
-        must_equal 'function C() {}; Object.defineProperty(C.prototype, "m", {enumerable: true, configurable: true, get: function() {var self = this; return list.each(function() {self._ivar})}})'
+        must_equal 'class C {get m() {return list.each(() => this._ivar)}}'
 
       to_js('class C; def m(); list.each do; @ivar; @ivar; end; end; end').
-        must_equal 'function C() {}; C.prototype.m = function() {var self = this; list.each(function() {self._ivar; self._ivar})}'
+        must_equal 'class C {m() {list.each(() => {this._ivar; this._ivar})}}'
 
       to_js('class C < S; def m; list.each do; @ivar; end; end; end').
-        must_equal 'function C() {S.call(this)}; C.prototype = Object.create(S.prototype); C.prototype.constructor = C; Object.defineProperty(C.prototype, "m", {enumerable: true, configurable: true, get: function() {var self = this; return list.each(function() {self._ivar})}})'
+        must_equal 'class C extends S {get m() {return list.each(() => this._ivar)}}'
 
       to_js('class C < S; def m(); list.each do; @ivar; @ivar; end; end; end').
-        must_equal 'function C() {S.call(this)}; C.prototype = Object.create(S.prototype); C.prototype.constructor = C; C.prototype.m = function() {var self = this; list.each(function() {self._ivar; self._ivar})}'
+        must_equal 'class C extends S {m() {list.each(() => {this._ivar; this._ivar})}}'
 
       to_js('class C < S; def m(); list.each do; {n: @ivar}; end; end; end').
-        must_equal 'function C() {S.call(this)}; C.prototype = Object.create(S.prototype); C.prototype.constructor = C; C.prototype.m = function() {var self = this; list.each(function() {{n: self._ivar}})}'
+        must_equal 'class C extends S {m() {list.each(() => ({n: this._ivar}))}}'
 
       to_js('class C; def self.a(); window.addEventListener :unload do; self.b(); end; end; end').
-        must_equal 'function C() {}; C.a = function() {var self = this; window.addEventListener("unload", function() {self.b()})}'
+        must_equal 'class C {static a() {window.addEventListener("unload", () => this.b())}}'
     end
     
     it "should handle methods with multiple statements" do
@@ -859,7 +849,7 @@ describe Ruby2JS do
 
     it "should handle methods with optional arguments" do
       to_js( 'def method(opt=1); return opt; end' ).
-        must_equal "function method(opt) {if (typeof opt === 'undefined') opt = 1; return opt}"
+        must_equal "function method(opt=1) {return opt}"
     end
 
     it "should handle methods with block arguments" do
@@ -875,8 +865,7 @@ describe Ruby2JS do
   describe 'class extensions' do
     it 'should handle constructors' do
       to_js('++class F; def initialize() {}; end; end').
-        must_equal '(function() {var $_ = F.prototype; ' +
-          '(F = function F() {{}}).prototype = $_})()'
+        must_equal '[(F = function F() {{}}).prototype] = [F.prototype]'
     end
 
     it 'should handle methods' do
@@ -887,24 +876,19 @@ describe Ruby2JS do
     it 'should handle properties' do
       to_js('++class F; def p; 1; end; end').
         must_equal 'Object.defineProperty(F.prototype, "p", ' +
-          '{enumerable: true, configurable: true, ' +
-          'get: function() {return 1}})'
+          '{enumerable: true, configurable: true, get() {return 1}})'
     end
   end
 
   describe 'anonymous classes' do
     it 'should handle anonymous classes without inheritance' do
       to_js('x = Class.new do def f(); return 1; end; end').
-        must_equal 'let x = function() {function $$() {}; ' +
-         '$$.prototype.f = function() {return 1}; return $$}()'
+        must_equal 'let x = class {f() {return 1}}'
     end
 
     it 'should handle anonymous classes with inheritance' do
       to_js('x = Class.new(D) do def f(); return 1; end; end').
-        must_equal 'let x = function() {function $$() {D.call(this)}; ' +
-         '$$.prototype = Object.create(D.prototype); ' +
-         '$$.prototype.constructor = $$; ' +
-         '$$.prototype.f = function() {return 1}; return $$}()'
+        must_equal 'let x = class extends D {f() {return 1}}'
     end
   end
 
@@ -916,25 +900,25 @@ describe Ruby2JS do
 
     it "should handle module definitions" do
       to_js( 'module A; B=1; end' ).
-        must_equal 'A = function() {var B = 1; return {B: B}}()'
+        must_equal 'A = (() => {const B = 1; return {B}})()'
       to_js( 'module A; def b; return 1; end; end' ).
-        must_equal 'let A = {}; Object.defineProperty(A.prototype, "b", {enumerable: true, configurable: true, get: function() {return 1}})'
+        must_equal 'const A = {get b() {return 1}}'
       to_js( 'module A; def b(); return 1; end; end' ).
-        must_equal 'let A = {b: function() {return 1}}'
+        must_equal 'const A = {b() {return 1}}'
       to_js( 'module A; class B; def initialize; @c=1; end; end; end' ).
-        must_equal 'A = function() {function B() {this._c = 1}; return {B: B}}()'
+        must_equal 'const A = {B: class {constructor() {this._c = 1}}}'
     end
 
     it "should handle private sections" do
       to_js( 'module A; B=1; private; C=1; end' ).
-        must_equal 'A = function() {var B = 1; var C = 1; return {B: B}}()'
+        must_equal 'A = (() => {const B = 1; const C = 1; return {B}})()'
     end
 
     it "should handle nested modules" do
       to_js( 'module M; module N; def f(); end; end; end' ).
-        must_equal('var M = {N: {f: function() {}}}')
+        must_equal('const M = {N: {f() {}}}')
       to_js( 'module M; module N; end; module N::O; end; end' ).
-        must_equal('var M = {N: {}}; M.N.O = {}')
+        must_equal('const M = {N: {}}; M.N.O = {}')
     end
   end
 
@@ -949,9 +933,9 @@ describe Ruby2JS do
       to_js( 'new Date()' ).must_equal 'new Date()'
       to_js( 'new Date' ).must_equal 'new Date'
       to_js( 'new Promise do; y(); end' ).
-        must_equal 'new Promise(function() {y()})'
+        must_equal 'new Promise(() => y())'
       to_js( 'new Promise() do; y(); end' ).
-        must_equal 'new Promise(function() {y()})'
+        must_equal 'new Promise(() => y())'
       to_js( 'new xeogl.Model()' ).
         must_equal 'new xeogl.Model()'
     end
@@ -983,9 +967,9 @@ describe Ruby2JS do
       to_js( 'a.kind_of? b' ).must_equal "(a instanceof b)"
       to_js( 'a.instance_of? b' ).must_equal "(a.constructor == b)"
 
-      to_js( 'x unless a.is_a? b' ).must_equal "if (!(a instanceof b)) var x"
-      to_js( 'x unless a.kind_of? b' ).must_equal "if (!(a instanceof b)) var x"
-      to_js( 'x unless a.instance_of? b' ).must_equal "if (!(a.constructor == b)) var x"
+      to_js( 'x unless a.is_a? b' ).must_equal "if (!(a instanceof b)) let x"
+      to_js( 'x unless a.kind_of? b' ).must_equal "if (!(a instanceof b)) let x"
+      to_js( 'x unless a.instance_of? b' ).must_equal "if (!(a.constructor == b)) let x"
     end
 
     it "should handle is_a?, kind_of?, instance_of? with safe navigation" do
@@ -1006,15 +990,15 @@ describe Ruby2JS do
 
     unless (RUBY_VERSION.split('.').map(&:to_i) <=> [2, 3, 0]) == -1
       it "should support conditional attribute references" do
-        to_js('x=a&.b').must_equal 'let x = a && a.b'
+        to_js('x=a&.b').must_equal 'let x = a?.b'
       end
 
       it "should chain conditional attribute references" do
-        to_js('x=a&.b&.c').must_equal 'let x = a && a.b && a.b.c'
+        to_js('x=a&.b&.c').must_equal 'let x = a?.b?.c'
       end
 
       it "should handle method args with conditional chaining" do
-        to_js('x=a&.b(c, d)').must_equal 'let x = a && a.b(c, d)'
+        to_js('x=a&.b(c, d)').must_equal 'let x = a?.b(c, d)'
       end
     end
 
@@ -1024,7 +1008,7 @@ describe Ruby2JS do
       end
 
       it "should support => operator with simple destructuring" do
-        to_js('hash => {a:, b:}').must_equal 'let a = hash.a; var b = hash.b'
+        to_js('hash => {a:, b:}').must_equal 'let { a, b } = hash'
       end
     end
   end
@@ -1049,7 +1033,7 @@ describe Ruby2JS do
 
     it "should handle function declarations" do
       to_js("Proc.new {return null}\n").
-        must_equal "function() {\n  return null\n}"
+        must_equal "() => null"
     end
 
     it "should add a blank line before blocks" do
@@ -1104,7 +1088,7 @@ describe Ruby2JS do
     end
 
     it "should handle regular expressions with interpolation" do
-      to_js( '/a#{b}c/i' ).must_equal 'new RegExp("a" + b + "c", "i")'
+      to_js( '/a#{b}c/i' ).must_equal 'new RegExp(`a${b}c`, "i")'
     end
 
     it "should map Ruby's Regexp to JavaScript's RegExp" do
@@ -1157,48 +1141,47 @@ describe Ruby2JS do
 
     it "should handle catching any exception" do
       to_js( 'begin a; rescue => e; b; end' ).
-        must_equal 'try {var a} catch (e) {var b}'
+        must_equal 'try {let a} catch (e) {let b}'
     end
 
     it "catching exceptions without a variable" do
       to_js("begin a; rescue; p $!; end").
-        must_equal 'try {var a} catch ($EXCEPTION) {p($EXCEPTION)}'
+        must_equal 'try {let a} catch ($EXCEPTION) {p($EXCEPTION)}'
     end
 
     it "should handle catching a specific exception" do
       to_js( 'begin a; rescue StandardError => e; b; end' ).
-        must_equal 'try {var a} catch (e) {' +
-          'if (e instanceof StandardError) {var b} else {throw e}}'
+        must_equal 'try {let a} catch (e) {if (e instanceof StandardError) {let b} else {throw e}}'
     end
 
     it "should handle catching a String" do
       to_js( 'begin a; rescue String => e; b; end' ).
-        must_equal 'try {var a} catch (e) {if (typeof e == "string") {var b} else {throw e}}'
+        must_equal 'try {let a} catch (e) {if (typeof e == "string") {let b} else {throw e}}'
     end
 
     it "catching exceptions with a type but without a variable" do
       to_js("begin a; rescue Foo; end").
-        must_equal 'try {var a} catch ($EXCEPTION) {if ($EXCEPTION instanceof Foo) {} else {throw $EXCEPTION}}'
+        must_equal 'try {let a} catch ($EXCEPTION) {if ($EXCEPTION instanceof Foo) {} else {throw $EXCEPTION}}'
     end
 
     it "should handle an ensure clause" do
       to_js( 'begin a; ensure b; end' ).
-        must_equal 'try {var a} finally {var b}'
+        must_equal 'try {let a} finally {let b}'
     end
 
     it "should handle catching an exception and an ensure clause" do
       to_js( 'begin a; rescue => e; b; ensure; c; end' ).
-        must_equal 'try {var a} catch (e) {var b} finally {var c}'
+        must_equal 'try {let a} catch (e) {let b} finally {let c}'
     end
 
     it "should handle multiple rescue clauses with different variables" do
       to_js( 'begin; a; rescue FooError => foo; b(foo); rescue BarError => bar; c(bar); end' ).
-        must_equal 'try {var a} catch (foo) {if (foo instanceof FooError) {b(foo)} else if (foo instanceof BarError) {var bar = foo; c(bar)} else {throw foo}}'
+        must_equal 'try {let a} catch (foo) {if (foo instanceof FooError) {b(foo)} else if (foo instanceof BarError) {var bar = foo; c(bar)} else {throw foo}}'
     end
 
     it "should handle multiple rescue clauses with mixed variable usage" do
       to_js( 'begin; a; rescue FooError => e; b(e); rescue BarError; c; end' ).
-        must_equal 'try {var a} catch (e) {if (e instanceof FooError) {b(e)} else if (e instanceof BarError) {var c} else {throw e}}'
+        must_equal 'try {let a} catch (e) {if (e instanceof FooError) {b(e)} else if (e instanceof BarError) {let c} else {throw e}}'
     end
 
     it "should handle implicit begin in methods" do
@@ -1218,46 +1201,46 @@ describe Ruby2JS do
 
     it "should handle retry in rescue block" do
       to_js( 'begin; a; rescue; retry; end' ).
-        must_equal 'while (true) {try {var a; break} catch ($EXCEPTION) {continue}}'
+        must_equal 'while (true) {try {let a; break} catch {continue}}'
     end
 
     it "should handle retry with exception type" do
       to_js( 'begin; a; rescue StandardError; retry; end' ).
-        must_equal 'while (true) {try {var a; break} catch ($EXCEPTION) {if ($EXCEPTION instanceof StandardError) {continue} else {throw $EXCEPTION}}}'
+        must_equal 'while (true) {try {let a; break} catch ($EXCEPTION) {if ($EXCEPTION instanceof StandardError) {continue} else {throw $EXCEPTION}}}'
     end
 
     it "should handle neither a rescue nor an ensure being present" do
-      to_js( 'begin a; b; end' ).must_equal '{var a; var b}'
+      to_js( 'begin a; b; end' ).must_equal '{let a; let b}'
     end
 
     it "should handle else clause in begin/rescue" do
       to_js( 'begin; a; rescue => e; b; else; c; end' ).
-        must_equal 'let $no_exception = false; try {var a; $no_exception = true} catch (e) {var b}; if ($no_exception) {var c}'
+        must_equal 'let $no_exception = false; try {let a; $no_exception = true} catch (e) {let b}; if ($no_exception) {let c}'
     end
 
     it "should handle else clause with ensure" do
       to_js( 'begin; a; rescue; b; else; c; ensure; d; end' ).
-        must_equal 'let $no_exception = false; try {var a; $no_exception = true} catch ($EXCEPTION) {var b} finally {var d}; if ($no_exception) {var c}'
+        must_equal 'let $no_exception = false; try {let a; $no_exception = true} catch {let b} finally {let d}; if ($no_exception) {let c}'
     end
 
     it "should hoist variables declared in try that are used in finally" do
-      to_js( 'begin; x = 1; rescue; y; ensure; z(x); end', eslevel: 2015 ).
-        must_equal '{let x; try {x = 1} catch ($EXCEPTION) {let y} finally {z(x)}}'
+      to_js( 'begin; x = 1; rescue; y; ensure; z(x); end', eslevel: 2020 ).
+        must_equal '{let x; try {x = 1} catch {let y} finally {z(x)}}'
     end
 
     it "should not hoist variables already declared" do
-      to_js( 'x = 0; begin; x = 1; ensure; z(x); end', eslevel: 2015 ).
+      to_js( 'x = 0; begin; x = 1; ensure; z(x); end', eslevel: 2020 ).
         must_equal 'let x = 0; try {x = 1} finally {z(x)}'
     end
 
     it "should not hoist variables not used in finally" do
-      to_js( 'begin; x = 1; ensure; z(); end', eslevel: 2015 ).
+      to_js( 'begin; x = 1; ensure; z(); end', eslevel: 2020 ).
         must_equal 'try {let x = 1} finally {z()}'
     end
 
     it "should handle begin as an expression" do
       to_js( 'z = begin; x = 1; x; end' ).
-        must_equal 'let z = function() {var x = 1; return x}()'
+        must_equal 'let z = (() => {let x = 1; return x})()'
     end
   end
 
@@ -1287,8 +1270,8 @@ describe Ruby2JS do
     end
 
     it "should not replace ivars in class definitions" do
-      to_js( 'class F; def f; @x; end; end', ivars: {:@x => 1} ).
-        must_equal 'function F() {}; Object.defineProperty(F.prototype, "f", {enumerable: true, configurable: true, get: function() {return this._x}})'
+      to_js( 'class F; def f; @x; end; end', ivars: {:@y => 1} ).
+        must_equal 'class F {get f() {return this._x}}'
     end
   end
 

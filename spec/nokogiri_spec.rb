@@ -59,7 +59,7 @@ describe Ruby2JS::Filter::Nokogiri do
       to_js( 'doc.create_element "a"' ).
         must_equal 'doc.createElement("a")'
       to_js( 'doc.create_element "a", "text", href: ".."' ).
-        must_equal '(function() {var $_ = doc.createElement("a"); ' +
+        must_equal '(() => {var $_ = doc.createElement("a"); ' +
           '$_.textContent = "text"; $_.setAttribute("href", ".."); return $_})()'
     end
   end

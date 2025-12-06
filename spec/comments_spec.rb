@@ -77,14 +77,14 @@ describe Ruby2JS::Filter::Functions do
       js.must_include "//subclass\nfunction Subclass() {\n  " +
         "Class.call(this)\n};"
       js.must_include "//constructor\nfunction Constructor() {"
-      js.must_include "//method\nMethod.prototype.method = function() {"
+      js.must_include "//method\nMethod.prototype.method = () => {"
       js.must_include "//attribute\n" +
        "Object.defineProperty(\n  Attribute.prototype,\n  " +
        '"attribute"'
       js.must_include "//setter\n" +
        "Object.defineProperty(\n  Setter.prototype,\n  " +
        '"setter"'
-      js.must_include "//classmethod\nClassMethod.classmethod = function() {"
+      js.must_include "//classmethod\nClassMethod.classmethod = () => {"
       js.must_include "//classattribute\nObject.defineProperty(\n  " +
         "ClassAttribute,\n  \"classattribute\""
       js.must_include "//classsetter\nObject.defineProperty(\n  " +
@@ -138,10 +138,10 @@ describe Ruby2JS::Filter::Functions do
       js.must_include "//statement\nvar statement;"
       js.must_include "//subclass\n//constructor\nfunction Subclass() {\n  " +
         "Class.call(this)\n};"
-      js.must_include "//method\nSubclass.prototype.method = function() {"
+      js.must_include "//method\nSubclass.prototype.method = () => {"
       js.must_include "//attribute\n  attribute: {"
       js.must_include "//setter\n  setter: {"
-      js.must_include "//classmethod\nSubclass.classmethod = function() {"
+      js.must_include "//classmethod\nSubclass.classmethod = () => {"
       js.must_include "//classattribute\n  classattribute: {"
       js.must_include "//classsetter\n  classsetter: {"
     end

@@ -375,15 +375,10 @@ module Ruby2JS
               type = :begin if block.first.type == :return
             end
 
-            if createClass
-              pairs << s(:pair, s(:sym, mname), child.updated(:block,
-                [s(:send, nil, :proc), args, process(s(type, *block))]))
-            else
-              pairs << child.updated(
-                ReactLifecycle.include?(mname.to_s) ? :defm : :def, 
-                [mname, args, process(s(type, *block))]
-              )
-            end
+            pairs << child.updated(
+              ReactLifecycle.include?(mname.to_s) ? :defm : :def,
+              [mname, args, process(s(type, *block))]
+            )
 
             # retain comment
             child_comments = @comments[child]

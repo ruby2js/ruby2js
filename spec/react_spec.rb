@@ -31,17 +31,17 @@ describe Ruby2JS::Filter::React do
 
     it "should create methods" do
       to_js( 'class Foo<React; def f(); end; end' ).
-        must_include 'f: function() {}'
+        must_include 'f: () => {}'
     end
 
     it "should convert initialize methods to getInitialState" do
       to_js( 'class Foo<React; def initialize(); end; end' ).
-        must_include 'getInitialState: function() {return {}}'
+        must_include 'getInitialState: () => {return {}}'
     end
 
     it "should create default getInitialState methods" do
       to_js( 'class Foo<React; def foo(); @i=1; end; end' ).
-        must_include 'getInitialState: function() {return {}}'
+        must_include 'getInitialState: () => {return {}}'
     end
 
     it "should autobind event handlers" do
@@ -52,18 +52,18 @@ describe Ruby2JS::Filter::React do
 
     it "should initialize, accumulate, and return state" do
       to_js( 'class Foo<React; def initialize; @a=1; b=2; @b = b; end; end' ).
-        must_include 'getInitialState: function() {this.state = {a: 1}; ' +
+        must_include 'getInitialState: () => {this.state = {a: 1}; ' +
           'var b = 2; this.state.b = b; return this.state}'
     end
 
     it "should collapse instance variable assignments into a return" do
       to_js( 'class Foo<React; def initialize; @a=1; @b=2; end; end' ).
-        must_include 'getInitialState: function() {return {a: 1, b: 2}}'
+        must_include 'getInitialState: () => {return {a: 1, b: 2}}'
     end
 
     it "should handle parallel instance variable assignments" do
       to_js( 'class Foo<React; def initialize; @a=@b=1; end; end' ).
-        must_include 'getInitialState: function() {return {a: 1, b: 1}}'
+        must_include 'getInitialState: () => {return {a: 1, b: 1}}'
     end
 
     it "should handle operator assignments on state values" do
@@ -133,7 +133,7 @@ describe Ruby2JS::Filter::React do
     it "should create complex nested elements" do
       result = to_js('class Foo<React; def render; _a {c="c"; _b c}; end; end')
 
-      result.must_include 'React.createElement.apply(React, function() {'
+      result.must_include 'React.createElement.apply(React, () => {'
       result.must_include 'var $_ = ["a", null];'
       result.must_include '$_.push(React.createElement("b", null, c));'
       result.must_include 'return $_'
@@ -150,7 +150,7 @@ describe Ruby2JS::Filter::React do
       result = to_js('class Foo<React; def render; _a {c="c"; ' +
         'React.createElement("b", null, c)}; end; end')
 
-      result.must_include 'React.createElement.apply(React, function() {'
+      result.must_include 'React.createElement.apply(React, () => {'
       result.must_include 'var $_ = ["a", null];'
       result.must_include '$_.push(React.createElement("b", null, c));'
       result.must_include 'return $_'
@@ -161,7 +161,7 @@ describe Ruby2JS::Filter::React do
       result = to_js( 'class Foo<React; def render; ' +
         'React.createElement("a") {_b}; end; end' )
       result.must_include 'React.createElement.apply(React,'
-      result.must_include 'function() {var $_ = ["a"];'
+      result.must_include '() => {var $_ = ["a"];'
       result.must_include '$_.push(React.createElement("b")'
     end
 
@@ -171,14 +171,14 @@ describe Ruby2JS::Filter::React do
         'do |i| _li i; end; end; end')
 
       result.must_include 'React.createElement("ul", null,'
-      result.must_include 'list.map(function(i) {'
+      result.must_include 'list.map((i) => {'
       result.must_include 'return React.createElement("li", null, i)'
 
       # multiple elements each iteration
       result = to_js('class Foo<React; def render; _dl list ' + 
         'do |i| _dt i.term; _dd i.defn; end; end; end')
 
-      result.must_include 'React.createElement.apply(React, function() {'
+      result.must_include 'React.createElement.apply(React, () => {'
       result.must_include 'var $_ = ["dl", null];'
       result.must_include 'list.forEach(function(i)'
       result.must_include '$_.push(React.createElement("dt", null, i.term))'
@@ -193,14 +193,14 @@ describe Ruby2JS::Filter::React do
         'do |i| _li i; end; end; end')
 
       result.must_include 'React.createElement("ul", {className: "todos"},'
-      result.must_include 'list.map(function(i) {'
+      result.must_include 'list.map((i) => {'
       result.must_include 'return React.createElement("li", null, i)'
 
       # multiple elements each iteration
       result = to_js('class Foo<React; def render; _dl.terms list ' + 
         'do |i| _dt i.term; _dd i.defn; end; end; end')
 
-      result.must_include 'React.createElement.apply(React, function() {'
+      result.must_include 'React.createElement.apply(React, () => {'
       result.must_include 'var $_ = ["dl", {className: "terms"}];'
       result.must_include 'list.forEach(function(i)'
       result.must_include '$_.push(React.createElement("dt", null, i.term))'
@@ -250,7 +250,7 @@ describe Ruby2JS::Filter::React do
 
     it "should handle stateless components" do
       to_js( 'Button = ->(x) { %x(<button>{x}</button>)}' ).
-        must_equal 'let Button = function(x) {return React.createElement("button", null, x)}'
+        must_equal 'let Button = (x) => {return React.createElement("button", null, x)}'
     end
   end
 
@@ -427,14 +427,14 @@ describe Ruby2JS::Filter::React do
 
     it "should create temporary variables when blocks are involved" do
       to_js( 'class Foo<React; def f; foo {@a=1}; b=@a; end; end' ).
-        must_include 'foo(function() {self.setState({a: $a = 1})}); '
+        must_include 'foo(() => {self.setState({a: $a = 1})}); '
           'var b = $a; return this.setState({a: $a})'
     end
 
     it "should create temporary variables when blocks+opasgn are involved" do
       to_js( 'class Foo<React; def f; foo {@a+=1}; b=@a; end; end' ).
         must_include 'var $a = this.state.a; ' +
-          'foo(function() {self.setState({a: ++$a})}); var b = $a; ' +
+          'foo(() => {self.setState({a: ++$a})}); var b = $a; ' +
           'return this.setState({a: $a})'
     end
 
@@ -517,7 +517,7 @@ describe Ruby2JS::Filter::React do
 
     it "should handle static methods" do
       to_js( 'class Foo<React; def self.one(); return 1; end; end' ).
-        must_include 'statics: {one: function() {return 1}}'
+        must_include 'statics: {one: () => {return 1}}'
     end
   end
 
@@ -531,25 +531,25 @@ describe Ruby2JS::Filter::React do
     it "should should insert props arg on componentWillReceiveProps" do
       to_js( 'class Foo<React; def componentWillReceiveProps();' +
         '@foo = @@foo; end; end' ).
-        must_include 'function($$props) {this.setState({foo: $$props.foo})}'
+        must_include '($$props) => {this.setState({foo: $$props.foo})}'
     end
 
     it "should should use props arg on componentWillReceiveProps" do
       to_js( 'class Foo<React; def componentWillReceiveProps(props);' +
         '@foo = @@foo; end; end' ).
-        must_include 'function(props) {this.setState({foo: props.foo})}'
+        must_include '(props) => {this.setState({foo: props.foo})}'
     end
   end
 
   describe "controlled components" do
     it "should should automatically create onChange value functions" do
       to_js( 'class Foo<React; def render; _input value: @x; end; end' ).
-        must_include 'onChange: function(event) {self.setState({x: event.target.value}'
+        must_include 'onChange: (event) => {self.setState({x: event.target.value}'
     end
 
     it "should should automatically create onChange checked functions" do
       to_js( 'class Foo<React; def render; _input checked: @x; end; end' ).
-        must_include 'onChange: function() {self.setState({x: !self.state.x}'
+        must_include 'onChange: () => {self.setState({x: !self.state.x}'
     end
 
     it "should should retain onChange functions" do

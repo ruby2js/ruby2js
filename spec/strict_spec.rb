@@ -9,15 +9,15 @@ describe 'use strict' do
   
   describe :strict do
     it "should handle one line scripts" do
-      to_js( 'a=1' ).must_equal '"use strict"; var a = 1'
+      to_js( 'a=1' ).must_equal '"use strict"; let a = 1'
     end
 
     it "should handle multi statement scripts" do
-      to_js( 'a=1; b=1' ).must_equal '"use strict"; var a = 1; var b = 1'
+      to_js( 'a=1; b=1' ).must_equal '"use strict"; let a = 1; let b = 1'
     end
 
     it "should handle multi line scripts" do
-      to_js( "a=1;\nb=1" ).must_equal "\"use strict\";\nvar a = 1;\nvar b = 1"
+      to_js( "a=1;\nb=1" ).must_equal "\"use strict\";\nlet a = 1;\nlet b = 1"
     end
   end
 end
