@@ -386,6 +386,24 @@ With `truthy: :ruby` enabled:
 The `truthy: :ruby` option adds small helper functions and wraps expressions in function calls to preserve short-circuit evaluation. This has minimal performance impact but does increase code size slightly.
 {% endrendercontent %}
 
+## Module
+
+Controls the module format for import/export statements. The default is `:esm` (ES Modules).
+
+```ruby
+# Configuration - use ES Modules (default)
+esm_modules
+
+# Configuration - use CommonJS
+cjs_modules
+```
+
+```ruby
+# API usage
+puts Ruby2JS.convert("export x = 1", module: :esm)   # => export let x = 1
+puts Ruby2JS.convert("export x = 1", module: :cjs)   # => exports.x = 1
+```
+
 ## Scope
 
 Make all Instance Variables (ivars) in a given scope available to the
@@ -395,6 +413,15 @@ script.  See also [ivars](#ivars).
 require "ruby2js"
 @x = 5
 puts Ruby2JS.convert("X = @x", scope: self)
+```
+
+## Strict
+
+Adds `"use strict";` at the beginning of the generated JavaScript output.
+
+```ruby
+puts Ruby2JS.convert("x = 1", strict: true)
+# => "use strict"; let x = 1
 ```
 
 ## Template Literal Tags
@@ -465,10 +492,12 @@ An example of all of the supported options:
   "include_all": true,
   "include_only": ["max"],
   "import_from_skypack": true,
+  "module": "esm",
   "nullish_to_s": true,
   "or": "nullish",
-  "require_recurse": true,
   "preset": true,
+  "require_recursive": true,
+  "strict": true,
   "template_literal_tags": ["color"],
   "truthy": "ruby",
   "underscored_private": true,
