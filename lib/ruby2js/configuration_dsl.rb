@@ -51,6 +51,10 @@ module Ruby2JS
       @options[:underscored_private] = false
     end
 
+    def auto_or
+      @options[:or] = :auto
+    end
+
     def logical_or
       @options[:or] = :logical
     end

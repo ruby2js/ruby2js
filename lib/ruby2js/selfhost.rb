@@ -490,7 +490,6 @@ module Ruby2JS
           combined_code,
           eslevel: 2022,
           underscored_private: true,  # Required: prototype methods can't access private fields
-          or: :nullish,
           nullish_to_s: true,  # Needed for conditional expressions in string interpolation
           filters: FILTERS
         ).to_s

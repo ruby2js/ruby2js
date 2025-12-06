@@ -115,11 +115,16 @@ module Ruby2JS
 
       put '(' if lgroup; parse left; put ')' if lgroup
 
-      # Use || in boolean contexts, ?? in value contexts (when @or == :nullish)
-      # @boolean_context is set by parse_condition for if/while/until conditions
-      # boolean_expression? detects comparisons, predicates, etc. within operands
-      use_nullish = @or == :nullish && es2020 && !@boolean_context &&
-        !boolean_expression?(left) && !boolean_expression?(right)
+      # Determine whether to use ?? or ||
+      # :auto (default) - context-aware: || in boolean contexts, ?? in value contexts
+      # :nullish - always use ??
+      # :logical - always use ||
+      use_nullish = case @or
+        when :logical then false
+        when :nullish then !boolean_expression?(left) && !boolean_expression?(right)
+        else # :auto - context-aware
+          !@boolean_context && !boolean_expression?(left) && !boolean_expression?(right)
+        end
 
       put (type==:and ? ' && ' : (use_nullish ? ' ?? ' : ' || '))
       put '(' if rgroup; parse right; put ')' if rgroup

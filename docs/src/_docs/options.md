@@ -311,9 +311,9 @@ puts Ruby2JS.convert('"hello #{x}"', nullish_to_s: true, eslevel: 2020)
 
 Ruby's `||` operator treats only `nil` and `false` as falsy. JavaScript's `||` operator treats `null`, `undefined`, `false`, `0`, `""`, and `NaN` as falsy. This difference can cause subtle bugs when transpiling Ruby code.
 
-**The default is `:nullish`**, which is context-aware:
-- In **boolean contexts** (conditions for `if`, `while`, `unless`, `until`, ternary), Ruby2JS uses `||`
-- In **value contexts** (assignments, return values, arguments), Ruby2JS uses `??`
+**The default is `:auto`**, which is context-aware:
+- In **boolean contexts** (conditions for `if`, `while`, `unless`, `until`, ternary), uses `||`
+- In **value contexts** (assignments, return values, arguments), uses `??`
 
 This gives the best of both worlds: conditions work naturally, while assignments preserve values like `0` and `""`.
 
@@ -325,20 +325,22 @@ a = 1 if b || c          # => if (b || c) a = 1
 
 # Value context - uses ??
 x = a || b               # => let x = a ?? b
-x ||= 0                  # => x = x ?? 0 (preserves 0)
+x ||= 0                  # => x ??= 0 (preserves 0)
 ```
 
-| Ruby Expression | `or: :nullish` (default) | `or: :logical` |
-|-----------------|--------------------------|----------------|
-| `x = count \|\| 0` | `x = count ?? 0` | `x = count \|\| 0` |
-| `if a \|\| b` | `if (a \|\| b)` | `if (a \|\| b)` |
-| `x = 0 \|\| 42` | `x = 0` (0 is kept) | `x = 42` (0 is falsy in JS) |
+Three options are available:
+
+| Option | Boolean context (`if a \|\| b`) | Value context (`x = a \|\| b`) |
+|--------|--------------------------------|-------------------------------|
+| `:auto` (default) | `if (a \|\| b)` | `let x = a ?? b` |
+| `:nullish` | `if (a ?? b)` | `let x = a ?? b` |
+| `:logical` | `if (a \|\| b)` | `let x = a \|\| b` |
 
 {% rendercontent "docs/note", type: "warning" %}
-**Note about `false`:** In value contexts, `false || x` will return `false` (not `x`) because `??` doesn't treat `false` as nullish. Use `or: :logical` or `truthy: :ruby` for exact Ruby semantics with `false`.
+**Note about `false`:** In value contexts with `:auto` or `:nullish`, `false || x` will return `false` (not `x`) because `??` doesn't treat `false` as nullish. Use `or: :logical` or `truthy: :ruby` for exact Ruby semantics with `false`.
 {% endrendercontent %}
 
-Ruby2JS also uses `||` when operands are detected as boolean expressions (comparisons, predicates ending in `?`, negations):
+With `:auto` and `:nullish`, Ruby2JS also uses `||` when operands are detected as boolean expressions (comparisons, predicates ending in `?`, negations):
 
 ```ruby
 a > 5 || b < 3      # => a > 5 || b < 3
@@ -348,18 +350,19 @@ a.empty? || b.nil?  # => a.empty || b.nil
 ### Configuration
 
 ```ruby
-# Configuration file - use nullish with context-awareness (default)
-nullish_or
-
-# Configuration file - always use logical ||
-logical_or
+# Configuration file
+auto_or      # context-aware (default)
+nullish_or   # always use ?? (except for boolean expressions)
+logical_or   # always use ||
 ```
 
 ```ruby
 # API usage
-puts Ruby2JS.convert("x = a || b")                # => let x = a ?? b (default)
-puts Ruby2JS.convert("if a || b; x; end")         # => if (a || b) let x (default)
-puts Ruby2JS.convert("x = a || b", or: :logical)  # => let x = a || b
+puts Ruby2JS.convert("x = a || b")                 # => let x = a ?? b
+puts Ruby2JS.convert("if a || b; x; end")          # => if (a || b) let x
+puts Ruby2JS.convert("x = a || b", or: :nullish)   # => let x = a ?? b
+puts Ruby2JS.convert("if a || b; x; end", or: :nullish)  # => if (a ?? b) let x
+puts Ruby2JS.convert("x = a || b", or: :logical)   # => let x = a || b
 ```
 
 ## Truthy
@@ -507,7 +510,7 @@ An example of all of the supported options:
   "import_from_skypack": true,
   "module": "esm",
   "nullish_to_s": true,
-  "or": "nullish",
+  "or": "auto",
   "preset": true,
   "require_recursive": true,
   "strict": true,

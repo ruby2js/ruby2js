@@ -72,7 +72,7 @@ module Ruby2JS
       @eslevel = 2020
       @strict = false
       @comparison = :equality
-      @or = :nullish
+      @or = :auto
       @truthy = :js
       @boolean_context = false
       @need_truthy_helpers = Set.new

@@ -312,7 +312,7 @@ describe 'Ruby2JS::Filter::Preact' do
 
     it "should handle mixed strings and a value" do
       to_js( 'class Foo<Preact; def render; _a.b class: c; end; end' ).
-        must_include 'Preact.h("a", {class: "b " + (c || "")})'
+        must_include 'Preact.h("a", {class: "b " + (c ?? "")})'
     end
 
     it "should handle mixed strings and a conditional value" do
