@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   This better matches Ruby semantics where only `nil` and `false` are falsy (preserving `0`, `""`).
   To restore JavaScript's `||` behavior, set `or: :logical` or use the `logical_or` config option.
   Note: `false || x` will now return `false` instead of `x`; use `truthy: :ruby` for exact Ruby semantics.
+- **Preset now targets ES2022** - The `preset` option now defaults to ES2022 (was ES2021).
+  ES2022 features include private fields (`#x`), the `at()` method, and static class fields.
 
 ### Changed
 
