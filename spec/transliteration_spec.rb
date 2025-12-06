@@ -1280,4 +1280,149 @@ describe Ruby2JS do
       to_js("::A").must_equal 'Function("return this")().A'
     end
   end
+
+  describe 'method_missing' do
+    it 'should handle method_missing with args' do
+      to_js('class A; def method_missing(method, *args); end; end').
+        must_equal(
+          'class A$ {method_missing(method, ...args) {}}; ' +
+          'function A(...args) {' +
+            'return new Proxy(new A$(...args), {get(obj, prop) {' +
+              'if (prop in obj) {'+
+                'return obj[prop]'+
+              '} else {'+
+                'return (...args) => (obj.method_missing(prop, ...args))'+
+              '}'+
+            '}})' +
+          '}'
+        )
+    end
+
+    it 'should handle method_missing with no args' do
+      to_js('class A; def method_missing(method); end; end').
+        must_equal(
+          'class A$ {method_missing(method) {}}; ' +
+          'function A(...args) {' +
+            'return new Proxy(new A$(...args), {get(obj, prop) {' +
+              'if (prop in obj) {'+
+                'return obj[prop]'+
+              '} else {'+
+                'return obj.method_missing(prop)'+
+              '}'+
+            '}})' +
+          '}'
+        )
+    end
+  end
+
+  describe 'async/await' do
+    it "should handle async named functions" do
+      to_js( 'async def f(x); end' ).must_equal 'async function f(x) {}'
+    end
+
+    it "should handle async named methods in classes" do
+      to_js( 'class F; async def m(x); end; end' ).
+        must_include 'class F {async m(x) {}}'
+    end
+
+    it "should handle async class methods" do
+      to_js( 'class F; async def self.m(x); end; end' ).
+        must_equal 'class F {static async m(x) {}}'
+    end
+
+    it "should handle async instance methods" do
+      to_js( 'async def o.m(x); end' ).
+        must_include 'o.m = async function(x) {}'
+    end
+
+    it "should handle async lambda functions" do
+      to_js( 'async lambda {|x| x}' ).
+        must_equal 'async x => x'
+      to_js( 'async lambda {|x| x}[]' ).
+        must_equal '(async x => x)()'
+    end
+
+    it "should handle async procs" do
+      to_js( 'async proc {|x| x}' ).
+        must_equal 'async x => x'
+      to_js( 'async proc {|x| x}[]' ).
+        must_equal '(async x => x)()'
+    end
+
+    it "should handle async blocks" do
+      to_js( 'it "works", async do end' ).
+        must_equal 'it("works", async () => {})'
+      to_js( 'async {x=1}[]' ).
+        must_equal '(async () => {let x = 1})()'
+    end
+
+    it "should handle async arrow functions" do
+      to_js( 'async -> (x) {x}' ).
+        must_equal 'async x => x'
+      to_js( 'async -> () {x}[]' ).
+        must_equal '(async () => x)()'
+    end
+
+    it "should auto bind async methods referenced as properties" do
+      to_js('class C; async def m1(x); end; def m2; m1; end; end').
+        must_equal 'class C {async m1(x) {}; get m2() {return this.m1.bind(this)}}'
+    end
+
+    it "should handle await with simple method calls" do
+      to_js( 'await f(x)' ).must_equal 'await f(x)'
+    end
+
+    it "should handle await with nested method calls" do
+      to_js( 'await o.f(x)' ).must_equal 'await o.f(x)'
+    end
+
+    it "should handle await with blocks" do
+      to_js( 'await f(x) {|y| y}' ).must_equal 'await f(x, y => y)'
+      to_js( 'await f(x) do |y| y; end' ).must_equal 'await f(x, y => y)'
+    end
+  end
+
+  describe 'keyword arguments' do
+    it 'should handle keyword arguments in methods' do
+      to_js('def a(q, a:, b: 2); end').
+        must_equal('function a(q, { a, b=2 }) {}')
+    end
+
+    it 'should handle all optional keyword arguments in methods' do
+      to_js('def a(q, a: 1, b: 2); end').
+        must_equal('function a(q, { a=1, b=2 } = {}) {}')
+    end
+
+    it 'should handle keyword arguments defaulting to undefined in methods' do
+      to_js('def a(q, a: undefined, b: 2); end').
+        must_equal('function a(q, { a, b=2 } = {}) {}')
+    end
+
+    it 'should handle keyword arguments in blocks' do
+      to_js('proc {|q, a:, b: 2|}').
+        must_equal('(q, { a, b=2 }) => {}')
+    end
+
+    it 'should handle all optional keyword arguments in blocks' do
+      to_js('proc {|q, a: 1, b: 2|}').
+        must_equal('(q, { a=1, b=2 } = {}) => {}')
+    end
+
+    it 'should handle rest arguments with keyword arguments in methods' do
+      to_js('def a(q, a:, b: 2, **r); end').
+        must_equal('function a(q, { a, b=2, ...r }) {}')
+    end
+
+    it 'should handle rest arguments with keyword arguments in blocks' do
+      to_js('proc {|q, a:, b: 2, **r|}').
+        must_equal('(q, { a, b=2, ...r }) => {}')
+    end
+  end
+
+  describe 'module extensions' do
+    it 'should handle methods' do
+      to_js('++module M; def m(); end; end').
+        must_equal 'Object.assign(M, {m() {}})'
+    end
+  end
 end

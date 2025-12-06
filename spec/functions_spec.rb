@@ -208,6 +208,16 @@ describe Ruby2JS::Filter::Functions do
       to_js( '" " * indent' ).must_equal "\" \".repeat(indent)"
       to_js_2020( '" " * indent' ).must_equal '" ".repeat(indent)'
     end
+
+    it 'should handle ljust (padEnd)' do
+      to_js( 'str.ljust(n)' ).must_equal 'str.padEnd(n)'
+      to_js( 'str.ljust(10, "-")' ).must_equal 'str.padEnd(10, "-")'
+    end
+
+    it 'should handle rjust (padStart)' do
+      to_js( 'str.rjust(n)' ).must_equal 'str.padStart(n)'
+      to_js( 'str.rjust(10, "0")' ).must_equal 'str.padStart(10, "0")'
+    end
   end
 
   describe 'array functions' do
@@ -453,6 +463,19 @@ describe Ruby2JS::Filter::Functions do
       to_js_2020( 'Array.new(5, 1)').
         must_equal 'new Array(5).fill(1)'
     end
+
+    it "should handle flatten" do
+      to_js( 'a.flatten()' ).must_equal 'a.flat(Infinity)'
+      to_js( 'a.flatten' ).must_equal 'a.flat(Infinity)'
+    end
+
+    it "should handle to_h" do
+      to_js( 'a.to_h' ).must_equal 'Object.fromEntries(a)'
+    end
+
+    it "should handle Hash[]" do
+      to_js( 'Hash[a]' ).must_equal 'Object.fromEntries(a)'
+    end
   end
 
   describe 'hash functions' do
@@ -469,6 +492,16 @@ describe Ruby2JS::Filter::Functions do
     it "should handle keys" do
       to_js( 'a.keys' ).must_equal 'a.keys'
       to_js( 'a.keys()' ).must_equal 'Object.keys(a)'
+    end
+
+    it "should handle values" do
+      to_js( 'a.values' ).must_equal 'a.values'
+      to_js( 'a.values()' ).must_equal 'Object.values(a)'
+    end
+
+    it "should handle entries" do
+      to_js( 'a.entries' ).must_equal 'a.entries'
+      to_js( 'a.entries()' ).must_equal 'Object.entries(a)'
     end
 
     it "should convert hash.each_key" do
