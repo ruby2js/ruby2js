@@ -309,20 +309,44 @@ puts Ruby2JS.convert('"hello #{x}"', nullish_to_s: true, eslevel: 2020)
 
 ## Or
 
-Introduced in ES2020, the
-[Nullish Coalescing](https://github.com/tc39/proposal-nullish-coalescing#nullish-coalescing-for-javascript)
-operator provides an alternative implementation of the *or* operator.  Select
-which version of the operator you want using the `or` option.  Permissible
-values are `:logical` and `:nullish` with the default being logical.
+Ruby's `||` operator treats only `nil` and `false` as falsy. JavaScript's `||` operator treats `null`, `undefined`, `false`, `0`, `""`, and `NaN` as falsy. This difference can cause subtle bugs when transpiling Ruby code.
+
+**The default is `:nullish`**, which maps Ruby's `||` to JavaScript's `??` (nullish coalescing). This is closer to Ruby semantics because `??` only treats `null` and `undefined` as falsy, preserving values like `0` and `""`.
+
+| Ruby Expression | `or: :nullish` (default) | `or: :logical` |
+|-----------------|--------------------------|----------------|
+| `count \|\| 0` | `count ?? 0` | `count \|\| 0` |
+| `0 \|\| 42` | `0` (0 is kept) | `42` (0 is falsy in JS) |
+| `"" \|\| "default"` | `""` (empty string kept) | `"default"` |
+| `false \|\| true` | `false` (⚠️ differs from Ruby) | `true` |
+
+{% rendercontent "docs/note", type: "warning" %}
+**Note about `false`:** Ruby's `||` treats `false` as falsy, but JavaScript's `??` does not. If your code relies on `false || x` returning `x`, use `or: :logical` or consider the `truthy: :ruby` option for exact Ruby semantics.
+{% endrendercontent %}
+
+In boolean contexts (comparisons, predicates ending in `?`, etc.), Ruby2JS automatically uses `||` even when `:nullish` is set, since the nullish distinction doesn't matter for boolean results:
 
 ```ruby
-# Configuration
+# These always use || regardless of :or setting
+a > 5 || b < 3      # => a > 5 || b < 3
+a.empty? || b.nil?  # => a.empty || b.nil
+```
 
+### Configuration
+
+```ruby
+# Configuration file - use nullish (default)
 nullish_or
+
+# Configuration file - use logical
+logical_or
 ```
 
 ```ruby
-puts Ruby2JS.convert("a || b", or: :nullish, eslevel: 2020)
+# API usage
+puts Ruby2JS.convert("a || b")                    # => a ?? b (default)
+puts Ruby2JS.convert("a || b", or: :logical)      # => a || b
+puts Ruby2JS.convert("a || b", or: :nullish)      # => a ?? b
 ```
 
 ## Truthy

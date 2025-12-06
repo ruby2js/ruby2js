@@ -80,7 +80,7 @@ describe Ruby2JS::Filter::Vue do
     it "should initialize, accumulate, and return state if op-assignment" do
       to_js( 'class Foo<Vue; def initialize; @a||=1; end; end' ).
         must_include '{data() {let $_ = {a: undefined}; ' +
-          '$_.a = $_.a || 1; return $_}}'
+          '$_.a = $_.a ?? 1; return $_}}'
     end
 
     it "should collapse instance variable assignments into a return" do

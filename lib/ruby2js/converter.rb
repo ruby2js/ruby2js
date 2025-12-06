@@ -69,10 +69,10 @@ module Ruby2JS
       @jsx = false
       @autobind = true
 
-      @eslevel = 2009 # ES5
+      @eslevel = 2020
       @strict = false
       @comparison = :equality
-      @or = :logical
+      @or = :nullish
       @truthy = :js
       @boolean_context = false
       @need_truthy_helpers = Set.new

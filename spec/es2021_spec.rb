@@ -12,24 +12,24 @@ describe "ES2021 support" do
       filters: [Ruby2JS::Filter::Functions]).to_s)
   end
 
-  def to_js_nullish( string)
-    _(Ruby2JS.convert(string, eslevel: 2021, or: :nullish, filters: []).to_s)
+  def to_js_logical( string)
+    _(Ruby2JS.convert(string, eslevel: 2021, or: :logical, filters: []).to_s)
   end
 
-  it "should do short circuit assign - logical (default)" do
-    to_js( 'a = nil; a ||= 1').must_equal 'let a = null; a ||= 1'
-    to_js( '@a ||= 1').must_equal 'this._a ||= 1'
-    to_js( '@@a ||= 1').must_equal 'this.constructor._a ||= 1'
-    to_js( 'self.p ||= 1').must_equal 'this.p ||= 1'
-    to_js( 'a[i] ||= 1').must_equal 'a[i] ||= 1'
+  it "should do short circuit assign - nullish (default)" do
+    to_js( 'a = nil; a ||= 1').must_equal 'let a = null; a ??= 1'
+    to_js( '@a ||= 1').must_equal 'this._a ??= 1'
+    to_js( '@@a ||= 1').must_equal 'this.constructor._a ??= 1'
+    to_js( 'self.p ||= 1').must_equal 'this.p ??= 1'
+    to_js( 'a[i] ||= 1').must_equal 'a[i] ??= 1'
   end
 
-  it "should do short circuit assign - nullish" do
-    to_js_nullish( 'a = nil; a ||= 1').must_equal 'let a = null; a ??= 1'
-    to_js_nullish( '@a ||= 1').must_equal 'this._a ??= 1'
-    to_js_nullish( '@@a ||= 1').must_equal 'this.constructor._a ??= 1'
-    to_js_nullish( 'self.p ||= 1').must_equal 'this.p ??= 1'
-    to_js_nullish( 'a[i] ||= 1').must_equal 'a[i] ??= 1'
+  it "should do short circuit assign - logical" do
+    to_js_logical( 'a = nil; a ||= 1').must_equal 'let a = null; a ||= 1'
+    to_js_logical( '@a ||= 1').must_equal 'this._a ||= 1'
+    to_js_logical( '@@a ||= 1').must_equal 'this.constructor._a ||= 1'
+    to_js_logical( 'self.p ||= 1').must_equal 'this.p ||= 1'
+    to_js_logical( 'a[i] ||= 1').must_equal 'a[i] ||= 1'
   end
 
   it "should do short circuit and" do

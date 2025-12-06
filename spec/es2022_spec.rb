@@ -12,8 +12,8 @@ describe "ES2022 support" do
     _(Ruby2JS.convert(string, eslevel: 2022, underscored_private: true, filters: []).to_s)
   end
 
-  def to_js_nullish( string)
-    _(Ruby2JS.convert(string, eslevel: 2022, or: :nullish, filters: []).to_s)
+  def to_js_logical( string)
+    _(Ruby2JS.convert(string, eslevel: 2022, or: :logical, filters: []).to_s)
   end
   
   def to_js_fn(string)
@@ -46,14 +46,14 @@ describe "ES2022 support" do
         must_equal 'class C {#a; #b; constructor() {[this.#a, this.#b] = [1, 2]}}'
     end
 
-    it "should do short circuit assign - logical (default)" do
-      to_js( '@a ||= 1').must_equal 'this.#a ||= 1'
-      to_js( '@@a ||= 1').must_equal 'this.constructor.#$a ||= 1'
+    it "should do short circuit assign - nullish (default)" do
+      to_js( '@a ||= 1').must_equal 'this.#a ??= 1'
+      to_js( '@@a ||= 1').must_equal 'this.constructor.#$a ??= 1'
     end
 
-    it "should do short circuit assign - nullish" do
-      to_js_nullish( '@a ||= 1').must_equal 'this.#a ??= 1'
-      to_js_nullish( '@@a ||= 1').must_equal 'this.constructor.#$a ??= 1'
+    it "should do short circuit assign - logical" do
+      to_js_logical( '@a ||= 1').must_equal 'this.#a ||= 1'
+      to_js_logical( '@@a ||= 1').must_equal 'this.constructor.#$a ||= 1'
     end
   end
 

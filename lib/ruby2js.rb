@@ -505,7 +505,7 @@ module Ruby2JS
     ruby2js.eslevel = options[:eslevel]
     ruby2js.strict = options[:strict]
     ruby2js.comparison = options[:comparison] || :equality
-    ruby2js.or = options[:or] || :logical
+    ruby2js.or = options[:or] || :nullish
     # truthy option: :ruby (only false/nil are falsy) or :js (standard JS truthiness)
     ruby2js.truthy = options[:truthy] || :js
     ruby2js.nullish_to_s = options[:nullish_to_s] || false

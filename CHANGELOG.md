@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   template literals, classes, spread syntax, optional chaining, and nullish coalescing by default.
   To restore previous behavior, explicitly set `eslevel: 2015` or lower.
 - Removed support for ES levels prior to ES2020 as the default target
+- **Default `or` option is now `:nullish`** - Ruby's `||` now maps to JavaScript's `??` by default.
+  This better matches Ruby semantics where only `nil` and `false` are falsy (preserving `0`, `""`).
+  To restore JavaScript's `||` behavior, set `or: :logical` or use the `logical_or` config option.
+  Note: `false || x` will now return `false` instead of `x`; use `truthy: :ruby` for exact Ruby semantics.
 
 ### Changed
 

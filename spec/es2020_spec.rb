@@ -14,8 +14,8 @@ describe "ES2020 support" do
       filters: [Ruby2JS::Filter::Functions]).to_s)
   end
 
-  def to_js_nullish( string)
-    _(Ruby2JS.convert(string, eslevel: 2020, or: :nullish, filters: []).to_s)
+  def to_js_logical( string)
+    _(Ruby2JS.convert(string, eslevel: 2020, or: :logical, filters: []).to_s)
   end
 
   def to_js_nullish_to_s( string)
@@ -42,34 +42,34 @@ describe "ES2020 support" do
 
   describe "nullish coalescing operator" do
     it "should map || operator based on :or option" do
-      to_js( 'a || b' ).must_equal 'a || b'
-      to_js_nullish( 'a || b' ).must_equal 'a ?? b'
+      to_js( 'a || b' ).must_equal 'a ?? b'
+      to_js_logical( 'a || b' ).must_equal 'a || b'
     end
 
     it "should use || instead of ?? in boolean contexts" do
       # Comparison operators should preserve ||
-      to_js_nullish( '(a == 1) || (b == 2)' ).must_equal '(a == 1) || (b == 2)'
-      to_js_nullish( 'a > 5 || b < 3' ).must_equal 'a > 5 || b < 3'
+      to_js( '(a == 1) || (b == 2)' ).must_equal '(a == 1) || (b == 2)'
+      to_js( 'a > 5 || b < 3' ).must_equal 'a > 5 || b < 3'
 
       # Predicate methods should preserve ||
-      to_js_nullish( 'a.empty? || b.nil?' ).must_equal 'a.empty || b.nil'
+      to_js( 'a.empty? || b.nil?' ).must_equal 'a.empty || b.nil'
 
       # Boolean literals should preserve ||
-      to_js_nullish( 'a || true' ).must_equal 'a || true'
-      to_js_nullish( 'false || b' ).must_equal 'false || b'
+      to_js( 'a || true' ).must_equal 'a || true'
+      to_js( 'false || b' ).must_equal 'false || b'
 
       # Mixed boolean context should preserve ||
-      to_js_nullish( 'a > 5 || b' ).must_equal 'a > 5 || b'
-      to_js_nullish( 'a || b < 3' ).must_equal 'a || b < 3'
+      to_js( 'a > 5 || b' ).must_equal 'a > 5 || b'
+      to_js( 'a || b < 3' ).must_equal 'a || b < 3'
 
       # Negation operator should preserve || (Ruby parses !x as x.!)
-      to_js_nullish( '!a || b' ).must_equal '!a || b'
-      to_js_nullish( 'a || !b' ).must_equal 'a || !b'
-      to_js_nullish( '!a || !b' ).must_equal '!a || !b'
-      to_js_nullish( '!a.foo || !b.bar' ).must_equal '!a.foo || !b.bar'
+      to_js( '!a || b' ).must_equal '!a || b'
+      to_js( 'a || !b' ).must_equal 'a || !b'
+      to_js( '!a || !b' ).must_equal '!a || !b'
+      to_js( '!a.foo || !b.bar' ).must_equal '!a.foo || !b.bar'
 
       # Non-boolean contexts should use ??
-      to_js_nullish( 'x = a || b' ).must_equal 'let x = a ?? b'
+      to_js( 'x = a || b' ).must_equal 'let x = a ?? b'
     end
 
     it "should convert 'a.nil? ? b : a' to nullish coalescing" do
