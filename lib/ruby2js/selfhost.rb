@@ -530,6 +530,18 @@ module Ruby2JS
     # JavaScript postamble: handler discovery and exports
     POSTAMBLE = <<~'JS'
 ;
+      // Define Converter class constants
+      // These are defined in the Ruby Converter class but need explicit JS assignment
+      Converter.LOGICAL = ["and", "not", "or"];
+      Converter.OPERATORS = [["[]", "[]="], ["not", "!"], ["**"], ["*", "/", "%"], ["+", "-"],
+        [">>", "<<"], ["&"], ["^", "|"], ["<=", "<", ">", ">="],
+        ["==", "!=", "===", "!==", "=~", "!~"], ["and", "or"]];
+      Converter.INVERT_OP = {"<": ">=", "<=": ">", ">": "<=", ">=": "<", "==": "!=",
+        "!=": "==", "===": "!==", "!==": "===", "=~": "!~", "!~": "=~"};
+      Converter.GROUP_OPERATORS = ["begin", "dstr", "dsym", "and", "or", "casgn", "if"];
+      Converter.VASGN = ["cvasgn", "ivasgn", "gvasgn", "lvasgn"];
+      Converter.COMPARISON_OPS = ["<", "<=", ">", ">=", "==", "!=", "===", "!==", "=~", "!~"];
+
       // Discover and register all on_* handler methods
       // The Ruby code uses handle(:type) { } which calls define_method and registers the type.
       // After transpilation, we have on_* methods but the #$handlers static array is empty.

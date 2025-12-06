@@ -562,7 +562,7 @@ module Ruby2JS
 
       # Class constants that need Converter. prefix when referenced bare
       CLASS_CONSTANTS = %i[
-        LOGICAL OPERATORS INVERT_OP GROUP_OPERATORS VASGN
+        LOGICAL OPERATORS INVERT_OP GROUP_OPERATORS VASGN COMPARISON_OPS
       ].freeze
 
       # Handle template literals (dstr) to wrap lvar in (var || "")
@@ -845,9 +845,15 @@ module Ruby2JS
           return s(:and, s(:and, type_check, null_check), not_node_check)
         end
 
-        # Handle Hash/Map key? method → .has() for JS Map
-        # @comments.key?(key) → @comments.has(key)
+        # Handle Hash/Map key? method
+        # For class constants (plain objects): INVERT_OP.has_key?(x) → (x in INVERT_OP)
+        # For Maps (@comments, etc.): @comments.key?(key) → @comments.has(key)
         if method == :key? || method == :has_key? || method == :member?
+          # Check if target is a class constant (plain object, not a Map)
+          if target&.type == :const && CLASS_CONSTANTS.include?(target.children[1])
+            # Use 'in' operator for plain objects
+            return s(:in?, process(args.first), s(:attr, s(:const, nil, :Converter), target.children[1]))
+          end
           return s(:send, process(target), :has, *process_all(args))
         end
 

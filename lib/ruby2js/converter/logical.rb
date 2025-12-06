@@ -157,7 +157,7 @@ module Ruby2JS
 
     handle :not do |expr|
 
-      if expr.type == :send and INVERT_OP.include? expr.children[1]
+      if expr.type == :send and INVERT_OP.has_key? expr.children[1]
         parse(s(:send, expr.children[0], INVERT_OP[expr.children[1]],
           expr.children[2]))
       elsif expr.type == :defined?
@@ -168,7 +168,7 @@ module Ruby2JS
         parse s(:or, s(:not, expr.children[0]), s(:not, expr.children[1]))
       elsif expr.type == :send and expr.children[0..1] == [nil, :typeof] and
         expr.children[2]&.type == :send and
-        INVERT_OP.include?(expr.children[2].children[1])
+        INVERT_OP.has_key?(expr.children[2].children[1])
         # Handle "not typeof x == y" => "typeof x != y"
         # Ruby parses "typeof x == y" as "typeof(x == y)" due to precedence
         comparison = expr.children[2]

@@ -77,26 +77,30 @@ module Ruby2JS
       # We wrap in a block scope to avoid changing variable visibility
       hoisted_any = false
       if finally
-        # Collect lvasgn names from body
-        try_vars = Set.new
+        # Collect lvasgn names from body (use Array for JS compatibility)
+        try_vars = []
         find_lvasgns = proc do |node|
           next unless node.respond_to?(:type) && node.respond_to?(:children)
-          try_vars << node.children[0] if node.type == :lvasgn
+          if node.type == :lvasgn
+            try_vars << node.children[0] unless try_vars.include?(node.children[0])
+          end
           node.children.each { |c| find_lvasgns[c] }
         end
         find_lvasgns[body]
 
-        # Collect lvar names from finally
-        finally_vars = Set.new
+        # Collect lvar names from finally (use Array for JS compatibility)
+        finally_vars = []
         find_lvars = proc do |node|
           next unless node.respond_to?(:type) && node.respond_to?(:children)
-          finally_vars << node.children[0] if node.type == :lvar
+          if node.type == :lvar
+            finally_vars << node.children[0] unless finally_vars.include?(node.children[0])
+          end
           node.children.each { |c| find_lvars[c] }
         end
         find_lvars[finally]
 
         # Hoist variables that appear in both (but not already declared)
-        hoisted = (try_vars & finally_vars).reject { |var| @vars[var] }
+        hoisted = try_vars.select { |var| finally_vars.include?(var) && !@vars[var] }
         if hoisted.any?
           hoisted_any = true
           puts '{'  # Open block scope to contain hoisted vars
