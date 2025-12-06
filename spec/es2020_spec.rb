@@ -62,6 +62,12 @@ describe "ES2020 support" do
       to_js_nullish( 'a > 5 || b' ).must_equal 'a > 5 || b'
       to_js_nullish( 'a || b < 3' ).must_equal 'a || b < 3'
 
+      # Negation operator should preserve || (Ruby parses !x as x.!)
+      to_js_nullish( '!a || b' ).must_equal '!a || b'
+      to_js_nullish( 'a || !b' ).must_equal 'a || !b'
+      to_js_nullish( '!a || !b' ).must_equal '!a || !b'
+      to_js_nullish( '!a.foo || !b.bar' ).must_equal '!a.foo || !b.bar'
+
       # Non-boolean contexts should use ??
       to_js_nullish( 'x = a || b' ).must_equal 'let x = a ?? b'
     end

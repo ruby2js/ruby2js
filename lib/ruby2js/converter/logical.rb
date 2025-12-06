@@ -28,6 +28,8 @@ module Ruby2JS
         return true if COMPARISON_OPS.include?(method)
         # Check for predicate methods (ending with ?)
         return true if method.to_s.end_with?('?')
+        # Check for negation (Ruby parses !x as x.!)
+        return true if method == :!
         false
       when :and, :or, :not
         true
@@ -133,8 +135,12 @@ module Ruby2JS
     # the global @or setting.
 
     handle :nullish do |left, right|
-      lgroup = LOGICAL.include?(left.type) || left.type == :begin
-      rgroup = LOGICAL.include?(right.type) || right.type == :begin
+      # Only group :begin if it has multiple children (actual grouping expression)
+      # Single-child :begin nodes are just wrappers and don't need parens
+      lgroup = LOGICAL.include?(left.type) ||
+        (left.type == :begin && left.children.length > 1)
+      rgroup = LOGICAL.include?(right.type) ||
+        (right.type == :begin && right.children.length > 1)
 
       put '(' if lgroup; parse left; put ')' if lgroup
       put ' ?? '

@@ -100,6 +100,36 @@ module Ruby2JS
           n.loc = this.loc;
           return n;
         }
+
+      }
+
+      // Check if node is a method call (has parentheses)
+      // In Ruby, this is determined by location info
+      // Standalone function so it works with any AST node format
+      function isMethod(node) {
+        if (!node) return false;
+        // Try node's own method first (our Node class)
+        if (typeof node.isMethod === 'function') return node.isMethod();
+        // Fall back to checking location info directly
+        const loc = node.loc || node.location;
+        if (!loc || typeof loc !== 'object') return false;
+        if (!('expression' in loc) || !loc.expression) return false;
+        const src = loc.expression.source_buffer?.source;
+        if (!src) return false;
+        const endPos = loc.selector?.end_pos ?? loc.expression.end_pos;
+        return src[endPos] === '(';
+      }
+
+      // Create a new node with optionally modified type and children
+      // Standalone function so it works with any AST node format
+      function updated(node, newType, newChildren) {
+        if (!node) return null;
+        // Try node's own method first (our Node class)
+        if (typeof node.updated === 'function') return node.updated(newType, newChildren);
+        // Fall back to creating a new Node
+        const n = new Node(newType || node.type, newChildren || node.children);
+        n.loc = node.loc || node.location || null;
+        return n;
       }
 
       // S-expression helper

@@ -429,12 +429,14 @@ module Ruby2JS
 
       # Methods ending in ? or ! that the functions filter handles
       # These should NOT be renamed - let functions filter transform them
+      # is_method? is a Ruby2JS AST method that becomes isMethod() in JS
       FUNCTIONS_FILTER_METHODS = %i[
         respond_to? is_a? kind_of? instance_of? nil? empty? blank? present?
         include? key? has_key? member? start_with? end_with? match?
         between? zero? positive? negative? even? odd? integer? float?
         any? all? none? one? many?
         slice! map! select! reverse! gsub! sub! compact!
+        is_method?
       ].freeze
 
       # Rename methods ending in ? or ! to valid JS identifiers
@@ -551,12 +553,12 @@ module Ruby2JS
         new_children = node.children.map do |child|
           if child.type == :begin && child.children.length == 1 &&
              child.children[0]&.type == :lvar
-            # #{var} → #{var || ""}
-            lvar = child.children[0]
+            # #{var} → #{var || ""}, process lvar to handle reserved word renaming
+            lvar = process(child.children[0])
             s(:begin, s(:or, lvar, s(:str, '')))
           elsif child.type == :lvar
-            # Direct lvar in dstr → (lvar || "")
-            s(:begin, s(:or, child, s(:str, '')))
+            # Direct lvar in dstr → (lvar || ""), process to handle reserved word renaming
+            s(:begin, s(:or, process(child), s(:str, '')))
           else
             process(child)
           end
@@ -568,6 +570,19 @@ module Ruby2JS
       # s(:send, ...) → s('send', ...)
       def on_send(node)
         target, method, *args = node.children
+
+        # Convert is_method? to isMethod(node) - this is a Ruby2JS AST method
+        # that checks if a node is a method call (has parentheses)
+        # Use a helper function since AST nodes may not have this method
+        if method == :is_method? && target
+          return s(:send, nil, :isMethod, process(target))
+        end
+
+        # Convert node.updated(...) to updated(node, ...) - standalone helper
+        # since AST nodes from Prism-WASM don't have the updated method
+        if method == :updated && target
+          return s(:send, nil, :updated, process(target), *process_all(args))
+        end
 
         # Convert Set.new to empty array (Set methods become array methods)
         # Ruby Set#include?/<</#empty? map to Array includes/push/length==0
