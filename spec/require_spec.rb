@@ -101,12 +101,12 @@ describe Ruby2JS::Filter::Require do
   describe :expression do
     it "should leave local variable assignment expressions alone" do
       to_js( 'fs = require("fs")' ).
-        must_equal 'var fs = require("fs")'
+        must_equal 'let fs = require("fs")'
     end
 
     it "should leave constant assignment expressions alone" do
       to_js( 'React = require("React")' ).
-        must_equal 'var React = require("React")'
+        must_equal 'const React = require("React")'
     end
   end
 

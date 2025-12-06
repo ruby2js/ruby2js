@@ -14,7 +14,7 @@ Ruby2JS provides quite a few options to help you configure your transpilation pr
 Starting with Ruby2JS 5.1, we've created a single "preset" configuration option which provides you with a sane set of modern conversion defaults. This includes:
 
 * The [Functions](/docs/filters/functions), [ESM](/docs/filters/esm), and [Return](/docs/filters/return) filters
-* ES2021 support
+* ES2022 support (private fields, `at()` method, static class fields)
 * Underscored fields for ivars (`@ivar` becomes `this._ivar`)
 * Identity comparison (`==` becomes `===`)
 
@@ -278,22 +278,91 @@ use case is when the script is a view template.  See also [scope](#scope).
 puts Ruby2JS.convert("X = @x", ivars: {:@x => 1})
 ```
 
-## Or
+## Nullish To S
 
-Introduced in ES2020, the 
-[Nullish Coalescing](https://github.com/tc39/proposal-nullish-coalescing#nullish-coalescing-for-javascript)
-operator provides an alternative implementation of the *or* operator.  Select
-which version of the operator you want using the `or` option.  Permissible
-values are `:logical` and `:nullish` with the default being logical.
+Ruby's `nil.to_s` returns an empty string, but JavaScript's `null.toString()` throws an error,
+and `String(null)` returns `"null"`. Similarly, string interpolation in Ruby like `"#{nil}"` produces `""`,
+but JavaScript's `` `${null}` `` produces `"null"`.
+
+The `nullish_to_s` option wraps these operations with the nullish coalescing operator (`??`) to match
+Ruby's behavior. This requires ES2020 or later.
 
 ```ruby
 # Configuration
 
-nullish_or
+nullish_to_s
 ```
 
 ```ruby
-puts Ruby2JS.convert("a || b", or: :nullish, eslevel: 2020)
+# to_s becomes nil-safe
+puts Ruby2JS.convert("x.to_s", nullish_to_s: true, eslevel: 2020)
+# => (x ?? "").toString()
+
+# String() becomes nil-safe
+puts Ruby2JS.convert("String(x)", nullish_to_s: true, eslevel: 2020, filters: [:functions])
+# => String(x ?? "")
+
+# Interpolation becomes nil-safe
+puts Ruby2JS.convert('"hello #{x}"', nullish_to_s: true, eslevel: 2020)
+# => `hello ${x ?? ""}`
+```
+
+## Or
+
+Ruby's `||` operator treats only `nil` and `false` as falsy. JavaScript's `||` operator treats `null`, `undefined`, `false`, `0`, `""`, and `NaN` as falsy. This difference can cause subtle bugs when transpiling Ruby code.
+
+**The default is `:auto`**, which is context-aware:
+- In **boolean contexts** (conditions for `if`, `while`, `unless`, `until`, ternary), uses `||`
+- In **value contexts** (assignments, return values, arguments), uses `??`
+
+This gives the best of both worlds: conditions work naturally, while assignments preserve values like `0` and `""`.
+
+```ruby
+# Boolean context - uses ||
+if a || b; x; end        # => if (a || b) x
+while a || b; x; end     # => while (a || b) {x}
+a = 1 if b || c          # => if (b || c) a = 1
+
+# Value context - uses ??
+x = a || b               # => let x = a ?? b
+x ||= 0                  # => x ??= 0 (preserves 0)
+```
+
+Three options are available:
+
+| Option | Boolean context (`if a \|\| b`) | Value context (`x = a \|\| b`) |
+|--------|--------------------------------|-------------------------------|
+| `:auto` (default) | `if (a \|\| b)` | `let x = a ?? b` |
+| `:nullish` | `if (a ?? b)` | `let x = a ?? b` |
+| `:logical` | `if (a \|\| b)` | `let x = a \|\| b` |
+
+{% rendercontent "docs/note", type: "warning" %}
+**Note about `false`:** In value contexts with `:auto` or `:nullish`, `false || x` will return `false` (not `x`) because `??` doesn't treat `false` as nullish. Use `or: :logical` or `truthy: :ruby` for exact Ruby semantics with `false`.
+{% endrendercontent %}
+
+With `:auto` and `:nullish`, Ruby2JS also uses `||` when operands are detected as boolean expressions (comparisons, predicates ending in `?`, negations):
+
+```ruby
+a > 5 || b < 3      # => a > 5 || b < 3
+a.empty? || b.nil?  # => a.empty || b.nil
+```
+
+### Configuration
+
+```ruby
+# Configuration file
+auto_or      # context-aware (default)
+nullish_or   # always use ?? (except for boolean expressions)
+logical_or   # always use ||
+```
+
+```ruby
+# API usage
+puts Ruby2JS.convert("x = a || b")                 # => let x = a ?? b
+puts Ruby2JS.convert("if a || b; x; end")          # => if (a || b) let x
+puts Ruby2JS.convert("x = a || b", or: :nullish)   # => let x = a ?? b
+puts Ruby2JS.convert("if a || b; x; end", or: :nullish)  # => if (a ?? b) let x
+puts Ruby2JS.convert("x = a || b", or: :logical)   # => let x = a || b
 ```
 
 ## Truthy
@@ -333,6 +402,24 @@ With `truthy: :ruby` enabled:
 The `truthy: :ruby` option adds small helper functions and wraps expressions in function calls to preserve short-circuit evaluation. This has minimal performance impact but does increase code size slightly.
 {% endrendercontent %}
 
+## Module
+
+Controls the module format for import/export statements. The default is `:esm` (ES Modules).
+
+```ruby
+# Configuration - use ES Modules (default)
+esm_modules
+
+# Configuration - use CommonJS
+cjs_modules
+```
+
+```ruby
+# API usage
+puts Ruby2JS.convert("export x = 1", module: :esm)   # => export let x = 1
+puts Ruby2JS.convert("export x = 1", module: :cjs)   # => exports.x = 1
+```
+
 ## Scope
 
 Make all Instance Variables (ivars) in a given scope available to the
@@ -342,6 +429,15 @@ script.  See also [ivars](#ivars).
 require "ruby2js"
 @x = 5
 puts Ruby2JS.convert("X = @x", scope: self)
+```
+
+## Strict
+
+Adds `"use strict";` at the beginning of the generated JavaScript output.
+
+```ruby
+puts Ruby2JS.convert("x = 1", strict: true)
+# => "use strict"; let x = 1
 ```
 
 ## Template Literal Tags
@@ -412,9 +508,12 @@ An example of all of the supported options:
   "include_all": true,
   "include_only": ["max"],
   "import_from_skypack": true,
-  "or": "nullish",
-  "require_recurse": true,
+  "module": "esm",
+  "nullish_to_s": true,
+  "or": "auto",
   "preset": true,
+  "require_recursive": true,
+  "strict": true,
   "template_literal_tags": ["color"],
   "truthy": "ruby",
   "underscored_private": true,

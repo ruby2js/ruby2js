@@ -32,11 +32,7 @@ module Ruby2JS
           end
 
           unless undecls.empty?
-            if es2015
-              put 'let '
-            else
-              put 'var ' 
-            end
+            put 'let '
             put undecls.map(&:to_s).join(', ') + @sep
             undecls.each {|var| @vars[var] = true}
           end
@@ -48,11 +44,7 @@ module Ruby2JS
         if state == :statement and not is_declared
           hoist = hoist?(@scope, @inner, name) if @inner and @scope != @inner
           if not hoist
-            if es2015
-              var = 'let '
-            else
-              var = 'var '
-            end
+            var = 'let '
           end
         end
 
@@ -107,11 +99,7 @@ module Ruby2JS
       end
 
       unless undecls.empty?
-        if es2015
-          put "let "
-        else
-          put "var "
-        end
+        put "let "
         put "#{undecls.map(&:to_s).join(', ')}#@sep"
       end
     end

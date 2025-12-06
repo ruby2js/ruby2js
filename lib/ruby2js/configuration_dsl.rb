@@ -51,6 +51,10 @@ module Ruby2JS
       @options[:underscored_private] = false
     end
 
+    def auto_or
+      @options[:or] = :auto
+    end
+
     def logical_or
       @options[:or] = :logical
     end
@@ -62,6 +66,10 @@ module Ruby2JS
     def truthy(mode = :ruby)
       # Accept :ruby, :js, or true (legacy, treated as :ruby)
       @options[:truthy] = mode
+    end
+
+    def nullish_to_s
+      @options[:nullish_to_s] = true
     end
 
     def autoimport(identifier = nil, file = nil, &block)

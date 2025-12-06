@@ -35,71 +35,7 @@ module Ruby2JS
       vars = {}
       vars.merge! @vars unless name
       if args and !args.children.empty?
-        # splats
-        if args.children.last.type == :restarg and not es2015
-          if args.children[-1].children.first
-            body = s(:begin, body) unless body.type == :begin
-            assign = s(:lvasgn, args.children[-1].children.first,
-              s(:send, s(:attr, 
-                s(:attr, s(:const, nil, :Array), :prototype), :slice),
-                :call, s(:lvar, :arguments),
-                s(:int, args.children.length-1)))
-            body = s(:begin, assign, *body.children)
-          end
-
-          args = s(:args, *args.children[0..-2])
-
-        elsif args.children.last.type == :blockarg and
-          args.children.length > 1 and args.children[-2].type == :restarg
-          body = s(:begin, body) unless body.type == :begin
-          blk = args.children[-1].children.first
-          vararg = args.children[-2].children.first
-          last = s(:send, s(:attr, s(:lvar, :arguments), :length), :-,
-                  s(:int, 1))
-
-          # set block argument to the last argument passed
-          assign2 = s(:lvasgn, blk, s(:send, s(:lvar, :arguments), :[], last))
-
-          if vararg
-            # extract arguments between those defined and the last
-            assign1 = s(:lvasgn, vararg, s(:send, s(:attr, s(:attr, s(:const,
-              nil, :Array), :prototype), :slice), :call, s(:lvar, :arguments),
-              s(:int, args.children.length-1), last))
-            # push block argument back onto args if not a function
-            pushback = s(:if, s(:send, s(:send, nil, :typeof, s(:lvar, blk)), 
-              :"!==", s(:str, "function")), s(:begin, s(:send, s(:lvar,
-              vararg), :push, s(:lvar, blk)), s(:lvasgn, blk, s(:nil))), nil)
-            # set block argument to null if all arguments were defined
-            pushback = s(:if, s(:send, s(:attr, s(:lvar, :arguments),
-              :length), :<=, s(:int, args.children.length-2)), s(:lvasgn, 
-              blk, s(:nil)), pushback)
-            # combine statements
-            body = s(:begin, assign1, assign2, pushback, *body.children)
-          else
-            # set block argument to null if all arguments were defined
-            ignore = s(:if, s(:send, s(:attr, s(:lvar, :arguments),
-              :length), :<=, s(:int, args.children.length-2)), s(:lvasgn, 
-              blk, s(:nil)), nil)
-            body = s(:begin, assign2, ignore, *body.children)
-          end
-
-          args = s(:args, *args.children[0..-3])
-        end
-
-        # optional arguments
-        args.children.each_with_index do |arg, i|
-          if arg.type == :optarg and not es2015
-            body = s(:begin, body) unless body.type == :begin
-            argname, value = arg.children
-            children = args.children.dup
-            children[i] = s(:arg, argname)
-            args = s(:args, *children)
-            body = s(:begin, body) unless body.type == :begin
-            default = s(:if, s(:send, s(:defined?, s(:lvar, argname)), :!),
-              s(:lvasgn, argname, value), nil)
-            body = s(:begin, default, *body.children)
-          end
-
+        args.children.each do |arg|
           if arg.type == :shadowarg
             vars.delete(arg.children.first)
           else
@@ -110,9 +46,9 @@ module Ruby2JS
 
       put 'async ' if @ast.type == :async
 
-      # es2015 fat arrow support
+      # fat arrow support
       if \
-        not name and es2015 and @state != :method and @ast.type != :defm and 
+        not name and @state != :method and @ast.type != :defm and
         @ast.type != :deff and not @prop
       then
         expr = body
@@ -189,7 +125,7 @@ module Ruby2JS
         mark = output_location
         scope body, vars
         if @block_this and @block_depth == 1
-          insert mark, "#{es2015 ? 'let' : 'var'} self = this#{@sep}"
+          insert mark, "let self = this#{@sep}"
           @block_this = false
         end
 
@@ -206,9 +142,9 @@ module Ruby2JS
       parse value 
     end
 
-    handle :restarg do |name|
+    handle :restarg do |name=nil|
       put '...'
-      put name
+      put name if name
     end
   end
 end

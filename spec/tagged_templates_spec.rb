@@ -5,17 +5,12 @@ require 'ruby2js/filter/tagged_templates'
 describe Ruby2JS::Filter::TaggedTemplates do
 
   def to_js(string)
-    _(Ruby2JS.convert(string, eslevel: 2015,
-      filters: [Ruby2JS::Filter::TaggedTemplates], scope: self).to_s)
-  end
-
-  def to_js_es5(string)
-    _(Ruby2JS.convert(string,
+    _(Ruby2JS.convert(string, eslevel: 2020,
       filters: [Ruby2JS::Filter::TaggedTemplates], scope: self).to_s)
   end
 
   def to_js_with_new_tags(string)
-    _(Ruby2JS.convert(string, eslevel: 2015,
+    _(Ruby2JS.convert(string, eslevel: 2020,
       filters: [Ruby2JS::Filter::TaggedTemplates], template_literal_tags: %i(tags work), scope: self).to_s)
   end
 
@@ -58,13 +53,6 @@ describe Ruby2JS::Filter::TaggedTemplates do
     it "should not process unless target is nil" do
       to_js('styles = self.css("color: green")').
         must_include('let styles = this.css("color: green")')
-    end
-  end
-
-  describe "es5 fallback" do
-    it "should fallback to call syntax for es5" do
-      to_js_es5('styles = css("color: green")').
-        must_include('var styles = css("color: green")')
     end
   end
 

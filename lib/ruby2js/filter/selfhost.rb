@@ -429,12 +429,14 @@ module Ruby2JS
 
       # Methods ending in ? or ! that the functions filter handles
       # These should NOT be renamed - let functions filter transform them
+      # is_method? is a Ruby2JS AST method that becomes isMethod() in JS
       FUNCTIONS_FILTER_METHODS = %i[
         respond_to? is_a? kind_of? instance_of? nil? empty? blank? present?
         include? key? has_key? member? start_with? end_with? match?
         between? zero? positive? negative? even? odd? integer? float?
         any? all? none? one? many?
         slice! map! select! reverse! gsub! sub! compact!
+        is_method?
       ].freeze
 
       # Rename methods ending in ? or ! to valid JS identifiers
@@ -526,15 +528,15 @@ module Ruby2JS
       # Note: es20XX methods are getters in JS, not in this list - they become this.esXXXX (no parens)
       SELF_METHODS = %i[
         put puts sput to_s output_location capture wrap compact enable_vertical_whitespace
-        parse parse_all scope jscope insert timestamp comments
+        parse parse_all scope jscope insert timestamp comments group
         visit visit_parameters multi_assign_declarations number_format operator_index
-        parse_condition collapse_strings
+        parse_condition collapse_strings redoable
       ].freeze
 
       # Properties that need this. prefix but are accessed as getters (no parentheses)
       # These are no-arg methods in Ruby that become getters in JS
       SELF_PROPERTIES = %i[
-        es2015 es2016 es2017 es2018 es2019 es2020 es2021 es2022 es2023
+        es2020 es2021 es2022 es2023 es2024 es2025
         underscored_private
       ].freeze
 
@@ -543,10 +545,44 @@ module Ruby2JS
         LOGICAL OPERATORS INVERT_OP GROUP_OPERATORS VASGN
       ].freeze
 
+      # Handle template literals (dstr) to wrap lvar in (var || "")
+      # This handles Ruby's nil.to_s == "" behavior for local variables
+      # that may be undefined in JavaScript
+      def on_dstr(node)
+        # Transform children: wrap :lvar in (lvar || "")
+        new_children = node.children.map do |child|
+          if child.type == :begin && child.children.length == 1 &&
+             child.children[0]&.type == :lvar
+            # #{var} → #{var || ""}, process lvar to handle reserved word renaming
+            lvar = process(child.children[0])
+            s(:begin, s(:or, lvar, s(:str, '')))
+          elsif child.type == :lvar
+            # Direct lvar in dstr → (lvar || ""), process to handle reserved word renaming
+            s(:begin, s(:or, process(child), s(:str, '')))
+          else
+            process(child)
+          end
+        end
+        node.updated(nil, new_children)
+      end
+
       # Convert symbols to strings in s() calls
       # s(:send, ...) → s('send', ...)
       def on_send(node)
         target, method, *args = node.children
+
+        # Convert is_method? to isMethod(node) - this is a Ruby2JS AST method
+        # that checks if a node is a method call (has parentheses)
+        # Use a helper function since AST nodes may not have this method
+        if method == :is_method? && target
+          return s(:send, nil, :isMethod, process(target))
+        end
+
+        # Convert node.updated(...) to updated(node, ...) - standalone helper
+        # since AST nodes from Prism-WASM don't have the updated method
+        if method == :updated && target
+          return s(:send, nil, :updated, process(target), *process_all(args))
+        end
 
         # Convert Set.new to empty array (Set methods become array methods)
         # Ruby Set#include?/<</#empty? map to Array includes/push/length==0
@@ -814,18 +850,19 @@ module Ruby2JS
           return s(:send, process(target), :call, s(:self), *process_all(args))
         end
 
-        # Handle hash[:key].to_s → (hash.key || '').toString()
+        # Handle hash[:key].to_s → (hash.key ?? '').toString()
         # Ruby's nil.to_s returns "", but JS undefined.toString() throws
         # This pattern is common: @options[:join].to_s
+        # Use nullish coalescing (??) to preserve empty strings and zeros
         if method == :to_s && args.empty? && target&.type == :send
           inner_target, inner_method, *inner_args = target.children
           if inner_method == :[] && inner_args.length == 1
-            # hash[:key].to_s → (hash.key || '').toString()
+            # hash[:key].to_s → (hash.key ?? '').toString()
             processed_target = process(inner_target)
             processed_key = process(inner_args.first)
-            # Build: (target[key] || '').toString()
+            # Build: (target[key] ?? '').toString()
             return s(:send,
-              s(:begin, s(:or, s(:send, processed_target, :[], processed_key), s(:str, ''))),
+              s(:begin, s(:nullish, s(:send, processed_target, :[], processed_key), s(:str, ''))),
               :toString)
           end
         end

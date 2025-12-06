@@ -12,7 +12,7 @@ The **camelCase** filter converts `underscore_case` (aka "snake case") to `camel
 ```ruby
 foo_bar = baz_qux
 # becomes:
-var fooBar = bazQux
+let fooBar = bazQux
 
 foo_bar(baz_qux)
 # becomes:
@@ -21,9 +21,7 @@ fooBar(bazQux)
 def foo_bar(baz_qux = nil)
 end
 # becomes:
-function fooBar(bazQux) {
-  if (typeof bazQux === 'undefined') bazQux = null
-}
+function fooBar(bazQux=null) {}
 ```
 
 {% rendercontent "docs/note", extra_margin: true %}

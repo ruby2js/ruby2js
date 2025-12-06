@@ -69,7 +69,7 @@ module Ruby2JS
       end
 
       if es2021 && @truthy != :ruby
-        op = type == :and ? '&&' : (@or == :nullish ? '??' : '||')
+        op = type == :and ? '&&' : (@or == :logical ? '||' : '??')
         parse s(:op_asgn, asgn, op, value);
       elsif vtype
         parse s(asgn.type, asgn.children.first, s(type,

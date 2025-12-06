@@ -9,10 +9,12 @@ describe "truthy option" do
   end
 
   def to_js_js(string, eslevel: 2021)
-    _(Ruby2JS.convert(string, eslevel: eslevel, truthy: :js).to_s)
+    # truthy: :js with or: :logical tests JS-style || behavior
+    _(Ruby2JS.convert(string, eslevel: eslevel, truthy: :js, or: :logical).to_s)
   end
 
   def to_js_default(string, eslevel: 2021)
+    # Default is now or: :nullish
     _(Ruby2JS.convert(string, eslevel: eslevel).to_s)
   end
 
@@ -108,17 +110,17 @@ describe "truthy option" do
     end
   end
 
-  describe 'no truthy option (default)' do
-    it "should use standard || without truthy option" do
-      to_js_default('a || b').must_equal 'a || b'
+  describe 'no truthy option (default uses nullish)' do
+    it "should use ?? without truthy option (nullish default)" do
+      to_js_default('a || b').must_equal 'a ?? b'
     end
 
     it "should use standard && without truthy option" do
       to_js_default('a && b').must_equal 'a && b'
     end
 
-    it "should use ||= operator without truthy option" do
-      to_js_default('a ||= b').must_equal 'a ||= b'
+    it "should use ??= operator without truthy option" do
+      to_js_default('a ||= b').must_equal 'a ??= b'
     end
 
     it "should use &&= operator without truthy option" do

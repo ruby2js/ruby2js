@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Breaking Changes
+
+- **Default ES level is now ES2020** - Ruby2JS now defaults to ES2020 instead of ES5.
+  This means output will use modern JavaScript features like `let`/`const`, arrow functions,
+  template literals, classes, spread syntax, optional chaining, and nullish coalescing by default.
+  To restore previous behavior, explicitly set `eslevel: 2015` or lower.
+- Removed support for ES levels prior to ES2020 as the default target
+- **New `or` option with `:auto` as default** - Ruby's `||` is now handled based on context:
+  - `:auto` (default): `||` in boolean contexts, `??` in value contexts
+  - `:nullish`: always use `??` (except for boolean expressions)
+  - `:logical`: always use `||`
+  This gives the best of both worlds by default - conditions work naturally while assignments preserve `0` and `""`.
+- **Preset now targets ES2022** - The `preset` option now defaults to ES2022 (was ES2021).
+  ES2022 features include private fields (`#x`), the `at()` method, and static class fields.
+
+### Changed
+
 - Update `regexp_parser` dependency
 
 ## [5.1.2] - 2024-05-11

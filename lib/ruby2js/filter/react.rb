@@ -177,32 +177,10 @@ module Ruby2JS
 
           pairs = []
 
-          createClass = (@react == :React and not es2015)
-
-          if createClass
-            # automatically capture the displayName for the class
-            pairs << s(:pair, s(:sym, :displayName),
-              s(:str, cname.children.last.to_s))
-          end
-
           # collect static properties/functions
           statics = []
           body.select {|child| child.type == :defs}.each do |child|
-            _parent, mname, args, *block = child.children
-            if not createClass
-              pairs << child
-            elsif child.is_method?
-              statics << s(:pair, s(:sym, mname), child.updated(:block,
-                [s(:send, nil, :proc), args, s(:autoreturn, *block)]))
-            elsif \
-              block.length == 1 and
-              Converter::EXPRESSIONS.include? block.first.type
-            then
-              statics << s(:pair, s(:sym, mname), *block)
-            else
-              statics << s(:pair, s(:prop, mname), {get: child.updated(
-                :block, [s(:send, nil, :proc), args, s(:autoreturn, *block)])})
-            end
+            pairs << child
           end
 
           # collect instance methods (including getters and setters)
@@ -224,35 +202,8 @@ module Ruby2JS
             end
           end
 
-          # determine which instance methods need binding
-          needs_binding = []
-          scan_events = lambda do |list|
-            list.each do |node|
-              next unless Ruby2JS.ast_node?(node)
-              node = process node if node.type == :xstr
-              if node.type == :hash
-                node.children.each do |pair|
-                  value = pair.children.last
-                  if value.type == :send and \
-                    @react_methods.include? value.children[1] and \
-                    [nil, s(:self), s(:send, nil, :this)].include? value.children[0]
-
-                    needs_binding << value.children[1]
-                  end
-                end
-              end
-              scan_events[node.children]
-            end
-          end
-          scan_events[body] if createClass
-
-          # append statics (if any)
-          unless statics.empty?
-            pairs << s(:pair, s(:sym, :statics), s(:hash, *statics))
-          end
-
           # determine if this class can be emitted as a hook
-          hook = (es2015 and inheritance.children.first == nil)
+          hook = (inheritance.children.first == nil)
           hookinit = nil
           useState = []
           body.each_with_index do |statement, index|
@@ -308,10 +259,7 @@ module Ruby2JS
               useState = (@reactIvars[:asgn] + @reactIvars[:ref]).uniq
             end
 
-            if createClass and not @reactIvars.values.flatten.empty?
-              body = [s(:def, :getInitialState, s(:args),
-                s(:return, s(:hash))), *body]
-            elsif not needs_binding.empty? or not @reactIvars.values.flatten.empty?
+            if not @reactIvars.values.flatten.empty?
               body = [s(:def, :initialize, s(:args)), *body]
             end
           end
@@ -334,8 +282,6 @@ module Ruby2JS
             @reactIvars[:pre] = @reactIvars[:post] = [] if @reactClass == :hook
 
             if mname == :initialize
-              mname = createClass ? :getInitialState : :initialize 
-
               # extract real list of statements
               if block.length == 1
                 if not block.first
@@ -377,21 +323,8 @@ module Ruby2JS
               state = s(:hash, *assigns.map {|anode| s(:pair, s(:str,
                 anode.children.first.to_s[1..-1]), anode.children.last)})
 
-              # bind methods as needed
-              needs_binding.each do |method|
-                block.push(s(:send, s(:self), "#{method}=",
-                  s(:send, s(:attr, s(:self), method), :bind, s(:self))))
-              end
-
               # modify block to build and/or return state
-              if mname == :initialize
-                block.unshift(s(:zsuper), s(:send, s(:self), :state=, state))
-              elsif block.empty?
-                block = [s(:return, state)]
-              else
-                block.unshift(s(:send, s(:self), :state=, state))
-                block.push(s(:return, s(:attr, s(:self), :state)))
-              end
+              block.unshift(s(:zsuper), s(:send, s(:self), :state=, state))
 
             elsif mname == :render and not react_wunderbar_free(block, true)
               if \
@@ -442,15 +375,10 @@ module Ruby2JS
               type = :begin if block.first.type == :return
             end
 
-            if createClass
-              pairs << s(:pair, s(:sym, mname), child.updated(:block,
-                [s(:send, nil, :proc), args, process(s(type, *block))]))
-            else
-              pairs << child.updated(
-                ReactLifecycle.include?(mname.to_s) ? :defm : :def, 
-                [mname, args, process(s(type, *block))]
-              )
-            end
+            pairs << child.updated(
+              ReactLifecycle.include?(mname.to_s) ? :defm : :def,
+              [mname, args, process(s(type, *block))]
+            )
 
             # retain comment
             child_comments = @comments[child]
@@ -459,11 +387,7 @@ module Ruby2JS
             end
           end
 
-          if createClass
-            # emit a createClass statement
-            node.updated(:casgn, [nil, cname.children.last,
-              s(:send, s(:const, nil, :React), :createClass, s(:hash, *pairs))])
-          elsif hook
+          if hook
             initialize = pairs.find_index {|node| node.type == :def and node.children.first == :initialize}
 
             hash = {}

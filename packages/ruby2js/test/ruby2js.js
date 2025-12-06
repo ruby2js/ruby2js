@@ -15,7 +15,7 @@ describe('ruby2js package', () => {
   it('does a basic conversion', () => {
     assert.strictEqual(
       to_js('foo = 1'),
-      'var foo = 1');
+      'let foo = 1');
   });
 
   it('handles eslevel option', () => {

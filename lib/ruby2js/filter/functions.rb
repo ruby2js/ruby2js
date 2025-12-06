@@ -214,12 +214,7 @@ module Ruby2JS
 
         elsif method == :merge
           args.unshift target
-
-          if es2018
-            process S(:hash, *args.map {|arg| s(:kwsplat, arg)})
-          else
-            process S(:assign, s(:hash), *args)
-          end
+          process S(:hash, *args.map {|arg| s(:kwsplat, arg)})
 
         elsif method == :merge!
           process S(:assign, target, *args)
@@ -234,14 +229,26 @@ module Ruby2JS
           end
 
         elsif method == :to_s
-          process S(:call, target, :toString, *args)
+          if @options[:nullish_to_s] && es2020 && args.empty?
+            # (x ?? '').toString() - nil-safe conversion matching Ruby's nil.to_s => ""
+            process S(:call,
+              s(:begin, s(:nullish, target, s(:str, ''))),
+              :toString)
+          else
+            process S(:call, target, :toString, *args)
+          end
 
         elsif method == :Array and target == nil
-          if es2015
-            process S(:send, s(:const, nil, :Array), :from, *args)
+          process S(:send, s(:const, nil, :Array), :from, *args)
+
+        elsif method == :String and target == nil and args.length == 1
+          if @options[:nullish_to_s] && es2020
+            # String(x ?? '') - nil-safe conversion matching Ruby's String(nil) => ""
+            # Wrap the argument in nullish coalescing, then let the converter handle it
+            node.updated(nil, [nil, :String,
+              s(:begin, s(:nullish, process(args.first), s(:str, '')))])
           else
-            process S(:send, s(:attr, s(:attr, s(:const, nil, :Array),
-              :prototype), :slice), :call, *args)
+            super
           end
 
         elsif method == :to_i
@@ -353,26 +360,10 @@ module Ruby2JS
           process S(:send, target, :==, s(:nil))
 
         elsif [:start_with?, :end_with?].include? method and args.length == 1
-          if es2015
-            if method == :start_with?
-              process S(:send, target, :startsWith, *args)
-            else
-              process S(:send, target, :endsWith, *args)
-            end
+          if method == :start_with?
+            process S(:send, target, :startsWith, *args)
           else
-            if args.first.type == :str
-              length = S(:int, args.first.children.first.length)
-            else
-              length = S(:attr, *args, :length)
-            end
-
-            if method == :start_with?
-              process S(:send, S(:send, target, :substring, s(:int, 0),
-                length), :==, *args)
-            else
-              process S(:send, S(:send, target, :slice,
-                S(:send, length, :-@)), :==, *args)
-            end
+            process S(:send, target, :endsWith, *args)
           end
 
         elsif method == :clear and args.length == 0 and parens_or_included?(node, method)
@@ -394,12 +385,7 @@ module Ruby2JS
             S(:and, s(:send, args.first, :>=, target.children.first),
               s(:send, args.first, :<, target.children.last))
           else
-            if es2016
-              process S(:send, target, :includes, args.first)
-            else
-              process S(:send, S(:send, target, :indexOf, args.first), :!=,
-                s(:int, -1))
-            end
+            process S(:send, target, :includes, args.first)
           end
 
         elsif method == :respond_to? and args.length == 1
@@ -564,12 +550,7 @@ module Ruby2JS
           S(:send, s(:const, nil, :JSON), :stringify, process(target))
 
         elsif method == :* and target.type == :str
-          if es2015
-            process S(:send, target, :repeat, args.first)
-          else
-            process S(:send, s(:send, s(:const, nil, :Array), :new,
-              s(:send, args.first, :+, s(:int, 1))), :join, target)
-          end
+          process S(:send, target, :repeat, args.first)
 
         elsif [:is_a?, :kind_of?].include? method and args.length == 1
           if args[0].type == :const
@@ -597,40 +578,30 @@ module Ruby2JS
           # prevent chained delete methods from being converted to undef
           S(:send, target.updated(:sendw), *node.children[1..-1])
 
-        elsif es2017 and method==:entries and args.length==0 and parens_or_included?(node, method)
+        elsif method==:entries and args.length==0 and parens_or_included?(node, method)
           process node.updated(nil, [s(:const, nil, :Object), :entries, target])
 
-        elsif es2017 and method==:values and args.length==0 and parens_or_included?(node, method)
+        elsif method==:values and args.length==0 and parens_or_included?(node, method)
           process node.updated(nil, [s(:const, nil, :Object), :values, target])
 
-        elsif es2017 and method==:rjust
+        elsif method==:rjust
           process node.updated(nil, [target, :padStart, *args])
 
-        elsif es2017 and method==:ljust
+        elsif method==:ljust
           process node.updated(nil, [target, :padEnd, *args])
 
-        elsif es2019 and method==:flatten and args.length == 0
+        elsif method==:flatten and args.length == 0
           process node.updated(nil, [target, :flat, s(:lvar, :Infinity)])
 
-        elsif es2019 and method==:to_h and args.length==0
+        elsif method==:to_h and args.length==0
           process node.updated(nil, [s(:const, nil, :Object), :fromEntries,
             target])
 
         elsif method==:rstrip
-          if es2019
-            process node.updated(nil, [target, :trimEnd, *args])
-          else
-            node.updated(nil, [process(target), :replace,
-              s(:regexp, s(:str, '\s+\z') , s(:regopt)), s(:str, '')])
-          end
+          process node.updated(nil, [target, :trimEnd, *args])
 
         elsif method==:lstrip and args.length == 0
-          if es2019
-            process s(:send!, target, :trimStart)
-          else
-            node.updated(nil, [process(target), :replace,
-              s(:regexp, s(:str, '\A\s+') , s(:regopt)), s(:str, '')])
-          end
+          process s(:send!, target, :trimStart)
 
         elsif method == :index and parens_or_included?(node, method)
           process node.updated(nil, [target, :indexOf, *args])
@@ -713,18 +684,10 @@ module Ruby2JS
             s(:attr, s(:attr, target, :prototype), args[1].children[0]))
 
         elsif method == :new and args.length == 2 and target == s(:const, nil, :Array)
-          if es2015
-            s(:send, S(:send, target, :new, args.first), :fill, args.last)
-          else
-            super
-          end
+          s(:send, S(:send, target, :new, args.first), :fill, args.last)
 
         elsif method == :chars and args.length == 0
-          if es2015
-            S(:send, s(:const, nil, :Array), :from, target)
-          else
-            super
-          end
+          S(:send, s(:const, nil, :Array), :from, target)
 
         elsif method == :method and target == nil and args.length == 1
           # method(:name) => this.name.bind(this) or this[name].bind(this)
@@ -1052,25 +1015,20 @@ module Ruby2JS
         elsif \
           [:each, :each_value].include? method
         then
-          if es2015 or @jsx
-            if node.children[1].children.length > 1
-              process node.updated(:for_of,
-                [s(:mlhs, *node.children[1].children.map {|child|
-                  s(:lvasgn, child.children[0])}),
-                node.children[0].children[0], node.children[2]])
-            elsif node.children[1].children[0].type == :mlhs
-              process node.updated(:for_of,
-                [s(:mlhs, *node.children[1].children[0].children.map {|child|
-                  s(:lvasgn, child.children[0])}),
-                node.children[0].children[0], node.children[2]])
-            else
-              process node.updated(:for_of,
-                [s(:lvasgn, node.children[1].children[0].children[0]),
-                node.children[0].children[0], node.children[2]])
-            end
+          if node.children[1].children.length > 1
+            process node.updated(:for_of,
+              [s(:mlhs, *node.children[1].children.map {|child|
+                s(:lvasgn, child.children[0])}),
+              node.children[0].children[0], node.children[2]])
+          elsif node.children[1].children[0].type == :mlhs
+            process node.updated(:for_of,
+              [s(:mlhs, *node.children[1].children[0].children.map {|child|
+                s(:lvasgn, child.children[0])}),
+              node.children[0].children[0], node.children[2]])
           else
-            process node.updated(nil, [s(:send, call.children[0],
-              :forEach), *node.children[1..2]])
+            process node.updated(:for_of,
+              [s(:lvasgn, node.children[1].children[0].children[0]),
+              node.children[0].children[0], node.children[2]])
           end
 
         elsif \
@@ -1082,26 +1040,16 @@ module Ruby2JS
             [s(:lvasgn, node.children[1].children[0].children[0]),
             node.children[0].children[0], node.children[2]])
 
-        elsif es2015 and method == :inject
+        elsif method == :inject
           process node.updated(:send, [call.children[0], :reduce,
             s(:block, s(:send, nil, :lambda), *node.children[1..2]),
             *call.children[2..-1]])
 
         elsif method == :each_pair and node.children[1].children.length == 2
-          if es2017
-            # Object.entries(a).forEach(([key, value]) => {})
-            process node.updated(nil, [s(:send, s(:send,
-            s(:const, nil, :Object), :entries, call.children[0]), :each),
-            node.children[1], node.children[2]])
-          else
-            # for (key in a). {var value = a[key]; ...}
-            process node.updated(:for, [s(:lvasgn,
-              node.children[1].children[0].children[0]), call.children[0],
-              s(:begin, s(:lvasgn, node.children[1].children[1].children[0],
-              s(:send, call.children[0], :[], 
-              s(:lvar, node.children[1].children[0].children[0]))),
-              node.children[2])])
-          end
+          # Object.entries(a).forEach(([key, value]) => {})
+          process node.updated(nil, [s(:send, s(:send,
+          s(:const, nil, :Object), :entries, call.children[0]), :each),
+          node.children[1], node.children[2]])
 
         elsif method == :scan and call.children.length == 3
           process call.updated(nil, [*call.children, s(:block,

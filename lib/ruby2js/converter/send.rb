@@ -47,12 +47,7 @@ module Ruby2JS
 
         parent = (args.length > 1) ? args.first : nil
 
-        if es2015
-          return parse s(:class2, nil, parent, *args.last.children[2..-1])
-        else
-          return parse s(:kwbegin, s(:class, s(:const, nil, :$$), parent,
-            *args.last.children[2..-1]), s(:const, nil, :$$))
-        end
+        return parse s(:class2, nil, parent, *args.last.children[2..-1])
       end
 
       # three ways to define anonymous functions
@@ -72,7 +67,7 @@ module Ruby2JS
       if [:call, :[]].include? method and receiver and receiver.type == :block
         t2,m2,*args2 = receiver.children.first.children
         if not t2 and [:lambda, :proc].include? m2 and args2.length == 0
-          (es2015 || @state == :statement ? group(receiver) : parse(receiver))
+          group(receiver)
           put '('; parse_all(*args, join: ', '); put ')'
           return
         elsif not t2 and m2 == :async and args2.length == 0
@@ -83,10 +78,10 @@ module Ruby2JS
 
       # async/await support
       # map "await x do...end" to "await x {...}" due to precedence rules
-      if method == :await and es2017 and receiver == nil and args.length == 2 and args[1].type == :def
+      if method == :await and receiver == nil and args.length == 2 and args[1].type == :def
         args = [s(:block, args.first, *args.last.children[1..-1])]
       end
-      if es2017 and receiver == nil and args.length == 1
+      if receiver == nil and args.length == 1
         if method == :async
           if args.first.type == :def
             # async def f(x) {...}
@@ -201,13 +196,6 @@ module Ruby2JS
           put '['; parse_all(*args[0..-2], join: ', '); put '] = '
         end
         parse args[-1]
-
-      elsif method == :** and not es2016
-        put 'Math.pow('
-        parse receiver
-        put ', '
-        parse args.first
-        put ')'
 
       elsif [:-@, :+@, :~, '~'].include? method
         child0 = receiver.children[0]
@@ -374,9 +362,6 @@ module Ruby2JS
           else
             parse ast.updated(:lvasgn, [method]), @state
           end
-        elsif args.any? {|arg| arg.type == :splat} and not es2015
-          parse s(:send, s(:attr, receiver, method), :apply,
-            (receiver || s(:nil)), s(:array, *args))
         else
           (group_receiver ? group(receiver) : parse(receiver))
           put "#{ '.' if receiver && method}#{ method }"
@@ -410,45 +395,18 @@ module Ruby2JS
         return
       end
 
-      if es2020
-
-        # optional chaining
-        parse receiver
-        put "?."
-        if method == :[]
-          put '['
-          parse_all(*args, join: ', ')
-          put ']'
-        else
-          put method.to_s
-          put '(' if @ast.is_method?
-          parse_all(*args, join: ', ')
-          put ')' if @ast.is_method?
-        end
-
+      # optional chaining
+      parse receiver
+      put "?."
+      if method == :[]
+        put '['
+        parse_all(*args, join: ', ')
+        put ']'
       else
-
-        node = @ast
-
-        # collect up chain of conditional sends
-        stack = []
-        while node.children.first.type == :csend
-          stack << node
-          node = node.children.first
-        end
-
-        # conditionally evaluate most nested expression
-        expr = node.updated(:send)
-        result = s(:and, node.children.first, expr)
-
-        # build up chain of conditional evaluations
-        until stack.empty?
-          node = stack.pop
-          expr = node.updated(:send, [expr, *node.children[1..-1]])
-          result = s(:and, result, expr)
-        end
-
-        parse result
+        put method.to_s
+        put '(' if @ast.is_method?
+        parse_all(*args, join: ', ')
+        put ')' if @ast.is_method?
       end
     end
 
@@ -531,11 +489,7 @@ module Ruby2JS
           length = "#{finish.children.last}" + (node.type == :irange ? "+1" : "")
         end
 
-        if es2015
-          return put "[...Array(#{length}).keys()]"
-        else
-          return put "Array.apply(null, {length: #{length}}).map(Function.call, Number)"
-        end
+        return put "[...Array(#{length}).keys()]"
       else
         # Use .compact because the first argument is nil with variables
         # This way the first value is always set
@@ -555,18 +509,14 @@ module Ruby2JS
           index_var = 'idx'
         end
 
-        if es2015
-          # Use _ because it's normal convention in JS for variable which is not used at all
-          if @vars.include? :_ or start_value == :_ or finish_value == :_
-            blank = '_$'
-          else
-            blank = '_'
-          end
-
-          return put "Array.from({length: #{length}}, (#{blank}, #{index_var}) => #{index_var}+#{start_value})"
+        # Use _ because it's normal convention in JS for variable which is not used at all
+        if @vars.include? :_ or start_value == :_ or finish_value == :_
+          blank = '_$'
         else
-          return put "Array.apply(null, {length: #{length}}).map(Function.call, Number).map(function (#{index_var}) { return #{index_var}+#{start_value} })"
+          blank = '_'
         end
+
+        return put "Array.from({length: #{length}}, (#{blank}, #{index_var}) => #{index_var}+#{start_value})"
       end
     end
   end

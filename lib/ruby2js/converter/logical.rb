@@ -28,6 +28,8 @@ module Ruby2JS
         return true if COMPARISON_OPS.include?(method)
         # Check for predicate methods (ending with ?)
         return true if method.to_s.end_with?('?')
+        # Check for negation (Ruby parses !x as x.!)
+        return true if method == :!
         false
       when :and, :or, :not
         true
@@ -74,22 +76,20 @@ module Ruby2JS
         end
 
         @need_truthy_helpers << :T
-        thunk_start = es2015 ? '() => ' : 'function() {return '
-        thunk_end = es2015 ? '' : '}'
         if type == :or
           @need_truthy_helpers << :ror
           put '$ror('
           parse left
-          put ", #{thunk_start}"
+          put ", () => "
           parse right
-          put "#{thunk_end})"
+          put ")"
         else
           @need_truthy_helpers << :rand
           put '$rand('
           parse left
-          put ", #{thunk_start}"
+          put ", () => "
           parse right
-          put "#{thunk_end})"
+          put ")"
         end
         return
       end
@@ -115,11 +115,40 @@ module Ruby2JS
 
       put '(' if lgroup; parse left; put ')' if lgroup
 
-      # Use || instead of ?? in boolean contexts even when nullish option is set
-      use_nullish = @or == :nullish && es2020 &&
-        !boolean_expression?(left) && !boolean_expression?(right)
+      # Determine whether to use ?? or ||
+      # :auto (default) - context-aware: || in boolean contexts, ?? in value contexts
+      # :nullish - always use ??
+      # :logical - always use ||
+      use_nullish = case @or
+        when :logical then false
+        when :nullish then !boolean_expression?(left) && !boolean_expression?(right)
+        else # :auto - context-aware
+          !@boolean_context && !boolean_expression?(left) && !boolean_expression?(right)
+        end
 
       put (type==:and ? ' && ' : (use_nullish ? ' ?? ' : ' || '))
+      put '(' if rgroup; parse right; put ')' if rgroup
+    end
+
+    # (nullish
+    #   (...)
+    #   (...))
+    #
+    # Explicit nullish coalescing (??) - used by nullish_to_s option
+    # to wrap expressions that need nil-safe string coercion.
+    # Unlike :or with @or == :nullish, this always emits ?? regardless of
+    # the global @or setting.
+
+    handle :nullish do |left, right|
+      # Only group :begin if it has multiple children (actual grouping expression)
+      # Single-child :begin nodes are just wrappers and don't need parens
+      lgroup = LOGICAL.include?(left.type) ||
+        (left.type == :begin && left.children.length > 1)
+      rgroup = LOGICAL.include?(right.type) ||
+        (right.type == :begin && right.children.length > 1)
+
+      put '(' if lgroup; parse left; put ')' if lgroup
+      put ' ?? '
       put '(' if rgroup; parse right; put ')' if rgroup
     end
 

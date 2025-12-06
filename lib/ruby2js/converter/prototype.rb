@@ -13,7 +13,7 @@ module Ruby2JS
         parse(expr)
 
         if @block_this
-          insert mark, "#{es2015 ? 'let' : 'var'} self = this#{@sep}" 
+          insert mark, "let self = this#{@sep}"
         end
       ensure
         @prototype = prototype

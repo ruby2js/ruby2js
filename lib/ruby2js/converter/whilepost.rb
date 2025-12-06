@@ -11,7 +11,7 @@ module Ruby2JS
       begin
         next_token, @next_token = @next_token, :continue
 
-        puts 'do {'; redoable block; sput '} while ('; parse condition; put ')'
+        puts 'do {'; redoable block; sput '} while ('; parse_condition condition; put ')'
       ensure
         @next_token = next_token
       end

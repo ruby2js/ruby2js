@@ -28,7 +28,7 @@ If you set the `eslevel` option to `2015` or newer, the Functions filter enables
 * `.downcase` {{ caret }} `.toLowerCase`
 * `.each` {{ caret }} `.forEach`
 * `.each_key` {{ caret }} `for (i in ...) {}`
-* `.each_pair` {{ caret }} `for (var key in item) {var value = item[key]; ...}`
+* `.each_pair` {{ caret }} `for (let key in item) {let value = item[key]; ...}`
 * `.each_value` {{ caret }} `.forEach`
 * `.each_with_index` {{ caret }} `.forEach`
 * `.end_with?` {{ caret }} `.slice(-arg.length) == arg`
@@ -65,25 +65,25 @@ If you set the `eslevel` option to `2015` or newer, the Functions filter enables
 * `.rstrip` {{ caret }} `.replace(/s+$/, "")`
 * `.scan` {{ caret }} `.match(//g)`
 * `.sort_by {}` {{ caret }} `.toSorted()` (ES2023+) or `.slice().sort()` fallback
-* `.sum` {{ caret }} `.reduce(function(a, b) {a + b}, 0)`
+* `.sum` {{ caret }} `.reduce((a, b) => a + b, 0)`
 * `.times` {{ caret }} `for (let i = 0; i < n; i++)`
-* `.start_with?` {{ caret }} `.substring(0, arg.length) == arg` or `.startsWith(arg)` for ES2015+
-* `.upto(lim)` {{ caret }} `for (var i=num; i<=lim; i+=1)`
-* `.downto(lim)` {{ caret }} `for (var i=num; i>=lim; i-=1)`
-* `.step(lim, n).each` {{ caret }} `for (var i=num; i<=lim; i+=n)`
-* `.step(lim, -n).each` {{ caret }} `for (var i=num; i>=lim; i-=n)`
-* `(0..a).to_a` {{ caret }} `Array.apply(null, {length: a}).map(Function.call, Number)`
-* `(b..a).to_a` {{ caret }} `Array.apply(null, {length: (a-b+1)}).map(Function.call, Number).map(function (idx) { return idx+b })`
-* `(b...a).to_a` {{ caret }} `Array.apply(null, {length: (a-b)}).map(Function.call, Number).map(function (idx) { return idx+b })`
+* `.start_with?` {{ caret }} `.startsWith(arg)`
+* `.upto(lim)` {{ caret }} `for (let i=num; i<=lim; i+=1)`
+* `.downto(lim)` {{ caret }} `for (let i=num; i>=lim; i-=1)`
+* `.step(lim, n).each` {{ caret }} `for (let i=num; i<=lim; i+=n)`
+* `.step(lim, -n).each` {{ caret }} `for (let i=num; i>=lim; i-=n)`
+* `(0..a).to_a` {{ caret }} `[...Array(a+1).keys()]`
+* `(b..a).to_a` {{ caret }} `Array.from({length: (a-b+1)}, (_, idx) => idx+b)`
+* `(b...a).to_a` {{ caret }} `Array.from({length: (a-b)}, (_, idx) => idx+b)`
 * `.strip` {{ caret }} `.trim`
 * `.sub` {{ caret }} `.replace`
-* `.tap {|n| n}` {{ caret }} `(function(n) {n; return n})(...)`
+* `.tap {|n| n}` {{ caret }} `(n => {n; return n})(...)`
 * `.to_f` {{ caret }} `parseFloat`
 * `.to_i` {{ caret }} `parseInt`
 * `.to_s` {{ caret }} `.toString`
 * `.to_json` {{ caret }} `JSON.stringify(obj)`
 * `.upcase` {{ caret }} `.toUpperCase`
-* `.yield_self {|n| n}` {{ caret }} `(function(n) {return n})(...)`
+* `.yield_self {|n| n}` {{ caret }} `(n => n)(...)`
 * `[-n]` {{ caret }} `[*.length-n]` for literal values of `n`
 * `[n...m]` {{ caret }} `.slice(n,m)`
 * `[n..m]` {{ caret }} `.slice(n,m+1)`
@@ -91,11 +91,11 @@ If you set the `eslevel` option to `2015` or newer, the Functions filter enables
 * `.slice!(n..m)` {{ caret }} `.splice(n, m-n+1)`
 * `[/r/, n]` {{ caret }} `.match(/r/)[n]`
 * `[/r/, n]=` {{ caret }} `.replace(/r/, ...)`
-* `(1..2).each {|i| ...}` {{ caret }} `for (var i=1 i<=2; i+=1)`
-* `"string" * length` {{ caret }} `new Array(length + 1).join("string")` or `"string".repeat(length)` for ES2015+
+* `(1..2).each {|i| ...}` {{ caret }} `for (let i=1; i<=2; i+=1)`
+* `"string" * length` {{ caret }} `"string".repeat(length)`
 * `@foo.call(args)` {{ caret }} `this._foo(args)`
 * `@@foo.call(args)` {{ caret }} `this.constructor._foo(args)`
-* `Array(x)` {{ caret }} `Array.prototype.slice.call(x)`
+* `Array(x)` {{ caret }} `Array.from(x)`
 * `delete x` {{ caret }} `delete x` (note lack of parenthesis)
 
 ## Additional Features

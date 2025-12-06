@@ -6,7 +6,7 @@ module Ruby2JS
     #   (const nil :B)
     #   (...)
 
-    # NOTE: this is the es2015 version of class
+    # NOTE: this is the ES2015+ class handler
 
     handle :class2 do |name, inheritance, *body|
       body.compact!
@@ -153,7 +153,7 @@ module Ruby2JS
           skipped = false
 
           # intercept async definitions
-          if es2017 and m.type == :send and m.children[0..1] == [nil, :async]
+          if m.type == :send and m.children[0..1] == [nil, :async]
             child = m.children[2]
             if child.type == :def
               m = child.updated(:async)

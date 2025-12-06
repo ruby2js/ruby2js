@@ -1,6 +1,7 @@
 gem 'minitest'
 require 'minitest/autorun'
 require 'ruby2js/filter/vue'
+require 'ruby2js/filter/functions'
 
 describe Ruby2JS::Filter::Vue do
 
@@ -20,81 +21,81 @@ describe Ruby2JS::Filter::Vue do
   describe :createApp do
     it "should create apps" do
       to_js( 'class FooBar<Vue; end' ).
-        must_include 'var FooBar = new Vue('
+        must_include 'const FooBar = new Vue('
     end
   end
 
   describe :createClass do
     it "should create classes" do
       to_js( 'class FooBar<Vue; def render; end; end' ).
-        must_include 'var FooBar = Vue.component("foo-bar",'
+        must_include 'const FooBar = Vue.component("foo-bar",'
       to_js( 'class FooBar<Vue; template "<span></span>"; end' ).
-        must_include 'var FooBar = Vue.component("foo-bar",'
+        must_include 'const FooBar = Vue.component("foo-bar",'
       to_js( 'class FooBar<Vue; template "<span></span>"; end' ).
-        must_include 'var FooBar = Vue.component("foo-bar",'
+        must_include 'const FooBar = Vue.component("foo-bar",'
     end
 
     it "should convert initialize methods to data" do
       to_js( 'class Foo<Vue; def initialize(); @a=1; end; end' ).
-        must_include '{data: function() {return {a: 1}}'
+        must_include '{data() {return {a: 1}}'
     end
 
     it "should insert an initialize method if none is present" do
       to_js( 'class Foo<Vue; def render; _h1 @title; end; end' ).
-        must_include '{data: function() {return {title: undefined}}'
+        must_include '{data() {return {title: undefined}}'
     end
 
     it "should convert merge uninitialized values - simple" do
       to_js( 'class Foo<Vue; def initialize; @var = ""; end; ' +
         'def render; _h1 @title; end; end' ).
-        must_include ', {data: function() {return {var: "", title: undefined}}'
+        must_include ', {data() {return {var: "", title: undefined}}'
     end
 
     it "should convert merge uninitialized values - complex" do
       to_js( 'class Foo<Vue; def initialize; value = "x"; @var = value; end; ' +
         'def render; _h1 @title; end; end' ).
-        must_include ', {data: function() {' +
-          'var $_ = {title: undefined}; var value = "x"; $_.var = value; ' +
+        must_include ', {data() {' +
+          'let $_ = {title: undefined}; let value = "x"; $_.var = value; ' +
           'return $_}'
     end
 
     it "should initialize, accumulate, and return state if complex" do
       to_js( 'class Foo<Vue; def initialize; @a=1; b=2; @b = b; end; end' ).
-        must_include 'data: function() {var $_ = {}; $_.a = 1; ' +
-          'var b = 2; $_.b = b; return $_}'
+        must_include 'data() {let $_ = {}; $_.a = 1; ' +
+          'let b = 2; $_.b = b; return $_}'
     end
 
     it "should initialize, accumulate, and return state if ivars are read" do
       to_js( 'class Foo<Vue; def initialize; @a=1; @b = @a; end; end' ).
-        must_include '{data: function() {var $_ = {}; $_.a = 1; ' +
+        must_include '{data() {let $_ = {}; $_.a = 1; ' +
           '$_.b = $_.a; return $_}}'
     end
 
     it "should initialize, accumulate, and return state if multi-assignment" do
       to_js( 'class Foo<Vue; def initialize; @a=@b=1; end; end' ).
-        must_include '{data: function() {var $_ = {b: undefined}; ' +
+        must_include '{data() {let $_ = {b: undefined}; ' +
           '$_.a = $_.b = 1; return $_}}'
     end
 
     it "should initialize, accumulate, and return state if op-assignment" do
       to_js( 'class Foo<Vue; def initialize; @a||=1; end; end' ).
-        must_include '{data: function() {var $_ = {a: undefined}; ' +
-          '$_.a = $_.a || 1; return $_}}'
+        must_include '{data() {let $_ = {a: undefined}; ' +
+          '$_.a = $_.a ?? 1; return $_}}'
     end
 
     it "should collapse instance variable assignments into a return" do
       to_js( 'class Foo<Vue; def initialize; @a=1; @b=2; end; end' ).
-        must_include 'data: function() {return {a: 1, b: 2}}'
+        must_include 'data() {return {a: 1, b: 2}}'
     end
 
     it "should handle lifecycle methods" do
       to_js( 'class Foo<Vue; def updated; console.log "."; end; end' ).
-        must_include '{updated: function() {return console.log(".")}'
+        must_include '{updated() {return console.log(".")}'
     end
 
     it "should handle other methods" do
       to_js( 'class Foo<Vue; def clicked(); @counter+=1; end; end' ).
-        must_include ', methods: {clicked: function() {this.$data.counter++}}'
+        must_include ', methods: {clicked() {this.$data.counter++}}'
     end
 
     it "should handle calls to methods" do
@@ -203,20 +204,20 @@ describe Ruby2JS::Filter::Vue do
 
     it "should create simple nested elements" do
       to_js( 'class Foo<Vue; def render; _a {_b}; end; end' ).
-        must_include '{render: function($h) {return $h("a", [$h("b")])}'
+        must_include '{render($h) {return $h("a", [$h("b")])}'
     end
 
     it "should handle options with blocks" do
       to_js( 'class Foo<Vue; def render; _a options do _b; end; end; end' ).
-        must_include '{render: function($h) ' +
+        must_include '{render($h) ' +
           '{return $h("a", options, [$h("b")])}'
     end
 
     it "should create complex nested elements - leading" do
       result = to_js('class Foo<Vue; def render; _a {_x; _b if true}; end; end')
 
-      result.must_include 'return $h("a", function() {'
-      result.must_include 'var $_ = [$h("x")];'
+      result.must_include 'return $h("a", (() => {'
+      result.must_include 'let $_ = [$h("x")];'
       result.must_include 'if (true) $_.push($h("b"))'
       result.must_include 'return $_'
     end
@@ -224,8 +225,8 @@ describe Ruby2JS::Filter::Vue do
     it "should create complex nested elements - trailing" do
       result = to_js('class Foo<Vue; def render; _a {c="c"; _b c}; end; end')
 
-      result.must_include 'return $h("a", function() {'
-      result.must_include 'var c = "c"'
+      result.must_include 'return $h("a", (() => {'
+      result.must_include 'let c = "c"'
       result.must_include 'return [$h("b", c)]'
     end
 
@@ -250,19 +251,19 @@ describe Ruby2JS::Filter::Vue do
       result = to_js('class Foo<Vue; def render; _a {c="c"; ' +
         'Vue.createElement("b", c)}; end; end')
 
-      result.must_include '$h("a", function() {'
+      result.must_include '$h("a", (() => {'
       result.must_include 'return [$h("b", c)]'
-      result.must_include '}())'
+      result.must_include '})())'
     end
 
     it "should handle call with blocks to Vue.createElement" do
       result = to_js( 'class Foo<Vue; def render; ' +
         'Vue.createElement("a") {_b}; end; end' )
-      result.must_include '$h("a", function() {'
-      result.must_include 'var $_ = [];'
+      result.must_include '$h("a", (() => {'
+      result.must_include 'let $_ = [];'
       result.must_include '$_.push($h("b"));'
       result.must_include 'return $_'
-      result.must_include '}())'
+      result.must_include '})())'
     end
 
     it "should iterate" do
@@ -270,8 +271,8 @@ describe Ruby2JS::Filter::Vue do
         'do |i| _li i; end; end; end')
 
       result.must_include '$h("ul", '
-      result.must_include 'list.map(function(i) {'
-      result.must_include '{return $h("li", i)}'
+      result.must_include 'list.map(i =>'
+      result.must_include '$h("li", i)'
     end
 
     it "should iterate with markaby style classes/ids" do
@@ -279,8 +280,8 @@ describe Ruby2JS::Filter::Vue do
         'do |i| _li i; end; end; end')
 
       result.must_include '$h("ul", {class: ["todos"]}, '
-      result.must_include 'list.map(function(i) {'
-      result.must_include '{return $h("li", i)})'
+      result.must_include 'list.map(i =>'
+      result.must_include '$h("li", i)'
     end
 
     it "should handle text nodes" do
@@ -290,7 +291,7 @@ describe Ruby2JS::Filter::Vue do
 
     it "should apply text nodes" do
       to_js( 'class Foo<Vue; def render; _a {text="hi"; _ text}; end; end' ).
-        must_include '{var text = "hi"; return [self._v(text)]}'
+        must_include '{let text = "hi"; return [this._v(text)]}'
     end
 
     it "should handle arbitrary nodes" do
@@ -305,12 +306,12 @@ describe Ruby2JS::Filter::Vue do
 
     it "should apply arbitrary nodes" do
       to_js( 'class Foo<Vue; def render; _a {text="hi"; _[text]}; end; end' ).
-        must_include '{var text = "hi"; return [text]}'
+        must_include '{let text = "hi"; return [text]}'
     end
 
     it "should apply list of arbitrary nodes" do
       to_js( 'class Foo<Vue; def render; _a {text="hi"; _[text, text]}; end; end' ).
-        must_include '{var text = "hi"; return [text, text]}'
+        must_include '{let text = "hi"; return [text, text]}'
     end
   end
 
@@ -322,20 +323,20 @@ describe Ruby2JS::Filter::Vue do
 
     it "should not wrap tail only element with a span" do
       to_js( 'class Foo<Vue; def render; x = "a"; _p x; end; end' ).
-        must_include 'function($h) {var x = "a"; return $h("p", x)}}'
+        must_include 'render($h) {let x = "a"; return $h("p", x)}'
     end
 
     it "should not be fooled by nesting" do
       result = to_js( 'class Foo<Vue; def render; _p "a" if @a; _p "b"; end; end' )
-      result.must_include '$h("span", function() {var $_ = [];'
-      result.must_include 'if (self.$data.a) {$_.push($h("p", "a"))}'
+      result.must_include '$h("span", (() => {let $_ = [];'
+      result.must_include 'if (this.$data.a) {$_.push($h("p", "a"))}'
       result.must_include 'return $_.concat([$h("p", "b")])'
     end
 
     it "should wrap anything that is not a method or block call with a span" do
       result = to_js( 'class Foo<Vue; def render; if @a; _p "a"; else;_p "b"; end; end; end' )
-      result.must_include '$h("span", function() {var $_ = [];'
-      result.must_include 'if (self.$data.a) {$_.push($h("p", "a"))}'
+      result.must_include '$h("span", (() => {let $_ = [];'
+      result.must_include 'if (this.$data.a) {$_.push($h("p", "a"))}'
       result.must_include 'else {$_.push($h("p", "b"))};'
       result.must_include 'return $_}'
     end
@@ -404,7 +405,7 @@ describe Ruby2JS::Filter::Vue do
 
     it "should handle an array value mixed with markup" do
       to_js( 'class Foo<Vue; def render; _a.b class: [*c]; end; end' ).
-        must_include '$h("a", {class: c.concat(["b"])})'
+        must_include '$h("a", {class: [...c, "b"]})'
     end
   end
 
@@ -474,7 +475,7 @@ describe Ruby2JS::Filter::Vue do
   describe "computed values" do
     it "should handle getters" do
       js = to_js( 'class Foo<Vue; def value; @x; end; def method(); value; end; end' )
-      js.must_include ', computed: {value: function() {'
+      js.must_include ', computed: {value() {'
       js.must_include 'this.value'
     end
 
@@ -485,7 +486,7 @@ describe Ruby2JS::Filter::Vue do
 
     it "should handle setters" do
       js = to_js( 'class Foo<Vue; def value=(x); @x=x; end; def method(); value=1; end; end' )
-      js.must_include ', computed: {value: {set: function(x) {'
+      js.must_include ', computed: {value: {set(x) {'
       js.must_include 'this.value = 1'
     end
 
@@ -496,15 +497,15 @@ describe Ruby2JS::Filter::Vue do
 
     it "should combine getters and setters" do
       js = to_js( 'class Foo<Vue; def value; @x; end; def value=(x); @x=x; end; end' )
-      js.must_include ', computed: {value: {get: function() {return '
-      js.must_include ', set: function(x) {this.$data.x = x}'
+      js.must_include ', computed: {value: {get() {return '
+      js.must_include ', set(x) {this.$data.x = x}'
     end
   end
 
   describe "watch values" do
     it 'should handle watch method' do
       to_js( 'class Numbers<Vue; def watch; {"_data":  refreshText  , deep: true}; end; end' ).
-        must_equal 'var Numbers = new Vue({watch: {_data: refreshText, deep: true}})'
+        must_equal 'const Numbers = new Vue({watch: {_data: refreshText, deep: true}})'
     end
   end
 
@@ -516,8 +517,7 @@ describe Ruby2JS::Filter::Vue do
 
     it 'should map Vue.render with block to Vue instance' do
       to_js( 'Vue.render "#sidebar" do _Element end' ).
-        must_include 'new Vue({el: "#sidebar", render: ' +
-          'function($h) {return $h(Element)}})'
+        must_include 'new Vue({el: "#sidebar", render($h) {return $h(Element)}})'
     end
 
     it 'should substitute scope instance variables / props' do
@@ -533,7 +533,7 @@ describe Ruby2JS::Filter::Vue do
 
     it 'should leave bare Vue.nextTick calls alone' do
       to_js( 'Vue.nextTick { nil }' ).
-        must_match 'Vue.nextTick(function() {null})'
+        must_match 'Vue.nextTick(() => null)'
     end
 
     it 'should map Vue.util.defineReactive cvar to class' do
@@ -555,7 +555,7 @@ describe Ruby2JS::Filter::Vue do
   describe "controlled components" do
     it "should automatically create onInput value functions: input ivar" do
       js = to_js( 'class Foo<Vue; def render; _input value: @x; end; end' )
-      js.must_include ', on: {input: function(event) {'
+      js.must_include ', on: {input(event) {'
       js.must_include '{self.$data.x = event.target.value}'
       js.must_include ', domProps: {value: this.$data.x,'
 
@@ -566,7 +566,7 @@ describe Ruby2JS::Filter::Vue do
     it "should automatically create onInput value functions: input computed" do
       js = to_js( 'class Foo<Vue; def render; _input value: x; end; ' +
         ' def x=(value); end; end' )
-      js.must_include ', on: {input: function(event) {'
+      js.must_include ', on: {input(event) {'
       js.must_include '{self.x = event.target.value}'
       js.must_include ', domProps: {value: this.x,'
 
@@ -576,7 +576,7 @@ describe Ruby2JS::Filter::Vue do
 
     it "should automatically create onInput value functions: input self" do
       js = to_js( 'class Foo<Vue; def render; _input value: self.x; end; end' )
-      js.must_include ', on: {input: function(event) {'
+      js.must_include ', on: {input(event) {'
       js.must_include '{self.x = event.target.value}'
       js.must_include ', domProps: {value: this.x,'
 
@@ -586,7 +586,7 @@ describe Ruby2JS::Filter::Vue do
 
     it "should automatically create onInput value functions: input array" do
       js = to_js( 'class Foo<Vue; def render; _input value: @a[x]; end; end' )
-      js.must_include ', on: {input: function(event) {'
+      js.must_include ', on: {input(event) {'
       js.must_include '{self.$data.a[x] = event.target.value}'
       js.must_include ', domProps: {value: this.$data.a[x],'
 
@@ -598,7 +598,7 @@ describe Ruby2JS::Filter::Vue do
       js = to_js( 'class Foo<Vue; def render; _input value: @@x; end; end' )
       js.must_include '{attrs: {value: this.$props.x}'
 
-      js.wont_include ', on: {input: function(event) {'
+      js.wont_include ', on: {input(event) {'
       js.wont_include ' = event.target.value'
       js.wont_include ', domProps: {value: '
       js.wont_include 'disabled'
@@ -606,7 +606,7 @@ describe Ruby2JS::Filter::Vue do
 
     it "should automatically create onInput value functions: textarea" do
       js = to_js( 'class Foo<Vue; def render; _textarea value: @x; end; end' )
-      js.must_include ', on: {input: function(event) {'
+      js.must_include ', on: {input(event) {'
       js.must_include '{self.$data.x = event.target.value}'
       js.must_include ', domProps: {value: this.$data.x,'
       js.must_include ', this.$data.x)'
@@ -623,7 +623,7 @@ describe Ruby2JS::Filter::Vue do
 
     it "should automatically create onClick checked functions - ivar" do
       js = to_js( 'class Foo<Vue; def render; _input checked: @x; end; end' )
-      js.must_include ', on: {click: function() {'
+      js.must_include ', on: {click() {'
       js.must_include 'self.$data.x = !self.$data.x}'
       js.must_include ', domProps: {checked: this.$data.x,'
 
@@ -633,7 +633,7 @@ describe Ruby2JS::Filter::Vue do
 
     it "should automatically create onClick checked functions - cvar based" do
       js = to_js( 'class Foo<Vue; def render; _input checked: @@x.y; end; end' )
-      js.must_include ', on: {click: function() {'
+      js.must_include ', on: {click() {'
       js.must_include 'self.$props.x.y = !self.$props.x.y}'
       js.must_include ', domProps: {checked: this.$props.x.y,'
 
@@ -643,7 +643,7 @@ describe Ruby2JS::Filter::Vue do
 
     it "should chose checked over value" do
       to_js( 'class Foo<Vue; def render; _input value: "foo", ' +
-        'checked: @@x.y; end; end' ).must_include ', on: {click: function() {'
+        'checked: @@x.y; end; end' ).must_include ', on: {click() {'
     end
 
     it "shouldn't replace disabled attributes in checkboxes" do
@@ -662,7 +662,7 @@ describe Ruby2JS::Filter::Vue do
   describe "options and mixins" do
     it "should capture and access options" do
       js = to_js( 'class Foo<Vue; options a: b; def render; _p $options.a; end; end' )
-      js.must_include '{a: b, render:'
+      js.must_include '{a: b, render($h)'
       js.must_include '$h("p", this.$options.a)'
     end
 
@@ -673,44 +673,44 @@ describe Ruby2JS::Filter::Vue do
 
     it "should enable a mixin to be defined" do
       to_js( 'class Foo<Vue::Mixin; def mounted(); @foo=1; end; end' ).
-        must_equal 'var Foo = {mounted: function() {this.$data.foo = 1}}'
+        must_equal 'const Foo = {mounted() {this.$data.foo = 1}}'
     end
 
     it "should enable a mixin to be included" do
       to_js( 'class Bar<Vue; mixin Foo; end' ).
-        must_equal 'var Bar = new Vue({mixins: [Foo]})'
+        must_equal 'const Bar = new Vue({mixins: [Foo]})'
     end
   end
 
   describe "static methods and properties" do
     it "should handle static properties" do
       to_js( 'class Foo<Vue; def self.one; 1; end; end' ).
-        must_include 'get: function() {return 1}'
+        must_include 'get() {return 1}'
     end
 
     it "should handle computed static properties" do
       js = to_js( 'class Foo<Vue; def self.one; return 1; end; end' )
       js.must_include 'Object.defineProperty(Foo, "one", {'
-      js.must_include 'get: function() {return 1}'
+      js.must_include 'get() {return 1}'
     end
 
     it "should handle computed static properties with getters and setters" do
       js = to_js( 'class Foo<Vue; def self.one; Foo._one; end;' +
         'def self.one=(x); Foo._one = x; end; end' )
       js.must_include 'Object.defineProperty(Foo, "one", {'
-      js.must_include 'get: function() {return Foo._one}, set'
-      js.must_include 'set: function(x) {Foo._one = x}}'
+      js.must_include 'get() {return Foo._one}, set'
+      js.must_include 'set(x) {Foo._one = x}}'
     end
 
     it "should handle static setters" do
       js = to_js( 'class Foo<Vue; def self.one=(x); Foo._one = x; end; end' )
       js.must_include 'Object.defineProperty(Foo, "one", {'
-      js.must_include 'set: function(x) {Foo._one = x}}'
+      js.must_include 'set(x) {Foo._one = x}}'
     end
 
     it "should handle static methods" do
       to_js( 'class Foo<Vue; def self.one(); return 1; end; end' ).
-        must_include 'Foo.one = function() {return 1}'
+        must_include 'Foo.one = () => 1'
     end
 
     it "should handle reactive properties" do
@@ -722,27 +722,27 @@ describe Ruby2JS::Filter::Vue do
   describe 'comments' do
     it "should handle class comments" do
       to_js( "#cc\nclass Foo<Vue; end" ).
-        must_include "//cc\nvar"
+        must_include "//cc\nconst"
     end
 
     it "should handle constructor comments" do
       to_js( "class Foo<Vue; \n#ctorc\ndef initialize; end; end" ).
-        must_include "//ctorc\n  data: function("
+        must_include "//ctorc\n  data("
     end
 
     it "should handle lifecycle method comments" do
       to_js( "class Foo<Vue; \n#lfc\ndef mounted(); end; end" ).
-        must_include "//lfc\n  mounted: function("
+        must_include "//lfc\n  mounted("
     end
 
     it "should handle instance method comments" do
       to_js( "class Foo<Vue;\n#imc\ndef method(); end; def render; end; end" ).
-        must_include "//imc\n    method: function("
+        must_include "//imc\n    method("
     end
 
     it "should handle class method comments" do
       to_js( "class Foo<Vue; \n#cmc\ndef self.method(); end; end" ).
-        must_include "//cmc\nFoo.method = function("
+        must_include "//cmc\nFoo.method = ("
     end
   end
 

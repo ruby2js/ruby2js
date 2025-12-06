@@ -11,11 +11,7 @@ module Ruby2JS
         cbase ||= @rbstack.map {|rb| rb[var]}.compact.last
 
         if @state == :statement and not cbase
-          if es2015
-            put "const "
-          else
-            put "var "
-          end
+          put "const "
         end
 
         (parse cbase; put '.') if cbase

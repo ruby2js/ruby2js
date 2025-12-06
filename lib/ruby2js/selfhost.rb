@@ -100,6 +100,42 @@ module Ruby2JS
           n.loc = this.loc;
           return n;
         }
+
+      }
+
+      // Check if node is a method call (has parentheses or arguments)
+      // In Ruby, this is determined by location info or presence of arguments
+      // Standalone function so it works with any AST node format
+      function isMethod(node) {
+        if (!node) return false;
+        // :send/:csend with arguments is always a method call
+        if (node.type === 'send' || node.type === 'csend') {
+          if (node.children && node.children.length > 2) return true;
+        }
+        // Check is_method property (set by walker for Prism AST when parens used)
+        if (node.is_method !== undefined) return node.is_method;
+        // Try node's own method (our Node class)
+        if (typeof node.isMethod === 'function') return node.isMethod();
+        // Fall back to checking location info directly
+        const loc = node.loc || node.location;
+        if (!loc || typeof loc !== 'object') return false;
+        if (!('expression' in loc) || !loc.expression) return false;
+        const src = loc.expression.source_buffer?.source;
+        if (!src) return false;
+        const endPos = loc.selector?.end_pos ?? loc.expression.end_pos;
+        return src[endPos] === '(';
+      }
+
+      // Create a new node with optionally modified type and children
+      // Standalone function so it works with any AST node format
+      function updated(node, newType, newChildren) {
+        if (!node) return null;
+        // Try node's own method first (our Node class)
+        if (typeof node.updated === 'function') return node.updated(newType, newChildren);
+        // Fall back to creating a new Node
+        const n = new Node(newType || node.type, newChildren || node.children);
+        n.loc = node.loc || node.location || null;
+        return n;
       }
 
       // S-expression helper
@@ -454,6 +490,7 @@ module Ruby2JS
           combined_code,
           eslevel: 2022,
           underscored_private: true,  # Required: prototype methods can't access private fields
+          nullish_to_s: true,  # Needed for conditional expressions in string interpolation
           filters: FILTERS
         ).to_s
 
@@ -542,7 +579,7 @@ module Ruby2JS
 end
 
 if __FILE__ == $0
-  esm = ARGV.include?('--esm')
+  esm = true  # Always generate ESM output with preamble and exports
   spec_file = ARGV.find { |arg| arg.end_with?('_spec.rb') }
 
   if spec_file

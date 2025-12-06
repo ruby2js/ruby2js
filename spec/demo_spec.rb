@@ -22,23 +22,23 @@ describe "demo" do
   describe "filters" do
     it "should work without filters" do
       to_js("x = 123; puts x").
-        must_equal('var x = 123; puts(x)')
+        must_equal('let x = 123; puts(x)')
     end
 
     it "should work with a filter" do
       to_js("x = 123; puts x", %w(--filter functions)).
-        must_equal('var x = 123; console.log(x)')
+        must_equal('let x = 123; console.log(x)')
     end
   end
 
   describe "options" do
     it "should work without options" do
       to_js("x = 123").
-        must_equal('var x = 123')
+        must_equal('let x = 123')
     end
 
     it "should work with an option" do
-      to_js("x = 123", %w(--strict --es2017)).
+      to_js("x = 123", %w(--strict --es2020)).
         must_equal('"use strict"; let x = 123')
     end
 
@@ -88,7 +88,7 @@ describe "demo" do
 
       it "should handle module/class definitions" do
         to_js("class C < A; def f; x; end; end",
-          %w(--filter esm --es2019 --autoimports A:a.js --defs A:[x,@y,:z],b:[q])).
+          %w(--filter esm --es2020 --autoimports A:a.js --defs A:[x,@y,:z],b:[q])).
           must_equal('import A from "a.js"; ' +
             'class C extends A {get f() {return this.x.bind(this)}}')
       end
@@ -124,7 +124,7 @@ describe "demo" do
     end
 
     it "should handle template literal tags" do
-      to_js("color 'red'", %w(--es2015 --filter tagged_templates --template_literal_tags color)).
+      to_js("color 'red'", %w(--es2020 --filter tagged_templates --template_literal_tags color)).
         must_equal('color`red`')
     end
 
