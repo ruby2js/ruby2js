@@ -108,7 +108,12 @@ class PrismWalker < Prism::Visitor
   def visit_call_node(node)
     receiver = visit(node.receiver)
     args = node.arguments_ ? visit_all(node.arguments_.arguments_) : []
-    call = s(:send, receiver, node.name, *args)
+
+    # Detect if this is a method call with parentheses
+    # Prism JS binding uses camelCase: openingLoc for the opening parenthesis location
+    is_method = !!node.openingLoc
+    # Create node with is_method option
+    call = Node.new(:send, [receiver, node.name, *args], { is_method: is_method })
 
     # Check for attached block
     if node.block
@@ -369,8 +374,11 @@ class PrismWalker < Prism::Visitor
   # === Other ===
 
   def visit_parentheses_node(node)
-    # Just visit the body - parentheses are for grouping
-    visit(node.body)
+    # Wrap in :begin to match Ruby parser behavior
+    # This is important for preserving semantics in cases like `not (a or b)`
+    # where the :begin prevents DeMorgan transformation
+    body = visit(node.body)
+    body ? s(:begin, body) : nil
   end
 
   def visit_splat_node(node)
@@ -1139,6 +1147,10 @@ class Node {
     this.type = type;
     this.children = children;
     this.location = options.location;
+    // Store is_method flag for call nodes (true if has parentheses)
+    if (options.is_method !== undefined) {
+      this.is_method = options.is_method;
+    }
   }
 }
 
