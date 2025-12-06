@@ -526,9 +526,9 @@ module Ruby2JS
       # Note: es20XX methods are getters in JS, not in this list - they become this.esXXXX (no parens)
       SELF_METHODS = %i[
         put puts sput to_s output_location capture wrap compact enable_vertical_whitespace
-        parse parse_all scope jscope insert timestamp comments
+        parse parse_all scope jscope insert timestamp comments group
         visit visit_parameters multi_assign_declarations number_format operator_index
-        parse_condition collapse_strings
+        parse_condition collapse_strings redoable
       ].freeze
 
       # Properties that need this. prefix but are accessed as getters (no parentheses)
@@ -542,6 +542,27 @@ module Ruby2JS
       CLASS_CONSTANTS = %i[
         LOGICAL OPERATORS INVERT_OP GROUP_OPERATORS VASGN
       ].freeze
+
+      # Handle template literals (dstr) to wrap lvar in (var || "")
+      # This handles Ruby's nil.to_s == "" behavior for local variables
+      # that may be undefined in JavaScript
+      def on_dstr(node)
+        # Transform children: wrap :lvar in (lvar || "")
+        new_children = node.children.map do |child|
+          if child.type == :begin && child.children.length == 1 &&
+             child.children[0]&.type == :lvar
+            # #{var} → #{var || ""}
+            lvar = child.children[0]
+            s(:begin, s(:or, lvar, s(:str, '')))
+          elsif child.type == :lvar
+            # Direct lvar in dstr → (lvar || "")
+            s(:begin, s(:or, child, s(:str, '')))
+          else
+            process(child)
+          end
+        end
+        node.updated(nil, new_children)
+      end
 
       # Convert symbols to strings in s() calls
       # s(:send, ...) → s('send', ...)

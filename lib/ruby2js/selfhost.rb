@@ -544,7 +544,7 @@ module Ruby2JS
 end
 
 if __FILE__ == $0
-  esm = ARGV.include?('--esm')
+  esm = true  # Always generate ESM output with preamble and exports
   spec_file = ARGV.find { |arg| arg.end_with?('_spec.rb') }
 
   if spec_file
