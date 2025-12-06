@@ -550,6 +550,7 @@ module Ruby2JS
         parse parse_all scope jscope insert timestamp comments group
         visit visit_parameters multi_assign_declarations number_format operator_index
         parse_condition collapse_strings redoable
+        is_boolean_expression rewrite conditionally_equals is_hoist
       ].freeze
 
       # Properties that need this. prefix but are accessed as getters (no parentheses)
@@ -753,6 +754,10 @@ module Ruby2JS
         # Rename method calls ending in ? or !
         renamed = rename_method(method)
         if renamed != method
+          # Also apply SELF_METHODS check for renamed methods
+          if target.nil? && SELF_METHODS.include?(renamed)
+            return s(:send, s(:self), renamed, *process_all(args))
+          end
           return s(:send, process(target), renamed, *process_all(args))
         end
 

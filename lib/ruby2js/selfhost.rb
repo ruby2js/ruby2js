@@ -103,6 +103,15 @@ module Ruby2JS
 
       }
 
+      // EXPRESSIONS constant from converter/return.rb
+      // Used to determine if a statement can be an expression (for arrow functions, returns, etc)
+      const EXPRESSIONS = [
+        'array', 'float', 'hash', 'int', 'lvar', 'nil', 'send', 'send!', 'attr',
+        'str', 'sym', 'dstr', 'dsym', 'cvar', 'ivar', 'zsuper', 'super', 'or', 'and',
+        'block', 'const', 'true', 'false', 'xnode', 'taglit', 'self',
+        'op_asgn', 'and_asgn', 'or_asgn', 'gvar', 'csend', 'call'
+      ];
+
       // Check if node is a method call (has parentheses or arguments)
       // In Ruby, this is determined by location info or presence of arguments
       // Standalone function so it works with any AST node format
@@ -220,6 +229,67 @@ module Ruby2JS
           }
           if (this.indent > 0) return ' '.repeat(this.indent) + content;
           return content;
+        }
+      }
+
+      // Namespace - tracks class/module scopes for proper 'this' binding
+      // Hand-written JS stub because the Ruby version doesn't transpile cleanly
+      class Namespace {
+        constructor() {
+          this._active = [];  // current scope
+          this._seen = {};    // history of all definitions seen
+        }
+
+        // Convert AST const node to array of symbols
+        resolve(token, result = []) {
+          if (!token || token.type !== 'const') return [];
+          this.resolve(token.children[0], result);
+          result.push(token.children[1]);
+          return result;
+        }
+
+        // Return the active scope as a flat array
+        get active() {
+          return this._active.flat().filter(x => x != null);
+        }
+
+        // Enter a new scope
+        enter(name) {
+          this._active.push(this.resolve(name));
+          const key = this.active.join('::');
+          const previous = this._seen[key];
+          if (!this._seen[key]) this._seen[key] = {};
+          return previous;
+        }
+
+        // Get properties for current scope or named subscope
+        getOwnProps(name = null) {
+          const key = [...this.active, ...this.resolve(name)].join('::');
+          return {...(this._seen[key] || {})};
+        }
+
+        // Add properties to current scope
+        defineProps(props, namespace = null) {
+          const key = (namespace || this.active).join?.('::') || this.active.join('::');
+          if (!this._seen[key]) this._seen[key] = {};
+          Object.assign(this._seen[key], props || {});
+        }
+
+        // Find a named scope relative to ancestry
+        find(name) {
+          const resolvedName = this.resolve(name);
+          const prefix = [...this.active];
+          while (prefix.pop() !== undefined || prefix.length === 0) {
+            const key = [...prefix, ...resolvedName].join('::');
+            if (this._seen[key]) return this._seen[key];
+            if (prefix.length === 0) break;
+          }
+          return {};
+        }
+
+        // Leave current scope
+        get leave() {
+          this._active.pop();
         }
       }
 
@@ -372,7 +442,14 @@ module Ruby2JS
         }
 
         // wrap long statements in curly braces
+        // Handle Ruby-style block passing: wrap { ... } becomes wrap(() => ...)
+        // but we need wrap('{', '}', () => ...) so detect and fix the args
         wrap(open = '{', close = '}', block) {
+          if (typeof open === 'function') {
+            block = open;
+            open = '{';
+            close = '}';
+          }
           this.puts(open);
           const mark = this.output_location();
           block();
@@ -472,7 +549,7 @@ module Ruby2JS
       // Re-export classes for convenience
       // Note: Token, Line, Serializer are defined in preamble (not in Ruby2JS)
       // Converter is transpiled at the top level, not inside Ruby2JS module
-      export { Node, s, Token, Line, Serializer, Ruby2JS, Converter };
+      export { Node, s, Token, Line, Namespace, Serializer, Ruby2JS, Converter };
     JS
 
     class << self

@@ -26,10 +26,16 @@ module Ruby2JS
         return
       end
 
+      # Declare variables at function scope for JS compatibility
+      # (Ruby allows creating vars inside if blocks; JS needs them declared first)
+      body = nil
+      recovers = nil
+      otherwise = nil
+      finally = nil
+      uses_retry = false
+
       if block&.type == :ensure
         block, finally = block.children
-      else
-        finally = nil
       end
 
       if block and block.type == :rescue
@@ -56,7 +62,6 @@ module Ruby2JS
         uses_retry = recovers.any? { |recover| has_retry[recover.children.last] }
       else
         body = block
-        uses_retry = false
       end
 
       if not recovers and not finally

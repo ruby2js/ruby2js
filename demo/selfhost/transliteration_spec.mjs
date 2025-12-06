@@ -9,6 +9,9 @@ import { describe, it, printResults } from "./test_harness.mjs";
 // Load Prism parser
 const parse = await loadPrism();
 
+// Import Namespace from the converter module
+import { Namespace } from "./selfhost_converter.mjs";
+
 // Self-hosted convert function (replaces Ruby2JS.convert)
 function convert(rubyCode, opts = {}) {
   const result = parse(rubyCode);
@@ -20,6 +23,8 @@ function convert(rubyCode, opts = {}) {
   const converter = new Converter(ast, new Map());
   // Default to ES2020 to match Ruby2JS minimum eslevel
   converter.eslevel = opts.eslevel || 2020;
+  // Initialize namespace for class/module scope tracking
+  converter.namespace = new Namespace();
   converter.convert();
   return converter.to_s();
 }
@@ -33,18 +38,6 @@ function Rational(n, d) { return Math.floor(n / d); }
 // RUBY_VERSION stub (used in conditional tests)
 const RUBY_VERSION = "3.4.0";
 
-// Block is popped from args at runtime since JS requires rest param to be last
-// it "should eval" do
-//   to_js('eval( "hi" )').must_equal 'eval(\"hi\")'
-// end
-// support a JavaScript-like syntax too.
-// This test passes a live Proc object which requires find_block to locate
-// the block by line number. The prism walker uses offset-based locations
-// and doesn't yet support line number lookups.
-// This test passes a live Proc object which requires find_block to locate
-// the block by line number. The prism walker uses offset-based locations
-// and doesn't yet support line number lookups.
-// not allowed by Ruby or JS, but useful for adding JS specific flags
 describe(Ruby2JS, () => {
   function to_js(string, opts={}) {
     return Ruby2JS.convert(string, {...opts, filters: []}).toString()
@@ -257,6 +250,7 @@ describe(Ruby2JS, () => {
       to_js("def f(a,*args, &block); end").must_equal("function f(a, ...args) {let block = args.pop()}")
     ));
 
+    // Block is popped from args at runtime since JS requires rest param to be last
     return it(
       "should handle splats in array literals",
       () => to_js("[*a,1,2,*b,3,4,*c]").must_equal("[...a, 1, 2, ...b, 3, 4, ...c]")
@@ -387,6 +381,9 @@ describe(Ruby2JS, () => {
   });
 
   describe("string concat", () => {
+    // it "should eval" do
+    //   to_js('eval( "hi" )').must_equal 'eval(\"hi\")'
+    // end
     it("should parse string ", () => (
       to_js("\"time is \#{ Time.now() }, say \#{ hello }\"").must_equal("`time is ${Time.now()}, say ${hello}`")
     ));
@@ -905,6 +902,8 @@ describe(Ruby2JS, () => {
       to_js("Date.new.toString()").must_equal("(new Date).toString()");
       to_js("Date.new()").must_equal("new Date()");
       to_js("Date.new().toString()").must_equal("new Date().toString()");
+
+      // support a JavaScript-like syntax too.
       to_js("new Date()").must_equal("new Date()");
       to_js("new Date").must_equal("new Date");
       to_js("new Promise do; y(); end").must_equal("new Promise(() => y())");
@@ -1039,6 +1038,12 @@ describe(Ruby2JS, () => {
 
   describe("procs", () => {
     it("should handle procs", () => {
+      // This test passes a live Proc object which requires find_block to locate
+      // the block by line number. The prism walker uses offset-based locations
+      // and doesn't yet support line number lookups.
+      // This test passes a live Proc object which requires find_block to locate
+      // the block by line number. The prism walker uses offset-based locations
+      // and doesn't yet support line number lookups.
       if (RUBY2JS_PARSER == "prism") {
         skip("prism walker doesn't support Proc source location")
       };
@@ -1093,6 +1098,7 @@ describe(Ruby2JS, () => {
       () => to_js("Regexp.new(/a\nb/ix, 'g')").must_equal("/ab/ig")
     );
 
+    // not allowed by Ruby or JS, but useful for adding JS specific flags
     it(
       "should handle regular expressions tests",
       () => to_js("'abc' =~ /abc/").must_equal("/abc/.test(\"abc\")")
