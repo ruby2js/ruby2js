@@ -77,6 +77,7 @@ module Ruby2JS
       @boolean_context = false
       @need_truthy_helpers = Set.new
       @underscored_private = true
+      @nullish_to_s = false
       @redoable = false
     end
 
@@ -169,7 +170,7 @@ module Ruby2JS
       end
     end
 
-    attr_accessor :strict, :eslevel, :module_type, :comparison, :or, :truthy, :underscored_private
+    attr_accessor :strict, :eslevel, :module_type, :comparison, :or, :truthy, :underscored_private, :nullish_to_s
 
     def es2015
       @eslevel >= 2015

@@ -528,6 +528,7 @@ module Ruby2JS
     ruby2js.or = options[:or] || :logical
     # truthy option: :ruby (only false/nil are falsy) or :js (standard JS truthiness)
     ruby2js.truthy = options[:truthy] || :js
+    ruby2js.nullish_to_s = options[:nullish_to_s] || false
     ruby2js.module_type = options[:module] || :esm
     ruby2js.underscored_private = (options[:eslevel] < 2022) || options[:underscored_private]
 

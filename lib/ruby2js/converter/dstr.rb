@@ -35,15 +35,9 @@ module Ruby2JS
             end
           elsif child != s(:begin)
             put '${'
-            # Handle nullable expressions: null should become "" in strings
-            # This matches Ruby's behavior where nil.to_s == ""
-            # Only wrap :if expressions without else (which return null in JS)
-            inner = child.type == :begin ? child.children.first : child
-            if inner && inner.type == :if && inner.children[2].nil?
-              # :if without else block returns null in JS, wrap with (x ?? "")
-              put '('
-              parse child
-              put ' ?? "")'
+            if @nullish_to_s && es2020
+              # ${x ?? ''} - nil-safe interpolation matching Ruby's "#{nil}" => ""
+              parse s(:nullish, child, s(:str, ''))
             else
               parse child
             end

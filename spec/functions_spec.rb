@@ -16,6 +16,10 @@ describe Ruby2JS::Filter::Functions do
     _(Ruby2JS.convert(string, eslevel: 2020, filters: [Ruby2JS::Filter::Functions]).to_s)
   end
 
+  def to_js_nullish(string)
+    _(Ruby2JS.convert(string, eslevel: 2020, nullish_to_s: true, filters: [Ruby2JS::Filter::Functions]).to_s)
+  end
+
   describe 'conversions' do
     it "should handle to_s" do
       to_js( 'a.to_s' ).must_equal 'a.toString()'
@@ -23,6 +27,22 @@ describe Ruby2JS::Filter::Functions do
 
     it "should handle to_s(16)" do
       to_js( 'a.to_s(16)' ).must_equal 'a.toString(16)'
+    end
+
+    it "should handle to_s with nullish_to_s option" do
+      to_js_nullish( 'a.to_s' ).must_equal '(a ?? "").toString()'
+    end
+
+    it "should not wrap to_s(radix) with nullish_to_s option" do
+      to_js_nullish( 'a.to_s(16)' ).must_equal 'a.toString(16)'
+    end
+
+    it "should handle String() with nullish_to_s option" do
+      to_js_nullish( 'String(a)' ).must_equal 'String(a ?? "")'
+    end
+
+    it "should not transform String() without nullish_to_s option" do
+      to_js_2020( 'String(a)' ).must_equal 'String(a)'
     end
 
     it "should handle to_i" do

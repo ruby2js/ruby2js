@@ -814,18 +814,19 @@ module Ruby2JS
           return s(:send, process(target), :call, s(:self), *process_all(args))
         end
 
-        # Handle hash[:key].to_s → (hash.key || '').toString()
+        # Handle hash[:key].to_s → (hash.key ?? '').toString()
         # Ruby's nil.to_s returns "", but JS undefined.toString() throws
         # This pattern is common: @options[:join].to_s
+        # Use nullish coalescing (??) to preserve empty strings and zeros
         if method == :to_s && args.empty? && target&.type == :send
           inner_target, inner_method, *inner_args = target.children
           if inner_method == :[] && inner_args.length == 1
-            # hash[:key].to_s → (hash.key || '').toString()
+            # hash[:key].to_s → (hash.key ?? '').toString()
             processed_target = process(inner_target)
             processed_key = process(inner_args.first)
-            # Build: (target[key] || '').toString()
+            # Build: (target[key] ?? '').toString()
             return s(:send,
-              s(:begin, s(:or, s(:send, processed_target, :[], processed_key), s(:str, ''))),
+              s(:begin, s(:nullish, s(:send, processed_target, :[], processed_key), s(:str, ''))),
               :toString)
           end
         end

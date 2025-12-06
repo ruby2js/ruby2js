@@ -223,12 +223,8 @@ describe "ES2015 support" do
       to_js('"x#{}y"').must_equal '`xy`'
     end
 
-    it "should coalesce null for if without else in interpolation" do
-      # Ruby: "#{x if y}" returns "" when y is false (nil.to_s == "")
-      # JS: x if y without else returns null, which stringifies to "null"
-      # Fix: wrap (x ?? "") to match Ruby behavior
-      to_js( '"#{x if y}"' ).must_equal('`${(y ? x : null ?? "")}`')
-    end
+    # Note: null coalescing for if-without-else is now opt-in via nullish_to_s option
+    # Tests for that behavior are in es2020_spec.rb since ?? requires ES2020
 
     it "should not coalesce for if with else in interpolation" do
       to_js( '"#{x ? y : z}"' ).must_equal('`${x ? y : z}`')
