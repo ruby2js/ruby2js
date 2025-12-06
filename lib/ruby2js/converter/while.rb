@@ -17,7 +17,7 @@ module Ruby2JS
         if condition.type == :lvasgn
           var = condition.children[0]
           unless @vars[var]
-            put "#{es2015 ? 'let' : 'var'} #{var}#@sep" 
+            put "let #{var}#@sep"
             @vars[var] = true
           end
         end

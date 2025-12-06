@@ -504,7 +504,7 @@ describe Ruby2JS::Filter::Vue do
   describe "watch values" do
     it 'should handle watch method' do
       to_js( 'class Numbers<Vue; def watch; {"_data":  refreshText  , deep: true}; end; end' ).
-        must_equal 'var Numbers = new Vue({watch: {_data: refreshText, deep: true}})'
+        must_equal 'let Numbers = new Vue({watch: {_data: refreshText, deep: true}})'
     end
   end
 
@@ -673,12 +673,12 @@ describe Ruby2JS::Filter::Vue do
 
     it "should enable a mixin to be defined" do
       to_js( 'class Foo<Vue::Mixin; def mounted(); @foo=1; end; end' ).
-        must_equal 'var Foo = {mounted: function() {this.$data.foo = 1}}'
+        must_equal 'let Foo = {mounted: function() {this.$data.foo = 1}}'
     end
 
     it "should enable a mixin to be included" do
       to_js( 'class Bar<Vue; mixin Foo; end' ).
-        must_equal 'var Bar = new Vue({mixins: [Foo]})'
+        must_equal 'let Bar = new Vue({mixins: [Foo]})'
     end
   end
 

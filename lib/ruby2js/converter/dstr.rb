@@ -15,58 +15,35 @@ module Ruby2JS
         return
       end
 
-      if es2015
-        # gather length of string parts; if long enough, newlines will
-        # not be escaped (poor man's HEREDOC)
-        strings = children.select {|child| child.type==:str}.
-          map {|child| child.children.last}.join
-        heredoc = (strings.length > 40 and strings.scan("\n").length > 3)
+      # gather length of string parts; if long enough, newlines will
+      # not be escaped (poor man's HEREDOC)
+      strings = children.select {|child| child.type==:str}.
+        map {|child| child.children.last}.join
+      heredoc = (strings.length > 40 and strings.scan("\n").length > 3)
 
-        put '`'
-        children.each do |child|
-          if child.type == :str
-            str = child.children.first.inspect[1..-2].
-              gsub('${', '$\{').gsub('`', '\\\`')
-            str = str.gsub(/\\"/, '"') unless str.include? '\\\\'
-            if heredoc
-              put! str.gsub("\\n", "\n")
-            else
-              put str
-            end
-          elsif child != s(:begin)
-            put '${'
-            if @nullish_to_s && es2020
-              # ${x ?? ''} - nil-safe interpolation matching Ruby's "#{nil}" => ""
-              parse s(:nullish, child, s(:str, ''))
-            else
-              parse child
-            end
-            put '}'
+      put '`'
+      children.each do |child|
+        if child.type == :str
+          str = child.children.first.inspect[1..-2].
+            gsub('${', '$\{').gsub('`', '\\\`')
+          str = str.gsub(/\\"/, '"') unless str.include? '\\\\'
+          if heredoc
+            put! str.gsub("\\n", "\n")
+          else
+            put str
           end
-        end
-        put '`'
-
-        return
-      end
-
-      children.each_with_index do |child, index|
-        put ' + ' unless index == 0
-
-        if child.type == :begin and child.children.length <= 1
-          child = child.children.first || s(:str, '')
-        end
-
-        if child.type == :send
-          op_index = operator_index child.children[1]
-          if op_index >= operator_index(:+)
-            group child
+        elsif child != s(:begin)
+          put '${'
+          if @nullish_to_s
+            # ${x ?? ''} - nil-safe interpolation matching Ruby's "#{nil}" => ""
+            parse s(:nullish, child, s(:str, ''))
           else
             parse child
           end
-        else
-          parse child
+          put '}'
         end
       end
+      put '`'
     end
   end
 end

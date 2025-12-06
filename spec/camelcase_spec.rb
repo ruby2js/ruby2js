@@ -28,7 +28,7 @@ describe Ruby2JS::Filter::CamelCase do
  
   describe :camelCase do
     it "should handle variables" do
-      to_js( 'foo_bar=baz_qux' ).must_equal 'var fooBar = bazQux'
+      to_js( 'foo_bar=baz_qux' ).must_equal 'let fooBar = bazQux'
     end
 
     it "should handle method calls" do
@@ -110,7 +110,7 @@ describe Ruby2JS::Filter::CamelCase do
 
     unless (RUBY_VERSION.split('.').map(&:to_i) <=> [3, 0, 0]) == -1
       it "should handle the => operator" do
-        to_js('a_bcd => x_yz').must_equal 'var xYz = aBcd'
+        to_js('a_bcd => x_yz').must_equal 'let xYz = aBcd'
       end
     end
 

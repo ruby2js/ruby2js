@@ -8,22 +8,22 @@ module Ruby2JS
       def on_send(node)
         target, method, *args = node.children
 
-        if es2015 and method == :blank?
+        if method == :blank?
           create_or_update_import("blank$")
           process node.updated :send, [nil, "blank$", target]
-        elsif es2015 and method == :present?
+        elsif method == :present?
           create_or_update_import("present$")
           process node.updated :send, [nil, "present$", target]
-        elsif es2015 and method == :presence
+        elsif method == :presence
           create_or_update_import("presence$")
           process node.updated :send, [nil, "presence$", target]
-        elsif es2015 and method == :chomp
+        elsif method == :chomp
           create_or_update_import("chomp$")
           process node.updated :send, [nil, "chomp$", target, *args]
-        elsif es2015 and method == :delete_prefix
+        elsif method == :delete_prefix
           create_or_update_import("deletePrefix$")
           process node.updated :send, [nil, "deletePrefix$", target, *args]
-        elsif es2015 and method == :delete_suffix
+        elsif method == :delete_suffix
           create_or_update_import("deleteSuffix$")
           process node.updated :send, [nil, "deleteSuffix$", target, *args]
         else

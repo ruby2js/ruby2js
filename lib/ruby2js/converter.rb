@@ -100,15 +100,9 @@ module Ruby2JS
       unless @need_truthy_helpers.empty?
         helpers = []
 
-        if es2015
-          helpers << 'let $T = (v) => v !== false && v != null' if @need_truthy_helpers.include?(:T)
-          helpers << 'let $ror = (a, b) => $T(a) ? a : b()' if @need_truthy_helpers.include?(:ror)
-          helpers << 'let $rand = (a, b) => $T(a) ? b() : a' if @need_truthy_helpers.include?(:rand)
-        else
-          helpers << 'var $T = function(v) {return v !== false && v != null}' if @need_truthy_helpers.include?(:T)
-          helpers << 'var $ror = function(a, b) {return $T(a) ? a : b()}' if @need_truthy_helpers.include?(:ror)
-          helpers << 'var $rand = function(a, b) {return $T(a) ? b() : a}' if @need_truthy_helpers.include?(:rand)
-        end
+        helpers << 'let $T = (v) => v !== false && v != null' if @need_truthy_helpers.include?(:T)
+        helpers << 'let $ror = (a, b) => $T(a) ? a : b()' if @need_truthy_helpers.include?(:ror)
+        helpers << 'let $rand = (a, b) => $T(a) ? b() : a' if @need_truthy_helpers.include?(:rand)
 
         if @sep == '; '
           @lines.first.unshift helpers.join(@sep) + @sep
@@ -139,7 +133,7 @@ module Ruby2JS
       # retroactively add a declaration for 'pending' variables
       vars = @vars.select {|key, value| value == :pending}.keys
       unless vars.empty?
-        insert mark, "#{es2015 ? 'let' : 'var'} #{vars.join(', ')}#{@sep}"
+        insert mark, "let #{vars.join(', ')}#{@sep}"
         vars.each {|var| @vars[var] = true}
       end
     ensure
@@ -171,26 +165,6 @@ module Ruby2JS
     end
 
     attr_accessor :strict, :eslevel, :module_type, :comparison, :or, :truthy, :underscored_private, :nullish_to_s
-
-    def es2015
-      @eslevel >= 2015
-    end
-
-    def es2016
-      @eslevel >= 2016
-    end
-
-    def es2017
-      @eslevel >= 2017
-    end
-
-    def es2018
-      @eslevel >= 2018
-    end
-
-    def es2019
-      @eslevel >= 2019
-    end
 
     def es2020
       @eslevel >= 2020
@@ -358,7 +332,7 @@ module Ruby2JS
     end
     
     def group( ast )
-      if [:dstr, :dsym].include? ast.type and es2015
+      if [:dstr, :dsym].include? ast.type
         parse ast
       else
         put '('; parse ast; put ')'
@@ -380,7 +354,7 @@ module Ruby2JS
       @redoable = has_redo[@ast]
 
       if @redoable
-        put es2015 ? 'let ' : 'var '
+        put 'let '
         put "redo$#@sep"
         puts 'do {'
         put "redo$ = false#@sep"

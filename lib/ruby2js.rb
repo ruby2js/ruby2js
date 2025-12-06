@@ -79,7 +79,7 @@ module Ruby2JS
     end
   end
 
-  @@eslevel_default = 2009 # ecmascript 5
+  @@eslevel_default = 2020
   @@eslevel_preset_default = 2021
   @@strict_default = false
   @@module_default = nil
@@ -177,26 +177,6 @@ module Ruby2JS
 
       def modules_enabled?
         @modules_enabled
-      end
-
-      def es2015
-        @options[:eslevel] >= 2015
-      end
-
-      def es2016
-        @options[:eslevel] >= 2016
-      end
-
-      def es2017
-        @options[:eslevel] >= 2017
-      end
-
-      def es2018
-        @options[:eslevel] >= 2018
-      end
-
-      def es2019
-        @options[:eslevel] >= 2019
       end
 
       def es2020

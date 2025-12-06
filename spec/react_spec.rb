@@ -26,7 +26,7 @@ describe Ruby2JS::Filter::React do
   describe :createClass do
     it "should create classes" do
       to_js( 'class Foo<React; end' ).
-        must_equal 'var Foo = React.createClass({displayName: "Foo"})'
+        must_equal 'let Foo = React.createClass({displayName: "Foo"})'
     end
 
     it "should create methods" do
@@ -250,7 +250,7 @@ describe Ruby2JS::Filter::React do
 
     it "should handle stateless components" do
       to_js( 'Button = ->(x) { %x(<button>{x}</button>)}' ).
-        must_equal 'var Button = function(x) {return React.createElement("button", null, x)}'
+        must_equal 'let Button = function(x) {return React.createElement("button", null, x)}'
     end
   end
 

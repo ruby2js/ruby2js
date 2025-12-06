@@ -536,7 +536,7 @@ module Ruby2JS
       # Properties that need this. prefix but are accessed as getters (no parentheses)
       # These are no-arg methods in Ruby that become getters in JS
       SELF_PROPERTIES = %i[
-        es2015 es2016 es2017 es2018 es2019 es2020 es2021 es2022 es2023
+        es2020 es2021 es2022 es2023 es2024 es2025
         underscored_private
       ].freeze
 

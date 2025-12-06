@@ -23,7 +23,7 @@ module Ruby2JS
       has_non_lvasgn = lhs.children.any? { |c| [:ivasgn, :cvasgn, :gvasgn, :send].include?(c.type) }
 
       # If mixed local and non-local, fall through to non-destructuring path
-      use_destructuring = es2015 && !(has_lvasgn && has_non_lvasgn)
+      use_destructuring = !(has_lvasgn && has_non_lvasgn)
 
       # Check for middle-splat: *a, b = arr - JS doesn't allow [...a, b]
       # Need to handle this specially: b = arr.pop(); a = arr.slice() or similar

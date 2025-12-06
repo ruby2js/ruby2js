@@ -27,7 +27,7 @@ describe Ruby2JS do
     end
 
     it "should handle hashes with keys that aren't identifiers" do
-      to_js( "{ 1 => 2 }" ).must_equal '{1: 2}'
+      to_js( "{ 1 => 2 }" ).must_equal '{[1]: 2}'
       to_js( "{ 'data-foo' => 2 }" ).must_equal '{"data-foo": 2}'
     end
     
@@ -45,7 +45,7 @@ describe Ruby2JS do
     end
     
     it "should parse global variables" do
-      to_js( "$a = 1" ).must_equal 'var $a = 1'
+      to_js( "$a = 1" ).must_equal 'let $a = 1'
     end
 
     it "should parse regular expression capture groups" do
@@ -55,31 +55,31 @@ describe Ruby2JS do
   
   describe 'assign' do
     it "should parse left assign" do
-      to_js( "a = 1" ).must_equal 'var a = 1'
-      to_js( "a = 'string'" ).must_equal 'var a = "string"'
-      to_js( "a = :symbol" ).must_equal 'var a = "symbol"'
+      to_js( "a = 1" ).must_equal 'let a = 1'
+      to_js( "a = 'string'" ).must_equal 'let a = "string"'
+      to_js( "a = :symbol" ).must_equal 'let a = "symbol"'
     end
 
     it "should parse constant assign" do
-      to_js( "PI = 3.14159" ).must_equal 'var PI = 3.14159'
+      to_js( "PI = 3.14159" ).must_equal 'const PI = 3.14159'
     end
 
     it "should not output var if variable is allready declared within a context" do
-      to_js( "a = 1; a = 2" ).must_equal 'var a = 1; a = 2'
+      to_js( "a = 1; a = 2" ).must_equal 'let a = 1; a = 2'
     end
 
     it "should parse mass assign" do
-      to_js( "a, b = 1, 2" ).must_equal 'var a = 1; var b = 2'
-      to_js( "a = 1, 2" ).must_equal 'var a = [1, 2]'
-      to_js( "a, b = c" ).must_equal 'var a = c[0]; var b = c[1]'
+      to_js( "a, b = 1, 2" ).must_equal 'let a = 1; var b = 2'
+      to_js( "a = 1, 2" ).must_equal 'let a = [1, 2]'
+      to_js( "a, b = c" ).must_equal 'let a = c[0]; var b = c[1]'
     end
 
     it "should parse chained assignment statements" do
-      to_js( "a = b = 1" ).must_equal 'var a, b; a = b = 1'
-      to_js( "x.a = b = 1" ).must_equal 'var b; x.a = b = 1'
-      to_js( "@a = b = 1" ).must_equal 'var b; this._a = b = 1'
-      to_js( "@@a = b = 1" ).must_equal 'var b; this.constructor._a = b = 1'
-      to_js( "A = b = 1" ).must_equal 'var b; var A = b = 1'
+      to_js( "a = b = 1" ).must_equal 'let a, b; a = b = 1'
+      to_js( "x.a = b = 1" ).must_equal 'let b; x.a = b = 1'
+      to_js( "@a = b = 1" ).must_equal 'let b; this._a = b = 1'
+      to_js( "@@a = b = 1" ).must_equal 'let b; this.constructor._a = b = 1'
+      to_js( "A = b = 1" ).must_equal 'let b; var A = b = 1'
     end
 
     it "should parse op assignments" do
@@ -94,11 +94,11 @@ describe Ruby2JS do
     end
 
     it "should parse exponential operators" do
-      to_js( '2 ** 0.5' ).must_equal 'Math.pow(2, 0.5)'
+      to_js( '2 ** 0.5' ).must_equal '2 ** 0.5'
     end
 
     it "should do short circuit assign" do
-      to_js( 'a = nil; a ||= 1').must_equal 'var a = null; a = a || 1'
+      to_js( 'a = nil; a ||= 1').must_equal 'let a = null; a = a || 1'
       to_js( '@a ||= 1').must_equal 'this._a = this._a || 1'
       to_js( '@@a ||= 1').
         must_equal 'this.constructor._a = this.constructor._a || 1'
@@ -108,13 +108,13 @@ describe Ruby2JS do
     
     it "should parse ternary operator" do
       to_js( 'x = true ? true : false').
-        must_equal "var x = true ? true : false"
+        must_equal "let x = true ? true : false"
       to_js( 'x = (true if y)').
-        must_equal "var x = y ? true : null"
+        must_equal "let x = y ? true : null"
       to_js( 'x = (true unless y)').
-        must_equal "var x = !y ? true : null"
+        must_equal "let x = !y ? true : null"
       to_js( 'x = a + (b ? 1 : 0)').
-        must_equal "var x = a + (b ? 1 : 0)"
+        must_equal "let x = a + (b ? 1 : 0)"
     end
   end
   
@@ -132,23 +132,23 @@ describe Ruby2JS do
     end
     
     it "should parse lvar as variable call" do
-      to_js( "a = 1; a" ).must_equal 'var a = 1; a'
+      to_js( "a = 1; a" ).must_equal 'let a = 1; a'
     end
     
     it "should parse square bracket call" do
-      to_js( "a = [1]; a[0]" ).must_equal 'var a = [1]; a[0]'
+      to_js( "a = [1]; a[0]" ).must_equal 'let a = [1]; a[0]'
       to_js( "a['x']" ).must_equal 'a.x'
       to_js( "a[:x]" ).must_equal 'a.x'
     end
 
     it "should parse square bracket assignment" do
-      to_js( "a = [1]; a[0]=2" ).must_equal 'var a = [1]; a[0] = 2'
+      to_js( "a = [1]; a[0]=2" ).must_equal 'let a = [1]; a[0] = 2'
       to_js( "a['x']=1" ).must_equal 'a.x = 1'
       to_js( "a[:x]=1" ).must_equal 'a.x = 1'
     end
 
     it "should parse nested square bracket call" do
-      to_js( "a = [[1]]; a[0][0]" ).must_equal 'var a = [[1]]; a[0][0]'
+      to_js( "a = [[1]]; a[0][0]" ).must_equal 'let a = [[1]]; a[0][0]'
     end
     
     it "should parse binary operation" do
@@ -172,8 +172,8 @@ describe Ruby2JS do
     it "should drop ! and ? from method calls and property accesses" do
       to_js( "a!()" ).must_equal 'a()'
       to_js( "a?()" ).must_equal 'a()'
-      to_js( "a!" ).must_equal 'var a'
-      to_js( "a?" ).must_equal 'var a'
+      to_js( "a!" ).must_equal 'let a'
+      to_js( "a?" ).must_equal 'let a'
     end
 
     it "should wrap numeric literals in parenthesis" do
@@ -293,7 +293,7 @@ describe Ruby2JS do
     
     it "should parse complex nested expressions with method calls and variables" do
       exp = 'a = 5; 1 + (a + (1 + a * (b() - d())))'
-      to_js( exp ).must_equal "var " << exp
+      to_js( exp ).must_equal "let " << exp
     end
     
     it "should parse nested sender" do
@@ -325,7 +325,7 @@ describe Ruby2JS do
 
     it "should handle function calls" do
       to_js( 'a = lambda {|x| return x+1}; a.(nil, 1)').
-        must_equal 'var a = function(x) {return x + 1}; a.call(null, 1)'
+        must_equal 'let a = function(x) {return x + 1}; a.call(null, 1)'
     end
   end
   
@@ -357,11 +357,11 @@ describe Ruby2JS do
     end
 
     it "should handle empty here docs" do
-      to_js("x = <<HERE\nHERE").must_equal "var x = \"\"\n"
+      to_js("x = <<HERE\nHERE").must_equal "let x = \"\"\n"
     end
 
     it "should handle mixed empty parens" do
-      to_js('x = ()').must_equal 'var x = null'
+      to_js('x = ()').must_equal 'let x = null'
     end
   end
 
@@ -375,7 +375,7 @@ describe Ruby2JS do
     end
 
     it "should leave << expressions alone" do
-      to_js( 'y = a << b' ).must_equal 'var y = a << b'
+      to_js( 'y = a << b' ).must_equal 'let y = a << b'
     end
   end
 
@@ -414,13 +414,13 @@ describe Ruby2JS do
 
     it "should parse if as an expression" do
       to_js( 'x = if a; b = 1; b; elsif c; x=1; x; end' ).
-        must_equal 'var x = a ? function() {var b = 1; return b}() : c ? ' +
+        must_equal 'let x = a ? function() {var b = 1; return b}() : c ? ' +
           'function() {var x = 1; return x}() : null' 
     end
     
     it "should handle basic variable scope" do
       to_js( 'z = 1; if a; b; elsif c; d = proc do e = 1; end; end; z = d' ).
-        must_equal 'var d; var z = 1; if (a) {var b} else if (c) {d = function() {var e = 1}}; z = d'
+        must_equal 'let d; var z = 1; if (a) {var b} else if (c) {d = function() {var e = 1}}; z = d'
 
       to_js( 'if a == 1; b = 0; c.forEach {|d| if d; b += d; end} end' ).
         must_equal 'if (a == 1) {var b = 0; c.forEach(function(d) {if (d) b += d})}'
@@ -428,17 +428,17 @@ describe Ruby2JS do
     
     it "should handle while loop" do
       to_js( 'a = 0; while true; a += 1; end' ).
-        must_equal 'var a = 0; while (true) {a++}'
+        must_equal 'let a = 0; while (true) {a++}'
     end
     
     it "should handle while loop that assigns a variable" do
       to_js( 'while match=f(); end' ).
-        must_equal 'var match; while (match = f()) {}'
+        must_equal 'let match; while (match = f()) {}'
     end
     
     it "should handle another while loop syntax" do
       to_js( 'a = 0; while true || false; a += 1; end' ).
-        must_equal 'var a = 0; while (true || false) {a++}'
+        must_equal 'let a = 0; while (true || false) {a++}'
     end
 
     it "should handle a redo within a loop" do
@@ -475,7 +475,7 @@ describe Ruby2JS do
 
     it "should parse case expressions" do
       to_js( 'x = case a; when true; b; else; c; end' ).
-        must_equal 'var x = function() {switch (a) {case true: return b; default: return c}}()'
+        must_equal 'let x = function() {switch (a) {case true: return b; default: return c}}()'
     end
 
     it "should handle empty when blocks" do
@@ -485,27 +485,27 @@ describe Ruby2JS do
 
     it "should handle a for loop" do
       to_js( 'a = {}; b = {}; for i in a; b[i] = a[i]; end' ).
-        must_equal 'var a = {}; var b = {}; for (var i in a) {b[i] = a[i]}'
+        must_equal 'let a = {}; var b = {}; for (var i in a) {b[i] = a[i]}'
     end
 
     it "should handle a for loop with an inclusive range" do
       to_js( 'a = 0; for i in 1..3; a += i; end' ).
-        must_equal 'var a = 0; for (var i = 1; i <= 3; i++) {a += i}'
+        must_equal 'let a = 0; for (var i = 1; i <= 3; i++) {a += i}'
     end
 
     it "should handle a for loop with an exclusive range" do
       to_js( 'a = 0; for i in 1...4; a += i; end' ).
-        must_equal 'var a = 0; for (var i = 1; i < 4; i++) {a += i}'
+        must_equal 'let a = 0; for (var i = 1; i < 4; i++) {a += i}'
     end
 
     it "should handle a stepped range with an inclusive range" do
       to_js( 'a = 0; (1..3).step(2) {|i| a += i}' ).
-        must_equal 'var a = 0; for (var i = 1; i <= 3; i += 2) {a += i}'
+        must_equal 'let a = 0; for (var i = 1; i <= 3; i += 2) {a += i}'
     end
 
     it "should handle a stepped range with an exclusive range" do
       to_js( 'a = 0; (1...4).step(2) {|i| a += i}' ).
-        must_equal 'var a = 0; for (var i = 1; i < 4; i += 2) {a += i}'
+        must_equal 'let a = 0; for (var i = 1; i < 4; i += 2) {a += i}'
     end
 
     it "should handle break" do
@@ -549,16 +549,16 @@ describe Ruby2JS do
     end
     
     it "should parse proc" do
-      to_js('Proc.new {}').must_equal 'function() {}'
+      to_js('Proc.new {}').must_equal '() => {}'
     end
     
     it "should parse lambda" do
-      to_js( 'lambda {}').must_equal 'function() {}'
-      to_js( 'y = lambda {|x| x + 1}').must_equal 'var y = function(x) {return x + 1}'
+      to_js( 'lambda {}').must_equal '() => {}'
+      to_js( 'y = lambda {|x| x + 1}').must_equal 'let y = function(x) {return x + 1}'
     end
 
     it "should parse proc" do
-      to_js( 'proc {}').must_equal 'function() {}'
+      to_js( 'proc {}').must_equal '() => {}'
     end
 
     it "should support calls to anonymous functions" do
@@ -566,16 +566,16 @@ describe Ruby2JS do
     end
 
     it "should handle basic variable scope" do
-      to_js( 'a = 1; lambda { a = 2; b = 1}').must_equal 'var a = 1; function() {a = 2; var b = 1}'
+      to_js( 'a = 1; lambda { a = 2; b = 1}').must_equal 'let a = 1; function() {a = 2; var b = 1}'
     end
 
     it "should handle shadow args" do
-      to_js( 'a = 1; lambda {|;a| a = 2}').must_equal 'var a = 1; function() {var a = 2}'
+      to_js( 'a = 1; lambda {|;a| a = 2}').must_equal 'let a = 1; function() {var a = 2}'
     end
 
     it "named functions aren't closures" do
       to_js( 'a = 1; def f; a = 2; b = 1; end').
-        must_equal 'var a = 1; function f() {var a = 2; var b = 1}'
+        must_equal 'let a = 1; function f() {var a = 2; var b = 1}'
     end
 
     it "should handle one argument" do
@@ -594,12 +594,12 @@ describe Ruby2JS do
     
     it "should handle variable scope" do
       to_js('a = 1; lambda {|b| c = 0; a = b - c }; lambda { |b| c = 1; a = b + c }').
-        must_equal 'var a = 1; function(b) {var c = 0; a = b - c}; function(b) {var c = 1; a = b + c}'
+        must_equal 'let a = 1; function(b) {var c = 0; a = b - c}; function(b) {var c = 1; a = b + c}'
     end
     
     it "should really handle variable scope" do
       to_js('a, d = 1, 2; lambda {|b| c = 0; a = b - c * d}; lambda { |b| c = 1; a = b + c * d}').
-        must_equal 'var a = 1; var d = 2; function(b) {var c = 0; a = b - c * d}; function(b) {var c = 1; a = b + c * d}'
+        must_equal 'let a = 1; var d = 2; function(b) {var c = 0; a = b - c * d}; function(b) {var c = 1; a = b + c * d}'
     end
     
     it "should parse with explicit return" do
@@ -608,7 +608,7 @@ describe Ruby2JS do
 
     it "should passthrough function definitions" do
       to_js('a=1; b=function(a,c) {return a + c}').
-        must_equal 'var a = 1; var b = function(a, c) {return a + c}'
+        must_equal 'let a = 1; var b = function(a, c) {return a + c}'
     end
 
     unless (RUBY_VERSION.split('.').map(&:to_i) <=> [2, 7, 0]) == -1
@@ -895,13 +895,13 @@ describe Ruby2JS do
   describe 'anonymous classes' do
     it 'should handle anonymous classes without inheritance' do
       to_js('x = Class.new do def f(); return 1; end; end').
-        must_equal 'var x = function() {function $$() {}; ' +
+        must_equal 'let x = function() {function $$() {}; ' +
          '$$.prototype.f = function() {return 1}; return $$}()'
     end
 
     it 'should handle anonymous classes with inheritance' do
       to_js('x = Class.new(D) do def f(); return 1; end; end').
-        must_equal 'var x = function() {function $$() {D.call(this)}; ' +
+        must_equal 'let x = function() {function $$() {D.call(this)}; ' +
          '$$.prototype = Object.create(D.prototype); ' +
          '$$.prototype.constructor = $$; ' +
          '$$.prototype.f = function() {return 1}; return $$}()'
@@ -918,9 +918,9 @@ describe Ruby2JS do
       to_js( 'module A; B=1; end' ).
         must_equal 'A = function() {var B = 1; return {B: B}}()'
       to_js( 'module A; def b; return 1; end; end' ).
-        must_equal 'var A = {}; Object.defineProperty(A.prototype, "b", {enumerable: true, configurable: true, get: function() {return 1}})'
+        must_equal 'let A = {}; Object.defineProperty(A.prototype, "b", {enumerable: true, configurable: true, get: function() {return 1}})'
       to_js( 'module A; def b(); return 1; end; end' ).
-        must_equal 'var A = {b: function() {return 1}}'
+        must_equal 'let A = {b: function() {return 1}}'
       to_js( 'module A; class B; def initialize; @c=1; end; end; end' ).
         must_equal 'A = function() {function B() {this._c = 1}; return {B: B}}()'
     end
@@ -997,41 +997,41 @@ describe Ruby2JS do
 
   describe 'attribute access' do
     it "should support attribute reference" do
-      to_js('x=a.b').must_equal 'var x = a.b'
+      to_js('x=a.b').must_equal 'let x = a.b'
     end
 
     it "should support attribute assignments" do
-      to_js('x={}; x.a="y"').must_equal 'var x = {}; x.a = "y"'
+      to_js('x={}; x.a="y"').must_equal 'let x = {}; x.a = "y"'
     end
 
     unless (RUBY_VERSION.split('.').map(&:to_i) <=> [2, 3, 0]) == -1
       it "should support conditional attribute references" do
-        to_js('x=a&.b').must_equal 'var x = a && a.b'
+        to_js('x=a&.b').must_equal 'let x = a && a.b'
       end
 
       it "should chain conditional attribute references" do
-        to_js('x=a&.b&.c').must_equal 'var x = a && a.b && a.b.c'
+        to_js('x=a&.b&.c').must_equal 'let x = a && a.b && a.b.c'
       end
 
       it "should handle method args with conditional chaining" do
-        to_js('x=a&.b(c, d)').must_equal 'var x = a && a.b(c, d)'
+        to_js('x=a&.b(c, d)').must_equal 'let x = a && a.b(c, d)'
       end
     end
 
     unless (RUBY_VERSION.split('.').map(&:to_i) <=> [3, 0, 0]) == -1
       it "should support => operator with simple left hand sides" do
-        to_js('0 => x').must_equal 'var x = 0'
+        to_js('0 => x').must_equal 'let x = 0'
       end
 
       it "should support => operator with simple destructuring" do
-        to_js('hash => {a:, b:}').must_equal 'var a = hash.a; var b = hash.b'
+        to_js('hash => {a:, b:}').must_equal 'let a = hash.a; var b = hash.b'
       end
     end
   end
   
   describe 'whitespace' do
     it "should handle newlines" do
-      to_js( "a = 1\na = 2" ).must_equal "var a = 1;\na = 2"
+      to_js( "a = 1\na = 2" ).must_equal "let a = 1;\na = 2"
     end
 
     it "should handle if statements" do
@@ -1232,12 +1232,12 @@ describe Ruby2JS do
 
     it "should handle else clause in begin/rescue" do
       to_js( 'begin; a; rescue => e; b; else; c; end' ).
-        must_equal 'var $no_exception = false; try {var a; $no_exception = true} catch (e) {var b}; if ($no_exception) {var c}'
+        must_equal 'let $no_exception = false; try {var a; $no_exception = true} catch (e) {var b}; if ($no_exception) {var c}'
     end
 
     it "should handle else clause with ensure" do
       to_js( 'begin; a; rescue; b; else; c; ensure; d; end' ).
-        must_equal 'var $no_exception = false; try {var a; $no_exception = true} catch ($EXCEPTION) {var b} finally {var d}; if ($no_exception) {var c}'
+        must_equal 'let $no_exception = false; try {var a; $no_exception = true} catch ($EXCEPTION) {var b} finally {var d}; if ($no_exception) {var c}'
     end
 
     it "should hoist variables declared in try that are used in finally" do
@@ -1257,7 +1257,7 @@ describe Ruby2JS do
 
     it "should handle begin as an expression" do
       to_js( 'z = begin; x = 1; x; end' ).
-        must_equal 'var z = function() {var x = 1; return x}()'
+        must_equal 'let z = function() {var x = 1; return x}()'
     end
   end
 

@@ -112,7 +112,7 @@ describe Ruby2JS::Filter::Functions do
       to_js( 'str.sub(/a/) {"x"}' ).
         must_equal 'str.replace(/a/, function() {return "x"})'
       to_js( 'str.sub!("a", "b")' ).
-        must_equal 'var str = str.replace("a", "b")'
+        must_equal 'let str = str.replace("a", "b")'
       to_js( 'item.str.sub!("a", "b")' ).
         must_equal 'item.str = item.str.replace("a", "b")'
       to_js( '@str.sub!("a", "b")' ).
@@ -120,9 +120,9 @@ describe Ruby2JS::Filter::Functions do
       to_js( '@@str.sub!("a", "b")' ).
         must_equal 'this.constructor._str = this.constructor._str.replace("a", "b")'
       to_js( '$str.sub!("a", "b")' ).
-        must_equal 'var $str = $str.replace("a", "b")'
+        must_equal 'let $str = $str.replace("a", "b")'
       to_js( 'str.sub!(/a/) {"x"}' ).
-        must_equal 'var str = str.replace(/a/, function() {return "x"})'
+        must_equal 'let str = str.replace(/a/, function() {return "x"})'
       to_js( "str.sub(/a(.)/, 'b\\1')" ).
         must_equal 'str.replace(/a(.)/, "b$1")'
     end
@@ -136,11 +136,11 @@ describe Ruby2JS::Filter::Functions do
       to_js( 'str.gsub(/a/) {"x"}' ).
         must_equal 'str.replace(/a/g, function() {return "x"})'
       to_js( 'str.gsub!("a", "b")' ).
-        must_equal 'var str = str.replace(/a/g, "b")'
+        must_equal 'let str = str.replace(/a/g, "b")'
       to_js( 'item.str.gsub!("a", "b")' ).
         must_equal 'item.str = item.str.replace(/a/g, "b")'
       to_js( 'str.gsub!(/a/, "b")' ).
-        must_equal 'var str = str.replace(/a/g, "b")'
+        must_equal 'let str = str.replace(/a/g, "b")'
       to_js( "str.gsub(/a(.)/, 'b\\1')" ).
         must_equal 'str.replace(/a(.)/g, "b$1")'
     end
@@ -214,12 +214,12 @@ describe Ruby2JS::Filter::Functions do
   describe 'array functions' do
     it "should map each to for statement" do
       to_js( 'a = 0; [1,2,3].each {|i| a += i}').
-        must_equal 'var a = 0; [1, 2, 3].forEach(function(i) {a += i})'
+        must_equal 'let a = 0; [1, 2, 3].forEach(function(i) {a += i})'
     end
 
     it "should map each_with_index to forEach" do
       to_js( 'a = 0; [1,2,3].each_with_index {|n, i| a += n}').
-        must_equal 'var a = 0; [1, 2, 3].forEach(function(n, i) {a += n})'
+        must_equal 'let a = 0; [1, 2, 3].forEach(function(n, i) {a += n})'
     end
 
     it "should handle first" do
@@ -502,7 +502,7 @@ describe Ruby2JS::Filter::Functions do
 
     it "should handle merge!" do
       to_js( 'b={}; a.merge!(b)' ).
-        must_equal "var b = {}; for (var $_ in b) {a[$_] = b[$_]}"
+        must_equal "let b = {}; for (var $_ in b) {a[$_] = b[$_]}"
     end
 
     it "should handle merge! with a constant hash" do
@@ -732,7 +732,7 @@ describe Ruby2JS::Filter::Functions do
       to_js( 'a.method_defined? :meth, true').must_equal '"meth" in a.prototype'
       to_js( 'a.method_defined? :meth, false').must_equal 'a.prototype.hasOwnProperty("meth")'
       to_js( 'result = a.method_defined? :meth, expr').
-        must_equal 'var result = expr ? "meth" in a.prototype : a.prototype.hasOwnProperty("meth")'
+        must_equal 'let result = expr ? "meth" in a.prototype : a.prototype.hasOwnProperty("meth")'
     end
 
     it "should handle alias_method" do

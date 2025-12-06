@@ -220,7 +220,7 @@ describe Ruby2JS::Filter::Nokogiri do
   describe 'cjs' do
     it 'should support JSDOM import' do
       to_js_cjs( 'Nokogiri::HTML.parse "<b>"' ).
-        must_equal 'var JSDOM = require("jsdom").JSDOM; ' +
+        must_equal 'let JSDOM = require("jsdom").JSDOM; ' +
         'new JSDOM("<b>").window.document'
     end
   end

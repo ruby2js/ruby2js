@@ -114,7 +114,7 @@ module Ruby2JS
         uses_iife = body.length > 0 && !body.all? { |child|
           child.respond_to?(:type) && (
             %i[def module].include?(child.type) ||
-            (es2015 && child.type == :class && child.children[1] == nil)
+            (child.type == :class && child.children[1] == nil)
           )
         }
         put 'const ' if uses_iife

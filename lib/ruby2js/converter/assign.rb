@@ -17,7 +17,7 @@ module Ruby2JS
 
       nonprop = proc do |node|
         next false unless node.respond_to?(:type) && node.respond_to?(:children)
-        next false if node.type == :pair and node.children.first.type == :prop and es2015
+        next false if node.type == :pair and node.children.first.type == :prop
         next true unless node.type == :def
         next false if node.children.first.to_s.end_with? '='
         node.is_method?
@@ -29,7 +29,7 @@ module Ruby2JS
       collapsible = true if args.length == 1 and args.first.type == :class_module and
         args.first.children.length == 3 and nonprop[args.first.children.last]
 
-      if es2015 and not collapsible and args.all? {|arg| 
+      if not collapsible and args.all? {|arg|
           case arg.type
           when :pair, :hash, :class_module
             arg.children.all? {|child| nonprop[child]}
@@ -46,7 +46,7 @@ module Ruby2JS
           copy = [s(:gvasgn, :$$, target)]
           target = s(:gvar, :$$)
           shadow = [s(:shadowarg, :$$)]
-        elsif collapsible or es2015 or
+        elsif collapsible or
           (%i(send const).include? target.type and
           target.children.length == 2 and target.children[0] == nil)
         then
@@ -101,48 +101,9 @@ module Ruby2JS
                   pair.updated(:defm, [nil, *pair.children[1..-1]]))
                 })
 
-            elsif modname.type == :lvar and not es2015
-              s(:for, s(:lvasgn, :$_), modname,
-              s(:send, target, :[]=,
-              s(:lvar, :$_), s(:send, modname, :[], s(:lvar, :$_))))
-
             else
-              if es2017
-                s(:send, s(:const, nil, :Object), :defineProperties, target, 
-                  s(:send, s(:const, nil, :Object), :getOwnPropertyDescriptors, modname))
-              else
-                if modname.type == :lvar or (%i(send const).include? modname.type and
-                  modname.children.length == 2 and modname.children[0] == nil)
-
-                  object = modname
-                else
-                  shadow += [s(:shadowarg, :$1)]
-                  object = s(:gvar, :$1)
-                end
-
-                copy = s(:send,
-                  s(:const, nil, :Object), :defineProperties, target,
-                  s(:send,
-                    s(:send, s(:const, nil, :Object), :getOwnPropertyNames, object),
-                    :reduce,
-                    s(:block,
-                      s(:send, nil, :lambda),
-                      s(:args, s(:arg, :$2), s(:arg, :$3)),
-                      s(:begin,
-                        s(:send,
-                          s(:lvar, :$2), :[]=, s(:lvar, :$3),
-                          s(:send, s(:const, nil, :Object), :getOwnPropertyDescriptor,
-                            object, s(:lvar, :$3))),
-                        s(:return, s(:lvar, :$2)))),
-                    s(:hash)))
-
-
-                if object.type == :gvar
-                  s(:begin, s(:gvasgn, object.children.last, modname), copy)
-                else
-                  copy
-                end
-              end
+              s(:send, s(:const, nil, :Object), :defineProperties, target,
+                s(:send, s(:const, nil, :Object), :getOwnPropertyDescriptors, modname))
             end
           }]
 
