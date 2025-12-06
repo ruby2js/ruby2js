@@ -741,6 +741,12 @@ module Ruby2JS
           node.updated nil, [process(call), process(node.children[1]),
             s(:autoreturn, *process_all(node.children[2..-1]))]
 
+        elsif method == :flat_map and call.children.length == 2
+          # Ruby's flat_map → JavaScript's flatMap
+          call = call.updated nil, [call.children.first, :flatMap]
+          node.updated nil, [process(call), process(node.children[1]),
+            s(:autoreturn, *process_all(node.children[2..-1]))]
+
         elsif method == :group_by and call.children.length == 2
           # array.group_by { |x| x.category }
           target = call.children.first

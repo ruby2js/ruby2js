@@ -83,7 +83,7 @@ module Ruby2JS
             cvars << ast.children.first if ast.type === :cvasgn
 
             ast.children.each do |child|
-              walk[child] if child.respond_to?(:type) && child.respond_to?(:children)
+              walk.call(child) if child.respond_to?(:type) && child.respond_to?(:children)
             end
 
             if ast.type == :send and ast.children.first == nil
@@ -103,7 +103,7 @@ module Ruby2JS
             end
 
           end
-          walk[@ast]
+          walk.call(@ast)
 
           while constructor.length == 1 and constructor.first.type == :begin
             constructor = constructor.first.children.dup

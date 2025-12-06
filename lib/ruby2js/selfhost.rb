@@ -51,6 +51,7 @@ module Ruby2JS
       'lib/ruby2js/converter/return.rb',
       'lib/ruby2js/converter/masgn.rb',
       'lib/ruby2js/converter/class.rb',
+      'lib/ruby2js/converter/class2.rb',
       'lib/ruby2js/converter/block.rb',
       'lib/ruby2js/converter/case.rb',
       'lib/ruby2js/converter/kwbegin.rb',
@@ -69,7 +70,9 @@ module Ruby2JS
       'lib/ruby2js/converter/next.rb',
       'lib/ruby2js/converter/break.rb',
       'lib/ruby2js/converter/ensure.rb',
-      'lib/ruby2js/converter/nthref.rb'
+      'lib/ruby2js/converter/nthref.rb',
+      'lib/ruby2js/converter/module.rb',
+      'lib/ruby2js/converter/in.rb'
     ].freeze
 
     # Filters to apply, in order
@@ -580,6 +583,7 @@ module Ruby2JS
           eslevel: 2022,
           underscored_private: true,  # Required: prototype methods can't access private fields
           nullish_to_s: true,  # Needed for conditional expressions in string interpolation
+          or: :logical,  # Use ||= instead of ??= (needed for false values, not just null/undefined)
           filters: FILTERS
         ).to_s
 

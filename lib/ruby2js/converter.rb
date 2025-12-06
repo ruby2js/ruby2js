@@ -37,7 +37,7 @@ module Ruby2JS
       :=== => :'!=='
     }
 
-    GROUP_OPERATORS = [:begin, :dstr, :dsym, :and, :or, :casgn, :if]
+    GROUP_OPERATORS = [:begin, :dstr, :dsym, :and, :or, :nullish, :casgn, :if]
 
     VASGN = [:cvasgn, :ivasgn, :gvasgn, :lvasgn]
 
@@ -57,6 +57,10 @@ module Ruby2JS
       @@handlers.each do |name|
         @handlers[name] = method("on_#{name}")
       end
+
+      # Add aliases for handlers with special characters (for selfhost JS version)
+      # JS renames on_in? to on_is_in, but AST still uses :in?
+      @handlers[:'in?'] = @handlers[:is_in] if @handlers[:is_in]
 
       @state = nil
       @block_this = nil
@@ -381,11 +385,11 @@ module Ruby2JS
         end
 
         ast.children.each do |child|
-          walk[child] if child.respond_to?(:type) && child.respond_to?(:children)
+          walk.call(child) if child.respond_to?(:type) && child.respond_to?(:children)
         end
       end
 
-      walk[@ast] if @ast
+      walk.call(@ast) if @ast
     end
   end
 end

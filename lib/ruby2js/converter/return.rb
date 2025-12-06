@@ -18,14 +18,15 @@ module Ruby2JS
       :op_asgn, :and_asgn, :or_asgn, :taglit, :gvar, :csend, :call ]
 
     handle :autoreturn do |*statements|
-      return if statements == [nil]
+      return if statements.length == 1 && statements.first.nil?
       block = statements.dup
-      while block.length == 1 and block.first.type == :begin
+      while block.length == 1 && block.first && block.first.type == :begin
         block = block.first.children.dup
       end
 
-      return if block == []
-      if EXPRESSIONS.include? block.last.type 
+      return if block.empty?
+      return unless block.last
+      if EXPRESSIONS.include? block.last.type
         block.push @ast.updated(:return, [block.pop])
 
       elsif block.last.type == :if

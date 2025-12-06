@@ -226,6 +226,26 @@ class PrismWalker < Prism::Visitor
     end
   end
 
+  # Local variable target for multiple assignment (a, b = 1, 2)
+  def visit_local_variable_target_node(node)
+    s(:lvasgn, node.name)
+  end
+
+  # Instance variable target for multiple assignment (@a, @b = 1, 2)
+  def visit_instance_variable_target_node(node)
+    s(:ivasgn, node.name)
+  end
+
+  # Class variable target for multiple assignment (@@a, @@b = 1, 2)
+  def visit_class_variable_target_node(node)
+    s(:cvasgn, node.name)
+  end
+
+  # Constant target for multiple assignment (A, B = 1, 2)
+  def visit_constant_target_node(node)
+    s(:casgn, nil, node.name)
+  end
+
   def visit_local_variable_operator_write_node(node)
     s(:op_asgn, s(:lvasgn, node.name), node.binaryOperator, visit(node.value))
   end
@@ -242,6 +262,18 @@ class PrismWalker < Prism::Visitor
     s(:op_asgn, s(:gvasgn, node.name), node.binaryOperator, visit(node.value))
   end
 
+  def visit_global_variable_write_node(node)
+    s(:gvasgn, node.name, visit(node.value))
+  end
+
+  def visit_global_variable_read_node(node)
+    s(:gvar, node.name)
+  end
+
+  def visit_global_variable_target_node(node)
+    s(:gvasgn, node.name)
+  end
+
   def visit_local_variable_or_write_node(node)
     s(:or_asgn, s(:lvasgn, node.name), visit(node.value))
   end
@@ -256,6 +288,25 @@ class PrismWalker < Prism::Visitor
 
   def visit_instance_variable_and_write_node(node)
     s(:and_asgn, s(:ivasgn, node.name), visit(node.value))
+  end
+
+  # Multiple assignment: a, b = 1, 2
+  def visit_multi_write_node(node)
+    targets = []
+    node.lefts.each { |target| targets.push(visit(target)) } if node.lefts
+    targets.push(visit(node.rest)) if node.rest && node.rest.constructor.name != 'ImplicitRestNode'
+    node.rights.each { |target| targets.push(visit(target)) } if node.rights
+    lhs = s(:mlhs, *targets)
+
+    # Build RHS
+    if node.value && node.value.constructor.name == 'ArrayNode' && node.value.elements
+      rhs_values = visit_all(node.value.elements)
+      rhs = rhs_values.length == 1 ? rhs_values[0] : s(:array, *rhs_values)
+    else
+      rhs = visit(node.value)
+    end
+
+    s(:masgn, lhs, rhs)
   end
 
   # === Operators ===

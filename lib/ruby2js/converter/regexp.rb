@@ -31,18 +31,18 @@ module Ruby2JS
       if parts.first.type == :str and parts.first.children[0].start_with?('^')
         if opts.include? :m or opts.include? 'm'
           if parts.first.children[0].gsub(/\\./, '').gsub(/\[.*?\]/, '').include? '.'
-            opts = opts + [:s] unless opts.include? :s or opts.include? 's'
+            opts = [*opts, :s] unless opts.include? :s or opts.include? 's'
           end
         else
-          opts = opts + [:m]
+          opts = [*opts, :m]
         end
       elsif parts.last.type == :str and parts.last.children[0].end_with?('$')
         if opts.include? :m or opts.include? 'm'
           if parts.last.children[0].gsub(/\\./, '').gsub(/\[.*?\]/, '').include? '.'
-            opts = opts + [:s] unless opts.include? :s or opts.include? 's'
+            opts = [*opts, :s] unless opts.include? :s or opts.include? 's'
           end
         else
-          opts = opts + [:m]
+          opts = [*opts, :m]
         end
       end
 
@@ -61,7 +61,7 @@ module Ruby2JS
       # use slash syntax if there are few embedded slashes in the regexp
       if parts.all? {|part| part.type == :str}
         str = parts.map {|part| part.children.first}.join
-        unless str.scan('/').length - str.scan("\\").length > 3
+        unless str.count('/') - str.count("\\") > 3
           return put "/#{ str.gsub('\\/', '/').gsub('/', '\\/') }/" +
             opts.join
         end

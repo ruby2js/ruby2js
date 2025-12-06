@@ -33,6 +33,7 @@ module Ruby2JS
         convert pop shift clear dup clone
         freeze thaw taint untaint
         newline indent outdent put puts
+        join reverse
       ].freeze
 
       # Method definitions that should never become getters (have side effects)
@@ -565,26 +566,10 @@ module Ruby2JS
         LOGICAL OPERATORS INVERT_OP GROUP_OPERATORS VASGN COMPARISON_OPS
       ].freeze
 
-      # Handle template literals (dstr) to wrap lvar in (var || "")
-      # This handles Ruby's nil.to_s == "" behavior for local variables
-      # that may be undefined in JavaScript
-      def on_dstr(node)
-        # Transform children: wrap :lvar in (lvar || "")
-        new_children = node.children.map do |child|
-          if child.type == :begin && child.children.length == 1 &&
-             child.children[0]&.type == :lvar
-            # #{var} → #{var || ""}, process lvar to handle reserved word renaming
-            lvar = process(child.children[0])
-            s(:begin, s(:or, lvar, s(:str, '')))
-          elsif child.type == :lvar
-            # Direct lvar in dstr → (lvar || ""), process to handle reserved word renaming
-            s(:begin, s(:or, process(child), s(:str, '')))
-          else
-            process(child)
-          end
-        end
-        node.updated(nil, new_children)
-      end
+      # NOTE: Template literal nil handling is now done by nullish_to_s option
+      # in selfhost.rb. The on_dstr handler was removed because it conflicted
+      # with nullish_to_s when or: :logical was enabled, producing invalid JS
+      # like ${type || "" ?? ""}
 
       # Convert symbols to strings in s() calls
       # s(:send, ...) → s('send', ...)
@@ -751,6 +736,16 @@ module Ruby2JS
             s(:splat, filter_call))
         end
 
+        # Handle .flatten! → arr.splice(0, Infinity, ...arr.flat(Infinity))
+        # Ruby flatten! recursively flattens array in place (must be before rename_method)
+        if method == :flatten! && args.empty? && target
+          processed_target = process(target)
+          return s(:send, processed_target, :splice,
+            s(:int, 0),
+            s(:const, nil, :Infinity),
+            s(:splat, s(:send, processed_target, :flat, s(:const, nil, :Infinity))))
+        end
+
         # Rename method calls ending in ? or !
         renamed = rename_method(method)
         if renamed != method
@@ -897,19 +892,51 @@ module Ruby2JS
           end
         end
 
-        # Handle .dup → {...obj} or [...arr] (shallow copy)
-        # For simplicity, use [...target] which works for arrays
-        # Hash.dup would need {...target} but we'll use Object.assign for safety
+        # Handle .dup → shallow copy
+        # Need to distinguish between Hash.dup and Array.dup:
+        # - vars.dup, @vars.dup are Hashes → Object.assign({}, obj)
+        # - children.dup, statements.dup are Arrays → .slice()
         if method == :dup && args.empty? && target
-          # Use spread syntax: [...target] for arrays, {...target} for hashes
-          # Since we don't know the type at transpile time, use a safe approach
-          return s(:send, s(:const, nil, :Object), :assign,
-            s(:hash), process(target))
+          # Check if the variable is a Hash by name convention
+          var_name = case target.type
+            when :ivar then target.children[0].to_s.sub('@', '')
+            when :lvar then target.children[0].to_s
+            else nil
+          end
+
+          if var_name == 'vars'
+            # Variables named 'vars' are Hashes in the converter
+            return s(:send, s(:const, nil, :Object), :assign,
+              s(:hash), process(target))
+          else
+            # Other variables (children, statements, etc.) are Arrays
+            return s(:send!, process(target), :slice)
+          end
         end
 
         # Handle array << value → array.push(value)
         if method == :<< && args.length == 1 && target
           return s(:send, process(target), :push, process(args.first))
+        end
+
+        # Handle .uniq → [...new Set(arr)]
+        # Ruby's .uniq returns array with duplicates removed
+        if method == :uniq && args.empty? && target
+          # [...new Set(arr)]
+          return s(:array, s(:splat, s(:send, s(:const, nil, :Set), :new, process(target))))
+        end
+
+        # Handle str.count(char) → str.split(char).length - 1
+        # Ruby's count returns number of occurrences of a character
+        if method == :count && args.length == 1 && target
+          # str.split(char).length - 1
+          # Use :attr for property access (length is a property, not a method)
+          return s(:send,
+            s(:attr,
+              s(:send, process(target), :split, process(args.first)),
+              :length),
+            :-,
+            s(:int, 1))
         end
 
         # Force blacklisted methods to be called as methods (with parens)

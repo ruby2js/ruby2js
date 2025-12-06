@@ -45,10 +45,10 @@ module Ruby2JS
       walk = ->(node) do
         add_implicit_block = true if node.type == :yield || (node.type == :send && node.children[1] == "_implicitBlockYield")
         node.children.each do |child|
-          walk[child] if child.respond_to?(:type) && child.respond_to?(:children)
+          walk.call(child) if child.respond_to?(:type) && child.respond_to?(:children)
         end
       end
-      walk[body]
+      walk.call(body)
 
       if add_implicit_block
         children = args.children.dup

@@ -27,8 +27,9 @@ module Ruby2JS
 
       # Check for middle-splat: *a, b = arr - JS doesn't allow [...a, b]
       # Need to handle this specially: b = arr.pop(); a = arr.slice() or similar
+      # Note: Using >= 0 check for JS compatibility (findIndex returns -1, not nil)
       splat_index = lhs.children.find_index { |c| c.type == :splat }
-      has_middle_splat = splat_index && splat_index < lhs.children.length - 1
+      has_middle_splat = splat_index && splat_index >= 0 && splat_index < lhs.children.length - 1
 
       if has_middle_splat && use_destructuring
         # Transform: *a, b, c = arr
@@ -80,23 +81,25 @@ module Ruby2JS
 
         parse s(:begin, *block), @state
       elsif use_destructuring
+        # Note: Using .call instead of [] for selfhost JS compatibility
         walk = lambda do |node|
           results = []
           node.children.each do |var|
             if var.type == :lvasgn
               results << var
             elsif var.type == :mlhs or var.type == :splat
-              results += walk[var]
+              results += walk.call(var)
             end
           end
           results
         end
 
-        vars = walk[lhs]
+        vars = walk.call(lhs)
         newvars = vars.select {|var| not @vars.include? var.children[0]}
 
         if newvars.length > 0
-          if vars == newvars
+          # Note: Using length comparison for JS compatibility (== compares references in JS)
+          if vars.length == newvars.length
             put 'let '
           else
             put "let #{newvars.map {|var| var.children.last}.join(', ')}#{@sep}"
