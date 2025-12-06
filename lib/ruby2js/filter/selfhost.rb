@@ -361,6 +361,25 @@ module Ruby2JS
       def on_def(node)
         method_name, args, body = node.children
 
+        # Rewrite the s() method to use the global s() function
+        # The Ruby version has: if defined?(Parser::AST::Node) ... else Ruby2JS::Node.new ... end
+        # For selfhost, we just want: return s(type, ...args) to delegate to the global s function
+        if method_name == :s && args&.children&.length == 2
+          type_arg = args.children[0]  # first arg is type
+          rest_arg = args.children[1]  # second arg is *args (restarg)
+          if type_arg&.type == :arg && rest_arg&.type == :restarg
+            type_name = type_arg.children[0]
+            args_name = rest_arg.children[0] || :args
+            # Return: new Node(type, args)
+            new_body = s(:send,
+              s(:const, nil, :Node),
+              :new,
+              s(:lvar, type_name),
+              s(:lvar, args_name))
+            return s(:def, :s, process(args), new_body)
+          end
+        end
+
         # Check for visit_*_node pattern
         if method_name.to_s.start_with?('visit_') && method_name.to_s.end_with?('_node')
           # Convert snake_case to camelCase: visit_integer_node → visitIntegerNode

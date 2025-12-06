@@ -135,6 +135,9 @@ class PrismWalker < Prism::Visitor
     if node.rest
       params << visit(node.rest)
     end
+    if node.block
+      params << visit(node.block)
+    end
     s(:args, *params)
   end
 
@@ -148,6 +151,10 @@ class PrismWalker < Prism::Visitor
 
   def visit_rest_parameter_node(node)
     s(:restarg, node.name)
+  end
+
+  def visit_block_parameter_node(node)
+    s(:blockarg, node.name)
   end
 
   # === Control Flow ===

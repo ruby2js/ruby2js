@@ -18,9 +18,8 @@ function convert(rubyCode, opts = {}) {
   const walker = new PrismWalker(rubyCode);
   const ast = walker.visit(result.value);
   const converter = new Converter(ast, new Map());
-  // Default to ES5 (no let/const) to match Ruby transliteration_spec defaults
-  // ES5 = 2009 in the eslevel system
-  converter.eslevel = opts.eslevel || 2009;
+  // Default to ES2020 to match Ruby2JS minimum eslevel
+  converter.eslevel = opts.eslevel || 2020;
   converter.convert();
   return converter.to_s();
 }
@@ -34,8 +33,9 @@ function Rational(n, d) { return Math.floor(n / d); }
 // RUBY_VERSION stub (used in conditional tests)
 const RUBY_VERSION = "3.4.0";
 
+// Block is popped from args at runtime since JS requires rest param to be last
 // it "should eval" do
-//   to_js('eval( "hi" )').must_equal 'eval("hi")'
+//   to_js('eval( "hi" )').must_equal 'eval(\"hi\")'
 // end
 // support a JavaScript-like syntax too.
 // This test passes a live Proc object which requires find_block to locate
@@ -68,7 +68,7 @@ describe(Ruby2JS, () => {
     });
 
     it("should handle hashes with keys that aren't identifiers", () => {
-      to_js("{ 1 => 2 }").must_equal("{1: 2}");
+      to_js("{ 1 => 2 }").must_equal("{[1]: 2}");
       return to_js("{ 'data-foo' => 2 }").must_equal("{\"data-foo\": 2}")
     });
 
@@ -89,7 +89,7 @@ describe(Ruby2JS, () => {
 
     it(
       "should parse global variables",
-      () => to_js("$a = 1").must_equal("var $a = 1")
+      () => to_js("$a = 1").must_equal("let $a = 1")
     );
 
     return it(
@@ -100,33 +100,33 @@ describe(Ruby2JS, () => {
 
   describe("assign", () => {
     it("should parse left assign", () => {
-      to_js("a = 1").must_equal("var a = 1");
-      to_js("a = 'string'").must_equal("var a = \"string\"");
-      return to_js("a = :symbol").must_equal("var a = \"symbol\"")
+      to_js("a = 1").must_equal("let a = 1");
+      to_js("a = 'string'").must_equal("let a = \"string\"");
+      return to_js("a = :symbol").must_equal("let a = \"symbol\"")
     });
 
     it(
       "should parse constant assign",
-      () => to_js("PI = 3.14159").must_equal("var PI = 3.14159")
+      () => to_js("PI = 3.14159").must_equal("const PI = 3.14159")
     );
 
     it(
       "should not output var if variable is allready declared within a context",
-      () => to_js("a = 1; a = 2").must_equal("var a = 1; a = 2")
+      () => to_js("a = 1; a = 2").must_equal("let a = 1; a = 2")
     );
 
     it("should parse mass assign", () => {
-      to_js("a, b = 1, 2").must_equal("var a = 1; var b = 2");
-      to_js("a = 1, 2").must_equal("var a = [1, 2]");
-      return to_js("a, b = c").must_equal("var a = c[0]; var b = c[1]")
+      to_js("a, b = 1, 2").must_equal("let [a, b] = [1, 2]");
+      to_js("a = 1, 2").must_equal("let a = [1, 2]");
+      return to_js("a, b = c").must_equal("let [a, b] = c")
     });
 
     it("should parse chained assignment statements", () => {
-      to_js("a = b = 1").must_equal("var a, b; a = b = 1");
-      to_js("x.a = b = 1").must_equal("var b; x.a = b = 1");
-      to_js("@a = b = 1").must_equal("var b; this._a = b = 1");
-      to_js("@@a = b = 1").must_equal("var b; this.constructor._a = b = 1");
-      return to_js("A = b = 1").must_equal("var b; var A = b = 1")
+      to_js("a = b = 1").must_equal("let a, b; a = b = 1");
+      to_js("x.a = b = 1").must_equal("let b; x.a = b = 1");
+      to_js("@a = b = 1").must_equal("let b; this._a = b = 1");
+      to_js("@@a = b = 1").must_equal("let b; this.constructor._a = b = 1");
+      return to_js("A = b = 1").must_equal("let b; const A = b = 1")
     });
 
     it("should parse op assignments", () => {
@@ -142,22 +142,22 @@ describe(Ruby2JS, () => {
 
     it(
       "should parse exponential operators",
-      () => to_js("2 ** 0.5").must_equal("Math.pow(2, 0.5)")
+      () => to_js("2 ** 0.5").must_equal("2 ** 0.5")
     );
 
     it("should do short circuit assign", () => {
-      to_js("a = nil; a ||= 1").must_equal("var a = null; a = a || 1");
-      to_js("@a ||= 1").must_equal("this._a = this._a || 1");
-      to_js("@@a ||= 1").must_equal("this.constructor._a = this.constructor._a || 1");
-      to_js("self.p ||= 1").must_equal("this.p = this.p || 1");
-      return to_js("a[i] ||= 1").must_equal("a[i] = a[i] || 1")
+      to_js("a = nil; a ||= 1").must_equal("let a = null; a = a ?? 1");
+      to_js("@a ||= 1").must_equal("this._a = this._a ?? 1");
+      to_js("@@a ||= 1").must_equal("this.constructor._a = this.constructor._a ?? 1");
+      to_js("self.p ||= 1").must_equal("this.p = this.p ?? 1");
+      return to_js("a[i] ||= 1").must_equal("a[i] = a[i] ?? 1")
     });
 
     return it("should parse ternary operator", () => {
-      to_js("x = true ? true : false").must_equal("var x = true ? true : false");
-      to_js("x = (true if y)").must_equal("var x = y ? true : null");
-      to_js("x = (true unless y)").must_equal("var x = !y ? true : null");
-      return to_js("x = a + (b ? 1 : 0)").must_equal("var x = a + (b ? 1 : 0)")
+      to_js("x = true ? true : false").must_equal("let x = true ? true : false");
+      to_js("x = (true if y)").must_equal("let x = y ? true : null");
+      to_js("x = (true unless y)").must_equal("let x = !y ? true : null");
+      return to_js("x = a + (b ? 1 : 0)").must_equal("let x = a + (b ? 1 : 0)")
     })
   });
 
@@ -179,24 +179,24 @@ describe(Ruby2JS, () => {
 
     it(
       "should parse lvar as variable call",
-      () => to_js("a = 1; a").must_equal("var a = 1; a")
+      () => to_js("a = 1; a").must_equal("let a = 1; a")
     );
 
     it("should parse square bracket call", () => {
-      to_js("a = [1]; a[0]").must_equal("var a = [1]; a[0]");
+      to_js("a = [1]; a[0]").must_equal("let a = [1]; a[0]");
       to_js("a['x']").must_equal("a.x");
       return to_js("a[:x]").must_equal("a.x")
     });
 
     it("should parse square bracket assignment", () => {
-      to_js("a = [1]; a[0]=2").must_equal("var a = [1]; a[0] = 2");
+      to_js("a = [1]; a[0]=2").must_equal("let a = [1]; a[0] = 2");
       to_js("a['x']=1").must_equal("a.x = 1");
       return to_js("a[:x]=1").must_equal("a.x = 1")
     });
 
     it(
       "should parse nested square bracket call",
-      () => to_js("a = [[1]]; a[0][0]").must_equal("var a = [[1]]; a[0][0]")
+      () => to_js("a = [[1]]; a[0][0]").must_equal("let a = [[1]]; a[0][0]")
     );
 
     it(
@@ -225,8 +225,8 @@ describe(Ruby2JS, () => {
       () => {
         to_js("a!()").must_equal("a()");
         to_js("a?()").must_equal("a()");
-        to_js("a!").must_equal("var a");
-        return to_js("a?").must_equal("var a")
+        to_js("a!").must_equal("let a");
+        return to_js("a?").must_equal("let a")
       }
     );
 
@@ -238,28 +238,29 @@ describe(Ruby2JS, () => {
 
   describe("splat", () => {
     it("should pass splat", () => (
-      to_js("console.log 'a', 'b', *%w(c d e)").must_equal("console.log.apply(console, [\"a\", \"b\"].concat([\"c\", \"d\", \"e\"]))")
+      to_js("console.log 'a', 'b', *%w(c d e)").must_equal("console.log(\"a\", \"b\", ...[\"c\", \"d\", \"e\"])")
     ));
 
     it("should optimize splat as only arg", () => (
-      to_js("console.log *%w(a b c d e)").must_equal("console.log.apply(console, [\"a\", \"b\", \"c\", \"d\", \"e\"])")
+      to_js("console.log *%w(a b c d e)").must_equal("console.log(...[\"a\", \"b\", \"c\", \"d\", \"e\"])")
     ));
 
     it("should receive splat", () => (
-      to_js("def f(a,*b); return b; end").must_equal("function f(a) {var b = Array.prototype.slice.call(arguments, 1); return b}")
+      to_js("def f(a,*b); return b; end").must_equal("function f(a, ...b) {return b}")
     ));
 
     it("should receive unnamed splat", () => (
-      to_js("def f(a,*); return a; end").must_equal("function f(a) {return a}")
+      to_js("def f(a,*); return a; end").must_equal("function f(a, ...) {return a}")
     ));
 
     it("should receive splat and block", () => (
-      to_js("def f(a,*args, &block); end").must_equal("function f(a) {var args = Array.prototype.slice.call(arguments, 2, arguments.length - 1); var block = arguments[arguments.length - 1]; if (arguments.length <= 1) {block = null} else if (typeof block !== \"function\") {args.push(block); block = null}}")
+      to_js("def f(a,*args, &block); end").must_equal("function f(a, ...args) {let block = args.pop()}")
     ));
 
-    return it("should handle splats in array literals", () => (
-      to_js("[*a,1,2,*b,3,4,*c]").must_equal("a.concat([1, 2]).concat(b).concat([3, 4]).concat(c)")
-    ))
+    return it(
+      "should handle splats in array literals",
+      () => to_js("[*a,1,2,*b,3,4,*c]").must_equal("[...a, 1, 2, ...b, 3, 4, ...c]")
+    )
   });
 
   describe("boolean", () => {
@@ -348,7 +349,7 @@ describe(Ruby2JS, () => {
 
       () => {
         let exp = "a = 5; 1 + (a + (1 + a * (b() - d())))";
-        return to_js(exp).must_equal("var ".push(exp))
+        return to_js(exp).must_equal("let ".push(exp))
       }
     );
 
@@ -358,9 +359,9 @@ describe(Ruby2JS, () => {
     });
 
     it("nest expressions when needed in string interpolation", () => {
-      to_js("\"\#{a}\#{b}\".length").must_equal("(a + b).length");
-      to_js("\"\#{a}\#{b}\".split(\" \")").must_equal("(a + b).split(\" \")");
-      return to_js("\"a\#{b+c}\"").must_equal("\"a\" + (b + c)")
+      to_js("\"\#{a}\#{b}\".length").must_equal("`${a}${b}`.length");
+      to_js("\"\#{a}\#{b}\".split(\" \")").must_equal("`${a}${b}`.split(\" \")");
+      return to_js("\"a\#{b+c}\"").must_equal("`a${b + c}`")
     });
 
     it(
@@ -381,44 +382,44 @@ describe(Ruby2JS, () => {
     });
 
     return it("should handle function calls", () => (
-      to_js("a = lambda {|x| return x+1}; a.(nil, 1)").must_equal("var a = function(x) {return x + 1}; a.call(null, 1)")
+      to_js("a = lambda {|x| return x+1}; a.(nil, 1)").must_equal("let a = x => x + 1; a.call(null, 1)")
     ))
   });
 
   describe("string concat", () => {
     it("should parse string ", () => (
-      to_js("\"time is \#{ Time.now() }, say \#{ hello }\"").must_equal("\"time is \" + Time.now() + \", say \" + hello")
+      to_js("\"time is \#{ Time.now() }, say \#{ hello }\"").must_equal("`time is ${Time.now()}, say ${hello}`")
     ));
 
     it("should parse string", () => (
-      to_js("\"time is \#{ Time.now() }\"").must_equal("\"time is \" + Time.now()")
+      to_js("\"time is \#{ Time.now() }\"").must_equal("`time is ${Time.now()}`")
     ));
 
     return it(
       "should parse interpolated symbols",
-      () => to_js(":\"a\#{b}c\"").must_equal("\"a\" + b + \"c\"")
+      () => to_js(":\"a\#{b}c\"").must_equal("`a${b}c`")
     )
   });
 
   describe("wow, such empty", () => {
     it(
       "should handle totally empty interpolation",
-      () => to_js("\"\#{}\"").must_equal("\"\"")
+      () => to_js("\"\#{}\"").must_equal("``")
     );
 
     it(
       "should handle mixed empty interpolation",
-      () => to_js("\"x\#{}y\"").must_equal("\"x\" + \"\" + \"y\"")
+      () => to_js("\"x\#{}y\"").must_equal("`xy`")
     );
 
     it(
       "should handle empty here docs",
-      () => to_js("x = <<HERE\nHERE").must_equal("var x = \"\"\n")
+      () => to_js("x = <<HERE\nHERE").must_equal("let x = \"\"\n")
     );
 
     return it(
       "should handle mixed empty parens",
-      () => to_js("x = ()").must_equal("var x = null")
+      () => to_js("x = ()").must_equal("let x = null")
     )
   });
 
@@ -435,7 +436,7 @@ describe(Ruby2JS, () => {
 
     return it(
       "should leave << expressions alone",
-      () => to_js("y = a << b").must_equal("var y = a << b")
+      () => to_js("y = a << b").must_equal("let y = a << b")
     )
   });
 
@@ -472,28 +473,28 @@ describe(Ruby2JS, () => {
     ));
 
     it("should parse if as an expression", () => (
-      to_js("x = if a; b = 1; b; elsif c; x=1; x; end").must_equal("var x = a ? function() {var b = 1; return b}() : c ? function() {var x = 1; return x}() : null")
+      to_js("x = if a; b = 1; b; elsif c; x=1; x; end").must_equal("let x = a ? (() => {let b = 1; return b})() : c ? (() => {let x = 1; return x})() : null")
     ));
 
     it("should handle basic variable scope", () => {
-      to_js("z = 1; if a; b; elsif c; d = proc do e = 1; end; end; z = d").must_equal("var d; var z = 1; if (a) {var b} else if (c) {d = function() {var e = 1}}; z = d");
-      return to_js("if a == 1; b = 0; c.forEach {|d| if d; b += d; end} end").must_equal("if (a == 1) {var b = 0; c.forEach(function(d) {if (d) b += d})}")
+      to_js("z = 1; if a; b; elsif c; d = proc do e = 1; end; end; z = d").must_equal("let d; let z = 1; if (a) {let b} else if (c) {d = () => {let e = 1}}; z = d");
+      return to_js("if a == 1; b = 0; c.forEach {|d| if d; b += d; end} end").must_equal("if (a == 1) {let b = 0; c.forEach((d) => {if (d) b += d})}")
     });
 
     it("should handle while loop", () => (
-      to_js("a = 0; while true; a += 1; end").must_equal("var a = 0; while (true) {a++}")
+      to_js("a = 0; while true; a += 1; end").must_equal("let a = 0; while (true) {a++}")
     ));
 
     it("should handle while loop that assigns a variable", () => (
-      to_js("while match=f(); end").must_equal("var match; while (match = f()) {}")
+      to_js("while match=f(); end").must_equal("let match; while (match = f()) {}")
     ));
 
     it("should handle another while loop syntax", () => (
-      to_js("a = 0; while true || false; a += 1; end").must_equal("var a = 0; while (true || false) {a++}")
+      to_js("a = 0; while true || false; a += 1; end").must_equal("let a = 0; while (true || false) {a++}")
     ));
 
     it("should handle a redo within a loop", () => (
-      to_js("while true do redo; end").must_equal("while (true) {var redo$; do {redo$ = false; redo$ = true; continue} while(redo$)}")
+      to_js("while true do redo; end").must_equal("while (true) {let redo$; do {redo$ = false; redo$ = true; continue} while(redo$)}")
     ));
 
     it("should handle simple case statement", () => (
@@ -521,31 +522,31 @@ describe(Ruby2JS, () => {
     ));
 
     it("should parse case expressions", () => (
-      to_js("x = case a; when true; b; else; c; end").must_equal("var x = function() {switch (a) {case true: return b; default: return c}}()")
+      to_js("x = case a; when true; b; else; c; end").must_equal("let x = (() => {switch (a) {case true: return b; default: return c}})()")
     ));
 
     it("should handle empty when blocks", () => (
-      to_js("case a; when 1; when 2; b; end").must_equal("switch (a) {case 1: ; break; case 2: var b}")
+      to_js("case a; when 1; when 2; b; end").must_equal("switch (a) {case 1: ; break; case 2: let b}")
     ));
 
     it("should handle a for loop", () => (
-      to_js("a = {}; b = {}; for i in a; b[i] = a[i]; end").must_equal("var a = {}; var b = {}; for (var i in a) {b[i] = a[i]}")
+      to_js("a = {}; b = {}; for i in a; b[i] = a[i]; end").must_equal("let a = {}; let b = {}; for (let i in a) {b[i] = a[i]}")
     ));
 
     it("should handle a for loop with an inclusive range", () => (
-      to_js("a = 0; for i in 1..3; a += i; end").must_equal("var a = 0; for (var i = 1; i <= 3; i++) {a += i}")
+      to_js("a = 0; for i in 1..3; a += i; end").must_equal("let a = 0; for (let i = 1; i <= 3; i++) {a += i}")
     ));
 
     it("should handle a for loop with an exclusive range", () => (
-      to_js("a = 0; for i in 1...4; a += i; end").must_equal("var a = 0; for (var i = 1; i < 4; i++) {a += i}")
+      to_js("a = 0; for i in 1...4; a += i; end").must_equal("let a = 0; for (let i = 1; i < 4; i++) {a += i}")
     ));
 
     it("should handle a stepped range with an inclusive range", () => (
-      to_js("a = 0; (1..3).step(2) {|i| a += i}").must_equal("var a = 0; for (var i = 1; i <= 3; i += 2) {a += i}")
+      to_js("a = 0; (1..3).step(2) {|i| a += i}").must_equal("let a = 0; for (let i = 1; i <= 3; i += 2) {a += i}")
     ));
 
     it("should handle a stepped range with an exclusive range", () => (
-      to_js("a = 0; (1...4).step(2) {|i| a += i}").must_equal("var a = 0; for (var i = 1; i < 4; i += 2) {a += i}")
+      to_js("a = 0; (1...4).step(2) {|i| a += i}").must_equal("let a = 0; for (let i = 1; i < 4; i += 2) {a += i}")
     ));
 
     it(
@@ -554,8 +555,8 @@ describe(Ruby2JS, () => {
     );
 
     it("should handle next as return", () => {
-      to_js("x.forEach { next }").must_equal("x.forEach(function() {return})");
-      return to_js("x.map {|i| next i}").must_equal("x.map(function(i) {return i})")
+      to_js("x.forEach { next }").must_equal("x.forEach(() => {return})");
+      return to_js("x.map {|i| next i}").must_equal("x.map((i) => {return i})")
     });
 
     it(
@@ -589,181 +590,184 @@ describe(Ruby2JS, () => {
 
     it(
       "should parse proc",
-      () => to_js("Proc.new {}").must_equal("function() {}")
+      () => to_js("Proc.new {}").must_equal("() => {}")
     );
 
     it("should parse lambda", () => {
-      to_js("lambda {}").must_equal("function() {}");
-      return to_js("y = lambda {|x| x + 1}").must_equal("var y = function(x) {return x + 1}")
+      to_js("lambda {}").must_equal("() => {}");
+      return to_js("y = lambda {|x| x + 1}").must_equal("let y = x => x + 1")
     });
 
     it(
       "should parse proc",
-      () => to_js("proc {}").must_equal("function() {}")
+      () => to_js("proc {}").must_equal("() => {}")
     );
 
     it(
       "should support calls to anonymous functions",
-      () => to_js("proc {}[]").must_equal("(function() {})()")
+      () => to_js("proc {}[]").must_equal("(() => {})()")
     );
 
     it("should handle basic variable scope", () => (
-      to_js("a = 1; lambda { a = 2; b = 1}").must_equal("var a = 1; function() {a = 2; var b = 1}")
+      to_js("a = 1; lambda { a = 2; b = 1}").must_equal("let a = 1; () => {a = 2; let b = 1}")
     ));
 
     it("should handle shadow args", () => (
-      to_js("a = 1; lambda {|;a| a = 2}").must_equal("var a = 1; function() {var a = 2}")
+      to_js("a = 1; lambda {|;a| a = 2}").must_equal("let a = 1; () => {let a = 2}")
     ));
 
     it("named functions aren't closures", () => (
-      to_js("a = 1; def f; a = 2; b = 1; end").must_equal("var a = 1; function f() {var a = 2; var b = 1}")
+      to_js("a = 1; def f; a = 2; b = 1; end").must_equal("let a = 1; function f() {let a = 2; let b = 1}")
     ));
 
-    it("should handle one argument", () => (
-      to_js("lambda { |a| return a + 1 }").must_equal("function(a) {return a + 1}")
-    ));
+    it(
+      "should handle one argument",
+      () => to_js("lambda { |a| return a + 1 }").must_equal("a => a + 1")
+    );
 
-    it("should handle arguments", () => (
-      to_js("lambda { |a,b| return a + b }").must_equal("function(a, b) {return a + b}")
-    ));
+    it(
+      "should handle arguments",
+      () => to_js("lambda { |a,b| return a + b }").must_equal("(a, b) => a + b")
+    );
 
     it("should pass functions", () => (
-      to_js("run(\"task\"){ |task| do_run task}").must_equal("run(\"task\", function(task) {do_run(task)})")
+      to_js("run(\"task\"){ |task| do_run task}").must_equal("run(\"task\", task => do_run(task))")
     ));
 
     it("should handle variable scope", () => (
-      to_js("a = 1; lambda {|b| c = 0; a = b - c }; lambda { |b| c = 1; a = b + c }").must_equal("var a = 1; function(b) {var c = 0; a = b - c}; function(b) {var c = 1; a = b + c}")
+      to_js("a = 1; lambda {|b| c = 0; a = b - c }; lambda { |b| c = 1; a = b + c }").must_equal("let a = 1; (b) => {let c = 0; a = b - c}; (b) => {let c = 1; a = b + c}")
     ));
 
     it("should really handle variable scope", () => (
-      to_js("a, d = 1, 2; lambda {|b| c = 0; a = b - c * d}; lambda { |b| c = 1; a = b + c * d}").must_equal("var a = 1; var d = 2; function(b) {var c = 0; a = b - c * d}; function(b) {var c = 1; a = b + c * d}")
+      to_js("a, d = 1, 2; lambda {|b| c = 0; a = b - c * d}; lambda { |b| c = 1; a = b + c * d}").must_equal("let [a, d] = [1, 2]; (b) => {let c = 0; a = b - c * d}; (b) => {let c = 1; a = b + c * d}")
     ));
 
     it(
       "should parse with explicit return",
-      () => to_js("Proc.new {return nil}").must_equal("function() {return null}")
+      () => to_js("Proc.new {return nil}").must_equal("() => null")
     );
 
     it("should passthrough function definitions", () => (
-      to_js("a=1; b=function(a,c) {return a + c}").must_equal("var a = 1; var b = function(a, c) {return a + c}")
+      to_js("a=1; b=function(a,c) {return a + c}").must_equal("let a = 1; let b = (a, c) => a + c")
     ));
 
     if (RUBY_VERSION.split(".").map(item => parseInt(item)) < [2, 7, 0] ? -1 : RUBY_VERSION.split(".").map(item => (
       parseInt(item)
     )) > [2, 7, 0] ? 1 : 0 != -1) {
-      return it("should handle numbered parameters", () => (
-        to_js("lambda { _1 + _2 }").must_equal("function(_1, _2) {return _1 + _2}")
-      ))
+      return it(
+        "should handle numbered parameters",
+        () => to_js("lambda { _1 + _2 }").must_equal("(_1, _2) => _1 + _2")
+      )
     }
   });
 
   describe("object definition", () => {
     it(
       "should parse class",
-      () => to_js("class Person; end").must_equal("function Person() {}")
+      () => to_js("class Person; end").must_equal("class Person {}")
     );
 
     it("should parse include", () => (
-      to_js("class Employee; include Person; end").must_equal("function Employee() {}; (function() {for (var $_ in Person) {Employee.prototype[$_] = Person[$_]}})()")
+      to_js("class Employee; include Person; end").must_equal("class Employee {}; (() => {let $0 = Employee.prototype; return Object.defineProperties($0, Object.getOwnPropertyDescriptors(Person))})()")
     ));
 
     it("should parse class with attr_accessor", () => (
-      to_js("class Person; attr_accessor :a; end").must_equal("function Person() {}; Object.defineProperty(Person.prototype, \"a\", {enumerable: true, configurable: true, get: function() {return this._a}, set: function(a) {this._a = a}})")
+      to_js("class Person; attr_accessor :a; end").must_equal("class Person {get a() {return this._a}; set a(a) {this._a = a}}")
     ));
 
     it("should parse class with constructor", () => (
-      to_js("class Person; def initialize(name); @name = name; end; end").must_equal("function Person(name) {this._name = name}")
+      to_js("class Person; def initialize(name); @name = name; end; end").must_equal("class Person {constructor(name) {this._name = name}}")
     ));
 
     it("should parse a nested class with constructor", () => (
-      to_js("class A::Person; def initialize(name); @name = name; end; end").must_equal("A.Person = function(name) {this._name = name}")
+      to_js("class A::Person; def initialize(name); @name = name; end; end").must_equal("A.Person = class {constructor(name) {this._name = name}}")
     ));
 
     it("should parse class with constructor and method", () => (
-      to_js("class Person; def initialize(name); @name = name; end; def name; @name; end; end").must_equal("function Person(name) {this._name = name}; Object.defineProperty(Person.prototype, \"name\", {enumerable: true, configurable: true, get: function() {return this._name}})")
+      to_js("class Person; def initialize(name); @name = name; end; def name; @name; end; end").must_equal("class Person {constructor(name) {this._name = name}; get name() {return this._name}}")
     ));
 
     it("should parse class with constructor and two methods", () => (
-      to_js("class Person; def initialize(name); @name = name; end; def name; @name; end; def reset!; @name = nil; end; end").must_equal("function Person(name) {this._name = name}; Object.defineProperty(Person.prototype, \"name\", {enumerable: true, configurable: true, get: function() {return this._name}}); Person.prototype.reset = function() {this._name = null}")
+      to_js("class Person; def initialize(name); @name = name; end; def name; @name; end; def reset!; @name = nil; end; end").must_equal("class Person {constructor(name) {this._name = name}; get name() {return this._name}; reset() {this._name = null}}")
     ));
 
     it("should strip ? from predicate method names in prototype", () => (
-      to_js("class Person; def valid?; @name != nil; end; end").must_equal("function Person() {}; Person.prototype.valid = function() {this._name != null}")
+      to_js("class Person; def valid?; @name != nil; end; end").must_equal("class Person {valid() {this._name != null}}")
     ));
 
     it(
       "should parse class with constructor and methods with multiple arguments",
 
       () => (
-        to_js("class Person; def initialize(name, surname); @name, @surname = name, surname; end; def full_name; @name  + @surname; end; end").must_equal("function Person(name, surname) {this._name = name; this._surname = surname}; Object.defineProperty(Person.prototype, \"full_name\", {enumerable: true, configurable: true, get: function() {return this._name + this._surname}})")
+        to_js("class Person; def initialize(name, surname); @name, @surname = name, surname; end; def full_name; @name  + @surname; end; end").must_equal("class Person {constructor(name, surname) {[this._name, this._surname] = [name, surname]}; get full_name() {return this._name + this._surname}}")
       )
     );
 
     it("should collapse multiple methods in a class", () => (
-      to_js("class C; def a; end; def b; end; end").must_equal("function C() {}; Object.defineProperties(C.prototype, {a: {enumerable: true, configurable: true, get: function() {}}, b: {enumerable: true, configurable: true, get: function() {}}})")
+      to_js("class C; def a; end; def b; end; end").must_equal("class C {get a() {}; get b() {}}")
     ));
 
     it("should collapse getters and setters in a class", () => (
-      to_js("class C; def a; end; def a=(a); end; end").must_equal("function C() {}; Object.defineProperty(C.prototype, \"a\", {enumerable: true, configurable: true, get: function() {}, set: function(a) {}})")
+      to_js("class C; def a; end; def a=(a); end; end").must_equal("class C {get a() {}; set a(a) {}}")
     ));
 
     it("should collapse properties", () => (
-      to_js("class C; def self.a; end; def self.b; end; end").must_equal("function C() {}; Object.defineProperties(C, {a: {enumerable: true, configurable: true, get: function() {}}, b: {enumerable: true, configurable: true, get: function() {}}})")
+      to_js("class C; def self.a; end; def self.b; end; end").must_equal("class C {static get a() {}; static get b() {}}")
     ));
 
     it("should parse class with inheritance", () => (
-      to_js("class Employee < Person; end").must_equal("function Employee() {Person.call(this)}; Employee.prototype = Object.create(Person.prototype); Employee.prototype.constructor = Employee")
+      to_js("class Employee < Person; end").must_equal("class Employee extends Person {}")
     ));
 
     it("should handle super", () => {
-      to_js("class A; def initialize(x); end; end; class B < A; end").must_equal("function A(x) {}; function B(x) {A.call(this, x)}; B.prototype = Object.create(A.prototype); B.prototype.constructor = B");
-      to_js("class A; end; class B < A; def initialize(x); super; end; end").must_equal("function A() {}; function B(x) {A.call(this, x)}; B.prototype = Object.create(A.prototype); B.prototype.constructor = B");
-      to_js("class A; end; class B < A; def initialize(x); super(3); end; end").must_equal("function A() {}; function B(x) {A.call(this, 3)}; B.prototype = Object.create(A.prototype); B.prototype.constructor = B");
-      to_js("class A; end; class B < A; def foo(x); super; end; end").must_equal("function A() {}; function B() {A.call(this)}; B.prototype = Object.create(A.prototype); B.prototype.constructor = B; B.prototype.foo = function(x) {A.prototype.foo.call(this, x)}");
-      return to_js("class A; end; class B < A; def foo(x); super(3); end; end").must_equal("function A() {}; function B() {A.call(this)}; B.prototype = Object.create(A.prototype); B.prototype.constructor = B; B.prototype.foo = function(x) {A.prototype.foo.call(this, 3)}")
+      to_js("class A; def initialize(x); end; end; class B < A; end").must_equal("class A {constructor(x) {}}; class B extends A {}");
+      to_js("class A; end; class B < A; def initialize(x); super; end; end").must_equal("class A {}; class B extends A {constructor(x) {super(x)}}");
+      to_js("class A; end; class B < A; def initialize(x); super(3); end; end").must_equal("class A {}; class B extends A {constructor(x) {super(3)}}");
+      to_js("class A; end; class B < A; def foo(x); super; end; end").must_equal("class A {}; class B extends A {foo(x) {super.foo(x)}}");
+      return to_js("class A; end; class B < A; def foo(x); super(3); end; end").must_equal("class A {}; class B extends A {foo(x) {super.foo(3)}}")
     });
 
     it("should parse class with class variables", () => {
-      to_js("class Person; @@count=0; end").must_equal("function Person() {}; Person._count = 0");
-      return to_js("class Person; @@count={}; @@count[1]=1; end").must_equal("function Person() {}; Person._count = {}; Person._count[1] = 1")
+      to_js("class Person; @@count=0; end").must_equal("class Person {}; Person._count = 0");
+      return to_js("class Person; @@count={}; @@count[1]=1; end").must_equal("class Person {}; Person._count = {}; Person._count[1] = 1")
     });
 
     it(
       "should parse class with instance variables, properties and methods",
 
       () => {
-        to_js("class Person; @@count=0; def offset(x); return @@count+x; end; end").must_equal("function Person() {}; Person._count = 0; Person.prototype.offset = function(x) {return Person._count + x}");
-        to_js("class Person; @@count=0; def count; @@count; end; end").must_equal("function Person() {}; Person._count = 0; Object.defineProperty(Person.prototype, \"count\", {enumerable: true, configurable: true, get: function() {return Person._count}})");
-        to_js("class Person; @@count=0; def count(); return @@count; end; end").must_equal("function Person() {}; Person._count = 0; Person.prototype.count = function() {return Person._count}");
-        to_js("class Person; def initialize(name); @name = name; end; def name; @name; end; @@count=0; def count; return @@count; end; end").must_equal("function Person(name) {this._name = name}; Object.defineProperty(Person.prototype, \"name\", {enumerable: true, configurable: true, get: function() {return this._name}}); Person._count = 0; Object.defineProperty(Person.prototype, \"count\", {enumerable: true, configurable: true, get: function() {return Person._count}})");
-        return to_js("class Person; def initialize(name); @name = name; end; def name; @name; end; @@count=0; def count(); return @@count; end; end").must_equal("function Person(name) {this._name = name}; Object.defineProperty(Person.prototype, \"name\", {enumerable: true, configurable: true, get: function() {return this._name}}); Person._count = 0; Person.prototype.count = function() {return Person._count}")
+        to_js("class Person; @@count=0; def offset(x); return @@count+x; end; end").must_equal("class Person {offset(x) {return Person._count + x}}; Person._count = 0");
+        to_js("class Person; @@count=0; def count; @@count; end; end").must_equal("class Person {get count() {return Person._count}}; Person._count = 0");
+        to_js("class Person; @@count=0; def count(); return @@count; end; end").must_equal("class Person {count() {return Person._count}}; Person._count = 0");
+        to_js("class Person; def initialize(name); @name = name; end; def name; @name; end; @@count=0; def count; return @@count; end; end").must_equal("class Person {constructor(name) {this._name = name}; get name() {return this._name}; get count() {return Person._count}}; Person._count = 0");
+        return to_js("class Person; def initialize(name); @name = name; end; def name; @name; end; @@count=0; def count(); return @@count; end; end").must_equal("class Person {constructor(name) {this._name = name}; get name() {return this._name}; count() {return Person._count}}; Person._count = 0")
       }
     );
 
     it("should parse instance methods with class variables", () => (
-      to_js("class Person; def count; @@count; end; end").must_equal("function Person() {}; Object.defineProperty(Person.prototype, \"count\", {enumerable: true, configurable: true, get: function() {return Person._count}})")
+      to_js("class Person; def count; @@count; end; end").must_equal("class Person {get count() {return Person._count}}")
     ));
 
     it("should parse class methods with class variables", () => {
-      to_js("class Person; def self.count(); return @@count; end; end").must_equal("function Person() {}; Person.count = function() {return Person._count}");
-      to_js("class Person; def self.count; @@count; end; end").must_equal("function Person() {}; Object.defineProperty(Person, \"count\", {enumerable: true, configurable: true, get: function() {return Person._count}})");
-      return to_js("class Person; def self.count=(count); @@count=count; end; end").must_equal("function Person() {}; Object.defineProperty(Person, \"count\", {enumerable: true, configurable: true, set: function(count) {Person._count = count}})")
+      to_js("class Person; def self.count(); return @@count; end; end").must_equal("class Person {static count() {return Person._count}}");
+      to_js("class Person; def self.count; @@count; end; end").must_equal("class Person {static get count() {return Person._count}}");
+      return to_js("class Person; def self.count=(count); @@count=count; end; end").must_equal("class Person {static set count(count) {Person._count = count}}")
     });
 
     it("should parse constructor methods with class variables", () => (
-      to_js("class Person; def initialize; @@count+=1; end; end").must_equal("function Person() {Person._count++}")
+      to_js("class Person; def initialize; @@count+=1; end; end").must_equal("class Person {constructor() {Person._count++}}")
     ));
 
     it("should parse class with class constants", () => (
-      to_js("class Person; ID=7; end").must_equal("function Person() {}; Person.ID = 7")
+      to_js("class Person; ID=7; end").must_equal("class Person {}; Person.ID = 7")
     ));
 
     it("should parse class with class methods", () => (
-      to_js("class Person; def self.search(name); end; end").must_equal("function Person() {}; Person.search = function(name) {}")
+      to_js("class Person; def self.search(name); end; end").must_equal("class Person {static search(name) {}}")
     ));
 
     it("should parse class with alias", () => (
-      to_js("class Person; def f(name); end; alias :g :f; end").must_equal("function Person() {}; Person.prototype.f = function(name) {}; Person.prototype.g = Person.prototype.f")
+      to_js("class Person; def f(name); end; alias :g :f; end").must_equal("class Person {f(name) {}; }; Person.prototype.g = Person.prototype.f")
     ));
 
     it("should parse method def", () => {
@@ -788,13 +792,13 @@ describe(Ruby2JS, () => {
 
     it("should parse singleton method and property definitions", () => {
       to_js("def self.method(); end").must_equal("this.method = function() {}");
-      to_js("def self.prop; @prop; end").must_equal("Object.defineProperty(this, \"prop\", {enumerable: true, configurable: true, get: function() {return this._prop}})");
-      to_js("def self.prop=(prop); @prop=prop; end").must_equal("Object.defineProperty(this, \"prop\", {enumerable: true, configurable: true, set: function(prop) {this._prop = prop}})");
-      return to_js("def self.prop; @prop; end; def self.prop=(prop); @prop=prop; end").must_equal("Object.defineProperty(this, \"prop\", {enumerable: true, configurable: true, get: function() {return this._prop}, set: function(prop) {this._prop = prop}})")
+      to_js("def self.prop; @prop; end").must_equal("Object.defineProperty(this, \"prop\", {enumerable: true, configurable: true, get() {return this._prop}})");
+      to_js("def self.prop=(prop); @prop=prop; end").must_equal("Object.defineProperty(this, \"prop\", {enumerable: true, configurable: true, set(prop) {this._prop = prop}})");
+      return to_js("def self.prop; @prop; end; def self.prop=(prop); @prop=prop; end").must_equal("Object.defineProperty(this, \"prop\", {enumerable: true, configurable: true, get() {return this._prop}, set(prop) {this._prop = prop}})")
     });
 
     it("should parse nested classes", () => (
-      to_js("class A; class B; class C; end; end; end").must_equal("function A() {}; A.B = function() {}; A.B.C = function() {}")
+      to_js("class A; class B; class C; end; end; end").must_equal("class A {}; A.B = class {}; A.B.C = class {}")
     ));
 
     it("should convert self to this", () => (
@@ -802,32 +806,32 @@ describe(Ruby2JS, () => {
     ));
 
     it("should prefix intra-method calls with 'this.'", () => (
-      to_js("class C; def m1; end; def m2; m1; end; end").must_equal("function C() {}; Object.defineProperties(C.prototype, {m1: {enumerable: true, configurable: true, get: function() {}}, m2: {enumerable: true, configurable: true, get: function() {return this.m1}}})")
+      to_js("class C; def m1; end; def m2; m1; end; end").must_equal("class C {get m1() {}; get m2() {return this.m1}}")
     ));
 
     it("should prefix property assignments with this.", () => (
-      to_js("class C; def a=(x); @a=x; end; def b(); a+=1; end; end").must_equal("function C() {}; Object.defineProperty(C.prototype, \"a\", {enumerable: true, configurable: true, set: function(x) {this._a = x}}); C.prototype.b = function() {a++}")
+      to_js("class C; def a=(x); @a=x; end; def b(); a+=1; end; end").must_equal("class C {set a(x) {this._a = x}; b() {this.a++}}")
     ));
 
     it("should prefix bind references to methods as properties", () => (
-      to_js("class C; def m1(); end; def m2; m1; end; end").must_equal("function C() {}; C.prototype.m1 = function() {}; Object.defineProperty(C.prototype, \"m2\", {enumerable: true, configurable: true, get: function() {return this.m1.bind(this)}})")
+      to_js("class C; def m1(); end; def m2; m1; end; end").must_equal("class C {m1() {}; get m2() {return this.m1.bind(this)}}")
     ));
 
     it(
       "should prefix class constants referenced in methods by class name",
 
       () => (
-        to_js("class C; X = 1; def m; X; end; end").must_equal("function C() {}; C.X = 1; Object.defineProperty(C.prototype, \"m\", {enumerable: true, configurable: true, get: function() {return C.X}})")
+        to_js("class C; X = 1; def m; X; end; end").must_equal("class C {get m() {return C.X}}; C.X = 1")
       )
     );
 
     it("should insert var self = this when needed", () => {
-      to_js("class C; def m; list.each do; @ivar; end; end; end").must_equal("function C() {}; Object.defineProperty(C.prototype, \"m\", {enumerable: true, configurable: true, get: function() {var self = this; return list.each(function() {self._ivar})}})");
-      to_js("class C; def m(); list.each do; @ivar; @ivar; end; end; end").must_equal("function C() {}; C.prototype.m = function() {var self = this; list.each(function() {self._ivar; self._ivar})}");
-      to_js("class C < S; def m; list.each do; @ivar; end; end; end").must_equal("function C() {S.call(this)}; C.prototype = Object.create(S.prototype); C.prototype.constructor = C; Object.defineProperty(C.prototype, \"m\", {enumerable: true, configurable: true, get: function() {var self = this; return list.each(function() {self._ivar})}})");
-      to_js("class C < S; def m(); list.each do; @ivar; @ivar; end; end; end").must_equal("function C() {S.call(this)}; C.prototype = Object.create(S.prototype); C.prototype.constructor = C; C.prototype.m = function() {var self = this; list.each(function() {self._ivar; self._ivar})}");
-      to_js("class C < S; def m(); list.each do; {n: @ivar}; end; end; end").must_equal("function C() {S.call(this)}; C.prototype = Object.create(S.prototype); C.prototype.constructor = C; C.prototype.m = function() {var self = this; list.each(function() {{n: self._ivar}})}");
-      return to_js("class C; def self.a(); window.addEventListener :unload do; self.b(); end; end; end").must_equal("function C() {}; C.a = function() {var self = this; window.addEventListener(\"unload\", function() {self.b()})}")
+      to_js("class C; def m; list.each do; @ivar; end; end; end").must_equal("class C {get m() {return list.each(() => this._ivar)}}");
+      to_js("class C; def m(); list.each do; @ivar; @ivar; end; end; end").must_equal("class C {m() {list.each(() => {this._ivar; this._ivar})}}");
+      to_js("class C < S; def m; list.each do; @ivar; end; end; end").must_equal("class C extends S {get m() {return list.each(() => this._ivar)}}");
+      to_js("class C < S; def m(); list.each do; @ivar; @ivar; end; end; end").must_equal("class C extends S {m() {list.each(() => {this._ivar; this._ivar})}}");
+      to_js("class C < S; def m(); list.each do; {n: @ivar}; end; end; end").must_equal("class C extends S {m() {list.each(() => ({n: this._ivar}))}}");
+      return to_js("class C; def self.a(); window.addEventListener :unload do; self.b(); end; end; end").must_equal("class C {static a() {window.addEventListener(\"unload\", () => this.b())}}")
     });
 
     it("should handle methods with multiple statements", () => (
@@ -835,7 +839,7 @@ describe(Ruby2JS, () => {
     ));
 
     it("should handle methods with optional arguments", () => (
-      to_js("def method(opt=1); return opt; end").must_equal("function method(opt) {if (typeof opt === 'undefined') opt = 1; return opt}")
+      to_js("def method(opt=1); return opt; end").must_equal("function method(opt=1) {return opt}")
     ));
 
     it("should handle methods with block arguments", () => (
@@ -850,7 +854,7 @@ describe(Ruby2JS, () => {
 
   describe("class extensions", () => {
     it("should handle constructors", () => (
-      to_js("++class F; def initialize() {}; end; end").must_equal("(function() {var $_ = F.prototype; (F = function F() {{}}).prototype = $_})()")
+      to_js("++class F; def initialize() {}; end; end").must_equal("[(F = function F() {{}}).prototype] = [F.prototype]")
     ));
 
     it("should handle methods", () => (
@@ -858,17 +862,17 @@ describe(Ruby2JS, () => {
     ));
 
     return it("should handle properties", () => (
-      to_js("++class F; def p; 1; end; end").must_equal("Object.defineProperty(F.prototype, \"p\", {enumerable: true, configurable: true, get: function() {return 1}})")
+      to_js("++class F; def p; 1; end; end").must_equal("Object.defineProperty(F.prototype, \"p\", {enumerable: true, configurable: true, get() {return 1}})")
     ))
   });
 
   describe("anonymous classes", () => {
     it("should handle anonymous classes without inheritance", () => (
-      to_js("x = Class.new do def f(); return 1; end; end").must_equal("var x = function() {function $$() {}; $$.prototype.f = function() {return 1}; return $$}()")
+      to_js("x = Class.new do def f(); return 1; end; end").must_equal("let x = class {f() {return 1}}")
     ));
 
     return it("should handle anonymous classes with inheritance", () => (
-      to_js("x = Class.new(D) do def f(); return 1; end; end").must_equal("var x = function() {function $$() {D.call(this)}; $$.prototype = Object.create(D.prototype); $$.prototype.constructor = $$; $$.prototype.f = function() {return 1}; return $$}()")
+      to_js("x = Class.new(D) do def f(); return 1; end; end").must_equal("let x = class extends D {f() {return 1}}")
     ))
   });
 
@@ -879,19 +883,19 @@ describe(Ruby2JS, () => {
     );
 
     it("should handle module definitions", () => {
-      to_js("module A; B=1; end").must_equal("A = function() {var B = 1; return {B: B}}()");
-      to_js("module A; def b; return 1; end; end").must_equal("var A = {}; Object.defineProperty(A.prototype, \"b\", {enumerable: true, configurable: true, get: function() {return 1}})");
-      to_js("module A; def b(); return 1; end; end").must_equal("var A = {b: function() {return 1}}");
-      return to_js("module A; class B; def initialize; @c=1; end; end; end").must_equal("A = function() {function B() {this._c = 1}; return {B: B}}()")
+      to_js("module A; B=1; end").must_equal("A = (() => {const B = 1; return {B}})()");
+      to_js("module A; def b; return 1; end; end").must_equal("const A = {get b() {return 1}}");
+      to_js("module A; def b(); return 1; end; end").must_equal("const A = {b() {return 1}}");
+      return to_js("module A; class B; def initialize; @c=1; end; end; end").must_equal("const A = {B: class {constructor() {this._c = 1}}}")
     });
 
     it("should handle private sections", () => (
-      to_js("module A; B=1; private; C=1; end").must_equal("A = function() {var B = 1; var C = 1; return {B: B}}()")
+      to_js("module A; B=1; private; C=1; end").must_equal("A = (() => {const B = 1; const C = 1; return {B}})()")
     ));
 
     return it("should handle nested modules", () => {
-      to_js("module M; module N; def f(); end; end; end").must_equal("var M = {N: {f: function() {}}}");
-      return to_js("module M; module N; end; module N::O; end; end").must_equal("var M = {N: {}}; M.N.O = {}")
+      to_js("module M; module N; def f(); end; end; end").must_equal("const M = {N: {f() {}}}");
+      return to_js("module M; module N; end; module N::O; end; end").must_equal("const M = {N: {}}; M.N.O = {}")
     })
   });
 
@@ -903,8 +907,8 @@ describe(Ruby2JS, () => {
       to_js("Date.new().toString()").must_equal("new Date().toString()");
       to_js("new Date()").must_equal("new Date()");
       to_js("new Date").must_equal("new Date");
-      to_js("new Promise do; y(); end").must_equal("new Promise(function() {y()})");
-      to_js("new Promise() do; y(); end").must_equal("new Promise(function() {y()})");
+      to_js("new Promise do; y(); end").must_equal("new Promise(() => y())");
+      to_js("new Promise() do; y(); end").must_equal("new Promise(() => y())");
       return to_js("new xeogl.Model()").must_equal("new xeogl.Model()")
     })
   ));
@@ -934,9 +938,9 @@ describe(Ruby2JS, () => {
       to_js("a.is_a? b").must_equal("(a instanceof b)");
       to_js("a.kind_of? b").must_equal("(a instanceof b)");
       to_js("a.instance_of? b").must_equal("(a.constructor == b)");
-      to_js("x unless a.is_a? b").must_equal("if (!(a instanceof b)) var x");
-      to_js("x unless a.kind_of? b").must_equal("if (!(a instanceof b)) var x");
-      return to_js("x unless a.instance_of? b").must_equal("if (!(a.constructor == b)) var x")
+      to_js("x unless a.is_a? b").must_equal("if (!(a instanceof b)) let x");
+      to_js("x unless a.kind_of? b").must_equal("if (!(a instanceof b)) let x");
+      return to_js("x unless a.instance_of? b").must_equal("if (!(a.constructor == b)) let x")
     });
 
     return it(
@@ -953,12 +957,12 @@ describe(Ruby2JS, () => {
   describe("attribute access", () => {
     it(
       "should support attribute reference",
-      () => to_js("x=a.b").must_equal("var x = a.b")
+      () => to_js("x=a.b").must_equal("let x = a.b")
     );
 
     it(
       "should support attribute assignments",
-      () => to_js("x={}; x.a=\"y\"").must_equal("var x = {}; x.a = \"y\"")
+      () => to_js("x={}; x.a=\"y\"").must_equal("let x = {}; x.a = \"y\"")
     );
 
     if (RUBY_VERSION.split(".").map(item => parseInt(item)) < [2, 3, 0] ? -1 : RUBY_VERSION.split(".").map(item => (
@@ -966,17 +970,17 @@ describe(Ruby2JS, () => {
     )) > [2, 3, 0] ? 1 : 0 != -1) {
       it(
         "should support conditional attribute references",
-        () => to_js("x=a&.b").must_equal("var x = a && a.b")
+        () => to_js("x=a&.b").must_equal("let x = a?.b")
       );
 
       it(
         "should chain conditional attribute references",
-        () => to_js("x=a&.b&.c").must_equal("var x = a && a.b && a.b.c")
+        () => to_js("x=a&.b&.c").must_equal("let x = a?.b?.c")
       );
 
       it(
         "should handle method args with conditional chaining",
-        () => to_js("x=a&.b(c, d)").must_equal("var x = a && a.b(c, d)")
+        () => to_js("x=a&.b(c, d)").must_equal("let x = a?.b(c, d)")
       )
     };
 
@@ -985,12 +989,12 @@ describe(Ruby2JS, () => {
     )) > [3, 0, 0] ? 1 : 0 != -1) {
       it(
         "should support => operator with simple left hand sides",
-        () => to_js("0 => x").must_equal("var x = 0")
+        () => to_js("0 => x").must_equal("let x = 0")
       );
 
       return it(
         "should support => operator with simple destructuring",
-        () => to_js("hash => {a:, b:}").must_equal("var a = hash.a; var b = hash.b")
+        () => to_js("hash => {a:, b:}").must_equal("let { a, b } = hash")
       )
     }
   });
@@ -998,7 +1002,7 @@ describe(Ruby2JS, () => {
   describe("whitespace", () => {
     it(
       "should handle newlines",
-      () => to_js("a = 1\na = 2").must_equal("var a = 1;\na = 2")
+      () => to_js("a = 1\na = 2").must_equal("let a = 1;\na = 2")
     );
 
     it(
@@ -1015,9 +1019,10 @@ describe(Ruby2JS, () => {
       to_js("case 1\nwhen 1\na()\nelse\nb()\nend").must_equal("switch (1) {\ncase 1:\n  a();\n  break;\n\ndefault:\n  b()\n}")
     ));
 
-    it("should handle function declarations", () => (
-      to_js("Proc.new {return null}\n").must_equal("function() {\n  return null\n}")
-    ));
+    it(
+      "should handle function declarations",
+      () => to_js("Proc.new {return null}\n").must_equal("() => null")
+    );
 
     it("should add a blank line before blocks", () => (
       to_js("x()\nif true; a(); b(); end").must_equal("x();\n\nif (true) {\n  a();\n  b()\n}")
@@ -1070,7 +1075,7 @@ describe(Ruby2JS, () => {
 
     it(
       "should handle regular expressions with interpolation",
-      () => to_js("/a\#{b}c/i").must_equal("new RegExp(\"a\" + b + \"c\", \"i\")")
+      () => to_js("/a\#{b}c/i").must_equal("new RegExp(`a${b}c`, \"i\")")
     );
 
     it(
@@ -1125,34 +1130,34 @@ describe(Ruby2JS, () => {
     ));
 
     it("should handle catching any exception", () => (
-      to_js("begin a; rescue => e; b; end").must_equal("try {var a} catch (e) {var b}")
+      to_js("begin a; rescue => e; b; end").must_equal("try {let a} catch (e) {let b}")
     ));
 
     it("catching exceptions without a variable", () => (
-      to_js("begin a; rescue; p $!; end").must_equal("try {var a} catch ($EXCEPTION) {p($EXCEPTION)}")
+      to_js("begin a; rescue; p $!; end").must_equal("try {let a} catch ($EXCEPTION) {p($EXCEPTION)}")
     ));
 
     it("should handle catching a specific exception", () => (
-      to_js("begin a; rescue StandardError => e; b; end").must_equal("try {var a} catch (e) {if (e instanceof StandardError) {var b} else {throw e}}")
+      to_js("begin a; rescue StandardError => e; b; end").must_equal("try {let a} catch (e) {if (e instanceof StandardError) {let b} else {throw e}}")
     ));
 
     it("should handle catching a String", () => (
-      to_js("begin a; rescue String => e; b; end").must_equal("try {var a} catch (e) {if (typeof e == \"string\") {var b} else {throw e}}")
+      to_js("begin a; rescue String => e; b; end").must_equal("try {let a} catch (e) {if (typeof e == \"string\") {let b} else {throw e}}")
     ));
 
     it("catching exceptions with a type but without a variable", () => (
-      to_js("begin a; rescue Foo; end").must_equal("try {var a} catch ($EXCEPTION) {if ($EXCEPTION instanceof Foo) {} else {throw $EXCEPTION}}")
+      to_js("begin a; rescue Foo; end").must_equal("try {let a} catch ($EXCEPTION) {if ($EXCEPTION instanceof Foo) {} else {throw $EXCEPTION}}")
     ));
 
     it("should handle an ensure clause", () => (
-      to_js("begin a; ensure b; end").must_equal("try {var a} finally {var b}")
+      to_js("begin a; ensure b; end").must_equal("try {let a} finally {let b}")
     ));
 
     it(
       "should handle catching an exception and an ensure clause",
 
       () => (
-        to_js("begin a; rescue => e; b; ensure; c; end").must_equal("try {var a} catch (e) {var b} finally {var c}")
+        to_js("begin a; rescue => e; b; ensure; c; end").must_equal("try {let a} catch (e) {let b} finally {let c}")
       )
     );
 
@@ -1160,7 +1165,7 @@ describe(Ruby2JS, () => {
       "should handle multiple rescue clauses with different variables",
 
       () => (
-        to_js("begin; a; rescue FooError => foo; b(foo); rescue BarError => bar; c(bar); end").must_equal("try {var a} catch (foo) {if (foo instanceof FooError) {b(foo)} else if (foo instanceof BarError) {var bar = foo; c(bar)} else {throw foo}}")
+        to_js("begin; a; rescue FooError => foo; b(foo); rescue BarError => bar; c(bar); end").must_equal("try {let a} catch (foo) {if (foo instanceof FooError) {b(foo)} else if (foo instanceof BarError) {var bar = foo; c(bar)} else {throw foo}}")
       )
     );
 
@@ -1168,7 +1173,7 @@ describe(Ruby2JS, () => {
       "should handle multiple rescue clauses with mixed variable usage",
 
       () => (
-        to_js("begin; a; rescue FooError => e; b(e); rescue BarError; c; end").must_equal("try {var a} catch (e) {if (e instanceof FooError) {b(e)} else if (e instanceof BarError) {var c} else {throw e}}")
+        to_js("begin; a; rescue FooError => e; b(e); rescue BarError; c; end").must_equal("try {let a} catch (e) {if (e instanceof FooError) {b(e)} else if (e instanceof BarError) {let c} else {throw e}}")
       )
     );
 
@@ -1185,44 +1190,44 @@ describe(Ruby2JS, () => {
     ));
 
     it("should handle retry in rescue block", () => (
-      to_js("begin; a; rescue; retry; end").must_equal("while (true) {try {var a; break} catch ($EXCEPTION) {continue}}")
+      to_js("begin; a; rescue; retry; end").must_equal("while (true) {try {let a; break} catch {continue}}")
     ));
 
     it("should handle retry with exception type", () => (
-      to_js("begin; a; rescue StandardError; retry; end").must_equal("while (true) {try {var a; break} catch ($EXCEPTION) {if ($EXCEPTION instanceof StandardError) {continue} else {throw $EXCEPTION}}}")
+      to_js("begin; a; rescue StandardError; retry; end").must_equal("while (true) {try {let a; break} catch ($EXCEPTION) {if ($EXCEPTION instanceof StandardError) {continue} else {throw $EXCEPTION}}}")
     ));
 
     it(
       "should handle neither a rescue nor an ensure being present",
-      () => to_js("begin a; b; end").must_equal("{var a; var b}")
+      () => to_js("begin a; b; end").must_equal("{let a; let b}")
     );
 
     it("should handle else clause in begin/rescue", () => (
-      to_js("begin; a; rescue => e; b; else; c; end").must_equal("var $no_exception = false; try {var a; $no_exception = true} catch (e) {var b}; if ($no_exception) {var c}")
+      to_js("begin; a; rescue => e; b; else; c; end").must_equal("let $no_exception = false; try {let a; $no_exception = true} catch (e) {let b}; if ($no_exception) {let c}")
     ));
 
     it("should handle else clause with ensure", () => (
-      to_js("begin; a; rescue; b; else; c; ensure; d; end").must_equal("var $no_exception = false; try {var a; $no_exception = true} catch ($EXCEPTION) {var b} finally {var d}; if ($no_exception) {var c}")
+      to_js("begin; a; rescue; b; else; c; ensure; d; end").must_equal("let $no_exception = false; try {let a; $no_exception = true} catch {let b} finally {let d}; if ($no_exception) {let c}")
     ));
 
     it(
       "should hoist variables declared in try that are used in finally",
 
       () => (
-        to_js("begin; x = 1; rescue; y; ensure; z(x); end", {eslevel: 2_015}).must_equal("{let x; try {x = 1} catch ($EXCEPTION) {let y} finally {z(x)}}")
+        to_js("begin; x = 1; rescue; y; ensure; z(x); end", {eslevel: 2_020}).must_equal("{let x; try {x = 1} catch {let y} finally {z(x)}}")
       )
     );
 
     it("should not hoist variables already declared", () => (
-      to_js("x = 0; begin; x = 1; ensure; z(x); end", {eslevel: 2_015}).must_equal("let x = 0; try {x = 1} finally {z(x)}")
+      to_js("x = 0; begin; x = 1; ensure; z(x); end", {eslevel: 2_020}).must_equal("let x = 0; try {x = 1} finally {z(x)}")
     ));
 
     it("should not hoist variables not used in finally", () => (
-      to_js("begin; x = 1; ensure; z(); end", {eslevel: 2_015}).must_equal("try {let x = 1} finally {z()}")
+      to_js("begin; x = 1; ensure; z(); end", {eslevel: 2_020}).must_equal("try {let x = 1} finally {z()}")
     ));
 
     return it("should handle begin as an expression", () => (
-      to_js("z = begin; x = 1; x; end").must_equal("var z = function() {var x = 1; return x}()")
+      to_js("z = begin; x = 1; x; end").must_equal("let z = (() => {let x = 1; return x})()")
     ))
   });
 
@@ -1253,15 +1258,132 @@ describe(Ruby2JS, () => {
     });
 
     return it("should not replace ivars in class definitions", () => (
-      to_js("class F; def f; @x; end; end", {ivars: {"@x": 1}}).must_equal("function F() {}; Object.defineProperty(F.prototype, \"f\", {enumerable: true, configurable: true, get: function() {return this._x}})")
+      to_js("class F; def f; @x; end; end", {ivars: {"@y": 1}}).must_equal("class F {get f() {return this._x}}")
     ))
   });
 
-  return describe("global scope", () => (
+  describe("global scope", () => (
     it(
       "should handle top level constants",
       () => to_js("::A").must_equal("Function(\"return this\")().A")
     )
+  ));
+
+  describe("method_missing", () => {
+    it("should handle method_missing with args", () => (
+      to_js("class A; def method_missing(method, *args); end; end").must_equal("class A$ {method_missing(method, ...args) {}}; function A(...args) {return new Proxy(new A$(...args), {get(obj, prop) {if (prop in obj) {return obj[prop]} else {return (...args) => (obj.method_missing(prop, ...args))}}})}")
+    ));
+
+    return it("should handle method_missing with no args", () => (
+      to_js("class A; def method_missing(method); end; end").must_equal("class A$ {method_missing(method) {}}; function A(...args) {return new Proxy(new A$(...args), {get(obj, prop) {if (prop in obj) {return obj[prop]} else {return obj.method_missing(prop)}}})}")
+    ))
+  });
+
+  describe("async/await", () => {
+    it(
+      "should handle async named functions",
+      () => to_js("async def f(x); end").must_equal("async function f(x) {}")
+    );
+
+    it("should handle async named methods in classes", () => (
+      to_js("class F; async def m(x); end; end").must_include("class F {async m(x) {}}")
+    ));
+
+    it("should handle async class methods", () => (
+      to_js("class F; async def self.m(x); end; end").must_equal("class F {static async m(x) {}}")
+    ));
+
+    it("should handle async instance methods", () => (
+      to_js("async def o.m(x); end").must_include("o.m = async function(x) {}")
+    ));
+
+    it("should handle async lambda functions", () => {
+      to_js("async lambda {|x| x}").must_equal("async x => x");
+      return to_js("async lambda {|x| x}[]").must_equal("(async x => x)()")
+    });
+
+    it("should handle async procs", () => {
+      to_js("async proc {|x| x}").must_equal("async x => x");
+      return to_js("async proc {|x| x}[]").must_equal("(async x => x)()")
+    });
+
+    it("should handle async blocks", () => {
+      to_js("it \"works\", async do end").must_equal("it(\"works\", async () => {})");
+      return to_js("async {x=1}[]").must_equal("(async () => {let x = 1})()")
+    });
+
+    it("should handle async arrow functions", () => {
+      to_js("async -> (x) {x}").must_equal("async x => x");
+      return to_js("async -> () {x}[]").must_equal("(async () => x)()")
+    });
+
+    it("should auto bind async methods referenced as properties", () => (
+      to_js("class C; async def m1(x); end; def m2; m1; end; end").must_equal("class C {async m1(x) {}; get m2() {return this.m1.bind(this)}}")
+    ));
+
+    it(
+      "should handle await with simple method calls",
+      () => to_js("await f(x)").must_equal("await f(x)")
+    );
+
+    it(
+      "should handle await with nested method calls",
+      () => to_js("await o.f(x)").must_equal("await o.f(x)")
+    );
+
+    return it("should handle await with blocks", () => {
+      to_js("await f(x) {|y| y}").must_equal("await f(x, y => y)");
+      return to_js("await f(x) do |y| y; end").must_equal("await f(x, y => y)")
+    })
+  });
+
+  describe("keyword arguments", () => {
+    it("should handle keyword arguments in methods", () => (
+      to_js("def a(q, a:, b: 2); end").must_equal("function a(q, { a, b=2 }) {}")
+    ));
+
+    it("should handle all optional keyword arguments in methods", () => (
+      to_js("def a(q, a: 1, b: 2); end").must_equal("function a(q, { a=1, b=2 } = {}) {}")
+    ));
+
+    it(
+      "should handle keyword arguments defaulting to undefined in methods",
+
+      () => (
+        to_js("def a(q, a: undefined, b: 2); end").must_equal("function a(q, { a, b=2 } = {}) {}")
+      )
+    );
+
+    it(
+      "should handle keyword arguments in blocks",
+      () => to_js("proc {|q, a:, b: 2|}").must_equal("(q, { a, b=2 }) => {}")
+    );
+
+    it("should handle all optional keyword arguments in blocks", () => (
+      to_js("proc {|q, a: 1, b: 2|}").must_equal("(q, { a=1, b=2 } = {}) => {}")
+    ));
+
+    it(
+      "should handle rest arguments with keyword arguments in methods",
+
+      () => (
+        to_js("def a(q, a:, b: 2, **r); end").must_equal("function a(q, { a, b=2, ...r }) {}")
+      )
+    );
+
+    return it(
+      "should handle rest arguments with keyword arguments in blocks",
+
+      () => (
+        to_js("proc {|q, a:, b: 2, **r|}").must_equal("(q, { a, b=2, ...r }) => {}")
+      )
+    )
+  });
+
+  return describe("module extensions", () => (
+    it("should handle methods", () => (
+      to_js("++module M; def m(); end; end").must_equal("Object.assign(M, {m() {}})")
+    ))
   ))
 })
 // Run tests and report results

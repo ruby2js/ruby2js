@@ -16,6 +16,30 @@ module Ruby2JS
         body = s(:autoreturn, body)
       end
 
+      # Handle blockarg after restarg: def f(*args, &block)
+      # JS doesn't allow params after rest, so we pop block from args at runtime
+      block_arg_after_rest = nil
+      if args
+        has_restarg = args.children.any? { |a| a.type == :restarg }
+        last_arg = args.children.last
+        if has_restarg && last_arg&.type == :blockarg
+          block_arg_after_rest = last_arg.children.first
+          # Get the restarg name for the pop
+          restarg = args.children.find { |a| a.type == :restarg }
+          restarg_name = restarg.children.first || 'args'
+          # Remove blockarg from args
+          args = s(:args, *args.children[0..-2])
+          # Prepend: let block = restarg.pop()
+          pop_stmt = s(:lvasgn, block_arg_after_rest,
+            s(:send, s(:lvar, restarg_name), :pop))
+          if body.type == :begin
+            body = s(:begin, pop_stmt, *body.children)
+          else
+            body = s(:begin, pop_stmt, body)
+          end
+        end
+      end
+
       add_implicit_block = false
 
       walk = ->(node) do

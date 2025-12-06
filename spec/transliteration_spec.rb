@@ -204,8 +204,9 @@ describe Ruby2JS do
     end
 
     it "should receive splat and block" do
+      # Block is popped from args at runtime since JS requires rest param to be last
       to_js( "def f(a,*args, &block); end" ).
-        must_equal "function f(a, ...args, block) {}"
+        must_equal "function f(a, ...args) {let block = args.pop()}"
     end
 
     it "should handle splats in array literals" do

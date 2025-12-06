@@ -8,10 +8,11 @@ module Ruby2JS
 
     handle :args do |*args|
       kwargs = []
-      while args.last and 
+      while args.last and
         [:kwarg, :kwoptarg, :kwrestarg].include? args.last.type
         kwargs.unshift args.pop
       end
+
 
       if kwargs.length == 1 and kwargs.last.type == :kwrestarg
         args.push s(:arg, *kwargs.last.children)

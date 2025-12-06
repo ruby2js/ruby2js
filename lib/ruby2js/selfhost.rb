@@ -551,8 +551,8 @@ module Ruby2JS
         const walker = new PrismWalker(rubyCode);
         const ast = walker.visit(result.value);
         const converter = new Converter(ast, new Map());
-        // Default to ES5 (no let/const) to match Ruby transliteration_spec defaults
-        converter.eslevel = opts.eslevel || 5;
+        // Default to ES2020 to match Ruby2JS minimum eslevel
+        converter.eslevel = opts.eslevel || 2020;
         converter.convert();
         return converter.to_s();
       }
