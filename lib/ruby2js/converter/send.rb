@@ -452,6 +452,25 @@ module Ruby2JS
       end
     end
 
+    # ccall = conditional call (safe navigation function invocation)
+    # Ruby: foo&.call(x) -> JS: foo?.(x)
+    handle :ccall do |receiver, method, *args|
+      if es2020
+        parse receiver
+        put '?.('
+        parse_all(*args, join: ', ')
+        put ')'
+      else
+        # Fallback for pre-ES2020: receiver && receiver(args)
+        parse receiver
+        put ' && '
+        parse receiver
+        put '('
+        parse_all(*args, join: ', ')
+        put ')'
+      end
+    end
+
     handle :splat do |expr|
        put '...'
        parse expr

@@ -65,6 +65,9 @@ module Ruby2JS
         result = on_send(node)
         if result&.type == :send and node.type == :csend
           result = result.updated(:csend)
+        elsif result&.type == :call and node.type == :csend
+          # Handle &.call -> ccall (conditional call) for optional chaining
+          result = result.updated(:ccall)
         end
         result
       end
