@@ -216,7 +216,14 @@ module Ruby2JS
           end
 
         elsif method == :to_s
-          process S(:call, target, :toString, *args)
+          if @options[:nullish_to_s] && es2020 && args.empty?
+            # (x ?? '').toString() - nil-safe conversion matching Ruby's nil.to_s => ""
+            process S(:call,
+              s(:begin, s(:nullish, target, s(:str, ''))),
+              :toString)
+          else
+            process S(:call, target, :toString, *args)
+          end
 
         elsif method == :Array and target == nil
           if es2015
@@ -224,6 +231,16 @@ module Ruby2JS
           else
             process S(:send, s(:attr, s(:attr, s(:const, nil, :Array),
               :prototype), :slice), :call, *args)
+          end
+
+        elsif method == :String and target == nil and args.length == 1
+          if @options[:nullish_to_s] && es2020
+            # String(x ?? '') - nil-safe conversion matching Ruby's String(nil) => ""
+            # Wrap the argument in nullish coalescing, then let the converter handle it
+            node.updated(nil, [nil, :String,
+              s(:begin, s(:nullish, process(args.first), s(:str, '')))])
+          else
+            super
           end
 
         elsif method == :to_i

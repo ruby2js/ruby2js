@@ -278,9 +278,38 @@ use case is when the script is a view template.  See also [scope](#scope).
 puts Ruby2JS.convert("X = @x", ivars: {:@x => 1})
 ```
 
+## Nullish To S
+
+Ruby's `nil.to_s` returns an empty string, but JavaScript's `null.toString()` throws an error,
+and `String(null)` returns `"null"`. Similarly, string interpolation in Ruby like `"#{nil}"` produces `""`,
+but JavaScript's `` `${null}` `` produces `"null"`.
+
+The `nullish_to_s` option wraps these operations with the nullish coalescing operator (`??`) to match
+Ruby's behavior. This requires ES2020 or later.
+
+```ruby
+# Configuration
+
+nullish_to_s
+```
+
+```ruby
+# to_s becomes nil-safe
+puts Ruby2JS.convert("x.to_s", nullish_to_s: true, eslevel: 2020)
+# => (x ?? "").toString()
+
+# String() becomes nil-safe
+puts Ruby2JS.convert("String(x)", nullish_to_s: true, eslevel: 2020, filters: [:functions])
+# => String(x ?? "")
+
+# Interpolation becomes nil-safe
+puts Ruby2JS.convert('"hello #{x}"', nullish_to_s: true, eslevel: 2020)
+# => `hello ${x ?? ""}`
+```
+
 ## Or
 
-Introduced in ES2020, the 
+Introduced in ES2020, the
 [Nullish Coalescing](https://github.com/tc39/proposal-nullish-coalescing#nullish-coalescing-for-javascript)
 operator provides an alternative implementation of the *or* operator.  Select
 which version of the operator you want using the `or` option.  Permissible
@@ -375,6 +404,7 @@ An example of all of the supported options:
   "include_all": true,
   "include_only": ["max"],
   "import_from_skypack": true,
+  "nullish_to_s": true,
   "or": "nullish",
   "require_recurse": true,
   "preset": true,

@@ -518,6 +518,7 @@ module Ruby2JS
     ruby2js.strict = options[:strict]
     ruby2js.comparison = options[:comparison] || :equality
     ruby2js.or = options[:or] || :logical
+    ruby2js.nullish_to_s = options[:nullish_to_s] || false
     ruby2js.module_type = options[:module] || :esm
     ruby2js.underscored_private = (options[:eslevel] < 2022) || options[:underscored_private]
 

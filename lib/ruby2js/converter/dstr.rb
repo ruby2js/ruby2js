@@ -35,7 +35,12 @@ module Ruby2JS
             end
           elsif child != s(:begin)
             put '${'
-            parse child
+            if @nullish_to_s && es2020
+              # ${x ?? ''} - nil-safe interpolation matching Ruby's "#{nil}" => ""
+              parse s(:nullish, child, s(:str, ''))
+            else
+              parse child
+            end
             put '}'
           end
         end

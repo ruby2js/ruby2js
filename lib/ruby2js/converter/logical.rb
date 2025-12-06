@@ -72,6 +72,24 @@ module Ruby2JS
       put '(' if rgroup; parse right; put ')' if rgroup
     end
 
+    # (nullish
+    #   (...)
+    #   (...))
+    #
+    # Explicit nullish coalescing (??) - used by nullish_to_s option
+    # to wrap expressions that need nil-safe string coercion.
+    # Unlike :or with @or == :nullish, this always emits ?? regardless of
+    # the global @or setting.
+
+    handle :nullish do |left, right|
+      lgroup = LOGICAL.include?(left.type) || left.type == :begin
+      rgroup = LOGICAL.include?(right.type) || right.type == :begin
+
+      put '(' if lgroup; parse left; put ')' if lgroup
+      put ' ?? '
+      put '(' if rgroup; parse right; put ')' if rgroup
+    end
+
     # (not
     #   (...))
 

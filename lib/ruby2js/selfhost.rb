@@ -434,6 +434,8 @@ module Ruby2JS
         converter_js = Ruby2JS.convert(
           combined_code,
           eslevel: 2022,
+          or: :nullish,
+          nullish_to_s: true,
           filters: FILTERS
         ).to_s
 
