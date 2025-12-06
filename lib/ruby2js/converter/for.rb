@@ -20,7 +20,7 @@ module Ruby2JS
       begin
         vars = @vars.dup
         next_token, @next_token = @next_token, :continue
-        put "for (#{es2015 ? 'let' : 'var'} "; parse var
+        put "for (let "; parse var
         if expression and [:irange, :erange].include? expression.type
           put ' = '; parse expression.children.first; put '; '; parse var
           (expression.type == :erange ? put(' < ') : put(' <= '))
@@ -31,7 +31,7 @@ module Ruby2JS
         puts ') {'; redoable block; sput '}'
       ensure
         @next_token = next_token
-        @vars = vars if es2015
+        @vars = vars
       end
     end
   end

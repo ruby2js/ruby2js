@@ -12,14 +12,14 @@ describe "namespace support" do
       to_js( 'module M; def f(); end; end;' +
              'module M; def g(); end; end').
       must_equal('const M = {f() {}}; ' +
-        'M.g = function() {}');
+        'M.g = () => {}');
     end
 
     it "should extend nested modules" do
       to_js( 'module M; module N; def f(); end; end; end;' +
              'module M::N; def g(); end; end').
       must_equal('const M = {N: {f() {}}}; ' +
-        'M.N.g = function() {}');
+        'M.N.g = () => {}');
     end
 
     it "should extend nested modules with getter" do
@@ -36,7 +36,7 @@ describe "namespace support" do
       to_js( 'class M; def f(); end; end;' +
              'class M; def g(); end; end').
       must_equal('class M {f() {}}; ' +
-        'M.prototype.g = function() {}');
+        'M.prototype.g = () => {}');
     end
 
     it "should extend nested modules with getter" do

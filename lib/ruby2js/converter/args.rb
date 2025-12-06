@@ -17,10 +17,6 @@ module Ruby2JS
         args.push s(:arg, *kwargs.last.children)
       end
 
-      unless kwargs.empty? or es2015
-        raise NotImplementedError.new('Keyword args require ES2015')
-      end
-
       parse_all(*args, join: ', ')
       if not kwargs.empty?
         put ', ' unless args.empty?
@@ -35,7 +31,6 @@ module Ruby2JS
               put '='; parse kw.children.last
             end
           elsif kw.type == :kwrestarg
-            raise 'Rest arg requires ES2018' unless es2018
             put '...'; put kw.children.first
           end
         end
@@ -46,13 +41,9 @@ module Ruby2JS
     end
 
     handle :mlhs do |*args|
-      if es2015 or @jsx
-        put '['
-        parse_all(*args, join: ', ')
-        put ']'
-      else
-        raise Error.new("destructuring requires ES2015", @ast)
-      end
+      put '['
+      parse_all(*args, join: ', ')
+      put ']'
     end
 
     # Ruby 2.7+ argument forwarding: def foo(...) / bar(...)

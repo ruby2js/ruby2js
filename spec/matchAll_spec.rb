@@ -27,7 +27,7 @@ describe "matchAll support" do
   describe "without filter functions" do
     it "should convert String.matchAll to RegExp.exec for ESLevel < 2020" do
       to_js( 'str.matchAll(pattern).forEach {|match| console.log match}' ).
-        must_equal 'var match; '  + 
+        must_equal 'let match; '  + 
           'while (match = pattern.exec(str)) {console.log(match)}'
     end
 
@@ -40,13 +40,13 @@ describe "matchAll support" do
   describe "with filter functions" do
     it "should convert with filter functions first" do
       to_js_fn1( 'str.matchAll(pattern).each {|match| puts match}' ).
-        must_equal 'var match; '  + 
+        must_equal 'let match; '  + 
           'while (match = pattern.exec(str)) {console.log(match)}'
     end
 
     it "should convert with filter functions second" do
       to_js_fn2( 'str.matchAll(pattern).each {|match| puts match}' ).
-        must_equal 'var match; '  + 
+        must_equal 'let match; '  + 
           'while (match = pattern.exec(str)) {console.log(match)}'
     end
 

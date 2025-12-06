@@ -7,24 +7,6 @@ module Ruby2JS
     #     (str "value")))
 
     handle :hash do |*pairs|
-      if not es2018 and pairs.any? {|pair| pair.type == :kwsplat}
-        groups = []
-        pending = []
-        while not pairs.empty?
-          pair = pairs.shift
-          if pair.type != :kwsplat
-            pending << pair
-          else
-            groups << s(:hash, *pending) unless pending.empty?
-            groups << pair.children.first
-            pending = []
-          end
-        end
-        groups << s(:hash, *pending) unless pending.empty?
-        parse s(:assign, s(:hash), *groups)
-        return
-      end
-
       compact do
         singleton = pairs.length <= 1
 
@@ -37,18 +19,14 @@ module Ruby2JS
           index += 1
 
           if node.type == :kwsplat
-            if es2018
-              if node.children.first.type == :hash
-                pairs.unshift(*node.children.first.children)
-                index = 0
-              else
-                put '...'; parse node.children.first
-              end
-
-              next
+            if node.children.first.type == :hash
+              pairs.unshift(*node.children.first.children)
+              index = 0
             else
-              raise Error.new("kwsplat", @ast)
+              put '...'; parse node.children.first
             end
+
+            next
           end
 
           node_comments = @comments[node]
@@ -106,8 +84,8 @@ module Ruby2JS
                 end
               end
 
-              # check to see if es2015 anonymous function syntax can be used
-              anonfn = (es2015 and right and right.type == :block)
+              # check to see if anonymous function syntax can be used
+              anonfn = (right and right.type == :block)
               if anonfn
                 receiver, method = right.children[0].children
                 if receiver
@@ -147,16 +125,16 @@ module Ruby2JS
                 @prop = left.children.first
                 parse right, :method
               elsif \
-                es2015 and left.type == :sym and (right.type == :lvar or 
+                left.type == :sym and (right.type == :lvar or
                 (right.type == :send and right.children.first == nil)) and
                 left.children.last == right.children.last
               then
-                parse right 
-              elsif right.type == :defm and %i[sym str].include? left.type and es2015
+                parse right
+              elsif right.type == :defm and %i[sym str].include? left.type
                 @prop = left.children.first.to_s
                 parse right
               else
-		if not [:str, :sym].include? left.type and es2015
+		if not [:str, :sym].include? left.type
 		  put '['
 		  parse left
 		  put ']'

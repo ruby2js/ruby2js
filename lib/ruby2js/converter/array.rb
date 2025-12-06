@@ -7,19 +7,9 @@ module Ruby2JS
 
     handle :array do |*items|
       splat = items.rindex { |a| a.type == :splat }
-      if splat and (items.length == 1 or not es2015)
+      if splat and items.length == 1
         item = items[splat].children.first
-        if items.length == 1
-          parse item
-        elsif splat == items.length - 1
-          parse s(:send, s(:array, *items[0..-2]), :concat, item)
-        elsif splat == 0
-          parse s(:send, item, :concat, s(:array, *items[1..-1]))
-        else
-          parse s(:send, 
-            s(:send, s(:array, *items[0..splat-1]), :concat, item), 
-            :concat, s(:array, *items[splat+1..-1]))
-        end
+        parse item
       else
         if items.length <= 1
           put '['; parse_all(*items, join: ', '); put ']'

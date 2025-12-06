@@ -64,6 +64,10 @@ module Ruby2JS
       @options[:truthy] = mode
     end
 
+    def nullish_to_s
+      @options[:nullish_to_s] = true
+    end
+
     def autoimport(identifier = nil, file = nil, &block)
       if block
         @options[:autoimports] = block

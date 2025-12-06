@@ -18,6 +18,10 @@ describe "ES2020 support" do
     _(Ruby2JS.convert(string, eslevel: 2020, or: :nullish, filters: []).to_s)
   end
 
+  def to_js_nullish_to_s( string)
+    _(Ruby2JS.convert(string, eslevel: 2020, nullish_to_s: true, filters: []).to_s)
+  end
+
   describe :matchAll do
     it 'should handle scan' do
       to_js_fn( 'str.scan(/\d/)' ).must_equal 'str.match(/\d/g)'
@@ -58,6 +62,12 @@ describe "ES2020 support" do
       to_js_nullish( 'a > 5 || b' ).must_equal 'a > 5 || b'
       to_js_nullish( 'a || b < 3' ).must_equal 'a || b < 3'
 
+      # Negation operator should preserve || (Ruby parses !x as x.!)
+      to_js_nullish( '!a || b' ).must_equal '!a || b'
+      to_js_nullish( 'a || !b' ).must_equal 'a || !b'
+      to_js_nullish( '!a || !b' ).must_equal '!a || !b'
+      to_js_nullish( '!a.foo || !b.bar' ).must_equal '!a.foo || !b.bar'
+
       # Non-boolean contexts should use ??
       to_js_nullish( 'x = a || b' ).must_equal 'let x = a ?? b'
     end
@@ -66,6 +76,25 @@ describe "ES2020 support" do
       to_js( 'a.nil? ? b : a' ).must_equal 'a ?? b'
       to_js( '@a.nil? ? b : @a' ).must_equal 'this._a ?? b'
       to_js( 'foo.bar.nil? ? default_val : foo.bar' ).must_equal 'foo.bar ?? default_val'
+    end
+  end
+
+  describe "nullish_to_s option" do
+    it "should wrap interpolated values with ?? ''" do
+      to_js_nullish_to_s( '"hello #{x}"' ).must_equal '`hello ${x ?? ""}`'
+    end
+
+    it "should wrap multiple interpolated values" do
+      to_js_nullish_to_s( '"#{a} and #{b}"' ).must_equal '`${a ?? ""} and ${b ?? ""}`'
+    end
+
+    it "should not wrap string literals in interpolation" do
+      to_js_nullish_to_s( '"prefix #{x} suffix"' ).must_equal '`prefix ${x ?? ""} suffix`'
+    end
+
+    it "should not apply when eslevel < 2020" do
+      _(Ruby2JS.convert('"hello #{x}"', eslevel: 2019, nullish_to_s: true, filters: []).to_s).
+        must_equal '`hello ${x}`'
     end
   end
 

@@ -10,29 +10,29 @@ describe Ruby2JS::Filter::Return do
   
   describe :lambda do
     it "should handle no line lambdas" do
-      to_js( 'lambda {|x|}' ).must_equal 'function(x) {return null}'
+      to_js( 'lambda {|x|}' ).must_equal 'x => null'
     end
 
     it "should handle single line lambdas" do
-      to_js( 'lambda {|x| x}' ).must_equal 'function(x) {return x}'
+      to_js( 'lambda {|x| x}' ).must_equal 'x => x'
     end
 
     it "should handle multi line lambdas" do
-      to_js( 'lambda {|x| x; x}' ).must_equal 'function(x) {x; return x}'
+      to_js( 'lambda {|x| x; x}' ).must_equal '(x) => {x; return x}'
     end
   end
-  
+
   describe :proc do
     it "should handle no line procs" do
-      to_js( 'Proc.new {|x|}' ).must_equal 'function(x) {return null}'
+      to_js( 'Proc.new {|x|}' ).must_equal 'x => null'
     end
 
     it "should handle single line procs" do
-      to_js( 'Proc.new {|x| x}' ).must_equal 'function(x) {return x}'
+      to_js( 'Proc.new {|x| x}' ).must_equal 'x => x'
     end
 
     it "should handle multi line procs" do
-      to_js( 'Proc.new {|x| x; x}' ).must_equal 'function(x) {x; return x}'
+      to_js( 'Proc.new {|x| x; x}' ).must_equal '(x) => {x; return x}'
     end
   end
   
@@ -50,64 +50,64 @@ describe Ruby2JS::Filter::Return do
     end
 
     it "should skip constructor" do
-      to_js( 'class X; def initialize(x) x; end; end' ).must_equal 'function X(x) {x}'
-      to_js( 'class X; def constructor(x) x; end; end' ).must_equal 'function X() {}; X.prototype.constructor = function(x) {x}'
+      to_js( 'class X; def initialize(x) x; end; end' ).must_equal 'class X {constructor(x) {x}}'
+      to_js( 'class X; def constructor(x) x; end; end' ).must_equal 'class X {constructor(x) {x}}'
     end
   end
 
   describe :defs do
     it "should handle no line definitions" do
       to_js( 'class C; def self.f(x) end; end' ).
-        must_equal 'function C() {}; C.f = function(x) {return null}'
+        must_equal 'class C {static f(x) {return null}}'
     end
 
     it "should handle single line definitions" do
       to_js( 'class C; def self.f(x) x; end; end' ).
-        must_equal 'function C() {}; C.f = function(x) {return x}'
+        must_equal 'class C {static f(x) {return x}}'
     end
 
     it "should handle multi line definitions" do
       to_js( 'class C; def self.f(x) x; x; end; end' ).
-        must_equal 'function C() {}; C.f = function(x) {x; return x}'
+        must_equal 'class C {static f(x) {x; return x}}'
     end
   end
 
   describe 'data types' do
     it "should handle integers" do
-      to_js( 'lambda {|x| 1}' ).must_equal 'function(x) {return 1}'
+      to_js( 'lambda {|x| 1}' ).must_equal 'x => 1'
     end
 
     it "should handle floats" do
-      to_js( 'lambda {|x| 1.2}' ).must_equal 'function(x) {return 1.2}'
+      to_js( 'lambda {|x| 1.2}' ).must_equal 'x => 1.2'
     end
 
     it "should handle hashes" do
-      to_js( 'lambda {|x| {x:x}}' ).must_equal 'function(x) {return {x: x}}'
+      to_js( 'lambda {|x| {x:x}}' ).must_equal 'x => ({x})'
     end
 
     it "should handle arrays" do
-      to_js( 'lambda {|x| [x]}' ).must_equal 'function(x) {return [x]}'
+      to_js( 'lambda {|x| [x]}' ).must_equal 'x => [x]'
     end
 
     it "should handle method calls" do
-      to_js( 'lambda {|x| x+x}' ).must_equal 'function(x) {return x + x}'
+      to_js( 'lambda {|x| x+x}' ).must_equal 'x => x + x'
     end
   end
 
   describe 'flow control statements' do
     it "should handle if statements" do
       to_js( 'lambda {|x| if false; a; elsif false; b; else c; end}' ).
-        must_equal 'function(x) {if (false) {return a} else if (false) {return b} else {return c}}'
+        must_equal '(x) => {if (false) {return a} else if (false) {return b} else {return c}}'
     end
 
     it "should handle case statements" do
       to_js( 'lambda {|x| case false; when true; a; when false; b; else c; end}' ).
-        must_equal 'function(x) {switch (false) {case true: return a; case false: return b; default: return c}}'
+        must_equal '(x) => {switch (false) {case true: return a; case false: return b; default: return c}}'
     end
 
     it "should handle case statements without else clause" do
       to_js( 'lambda {|x| case false; when true; a; when false; b; end}' ).
-        must_equal 'function(x) {switch (false) {case true: return a; case false: return b}}'
+        must_equal '(x) => {switch (false) {case true: return a; case false: return b}}'
     end
   end
 

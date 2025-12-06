@@ -96,7 +96,7 @@ module Ruby2JS
           hoisted_any = true
           puts '{'  # Open block scope to contain hoisted vars
           hoisted.each do |var|
-            put "#{es2015 ? 'let' : 'var'} #{var}#{@sep}"
+            put "let #{var}#{@sep}"
             @vars[var] = true
           end
         end
@@ -107,7 +107,7 @@ module Ruby2JS
 
       # If else clause exists, we need a flag to track if no exception occurred
       if otherwise
-        puts "#{es2015 ? 'let' : 'var'} $no_exception = false#{@sep}"
+        puts "let $no_exception = false#{@sep}"
       end
 
       puts "try {"; scope body
@@ -130,7 +130,7 @@ module Ruby2JS
           end
 
           # single catch with no exception named
-          if es2019 and not var and not walk[@ast]
+          if not var and not walk[@ast]
             puts " catch {"
           else
             var ||= s(:gvar, :$EXCEPTION)

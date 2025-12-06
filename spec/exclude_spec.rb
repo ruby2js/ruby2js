@@ -44,12 +44,12 @@ describe 'Ruby2JS::Filter.exclude' do
   describe 'explicit exclude - block' do
     it "should default to mapping for setInterval" do
       to_js( 'setInterval(500) {nil}' ).
-        must_equal 'setInterval(function() {null}, 500)'
+        must_equal 'setInterval(() => {null}, 500)'
     end
 
     it "should be able to OPT OUT of setInterval mapping" do
       to_js( 'setInterval(500) {nil}', exclude: :setInterval ).
-        must_equal 'setInterval(500, function() {null})'
+        must_equal 'setInterval(500, () => {null})'
     end
   end
 end

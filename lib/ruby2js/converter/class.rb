@@ -25,22 +25,13 @@ module Ruby2JS
       if !%i(class class_hash).include?(@ast.type) or extend
         init = nil
       else
-        if es2015 and not extend
-          if @ast.type == :class_hash
-            parse @ast.updated(:class2, [nil, *@ast.children[1..-1]])
-          else
-            parse @ast.updated(:class2)
-          end
-          @namespace.leave unless @ast.type == :class_module
-          return
-        end
-
-        if inheritance
-          parent = @namespace.find(inheritance)&.[](:constructor)
-          init = s(:def, :initialize, parent || s(:args), s(:zsuper))
+        if @ast.type == :class_hash
+          parse @ast.updated(:class2, [nil, *@ast.children[1..-1]])
         else
-          init = s(:def, :initialize, s(:args), nil)
+          parse @ast.updated(:class2)
         end
+        @namespace.leave unless @ast.type == :class_module
+        return
       end
 
       body.compact!
@@ -231,11 +222,11 @@ module Ruby2JS
         methods = 0
         start = 0
         body.each do |node|
-          if (node.type == :method or (node.type == :prop and es2015)) and
+          if (node.type == :method or node.type == :prop) and
             node.children[0].type == :attr and
             node.children[0].children[1] == :prototype
             methods += 1
-          elsif node.type == :class and @ast.type == :class_module and es2015
+          elsif node.type == :class and @ast.type == :class_module
             methods += 1 if node.children.first.children.first == name
           elsif node.type == :module and @ast.type == :class_module
             methods += 1 if node.children.first.children.first == name
@@ -314,17 +305,9 @@ module Ruby2JS
         visible[:constructor] = init.children[1]
 
         if @ast.type == :class_extend or extend
-          if es2015
-            constructor = s(:masgn, s(:mlhs, 
-              s(:attr, s(:casgn, *name.children, constructor), :prototype)), 
-              s(:array, s(:attr, name, :prototype)))
-          else
-            constructor = s(:send, s(:block, s(:send, nil, :proc),
-              s(:args, s(:shadowarg, :$_)), s(:begin,
-              s(:gvasgn, :$_, s(:attr, name, :prototype)),
-              s(:send, s(:casgn, *name.children, constructor),
-              :prototype=, s(:gvar, :$_)))), :[])
-          end
+          constructor = s(:masgn, s(:mlhs,
+            s(:attr, s(:casgn, *name.children, constructor), :prototype)),
+            s(:array, s(:attr, name, :prototype)))
         end
 
         init_comments = @comments[init]

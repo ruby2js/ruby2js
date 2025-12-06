@@ -17,7 +17,7 @@ describe Ruby2JS::Filter::SecureRandom do
   describe 'alphanumeric' do
     it 'should support cjs' do
       to_js_cjs( 'SecureRandom.alphanumeric(10)' ).
-        must_equal 'var base62_random = require("base62-random"); ' +
+        must_equal 'let base62_random = require("base62-random"); ' +
         'base62_random(10)'
     end
 

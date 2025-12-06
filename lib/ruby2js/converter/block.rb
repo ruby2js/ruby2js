@@ -9,7 +9,7 @@ module Ruby2JS
 
     handle :block do |call, args, block|
 
-      if es2017 and call.children.last == s(:send, nil, :async)
+      if call.children.last == s(:send, nil, :async)
         return parse call.updated(nil, [*call.children[0..-2],
         s(:send, nil, :async, s(:block, s(:send, nil, :proc), args, block))])
       end
@@ -28,7 +28,7 @@ module Ruby2JS
           var = args.children.first
           expression = call.children.first.children.first
           comp = (expression.type == :irange ? '<=' : '<')
-          put "for (#{es2015 ? 'let' : 'var'} "; 
+          put "for (let "; 
           parse var; put " = "; parse expression.children.first
           put "; "; parse var; 
           if call.children[2].type == :int and call.children[2].children[0] < 0
@@ -44,7 +44,7 @@ module Ruby2JS
           sput "}"
         ensure
           @next_token = next_token
-          @vars = vars if es2015
+          @vars = vars
         end
 
       elsif \

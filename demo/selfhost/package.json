@@ -6,7 +6,14 @@
     "ruby2js": "./ruby2js"
   },
   "scripts": {
-    "test": "node test_e2e.mjs"
+    "test": "node transliteration_spec.mjs",
+    "test:e2e": "node test_e2e.mjs",
+    "test:pipeline": "node test_full_pipeline.mjs",
+    "test:walker": "node test_transpiled_walker.mjs",
+    "build": "npm run build:converter && npm run build:spec",
+    "build:converter": "bundle exec ruby ../../lib/ruby2js/selfhost.rb > selfhost_converter.mjs",
+    "build:spec": "bundle exec ruby ../../lib/ruby2js/selfhost.rb ../../spec/transliteration_spec.rb > transliteration_spec.mjs",
+    "build:walker": "ruby transpile_walker.rb > transpiled_walker.mjs"
   },
   "keywords": ["ruby", "javascript", "transpiler"],
   "author": "Sam Ruby",

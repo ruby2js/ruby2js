@@ -127,30 +127,30 @@ describe Ruby2JS::Filter::MiniTestJasmine do
     it "should handle test functions" do
       to_js("class TestMeme < Minitest::Test; " +
         "def test_me; assert_nil nil; end; end").
-        must_equal 'describe("TestMeme", function() {it("me", function() ' +
+        must_equal 'describe("TestMeme", () => {it("me", function() ' +
           '{expect(null).toBeNull()})})'
     end
 
     it "should handle setup and teardown functions" do
       to_js("class TestMeme < Minitest::Test; def setup; @x=1; end; " +
         "def teardown; @x=nil; end; end").
-        must_equal 'describe("TestMeme", function() {beforeEach(' +
-         'function() {this._x = 1}); afterEach(function() {this._x = null})})'
+        must_equal 'describe("TestMeme", () => {beforeEach(' +
+         '() => {this._x = 1}); afterEach(() => {this._x = null})})'
     end
   end
 
   describe "behavioral spec syntax" do
     it "should handle describe and it functions" do
       to_js("describe 'test' do; it 'works' do; nil.must_be_nil; end; end").
-        must_equal 'describe("test", function() {it("works", function() ' +
+        must_equal 'describe("test", () => {it("works", function() ' +
           '{expect(null).toBeNull()})})'
     end
 
     it "should handle before and after functions" do
       to_js("describe 'test' do; before do @x=1; end; " +
         "after do @x=nil; end; end").
-        must_equal 'describe("test", function() {beforeEach(function() ' +
-          '{this._x = 1}); afterEach(function() {this._x = null})})'
+        must_equal 'describe("test", () => {beforeEach(function() ' +
+          '{this._x = 1}); afterEach(() => {this._x = null})})'
     end
   end
 end
