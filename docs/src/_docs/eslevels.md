@@ -5,9 +5,13 @@ top_section: Introduction
 category: eslevels
 ---
 
-By default, Ruby2JS will output JavaScript with the widest compatibility possible, but that also means many new features in recent ECMAScript versions are compromised or impossible to achieve.
+By default, Ruby2JS targets **ES2020**, which provides a good balance of modern JavaScript features and broad browser/runtime support. ES2020 includes `let`/`const`, arrow functions, template literals, classes, spread syntax, optional chaining (`?.`), and nullish coalescing (`??`).
 
-By passing an `eslevel` option to the `convert` method, you can indicate which new language features you wish to enable. Every newer level enables older levels, so for example `2021` will enable ES2015, ES2016, etc.
+By passing an `eslevel` option to the `convert` method, you can target a different ECMAScript version. Every newer level enables older levels, so for example `2021` will enable ES2015, ES2016, etc.
+
+{% rendercontent "docs/note", type: "warning" %}
+**Note:** ES levels prior to ES2020 (ES2015-ES2019) are still supported but are no longer the default. If you need to target older JavaScript environments, explicitly set `eslevel: 2015` or the appropriate version.
+{% endrendercontent %}
 
 {% capture caret %}<sl-icon name="caret-right-fill"></sl-icon>{% endcapture %}
 

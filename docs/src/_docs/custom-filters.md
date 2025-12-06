@@ -223,7 +223,7 @@ module Ruby2JS
           count = receiver.children.first
           var = args.children.first&.children&.first || :i
 
-          # Create: for (var i = 0; i < count; i++) { body }
+          # Create: for (let i = 0; i < count; i++) { body }
           s(:for,
             s(:lvasgn, var),
             s(:erange, s(:int, 0), s(:int, count)),

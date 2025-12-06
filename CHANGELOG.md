@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Breaking Changes
+
+- **Default ES level is now ES2020** - Ruby2JS now defaults to ES2020 instead of ES5.
+  This means output will use modern JavaScript features like `let`/`const`, arrow functions,
+  template literals, classes, spread syntax, optional chaining, and nullish coalescing by default.
+  To restore previous behavior, explicitly set `eslevel: 2015` or lower.
+- Removed support for ES levels prior to ES2020 as the default target
+
+### Changed
+
 - Update `regexp_parser` dependency
 
 ## [5.1.2] - 2024-05-11

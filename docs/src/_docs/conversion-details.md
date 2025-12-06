@@ -82,6 +82,8 @@ With enough of each, one could reproduce any functionality desired.
 
 ## Syntax Mappings
 
+With ES2020 as the default, Ruby2JS produces modern JavaScript:
+
   * a Ruby Hash literal becomes a JavaScript Object literal
   * Ruby symbols become JavaScript strings.
   * Ruby method calls become JavaScript function calls IF
@@ -89,30 +91,32 @@ With enough of each, one could reproduce any functionality desired.
     parenthesis are used
   * otherwise Ruby method calls become JavaScript property accesses.
   * by default, methods and procs return `undefined`
-  * splats mapped to spread syntax when ES2015 or later is selected, and
-    to equivalents using `apply`, `concat`, `slice`, and `arguments` otherwise.
-  * ruby string interpolation is expanded into string + operations
+  * splats are mapped to spread syntax (`...args`)
+  * ruby string interpolation becomes template literals (<code>\`${value}\`</code>)
   * `and` and `or` become `&&` and `||`
-  * `a ** b` becomes `Math.pow(a,b)`
+  * `a ** b` becomes `a ** b`
   * `<< a` becomes `.push(a)`
   * `unless` becomes `if !`
   * `until` becomes `while !`
   * `case` and `when` becomes `switch` and `case`
   * ruby for loops become js for loops
-  * `(1...4).step(2){` becomes `for (var i = 1; i < 4; i += 2) {`
-  * `x.forEach { next }` becomes `x.forEach(function() {return})`
-  * `lambda {}` and `proc {}` becomes `function() {}`
-  * `class Person; end` becomes `function Person() {}`
-  * `Class.new do; end` becomes `function () {}`
-  * instance methods become prototype methods
+  * `(1...4).step(2){` becomes `for (let i = 1; i < 4; i += 2) {`
+  * `x.forEach { next }` becomes `x.forEach(() => {return})`
+  * `lambda {}` becomes `() => {}`
+  * `proc {}` becomes `() => {}`
+  * `class Person; end` becomes `class Person {}`
+  * `Class.new do; end` becomes `class {}`
+  * instance methods become class methods
   * instance variables become underscored, `@name` becomes `this._name`
-  * self is assigned to this is if used
-  * Any block becomes and explicit argument `new Promise do; y(); end` becomes `new Promise(function() {y()})`
+  * self is assigned to this if used
+  * Any block becomes an explicit argument `new Promise do; y(); end` becomes `new Promise(() => {y()})`
   * regular expressions are mapped to js
   * `raise` becomes `throw`
   * `.is_a?` becomes `instanceof`
   * `.kind_of?` becomes `instanceof`
   * `.instance_of?` becomes `.constructor ==`
+  * `a&.b` becomes `a?.b` (optional chaining)
+  * `a.nil? ? b : a` becomes `a ?? b` (nullish coalescing)
 
 Ruby attribute accessors, methods defined with no parameters and no
 parenthesis, as well as setter method definitions, are
