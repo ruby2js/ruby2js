@@ -330,11 +330,11 @@ x ||= 0                  # => x ??= 0 (preserves 0)
 
 Three options are available:
 
-| Option | Boolean context (`if a \|\| b`) | Value context (`x = a \|\| b`) |
+| Option | Boolean context (`if a || b`) | Value context (`x = a || b`) |
 |--------|--------------------------------|-------------------------------|
-| `:auto` (default) | `if (a \|\| b)` | `let x = a ?? b` |
+| `:auto` (default) | `if (a || b)` | `let x = a ?? b` |
 | `:nullish` | `if (a ?? b)` | `let x = a ?? b` |
-| `:logical` | `if (a \|\| b)` | `let x = a \|\| b` |
+| `:logical` | `if (a || b)` | `let x = a || b` |
 
 {% rendercontent "docs/note", type: "warning" %}
 **Note about `false`:** In value contexts with `:auto` or `:nullish`, `false || x` will return `false` (not `x`) because `??` doesn't treat `false` as nullish. Use `or: :logical` or `truthy: :ruby` for exact Ruby semantics with `false`.
@@ -347,7 +347,7 @@ a > 5 || b < 3      # => a > 5 || b < 3
 a.empty? || b.nil?  # => a.empty || b.nil
 ```
 
-### Configuration
+Configuration:
 
 ```ruby
 # Configuration file
