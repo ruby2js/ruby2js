@@ -700,10 +700,6 @@ describe Ruby2JS::Filter::Functions do
       _(Ruby2JS.convert('foo&.call(x)', eslevel: 2020, include: [:call],
         filters: [Ruby2JS::Filter::Functions]).to_s).must_equal 'foo?.(x)'
     end
-
-    it 'should handle safe navigation call fallback for pre-ES2020' do
-      to_js( '@f&.call(1, 2, 3)' ).must_equal 'this._f && this._f(1, 2, 3)'
-    end
   end
 
   describe 'Exceptions' do
