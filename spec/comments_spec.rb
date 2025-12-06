@@ -72,23 +72,16 @@ describe Ruby2JS::Filter::Functions do
         end
       EOF
 
-      js.must_include "//statement\nvar statement;"
-      js.must_include "//class\nfunction Class() {};"
-      js.must_include "//subclass\nfunction Subclass() {\n  " +
-        "Class.call(this)\n};"
-      js.must_include "//constructor\nfunction Constructor() {"
-      js.must_include "//method\nMethod.prototype.method = () => {"
-      js.must_include "//attribute\n" +
-       "Object.defineProperty(\n  Attribute.prototype,\n  " +
-       '"attribute"'
-      js.must_include "//setter\n" +
-       "Object.defineProperty(\n  Setter.prototype,\n  " +
-       '"setter"'
-      js.must_include "//classmethod\nClassMethod.classmethod = () => {"
-      js.must_include "//classattribute\nObject.defineProperty(\n  " +
-        "ClassAttribute,\n  \"classattribute\""
-      js.must_include "//classsetter\nObject.defineProperty(\n  " +
-        "ClassSetter,\n  \"classsetter\"" 
+      js.must_include "//statement\nlet statement;"
+      js.must_include "//class\nclass Class {"
+      js.must_include "//subclass\nclass Subclass extends Class {"
+      js.must_include "//constructor\n  constructor() {"
+      js.must_include "//method\n  method() {"
+      js.must_include "//attribute\n  get attribute() {"
+      js.must_include "//setter\n  set setter(n) {"
+      js.must_include "//classmethod\n  static classmethod() {"
+      js.must_include "//classattribute\n  static get classattribute() {"
+      js.must_include "//classsetter\n  static set classsetter(n) {" 
     end
 
     it "should handle everything together" do
@@ -135,15 +128,15 @@ describe Ruby2JS::Filter::Functions do
         end
       EOF
 
-      js.must_include "//statement\nvar statement;"
-      js.must_include "//subclass\n//constructor\nfunction Subclass() {\n  " +
-        "Class.call(this)\n};"
-      js.must_include "//method\nSubclass.prototype.method = () => {"
-      js.must_include "//attribute\n  attribute: {"
-      js.must_include "//setter\n  setter: {"
-      js.must_include "//classmethod\nSubclass.classmethod = () => {"
-      js.must_include "//classattribute\n  classattribute: {"
-      js.must_include "//classsetter\n  classsetter: {"
+      js.must_include "//statement\nlet statement;"
+      js.must_include "//subclass\nclass Subclass extends Class {"
+      js.must_include "//constructor\n  constructor() {"
+      js.must_include "//method\n  method() {"
+      js.must_include "//attribute\n  get attribute() {"
+      js.must_include "//setter\n  set setter(n) {"
+      js.must_include "//classmethod\n  static classmethod() {"
+      js.must_include "//classattribute\n  static get classattribute() {"
+      js.must_include "//classsetter\n  static set classsetter(n) {"
     end
 
     it "should handle =begin...=end" do
@@ -154,7 +147,7 @@ describe Ruby2JS::Filter::Functions do
         statement
       }.gsub(/^\s+/, '')
 
-      js.must_equal "/*\ncomment\n*/\nvar statement"
+      js.must_equal "/*\ncomment\n*/\nlet statement"
     end
 
     it "should handle =begin...*/...=end" do
@@ -165,7 +158,7 @@ describe Ruby2JS::Filter::Functions do
         statement
       }.gsub(/^\s+/, '')
 
-      js.must_equal "//\n///* comment */\n//\nvar statement"
+      js.must_equal "//\n///* comment */\n//\nlet statement"
     end
   end
 end

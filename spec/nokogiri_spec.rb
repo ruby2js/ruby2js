@@ -59,7 +59,7 @@ describe Ruby2JS::Filter::Nokogiri do
       to_js( 'doc.create_element "a"' ).
         must_equal 'doc.createElement("a")'
       to_js( 'doc.create_element "a", "text", href: ".."' ).
-        must_equal '(() => {var $_ = doc.createElement("a"); ' +
+        must_equal '(() => {let $_ = doc.createElement("a"); ' +
           '$_.textContent = "text"; $_.setAttribute("href", ".."); return $_})()'
     end
   end
@@ -220,7 +220,7 @@ describe Ruby2JS::Filter::Nokogiri do
   describe 'cjs' do
     it 'should support JSDOM import' do
       to_js_cjs( 'Nokogiri::HTML.parse "<b>"' ).
-        must_equal 'let JSDOM = require("jsdom").JSDOM; ' +
+        must_equal 'const JSDOM = require("jsdom").JSDOM; ' +
         'new JSDOM("<b>").window.document'
     end
   end

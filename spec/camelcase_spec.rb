@@ -60,17 +60,17 @@ describe Ruby2JS::Filter::CamelCase do
 
     it "should handle optional arguments" do
       to_js( 'def foo_bar(baz_qux=nil); end' ).
-        must_equal "function fooBar(bazQux) {if (typeof bazQux === 'undefined') bazQux = null}"
+        must_equal "function fooBar(bazQux=null) {}"
     end
 
     it "should handle instance method definitions" do
       to_js( 'def instance.foo_bar(baz_qux); end' ).
-        must_equal 'instance.fooBar = (bazQux) => {}'
+        must_equal 'instance.fooBar = function(bazQux) {}'
     end
 
     it "should handle procs" do
       to_js( 'foo_bar {|baz_qux| return 1}' ).
-        must_equal 'fooBar((bazQux) => {return 1})'
+        must_equal 'fooBar(bazQux => 1)'
     end
 
     it "should handle hashes" do
@@ -83,15 +83,11 @@ describe Ruby2JS::Filter::CamelCase do
 
     it "should work with autoreturn filter" do
       to_js_with_autoreturn( 'foo_bar(123) {|a_b_c| x }' ).
-        must_equal 'fooBar(123, (aBC) => {return x})'
-    end
-
-    it "should handle lonely operator prior to ES2020" do
-      to_js( 'a_a&.b_b&.c_c' ).must_equal 'aA && aA.bB && aA.bB.cC'
+        must_equal 'fooBar(123, aBC => x)'
     end
 
     it "should handle lonely operator for ES2020" do
-      to_js_2020( 'a_a&.b_b&.c_c' ).must_equal 'aA?.bB?.cC'
+      to_js( 'a_a&.b_b&.c_c' ).must_equal 'aA?.bB?.cC'
     end
 
     it "should handle kwargs" do

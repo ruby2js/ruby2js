@@ -92,10 +92,6 @@ describe "ES2020 support" do
       to_js_nullish_to_s( '"prefix #{x} suffix"' ).must_equal '`prefix ${x ?? ""} suffix`'
     end
 
-    it "should not apply when eslevel < 2020" do
-      _(Ruby2JS.convert('"hello #{x}"', eslevel: 2019, nullish_to_s: true, filters: []).to_s).
-        must_equal '`hello ${x}`'
-    end
   end
 
   describe :OptionalChaining do

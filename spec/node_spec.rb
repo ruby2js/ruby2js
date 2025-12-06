@@ -3,7 +3,7 @@ require 'minitest/autorun'
 require 'ruby2js/filter/node'
 require 'ruby2js/filter/esm'
 
-describe Ruby2JS::Filter::Functions do
+describe Ruby2JS::Filter::Node do
   
   def to_js( string)
     _(Ruby2JS.convert(string, filters: [Ruby2JS::Filter::Node],
@@ -33,22 +33,22 @@ describe Ruby2JS::Filter::Functions do
   describe 'child_process' do
     it 'should handle backtics' do
       to_js('`echo hi`').
-        must_equal 'let child_process = require("child_process"); ' +
+        must_equal 'const child_process = require("child_process"); ' +
           'child_process.execSync("echo hi", {encoding: "utf8"})'
       to_js('`echo #{hi}`').
-        must_equal 'let child_process = require("child_process"); ' +
+        must_equal 'const child_process = require("child_process"); ' +
           'child_process.execSync("echo " + hi, {encoding: "utf8"})'
     end
 
     it 'should handle system with single argument' do
       to_js('system "echo hi"').
-        must_equal 'let child_process = require("child_process"); ' +
+        must_equal 'const child_process = require("child_process"); ' +
           'child_process.execSync("echo hi", {stdio: "inherit"})'
     end
 
     it 'should handle system with multiple arguments' do
       to_js('system "echo", "hi"').
-        must_equal 'let child_process = require("child_process"); ' +
+        must_equal 'const child_process = require("child_process"); ' +
           'child_process.execFileSync("echo", ["hi"], {stdio: "inherit"})'
     end
   end
@@ -191,52 +191,52 @@ describe Ruby2JS::Filter::Functions do
   describe 'path' do
     it 'should handle File.absolute_path' do
       to_js( 'File.absolute_path("foo")' ).
-        must_equal 'let path = require("path"); path.resolve("foo")'
+        must_equal 'const path = require("path"); path.resolve("foo")'
     end
 
     it 'should handle File.absolute_path?' do
       to_js( 'File.absolute_path?("foo")' ).
-        must_equal 'let path = require("path"); path.isAbsolute("foo")'
+        must_equal 'const path = require("path"); path.isAbsolute("foo")'
     end
 
     it 'should handle File.basename' do
       to_js( 'File.basename("foo")' ).
-        must_equal 'let path = require("path"); path.basename("foo")'
+        must_equal 'const path = require("path"); path.basename("foo")'
     end
 
     it 'should handle File.dirname' do
       to_js( 'File.dirname("foo")' ).
-        must_equal 'let path = require("path"); path.dirname("foo")'
+        must_equal 'const path = require("path"); path.dirname("foo")'
     end
 
     it 'should handle File.extname' do
       to_js( 'File.extname("foo")' ).
-        must_equal 'let path = require("path"); path.extname("foo")'
+        must_equal 'const path = require("path"); path.extname("foo")'
     end
 
     it 'should handle File.join' do
       to_js( 'File.join("foo", "bar")' ).
-        must_equal 'let path = require("path"); path.join("foo", "bar")'
+        must_equal 'const path = require("path"); path.join("foo", "bar")'
     end
 
     it 'should handle File::PATH_SEPARATOR' do
       to_js( 'File::PATH_SEPARATOR' ).
-        must_equal 'let path = require("path"); path.delimiter'
+        must_equal 'const path = require("path"); path.delimiter'
     end
 
     it 'should handle File::SEPARATOR' do
       to_js( 'File::SEPARATOR' ).
-        must_equal 'let path = require("path"); path.sep'
+        must_equal 'const path = require("path"); path.sep'
     end
   end
 
   describe 'os' do
     it 'should handle Dir.home' do
-      to_js( 'Dir.home' ).must_equal 'let os = require("os"); os.homedir()'
+      to_js( 'Dir.home' ).must_equal 'const os = require("os"); os.homedir()'
     end
 
     it 'should handle Dir.tmpdir' do
-      to_js( 'Dir.tmpdir' ).must_equal 'let os = require("os"); os.tmpdir()'
+      to_js( 'Dir.tmpdir' ).must_equal 'const os = require("os"); os.tmpdir()'
     end
   end
 
@@ -311,8 +311,8 @@ describe Ruby2JS::Filter::Functions do
 
     it 'should put imports first' do
       to_js_esm( 'ARGV[0] + `echo hi`' ).
-        must_equal 'import child_process from "child_process"; ' + 
-          'var ARGV = process.argv.slice(2); ' +
+        must_equal 'import child_process from "child_process"; ' +
+          'let ARGV = process.argv.slice(2); ' +
           'ARGV[0] + child_process.execSync("echo hi", {encoding: "utf8"})'
     end
   end

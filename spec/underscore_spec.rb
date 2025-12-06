@@ -30,22 +30,22 @@ describe Ruby2JS::Filter::Underscore do
   describe 'find, reject, times' do
     it "should map .find to _.find" do
       to_js( 'a.find {|item| item > 0}' ).
-        must_equal '_.find(a, (item) => {return item > 0})'
+        must_equal '_.find(a, item => item > 0)'
     end
 
     it "should map .reject to _.reject" do
       to_js( 'a.reject {|item| item > 0}' ).
-        must_equal '_.reject(a, (item) => {return item > 0})'
+        must_equal '_.reject(a, item => item > 0)'
     end
 
     it "should map .reject! to .splice(0, .length, *_.reject)" do
       to_js( 'a.reject! {|item| item > 0}' ).
-        must_equal 'a.splice.apply(a, [0, a.length].concat(_.reject(a, (item) => {return item > 0})))'
+        must_equal 'a.splice(...[0, a.length].concat(_.reject(a, item => item > 0)))'
     end
 
     it "should map .times to _.times" do
       to_js( '5.times {|i| console.log i}' ).
-        must_equal '_.times(5, (i) => {console.log(i)})'
+        must_equal '_.times(5, i => console.log(i))'
     end
   end
 
@@ -68,32 +68,32 @@ describe Ruby2JS::Filter::Underscore do
 
     it "should map .sort_by to _.sortBy" do
       to_js( 'x.sort_by {|n| -n}' ).
-        must_equal '_.sortBy(x, (n) => {return -n})'
+        must_equal '_.sortBy(x, n => -n)'
     end
 
     it "should map .sort_by to _.sortBy" do
       to_js( 'x.sort_by(&:foo)' ).
-        must_equal '_.sortBy(x, (item) => {return item.foo})'
+        must_equal '_.sortBy(x, item => item.foo)'
     end
 
     it "should map .sort_by! to .splice(0, .length, *_.sortBy)" do
       to_js( 'a.sort_by! {|item| item > 0}' ).
-        must_equal 'a.splice.apply(a, [0, a.length].concat(_.sortBy(a, (item) => {return item > 0})))'
+        must_equal 'a.splice(...[0, a.length].concat(_.sortBy(a, item => item > 0)))'
     end
 
     it "should map .group_by to _.groupBy" do
       to_js( 'x.group_by(&:foo)' ).
-        must_equal '_.groupBy(x, (item) => {return item.foo})'
+        must_equal '_.groupBy(x, item => item.foo)'
     end
 
     it "should map .index_by to _.indexBy" do
       to_js( 'x.index_by(&:foo)' ).
-        must_equal '_.indexBy(x, (item) => {return item.foo})'
+        must_equal '_.indexBy(x, item => item.foo)'
     end
 
     it "should map .count_by to _.countBy" do
       to_js( 'x.count_by(&:foo)' ).
-        must_equal '_.countBy(x, (item) => {return item.foo})'
+        must_equal '_.countBy(x, item => item.foo)'
     end
   end
 
@@ -142,7 +142,7 @@ describe Ruby2JS::Filter::Underscore do
 
     it "should map shuffle!() to a.splice(0, .length, *_.shuffle())" do
       to_js( 'a.shuffle!()' ).
-        must_equal 'a.splice.apply(a, [0, a.length].concat(_.shuffle(a)))'
+        must_equal 'a.splice(0, a.length, ..._.shuffle(a))'
     end
 
     it "should map compact() to _.compact()" do
@@ -151,7 +151,7 @@ describe Ruby2JS::Filter::Underscore do
 
     it "should map compact!() to a.splice(0, .length, *_.compact())" do
       to_js( 'a.compact!()' ).
-        must_equal 'a.splice.apply(a, [0, a.length].concat(_.compact(a)))'
+        must_equal 'a.splice(0, a.length, ..._.compact(a))'
     end
 
     it "should map flatten() to _.flatten()" do
@@ -160,7 +160,7 @@ describe Ruby2JS::Filter::Underscore do
 
     it "should map flatten!() to a.splice(0, .length, *_.flatten())" do
       to_js( 'a.flatten!()' ).
-        must_equal 'a.splice.apply(a, [0, a.length].concat(_.flatten(a)))'
+        must_equal 'a.splice(0, a.length, ..._.flatten(a))'
     end
 
     it "should map invert() to _.invert()" do
@@ -181,7 +181,7 @@ describe Ruby2JS::Filter::Underscore do
 
     it "should map uniq!() to a.splice(0, .length, *_.uniq())" do
       to_js( 'a.uniq!()' ).
-        must_equal 'a.splice.apply(a, [0, a.length].concat(_.uniq(a)))'
+        must_equal 'a.splice(0, a.length, ..._.uniq(a))'
     end
 
     it "should not map size" do
@@ -192,27 +192,27 @@ describe Ruby2JS::Filter::Underscore do
   describe 'reduce' do
     it "should map reduce: symbol to _.reduce" do
       to_js( 'a.reduce(:+)' ).
-        must_equal '_.reduce(_.rest(a), (memo, item) => {return memo + item}, a[0])'
+        must_equal '_.reduce(_.rest(a), (memo, item) => memo + item, a[0])'
     end
 
     it "should map reduce: initial, symbol to _.reduce function, initial" do
       to_js( 'a.reduce(0, :+)' ).
-        must_equal '_.reduce(a, (memo, item) => {return memo + item}, 0)'
+        must_equal '_.reduce(a, (memo, item) => memo + item, 0)'
     end
 
     it "should map reduce: function to _.reduce" do
       to_js( 'a.reduce {|memo, item| memo + item}' ).
-        must_equal '_.reduce(_.rest(a), (memo, item) => {return memo + item}, a[0])'
+        must_equal '_.reduce(_.rest(a), (memo, item) => memo + item, a[0])'
     end
 
     it "should map reduce: initial, function to _.reduce function, initial" do
       to_js( 'a.reduce(0) {|memo, item| memo + item}' ).
-        must_equal '_.reduce(a, (memo, item) => {return memo + item}, 0)'
+        must_equal '_.reduce(a, (memo, item) => memo + item, 0)'
     end
 
     it "should map reduce: block-pass to _.reduce" do
       to_js( 'a.reduce(&:+)' ).
-        must_equal '_.reduce(_.rest(a), (memo, item) => {return memo + item}, a[0])'
+        must_equal '_.reduce(_.rest(a), (memo, item) => memo + item, a[0])'
     end
   end
 

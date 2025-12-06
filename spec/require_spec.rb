@@ -106,7 +106,7 @@ describe Ruby2JS::Filter::Require do
 
     it "should leave constant assignment expressions alone" do
       to_js( 'React = require("React")' ).
-        must_equal 'let React = require("React")'
+        must_equal 'const React = require("React")'
     end
   end
 

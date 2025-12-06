@@ -63,7 +63,7 @@ describe Ruby2JS::Filter::JQuery do
   describe 'post defaults' do
     it 'should default post parameters' do
       to_js( '$$.post { x() }' ).
-        must_equal '$.post("", {}, () => {x()}, "json")'
+        must_equal '$.post("", {}, () => x(), "json")'
     end
   end
 
