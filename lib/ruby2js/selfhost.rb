@@ -103,12 +103,18 @@ module Ruby2JS
 
       }
 
-      // Check if node is a method call (has parentheses)
-      // In Ruby, this is determined by location info
+      // Check if node is a method call (has parentheses or arguments)
+      // In Ruby, this is determined by location info or presence of arguments
       // Standalone function so it works with any AST node format
       function isMethod(node) {
         if (!node) return false;
-        // Try node's own method first (our Node class)
+        // :send/:csend with arguments is always a method call
+        if (node.type === 'send' || node.type === 'csend') {
+          if (node.children && node.children.length > 2) return true;
+        }
+        // Check is_method property (set by walker for Prism AST when parens used)
+        if (node.is_method !== undefined) return node.is_method;
+        // Try node's own method (our Node class)
         if (typeof node.isMethod === 'function') return node.isMethod();
         // Fall back to checking location info directly
         const loc = node.loc || node.location;
@@ -485,7 +491,7 @@ module Ruby2JS
           eslevel: 2022,
           underscored_private: true,  # Required: prototype methods can't access private fields
           or: :nullish,
-          nullish_to_s: true,
+          nullish_to_s: true,  # Needed for conditional expressions in string interpolation
           filters: FILTERS
         ).to_s
 
