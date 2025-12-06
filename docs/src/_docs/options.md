@@ -311,23 +311,36 @@ puts Ruby2JS.convert('"hello #{x}"', nullish_to_s: true, eslevel: 2020)
 
 Ruby's `||` operator treats only `nil` and `false` as falsy. JavaScript's `||` operator treats `null`, `undefined`, `false`, `0`, `""`, and `NaN` as falsy. This difference can cause subtle bugs when transpiling Ruby code.
 
-**The default is `:nullish`**, which maps Ruby's `||` to JavaScript's `??` (nullish coalescing). This is closer to Ruby semantics because `??` only treats `null` and `undefined` as falsy, preserving values like `0` and `""`.
+**The default is `:nullish`**, which is context-aware:
+- In **boolean contexts** (conditions for `if`, `while`, `unless`, `until`, ternary), Ruby2JS uses `||`
+- In **value contexts** (assignments, return values, arguments), Ruby2JS uses `??`
+
+This gives the best of both worlds: conditions work naturally, while assignments preserve values like `0` and `""`.
+
+```ruby
+# Boolean context - uses ||
+if a || b; x; end        # => if (a || b) x
+while a || b; x; end     # => while (a || b) {x}
+a = 1 if b || c          # => if (b || c) a = 1
+
+# Value context - uses ??
+x = a || b               # => let x = a ?? b
+x ||= 0                  # => x = x ?? 0 (preserves 0)
+```
 
 | Ruby Expression | `or: :nullish` (default) | `or: :logical` |
 |-----------------|--------------------------|----------------|
-| `count \|\| 0` | `count ?? 0` | `count \|\| 0` |
-| `0 \|\| 42` | `0` (0 is kept) | `42` (0 is falsy in JS) |
-| `"" \|\| "default"` | `""` (empty string kept) | `"default"` |
-| `false \|\| true` | `false` (⚠️ differs from Ruby) | `true` |
+| `x = count \|\| 0` | `x = count ?? 0` | `x = count \|\| 0` |
+| `if a \|\| b` | `if (a \|\| b)` | `if (a \|\| b)` |
+| `x = 0 \|\| 42` | `x = 0` (0 is kept) | `x = 42` (0 is falsy in JS) |
 
 {% rendercontent "docs/note", type: "warning" %}
-**Note about `false`:** Ruby's `||` treats `false` as falsy, but JavaScript's `??` does not. If your code relies on `false || x` returning `x`, use `or: :logical` or consider the `truthy: :ruby` option for exact Ruby semantics.
+**Note about `false`:** In value contexts, `false || x` will return `false` (not `x`) because `??` doesn't treat `false` as nullish. Use `or: :logical` or `truthy: :ruby` for exact Ruby semantics with `false`.
 {% endrendercontent %}
 
-In boolean contexts (comparisons, predicates ending in `?`, etc.), Ruby2JS automatically uses `||` even when `:nullish` is set, since the nullish distinction doesn't matter for boolean results:
+Ruby2JS also uses `||` when operands are detected as boolean expressions (comparisons, predicates ending in `?`, negations):
 
 ```ruby
-# These always use || regardless of :or setting
 a > 5 || b < 3      # => a > 5 || b < 3
 a.empty? || b.nil?  # => a.empty || b.nil
 ```
@@ -335,18 +348,18 @@ a.empty? || b.nil?  # => a.empty || b.nil
 ### Configuration
 
 ```ruby
-# Configuration file - use nullish (default)
+# Configuration file - use nullish with context-awareness (default)
 nullish_or
 
-# Configuration file - use logical
+# Configuration file - always use logical ||
 logical_or
 ```
 
 ```ruby
 # API usage
-puts Ruby2JS.convert("a || b")                    # => a ?? b (default)
-puts Ruby2JS.convert("a || b", or: :logical)      # => a || b
-puts Ruby2JS.convert("a || b", or: :nullish)      # => a ?? b
+puts Ruby2JS.convert("x = a || b")                # => let x = a ?? b (default)
+puts Ruby2JS.convert("if a || b; x; end")         # => if (a || b) let x (default)
+puts Ruby2JS.convert("x = a || b", or: :logical)  # => let x = a || b
 ```
 
 ## Truthy
