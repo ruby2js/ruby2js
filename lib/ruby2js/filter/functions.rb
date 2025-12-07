@@ -76,6 +76,16 @@ module Ruby2JS
         target, method, *args = node.children
         return super if excluded?(method) and method != :call
 
+        # debugger as a standalone statement -> JS debugger statement
+        if method == :debugger and target.nil? and args.empty?
+          return s(:debugger)
+        end
+
+        # typeof(x) -> typeof x (JS type checking operator)
+        if method == :typeof and target.nil? and args.length == 1
+          return s(:typeof, process(args.first))
+        end
+
         if [:max, :min].include? method and args.length == 0
           if target.type == :array
             process S(:send, s(:const, nil, :Math), node.children[1],

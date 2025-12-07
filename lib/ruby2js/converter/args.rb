@@ -25,14 +25,14 @@ module Ruby2JS
         kwargs.each_with_index do |kw, index|
           put ', ' unless index == 0
           if kw.type == :kwarg
-            put kw.children.first
+            put jsvar(kw.children.first)
           elsif kw.type == :kwoptarg
-            put kw.children.first
+            put jsvar(kw.children.first)
             unless kw.children.last == s(:send, nil, :undefined)
               put '='; parse kw.children.last
             end
           elsif kw.type == :kwrestarg
-            put '...'; put kw.children.first
+            put '...'; put jsvar(kw.children.first)
           end
         end
         put ' }'

@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require 'prism'
+require 'prism' # Pragma: skip
 require_relative 'node'
 
 module Ruby2JS
@@ -135,11 +135,11 @@ module Ruby2JS
     attr_reader :source, :file, :source_buffer
 
     def initialize(source, file = nil)
+      super()  # Must be first for JavaScript derived class compatibility
       @source = source
       @file = file
       # Create a shared source buffer for all nodes (ensures == comparison works for comments)
       @source_buffer = PrismSourceBuffer.new(source, file)
-      super()
     end
 
     # Create a new AST node

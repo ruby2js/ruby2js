@@ -5,9 +5,8 @@ demo/filters.opal
 testrails
 node_modules
 
-# Selfhost generated outputs (regenerated during build)
-demo/selfhost/selfhost_converter.mjs
-demo/selfhost/transpiled_walker.mjs
+# Selfhost generated outputs (regenerated via npm run build:*)
+demo/selfhost/dist/
 
 # Editor swap files
 *.swp

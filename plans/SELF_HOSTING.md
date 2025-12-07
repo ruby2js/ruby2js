@@ -69,9 +69,29 @@ The self-hosted converter supports:
 
 ## Implementation Progress
 
-### Phase 1: Prism Walker ✅ COMPLETE
+### Phase 1: Prism Walker Transpilation 🔄 IN PROGRESS
 
 Direct AST translation from Prism to Parser-compatible format.
+
+**Goal:** Transpile `lib/ruby2js/prism_walker.rb` and all 12 sub-modules to JavaScript.
+
+**Input (Ruby):** 1,855 lines total
+- `prism_walker.rb` (254 lines) - Main class with helper location classes
+- 12 visitor modules in `prism_walker/` directory (~1,600 lines)
+
+**Output (JavaScript):** 1,957 lines total (all syntax-valid)
+- `prism_walker.js` (363 lines) - Helper classes + main PrismWalker
+- 12 module files (~1,594 lines) - Individual visitor methods
+
+**Current Status:**
+- [x] All 13 files transpile to syntax-valid JavaScript
+- [x] Created `selfhost_walker.rb` filter for walker-specific transformations
+- [x] Fixed core Ruby2JS bug: `def foo(*rest, opt: default)` now works
+- [x] Fixed Return filter: no implicit return in arrow function callbacks
+- [ ] Bundle modules into single unified class
+- [ ] Implement visitor dispatch (currently each module creates separate class)
+- [ ] Test transpiled walker against actual Prism AST input
+- [ ] Verify output matches Ruby walker's Parser-compatible AST
 
 ### Phase 2: Proof of Concept ✅ COMPLETE
 
@@ -182,9 +202,20 @@ These improvements to Ruby2JS were discovered by attempting to transpile specs:
 - `define_method(name, block_var)` form wasn't supported → Fixed in functions filter
 - Private fields (`#field`) can't be accessed from prototype methods → Added `underscored_private` option
 - `handle :type do ... end` macro wasn't being processed → Added to selfhost filter
+- **`def foo(*rest, opt: default)` pattern** - Rest params followed by kwargs produced invalid JS → Fixed in converter/def.rb
+- **`respond_to?` with implicit Object parent** - `super` in `respond_to?` method with no explicit parent class → Handled by removing `respond_to?` definitions in selfhost_walker filter
 
 **Remaining Issue:**
 - Lexical declarations (`let`, `const`) in single-statement `if` context produce invalid JS
+
+**General Ruby Idioms to Promote to Core Filters (Post-Refactor):**
+The following transformations are currently in `selfhost_walker.rb` but are general Ruby idioms
+that would benefit all Ruby2JS users. After self-hosting is complete, consider promoting these
+to the `functions` filter or a new general-purpose filter:
+- `arr[-1] = x` → `arr[arr.length - 1] = x` (negative index assignment)
+- `str[offset, length]` → `str.slice(offset, offset + length)` (Ruby 2-arg slice)
+- `.reject(&:method)` → `.filter(x => !x.method())` (symbol-to-proc with reject)
+- `.reject { |x| cond }` → `.filter(x => !(cond))` (reject to filter with negation)
 
 ## Regenerating the Self-Hosted Converter
 

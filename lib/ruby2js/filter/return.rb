@@ -7,14 +7,34 @@ module Ruby2JS
 
       EXPRESSIONS = [ :array, :float, :hash, :if, :int, :lvar, :nil, :send ]
 
+      # Methods where blocks become arrow functions with implicit returns
+      # These shouldn't get explicit return added
+      IMPLICIT_RETURN_METHODS = %i[
+        map select filter reject find find_all detect collect
+        each each_with_index each_with_object
+        reduce inject fold
+        sort sort_by
+        any? all? none? one?
+        take_while drop_while
+        group_by partition
+        min_by max_by minmax_by
+        forEach
+      ].freeze
+
       def on_block(node)
         node = super
         return node unless node.type == :block
 
-        # Don't wrap Class.new blocks - they contain method definitions, not return values
         call = node.children.first
+
+        # Don't wrap Class.new blocks - they contain method definitions, not return values
         if call.type == :send and call.children[0]&.type == :const and
            call.children[0].children == [nil, :Class] and call.children[1] == :new
+          return node
+        end
+
+        # Don't wrap blocks for methods that become arrow functions with implicit returns
+        if call.type == :send && IMPLICIT_RETURN_METHODS.include?(call.children[1])
           return node
         end
 

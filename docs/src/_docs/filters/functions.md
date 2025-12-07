@@ -23,6 +23,7 @@ If you set the `eslevel` option to `2015` or newer, the Functions filter enables
 * `.chars` {{ caret }} `Array.from()`
 * `.chr` {{ caret }} `fromCharCode`
 * `.clear` {{ caret }} `.length = 0`
+* `debugger` {{ caret }} `debugger` (JS debugger statement)
 * `.define_method` {{ caret }} `klass.prototype.meth = function ...`
 * `.delete` {{ caret }} `delete target[arg]`
 * `.downcase` {{ caret }} `.toLowerCase`
@@ -36,6 +37,7 @@ If you set the `eslevel` option to `2015` or newer, the Functions filter enables
 * `.find_index` {{ caret }} `findIndex`
 * `.first` {{ caret }} `[0]`
 * `.first(n)` {{ caret }} `.slice(0, n)`
+* `.flat_map {}` {{ caret }} `.flatMap()`
 * `.floor` {{ caret }} `Math.floor()`
 * `.group_by {}` {{ caret }} `Object.groupBy()` (ES2024+) or `.reduce()` fallback
 * `.gsub` {{ caret }} `replace(//g)`
@@ -82,6 +84,7 @@ If you set the `eslevel` option to `2015` or newer, the Functions filter enables
 * `.to_i` {{ caret }} `parseInt`
 * `.to_s` {{ caret }} `.toString`
 * `.to_json` {{ caret }} `JSON.stringify(obj)`
+* `typeof(x)` {{ caret }} `typeof x` (JS type checking operator)
 * `.upcase` {{ caret }} `.toUpperCase`
 * `.yield_self {|n| n}` {{ caret }} `(n => n)(...)`
 * `[-n]` {{ caret }} `[*.length-n]` for literal values of `n`

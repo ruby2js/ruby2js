@@ -167,8 +167,9 @@ describe Ruby2JS::Filter::Pragma do
     end
 
     it "should handle pragma at end of complex statement" do
-      to_js('result = foo.bar.baz || default # Pragma: ??').
-        must_equal 'let result = foo.bar.baz ?? default'
+      # Note: 'default' is a JS reserved word, so it gets escaped to '$default'
+      to_js('result = foo.bar.baz || default_value # Pragma: ??').
+        must_equal 'let result = foo.bar.baz ?? default_value'
     end
 
     it "should ignore unknown pragmas" do
@@ -262,6 +263,33 @@ describe Ruby2JS::Filter::Pragma do
     it "should not affect each without pragma" do
       to_js('hash.each { |k, v| puts k }').
         must_include 'hash.each'
+    end
+  end
+
+  describe "skip pragma" do
+    it "should remove require with skip pragma" do
+      to_js("require 'prism' # Pragma: skip").
+        wont_include 'require'
+    end
+
+    it "should remove require_relative with skip pragma" do
+      to_js("require_relative 'other' # Pragma: skip").
+        wont_include 'require'
+    end
+
+    it "should not affect require without pragma" do
+      to_js("require 'something'").
+        must_include 'require'
+    end
+
+    it "should handle skip with other statements" do
+      code = <<~RUBY
+        require 'external' # Pragma: skip
+        puts 'hello'
+      RUBY
+      js = to_js(code)
+      js.wont_include 'require'
+      js.must_include 'puts'
     end
   end
 end

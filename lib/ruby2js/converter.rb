@@ -41,6 +41,19 @@ module Ruby2JS
 
     VASGN = [:cvasgn, :ivasgn, :gvasgn, :lvasgn]
 
+    # JavaScript reserved words that are valid Ruby identifiers
+    # These get prefixed with $ when used as local variables
+    # NOTE: Words like 'if', 'class', 'while' are reserved in BOTH languages,
+    # so they can never appear as Ruby variable names and don't need handling.
+    # Also excludes pass-through identifiers used by Ruby2JS:
+    #   true/false/null/this - used by jQuery filter, etc.
+    # The functions filter maps `debugger` as a statement to JS's `debugger;`
+    JS_RESERVED = Set.new(%w[
+      catch const continue debugger default delete enum export extends finally
+      function import instanceof new switch throw try typeof var void with
+      let static implements interface package private protected public
+    ]).freeze
+
     attr_accessor :binding, :ivars, :namespace
 
     def initialize( ast, comments, vars = {} )
@@ -166,6 +179,13 @@ module Ruby2JS
       else
         Ruby2JS::Node.new(type, args)
       end
+    end
+
+    # Escape JavaScript reserved words by prefixing with $
+    # var → $var, class → $class, etc.
+    def jsvar(name)
+      name = name.to_s
+      JS_RESERVED.include?(name) ? "$#{name}" : name
     end
 
     attr_accessor :strict, :eslevel, :module_type, :comparison, :or, :truthy, :underscored_private, :nullish_to_s

@@ -81,6 +81,29 @@ This pragma guards against that by using nullish coalescing.
 **When to use:** When working with data from external APIs or DOM methods that
 might return `null`, and you want to safely spread the result into an array.
 
+### `skip`
+
+Removes `require` or `require_relative` statements from the output.
+
+This is useful when a Ruby file requires a dependency that shouldn't be
+included in the JavaScript output (e.g., native Ruby gems, runtime dependencies
+that will be provided separately).
+
+```ruby
+require 'prism' # Pragma: skip
+# => (no output)
+
+require_relative 'helper' # Pragma: skip
+# => (no output)
+
+require 'my_module'  # No pragma, will be processed normally
+# => import ... (if ESM filter is active)
+```
+
+**When to use:** When transpiling Ruby code that requires external dependencies
+that are provided separately in the JavaScript environment, or when using the
+`require` filter and you need to exclude specific requires from bundling.
+
 ## Type Disambiguation Pragmas
 
 Some Ruby methods have different JavaScript equivalents depending on the

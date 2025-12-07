@@ -21,7 +21,9 @@ module Ruby2JS
         'method' => :method,         # proc.call → fn()
         'self' => :self_pragma,      # self → this (avoid conflict with :self)
         'proto' => :proto,           # .class → .constructor
-        'entries' => :entries        # Object.entries for hash iteration
+        'entries' => :entries,       # Object.entries for hash iteration
+        # Statement control pragmas
+        'skip' => :skip              # skip require/require_relative statements
       }.freeze
 
       def initialize(*args)
@@ -164,6 +166,13 @@ module Ruby2JS
       # Handle send nodes with type disambiguation and behavior pragmas
       def on_send(node)
         target, method, *args = node.children
+
+        # Skip pragma: remove require/require_relative statements
+        if target.nil? && [:require, :require_relative].include?(method)
+          if pragma?(node, :skip)
+            return s(:hide)
+          end
+        end
 
         # Type disambiguation for ambiguous methods
         case method

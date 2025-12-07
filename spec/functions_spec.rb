@@ -61,6 +61,18 @@ describe Ruby2JS::Filter::Functions do
       to_js( 'puts "hi"' ).must_equal 'console.log("hi")'
     end
 
+    it "should handle debugger statement" do
+      to_js( 'debugger' ).must_equal 'debugger'
+    end
+
+    it "should handle typeof operator" do
+      to_js( 'typeof(x)' ).must_equal 'typeof x'
+    end
+
+    it "should handle typeof in comparison" do
+      to_js( 'typeof(x) == "function"' ).must_equal 'typeof x == "function"'
+    end
+
     it "should handle to_json" do
       to_js( 'obj.to_json' ).must_equal 'JSON.stringify(obj)'
     end
@@ -354,6 +366,11 @@ describe Ruby2JS::Filter::Functions do
     it "should handle map" do
       to_js( 'a.map {|i| i+1}' ).
         must_equal 'a.map(i => i + 1)'
+    end
+
+    it "should handle flat_map" do
+      to_js( 'a.flat_map {|i| [i, i*2]}' ).
+        must_equal 'a.flatMap(i => ([i, i * 2]))'
     end
 
     it "should handle range.map starting from 0" do

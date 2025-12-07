@@ -49,9 +49,9 @@ module Ruby2JS
         end
 
         if value
-          put "#{ var }#{ name } = "; parse value
+          put "#{ var }#{ jsvar(name) } = "; parse value
         else
-          put "#{ var }#{ name }"
+          put "#{ var }#{ jsvar(name) }"
         end
 
         if not hoist

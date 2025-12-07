@@ -40,6 +40,98 @@ module Ruby2JS
         end
       end
 
+      # Handle kwargs after restarg: def f(*args, opt: default)
+      # JS doesn't allow params after rest, so extract kwargs from last element
+      if args
+        kwarg_types = [:kwarg, :kwoptarg, :kwrestarg]
+        has_restarg = args.children.any? { |a| a.type == :restarg }
+        kwargs = args.children.select { |a| kwarg_types.include?(a.type) }
+
+        if has_restarg && !kwargs.empty?
+          restarg = args.children.find { |a| a.type == :restarg }
+          restarg_name = restarg.children.first || 'args'
+
+          # Remove kwargs from args
+          args = s(:args, *args.children.reject { |a| kwarg_types.include?(a.type) })
+
+          # Build destructuring: let { opt = default } = restarg.at(-1)?.constructor === Object ? restarg.pop() : {}
+          # For simplicity, use: let { opt = default } = typeof restarg.at(-1) === 'object' && restarg.at(-1)?.constructor === Object ? restarg.pop() : {}
+          # Even simpler pattern that works: extract options if last arg is plain object
+          kwarg_names = []
+          kwarg_defaults = {}
+          kwargs.each do |kw|
+            if kw.type == :kwarg
+              kwarg_names << kw.children.first
+            elsif kw.type == :kwoptarg
+              kwarg_names << kw.children.first
+              kwarg_defaults[kw.children.first] = kw.children.last
+            end
+          end
+
+          # Create: let $opts = restarg.at(-1)
+          # Create: if (typeof $opts === 'object' && $opts !== null && $opts.constructor === Object) { restarg.pop() } else { $opts = {} }
+          # Create: let { opt1, opt2 = default } = $opts
+          opts_var = :$kwargs
+
+          # $opts = restarg.at(-1)
+          opts_init = s(:lvasgn, opts_var, s(:send, s(:lvar, restarg_name), :at, s(:int, -1)))
+
+          # typeof $opts === 'object' && $opts !== null && $opts.constructor === Object
+          # Use :! and :== instead of :!== since Ruby symbols can't contain ==
+          # Use :attr for property access (not method call)
+          is_plain_object = s(:and,
+            s(:and,
+              s(:send, s(:send, nil, :typeof, s(:lvar, opts_var)), :===, s(:str, 'object')),
+              s(:send, s(:send, s(:lvar, opts_var), :==, s(:nil)), :!)),
+            s(:send, s(:attr, s(:lvar, opts_var), :constructor), :===, s(:const, nil, :Object)))
+
+          # if check then restarg.pop() else $opts = {}
+          conditional = s(:if, is_plain_object,
+            s(:send, s(:lvar, restarg_name), :pop),
+            s(:lvasgn, opts_var, s(:hash)))
+
+          # Destructure: let { k1, k2 = default } = $opts
+          pairs = kwarg_names.map do |kw_name|
+            if kwarg_defaults[kw_name]
+              s(:pair, s(:sym, kw_name), kwarg_defaults[kw_name])
+            else
+              s(:pair, s(:sym, kw_name), s(:lvar, kw_name))
+            end
+          end
+          destructure = s(:lvasgn, s(:hash_pattern, *kwarg_names.map { |n|
+            if kwarg_defaults[n]
+              s(:match_var_with_default, n, kwarg_defaults[n])
+            else
+              s(:match_var, n)
+            end
+          }), s(:lvar, opts_var))
+
+          # Simpler approach: just use direct assignment for each kwarg
+          kwarg_stmts = []
+          kwarg_stmts << opts_init
+          kwarg_stmts << conditional
+          kwarg_names.each do |kw_name|
+            if kwarg_defaults[kw_name]
+              # let kw = $opts.kw ?? default (nullish coalescing handles undefined)
+              # Use :attr for property access and :nullish for ?? operator
+              kwarg_stmts << s(:lvasgn, kw_name,
+                s(:nullish, s(:attr, s(:lvar, opts_var), kw_name), kwarg_defaults[kw_name]))
+            else
+              # let kw = $opts.kw (required kwarg)
+              kwarg_stmts << s(:lvasgn, kw_name, s(:attr, s(:lvar, opts_var), kw_name))
+            end
+          end
+
+          if body.type == :begin
+            body = s(:begin, *kwarg_stmts, *body.children)
+          elsif body
+            body = s(:begin, *kwarg_stmts, body)
+          else
+            body = s(:begin, *kwarg_stmts)
+          end
+        end
+      end
+
       add_implicit_block = false
 
       walk = ->(node) do
@@ -137,7 +229,9 @@ module Ruby2JS
         end
 
         put '('
-        if args.type == :forward_args
+        if args.nil?
+          # Method with no arguments
+        elsif args.type == :forward_args
           parse args
         else
           parse s(:args, *args.children.select {|arg| arg.type != :shadowarg})
@@ -161,14 +255,14 @@ module Ruby2JS
     end
 
     handle :optarg do |name, value|
-      put name
+      put jsvar(name)
       put '='
-      parse value 
+      parse value
     end
 
     handle :restarg do |name=nil|
       put '...'
-      put name if name
+      put jsvar(name) if name
     end
   end
 end
