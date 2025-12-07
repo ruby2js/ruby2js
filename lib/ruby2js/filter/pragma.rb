@@ -12,7 +12,16 @@ module Ruby2JS
         'nullish' => :nullish,
         'noes2015' => :noes2015,
         'function' => :noes2015,
-        'guard' => :guard
+        'guard' => :guard,
+        # Type disambiguation pragmas
+        'array' => :array,
+        'hash' => :hash,
+        'string' => :string,
+        # Behavior pragmas
+        'method' => :method,         # proc.call → fn()
+        'self' => :self_pragma,      # self → this (avoid conflict with :self)
+        'proto' => :proto,           # .class → .constructor
+        'entries' => :entries        # Object.entries for hash iteration
       }.freeze
 
       def initialize(*args)
@@ -163,6 +172,108 @@ module Ruby2JS
         else
           super
         end
+      end
+
+      # Handle send nodes with type disambiguation and behavior pragmas
+      def on_send(node)
+        target, method, *args = node.children
+
+        # Type disambiguation for ambiguous methods
+        case method
+
+        # .dup - Array: .slice(), Hash: {...obj}, String: str (no-op in JS)
+        when :dup
+          if pragma?(node, :array)
+            # target.slice() - creates shallow copy of array
+            return process s(:send, target, :slice)
+          elsif pragma?(node, :hash)
+            # {...target}
+            return process s(:hash, s(:kwsplat, target))
+          elsif pragma?(node, :string)
+            # No-op for strings in JS (they're immutable)
+            return process target
+          end
+
+        # << - Array: push, String: +=
+        when :<<
+          if pragma?(node, :array) && args.length == 1
+            # target.push(arg)
+            return process s(:send, target, :push, args.first)
+          elsif pragma?(node, :string) && args.length == 1
+            # target += arg (returns new string)
+            return process s(:op_asgn, target, :+, args.first)
+          end
+
+        # .include? - Array: includes(), String: includes(), Hash: 'key' in obj
+        when :include?
+          if pragma?(node, :hash) && args.length == 1
+            # arg in target (uses :in? synthetic type)
+            return process s(:in?, args.first, target)
+          end
+          # Note: array and string both use .includes() which functions filter handles
+
+        # .call - with method pragma, convert proc.call(args) to proc(args)
+        when :call
+          if pragma?(node, :method) && target
+            # Direct invocation using :call type with nil method
+            return process node.updated(:call, [target, nil, *args])
+          end
+
+        # .class - with proto pragma, use .constructor instead
+        when :class
+          if pragma?(node, :proto) && target
+            return process s(:attr, target, :constructor)
+          end
+        end
+
+        super
+      end
+
+      # Handle self with self pragma -> this
+      def on_self(node)
+        if pragma?(node, :self_pragma)
+          s(:send, nil, :this)
+        else
+          super
+        end
+      end
+
+      # Handle each/each_pair on hashes with entries pragma
+      # hash.each { |k,v| } -> Object.entries(hash).forEach(([k,v]) => {})
+      def on_block(node)
+        call, args, body = node.children
+
+        if pragma?(node, :noes2015)
+          # Transform to use :deff which forces function syntax
+          function = node.updated(:deff, [nil, args, body])
+          return process s(call.type, *call.children, function)
+        end
+
+        if pragma?(node, :entries) && call.type == :send
+          target, method = call.children[0], call.children[1]
+
+          if [:each, :each_pair].include?(method) && target
+            # Transform: hash.each { |k,v| body }
+            # Into: Object.entries(hash).forEach(([k,v]) => body)
+            entries_call = s(:send,
+              s(:const, nil, :Object), :entries, target)
+
+            # Wrap args in destructuring array pattern if multiple args
+            new_args = if args.children.length > 1
+              s(:args, s(:mlhs, *args.children))
+            else
+              args
+            end
+
+            return process node.updated(nil, [
+              s(:send, entries_call, :forEach),
+              new_args,
+              body
+            ])
+          end
+        end
+
+        super
       end
     end
 

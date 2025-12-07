@@ -81,6 +81,92 @@ This pragma guards against that by using nullish coalescing.
 **When to use:** When working with data from external APIs or DOM methods that
 might return `null`, and you want to safely spread the result into an array.
 
+## Type Disambiguation Pragmas
+
+Some Ruby methods have different JavaScript equivalents depending on the
+receiver type. These pragmas let you specify the intended type.
+
+### `array`
+
+Specifies that the receiver is an Array.
+
+```ruby
+arr.dup # Pragma: array
+# => arr.slice()
+
+arr << item # Pragma: array
+# => arr.push(item)
+```
+
+**When to use:** When Ruby2JS can't infer the type and you need array-specific
+behavior.
+
+### `hash`
+
+Specifies that the receiver is a Hash (JavaScript object).
+
+```ruby
+obj.dup # Pragma: hash
+# => {...obj}
+
+obj.include?(key) # Pragma: hash
+# => key in obj
+```
+
+**When to use:** When you need hash-specific operations like the `in` operator
+for key checking.
+
+### `string`
+
+Specifies that the receiver is a String.
+
+```ruby
+str.dup # Pragma: string
+# => str
+```
+
+**Note:** Strings in JavaScript are immutable, so `.dup` is a no-op.
+
+## Behavior Pragmas
+
+These pragmas modify how specific Ruby patterns translate to JavaScript.
+
+### `method`
+
+Converts `.call()` to direct invocation for function objects.
+
+```ruby
+fn.call(x, y) # Pragma: method
+# => fn(x, y)
+```
+
+**When to use:** When working with first-class functions stored in variables
+that need to be invoked directly rather than using `.call()`.
+
+### `proto`
+
+Converts `.class` to `.constructor` for JavaScript prototype access.
+
+```ruby
+obj.class # Pragma: proto
+# => obj.constructor
+```
+
+**When to use:** When you need to access the JavaScript constructor function
+rather than a literal `.class` property.
+
+### `entries`
+
+Converts hash iteration to use `Object.entries()`.
+
+```ruby
+hash.each { |k, v| process(k, v) } # Pragma: entries
+# => Object.entries(hash).forEach(([k, v]) => process(k, v))
+```
+
+**When to use:** When iterating over JavaScript objects where you need both
+keys and values, and the standard `.each` translation doesn't apply.
+
 ## Usage Notes
 
 ### Case Insensitivity

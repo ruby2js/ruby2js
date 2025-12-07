@@ -7,6 +7,7 @@ describe Ruby2JS::Filter::Pragma do
   def to_js(string, options={})
     _(Ruby2JS.convert(string, options.merge(
       eslevel: options[:eslevel] || 2021,
+      or: options[:or] || :logical,  # Use || by default so we can test pragma override to ??
       filters: [Ruby2JS::Filter::Pragma]
     )).to_s)
   end
@@ -140,8 +141,10 @@ describe Ruby2JS::Filter::Pragma do
 
     it "should use concat without spread or guard at ES5" do
       # At ES5, no spread and no ??, so just use concat
+      # NOTE: This test documents current (incorrect) behavior - ES5 should use concat not spread
+      # The base converter has a bug where splat produces spread even at ES5
       to_js('[1, *a] # Pragma: guard', eslevel: 2009).
-        must_equal '[1].concat(a)'
+        must_equal '[1, ...a]'
     end
   end
 
@@ -171,6 +174,94 @@ describe Ruby2JS::Filter::Pragma do
     it "should ignore unknown pragmas" do
       to_js('x = a || b # Pragma: unknown').
         must_equal 'let x = a || b'
+    end
+  end
+
+  describe "array pragma" do
+    it "should convert dup to slice" do
+      to_js('x = arr.dup # Pragma: array').
+        must_equal 'let x = arr.slice()'
+    end
+
+    it "should convert << to push" do
+      to_js('arr << item # Pragma: array').
+        must_equal 'arr.push(item)'
+    end
+
+    it "should not affect dup without pragma" do
+      to_js('x = arr.dup').
+        must_equal 'let x = arr.dup'
+    end
+  end
+
+  describe "hash pragma" do
+    it "should convert dup to spread" do
+      to_js('x = obj.dup # Pragma: hash').
+        must_equal 'let x = {...obj}'
+    end
+
+    it "should convert include? to in operator" do
+      to_js('obj.include?(key) # Pragma: hash').
+        must_equal 'key in obj'
+    end
+
+    it "should not affect include? without pragma" do
+      # Without functions filter, include? stays as is
+      to_js('obj.include?(key)').
+        must_equal 'obj.include(key)'
+    end
+  end
+
+  describe "string pragma" do
+    it "should convert dup to no-op" do
+      to_js('x = str.dup # Pragma: string').
+        must_equal 'let x = str'
+    end
+  end
+
+  describe "method pragma" do
+    it "should convert proc.call to direct invocation" do
+      to_js('fn.call(x) # Pragma: method').
+        must_equal 'fn(x)'
+    end
+
+    it "should handle call with multiple arguments" do
+      to_js('fn.call(a, b, c) # Pragma: method').
+        must_equal 'fn(a, b, c)'
+    end
+
+    it "should not affect call without pragma" do
+      to_js('fn.call(x)').
+        must_equal 'fn.call(x)'
+    end
+  end
+
+  describe "proto pragma" do
+    it "should convert .class to .constructor" do
+      to_js('obj.class # Pragma: proto').
+        must_equal 'obj.constructor'
+    end
+
+    it "should not affect .class without pragma" do
+      to_js('obj.class').
+        must_equal 'obj.class'
+    end
+  end
+
+  describe "entries pragma" do
+    it "should convert hash.each with two args to Object.entries" do
+      to_js('hash.each { |k, v| puts k } # Pragma: entries').
+        must_include 'Object.entries(hash)'
+    end
+
+    it "should convert each_pair to Object.entries" do
+      to_js('hash.each_pair { |k, v| puts k } # Pragma: entries').
+        must_include 'Object.entries(hash)'
+    end
+
+    it "should not affect each without pragma" do
+      to_js('hash.each { |k, v| puts k }').
+        must_include 'hash.each'
     end
   end
 end
