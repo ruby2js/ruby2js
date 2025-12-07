@@ -114,19 +114,6 @@ module Ruby2JS
         end
       end
 
-      # Handle blocks/lambdas with noes2015 pragma -> force function syntax
-      def on_block(node)
-        call, args, body = node.children
-
-        if pragma?(node, :noes2015)
-          # Transform to use :deff which forces function syntax
-          function = node.updated(:deff, [nil, args, body])
-          process s(call.type, *call.children, function)
-        else
-          super
-        end
-      end
-
       # Handle def (anonymous functions) with noes2015 pragma
       def on_def(node)
         if node.children[0].nil? && pragma?(node, :noes2015)
