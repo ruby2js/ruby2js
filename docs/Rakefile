@@ -158,46 +158,21 @@ task :clean do
 end
 
 task :clobber => :clean do
-  rm_f "#{root}/demo/selfhost/selfhost_converter.mjs"
-  rm_f "#{root}/demo/selfhost/transpiled_walker.mjs"
+  rm_rf "#{root}/demo/selfhost/dist"
 end
 
-# Selfhost demo - generate and copy source files
+# Selfhost demo - copy browser demo (stub for now, full implementation pending)
 selfhost_dir = "#{dest}/selfhost"
 selfhost_source = "#{root}/demo/selfhost"
 
 directory dest
 directory selfhost_dir => dest
 
-# Generate selfhost_converter.mjs as a re-export from transpiled_walker.mjs
-# (transpile_walker.rb exports both PrismWalker and Converter in one file)
-file "#{selfhost_source}/selfhost_converter.mjs" => ["#{selfhost_source}/transpiled_walker.mjs"] do
-  IO.write("#{selfhost_source}/selfhost_converter.mjs",
-    "// Re-export Converter from transpiled_walker.mjs\n" +
-    "export { Converter, s } from './transpiled_walker.mjs';\n")
+file "#{selfhost_dir}/index.html" => [selfhost_dir, "#{selfhost_source}/browser_demo.html"] do
+  cp "#{selfhost_source}/browser_demo.html", "#{selfhost_dir}/index.html"
 end
 
-# Generate transpiled_walker.mjs from Ruby source
-file "#{selfhost_source}/transpiled_walker.mjs" => ["#{selfhost_source}/transpile_walker.rb", *source_files] do
-  Dir.chdir(selfhost_source) do
-    sh "ruby transpile_walker.rb > transpiled_walker.mjs"
-  end
-end
-
-# Map source files to destination names (browser_demo.html -> index.html)
-selfhost_file_map = {
-  'browser_demo.html' => 'index.html',
-  'selfhost_converter.mjs' => 'selfhost_converter.mjs',
-  'transpiled_walker.mjs' => 'transpiled_walker.mjs'
-}
-
-selfhost_file_map.each do |src, dst|
-  file "#{selfhost_dir}/#{dst}" => [selfhost_dir, "#{selfhost_source}/#{src}"] do
-    cp "#{selfhost_source}/#{src}", "#{selfhost_dir}/#{dst}"
-  end
-end
-
-task :selfhost => selfhost_file_map.values.map { |f| "#{selfhost_dir}/#{f}" }
+task :selfhost => ["#{selfhost_dir}/index.html"]
 
 task :default => [
   "#{dest}/index.erb",

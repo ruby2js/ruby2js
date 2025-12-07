@@ -335,96 +335,27 @@ end</textarea>
   </footer>
 
   <script type="module">
-    // Browser requires WASI shim and manual WebAssembly setup
-    import { WASI } from "https://unpkg.com/@bjorn3/browser_wasi_shim@0.3.0/dist/index.js";
-    import { parsePrism } from "https://unpkg.com/@ruby/prism@1.4.0/src/parsePrism.js";
-
-    // Import the self-hosted walker and converter
-    import { PrismWalker } from "./transpiled_walker.mjs";
-    import { Converter } from "./selfhost_converter.mjs";
+    // Self-hosted demo - work in progress
+    // The walker has been transpiled, converter transpilation is pending
 
     // Initialize
     const input = document.getElementById('input');
     const output = document.getElementById('output');
     const status = document.getElementById('status');
 
-    let prismExports;
-    let debounceTimer;
-
     async function init() {
-      try {
-        // Compile WebAssembly module
-        status.textContent = 'Loading WebAssembly module...';
-        const wasm = await WebAssembly.compileStreaming(
-          fetch("https://unpkg.com/@ruby/prism@1.4.0/src/prism.wasm")
-        );
-
-        // Initialize WASI
-        status.textContent = 'Initializing WASI...';
-        const wasi = new WASI([], [], []);
-        const instance = await WebAssembly.instantiate(wasm, {
-          wasi_snapshot_preview1: wasi.wasiImport
-        });
-        wasi.initialize(instance);
-
-        prismExports = instance.exports;
-
-        status.className = 'success';
-        status.textContent = 'Ready! Start typing Ruby code...';
-
-        // Initial conversion
-        convert();
-      } catch (e) {
-        status.className = 'error';
-        status.textContent = 'Error loading Prism: ' + e.message;
-        console.error(e);
-      }
-    }
-
-    // Wrapper to match Node.js API
-    function parse(code) {
-      return parsePrism(prismExports, code);
+      status.className = 'warning';
+      status.textContent = 'Work in progress - converter transpilation pending';
+      output.value = '// Self-hosted demo is under development\n// Walker transpilation: complete\n// Converter transpilation: pending';
     }
 
     function convert() {
-      if (!prismExports) return;
-
-      try {
-        const rubyCode = input.value;
-        const result = parse(rubyCode);
-
-        if (result.errors.length > 0) {
-          output.value = 'Parse errors:\n' + result.errors.map(e => e.message).join('\n');
-          status.className = 'error';
-          status.textContent = 'Parse error';
-          return;
-        }
-
-        const walker = new PrismWalker(rubyCode);
-        const ast = walker.visit(result.value);
-        const converter = new Converter(ast, new Map());  // Empty comments as Map
-        converter.eslevel = 2015;  // Use ES2015 for let/const
-        converter.enable_vertical_whitespace();
-        converter.convert();
-        const js = converter.to_s();
-
-        output.value = js;
-        status.className = 'success';
-        status.textContent = 'Converted successfully!';
-      } catch (e) {
-        output.value = 'Error: ' + e.message;
-        status.className = 'error';
-        status.textContent = 'Conversion error: ' + e.message;
-        console.error(e);
-      }
+      output.value = '// Self-hosted demo is under development\n// Walker transpilation: complete\n// Converter transpilation: pending\n\n// Your Ruby code:\n' + input.value.split('\n').map(l => '// ' + l).join('\n');
     }
 
     // Debounced conversion on input
     input.addEventListener('input', () => {
-      status.className = '';
-      status.textContent = 'Converting...';
-      clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(convert, 300);
+      convert();
     });
 
     init();
