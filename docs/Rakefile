@@ -131,7 +131,7 @@ file "#{dest}/litelement.js" => ["#{root}/demo/litelement.js"] do
 end
 
 file "#{dest}/livedemo.js" => ["#{root}/demo/livedemo.js.rb", *controller_files] do
-  sh "#{RbConfig.ruby} #{root}/demo/ruby2js.rb --filter esm --filter require --filter stimulus --filter functions --identity --es2019 #{root}/demo/livedemo.js.rb | " +
+  sh "#{RbConfig.ruby} #{root}/demo/ruby2js.rb --filter esm --filter require --filter stimulus --filter functions --identity --es2020 #{root}/demo/livedemo.js.rb | " +
     "npx rollup -f iife --context window -p @rollup/plugin-node-resolve | " +
     "#{terser} > #{dest}/livedemo.js"
 end
@@ -169,11 +169,12 @@ selfhost_source = "#{root}/demo/selfhost"
 directory dest
 directory selfhost_dir => dest
 
-# Generate selfhost_converter.mjs from Ruby source
-file "#{selfhost_source}/selfhost_converter.mjs" => source_files do
-  Dir.chdir(root) do
-    sh "bundle exec ruby lib/ruby2js/selfhost.rb --esm > demo/selfhost/selfhost_converter.mjs"
-  end
+# Generate selfhost_converter.mjs as a re-export from transpiled_walker.mjs
+# (transpile_walker.rb exports both PrismWalker and Converter in one file)
+file "#{selfhost_source}/selfhost_converter.mjs" => ["#{selfhost_source}/transpiled_walker.mjs"] do
+  IO.write("#{selfhost_source}/selfhost_converter.mjs",
+    "// Re-export Converter from transpiled_walker.mjs\n" +
+    "export { Converter, s } from './transpiled_walker.mjs';\n")
 end
 
 # Generate transpiled_walker.mjs from Ruby source
