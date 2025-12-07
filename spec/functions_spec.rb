@@ -848,4 +848,56 @@ describe Ruby2JS::Filter::Functions do
       to_js_include_all( 'a.clear' ).must_equal 'a.length = 0'
     end
   end
+
+  describe "freeze" do
+    it "should handle .freeze" do
+      to_js( 'obj.freeze' ).must_equal 'Object.freeze(obj)'
+    end
+
+    it "should handle .freeze on literal" do
+      to_js( '{a: 1}.freeze' ).must_equal 'Object.freeze({a: 1})'
+    end
+
+    it "should handle .freeze on array" do
+      to_js( '[1, 2, 3].freeze' ).must_equal 'Object.freeze([1, 2, 3])'
+    end
+  end
+
+  describe "negative index assignment" do
+    it "should handle arr[-1] = x" do
+      to_js( 'arr[-1] = x' ).must_equal 'arr[arr.length - 1] = x'
+    end
+
+    it "should handle arr[-2] = x" do
+      to_js( 'arr[-2] = x' ).must_equal 'arr[arr.length - 2] = x'
+    end
+
+    it "should handle ivar target with negative index" do
+      to_js( '@arr[-1] = x' ).must_equal 'this._arr[this._arr.length - 1] = x'
+    end
+  end
+
+  describe "two-argument slice" do
+    it "should handle str[0, 5]" do
+      to_js( 'str[0, 5]' ).must_equal 'str.slice(0, 0 + 5)'
+    end
+
+    it "should handle str[3, 2]" do
+      to_js( 'str[3, 2]' ).must_equal 'str.slice(3, 3 + 2)'
+    end
+
+    it "should handle negative start" do
+      to_js( 'str[-3, 2]' ).must_equal 'str.slice(str.length - 3, str.length - 3 + 2)'
+    end
+  end
+
+  describe "reject with block" do
+    it "should handle reject with block" do
+      to_js( 'arr.reject { |x| x.empty? }' ).must_equal 'arr.filter(x => !(x.length == 0))'
+    end
+
+    it "should handle reject with simple condition" do
+      to_js( 'arr.reject { |n| n > 5 }' ).must_equal 'arr.filter(n => !(n > 5))'
+    end
+  end
 end

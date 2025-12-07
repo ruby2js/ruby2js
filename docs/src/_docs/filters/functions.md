@@ -39,6 +39,7 @@ If you set the `eslevel` option to `2015` or newer, the Functions filter enables
 * `.first(n)` {{ caret }} `.slice(0, n)`
 * `.flat_map {}` {{ caret }} `.flatMap()`
 * `.floor` {{ caret }} `Math.floor()`
+* `.freeze` {{ caret }} `Object.freeze()`
 * `.group_by {}` {{ caret }} `Object.groupBy()` (ES2024+) or `.reduce()` fallback
 * `.gsub` {{ caret }} `replace(//g)`
 * `.include?` {{ caret }} `.indexOf() != -1`
@@ -55,11 +56,13 @@ If you set the `eslevel` option to `2015` or newer, the Functions filter enables
 * `.method_defined?` {{ caret }} `klass.prototype.hasOwnProperty(meth)` or `meth in klass.prototype`
 * `.min` {{ caret }} `Math.min.apply(Math)`
 * `.min_by {}` {{ caret }} `.reduce()`
+* `[-n] = x` {{ caret }} `[*.length-n] = x` for literal negative index assignment
 * `.new(size,default)` {{ caret }} `== .new(size).fill(default)`
 * `.nil?` {{ caret }} `== null`
 * `.ord` {{ caret }} `charCodeAt(0)`
 * `puts` {{ caret }} `console.log`
 * `rand` {{ caret }} `Math.random`
+* `.reject {}` {{ caret }} `.filter(x => !(...))` (negated condition)
 * `.replace` {{ caret }} `.length = 0; ...push.apply(*)`
 * `.respond_to?` {{ caret }} `right in left`
 * `.rindex` {{ caret }} `.lastIndexOf`
@@ -90,6 +93,7 @@ If you set the `eslevel` option to `2015` or newer, the Functions filter enables
 * `[-n]` {{ caret }} `[*.length-n]` for literal values of `n`
 * `[n...m]` {{ caret }} `.slice(n,m)`
 * `[n..m]` {{ caret }} `.slice(n,m+1)`
+* `[start, length]` {{ caret }} `.slice(start, start+length)` (Ruby 2-arg slice)
 * `[n..m] = v` {{ caret }} `.splice(n, m-n+1, ...v)` (ES2015+ for spread syntax)
 * `.slice!(n..m)` {{ caret }} `.splice(n, m-n+1)`
 * `[/r/, n]` {{ caret }} `.match(/r/)[n]`

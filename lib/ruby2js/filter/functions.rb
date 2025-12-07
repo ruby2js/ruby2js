@@ -192,6 +192,13 @@ module Ruby2JS
           end
 
         elsif method == :[]= and args.length == 2 and
+          args[0].type == :int and args[0].children.first < 0
+          # arr[-1] = x => arr[arr.length - 1] = x
+          neg_index = -args[0].children.first
+          new_index = S(:send, S(:attr, target, :length), :-, s(:int, neg_index))
+          process S(:send, target, :[]=, new_index, args[1])
+
+        elsif method == :[]= and args.length == 2 and
           %i[irange erange].include?(args[0].type)
           # input: arr[start..finish] = value or arr[start...finish] = value
           # output: arr.splice(start, length, ...value)
@@ -476,6 +483,20 @@ module Ruby2JS
                 :[], args[1] || s(:int, 0))
             end
 
+          elsif args.length == 2 and args[0].type == :int and args[1].type == :int
+            # str[start, length] => str.slice(start, start + length)
+            # Ruby's 2-arg slice: str[start, length] extracts length chars starting at start
+            start = args[0]
+            length = args[1]
+            if start.children.first < 0
+              # Handle negative start index
+              start_expr = S(:send, S(:attr, target, :length), :-, s(:int, -start.children.first))
+            else
+              start_expr = start
+            end
+            end_expr = S(:send, start_expr, :+, length)
+            process S(:send, target, :slice, start_expr, end_expr)
+
           elsif node.children.length != 3
             super
 
@@ -696,6 +717,9 @@ module Ruby2JS
         elsif method == :new and args.length == 2 and target == s(:const, nil, :Array)
           s(:send, S(:send, target, :new, args.first), :fill, args.last)
 
+        elsif method == :freeze and args.length == 0
+          process S(:send, s(:const, nil, :Object), :freeze, target)
+
         elsif method == :chars and args.length == 0
           S(:send, s(:const, nil, :Array), :from, target)
 
@@ -736,6 +760,15 @@ module Ruby2JS
           call = call.updated nil, [call.children.first, :filter]
           node.updated nil, [process(call), process(node.children[1]),
             s(:autoreturn, *process_all(node.children[2..-1]))]
+
+        elsif method == :reject and call.children.length == 2
+          # arr.reject { |x| cond } => arr.filter(x => !(cond))
+          call = call.updated nil, [call.children.first, :filter]
+          # Process the body first, then negate - use :send with :! to wrap
+          processed_body = process_all(node.children[2..-1])
+          negated_body = s(:send, s(:begin, *processed_body), :!)
+          node.updated nil, [process(call), process(node.children[1]),
+            s(:autoreturn, negated_body)]
 
         elsif method == :any? and call.children.length == 2
           call = call.updated nil, [call.children.first, :some]

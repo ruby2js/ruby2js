@@ -2,15 +2,22 @@
 
 # Selfhost Walker Filter - Transformations for PrismWalker transpilation
 #
-# Handles idioms specific to the walker codebase:
-# - arr[-1] = x → arr[arr.length - 1] = x (negative index assignment)
-# - @source[offset, length] → this.#source.slice(offset, offset + length)
-# - .to_sym → removed (symbols are strings in JS)
-# - .freeze → removed (not needed in JS)
+# Handles idioms specific to the walker codebase.
+#
+# Note: Many transformations previously here are now in functions filter:
+# - arr[-1] = x → arr[arr.length - 1] = x
+# - str[offset, length] → str.slice(offset, offset + length)
+# - .freeze → Object.freeze()
+# - .reject { } → .filter { ! }
+#
+# What remains here:
+# - Skip external requires (prism, node)
+# - .to_sym removal (symbols are strings in JS)
 # - .empty? → .length == 0
-# - require 'prism' / require_relative 'node' → removed (external deps)
-# - respond_to? method definitions → removed (use JS 'in' operator instead)
-# - .reject { } → .filter { ! } with negated condition
+# - arr << x → arr.push(x) (ensure works in all contexts)
+# - .reject(&:method) symbol-to-proc pattern
+# - Remove Ruby-specific method definitions (respond_to?, etc.)
+# - autoreturn for constructor calls
 
 require 'ruby2js'
 
@@ -48,36 +55,8 @@ module Ruby2JS
             end
           end
 
-          # arr[-1] = x → arr[arr.length - 1] = x
-          if method == :[]= && args.length == 2
-            index_arg = args[0]
-            if index_arg&.type == :int && index_arg.children[0] < 0
-              neg_index = index_arg.children[0]
-              # arr[arr.length - 1] = value (use :attr for property access)
-              new_index = s(:send,
-                s(:attr, target, :length),
-                :+,
-                s(:int, neg_index))
-              return process s(:send, target, :[]=, new_index, args[1])
-            end
-          end
-
-          # Ruby's 2-arg slice: str[offset, length] → str.slice(offset, offset + length)
-          # This is used for @source[loc.start_offset, loc.length]
-          if method == :[] && args.length == 2
-            offset, length = args
-            # Convert to .slice(offset, offset + length)
-            end_pos = s(:send, offset, :+, length)
-            return process s(:send, target, :slice, offset, end_pos)
-          end
-
           # .to_sym → no-op (symbols are strings in JS)
           if method == :to_sym && args.empty? && target
-            return process target
-          end
-
-          # .freeze → no-op (JS objects don't need freezing for our purposes)
-          if method == :freeze && args.empty? && target
             return process target
           end
 
@@ -165,30 +144,6 @@ module Ruby2JS
               return s(:hide)
             end
           end
-          super
-        end
-
-        # Handle .reject { } → .filter() with negated condition
-        def on_block(node)
-          call = node.children[0]
-          return super unless call&.type == :send
-
-          target, method = call.children[0], call.children[1]
-
-          if method == :reject && target
-            args = node.children[1]
-            body = node.children[2]
-            # Negate the body: .reject { |x| cond } → .filter(x => !(cond))
-            # Wrap in :not instead of sending :! to avoid return issues
-            negated_body = s(:send, s(:begin, body), :!)
-            new_block = node.updated(nil, [
-              s(:send, target, :filter),
-              args,
-              negated_body
-            ])
-            return process new_block
-          end
-
           super
         end
       end

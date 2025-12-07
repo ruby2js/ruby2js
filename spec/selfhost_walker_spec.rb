@@ -15,6 +15,7 @@ describe "Selfhost Walker Transpilation" do
     source = File.read(File.expand_path('../../lib/ruby2js/prism_walker.rb', __FILE__))
     Ruby2JS.convert(source,
       eslevel: 2022,
+      comparison: :identity,
       underscored_private: true,
       file: File.expand_path('../../lib/ruby2js/prism_walker.rb', __FILE__),
       filters: [
