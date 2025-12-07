@@ -28,7 +28,7 @@ module Ruby2JS
 
     # Check if this is a method call (has parentheses or arguments)
     # Uses location-based detection like Parser::AST::Node to check for '(' after selector
-    def is_method?
+    def is_method? # Pragma: skip
       return false if type == :attr
       return true if type == :call
       return true unless loc
@@ -51,33 +51,33 @@ module Ruby2JS
     end
 
     # For compatibility with code that checks Parser::AST::Node
-    def is_a?(klass)
+    def is_a?(klass) # Pragma: skip
       return true if defined?(::Parser::AST::Node) && klass == ::Parser::AST::Node
       super
     end
 
     # For compatibility with code that uses === checks
-    def self.===(other)
+    def self.===(other) # Pragma: skip
       other.is_a?(Node) || (defined?(::Parser::AST::Node) && other.is_a?(::Parser::AST::Node))
     end
 
     # For compatibility with kind_of? checks
-    alias :kind_of? :is_a?
+    alias :kind_of? :is_a? # Pragma: skip
 
     # Equality based on type and children
-    def ==(other)
+    def ==(other) # Pragma: skip
       return false unless other.respond_to?(:type) && other.respond_to?(:children)
       type == other.type && children == other.children
     end
 
-    alias :eql? :==
+    alias :eql? :== # Pragma: skip
 
-    def hash
+    def hash # Pragma: skip
       [type, children].hash
     end
 
     # Pretty print the AST
-    def to_sexp(indent = 0)
+    def to_sexp(indent = 0) # Pragma: skip
       prefix = "  " * indent
       if children.empty?
         "#{prefix}(#{type})"
@@ -96,7 +96,7 @@ module Ruby2JS
       end
     end
 
-    def inspect
+    def inspect # Pragma: skip
       "#<Ruby2JS::Node #{to_sexp}>"
     end
   end

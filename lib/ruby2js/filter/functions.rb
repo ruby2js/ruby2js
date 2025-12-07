@@ -720,6 +720,23 @@ module Ruby2JS
         elsif method == :freeze and args.length == 0
           process S(:send, s(:const, nil, :Object), :freeze, target)
 
+        elsif method == :to_sym and args.length == 0
+          # .to_sym is a no-op - symbols are strings in JS
+          process target
+
+        elsif method == :reject and args.length == 1 and args[0]&.type == :block_pass
+          # .reject(&:method) → .filter with negated block
+          # reject(&:empty?) → filter(item => !item.empty())
+          block_pass = args[0]
+          if block_pass.children[0]&.type == :sym
+            method_sym = block_pass.children[0].children[0]
+            arg = s(:arg, :item)
+            body = s(:send, s(:begin, s(:send, s(:lvar, :item), method_sym)), :!)
+            new_block = s(:block, s(:send, target, :filter), s(:args, arg), s(:autoreturn, body))
+            return process new_block
+          end
+          super
+
         elsif method == :chars and args.length == 0
           S(:send, s(:const, nil, :Array), :from, target)
 

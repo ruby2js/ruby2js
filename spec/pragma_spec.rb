@@ -291,5 +291,47 @@ describe Ruby2JS::Filter::Pragma do
       js.wont_include 'require'
       js.must_include 'puts'
     end
+
+    it "should remove method definition with skip pragma" do
+      code = <<~RUBY
+        def respond_to?(method) # Pragma: skip
+          true
+        end
+        def foo
+          1
+        end
+      RUBY
+      js = to_js(code)
+      js.wont_include 'respond_to'
+      js.must_include 'foo'
+    end
+
+    it "should remove class method with skip pragma" do
+      code = <<~RUBY
+        class Foo
+          def self.===(other) # Pragma: skip
+            true
+          end
+          def self.create
+            42
+          end
+        end
+      RUBY
+      js = to_js(code)
+      js.wont_include '==='
+      js.must_include 'create'
+    end
+
+    it "should remove alias with skip pragma" do
+      code = <<~RUBY
+        class Foo
+          alias loc location # Pragma: skip
+          alias name title
+        end
+      RUBY
+      js = to_js(code)
+      js.wont_include 'loc'
+      js.must_include 'name'
+    end
   end
 end

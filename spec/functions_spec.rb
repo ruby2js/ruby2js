@@ -899,5 +899,23 @@ describe Ruby2JS::Filter::Functions do
     it "should handle reject with simple condition" do
       to_js( 'arr.reject { |n| n > 5 }' ).must_equal 'arr.filter(n => !(n > 5))'
     end
+
+    it "should handle reject(&:method) symbol-to-proc" do
+      to_js( 'arr.reject(&:empty?)' ).must_equal 'arr.filter(item => !(item.length == 0))'
+    end
+
+    it "should handle reject(&:nil?)" do
+      to_js( 'arr.reject(&:nil?)' ).must_equal 'arr.filter(item => !(item == null))'
+    end
+  end
+
+  describe "to_sym" do
+    it "should remove .to_sym (no-op)" do
+      to_js( '"foo".to_sym' ).must_equal '"foo"'
+    end
+
+    it "should remove .to_sym in chain" do
+      to_js( '"name".downcase.to_sym' ).must_equal '"name".toLowerCase()'
+    end
   end
 end

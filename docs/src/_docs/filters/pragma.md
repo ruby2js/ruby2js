@@ -83,11 +83,16 @@ might return `null`, and you want to safely spread the result into an array.
 
 ### `skip`
 
-Removes `require` or `require_relative` statements from the output.
+Removes statements from the JavaScript output entirely. Works with:
 
-This is useful when a Ruby file requires a dependency that shouldn't be
-included in the JavaScript output (e.g., native Ruby gems, runtime dependencies
-that will be provided separately).
+- `require` and `require_relative` statements
+- Method definitions (`def`)
+- Class method definitions (`def self.method`)
+- Alias declarations (`alias`)
+
+This is useful when a Ruby file contains code that shouldn't be included in
+the JavaScript output (e.g., Ruby-specific methods, native Ruby gems, runtime
+dependencies that will be provided separately).
 
 ```ruby
 require 'prism' # Pragma: skip
@@ -96,13 +101,33 @@ require 'prism' # Pragma: skip
 require_relative 'helper' # Pragma: skip
 # => (no output)
 
+def respond_to?(method) # Pragma: skip
+  # Ruby-only method, not needed in JS
+  true
+end
+# => (no output)
+
+def self.===(other) # Pragma: skip
+  # Ruby-only class method
+  other.is_a?(Node)
+end
+# => (no output)
+
+alias loc location # Pragma: skip
+# => (no output)
+
 require 'my_module'  # No pragma, will be processed normally
 # => import ... (if ESM filter is active)
 ```
 
-**When to use:** When transpiling Ruby code that requires external dependencies
-that are provided separately in the JavaScript environment, or when using the
-`require` filter and you need to exclude specific requires from bundling.
+**When to use:**
+- When transpiling Ruby code that requires external dependencies provided
+  separately in the JavaScript environment
+- When using the `require` filter and you need to exclude specific requires
+  from bundling
+- When Ruby source files contain methods that are Ruby-specific and have no
+  JavaScript equivalent (e.g., `respond_to?`, `is_a?`, `to_sexp`)
+- When removing Ruby metaprogramming methods that don't translate to JavaScript
 
 ## Type Disambiguation Pragmas
 

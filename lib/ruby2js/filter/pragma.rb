@@ -23,30 +23,29 @@ module Ruby2JS
         'proto' => :proto,           # .class → .constructor
         'entries' => :entries,       # Object.entries for hash iteration
         # Statement control pragmas
-        'skip' => :skip              # skip require/require_relative statements
+        'skip' => :skip              # skip statement (require, def, defs, alias)
       }.freeze
 
       def initialize(*args)
         super
         @pragmas = {}
-        @pragma_scanned = false
+        @pragma_scanned_count = 0
       end
 
       def options=(options)
         super
         @pragmas = {}
-        @pragma_scanned = false
+        @pragma_scanned_count = 0
       end
 
       # Scan all comments for pragma patterns and build line => Set<pragma> map
+      # Re-scans when new comments are added (e.g., from require filter merging files)
       def scan_pragmas
-        return if @pragma_scanned
-        @pragma_scanned = true
-
-        # Get raw comments from the comments hash
         raw_comments = @comments[:_raw] || []
+        return if raw_comments.length == @pragma_scanned_count
 
-        raw_comments.each do |comment|
+        # Process only new comments (from index @pragma_scanned_count onwards)
+        raw_comments[@pragma_scanned_count..].each do |comment|
           text = comment.respond_to?(:text) ? comment.text : comment.to_s
 
           # Match "# Pragma: <name>" pattern (case insensitive)
@@ -70,6 +69,8 @@ module Ruby2JS
             end
           end
         end
+
+        @pragma_scanned_count = raw_comments.length
       end
 
       # Check if a node's line has a specific pragma
@@ -116,8 +117,13 @@ module Ruby2JS
         end
       end
 
-      # Handle def (anonymous functions) with noes2015 pragma
+      # Handle def with skip pragma (remove method definition) or noes2015 pragma
       def on_def(node)
+        # Skip pragma: remove method definition entirely
+        if pragma?(node, :skip)
+          return s(:hide)
+        end
+
         if node.children[0].nil? && pragma?(node, :noes2015)
           # Convert anonymous def to deff (forces function syntax)
           # Don't re-process - just update type and process children
@@ -125,6 +131,22 @@ module Ruby2JS
         else
           super
         end
+      end
+
+      # Handle defs (class methods like self.foo) with skip pragma
+      def on_defs(node)
+        if pragma?(node, :skip)
+          return s(:hide)
+        end
+        super
+      end
+
+      # Handle alias with skip pragma
+      def on_alias(node)
+        if pragma?(node, :skip)
+          return s(:hide)
+        end
+        super
       end
 
       # Pass through deff nodes without re-triggering pragma checks

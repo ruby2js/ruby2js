@@ -63,6 +63,7 @@ If you set the `eslevel` option to `2015` or newer, the Functions filter enables
 * `puts` {{ caret }} `console.log`
 * `rand` {{ caret }} `Math.random`
 * `.reject {}` {{ caret }} `.filter(x => !(...))` (negated condition)
+* `.reject(&:method)` {{ caret }} `.filter(item => !item.method())` (symbol-to-proc)
 * `.replace` {{ caret }} `.length = 0; ...push.apply(*)`
 * `.respond_to?` {{ caret }} `right in left`
 * `.rindex` {{ caret }} `.lastIndexOf`
@@ -86,6 +87,7 @@ If you set the `eslevel` option to `2015` or newer, the Functions filter enables
 * `.to_f` {{ caret }} `parseFloat`
 * `.to_i` {{ caret }} `parseInt`
 * `.to_s` {{ caret }} `.toString`
+* `.to_sym` {{ caret }} (removed - symbols are strings in JS)
 * `.to_json` {{ caret }} `JSON.stringify(obj)`
 * `typeof(x)` {{ caret }} `typeof x` (JS type checking operator)
 * `.upcase` {{ caret }} `.toUpperCase`

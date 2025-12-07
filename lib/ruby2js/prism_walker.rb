@@ -33,7 +33,7 @@ module Ruby2JS
       @end_loc
     end
 
-    def respond_to?(method, include_private = false)
+    def respond_to?(method, include_private = false) # Pragma: skip
       [:start_offset, :end_offset, :assignment, :end, :expression].include?(method) || super
     end
   end
@@ -96,7 +96,7 @@ module Ruby2JS
       @expression = PrismSourceRange.new(prism_buffer, start_offset, end_offset)
     end
 
-    def respond_to?(method, include_private = false)
+    def respond_to?(method, include_private = false) # Pragma: skip
       [:start_offset, :end_offset, :selector, :expression].include?(method) || super
     end
   end
@@ -123,7 +123,7 @@ module Ruby2JS
       @end_loc
     end
 
-    def respond_to?(method, include_private = false)
+    def respond_to?(method, include_private = false) # Pragma: skip
       [:start_offset, :end_offset, :name, :assignment, :end, :expression].include?(method) || super
     end
   end
