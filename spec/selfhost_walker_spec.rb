@@ -5,7 +5,7 @@ require 'ruby2js'
 require 'ruby2js/filter/require'
 require 'ruby2js/filter/combiner'
 require 'ruby2js/filter/pragma'
-require 'ruby2js/filter/selfhost_walker'
+require 'ruby2js/filter/selfhost'
 require 'ruby2js/filter/functions'
 require 'ruby2js/filter/esm'
 require 'tempfile'
@@ -21,7 +21,8 @@ describe "Selfhost Walker Transpilation" do
         Ruby2JS::Filter::Pragma,
         Ruby2JS::Filter::Require,
         Ruby2JS::Filter::Combiner,
-        Ruby2JS::Filter::SelfhostWalker,
+        Ruby2JS::Filter::Selfhost::Core,
+        Ruby2JS::Filter::Selfhost::Walker,
         Ruby2JS::Filter::Functions,
         Ruby2JS::Filter::ESM
       ]

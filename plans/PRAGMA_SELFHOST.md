@@ -1,6 +1,6 @@
 # Pragma-Based Self-Hosting Plan
 
-## Status: Proposed
+## Status: In Progress
 
 This document describes a new approach to self-hosting Ruby2JS that replaces the current
 heuristic-based `filter/selfhost.rb` with a pragma-based system.
@@ -59,44 +59,64 @@ Instead of one monolithic filter, use focused filters for each context:
 
 ```
 lib/ruby2js/filter/
-├── pragma.rb              # Universal pragma handling (PR #257)
-├── selfhost/
-│   ├── core.rb            # Universal rules (~50 lines)
-│   ├── converter.rb       # Converter handler patterns (~100 lines)
-│   ├── walker.rb          # Prism::Visitor patterns (~50 lines)
-│   └── spec.rb            # Minitest → JS test framework (~50 lines)
+├── pragma.rb              # Universal pragma handling ✓ IMPLEMENTED
+├── combiner.rb            # Merges reopened modules/classes ✓ IMPLEMENTED
+├── selfhost.rb            # Orchestrator (loads all modules) ✓ IMPLEMENTED
+└── selfhost/
+    ├── core.rb            # Universal rules ✓ IMPLEMENTED (~150 lines)
+    ├── walker.rb          # Prism::Visitor patterns ✓ IMPLEMENTED (~180 lines)
+    ├── converter.rb       # Converter handler patterns (STUB)
+    └── spec.rb            # Minitest → JS test framework (STUB)
 ```
+
+### Current Implementation Status
+
+| Component | Status | Lines | Notes |
+|-----------|--------|-------|-------|
+| `pragma.rb` | ✓ Complete | ~280 | Type disambiguation, behavior pragmas |
+| `combiner.rb` | ✓ Complete | ~150 | Merges reopened modules/classes |
+| `selfhost/core.rb` | ✓ Complete | ~150 | Reserved words, sym→str conversion |
+| `selfhost/walker.rb` | ✓ Complete | ~180 | Walker-specific transforms |
+| `selfhost/converter.rb` | Stub | ~25 | To be implemented |
+| `selfhost/spec.rb` | Stub | ~25 | To be implemented |
 
 ### Filter Responsibilities
 
-#### `pragma.rb` (from PR #257)
+#### `pragma.rb` ✓ IMPLEMENTED
 Line-level control via comments:
 - `# Pragma: ??` - nullish coalescing
 - `# Pragma: function` - force traditional function syntax
 - `# Pragma: guard` - null-guard splat arrays
-- Plus new selfhost pragmas (see below)
+- `# Pragma: array/hash/string` - type disambiguation
+- `# Pragma: method/self/proto/entries` - behavior control
+- `# Pragma: skip` - skip require statements
 
-#### `selfhost/core.rb` (~50 lines)
-Universal transformations, always loaded:
+#### `selfhost/core.rb` ✓ IMPLEMENTED
+Universal transformations for all selfhost targets:
 - `s(:sym, ...)` → `s('sym', ...)` (symbols to strings in AST construction)
 - `node.type == :sym` → `node.type === 'sym'` (type comparisons)
+- `%i[...].include?(x)` → `['...'].includes(x)` (symbol arrays)
 - Reserved word renaming (`var` → `var_`)
-- `respond_to?(:type)` → type guard
+- Remove `private/protected/public` declarations
 
-#### `selfhost/converter.rb` (~100 lines)
-For converter handler files:
-- `handle :type do ... end` → `on_type = function() {...}`
-- Class reopening → prototype assignments
+#### `selfhost/walker.rb` ✓ IMPLEMENTED
+For the Prism walker transpilation:
+- `arr[-1] = x` → `arr[arr.length - 1] = x` (negative indexing)
+- `str[i, len]` → `str.slice(i, i + len)` (2-arg slice)
+- `.to_sym`, `.freeze` → removed (no-op in JS)
+- `.empty?` → `.length == 0`
+- `.reject {}` → `.filter {}` with negated condition
+- Remove Ruby-specific methods (respond_to?, is_a?, etc.)
+- Skip external requires (prism, node)
+
+#### `selfhost/converter.rb` (STUB)
+For converter handler files (to be implemented):
+- `handle :type do ... end` → method definitions
+- Class reopening → merged class definitions
 - Serializer ivar access (`@sep`, `@nl`, etc.)
 
-#### `selfhost/walker.rb` (~50 lines)
-For the Prism walker:
-- `class X < Prism::Visitor` → class with visit dispatch
-- `visit_*_node` → `visitCamelCase` naming
-- Remove `super` calls in visitor
-
-#### `selfhost/spec.rb` (~50 lines)
-For test specs:
+#### `selfhost/spec.rb` (STUB)
+For test specs (to be implemented):
 - `describe X do ... end` → `describe('X', () => {...})`
 - `it 'text' do ... end` → `it('text', () => {...})`
 - `_(x).must_equal(y)` → assertion
@@ -146,39 +166,41 @@ Most files will have 1-3 pragmas. Source files will **not** be dominated by prag
 
 ## Implementation Plan
 
-### Phase 0: Prerequisites
+### Phase 0: Prerequisites ✓ COMPLETE
 - [x] PR #257 merged (pragma infrastructure)
 
-### Phase 1: Create Filter Structure
-1. Create `lib/ruby2js/filter/selfhost/` directory
-2. Create `core.rb` with universal rules (extracted from current selfhost.rb)
-3. Create empty `converter.rb`, `walker.rb`, `spec.rb` shells
-4. Update `selfhost.rb` orchestration to use new filters
+### Phase 1: Create Filter Structure ✓ COMPLETE
+- [x] Create `lib/ruby2js/filter/selfhost/` directory
+- [x] Create `core.rb` with universal rules
+- [x] Create `walker.rb` with walker-specific transforms
+- [x] Create stub `converter.rb`, `spec.rb` shells
+- [x] Update `selfhost.rb` as orchestrator
 
-### Phase 2: Add Pragma Handlers
-1. Add selfhost pragmas to `pragma.rb`:
-   - `array`, `hash`, `string`
-   - `method`, `self`
-   - `proto`, `entries`
-2. Each pragma: ~10-20 lines of handler code
+### Phase 2: Walker Transpilation ✓ COMPLETE
+- [x] Add pragma handlers (array, hash, string, method, self, proto, entries, skip)
+- [x] Implement walker-specific transforms (negative indexing, 2-arg slice, etc.)
+- [x] Create smoke tests (`spec/selfhost_walker_spec.rb`)
+- [x] Walker transpiles to valid JavaScript (31 tests pass)
 
-### Phase 3: Strip Old Heuristics
-1. Remove heuristic code from old `filter/selfhost.rb`
-2. Keep only code that doesn't have a pragma equivalent
-3. Target: <100 lines remaining
+### Phase 3: Converter Transpilation (NEXT)
+1. Implement `selfhost/converter.rb`:
+   - `handle :type do...end` pattern
+   - Class reopening handling
+   - Serializer ivar access
+2. Add pragmas to converter source files as needed
+3. Create smoke tests for transpiled converter
 
-### Phase 4: Annotate Source Files
-1. Run tests, identify failures
-2. For each failure:
-   - Find the source line
-   - Add appropriate pragma
-   - Verify fix
-3. Track progress (should be fast - ~1 pragma per minute)
+### Phase 4: Spec Transpilation (FUTURE)
+1. Implement `selfhost/spec.rb`:
+   - Minitest describe/it blocks
+   - Assertion helpers
+2. Transpile test suite to JavaScript
+3. Run tests in Node.js
 
-### Phase 5: Complete Test Suite
-1. Converter tests (currently 130/248 = 52%)
-2. Filter tests
-3. Integration tests
+### Phase 5: Integration (FUTURE)
+1. Create browser demo with full converter
+2. Document the self-hosting approach
+3. Size comparison with Opal-based demo
 
 ## Migration Strategy
 

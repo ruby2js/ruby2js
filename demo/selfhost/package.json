@@ -5,7 +5,7 @@
   "description": "Self-hosted Ruby2JS converter running in Node.js",
   "scripts": {
     "build": "npm run build:walker",
-    "build:walker": "bundle exec ruby -I../../lib -rruby2js -rruby2js/filter/require -rruby2js/filter/combiner -rruby2js/filter/pragma -rruby2js/filter/selfhost_walker -rruby2js/filter/functions -rruby2js/filter/esm -e \"puts Ruby2JS.convert(File.read('../../lib/ruby2js/prism_walker.rb'), eslevel: 2022, underscored_private: true, file: '../../lib/ruby2js/prism_walker.rb', filters: [Ruby2JS::Filter::Pragma, Ruby2JS::Filter::Require, Ruby2JS::Filter::Combiner, Ruby2JS::Filter::SelfhostWalker, Ruby2JS::Filter::Functions, Ruby2JS::Filter::ESM])\" > dist/walker.mjs",
+    "build:walker": "bundle exec ruby -I../../lib -rruby2js -rruby2js/filter/require -rruby2js/filter/combiner -rruby2js/filter/pragma -rruby2js/filter/selfhost -rruby2js/filter/functions -rruby2js/filter/esm -e \"puts Ruby2JS.convert(File.read('../../lib/ruby2js/prism_walker.rb'), eslevel: 2022, underscored_private: true, file: '../../lib/ruby2js/prism_walker.rb', filters: [Ruby2JS::Filter::Pragma, Ruby2JS::Filter::Require, Ruby2JS::Filter::Combiner, Ruby2JS::Filter::Selfhost::Core, Ruby2JS::Filter::Selfhost::Walker, Ruby2JS::Filter::Functions, Ruby2JS::Filter::ESM])\" > dist/walker.mjs",
     "clean": "rm -rf dist"
   },
   "keywords": ["ruby", "javascript", "transpiler"],

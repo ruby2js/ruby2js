@@ -1,146 +1,43 @@
 # frozen_string_literal: true
 
-# Minimal selfhost filter for Ruby2JS self-hosting
+# Selfhost Filter - Orchestrates self-hosting filters for Ruby2JS transpilation
 #
-# This filter handles only transformations that CANNOT be expressed as pragmas:
-# - s(:sym, ...) → s('str', ...) - symbol to string for AST node types
-# - node.type == :sym → node.type === 'str' - type comparisons
-# - Reserved word renaming (var → var_)
+# This is the main entry point for self-hosting Ruby2JS to JavaScript.
+# It loads the modular filter components:
 #
-# Type disambiguation (.dup, <<, .include?) should use pragmas in source files:
-#   arr.dup # Pragma: array
-#   hash.dup # Pragma: hash
+# - selfhost/core.rb     - Universal transformations (always loaded)
+# - selfhost/walker.rb   - PrismWalker patterns (for walker transpilation)
+# - selfhost/converter.rb - Converter patterns (for converter transpilation)
+# - selfhost/spec.rb     - Test spec patterns (for spec transpilation)
+#
+# Usage:
+#   # For walker transpilation:
+#   require 'ruby2js/filter/selfhost'  # Loads core + walker
+#
+#   # Filter chain for walker:
+#   filters: [Pragma, Require, Combiner, Selfhost::Core, Selfhost::Walker, Functions, ESM]
+#
+#   # For converter transpilation (when implemented):
+#   filters: [Pragma, Require, Combiner, Selfhost::Core, Selfhost::Converter, Functions, ESM]
+#
+#   # For spec transpilation (when implemented):
+#   filters: [Pragma, Selfhost::Core, Selfhost::Spec, Functions, ESM]
 #
 # See plans/PRAGMA_SELFHOST.md for the full approach.
 
 require 'ruby2js'
 
+# Load all selfhost filter modules
+require_relative 'selfhost/core'
+require_relative 'selfhost/walker'
+require_relative 'selfhost/converter'
+require_relative 'selfhost/spec'
+
 module Ruby2JS
   module Filter
     module Selfhost
-      include SEXP
-
-      # JavaScript reserved words that need renaming
-      JS_RESERVED_WORDS = %i[
-        break case catch class const continue debugger default delete do else
-        enum export extends false finally for function if import in instanceof
-        new null return super switch this throw true try typeof var void while
-        with yield let static implements interface package private protected public
-      ].freeze
-
-      def initialize(*args)
-        super
-        @selfhost_spec = false
-      end
-
-      def options=(options)
-        super
-        @selfhost_spec = options[:selfhost_spec]
-      end
-
-      # Rename reserved words: var → var_, class → class_, etc.
-      def rename_var(name)
-        return name unless name.is_a?(Symbol)
-        JS_RESERVED_WORDS.include?(name) ? :"#{name}_" : name
-      end
-
-      # Handle local variable assignments - rename reserved words
-      def on_lvasgn(node)
-        name, value = node.children
-        renamed = rename_var(name)
-        if renamed != name
-          node.updated(nil, [renamed, value ? process(value) : nil])
-        else
-          super
-        end
-      end
-
-      # Handle local variable references - rename reserved words
-      def on_lvar(node)
-        name = node.children.first
-        renamed = rename_var(name)
-        renamed != name ? node.updated(nil, [renamed]) : super
-      end
-
-      # Handle argument names - rename reserved words
-      def on_arg(node)
-        name = node.children.first
-        renamed = rename_var(name)
-        renamed != name ? node.updated(nil, [renamed]) : super
-      end
-
-      def on_optarg(node)
-        name, default = node.children
-        renamed = rename_var(name)
-        if renamed != name
-          node.updated(nil, [renamed, process(default)])
-        else
-          super
-        end
-      end
-
-      def on_kwarg(node)
-        name = node.children.first
-        renamed = rename_var(name)
-        renamed != name ? node.updated(nil, [renamed]) : super
-      end
-
-      def on_kwoptarg(node)
-        name, default = node.children
-        renamed = rename_var(name)
-        if renamed != name
-          node.updated(nil, [renamed, process(default)])
-        else
-          super
-        end
-      end
-
-      # Handle s(:type, ...) → s('type', ...) - symbol to string for AST construction
-      def on_send(node)
-        target, method, *args = node.children
-
-        # s(:sym, ...) → s('str', ...)
-        if target.nil? && method == :s && args.first&.type == :sym
-          sym_node = args.first
-          str_node = s(:str, sym_node.children.first.to_s)
-          return process s(:send, nil, :s, str_node, *args[1..])
-        end
-
-        # node.type == :sym → node.type === 'str'
-        if method == :== && args.length == 1 && args.first&.type == :sym
-          if target&.type == :send && target.children[1] == :type
-            sym = args.first.children.first
-            return s(:send, process(target), :===, s(:str, sym.to_s))
-          end
-        end
-
-        # %i[...].include?(x) where array is symbols → ['...'].includes(x)
-        if method == :include? && target&.type == :array
-          if target.children.all? { |c| c&.type == :sym }
-            str_array = s(:array, *target.children.map { |c| s(:str, c.children.first.to_s) })
-            return s(:send, str_array, :includes, *process_all(args))
-          end
-        end
-
-        # Spec mode: remove gem() calls
-        if @selfhost_spec && target.nil? && method == :gem
-          return nil
-        end
-
-        # Spec mode: _(...) wrapper → just the inner expression
-        if @selfhost_spec && target.nil? && method == :_ && args.length == 1
-          return process(args.first)
-        end
-
-        # Remove private/protected/public (no-op in JS)
-        if target.nil? && [:private, :protected, :public].include?(method) && args.empty?
-          return nil
-        end
-
-        super
-      end
+      # Re-export the modules for convenient access
+      # Usage: Ruby2JS::Filter::Selfhost::Core, etc.
     end
-
-    DEFAULTS.push Selfhost
   end
 end
