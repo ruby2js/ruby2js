@@ -223,16 +223,20 @@ module Ruby2JS
       end
 
       list.map do |comment|
-        if comment.text.start_with? '=begin'
-          if comment.text.include? '*/'
-            comment.text.sub(/\A=begin/, '').sub(/^=end\Z/, '').gsub(/^/, '//')
+        # Skip pragma comments - they're directives, not documentation
+        text = comment.text
+        next nil if text =~ /#\s*Pragma:/i
+
+        if text.start_with? '=begin'
+          if text.include? '*/'
+            text.sub(/\A=begin/, '').sub(/^=end\Z/, '').gsub(/^/, '//')
           else
-            comment.text.sub(/\A=begin/, '/*').sub(/^=end\Z/, '*/')
+            text.sub(/\A=begin/, '/*').sub(/^=end\Z/, '*/')
           end
         else
-          comment.text.sub(/^#/, '//') + "\n"
+          text.sub(/^#/, '//') + "\n"
         end
-      end
+      end.compact
     end
 
     private
@@ -467,6 +471,7 @@ require 'ruby2js/converter/module'
 require 'ruby2js/converter/next'
 require 'ruby2js/converter/nil'
 require 'ruby2js/converter/nthref'
+require 'ruby2js/converter/nullish'
 require 'ruby2js/converter/opasgn'
 require 'ruby2js/converter/prototype'
 require 'ruby2js/converter/redo'
