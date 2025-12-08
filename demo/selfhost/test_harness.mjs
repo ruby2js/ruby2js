@@ -108,6 +108,18 @@ if (!String.prototype.chomp) {
   };
 }
 
+// Ruby's String#count(chars) - count occurrences of any character in chars
+// e.g., "hello".count("l") => 2, "hello".count("lo") => 3
+if (!String.prototype.count) {
+  String.prototype.count = function(chars) {
+    let count = 0;
+    for (const c of this) {
+      if (chars.includes(c)) count++;
+    }
+    return count;
+  };
+}
+
 // Ruby's Hash#to_a - convert to array of [key, value] pairs
 // In JS, works on plain objects via Object.entries()
 // Defined as getter since Ruby's to_a is called without parens

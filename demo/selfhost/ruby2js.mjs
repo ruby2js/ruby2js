@@ -86,6 +86,47 @@ if (!Array.prototype.insert) {
   };
 }
 
+// Ruby's String#count(chars) - count occurrences of any character in chars
+// e.g., "hello".count("l") => 2, "hello".count("lo") => 3
+if (!String.prototype.count) {
+  String.prototype.count = function(chars) {
+    let count = 0;
+    for (const c of this) {
+      if (chars.includes(c)) count++;
+    }
+    return count;
+  };
+}
+
+// Ruby's String#chomp(suffix) - remove suffix from end of string
+if (!String.prototype.chomp) {
+  String.prototype.chomp = function(suffix) {
+    if (suffix === undefined) {
+      return this.replace(/\r?\n$/, '');
+    }
+    if (this.endsWith(suffix)) {
+      return this.slice(0, this.length - suffix.length);
+    }
+    return String(this);
+  };
+}
+
+// Ruby's Array#first - get first element (like .at(0))
+Object.defineProperty(Array.prototype, 'first', {
+  get: function() {
+    return this[0];
+  },
+  configurable: true
+});
+
+// Ruby's Array#last - get last element (like .at(-1))
+Object.defineProperty(Array.prototype, 'last', {
+  get: function() {
+    return this[this.length - 1];
+  },
+  configurable: true
+});
+
 // Mock globals
 globalThis.RUBY_VERSION = "3.4.0";
 globalThis.RUBY2JS_PARSER = "prism";
