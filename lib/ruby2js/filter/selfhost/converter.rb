@@ -46,6 +46,28 @@ module Ruby2JS
             return process node.updated(nil, [s(:self), method_name, *args])
           end
 
+          # Transform Ruby2JS::Node.new(...) to new globalThis.Ruby2JS.Node(...)
+          # The converter module defines its own Ruby2JS local, so we need
+          # to reference the global Node class instead
+          if target&.type == :const && method_name == :new
+            parent_const = target.children[0]
+            const_name = target.children[1]
+            if const_name == :Node &&
+               parent_const&.type == :const &&
+               parent_const.children == [nil, :Ruby2JS]
+              # Build: new globalThis.Ruby2JS.Node(args)
+              # Use :lvar for globalThis (no parens), :attr for property access
+              global_node = s(:attr,
+                s(:attr,
+                  s(:lvar, :globalThis),
+                  :Ruby2JS
+                ),
+                :Node
+              )
+              return process node.updated(nil, [global_node, :new, *args])
+            end
+          end
+
           # Check for: method("on_#{name}")
           if target.nil? && method_name == :method && args.length == 1
             arg = args[0]

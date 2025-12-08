@@ -70,12 +70,12 @@ if (!Array.prototype.rindex) {
   };
 }
 
-// Import transpiled modules (must be after Prism setup and polyfills)
+// Import walker first to get Node class (transpiled from lib/ruby2js/node.rb)
 const { Ruby2JS: WalkerModule } = await import('./dist/walker.mjs');
-const { Ruby2JS: ConverterModule } = await import('./dist/converter.mjs');
 
-// Ruby2JS placeholder - will be replaced after Prism init
+// Set up Ruby2JS.Node before importing converter (which uses it)
 globalThis.Ruby2JS = {
+  Node: WalkerModule.Node,  // Reuse Node from walker (single source of truth)
   convert(source, opts = {}) {
     return {
       toString() {
@@ -84,6 +84,9 @@ globalThis.Ruby2JS = {
     };
   }
 };
+
+// Now import converter (needs Ruby2JS.Node to be available)
+const { Ruby2JS: ConverterModule } = await import('./dist/converter.mjs');
 
 // Since Prism.loadPrism() is async, we need to initialize it
 let prismParse = null;

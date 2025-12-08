@@ -172,11 +172,12 @@ module Ruby2JS
     end
 
     def s(type, *args)
-      if defined?(Parser::AST::Node)
-        Parser::AST::Node.new(type, args)
-      else
-        Ruby2JS::Node.new(type, args)
+      unless defined?(RUBY2JS_SELFHOST)
+        if defined?(Parser::AST::Node)
+          return Parser::AST::Node.new(type, args)
+        end
       end
+      Ruby2JS::Node.new(type, args)
     end
 
     # Escape JavaScript reserved words by prefixing with $
