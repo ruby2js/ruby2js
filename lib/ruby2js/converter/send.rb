@@ -15,13 +15,11 @@ module Ruby2JS
     # Sendw forces parameters to be placed on separate lines.
 
     handle :send, :sendw, :send!, :await, :attr, :call do |receiver, method, *args|
-      ast = @ast
-
       if \
         args.length == 1 and method == :+
       then
-        node = collapse_strings(ast)
-        return parse node if node != ast
+        node = collapse_strings(@ast)
+        return parse node if node != @ast
       end
 
       # :irange support
@@ -302,7 +300,7 @@ module Ruby2JS
           end
 
           put "new "; (group_receiver ? group(receiver) : parse(receiver))
-          if ast.is_method?
+          if @ast.is_method?
             put '('; parse_all(*args, join: ', '); put ')'
           end
         elsif args.length == 1 and args.first.type == :send
@@ -342,13 +340,13 @@ module Ruby2JS
       elsif method == :typeof and receiver == nil
         put 'typeof '; parse args.first
 
-      elsif ast.children[1] == :is_a? and receiver and args.length == 1
+      elsif @ast.children[1] == :is_a? and receiver and args.length == 1
         put '('; parse receiver; put ' instanceof '; parse args.first; put ')'
 
-      elsif ast.children[1] == :kind_of? and receiver and args.length == 1
+      elsif @ast.children[1] == :kind_of? and receiver and args.length == 1
         put '('; parse receiver; put ' instanceof '; parse args.first; put ')'
 
-      elsif ast.children[1] == :instance_of? and receiver and args.length == 1
+      elsif @ast.children[1] == :instance_of? and receiver and args.length == 1
         put '('; parse s(:send, s(:attr, receiver, :constructor), :==, args.first); put ')'
 
       else
@@ -360,14 +358,14 @@ module Ruby2JS
 
         # :send! and :call force method call output (with parens)
         # :await preserves is_method? from the underlying node via updated()
-        if not ast.is_method? and ![:send!, :call].include?(ast.type)
+        if not @ast.is_method? and ![:send!, :call].include?(@ast.type)
           if receiver
             (group_receiver ? group(receiver) : parse(receiver))
             put ".#{ method }"
-          elsif ast.type == :attr
+          elsif @ast.type == :attr
             put method
           else
-            parse ast.updated(:lvasgn, [method]), @state
+            parse @ast.updated(:lvasgn, [method]), @state
           end
         else
           (group_receiver ? group(receiver) : parse(receiver))
@@ -376,11 +374,11 @@ module Ruby2JS
           if args.length <= 1
             put "("; parse_all(*args, join: ', '); put ')'
           else
-            compact { puts "("; parse_all(*args, join: ",#@ws"); sput ')' }
+            self._compact { puts "("; parse_all(*args, join: ",#@ws"); sput ')' }
           end
         end
 
-        if autobind and not ast.is_method? and ast.type != :attr
+        if autobind and not @ast.is_method? and @ast.type != :attr
           if @state == :statement
             put '()'
           else

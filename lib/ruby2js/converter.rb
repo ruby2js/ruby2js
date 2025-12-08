@@ -359,7 +359,7 @@ module Ruby2JS
     end
 
     def parse_all(*args)
-      @options = (Hash === args.last) ? args.pop : {}
+      @options = args.last.is_a?(Hash) ? args.pop() : {}
       sep = @options[:join].to_s
       state = @options[:state] || :expression
 

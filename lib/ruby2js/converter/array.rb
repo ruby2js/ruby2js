@@ -14,7 +14,7 @@ module Ruby2JS
         if items.length <= 1
           put '['; parse_all(*items, join: ', '); put ']'
         else
-          compact { puts '['; parse_all(*items, join: ",#{@ws}"); sput ']' }
+          self._compact { puts '['; parse_all(*items, join: ",#{@ws}"); sput ']' }
         end
       end
     end

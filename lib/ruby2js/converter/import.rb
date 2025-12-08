@@ -12,7 +12,7 @@ module Ruby2JS
         if first_arg.respond_to?(:type) && first_arg.respond_to?(:children) && first_arg.type == :attr
           return parse s(:casgn, *first_arg.children,
             s(:send, nil, :require, s(:str, Array(path).first))), :statement
-        elsif Array === first_arg and first_arg.length == 1
+        elsif first_arg.is_a?(Array) and first_arg.length == 1
           target = first_arg.first
           if target.respond_to?(:type) && target.respond_to?(:children) && target.type == :attr && target.children.first == nil
             return parse s(:casgn, *target.children,

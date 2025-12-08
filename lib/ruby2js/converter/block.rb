@@ -52,7 +52,7 @@ module Ruby2JS
         call.children[2..-1].all? do |child|
           child.type == :lvar or (child.type == :send and
             child.children.length == 2 and child.children[0] == nil and 
-            Symbol === child.children[1])
+            child.children[1].is_a?(Symbol))
         end
       then
         # accommodate javascript style syntax: convert function blocks with

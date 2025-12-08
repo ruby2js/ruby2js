@@ -117,11 +117,13 @@ Ruby2JS.convert = function(source, opts = {}) {
     if (opts.comparison) converter.comparison = opts.comparison;
     if (opts.strict) converter.strict = opts.strict;
 
-    converter.convert();
+    // convert is a getter (no-arg method becomes getter in ES6 class)
+    converter.convert;
 
     return {
       toString() {
-        return converter.toString();
+        // to_s is also a getter
+        return converter.to_s;
       }
     };
   } catch (e) {
@@ -174,6 +176,22 @@ export function before(fn) {
   // For now, just execute it once
   fn();
 }
+
+// Ruby's rindex with block - find last index where block returns true
+if (!Array.prototype.rindex) {
+  Array.prototype.rindex = function(fn) {
+    for (let i = this.length - 1; i >= 0; i--) {
+      if (fn(this[i])) return i;
+    }
+    return null;  // Ruby returns nil when not found
+  };
+}
+
+// Ruby Hash class placeholder - Hash === x patterns in Ruby source have been
+// changed to x.is_a?(Hash) which transpiles to x instanceof Hash.
+// This class exists for compatibility but is not currently used.
+class Hash {}
+globalThis.Hash = Hash;
 
 // Extend String prototype with must_equal for chaining
 String.prototype.must_equal = function(expected) {

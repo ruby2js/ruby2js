@@ -7,7 +7,7 @@ module Ruby2JS
     #     (str "value")))
 
     handle :hash do |*pairs|
-      compact do
+      self._compact do
         singleton = pairs.length <= 1
 
         (singleton ? put('{') : puts('{'))
@@ -39,7 +39,7 @@ module Ruby2JS
             block_depth,block_hash = @block_depth,false
             left, right = node.children
 
-            if Hash === right or right.type == :block
+            if right.is_a?(Hash) or right.type == :block
               block_hash = true
               @block_depth = 0 unless @block_depth
             end

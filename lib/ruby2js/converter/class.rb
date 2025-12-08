@@ -193,7 +193,7 @@ module Ruby2JS
 
         # associate comments
         if node and @comments[m]
-          if Array === node
+          if node.is_a?(Array)
             node[0] = m.updated(node.first.type, node.first.children)
             @comments[node.first] = @comments[m]
           else
@@ -262,7 +262,7 @@ module Ruby2JS
             end
 
             if @comments[node]
-              if Array === replacement
+              if replacement.is_a?(Array)
                 @comments[replacement.first] = @comments[node]
               else
                 @comments[replacement] = @comments[node]

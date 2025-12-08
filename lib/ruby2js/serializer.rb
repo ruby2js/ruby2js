@@ -282,7 +282,7 @@ module Ruby2JS
 
     # add a single token to the current line
     def put(string)
-      unless String === string && string.include?("\n")
+      unless string.is_a?(String) && string.include?("\n")
         @line << Token.new(string, @ast) # Pragma: array
       else
         parts = string.split("\n")
@@ -301,7 +301,7 @@ module Ruby2JS
 
     # add a single token to the current line and then advance to next line
     def puts(string)
-      unless String === string && string.include?("\n")
+      unless string.is_a?(String) && string.include?("\n")
         @line << Token.new(string, @ast) # Pragma: array
       else
         put string
@@ -313,7 +313,7 @@ module Ruby2JS
 
     # advance to next line and then add a single token to the current line
     def sput(string)
-      unless String === string && string.include?("\n")
+      unless string.is_a?(String) && string.include?("\n")
         @line = Line.new(Token.new(string, @ast))
         @lines << @line # Pragma: array
       else
@@ -425,6 +425,9 @@ module Ruby2JS
         end
       end
     end
+
+    # Alias for selfhost transpilation (_compact avoids functions filter transformation)
+    alias _compact compact
 
     # return the output as a string
     def to_s

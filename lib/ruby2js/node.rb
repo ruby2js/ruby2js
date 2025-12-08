@@ -28,22 +28,22 @@ module Ruby2JS
 
     # Check if this is a method call (has parentheses or arguments)
     # Uses location-based detection like Parser::AST::Node to check for '(' after selector
-    def is_method? # Pragma: skip
-      return false if type == :attr
-      return true if type == :call
-      return true unless loc
+    def is_method?
+      return false if @type == :attr
+      return true if @type == :call
+      return true unless @location
 
-      if loc.respond_to?(:selector)
-        return true if children.length > 2
-        selector = loc.selector
-      elsif type == :defs
-        return true if children[1] =~ /[!?]$/
-        return true if children[2].children.length > 0
-        selector = loc.respond_to?(:name) ? loc.name : nil
-      elsif type == :def
-        return true if children[0] =~ /[!?]$/
-        return true if children[1].children.length > 0
-        selector = loc.respond_to?(:name) ? loc.name : nil
+      if @location.respond_to?(:selector)
+        return true if @children.length > 2
+        selector = @location.selector
+      elsif @type == :defs
+        return true if @children[1] =~ /[!?]$/
+        return true if @children[2].children.length > 0
+        selector = @location.respond_to?(:name) ? @location.name : nil
+      elsif @type == :def
+        return true if @children[0] =~ /[!?]$/
+        return true if @children[1].children.length > 0
+        selector = @location.respond_to?(:name) ? @location.name : nil
       end
 
       return true unless selector && selector.respond_to?(:source_buffer) && selector.source_buffer

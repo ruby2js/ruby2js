@@ -45,15 +45,15 @@ module Ruby2JS
       else
 	value = value.as_json if value.respond_to?(:as_json)
 
-        if value.respond_to?(:to_hash) and Hash === value.to_hash
+        if value.respond_to?(:to_hash) and value.to_hash.is_a?(Hash)
 	  parse s(:hostvalue, value.to_hash)
-        elsif value.respond_to?(:to_ary) and Array === value.to_ary
+        elsif value.respond_to?(:to_ary) and value.to_ary.is_a?(Array)
 	  parse s(:hostvalue, value.to_ary)
-	elsif value.respond_to?(:to_str) and String === value.to_str
+	elsif value.respond_to?(:to_str) and value.to_str.is_a?(String)
 	  parse s(:str, value.to_str)
-	elsif value.respond_to?(:to_int) and Integer === value.to_int
+	elsif value.respond_to?(:to_int) and value.to_int.is_a?(Integer)
 	  parse s(:int, value.to_int)
-	elsif value.respond_to?(:to_sym) and Symbol === value.to_sym
+	elsif value.respond_to?(:to_sym) and value.to_sym.is_a?(Symbol)
 	  parse s(:sym, value.to_sym)
 	else
           parse s(:str, value.inspect)
