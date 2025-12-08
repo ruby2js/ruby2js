@@ -113,18 +113,30 @@ module Ruby2JS
         op_index < operator_index( right.type )
       rgroup = true if right.type == :begin
 
-      put '(' if lgroup; parse left; put ')' if lgroup
-
       # Determine whether to use ?? or ||
       # :auto (default) - context-aware: || in boolean contexts, ?? in value contexts
       # :nullish - always use ??
       # :logical - always use ||
+      # Note: Chained || operators (e.g., a || b || c) always use || consistently
+      # to avoid JavaScript syntax errors from mixing ?? and || operators.
       use_nullish = case @or
         when :logical then false
         when :nullish then !boolean_expression?(left) && !boolean_expression?(right)
         else # :auto - context-aware
-          !@boolean_context && !boolean_expression?(left) && !boolean_expression?(right)
+          # For chained || (left is an :or node), use || consistently
+          !@boolean_context && !boolean_expression?(left) && !boolean_expression?(right) &&
+            left.type != :or
         end
+
+      # If we're using || and left is an :or node, force || for the entire chain
+      # to avoid mixing ?? and || (which is a JavaScript syntax error)
+      if type == :or && !use_nullish && left.type == :or
+        saved_or, @or = @or, :logical
+        put '(' if lgroup; parse left; put ')' if lgroup
+        @or = saved_or
+      else
+        put '(' if lgroup; parse left; put ')' if lgroup
+      end
 
       put (type==:and ? ' && ' : (use_nullish ? ' ?? ' : ' || '))
       put '(' if rgroup; parse right; put ')' if rgroup

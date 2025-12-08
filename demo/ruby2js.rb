@@ -156,9 +156,14 @@ def parse_request(env=ENV)
     @output_filtered_ast = true
   end
 
+  opts.on("-e CODE", "Evaluate inline Ruby code") do |code|
+    @inline_code = code
+  end
+
   # shameless hack.  Instead of repeating the available options, extract them
   # from the OptionParser.  Exclude default options and es20xx options.
   options_available = opts.instance_variable_get(:@stack).last.list.
+    select {|opt| opt.long.first}.  # only options with long form
     map {|opt| [opt.long.first[2..-1], opt.arg != nil]}.
     reject {|name, arg| %w{equality logical}.include?(name) || name =~ /es20\d\d/}.to_h
 
@@ -223,7 +228,9 @@ if (not defined? Wunderbar or not env['SERVER_PORT']) and not @live
   end
 
   # command line support
-  if ARGV.length > 0
+  if @inline_code
+    source = @inline_code
+  elsif ARGV.length > 0
     options[:file] = ARGV.first
     source = File.read(ARGV.first)
   else

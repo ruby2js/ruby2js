@@ -314,8 +314,9 @@ Ruby's `||` operator treats only `nil` and `false` as falsy. JavaScript's `||` o
 **The default is `:auto`**, which is context-aware:
 - In **boolean contexts** (conditions for `if`, `while`, `unless`, `until`, ternary), uses `||`
 - In **value contexts** (assignments, return values, arguments), uses `??`
+- **Chained `||` operators** always use `||` consistently (e.g., `a || b || c` becomes `a || b || c`)
 
-This gives the best of both worlds: conditions work naturally, while assignments preserve values like `0` and `""`.
+This gives the best of both worlds: conditions work naturally, while assignments preserve values like `0` and `""`. Chained expressions use `||` throughout for consistent Ruby semantics.
 
 ```ruby
 # Boolean context - uses ||
@@ -326,6 +327,9 @@ a = 1 if b || c          # => if (b || c) a = 1
 # Value context - uses ??
 x = a || b               # => let x = a ?? b
 x ||= 0                  # => x ??= 0 (preserves 0)
+
+# Chained || - uses || consistently
+x = a || b || 1          # => let x = a || b || 1
 ```
 
 Three options are available:
