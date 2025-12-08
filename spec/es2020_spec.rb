@@ -65,6 +65,13 @@ describe "ES2020 support" do
         to_js( 'false || b' ).must_equal 'false || b'
         to_js( '!a || !b' ).must_equal '!a || !b'
       end
+
+      it "should use || consistently for chained || operators (issue #264)" do
+        # Mixing ?? and || without parentheses is a JavaScript syntax error
+        to_js( 'q = a || b || 1' ).must_equal 'let q = a || b || 1'
+        to_js( 'x = a || b || c' ).must_equal 'let x = a || b || c'
+        to_js( 'x = a || b || c || d' ).must_equal 'let x = a || b || c || d'
+      end
     end
 
     describe "or: :nullish" do
