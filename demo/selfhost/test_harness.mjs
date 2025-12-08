@@ -59,7 +59,18 @@ globalThis.PrismSourceRange = PrismSourceRange;
 globalThis.RUBY_VERSION = "3.4.0";
 globalThis.RUBY2JS_PARSER = "prism";
 
-// Import transpiled modules (must be after Prism setup)
+// Ruby's rindex with block - find last index where block returns true
+// Must be defined before importing converter which uses it
+if (!Array.prototype.rindex) {
+  Array.prototype.rindex = function(fn) {
+    for (let i = this.length - 1; i >= 0; i--) {
+      if (fn(this[i])) return i;
+    }
+    return null;  // Ruby returns nil when not found
+  };
+}
+
+// Import transpiled modules (must be after Prism setup and polyfills)
 const { Ruby2JS: WalkerModule } = await import('./dist/walker.mjs');
 const { Ruby2JS: ConverterModule } = await import('./dist/converter.mjs');
 
@@ -175,16 +186,6 @@ let beforeEachFn = null;
 export function before(fn) {
   // For now, just execute it once
   fn();
-}
-
-// Ruby's rindex with block - find last index where block returns true
-if (!Array.prototype.rindex) {
-  Array.prototype.rindex = function(fn) {
-    for (let i = this.length - 1; i >= 0; i--) {
-      if (fn(this[i])) return i;
-    }
-    return null;  // Ruby returns nil when not found
-  };
 }
 
 // Ruby Hash class placeholder - Hash === x patterns in Ruby source have been

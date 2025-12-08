@@ -38,6 +38,14 @@ module Ruby2JS
         def on_send(node)
           target, method_name, *args = node.children
 
+          # Protect `puts` calls from functions filter transformation
+          # The functions filter transforms `puts(x)` to `console.log(x)` but
+          # in Serializer, `puts` is a method that adds tokens to output lines
+          if target.nil? && method_name == :puts
+            # Transform to self.puts to prevent functions filter from changing it
+            return process node.updated(nil, [s(:self), method_name, *args])
+          end
+
           # Check for: method("on_#{name}")
           if target.nil? && method_name == :method && args.length == 1
             arg = args[0]
