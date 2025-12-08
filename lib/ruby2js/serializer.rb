@@ -40,6 +40,13 @@ module Ruby2JS
     def at(index)
       @string[index]
     end
+
+    # Method for JavaScript compatibility (used by selfhost transpilation)
+    # Using to_s! to avoid functions filter converting to_s->toString (causes infinite recursion)
+    # Dummy underscore param forces this to be a method not a getter
+    def toString(_=nil)
+      self.to_s!
+    end
   end
 
   # Line holds tokens for a single output line
@@ -52,7 +59,7 @@ module Ruby2JS
     end
 
     def <<(token) # Pragma: skip
-      @tokens << token
+      @tokens << token # Pragma: array
       self
     end
 
@@ -156,12 +163,19 @@ module Ruby2JS
       if empty?
         ''
       elsif ['case ', 'default:'].include?(@tokens[0].to_s)
-        ' ' * ([0, indent - 2].max) + join
+        ' ' * ([0, indent - 2].max) + join()
       elsif indent > 0
-        ' ' * indent + join
+        ' ' * indent + join()
       else
-        join
+        join()
       end
+    end
+
+    # Method for JavaScript compatibility (used by selfhost transpilation)
+    # Using to_s! to avoid functions filter converting to_s->toString (causes infinite recursion)
+    # Dummy underscore param forces this to be a method not a getter
+    def toString(_=nil)
+      self.to_s!
     end
 
     # For array-like concatenation: work += line
@@ -269,42 +283,42 @@ module Ruby2JS
     # add a single token to the current line
     def put(string)
       unless String === string && string.include?("\n")
-        @line << Token.new(string, @ast)
+        @line << Token.new(string, @ast) # Pragma: array
       else
         parts = string.split("\n")
         first = parts.shift
-        @line << Token.new(first, @ast) if first
-        parts.each { |part| @lines << Line.new(Token.new(part, @ast)) }
-        @lines << Line.new if string.end_with?("\n")
+        @line << Token.new(first, @ast) if first # Pragma: array
+        parts.each { |part| @lines << Line.new(Token.new(part, @ast)) } # Pragma: array
+        @lines << Line.new if string.end_with?("\n") # Pragma: array
         @line = @lines.last
       end
     end
 
     # add a single token to the current line without checking for newline
     def put!(string)
-      @line << Token.new(string.gsub("\r", "\n"), @ast)
+      @line << Token.new(string.gsub("\r", "\n"), @ast) # Pragma: array
     end
 
     # add a single token to the current line and then advance to next line
     def puts(string)
       unless String === string && string.include?("\n")
-        @line << Token.new(string, @ast)
+        @line << Token.new(string, @ast) # Pragma: array
       else
         put string
       end
 
       @line = Line.new
-      @lines << @line
+      @lines << @line # Pragma: array
     end
 
     # advance to next line and then add a single token to the current line
     def sput(string)
       unless String === string && string.include?("\n")
         @line = Line.new(Token.new(string, @ast))
-        @lines << @line
+        @lines << @line # Pragma: array
       else
         @line = Line.new
-        @lines << @line
+        @lines << @line # Pragma: array
         put string
       end
     end
@@ -374,7 +388,7 @@ module Ruby2JS
       index = 0
       while index < slice.length
         line = slice[index]
-        line << Token.new('', nil) if line.empty?
+        line << Token.new('', nil) if line.empty? # Pragma: array
         if line.first.start_with?('//')
           len += @width # comments are a deal breaker
         else
@@ -397,7 +411,7 @@ module Ruby2JS
       if len < @width - 10
         # full collapse
         @lines.slice!(mark.first..-1)
-        @lines << Line.new(*work)
+        @lines << Line.new(*work) # Pragma: array
         @line = @lines.last
       elsif split && split[0] < @width - 10
         if slice[split[2]].indent < slice[split[2] + 1]&.indent.to_i
@@ -406,7 +420,7 @@ module Ruby2JS
           slice[-1].push(*close.to_ary)
           @lines[mark.first] = Line.new(*work[0..split[1] - 1])
           @lines.slice!(mark.first + 1..-1)
-          slice[split[2] + 1..-1]&.each { |line| @lines << line }
+          slice[split[2] + 1..-1]&.each { |line| @lines << line } # Pragma: array
           @line = @lines.last
         end
       end
@@ -492,7 +506,7 @@ module Ruby2JS
             unless source_index
               source_index = sources.length
               timestamp buffer.name
-              sources << buffer
+              sources << buffer # Pragma: array
             end
 
             line_num = buffer.line_for_position(pos) - 1
@@ -510,7 +524,7 @@ module Ruby2JS
 
               unless index
                 index = names.length
-                names << name
+                names << name # Pragma: array
               end
 
               vlq row, col, source_index, line_num, column, index

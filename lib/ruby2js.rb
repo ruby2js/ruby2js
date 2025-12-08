@@ -660,7 +660,7 @@ module Ruby2JS
     alias loc location  # Parser gem uses .loc, Prism wrapper uses .location
 
     def initialize(prism_comment, source, source_buffer = nil)
-      @text = source[prism_comment.location.start_offset...prism_comment.location.end_offset]
+      @text = prism_comment.location.slice
       @location = PrismLocation.new(prism_comment.location, source, source_buffer)
     end
 

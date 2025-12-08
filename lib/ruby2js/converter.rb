@@ -48,18 +48,19 @@ module Ruby2JS
     # Also excludes pass-through identifiers used by Ruby2JS:
     #   true/false/null/this - used by jQuery filter, etc.
     # The functions filter maps `debugger` as a statement to JS's `debugger;`
-    JS_RESERVED = Set.new(%w[
+    # Using array instead of Set for selfhost compatibility (JS Set uses .has() not .includes())
+    JS_RESERVED = %w[
       catch const continue debugger default delete enum export extends finally
       function import instanceof new switch throw try typeof var void with
       let static implements interface package private protected public
-    ]).freeze
+    ].freeze
 
     attr_accessor :binding, :ivars, :namespace
 
     def initialize( ast, comments, vars = {} )
       super()
 
-      @ast, @comments, @vars = ast, comments, vars.dup
+      @ast, @comments, @vars = ast, comments, vars.dup # Pragma: hash
       @varstack = []
       @scope = ast
       @inner = nil
@@ -71,9 +72,6 @@ module Ruby2JS
         @handlers[name] = method("on_#{name}")
       end
 
-      # Add aliases for handlers with special characters (for selfhost JS version)
-      # JS renames on_in? to on_is_in, but AST still uses :in?
-      @handlers[:'in?'] = @handlers[:is_in] if @handlers[:is_in]
 
       @state = nil
       @block_this = nil
@@ -92,7 +90,7 @@ module Ruby2JS
       @or = :auto
       @truthy = :js
       @boolean_context = false
-      @need_truthy_helpers = Set.new
+      @need_truthy_helpers = []
       @underscored_private = true
       @nullish_to_s = false
       @redoable = false
@@ -139,22 +137,22 @@ module Ruby2JS
     # declarations
     def scope( ast, args=nil )
       scope, @scope = @scope, ast
-      inner, @inner = @inner, nil 
+      inner, @inner = @inner, nil
       mark = output_location
       @varstack.push @vars
       @vars = args if args
-      @vars = Hash[@vars.map {|key, value| [key, true]}]
+      @vars = Hash[@vars.map {|key, value| [key, true]}] # Pragma: entries
 
       parse( ast, :statement )
 
       # retroactively add a declaration for 'pending' variables
-      vars = @vars.select {|key, value| value == :pending}.keys
+      vars = @vars.select {|key, value| value == :pending}.keys() # Pragma: entries
       unless vars.empty?
         insert mark, "let #{vars.map { |v| jsvar(v) }.join(', ')}#{@sep}"
         vars.each {|var| @vars[var] = true}
       end
     ensure
-      @vars = @varstack.pop
+      @vars = @varstack.pop()
       @scope = scope
       @inner = inner
     end
@@ -164,12 +162,12 @@ module Ruby2JS
     def jscope( ast, args=nil )
       @varstack.push @vars
       @vars = args if args
-      @vars = Hash[@vars.map {|key, value| [key, true]}]
+      @vars = Hash[@vars.map {|key, value| [key, true]}] # Pragma: entries
 
       parse( ast, :statement )
     ensure
-      pending = @vars.select {|key, value| value == :pending}
-      @vars = @varstack.pop
+      pending = @vars.select {|key, value| value == :pending} # Pragma: entries
+      @vars = @varstack.pop()
       @vars.merge! pending
     end
 
@@ -238,7 +236,7 @@ module Ruby2JS
         list = comment_list
       end
 
-      if @comments.key?(comment_key) && @comments[comment_key]
+      if @comments.include?(comment_key) && @comments[comment_key] # Pragma: hash
         @comments[comment_key] -= list
       end
 
@@ -321,11 +319,20 @@ module Ruby2JS
         return ast.loc.expression
       end
       ast.children.each do |child|
-        next unless child.respond_to?(:type) && child.respond_to?(:children)
+        next unless self.ast_node?(child)
         loc = find_first_location(child)
         return loc if loc
       end
       nil
+    end
+
+    # Check if obj is an AST node (has type and children)
+    # Safe for both Ruby and JS (doesn't throw on primitives)
+    def ast_node?(obj)
+      return false unless obj
+      # In Ruby: respond_to? is safe for all objects
+      # In JS: selfhost/converter filter transforms to add typeof guard
+      obj.respond_to?(:type) && obj.respond_to?(:children)
     end
 
     public
@@ -345,7 +352,7 @@ module Ruby2JS
         comments(ast).each {|comment| puts comment.chomp}
       end
 
-      handler.call(*ast.children)
+      handler.call(*ast.children) # Pragma: method
     ensure
       @ast = oldast
       @state = oldstate

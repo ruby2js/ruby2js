@@ -38,8 +38,9 @@ module Ruby2JS
         @pragma_scanned_count = 0
       end
 
-      # Scan all comments for pragma patterns and build line => Set<pragma> map
+      # Scan all comments for pragma patterns and build [source, line] => Set<pragma> map
       # Re-scans when new comments are added (e.g., from require filter merging files)
+      # Uses both source buffer name and line number to avoid collisions across files
       def scan_pragmas
         raw_comments = @comments[:_raw] || []
         return if raw_comments.length == @pragma_scanned_count
@@ -54,18 +55,33 @@ module Ruby2JS
             pragma_sym = PRAGMAS[pragma_name]
 
             if pragma_sym
-              # Get the line number of the comment
-              line = if comment.respond_to?(:loc) && comment.loc.respond_to?(:line)
-                comment.loc.line
+              # Get the source buffer name and line number of the comment
+              source_name = nil
+              line = nil
+
+              if comment.respond_to?(:loc) && comment.loc
+                loc = comment.loc
+                if loc.respond_to?(:expression) && loc.expression
+                  source_name = loc.expression.source_buffer&.name
+                  line = loc.line
+                elsif loc.respond_to?(:line)
+                  line = loc.line
+                end
               elsif comment.respond_to?(:location)
                 loc = comment.location
-                loc.respond_to?(:start_line) ? loc.start_line : loc.line
-              else
-                next
+                line = loc.respond_to?(:start_line) ? loc.start_line : loc.line
+                # Try to get source buffer name from location
+                if loc.respond_to?(:source_buffer)
+                  source_name = loc.source_buffer&.name
+                end
               end
 
-              @pragmas[line] ||= Set.new
-              @pragmas[line] << pragma_sym
+              next unless line
+
+              # Use [source_name, line] as key to avoid cross-file collisions
+              key = [source_name, line]
+              @pragmas[key] ||= Set.new
+              @pragmas[key] << pragma_sym
             end
           end
         end
@@ -77,24 +93,37 @@ module Ruby2JS
       def pragma?(node, pragma_sym)
         scan_pragmas
 
-        line = node_line(node)
+        source_name, line = node_source_and_line(node)
         return false unless line
 
-        @pragmas[line]&.include?(pragma_sym)
+        # Try with source name first, then fall back to nil source for compatibility
+        key = [source_name, line]
+        return true if @pragmas[key]&.include?(pragma_sym)
+
+        # Fallback: check without source name (for backward compatibility)
+        key_no_source = [nil, line]
+        @pragmas[key_no_source]&.include?(pragma_sym)
       end
 
-      # Get the line number for a node
-      def node_line(node)
-        return nil unless node.respond_to?(:loc) && node.loc
+      # Get the source buffer name and line number for a node
+      def node_source_and_line(node)
+        return [nil, nil] unless node.respond_to?(:loc) && node.loc
 
         loc = node.loc
-        if loc.respond_to?(:line)
-          loc.line
-        elsif loc.respond_to?(:expression) && loc.expression
-          loc.expression.line
+        source_name = nil
+        line = nil
+
+        if loc.respond_to?(:expression) && loc.expression
+          source_name = loc.expression.source_buffer&.name
+          line = loc.expression.line
+        elsif loc.respond_to?(:line)
+          line = loc.line
+          source_name = loc.source_buffer&.name if loc.respond_to?(:source_buffer)
         elsif loc.is_a?(Hash) && loc[:start_line]
-          loc[:start_line]
+          line = loc[:start_line]
         end
+
+        [source_name, line]
       end
 
       # Handle || with nullish pragma -> ??
@@ -256,8 +285,10 @@ module Ruby2JS
         end
       end
 
-      # Handle each/each_pair on hashes with entries pragma
+      # Handle hash iteration methods with entries pragma
       # hash.each { |k,v| } -> Object.entries(hash).forEach(([k,v]) => {})
+      # hash.map { |k,v| } -> Object.entries(hash).map(([k,v]) => {})
+      # hash.select { |k,v| } -> Object.fromEntries(Object.entries(hash).filter(([k,v]) => {}))
       def on_block(node)
         call, args, body = node.children
 
@@ -283,11 +314,56 @@ module Ruby2JS
               args
             end
 
-            return process node.updated(nil, [
+            # Create new block without location to avoid re-triggering pragma
+            return process s(:block,
               s(:send, entries_call, :forEach),
               new_args,
               body
-            ])
+            )
+
+          elsif method == :map && target
+            # Transform: hash.map { |k,v| expr }
+            # Into: Object.entries(hash).map(([k,v]) => expr)
+            entries_call = s(:send,
+              s(:const, nil, :Object), :entries, target)
+
+            new_args = if args.children.length > 1
+              s(:args, s(:mlhs, *args.children))
+            else
+              args
+            end
+
+            # Create new block without location to avoid re-triggering pragma
+            return process s(:block,
+              s(:send, entries_call, :map),
+              new_args,
+              body
+            )
+
+          elsif method == :select && target
+            # Transform: hash.select { |k,v| expr }
+            # Into: Object.fromEntries(Object.entries(hash).filter(([k,v]) => expr))
+            entries_call = s(:send,
+              s(:const, nil, :Object), :entries, target)
+
+            new_args = if args.children.length > 1
+              s(:args, s(:mlhs, *args.children))
+            else
+              args
+            end
+
+            # Create a new block node without location info to avoid re-triggering pragma
+            filter_block = s(:block,
+              s(:send, entries_call, :filter),
+              new_args,
+              body
+            )
+
+            # Process the inner block first, then wrap with fromEntries
+            processed_filter = process filter_block
+
+            return s(:send,
+              s(:const, nil, :Object), :fromEntries, processed_filter)
           end
         end
 

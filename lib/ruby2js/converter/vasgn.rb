@@ -23,11 +23,11 @@ module Ruby2JS
       begin
         if value and value.type == :lvasgn and @state == :statement
           undecls = []
-          undecls << name unless @vars.include? name
+          undecls << name unless @vars.include? name # Pragma: hash
 
           child = value
           while child and child.type == :lvasgn
-            undecls << child.children[0] unless @vars.include? child.children[0]
+            undecls << child.children[0] unless @vars.include? child.children[0] # Pragma: hash
             child = child.children[1]
           end
 
@@ -40,7 +40,7 @@ module Ruby2JS
 
         hoist = false
         # Treat :masgn marker as "not yet declared" for purposes of adding let/var
-        is_declared = @vars.include?(name) && @vars[name] != :masgn
+        is_declared = @vars.include?(name) && @vars[name] != :masgn # Pragma: hash
         if state == :statement and not is_declared
           hoist = hoist?(@scope, @inner, name) if @inner and @scope != @inner
           if not hoist
@@ -93,7 +93,7 @@ module Ruby2JS
 
         child = subchild
 
-        if child.type == :lvasgn and not @vars.include?(child.children[0]) 
+        if child.type == :lvasgn and not @vars.include?(child.children[0]) # Pragma: hash
           undecls << child.children[0]
         end
       end
