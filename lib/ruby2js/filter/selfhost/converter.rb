@@ -33,6 +33,11 @@ module Ruby2JS
           super
         end
 
+        # Methods that are always method calls in Ruby, never property accesses
+        # These need to be marked as :call type to ensure they get () in JS
+        # Note: .first and .last are excluded because they become getters on custom classes
+        ALWAYS_METHODS = %i[pop shift].freeze
+
         # Transform method("on_#{name}") to use cleaned name without ? or !
         # This handles the handler registration loop in Converter#initialize
         def on_send(node)
@@ -44,6 +49,14 @@ module Ruby2JS
           if target.nil? && method_name == :puts
             # Transform to self.puts to prevent functions filter from changing it
             return process node.updated(nil, [s(:self), method_name, *args])
+          end
+
+          # Force .pop, .shift, .first, .last to always be method calls
+          # In Ruby these are always methods; in JS they could be property access
+          # Mark as :call type so converter adds parentheses
+          # Don't re-process - just update the type and return (avoids infinite loop)
+          if target && ALWAYS_METHODS.include?(method_name) && args.empty?
+            return node.updated(:call, node.children)
           end
 
           # Transform Ruby2JS::Node.new(...) to new globalThis.Ruby2JS.Node(...)

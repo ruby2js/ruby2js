@@ -416,7 +416,7 @@ module Ruby2JS
       elsif split && split[0] < @width - 10
         if slice[split[2]].indent < slice[split[2] + 1]&.indent.to_i
           # collapse all but the last argument (typically a hash or function)
-          close = slice.pop() # Pragma: method
+          close = slice.pop
           slice[-1].push(*close.to_ary)
           @lines[mark.first] = Line.new(*work[0..split[1] - 1])
           @lines.slice!(mark.first + 1..-1)

@@ -10,7 +10,7 @@ module Ruby2JS
       kwargs = []
       while args.last and
         [:kwarg, :kwoptarg, :kwrestarg].include? args.last.type
-        kwargs.unshift args.pop() # Pragma: method
+        kwargs.unshift args.pop
       end
 
 
