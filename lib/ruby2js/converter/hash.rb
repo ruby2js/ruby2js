@@ -89,7 +89,8 @@ module Ruby2JS
               if anonfn
                 receiver, method = right.children[0].children
                 if receiver
-                  unless method == :new and receiver.children == [nil, :Proc]
+                  # Note: use explicit element comparison for JS compatibility (array == array compares refs in JS)
+                  unless method == :new and receiver.children[0] == nil and receiver.children[1] == :Proc
                     anonfn = false
                   end
                 elsif not [:lambda, :proc].include? method

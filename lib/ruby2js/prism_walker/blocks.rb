@@ -2,12 +2,32 @@
 
 module Ruby2JS
   class PrismWalker
+    # Helper to check Prism node type - JS version (constructor.name check)
+    def is_numbered_params?(node)
+      node && node.constructor.name == 'NumberedParametersNode'
+    end
+
+    # Helper to check Prism node type - Ruby version (is_a? check)
+    def is_numbered_params?(node) # Pragma: skip
+      node.is_a?(Prism::NumberedParametersNode)
+    end
+
+    # Helper to check Prism node type - JS version
+    def is_implicit_rest?(node)
+      node && node.constructor.name == 'ImplicitRestNode'
+    end
+
+    # Helper to check Prism node type - Ruby version
+    def is_implicit_rest?(node) # Pragma: skip
+      node.is_a?(Prism::ImplicitRestNode)
+    end
+
     # Block: foo { |x| x + 1 }
     def visit_block_node(node)
       call = visit(node.call)
       body = visit(node.body)
 
-      if node.parameters.is_a?(Prism::NumberedParametersNode)
+      if self.is_numbered_params?(node.parameters)
         # Numbered parameters: { _1 + _2 }
         sl(node, :numblock, call, node.parameters.maximum, body)
       else
@@ -23,7 +43,7 @@ module Ruby2JS
       # Parser gem produces (:send nil :lambda) for the lambda keyword
       lambda_call = s(:send, nil, :lambda)
 
-      if node.parameters.is_a?(Prism::NumberedParametersNode)
+      if self.is_numbered_params?(node.parameters)
         # Numbered parameters in lambda
         sl(node, :numblock, lambda_call, node.parameters.maximum, body)
       else
@@ -36,9 +56,9 @@ module Ruby2JS
     def visit_block_parameters_node(node)
       params = []
 
-      # Required parameters
+      # Required parameters (use push with splat since JS concat doesn't mutate)
       if node.parameters
-        params.concat(visit_parameters(node.parameters))
+        params.push(*visit_parameters(node.parameters))
       end
 
       # Block-local variables (shadow variables): |; a, b|
@@ -73,7 +93,7 @@ module Ruby2JS
       end
 
       # Rest parameter
-      if params.rest && !params.rest.is_a?(Prism::ImplicitRestNode)
+      if params.rest && !self.is_implicit_rest?(params.rest)
         result << visit(params.rest)
       end
 
@@ -164,7 +184,7 @@ module Ruby2JS
         targets << visit(target)
       end
 
-      if node.rest && !node.rest.is_a?(Prism::ImplicitRestNode)
+      if node.rest && !self.is_implicit_rest?(node.rest)
         targets << visit(node.rest)
       end
 

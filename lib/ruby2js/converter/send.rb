@@ -40,7 +40,8 @@ module Ruby2JS
       method = method.to_s[0..-2] if method =~ /\w[!?]$/
 
       # anonymous class
-      if method == :new and receiver and receiver.children == [nil, :Class] and
+      # Note: use explicit element comparison for JS compatibility (array == array compares refs in JS)
+      if method == :new and receiver and receiver.children[0] == nil and receiver.children[1] == :Class and
         args.last.type == :def and args.last.children.first == nil
 
         parent = (args.length > 1) ? args.first : nil
@@ -49,7 +50,8 @@ module Ruby2JS
       end
 
       # three ways to define anonymous functions
-      if method == :new and receiver and receiver.children == [nil, :Proc]
+      # Note: use explicit element comparison for JS compatibility (array == array compares refs in JS)
+      if method == :new and receiver and receiver.children[0] == nil and receiver.children[1] == :Proc
         return parse args.first, @state
 
       elsif not receiver and [:lambda, :proc].include? method

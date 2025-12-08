@@ -70,6 +70,21 @@ if (!Array.prototype.rindex) {
   };
 }
 
+// Ruby's compact/compact! - remove null/undefined from array
+// compact() is called as a property access in transpiled code (body.compact)
+// so we define it as a getter that mutates in place (simulating compact!)
+Object.defineProperty(Array.prototype, 'compact', {
+  get: function() {
+    for (let i = this.length - 1; i >= 0; i--) {
+      if (this[i] === null || this[i] === undefined) {
+        this.splice(i, 1);
+      }
+    }
+    return this;
+  },
+  configurable: true
+});
+
 // Import walker first to get Node class (transpiled from lib/ruby2js/node.rb)
 const { Ruby2JS: WalkerModule } = await import('./dist/walker.mjs');
 
@@ -136,6 +151,9 @@ Ruby2JS.convert = function(source, opts = {}) {
     if (opts.comparison) converter.comparison = opts.comparison;
     if (opts.strict) converter.strict = opts.strict;
 
+    // Set up namespace for class/module tracking
+    converter.namespace = new Namespace();
+
     // convert is a getter (no-arg method becomes getter in ES6 class)
     converter.convert;
 
@@ -201,6 +219,72 @@ export function before(fn) {
 // This class exists for compatibility but is not currently used.
 class Hash {}
 globalThis.Hash = Hash;
+
+// Namespace class - tracks class/module scopes and their properties
+class Namespace {
+  constructor() {
+    this._active = [];  // current scope
+    this._seen = new Map();  // history of all definitions
+  }
+
+  // Convert AST const nodes to array of names
+  resolve(token, result = []) {
+    if (!token || token.type !== 'const') return [];
+    this.resolve(token.children[0], result);
+    result.push(token.children[1]);
+    return result;
+  }
+
+  // Return the active scope as flat array
+  get active() {
+    return this._active.flat().filter(x => x);
+  }
+
+  // Enter a new scope
+  enter(name) {
+    this._active.push(this.resolve(name));
+    const key = JSON.stringify(this.active);
+    const previous = this._seen.get(key);
+    if (!this._seen.has(key)) {
+      this._seen.set(key, {});
+    }
+    return previous;
+  }
+
+  // Get properties for current or named scope
+  getOwnProps(name = null) {
+    const key = JSON.stringify([...this.active, ...this.resolve(name)]);
+    const props = this._seen.get(key);
+    return props ? { ...props } : {};
+  }
+
+  // Add properties to current scope
+  defineProps(props, namespace = this.active) {
+    const key = JSON.stringify(namespace);
+    if (!this._seen.has(key)) {
+      this._seen.set(key, {});
+    }
+    Object.assign(this._seen.get(key), props || {});
+  }
+
+  // Find a scope relative to ancestry
+  find(name) {
+    name = this.resolve(name);
+    const prefix = [...this.active];
+    while (prefix.pop() !== undefined) {
+      const key = JSON.stringify([...prefix, ...name]);
+      const result = this._seen.get(key);
+      if (result) return result;
+    }
+    return {};
+  }
+
+  // Leave current scope
+  leave() {
+    this._active.pop();
+  }
+}
+globalThis.Namespace = Namespace;
 
 // Extend String prototype with must_equal for chaining
 String.prototype.must_equal = function(expected) {

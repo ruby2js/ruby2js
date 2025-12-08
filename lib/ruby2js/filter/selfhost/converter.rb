@@ -37,7 +37,9 @@ module Ruby2JS
         # These need to be marked as :call type to ensure they get () in JS
         # Note: .first and .last are excluded because they become getters on custom classes
         # is_method? is critical - Ruby's is_method? becomes is_method in JS, must be called with ()
-        ALWAYS_METHODS = %i[pop shift is_method?].freeze
+        # reverse is needed because arr.reverse.each becomes for-of loop in JS
+        # getOwnProps is a method on Namespace class that returns an object
+        ALWAYS_METHODS = %i[pop shift is_method? reverse sort getOwnProps dup].freeze
 
         # Instance methods defined in converter files that need `this.` prefix when called
         # without an explicit receiver. In Ruby you can call instance methods without `self.`,

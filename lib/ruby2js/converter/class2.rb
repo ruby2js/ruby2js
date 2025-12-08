@@ -148,7 +148,7 @@ module Ruby2JS
         body.each do |m|
           put(index == 0 ? @nl : @sep) unless skipped
           index += 1
-          comments = comments(m)
+          node_comments = comments(m)
           location = output_location
           skipped = false
 
@@ -303,18 +303,18 @@ module Ruby2JS
           end
 
           if skipped
-            post << [m, comments] unless m.type == :defineProps
+            post << [m, node_comments] unless m.type == :defineProps
           else
-            comments.reverse.each {|comment| insert location, comment}
+            (node_comments || []).reverse.each {|comment| insert location, comment}
           end
         end
 
         put @nl unless skipped
         put '}'
 
-        post.each do |m, comments|
+        post.each do |m, m_comments|
           put @sep
-          comments.each {|comment| put comment}
+          m_comments.each {|comment| put comment}
           if m.type == :alias
             parse name
             put '.prototype.'

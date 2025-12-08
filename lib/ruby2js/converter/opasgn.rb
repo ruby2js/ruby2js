@@ -20,9 +20,10 @@ module Ruby2JS
         end
       end
 
+      # Note: use explicit element comparison for JS compatibility (array == array compares refs in JS)
       if \
-        [:+, :-].include?(op) and value.type==:int and 
-        (value.children==[1] or value.children==[-1])
+        [:+, :-].include?(op) and value.type==:int and
+        value.children.length == 1 and (value.children[0] == 1 or value.children[0] == -1)
       then
         if value.children.first == -1
           op = (op == :+ ? :- : :+)

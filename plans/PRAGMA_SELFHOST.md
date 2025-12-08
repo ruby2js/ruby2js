@@ -168,7 +168,7 @@ filters: [
 
 Running the transpiled converter against the transliteration test suite.
 
-**Current status:** 73/249 tests passing (29% pass rate)
+**Current status:** 162/249 tests passing (65% pass rate)
 
 **Key fixes completed:**
 1. `isSafeNavigation()` - JS Prism methods need parentheses (use `:call` type)
@@ -176,12 +176,19 @@ Running the transpiled converter against the transliteration test suite.
 3. Filter loading for subdirectory filters (`selfhost/walker`, `selfhost/converter`)
 4. Method name conversion: `send!` → `send_bang`, `send?` → `send_q`
 5. Handler registration with JS-safe method names
+6. Lambda argument parsing - Fixed `is_numbered_params?` dual-method pattern
+7. Array.concat mutation - Changed to `push(*...)` which mutates in both languages
+8. Array comparison for Proc.new/Class.new - Use element-by-element comparison
+9. Namespace class - Added to test harness for class/module tracking
+10. Array.compact polyfill - Added as getter to mutate in place
+11. Variable shadowing with `comments` method - Renamed to `node_comments`
+12. `.reverse`/`.sort`/`.getOwnProps`/`.dup` - Added to ALWAYS_METHODS for parens
+13. `++`/`--` operators - Fixed array comparison in opasgn.rb
 
-**Remaining issues to investigate:**
-- `_implicitBlockYield is not a function` errors
-- Empty interpolation handling
-- Mass assignment parsing
-- Various converter handler issues
+**Known remaining issues:**
+- Endless method detection needs `.loc` getter (alias doesn't transpile)
+- `@comments.each` iteration uses `for...of` which fails on plain Objects
+- Various null access errors in class/module handling
 
 **Debugging tools available:**
 - `bin/ruby2js --ast` / `--filtered-ast` - Ruby-side AST inspection
