@@ -277,16 +277,16 @@ module Ruby2JS
             start = 0 if methods == 0
             if name
               body[start...start+methods] =
-                s(:casgn, *name.children, s(:hash, *pairs.flatten))
+                [s(:casgn, *name.children, s(:hash, *pairs.flatten))]
             else
-              body[start...start+methods] = s(:hash, *pairs.flatten)
+              body[start...start+methods] = [s(:hash, *pairs.flatten)]
             end
           elsif @ast.type == :class_extend or extend
             body[start...start+methods] =
-              s(:assign, body[start].children.first, s(:hash, *pairs.flatten))
+              [s(:assign, body[start].children.first, s(:hash, *pairs.flatten))]
           else
             body[start...start+methods] =
-              s(:send, name, :prototype=, s(:hash, *pairs.flatten))
+              [s(:send, name, :prototype=, s(:hash, *pairs.flatten))]
           end
 
         elsif (@ast.type == :class_extend or extend) and methods > 1
@@ -297,7 +297,7 @@ module Ruby2JS
           end
 
           body[start...start+methods] =
-            s(:assign, body[start].children.first, s(:hash, *pairs))
+            [s(:assign, body[start].children.first, s(:hash, *pairs))]
         end
       end
 

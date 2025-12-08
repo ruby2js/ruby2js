@@ -102,7 +102,7 @@ if (!String.prototype.chomp) {
       return this.replace(/\r?\n$/, '');
     }
     if (this.endsWith(suffix)) {
-      return this.slice(0, -suffix.length);
+      return this.slice(0, this.length - suffix.length);
     }
     return String(this);
   };
