@@ -102,9 +102,15 @@ module Ruby2JS
 
           # Convert Prism Ruby property names to JS camelCase equivalents
           # Note: end_offset is handled specially above (needs calculation in JS Prism)
+          # Use :attr for property access without arguments (no parentheses in JS)
           if PRISM_PROPERTY_MAP.key?(method) && method != :end_offset
             js_method = PRISM_PROPERTY_MAP[method]
-            return process node.updated(nil, [target, js_method, *args])
+            if args.empty? && target
+              # Property access - use :attr to avoid parentheses
+              return process s(:attr, target, js_method)
+            else
+              return process node.updated(nil, [target, js_method, *args])
+            end
           end
 
           # node.unescaped -> node.unescaped.value (JS Prism returns {encoding, value} object)

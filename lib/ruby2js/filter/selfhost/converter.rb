@@ -39,6 +39,14 @@ module Ruby2JS
         # is_method? is critical - Ruby's is_method? becomes is_method in JS, must be called with ()
         ALWAYS_METHODS = %i[pop shift is_method?].freeze
 
+        # Instance methods defined in converter files that need `this.` prefix when called
+        # without an explicit receiver. In Ruby you can call instance methods without `self.`,
+        # but in JavaScript you need `this.` to call instance methods.
+        CONVERTER_INSTANCE_METHODS = %i[
+          boolean_expression? collapse_strings combine_properties conditionally_equals
+          hoist? number_format parse_condition range_to_array rewrite transform_defs
+        ].freeze
+
         # Transform method("on_#{name}") to use cleaned name without ? or !
         # This handles the handler registration loop in Converter#initialize
         def on_send(node)
@@ -49,6 +57,12 @@ module Ruby2JS
           # in Serializer, `puts` is a method that adds tokens to output lines
           if target.nil? && method_name == :puts
             # Transform to self.puts to prevent functions filter from changing it
+            return process node.updated(nil, [s(:self), method_name, *args])
+          end
+
+          # Convert unqualified calls to converter instance methods to `self.methodName()`
+          # Ruby allows calling instance methods without `self.`, JS requires `this.`
+          if target.nil? && CONVERTER_INSTANCE_METHODS.include?(method_name)
             return process node.updated(nil, [s(:self), method_name, *args])
           end
 
