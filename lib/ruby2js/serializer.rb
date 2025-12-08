@@ -340,7 +340,7 @@ module Ruby2JS
     # capture (and remove) tokens from the output stream
     def capture(&block)
       mark = output_location
-      block.call
+      block.() # Explicit call syntax for selfhost compatibility
       lines = @lines.slice!(mark.first + 1..-1) || []
       @line = @lines.last
 
@@ -373,7 +373,7 @@ module Ruby2JS
     # compact small expressions into a single line
     def compact(&block)
       mark = output_location
-      block.call
+      block.() # Explicit call syntax for selfhost compatibility
       return unless @lines.length - mark.first > 1
       return if @indent == 0
 
@@ -416,7 +416,7 @@ module Ruby2JS
       elsif split && split[0] < @width - 10
         if slice[split[2]].indent < slice[split[2] + 1]&.indent.to_i
           # collapse all but the last argument (typically a hash or function)
-          close = slice.pop
+          close = slice.pop() # Pragma: method
           slice[-1].push(*close.to_ary)
           @lines[mark.first] = Line.new(*work[0..split[1] - 1])
           @lines.slice!(mark.first + 1..-1)
