@@ -16,14 +16,6 @@ require 'ruby2js/filter/esm'
 converter_file = File.expand_path('../../../lib/ruby2js/converter.rb', __dir__)
 source = File.read(converter_file)
 
-# Workaround: Remove non-pragma comments that cause issues with extended regex handling
-# The transpiler sometimes confuses Ruby comments with extended regex comments
-source = source.gsub(/^(\s*)#(?!\s*Pragma:)(.*)$/) do |match|
-  indent = $1
-  # Keep the line but make it empty (preserves line numbers)
-  "#{indent}"
-end
-
 js = Ruby2JS.convert(source,
   eslevel: 2022,
   comparison: :identity,
