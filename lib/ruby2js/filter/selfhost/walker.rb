@@ -5,10 +5,11 @@
 # Most transformations have been moved to general-purpose filters:
 # - Functions filter: .freeze, .to_sym, .reject, negative index, 2-arg slice, .empty?
 # - Pragma filter: # Pragma: skip for require/def/alias
+# - Return filter: autoreturn for method bodies
 #
 # What remains here:
-# - autoreturn for methods ending with constructor calls (Node.new(...))
-#   This ensures visitor methods return their constructed Node values
+# - Remove private/protected/public (walker source uses these but JS doesn't need them,
+#   and Ruby2JS core raises an error for these in classes)
 
 require 'ruby2js'
 
@@ -18,35 +19,16 @@ module Ruby2JS
       module Walker
         include SEXP
 
-        # Wrap method bodies in autoreturn when the last expression is a constructor call
-        # This ensures methods like visit_integer_node return their Node.new(...) value
-        def on_def(node)
-          body = node.children[2]
-          if body && needs_autoreturn?(body)
-            node = node.updated(nil, [node.children[0], node.children[1], s(:autoreturn, body)])
+        def on_send(node)
+          target, method, *args = node.children
+
+          # Remove private/protected/public (no-op in JS)
+          # Ruby2JS core raises an error for these in classes, but walker source uses them
+          if target.nil? && [:private, :protected, :public].include?(method) && args.empty?
+            return s(:hide)
           end
 
-          super(node)
-        end
-
-        private
-
-        # Check if an expression is a constructor call that should be returned
-        def needs_autoreturn?(node)
-          return false unless node
-
-          # Handle begin blocks - check last expression
-          if node.type == :begin
-            return needs_autoreturn?(node.children.last)
-          end
-
-          # Check for Foo.new(...) pattern
-          if node.type == :send
-            target, method = node.children[0], node.children[1]
-            return true if method == :new && target&.type == :const
-          end
-
-          false
+          super
         end
       end
 

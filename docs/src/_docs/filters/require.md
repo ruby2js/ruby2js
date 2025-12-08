@@ -1,13 +1,9 @@
 ---
-order: 39
+order: 22
 title: Require
-top_section: Deprecations
+top_section: Filters
 category: require
 ---
-
-{% rendercontent "docs/note", type: "warning" %}
-This filter has been deprecated and will be removed in Ruby2JS 6.0.
-{% endrendercontent %}
 
 The **Require** filter supports Ruby-style `require` and `require_relative` statements.  `require` function calls in expressions are left alone.
 

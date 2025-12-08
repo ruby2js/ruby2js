@@ -1,4 +1,3 @@
-gem 'minitest'
 require 'minitest/autorun'
 
 describe "ES2021 support" do

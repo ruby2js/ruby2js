@@ -1,5 +1,3 @@
-# TODO: This feature is deprecated.
-
 require 'ruby2js'
 require 'pathname'
 

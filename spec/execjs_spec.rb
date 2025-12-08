@@ -1,4 +1,3 @@
-gem 'minitest'
 require 'minitest/autorun'
 
 describe 'Ruby2JS::ExecJS' do

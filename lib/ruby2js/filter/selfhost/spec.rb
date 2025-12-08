@@ -2,13 +2,14 @@
 
 # Selfhost Spec Filter - Transformations for test spec transpilation
 #
-# Handles Minitest patterns:
+# Currently handles:
+# - _(...) wrapper removal (minitest expectation syntax)
+#
+# Future patterns to handle:
 # - describe X do...end → describe('X', () => {...})
 # - it 'text' do...end → it('text', () => {...})
-# - _(...).must_equal(...) → assertion
 # - before do...end → beforeEach(() => {...})
-#
-# Status: STUB - To be implemented when transpiling specs
+# - Minitest assertions: must_equal, must_be_nil, etc.
 
 require 'ruby2js'
 
@@ -18,14 +19,17 @@ module Ruby2JS
       module Spec
         include SEXP
 
-        # Placeholder - spec-specific transformations will be added here
-        # as we work on transpiling the test suite
+        def on_send(node)
+          target, method, *args = node.children
 
-        # Example patterns to handle (not yet implemented):
-        # - describe 'X' do...end blocks
-        # - it 'should...' do...end blocks
-        # - Minitest assertions: must_equal, must_be_nil, etc.
-        # - before/after hooks
+          # _(...) wrapper → just the inner expression
+          # Minitest uses _() to wrap values for expectation syntax
+          if target.nil? && method == :_ && args.length == 1
+            return process(args.first)
+          end
+
+          super
+        end
       end
 
       # NOTE: Spec is NOT added to DEFAULTS - it's loaded explicitly
