@@ -83,6 +83,14 @@ module Ruby2JS
           :read_name => :readName,
           :write_name => :writeName,
           :binary_operator => :binaryOperator,
+          # Control flow clause properties
+          :else_clause => :elseClause,
+          :rescue_clause => :rescueClause,
+          :ensure_clause => :ensureClause,
+          :rescue_expression => :rescueExpression,
+          # Alias properties
+          :new_name => :newName,
+          :old_name => :oldName,
           # Reserved word renames in JS
           :arguments => :arguments_,
         }.freeze
@@ -92,6 +100,12 @@ module Ruby2JS
         PRISM_METHOD_MAP = {
           :safe_navigation? => :isSafeNavigation,
           :exclude_end? => :isExcludeEnd,
+          :begin_modifier? => :isBeginModifier,
+          :ignore_case? => :isIgnoreCase,
+          :multi_line? => :isMultiLine,
+          :euc_jp? => :isEucJp,
+          :extended? => :isExtended,
+          :once? => :isOnce,
         }.freeze
 
         def on_send(node)
