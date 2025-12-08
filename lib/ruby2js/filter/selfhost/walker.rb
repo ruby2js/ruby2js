@@ -67,6 +67,8 @@ module Ruby2JS
           :name_loc => :nameLoc,
           :operator_loc => :operatorLoc,
           :call_operator_loc => :callOperatorLoc,
+          :equal_loc => :equalLoc,
+          :end_keyword_loc => :endKeywordLoc,
           :constant_path => :constantPath,
           :start_offset => :startOffset,
           :end_offset => :endOffset,

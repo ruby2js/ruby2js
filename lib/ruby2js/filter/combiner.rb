@@ -25,7 +25,13 @@ module Ruby2JS
 
       # Process the entire AST after all children are processed
       # We need to find and merge duplicate module/class definitions
+      # Note: Only handles statement-level :begin, not expression grouping
       def on_begin(node)
+        # Only process if this is a top-level statement sequence (multiple children)
+        # Single-child begin nodes are used for expression grouping (like `!(a && b)`)
+        # and should be left alone to preserve semantics
+        return super if node.children.length <= 1
+
         children = process_all(node.children)
         children = merge_definitions(children)
         children = children.compact

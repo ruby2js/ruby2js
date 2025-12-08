@@ -213,10 +213,11 @@ module Ruby2JS
       elsif conditionally_equals(left, right.children.first)
         # a && a.b => a&.b
         right.updated(:csend, [left, *right.children[1..-1]])
-      elsif conditionally_equals(left.children.last, right.children.first)
+      elsif left.type != :in? && conditionally_equals(left.children.last, right.children.first)
         # a && b && b.c => a && b&.c
+        # Skip for :in? nodes - their structure is (in? prop target) not (and left right)
         left.updated(:and, [left.children.first,
-          left.children.last.updated(:csend, 
+          left.children.last.updated(:csend,
           [left.children.last, *right.children[1..-1]])])
       else
         s(:and, left, right)

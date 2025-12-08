@@ -153,6 +153,23 @@ describe Ruby2JS::Filter::Combiner do
     end
   end
 
+  describe 'expression grouping' do
+    it "should preserve single-child begin nodes used for grouping" do
+      # The !! pattern uses begin nodes for grouping: !!(a && b)
+      # Combiner should not unwrap these, otherwise De Morgan's law gets applied
+      to_js('x = !!(a && b)').must_equal 'let x = !!(a && b)'
+    end
+
+    it "should preserve negation of grouped and expressions" do
+      to_js('x = !(a && b)').must_equal 'let x = !(a && b)'
+    end
+
+    it "should preserve negation of grouped or expressions" do
+      # Note: || becomes ?? (nullish coalescing) in ES2022 for non-boolean contexts
+      to_js('x = !(a || b)').must_equal 'let x = !(a ?? b)'
+    end
+  end
+
   describe Ruby2JS::Filter::DEFAULTS do
     it "should NOT include Combiner (it's for self-hosting only)" do
       _(Ruby2JS::Filter::DEFAULTS).wont_include Ruby2JS::Filter::Combiner
