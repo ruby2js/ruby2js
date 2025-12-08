@@ -57,8 +57,8 @@ module Ruby2JS
           super
         end
 
-        # Prism Ruby API to JS API property name mapping (snake_case -> camelCase)
-        # Note: Some properties are renamed in JS due to reserved words (arguments -> arguments_)
+        # Prism Ruby API to JS API PROPERTY name mapping (snake_case -> camelCase)
+        # These are accessed as properties without parentheses in JS
         PRISM_PROPERTY_MAP = {
           # Location properties
           :opening_loc => :openingLoc,
@@ -77,8 +77,19 @@ module Ruby2JS
           :right_parenthesis => :rightParenthesis,
           :opening => :opening,
           :closing => :closing,
+          # Call/write node properties
+          :read_name => :readName,
+          :write_name => :writeName,
+          :binary_operator => :binaryOperator,
           # Reserved word renames in JS
           :arguments => :arguments_,
+        }.freeze
+
+        # Prism Ruby API to JS API METHOD name mapping
+        # These are methods in JS Prism and need to be called with ()
+        PRISM_METHOD_MAP = {
+          :safe_navigation? => :isSafeNavigation,
+          :exclude_end? => :isExcludeEnd,
         }.freeze
 
         def on_send(node)
@@ -111,6 +122,15 @@ module Ruby2JS
             else
               return process node.updated(nil, [target, js_method, *args])
             end
+          end
+
+          # Convert Prism Ruby method names to JS method names
+          # These are methods that need to be called with parentheses in JS
+          # e.g., node.safe_navigation? -> node.isSafeNavigation()
+          if PRISM_METHOD_MAP.key?(method) && args.empty? && target
+            js_method = PRISM_METHOD_MAP[method]
+            # Use :call to force parentheses in output (Ruby2JS treats :call as method call)
+            return process node.updated(:call, [target, js_method])
           end
 
           # node.unescaped -> node.unescaped.value (JS Prism returns {encoding, value} object)

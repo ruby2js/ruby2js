@@ -39,16 +39,26 @@ module Ruby2JS
         begin
           if registered_filters.include? name
             require registered_filters[name]
-    
+
             Ruby2JS::Filter::DEFAULTS.each do |mod|
               method = mod.instance_method(mod.instance_methods.first)
               if registered_filters[name] == method.source_location.first
                 mods << mod
               end
             end
-          elsif not name.empty? and name =~ /^[-\w+]$/
-            $load_error = "UNKNOWN filter: #{name}"
+          elsif not name.empty? and name =~ /^[-\w\/]+$/
+            # Try to require unregistered filter by name
+            # Supports both "selfhost/walker" and "selfhost_walker" (underscores converted to slashes)
+            require_name = "ruby2js/filter/#{name.tr('_', '/')}"
+            defaults_before = Ruby2JS::Filter::DEFAULTS.dup
+            require require_name
+            # Add any new modules that were registered
+            (Ruby2JS::Filter::DEFAULTS - defaults_before).each do |mod|
+              mods << mod
+            end
           end
+        rescue LoadError
+          $load_error = "UNKNOWN filter: #{name}"
         rescue Exception => $load_error
         end
       end

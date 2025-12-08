@@ -116,13 +116,18 @@ module Ruby2JS
               if prefix.type == :str && prefix.children[0] == 'on_' &&
                  [:send, :lvar].include?(var_node.type)
 
-                # Transform to: this[`on_${name.replace(/[?!]$/, '')}`].bind(this)
-                # Build: "on_" + name.to_s.sub(/[?!]$/, '')
+                # Transform to: this[`on_${name.replace(/!$/, '_bang').replace(/\?$/, '_q')}`].bind(this)
+                # Build: "on_" + name.to_s.sub(/!$/, '_bang').sub(/\?$/, '_q')
                 cleaned_name = s(:send,
-                  s(:send, var_node, :to_s),
+                  s(:send,
+                    s(:send, var_node, :to_s),
+                    :sub,
+                    s(:regexp, s(:str, '!$'), s(:regopt)),
+                    s(:str, '_bang')
+                  ),
                   :sub,
-                  s(:regexp, s(:str, '[?!]$'), s(:regopt)),
-                  s(:str, '')
+                  s(:regexp, s(:str, '\\?$'), s(:regopt)),
+                  s(:str, '_q')
                 )
 
                 key_expr = s(:dstr,
@@ -207,17 +212,22 @@ module Ruby2JS
             # All types should be symbols
             if types.all? { |t| t.type == :sym }
               # Create method definitions for each type, plus handler registration
+              # Ruby allows ! and ? in method names, JS doesn't. Convert:
+              #   send! -> send_bang
+              #   send? -> send_q
               results = []
 
               types.each do |type_sym|
                 type_name = type_sym.children[0].to_s
-                method_name = "on_#{type_name}".to_sym
+                # Convert to JS-safe method name
+                js_type_name = type_name.sub(/!$/, '_bang').sub(/\?$/, '_q')
+                js_method_name = "on_#{js_type_name}".to_sym
 
                 # Create method definition
-                results << s(:def, method_name, args, body)
+                results << s(:def, js_method_name, args, body)
 
-                # Add handler registration with original type name
-                # The constructor loop handles converting to JS-safe method names
+                # Register handler with original type name
+                # The constructor loop will convert to JS-safe method names
                 results << s(:send,
                   s(:attr, s(:const, nil, :Converter), :_handlers),
                   :push,

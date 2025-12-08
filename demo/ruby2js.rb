@@ -148,6 +148,14 @@ def parse_request(env=ENV)
     @provide_sourcemap = true
   end
 
+  opts.on("--ast", "Output the parsed AST instead of JavaScript") do
+    @output_ast = true
+  end
+
+  opts.on("--filtered-ast", "Output the filtered AST instead of JavaScript") do
+    @output_filtered_ast = true
+  end
+
   # shameless hack.  Instead of repeating the available options, extract them
   # from the OptionParser.  Exclude default options and es20xx options.
   options_available = opts.instance_variable_get(:@stack).last.list.
@@ -183,32 +191,64 @@ end
 options = parse_request.first
 
 if (not defined? Wunderbar or not env['SERVER_PORT']) and not @live
+  # Helper to format AST as s-expression
+  def format_ast(ast, indent = '')
+    return 'nil' if ast.nil?
+    return ast.inspect unless ast.respond_to?(:type)
+
+    type = ast.type
+    children = ast.children
+
+    if children.empty?
+      "s(:#{type})"
+    elsif children.none? { |c| c.respond_to?(:type) }
+      # All children are primitives - single line
+      "s(:#{type}, #{children.map(&:inspect).join(', ')})"
+    else
+      # Has nested nodes - multi-line
+      lines = ["s(:#{type},"]
+      children.each_with_index do |child, i|
+        comma = i < children.length - 1 ? ',' : ''
+        if child.respond_to?(:type)
+          lines << format_ast(child, indent + '  ').lines.map.with_index { |line, j|
+            j == 0 ? "#{indent}  #{line.chomp}#{comma}" : "#{indent}  #{line.chomp}"
+          }.join("\n")
+        else
+          lines << "#{indent}  #{child.inspect}#{comma}"
+        end
+      end
+      lines << "#{indent})"
+      lines.join("\n")
+    end
+  end
+
   # command line support
   if ARGV.length > 0
     options[:file] = ARGV.first
-    conv = Ruby2JS.convert(File.read(ARGV.first), options)
-    if @provide_sourcemap
-      puts(
-        {
-          code: conv.to_s,
-          sourcemap: conv.sourcemap,
-        }.to_json
-      )
-    else
-      puts conv.to_s
-    end
+    source = File.read(ARGV.first)
   else
-    conv = Ruby2JS.convert($stdin.read, options)
-    if @provide_sourcemap
-      puts(
-        {
-          code: conv.to_s,
-          sourcemap: conv.sourcemap,
-        }.to_json
-      )
-    else
-      puts conv.to_s
-    end
+    source = $stdin.read
+  end
+
+  if @output_ast
+    # Output raw parsed AST
+    ast, _comments = Ruby2JS.parse(source, options[:file])
+    puts format_ast(ast)
+  elsif @output_filtered_ast
+    # Output AST after filters applied
+    conv = Ruby2JS.convert(source, options)
+    puts format_ast(conv.ast)
+  elsif @provide_sourcemap
+    conv = Ruby2JS.convert(source, options)
+    puts(
+      {
+        code: conv.to_s,
+        sourcemap: conv.sourcemap,
+      }.to_json
+    )
+  else
+    conv = Ruby2JS.convert(source, options)
+    puts conv.to_s
   end  
 
 else
