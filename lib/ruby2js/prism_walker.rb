@@ -225,8 +225,15 @@ module Ruby2JS
       Node.new(type, children, location: location)
     end
 
-    # Visit a node, returning nil if node is nil
+    # JavaScript-compatible visit (dispatches via constructor.name)
+    # JS output uses this version; Ruby uses the one below (last definition wins)
     def visit(node)
+      return nil if node.nil?
+      self["visit#{node.constructor.name}"].call!(self, node)
+    end
+
+    # Ruby visit - uses super to call Prism::Visitor#visit which dispatches properly
+    def visit(node) # Pragma: skip
       return nil if node.nil?
       super
     end

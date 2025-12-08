@@ -425,30 +425,33 @@ end
 
 # Add is_method? to Parser::AST::Node for distinguishing method calls from property access
 # Only do this if the Parser gem has been loaded
-if defined?(Parser::AST::Node) && Parser::AST::Node.ancestors.include?(AST::Node)
-  module Parser
-    module AST
-      class Node
-        def is_method?
-          return false if type == :attr
-          return true if type == :call
-          return true unless loc
+# NOTE: This entire block is parser-gem specific and skipped during selfhost transpilation
+unless defined?(RUBY2JS_SELFHOST) # Pragma: skip
+  if defined?(Parser::AST::Node) && Parser::AST::Node.ancestors.include?(AST::Node)
+    module Parser
+      module AST
+        class Node
+          def is_method?
+            return false if type == :attr
+            return true if type == :call
+            return true unless loc
 
-          if loc.respond_to? :selector
-            return true if children.length > 2
-            selector = loc.selector
-          elsif type == :defs
-            return true if children[1] =~ /[!?]$/
-            return true if children[2].children.length > 0
-            selector = loc.name
-          elsif type == :def
-            return true if children[0] =~ /[!?]$/
-            return true if children[1].children.length > 0
-            selector = loc.name
+            if loc.respond_to? :selector
+              return true if children.length > 2
+              selector = loc.selector
+            elsif type == :defs
+              return true if children[1] =~ /[!?]$/
+              return true if children[2].children.length > 0
+              selector = loc.name
+            elsif type == :def
+              return true if children[0] =~ /[!?]$/
+              return true if children[1].children.length > 0
+              selector = loc.name
+            end
+
+            return true unless selector and selector.source_buffer
+            selector.source_buffer.source[selector.end_pos] == '('
           end
-
-          return true unless selector and selector.source_buffer
-          selector.source_buffer.source[selector.end_pos] == '('
         end
       end
     end

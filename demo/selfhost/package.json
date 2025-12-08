@@ -5,10 +5,12 @@
   "description": "Self-hosted Ruby2JS converter running in Node.js",
   "scripts": {
     "build": "npm run build:walker && npm run build:converter && npm run build:spec",
-    "build:walker": "bundle exec ruby -I../../lib -rruby2js -rruby2js/filter/require -rruby2js/filter/combiner -rruby2js/filter/pragma -rruby2js/filter/selfhost -rruby2js/filter/functions -rruby2js/filter/return -rruby2js/filter/esm -e \"puts Ruby2JS.convert(File.read('../../lib/ruby2js/prism_walker.rb'), eslevel: 2022, comparison: :identity, underscored_private: true, file: '../../lib/ruby2js/prism_walker.rb', filters: [Ruby2JS::Filter::Pragma, Ruby2JS::Filter::Require, Ruby2JS::Filter::Combiner, Ruby2JS::Filter::Selfhost::Core, Ruby2JS::Filter::Selfhost::Walker, Ruby2JS::Filter::Functions, Ruby2JS::Filter::Return, Ruby2JS::Filter::ESM])\" > dist/walker.mjs",
+    "build:walker": "bundle exec ruby scripts/transpile_walker.rb > dist/walker.mjs",
     "build:converter": "bundle exec ruby scripts/transpile_converter.rb > dist/converter.mjs",
     "build:spec": "bundle exec ruby scripts/transpile_spec.rb ../../spec/transliteration_spec.rb > dist/transliteration_spec.mjs",
-    "test": "node run_spec.mjs",
+    "test": "npm run test:walker && npm run test:spec",
+    "test:walker": "node test_walker.mjs",
+    "test:spec": "node run_spec.mjs",
     "clean": "rm -rf dist"
   },
   "keywords": ["ruby", "javascript", "transpiler"],

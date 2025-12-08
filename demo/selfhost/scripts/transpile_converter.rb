@@ -42,4 +42,18 @@ js = Ruby2JS.convert(source,
   ]
 ).to_s
 
-puts js
+# Add preamble for ES module compatibility
+preamble = <<~JS
+// Preamble: Ruby built-ins needed by the transpiled converter
+class NotImplementedError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'NotImplementedError';
+  }
+}
+
+// Export the Ruby2JS module
+export const
+JS
+
+puts preamble + js

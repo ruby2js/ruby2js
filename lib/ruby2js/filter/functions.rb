@@ -624,6 +624,13 @@ module Ruby2JS
         elsif method==:flatten and args.length == 0
           process node.updated(nil, [target, :flat, s(:lvar, :Infinity)])
 
+        elsif method==:compact and args.length == 0
+          # array.compact -> array.filter(x => x != null)
+          # This removes nil/null values from the array
+          process s(:send, target, :filter,
+            s(:block, s(:send, nil, :proc), s(:args, s(:arg, :x)),
+              s(:send, s(:lvar, :x), :'!=', s(:nil))))
+
         elsif method==:to_h and args.length==0
           process node.updated(nil, [s(:const, nil, :Object), :fromEntries,
             target])

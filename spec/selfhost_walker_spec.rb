@@ -76,11 +76,12 @@ describe "Selfhost Walker Transpilation" do
     end
 
     it "contains visitor methods" do
-      _(@js).must_include 'visit_integer_node'
-      _(@js).must_include 'visit_string_node'
-      _(@js).must_include 'visit_call_node'
-      _(@js).must_include 'visit_def_node'
-      _(@js).must_include 'visit_class_node'
+      # Method names are converted to camelCase for JavaScript
+      _(@js).must_include 'visitIntegerNode'
+      _(@js).must_include 'visitStringNode'
+      _(@js).must_include 'visitCallNode'
+      _(@js).must_include 'visitDefNode'
+      _(@js).must_include 'visitClassNode'
     end
 
     it "contains helper location classes" do
@@ -228,27 +229,28 @@ describe "Selfhost Walker Transpilation" do
     end
 
     # Smoke test: check that key visitor methods are present
+    # Note: Method names are converted to camelCase for JavaScript (visitIntegerNode, etc.)
     %w[
-      visit_integer_node
-      visit_float_node
-      visit_string_node
-      visit_symbol_node
-      visit_nil_node
-      visit_true_node
-      visit_false_node
-      visit_array_node
-      visit_hash_node
-      visit_call_node
-      visit_local_variable_read_node
-      visit_local_variable_write_node
-      visit_instance_variable_read_node
-      visit_def_node
-      visit_class_node
-      visit_module_node
-      visit_if_node
-      visit_while_node
-      visit_block_node
-      visit_lambda_node
+      visitIntegerNode
+      visitFloatNode
+      visitStringNode
+      visitSymbolNode
+      visitNilNode
+      visitTrueNode
+      visitFalseNode
+      visitArrayNode
+      visitHashNode
+      visitCallNode
+      visitLocalVariableReadNode
+      visitLocalVariableWriteNode
+      visitInstanceVariableReadNode
+      visitDefNode
+      visitClassNode
+      visitModuleNode
+      visitIfNode
+      visitWhileNode
+      visitBlockNode
+      visitLambdaNode
     ].each do |method|
       it "has #{method}" do
         _(@js).must_include "#{method}(node)"

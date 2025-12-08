@@ -232,6 +232,37 @@ project that wants to maintain a single Ruby codebase that runs in both Ruby and
 - **Documented** - Pragmas serve as inline documentation of JS behavior
 - **Testable** - Same tests run against both Ruby and transpiled JS
 
+### Dual-Method Pattern for Platform-Specific Code
+
+When Ruby and JavaScript require fundamentally different implementations (not just
+syntax differences), use the **dual-method pattern**:
+
+```ruby
+# JavaScript-compatible implementation (appears first)
+# Ruby2JS outputs this version to JavaScript
+def visit(node)
+  return nil if node.nil?
+  self["visit#{node.constructor.name}"].call!(self, node)
+end
+
+# Ruby implementation (appears second, with Pragma: skip)
+# Ruby uses this version (last definition wins); JS never sees it
+def visit(node) # Pragma: skip
+  return nil if node.nil?
+  super  # Uses Prism::Visitor's visit method
+end
+```
+
+**How it works:**
+1. Ruby uses the **last** definition of a method (second `visit` wins)
+2. `# Pragma: skip` removes the Ruby version from JS output
+3. JavaScript gets only the **first** definition
+
+**When to use:**
+- Parent class behavior differs between Ruby and JS (e.g., Prism::Visitor)
+- Platform APIs have incompatible semantics
+- Runtime introspection differs (e.g., `constructor.name` vs `class.name`)
+
 ### Incompatible Patterns (No Pragma Solution)
 
 Some Ruby patterns cannot be dual-targeted:

@@ -16,6 +16,23 @@ module Ruby2JS
       module Converter
         include SEXP
 
+        # Skip blocks guarded by `unless defined?(RUBY2JS_SELFHOST)`
+        # This removes parser-gem specific code from the selfhosted output
+        def on_if(node)
+          condition, then_branch, else_branch = node.children
+
+          # Check for: unless defined?(RUBY2JS_SELFHOST) ... end
+          # In AST, `unless` is an `if` with nil then_branch and code in else_branch
+          if then_branch.nil? && condition.type == :defined? &&
+             condition.children[0]&.type == :const &&
+             condition.children[0].children[1] == :RUBY2JS_SELFHOST
+            # Skip this entire block
+            return s(:hide)
+          end
+
+          super
+        end
+
         def on_block(node)
           call = node.children[0]
           args = node.children[1]
