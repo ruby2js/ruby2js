@@ -151,7 +151,7 @@ module Ruby2JS
 
         group_receiver = receiver.type == :send &&
           op_index < operator_index( receiver.children[1] ) if receiver
-        group_receiver ||= GROUP_OPERATORS.include? receiver.type
+        group_receiver ||= GROUP_OPERATORS.include? receiver.type # Pragma: logical
         group_receiver = false if receiver.children[1] == :[]
         if receiver.type == :int and !OPERATORS.flatten.include?(method)
           group_receiver = true
@@ -164,7 +164,7 @@ module Ruby2JS
       if target
         group_target = target.type == :send &&
           op_index < operator_index( target.children[1] )
-        group_target ||= GROUP_OPERATORS.include? target.type
+        group_target ||= GROUP_OPERATORS.include? target.type # Pragma: logical
       end
 
       put 'await ' if @ast.type == :await

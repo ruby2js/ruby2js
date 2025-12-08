@@ -70,6 +70,48 @@ describe Ruby2JS::Filter::Pragma do
     end
   end
 
+  describe "logical pragma (||)" do
+    # These tests use or: :nullish to test pragma override from ?? back to ||
+    def to_js_nullish(string, options={})
+      _(Ruby2JS.convert(string, options.merge(
+        eslevel: options[:eslevel] || 2021,
+        or: :nullish,  # Use ?? by default so we can test pragma override to ||
+        filters: [Ruby2JS::Filter::Pragma]
+      )).to_s)
+    end
+
+    it "should force || with pragma when or: :nullish" do
+      to_js_nullish('x = a || b # Pragma: logical').
+        must_equal 'let x = a || b'
+    end
+
+    it "should force || with pragma when or: :nullish" do
+      to_js_nullish('x = a || b # Pragma: ||').
+        must_equal 'let x = a || b'
+    end
+
+    it "should force ||= with pragma when or: :nullish" do
+      to_js_nullish('a ||= b # Pragma: logical').
+        must_equal 'a ||= b'
+    end
+
+    it "should not force || without pragma when or: :nullish" do
+      to_js_nullish('x = a || b').
+        must_equal 'let x = a ?? b'
+    end
+
+    it "should handle boolean false correctly with logical pragma" do
+      # This is the key use case: when variable can be false, ||= should stay as ||=
+      to_js_nullish('x ||= true # Pragma: logical').
+        must_equal 'x ||= true'
+    end
+
+    it "should expand logical assignment when ES2021 not available" do
+      to_js_nullish('a ||= b # Pragma: logical', eslevel: 2020).
+        must_equal 'a = a || b'
+    end
+  end
+
   describe "noes2015 pragma" do
     it "should force function syntax for blocks" do
       to_js('items.each { |item| process(item) } # Pragma: noes2015').

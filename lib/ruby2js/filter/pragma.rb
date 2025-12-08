@@ -10,6 +10,8 @@ module Ruby2JS
       PRAGMAS = {
         '??' => :nullish,
         'nullish' => :nullish,
+        '||' => :logical,
+        'logical' => :logical,       # || stays as || (for boolean false handling)
         'noes2015' => :noes2015,
         'function' => :noes2015,
         'guard' => :guard,
@@ -126,21 +128,27 @@ module Ruby2JS
         [source_name, line]
       end
 
-      # Handle || with nullish pragma -> ??
+      # Handle || with nullish pragma -> ?? or with logical pragma -> || (forces logical)
       def on_or(node)
         if pragma?(node, :nullish) && es2020
           process s(:nullish_or, *node.children)
+        elsif pragma?(node, :logical)
+          # Force || even when @or option would normally use ??
+          process s(:logical_or, *node.children)
         else
           super
         end
       end
 
-      # Handle ||= with nullish pragma -> ??=
+      # Handle ||= with nullish pragma -> ??= or with logical pragma -> ||= (forces logical)
       # Note: We check es2020 here because ?? is available then.
       # The converter will decide whether to use ??= (ES2021+) or expand to a = a ?? b
       def on_or_asgn(node)
         if pragma?(node, :nullish) && es2020
           process s(:nullish_asgn, *node.children)
+        elsif pragma?(node, :logical)
+          # Force ||= even when @or option would normally use ??=
+          process s(:logical_asgn, *node.children)
         else
           super
         end

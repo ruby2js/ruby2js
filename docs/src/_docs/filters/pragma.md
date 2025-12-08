@@ -14,7 +14,7 @@ Pragmas are specified with a comment at the end of a line using the format:
 
 ## Available Pragmas
 
-### `??` (nullish)
+### `??` (or `nullish`)
 
 Forces the use of nullish coalescing (`??`) instead of logical or (`||`).
 
@@ -34,6 +34,26 @@ x = value || default # Pragma: ??
 **When to use:** jQuery/DOM APIs often return `null` or `undefined` but valid
 values could be falsy (e.g., `0` for an index). Use this pragma when you need
 nullish semantics.
+
+### `||` (or `logical`)
+
+Forces the use of logical or (`||`) instead of nullish coalescing (`??`).
+
+This is the inverse of the `??` pragma. It's useful when you're using the
+`or: :nullish` or `or: :auto` options globally but need logical `||` behavior
+for a specific line where the value could legitimately be `false`.
+
+```ruby
+enabled ||= true # Pragma: logical
+# => enabled ||= true  (not ??=)
+
+x = flag || default # Pragma: ||
+# => let x = flag || default  (not ??)
+```
+
+**When to use:** When a variable can hold `false` as a valid value and you
+want the fallback to execute for `false`, not just `null`/`undefined`. For
+example, boolean flags where `false` should trigger the default assignment.
 
 ### `noes2015` (or `function`)
 
