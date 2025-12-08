@@ -76,6 +76,11 @@ const { Ruby2JS: WalkerModule } = await import('./dist/walker.mjs');
 // Set up Ruby2JS.Node before importing converter (which uses it)
 globalThis.Ruby2JS = {
   Node: WalkerModule.Node,  // Reuse Node from walker (single source of truth)
+  // Check if something is an AST node (has type and children properties)
+  // Guarded to handle primitives safely (unlike 'prop' in obj which throws)
+  ast_node(obj) {
+    return typeof obj === 'object' && obj !== null && 'type' in obj && 'children' in obj;
+  },
   convert(source, opts = {}) {
     return {
       toString() {

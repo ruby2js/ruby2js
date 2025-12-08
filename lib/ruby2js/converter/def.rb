@@ -137,10 +137,10 @@ module Ruby2JS
       walk = ->(node) do
         add_implicit_block = true if node.type == :yield || (node.type == :send && node.children[1] == "_implicitBlockYield")
         node.children.each do |child|
-          walk.call(child) if child.respond_to?(:type) && child.respond_to?(:children)
+          walk.call(child) if self.ast_node?(child) # Pragma: method
         end
       end
-      walk.call(body)
+      walk.call(body) # Pragma: method
 
       if add_implicit_block
         children = args.children.dup
@@ -174,7 +174,7 @@ module Ruby2JS
         end
         expr = expr.children.first if expr.type == :return
 
-        if EXPRESSIONS.include? expr.type
+        if Converter::EXPRESSIONS.include? expr.type
           if expr.type == :send and expr.children[0..1] == [nil, :raise]
             style = :statement
           elsif expr.type == :send and expr.children.length == 2 and
@@ -186,8 +186,8 @@ module Ruby2JS
           end
         elsif \
           expr.type == :if and expr.children[1] and expr.children[2] and
-          EXPRESSIONS.include? expr.children[1].type and
-          EXPRESSIONS.include? expr.children[2].type
+          Converter::EXPRESSIONS.include? expr.children[1].type and
+          Converter::EXPRESSIONS.include? expr.children[2].type
         then
           style = :expression
         else
