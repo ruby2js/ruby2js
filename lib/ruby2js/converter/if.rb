@@ -87,7 +87,7 @@ module Ruby2JS
             put "if ("
             parse_condition condition
             put ') '
-            wrap { jscope then_block }
+            wrap('{', '}') { jscope then_block }
           else
             put "if ("
             parse_condition condition

@@ -73,7 +73,7 @@ module Ruby2JS
       self
     end
 
-    def pop
+    def pop()
       @tokens.pop
     end
 
@@ -354,10 +354,10 @@ module Ruby2JS
     end
 
     # wrap long statements in curly braces
-    def wrap(open = '{', close = '}')
+    def wrap(open = '{', close = '}', &block)
       puts open
       mark = output_location
-      yield
+      block.() # Explicit call syntax for selfhost compatibility
 
       if @lines.length > mark.first + 1 ||
          @lines[mark.first - 1].join.length + @line.join.length >= @width
