@@ -20,6 +20,7 @@ js = Ruby2JS.convert(source,
   eslevel: 2022,
   comparison: :identity,
   underscored_private: true,
+  nullish_to_s: true,
   file: converter_file,
   filters: [
     Ruby2JS::Filter::Pragma,

@@ -140,12 +140,19 @@ module Ruby2JS
     # the global @or setting.
 
     handle :nullish do |left, right|
+      # Handle nil left (e.g., from nullish_to_s on nil.to_s)
+      if left.nil?
+        put 'null ?? '
+        parse right
+        return
+      end
+
       # Only group :begin if it has multiple children (actual grouping expression)
       # Single-child :begin nodes are just wrappers and don't need parens
       lgroup = LOGICAL.include?(left.type) ||
         (left.type == :begin && left.children.length > 1)
-      rgroup = LOGICAL.include?(right.type) ||
-        (right.type == :begin && right.children.length > 1)
+      rgroup = right && (LOGICAL.include?(right.type) ||
+        (right.type == :begin && right.children.length > 1))
 
       put '(' if lgroup; parse left; put ')' if lgroup
       put ' ?? '
