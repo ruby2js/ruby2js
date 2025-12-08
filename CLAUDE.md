@@ -106,6 +106,47 @@ ast, _ = Ruby2JS.parse('your_ruby_code')
 puts ast.to_sexp
 ```
 
+### Debugging Tools
+
+Two CLI tools are available for debugging transpilation issues:
+
+**Ruby CLI (`bin/ruby2js`)** - The main Ruby-based converter:
+```bash
+# Basic conversion
+bin/ruby2js -e 'self.foo ||= 1'
+
+# Show AST before filters
+bin/ruby2js --ast -e 'self.foo ||= 1'
+
+# Show AST after filters (what converter sees)
+bin/ruby2js --filtered-ast -e 'self.foo ||= 1'
+
+# Apply specific filters
+bin/ruby2js --filter functions --filter esm -e 'puts "hello"'
+```
+
+**JavaScript CLI (`demo/selfhost/ruby2js.mjs`)** - The self-hosted JS converter:
+```bash
+cd demo/selfhost
+
+# Basic conversion (reads from stdin)
+echo 'self.foo ||= 1' | node ruby2js.mjs --stdin
+
+# Show Prism AST (raw JS Prism output)
+echo 'self.foo' | node ruby2js.mjs --stdin --ast
+
+# Show Walker AST (after PrismWalker transforms to Parser-compatible format)
+echo 'self.foo' | node ruby2js.mjs --stdin --walker-ast
+
+# Find a node type in the AST
+echo 'self.foo ||= 1' | node ruby2js.mjs --stdin --find OrAssignNode
+
+# Inspect specific property paths
+echo 'self.foo ||= 1' | node ruby2js.mjs --stdin --inspect "value.name.receiver"
+```
+
+These tools help debug differences between Ruby and JS converters, especially for self-hosting work.
+
 ## Online Demo
 
 The ruby2js.com demo runs in the browser using Opal (Ruby compiled to JavaScript). The demo code is in `docs/src/demo/`.

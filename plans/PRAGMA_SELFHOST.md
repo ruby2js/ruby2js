@@ -1,6 +1,6 @@
 # Pragma-Based Self-Hosting Plan
 
-## Status: Phase 3 Complete (Converter Transpilation Working)
+## Status: Phase 4 In Progress (Spec Integration)
 
 This document describes the pragma-based approach to self-hosting Ruby2JS.
 
@@ -68,7 +68,7 @@ lib/ruby2js/filter/
 | `selfhost/core.rb` | Empty | ~32 | Entry point only |
 | `selfhost/walker.rb` | Complete | ~39 | Visibility removal |
 | `selfhost/spec.rb` | Complete | ~39 | _() wrapper removal |
-| `selfhost/converter.rb` | Stub | ~25 | To be implemented |
+| `selfhost/converter.rb` | Complete | ~250 | handle :type patterns, method name conversion |
 
 ### Pragmas in Source Files
 
@@ -164,15 +164,31 @@ filters: [
 ]
 ```
 
-### Phase 4: Spec Transpilation
+### Phase 4: Spec Integration (IN PROGRESS)
 
-1. Extend `selfhost/spec.rb`:
-   - Minitest describe/it blocks → JS test framework
-   - Assertion helpers
-2. Transpile test suite to JavaScript
-3. Run tests in Node.js
+Running the transpiled converter against the transliteration test suite.
 
-### Phase 5: Integration
+**Current status:** 73/249 tests passing (29% pass rate)
+
+**Key fixes completed:**
+1. `isSafeNavigation()` - JS Prism methods need parentheses (use `:call` type)
+2. `respond_to?(:message_loc)` - Transform property names in `in?` checks to camelCase
+3. Filter loading for subdirectory filters (`selfhost/walker`, `selfhost/converter`)
+4. Method name conversion: `send!` → `send_bang`, `send?` → `send_q`
+5. Handler registration with JS-safe method names
+
+**Remaining issues to investigate:**
+- `_implicitBlockYield is not a function` errors
+- Empty interpolation handling
+- Mass assignment parsing
+- Various converter handler issues
+
+**Debugging tools available:**
+- `bin/ruby2js --ast` / `--filtered-ast` - Ruby-side AST inspection
+- `demo/selfhost/ruby2js.mjs --ast` / `--walker-ast` - JS-side AST inspection
+- See CLAUDE.md for detailed usage
+
+### Phase 6: Integration (FUTURE)
 
 1. Create browser demo with full converter
 2. Document the self-hosting approach

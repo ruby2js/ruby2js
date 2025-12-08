@@ -235,6 +235,36 @@ test('lambda', () => {
   assertEqual(ast._children[0]._children[1], 'lambda');
 });
 
+console.log('\nLocation info (is_method detection):');
+
+test('property access has selector location for is_method detection', () => {
+  // self.p ||= 1 should NOT be detected as a method call
+  // The AST node for the property read should have selector info
+  const ast = parse('self.p ||= 1');
+  assertEqual(ast._type, 'or_asgn');
+  // The left side is the property access (send self :p)
+  const sendNode = ast._children[0];
+  assertEqual(sendNode._type, 'send');
+  assertEqual(sendNode._children[0]._type, 'self');
+  assertEqual(sendNode._children[1], 'p');
+  // Key test: location should have selector info (not nil)
+  // This enables is_method? to detect it's a property, not a method call
+  const loc = sendNode._location;
+  if (!loc || !loc.selector) {
+    throw new Error('send node should have selector location for is_method? detection');
+  }
+});
+
+test('method call without parens has selector location', () => {
+  // foo.bar should have selector location
+  const ast = parse('foo.bar');
+  assertEqual(ast._type, 'send');
+  const loc = ast._location;
+  if (!loc || !loc.selector) {
+    throw new Error('send node should have selector location');
+  }
+});
+
 console.log('\n----------------------------------------');
 console.log(`Results: ${passed} passed, ${failed} failed`);
 process.exit(failed > 0 ? 1 : 0);

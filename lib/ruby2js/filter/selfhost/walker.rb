@@ -144,6 +144,21 @@ module Ruby2JS
 
           super
         end
+
+        # Transform property names in 'in?' checks (from respond_to? -> "prop" in obj)
+        # Ruby: node.respond_to?(:message_loc) -> JS functions filter -> :message_loc in node
+        # The property name needs to be converted from snake_case to camelCase
+        def on_in?(node)
+          left, right = node.children
+
+          # Check if left is a symbol that needs camelCase conversion
+          if left.type == :sym && PRISM_PROPERTY_MAP.key?(left.children[0])
+            js_prop = PRISM_PROPERTY_MAP[left.children[0]]
+            return process node.updated(nil, [s(:sym, js_prop), right])
+          end
+
+          super
+        end
       end
 
       # Register Walker module

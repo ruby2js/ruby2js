@@ -2,15 +2,16 @@
 
 This directory contains a proof-of-concept demonstrating Ruby2JS running entirely in JavaScript, using the actual Ruby2JS converter transpiled from Ruby source.
 
-## Status: Phase 3 Complete (Converter Transpilation)
+## Status: Phase 4 In Progress (Spec Integration)
 
 See `plans/PRAGMA_SELFHOST.md` for the full roadmap.
 
 - [x] Phase 1: Filter infrastructure (pragma, combiner, require filters)
 - [x] Phase 2: Walker transpilation (prism_walker.rb → JavaScript)
 - [x] Phase 3: Converter transpilation (converter.rb + 60 handlers → JavaScript)
-- [ ] Phase 4: Spec transpilation and test integration
-- [ ] Phase 5: Browser demo integration
+- [ ] Phase 4: Spec integration and debugging (73/249 tests passing)
+- [ ] Phase 5: Spec transpilation
+- [ ] Phase 6: Browser demo integration
 
 ## Architecture
 
@@ -37,8 +38,11 @@ JavaScript Output
 | `dist/converter.mjs` | Transpiled converter (~11,700 lines) |
 | `dist/walker.mjs` | Transpiled PrismWalker |
 | `dist/transliteration_spec.mjs` | Transpiled test suite |
+| `ruby2js.mjs` | CLI debugging tool for JS converter |
 | `test_harness.mjs` | Minitest-compatible test framework |
+| `test_walker.mjs` | Unit tests for PrismWalker (29 tests) |
 | `scripts/transpile_converter.rb` | Build script for converter |
+| `scripts/transpile_walker.rb` | Build script for walker |
 | `scripts/transpile_spec.rb` | Build script for specs |
 
 ## Quick Start
@@ -60,7 +64,9 @@ npm test
 
 | Script | Description |
 |--------|-------------|
-| `npm test` | Run transliteration test suite |
+| `npm test` | Run walker unit tests + spec tests |
+| `npm run test:walker` | Run walker unit tests only (29 tests) |
+| `npm run test:spec` | Run spec tests only (249 tests) |
 | `npm run build` | Build walker and spec |
 | `npm run build:converter` | Regenerate converter from Ruby source |
 | `npm run build:walker` | Regenerate walker from Ruby source |
@@ -154,14 +160,46 @@ The following Ruby source files required modifications for transpilation:
 ### lib/ruby2js/converter/send.rb
 - Wrapped `throw` in IIFE when in expression context (JS limitation)
 
+## Debugging
+
+The `ruby2js.mjs` CLI tool helps debug transpilation issues:
+
+```bash
+# Basic conversion (reads from stdin)
+echo 'self.foo ||= 1' | node ruby2js.mjs --stdin
+
+# Show raw Prism AST (JS @ruby/prism output)
+echo 'self.foo' | node ruby2js.mjs --stdin --ast
+
+# Show Walker AST (after PrismWalker transforms to Parser-compatible format)
+echo 'self.foo' | node ruby2js.mjs --stdin --walker-ast
+
+# Find a specific node type in the AST
+echo 'self.foo ||= 1' | node ruby2js.mjs --stdin --find OrAssignNode
+
+# Inspect specific property paths
+echo 'self.foo ||= 1' | node ruby2js.mjs --stdin --inspect "value.name.receiver"
+```
+
+Compare with Ruby-side output using `bin/ruby2js --ast` and `bin/ruby2js --filtered-ast`.
+
 ## Next Steps
 
-### Phase 4: Spec Integration
-1. Wire up transpiled converter with test harness
-2. Create `Ruby2JS.convert()` wrapper function
-3. Run transliteration tests against transpiled converter
+### Phase 4: Spec Integration (IN PROGRESS)
+Current status: 73/249 tests passing (29%)
 
-### Phase 5: Browser Demo
+Remaining issues:
+- `_implicitBlockYield is not a function` errors
+- Empty interpolation handling
+- Mass assignment parsing
+- Various converter handler issues
+
+### Phase 5: Spec Transpilation
+1. Extend `selfhost/spec.rb` for full Minitest support
+2. Transpile complete test suite to JavaScript
+3. Run tests in Node.js
+
+### Phase 6: Browser Demo
 1. Create unified module exporting `Ruby2JS.convert()`
 2. Update `browser_demo.html` to use real converter
 3. Document any remaining limitations
