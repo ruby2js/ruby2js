@@ -256,7 +256,9 @@ module Ruby2JS
               replacement = s(:pair, s(:sym, sym),
                 s(:module_hash, s(:const, nil, sym), node.children.last))
             else
-              replacement = node.children[1].map do |prop, descriptor|
+              # Use to_a to convert Hash to array for JS compatibility
+              replacement = node.children[1].to_a.map do |pair|
+                prop, descriptor = pair[0], pair[1]
                 node.updated(:pair, [s(:prop, prop), descriptor])
               end
             end
