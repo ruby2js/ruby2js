@@ -223,6 +223,21 @@ describe "Selfhost Walker Transpilation" do
     end
   end
 
+  describe "JS Prism API differences" do
+    before do
+      @js = transpile_walker
+    end
+
+    it "transforms end_offset to startOffset + length" do
+      # JS Prism locations have {startOffset, length} not {startOffset, endOffset}
+      # The filter should transform .end_offset to .startOffset + .length
+      _(@js).wont_include '.endOffset'
+      # Check that the transformation is present (startOffset + length pattern)
+      _(@js).must_include '.startOffset + '
+      _(@js).must_include '.length'
+    end
+  end
+
   describe "visitor methods exist" do
     before do
       @js = transpile_walker

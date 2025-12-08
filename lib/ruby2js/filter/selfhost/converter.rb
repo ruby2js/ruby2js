@@ -36,7 +36,8 @@ module Ruby2JS
         # Methods that are always method calls in Ruby, never property accesses
         # These need to be marked as :call type to ensure they get () in JS
         # Note: .first and .last are excluded because they become getters on custom classes
-        ALWAYS_METHODS = %i[pop shift].freeze
+        # is_method? is critical - Ruby's is_method? becomes is_method in JS, must be called with ()
+        ALWAYS_METHODS = %i[pop shift is_method?].freeze
 
         # Transform method("on_#{name}") to use cleaned name without ? or !
         # This handles the handler registration loop in Converter#initialize

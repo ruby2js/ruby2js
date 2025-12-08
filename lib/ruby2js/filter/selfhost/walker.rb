@@ -90,8 +90,19 @@ module Ruby2JS
             return s(:hide)
           end
 
+          # JS Prism locations have {startOffset, length} not {startOffset, endOffset}
+          # Transform .end_offset to (.startOffset + .length)
+          if method == :end_offset && args.empty? && target
+            processed_target = process target
+            # Build: target.startOffset + target.length
+            start_access = s(:attr, processed_target, :startOffset)
+            length_access = s(:attr, processed_target, :length)
+            return s(:send, start_access, :+, length_access)
+          end
+
           # Convert Prism Ruby property names to JS camelCase equivalents
-          if PRISM_PROPERTY_MAP.key?(method)
+          # Note: end_offset is handled specially above (needs calculation in JS Prism)
+          if PRISM_PROPERTY_MAP.key?(method) && method != :end_offset
             js_method = PRISM_PROPERTY_MAP[method]
             return process node.updated(nil, [target, js_method, *args])
           end
