@@ -21,7 +21,7 @@ module Ruby2JS
         [:irange, :erange].include? call.children.first.children.first.type
       then
         begin
-          vars = @vars.dup
+          vars = @vars.dup # Pragma: hash
           next_token, @next_token = @next_token, :continue
 
           # convert combinations of range, step and block to a for loop

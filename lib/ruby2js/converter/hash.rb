@@ -111,10 +111,10 @@ module Ruby2JS
                     end
 
                     ast.children.each do |child|
-                      walk.call(child) if child.respond_to?(:type) && child.respond_to?(:children)
+                      walk.call(child) if child.respond_to?(:type) && child.respond_to?(:children) # Pragma: method
                     end
                   end
-                  walk.call(right)
+                  walk.call(right) # Pragma: method
                 end
               end
 

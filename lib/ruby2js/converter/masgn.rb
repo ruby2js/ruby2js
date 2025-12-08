@@ -48,14 +48,14 @@ module Ruby2JS
         # Mark all vars as :masgn so they get let declarations
         before_splat.each do |var|
           var_name = var.children.first
-          @vars[var_name] = :masgn unless @vars.include?(var_name)
+          @vars[var_name] = :masgn unless @vars.include?(var_name) # Pragma: hash
         end
         after_splat.each do |var|
           var_name = var.children.first
-          @vars[var_name] = :masgn unless @vars.include?(var_name)
+          @vars[var_name] = :masgn unless @vars.include?(var_name) # Pragma: hash
         end
         if splat_name
-          @vars[splat_name] = :masgn unless @vars.include?(splat_name)
+          @vars[splat_name] = :masgn unless @vars.include?(splat_name) # Pragma: hash
         end
 
         # First assign rhs to temp (sliced if it's an array/call)
@@ -88,14 +88,14 @@ module Ruby2JS
             if var.type == :lvasgn
               results << var
             elsif var.type == :mlhs or var.type == :splat
-              results += walk.call(var)
+              results += walk.call(var) # Pragma: method
             end
           end
           results
         end
 
-        vars = walk.call(lhs)
-        newvars = vars.select {|var| not @vars.include? var.children[0]}
+        vars = walk.call(lhs) # Pragma: method
+        newvars = vars.select {|var| not @vars.include? var.children[0]} # Pragma: hash
 
         if newvars.length > 0
           # Note: Using length comparison for JS compatibility (== compares references in JS)
@@ -131,7 +131,7 @@ module Ruby2JS
           # Mark new local vars as :masgn to tell vasgn handler not to treat as setters
           # The marker will be cleared to true when actually processed
           lhs.children.each do |var|
-            if var.type == :lvasgn && !@vars.include?(var.children[0])
+            if var.type == :lvasgn && !@vars.include?(var.children[0]) # Pragma: hash
               @vars[var.children[0]] = :masgn
             end
           end
@@ -148,7 +148,7 @@ module Ruby2JS
         block = []
         # Mark new local vars as :masgn to tell vasgn handler not to treat as setters
         lhs.children.each do |var|
-          if var.type == :lvasgn && !@vars.include?(var.children[0])
+          if var.type == :lvasgn && !@vars.include?(var.children[0]) # Pragma: hash
             @vars[var.children[0]] = :masgn
           end
         end

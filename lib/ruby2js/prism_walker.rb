@@ -228,7 +228,7 @@ module Ruby2JS
     # JavaScript-compatible visit (dispatches via constructor.name)
     # JS output uses this version; Ruby uses the one below (last definition wins)
     def visit(node)
-      return nil if node.nil?
+      return nil if !node  # !node handles both null and undefined in JS
       self["visit#{node.constructor.name}"].call!(self, node)
     end
 

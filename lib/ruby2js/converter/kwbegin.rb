@@ -133,13 +133,13 @@ module Ruby2JS
           walk = proc do |ast|
             result = ast if ast.type === :gvar and ast.children.first == :$!
             ast.children.each do |child|
-              result ||= walk.call(child) if child.respond_to?(:type) && child.respond_to?(:children)
+              result ||= walk.call(child) if child.respond_to?(:type) && child.respond_to?(:children) # Pragma: method
             end
             result
           end
 
           # single catch with no exception named
-          if not var and not walk.call(@ast)
+          if not var and not walk.call(@ast) # Pragma: method
             puts " catch {"
           else
             var ||= s(:gvar, :$EXCEPTION)

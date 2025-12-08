@@ -19,9 +19,9 @@ module Ruby2JS
 
     handle :autoreturn do |*statements|
       return if statements.length == 1 && statements.first.nil?
-      block = statements.dup
+      block = statements.dup # Pragma: array
       while block.length == 1 && block.first && block.first.type == :begin
-        block = block.first.children.dup
+        block = block.first.children.dup # Pragma: array
       end
 
       return if block.empty?
@@ -55,12 +55,12 @@ module Ruby2JS
 
       elsif block.last.type == :case
         node = block.pop
-        children = node.children.dup
+        children = node.children.dup # Pragma: array
         (1...children.length).each do |i|
           next if children[i].nil? # case statements without else clause end with nil
 
           if children[i].type == :when
-            gchildren = children[i].children.dup
+            gchildren = children[i].children.dup # Pragma: array
             if !gchildren.empty? and EXPRESSIONS.include? gchildren.last.type
               gchildren.push s(:return, gchildren.pop)
               children[i] = children[i].updated(nil, gchildren)

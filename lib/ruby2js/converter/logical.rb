@@ -51,9 +51,9 @@ module Ruby2JS
         if @boolean_context
           @need_truthy_helpers << :T
           op_index = operator_index type
-          lgroup = LOGICAL.include?(left.type) && op_index < operator_index(left.type)
+          lgroup = Converter::LOGICAL.include?(left.type) && op_index < operator_index(left.type)
           lgroup = true if left and left.type == :begin
-          rgroup = LOGICAL.include?(right.type) && op_index < operator_index(right.type)
+          rgroup = Converter::LOGICAL.include?(right.type) && op_index < operator_index(right.type)
           rgroup = true if right.type == :begin
 
           # Check if child is an and/or (possibly wrapped in begin node)
@@ -105,11 +105,11 @@ module Ruby2JS
 
       op_index = operator_index type
 
-      lgroup   = LOGICAL.include?( left.type ) &&
+      lgroup   = Converter::LOGICAL.include?( left.type ) &&
         op_index < operator_index( left.type )
       lgroup = true if left and left.type == :begin
 
-      rgroup = LOGICAL.include?( right.type ) &&
+      rgroup = Converter::LOGICAL.include?( right.type ) &&
         op_index < operator_index( right.type )
       rgroup = true if right.type == :begin
 
@@ -149,9 +149,9 @@ module Ruby2JS
 
       # Only group :begin if it has multiple children (actual grouping expression)
       # Single-child :begin nodes are just wrappers and don't need parens
-      lgroup = LOGICAL.include?(left.type) ||
+      lgroup = Converter::LOGICAL.include?(left.type) ||
         (left.type == :begin && left.children.length > 1)
-      rgroup = right && (LOGICAL.include?(right.type) ||
+      rgroup = right && (Converter::LOGICAL.include?(right.type) ||
         (right.type == :begin && right.children.length > 1))
 
       put '(' if lgroup; parse left; put ')' if lgroup
@@ -164,8 +164,8 @@ module Ruby2JS
 
     handle :not do |expr|
 
-      if expr.type == :send and INVERT_OP.has_key? expr.children[1]
-        parse(s(:send, expr.children[0], INVERT_OP[expr.children[1]],
+      if expr.type == :send and Converter::INVERT_OP[expr.children[1]]
+        parse(s(:send, expr.children[0], Converter::INVERT_OP[expr.children[1]],
           expr.children[2]))
       elsif expr.type == :defined?
         parse s(:undefined?, *expr.children)
@@ -175,14 +175,14 @@ module Ruby2JS
         parse s(:or, s(:not, expr.children[0]), s(:not, expr.children[1]))
       elsif expr.type == :send and expr.children[0..1] == [nil, :typeof] and
         expr.children[2]&.type == :send and
-        INVERT_OP.has_key?(expr.children[2].children[1])
+        Converter::INVERT_OP[expr.children[2].children[1]]
         # Handle "not typeof x == y" => "typeof x != y"
         # Ruby parses "typeof x == y" as "typeof(x == y)" due to precedence
         comparison = expr.children[2]
         parse(s(:send, s(:send, nil, :typeof, comparison.children[0]),
-          INVERT_OP[comparison.children[1]], comparison.children[2]))
+          Converter::INVERT_OP[comparison.children[1]], comparison.children[2]))
       else
-        group   = LOGICAL.include?( expr.type ) &&
+        group   = Converter::LOGICAL.include?( expr.type ) &&
           operator_index( :not ) < operator_index( expr.type )
         group = true if expr and %i[begin in?].include? expr.type
 
@@ -196,7 +196,7 @@ module Ruby2JS
         left = rewrite(*left.children)
       end
 
-      if right.type != :send or OPERATORS.flatten.include? right.children[1]
+      if right.type != :send or Converter::OPERATORS.flatten.include? right.children[1]
         s(:and, left, right)
       elsif conditionally_equals(left, right.children.first)
         # a && a.b => a&.b

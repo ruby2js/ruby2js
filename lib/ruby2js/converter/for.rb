@@ -18,7 +18,7 @@ module Ruby2JS
       end
 
       begin
-        vars = @vars.dup
+        vars = @vars.dup # Pragma: hash
         next_token, @next_token = @next_token, :continue
         put "for (let "; parse var
         if expression and [:irange, :erange].include? expression.type

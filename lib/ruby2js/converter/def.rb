@@ -143,7 +143,7 @@ module Ruby2JS
       walk.call(body) # Pragma: method
 
       if add_implicit_block
-        children = args.children.dup
+        children = args.children.dup # Pragma: array
         children.push s(:optarg, "_implicitBlockYield", s(:nil))
         args = s(:args, *children)
       end

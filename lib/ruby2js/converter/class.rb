@@ -37,7 +37,7 @@ module Ruby2JS
       body.compact!
 
       if body.length == 1 and body.first.type == :begin
-        body = body.first.children.dup 
+        body = body.first.children.dup  # Pragma: array
       end
 
       body.compact!
