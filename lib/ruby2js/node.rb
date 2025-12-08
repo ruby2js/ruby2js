@@ -28,7 +28,10 @@ module Ruby2JS
       )
     end
 
-    alias :to_a :children
+    # Return children array (for compatibility with code expecting to_a method)
+    def to_a
+      @children
+    end
 
     # Check if this is a method call (has parentheses or arguments)
     # Uses location-based detection like Parser::AST::Node to check for '(' after selector

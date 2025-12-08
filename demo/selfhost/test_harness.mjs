@@ -94,6 +94,32 @@ if (!Array.prototype.insert) {
   };
 }
 
+// Ruby's String#chomp(suffix) - remove suffix from end of string
+// Without argument, removes trailing newline. With argument, removes that suffix.
+if (!String.prototype.chomp) {
+  String.prototype.chomp = function(suffix) {
+    if (suffix === undefined) {
+      return this.replace(/\r?\n$/, '');
+    }
+    if (this.endsWith(suffix)) {
+      return this.slice(0, -suffix.length);
+    }
+    return String(this);
+  };
+}
+
+// Ruby's Hash#to_a - convert to array of [key, value] pairs
+// In JS, works on plain objects via Object.entries()
+// Defined as getter since Ruby's to_a is called without parens
+if (!Object.prototype.to_a) {
+  Object.defineProperty(Object.prototype, 'to_a', {
+    get: function() {
+      return Object.entries(this);
+    },
+    configurable: true
+  });
+}
+
 // Import walker first to get Node class (transpiled from lib/ruby2js/node.rb)
 const { Ruby2JS: WalkerModule } = await import('./dist/walker.mjs');
 

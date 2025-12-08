@@ -12,7 +12,7 @@ module Ruby2JS
     handle :module, :module_hash do |name, *body|
       extend = @namespace.enter(name)
 
-      if body == [nil]
+      if body.length == 1 && body.first == nil
         if @ast.type == :module and not extend
           parse @ast.updated(:casgn, [*name.children, s(:hash)])
         else
@@ -23,7 +23,7 @@ module Ruby2JS
         return
       end
 
-      while body.length == 1 and body.first.type == :begin
+      while body.length == 1 and body.first&.type == :begin
         body = body.first.children
       end
 
@@ -76,8 +76,8 @@ module Ruby2JS
         end
       end
 
-      body = body - omit + [s(:return, s(:hash, 
-        *symbols.map {|sym| s(:pair, s(:sym, sym), s(:lvar, sym))}))]
+      body = body.reject {|node| omit.include? node}.concat([s(:return, s(:hash,
+        *symbols.map {|sym| s(:pair, s(:sym, sym), s(:lvar, sym))}))])
 
       body = s(:send, s(:block, s(:send, nil, :proc), s(:args),
         s(:begin, *body)), :[])

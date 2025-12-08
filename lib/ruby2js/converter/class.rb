@@ -348,18 +348,24 @@ module Ruby2JS
         instance_method, @instance_method = @instance_method, @ast
         @block_this, @block_depth = false, 0
         if @ast.type == :prop
-          obj, props = *args
-          if props.length == 1
-            prop, descriptor = props.flatten
+          obj = args[0]
+          # Convert Hash to array of [key, value] pairs for JS compatibility
+          # Ruby Hash has .to_a, JS Object needs Object.entries()
+          props_array = args[1].to_a
+          if props_array.length == 1
+            prop, descriptor = props_array[0]
+            descriptor_array = descriptor.to_a
             parse s(:send, s(:const, nil, :Object), :defineProperty,
               obj, s(:sym, prop), s(:hash,
-              *descriptor.map { |key, value| s(:pair, s(:sym, key), value) }))
+              *descriptor_array.map { |pair| s(:pair, s(:sym, pair[0]), pair[1]) }))
           else
             parse s(:send, s(:const, nil, :Object), :defineProperties,
-              obj, s(:hash, *props.map {|hprop, hdescriptor|
-                s(:pair, s(:sym, hprop), 
-                s(:hash, *hdescriptor.map {|key, value| 
-                  s(:pair, s(:sym, key), value) }))}))
+              obj, s(:hash, *props_array.map {|pair|
+                hprop, hdescriptor = pair[0], pair[1]
+                hdescriptor_array = hdescriptor.to_a
+                s(:pair, s(:sym, hprop),
+                s(:hash, *hdescriptor_array.map {|dpair|
+                  s(:pair, s(:sym, dpair[0]), dpair[1]) }))}))
           end
         elsif @ast.type == :method
           parse s(:send, *args)
