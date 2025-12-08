@@ -1,6 +1,6 @@
 # Pragma-Based Self-Hosting Plan
 
-## Status: Phase 2 Complete (Walker Transpilation Working)
+## Status: Phase 3 Complete (Converter Transpilation Working)
 
 This document describes the pragma-based approach to self-hosting Ruby2JS.
 
@@ -136,13 +136,33 @@ During walker implementation, several transformations were moved from selfhost f
 
 ## Next Steps
 
-### Phase 3: Converter Transpilation
+### Phase 3: Converter Transpilation (COMPLETE)
 
-1. Implement `selfhost/converter.rb`:
-   - `handle :type do...end` pattern
-   - Class reopening handling
-2. Add pragmas to converter source files as needed
-3. Create smoke tests for transpiled converter
+The converter now transpiles successfully to ~11,700 lines of JavaScript.
+
+**Key fixes required:**
+1. `(range).step(n) {}` pattern → for loop (functions.rb + for.rb)
+2. `each_with_index` + `break` → while loop (serializer.rb refactored)
+3. `[]`, `[]=`, `<<` methods → `# Pragma: skip` + alternatives (serializer.rb)
+4. `yield` → explicit `&block` parameter (serializer.rb)
+5. Reserved word `function` as variable → `jsvar()` in scope (converter.rb)
+6. Rest parameter position → refactored (case.rb, regexp.rb)
+7. `throw` in expression context → IIFE wrapper (send.rb)
+
+**Filter chain for converter:**
+```ruby
+filters: [
+  Ruby2JS::Filter::Pragma,
+  Ruby2JS::Filter::Combiner,
+  Ruby2JS::Filter::Require,
+  Ruby2JS::Filter::Selfhost::Core,
+  Ruby2JS::Filter::Selfhost::Walker,
+  Ruby2JS::Filter::Selfhost::Converter,
+  Ruby2JS::Filter::Functions,
+  Ruby2JS::Filter::Return,
+  Ruby2JS::Filter::ESM
+]
+```
 
 ### Phase 4: Spec Transpilation
 
@@ -164,7 +184,7 @@ During walker implementation, several transformations were moved from selfhost f
 - [x] Selfhost filters are minimal (<100 lines each)
 - [x] Most transformations in general filters
 - [x] Source files have minimal pragmas (<5 per file average)
-- [ ] Converter transpiles to valid JavaScript
+- [x] Converter transpiles to valid JavaScript (~11,700 lines)
 - [ ] Specs transpile and pass in Node.js
 - [ ] Browser demo works
 

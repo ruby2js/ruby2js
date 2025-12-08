@@ -3,11 +3,10 @@
 # Selfhost Converter Filter - Transformations for Converter transpilation
 #
 # Handles patterns specific to the converter codebase:
-# - handle :type do...end → method definitions
-# - Class reopening → merged class definitions
-# - Serializer ivar access (@sep, @nl, etc.)
+# - handle :type do...end → on_type() method definitions
 #
-# Status: STUB - To be implemented when transpiling converter.rb
+# The handle pattern: handle :nil do put 'null' end
+# Becomes: on_nil() { this.put('null') }
 
 require 'ruby2js'
 
@@ -17,13 +16,35 @@ module Ruby2JS
       module Converter
         include SEXP
 
-        # Placeholder - converter-specific transformations will be added here
-        # as we work on transpiling converter.rb and its handlers
+        def on_block(node)
+          call = node.children[0]
+          args = node.children[1]
+          body = node.children[2]
 
-        # Example patterns to handle (not yet implemented):
-        # - handle :type do |*args| ... end
-        # - Class.class_eval do ... end
-        # - Serializer instance variable access
+          # Check for handle :type do...end pattern
+          if call.type == :send && call.children[0].nil? && call.children[1] == :handle
+            types = call.children[2..-1]
+
+            # All types should be symbols
+            if types.all? { |t| t.type == :sym }
+              # Create method definitions for each type
+              methods = types.map do |type_sym|
+                type_name = type_sym.children[0].to_s
+                method_name = "on_#{type_name}".to_sym
+                s(:def, method_name, args, body)
+              end
+
+              # If single type, return single def; otherwise wrap in begin
+              if methods.length == 1
+                return process(methods.first)
+              else
+                return process(s(:begin, *methods))
+              end
+            end
+          end
+
+          super
+        end
       end
 
       # NOTE: Converter is NOT added to DEFAULTS - it's loaded explicitly

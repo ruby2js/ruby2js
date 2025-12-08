@@ -1,21 +1,31 @@
-# Self-Hosted Ruby2JS Demo
+# Self-Hosted Ruby2JS
 
-This directory contains a proof-of-concept demonstrating Ruby2JS running entirely in the browser, using the actual Ruby2JS converter transpiled to JavaScript.
+This directory contains a proof-of-concept demonstrating Ruby2JS running entirely in JavaScript, using the actual Ruby2JS converter transpiled from Ruby source.
+
+## Status: Phase 3 Complete (Converter Transpilation)
+
+See `plans/PRAGMA_SELFHOST.md` for the full roadmap.
+
+- [x] Phase 1: Filter infrastructure (pragma, combiner, require filters)
+- [x] Phase 2: Walker transpilation (prism_walker.rb → JavaScript)
+- [x] Phase 3: Converter transpilation (converter.rb + 60 handlers → JavaScript)
+- [ ] Phase 4: Spec transpilation and test integration
+- [ ] Phase 5: Browser demo integration
 
 ## Architecture
 
 ```
 Ruby Source Code
        ↓
-@ruby/prism (WebAssembly, ~2.7MB)
+@ruby/prism (WebAssembly, ~2MB)
        ↓
 Prism AST (JavaScript objects)
        ↓
-PrismWalker (transpiled from Ruby)
+PrismWalker (transpiled from lib/ruby2js/prism_walker.rb)
        ↓
-Parser-compatible AST
+Parser-compatible AST (Ruby2JS::Node format)
        ↓
-Converter (transpiled from Ruby2JS source)
+Converter (transpiled from lib/ruby2js/converter.rb + handlers)
        ↓
 JavaScript Output
 ```
@@ -24,150 +34,139 @@ JavaScript Output
 
 | File | Description |
 |------|-------------|
-| `ruby2js` | Node.js CLI for converting Ruby to JavaScript |
-| `browser_demo.html` | Interactive browser demo (open via HTTP server) |
-| `selfhost_converter.mjs` | The Ruby2JS converter transpiled to JavaScript |
-| `transpiled_walker.mjs` | PrismWalker: translates Prism AST to Parser-compatible AST |
-| `transliteration_spec.mjs` | Transpiled test suite from Ruby spec |
+| `dist/converter.mjs` | Transpiled converter (~11,700 lines) |
+| `dist/walker.mjs` | Transpiled PrismWalker |
+| `dist/transliteration_spec.mjs` | Transpiled test suite |
+| `test_harness.mjs` | Minitest-compatible test framework |
+| `scripts/transpile_converter.rb` | Build script for converter |
+| `scripts/transpile_spec.rb` | Build script for specs |
 
 ## Quick Start
 
 ```bash
 cd demo/selfhost
 npm install
-npm test          # Run the test suite
-npm run build     # Regenerate converter and tests from Ruby source
+
+# Build transpiled files
+npm run build:converter   # Transpile converter
+npm run build:walker      # Transpile walker
+npm run build:spec        # Transpile test suite
+
+# Run tests
+npm test
 ```
 
 ## npm Scripts
 
-### Testing
-
 | Script | Description |
 |--------|-------------|
-| `npm test` | Run main test suite (transliteration_spec - 226 tests) |
-| `npm run test:e2e` | Quick sanity check with basic AST tests |
-| `npm run test:pipeline` | Test full Ruby→JS pipeline |
-| `npm run test:walker` | Test the Prism→Parser AST walker |
+| `npm test` | Run transliteration test suite |
+| `npm run build` | Build walker and spec |
+| `npm run build:converter` | Regenerate converter from Ruby source |
+| `npm run build:walker` | Regenerate walker from Ruby source |
+| `npm run build:spec` | Regenerate spec from Ruby source |
 
-### Building
+## Filter Chain
 
-| Script | Description |
-|--------|-------------|
-| `npm run build` | Regenerate converter and spec |
-| `npm run build:converter` | Regenerate `selfhost_converter.mjs` from Ruby source |
-| `npm run build:spec` | Regenerate `transliteration_spec.mjs` from Ruby spec |
-| `npm run build:walker` | Regenerate `transpiled_walker.mjs` |
+The transpilation uses this filter chain:
 
-## Command Line Usage
-
-The self-hosted Ruby2JS can be run from the command line using Node.js:
-
-```bash
-cd demo/selfhost
-npm install  # Install @ruby/prism dependency
-
-# Convert a file
-node ruby2js script.rb
-
-# Convert from stdin
-echo 'x = 42' | node ruby2js
-
-# Compact output (no newlines)
-node ruby2js --compact script.rb
-
-# Show help
-node ruby2js --help
+```ruby
+filters: [
+  Ruby2JS::Filter::Pragma,           # Handle # Pragma: skip
+  Ruby2JS::Filter::Combiner,         # Merge reopened classes
+  Ruby2JS::Filter::Require,          # require_relative → inline
+  Ruby2JS::Filter::Selfhost::Core,   # Core transformations
+  Ruby2JS::Filter::Selfhost::Walker, # private/protected removal
+  Ruby2JS::Filter::Selfhost::Converter, # handle :type patterns
+  Ruby2JS::Filter::Functions,        # Ruby methods → JS
+  Ruby2JS::Filter::Return,           # Autoreturn for methods
+  Ruby2JS::Filter::ESM               # ES module exports
+]
 ```
 
-## Running the Browser Demo
+## Philosophy
 
-The demo requires HTTP (not `file://`) due to ES module and WASM restrictions:
+### Pragma-Based Approach
 
-```bash
-cd demo/selfhost
-python3 -m http.server 8080
-# Open http://localhost:8080/browser_demo.html
+The self-hosting uses a **pragma-based approach** where Ruby source files are annotated with special comments that guide transpilation:
+
+```ruby
+require 'prism' # Pragma: skip   # Don't transpile this require
+
+def respond_to?(method) # Pragma: skip   # Skip this method entirely
+  # ...
+end
 ```
 
-## What Works
+This allows the same Ruby source to:
+1. Run normally in Ruby (pragmas are just comments)
+2. Transpile correctly to JavaScript (pragmas guide transformations)
 
-The self-hosted converter supports:
+### What Belongs Where
 
-- **Literals**: integers, floats, strings, symbols, nil, true, false
-- **Variables**: local (`x`), instance (`@x`), assignments
-- **Collections**: arrays, hashes
-- **Control flow**: `if/else/elsif`, `case/when`
-- **Definitions**: `def foo(args)` → `function foo(args)`
-- **Operators**: arithmetic, comparison, logical
-- **Begin blocks**: multiple statements
+| Pattern | Filter | Notes |
+|---------|--------|-------|
+| `.freeze` removal | functions | No-op in JS |
+| `.to_sym` removal | functions | Symbols are strings |
+| `arr[-1] = x` | functions | Negative index assignment |
+| `(a..b).step(n)` | functions + for.rb | Range with step |
+| Autoreturn | return | Method bodies |
+| `# Pragma: skip` | pragma | Skip statements |
+| `handle :type` | selfhost/converter | Handler pattern |
+| `private`/`protected` | selfhost/walker | Visibility modifiers |
 
-## Current Limitations
+## Generated Output
 
-- No implicit `return` for method bodies (use explicit `return`)
-- Comments are not preserved
-- No indentation in output
-- Classes and modules not yet tested
-- Some complex patterns may not work
+The transpiled converter is ~11,700 lines of JavaScript containing:
 
-## The Selfhost Filter
-
-The `lib/ruby2js/filter/selfhost.rb` filter enables transpiling Ruby2JS internals:
-
-- `s(:type, ...)` → `s('type', ...)` (symbols to strings for AST types)
-- `node.type == :sym` → `node.type === 'string'` (type comparisons)
-- `class Foo < Prism::Visitor` → class with self-dispatch `visit()` method
-- `visit_integer_node` → `visitIntegerNode` (camelCase for JS Prism API)
-- `@sep`, `@nl`, `@ws` → `this._sep`, etc. (Serializer base class properties)
-- `handle :type do ... end` → `on_type(...)` method definitions
+- `Token` class - Source token wrapper
+- `Line` class - Output line management
+- `Serializer` class - Output formatting
+- `Converter` class - AST to JavaScript conversion
+- 60+ handler methods (`on_send`, `on_def`, `on_class`, etc.)
 
 ## Size Comparison
 
 | Approach | Size | Notes |
 |----------|------|-------|
-| Self-hosted | ~2.9MB | prism.wasm + WASI shim + walker + converter |
+| Self-hosted | ~2.5MB | prism.wasm + walker + converter |
 | Opal-based | ~24MB | Opal runtime + parser gem + Ruby2JS |
 
-## How It Works
+~10x smaller than the Opal-based approach.
 
-1. **Prism WASM** parses Ruby source into a Prism AST
-2. **PrismWalker** translates Prism AST nodes to Parser-gem compatible AST format
-3. **Converter** (transpiled from Ruby2JS) converts the AST to JavaScript
-4. **Serializer** handles output formatting (separators, newlines)
+## Source File Modifications
 
-The converter is the actual Ruby2JS converter code, transpiled to JavaScript using Ruby2JS itself with the `selfhost` filter. This means the same conversion logic runs in both Ruby and JavaScript environments.
+The following Ruby source files required modifications for transpilation:
 
-## Maintenance Overview
+### lib/ruby2js/serializer.rb
+- Changed `each_with_index` + `break` to `while` loop (JS `forEach` can't break)
+- Added `# Pragma: skip` to `[]`, `[]=`, `<<` methods (not valid JS method names)
+- Added alternative methods: `at`, `set`, `append`
+- Changed `yield` to explicit `&block` parameter
 
-Once self-hosting is complete, here's what needs to be maintained:
+### lib/ruby2js/converter.rb
+- Applied `jsvar()` to pending variable declarations (handles reserved words like `function`)
+- Enhanced comment handling for edge cases
 
-### Hand-Written Files (~1,150 lines total)
+### lib/ruby2js/converter/case.rb, regexp.rb
+- Refactored rest parameters to be last (JS requirement)
 
-| File | Lines | Purpose |
-|------|-------|---------|
-| `lib/ruby2js/filter/selfhost.rb` | ~950 | AST transformations for Ruby→JS patterns |
-| `preamble.mjs` | ~60 | JS stubs (Node, s(), Hash, NotImplementedError) |
-| Build script (Rakefile task) | ~50 | Lists files, calls Ruby2JS.convert, concatenates |
-| `browser_demo.html` | ~100 | Demo UI |
-
-### Generated Files (regenerated on build, not manually maintained)
-
-| File | Lines | Source |
-|------|-------|--------|
-| `transpiled_walker.mjs` | ~1,700 | From `lib/ruby2js/prism_walker.rb` + submodules |
-| `selfhost_converter.mjs` | ~6,500 | From `lib/ruby2js/converter.rb` + handlers + serializer |
-| `transliteration_spec.mjs` | ~1,500 | From `spec/transliteration_spec.rb` |
-
-The `selfhost.rb` filter encodes "how to transpile Ruby2JS's Ruby idioms to JavaScript."
-Once it handles all the patterns, changes to the converter/walker Ruby code automatically
-flow through to the browser version on rebuild.
+### lib/ruby2js/converter/send.rb
+- Wrapped `throw` in IIFE when in expression context (JS limitation)
 
 ## Next Steps
 
-See `plans/SELF_HOSTING.md` for the full roadmap:
+### Phase 4: Spec Integration
+1. Wire up transpiled converter with test harness
+2. Create `Ruby2JS.convert()` wrapper function
+3. Run transliteration tests against transpiled converter
 
-- Add implicit return handling for method bodies
-- Preserve comments from source
-- Add indentation support
-- Transpile more filters (functions, esm, camelCase)
-- Replace the ruby2js.com demo with the self-hosted version
+### Phase 5: Browser Demo
+1. Create unified module exporting `Ruby2JS.convert()`
+2. Update `browser_demo.html` to use real converter
+3. Document any remaining limitations
+
+## References
+
+- [PRAGMA_SELFHOST.md](../../plans/PRAGMA_SELFHOST.md) - Detailed implementation plan
+- [SELF_HOSTING.md](../../plans/SELF_HOSTING.md) - Original roadmap

@@ -1,4 +1,4 @@
-require 'ruby2js/serializer'
+require_relative 'serializer'
 
 module Ruby2JS
   class Error < NotImplementedError
@@ -150,7 +150,7 @@ module Ruby2JS
       # retroactively add a declaration for 'pending' variables
       vars = @vars.select {|key, value| value == :pending}.keys
       unless vars.empty?
-        insert mark, "let #{vars.join(', ')}#{@sep}"
+        insert mark, "let #{vars.map { |v| jsvar(v) }.join(', ')}#{@sep}"
         vars.each {|var| @vars[var] = true}
       end
     ensure
@@ -254,7 +254,12 @@ module Ruby2JS
             text.sub(/\A=begin/, '/*').sub(/^=end\Z/, '*/')
           end
         else
-          text.sub(/^#/, '//') + "\n"
+          # Handle comments - ensure they have // prefix
+          if text.start_with?('#')
+            text.sub(/^#/, '//') + "\n"
+          else
+            '// ' + text + "\n"
+          end
         end
       end.compact
     end
@@ -452,64 +457,64 @@ end
 
 # see https://github.com/whitequark/parser/blob/master/doc/AST_FORMAT.md
 
-require 'ruby2js/converter/arg'
-require 'ruby2js/converter/args'
-require 'ruby2js/converter/array'
-require 'ruby2js/converter/assign'
-require 'ruby2js/converter/begin'
-require 'ruby2js/converter/block'
-require 'ruby2js/converter/blockpass'
-require 'ruby2js/converter/boolean'
-require 'ruby2js/converter/break'
-require 'ruby2js/converter/case'
-require 'ruby2js/converter/casgn'
-require 'ruby2js/converter/class'
-require 'ruby2js/converter/class2'
-require 'ruby2js/converter/const'
-require 'ruby2js/converter/cvar'
-require 'ruby2js/converter/cvasgn'
-require 'ruby2js/converter/def'
-require 'ruby2js/converter/defs'
-require 'ruby2js/converter/defined'
-require 'ruby2js/converter/dstr'
-require 'ruby2js/converter/ensure'
-require 'ruby2js/converter/fileline'
-require 'ruby2js/converter/for'
-require 'ruby2js/converter/hash'
-require 'ruby2js/converter/hide'
-require 'ruby2js/converter/if'
-require 'ruby2js/converter/in'
-require 'ruby2js/converter/import'
-require 'ruby2js/converter/ivar'
-require 'ruby2js/converter/ivasgn'
-require 'ruby2js/converter/kwbegin'
-require 'ruby2js/converter/literal'
-require 'ruby2js/converter/logical'
-require 'ruby2js/converter/masgn'
-require 'ruby2js/converter/match'
-require 'ruby2js/converter/module'
-require 'ruby2js/converter/next'
-require 'ruby2js/converter/nil'
-require 'ruby2js/converter/nthref'
-require 'ruby2js/converter/nullish'
-require 'ruby2js/converter/opasgn'
-require 'ruby2js/converter/prototype'
-require 'ruby2js/converter/redo'
-require 'ruby2js/converter/regexp'
-require 'ruby2js/converter/retry'
-require 'ruby2js/converter/return'
-require 'ruby2js/converter/self'
-require 'ruby2js/converter/send'
-require 'ruby2js/converter/super'
-require 'ruby2js/converter/sym'
-require 'ruby2js/converter/taglit'
-require 'ruby2js/converter/undef'
-require 'ruby2js/converter/until'
-require 'ruby2js/converter/untilpost'
-require 'ruby2js/converter/var'
-require 'ruby2js/converter/vasgn'
-require 'ruby2js/converter/while'
-require 'ruby2js/converter/whilepost'
-require 'ruby2js/converter/xstr'
-require 'ruby2js/converter/xnode'
-require 'ruby2js/converter/yield'
+require_relative 'converter/arg'
+require_relative 'converter/args'
+require_relative 'converter/array'
+require_relative 'converter/assign'
+require_relative 'converter/begin'
+require_relative 'converter/block'
+require_relative 'converter/blockpass'
+require_relative 'converter/boolean'
+require_relative 'converter/break'
+require_relative 'converter/case'
+require_relative 'converter/casgn'
+require_relative 'converter/class'
+require_relative 'converter/class2'
+require_relative 'converter/const'
+require_relative 'converter/cvar'
+require_relative 'converter/cvasgn'
+require_relative 'converter/def'
+require_relative 'converter/defs'
+require_relative 'converter/defined'
+require_relative 'converter/dstr'
+require_relative 'converter/ensure'
+require_relative 'converter/fileline'
+require_relative 'converter/for'
+require_relative 'converter/hash'
+require_relative 'converter/hide'
+require_relative 'converter/if'
+require_relative 'converter/in'
+require_relative 'converter/import'
+require_relative 'converter/ivar'
+require_relative 'converter/ivasgn'
+require_relative 'converter/kwbegin'
+require_relative 'converter/literal'
+require_relative 'converter/logical'
+require_relative 'converter/masgn'
+require_relative 'converter/match'
+require_relative 'converter/module'
+require_relative 'converter/next'
+require_relative 'converter/nil'
+require_relative 'converter/nthref'
+require_relative 'converter/nullish'
+require_relative 'converter/opasgn'
+require_relative 'converter/prototype'
+require_relative 'converter/redo'
+require_relative 'converter/regexp'
+require_relative 'converter/retry'
+require_relative 'converter/return'
+require_relative 'converter/self'
+require_relative 'converter/send'
+require_relative 'converter/super'
+require_relative 'converter/sym'
+require_relative 'converter/taglit'
+require_relative 'converter/undef'
+require_relative 'converter/until'
+require_relative 'converter/untilpost'
+require_relative 'converter/var'
+require_relative 'converter/vasgn'
+require_relative 'converter/while'
+require_relative 'converter/whilepost'
+require_relative 'converter/xstr'
+require_relative 'converter/xnode'
+require_relative 'converter/yield'

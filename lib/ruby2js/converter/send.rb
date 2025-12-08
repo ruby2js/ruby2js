@@ -326,10 +326,17 @@ module Ruby2JS
         end
 
       elsif method == :raise and receiver == nil
+        # JavaScript doesn't allow throw as an expression, so wrap in IIFE if needed
+        if @state == :expression
+          put '(() => { '
+        end
         if args.length == 1
           put 'throw '; parse args.first
         else
           put 'throw new '; parse args.first; put '('; parse args[1]; put ')'
+        end
+        if @state == :expression
+          put ' })()'
         end
 
       elsif method == :typeof and receiver == nil

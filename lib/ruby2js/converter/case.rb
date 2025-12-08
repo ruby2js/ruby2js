@@ -8,7 +8,9 @@ module Ruby2JS
     #      (...))
     #   (...))
 
-    handle :case do |expr, *whens, other|
+    handle :case do |expr, *rest|
+      whens = rest
+      other = whens.pop unless whens.last&.type == :when
       begin
         if @state == :expression
           parse s(:kwbegin, @ast), @state

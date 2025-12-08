@@ -33,7 +33,11 @@ module Ruby2JS
       @string.end_with?(*args)
     end
 
-    def [](index)
+    def [](index) # Pragma: skip
+      @string[index]
+    end
+
+    def at(index)
       @string[index]
     end
   end
@@ -47,8 +51,13 @@ module Ruby2JS
       @indent = 0
     end
 
-    def <<(token)
+    def <<(token) # Pragma: skip
       @tokens << token
+      self
+    end
+
+    def append(token)
+      @tokens.push(token)
       self
     end
 
@@ -73,11 +82,19 @@ module Ruby2JS
       @tokens.length
     end
 
-    def [](index)
+    def [](index) # Pragma: skip
       @tokens[index]
     end
 
-    def []=(index, value)
+    def at(index)
+      @tokens[index]
+    end
+
+    def []=(index, value) # Pragma: skip
+      @tokens[index] = value
+    end
+
+    def set(index, value)
       @tokens[index] = value
     end
 
@@ -340,9 +357,9 @@ module Ruby2JS
     end
 
     # compact small expressions into a single line
-    def compact
+    def compact(&block)
       mark = output_location
-      yield
+      block.call
       return unless @lines.length - mark.first > 1
       return if @indent == 0
 
@@ -354,7 +371,9 @@ module Ruby2JS
       split = nil
       slice = @lines[mark.first..-1]
       reindent(slice)
-      slice.each_with_index do |line, index|
+      index = 0
+      while index < slice.length
+        line = slice[index]
         line << Token.new('', nil) if line.empty?
         if line.first.start_with?('//')
           len += @width # comments are a deal breaker
@@ -372,6 +391,7 @@ module Ruby2JS
           end
           trail = line.indent
         end
+        index += 1
       end
 
       if len < @width - 10

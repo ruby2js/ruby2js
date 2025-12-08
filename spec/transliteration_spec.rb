@@ -1139,6 +1139,11 @@ describe Ruby2JS do
         must_equal 'throw new Exception("heck")'
     end
 
+    it "should handle raise in expression context" do
+      to_js( 'x = a ? b : raise("error")' ).
+        must_include '(() => { throw "error" })()'
+    end
+
     it "should handle catching any exception" do
       to_js( 'begin a; rescue => e; b; end' ).
         must_equal 'try {let a} catch (e) {let b}'

@@ -5,7 +5,9 @@ module Ruby2JS
     #   (str "x")
     #   (regopt :i))
 
-    handle :regexp do |*parts, opt|
+    handle :regexp do |*args|
+      parts = args
+      opt = parts.pop
       # remove "extended" from list of options
       extended = false
       opts = opt.children
