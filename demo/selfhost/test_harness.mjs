@@ -85,6 +85,15 @@ Object.defineProperty(Array.prototype, 'compact', {
   configurable: true
 });
 
+// Ruby's Array#insert(index, items...) - insert items at index
+// Returns the array for chaining
+if (!Array.prototype.insert) {
+  Array.prototype.insert = function(index, ...items) {
+    this.splice(index, 0, ...items);
+    return this;
+  };
+}
+
 // Import walker first to get Node class (transpiled from lib/ruby2js/node.rb)
 const { Ruby2JS: WalkerModule } = await import('./dist/walker.mjs');
 

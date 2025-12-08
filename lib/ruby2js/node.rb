@@ -5,7 +5,11 @@ module Ruby2JS
   # Used by the Prism walker to avoid dependency on parser gem.
   class Node
     attr_reader :type, :children, :location
-    alias :loc :location
+
+    # Alias for location - defined as method for JS getter aliasing compatibility
+    def loc
+      @location
+    end
 
     def initialize(type, children = [], properties = {})
       @type = type.to_sym

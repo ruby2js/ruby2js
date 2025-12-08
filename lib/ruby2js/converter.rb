@@ -277,37 +277,41 @@ module Ruby2JS
 
       # If ast has location info, try location-based lookup
       # This handles cases where filters created new nodes with same location
-      if ast.loc && ast.loc.respond_to?(:expression) && ast.loc.expression
-        expression = ast.loc.expression
-        @comments.each do |key, value|
-          next if key == :_raw || value.nil? || value.empty?
-          next unless key.respond_to?(:loc) && key.loc&.respond_to?(:expression)
-          key_expr = key.loc.expression
-          next unless key_expr
-          if key_expr.source_buffer == expression.source_buffer &&
-             key_expr.begin_pos == expression.begin_pos &&
-             key_expr.end_pos == expression.end_pos
-            return [value, key]
-          end
-        end
-      end
-
-      # For synthetic nodes (no location), try to find comments via first child with location
-      if !ast.loc || !ast.loc.respond_to?(:expression) || !ast.loc.expression
-        first_loc = find_first_location(ast)
-        if first_loc
+      # Skip complex location-based comment lookup in self-hosted JS version
+      # The location-based lookup requires Hash with object keys (Map in JS)
+      # For simplicity, selfhost version only uses direct lookup above
+      unless defined?(RUBY2JS_SELFHOST) # Pragma: skip
+        if ast.loc && ast.loc.respond_to?(:expression) && ast.loc.expression
+          expression = ast.loc.expression
           @comments.each do |key, value|
             next if key == :_raw || value.nil? || value.empty?
             next unless key.respond_to?(:loc) && key.loc&.respond_to?(:expression)
             key_expr = key.loc.expression
-            next unless key_expr && key_expr.source_buffer == first_loc.source_buffer
-            # If the key starts at or near where our content starts, use its comments
-            if key_expr.begin_pos <= first_loc.begin_pos + 1
+            next unless key_expr
+            if key_expr.source_buffer == expression.source_buffer &&
+               key_expr.begin_pos == expression.begin_pos &&
+               key_expr.end_pos == expression.end_pos
               return [value, key]
             end
           end
         end
-        # If no first_loc (empty synthetic node), don't try to find comments
+
+        # For synthetic nodes (no location), try to find comments via first child with location
+        if !ast.loc || !ast.loc.respond_to?(:expression) || !ast.loc.expression
+          first_loc = find_first_location(ast)
+          if first_loc
+            @comments.each do |key, value|
+              next if key == :_raw || value.nil? || value.empty?
+              next unless key.respond_to?(:loc) && key.loc&.respond_to?(:expression)
+              key_expr = key.loc.expression
+              next unless key_expr && key_expr.source_buffer == first_loc.source_buffer
+              # If the key starts at or near where our content starts, use its comments
+              if key_expr.begin_pos <= first_loc.begin_pos + 1
+                return [value, key]
+              end
+            end
+          end
+        end
       end
 
       [[], ast]

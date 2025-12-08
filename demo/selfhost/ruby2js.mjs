@@ -77,6 +77,15 @@ Object.defineProperty(Array.prototype, 'compact', {
   configurable: true
 });
 
+// Ruby's Array#insert(index, items...) - insert items at index
+// Returns the array for chaining
+if (!Array.prototype.insert) {
+  Array.prototype.insert = function(index, ...items) {
+    this.splice(index, 0, ...items);
+    return this;
+  };
+}
+
 // Mock globals
 globalThis.RUBY_VERSION = "3.4.0";
 globalThis.RUBY2JS_PARSER = "prism";

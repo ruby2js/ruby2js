@@ -151,14 +151,16 @@ module Ruby2JS
           super
         end
 
-        # Transform ast_node? method to use typeof guard
+        # Transform methods that use respond_to? to use typeof guard
         # Ruby's respond_to? becomes 'prop in obj' which throws on primitives
         # We transform to: typeof obj === 'object' && obj !== null && 'prop' in obj
+        METHODS_NEEDING_RESPOND_TO_GUARD = %i[ast_node? hoist?].freeze
+
         def on_def(node)
           method_name, args, body = node.children
 
-          # Transform ast_node? method
-          if method_name == :ast_node? && body
+          # Transform methods that use respond_to? with type/children checks
+          if METHODS_NEEDING_RESPOND_TO_GUARD.include?(method_name) && body
             # Replace respond_to? calls with guarded 'in' checks
             new_body = transform_respond_to_guards(body)
             return super(node.updated(nil, [method_name, args, new_body])) if new_body != body
