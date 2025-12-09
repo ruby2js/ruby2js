@@ -29,7 +29,17 @@ module Ruby2JS
       @string.start_with?(*args)
     end
 
+    # JavaScript compatibility - functions filter converts start_with? -> startsWith
+    def startsWith(*args)
+      @string.start_with?(*args)
+    end
+
     def end_with?(*args)
+      @string.end_with?(*args)
+    end
+
+    # JavaScript compatibility - functions filter converts end_with? -> endsWith
+    def endsWith(*args)
       @string.end_with?(*args)
     end
 
