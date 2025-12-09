@@ -58,12 +58,12 @@ module Ruby2JS
 
         # Check if any rescue body contains a retry statement
         has_retry = nil
-        has_retry = lambda do |node|
-          next false unless node and node.respond_to?(:type) && node.respond_to?(:children) # Pragma: logical
-          next true if node.type == :retry
-          node.children.any? { |child| has_retry.call(child) }
-        end
-        uses_retry = recovers.any? { |recover| has_retry.call(recover.children.last) }
+        has_retry = ->(node) {
+          return false unless self.ast_node?(node)
+          return true if node.type == :retry
+          node.children.any? { |child| has_retry.call(child) } # Pragma: method
+        }
+        uses_retry = recovers.any? { |recover| has_retry.call(recover.children.last) } # Pragma: method
       else
         body = block
       end
@@ -83,29 +83,31 @@ module Ruby2JS
       if finally
         # Collect lvasgn names from body (use Array for JS compatibility)
         try_vars = []
+        find_lvasgns = nil
         find_lvasgns = proc do |node|
-          next unless node and node.respond_to?(:type) && node.respond_to?(:children) # Pragma: logical
+          next unless self.ast_node?(node)
           if node.type == :lvasgn
             try_vars << node.children[0] unless try_vars.include?(node.children[0])
           end
-          node.children.each { |c| find_lvasgns.call(c) }
+          node.children.each { |c| find_lvasgns.call(c) } # Pragma: method
         end
-        find_lvasgns.call(body)
+        find_lvasgns.call(body) # Pragma: method
 
         # Collect lvar names from finally (use Array for JS compatibility)
         finally_vars = []
+        find_lvars = nil
         find_lvars = proc do |node|
-          next unless node and node.respond_to?(:type) && node.respond_to?(:children) # Pragma: logical
+          next unless self.ast_node?(node)
           if node.type == :lvar
             finally_vars << node.children[0] unless finally_vars.include?(node.children[0])
           end
-          node.children.each { |c| find_lvars.call(c) }
+          node.children.each { |c| find_lvars.call(c) } # Pragma: method
         end
-        find_lvars.call(finally)
+        find_lvars.call(finally) # Pragma: method
 
         # Hoist variables that appear in both (but not already declared)
         hoisted = try_vars.select { |var| finally_vars.include?(var) && !@vars[var] }
-        if hoisted.any?
+        if hoisted.length > 0
           hoisted_any = true
           puts '{'  # Open block scope to contain hoisted vars
           hoisted.each do |var|
@@ -134,11 +136,12 @@ module Ruby2JS
 
         if recovers.length == 1 and not recovers.first.children.first
           # find reference to exception ($!)
+          walk = nil
           walk = proc do |ast|
-            next nil unless ast and ast.respond_to?(:type) && ast.respond_to?(:children) # Pragma: logical
+            next nil unless self.ast_node?(ast)
             result = ast if ast.type === :gvar and ast.children.first == :$!
             ast.children.each do |child|
-              result ||= walk.call(child) # Pragma: logical
+              result ||= walk.call(child) # Pragma: method # Pragma: logical
             end
             result
           end
@@ -167,7 +170,8 @@ module Ruby2JS
               put  'if ('
               exceptions.children.each_with_index do |exception, index|
                 put ' || ' unless index == 0
-                if exception == s(:const, nil, :String)
+                if exception.type == :const and exception.children[0] == nil and
+                  exception.children[1] == :String
                   put 'typeof '; parse catch_var; put ' == "string"'
                 else
                   parse catch_var; put ' instanceof '; parse exception
