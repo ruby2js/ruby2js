@@ -9,7 +9,15 @@ module Ruby2JS
 
     handle :block do |call, args, block|
 
-      if call.children.last == s(:send, nil, :async)
+      # Check for trailing `async` arg in block call: `it "works", async do end`
+      # Using element-wise comparison for selfhost JS compatibility
+      last_arg = call.children.last
+      is_async_arg = last_arg.respond_to?(:type) &&
+                     last_arg.type == :send &&
+                     last_arg.children[0] == nil &&
+                     last_arg.children[1] == :async &&
+                     last_arg.children.length == 2
+      if is_async_arg
         return parse call.updated(nil, [*call.children[0..-2],
         s(:send, nil, :async, s(:block, s(:send, nil, :proc), args, block))])
       end
