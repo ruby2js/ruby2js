@@ -1,141 +1,138 @@
 ---
 order: 30
-title: Conversion Details
+title: Design Philosophy
 top_section: Behind the Scenes
 category: conversion-details
 ---
 
-**Ruby2JS** makes writing JavaScript using Ruby idioms as straightforward as possible, but the devil is in the details. The following is a detailed explanation of what happens under the hood during the transpilation process and some of the thinking behind the various decisions made. 
+This page explains the design decisions behind Ruby2JS and how it compares to other approaches for running Ruby in the browser.
 
 {% toc %}
 
-## Introduction
+## Three Approaches to Ruby in the Browser
 
-JavaScript is a language where `0` is considered `false`, strings are
-immutable, and the behaviors for operators like `==` are, at best,
-[convoluted](https://zero.milosz.ca/).
+There are three main ways to run Ruby code in a web browser:
 
-Any attempt to bridge the semantics of Ruby and JavaScript will involve
-trade-offs.  Consider the following expression:
+### 1. Opal (Runtime Compilation)
 
-```ruby
-a[-1]
-```
+[Opal](https://opalrb.com/) compiles Ruby to JavaScript with a comprehensive runtime library. It modifies JavaScript's built-in objects to match Ruby semantics—for example, making `a[-1]` return the last element of an array.
 
-Programmers who are familiar with Ruby will recognize that this returns the
-last element (or character) of an array (or string).  However, the meaning is
-quite different if `a` is a Hash.
+**Pros:**
+- High Ruby compatibility
+- Ruby semantics preserved (negative indexing, truthiness, etc.)
 
-One way to resolve this is to change the way indexing operators are evaluated,
-and to provide a runtime library that adds properties to global JavaScript
-objects to handle this.  This is the approach that [Opal](https://opalrb.com/)
-takes.  It is a fine approach, with a number of benefits.  It also has some
-notable drawbacks.  For example,
-[readability](https://opalrb.com/try/#code:a%20%3D%20%22abc%22%3B%20puts%20a[-1])
-and
-[compatibility with other frameworks](https://github.com/opal/opal/issues/400).
+**Cons:**
+- Large runtime (~24MB for full Ruby2JS demo)
+- Output is [harder to read](https://opalrb.com/try/#code:a%20%3D%20%22abc%22%3B%20puts%20a[-1])
+- [Compatibility issues](https://github.com/opal/opal/issues/400) with some JavaScript frameworks
 
-Another approach is to simply accept JavaScript semantics for what they are.
-This would mean that negative indexes would return `undefined` for arrays
-and strings.  This is the base approach provided by Ruby2JS.
+### 2. WebAssembly Ruby (ruby.wasm)
 
-A third approach would be to do static transformations on the source in order
-to address common usage patterns or idioms.  These transformations can even be
-occasionally unsafe, as long as the transformations themselves are opt-in.
-Ruby2JS provides a number of such filters, including one that handles negative
-indexes when passed as a literal.  As indicated above, this is unsafe in that
-it will do the wrong thing when it encounters a hash index which is expressed
-as a literal constant negative one.  My experience is that such is rare enough
-to be safely ignored, but YMMV.  More troublesome, this also won’t work when
-the index is not a literal (e.g., `a[n]`) and the index happens to be
-negative at runtime.
+[ruby.wasm](https://github.com/ruby/ruby.wasm) runs a full Ruby interpreter compiled to WebAssembly. This is actual Ruby running in the browser, not transpiled code.
 
-## Method Exclusions
+**Pros:**
+- Full Ruby compatibility (it *is* Ruby)
+- Access to Ruby standard library
+- Can run existing Ruby code unmodified
 
-This quickly gets into gray areas.  `each` in Ruby is a common method that
-facilitates iteration over arrays.  `forEach` is the JavaScript equivalent.
-Mapping this is fine until you start using a framework like jQuery which
-provides a function named [each](https://api.jquery.com/jQuery.each/).
+**Cons:**
+- Large download (~20-40MB depending on configuration)
+- Slower startup (must initialize Ruby VM)
+- JavaScript interop requires explicit bridging
+- Not suitable for generating JavaScript libraries
 
-Fortunately, Ruby provides `?` and `!` as legal suffixes for method names,
-Ruby2JS filters do an exact match, so if you select a filter that maps `each`
-to `forEach`, `each!` will pass through the filter.  The final code that emits
-JavaScript function calls and parameter accesses will strip off these
-suffixes.
+### 3. Ruby2JS (Static Transpilation)
 
-This approach works well if it is an occasional change, but if the usage is
-pervasive, most filters support options to `exclude` a list of mappings,
-for example:
+Ruby2JS takes a different approach: it performs **static transformations** at build time to produce idiomatic JavaScript. There's no runtime—just the generated code.
+
+**Pros:**
+- Small output (~2.5MB for full converter demo, most apps much smaller)
+- Readable, debuggable JavaScript output
+- Works seamlessly with JavaScript frameworks
+- Generated code runs at native JavaScript speed
+
+**Cons:**
+- Not all Ruby features translate (see [Anti-Patterns](/docs/users-guide/anti-patterns))
+- Some semantic differences (truthiness, negative indexing)
+- Requires understanding of what translates and what doesn't
+
+## Ruby2JS Design Decisions
+
+### Choose Your Level of Ruby Compatibility
+
+By default, Ruby2JS accepts JavaScript semantics rather than fighting them:
 
 ```ruby
-puts Ruby2JS.convert('jQuery("li").each {|index| ...}', exclude: :each)
+a[-1]  # Returns undefined in JS, not last element
+0 || 1 # Returns 0 in Ruby, 1 in JS (0 is falsy in JS)
 ```
 
-Alternatively, you can change the default:
+But you can opt into more Ruby-like behavior at multiple levels:
+
+**Filters** transform Ruby methods to JavaScript equivalents at transpile time:
+```ruby
+# With functions filter:
+arr.first        # => arr[0]
+arr.empty?       # => arr.length === 0
+str.gsub(/a/, 'b')  # => str.replace(/a/g, 'b')
+```
+
+**Polyfills** add Ruby methods to JavaScript prototypes at runtime:
+```ruby
+# With polyfill filter:
+arr.first        # => arr.first (property, via Object.defineProperty)
+arr.compact      # => arr.compact (mutating, like Ruby)
+```
+
+**Pragmas** give line-level control for edge cases:
+```ruby
+x ||= default # Pragma: ??     # Use nullish coalescing
+hash.each { |k,v| } # Pragma: entries  # Use Object.entries()
+```
+
+**Options** like `or: :nullish` and `truthy: :ruby` can change behavior globally.
+
+This layered approach lets you choose the trade-offs appropriate for your project—from minimal transformation to comprehensive Ruby compatibility.
+
+### Static Over Dynamic
+
+The real limitations come from Ruby2JS using **static AST transformations** rather than runtime modifications:
+
+- **Predictable output** - The same Ruby always produces the same JavaScript
+- **No runtime overhead** - Generated code runs at native speed
+- **Framework compatible** - No conflicts with React, Vue, etc.
+
+The cost is that Ruby's dynamic features simply can't be supported. There's no way to statically transpile `method_missing`, `define_method`, or `eval`—these require a runtime that can intercept and handle arbitrary method calls. See [Anti-Patterns](/docs/users-guide/anti-patterns) for the full list.
+
+## Edge Cases
+
+### Extending Existing Classes
+
+Both Ruby and JavaScript have open classes, but Ruby unifies syntax for defining and extending classes while JavaScript does not. To extend an existing class, prepend `++`:
 
 ```ruby
-Ruby2JS::Filter.exclude :each
+++class String
+  def blank?
+    strip.empty?
+  end
+end
 ```
 
-Static transformations and runtime libraries aren't aren’t mutually exclusive.
-With enough of each, one could reproduce any functionality desired.
+This tells Ruby2JS you're extending an existing class rather than defining a new one.
 
-## Syntax Mappings
+### Suffix Stripping
 
-With ES2020 as the default, Ruby2JS produces modern JavaScript:
+Ruby allows `?` and `!` in method names; JavaScript doesn't. Ruby2JS strips these suffixes:
 
-  * a Ruby Hash literal becomes a JavaScript Object literal
-  * Ruby symbols become JavaScript strings.
-  * Ruby method calls become JavaScript function calls IF
-    there are either one or more arguments passed OR
-    parenthesis are used
-  * otherwise Ruby method calls become JavaScript property accesses.
-  * by default, methods and procs return `undefined`
-  * splats are mapped to spread syntax (`...args`)
-  * ruby string interpolation becomes template literals (<code>\`${value}\`</code>)
-  * `and` and `or` become `&&` and `||`
-  * `a ** b` becomes `a ** b`
-  * `<< a` becomes `.push(a)`
-  * `unless` becomes `if !`
-  * `until` becomes `while !`
-  * `case` and `when` becomes `switch` and `case`
-  * ruby for loops become js for loops
-  * `(1...4).step(2){` becomes `for (let i = 1; i < 4; i += 2) {`
-  * `x.forEach { next }` becomes `x.forEach(() => {return})`
-  * `lambda {}` becomes `() => {}`
-  * `proc {}` becomes `() => {}`
-  * `class Person; end` becomes `class Person {}`
-  * `Class.new do; end` becomes `class {}`
-  * instance methods become class methods
-  * instance variables become underscored, `@name` becomes `this._name`
-  * self is assigned to this if used
-  * Any block becomes an explicit argument `new Promise do; y(); end` becomes `new Promise(() => {y()})`
-  * regular expressions are mapped to js
-  * `raise` becomes `throw`
-  * `.is_a?` becomes `instanceof`
-  * `.kind_of?` becomes `instanceof`
-  * `.instance_of?` becomes `.constructor ==`
-  * `a&.b` becomes `a?.b` (optional chaining)
-  * `a.nil? ? b : a` becomes `a ?? b` (nullish coalescing)
+```ruby
+array.empty?   # => array.empty
+string.chomp!  # => string.chomp
+```
 
-Ruby attribute accessors, methods defined with no parameters and no
-parenthesis, as well as setter method definitions, are
-mapped to
-[Object.defineProperty](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/defineProperty?redirectlocale=en-US&redirectslug=JavaScript%2FReference%2FGlobal_Objects%2FObject%2FdefineProperty),
-so avoid these if you wish to target users running IE8 or lower.
+This can be useful for avoiding filter conflicts—if a filter maps `each` to `forEach`, you can use `each!` to bypass it.
 
-While both Ruby and JavaScript have open classes, Ruby unifies the syntax for
-defining and extending an existing class, whereas JavaScript does not.  This
-means that Ruby2JS needs to be told when a class is being extended, which is
-done by prepending the `class` keyword with two plus signs, thus:
-`++class C; ...; end`.
+## Further Reading
 
-Filters may be provided to add Ruby-specific or framework specific
-behavior.  Filters are essentially macro facilities that operate on
-an AST representation of the code.
-
-{% rendercontent "docs/note" %}
-See
-[notimplemented_spec](https://github.com/ruby2js/ruby2js/blob/master/spec/notimplemented_spec.rb)
-for a list of Ruby features _known_ to be not implemented.
-{% endrendercontent %}
+- **[User's Guide](/docs/users-guide/introduction)** - How to write dual-target Ruby/JavaScript code
+- **[Options](/docs/options)** - Configuration including `exclude` for filter control
+- **[notimplemented_spec](https://github.com/ruby2js/ruby2js/blob/master/spec/notimplemented_spec.rb)** - Ruby features known to be unsupported

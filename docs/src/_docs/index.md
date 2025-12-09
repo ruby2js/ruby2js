@@ -81,4 +81,8 @@ Conversions can be explored interactively using the
 [demo](/docs/running-the-demo) provided. (**[Try It Online](/demo?preset=true)**)
 {% endrendercontent %}
 
-Continue to the next page to learn all about how to use the "preset" configuration or build your own.
+## Next Steps
+
+- **[Options](/docs/options)** - Learn about the "preset" configuration or build your own
+- **[User's Guide](/docs/users-guide/introduction)** - Best practices for writing dual-target Ruby/JavaScript code
+- **[Filters](/docs/filters/functions)** - Available transformations for your code
