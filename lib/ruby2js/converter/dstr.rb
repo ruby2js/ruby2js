@@ -32,7 +32,7 @@ module Ruby2JS
           else
             put str
           end
-        elsif child != s(:begin)
+        elsif not (child.type == :begin and child.children.empty?)
           put '${'
           if @nullish_to_s
             # ${x ?? ''} - nil-safe interpolation matching Ruby's "#{nil}" => ""
