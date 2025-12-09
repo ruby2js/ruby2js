@@ -199,59 +199,6 @@ module Ruby2JS
           super
         end
 
-        # Transform methods that use respond_to? to use typeof guard
-        # Ruby's respond_to? becomes 'prop in obj' which throws on primitives
-        # We transform to: typeof obj === 'object' && obj !== null && 'prop' in obj
-        METHODS_NEEDING_RESPOND_TO_GUARD = %i[ast_node? hoist?].freeze
-
-        def on_def(node)
-          method_name, args, body = node.children
-
-          # Transform methods that use respond_to? with type/children checks
-          if METHODS_NEEDING_RESPOND_TO_GUARD.include?(method_name) && body
-            # Replace respond_to? calls with guarded 'in' checks
-            new_body = transform_respond_to_guards(body)
-            return super(node.updated(nil, [method_name, args, new_body])) if new_body != body
-          end
-
-          super
-        end
-
-        # Transform respond_to? calls to use typeof guard for safe 'in' operator
-        def transform_respond_to_guards(node)
-          return node unless node.respond_to?(:type)
-
-          if node.type == :send && node.children[1] == :respond_to? && node.children[2]
-            target = node.children[0]
-            prop = node.children[2]
-
-            # Create: typeof(target) === 'object' && target !== null && prop in target
-            type_check = s(:send,
-              s(:send, nil, :typeof, target),
-              :===,
-              s(:str, 'object')
-            )
-            null_check = s(:send, target, :!=, s(:nil))
-            in_check = s(:in?, prop, target)
-
-            return s(:and, s(:and, type_check, null_check), in_check)
-          end
-
-          # Recursively process children
-          if node.respond_to?(:children) && node.children.any?
-            new_children = node.children.map do |child|
-              if child.respond_to?(:type)
-                transform_respond_to_guards(child)
-              else
-                child
-              end
-            end
-            return node.updated(nil, new_children)
-          end
-
-          node
-        end
-
         def on_block(node)
           call = node.children[0]
           args = node.children[1]
