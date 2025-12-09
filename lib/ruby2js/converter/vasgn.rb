@@ -69,7 +69,7 @@ module Ruby2JS
       outer.children.each do |var|
         next if var == inner
         return true if var == name and [:lvar, :gvar].include? outer.type
-        return true if self.ast_node?(var) && hoist?(var, inner, name)
+        return true if ast_node?(var) && hoist?(var, inner, name)
       end
       return false
     end

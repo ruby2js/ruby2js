@@ -59,7 +59,7 @@ module Ruby2JS
         # Check if any rescue body contains a retry statement
         has_retry = nil
         has_retry = ->(node) {
-          return false unless self.ast_node?(node)
+          return false unless ast_node?(node)
           return true if node.type == :retry
           node.children.any? { |child| has_retry.call(child) } # Pragma: method
         }
@@ -85,7 +85,7 @@ module Ruby2JS
         try_vars = []
         find_lvasgns = nil
         find_lvasgns = proc do |node|
-          next unless self.ast_node?(node)
+          next unless ast_node?(node)
           if node.type == :lvasgn
             try_vars << node.children[0] unless try_vars.include?(node.children[0])
           end
@@ -97,7 +97,7 @@ module Ruby2JS
         finally_vars = []
         find_lvars = nil
         find_lvars = proc do |node|
-          next unless self.ast_node?(node)
+          next unless ast_node?(node)
           if node.type == :lvar
             finally_vars << node.children[0] unless finally_vars.include?(node.children[0])
           end
@@ -138,7 +138,7 @@ module Ruby2JS
           # find reference to exception ($!)
           walk = nil
           walk = proc do |ast|
-            next nil unless self.ast_node?(ast)
+            next nil unless ast_node?(ast)
             result = ast if ast.type === :gvar and ast.children.first == :$!
             ast.children.each do |child|
               result ||= walk.call(child) # Pragma: method # Pragma: logical

@@ -16,7 +16,7 @@ module Ruby2JS
       collapsible = false
 
       nonprop = proc do |node|
-        next false unless self.ast_node?(node)
+        next false unless ast_node?(node)
         next false if node.type == :pair and node.children.first.type == :prop
         next true unless node.type == :def
         next false if node.children.first.to_s.end_with? '='

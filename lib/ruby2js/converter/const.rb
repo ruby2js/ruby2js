@@ -8,7 +8,7 @@ module Ruby2JS
       receiver ||= @rbstack.map {|rb| rb[name]}.compact.last
 
       if receiver
-        if self.ast_node?(receiver) && receiver.type == :cbase
+        if ast_node?(receiver) && receiver.type == :cbase
           put 'Function("return this")().'
         else
           parse receiver
