@@ -185,14 +185,14 @@ module Ruby2JS
         parse s(:and, s(:not, expr.children[0]), s(:not, expr.children[1]))
       elsif expr.type == :and
         parse s(:or, s(:not, expr.children[0]), s(:not, expr.children[1]))
-      elsif expr.type == :send and expr.children[0..1] == [nil, :typeof] and
-        expr.children[2]&.type == :send and
+      elsif expr.type == :send and expr.children[0] == nil and
+        expr.children[1] == :typeof and expr.children[2]&.type == :send and
         Converter::INVERT_OP[expr.children[2].children[1]]
         # Handle "not typeof x == y" => "typeof x != y"
         # Ruby parses "typeof x == y" as "typeof(x == y)" due to precedence
-        comparison = expr.children[2]
-        parse(s(:send, s(:send, nil, :typeof, comparison.children[0]),
-          Converter::INVERT_OP[comparison.children[1]], comparison.children[2]))
+        cmp = expr.children[2]
+        parse(s(:send, s(:send, nil, :typeof, cmp.children[0]),
+          Converter::INVERT_OP[cmp.children[1]], cmp.children[2]))
       else
         group   = Converter::LOGICAL.include?( expr.type ) &&
           operator_index( :not ) < operator_index( expr.type )

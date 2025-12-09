@@ -271,13 +271,15 @@ module Ruby2JS
 
       elsif method == :new
         if receiver
-          # map Ruby's "Regexp" to JavaScript's "Regexp"
-          if receiver == s(:const, nil, :Regexp)
+          # map Ruby's "Regexp" to JavaScript's "RegExp"
+          if receiver.type == :const and receiver.children[0] == nil and
+            receiver.children[1] == :Regexp
             receiver = s(:const, nil, :RegExp)
           end
 
           # allow a RegExp to be constructed from another RegExp
-          if receiver == s(:const, nil, :RegExp)
+          if receiver.type == :const and receiver.children[0] == nil and
+            receiver.children[1] == :RegExp
             if args.first.type == :regexp
               opts = ''
               if args.first.children.last.children.length > 0
@@ -297,7 +299,7 @@ module Ruby2JS
                 opts = ''
               end
               return parse s(:regexp, args.first,
-                s(:regopt, *opts.each_char.map {|c| c}))
+                s(:regopt, *opts.split('').map {|c| c}))
             end
           end
 

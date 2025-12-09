@@ -50,14 +50,14 @@ module Ruby2JS
 
       # in Ruby regular expressions, /A is the start of the string
       if parts.first.type == :str and parts.first.children[0].start_with?('\A')
-        parts = [s(:str, parts.first.children[0].sub('\A', '^'))] +
-          parts[1..-1]
+        parts = [s(:str, parts.first.children[0].sub('\A', '^'))].concat(
+          parts[1..-1])
       end
 
       # in Ruby regular expressions, /z is the end of the string
       if parts.last.type == :str and parts.last.children[0].end_with?('\z')
-        parts = parts[0..-2] +
-          [s(:str, parts.first.children[0].sub('\z', '$'))]
+        parts = parts[0..-2].concat(
+          [s(:str, parts.last.children[0].sub('\z', '$'))])
       end
 
       # use slash syntax if there are few embedded slashes in the regexp

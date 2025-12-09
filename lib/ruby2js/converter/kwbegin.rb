@@ -42,7 +42,11 @@ module Ruby2JS
         body, *recovers, otherwise = block.children
 
         # Collect all unique exception variables used across rescue clauses
-        exception_vars = recovers.map {|r| r.children[1]}.compact.uniq
+        exception_vars = []
+        recovers.each do |r|
+          v = r.children[1]
+          exception_vars << v if v and not exception_vars.include?(v)
+        end
 
         # Use a common catch variable - prefer the first named one, or $EXCEPTION
         var = exception_vars.first
@@ -55,7 +59,7 @@ module Ruby2JS
         # Check if any rescue body contains a retry statement
         has_retry = nil
         has_retry = lambda do |node|
-          next false unless node.respond_to?(:type) && node.respond_to?(:children)
+          next false unless node and node.respond_to?(:type) && node.respond_to?(:children) # Pragma: logical
           next true if node.type == :retry
           node.children.any? { |child| has_retry.call(child) }
         end
@@ -80,7 +84,7 @@ module Ruby2JS
         # Collect lvasgn names from body (use Array for JS compatibility)
         try_vars = []
         find_lvasgns = proc do |node|
-          next unless node.respond_to?(:type) && node.respond_to?(:children)
+          next unless node and node.respond_to?(:type) && node.respond_to?(:children) # Pragma: logical
           if node.type == :lvasgn
             try_vars << node.children[0] unless try_vars.include?(node.children[0])
           end
@@ -91,7 +95,7 @@ module Ruby2JS
         # Collect lvar names from finally (use Array for JS compatibility)
         finally_vars = []
         find_lvars = proc do |node|
-          next unless node.respond_to?(:type) && node.respond_to?(:children)
+          next unless node and node.respond_to?(:type) && node.respond_to?(:children) # Pragma: logical
           if node.type == :lvar
             finally_vars << node.children[0] unless finally_vars.include?(node.children[0])
           end
@@ -131,9 +135,10 @@ module Ruby2JS
         if recovers.length == 1 and not recovers.first.children.first
           # find reference to exception ($!)
           walk = proc do |ast|
+            next nil unless ast and ast.respond_to?(:type) && ast.respond_to?(:children) # Pragma: logical
             result = ast if ast.type === :gvar and ast.children.first == :$!
             ast.children.each do |child|
-              result ||= walk.call(child) if child.respond_to?(:type) && child.respond_to?(:children) # Pragma: method
+              result ||= walk.call(child) # Pragma: logical
             end
             result
           end
