@@ -83,6 +83,14 @@ describe Ruby2JS::Filter::Functions do
     it "should handle to_json with space argument" do
       to_js( 'obj.to_json(nil, "\t")' ).must_equal 'JSON.stringify(obj, null, "\t")'
     end
+
+    it "should handle JSON.generate" do
+      to_js( 'JSON.generate(obj)' ).must_equal 'JSON.stringify(obj)'
+    end
+
+    it "should handle JSON.dump" do
+      to_js( 'JSON.dump(obj)' ).must_equal 'JSON.stringify(obj)'
+    end
   end
 
   describe :irange do
@@ -277,6 +285,11 @@ describe Ruby2JS::Filter::Functions do
       unless (RUBY_VERSION.split('.').map(&:to_i) <=> [2, 6, 0]) == -1
         to_js( 'a[i...]' ).must_equal 'a.slice(i)'
       end
+    end
+
+    it "should handle join" do
+      to_js( 'a.join' ).must_equal 'a.join("")'
+      to_js( 'a.join(",")' ).must_equal 'a.join(",")'
     end
 
     it "should handle slice! with ranges" do

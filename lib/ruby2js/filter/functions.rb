@@ -420,6 +420,10 @@ module Ruby2JS
         elsif method == :strip and args.length == 0
           process s(:send!, target, :trim)
 
+        elsif method == :join and args.length == 0
+          # Ruby's join defaults to "", JS defaults to ","
+          process node.updated(nil, [target, :join, s(:str, '')])
+
         elsif node.children[0..1] == [nil, :puts]
           process S(:send, s(:attr, nil, :console), :log, *args)
 
@@ -451,6 +455,17 @@ module Ruby2JS
 
         elsif method == :[] and target == s(:const, nil, :Hash)
           s(:send, s(:const, nil, :Object), :fromEntries, *process_all(args))
+
+        elsif target == s(:const, nil, :JSON)
+          if method == :generate or method == :dump
+            # JSON.generate(x) / JSON.dump(x) => JSON.stringify(x)
+            process node.updated(nil, [target, :stringify, *args])
+          elsif method == :parse or method == :load
+            # JSON.parse(x) / JSON.load(x) => JSON.parse(x)
+            super
+          else
+            super
+          end
 
         elsif method == :[]
           # resolve negative literal indexes

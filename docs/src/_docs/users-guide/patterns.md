@@ -310,6 +310,10 @@ str.include?("x") # => str.includes("x")
 str.start_with?("x")  # => str.startsWith("x")
 str.end_with?("x")    # => str.endsWith("x")
 str.gsub(/a/, "b")    # => str.replace(/a/g, "b")
+
+# join handles the Ruby/JS difference automatically:
+arr.join          # => arr.join("") (Ruby default is "", JS default is ",")
+arr.join(",")     # => arr.join(",")
 ```
 
 ## Type Checking

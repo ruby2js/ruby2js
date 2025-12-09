@@ -72,12 +72,6 @@ module Ruby2JS
             return process node.updated(nil, [s(:self), method_name, *args])
           end
 
-          # Ruby's .join with no args uses "" as separator, JS uses ","
-          # Transform .join -> .join("") - must be before ALWAYS_METHODS check
-          if target && method_name == :join && args.empty?
-            return process node.updated(nil, [target, :join, s(:str, '')])
-          end
-
           # Force .pop, .shift to always be method calls
           # In Ruby these are always methods; in JS they could be property access
           # Mark as :call type so converter adds parentheses

@@ -1,30 +1,14 @@
 // Unit tests for the transpiled PrismWalker
 // Tests that the JavaScript walker correctly transforms Prism AST to Parser-compatible AST
 
-import * as Prism from '@ruby/prism';
+// Import shared runtime (single source of truth)
+import { setupGlobals, initPrism } from './shared/runtime.mjs';
 
 // Set up globals before importing walker
-globalThis.Prism = Prism;
-
-class PrismSourceBuffer {
-  constructor(source, file) {
-    this.source = source;
-    this.name = file || '(eval)';
-  }
-}
-globalThis.PrismSourceBuffer = PrismSourceBuffer;
-
-class PrismSourceRange {
-  constructor(sourceBuffer, beginPos, endPos) {
-    this.source_buffer = sourceBuffer;
-    this.begin_pos = beginPos;
-    this.end_pos = endPos;
-  }
-}
-globalThis.PrismSourceRange = PrismSourceRange;
+setupGlobals();
 
 const { Ruby2JS } = await import('./dist/walker.mjs');
-const prismParse = await Prism.loadPrism();
+const prismParse = await initPrism();
 
 // Test helper
 function parse(source) {
