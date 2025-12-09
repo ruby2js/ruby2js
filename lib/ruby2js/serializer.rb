@@ -273,9 +273,9 @@ module Ruby2JS
             node = line.join[/.*(<.*)/, 1]
             indent += @indent unless node.include?('</') || node.include?('/>')
           else
-            indent -= @indent if ')}]'.include?(first.at(0)) && indent >= @indent
+            indent -= @indent if ')}]'.include?(first.to_s[0]) && indent >= @indent
             line.indent = indent
-            indent += @indent if '({['.include?(last.at(-1))
+            indent += @indent if '({['.include?(last.to_s[-1])
           end
         else
           line.indent = indent

@@ -50,3 +50,33 @@ jobs:
     - run: cd packages/ruby2js && yarn install
     - name: Run tests
       run: bundle exec rake packages:test
+
+  selfhost-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: 3.3
+        bundler-cache: true
+
+    - name: Set up Node
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install npm dependencies
+      run: cd demo/selfhost && npm install
+
+    - name: Build transpiled files
+      run: |
+        mkdir -p demo/selfhost/dist
+        bundle exec ruby demo/selfhost/scripts/transpile_walker.rb > demo/selfhost/dist/walker.mjs
+        bundle exec ruby demo/selfhost/scripts/transpile_converter.rb > demo/selfhost/dist/converter.mjs
+        bundle exec ruby demo/selfhost/scripts/transpile_spec.rb spec/transliteration_spec.rb > demo/selfhost/dist/transliteration_spec.mjs
+
+    - name: Run selfhost tests
+      run: cd demo/selfhost && npm test
