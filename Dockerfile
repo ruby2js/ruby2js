@@ -52,7 +52,8 @@ server {
     root /usr/share/nginx/html;
     index index.html;
 
-    # Add MIME types not in default nginx (ES modules and WebAssembly)
+    # Include default MIME types and add extras for ES modules and WebAssembly
+    include /etc/nginx/mime.types;
     types {
         application/javascript mjs;
         application/wasm wasm;
