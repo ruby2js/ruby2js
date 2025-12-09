@@ -159,8 +159,10 @@ module Ruby2JS
                   end
                 end
               else
-                prepend_list.keep_if do |import|
-                  save_prepend_list.include? import 
+                # Discard duplicate imports from inlined files, but keep
+                # non-import items like polyfills which need to be hoisted
+                prepend_list.keep_if do |item|
+                  save_prepend_list.include?(item) || item.type != :import
                 end
               end
 

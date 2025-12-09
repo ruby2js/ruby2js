@@ -274,7 +274,14 @@ module Ruby2JS
     def find_comment_entry(ast)
       # First try direct lookup by object identity
       comment_list = @comments[ast]
-      return [comment_list, ast] if comment_list && !comment_list.empty?
+      # Return early if there's an explicit entry (even if empty).
+      # Empty entries are used to prevent synthetic nodes from inheriting
+      # comments from their children (e.g., prepended polyfills/imports).
+      # Note: The Pragma: hash comment triggers `in` operator in JS, but that
+      # doesn't work for object keys. The selfhost version skips the complex
+      # location-based lookup below anyway (Pragma: skip), so we just check
+      # if comment_list is an array for the early return.
+      return [comment_list, ast] if comment_list.is_a?(Array)
 
       # If ast has location info, try location-based lookup
       # This handles cases where filters created new nodes with same location

@@ -499,6 +499,11 @@ module Ruby2JS
         else
           ast = Ruby2JS::Node.new(:begin, [*prepend, ast])
         end
+        # Register the new :begin node with empty comments to prevent it from
+        # inheriting comments from its first child with location info.
+        # Without this, comments from the original code get output before
+        # the prepended polyfills/imports.
+        comments[ast] = []
       end
     end
 

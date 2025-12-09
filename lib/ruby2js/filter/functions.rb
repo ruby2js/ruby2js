@@ -727,7 +727,8 @@ module Ruby2JS
           s(:send, S(:send, target, :new, args.first), :fill, args.last)
 
         elsif method == :freeze and args.length == 0
-          process S(:send, s(:const, nil, :Object), :freeze, target)
+          # .freeze → Object.freeze(target), bare freeze → Object.freeze(this)
+          process S(:send, s(:const, nil, :Object), :freeze, target || s(:self))
 
         elsif method == :to_sym and args.length == 0
           # .to_sym is a no-op - symbols are strings in JS

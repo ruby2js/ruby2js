@@ -90,6 +90,7 @@ filters: [
   Ruby2JS::Filter::Selfhost::Core,   # Core transformations
   Ruby2JS::Filter::Selfhost::Walker, # private/protected removal
   Ruby2JS::Filter::Selfhost::Converter, # handle :type patterns
+  Ruby2JS::Filter::Polyfill,         # Ruby method polyfills (first, last, compact, etc.)
   Ruby2JS::Filter::Functions,        # Ruby methods → JS
   Ruby2JS::Filter::Return,           # Autoreturn for methods
   Ruby2JS::Filter::ESM               # ES module exports
@@ -122,6 +123,8 @@ This allows the same Ruby source to:
 | `.to_sym` removal | functions | Symbols are strings |
 | `arr[-1] = x` | functions | Negative index assignment |
 | `(a..b).step(n)` | functions + for.rb | Range with step |
+| `.first`, `.last`, `.compact` | polyfill | Ruby method polyfills |
+| `.chomp`, `.count`, `.to_a` | polyfill | Ruby method polyfills |
 | Autoreturn | return | Method bodies |
 | `# Pragma: skip` | pragma | Skip statements |
 | `handle :type` | selfhost/converter | Handler pattern |
