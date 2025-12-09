@@ -121,6 +121,40 @@ module Ruby2JS
             return process s(:and, s(:and, type_check, null_check), in_check)
           end
 
+          # Transform array slice comparison: x.children[0..1] == [nil, :async]
+          # In JS, array === array always fails (reference comparison)
+          # Transform to element-wise: x.children[0] === null && x.children[1] === "async"
+          if [:==, :===].include?(method_name) && args.length == 1
+            # Check for: target[range] == [literal array]
+            if target&.type == :send && target.children[1] == :[]
+              range_arg = target.children[2]
+              rhs = args[0]
+
+              # Match: x[0..n] == [a, b, ...]  where range is an irange
+              if range_arg&.type == :irange && rhs&.type == :array
+                range_start = range_arg.children[0]
+                base_expr = target.children[0]  # e.g., m.children
+
+                # Build element-wise comparisons
+                comparisons = rhs.children.each_with_index.map do |elem, idx|
+                  # Calculate actual index: range_start + idx
+                  if range_start&.type == :int
+                    actual_idx = s(:int, range_start.children[0] + idx)
+                  else
+                    actual_idx = s(:int, idx)
+                  end
+
+                  # base_expr[actual_idx] === elem
+                  s(:send, s(:send, base_expr, :[], actual_idx), :===, elem)
+                end
+
+                # Combine with &&
+                result = comparisons.reduce { |acc, cmp| s(:and, acc, cmp) }
+                return process result
+              end
+            end
+          end
+
           # Check for: method("on_#{name}")
           if target.nil? && method_name == :method && args.length == 1
             arg = args[0]
