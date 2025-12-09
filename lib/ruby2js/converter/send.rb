@@ -202,7 +202,7 @@ module Ruby2JS
         if \
           receiver.type == :send and
           receiver.children[1] == :+@ and
-          child0.respond_to?(:type) && child0.respond_to?(:children) and
+          self.ast_node?(child0) and
           %i(class module).include? child0.type
         then
           if receiver.children[0].type == :class

@@ -83,7 +83,7 @@ module Ruby2JS
             cvars << ast.children.first if ast.type === :cvasgn
 
             ast.children.each do |child|
-              walk.call(child) if child.respond_to?(:type) && child.respond_to?(:children) # Pragma: method
+              walk.call(child) if self.ast_node?(child) # Pragma: method
             end
 
             if ast.type == :send and ast.children.first == nil

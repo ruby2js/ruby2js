@@ -72,7 +72,7 @@ module Ruby2JS
               if right.type == :hash
                 right.children.each do |pair|
                   pair_child = pair.children.last
-                  next unless pair_child.respond_to?(:type) && pair_child.respond_to?(:children)
+                  next unless self.ast_node?(pair_child)
                   if %i[block def defm async].include? pair_child.type
                     if @comments[pair_child]
                       (puts ''; singleton = false) if singleton
@@ -112,7 +112,7 @@ module Ruby2JS
                     end
 
                     ast.children.each do |child|
-                      walk.call(child) if child.respond_to?(:type) && child.respond_to?(:children) # Pragma: method
+                      walk.call(child) if self.ast_node?(child) # Pragma: method
                     end
                   end
                   walk.call(right) # Pragma: method

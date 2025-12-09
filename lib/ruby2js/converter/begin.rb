@@ -48,7 +48,7 @@ module Ruby2JS
               node_comments = @comments[node]
               if node_comments && !node_comments.empty?
                 node.children[1].values.first.each do |key, value|
-                  if [:get, :set].include?(key) && value.respond_to?(:type) && value.respond_to?(:children)
+                  if [:get, :set].include?(key) && self.ast_node?(value)
                     @comments[value] = @comments[node]
                     break
                   end
