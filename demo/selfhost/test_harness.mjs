@@ -202,6 +202,11 @@ Ruby2JS.convert = function(source, opts = {}) {
     // Set up namespace for class/module tracking
     converter.namespace = new Namespace();
 
+    // Enable vertical whitespace if source has newlines (matches Ruby2JS.convert)
+    if (source.includes("\n")) {
+      converter.enable_vertical_whitespace;
+    }
+
     // convert is a getter (no-arg method becomes getter in ES6 class)
     converter.convert;
 

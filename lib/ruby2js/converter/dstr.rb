@@ -28,7 +28,7 @@ module Ruby2JS
             gsub('${', '$\{').gsub('`', '\\\`')
           str = str.gsub(/\\"/, '"') unless str.include? '\\\\'
           if heredoc
-            put! str.gsub("\\n", "\n")
+            put_raw str.gsub("\\n", "\n")
           else
             put str
           end

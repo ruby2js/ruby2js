@@ -644,7 +644,9 @@ module Ruby2JS
         elsif method == :index and parens_or_included?(node, method)
           process node.updated(nil, [target, :indexOf, *args])
 
-        elsif method == :rindex and parens_or_included?(node, method)
+        elsif method == :rindex and parens_or_included?(node, method) and
+            args.none? { |arg| arg.type == :block_pass }
+          # Only convert to lastIndexOf when no block - with block, keep rindex
           process node.updated(nil, [target, :lastIndexOf, *args])
 
         elsif method == :class and args.length==0 and not node.is_method?

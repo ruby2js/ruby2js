@@ -48,7 +48,13 @@ module Ruby2JS
     end
 
     def at(index)
-      @string[index]
+      # Handle negative indices for JS compatibility
+      # In JS, string[negativeIndex] returns undefined, but at(negative) works
+      if index < 0
+        @string[index + @string.length]
+      else
+        @string[index]
+      end
     end
 
     # Method for JavaScript compatibility (used by selfhost transpilation)
@@ -169,8 +175,14 @@ module Ruby2JS
       @tokens.all? { |token| token.empty? }
     end
 
+    # Duplicate method for selfhost: _empty avoids functions filter's empty? -> length==0 transform
+    def _empty
+      @tokens.all? { |token| token.empty? }
+    end
+
     def to_s
-      if empty?
+      # Use self._empty (no parens -> getter in JS) to avoid functions filter
+      if self._empty
         ''
       elsif ['case ', 'default:'].include?(@tokens[0].to_s)
         ' ' * ([0, indent - 2].max) + join()
@@ -243,7 +255,7 @@ module Ruby2JS
       lines.each do |line|
         first = line.find { |token| !token.empty? }
         if first
-          last = line[line.rindex { |token| !token.empty? }]
+          last = line.at(line.rindex { |token| !token.empty? })
           if (first.start_with?('<') && line.include?('>')) ||
              (last.end_with?('>') && line.include?('<'))
             node = line.join[/.*?(<.*)/, 1]
@@ -305,7 +317,8 @@ module Ruby2JS
     end
 
     # add a single token to the current line without checking for newline
-    def put!(string)
+    # Named put_raw to avoid conflict with put (put! -> put in JS)
+    def put_raw(string)
       @line << Token.new(string.gsub("\r", "\n"), @ast) # Pragma: array
     end
 
