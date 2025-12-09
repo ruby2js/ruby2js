@@ -58,9 +58,11 @@ module Ruby2JS
       elsif \
         call.children[0] == nil and call.children[1] == :function and
         call.children[2..-1].all? do |child|
+          # In Ruby, method names are Symbols. In JS (selfhosted), they're strings.
+          # Using respond_to? pattern to work in both: check it's not a complex node
           child.type == :lvar or (child.type == :send and
-            child.children.length == 2 and child.children[0] == nil and 
-            child.children[1].is_a?(Symbol))
+            child.children.length == 2 and child.children[0] == nil and
+            !child.children[1].respond_to?(:type))
         end
       then
         # accommodate javascript style syntax: convert function blocks with

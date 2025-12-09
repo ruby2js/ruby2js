@@ -86,17 +86,19 @@ module Ruby2JS
     end
 
     # Visit a pattern node (produces match_var instead of lvasgn for variables)
+    # Note: Uses if/elsif instead of case/when for JS compatibility
+    # (Ruby's case/when uses === which checks class membership, but JS switch
+    # uses === for strict equality which doesn't work for instanceof checks)
     def visit_pattern(node)
-      case node
-      when Prism::LocalVariableTargetNode
+      if node.is_a?(Prism::LocalVariableTargetNode)
         s(:match_var, node.name)
-      when Prism::HashPatternNode
+      elsif node.is_a?(Prism::HashPatternNode)
         visit_hash_pattern_node(node)
-      when Prism::ArrayPatternNode
+      elsif node.is_a?(Prism::ArrayPatternNode)
         visit_array_pattern_node(node)
-      when Prism::PinnedVariableNode
+      elsif node.is_a?(Prism::PinnedVariableNode)
         sl(node, :pin, visit(node.variable))
-      when Prism::PinnedExpressionNode
+      elsif node.is_a?(Prism::PinnedExpressionNode)
         sl(node, :pin, visit(node.expression))
       else
         # For other node types, use regular visit

@@ -293,7 +293,7 @@ describe Ruby2JS do
     
     it "should parse complex nested expressions with method calls and variables" do
       exp = 'a = 5; 1 + (a + (1 + a * (b() - d())))'
-      to_js( exp ).must_equal "let " << exp
+      to_js( exp ).must_equal "let " + exp
     end
     
     it "should parse nested sender" do
@@ -1251,14 +1251,17 @@ describe Ruby2JS do
 
   describe 'execution' do
     it "should handle tic marks" do
+      skip() if defined? Function  # JS doesn't have Ruby's binding
       to_js( '`1+2`', binding: binding ).must_equal '3'
     end
 
     it "should handle execute strings" do
+      skip() if defined? Function  # JS doesn't have Ruby's binding
       to_js( '%x(3*4)', binding: binding ).must_equal '12'
     end
 
     it "should evaluate variables using the binding" do
+      skip() if defined? Function  # JS doesn't have Ruby's binding
       foo = "console.log('hi there')"
       to_js( '%x(foo)', binding: binding ).must_equal foo
     end
@@ -1266,6 +1269,7 @@ describe Ruby2JS do
 
   describe 'ivars' do
     it "should handle ivars" do
+      skip() if defined? Function  # JS doesn't support ivars option
       to_js( '@x', ivars: {:@x => {a:1}} ).must_equal '{a: 1}'
       to_js( '@x', ivars: {:@x => %w{a b c}} ).must_equal '["a", "b", "c"]'
       to_js( '@x', ivars: {:@x => 5.1} ).must_equal '5.1'
