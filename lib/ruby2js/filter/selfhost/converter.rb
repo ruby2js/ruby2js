@@ -104,6 +104,23 @@ module Ruby2JS
             end
           end
 
+          # Transform respond_to?(:type) to safe in-check with typeof guard
+          # Ruby's respond_to? becomes 'prop in obj' which throws on primitives/null
+          # Transform to: typeof obj === 'object' && obj !== null && 'prop' in obj
+          if method_name == :respond_to? && args.length >= 1 && target
+            prop = args[0]
+            # Create: typeof(target) === 'object' && target !== null && prop in target
+            type_check = s(:send,
+              s(:send, nil, :typeof, target),
+              :===,
+              s(:str, 'object')
+            )
+            null_check = s(:send, target, :'!=', s(:nil))
+            in_check = s(:in?, prop, target)
+
+            return process s(:and, s(:and, type_check, null_check), in_check)
+          end
+
           # Check for: method("on_#{name}")
           if target.nil? && method_name == :method && args.length == 1
             arg = args[0]
