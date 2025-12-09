@@ -226,10 +226,11 @@ module Ruby2JS
     def comments(ast)
       comment_list, comment_key = find_comment_entry(ast)
 
-      if ast.loc and ast.loc.respond_to? :expression
+      if ast.loc and ast.loc.respond_to?(:expression) and ast.loc.expression
         expression = ast.loc.expression
 
         list = comment_list.select do |comment|
+          next false unless comment.loc and comment.loc.respond_to?(:expression) and comment.loc.expression
           expression.source_buffer == comment.loc.expression.source_buffer and
           comment.loc.expression.begin_pos < expression.end_pos
         end

@@ -161,18 +161,74 @@ task :clobber => :clean do
   rm_rf "#{root}/demo/selfhost/dist"
 end
 
-# Selfhost demo - copy browser demo (stub for now, full implementation pending)
+desc "Install all dependencies (Ruby gems, Node packages, selfhost)"
+task :install do
+  sh "bundle install"
+  sh "yarn install"
+  Dir.chdir("#{root}/demo/selfhost") do
+    sh "npm install"
+  end
+end
+
+# Selfhost demo - builds and copies the self-hosted converter demo
 selfhost_dir = "#{dest}/selfhost"
 selfhost_source = "#{root}/demo/selfhost"
+selfhost_dist = "#{selfhost_dir}/dist"
 
 directory dest
 directory selfhost_dir => dest
+directory selfhost_dist => selfhost_dir
 
+# Build transpiled files in demo/selfhost
+selfhost_walker_deps = Rake::FileList.new("#{root}/lib/ruby2js/node.rb", "#{root}/lib/ruby2js/prism_walker.rb")
+selfhost_converter_deps = Rake::FileList.new("#{root}/lib/ruby2js/converter.rb", "#{root}/lib/ruby2js/converter/*.rb", "#{root}/lib/ruby2js/serializer.rb")
+
+file "#{selfhost_source}/dist/walker.mjs" => selfhost_walker_deps do
+  Dir.chdir(selfhost_source) do
+    sh "npm run build:walker"
+  end
+end
+
+file "#{selfhost_source}/dist/converter.mjs" => selfhost_converter_deps do
+  Dir.chdir(selfhost_source) do
+    sh "npm run build:converter"
+  end
+end
+
+# Copy dist files to docs
+file "#{selfhost_dist}/walker.mjs" => [selfhost_dist, "#{selfhost_source}/dist/walker.mjs"] do
+  cp "#{selfhost_source}/dist/walker.mjs", "#{selfhost_dist}/walker.mjs"
+end
+
+file "#{selfhost_dist}/converter.mjs" => [selfhost_dist, "#{selfhost_source}/dist/converter.mjs"] do
+  cp "#{selfhost_source}/dist/converter.mjs", "#{selfhost_dist}/converter.mjs"
+end
+
+# Copy @ruby/prism module (needed for browser)
+prism_dir = "#{selfhost_dir}/node_modules/@ruby/prism"
+directory "#{selfhost_dir}/node_modules/@ruby" => selfhost_dir
+
+file prism_dir => ["#{selfhost_dir}/node_modules/@ruby"] do
+  cp_r "#{selfhost_source}/node_modules/@ruby/prism", prism_dir
+end
+
+# Copy browser demo as index.html
 file "#{selfhost_dir}/index.html" => [selfhost_dir, "#{selfhost_source}/browser_demo.html"] do
   cp "#{selfhost_source}/browser_demo.html", "#{selfhost_dir}/index.html"
 end
 
-task :selfhost => ["#{selfhost_dir}/index.html"]
+# Copy browser-compatible Prism loader
+file "#{selfhost_dir}/prism_browser.mjs" => [selfhost_dir, "#{selfhost_source}/prism_browser.mjs"] do
+  cp "#{selfhost_source}/prism_browser.mjs", "#{selfhost_dir}/prism_browser.mjs"
+end
+
+task :selfhost => [
+  "#{selfhost_dir}/index.html",
+  "#{selfhost_dir}/prism_browser.mjs",
+  "#{selfhost_dist}/walker.mjs",
+  "#{selfhost_dist}/converter.mjs",
+  prism_dir
+]
 
 task :default => [
   "#{dest}/index.erb",

@@ -170,6 +170,15 @@
       background: var(--js-bg);
     }
 
+    .panel-title {
+      margin: 0;
+      padding: 0.75rem 1rem;
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--primary);
+      border-bottom: 1px solid rgba(0,0,0,0.1);
+    }
+
     textarea {
       width: 100%;
       height: 300px;
@@ -277,31 +286,41 @@
 
   <main>
     <div class="container">
-      <h1 class="title">Ruby</h1>
-
       <div class="editor-container">
         <div class="editor-panel ruby">
+          <h2 class="panel-title">Ruby</h2>
           <textarea id="input" placeholder="Enter Ruby code..."># Self-hosted Ruby2JS demo
 # Runs entirely in the browser!
 
-x = 42
-name = "hello"
+class Greeter
+  def initialize(name)
+    @name = name
+  end
 
-if true
-  result = 1
-else
-  result = 2
+  def greet
+    "Hello, #{@name}!"
+  end
 end
+
+greeter = Greeter.new("World")
+puts greeter.greet
+
+# Arrays and hashes
+items = [1, 2, 3]
+doubled = items.map { |x| x * 2 }
 
 options = {a: 1, b: 2}
 
-def greet
-  "hello"
+# Control flow
+if doubled.length > 0
+  result = "found items"
+else
+  result = "empty"
 end</textarea>
         </div>
 
         <div class="editor-panel js">
-          <h2 class="title" style="padding: 0.75rem 1rem 0; margin: 0;">JavaScript</h2>
+          <h2 class="panel-title">JavaScript</h2>
           <textarea id="output" readonly placeholder="JavaScript will appear here..."></textarea>
         </div>
       </div>
@@ -314,11 +333,10 @@ end</textarea>
         <strong>Self-Hosted Demo:</strong> This demo runs Ruby2JS entirely in the browser using
         <code>@ruby/prism</code> (WebAssembly) for parsing and the Ruby2JS converter transpiled to JavaScript.
         <br><br>
-        <strong>Supported:</strong> Literals, variables, arrays, hashes, <code>if</code>/<code>else</code>,
-        <code>def</code>, operators, and more.
+        <strong>Supported:</strong> Classes, methods, blocks, string interpolation, arrays, hashes,
+        <code>if</code>/<code>else</code>/<code>case</code>, loops, operators, and 90% of the transliteration test suite.
         <br><br>
-        <strong>Note:</strong> This is an early self-hosted version (~2.9MB vs 24MB with Opal).
-        Some features are still being implemented.
+        <strong>Size:</strong> ~2.5MB total (prism.wasm + walker + converter) vs ~24MB with Opal.
       </div>
     </div>
   </main>
@@ -335,27 +353,307 @@ end</textarea>
   </footer>
 
   <script type="module">
-    // Self-hosted demo - work in progress
-    // The walker has been transpiled, converter transpilation is pending
+    // Self-hosted Ruby2JS demo
+    // Uses @ruby/prism for parsing and the transpiled Ruby2JS converter
+
+    import * as Prism from './prism_browser.mjs';
+
+    // Set up Prism global before importing walker
+    globalThis.Prism = Prism;
+
+    // PrismSourceBuffer - provides source buffer for location tracking
+    class PrismSourceBuffer {
+      constructor(source, file) {
+        this.source = source;
+        this.name = file || '(eval)';
+        this._lineOffsets = [0];
+        for (let i = 0; i < source.length; i++) {
+          if (source[i] === '\n') {
+            this._lineOffsets.push(i + 1);
+          }
+        }
+      }
+
+      lineForPosition(pos) {
+        let idx = this._lineOffsets.findIndex(offset => offset > pos);
+        return idx === -1 ? this._lineOffsets.length : idx;
+      }
+
+      columnForPosition(pos) {
+        let lineIdx = this._lineOffsets.findIndex(offset => offset > pos);
+        if (lineIdx === -1) lineIdx = this._lineOffsets.length;
+        return pos - this._lineOffsets[lineIdx - 1];
+      }
+    }
+    globalThis.PrismSourceBuffer = PrismSourceBuffer;
+
+    // PrismSourceRange - provides source range for location tracking
+    class PrismSourceRange {
+      constructor(sourceBuffer, beginPos, endPos) {
+        this.source_buffer = sourceBuffer;
+        this.begin_pos = beginPos;
+        this.end_pos = endPos;
+      }
+
+      get source() {
+        return this.source_buffer.source.slice(this.begin_pos, this.end_pos);
+      }
+
+      get line() {
+        return this.source_buffer.lineForPosition(this.begin_pos);
+      }
+
+      get column() {
+        return this.source_buffer.columnForPosition(this.begin_pos);
+      }
+    }
+    globalThis.PrismSourceRange = PrismSourceRange;
+
+    // Ruby polyfills needed by transpiled code
+    if (!Array.prototype.rindex) {
+      Array.prototype.rindex = function(fn) {
+        for (let i = this.length - 1; i >= 0; i--) {
+          if (fn(this[i])) return i;
+        }
+        return null;
+      };
+    }
+
+    Object.defineProperty(Array.prototype, 'compact', {
+      get: function() {
+        for (let i = this.length - 1; i >= 0; i--) {
+          if (this[i] === null || this[i] === undefined) {
+            this.splice(i, 1);
+          }
+        }
+        return this;
+      },
+      configurable: true
+    });
+
+    // Ruby's Array#first - get first element
+    Object.defineProperty(Array.prototype, 'first', {
+      get() {
+        return this[0];
+      },
+      configurable: true
+    });
+
+    // Ruby's Array#last - get last element
+    Object.defineProperty(Array.prototype, 'last', {
+      get() {
+        return this.at(-1);
+      },
+      configurable: true
+    });
+
+    if (!Array.prototype.insert) {
+      Array.prototype.insert = function(index, ...items) {
+        this.splice(index, 0, ...items);
+        return this;
+      };
+    }
+
+    if (!Array.prototype.delete_at) {
+      Array.prototype.delete_at = function(index) {
+        if (index < 0) index = this.length + index;
+        if (index < 0 || index >= this.length) return undefined;
+        return this.splice(index, 1)[0];
+      };
+    }
+
+    if (!String.prototype.chomp) {
+      String.prototype.chomp = function(suffix) {
+        if (suffix === undefined) {
+          return this.replace(/\r?\n$/, '');
+        }
+        if (this.endsWith(suffix)) {
+          return this.slice(0, this.length - suffix.length);
+        }
+        return String(this);
+      };
+    }
+
+    if (!String.prototype.count) {
+      String.prototype.count = function(chars) {
+        let count = 0;
+        for (const c of this) {
+          if (chars.includes(c)) count++;
+        }
+        return count;
+      };
+    }
+
+    if (!Object.prototype.to_a) {
+      Object.defineProperty(Object.prototype, 'to_a', {
+        get: function() {
+          return Object.entries(this);
+        },
+        configurable: true
+      });
+    }
+
+    // Namespace class for class/module tracking
+    // Matches lib/ruby2js/namespace.rb
+    class Namespace {
+      constructor() {
+        this._active = []; // current scope
+        this._seen = new Map(); // history of all definitions seen previously
+      }
+
+      // Helper to get map key from array
+      _key(arr) {
+        return JSON.stringify(arr);
+      }
+
+      // convert an AST name which is represented as a set of nested
+      // s(:const, ...) into an array of symbols that represent the relative path.
+      resolve(token, result = []) {
+        if (!token || token.type !== 'const') return [];
+        this.resolve(token.children[0], result);
+        result.push(token.children[1]);
+        return result;
+      }
+
+      // return the active scope as a flat array
+      get active() {
+        return this._active.flat().filter(x => x != null);
+      }
+
+      // enter a new scope
+      enter(name) {
+        this._active.push(this.resolve(name));
+        const key = this._key(this.active);
+        const previous = this._seen.get(key);
+        if (!this._seen.has(key)) {
+          this._seen.set(key, {});
+        }
+        return previous;
+      }
+
+      // return the set of known properties for either the current scope or a named subscope
+      getOwnProps(name = null) {
+        const key = this._key([...this.active, ...this.resolve(name)]);
+        const props = this._seen.get(key);
+        return props ? {...props} : {};
+      }
+
+      // add new props to the current scope
+      defineProps(props, namespace = null) {
+        const key = this._key(namespace || this.active);
+        if (!this._seen.has(key)) {
+          this._seen.set(key, {});
+        }
+        Object.assign(this._seen.get(key), props || {});
+      }
+
+      // find a named scope which may be relative to any point in the ancestry
+      find(name) {
+        const resolved = this.resolve(name);
+        const prefix = [...this.active];
+        while (prefix.length > 0) {
+          prefix.pop();
+          const key = this._key([...prefix, ...resolved]);
+          const result = this._seen.get(key);
+          if (result) return result;
+        }
+        // Check at root level
+        const rootKey = this._key(resolved);
+        return this._seen.get(rootKey) || {};
+      }
+
+      // leave a given scope
+      leave() {
+        this._active.pop();
+      }
+    }
+    globalThis.Namespace = Namespace;
 
     // Initialize
     const input = document.getElementById('input');
     const output = document.getElementById('output');
     const status = document.getElementById('status');
 
+    let prismParse = null;
+    let WalkerModule = null;
+    let ConverterModule = null;
+
     async function init() {
-      status.className = 'warning';
-      status.textContent = 'Work in progress - converter transpilation pending';
-      output.value = '// Self-hosted demo is under development\n// Walker transpilation: complete\n// Converter transpilation: pending';
+      try {
+        // Load Prism WASM
+        status.textContent = 'Loading Prism WebAssembly...';
+        prismParse = await Prism.loadPrism();
+
+        // Load walker module
+        status.textContent = 'Loading walker...';
+        const walkerImport = await import('./dist/walker.mjs');
+        WalkerModule = walkerImport.Ruby2JS;
+
+        // Set up Ruby2JS.Node before loading converter
+        globalThis.Ruby2JS = {
+          Node: WalkerModule.Node,
+          ast_node(obj) {
+            return typeof obj === 'object' && obj !== null && 'type' in obj && 'children' in obj;
+          }
+        };
+
+        // Load converter module
+        status.textContent = 'Loading converter...';
+        const converterImport = await import('./dist/converter.mjs');
+        ConverterModule = converterImport.Ruby2JS;
+
+        status.className = 'success';
+        status.textContent = 'Ready! Edit the Ruby code to see the JavaScript output.';
+
+        // Initial conversion
+        convert();
+      } catch (e) {
+        status.className = 'error';
+        status.textContent = `Error loading: ${e.message}`;
+        console.error(e);
+      }
     }
 
     function convert() {
-      output.value = '// Self-hosted demo is under development\n// Walker transpilation: complete\n// Converter transpilation: pending\n\n// Your Ruby code:\n' + input.value.split('\n').map(l => '// ' + l).join('\n');
+      if (!prismParse || !WalkerModule || !ConverterModule) {
+        return;
+      }
+
+      const source = input.value;
+
+      try {
+        // Parse with Prism
+        const parseResult = prismParse(source);
+
+        // Walk to create Parser-compatible AST
+        const walker = new WalkerModule.PrismWalker(source, null);
+        const ast = walker.visit(parseResult.value);
+
+        // Create converter
+        const converter = new ConverterModule.Converter(ast, {}, {});
+        converter.namespace = new Namespace();
+
+        // Enable vertical whitespace if source has newlines
+        if (source.includes("\n")) {
+          converter.enable_vertical_whitespace;
+        }
+
+        // Convert (getter)
+        converter.convert;
+
+        // Get output (to_s is a getter)
+        output.value = converter.to_s;
+      } catch (e) {
+        output.value = `// Error: ${e.message}\n// ${e.stack?.split('\n').slice(0,3).join('\n// ')}`;
+        console.error(e);
+      }
     }
 
     // Debounced conversion on input
+    let debounceTimer;
     input.addEventListener('input', () => {
-      convert();
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(convert, 150);
     });
 
     init();

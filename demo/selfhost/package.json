@@ -8,9 +8,10 @@
     "build:walker": "bundle exec ruby scripts/transpile_walker.rb > dist/walker.mjs",
     "build:converter": "bundle exec ruby scripts/transpile_converter.rb > dist/converter.mjs",
     "build:spec": "bundle exec ruby scripts/transpile_spec.rb ../../spec/transliteration_spec.rb > dist/transliteration_spec.mjs",
-    "test": "npm run test:walker && npm run test:spec",
+    "test": "npm run test:walker && npm run test:all-specs",
     "test:walker": "node test_walker.mjs",
     "test:spec": "node run_spec.mjs",
+    "test:all-specs": "node run_all_specs.mjs",
     "clean": "rm -rf dist"
   },
   "keywords": ["ruby", "javascript", "transpiler"],

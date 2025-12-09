@@ -85,6 +85,24 @@ Object.defineProperty(Array.prototype, 'compact', {
   configurable: true
 });
 
+// Ruby's Array#first - get first element
+// Added as getter to match Ruby semantics (arr.first not arr.first())
+Object.defineProperty(Array.prototype, 'first', {
+  get() {
+    return this[0];
+  },
+  configurable: true
+});
+
+// Ruby's Array#last - get last element
+// Added as getter to match Ruby semantics (arr.last not arr.last())
+Object.defineProperty(Array.prototype, 'last', {
+  get() {
+    return this.at(-1);
+  },
+  configurable: true
+});
+
 // Ruby's Array#insert(index, items...) - insert items at index
 // Returns the array for chaining
 if (!Array.prototype.insert) {
@@ -164,6 +182,10 @@ globalThis.Ruby2JS = {
 // Now import converter (needs Ruby2JS.Node to be available)
 const { Ruby2JS: ConverterModule } = await import('./dist/converter.mjs');
 
+// Expose Serializer and Converter for specs that test them directly
+Ruby2JS.Serializer = ConverterModule.Serializer;
+Ruby2JS.Converter = ConverterModule.Converter;
+
 // Since Prism.loadPrism() is async, we need to initialize it
 let prismParse = null;
 
@@ -242,9 +264,15 @@ let failCount = 0;
 let skipCount = 0;
 let failures = [];
 
+// Store before hooks per describe level
+let beforeHooks = [];
+
 export function describe(name, fn) {
   currentDescribe.push(typeof name === 'function' ? name.name : name);
+  const prevBeforeHooksLength = beforeHooks.length;
   fn();
+  // Remove any before hooks added at this level
+  beforeHooks.length = prevBeforeHooksLength;
   currentDescribe.pop();
 }
 
@@ -252,6 +280,10 @@ export function it(name, fn) {
   testCount++;
   const fullName = [...currentDescribe, name].join(' > ');
   try {
+    // Run all before hooks first
+    for (const hook of beforeHooks) {
+      hook();
+    }
     fn();
     passCount++;
   } catch (e) {
@@ -269,11 +301,9 @@ export function skip(reason) {
   throw new Error('SKIP');
 }
 
-// before/after hooks (simplified - just run them)
-let beforeEachFn = null;
+// before hooks - store to run before each test
 export function before(fn) {
-  // For now, just execute it once
-  fn();
+  beforeHooks.push(fn);
 }
 
 // Ruby Hash class placeholder - Hash === x patterns in Ruby source have been

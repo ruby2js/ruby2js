@@ -1,6 +1,6 @@
 # Pragma-Based Self-Hosting Plan
 
-## Status: Phase 4 In Progress (Spec Integration)
+## Status: Phase 6 Complete (CI Integration)
 
 This document describes the pragma-based approach to self-hosting Ruby2JS.
 
@@ -188,6 +188,9 @@ Running the transpiled converter against the transliteration test suite.
 15. Token character access - Changed `first[0]` to `first.at(0)` for JS compatibility
 16. Functions filter method reference bug - Added `_comment`/`_empty` aliases
 
+**Known limitations:**
+- Comments are not yet preserved in output (needs `associate_comments` implementation in JS)
+
 **Skipped tests (6 issues, 12 tests):**
 Tests are skipped using `skip() if defined? Function` pattern which activates in JS but not Ruby.
 
@@ -206,11 +209,34 @@ Tests are skipped using `skip() if defined? Function` pattern which activates in
 - `demo/selfhost/test_serializer.mjs` - Isolated serializer tests
 - See CLAUDE.md for detailed usage
 
-### Phase 6: Integration (FUTURE)
+### Phase 5: Browser Demo (COMPLETE)
 
-1. Create browser demo with full converter
-2. Document the self-hosting approach
-3. Size comparison with Opal-based demo
+The browser demo is now functional:
+- `browser_demo.html` - Full converter demo running in browser
+- `prism_browser.mjs` - Browser-compatible WASI polyfill for @ruby/prism
+- Uses Prism WASM for parsing + transpiled walker + converter
+
+### Phase 6: CI Integration (COMPLETE)
+
+Comprehensive spec runner infrastructure:
+- `spec_manifest.json` - Manifest tracking spec readiness
+- `run_all_specs.mjs` - Manifest-driven spec runner
+- Three spec categories:
+  - **ready**: Must pass (CI fails if they don't)
+  - **partial**: Run but don't fail CI (informational)
+  - **blocked**: Skipped with documented reasons
+
+**Current spec coverage:**
+- Ready: transliteration_spec (225 passed, 12 skipped)
+- Partial: serializer_spec (6 passed, 20 failed - needs polyfills)
+- Blocked: 24 specs (need filters support)
+
+### Future Work
+
+1. Transpile filters to JavaScript (biggest blocker for most specs)
+2. Implement `associate_comments` in JavaScript for comment preservation
+3. Fix remaining serializer spec failures
+4. Move specs from blocked → partial → ready as dependencies are met
 
 ## Success Criteria
 

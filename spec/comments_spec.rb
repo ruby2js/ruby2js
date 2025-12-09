@@ -159,5 +159,16 @@ describe Ruby2JS::Filter::Functions do
 
       js.must_equal "//\n///* comment */\n//\nlet statement"
     end
+
+    it "should handle comment before class" do
+      js = to_js %{
+        # comment before class
+        class Greeter
+        end
+      }
+
+      js.must_include "// comment before class"
+      js.must_include "class Greeter"
+    end
   end
 end

@@ -2,7 +2,7 @@
 
 This directory contains a proof-of-concept demonstrating Ruby2JS running entirely in JavaScript, using the actual Ruby2JS converter transpiled from Ruby source.
 
-## Status: Phase 4 Complete (Spec Integration)
+## Status: Phase 6 Complete (CI Integration)
 
 See `plans/PRAGMA_SELFHOST.md` for the full roadmap.
 
@@ -10,8 +10,8 @@ See `plans/PRAGMA_SELFHOST.md` for the full roadmap.
 - [x] Phase 2: Walker transpilation (prism_walker.rb → JavaScript)
 - [x] Phase 3: Converter transpilation (converter.rb + 60 handlers → JavaScript)
 - [x] Phase 4: Spec integration and debugging (225/249 passing, 12 skipped)
-- [ ] Phase 5: Spec transpilation
-- [ ] Phase 6: Browser demo integration
+- [x] Phase 5: Browser demo (browser_demo.html with WASI polyfill)
+- [x] Phase 6: CI integration (spec manifest system)
 
 ## Architecture
 
@@ -41,6 +41,11 @@ JavaScript Output
 | `ruby2js.mjs` | CLI debugging tool for JS converter |
 | `test_harness.mjs` | Minitest-compatible test framework |
 | `test_walker.mjs` | Unit tests for PrismWalker (29 tests) |
+| `run_all_specs.mjs` | Manifest-driven spec runner for CI |
+| `run_spec.mjs` | Run a single spec file |
+| `spec_manifest.json` | Spec readiness manifest (ready/partial/blocked) |
+| `browser_demo.html` | Browser demo with WASI polyfill |
+| `prism_browser.mjs` | Browser-compatible @ruby/prism loader |
 | `scripts/transpile_converter.rb` | Build script for converter |
 | `scripts/transpile_walker.rb` | Build script for walker |
 | `scripts/transpile_spec.rb` | Build script for specs |
@@ -64,10 +69,11 @@ npm test
 
 | Script | Description |
 |--------|-------------|
-| `npm test` | Run walker unit tests + spec tests |
-| `npm run test:walker` | Run walker unit tests only (29 tests) |
-| `npm run test:spec` | Run spec tests only (249 tests) |
-| `npm run build` | Build walker and spec |
+| `npm test` | Run walker unit tests + all specs via manifest |
+| `npm run test:walker` | Run walker unit tests only (31 tests) |
+| `npm run test:spec` | Run a single spec file |
+| `npm run test:all-specs` | Run all specs via manifest |
+| `npm run build` | Build walker, converter, and spec |
 | `npm run build:converter` | Regenerate converter from Ruby source |
 | `npm run build:walker` | Regenerate walker from Ruby source |
 | `npm run build:spec` | Regenerate spec from Ruby source |
@@ -183,17 +189,64 @@ echo 'self.foo ||= 1' | node ruby2js.mjs --stdin --inspect "value.name.receiver"
 
 Compare with Ruby-side output using `bin/ruby2js --ast` and `bin/ruby2js --filtered-ast`.
 
-## Next Steps
+## Spec Manifest System
 
-### Phase 5: Spec Transpilation
-1. Extend `selfhost/spec.rb` for full Minitest support
-2. Transpile complete test suite to JavaScript
-3. Run tests in Node.js
+The `spec_manifest.json` file tracks which specs are ready to run in the selfhost environment:
 
-### Phase 6: Browser Demo
-1. Create unified module exporting `Ruby2JS.convert()`
-2. Update `browser_demo.html` to use real converter
-3. Document any remaining limitations
+```json
+{
+  "ready": ["transliteration_spec.rb"],
+  "partial": [{"spec": "serializer_spec.rb", "reason": "...", "expected_pass": 6}],
+  "blocked": {"comments_spec.rb": "needs filters", ...}
+}
+```
+
+### Categories
+
+| Category | CI Behavior | When to Use |
+|----------|-------------|-------------|
+| `ready` | Must pass (CI fails if they don't) | Fully working specs |
+| `partial` | Run but don't fail CI | Specs that partially work |
+| `blocked` | Skipped with explanation | Specs waiting on dependencies |
+
+### Current Status
+
+- **Ready**: `transliteration_spec.rb` (225 passed, 12 skipped)
+- **Partial**: `serializer_spec.rb` (6 passed, 20 failed - needs polyfills)
+- **Blocked**: 24 specs (waiting on filters to be transpiled)
+
+### Adding New Specs
+
+1. Add to `blocked` with reason explaining what's needed
+2. When partially working, move to `partial` with `expected_pass` count
+3. When fully working, move to `ready`
+
+## Browser Demo
+
+The `browser_demo.html` file demonstrates Ruby2JS running entirely in the browser:
+
+- Uses `prism_browser.mjs` - WASI polyfill for @ruby/prism WebAssembly
+- Loads transpiled walker and converter
+- Provides interactive Ruby → JavaScript conversion
+
+To run locally:
+```bash
+# Start a local server
+python3 -m http.server 8080
+# Open http://localhost:8080/browser_demo.html
+```
+
+## Known Limitations
+
+- **Comments not preserved**: Ruby comments are not yet included in JavaScript output. Requires implementing `associate_comments` logic in JavaScript to map Prism comments to AST nodes.
+
+## Future Work
+
+1. **Transpile filters to JavaScript** (biggest blocker for most specs)
+2. Implement `associate_comments` in JavaScript for comment preservation
+3. Fix remaining serializer spec failures
+4. Move specs from blocked → partial → ready as dependencies are met
+5. Eventually: scan spec directory like Ruby tests do
 
 ## Known Skipped Tests
 

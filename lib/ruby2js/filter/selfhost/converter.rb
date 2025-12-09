@@ -35,11 +35,15 @@ module Ruby2JS
 
         # Methods that are always method calls in Ruby, never property accesses
         # These need to be marked as :call type to ensure they get () in JS
-        # Note: .first and .last are excluded because they become getters on custom classes
         # is_method? is critical - Ruby's is_method? becomes is_method in JS, must be called with ()
         # reverse is needed because arr.reverse.each becomes for-of loop in JS
         # getOwnProps is a method on Namespace class that returns an object
         ALWAYS_METHODS = %i[pop shift is_method? reverse sort getOwnProps dup chomp].freeze
+
+        # Methods that become getters on custom classes (Line, Token)
+        # These need to be marked as :call type WITHOUT parentheses to prevent
+        # functions filter from transforming .first -> [0]
+        GETTER_METHODS = %i[first last].freeze
 
         # Instance methods defined in converter files that need `this.` prefix when called
         # without an explicit receiver. In Ruby you can call instance methods without `self.`,
@@ -74,12 +78,19 @@ module Ruby2JS
             return process node.updated(nil, [target, :join, s(:str, '')])
           end
 
-          # Force .pop, .shift, .first, .last to always be method calls
+          # Force .pop, .shift to always be method calls
           # In Ruby these are always methods; in JS they could be property access
           # Mark as :call type so converter adds parentheses
           # Don't re-process - just update the type and return (avoids infinite loop)
           if target && ALWAYS_METHODS.include?(method_name) && args.empty?
             return node.updated(:call, node.children)
+          end
+
+          # Convert .first/.last to property access (getter) instead of method call
+          # This prevents functions filter from transforming .first -> [0]
+          # The Line/Token classes define these as getters
+          if target && GETTER_METHODS.include?(method_name) && args.empty?
+            return s(:attr, process(target), method_name)
           end
 
           # Transform Ruby2JS::Node.new(...) to new globalThis.Ruby2JS.Node(...)

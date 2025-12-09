@@ -1,0 +1,39 @@
+{
+  "description": "Manifest of specs for selfhost testing",
+  "ready": [
+    "transliteration_spec.rb"
+  ],
+  "partial": [
+    {
+      "spec": "serializer_spec.rb",
+      "reason": "Some Line class methods and polyfills missing",
+      "expected_pass": 6
+    }
+  ],
+  "blocked": {
+    "comments_spec.rb": "needs filters (Ruby2JS.Filter.Functions)",
+    "functions_spec.rb": "needs filters",
+    "esm_spec.rb": "needs filters",
+    "camelcase_spec.rb": "needs filters",
+    "react_spec.rb": "needs filters",
+    "stimulus_spec.rb": "needs filters",
+    "jquery_spec.rb": "needs filters",
+    "underscore_spec.rb": "needs filters",
+    "active_functions_spec.rb": "needs filters",
+    "active_support_spec.rb": "needs filters",
+    "cjs_spec.rb": "needs filters",
+    "erb_spec.rb": "needs filters",
+    "jsx_spec.rb": "needs filters",
+    "lit_spec.rb": "needs filters",
+    "matchAll_spec.rb": "needs filters",
+    "minitest_jasmine_spec.rb": "needs filters",
+    "node_spec.rb": "needs filters",
+    "nokogiri_spec.rb": "needs filters",
+    "pragma_spec.rb": "needs filters",
+    "preact_spec.rb": "needs filters",
+    "return_spec.rb": "needs filters",
+    "securerandom_spec.rb": "needs filters",
+    "tagged_templates_spec.rb": "needs filters",
+    "vue_spec.rb": "needs filters"
+  }
+}
