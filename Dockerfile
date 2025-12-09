@@ -52,9 +52,15 @@ server {
     root /usr/share/nginx/html;
     index index.html;
 
+    # Add MIME types not in default nginx (ES modules and WebAssembly)
+    types {
+        application/javascript mjs;
+        application/wasm wasm;
+    }
+
     # Enable gzip compression
     gzip on;
-    gzip_types text/plain text/css application/json application/javascript text/xml application/xml text/javascript;
+    gzip_types text/plain text/css application/json application/javascript text/xml application/xml text/javascript application/wasm;
 
     # Upgrade insecure requests - fixes mixed content when behind HTTPS proxy
     add_header Content-Security-Policy "upgrade-insecure-requests" always;
@@ -67,8 +73,8 @@ server {
         try_files $uri $uri/index.html $uri.html /index.html;
     }
 
-    # Cache static assets
-    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2)$ {
+    # Cache static assets (including ES modules and WebAssembly)
+    location ~* \.(js|mjs|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|wasm)$ {
         expires 1y;
         add_header Cache-Control "public, immutable";
     }
