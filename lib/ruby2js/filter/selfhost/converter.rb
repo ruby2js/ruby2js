@@ -45,12 +45,13 @@ module Ruby2JS
         # functions filter from transforming .first -> [0]
         GETTER_METHODS = %i[first last].freeze
 
-        # Instance methods defined in converter files that need `this.` prefix when called
-        # without an explicit receiver. In Ruby you can call instance methods without `self.`,
-        # but in JavaScript you need `this.` to call instance methods.
+        # Instance methods that need `this.` prefix when called without an explicit receiver.
+        # Even with combiner merging class definitions, methods called BEFORE they are
+        # defined in the merged body won't get `this.` added (converter does single forward pass).
+        # The require order in converter.rb is alphabetical, so calls in earlier files
+        # (e.g., if.rb) to methods defined in later files (e.g., logical.rb) need this.
         CONVERTER_INSTANCE_METHODS = %i[
-          boolean_expression? collapse_strings combine_properties conditionally_equals
-          hoist? number_format parse_condition range_to_array rewrite transform_defs
+          boolean_expression? hoist?
         ].freeze
 
         # Transform method("on_#{name}") to use cleaned name without ? or !
@@ -66,8 +67,8 @@ module Ruby2JS
             return process node.updated(nil, [s(:self), method_name, *args])
           end
 
-          # Convert unqualified calls to converter instance methods to `self.methodName()`
-          # Ruby allows calling instance methods without `self.`, JS requires `this.`
+          # Convert unqualified calls to instance methods to `self.methodName()`
+          # for methods that are called before they're defined in the merged body
           if target.nil? && CONVERTER_INSTANCE_METHODS.include?(method_name)
             return process node.updated(nil, [s(:self), method_name, *args])
           end
