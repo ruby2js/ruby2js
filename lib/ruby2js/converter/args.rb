@@ -28,7 +28,13 @@ module Ruby2JS
             put jsvar(kw.children.first)
           elsif kw.type == :kwoptarg
             put jsvar(kw.children.first)
-            unless kw.children.last == s(:send, nil, :undefined)
+            # Check if default is `undefined` - skip '=' if so (JS default behavior)
+            # Using element-wise comparison for selfhost JS compatibility
+            default_val = kw.children.last
+            is_undefined = default_val.type == :send &&
+                           default_val.children[0] == nil &&
+                           default_val.children[1] == :undefined
+            unless is_undefined
               put '='; parse kw.children.last
             end
           elsif kw.type == :kwrestarg
