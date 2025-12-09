@@ -13,10 +13,12 @@ Ruby2JS provides quite a few options to help you configure your transpilation pr
 
 Starting with Ruby2JS 5.1, we've created a single "preset" configuration option which provides you with a sane set of modern conversion defaults. This includes:
 
-* The [Functions](/docs/filters/functions), [ESM](/docs/filters/esm), and [Return](/docs/filters/return) filters
+* The [Functions](/docs/filters/functions), [ESM](/docs/filters/esm), [Pragma](/docs/filters/pragma), and [Return](/docs/filters/return) filters
 * ES2022 support (private fields, `at()` method, static class fields)
 * Underscored fields for ivars (`@ivar` becomes `this._ivar`)
 * Identity comparison (`==` becomes `===`)
+
+If you're not sure where to start, **use the preset**. It provides sensible defaults that work well for most projects, and you can always fine-tune individual options later as needed.
 
 You can pass `preset: true` as an option to the Ruby2JS API or `--preset` via the CLI. In addition, you can set it in your configuration file should you choose to have one.
 

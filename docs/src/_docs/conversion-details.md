@@ -60,6 +60,10 @@ Ruby2JS takes a different approach: it performs **static transformations** at bu
 
 ### Choose Your Level of Ruby Compatibility
 
+{% rendercontent "docs/note", title: "Start with the Preset" %}
+If you're not sure which options to choose, start with `preset: true` (or the `# ruby2js: preset` magic comment). The preset provides sensible defaults including the most commonly used filters, ES2022 support, and identity comparison. You can always fine-tune individual settings later. See [Preset Configuration](/docs/options#preset-configuration) for details.
+{% endrendercontent %}
+
 By default, Ruby2JS accepts JavaScript semantics rather than fighting them:
 
 ```ruby

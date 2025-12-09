@@ -5,7 +5,7 @@
 
 module Ruby2JS
   module Filter
-    PRESET_FILTERS = [:esm, :functions, :return]
+    PRESET_FILTERS = [:esm, :functions, :pragma, :return]
 
     def self.registered_filters
       @@registered_filters ||= {}

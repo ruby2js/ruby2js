@@ -1,5 +1,5 @@
 ---
-order: 14
+order: 15
 title: Functions
 top_section: Filters
 category: functions
@@ -45,6 +45,7 @@ If you set the `eslevel` option to `2015` or newer, the Functions filter enables
 * `.include?` {{ caret }} `.indexOf() != -1`
 * `.index` {{ caret }} `indexOf` (when using arg) or `findIndex` (when using block)
 * `.inspect` {{ caret }} `JSON.stringify()`
+* `.join` {{ caret }} `.join('')` (Ruby defaults to `""`, JS to `","`)
 * `.keys()` {{ caret }} `Object.keys()`
 * `.last` {{ caret }} `[*.length-1]`
 * `.last(n)` {{ caret }} `.slice(*.length-1, *.length)`

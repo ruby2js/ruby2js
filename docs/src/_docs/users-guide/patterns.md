@@ -410,12 +410,13 @@ For dual-target code, we recommend:
 # ruby2js: preset
 
 # Or explicitly:
-# ruby2js: filters: functions, esm, return
+# ruby2js: filters: functions, esm, pragma, return
 ```
 
 The `preset` mode enables:
 - **functions** - Ruby method → JS method mappings
 - **esm** - ES module imports/exports
+- **pragma** - Line-level control via comments (e.g., `# Pragma: ??` for nullish coalescing)
 - **return** - Implicit returns in methods
 - ES2022 features
 - Identity comparison (`==` → `===`)
