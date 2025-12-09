@@ -94,6 +94,15 @@ if (!Array.prototype.insert) {
   };
 }
 
+// Ruby's Array#delete_at(index) - remove element at index, return it
+if (!Array.prototype.delete_at) {
+  Array.prototype.delete_at = function(index) {
+    if (index < 0) index = this.length + index;
+    if (index < 0 || index >= this.length) return undefined;
+    return this.splice(index, 1)[0];
+  };
+}
+
 // Ruby's String#chomp(suffix) - remove suffix from end of string
 // Without argument, removes trailing newline. With argument, removes that suffix.
 if (!String.prototype.chomp) {

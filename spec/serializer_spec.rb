@@ -137,6 +137,109 @@ describe 'serializer tests' do
     end
   end
 
+  describe 'reindent' do
+    it 'should indent content inside braces' do
+      @serializer.puts '{'
+      @serializer.puts 'content'
+      @serializer.puts '}'
+      @serializer.send(:reindent, @serializer.lines)
+      _(@serializer.lines.map(&:indent)).must_equal [0, 2, 0, 0]
+    end
+
+    it 'should indent content inside brackets' do
+      @serializer.puts '['
+      @serializer.puts 'item'
+      @serializer.puts ']'
+      @serializer.send(:reindent, @serializer.lines)
+      _(@serializer.lines.map(&:indent)).must_equal [0, 2, 0, 0]
+    end
+
+    it 'should indent content inside parentheses' do
+      @serializer.puts '('
+      @serializer.puts 'arg'
+      @serializer.puts ')'
+      @serializer.send(:reindent, @serializer.lines)
+      _(@serializer.lines.map(&:indent)).must_equal [0, 2, 0, 0]
+    end
+
+    it 'should handle nested braces' do
+      @serializer.puts 'if (true) {'
+      @serializer.puts 'if (false) {'
+      @serializer.puts 'inner'
+      @serializer.puts '}'
+      @serializer.puts '}'
+      @serializer.send(:reindent, @serializer.lines)
+      _(@serializer.lines.map(&:indent)).must_equal [0, 2, 4, 2, 0, 0]
+    end
+
+    it 'should handle closing brace at start of line' do
+      @serializer.puts 'function() {'
+      @serializer.puts 'body'
+      @serializer.puts '}'
+      @serializer.send(:reindent, @serializer.lines)
+      _(@serializer.lines.map(&:indent)).must_equal [0, 2, 0, 0]
+    end
+
+    it 'should handle empty lines' do
+      @serializer.puts '{'
+      @serializer.puts ''
+      @serializer.puts 'content'
+      @serializer.puts '}'
+      @serializer.send(:reindent, @serializer.lines)
+      _(@serializer.lines.map(&:indent)).must_equal [0, 2, 2, 0, 0]
+    end
+  end
+
+  describe 'respace' do
+    it 'should remove truly empty lines' do
+      # respace removes lines with length 0 (no tokens)
+      # Note: puts '' creates a line with one empty token, length 0 means zero tokens
+      @serializer.puts 'a'
+      @serializer.puts 'b'
+      @serializer.put 'c'
+      @serializer.to_s
+      _(@serializer.lines.length).must_equal 3
+    end
+
+    it 'should add blank line before indented block' do
+      @serializer.puts 'x()'
+      @serializer.puts 'if (true) {'
+      @serializer.puts 'a()'
+      @serializer.put '}'
+      result = @serializer.to_s
+      _(result).must_equal "x()\n\nif (true) {\n  a()\n}"
+    end
+
+    it 'should add blank line after indented block' do
+      @serializer.puts 'if (true) {'
+      @serializer.puts 'a()'
+      @serializer.puts '}'
+      @serializer.put 'x()'
+      result = @serializer.to_s
+      _(result).must_equal "if (true) {\n  a()\n}\n\nx()"
+    end
+
+    it 'should NOT add blank lines inside blocks' do
+      @serializer.puts 'if (true) {'
+      @serializer.puts 'a();'
+      @serializer.puts 'b()'
+      @serializer.put '}'
+      result = @serializer.to_s
+      _(result).must_equal "if (true) {\n  a();\n  b()\n}"
+    end
+
+    it 'should add single blank line between blocks' do
+      @serializer.puts 'if (true) {'
+      @serializer.puts 'a()'
+      @serializer.puts '}'
+      @serializer.puts 'if (false) {'
+      @serializer.puts 'b()'
+      @serializer.put '}'
+      result = @serializer.to_s
+      _(result).must_equal "if (true) {\n  a()\n}\n\nif (false) {\n  b()\n}"
+    end
+  end
+
   describe 'serialize' do
     it 'should serialize tokens' do
       @serializer.enable_vertical_whitespace

@@ -171,6 +171,13 @@ module Ruby2JS
       first_token && first_token.start_with?('//')
     end
 
+    # Duplicate method for selfhost: _comment avoids functions filter's comment? -> comment transform
+    # which results in a method reference (truthy) instead of calling the method
+    def _comment
+      first_token = find { |token| !token.empty? }
+      first_token && first_token.start_with?('//')
+    end
+
     def empty?
       @tokens.all? { |token| token.empty? }
     end
@@ -266,9 +273,9 @@ module Ruby2JS
             node = line.join[/.*(<.*)/, 1]
             indent += @indent unless node.include?('</') || node.include?('/>')
           else
-            indent -= @indent if ')}]'.include?(first[0]) && indent >= @indent
+            indent -= @indent if ')}]'.include?(first.at(0)) && indent >= @indent
             line.indent = indent
-            indent += @indent if '({['.include?(last[-1])
+            indent += @indent if '({['.include?(last.at(-1))
           end
         else
           line.indent = indent
@@ -283,14 +290,14 @@ module Ruby2JS
 
       (@lines.length - 3).downto(0) do |i|
         if @lines[i].length == 0
-          @lines.delete(i)
-        elsif @lines[i + 1].comment? && !@lines[i].comment? &&
+          @lines.delete_at(i)
+        elsif @lines[i + 1]._comment && !@lines[i]._comment &&
               @lines[i].indent == @lines[i + 1].indent
           # before a comment
           @lines.insert(i + 1, Line.new)
         elsif @lines[i].indent == @lines[i + 1].indent &&
               @lines[i + 1].indent < @lines[i + 2]&.indent.to_i &&
-              !@lines[i].comment?
+              !@lines[i]._comment
           # start of indented block
           @lines.insert(i + 1, Line.new)
         elsif @lines[i].indent > @lines[i + 1].indent &&
@@ -308,6 +315,8 @@ module Ruby2JS
         @line << Token.new(string, @ast) # Pragma: array
       else
         parts = string.split("\n")
+        # Remove trailing empty strings (JS split keeps them, Ruby drops them)
+        parts.pop while !parts.empty? && parts.last.empty?
         first = parts.shift
         @line << Token.new(first, @ast) if first # Pragma: array
         parts.each { |part| @lines << Line.new(Token.new(part, @ast)) } # Pragma: array
