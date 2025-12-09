@@ -180,16 +180,20 @@ directory selfhost_dir => dest
 directory selfhost_dist => selfhost_dir
 
 # Build transpiled files in demo/selfhost
-selfhost_walker_deps = Rake::FileList.new("#{root}/lib/ruby2js/node.rb", "#{root}/lib/ruby2js/prism_walker.rb")
-selfhost_converter_deps = Rake::FileList.new("#{root}/lib/ruby2js/converter.rb", "#{root}/lib/ruby2js/converter/*.rb", "#{root}/lib/ruby2js/serializer.rb")
+selfhost_source_dist = "#{selfhost_source}/dist"
+directory selfhost_source_dist
 
-file "#{selfhost_source}/dist/walker.mjs" => selfhost_walker_deps do
+selfhost_walker_deps = Rake::FileList.new("#{root}/lib/ruby2js/node.rb", "#{root}/lib/ruby2js/prism_walker.rb", "#{root}/lib/ruby2js/prism_walker/*.rb")
+selfhost_converter_deps = Rake::FileList.new("#{root}/lib/ruby2js/converter.rb", "#{root}/lib/ruby2js/converter/*.rb", "#{root}/lib/ruby2js/serializer.rb")
+selfhost_filter_deps = Rake::FileList.new("#{root}/lib/ruby2js/filter/selfhost.rb", "#{root}/lib/ruby2js/filter/selfhost/*.rb")
+
+file "#{selfhost_source}/dist/walker.mjs" => [selfhost_source_dist, *selfhost_walker_deps, *selfhost_filter_deps] do
   Dir.chdir(selfhost_source) do
     sh "npm run build:walker"
   end
 end
 
-file "#{selfhost_source}/dist/converter.mjs" => selfhost_converter_deps do
+file "#{selfhost_source}/dist/converter.mjs" => [selfhost_source_dist, *selfhost_converter_deps, *selfhost_filter_deps] do
   Dir.chdir(selfhost_source) do
     sh "npm run build:converter"
   end
@@ -204,12 +208,20 @@ file "#{selfhost_dist}/converter.mjs" => [selfhost_dist, "#{selfhost_source}/dis
   cp "#{selfhost_source}/dist/converter.mjs", "#{selfhost_dist}/converter.mjs"
 end
 
+# Install selfhost npm dependencies if needed (provides @ruby/prism)
+selfhost_prism_source = "#{selfhost_source}/node_modules/@ruby/prism"
+file selfhost_prism_source do
+  Dir.chdir(selfhost_source) do
+    sh "npm install"
+  end
+end
+
 # Copy @ruby/prism module (needed for browser)
 prism_dir = "#{selfhost_dir}/node_modules/@ruby/prism"
 directory "#{selfhost_dir}/node_modules/@ruby" => selfhost_dir
 
-file prism_dir => ["#{selfhost_dir}/node_modules/@ruby"] do
-  cp_r "#{selfhost_source}/node_modules/@ruby/prism", prism_dir
+file prism_dir => ["#{selfhost_dir}/node_modules/@ruby", selfhost_prism_source] do
+  cp_r selfhost_prism_source, prism_dir
 end
 
 # Copy browser demo as index.html
