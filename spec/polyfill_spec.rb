@@ -90,6 +90,39 @@ describe Ruby2JS::Filter::Polyfill do
       _(js).must_include 'String.prototype.chomp'
       _(js).must_include 'str.chomp("\\n")'
     end
+
+    it 'should use String(this) to return unchanged string' do
+      js = to_js('str.chomp')
+      _(js).must_include 'return String(this)'
+      _(js).wont_include 'String.call'
+    end
+  end
+
+  describe 'String#count' do
+    it 'should add polyfill for count with chars' do
+      js = to_js('str.count("aeiou")')
+      _(js).must_include 'String.prototype.count'
+      _(js).must_include 'str.count("aeiou")'
+    end
+
+    it 'should use for...of loop in polyfill' do
+      js = to_js('str.count("x")')
+      _(js).must_include 'for (let c of this)'
+    end
+  end
+
+  describe 'Object#to_a' do
+    it 'should add polyfill for to_a' do
+      js = to_js('hash.to_a')
+      _(js).must_include 'Object.defineProperty(Object.prototype, "to_a"'
+      _(js).must_include 'hash.to_a'
+      _(js).wont_include 'hash.to_a()'
+    end
+
+    it 'should use Object.entries in polyfill' do
+      js = to_js('obj.to_a')
+      _(js).must_include 'Object.entries(this)'
+    end
   end
 
   describe 'multiple polyfills' do

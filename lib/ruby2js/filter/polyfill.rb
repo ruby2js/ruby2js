@@ -151,8 +151,32 @@ module Ruby2JS
                 s(:return, s(:send, s(:self), :slice, s(:int, 0), s(:send, s(:attr, s(:self), :length), :-, s(:attr, s(:lvar, :suffix), :length)))),
                 nil
               ),
-              s(:return, s(:send, s(:const, nil, :String), :call, s(:self)))
+              s(:return, s(:send, nil, :String, s(:self)))
             )
+          )
+
+        when :string_count
+          # if (!String.prototype.count) { String.prototype.count = function(chars) {...} }
+          # Counts occurrences of any character in chars string
+          # for (const c of this) { if (chars.includes(c)) count++ }
+          define_prototype_method(:String, :count, s(:args, s(:arg, :chars)),
+            s(:begin,
+              s(:lvasgn, :count, s(:int, 0)),
+              s(:for_of, s(:lvasgn, :c), s(:self),
+                s(:if,
+                  s(:send, s(:lvar, :chars), :includes, s(:lvar, :c)),
+                  s(:op_asgn, s(:lvasgn, :count), :+, s(:int, 1)),
+                  nil
+                )
+              ),
+              s(:return, s(:lvar, :count))
+            )
+          )
+
+        when :object_to_a
+          # Object.defineProperty(Object.prototype, 'to_a', {get() { return Object.entries(this) }, configurable: true})
+          define_property_getter(:Object, :to_a,
+            s(:return, s(:send, s(:const, nil, :Object), :entries, s(:self)))
           )
         end
       end
@@ -212,6 +236,20 @@ module Ruby2JS
             if args.length <= 1
               add_polyfill(:string_chomp)
               return s(:send!, process(target), :chomp, *args.map { |a| process(a) })
+            end
+
+          when :count
+            # String#count(chars) - count occurrences of any char in chars
+            if args.length == 1
+              add_polyfill(:string_count)
+              return s(:send!, process(target), :count, process(args.first))
+            end
+
+          when :to_a
+            # Hash#to_a / Object#to_a - convert to array of entries
+            if args.empty?
+              add_polyfill(:object_to_a)
+              return s(:attr, process(target), :to_a)
             end
           end
         end
