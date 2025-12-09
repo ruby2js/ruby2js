@@ -29,13 +29,21 @@ converter_deps = FileList["#{ROOT}/lib/ruby2js/converter.rb", "#{ROOT}/lib/ruby2
 # Selfhost filter dependencies
 selfhost_deps = FileList["#{ROOT}/lib/ruby2js/filter/selfhost.rb", "#{ROOT}/lib/ruby2js/filter/selfhost/*.rb"]
 
+# Namespace dependencies
+namespace_deps = FileList["#{ROOT}/lib/ruby2js/namespace.rb"]
+
+desc "Build namespace.mjs"
+file "#{DIST}/namespace.mjs" => [DIST, *namespace_deps, *selfhost_deps] do
+  sh bundle_exec("ruby #{SELFHOST}/scripts/transpile_namespace.rb > #{DIST}/namespace.mjs")
+end
+
 desc "Build walker.mjs"
-file "#{DIST}/walker.mjs" => [DIST, *walker_deps, *selfhost_deps] do
+file "#{DIST}/walker.mjs" => [DIST, "#{DIST}/namespace.mjs", *walker_deps, *selfhost_deps] do
   sh bundle_exec("ruby #{SELFHOST}/scripts/transpile_walker.rb > #{DIST}/walker.mjs")
 end
 
 desc "Build converter.mjs"
-file "#{DIST}/converter.mjs" => [DIST, *converter_deps, *selfhost_deps] do
+file "#{DIST}/converter.mjs" => [DIST, "#{DIST}/namespace.mjs", *converter_deps, *selfhost_deps] do
   sh bundle_exec("ruby #{SELFHOST}/scripts/transpile_converter.rb > #{DIST}/converter.mjs")
 end
 
