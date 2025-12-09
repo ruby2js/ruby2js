@@ -45,16 +45,6 @@ module Ruby2JS
         # functions filter from transforming .first -> [0]
         GETTER_METHODS = %i[first last].freeze
 
-        # Instance methods that need `this.` prefix when called without an explicit receiver.
-        # The class2 pre-scan that captures method names runs BEFORE filters transform the AST.
-        # Methods created by `handle :type do...end` (transformed to `def on_type` by selfhost
-        # filter) aren't seen by the pre-scan because they're still :block nodes at that point.
-        # - boolean_expression?: called in if.rb (from handle block), defined in logical.rb
-        # - hoist?: called in vasgn.rb handle block, defined as def in same file but after
-        CONVERTER_INSTANCE_METHODS = %i[
-          boolean_expression? hoist?
-        ].freeze
-
         # Transform method("on_#{name}") to use cleaned name without ? or !
         # This handles the handler registration loop in Converter#initialize
         def on_send(node)
@@ -65,12 +55,6 @@ module Ruby2JS
           # in Serializer, `puts` is a method that adds tokens to output lines
           if target.nil? && method_name == :puts
             # Transform to self.puts to prevent functions filter from changing it
-            return process node.updated(nil, [s(:self), method_name, *args])
-          end
-
-          # Convert unqualified calls to instance methods to `self.methodName()`
-          # for methods that are called before they're defined in the merged body
-          if target.nil? && CONVERTER_INSTANCE_METHODS.include?(method_name)
             return process node.updated(nil, [s(:self), method_name, *args])
           end
 

@@ -53,8 +53,21 @@ module Ruby2JS
             defaults_before = Ruby2JS::Filter::DEFAULTS.dup
             require require_name
             # Add any new modules that were registered
-            (Ruby2JS::Filter::DEFAULTS - defaults_before).each do |mod|
-              mods << mod
+            new_defaults = Ruby2JS::Filter::DEFAULTS - defaults_before
+            if new_defaults.any?
+              new_defaults.each { |mod| mods << mod }
+            else
+              # Filter didn't register with DEFAULTS, try to find module by name
+              # Convert "selfhost/converter" to Selfhost::Converter
+              mod_name = name.split('/').map { |part|
+                part.split('_').map(&:capitalize).join
+              }.join('::')
+              begin
+                mod = Ruby2JS::Filter.const_get(mod_name)
+                mods << mod if mod.is_a?(Module)
+              rescue NameError
+                # Module not found by that name
+              end
             end
           end
         rescue LoadError

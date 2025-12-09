@@ -60,12 +60,24 @@ module Ruby2JS
             elsif prop.to_s.end_with? '='
               @rbstack.last[prop.to_s[0..-2].to_sym] = s(:autobind, s(:self))
             else
+              # Store both symbol and string-without-suffix versions of the method name
+              # to match how send.rb looks up methods:
+              # - For regular methods (no ?/!), send.rb looks up by symbol
+              # - For ?/! methods, send.rb strips suffix and looks up by string
               @rbstack.last[prop] = m.is_method? ? s(:autobind, s(:self)) : s(:self)
+              if prop.to_s =~ /[?!]$/
+                key = prop.to_s.sub(/[?!]$/, '')
+                @rbstack.last[key] = m.is_method? ? s(:autobind, s(:self)) : s(:self)
+              end
             end
           elsif m.type == :send and m.children[0..1] == [nil, :async]
             if m.children[2].type == :def
               prop = m.children[2].children.first
               @rbstack.last[prop] = s(:autobind, s(:self))
+              if prop.to_s =~ /[?!]$/
+                key = prop.to_s.sub(/[?!]$/, '')
+                @rbstack.last[key] = s(:autobind, s(:self))
+              end
             end
           end
         end
