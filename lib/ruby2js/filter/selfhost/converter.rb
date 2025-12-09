@@ -46,10 +46,11 @@ module Ruby2JS
         GETTER_METHODS = %i[first last].freeze
 
         # Instance methods that need `this.` prefix when called without an explicit receiver.
-        # Even with combiner merging class definitions, methods called BEFORE they are
-        # defined in the merged body won't get `this.` added (converter does single forward pass).
-        # The require order in converter.rb is alphabetical, so calls in earlier files
-        # (e.g., if.rb) to methods defined in later files (e.g., logical.rb) need this.
+        # The class2 pre-scan that captures method names runs BEFORE filters transform the AST.
+        # Methods created by `handle :type do...end` (transformed to `def on_type` by selfhost
+        # filter) aren't seen by the pre-scan because they're still :block nodes at that point.
+        # - boolean_expression?: called in if.rb (from handle block), defined in logical.rb
+        # - hoist?: called in vasgn.rb handle block, defined as def in same file but after
         CONVERTER_INSTANCE_METHODS = %i[
           boolean_expression? hoist?
         ].freeze
