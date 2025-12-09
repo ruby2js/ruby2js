@@ -5,6 +5,18 @@ module Ruby2JS
     module Polyfill
       include SEXP
 
+      # Ensure polyfill runs before functions filter so that
+      # the polyfill methods can be transformed by functions
+      def self.reorder(filters)
+        if defined?(Ruby2JS::Filter::Functions) &&
+           filters.include?(Ruby2JS::Filter::Functions)
+          filters = filters.dup
+          polyfill = filters.delete(Ruby2JS::Filter::Polyfill)
+          filters.insert(filters.index(Ruby2JS::Filter::Functions), polyfill)
+        end
+        filters
+      end
+
       def initialize(comments)
         super
         @polyfills_added = Set.new
