@@ -12,7 +12,7 @@ module Ruby2JS
       extended = false
       opts = opt.children
       if opts.include? :x
-        opts = opts - [:x]
+        opts = opts.reject { |o| o == :x }
         extended = true
       end
 

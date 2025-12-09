@@ -142,7 +142,7 @@ module Ruby2JS
       end
 
       # resolve anonymous receivers against rbstack
-      receiver ||= @rbstack.map {|rb| rb[method]}.compact.last
+      receiver ||= @rbstack.map {|rb| rb[method]}.compact.last || nil # Pragma: logical
       autobind = nil
 
       if receiver

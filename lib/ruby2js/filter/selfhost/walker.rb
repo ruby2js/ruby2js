@@ -91,6 +91,8 @@ module Ruby2JS
           # Alias properties
           :new_name => :newName,
           :old_name => :oldName,
+          # Parameter properties
+          :keyword_rest => :keywordRest,
           # Reserved word renames in JS
           :arguments => :arguments_,
         }.freeze
