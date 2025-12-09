@@ -1,0 +1,144 @@
+# Selfhost Rake tasks
+# These build and test the self-hosted Ruby2JS converter
+
+require 'json'
+require 'fileutils'
+
+ROOT = File.expand_path('../..', __dir__)
+SELFHOST = __dir__
+DIST = File.join(SELFHOST, 'dist')
+
+# Helper to run bundle exec from root directory (where Gemfile is)
+def bundle_exec(cmd)
+  "cd #{ROOT} && bundle exec #{cmd}"
+end
+
+# Load manifest
+def manifest
+  @manifest ||= JSON.parse(File.read(File.join(SELFHOST, 'spec_manifest.json')))
+end
+
+directory DIST
+
+# Walker dependencies
+walker_deps = FileList["#{ROOT}/lib/ruby2js/node.rb", "#{ROOT}/lib/ruby2js/prism_walker.rb", "#{ROOT}/lib/ruby2js/prism_walker/*.rb"]
+
+# Converter dependencies
+converter_deps = FileList["#{ROOT}/lib/ruby2js/converter.rb", "#{ROOT}/lib/ruby2js/converter/*.rb", "#{ROOT}/lib/ruby2js/serializer.rb"]
+
+# Selfhost filter dependencies
+selfhost_deps = FileList["#{ROOT}/lib/ruby2js/filter/selfhost.rb", "#{ROOT}/lib/ruby2js/filter/selfhost/*.rb"]
+
+desc "Build walker.mjs"
+file "#{DIST}/walker.mjs" => [DIST, *walker_deps, *selfhost_deps] do
+  sh bundle_exec("ruby #{SELFHOST}/scripts/transpile_walker.rb > #{DIST}/walker.mjs")
+end
+
+desc "Build converter.mjs"
+file "#{DIST}/converter.mjs" => [DIST, *converter_deps, *selfhost_deps] do
+  sh bundle_exec("ruby #{SELFHOST}/scripts/transpile_converter.rb > #{DIST}/converter.mjs")
+end
+
+# Dynamically create spec file tasks based on manifest
+def spec_output_path(spec_name)
+  "#{DIST}/#{spec_name.sub('.rb', '.mjs')}"
+end
+
+# Build tasks for ready specs
+manifest['ready'].each do |spec_name|
+  spec_path = "#{ROOT}/spec/#{spec_name}"
+  output_path = spec_output_path(spec_name)
+
+  file output_path => [DIST, spec_path, *selfhost_deps] do
+    sh bundle_exec("ruby #{SELFHOST}/scripts/transpile_spec.rb #{spec_path} > #{output_path}")
+  end
+end
+
+# Build tasks for partial specs
+manifest['partial'].each do |entry|
+  spec_name = entry.is_a?(Hash) ? entry['spec'] : entry
+  spec_path = "#{ROOT}/spec/#{spec_name}"
+  output_path = spec_output_path(spec_name)
+
+  file output_path => [DIST, spec_path, *selfhost_deps] do
+    sh bundle_exec("ruby #{SELFHOST}/scripts/transpile_spec.rb #{spec_path} > #{output_path}")
+  end
+end
+
+desc "Build all transpiled files (walker, converter, specs)"
+task :build => ["#{DIST}/walker.mjs", "#{DIST}/converter.mjs"] do
+  # Build ready specs
+  manifest['ready'].each do |spec_name|
+    Rake::Task[spec_output_path(spec_name)].invoke
+  end
+
+  # Build partial specs
+  manifest['partial'].each do |entry|
+    spec_name = entry.is_a?(Hash) ? entry['spec'] : entry
+    Rake::Task[spec_output_path(spec_name)].invoke
+  end
+end
+
+desc "Build only ready specs"
+task :build_ready => ["#{DIST}/walker.mjs", "#{DIST}/converter.mjs"] do
+  manifest['ready'].each do |spec_name|
+    Rake::Task[spec_output_path(spec_name)].invoke
+  end
+end
+
+desc "Build partial specs"
+task :build_partial => ["#{DIST}/walker.mjs", "#{DIST}/converter.mjs"] do
+  manifest['partial'].each do |entry|
+    spec_name = entry.is_a?(Hash) ? entry['spec'] : entry
+    Rake::Task[spec_output_path(spec_name)].invoke
+  end
+end
+
+desc "Install npm dependencies"
+task :npm_install do
+  Dir.chdir(SELFHOST) do
+    sh "npm install" unless File.exist?('node_modules/@ruby/prism')
+  end
+end
+
+desc "Run walker unit tests"
+task :test_walker => [:npm_install, "#{DIST}/walker.mjs"] do
+  Dir.chdir(SELFHOST) do
+    sh "node test_walker.mjs"
+  end
+end
+
+desc "Run spec tests (requires build first)"
+task :test_specs => :npm_install do
+  Dir.chdir(SELFHOST) do
+    sh "node run_all_specs.mjs --skip-transpile"
+  end
+end
+
+desc "Run only ready spec tests"
+task :test_ready => :npm_install do
+  Dir.chdir(SELFHOST) do
+    sh "node run_all_specs.mjs --skip-transpile --ready-only"
+  end
+end
+
+desc "Run partial spec tests (informational, won't fail)"
+task :test_partial => :npm_install do
+  Dir.chdir(SELFHOST) do
+    # Run partial specs but don't fail CI - they're informational
+    sh "node run_all_specs.mjs --skip-transpile --partial-only || true"
+  end
+end
+
+desc "Build and run all tests"
+task :test => [:build, :test_walker, :test_specs]
+
+desc "Build and run CI tests (ready must pass, partial informational)"
+task :ci => [:build_ready, :build_partial, :test_walker, :test_ready, :test_partial]
+
+desc "Clean dist directory"
+task :clean do
+  rm_rf DIST
+end
+
+task :default => :test

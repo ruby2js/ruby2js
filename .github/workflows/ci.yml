@@ -68,14 +68,5 @@ jobs:
       with:
         node-version: '20'
 
-    - name: Install npm dependencies
-      run: cd demo/selfhost && npm install
-
-    - name: Build walker and converter
-      run: |
-        mkdir -p demo/selfhost/dist
-        bundle exec ruby demo/selfhost/scripts/transpile_walker.rb > demo/selfhost/dist/walker.mjs
-        bundle exec ruby demo/selfhost/scripts/transpile_converter.rb > demo/selfhost/dist/converter.mjs
-
-    - name: Run selfhost tests
-      run: cd demo/selfhost && npm test
+    - name: Run selfhost CI tests
+      run: bundle exec rake -f demo/selfhost/Rakefile ci

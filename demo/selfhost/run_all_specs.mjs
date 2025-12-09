@@ -3,6 +3,11 @@
 // - "ready" specs must pass (CI fails if they don't)
 // - "partial" specs are run but don't fail CI
 // - "blocked" specs are skipped with explanation
+//
+// Options:
+//   --skip-transpile  Skip transpilation (use pre-built dist/*.mjs files)
+//   --ready-only      Only run "ready" specs (skip partial and blocked)
+//   --partial-only    Only run "partial" specs (skip ready and blocked)
 
 import { execSync, spawnSync } from 'child_process';
 import { readFileSync, existsSync } from 'fs';
@@ -11,6 +16,9 @@ import { dirname, join } from 'path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const manifest = JSON.parse(readFileSync(join(__dirname, 'spec_manifest.json'), 'utf-8'));
+const skipTranspile = process.argv.includes('--skip-transpile');
+const readyOnly = process.argv.includes('--ready-only');
+const partialOnly = process.argv.includes('--partial-only');
 
 // Colors for output
 const colors = {
@@ -29,6 +37,15 @@ function log(color, message) {
 function transpileSpec(specName) {
   const specPath = `../../spec/${specName}`;
   const outputPath = `dist/${specName.replace('.rb', '.mjs')}`;
+
+  // If skip-transpile is set, just check if the file exists
+  if (skipTranspile) {
+    if (existsSync(join(__dirname, outputPath))) {
+      return true;
+    }
+    log('red', `  Pre-built file not found: ${outputPath}`);
+    return false;
+  }
 
   try {
     execSync(`bundle exec ruby scripts/transpile_spec.rb ${specPath} > ${outputPath}`, {
@@ -90,7 +107,7 @@ async function main() {
   };
 
   // Run "ready" specs - these must pass
-  if (manifest.ready.length > 0) {
+  if (manifest.ready.length > 0 && !partialOnly) {
     log('bold', '▶ READY SPECS (must pass):');
     console.log('');
 
@@ -119,7 +136,7 @@ async function main() {
   }
 
   // Run "partial" specs - report but don't fail CI
-  if (manifest.partial.length > 0) {
+  if (manifest.partial.length > 0 && !readyOnly) {
     log('bold', '▶ PARTIAL SPECS (informational, won\'t fail CI):');
     console.log('');
 
@@ -158,7 +175,7 @@ async function main() {
 
   // Report blocked specs
   const blockedSpecs = Object.entries(manifest.blocked);
-  if (blockedSpecs.length > 0) {
+  if (blockedSpecs.length > 0 && !readyOnly && !partialOnly) {
     log('bold', `▶ BLOCKED SPECS (${blockedSpecs.length} specs waiting on dependencies):`);
     console.log('');
 
@@ -184,12 +201,25 @@ async function main() {
   console.log(`${colors.bold}═══════════════════════════════════════════════════════════════${colors.reset}`);
 
   const readyPassed = results.ready.filter(r => r.status === 'passed').length;
-  const readyFailed = results.ready.filter(r => r.status !== 'passed').length;
+  const partialPassed = results.partial.filter(r => r.failed === 0 && !r.error).length;
+  const partialTotal = results.partial.length;
 
-  console.log(`  Ready:   ${readyPassed}/${manifest.ready.length} passed`);
-  console.log(`  Partial: ${manifest.partial.length} specs (informational)`);
-  console.log(`  Blocked: ${blockedSpecs.length} specs`);
+  if (!partialOnly) {
+    console.log(`  Ready:   ${readyPassed}/${manifest.ready.length} passed`);
+  }
+  if (!readyOnly) {
+    console.log(`  Partial: ${partialPassed}/${partialTotal} passed (informational)`);
+  }
+  if (!readyOnly && !partialOnly) {
+    console.log(`  Blocked: ${blockedSpecs.length} specs`);
+  }
   console.log('');
+
+  // In partial-only mode, always succeed (informational)
+  if (partialOnly) {
+    log('blue', '  ℹ Partial specs are informational only');
+    process.exit(0);
+  }
 
   if (overallSuccess) {
     log('green', '  ✓ All required specs passed!');
