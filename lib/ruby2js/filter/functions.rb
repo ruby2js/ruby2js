@@ -724,6 +724,22 @@ module Ruby2JS
             s(:args, s(:arg, :a), s(:arg, :b)),
             s(:send, s(:lvar, :a), :+, s(:lvar, :b))), s(:int, 0))
 
+        elsif [:reduce, :inject].include?(method) and args.length == 1 and args[0].type == :sym
+          # reduce(:+) → reduce((a, b) => a + b)
+          # reduce(:merge) → reduce((a, b) => ({...a, ...b}))
+          op = args[0].children[0]
+          if op == :merge
+            # Hash merge: spread both objects
+            process S(:send, target, :reduce, s(:block, s(:send, nil, :proc),
+              s(:args, s(:arg, :a), s(:arg, :b)),
+              s(:hash, s(:kwsplat, s(:lvar, :a)), s(:kwsplat, s(:lvar, :b)))))
+          else
+            # Arithmetic/other operators: a.op(b) or a op b
+            process S(:send, target, :reduce, s(:block, s(:send, nil, :proc),
+              s(:args, s(:arg, :a), s(:arg, :b)),
+              s(:send, s(:lvar, :a), op, s(:lvar, :b))))
+          end
+
         elsif method == :method_defined? and args.length >= 1
           if args[1] == s(:false)
             process S(:send, s(:attr, target, :prototype), :hasOwnProperty, args[0])
@@ -834,14 +850,36 @@ module Ruby2JS
 
         elsif method == :group_by and call.children.length == 2
           # array.group_by { |x| x.category }
+          # array.group_by { |k, v| k.to_s }  # with destructuring
           target = call.children.first
           args = node.children[1]
           block_body = node.children[2]
-          arg_name = args.children.first.children.first
+
+          # Check if we have multiple args (destructuring case)
+          if args.children.length > 1
+            # Multiple args: use destructuring and push the whole item as array
+            arg_names = args.children.map { |arg| arg.children.first }
+            # Create mlhs for destructuring: ([a, b]) => ...
+            mlhs_arg = s(:mlhs, *args.children)
+            # Push the reconstructed array [a, b]
+            item_to_push = s(:array, *arg_names.map { |name| s(:lvar, name) })
+            reduce_arg = s(:args, s(:arg, :$acc), mlhs_arg)
+          else
+            # Single arg: simple case
+            arg_name = args.children.first.children.first
+            item_to_push = s(:lvar, arg_name)
+            reduce_arg = s(:args, s(:arg, :$acc), s(:arg, arg_name))
+          end
 
           if es2024
             # ES2024+: Object.groupBy(array, x => x.category)
-            callback = s(:block, s(:send, nil, :proc), node.children[1],
+            # For destructuring, wrap args in mlhs: ([a, b]) => ...
+            callback_args = if args.children.length > 1
+              s(:args, s(:mlhs, *args.children))
+            else
+              node.children[1]
+            end
+            callback = s(:block, s(:send, nil, :proc), callback_args,
               s(:autoreturn, *node.children[2..-1]))
             process s(:send, s(:const, nil, :Object), :groupBy, target, callback)
           else
@@ -851,7 +889,7 @@ module Ruby2JS
             acc_key_or_empty = s(:or, acc_key, s(:array))
             assign_and_push = s(:send,
               s(:send, s(:lvar, :$acc), :[]=, s(:lvar, :$key), acc_key_or_empty),
-              :push, s(:lvar, arg_name))
+              :push, item_to_push)
 
             # Build the reduce block body
             reduce_body = s(:begin,
@@ -861,7 +899,7 @@ module Ruby2JS
 
             reduce_block = s(:block,
               s(:send, nil, :proc),
-              s(:args, s(:arg, :$acc), s(:arg, arg_name)),
+              reduce_arg,
               reduce_body)
 
             process s(:send, target, :reduce, reduce_block, s(:hash))
@@ -1014,7 +1052,14 @@ module Ruby2JS
           end
 
         elsif method == :map and call.children.length == 2
-          node.updated nil, [process(call), process(node.children[1]),
+          # For destructuring (multiple args), wrap in mlhs: ([a, b]) => ...
+          args = node.children[1]
+          processed_args = if args.children.length > 1
+            s(:args, s(:mlhs, *args.children))
+          else
+            process(args)
+          end
+          node.updated nil, [process(call), processed_args,
             s(:autoreturn, *process_all(node.children[2..-1]))]
 
         elsif [:map!, :select!].include? method

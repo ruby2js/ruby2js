@@ -57,7 +57,7 @@ module Ruby2JS
             end
 
             # merge properties
-            merge = Hash[(body[i].children[1].to_a+body[j].children[1].to_a).
+            merge = Hash[[*body[i].children[1].to_a, *body[j].children[1].to_a].
               group_by {|name, value| name.to_s}.map {|name, values|
               [name, values.map(&:last).reduce(:merge)]}]
             body[j] = s(:prop, body[j].children[0], merge)

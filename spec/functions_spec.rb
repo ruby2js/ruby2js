@@ -466,6 +466,23 @@ describe Ruby2JS::Filter::Functions do
       to_js( 'a.sum' ).must_equal "a.reduce((a, b) => a + b, 0)"
     end
 
+    it "should handle reduce with symbol" do
+      to_js( 'a.reduce(:+)' ).must_equal "a.reduce((a, b) => a + b)"
+      to_js( 'a.reduce(:*)' ).must_equal "a.reduce((a, b) => a * b)"
+      to_js( 'a.reduce(:merge)' ).must_equal "a.reduce((a, b) => ({...a, ...b}))"
+      to_js( 'a.inject(:+)' ).must_equal "a.reduce((a, b) => a + b)"
+    end
+
+    it "should handle group_by with destructuring" do
+      to_js( 'a.group_by {|k, v| k.to_s}' ).
+        must_equal 'a.reduce(($acc, [k, v]) => {let $key = k.toString(); ($acc[$key] = $acc[$key] ?? []).push([k, v]); return $acc}, {})'
+    end
+
+    it "should handle map with destructuring" do
+      to_js( 'a.map {|k, v| k + v}' ).
+        must_equal 'a.map(([k, v]) => k + v)'
+    end
+
     it "should map .select to .filter" do
       to_js( 'a.select {|item| item > 0}' ).
         must_equal 'a.filter(item => item > 0)'

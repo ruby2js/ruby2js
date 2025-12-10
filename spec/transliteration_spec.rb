@@ -785,14 +785,16 @@ describe Ruby2JS do
     end
 
     it "should parse singleton method and property definitions" do
-      skip() if defined? Function  # JS selfhost: handler not producing output
       to_js('def self.method(); end').must_equal 'this.method = function() {}'
       to_js('def self.prop; @prop; end').
         must_equal 'Object.defineProperty(this, "prop", {enumerable: true, configurable: true, get() {return this._prop}})'
       to_js('def self.prop=(prop); @prop=prop; end').
         must_equal 'Object.defineProperty(this, "prop", {enumerable: true, configurable: true, set(prop) {this._prop = prop}})'
-      to_js('def self.prop; @prop; end; def self.prop=(prop); @prop=prop; end').
-        must_equal 'Object.defineProperty(this, "prop", {enumerable: true, configurable: true, get() {return this._prop}, set(prop) {this._prop = prop}})'
+      # JS selfhost: combine_properties doesn't merge getter/setter into single defineProperty
+      unless defined? Function
+        to_js('def self.prop; @prop; end; def self.prop=(prop); @prop=prop; end').
+          must_equal 'Object.defineProperty(this, "prop", {enumerable: true, configurable: true, get() {return this._prop}, set(prop) {this._prop = prop}})'
+      end
     end
 
     it "should parse nested classes" do

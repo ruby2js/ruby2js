@@ -41,6 +41,7 @@ If you set the `eslevel` option to `2015` or newer, the Functions filter enables
 * `.floor` {{ caret }} `Math.floor()`
 * `.freeze` {{ caret }} `Object.freeze()`
 * `.group_by {}` {{ caret }} `Object.groupBy()` (ES2024+) or `.reduce()` fallback
+* `.group_by {|k,v| ...}` {{ caret }} destructuring support `([k, v]) => ...`
 * `.gsub` {{ caret }} `replace(//g)`
 * `.include?` {{ caret }} `.indexOf() != -1`
 * `.index` {{ caret }} `indexOf` (when using arg) or `findIndex` (when using block)
@@ -73,6 +74,8 @@ If you set the `eslevel` option to `2015` or newer, the Functions filter enables
 * `.scan` {{ caret }} `.match(//g)`
 * `.sort_by {}` {{ caret }} `.toSorted()` (ES2023+) or `.slice().sort()` fallback
 * `.sum` {{ caret }} `.reduce((a, b) => a + b, 0)`
+* `.reduce(:+)` {{ caret }} `.reduce((a, b) => a + b)` (symbol-to-proc for operators)
+* `.reduce(:merge)` {{ caret }} `.reduce((a, b) => ({...a, ...b}))` (hash merge)
 * `.times` {{ caret }} `for (let i = 0; i < n; i++)`
 * `.start_with?` {{ caret }} `.startsWith(arg)`
 * `.upto(lim)` {{ caret }} `for (let i=num; i<=lim; i+=1)`
@@ -125,6 +128,7 @@ If you set the `eslevel` option to `2015` or newer, the Functions filter enables
 * `raise Exception.new(...)` will be replaced with `throw new Error(...)`
 * `block_given?` will check for the presence of optional argument `_implicitBlockYield` which is a function made accessible through the use of `yield` in a method body.
 * `alias_method` works both inside of a class definition as well as called directly on a class name (e.g. `MyClass.alias_method`)
+* Block parameter destructuring is supported: `.map {|k, v| ...}` becomes `.map(([k, v]) => ...)`
 
 ## Methods Requiring Parentheses
 
