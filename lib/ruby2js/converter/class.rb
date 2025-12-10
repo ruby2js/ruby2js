@@ -168,8 +168,8 @@ module Ruby2JS
           s(:send, name, "#{m.children[1]}=", *m.children[2..-1])
         elsif m.type == :alias
           s(:send, s(:attr, name, :prototype),
-            "#{m.children[0].children.first}=", 
-            s(:attr, s(:attr, name, :prototype), m.children[1].children.first))
+            "#{m.children[0].children.first.to_s.sub(/[?!]$/, '')}=",
+            s(:attr, s(:attr, name, :prototype), m.children[1].children.first.to_s.sub(/[?!]$/, '')))
         elsif m.type == :class or m.type == :module
           innerclass_name = m.children.first
           if innerclass_name.children.first

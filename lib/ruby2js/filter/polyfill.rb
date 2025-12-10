@@ -257,6 +257,23 @@ module Ruby2JS
         super
       end
 
+      # Handle .first/.last when already converted to attr by another filter
+      # (e.g., selfhost/converter transforms these before polyfill runs)
+      def on_attr(node)
+        target, method = node.children
+
+        case method
+        when :first
+          add_polyfill(:array_first)
+        when :last
+          add_polyfill(:array_last)
+        when :compact
+          add_polyfill(:array_compact)
+        end
+
+        super
+      end
+
       # Handle rindex with block
       def on_block(node)
         call = node.children.first

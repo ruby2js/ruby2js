@@ -153,6 +153,10 @@ module Ruby2JS
       @tokens.slice!(range)
     end
 
+    # For selfhost: functions filter transforms slice!(range) calls to splice(start)
+    # but the method definition becomes slice, so we need splice to exist
+    alias splice slice!
+
     def unshift(*items)
       @tokens.unshift(*items)
       self

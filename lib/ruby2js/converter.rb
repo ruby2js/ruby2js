@@ -373,7 +373,9 @@ module Ruby2JS
 
     def parse_all(*args)
       last_arg = args[-1] # Pragma: method
-      @options = last_arg.is_a?(Hash) ? args.pop() : {}
+      # In selfhost JS, is_a?(Hash) becomes Object check which matches Node too.
+      # Add !respond_to?(:type) to exclude Node objects (they have a type property)
+      @options = last_arg.is_a?(Hash) && !last_arg.respond_to?(:type) ? args.pop() : {}
       sep = @options[:join].to_s
       state = @options[:state] || :expression
 

@@ -330,11 +330,11 @@ module Ruby2JS
           if m.type == :alias
             parse name
             put '.prototype.'
-            put m.children[0].children[0]
+            put m.children[0].children[0].to_s.sub(/[?!]$/, '')
             put ' = '
             parse name
             put '.prototype.'
-            put m.children[1].children[0]
+            put m.children[1].children[0].to_s.sub(/[?!]$/, '')
           elsif m.type == :class
             innerclass_name = m.children.first
             if innerclass_name.children.first
