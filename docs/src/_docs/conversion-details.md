@@ -46,7 +46,7 @@ There are three main ways to run Ruby code in a web browser:
 Ruby2JS takes a different approach: it performs **static transformations** at build time to produce idiomatic JavaScript. There's no runtime—just the generated code.
 
 **Pros:**
-- Small output (~2.5MB for full converter demo, most apps much smaller)
+- Small output (~460KB for the transpiled converter, walker, and runtime)
 - Readable, debuggable JavaScript output
 - Works seamlessly with JavaScript frameworks
 - Generated code runs at native JavaScript speed
