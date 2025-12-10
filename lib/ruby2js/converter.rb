@@ -238,7 +238,7 @@ module Ruby2JS
         list = comment_list
       end
 
-      if @comments.include?(comment_key) && @comments[comment_key] # Pragma: hash
+      if @comments.key?(comment_key) && @comments[comment_key]
         @comments[comment_key] -= list
       end
 

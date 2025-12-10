@@ -43,16 +43,19 @@ If you set the `eslevel` option to `2015` or newer, the Functions filter enables
 * `.group_by {}` {{ caret }} `Object.groupBy()` (ES2024+) or `.reduce()` fallback
 * `.group_by {|k,v| ...}` {{ caret }} destructuring support `([k, v]) => ...`
 * `.gsub` {{ caret }} `replace(//g)`
+* `.has_key?` {{ caret }} `key in hash`
 * `.include?` {{ caret }} `.indexOf() != -1`
 * `.index` {{ caret }} `indexOf` (when using arg) or `findIndex` (when using block)
 * `.inspect` {{ caret }} `JSON.stringify()`
 * `.join` {{ caret }} `.join('')` (Ruby defaults to `""`, JS to `","`)
+* `.key?` {{ caret }} `key in hash`
 * `.keys()` {{ caret }} `Object.keys()`
 * `.last` {{ caret }} `[*.length-1]`
 * `.last(n)` {{ caret }} `.slice(*.length-1, *.length)`
 * `.lstrip` {{ caret }} `.replace(/^\s+/, "")`
 * `.max` {{ caret }} `Math.max.apply(Math)`
 * `.max_by {}` {{ caret }} `.reduce()`
+* `.member?` {{ caret }} `key in hash`
 * `.merge` {{ caret }} `Object.assign({}, ...)`
 * `.merge!` {{ caret }} `Object.assign()`
 * `.method_defined?` {{ caret }} `klass.prototype.hasOwnProperty(meth)` or `meth in klass.prototype`

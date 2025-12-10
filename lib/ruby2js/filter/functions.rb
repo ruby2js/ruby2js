@@ -408,6 +408,10 @@ module Ruby2JS
         elsif method == :respond_to? and args.length == 1
           process S(:in?, args.first, target)
 
+        elsif [:has_key?, :key?, :member?].include?(method) and args.length == 1
+          # hash.has_key?(k) => k in hash
+          process S(:in?, args.first, target)
+
         elsif method == :each
           process S(:send, target, :forEach, *args)
 

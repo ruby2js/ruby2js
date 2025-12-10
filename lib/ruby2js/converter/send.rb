@@ -512,14 +512,14 @@ module Ruby2JS
 
         # Avoid of using same variables in the map as used in the irange or elsewhere in this code
         # Ruby2js only allows dollar sign in beginning of variable so i$ is safe
-        if @vars.include?(:idx) or start_value == :idx or finish_value == :idx # Pragma: hash
+        if @vars.key?(:idx) or start_value == :idx or finish_value == :idx
           index_var = 'i$'
         else
           index_var = 'idx'
         end
 
         # Use _ because it's normal convention in JS for variable which is not used at all
-        if @vars.include?(:_) or start_value == :_ or finish_value == :_ # Pragma: hash
+        if @vars.key?(:_) or start_value == :_ or finish_value == :_
           blank = '_$'
         else
           blank = '_'

@@ -373,6 +373,12 @@ describe Ruby2JS::Filter::Functions do
         must_equal '"foo" in a && a.foo'
     end
 
+    it "should handle has_key?/key?/member?" do
+      to_js( 'h.has_key?(:foo)' ).must_equal '"foo" in h'
+      to_js( 'h.key?(:foo)' ).must_equal '"foo" in h'
+      to_js( 'h.member?(:foo)' ).must_equal '"foo" in h'
+    end
+
     it "should handle any?" do
       to_js( 'a.any? {|i| i==0}' ).
         must_equal 'a.some(i => i == 0)'
