@@ -1061,19 +1061,15 @@ describe Ruby2JS do
 
   describe 'procs' do
     it "should handle procs" do
-      # This test passes a live Proc object which requires find_block to locate
-      # the block by line number. The prism walker uses offset-based locations
-      # and doesn't yet support line number lookups.
-      skip "prism walker doesn't support Proc source location" if RUBY2JS_PARSER == :prism
+      # JS doesn't have Proc objects or source_location
+      skip "JS doesn't support Proc source location" if defined? Function
       source = Proc.new { c + 1 }
       to_js( source ).must_equal "c + 1"
     end
 
     it "should handle lambdas" do
-      # This test passes a live Proc object which requires find_block to locate
-      # the block by line number. The prism walker uses offset-based locations
-      # and doesn't yet support line number lookups.
-      skip "prism walker doesn't support Proc source location" if RUBY2JS_PARSER == :prism
+      # JS doesn't have Proc objects or source_location
+      skip "JS doesn't support Proc source location" if defined? Function
       source = lambda { c + 1 }
       to_js( source ).must_equal "c + 1"
     end
