@@ -177,6 +177,8 @@ module Ruby2JS
 
     # Duplicate method for selfhost: _comment avoids functions filter's comment? -> comment transform
     # which results in a method reference (truthy) instead of calling the method
+    # Note: Cannot use alias here because selfhost transpiles no-arg methods to getters,
+    # and the calling code uses getter syntax (no parens)
     def _comment
       first_token = find { |token| !token.empty? }
       first_token && first_token.start_with?('//')
@@ -187,6 +189,8 @@ module Ruby2JS
     end
 
     # Duplicate method for selfhost: _empty avoids functions filter's empty? -> length==0 transform
+    # Note: Cannot use alias here because selfhost transpiles no-arg methods to getters,
+    # and the calling code uses getter syntax (no parens)
     def _empty
       @tokens.all? { |token| token.empty? }
     end
