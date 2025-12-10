@@ -77,13 +77,63 @@ export "*", from: "./utils.js"
 # => export * from "./utils.js"
 ```
 
-If the `autoexports` option is `true`, all top level modules, classes, 
+If the `autoexports` option is `true`, all top level modules, classes,
 methods and constants will automatically be exported.
 
 If the `autoexports` option is `:default`, and there is only one top level
 module, class, method or constant it will automatically be exported as
 `default`.  If there are multiple, each will be exported with none of them as
 default.
+
+## Require to Import Conversion
+
+When the ESM filter is used **without** the [Require filter](require), it will convert `require` statements to `import` statements by analyzing the required files for exports.
+
+```ruby
+# Given a file lib/helper.rb containing:
+# class Helper; end
+
+require "lib/helper.rb"
+# => import { Helper } from "./lib/helper.rb"
+```
+
+The ESM filter will:
+1. Parse the required file
+2. Detect exported classes, modules, constants, and methods
+3. Generate an appropriate `import` statement
+
+With the `autoexports` option enabled, top-level definitions in the required file are treated as exports:
+
+```ruby
+require "ruby2js/filter/esm"
+puts Ruby2JS.convert('require "lib/myclass.rb"',
+  file: __FILE__, autoexports: true)
+# If lib/myclass.rb contains "class MyClass; end":
+# => import { MyClass } from "./lib/myclass.rb"
+```
+
+With `autoexports: :default`, a single export becomes the default export:
+
+```ruby
+puts Ruby2JS.convert('require "lib/myclass.rb"',
+  file: __FILE__, autoexports: :default)
+# => import MyClass from "./lib/myclass.rb"
+```
+
+### Recursive Requires
+
+The `require_recursive` option follows nested `require` and `require_relative` statements, generating import statements for all files in the dependency tree:
+
+```ruby
+puts Ruby2JS.convert('require "lib/main.rb"',
+  file: __FILE__, autoexports: :default, require_recursive: true)
+# If main.rb requires helper.rb which requires utils.rb:
+# => import Main from "./lib/main.rb"; import Helper from "./lib/helper.rb"; import Utils from "./lib/utils.rb"
+```
+
+{% rendercontent "docs/note", title: "Using the Require Filter" %}
+If the [Require filter](require) is included in the filter chain **before** the ESM filter, it will inline required files instead of converting them to imports. This is useful when you want to bundle all code into a single file rather than keeping separate modules.
+{% endrendercontent %}
 
 ## Autoimports
 

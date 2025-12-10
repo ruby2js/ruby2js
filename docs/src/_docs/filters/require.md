@@ -5,19 +5,20 @@ top_section: Filters
 category: require
 ---
 
-The **Require** filter supports Ruby-style `require` and `require_relative` statements.  `require` function calls in expressions are left alone.
+The **Require** filter supports Ruby-style `require` and `require_relative` statements by inlining the referenced files.
 
-If the [esm](esm) filter is used and the code being required contains
-[`export`](esm#export) statements (either explicitly or via the `autoexports`
-option), then the require statement will be replaced with an `import`
-statement referencing the top level classes, modules, constants, and methods
-defined in that source.
+When this filter is active, `require` and `require_relative` statements are processed by:
+1. Reading the referenced Ruby file
+2. Converting it to JavaScript
+3. Inlining the result at the location of the require statement
 
-If the `require_recursive` option is specified, then all symbols defined by all
-sources referenced by the transitive closure of all requires defined by that
-source.
+This allows you to organize your Ruby source code across multiple files while producing a single bundled JavaScript output.
 
-If no exports are found, the required file is converted to JavaScript and expanded inline. 
+`require` function calls in expressions (e.g., `fs = require("fs")`) are left alone since they represent dynamic requires, not static file inclusions.
+
+{% rendercontent "docs/note", title: "ESM Import Conversion" %}
+If you want `require` statements to be converted to ES module `import` statements instead of being inlined, use the [ESM filter](esm) **without** the Require filter. See the [ESM filter documentation](esm#require-to-import-conversion) for details.
+{% endrendercontent %}
 
 {% rendercontent "docs/note", extra_margin: true %}
 More examples of how this filter works are in the [specs file](https://github.com/ruby2js/ruby2js/blob/master/spec/require_spec.rb).

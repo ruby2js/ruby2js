@@ -1,4 +1,4 @@
-require 'json'
+require 'json' # Pragma: skip
 
 # Instances of this class keep track of both classes and modules that we have
 # seen before, as well as the methods and properties that are defined in each.

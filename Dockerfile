@@ -67,7 +67,8 @@ server {
     add_header Content-Security-Policy "upgrade-insecure-requests" always;
 
     # Strip trailing slashes (per Bridgetown docs)
-    rewrite ^(.+)/+$ $1 permanent;
+    # Use $scheme://$http_host to preserve the port in redirects
+    rewrite ^(.+)/+$ $scheme://$http_host$1 permanent;
 
     # Clean URLs - serve index.html from directories, or .html files
     location / {

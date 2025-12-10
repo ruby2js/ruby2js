@@ -99,7 +99,7 @@ file "#{dest}/index.erb" => [*filters, "#{root}/demo/ruby2js.rb"] do
     # Add link to self-hosted demo at the bottom
     selfhost_link = <<~HTML
       <div style="text-align: center; margin-top: 2rem; padding: 1rem; background: #f8f9fa; border-radius: 4px;">
-        <a href="/demo/selfhost/" style="color: #0d6efd;">
+        <a href="/demo/selfhost" style="color: #0d6efd;">
           Try the Self-Hosted Preview &rarr;
         </a>
         <span style="color: #666; font-size: 0.85em; margin-left: 0.5rem;">

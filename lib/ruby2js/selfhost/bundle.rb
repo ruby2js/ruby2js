@@ -1,14 +1,35 @@
-# Ruby2JS Self-hosted Bundle Entry Point (Node.js CLI)
-# This is the main entry point that re-exports everything needed for the CLI.
-# Each module is transpiled separately; this file just ties them together.
+# Ruby2JS Self-hosted Bundle
 #
-# Note: prism_browser.mjs is NOT included here - it's for browser use only.
-# The runtime.mjs imports @ruby/prism directly which works for Node.js.
+# This file uses require_relative to inline all necessary sources into a single
+# JavaScript module. The Ruby2JS Require filter processes these require_relative
+# calls and inlines the actual code content.
+#
+# The resulting ruby2js.mjs can be:
+#   - Run as a CLI: node ruby2js.mjs [options] [file]
+#   - Imported in browser: import { convert } from './ruby2js.mjs'
+#
+# External dependencies: @ruby/prism only
 
-# Runtime classes (PrismSourceBuffer, PrismSourceRange, Prism, etc.)
-export "*", from: './runtime.mjs'
+# ============================================================================
+# Inline all source files via require_relative
+# ============================================================================
 
-# Core modules
-export "*", from: './namespace.mjs'
-export "*", from: './walker.mjs'
-export "*", from: './converter.mjs'
+# Runtime support classes (source buffer, source range, comments)
+# Note: runtime.rb imports @ruby/prism, so we don't need to import it here
+require_relative 'runtime'
+
+# Namespace tracking for class/module scope
+require_relative '../../ruby2js/namespace'
+
+# AST node representation
+require_relative '../../ruby2js/node'
+
+# Prism AST walker (converts Prism AST to Parser-compatible format)
+require_relative '../../ruby2js/prism_walker'
+
+# Converter (main conversion logic + all handlers)
+# Note: converter.rb already requires serializer.rb internally
+require_relative '../../ruby2js/converter'
+
+# Export the Ruby2JS module
+export [Ruby2JS]
