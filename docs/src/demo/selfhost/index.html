@@ -366,7 +366,7 @@ end</textarea>
       associateComments,
       initPrism,
       setupGlobals
-    } from './dist/runtime.mjs';
+    } from '/demo/selfhost/dist/runtime.mjs';
 
     // Set up globals before importing walker
     setupGlobals();
@@ -375,7 +375,7 @@ end</textarea>
     // in the transpiled walker.mjs and converter.mjs modules
 
     // Import Namespace from transpiled module
-    const { Namespace } = await import('./dist/namespace.mjs');
+    const { Namespace } = await import('/demo/selfhost/dist/namespace.mjs');
     globalThis.Namespace = Namespace;
 
     // Initialize
@@ -395,7 +395,7 @@ end</textarea>
 
         // Load walker module
         status.textContent = 'Loading walker...';
-        const walkerImport = await import('./dist/walker.mjs');
+        const walkerImport = await import('/demo/selfhost/dist/walker.mjs');
         WalkerModule = walkerImport.Ruby2JS;
 
         // Set up Ruby2JS.Node before loading converter
@@ -408,7 +408,7 @@ end</textarea>
 
         // Load converter module
         status.textContent = 'Loading converter...';
-        const converterImport = await import('./dist/converter.mjs');
+        const converterImport = await import('/demo/selfhost/dist/converter.mjs');
         ConverterModule = converterImport.Ruby2JS;
 
         status.className = 'success';

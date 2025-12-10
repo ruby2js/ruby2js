@@ -66,19 +66,8 @@ server {
     # Upgrade insecure requests - fixes mixed content when behind HTTPS proxy
     add_header Content-Security-Policy "upgrade-insecure-requests" always;
 
-    # Add trailing slash to directories (needed for ES module relative imports)
-    # Without this, /demo/selfhost serves index.html but browser resolves
-    # ./dist/runtime.mjs relative to /demo/ instead of /demo/selfhost/
-    # But first check if a .html file exists (e.g., /docs -> docs.html)
-    location ~ ^([^.]*[^/])$ {
-        if (-f $document_root$uri.html) {
-            rewrite ^(.*)$ $1.html last;
-        }
-        if (-d $document_root$uri) {
-            return 301 $scheme://$http_host$uri/$is_args$args;
-        }
-        try_files $uri $uri.html /index.html;
-    }
+    # Strip trailing slashes (per Bridgetown docs)
+    rewrite ^(.+)/+$ $1 permanent;
 
     # Clean URLs - serve index.html from directories, or .html files
     location / {
