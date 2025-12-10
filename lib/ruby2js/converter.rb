@@ -273,7 +273,8 @@ module Ruby2JS
     # Returns [comment_list, comment_key] where comment_key is used for removal
     def find_comment_entry(ast)
       # First try direct lookup by object identity
-      comment_list = @comments[ast]
+      # Ruby uses Hash ([]), JS selfhost uses Map (.get())
+      comment_list = @comments.respond_to?(:get) ? @comments.get(ast) : @comments[ast]
       # Return early if there's an explicit entry (even if empty).
       # Empty entries are used to prevent synthetic nodes from inheriting
       # comments from their children (e.g., prepended polyfills/imports).

@@ -607,55 +607,48 @@ module Ruby2JS
     [ast, comments_hash]
   end
 
-  # Associate comments with AST nodes (similar to Parser::Source::Comment.associate)
+  # CommentsMap - just a Hash subclass for type identification
+  # In JS selfhost, Map is used instead (for object key support)
+  class CommentsMap < Hash # Pragma: skip
+  end
+
+  # Associate comments with AST nodes based on position.
   # Each comment attaches to the first eligible node that starts at or after the comment ends.
   # This mimics Parser gem behavior which skips :begin nodes for preceding comments.
+  #
+  # The JS version in demo/selfhost/shared/runtime.mjs uses Map instead of Hash.
   def self.associate_comments(ast, comments)
-    return {} if comments.empty? || ast.nil?
+    result = CommentsMap.new
+    return result if comments.nil? || comments.empty? || ast.nil?
 
-    # Collect all nodes with their start positions and depth
-    # Skip :begin nodes for comment association (matching Parser gem behavior)
     nodes_by_pos = []
-    collect_nodes = lambda do |node, depth = 0|
-      return unless node.respond_to?(:loc) && node.loc
-      start_pos = if node.loc.respond_to?(:start_offset)
-        node.loc.start_offset
-      elsif node.loc.respond_to?(:expression) && node.loc.expression
-        node.loc.expression.begin_pos
-      elsif node.loc.is_a?(Hash) && node.loc[:start_offset]
-        node.loc[:start_offset]
+
+    collect_nodes = proc do |node, depth|
+      next unless node && node.loc
+      start_pos = node.loc.start_offset
+
+      if start_pos && node.type != :begin
+        nodes_by_pos << [start_pos, depth, node]
       end
 
-      # Skip :begin nodes for comment association (Parser gem skips these)
-      nodes_by_pos << [start_pos, depth, node] if start_pos && node.type != :begin
-
-      node.children.each do |child|
-        collect_nodes.call(child, depth + 1) if child.respond_to?(:type) && child.respond_to?(:children)
+      if node.children
+        node.children.each do |child|
+          collect_nodes.(child, depth + 1) if child.respond_to?(:type) && child.respond_to?(:children)
+        end
       end
     end
-    collect_nodes.call(ast)
 
-    # Sort nodes by start position, then by depth (shallower first for same position)
-    nodes_by_pos.sort_by! { |pos, depth, _| [pos, depth] }
+    collect_nodes.(ast, 0)
 
-    # Associate each comment with the first eligible node that starts at or after comment ends
-    result = {}
+    nodes_by_pos.sort_by! { |pos, depth, _node| [pos, depth] }
+
     comments.each do |comment|
       comment_end = comment.location.end_offset
+      candidate = nodes_by_pos.find { |item| item[0] >= comment_end }
+      next unless candidate
 
-      # Find nodes that start at or after comment ends
-      candidates = nodes_by_pos.select { |pos, _, _| pos >= comment_end }
-      next if candidates.empty?
-
-      # Get minimum position
-      min_pos = candidates.first[0]
-
-      # Among nodes at minimum position, pick the first one (shallower due to sorting)
-      node = candidates.find { |pos, _, _| pos == min_pos }&.last
-      next unless node
-
-      result[node] ||= []
-      result[node] << comment
+      node = candidate[2]
+      (result[node] ||= []) << comment
     end
 
     result

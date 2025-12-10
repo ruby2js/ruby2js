@@ -14,6 +14,9 @@ import {
   Prism,
   PrismSourceBuffer,
   PrismSourceRange,
+  PrismComment,
+  CommentsMap,
+  associateComments,
   Hash,
   setupGlobals,
   initPrism
@@ -366,11 +369,15 @@ try {
     const walker = new WalkerModule.PrismWalker(source, file);
     const ast = walker.visit(parseResult.value);
 
-    const comments = {};
-    if (parseResult.comments) {
-      comments[ast] = parseResult.comments;
-      comments._raw = parseResult.comments;
-    }
+    // Use walker's source buffer for comment association
+    // This ensures AST nodes and comments share the same buffer reference
+    const sourceBuffer = walker.source_buffer;
+
+    // Wrap and associate comments with AST nodes
+    const wrappedComments = (parseResult.comments || []).map(
+      c => new PrismComment(c, source, sourceBuffer)
+    );
+    const comments = associateComments(ast, wrappedComments);
 
     const converter = new ConverterModule.Converter(ast, comments, {});
     converter.eslevel = eslevel;
