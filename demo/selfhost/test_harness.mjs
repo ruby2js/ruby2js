@@ -95,6 +95,7 @@ Ruby2JS.convert = function(source, opts = {}) {
     if (opts.comparison) converter.comparison = opts.comparison;
     if (opts.strict) converter.strict = opts.strict;
     if (opts.binding) converter.binding = opts.binding;
+    if (opts.ivars) converter.ivars = opts.ivars;
 
     // Set up namespace for class/module tracking
     converter.namespace = new Namespace();

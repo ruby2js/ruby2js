@@ -95,6 +95,13 @@ module Ruby2JS
             end
           end
 
+          # Transform self.ivars.include?(var) to var in this.ivars
+          # ivars is a Hash/Object, not an Array, so we need 'in' check
+          if method_name == :include? && args.length == 1 &&
+             target&.type == :send && target.children[1] == :ivars
+            return process s(:in?, args[0], target)
+          end
+
           # Transform respond_to?(:type) to safe in-check with typeof guard
           # Ruby's respond_to? becomes 'prop in obj' which throws on primitives/null
           # Transform to: typeof obj === 'object' && obj !== null && 'prop' in obj

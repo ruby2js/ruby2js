@@ -5,7 +5,9 @@ module Ruby2JS
 
     handle :ivar do |var|
       if self.ivars and self.ivars.include? var
-        parse s(:hostvalue, self.ivars[var])
+        # Use js_hostvalue in JS context, hostvalue in Ruby context
+        node_type = defined?(Function) ? :js_hostvalue : :hostvalue
+        parse s(node_type, self.ivars[var])
       elsif underscored_private
         parse s(:attr, s(:self), var.to_s.sub('@', '_'))
       else
@@ -13,10 +15,49 @@ module Ruby2JS
       end
     end
 
+    # JS context: convert JSON-like values to AST nodes
+    # Uses JS-compatible type checks (typeof, Array.isArray, Number.isInteger)
+    handle :js_hostvalue do |value|
+      if value.nil?
+        parse s(:nil)
+      elsif value == true
+        parse s(:true)
+      elsif value == false
+        parse s(:false)
+      elsif typeof(value) == 'string'
+        parse s(:str, value)
+      elsif typeof(value) == 'number'
+        # In JS, use Number.isInteger to distinguish int from float
+        if Number.isInteger(value)
+          parse s(:int, value)
+        else
+          parse s(:float, value)
+        end
+      elsif value.is_a?(Symbol)
+        # Symbols become strings in JS (Ruby context fallback)
+        parse s(:str, value.to_s)
+      elsif Array.isArray(value)
+        parse s(:array, *value.map { |v| s(:js_hostvalue, v) })
+      elsif typeof(value) == 'object'
+        # Use Object.entries for JS object iteration
+        pairs = Object.entries(value).map do |entry|
+          k = entry[0]
+          v = entry[1]
+          s(:pair, s(:str, k.to_s), s(:js_hostvalue, v))
+        end
+        parse s(:hash, *pairs)
+      else
+        # Fallback: convert to string
+        parse s(:str, value.to_s)
+      end
+    end
+
+    # Ruby context: convert Ruby objects to AST nodes
+    # Uses case/when which works with Ruby's === operator
     handle :hostvalue do |value|
       case value
       when Hash
-        parse s(:hash, *value.map {|key, hvalue| 
+        parse s(:hash, *value.map {|key, hvalue|
           case key
           when String
             s(:pair, s(:str, key), s(:hostvalue, hvalue))

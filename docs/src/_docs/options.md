@@ -495,7 +495,7 @@ necessary:
   * use strings for symbols
   * for `functions`, specify string names not module names
   * for `autoimports`, specify keys as strings, even if key is an array
-  * not supported: `binding`, `ivars`, `scope`
+  * not supported: `scope`
 
 Currently the new configuration file format (`config/ruby2js.rb`) isn't supported by the Node version of Ruby2JS either.
 
@@ -514,6 +514,7 @@ An example of all of the supported options:
   "include_all": true,
   "include_only": ["max"],
   "import_from_skypack": true,
+  "ivars": {"@x": 1, "@name": "value"},
   "module": "esm",
   "nullish_to_s": true,
   "or": "auto",
