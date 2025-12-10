@@ -42,7 +42,7 @@ module Ruby2JS
     # as seen, and return any previous definition that may have been seen
     # before.
     def enter(name)
-      @active.push(resolve(name)) # Pragma: array
+      @active.push(resolve(name))
       key = JSON.generate(active)
       previous = @seen[key]
       @seen[key] ||= {}

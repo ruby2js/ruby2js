@@ -75,7 +75,7 @@ module Ruby2JS
     end
 
     def <<(token) # Pragma: skip
-      @tokens << token # Pragma: array
+      @tokens.push(token)
       self
     end
 
@@ -320,15 +320,15 @@ module Ruby2JS
     # add a single token to the current line
     def put(string)
       unless string.is_a?(String) && string.include?("\n")
-        @line << Token.new(string, @ast) # Pragma: array
+        @line.push(Token.new(string, @ast))
       else
         parts = string.split("\n")
         # Remove trailing empty strings (JS split keeps them, Ruby drops them)
         parts.pop while !parts.empty? && parts.last.empty?
         first = parts.shift
-        @line << Token.new(first, @ast) if first # Pragma: array
-        parts.each { |part| @lines << Line.new(Token.new(part, @ast)) } # Pragma: array
-        @lines << Line.new if string.end_with?("\n") # Pragma: array
+        @line.push(Token.new(first, @ast)) if first
+        parts.each { |part| @lines.push(Line.new(Token.new(part, @ast))) }
+        @lines.push(Line.new) if string.end_with?("\n")
         @line = @lines.last
       end
     end
@@ -336,29 +336,29 @@ module Ruby2JS
     # add a single token to the current line without checking for newline
     # Named put_raw to avoid conflict with put (put! -> put in JS)
     def put_raw(string)
-      @line << Token.new(string.gsub("\r", "\n"), @ast) # Pragma: array
+      @line.push(Token.new(string.gsub("\r", "\n"), @ast))
     end
 
     # add a single token to the current line and then advance to next line
     def puts(string)
       unless string.is_a?(String) && string.include?("\n")
-        @line << Token.new(string, @ast) # Pragma: array
+        @line.push(Token.new(string, @ast))
       else
         put string
       end
 
       @line = Line.new
-      @lines << @line # Pragma: array
+      @lines.push(@line)
     end
 
     # advance to next line and then add a single token to the current line
     def sput(string)
       unless string.is_a?(String) && string.include?("\n")
         @line = Line.new(Token.new(string, @ast))
-        @lines << @line # Pragma: array
+        @lines.push(@line)
       else
         @line = Line.new
-        @lines << @line # Pragma: array
+        @lines.push(@line)
         put string
       end
     end
@@ -428,7 +428,7 @@ module Ruby2JS
       index = 0
       while index < slice.length
         line = slice[index]
-        line << Token.new('', nil) if line.empty? # Pragma: array
+        line.push(Token.new('', nil)) if line.empty?
         if line.first.start_with?('//')
           len += @width # comments are a deal breaker
         else
@@ -451,7 +451,7 @@ module Ruby2JS
       if len < @width - 10
         # full collapse
         @lines.slice!(mark.first..-1)
-        @lines << Line.new(*work) # Pragma: array
+        @lines.push(Line.new(*work))
         @line = @lines.last
       elsif split && split[0] < @width - 10
         if slice[split[2]].indent < slice[split[2] + 1]&.indent.to_i
@@ -460,7 +460,7 @@ module Ruby2JS
           slice[-1].push(*close.to_ary)
           @lines[mark.first] = Line.new(*work[0..split[1] - 1])
           @lines.slice!(mark.first + 1..-1)
-          slice[split[2] + 1..-1]&.each { |line| @lines << line } # Pragma: array
+          slice[split[2] + 1..-1]&.each { |line| @lines.push(line) }
           @line = @lines.last
         end
       end
@@ -549,7 +549,7 @@ module Ruby2JS
             unless source_index
               source_index = sources.length
               timestamp buffer.name
-              sources << buffer # Pragma: array
+              sources.push(buffer)
             end
 
             line_num = buffer.line_for_position(pos) - 1
@@ -567,7 +567,7 @@ module Ruby2JS
 
               unless index
                 index = names.length
-                names << name # Pragma: array
+                names.push(name)
               end
 
               vlq row, col, source_index, line_num, column, index
