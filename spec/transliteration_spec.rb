@@ -357,7 +357,6 @@ describe Ruby2JS do
     end
 
     it "should handle empty here docs" do
-      skip() if defined? Function  # JS selfhost: trailing newline handling differs
       to_js("x = <<HERE\nHERE").must_equal "let x = \"\"\n"
     end
 

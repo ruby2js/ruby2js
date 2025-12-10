@@ -927,6 +927,14 @@ describe Ruby2JS::Filter::Functions do
     it "should handle negative start" do
       to_js( 'str[-3, 2]' ).must_equal 'str.slice(str.length - 3, str.length - 3 + 2)'
     end
+
+    it "should handle non-integer arguments" do
+      to_js( 'str[start, length]' ).must_equal 'str.slice(start, start + length)'
+    end
+
+    it "should handle method call arguments" do
+      to_js( 'str[node.offset, node.length]' ).must_equal 'str.slice(node.offset, node.offset + node.length)'
+    end
   end
 
   describe "reject with block" do

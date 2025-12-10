@@ -502,13 +502,13 @@ module Ruby2JS
                 :[], args[1] || s(:int, 0))
             end
 
-          elsif args.length == 2 and args[0].type == :int and args[1].type == :int
+          elsif args.length == 2
             # str[start, length] => str.slice(start, start + length)
             # Ruby's 2-arg slice: str[start, length] extracts length chars starting at start
             start = args[0]
             length = args[1]
-            if start.children.first < 0
-              # Handle negative start index
+            if start.type == :int && start.children.first < 0
+              # Handle negative start index (only for literal integers)
               start_expr = S(:send, S(:attr, target, :length), :-, s(:int, -start.children.first))
             else
               start_expr = start
