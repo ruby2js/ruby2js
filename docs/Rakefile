@@ -235,6 +235,7 @@ file "#{selfhost_dist}/runtime.mjs" => [selfhost_dist, "#{selfhost_source}/dist/
   content = File.read("#{selfhost_source}/dist/runtime.mjs")
   content.sub!('from "@ruby/prism"', 'from "../prism_browser.mjs"')
   File.write("#{selfhost_dist}/runtime.mjs", content)
+  File.chmod(0644, "#{selfhost_dist}/runtime.mjs")
 end
 
 # Install selfhost npm dependencies if needed (provides @ruby/prism)
@@ -267,7 +268,12 @@ task :selfhost => [
   "#{selfhost_dist}/namespace.mjs",
   "#{selfhost_dist}/runtime.mjs",
   prism_dir
-]
+] do
+  # Ensure all files are world-readable (needed for nginx in Docker)
+  FileUtils.chmod_R(0644, Dir.glob("#{selfhost_dir}/**/*.mjs"))
+  FileUtils.chmod_R(0644, Dir.glob("#{selfhost_dir}/**/*.js"))
+  FileUtils.chmod_R(0644, Dir.glob("#{selfhost_dir}/**/*.wasm"))
+end
 
 task :default => [
   "#{dest}/index.erb",

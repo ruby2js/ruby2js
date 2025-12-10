@@ -66,8 +66,15 @@ server {
     # Upgrade insecure requests - fixes mixed content when behind HTTPS proxy
     add_header Content-Security-Policy "upgrade-insecure-requests" always;
 
-    # Strip trailing slashes (redirect /docs/ to /docs)
-    rewrite ^/(.*)/$ /$1 permanent;
+    # Add trailing slash to directories (needed for ES module relative imports)
+    # Without this, /demo/selfhost serves index.html but browser resolves
+    # ./dist/runtime.mjs relative to /demo/ instead of /demo/selfhost/
+    location ~ ^([^.]*[^/])$ {
+        if (-d $document_root$uri) {
+            return 301 $scheme://$http_host$uri/$is_args$args;
+        }
+        try_files $uri $uri.html /index.html;
+    }
 
     # Clean URLs - serve index.html from directories, or .html files
     location / {

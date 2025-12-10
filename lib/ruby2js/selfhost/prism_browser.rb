@@ -2,7 +2,7 @@
 # The official index.js uses Node.js WASI which isn't available in browsers.
 # This provides a browser-compatible loadPrism() function.
 
-import parsePrism, './node_modules/@ruby/prism/src/parsePrism.js'
+import [parsePrism], from: './node_modules/@ruby/prism/src/parsePrism.js'
 
 export "*", from: './node_modules/@ruby/prism/src/visitor.js'
 export "*", from: './node_modules/@ruby/prism/src/nodes.js'
@@ -110,3 +110,8 @@ export async def loadPrism
     parsePrism(instance.exports, source, options)
   end
 end
+
+# Export Prism namespace object with loadPrism method
+# This allows runtime.mjs to use `await Prism.loadPrism()` in browser
+Prism = { loadPrism: loadPrism }
+export [Prism]
