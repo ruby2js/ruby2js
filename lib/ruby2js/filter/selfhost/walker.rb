@@ -160,6 +160,13 @@ module Ruby2JS
             return s(:attr, unescaped_access, :value)
           end
 
+          # Convert visit_*_node method calls to camelCase visitXxxNode
+          # e.g., self.visit_hash_pattern_node(x) -> this.visitHashPatternNode(x)
+          if method.to_s.start_with?('visit_') && method.to_s.end_with?('_node')
+            camel_name = method.to_s.gsub(/_([a-z])/) { $1.upcase }.to_sym
+            return process node.updated(nil, [target, camel_name, *args])
+          end
+
           super
         end
 

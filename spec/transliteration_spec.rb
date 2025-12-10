@@ -877,7 +877,6 @@ describe Ruby2JS do
     end
 
     it 'should handle properties' do
-      skip() if defined? Function  # JS selfhost: Hash#map incompatibility in converter
       to_js('++class F; def p; 1; end; end').
         must_equal 'Object.defineProperty(F.prototype, "p", ' +
           '{enumerable: true, configurable: true, get() {return 1}})'
@@ -1012,7 +1011,6 @@ describe Ruby2JS do
       end
 
       it "should support => operator with simple destructuring" do
-        skip() if defined? Function  # JS selfhost: missing visit_hash_pattern_node in walker
         to_js('hash => {a:, b:}').must_equal 'let { a, b } = hash'
       end
     end
@@ -1032,7 +1030,6 @@ describe Ruby2JS do
     end
 
     it "should parse when and else clauses as statements" do
-      skip() if defined? Function  # JS selfhost: missing blank line before default:
       to_js( "case 1\nwhen 1\na()\nelse\nb()\nend" ).
         must_equal "switch (1) {\ncase 1:\n  a();\n  break;\n\ndefault:\n  b()\n}"
     end

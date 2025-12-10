@@ -326,7 +326,7 @@ module Ruby2JS
         # Remove trailing empty strings (JS split keeps them, Ruby drops them)
         parts.pop while !parts.empty? && parts.last.empty?
         first = parts.shift
-        @line.push(Token.new(first, @ast)) if first
+        @line.push(Token.new(first, @ast)) unless first.nil?
         parts.each { |part| @lines.push(Line.new(Token.new(part, @ast))) }
         @lines.push(Line.new) if string.end_with?("\n")
         @line = @lines.last

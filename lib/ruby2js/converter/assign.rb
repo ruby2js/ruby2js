@@ -65,17 +65,17 @@ module Ruby2JS
 
               if modname.children.length == 1
                 pair = modname.children.first
-                s(:send, s(:const, nil, :Object), :defineProperty, target, 
+                s(:send, s(:const, nil, :Object), :defineProperty, target,
                   s(:sym, pair.children.first.children.last),
-                  s(:hash, *pair.children.last.map {|name, value| s(:pair,
-                  s(:sym, name), value)}))
+                  s(:hash, *pair.children.last.map {|entry| s(:pair, # Pragma: entries
+                  s(:sym, entry[0]), entry[1])}))
               else
                 pair = modname.children.first
-                s(:send, s(:const, nil, :Object), :defineProperties, target, 
+                s(:send, s(:const, nil, :Object), :defineProperties, target,
                   s(:hash, *modname.children.map {|pair| s(:pair,
                     s(:sym, pair.children.first.children.last),
-                    s(:hash, *pair.children.last.map {|name, value| s(:pair,
-                    s(:sym, name), value)})
+                    s(:hash, *pair.children.last.map {|entry| s(:pair, # Pragma: entries
+                    s(:sym, entry[0]), entry[1])})
                   )}))
               end
 
@@ -84,10 +84,10 @@ module Ruby2JS
 
               s(:begin, *modname.children.map {|pair|
                 if pair.children.first.type == :prop
-                  s(:send, s(:const, nil, :Object), :defineProperty, target, 
+                  s(:send, s(:const, nil, :Object), :defineProperty, target,
                     s(:sym, pair.children.first.children.last),
-                    s(:hash, *pair.children.last.map {|name, value| s(:pair,
-                    s(:sym, name), value)}))
+                    s(:hash, *pair.children.last.map {|entry| s(:pair, # Pragma: entries
+                    s(:sym, entry[0]), entry[1])}))
                 else
                   s(:send, target, :[]=, *pair.children)
                 end
