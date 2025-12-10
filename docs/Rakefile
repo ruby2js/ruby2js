@@ -199,6 +199,14 @@ file "#{selfhost_source}/dist/converter.mjs" => [selfhost_source_dist, *selfhost
   end
 end
 
+selfhost_namespace_deps = Rake::FileList.new("#{root}/lib/ruby2js/namespace.rb")
+
+file "#{selfhost_source}/dist/namespace.mjs" => [selfhost_source_dist, *selfhost_namespace_deps, *selfhost_filter_deps] do
+  Dir.chdir(selfhost_source) do
+    sh "npm run build:namespace"
+  end
+end
+
 # Copy dist files to docs
 file "#{selfhost_dist}/walker.mjs" => [selfhost_dist, "#{selfhost_source}/dist/walker.mjs"] do
   cp "#{selfhost_source}/dist/walker.mjs", "#{selfhost_dist}/walker.mjs"
@@ -206,6 +214,18 @@ end
 
 file "#{selfhost_dist}/converter.mjs" => [selfhost_dist, "#{selfhost_source}/dist/converter.mjs"] do
   cp "#{selfhost_source}/dist/converter.mjs", "#{selfhost_dist}/converter.mjs"
+end
+
+file "#{selfhost_dist}/namespace.mjs" => [selfhost_dist, "#{selfhost_source}/dist/namespace.mjs"] do
+  cp "#{selfhost_source}/dist/namespace.mjs", "#{selfhost_dist}/namespace.mjs"
+end
+
+# Copy runtime.mjs (shared runtime with comment handling)
+file "#{selfhost_dist}/runtime.mjs" => [selfhost_dist, "#{selfhost_source}/shared/runtime.mjs"] do
+  # Browser version needs different Prism import path
+  content = File.read("#{selfhost_source}/shared/runtime.mjs")
+  content.sub!("from '@ruby/prism'", "from '../prism_browser.mjs'")
+  File.write("#{selfhost_dist}/runtime.mjs", content)
 end
 
 # Install selfhost npm dependencies if needed (provides @ruby/prism)
@@ -224,10 +244,7 @@ file prism_dir => ["#{selfhost_dir}/node_modules/@ruby", selfhost_prism_source] 
   cp_r selfhost_prism_source, prism_dir
 end
 
-# Copy browser demo as index.html
-file "#{selfhost_dir}/index.html" => [selfhost_dir, "#{selfhost_source}/browser_demo.html"] do
-  cp "#{selfhost_source}/browser_demo.html", "#{selfhost_dir}/index.html"
-end
+# Note: index.html is checked into docs/src/demo/selfhost/ directly
 
 # Copy browser-compatible Prism loader
 file "#{selfhost_dir}/prism_browser.mjs" => [selfhost_dir, "#{selfhost_source}/prism_browser.mjs"] do
@@ -235,10 +252,11 @@ file "#{selfhost_dir}/prism_browser.mjs" => [selfhost_dir, "#{selfhost_source}/p
 end
 
 task :selfhost => [
-  "#{selfhost_dir}/index.html",
   "#{selfhost_dir}/prism_browser.mjs",
   "#{selfhost_dist}/walker.mjs",
   "#{selfhost_dist}/converter.mjs",
+  "#{selfhost_dist}/namespace.mjs",
+  "#{selfhost_dist}/runtime.mjs",
   prism_dir
 ]
 
