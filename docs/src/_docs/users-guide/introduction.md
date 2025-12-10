@@ -35,7 +35,7 @@ Ruby2JS enables a powerful development pattern: write Ruby code that runs native
 
 Unlike Opal (which compiles Ruby to JavaScript with a runtime), Ruby2JS produces **idiomatic JavaScript** that reads like hand-written code. This means:
 
-- **Small output size** (~2.5MB vs ~24MB with Opal for equivalent functionality)
+- **Small output size** - no runtime overhead
 - **Debuggable output** - the JavaScript looks like JavaScript
 - **Framework-friendly** - works with React, Vue, Stimulus, etc.
 - **No runtime required** - just the transpiled code

@@ -103,7 +103,7 @@ file "#{dest}/index.erb" => [*filters, "#{root}/demo/ruby2js.rb"] do
           Try the Self-Hosted Preview &rarr;
         </a>
         <span style="color: #666; font-size: 0.85em; margin-left: 0.5rem;">
-          (experimental, ~8x smaller)
+          (experimental)
         </span>
       </div>
     HTML

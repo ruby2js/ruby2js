@@ -6,10 +6,10 @@ The `docs` folder of the monorepo contains the source of the Ruby2JS website at 
 
 There are two live demos:
 
-1. **Opal Demo** (main demo) - Uses [Opal](https://opalrb.com) to run ruby2js entirely in the browser (~24MB)
-2. **Self-Hosted Demo** - Uses the transpiled Ruby2JS converter running in JavaScript (~2.5MB, ~10x smaller)
+1. **Opal Demo** (main demo) - Uses [Opal](https://opalrb.com) to run ruby2js entirely in the browser
+2. **Self-Hosted Demo** (experimental) - Uses the transpiled Ruby2JS converter running in JavaScript
 
-The self-hosted demo transpiles `lib/ruby2js/converter.rb` and related files to JavaScript using Ruby2JS itself. It passes 90% of the transliteration test suite.
+The self-hosted demo transpiles `lib/ruby2js/converter.rb` and related files to JavaScript using Ruby2JS itself. It passes the full transliteration test suite but does not yet support filters or configuration options.
 
 ## Getting Started
 

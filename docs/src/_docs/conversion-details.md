@@ -22,7 +22,7 @@ There are three main ways to run Ruby code in a web browser:
 - Ruby semantics preserved (negative indexing, truthiness, etc.)
 
 **Cons:**
-- Large runtime (~24MB for full Ruby2JS demo)
+- Large runtime required
 - Output is [harder to read](https://opalrb.com/try/#code:a%20%3D%20%22abc%22%3B%20puts%20a[-1])
 - [Compatibility issues](https://github.com/opal/opal/issues/400) with some JavaScript frameworks
 
