@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ruby2JS Self-Hosted Demo</title>
+  <style>
+    :root {
+      --primary: #242341;
+      --red: #c92514;
+      --red-dark: #460f0e;
+      --grey: #888;
+      --grey-light: #c9c8b8;
+      --grey-lighter: #e6e1d7;
+      --white-ter: #f6f6f6;
+      --ruby-bg: #ffeeee;
+      --ruby-active: #ffdddd;
+      --js-bg: #ffffcc;
+      --js-active: #ffffdd;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      font-size: 18px;
+      margin: 0;
+      padding: 0;
+      background: var(--white-ter);
+      color: #333;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Navbar */
+    .navbar {
+      background-color: var(--primary);
+      padding: 0.75rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .navbar-brand {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .navbar-brand a {
+      color: white;
+      text-decoration: none;
+      font-size: 1.25rem;
+      font-weight: 700;
+    }
+
+    .navbar-brand .badge {
+      background: var(--red);
+      color: white;
+      font-size: 0.7rem;
+      padding: 0.2rem 0.5rem;
+      border-radius: 3px;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+
+    .navbar-links {
+      display: flex;
+      gap: 1.5rem;
+    }
+
+    .navbar-links a {
+      color: var(--white-ter);
+      text-decoration: none;
+      font-size: 0.95rem;
+    }
+
+    .navbar-links a:hover {
+      color: white;
+    }
+
+    /* Main content */
+    main {
+      flex: 1;
+      padding: 1.5rem 3%;
+      max-width: 100%;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    h1.title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin: 0 0 0.75rem 0;
+      color: var(--primary);
+    }
+
+    h2.title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin: 1.5rem 0 0.5rem 0;
+      color: var(--primary);
+    }
+
+    /* Status bar */
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
+    }
+
+    #status {
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      font-size: 0.9rem;
+      flex: 1;
+    }
+
+    .loading {
+      background: #fff3cd;
+      color: #856404;
+    }
+
+    .success {
+      background: #d4edda;
+      color: #155724;
+    }
+
+    .error {
+      background: #f8d7da;
+      color: #721c24;
+    }
+
+    /* Editors */
+    .editor-container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin-bottom: 1rem;
+    }
+
+    @media (max-width: 900px) {
+      .editor-container {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .editor-panel {
+      background: white;
+      border-radius: 4px;
+      box-shadow: 0 2px 3px rgba(62, 62, 62, 0.1), 0 0 0 1px rgba(62, 62, 62, 0.1);
+      overflow: hidden;
+    }
+
+    .editor-panel.ruby {
+      background: var(--ruby-bg);
+    }
+
+    .editor-panel.js {
+      background: var(--js-bg);
+    }
+
+    .panel-title {
+      margin: 0;
+      padding: 0.75rem 1rem;
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--primary);
+      border-bottom: 1px solid rgba(0,0,0,0.1);
+    }
+
+    textarea {
+      width: 100%;
+      height: 300px;
+      font-family: var(--font-mono);
+      font-size: 14px;
+      line-height: 1.5;
+      border: none;
+      padding: 1rem;
+      resize: vertical;
+      background: inherit;
+    }
+
+    textarea:focus {
+      outline: none;
+    }
+
+    textarea#input {
+      background: var(--ruby-bg);
+    }
+
+    textarea#output {
+      background: var(--js-bg);
+    }
+
+    /* Exception display */
+    .exception {
+      background-color: #ff0;
+      margin: 1rem 0;
+      padding: 1rem;
+      border: 4px solid red;
+      border-radius: 1rem;
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+      white-space: pre-wrap;
+    }
+
+    /* Footer */
+    footer {
+      background-color: var(--primary);
+      color: white;
+      padding: 2rem 1.5rem;
+      margin-top: auto;
+    }
+
+    footer .content {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    footer a {
+      color: white;
+      text-decoration: none;
+    }
+
+    footer a:hover {
+      text-decoration: underline;
+    }
+
+    footer .credits {
+      font-size: 0.9rem;
+      opacity: 0.9;
+    }
+
+    /* Info box */
+    .info-box {
+      background: white;
+      border-radius: 4px;
+      padding: 1rem 1.25rem;
+      margin-top: 1.5rem;
+      font-size: 0.95rem;
+      color: #666;
+      box-shadow: 0 2px 3px rgba(62, 62, 62, 0.1), 0 0 0 1px rgba(62, 62, 62, 0.1);
+    }
+
+    .info-box strong {
+      color: var(--primary);
+    }
+
+    .info-box code {
+      background: var(--white-ter);
+      padding: 0.15rem 0.4rem;
+      border-radius: 3px;
+      font-family: var(--font-mono);
+      font-size: 0.85em;
+    }
+  </style>
+</head>
+<body>
+  <nav class="navbar">
+    <div class="navbar-brand">
+      <a href="https://www.ruby2js.com/">Ruby2JS</a>
+      <span class="badge">Self-Hosted</span>
+    </div>
+    <div class="navbar-links">
+      <a href="https://www.ruby2js.com/docs">Documentation</a>
+      <a href="https://www.ruby2js.com/examples">Examples</a>
+      <a href="https://github.com/ruby2js/ruby2js">GitHub</a>
+    </div>
+  </nav>
+
+  <main>
+    <div class="container">
+      <div class="editor-container">
+        <div class="editor-panel ruby">
+          <h2 class="panel-title">Ruby</h2>
+          <textarea id="input" placeholder="Enter Ruby code..."># Self-hosted Ruby2JS demo
+# Runs entirely in the browser!
+
+class Greeter
+  def initialize(name)
+    @name = name
+  end
+
+  def greet
+    "Hello, #{@name}!"
+  end
+end
+
+greeter = Greeter.new("World")
+puts greeter.greet
+
+# Arrays and hashes
+items = [1, 2, 3]
+doubled = items.map { |x| x * 2 }
+
+options = {a: 1, b: 2}
+
+# Control flow
+if doubled.length > 0
+  result = "found items"
+else
+  result = "empty"
+end</textarea>
+        </div>
+
+        <div class="editor-panel js">
+          <h2 class="panel-title">JavaScript</h2>
+          <textarea id="output" readonly placeholder="JavaScript will appear here..."></textarea>
+        </div>
+      </div>
+
+      <div class="status-bar">
+        <div id="status" class="loading">Loading @ruby/prism WebAssembly module...</div>
+      </div>
+
+      <div class="info-box">
+        <strong>Self-Hosted Demo:</strong> This demo runs Ruby2JS entirely in the browser using
+        <code>@ruby/prism</code> (WebAssembly) for parsing and the Ruby2JS converter transpiled to JavaScript.
+        <br><br>
+        <strong>Supported:</strong> Classes, methods, blocks, string interpolation, arrays, hashes,
+        <code>if</code>/<code>else</code>/<code>case</code>, loops, operators, and 90% of the transliteration test suite.
+        <br><br>
+        <strong>Size:</strong> ~2.5MB total (prism.wasm + walker + converter) vs ~24MB with Opal.
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="content">
+      <div class="credits">
+        Ruby2JS is an extensible Ruby to modern JavaScript transpiler.
+      </div>
+      <div>
+        <a href="https://github.com/ruby2js/ruby2js">View on GitHub</a>
+      </div>
+    </div>
+  </footer>
+
+  <script type="module">
+    // Self-hosted Ruby2JS demo
+    // Uses @ruby/prism for parsing and the transpiled Ruby2JS converter
+
+    // Import shared runtime (single source of truth)
+    import {
+      Prism,
+      PrismSourceBuffer,
+      PrismSourceRange,
+      PrismComment,
+      CommentsMap,
+      associateComments,
+      initPrism,
+      setupGlobals
+    } from './dist/runtime.mjs';
+
+    // Set up globals before importing walker
+    setupGlobals();
+
+    // Ruby polyfills needed by transpiled code
+    if (!Array.prototype.rindex) {
+      Array.prototype.rindex = function(fn) {
+        for (let i = this.length - 1; i >= 0; i--) {
+          if (fn(this[i])) return i;
+        }
+        return null;
+      };
+    }
+
+    Object.defineProperty(Array.prototype, 'compact', {
+      get: function() {
+        for (let i = this.length - 1; i >= 0; i--) {
+          if (this[i] === null || this[i] === undefined) {
+            this.splice(i, 1);
+          }
+        }
+        return this;
+      },
+      configurable: true
+    });
+
+    // Ruby's Array#first - get first element
+    Object.defineProperty(Array.prototype, 'first', {
+      get() {
+        return this[0];
+      },
+      configurable: true
+    });
+
+    // Ruby's Array#last - get last element
+    Object.defineProperty(Array.prototype, 'last', {
+      get() {
+        return this.at(-1);
+      },
+      configurable: true
+    });
+
+    if (!Array.prototype.insert) {
+      Array.prototype.insert = function(index, ...items) {
+        this.splice(index, 0, ...items);
+        return this;
+      };
+    }
+
+    if (!Array.prototype.delete_at) {
+      Array.prototype.delete_at = function(index) {
+        if (index < 0) index = this.length + index;
+        if (index < 0 || index >= this.length) return undefined;
+        return this.splice(index, 1)[0];
+      };
+    }
+
+    if (!String.prototype.chomp) {
+      String.prototype.chomp = function(suffix) {
+        if (suffix === undefined) {
+          return this.replace(/\r?\n$/, '');
+        }
+        if (this.endsWith(suffix)) {
+          return this.slice(0, this.length - suffix.length);
+        }
+        return String(this);
+      };
+    }
+
+    if (!String.prototype.count) {
+      String.prototype.count = function(chars) {
+        let count = 0;
+        for (const c of this) {
+          if (chars.includes(c)) count++;
+        }
+        return count;
+      };
+    }
+
+    if (!Object.prototype.to_a) {
+      Object.defineProperty(Object.prototype, 'to_a', {
+        get: function() {
+          return Object.entries(this);
+        },
+        configurable: true
+      });
+    }
+
+    // Import Namespace from transpiled module
+    const { Namespace } = await import('./dist/namespace.mjs');
+    globalThis.Namespace = Namespace;
+
+    // Initialize
+    const input = document.getElementById('input');
+    const output = document.getElementById('output');
+    const status = document.getElementById('status');
+
+    let prismParse = null;
+    let WalkerModule = null;
+    let ConverterModule = null;
+
+    async function init() {
+      try {
+        // Load Prism WASM (using shared runtime's initPrism)
+        status.textContent = 'Loading Prism WebAssembly...';
+        prismParse = await initPrism();
+
+        // Load walker module
+        status.textContent = 'Loading walker...';
+        const walkerImport = await import('./dist/walker.mjs');
+        WalkerModule = walkerImport.Ruby2JS;
+
+        // Set up Ruby2JS.Node before loading converter
+        globalThis.Ruby2JS = {
+          Node: WalkerModule.Node,
+          ast_node(obj) {
+            return typeof obj === 'object' && obj !== null && 'type' in obj && 'children' in obj;
+          }
+        };
+
+        // Load converter module
+        status.textContent = 'Loading converter...';
+        const converterImport = await import('./dist/converter.mjs');
+        ConverterModule = converterImport.Ruby2JS;
+
+        status.className = 'success';
+        status.textContent = 'Ready! Edit the Ruby code to see the JavaScript output.';
+
+        // Initial conversion
+        convert();
+      } catch (e) {
+        status.className = 'error';
+        status.textContent = `Error loading: ${e.message}`;
+        console.error(e);
+      }
+    }
+
+    function convert() {
+      if (!prismParse || !WalkerModule || !ConverterModule) {
+        return;
+      }
+
+      const source = input.value;
+
+      try {
+        // Parse with Prism
+        const parseResult = prismParse(source);
+
+        // Walk to create Parser-compatible AST
+        const walker = new WalkerModule.PrismWalker(source, null);
+        const ast = walker.visit(parseResult.value);
+
+        // Use walker's source buffer for comment association
+        // This ensures AST nodes and comments share the same buffer reference
+        const sourceBuffer = walker.source_buffer;
+
+        // Wrap Prism comments and associate with AST nodes
+        const wrappedComments = (parseResult.comments || []).map(
+          c => new PrismComment(c, source, sourceBuffer)
+        );
+        const commentsMap = associateComments(ast, wrappedComments);
+
+        // Create converter with comments
+        const converter = new ConverterModule.Converter(ast, commentsMap, {});
+        converter.namespace = new Namespace();
+
+        // Enable vertical whitespace if source has newlines
+        if (source.includes("\n")) {
+          converter.enable_vertical_whitespace;
+        }
+
+        // Convert (getter)
+        converter.convert;
+
+        // Get output (to_s is a getter)
+        output.value = converter.to_s;
+      } catch (e) {
+        output.value = `// Error: ${e.message}\n// ${e.stack?.split('\n').slice(0,3).join('\n// ')}`;
+        console.error(e);
+      }
+    }
+
+    // Debounced conversion on input
+    let debounceTimer;
+    input.addEventListener('input', () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(convert, 150);
+    });
+
+    init();
+  </script>
+</body>
+</html>
