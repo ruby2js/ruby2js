@@ -96,9 +96,24 @@ module Ruby2JS
 
       def on_send(node)
         target, method, *args = node.children
+
+        # import.meta => s(:attr, nil, :"import.meta")
+        # This bypasses jsvar escaping of the reserved word 'import'
+        if method == :meta and
+          target&.type == :send and
+          target.children[0].nil? and
+          target.children[1] == :import and
+          target.children.length == 2
+        then
+          return process s(:attr, nil, :"import.meta", *args)
+        end
+
         return super unless target.nil?
 
         if method == :import or (method == :require and @esm_top&.include? @ast)
+          # handle import with no arguments (e.g., import.meta.url)
+          return super if args.empty?
+
           # don't do the conversion if the word import is followed by a paren
           if node.loc.respond_to? :selector
             selector = node.loc.selector

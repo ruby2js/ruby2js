@@ -41,7 +41,10 @@ JavaScript Output
 cd demo/selfhost
 npm install
 
-# Build transpiled files
+# Build transpiled files (using Rakefile - recommended)
+rake build
+
+# Or using npm scripts
 npm run build
 
 # Run tests
@@ -52,47 +55,79 @@ npm test
 
 | File | Description |
 |------|-------------|
+| `dist/runtime.mjs` | Transpiled runtime classes (PrismSourceBuffer, Hash, etc.) |
 | `dist/converter.mjs` | Transpiled converter |
 | `dist/walker.mjs` | Transpiled PrismWalker |
 | `dist/namespace.mjs` | Transpiled Namespace class |
-| `shared/runtime.mjs` | Shared runtime (comment handling, etc.) |
+| `dist/bundle.mjs` | Entry point that re-exports all modules |
+| `prism_browser.mjs` | Browser WASM loader for Prism |
 | `ruby2js.mjs` | CLI tool for JS converter |
+| `browser_demo.html` | Browser demo page |
 | `run_all_specs.mjs` | Manifest-driven spec runner for CI |
+
+## Source Files
+
+All JavaScript modules are transpiled from Ruby source files:
+
+| Ruby Source | JavaScript Output |
+|-------------|-------------------|
+| `lib/ruby2js/selfhost/runtime.rb` | `dist/runtime.mjs` |
+| `lib/ruby2js/selfhost/prism_browser.rb` | `prism_browser.mjs` |
+| `lib/ruby2js/selfhost/bundle.rb` | `dist/bundle.mjs` |
+| `lib/ruby2js/namespace.rb` | `dist/namespace.mjs` |
+| `lib/ruby2js/prism_walker.rb` | `dist/walker.mjs` |
+| `lib/ruby2js/converter.rb` + handlers | `dist/converter.mjs` |
 
 ## npm Scripts
 
 | Script | Description |
 |--------|-------------|
 | `npm test` | Run all tests via manifest |
-| `npm run build` | Build walker, converter, namespace, and spec |
-| `npm run build:converter` | Regenerate converter from Ruby source |
-| `npm run build:walker` | Regenerate walker from Ruby source |
+| `npm run build` | Build all transpiled files |
+| `npm run build:runtime` | Regenerate runtime from Ruby source |
+| `npm run build:prism-browser` | Regenerate prism_browser from Ruby source |
 | `npm run build:namespace` | Regenerate namespace from Ruby source |
+| `npm run build:walker` | Regenerate walker from Ruby source |
+| `npm run build:converter` | Regenerate converter from Ruby source |
+| `npm run build:bundle` | Regenerate bundle from Ruby source |
+| `npm run clean` | Remove all transpiled files |
+
+## Rake Tasks
+
+The Rakefile provides dependency-aware builds (only rebuilds when source changes):
+
+| Task | Description |
+|------|-------------|
+| `rake build` | Build all transpiled files |
+| `rake build_ready` | Build core + ready specs |
+| `rake test` | Build and run all tests |
+| `rake ci` | CI build (ready must pass, partial informational) |
+| `rake clean` | Remove dist directory |
 
 ## CLI Usage
 
 ```bash
 # Basic conversion (reads from stdin)
-echo 'puts "hello"' | node ruby2js.mjs
+echo 'puts "hello"' | node ruby2js.mjs --stdin
 
 # Show raw Prism AST
-echo 'x = 1' | node ruby2js.mjs --ast
+echo 'x = 1' | node ruby2js.mjs --stdin --ast
 
 # Show Walker AST (Parser-compatible format)
-echo 'x = 1' | node ruby2js.mjs --walker-ast
+echo 'x = 1' | node ruby2js.mjs --stdin --walker-ast
 ```
 
 ## Browser Demo
 
-The browser demo is at `docs/src/demo/selfhost/index.html`. To run locally:
+Open `browser_demo.html` directly in a browser, or run via a local server:
 
 ```bash
-# From repo root
-cd docs
-bundle exec rake selfhost
-bin/bridgetown start
-# Open http://localhost:4000/demo/selfhost/
+# From demo/selfhost directory
+npx serve .
+# Open http://localhost:3000/browser_demo.html
 ```
+
+The browser demo loads Prism WASM and runs the transpiled converter entirely client-side.
 
 ## Filter Chain
 
@@ -112,15 +147,6 @@ filters: [
   Ruby2JS::Filter::ESM               # ES module exports
 ]
 ```
-
-## Shared Code
-
-Comment handling is shared between Ruby and JavaScript:
-
-- **Ruby**: `lib/ruby2js.rb` has `Ruby2JS.associate_comments` and `CommentsMap`
-- **JavaScript**: `shared/runtime.mjs` has equivalent `associateComments` and uses `Map`
-
-The CLI (`ruby2js.mjs`) and browser demo both import from `shared/runtime.mjs`.
 
 ## Known Limitations
 

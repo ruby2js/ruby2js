@@ -9,7 +9,7 @@
 
 import * as fs from 'fs';
 
-// Import shared runtime (single source of truth for these classes)
+// Import runtime classes (transpiled from lib/ruby2js/selfhost/runtime.rb)
 import {
   Prism,
   PrismSourceBuffer,
@@ -20,24 +20,22 @@ import {
   Hash,
   setupGlobals,
   initPrism
-} from './shared/runtime.mjs';
+} from './dist/runtime.mjs';
+
 import { Namespace } from './dist/namespace.mjs';
 
-// Set up globals and initialize Prism
+// Set up globals and initialize Prism BEFORE importing walker/converter
+// (they depend on Prism being available as a global)
 setupGlobals();
 globalThis.Namespace = Namespace;
 const prismParse = await initPrism();
 
-// Import walker to get Node class and PrismWalker
+// Import walker and converter (must be after setupGlobals)
 const { Ruby2JS: WalkerModule } = await import('./dist/walker.mjs');
+const { Ruby2JS: ConverterModule } = await import('./dist/converter.mjs');
 
 // Set up Ruby2JS global
-globalThis.Ruby2JS = {
-  Node: WalkerModule.Node
-};
-
-// Import converter
-const { Ruby2JS: ConverterModule } = await import('./dist/converter.mjs');
+globalThis.Ruby2JS = { Node: WalkerModule.Node };
 
 // ============================================================================
 // AST Formatting and Inspection

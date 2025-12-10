@@ -9,7 +9,7 @@
 //   --ready-only      Only run "ready" specs (skip partial and blocked)
 //   --partial-only    Only run "partial" specs (skip ready and blocked)
 
-import { execSync, spawnSync } from 'child_process';
+import { execSync } from 'child_process';
 import { readFileSync, existsSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -19,6 +19,18 @@ const manifest = JSON.parse(readFileSync(join(__dirname, 'spec_manifest.json'), 
 const skipTranspile = process.argv.includes('--skip-transpile');
 const readyOnly = process.argv.includes('--ready-only');
 const partialOnly = process.argv.includes('--partial-only');
+
+// Import test harness for running specs in-process
+import { initPrism, runTests, describe, it, skip, before } from './test_harness.mjs';
+
+// Initialize Prism once at startup
+let prismInitialized = false;
+async function ensurePrismInitialized() {
+  if (!prismInitialized) {
+    await initPrism();
+    prismInitialized = true;
+  }
+}
 
 // Colors for output
 const colors = {
@@ -59,39 +71,64 @@ function transpileSpec(specName) {
   }
 }
 
-function runSpec(specName) {
+async function runSpec(specName) {
   const specPath = `./dist/${specName.replace('.rb', '.mjs')}`;
 
-  const result = spawnSync('node', ['run_spec.mjs', specPath], {
-    cwd: __dirname,
-    stdio: ['pipe', 'pipe', 'pipe'],
-    encoding: 'utf-8'
-  });
+  try {
+    await ensurePrismInitialized();
 
-  // Parse output for test counts
-  const output = result.stdout + result.stderr;
-  const match = output.match(/Tests: (\d+), Passed: (\d+), Failed: (\d+), Skipped: (\d+)/);
+    // Reset global test state in test_harness (we need to import it fresh)
+    // Since we can't easily reset the module, we'll capture results via runTests
+    const specModule = await import(specPath + '?t=' + Date.now()); // Cache bust
 
-  if (match) {
+    // runTests() returns success and logs stats - we need to capture these
+    // The test_harness module tracks state globally, so we just call runTests
+    // But we need to suppress its console output and parse the results
+
+    // Capture console output
+    const logs = [];
+    const originalLog = console.log;
+    console.log = (...args) => logs.push(args.join(' '));
+
+    const success = runTests();
+
+    console.log = originalLog;
+
+    // Parse the captured output
+    const output = logs.join('\n');
+    const match = output.match(/Tests: (\d+), Passed: (\d+), Failed: (\d+), Skipped: (\d+)/);
+
+    if (match) {
+      return {
+        total: parseInt(match[1]),
+        passed: parseInt(match[2]),
+        failed: parseInt(match[3]),
+        skipped: parseInt(match[4]),
+        exitCode: success ? 0 : 1,
+        output
+      };
+    }
+
     return {
-      total: parseInt(match[1]),
-      passed: parseInt(match[2]),
-      failed: parseInt(match[3]),
-      skipped: parseInt(match[4]),
-      exitCode: result.status,
-      output
+      total: 0,
+      passed: 0,
+      failed: 0,
+      skipped: 0,
+      exitCode: success ? 0 : 1,
+      output,
+      error: 'Could not parse test output'
+    };
+  } catch (e) {
+    return {
+      total: 0,
+      passed: 0,
+      failed: 0,
+      skipped: 0,
+      exitCode: 1,
+      output: e.stack || e.message,
+      error: e.message
     };
   }
-
-  return {
-    total: 0,
-    passed: 0,
-    failed: 0,
-    skipped: 0,
-    exitCode: result.status,
-    output,
-    error: 'Could not parse test output'
-  };
 }
 
 async function main() {
@@ -121,7 +158,7 @@ async function main() {
         continue;
       }
 
-      const result = runSpec(specName);
+      const result = await runSpec(specName);
 
       if (result.failed === 0 && !result.error) {
         log('green', `✓ ${result.passed} passed, ${result.skipped} skipped`);
@@ -158,7 +195,7 @@ async function main() {
         continue;
       }
 
-      const result = runSpec(specName);
+      const result = await runSpec(specName);
 
       if (result.failed === 0 && !result.error) {
         log('green', `✓ ${result.passed} passed (was partial, now ready!)`);

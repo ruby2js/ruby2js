@@ -32,6 +32,25 @@ selfhost_deps = FileList["#{ROOT}/lib/ruby2js/filter/selfhost.rb", "#{ROOT}/lib/
 # Namespace dependencies
 namespace_deps = FileList["#{ROOT}/lib/ruby2js/namespace.rb"]
 
+# Runtime dependencies
+runtime_deps = FileList["#{ROOT}/lib/ruby2js/selfhost/runtime.rb"]
+
+# Prism browser dependencies
+prism_browser_deps = FileList["#{ROOT}/lib/ruby2js/selfhost/prism_browser.rb"]
+
+# Bundle dependencies
+bundle_deps = FileList["#{ROOT}/lib/ruby2js/selfhost/bundle.rb"]
+
+desc "Build runtime.mjs"
+file "#{DIST}/runtime.mjs" => [DIST, *runtime_deps, *selfhost_deps] do
+  sh bundle_exec("ruby #{SELFHOST}/scripts/transpile_runtime.rb > #{DIST}/runtime.mjs")
+end
+
+desc "Build prism_browser.mjs (in selfhost root for correct node_modules paths)"
+file "#{SELFHOST}/prism_browser.mjs" => [*prism_browser_deps, *selfhost_deps] do
+  sh bundle_exec("ruby #{SELFHOST}/scripts/transpile_prism_browser.rb > #{SELFHOST}/prism_browser.mjs")
+end
+
 desc "Build namespace.mjs"
 file "#{DIST}/namespace.mjs" => [DIST, *namespace_deps, *selfhost_deps] do
   sh bundle_exec("ruby #{SELFHOST}/scripts/transpile_namespace.rb > #{DIST}/namespace.mjs")
@@ -45,6 +64,11 @@ end
 desc "Build converter.mjs"
 file "#{DIST}/converter.mjs" => [DIST, "#{DIST}/namespace.mjs", *converter_deps, *selfhost_deps] do
   sh bundle_exec("ruby #{SELFHOST}/scripts/transpile_converter.rb > #{DIST}/converter.mjs")
+end
+
+desc "Build bundle.mjs (entry point for Node.js CLI)"
+file "#{DIST}/bundle.mjs" => [DIST, *bundle_deps, "#{DIST}/runtime.mjs", "#{DIST}/namespace.mjs", "#{DIST}/walker.mjs", "#{DIST}/converter.mjs"] do
+  sh bundle_exec("ruby #{SELFHOST}/scripts/transpile_bundle.rb > #{DIST}/bundle.mjs")
 end
 
 # Dynamically create spec file tasks based on manifest
@@ -73,8 +97,11 @@ manifest['partial'].each do |entry|
   end
 end
 
-desc "Build all transpiled files (walker, converter, specs)"
-task :build => ["#{DIST}/walker.mjs", "#{DIST}/converter.mjs"] do
+# Core build targets
+CORE_TARGETS = ["#{DIST}/bundle.mjs", "#{SELFHOST}/prism_browser.mjs"]
+
+desc "Build all transpiled files (bundle, prism_browser, specs)"
+task :build => CORE_TARGETS do
   # Build ready specs
   manifest['ready'].each do |spec_name|
     Rake::Task[spec_output_path(spec_name)].invoke
@@ -88,14 +115,14 @@ task :build => ["#{DIST}/walker.mjs", "#{DIST}/converter.mjs"] do
 end
 
 desc "Build only ready specs"
-task :build_ready => ["#{DIST}/walker.mjs", "#{DIST}/converter.mjs"] do
+task :build_ready => CORE_TARGETS do
   manifest['ready'].each do |spec_name|
     Rake::Task[spec_output_path(spec_name)].invoke
   end
 end
 
 desc "Build partial specs"
-task :build_partial => ["#{DIST}/walker.mjs", "#{DIST}/converter.mjs"] do
+task :build_partial => CORE_TARGETS do
   manifest['partial'].each do |entry|
     spec_name = entry.is_a?(Hash) ? entry['spec'] : entry
     Rake::Task[spec_output_path(spec_name)].invoke

@@ -92,7 +92,20 @@ module Ruby2JS
       node = args.first
       final_export = false
 
-      if node == :default
+      # export "*", from: "./file.js" => export * from "./file.js"
+      if node.respond_to?(:type) && node.type == :str && node.children[0] == '*'
+        put '* from '
+        # args[1] should be a hash with from: key
+        if args[1].respond_to?(:type) && args[1].type == :hash
+          from_pair = args[1].children.find { |pair|
+            pair.children[0].respond_to?(:children) && pair.children[0].children[0] == :from
+          }
+          if from_pair
+            put from_pair.children[1].children[0].inspect
+          end
+        end
+        return
+      elsif node == :default
         put 'default '
         args.shift
       elsif node.respond_to?(:type) && node.children[1] == :default

@@ -2,7 +2,7 @@
 // Tests that the JavaScript walker correctly transforms Prism AST to Parser-compatible AST
 
 // Import shared runtime (single source of truth)
-import { setupGlobals, initPrism } from './shared/runtime.mjs';
+import { setupGlobals, initPrism } from './dist/runtime.mjs';
 
 // Set up globals before importing walker
 setupGlobals();

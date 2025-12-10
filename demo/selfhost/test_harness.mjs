@@ -10,7 +10,7 @@ import {
   setupGlobals,
   initPrism as sharedInitPrism,
   getPrismParse
-} from './shared/runtime.mjs';
+} from './dist/runtime.mjs';
 import { Namespace } from './dist/namespace.mjs';
 
 // Set up globals

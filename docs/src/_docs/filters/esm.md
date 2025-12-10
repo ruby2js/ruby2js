@@ -35,6 +35,18 @@ import "*", as: React, from: "react"
 # => import * as React from "react"
 ```
 
+### import.meta
+
+The `import.meta` object is supported for accessing module metadata:
+
+```ruby
+import.meta.url
+# => import.meta.url
+
+URL.new("./data.json", import.meta.url)
+# => new URL("./data.json", import.meta.url)
+```
+
 ### export
 
 ```ruby
@@ -59,6 +71,10 @@ end
 # or final export statement:
 export [ one, two, default: three ]
 # => export { one, two, three as default }
+
+# re-export all from another module:
+export "*", from: "./utils.js"
+# => export * from "./utils.js"
 ```
 
 If the `autoexports` option is `true`, all top level modules, classes, 

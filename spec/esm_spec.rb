@@ -98,12 +98,29 @@ describe Ruby2JS::Filter::ESM do
       to_js("export [one, two, three, four: alias1, five: alias2]").
         must_include "export { one, two, three, alias1 as four, alias2 as five }"
     end
+
+    it "should handle export * from" do
+      to_js('export "*", from: "./foo.js"').
+        must_equal 'export * from "./foo.js"'
+    end
   end
 
   describe "import as a function" do
     it "should leave import function calls alone" do
       to_js('X = await import("x.js")').
         must_equal 'const X = await import("x.js")'
+    end
+  end
+
+  describe "import.meta" do
+    it "should handle import.meta.url" do
+      to_js('import.meta.url').
+        must_equal 'import.meta.url'
+    end
+
+    it "should handle import.meta in expressions" do
+      to_js('URL.new("./file.wasm", import.meta.url)').
+        must_equal 'new URL("./file.wasm", import.meta.url)'
     end
   end
 
