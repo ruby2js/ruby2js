@@ -404,6 +404,9 @@ module Ruby2JS
         return
       end
 
+      # strip '!' and '?' decorations (same as send handler)
+      method = method.to_s[0..-2] if method =~ /\w[!?]$/
+
       # optional chaining
       parse receiver
       put "?."
