@@ -403,11 +403,11 @@ module Ruby2JS
           next false unless child.respond_to?(:type) && child.respond_to?(:children)
           next true if child.type == :redo
           next false if %i[for while while_post until until_post].include? child.type
-          has_redo[child]
+          has_redo.call(child) # Pragma: method
         end
       end
 
-      @redoable = has_redo[@ast]
+      @redoable = has_redo.call(@ast) # Pragma: method
 
       if @redoable
         put 'let '

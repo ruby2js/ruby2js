@@ -443,7 +443,6 @@ describe Ruby2JS do
     end
 
     it "should handle a redo within a loop" do
-      skip() if defined? Function  # JS selfhost: loop detection logic error
       to_js( 'while true do redo; end' ).
         must_equal 'while (true) {let redo$; do {redo$ = false; ' +
           'redo$ = true; continue} while(redo$)}'
