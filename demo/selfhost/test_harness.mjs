@@ -135,7 +135,21 @@ let failures = [];
 let beforeHooks = [];
 
 export function describe(name, fn) {
-  currentDescribe.push(typeof name === 'function' ? name.name : name);
+  // Handle different name types: functions use .name, objects need special handling
+  let displayName;
+  if (typeof name === 'function') {
+    displayName = name.name || 'Anonymous';
+  } else if (typeof name === 'object' && name !== null) {
+    // Check for well-known module objects (like Ruby2JS which has convert method)
+    if (name === globalThis.Ruby2JS) {
+      displayName = 'Ruby2JS';
+    } else {
+      displayName = name.constructor?.name !== 'Object' ? name.constructor.name : 'Object';
+    }
+  } else {
+    displayName = String(name);
+  }
+  currentDescribe.push(displayName);
   const prevBeforeHooksLength = beforeHooks.length;
   fn();
   // Remove any before hooks added at this level

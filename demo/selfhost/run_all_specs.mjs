@@ -130,6 +130,11 @@ async function main() {
         log('red', `✗ ${result.passed} passed, ${result.failed} failed`);
         overallSuccess = false;
         results.ready.push({ spec: specName, status: 'failed', ...result });
+        // Show failure details
+        const failureMatch = result.output.match(/Failures:[\s\S]*?(?=\n\nTests:|$)/);
+        if (failureMatch) {
+          console.log(colors.red + failureMatch[0].trim() + colors.reset);
+        }
       }
     }
     console.log('');
