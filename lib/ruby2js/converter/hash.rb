@@ -112,10 +112,10 @@ module Ruby2JS
                     end
 
                     ast.children.each do |child|
-                      walk.call(child) if ast_node?(child) # Pragma: method
+                      walk.call(child) if ast_node?(child)
                     end
                   end
-                  walk.call(right) # Pragma: method
+                  walk.call(right)
                 end
               end
 

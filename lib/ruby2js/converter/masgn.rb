@@ -88,13 +88,13 @@ module Ruby2JS
             if var.type == :lvasgn
               results << var
             elsif var.type == :mlhs or var.type == :splat
-              results += walk.call(var) # Pragma: method
+              results += walk.call(var)
             end
           end
           results
         end
 
-        vars = walk.call(lhs) # Pragma: method
+        vars = walk.call(lhs)
         newvars = vars.select {|var| not @vars.include? var.children[0]} # Pragma: hash
 
         if newvars.length > 0

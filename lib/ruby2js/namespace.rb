@@ -69,7 +69,7 @@ module Ruby2JS
     def find(name)
       name = resolve(name)
       prefix = active.dup # Pragma: array
-      while prefix.pop() # Pragma: method
+      while prefix.pop()
         key = JSON.generate([*prefix, *name])
         result = @seen[key]
         return result if result
@@ -80,7 +80,7 @@ module Ruby2JS
     # leave a given scope.  Note that the scope may be compound (e.g., M::N),
     # and if so, it will pop the entire resolved name.
     def leave()
-      @active.pop() # Pragma: method
+      @active.pop()
     end
   end
 end

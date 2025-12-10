@@ -365,14 +365,14 @@ module Ruby2JS
         comments(ast).each {|comment| puts comment.chomp}
       end
 
-      handler.call(*ast.children) # Pragma: method
+      handler.call(*ast.children)
     ensure
       @ast = oldast
       @state = oldstate
     end
 
     def parse_all(*args)
-      last_arg = args[-1] # Pragma: method
+      last_arg = args[-1]
       # In selfhost JS, is_a?(Hash) becomes Object check which matches Node too.
       # Add !respond_to?(:type) to exclude Node objects (they have a type property)
       @options = last_arg.is_a?(Hash) && !last_arg.respond_to?(:type) ? args.pop() : {}
@@ -403,11 +403,11 @@ module Ruby2JS
           next false unless child.respond_to?(:type) && child.respond_to?(:children)
           next true if child.type == :redo
           next false if %i[for while while_post until until_post].include? child.type
-          has_redo.call(child) # Pragma: method
+          has_redo.call(child)
         end
       end
 
-      @redoable = has_redo.call(@ast) # Pragma: method
+      @redoable = has_redo.call(@ast)
 
       if @redoable
         put 'let '

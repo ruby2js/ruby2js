@@ -61,9 +61,9 @@ module Ruby2JS
         has_retry = ->(node) {
           return false unless ast_node?(node)
           return true if node.type == :retry
-          node.children.any? { |child| has_retry.call(child) } # Pragma: method
+          node.children.any? { |child| has_retry.call(child) }
         }
-        uses_retry = recovers.any? { |recover| has_retry.call(recover.children.last) } # Pragma: method
+        uses_retry = recovers.any? { |recover| has_retry.call(recover.children.last) }
       else
         body = block
       end
@@ -89,9 +89,9 @@ module Ruby2JS
           if node.type == :lvasgn
             try_vars << node.children[0] unless try_vars.include?(node.children[0])
           end
-          node.children.each { |c| find_lvasgns.call(c) } # Pragma: method
+          node.children.each { |c| find_lvasgns.call(c) }
         end
-        find_lvasgns.call(body) # Pragma: method
+        find_lvasgns.call(body)
 
         # Collect lvar names from finally (use Array for JS compatibility)
         finally_vars = []
@@ -101,9 +101,9 @@ module Ruby2JS
           if node.type == :lvar
             finally_vars << node.children[0] unless finally_vars.include?(node.children[0])
           end
-          node.children.each { |c| find_lvars.call(c) } # Pragma: method
+          node.children.each { |c| find_lvars.call(c) }
         end
-        find_lvars.call(finally) # Pragma: method
+        find_lvars.call(finally)
 
         # Hoist variables that appear in both (but not already declared)
         hoisted = try_vars.select { |var| finally_vars.include?(var) && !@vars[var] }
@@ -141,13 +141,13 @@ module Ruby2JS
             next nil unless ast_node?(ast)
             result = ast if ast.type === :gvar and ast.children.first == :$!
             ast.children.each do |child|
-              result ||= walk.call(child) # Pragma: method # Pragma: logical
+              result ||= walk.call(child) # Pragma: logical
             end
             result
           end
 
           # single catch with no exception named
-          if not var and not walk.call(@ast) # Pragma: method
+          if not var and not walk.call(@ast)
             puts " catch {"
           else
             var ||= s(:gvar, :$EXCEPTION)
