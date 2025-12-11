@@ -1,27 +1,23 @@
 // Debug why converter produces extra blank lines
-import { initPrism } from './test_harness.mjs';
+import { Ruby2JS, initPrism, getPrismParse } from './ruby2js.mjs';
 await initPrism();
 
-const { Ruby2JS: ConverterModule } = await import('./dist/converter.mjs');
-const { Ruby2JS: WalkerModule } = await import('./dist/walker.mjs');
-
-const { Converter, Serializer, Line, Token } = ConverterModule;
+const { Converter, Serializer, Line, Token, PrismWalker } = Ruby2JS;
 
 // Test case: multi-statement block with newlines (like actual test)
 const source = "if true\na()\nb()\nend";
 
 // Parse
-const Prism = globalThis.Prism;
-const prismParse = await Prism.loadPrism();
+const prismParse = getPrismParse();
 const parseResult = prismParse(source);
 
 // Walk
-const walker = new WalkerModule.PrismWalker(source, null);
+const walker = new PrismWalker(source, null);
 const ast = walker.visit(parseResult.value);
 
 // Convert
 const converter = new Converter(ast, {}, {});
-converter.namespace = new globalThis.Namespace();
+converter.namespace = new Ruby2JS.Namespace();
 // Enable vertical whitespace since we have a multiline test
 converter.enable_vertical_whitespace;
 converter.convert;

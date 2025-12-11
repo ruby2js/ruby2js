@@ -4,19 +4,15 @@
   "type": "module",
   "description": "Self-hosted Ruby2JS converter running in Node.js",
   "scripts": {
-    "build": "mkdir -p dist && npm run build:runtime && npm run build:prism-browser && npm run build:namespace && npm run build:walker && npm run build:converter && npm run build:bundle && npm run build:spec",
-    "build:runtime": "bundle exec ruby scripts/transpile_runtime.rb > dist/runtime.mjs",
+    "build": "mkdir -p dist && npm run build:prism-browser && npm run build:bundle && npm run build:spec",
     "build:prism-browser": "bundle exec ruby scripts/transpile_prism_browser.rb > prism_browser.mjs",
-    "build:namespace": "bundle exec ruby scripts/transpile_namespace.rb > dist/namespace.mjs",
-    "build:walker": "bundle exec ruby scripts/transpile_walker.rb > dist/walker.mjs",
-    "build:converter": "bundle exec ruby scripts/transpile_converter.rb > dist/converter.mjs",
     "build:bundle": "bundle exec ruby scripts/transpile_bundle.rb > ruby2js.mjs",
     "build:spec": "bundle exec ruby scripts/transpile_spec.rb ../../spec/transliteration_spec.rb > dist/transliteration_spec.mjs",
     "test": "npm run test:cli && npm run test:walker && npm run test:all-specs",
     "test:cli": "node test_cli.mjs",
     "test:walker": "node test_walker.mjs",
     "test:all-specs": "node run_all_specs.mjs",
-    "clean": "rm -rf dist prism_browser.mjs"
+    "clean": "rm -rf dist ruby2js.mjs prism_browser.mjs"
   },
   "keywords": ["ruby", "javascript", "transpiler"],
   "author": "Sam Ruby",

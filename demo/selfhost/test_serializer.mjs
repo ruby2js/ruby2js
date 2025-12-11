@@ -1,12 +1,9 @@
 // Test the transpiled Serializer class directly
-// Import the test harness first to get polyfills (rindex, etc.)
-import { initPrism } from './test_harness.mjs';
+// Import from the unified bundle (same code used by CLI and browser)
+import { Ruby2JS, initPrism } from './ruby2js.mjs';
 await initPrism();
 
-// Import the converter module which contains Serializer, Token, Line classes
-const { Ruby2JS: ConverterModule } = await import('./dist/converter.mjs');
-
-const { Serializer, Token, Line } = ConverterModule;
+const { Serializer, Token, Line } = Ruby2JS;
 
 let passed = 0;
 let failed = 0;

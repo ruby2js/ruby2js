@@ -1,13 +1,12 @@
 // Unit tests for the transpiled PrismWalker
 // Tests that the JavaScript walker correctly transforms Prism AST to Parser-compatible AST
 
-// Import shared runtime (single source of truth)
-import { setupGlobals, initPrism } from './dist/runtime.mjs';
+// Import from the unified bundle (same code used by CLI and browser)
+import { Ruby2JS, setupGlobals, initPrism } from './ruby2js.mjs';
 
-// Set up globals before importing walker
-setupGlobals();
+// Set up globals
+setupGlobals(Ruby2JS);
 
-const { Ruby2JS } = await import('./dist/walker.mjs');
 const prismParse = await initPrism();
 
 // Test helper
