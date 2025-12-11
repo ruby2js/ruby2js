@@ -10,6 +10,25 @@ next_page_order: 9.1
 
 Ruby2JS enables a powerful development pattern: write Ruby code that runs natively in Ruby **and** transpiles to JavaScript. This "dual-target" approach lets you maintain a single codebase that works in both environments.
 
+**Try it now** — edit the Ruby code below and see the JavaScript output update live:
+
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["esm", "functions"]
+}'></div>
+
+```ruby
+class Greeter
+  def initialize(name)
+    @name = name
+  end
+
+  def greet
+    "Hello, #{@name}!"
+  end
+end
+```
+
 {% toc %}
 
 ## Why Dual-Target?
@@ -67,6 +86,13 @@ The key insight is that **Ruby2JS pragmas are just comments** - they have no eff
 
 ## Example: A Dual-Target Class
 
+This class works identically in Ruby and when transpiled to JavaScript. Notice how private methods get an underscore prefix, instance variables become properties, and Ruby's `.round` becomes appropriate JavaScript:
+
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["functions"]
+}'></div>
+
 ```ruby
 class Calculator
   def initialize(precision = 2)
@@ -87,28 +113,6 @@ class Calculator
     value.round(@precision)
   end
 end
-```
-
-This class works identically in Ruby and when transpiled to JavaScript:
-
-```javascript
-class Calculator {
-  constructor(precision = 2) {
-    this._precision = precision
-  }
-
-  add(a, b) {
-    return this._round(a + b)
-  }
-
-  multiply(a, b) {
-    return this._round(a * b)
-  }
-
-  _round(value) {
-    return Math.round(value * 10 ** this._precision) / 10 ** this._precision
-  }
-}
 ```
 
 ## When Dual-Target Works Best

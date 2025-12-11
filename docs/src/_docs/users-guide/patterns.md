@@ -229,14 +229,19 @@ end
 
 ### Blocks
 
-Blocks become arrow functions by default:
+Blocks become arrow functions by default. Try editing the code below:
+
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["functions"]
+}'></div>
 
 ```ruby
-items.each { |item| process(item) }
-# => items.forEach(item => process(item))
+items = [1, 2, 3, 4, 5]
 
-items.map { |x| x * 2 }
-# => items.map(x => x * 2)
+doubled = items.map { |x| x * 2 }
+evens = items.select { |x| x % 2 == 0 }
+sum = items.reduce(0) { |acc, x| acc + x }
 ```
 
 ### When You Need `this`

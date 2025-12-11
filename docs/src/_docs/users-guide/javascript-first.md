@@ -20,6 +20,28 @@ This approach is ideal for:
 
 ## Why JavaScript-First?
 
+**Try it** — this example uses JavaScript APIs directly:
+
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["esm", "functions"]
+}'></div>
+
+```ruby
+export class Counter
+  def initialize(element)
+    @element = element
+    @count = 0
+    @element.addEventListener('click') { increment }
+  end
+
+  def increment
+    @count += 1
+    @element.textContent = "Count: #{@count}"
+  end
+end
+```
+
 Ruby2JS produces idiomatic JavaScript without a runtime. Combined with Ruby's cleaner syntax, you get:
 
 - **Better syntax** - blocks, unless, guard clauses, implicit returns
@@ -44,34 +66,37 @@ Ruby2JS produces idiomatic JavaScript without a runtime. Combined with Ruby's cl
 
 Call JavaScript APIs as if they were Ruby methods:
 
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["esm", "functions"]
+}'></div>
+
 ```ruby
 # DOM manipulation
-document.getElementById('app')
+element = document.getElementById('app')
 element.addEventListener('click') { |e| handle(e) }
 element.classList.add('active')
 
 # Console and debugging
 console.log('Debug:', data)
-console.error('Failed:', error)
 
 # Modern JS APIs
 data = await fetch('/api/users').then { |r| r.json() }
-stored = localStorage.getItem('prefs')
-
-# Node.js APIs
-import "*", as: :fs, from: 'fs'
-content = fs.readFileSync(path, 'utf-8')
 ```
 
 ### Constructor Calls
 
 JavaScript's `new` keyword works naturally:
 
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["functions"]
+}'></div>
+
 ```ruby
-# new ClassName(args) in JS
 date = Date.new
 map = Map.new
-url = URL.new(path, import.meta.url)
+url = URL.new(path, base_url)
 view = DataView.new(buffer)
 arr = Uint8Array.new(buffer, offset, length)
 ```
@@ -80,14 +105,19 @@ arr = Uint8Array.new(buffer, offset, length)
 
 Access `globalThis`, `window`, `document`, etc.:
 
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["functions"]
+}'></div>
+
 ```ruby
 # Browser globals
-window.location.href
+location = window.location.href
 document.body.style.background = 'red'
 
 # Node.js globals
-process.argv[2..-1]
-process.env.DEBUG
+args = process.argv[2..-1]
+debug = process.env.DEBUG
 
 # Universal global
 globalThis.MyLib = my_module
@@ -96,6 +126,11 @@ globalThis.MyLib = my_module
 ## Module System
 
 ### ES Module Imports
+
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["esm", "functions"]
+}'></div>
 
 ```ruby
 # Default import
@@ -116,10 +151,16 @@ mod = await import('./module.js')
 
 ### ES Module Exports
 
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["esm", "functions"]
+}'></div>
+
 ```ruby
-# Named exports
 export class MyClass
-  # ...
+  def process(x)
+    x * 2
+  end
 end
 
 export def helper(x)
@@ -127,17 +168,16 @@ export def helper(x)
 end
 
 export DEFAULT_VALUE = 42
-
-# Export list
-export [MyClass, helper, DEFAULT_VALUE]
-
-# Default export
-export default MyComponent
 ```
 
 ## Async/Await
 
 Ruby2JS supports async/await naturally:
+
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["esm", "functions"]
+}'></div>
 
 ```ruby
 async def fetch_user(id)
@@ -161,10 +201,17 @@ end
 
 For modules that can be both imported and run directly:
 
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["esm", "functions"]
+}'></div>
+
 ```ruby
 import [fileURLToPath], from: 'url'
 
-# Module code here...
+def main
+  console.log("Running as CLI")
+end
 
 # Only run when executed directly (not imported)
 if process.argv[1] == fileURLToPath(import.meta.url)
@@ -176,17 +223,25 @@ end
 
 Use Ruby's safe navigation operator:
 
-```ruby
-# Ruby: &.
-user&.profile&.name
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["functions"]
+}'></div>
 
-# Becomes JavaScript: ?.
-# user?.profile?.name
+```ruby
+# Ruby's &. becomes JavaScript's ?.
+name = user&.profile&.name
+count = data&.items&.length
 ```
 
 ### Nullish Coalescing
 
 Use pragmas to control `||` vs `??`:
+
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["functions"]
+}'></div>
 
 ```ruby
 # When 0 or "" are valid values, use ??
@@ -200,35 +255,42 @@ enabled ||= true # Pragma: logical
 
 Ruby2JS uses parentheses to distinguish:
 
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["functions"]
+}'></div>
+
 ```ruby
 # No parens = property access
-obj.length      # => obj.length
-arr.first       # => arr[0] (with functions filter)
+len = obj.length
+first = arr.first
 
 # Empty parens = method call
-obj.process()   # => obj.process()
-list.pop()      # => list.pop()
+item = list.pop()
+result = obj.process()
 
 # Parens with args = always method call
-obj.set(42)     # => obj.set(42)
+obj.set(42)
 ```
 
 ### Skipping Ruby-Only Code
 
 Use `# Pragma: skip` liberally:
 
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["esm", "functions", "pragma"]
+}'></div>
+
 ```ruby
 require 'json' # Pragma: skip
 
-# Skip entire methods
 def to_sexp # Pragma: skip
   # Ruby debugging only
 end
 
-# Skip conditional blocks
-unless defined?(JS_RUNTIME) # Pragma: skip
-  require 'parser/current'
-  # Ruby-only setup...
+def process(data)
+  data.map { |x| x * 2 }
 end
 ```
 
@@ -236,14 +298,17 @@ end
 
 When Ruby2JS can't infer types:
 
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["functions", "pragma"]
+}'></div>
+
 ```ruby
 # Array operations
 items << item # Pragma: array
-items.dup # Pragma: array
 
 # Hash/Object operations
-config.dup # Pragma: hash
-options.each { |k, v| ... } # Pragma: entries
+options.each { |k, v| process(k, v) } # Pragma: entries
 
 # First-class functions
 handler.call(args) # Pragma: method
@@ -253,10 +318,12 @@ handler.call(args) # Pragma: method
 
 The Ruby2JS project uses this approach for its browser bundle. Here's a simplified example:
 
-```ruby
-# lib/ruby2js/selfhost/runtime.rb
-# This file is "Ruby-syntax JavaScript"
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["esm", "functions"]
+}'></div>
 
+```ruby
 import "*", as: Prism, from: '@ruby/prism'
 
 export class SourceBuffer
@@ -277,11 +344,6 @@ export class SourceBuffer
     idx = @lineOffsets.findIndex { |offset| offset > pos }
     idx == -1 ? @lineOffsets.length : idx
   end
-end
-
-export async def initPrism
-  @prismParse ||= await Prism.loadPrism()
-  @prismParse
 end
 ```
 
@@ -338,17 +400,27 @@ Ruby2JS.convert(source,
 
 The functions filter converts `.to_s` to `.toString()`. When you need the literal `.to_s` method:
 
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["functions"]
+}'></div>
+
 ```ruby
 # This becomes .toString()
-obj.to_s
+str = obj.to_s
 
 # Use bang to keep as .to_s()
-obj.to_s!
+str = obj.to_s!
 ```
 
 ### Arrow Functions and `this`
 
 Blocks become arrow functions, which capture `this` lexically:
+
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["functions", "pragma"]
+}'></div>
 
 ```ruby
 # Arrow function - this is outer scope
@@ -366,21 +438,26 @@ Ruby2JS hoists imports to the top of the output. Be aware when inlining multiple
 
 Methods without parentheses become getters:
 
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["functions"]
+}'></div>
+
 ```ruby
 class Token
+  def initialize(text)
+    @text = text
+  end
+
+  # Becomes a getter, accessed as: token.text
   def text
     @text
   end
-end
 
-# Becomes a getter, accessed as: token.text (no parens)
-```
-
-To force method syntax:
-
-```ruby
-def text()  # Empty parens = method
-  @text
+  # Empty parens = method call: token.getText()
+  def getText()
+    @text
+  end
 end
 ```
 
