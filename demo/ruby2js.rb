@@ -46,7 +46,6 @@ def parse_request(env=ENV)
 
   # extract options from the argument list
   options = {}
-  options[:include] = [:class] if ARGV.delete('--include-class')
   @live = ARGV.delete('--live')
   wunderbar_options = []
 
