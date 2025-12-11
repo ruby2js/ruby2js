@@ -18,6 +18,11 @@ This guide covers patterns that work well when writing Ruby code that will run b
 
 Classes translate naturally:
 
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["functions"]
+}'></div>
+
 ```ruby
 class Greeter
   def initialize(name)
@@ -30,23 +35,16 @@ class Greeter
 end
 ```
 
-```javascript
-class Greeter {
-  constructor(name) {
-    this._name = name
-  }
-
-  get greet() {
-    return `Hello, ${this._name}!`
-  }
-}
-```
-
 Note: Instance variables become underscore-prefixed properties by default (configurable via `underscored_private` option).
 
 ### Private Methods
 
 Mark private methods and they'll be prefixed with underscore in JavaScript:
+
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["functions"]
+}'></div>
 
 ```ruby
 class Calculator
@@ -58,7 +56,7 @@ class Calculator
   private
 
   def validate(x)
-    raise "Invalid" unless x.is_a?(Numeric)
+    raise "Invalid" unless x > 0
   end
 
   def process(x)
@@ -71,21 +69,21 @@ end
 
 Ruby2JS distinguishes between method calls and property access based on parentheses:
 
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["functions"]
+}'></div>
+
 ```ruby
-# No parens, no args - becomes property access in JS
-obj.value     # => obj.value
-obj.length    # => obj.length
-arr.first     # => arr.first (with polyfill) or arr[0]
+# No parens, no args - becomes property access
+len = obj.length
+first = arr.first
 
-# No parens, with args - becomes method call in JS
-obj.set 42    # => obj.set(42)
-puts "hello"  # => console.log("hello")
+# Empty parens - becomes method call
+result = obj.process()
 
-# Empty parens - becomes method call in JS
-obj.process() # => obj.process()
-
-# Parens with args - becomes method call in JS
-obj.set(42)   # => obj.set(42)
+# Parens with args - always method call
+obj.set(42)
 ```
 
 ## Data Structures
@@ -94,56 +92,63 @@ obj.set(42)   # => obj.set(42)
 
 Most array operations translate directly:
 
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["functions"]
+}'></div>
+
 ```ruby
 arr = [1, 2, 3]
-arr.push(4)           # => arr.push(4)
-arr.length            # => arr.length
-arr.map { |x| x * 2 } # => arr.map(x => x * 2)
-arr.select { |x| x > 1 }  # => arr.filter(x => x > 1)
-arr.find { |x| x > 1 }    # => arr.find(x => x > 1)
+arr.push(4)
+arr.length
+doubled = arr.map { |x| x * 2 }
+big = arr.select { |x| x > 1 }
+found = arr.find { |x| x > 1 }
 ```
 
 **Watch out:** The `<<` operator needs disambiguation:
 
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["functions", "pragma"]
+}'></div>
+
 ```ruby
-# Could be Array#<< or String#<<
-items << item  # Ruby2JS may not know the type
+items = [1, 2, 3]
 
 # Solution 1: Use push explicitly
-items.push(item)
+items.push(4)
 
 # Solution 2: Use pragma for one-off cases
-items << item # Pragma: array
+items << 5 # Pragma: array
 ```
 
 ### Hashes/Objects
 
 Ruby hashes become JavaScript objects:
 
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["functions"]
+}'></div>
+
 ```ruby
 options = { name: "test", count: 42 }
-options[:name]        # => options.name or options["name"]
-options.keys          # => Object.keys(options)
-options.values        # => Object.values(options)
-```
-
-**Type disambiguation for methods that exist on both Hash and Array:**
-
-```ruby
-# .dup behavior differs
-arr.dup   # => [...arr] (spread) or arr.slice()
-hash.dup  # => {...hash} (spread)
-
-# Use pragma when type is ambiguous
-data.dup # Pragma: hash
+name = options[:name]
+keys = options.keys
+values = options.values
 ```
 
 ### Rich Object Literals
 
 JavaScript objects can have getters, setters, and methods—richer than Ruby hashes. Ruby2JS supports this via anonymous classes:
 
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["functions"]
+}'></div>
+
 ```ruby
-# Ruby: anonymous class instance
 obj = Class.new do
   def initialize
     @count = 0
@@ -159,39 +164,22 @@ obj = Class.new do
 end.new
 ```
 
-```javascript
-// JavaScript: object literal with methods
-let obj = {
-  _count: 0,
-
-  increment() {
-    return this._count++
-  },
-
-  get count() {
-    return this._count
-  }
-}
-```
-
 This pattern is useful when you need a one-off object with behavior, not just data.
 
 ### Hash Iteration
 
 Ruby's `.each` on hashes needs special handling:
 
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["functions", "pragma"]
+}'></div>
+
 ```ruby
-# Ruby: iterates key-value pairs
-hash.each { |k, v| process(k, v) }
+hash = { a: 1, b: 2, c: 3 }
 
-# JavaScript equivalent needs Object.entries()
-# Use the entries pragma:
-hash.each { |k, v| process(k, v) } # Pragma: entries
-```
-
-This generates:
-```javascript
-Object.entries(hash).forEach(([k, v]) => process(k, v))
+# Use the entries pragma for key-value iteration
+hash.each { |k, v| console.log(k, v) } # Pragma: entries
 ```
 
 ## Control Flow
@@ -200,29 +188,38 @@ Object.entries(hash).forEach(([k, v]) => process(k, v))
 
 Standard conditionals work as expected:
 
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["functions"]
+}'></div>
+
 ```ruby
-if condition
-  do_something
-elsif other
-  do_other
-else
-  do_default
+def classify(x)
+  if x > 10
+    "large"
+  elsif x > 5
+    "medium"
+  else
+    "small"
+  end
 end
-```
-
-### Ternary Expressions
-
-```ruby
-result = condition ? value_a : value_b
 ```
 
 ### Unless
 
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["functions"]
+}'></div>
+
 ```ruby
-unless done?
-  continue_work
+def process(item)
+  return if item.nil?
+
+  unless item.empty?
+    handle(item)
+  end
 end
-# => if (!done()) { continueWork() }
 ```
 
 ## Blocks and Lambdas
@@ -248,18 +245,34 @@ sum = items.reduce(0) { |acc, x| acc + x }
 
 Arrow functions capture `this` lexically. For DOM event handlers where you need dynamic `this`:
 
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["functions", "pragma"]
+}'></div>
+
 ```ruby
-element.on("click") { handle_click(this) } # Pragma: noes2015
-# => element.on("click", function() { handleClick(this) })
+# Arrow function - this is lexical (outer scope)
+element.on("click") { handle(this) }
+
+# Traditional function - this is the element
+element.on("click") { handle(this) } # Pragma: noes2015
 ```
 
 ### Lambdas
 
 Lambdas with stabby syntax work well:
 
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["functions"]
+}'></div>
+
 ```ruby
 double = ->(x) { x * 2 }
-double.call(21)  # => double(21)
+result = double.call(21)
+
+add = ->(a, b) { a + b }
+sum = add.call(1, 2)
 ```
 
 ## Variable Declarations
@@ -267,6 +280,11 @@ double.call(21)  # => double(21)
 ### Local Variables
 
 Ruby2JS tracks variable declarations and emits `let` appropriately:
+
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["functions"]
+}'></div>
 
 ```ruby
 x = 1       # First use: let x = 1
@@ -276,22 +294,33 @@ y = x + 1   # let y = x + 1
 
 ### Constants
 
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["functions"]
+}'></div>
+
 ```ruby
-MAX_SIZE = 100  # => const MAX_SIZE = 100
+MAX_SIZE = 100
+PI = 3.14159
 ```
 
 ## Working with First-Class Functions
 
 When you have functions stored in variables:
 
-```ruby
-# Ruby: handlers is a hash of procs
-handler = handlers[event_type]
-handler.call(data)
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["functions", "pragma"]
+}'></div>
 
-# For JS, use the method pragma to invoke directly:
-handler.call(data) # Pragma: method
-# => handler(data)
+```ruby
+handlers = {
+  click: ->(e) { console.log("clicked", e) },
+  hover: ->(e) { console.log("hovered", e) }
+}
+
+handler = handlers[:click]
+handler.call(event) # Pragma: method
 ```
 
 ## String Operations
@@ -300,52 +329,34 @@ handler.call(data) # Pragma: method
 
 String interpolation translates to template literals:
 
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["functions"]
+}'></div>
+
 ```ruby
-"Hello, #{name}!"
-# => `Hello, ${name}!`
+name = "World"
+greeting = "Hello, #{name}!"
+multi = "Count: #{1 + 2 + 3}"
 ```
 
 ### Common Methods
 
-```ruby
-str.length        # => str.length
-str.upcase        # => str.toUpperCase()
-str.downcase      # => str.toLowerCase()
-str.include?("x") # => str.includes("x")
-str.start_with?("x")  # => str.startsWith("x")
-str.end_with?("x")    # => str.endsWith("x")
-str.gsub(/a/, "b")    # => str.replace(/a/g, "b")
-
-# join handles the Ruby/JS difference automatically:
-arr.join          # => arr.join("") (Ruby default is "", JS default is ",")
-arr.join(",")     # => arr.join(",")
-```
-
-## Type Checking
-
-### Avoiding `is_a?` and `respond_to?`
-
-These methods are Ruby-specific. Instead:
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["functions"]
+}'></div>
 
 ```ruby
-# Instead of:
-if obj.is_a?(Array)
+str = "Hello World"
 
-# Use duck typing or explicit checks:
-if Array.isArray(obj)  # when targeting JS
-
-# Or structure code to avoid type checks
-```
-
-### The `respond_to?` Pattern
-
-If you must check for method existence:
-
-```ruby
-# Ruby-only method, skip in JS:
-def respond_to?(method) # Pragma: skip
-  # Ruby implementation
-end
+len = str.length
+upper = str.upcase
+lower = str.downcase
+has_o = str.include?("o")
+starts = str.start_with?("Hello")
+ends = str.end_with?("World")
+replaced = str.gsub(/o/, "0")
 ```
 
 ## Module Organization
@@ -354,13 +365,20 @@ end
 
 Using the ESM filter:
 
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["esm", "functions"]
+}'></div>
+
 ```ruby
 export class MyClass
-  # ...
+  def process(x)
+    x * 2
+  end
 end
 
-export def helper_method
-  # ...
+export def helper_method(x)
+  x + 1
 end
 
 export DEFAULT_VALUE = 42
@@ -368,9 +386,15 @@ export DEFAULT_VALUE = 42
 
 ### Imports
 
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["esm", "functions"]
+}'></div>
+
 ```ruby
-import React, { useState, useEffect } from 'react'
-import MyModule from './my_module'
+import React, from: 'react'
+import [useState, useEffect], from: 'react'
+import MyModule, from: './my_module'
 ```
 
 ## Ruby-Only Code
@@ -379,31 +403,20 @@ import MyModule from './my_module'
 
 Use `# Pragma: skip` to exclude Ruby-only code from JS output:
 
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["functions", "pragma"]
+}'></div>
+
 ```ruby
-require 'some_gem' # Pragma: skip
+require 'json' # Pragma: skip
 
 def ruby_only_helper # Pragma: skip
-  # This entire method won't appear in JS
+  # This method won't appear in JS
 end
 
-# For class methods:
-def self.from_file(path) # Pragma: skip
-  # File I/O - Ruby only
-end
-```
-
-### Conditional Blocks
-
-For larger blocks of Ruby-only code:
-
-```ruby
-unless defined?(RUBY2JS_SELFHOST) # Pragma: skip
-  # This entire block is Ruby-only
-  require 'some_ruby_lib'
-
-  def complex_ruby_method
-    # ...
-  end
+def works_in_both
+  "Hello from Ruby or JS!"
 end
 ```
 

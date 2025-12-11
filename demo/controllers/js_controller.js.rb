@@ -1,8 +1,24 @@
 # control the JS (read-only) editor.
 class JSController < DemoController
   def source
-    @source ||= findController type: RubyController,
-      element: document.querySelector(element.dataset.source)
+    return @source if @source
+
+    # If data-source is specified, use that element
+    source_selector = element.dataset.source
+    if source_selector
+      @source = findController type: RubyController,
+        element: document.querySelector(source_selector)
+      return @source
+    end
+
+    # Otherwise, find the RubyController in the same parent (e.g., same combo tab group)
+    parent = element.parentElement
+    if parent
+      ruby_div = parent.parentElement&.querySelector('[data-controller="ruby"]')
+      @source = findController type: RubyController, element: ruby_div if ruby_div
+    end
+
+    @source
   end
 
   async def setup()
