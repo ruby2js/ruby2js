@@ -7,10 +7,24 @@
 //
 // See --help for full options
 
-import * as fs from 'fs';
+// Suppress the "WASI is an experimental feature" warning from @ruby/prism
+// while allowing all other warnings through. This MUST run before any
+// imports that load @ruby/prism (which uses WASI internally).
+const originalEmit = process.emit.bind(process);
+process.emit = function(event, ...args) {
+  if (event === 'warning' && args[0]?.name === 'ExperimentalWarning' &&
+      args[0]?.message?.includes('WASI')) {
+    return false;
+  }
+  return originalEmit(event, ...args);
+};
+
+// Use dynamic imports so they execute AFTER the warning suppression above.
+// Static imports are hoisted and would run before our process.emit override.
+const fs = await import('fs');
 
 // Import runtime classes (transpiled from lib/ruby2js/selfhost/runtime.rb)
-import {
+const {
   Prism,
   PrismSourceBuffer,
   PrismSourceRange,
@@ -20,9 +34,9 @@ import {
   Hash,
   setupGlobals,
   initPrism
-} from './dist/runtime.mjs';
+} = await import('./dist/runtime.mjs');
 
-import { Namespace } from './dist/namespace.mjs';
+const { Namespace } = await import('./dist/namespace.mjs');
 
 // Set up globals and initialize Prism BEFORE importing walker/converter
 // (they depend on Prism being available as a global)

@@ -12,7 +12,8 @@
     "build:converter": "bundle exec ruby scripts/transpile_converter.rb > dist/converter.mjs",
     "build:bundle": "bundle exec ruby scripts/transpile_bundle.rb > dist/bundle.mjs",
     "build:spec": "bundle exec ruby scripts/transpile_spec.rb ../../spec/transliteration_spec.rb > dist/transliteration_spec.mjs",
-    "test": "npm run test:walker && npm run test:all-specs",
+    "test": "npm run test:cli && npm run test:walker && npm run test:all-specs",
+    "test:cli": "node test_cli.mjs",
     "test:walker": "node test_walker.mjs",
     "test:all-specs": "node run_all_specs.mjs",
     "clean": "rm -rf dist prism_browser.mjs"
