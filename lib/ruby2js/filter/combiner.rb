@@ -42,8 +42,27 @@ module Ruby2JS
 
       private
 
+      # Flatten nested :begin nodes to get all children at the same level
+      # This handles cases where require filter wraps content in :begin nodes
+      def flatten_begins(nodes)
+        result = []
+        nodes.each do |node|
+          next unless node
+          if node.type == :begin
+            # Recursively flatten nested begins
+            result.concat(flatten_begins(node.children))
+          else
+            result << node
+          end
+        end
+        result
+      end
+
       # Merge duplicate module and class definitions
       def merge_definitions(nodes)
+        # Flatten any nested :begin nodes first
+        nodes = flatten_begins(nodes)
+
         # Track definitions by their full name (including nesting)
         definitions = {}  # name => [index, node]
         result = []

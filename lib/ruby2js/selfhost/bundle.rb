@@ -24,12 +24,20 @@ require_relative '../../ruby2js/namespace'
 # AST node representation
 require_relative '../../ruby2js/node'
 
+# Set up globals (including Ruby2JS.Node) before walker needs them
+setupGlobals(Ruby2JS)
+
 # Prism AST walker (converts Prism AST to Parser-compatible format)
 require_relative '../../ruby2js/prism_walker'
 
+# Serializer (output formatting) - must come before Converter
+require_relative '../../ruby2js/serializer'
+
 # Converter (main conversion logic + all handlers)
-# Note: converter.rb already requires serializer.rb internally
 require_relative '../../ruby2js/converter'
+
+# CLI for command-line usage
+require_relative 'cli'
 
 # Export the Ruby2JS module
 export [Ruby2JS]

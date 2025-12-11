@@ -1,6 +1,7 @@
 require 'minitest/autorun'
 require 'ruby2js/filter/combiner'
 require 'ruby2js/filter/functions'
+require 'ruby2js/filter/require'
 
 describe Ruby2JS::Filter::Combiner do
 
@@ -167,6 +168,29 @@ describe Ruby2JS::Filter::Combiner do
     it "should preserve negation of grouped or expressions" do
       # Note: || becomes ?? (nullish coalescing) in ES2022 for non-boolean contexts
       to_js('x = !(a || b)').must_equal 'let x = !(a ?? b)'
+    end
+  end
+
+  describe 'nested begin nodes' do
+    it "should flatten nested begin nodes from require filter" do
+      # When the require filter inlines files, it wraps content in :begin nodes.
+      # The combiner needs to flatten these to properly merge modules.
+      # This test uses the require filter with combiner to verify the integration.
+      code = <<~RUBY
+        module Foo
+          def bar; end
+        end
+        require_relative 'combiner/reopen_foo'
+      RUBY
+      result = Ruby2JS.convert(code,
+        eslevel: 2022,
+        file: __FILE__,
+        filters: [Ruby2JS::Filter::Require, Ruby2JS::Filter::Combiner]).to_s
+      _(result).must_include 'const Foo'
+      _(result).must_include 'bar()'
+      _(result).must_include 'baz()'
+      # Should only have one Foo definition (modules were merged)
+      _(result.scan('const Foo').length).must_equal 1
     end
   end
 

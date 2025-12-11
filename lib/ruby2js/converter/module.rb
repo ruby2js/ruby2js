@@ -86,7 +86,8 @@ module Ruby2JS
       elsif extend
         parse s(:assign, name, body)
       elsif name.children.first == nil
-        parse s(:lvasgn, name.children.last, body)
+        # Use casgn for const declaration (consistent with class_module)
+        parse s(:casgn, nil, name.children.last, body), :statement
       else
         parse s(:send, name.children.first, "#{name.children.last}=", body)
       end

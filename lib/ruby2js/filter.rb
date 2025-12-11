@@ -38,12 +38,34 @@ module Ruby2JS
 
         begin
           if registered_filters.include? name
+            mods_before = mods.length
+            defaults_before = Ruby2JS::Filter::DEFAULTS.dup
             require registered_filters[name]
 
-            Ruby2JS::Filter::DEFAULTS.each do |mod|
-              method = mod.instance_method(mod.instance_methods.first)
-              if registered_filters[name] == method.source_location.first
-                mods << mod
+            # Check if filter added itself to DEFAULTS
+            new_defaults = Ruby2JS::Filter::DEFAULTS - defaults_before
+            if new_defaults.any?
+              new_defaults.each { |mod| mods << mod }
+            else
+              # Also check existing DEFAULTS (file may have been required earlier)
+              Ruby2JS::Filter::DEFAULTS.each do |mod|
+                method = mod.instance_method(mod.instance_methods.first)
+                if registered_filters[name] == method.source_location.first
+                  mods << mod
+                end
+              end
+            end
+
+            # Fallback: Filter didn't register with DEFAULTS, try const_get
+            if mods.length == mods_before
+              mod_name = name.split('/').map { |part|
+                part.split('_').map(&:capitalize).join
+              }.join('::')
+              begin
+                mod = Ruby2JS::Filter.const_get(mod_name)
+                mods << mod if mod.is_a?(Module)
+              rescue NameError
+                # Module not found by that name
               end
             end
           elsif not name.empty? and name =~ /^[-\w\/]+$/

@@ -34,9 +34,9 @@ js = Ruby2JS.convert(source,
   ]
 ).to_s
 
-# Add export const prefix for ES module
-# Replace the assignment statement with export const version
+# Add export prefix for ES module
+# Replace the const/let assignment statement with export version
 # Handle leading semicolons, comments, and whitespace
 js = js.sub(/\A;\s*/, '') # Remove leading semicolon
-js = js.sub(/^Ruby2JS\s*=/, 'export const Ruby2JS =')
+js = js.sub(/^(const|let)\s+Ruby2JS\s*=/, 'export const Ruby2JS =')
 puts js

@@ -903,7 +903,7 @@ describe Ruby2JS do
 
     it "should handle module definitions" do
       to_js( 'module A; B=1; end' ).
-        must_equal 'A = (() => {const B = 1; return {B}})()'
+        must_equal 'const A = (() => {const B = 1; return {B}})()'
       to_js( 'module A; def b; return 1; end; end' ).
         must_equal 'const A = {get b() {return 1}}'
       to_js( 'module A; def b(); return 1; end; end' ).
@@ -914,7 +914,7 @@ describe Ruby2JS do
 
     it "should handle private sections" do
       to_js( 'module A; B=1; private; C=1; end' ).
-        must_equal 'A = (() => {const B = 1; const C = 1; return {B}})()'
+        must_equal 'const A = (() => {const B = 1; const C = 1; return {B}})()'
     end
 
     it "should handle nested modules" do

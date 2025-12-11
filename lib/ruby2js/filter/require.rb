@@ -13,6 +13,42 @@ module Ruby2JS
         super
       end
 
+      # Check if a node has a Pragma: skip comment on the same line
+      def has_skip_pragma?(node)
+        return false unless @comments
+
+        # Check comments in _raw array for this node's line
+        raw_comments = @comments[:_raw] || []
+        return false if raw_comments.empty?
+
+        # Get the line number of the node
+        line = nil
+        if node.respond_to?(:loc) && node.loc
+          loc = node.loc
+          if loc.respond_to?(:expression) && loc.expression
+            line = loc.expression.line
+          elsif loc.respond_to?(:line)
+            line = loc.line
+          end
+        end
+        return false unless line
+
+        # Check for Pragma: skip comment on this line
+        raw_comments.any? do |comment|
+          comment_line = nil
+          if comment.respond_to?(:loc) && comment.loc
+            comment_line = comment.loc.line
+          elsif comment.respond_to?(:location)
+            loc = comment.location
+            comment_line = loc.respond_to?(:start_line) ? loc.start_line : loc.line
+          end
+          next false unless comment_line == line
+
+          text = comment.respond_to?(:text) ? comment.text : comment.to_s
+          text =~ /#\s*Pragma:\s*skip/i
+        end
+      end
+
       def on_send(node)
         if \
           not @require_expr and # only statements
@@ -22,6 +58,11 @@ module Ruby2JS
           node.children[2].type == :str and
           @options[:file]
         then
+
+          # Check for Pragma: skip before trying to load the file
+          if has_skip_pragma?(node)
+            return s(:hide)
+          end
 
           begin
             file2 = @options[:file2]

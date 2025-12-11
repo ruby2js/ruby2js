@@ -145,13 +145,15 @@ export associateComments = ->(ast, comments) do
 end
 
 # Set up globals for modules that expect them
-export setupGlobals = ->() do
+export setupGlobals = ->(ruby2js_module) do
   globalThis.Prism = Prism
   globalThis.PrismSourceBuffer = PrismSourceBuffer
   globalThis.PrismSourceRange = PrismSourceRange
   globalThis.Hash = Hash
   globalThis.RUBY_VERSION = "3.4.0"
   globalThis.RUBY2JS_PARSER = "prism"
+  # Set up Ruby2JS global with Node class for prism_walker
+  globalThis.Ruby2JS = ruby2js_module if ruby2js_module
 end
 
 # Initialize Prism WASM parser
