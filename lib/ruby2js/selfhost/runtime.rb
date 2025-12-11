@@ -156,8 +156,8 @@ export setupGlobals = ->(ruby2js_module) do
   globalThis.Ruby2JS = ruby2js_module if ruby2js_module
 end
 
-# Initialize Prism WASM parser
-prismParse_ = nil # Pragma: let prismParse = null
+# Initialize Prism WASM parser (module-level variable for caching)
+prismParse_ = nil
 
 export async def initPrism
   prismParse_ ||= await Prism.loadPrism()
