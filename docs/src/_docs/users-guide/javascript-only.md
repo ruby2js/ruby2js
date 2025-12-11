@@ -1,24 +1,24 @@
 ---
 order: 9.4
-title: JavaScript-First Development
+title: JavaScript-Only Development
 top_section: User's Guide
-category: users-guide-js-first
+category: users-guide-js-only
 next_page_order: 10
 ---
 
-# JavaScript-First Development
+# JavaScript-Only Development
 
-This guide covers writing Ruby code that's designed primarily to run as JavaScript, with optional Ruby execution for testing. This is different from "dual-target" code—here, **JavaScript is the primary target**.
+This guide covers writing Ruby code that's designed exclusively to run as JavaScript. This is different from "dual-target" code—here, **JavaScript is the only target** and the code won't run in Ruby.
 
 This approach is ideal for:
 - Browser applications and SPAs
 - Node.js tools and libraries
 - Browser extensions
-- Self-hosting transpilers (like Ruby2JS itself)
+- CLI tools, runtimes, and scaffolding for self-hosted transpilers
 
 {% toc %}
 
-## Why JavaScript-First?
+## Why JavaScript-Only?
 
 **Try it** — this example uses JavaScript APIs directly:
 
@@ -52,10 +52,10 @@ Ruby2JS produces idiomatic JavaScript without a runtime. Combined with Ruby's cl
 
 ## Key Differences from Dual-Target
 
-| Aspect | Dual-Target | JavaScript-First |
-|--------|-------------|------------------|
+| Aspect | Dual-Target | JavaScript-Only |
+|--------|-------------|-----------------|
 | Primary runtime | Both Ruby and JS | JavaScript only |
-| Ruby execution | Production use | Testing only |
+| Ruby execution | Production use | None |
 | JS APIs | Avoided or wrapped | Used directly |
 | Ruby-only code | Minimized | Skipped liberally |
 | Pragmas | Occasional | Common |
@@ -86,7 +86,7 @@ data = await fetch('/api/users').then { |r| r.json() }
 
 ### Constructor Calls
 
-JavaScript's `new` keyword works naturally:
+JavaScript's `new` keyword works naturally. Ruby2JS preserves whether you use parentheses—`new Date` vs `new Date()`. While functionally equivalent for no-argument constructors, parentheses affect operator precedence (e.g., `new Date().getTime()` works but `new Date.getTime()` tries to construct `Date.getTime`):
 
 <div data-controller="combo" data-options='{
   "eslevel": 2022,
@@ -94,11 +94,29 @@ JavaScript's `new` keyword works naturally:
 }'></div>
 
 ```ruby
-date = Date.new
-map = Map.new
+date = Date.new       # new Date
+date = Date.new()     # new Date()
 url = URL.new(path, base_url)
-view = DataView.new(buffer)
 arr = Uint8Array.new(buffer, offset, length)
+```
+
+Note: Some JavaScript built-ins have special rules. Ruby2JS knows that `Symbol()` must not use `new`, while `Promise`, `Map`, and `Set` require it. Call `Symbol("name")` directly without `.new`.
+
+### JavaScript Operators
+
+The functions filter provides direct access to JavaScript operators:
+
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["functions"]
+}'></div>
+
+```ruby
+# typeof operator
+type = typeof(value)
+
+# debugger statement
+debugger
 ```
 
 ### Global Objects
@@ -195,7 +213,7 @@ async def load_data
 end
 ```
 
-## Patterns for JavaScript-First Code
+## Patterns for JavaScript-Only Code
 
 ### Entry Point Guard
 
@@ -253,7 +271,7 @@ enabled ||= true # Pragma: logical
 
 ### Property Access vs Method Calls
 
-Ruby2JS uses parentheses to distinguish between property access and method calls. **This is one of the most important concepts for JavaScript-first development.**
+Ruby2JS uses parentheses to distinguish between property access and method calls. **This is one of the most important concepts for JavaScript-only development.**
 
 <div data-controller="combo" data-options='{
   "eslevel": 2022,
@@ -341,9 +359,9 @@ options.each { |k, v| process(k, v) } # Pragma: entries
 handler.call(args) # Pragma: method
 ```
 
-## Real Example: Self-Hosted Ruby2JS
+## Real Example: Self-Hosted CLI
 
-The Ruby2JS project uses this approach for its browser bundle. Here's a simplified example:
+The Ruby2JS project uses this approach for its self-hosted CLI and runtime scaffolding. Here's a simplified example from the source buffer implementation:
 
 <div data-controller="combo" data-options='{
   "eslevel": 2022,
@@ -404,7 +422,7 @@ require_relative 'helper'  # This gets inlined
 
 ## Filter Configuration
 
-Recommended filters for JavaScript-first development:
+Recommended filters for JavaScript-only development:
 
 ```ruby
 Ruby2JS.convert(source,
@@ -484,32 +502,6 @@ class Token
   # Empty parens = method call: token.getText()
   def getText()
     @text
-  end
-end
-```
-
-## Testing JavaScript-First Code
-
-You can still run tests in Ruby:
-
-```ruby
-# test_helper.rb
-require 'minitest/autorun'
-
-# Mock JS APIs for Ruby testing
-module GlobalMocks
-  def console
-    @console ||= OpenStruct.new(log: ->(*args) { puts args.join(' ') })
-  end
-end
-
-# Your test file
-class MyClassTest < Minitest::Test
-  include GlobalMocks
-
-  def test_something
-    obj = MyClass.new
-    assert_equal "expected", obj.compute
   end
 end
 ```
