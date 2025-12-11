@@ -376,6 +376,15 @@ module Ruby2JS
         elsif method == :nil? and args.length == 0
           process S(:send, target, :==, s(:nil))
 
+        elsif method == :zero? and args.length == 0
+          process S(:send, target, :===, s(:int, 0))
+
+        elsif method == :positive? and args.length == 0
+          process S(:send, target, :>, s(:int, 0))
+
+        elsif method == :negative? and args.length == 0
+          process S(:send, target, :<, s(:int, 0))
+
         elsif [:start_with?, :end_with?].include? method and args.length == 1
           if method == :start_with?
             process S(:send, target, :startsWith, *args)

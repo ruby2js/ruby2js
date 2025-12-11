@@ -61,10 +61,12 @@ If you set the `eslevel` option to `2015` or newer, the Functions filter enables
 * `.method_defined?` {{ caret }} `klass.prototype.hasOwnProperty(meth)` or `meth in klass.prototype`
 * `.min` {{ caret }} `Math.min.apply(Math)`
 * `.min_by {}` {{ caret }} `.reduce()`
+* `.negative?` {{ caret }} `< 0`
 * `[-n] = x` {{ caret }} `[*.length-n] = x` for literal negative index assignment
 * `.new(size,default)` {{ caret }} `== .new(size).fill(default)`
 * `.nil?` {{ caret }} `== null`
 * `.ord` {{ caret }} `charCodeAt(0)`
+* `.positive?` {{ caret }} `> 0`
 * `puts` {{ caret }} `console.log`
 * `rand` {{ caret }} `Math.random`
 * `.reject {}` {{ caret }} `.filter(x => !(...))` (negated condition)
@@ -99,6 +101,7 @@ If you set the `eslevel` option to `2015` or newer, the Functions filter enables
 * `typeof(x)` {{ caret }} `typeof x` (JS type checking operator)
 * `.upcase` {{ caret }} `.toUpperCase`
 * `.yield_self {|n| n}` {{ caret }} `(n => n)(...)`
+* `.zero?` {{ caret }} `=== 0`
 * `[-n]` {{ caret }} `[*.length-n]` for literal values of `n`
 * `[n...m]` {{ caret }} `.slice(n,m)`
 * `[n..m]` {{ caret }} `.slice(n,m+1)`

@@ -344,6 +344,18 @@ describe Ruby2JS::Filter::Functions do
       to_js( 'a.nil?' ).must_equal 'a == null'
     end
 
+    it "should handle zero?" do
+      to_js( 'n.zero?' ).must_equal 'n === 0'
+    end
+
+    it "should handle positive?" do
+      to_js( 'n.positive?' ).must_equal 'n > 0'
+    end
+
+    it "should handle negative?" do
+      to_js( 'n.negative?' ).must_equal 'n < 0'
+    end
+
     it "should handle clear" do
       to_js( 'a.clear()' ).must_equal 'a.length = 0'
     end
