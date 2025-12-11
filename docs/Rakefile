@@ -170,39 +170,30 @@ task :install do
   end
 end
 
-# Selfhost demo - builds and copies the unified ruby2js.mjs bundle
+# Selfhost demo - delegates to demo/selfhost/Rakefile for building,
+# then copies files to docs site
 selfhost_dir = "#{dest}/selfhost"
 selfhost_source = "#{root}/demo/selfhost"
+selfhost_rakefile = "#{selfhost_source}/Rakefile"
 
 directory dest
 directory selfhost_dir => dest
 
-# Dependencies for the unified bundle
-selfhost_bundle_deps = Rake::FileList.new(
-  "#{root}/lib/ruby2js/node.rb",
-  "#{root}/lib/ruby2js/prism_walker.rb",
-  "#{root}/lib/ruby2js/prism_walker/*.rb",
-  "#{root}/lib/ruby2js/converter.rb",
-  "#{root}/lib/ruby2js/converter/*.rb",
-  "#{root}/lib/ruby2js/serializer.rb",
-  "#{root}/lib/ruby2js/namespace.rb",
-  "#{root}/lib/ruby2js/selfhost/*.rb",
-  "#{root}/lib/ruby2js/filter/selfhost.rb",
-  "#{root}/lib/ruby2js/filter/selfhost/*.rb"
-)
-
-# Build unified bundle in demo/selfhost
-file "#{selfhost_source}/ruby2js.mjs" => selfhost_bundle_deps do
+# Build selfhost bundle using the authoritative Rakefile
+# This ensures dependency tracking is in one place
+task :selfhost_build do
   Dir.chdir(selfhost_source) do
-    sh "npm run build:bundle"
+    sh "bundle exec rake -f Rakefile #{selfhost_source}/ruby2js.mjs #{selfhost_source}/prism_browser.mjs"
   end
 end
 
 # Install selfhost npm dependencies if needed (provides @ruby/prism)
 selfhost_prism_source = "#{selfhost_source}/node_modules/@ruby/prism"
-file selfhost_prism_source do
-  Dir.chdir(selfhost_source) do
-    sh "npm install"
+task :selfhost_npm_install do
+  unless File.exist?(selfhost_prism_source)
+    Dir.chdir(selfhost_source) do
+      sh "npm install"
+    end
   end
 end
 
@@ -210,26 +201,26 @@ end
 prism_dir = "#{selfhost_dir}/node_modules/@ruby/prism"
 directory "#{selfhost_dir}/node_modules/@ruby" => selfhost_dir
 
-file prism_dir => ["#{selfhost_dir}/node_modules/@ruby", selfhost_prism_source] do
-  cp_r selfhost_prism_source, prism_dir
+task :selfhost_copy_prism => ["#{selfhost_dir}/node_modules/@ruby", :selfhost_npm_install] do
+  cp_r selfhost_prism_source, prism_dir unless File.exist?(prism_dir)
 end
 
 # Copy browser-compatible Prism loader
-file "#{selfhost_dir}/prism_browser.mjs" => [selfhost_dir, "#{selfhost_source}/prism_browser.mjs"] do
+task :selfhost_copy_prism_browser => [selfhost_dir, :selfhost_build] do
   cp "#{selfhost_source}/prism_browser.mjs", "#{selfhost_dir}/prism_browser.mjs"
 end
 
 # Copy the unified bundle
-file "#{selfhost_dir}/ruby2js.mjs" => [selfhost_dir, "#{selfhost_source}/ruby2js.mjs"] do
+task :selfhost_copy_bundle => [selfhost_dir, :selfhost_build] do
   cp "#{selfhost_source}/ruby2js.mjs", "#{selfhost_dir}/ruby2js.mjs"
 end
 
 # Note: index.html is checked into docs/src/demo/selfhost/ directly
 
 task :selfhost => [
-  "#{selfhost_dir}/prism_browser.mjs",
-  "#{selfhost_dir}/ruby2js.mjs",
-  prism_dir
+  :selfhost_copy_prism_browser,
+  :selfhost_copy_bundle,
+  :selfhost_copy_prism
 ] do
   # Ensure all files are world-readable (needed for nginx in Docker)
   FileUtils.chmod_R(0644, Dir.glob("#{selfhost_dir}/**/*.mjs"))

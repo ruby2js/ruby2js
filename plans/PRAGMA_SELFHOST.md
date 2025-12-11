@@ -1,6 +1,6 @@
 # Pragma-Based Self-Hosting Plan
 
-## Status: Phase 6 Complete (CI Integration)
+## Status: Phase 7 Complete (Unified Bundle)
 
 This document describes the pragma-based approach to self-hosting Ruby2JS.
 
@@ -230,16 +230,54 @@ Comprehensive spec runner infrastructure:
   - **blocked**: Skipped with documented reasons
 
 **Current spec coverage:**
-- Ready: transliteration_spec (225 passed, 12 skipped)
-- Partial: serializer_spec (6 passed, 20 failed - needs polyfills)
+- Ready: transliteration_spec (245 passed, 2 skipped)
+- Partial: serializer_spec (253 passed, 18 failed - needs polyfills)
 - Blocked: 24 specs (need filters support)
+
+### Phase 7: Unified Bundle (COMPLETE)
+
+Single `ruby2js.mjs` bundle that works in all contexts:
+
+**Key changes:**
+- CLI, browser, and tests all use the same `ruby2js.mjs` bundle
+- Conditional Prism loading: browser uses `prism_browser.mjs`, Node.js uses `@ruby/prism`
+- Exports `convert()` function and `Ruby2JS` module with internal classes
+- Prism initializes at module load time (top-level await)
+
+**Removed obsolete files:**
+- Individual `dist/*.mjs` files (runtime, walker, converter, namespace)
+- Individual transpile scripts (transpile_runtime.rb, transpile_walker.rb, etc.)
+- Separate CLI file (now inlined in bundle)
+
+**File structure:**
+```
+demo/selfhost/
+├── ruby2js.mjs         # Unified bundle (CLI + importable)
+├── prism_browser.mjs   # Browser WASM loader
+├── browser_demo.html   # Browser demo
+├── test_harness.mjs    # Test framework (imports from bundle)
+├── test_*.mjs          # Tests (all import from bundle)
+├── run_all_specs.mjs   # CI spec runner
+└── dist/               # Only transpiled test specs
+```
+
+**Browser usage:**
+```javascript
+import { convert } from './ruby2js.mjs';
+const js = convert('puts "hello"');
+```
+
+**CLI usage:**
+```bash
+echo 'puts "hello"' | node ruby2js.mjs
+node ruby2js.mjs --ast myfile.rb
+```
 
 ### Future Work
 
 1. Transpile filters to JavaScript (biggest blocker for most specs)
-2. Implement `associate_comments` in JavaScript for comment preservation
-3. Fix remaining serializer spec failures
-4. Move specs from blocked → partial → ready as dependencies are met
+2. Fix remaining serializer spec failures
+3. Move specs from blocked → partial → ready as dependencies are met
 
 ## Success Criteria
 
@@ -248,8 +286,9 @@ Comprehensive spec runner infrastructure:
 - [x] Most transformations in general filters
 - [x] Source files have minimal pragmas (<5 per file average)
 - [x] Converter transpiles to valid JavaScript (~11,700 lines)
-- [ ] Specs transpile and pass in Node.js
-- [ ] Browser demo works
+- [x] Specs transpile and pass in Node.js (245/247 transliteration tests)
+- [x] Browser demo works (unified bundle)
+- [x] CLI, browser, and tests use same code
 
 ## Generalization: Dual-Target Ruby Development
 

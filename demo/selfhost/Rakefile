@@ -38,37 +38,17 @@ runtime_deps = FileList["#{ROOT}/lib/ruby2js/selfhost/runtime.rb"]
 # Prism browser dependencies
 prism_browser_deps = FileList["#{ROOT}/lib/ruby2js/selfhost/prism_browser.rb"]
 
-# Bundle dependencies
-bundle_deps = FileList["#{ROOT}/lib/ruby2js/selfhost/bundle.rb"]
-
-desc "Build runtime.mjs"
-file "#{DIST}/runtime.mjs" => [DIST, *runtime_deps, *selfhost_deps] do
-  sh bundle_exec("ruby #{SELFHOST}/scripts/transpile_runtime.rb > #{DIST}/runtime.mjs")
-end
+# Bundle dependencies (includes CLI)
+bundle_deps = FileList["#{ROOT}/lib/ruby2js/selfhost/bundle.rb", "#{ROOT}/lib/ruby2js/selfhost/cli.rb"]
 
 desc "Build prism_browser.mjs (in selfhost root for correct node_modules paths)"
 file "#{SELFHOST}/prism_browser.mjs" => [*prism_browser_deps, *selfhost_deps] do
   sh bundle_exec("ruby #{SELFHOST}/scripts/transpile_prism_browser.rb > #{SELFHOST}/prism_browser.mjs")
 end
 
-desc "Build namespace.mjs"
-file "#{DIST}/namespace.mjs" => [DIST, *namespace_deps, *selfhost_deps] do
-  sh bundle_exec("ruby #{SELFHOST}/scripts/transpile_namespace.rb > #{DIST}/namespace.mjs")
-end
-
-desc "Build walker.mjs"
-file "#{DIST}/walker.mjs" => [DIST, "#{DIST}/namespace.mjs", *walker_deps, *selfhost_deps] do
-  sh bundle_exec("ruby #{SELFHOST}/scripts/transpile_walker.rb > #{DIST}/walker.mjs")
-end
-
-desc "Build converter.mjs"
-file "#{DIST}/converter.mjs" => [DIST, "#{DIST}/namespace.mjs", *converter_deps, *selfhost_deps] do
-  sh bundle_exec("ruby #{SELFHOST}/scripts/transpile_converter.rb > #{DIST}/converter.mjs")
-end
-
-desc "Build bundle.mjs (entry point for Node.js CLI)"
-file "#{DIST}/bundle.mjs" => [DIST, *bundle_deps, "#{DIST}/runtime.mjs", "#{DIST}/namespace.mjs", "#{DIST}/walker.mjs", "#{DIST}/converter.mjs"] do
-  sh bundle_exec("ruby #{SELFHOST}/scripts/transpile_bundle.rb > #{DIST}/bundle.mjs")
+desc "Build ruby2js.mjs (unified bundle for CLI, browser, and tests)"
+file "#{SELFHOST}/ruby2js.mjs" => [*bundle_deps, *runtime_deps, *namespace_deps, *walker_deps, *converter_deps, *selfhost_deps] do
+  sh bundle_exec("ruby #{SELFHOST}/scripts/transpile_bundle.rb > #{SELFHOST}/ruby2js.mjs")
 end
 
 # Dynamically create spec file tasks based on manifest
@@ -97,8 +77,8 @@ manifest['partial'].each do |entry|
   end
 end
 
-# Core build targets
-CORE_TARGETS = ["#{DIST}/bundle.mjs", "#{SELFHOST}/prism_browser.mjs"]
+# Core build targets (unified bundle and prism_browser)
+CORE_TARGETS = ["#{SELFHOST}/ruby2js.mjs", "#{SELFHOST}/prism_browser.mjs"]
 
 desc "Build all transpiled files (bundle, prism_browser, specs)"
 task :build => CORE_TARGETS do
@@ -137,7 +117,7 @@ task :npm_install do
 end
 
 desc "Run walker unit tests"
-task :test_walker => [:npm_install, "#{DIST}/walker.mjs"] do
+task :test_walker => [:npm_install, "#{SELFHOST}/ruby2js.mjs"] do
   Dir.chdir(SELFHOST) do
     sh "node test_walker.mjs"
   end
@@ -171,9 +151,11 @@ task :test => [:build, :test_walker, :test_specs]
 desc "Build and run CI tests (ready must pass, partial informational)"
 task :ci => [:build_ready, :build_partial, :test_walker, :test_ready, :test_partial]
 
-desc "Clean dist directory"
+desc "Clean dist directory and generated files"
 task :clean do
   rm_rf DIST
+  rm_f "#{SELFHOST}/ruby2js.mjs"
+  rm_f "#{SELFHOST}/prism_browser.mjs"
 end
 
 task :default => :test

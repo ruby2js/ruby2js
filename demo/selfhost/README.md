@@ -2,19 +2,18 @@
 
 This directory contains Ruby2JS running entirely in JavaScript, using the actual Ruby2JS converter transpiled from Ruby source.
 
-## Status: Transliteration Complete
+## Status: Unified Bundle Complete
 
-The full transliteration test suite passes. Two tests are intentionally skipped (Proc source location - a JavaScript limitation).
+A single `ruby2js.mjs` bundle provides the full converter for both CLI and browser use. The same code is tested in CI, runs in Node.js CLI, and works in browsers.
 
 **Supported:**
 - Classes, methods, blocks, string interpolation
 - Arrays, hashes, if/else/case, loops, operators
 - Comments (preserved in output)
-- Full transliteration test suite
+- Full transliteration test suite (245 tests passing)
 
 **Not yet supported:**
-- eslevel options
-- Filters
+- Filters (functions, camelCase, esm, etc.)
 - Other configuration options
 
 ## Architecture
@@ -40,14 +39,7 @@ JavaScript Output
 ```bash
 cd demo/selfhost
 npm install
-
-# Build transpiled files (using Rakefile - recommended)
-rake build
-
-# Or using npm scripts
 npm run build
-
-# Run tests
 npm test
 ```
 
@@ -55,79 +47,97 @@ npm test
 
 | File | Description |
 |------|-------------|
-| `dist/runtime.mjs` | Transpiled runtime classes (PrismSourceBuffer, Hash, etc.) |
-| `dist/converter.mjs` | Transpiled converter |
-| `dist/walker.mjs` | Transpiled PrismWalker |
-| `dist/namespace.mjs` | Transpiled Namespace class |
-| `dist/bundle.mjs` | Entry point that re-exports all modules |
+| `ruby2js.mjs` | Unified bundle - CLI and importable module |
 | `prism_browser.mjs` | Browser WASM loader for Prism |
-| `ruby2js.mjs` | CLI tool for JS converter |
 | `browser_demo.html` | Browser demo page |
+| `test_harness.mjs` | Test framework for specs |
 | `run_all_specs.mjs` | Manifest-driven spec runner for CI |
+| `dist/` | Transpiled test specs only |
 
 ## Source Files
 
-All JavaScript modules are transpiled from Ruby source files:
+The unified bundle is transpiled from Ruby source files:
 
 | Ruby Source | JavaScript Output |
 |-------------|-------------------|
-| `lib/ruby2js/selfhost/runtime.rb` | `dist/runtime.mjs` |
+| `lib/ruby2js/selfhost/bundle.rb` | `ruby2js.mjs` |
+| `lib/ruby2js/selfhost/runtime.rb` | (inlined in bundle) |
+| `lib/ruby2js/selfhost/cli.rb` | (inlined in bundle) |
 | `lib/ruby2js/selfhost/prism_browser.rb` | `prism_browser.mjs` |
-| `lib/ruby2js/selfhost/bundle.rb` | `dist/bundle.mjs` |
-| `lib/ruby2js/namespace.rb` | `dist/namespace.mjs` |
-| `lib/ruby2js/prism_walker.rb` | `dist/walker.mjs` |
-| `lib/ruby2js/converter.rb` + handlers | `dist/converter.mjs` |
+| `lib/ruby2js/namespace.rb` | (inlined in bundle) |
+| `lib/ruby2js/prism_walker.rb` | (inlined in bundle) |
+| `lib/ruby2js/converter.rb` + handlers | (inlined in bundle) |
 
 ## npm Scripts
 
 | Script | Description |
 |--------|-------------|
-| `npm test` | Run all tests via manifest |
-| `npm run build` | Build all transpiled files |
-| `npm run build:runtime` | Regenerate runtime from Ruby source |
-| `npm run build:prism-browser` | Regenerate prism_browser from Ruby source |
-| `npm run build:namespace` | Regenerate namespace from Ruby source |
-| `npm run build:walker` | Regenerate walker from Ruby source |
-| `npm run build:converter` | Regenerate converter from Ruby source |
-| `npm run build:bundle` | Regenerate bundle from Ruby source |
-| `npm run clean` | Remove all transpiled files |
-
-## Rake Tasks
-
-The Rakefile provides dependency-aware builds (only rebuilds when source changes):
-
-| Task | Description |
-|------|-------------|
-| `rake build` | Build all transpiled files |
-| `rake build_ready` | Build core + ready specs |
-| `rake test` | Build and run all tests |
-| `rake ci` | CI build (ready must pass, partial informational) |
-| `rake clean` | Remove dist directory |
+| `npm test` | Run all tests (CLI, walker, specs) |
+| `npm run build` | Build bundle, prism_browser, and specs |
+| `npm run build:bundle` | Regenerate ruby2js.mjs from Ruby source |
+| `npm run build:prism-browser` | Regenerate prism_browser.mjs |
+| `npm run build:spec` | Transpile test specs |
+| `npm run clean` | Remove generated files |
 
 ## CLI Usage
 
 ```bash
-# Basic conversion (reads from stdin)
-echo 'puts "hello"' | node ruby2js.mjs --stdin
+# Basic conversion (reads from stdin or file)
+echo 'puts "hello"' | node ruby2js.mjs
+node ruby2js.mjs myfile.rb
 
 # Show raw Prism AST
-echo 'x = 1' | node ruby2js.mjs --stdin --ast
+echo 'x = 1' | node ruby2js.mjs --ast
 
 # Show Walker AST (Parser-compatible format)
-echo 'x = 1' | node ruby2js.mjs --stdin --walker-ast
+echo 'x = 1' | node ruby2js.mjs --walker-ast
+
+# Find nodes in AST
+echo 'x ||= 1' | node ruby2js.mjs --find=OrAssign
+
+# Full help
+node ruby2js.mjs --help
 ```
 
-## Browser Demo
+## Browser Usage
 
-Open `browser_demo.html` directly in a browser, or run via a local server:
+Import directly from the bundle:
+
+```html
+<script type="module">
+  import { convert } from './ruby2js.mjs';
+
+  const js = convert('puts "hello"');
+  console.log(js); // console.log("hello")
+</script>
+```
+
+Or open `browser_demo.html` via a local server:
 
 ```bash
-# From demo/selfhost directory
 npx serve .
 # Open http://localhost:3000/browser_demo.html
 ```
 
-The browser demo loads Prism WASM and runs the transpiled converter entirely client-side.
+## Exported API
+
+The bundle exports:
+
+```javascript
+import {
+  convert,           // Main conversion function
+  Ruby2JS,           // Module with internal classes
+  initPrism,         // Initialize Prism parser
+  getPrismParse,     // Get the Prism parse function
+  // Plus runtime classes for advanced usage
+} from './ruby2js.mjs';
+
+// Simple usage
+const js = convert(rubySource, { eslevel: 2022 });
+
+// Access internal classes
+const { PrismWalker, Converter, Serializer, Node, Namespace } = Ruby2JS;
+```
 
 ## Filter Chain
 
@@ -150,15 +160,13 @@ filters: [
 
 ## Known Limitations
 
-- **2 tests skipped**: Proc source location (JavaScript limitation - can't get source of a function)
+- **2 tests skipped**: Proc source location (JavaScript limitation)
 - **No filters**: The `functions`, `camelCase`, `esm`, etc. filters are not yet transpiled
-- **No eslevel**: ES level configuration options are not yet supported
 
 ## Future Work
 
 1. Transpile filters to JavaScript
-2. Add eslevel support
-3. Add configuration options
+2. Add configuration options
 
 ## References
 
