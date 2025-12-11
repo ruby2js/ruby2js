@@ -23,11 +23,8 @@ describe 'not implemented' do
     todo( '1...2' )
   end
 
-  it "class visibility modifiers" do
-    todo( 'class C; public; end' )
-    todo( 'class C; private; end' )
-    todo( 'class C; protected; end' )
-  end
+  # class visibility modifiers are now implemented
+  # see es2022_spec.rb and converter_spec.rb for tests
 
   it "pattern matching" do
     todo("case x; in {a:}; a; end")  # case_match

@@ -53,7 +53,23 @@ module Ruby2JS
 
         # capture constructor, method names for automatic self referencing
         constructor_args = Set.new
+        private_methods = Set.new
+        method_visibility = :public
         body.each do |m|
+          # Track visibility changes
+          if m.type == :send and m.children.first == nil
+            if m.children[1] == :private
+              method_visibility = :private
+              next
+            elsif m.children[1] == :protected
+              method_visibility = :protected
+              next
+            elsif m.children[1] == :public
+              method_visibility = :public
+              next
+            end
+          end
+
           if m.type == :def
             prop = m.children.first
             if prop == :initialize and !@rbstack.last[:initialize]
@@ -69,25 +85,50 @@ module Ruby2JS
                 end
               end
             elsif prop.to_s.end_with? '='
-              @rbstack.last[prop.to_s[0..-2].to_sym] = s(:autobind, s(:self))
+              base_node = s(:autobind, s(:self))
+              # Wrap private setters so send.rb can apply the prefix
+              if method_visibility == :private
+                private_methods << prop
+                prefix = (es2022 and !underscored_private) ? '#' : '_'
+                base_node = s(:private_method, prefix, base_node)
+              end
+              @rbstack.last[prop.to_s[0..-2].to_sym] = base_node
             else
               # Store both symbol and string-without-suffix versions of the method name
               # to match how send.rb looks up methods:
               # - For regular methods (no ?/!), send.rb looks up by symbol
               # - For ?/! methods, send.rb strips suffix and looks up by string
-              @rbstack.last[prop] = m.is_method? ? s(:autobind, s(:self)) : s(:self)
+              base_node = m.is_method? ? s(:autobind, s(:self)) : s(:self)
+
+              # Wrap private methods so send.rb can apply the prefix
+              if method_visibility == :private
+                private_methods << prop
+                prefix = (es2022 and !underscored_private) ? '#' : '_'
+                base_node = s(:private_method, prefix, base_node)
+              end
+
+              @rbstack.last[prop] = base_node
               if prop.to_s =~ /[?!]$/
                 key = prop.to_s.sub(/[?!]$/, '')
-                @rbstack.last[key] = m.is_method? ? s(:autobind, s(:self)) : s(:self)
+                @rbstack.last[key] = base_node
               end
             end
           elsif m.type == :send and m.children[0..1] == [nil, :async]
             if m.children[2].type == :def
               prop = m.children[2].children.first
-              @rbstack.last[prop] = s(:autobind, s(:self))
+              base_node = s(:autobind, s(:self))
+
+              # Wrap private async methods
+              if method_visibility == :private
+                private_methods << prop
+                prefix = (es2022 and !underscored_private) ? '#' : '_'
+                base_node = s(:private_method, prefix, base_node)
+              end
+
+              @rbstack.last[prop] = base_node
               if prop.to_s =~ /[?!]$/
                 key = prop.to_s.sub(/[?!]$/, '')
-                @rbstack.last[key] = s(:autobind, s(:self))
+                @rbstack.last[key] = base_node
               end
             end
           end
@@ -177,6 +218,8 @@ module Ruby2JS
         # process class definition
         post = []
         skipped = false
+        visibility = :public
+
         body.each do |m|
           put(index == 0 ? @nl : @sep) unless skipped
           index += 1
@@ -220,6 +263,18 @@ module Ruby2JS
             elsif @prop.to_s.end_with? '?'
               @prop = @prop.to_s.sub('?', '')
               m = m.updated(m.type, [@prop, *m.children[1..2]])
+            end
+
+            # Handle private methods
+            if visibility == :private and @prop != :constructor
+              prefix = (es2022 and !underscored_private) ? '#' : '_'
+              # Extract base method name from @prop (which may be "get foo" or just "foo")
+              if @prop.to_s.start_with?('get ', 'set ')
+                kind, base_name = @prop.to_s.split(' ', 2)
+                @prop = "#{kind} #{prefix}#{base_name}"
+              else
+                @prop = "#{prefix}#{@prop}"
+              end
             end
 
             begin
@@ -287,8 +342,15 @@ module Ruby2JS
                 @rbstack.last[var] = s(:self)
                 put "set #{var}(#{var}) {#{@nl}this.#{p}#{var} = #{var}#@nl}"
               end
-            elsif [:private, :protected, :public].include? m.children[1]
-              raise Error.new("class #{m.children[1]} is not supported", @ast)
+            elsif m.children[1] == :private
+              visibility = :private
+              skipped = true
+            elsif m.children[1] == :protected
+              visibility = :protected
+              skipped = true
+            elsif m.children[1] == :public
+              visibility = :public
+              skipped = true
             else
               if m.children[1] == :include
                 m = m.updated(:begin, m.children[2..-1].map {|mname|
@@ -335,7 +397,12 @@ module Ruby2JS
           end
 
           if skipped
-            post << [m, node_comments] unless m.type == :defineProps
+            # Don't add visibility keywords or defineProps to post
+            unless m.type == :defineProps or
+              (m.type == :send and m.children.first == nil and
+               [:private, :protected, :public].include?(m.children[1]))
+              post << [m, node_comments]
+            end
           else
             (node_comments || []).reverse.each {|comment| insert location, comment}
           end

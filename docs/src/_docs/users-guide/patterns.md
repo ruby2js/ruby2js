@@ -39,7 +39,7 @@ Note: Instance variables become underscore-prefixed properties by default (confi
 
 ### Private Methods
 
-Mark private methods and they'll be prefixed with underscore in JavaScript:
+Mark private methods and they'll be prefixed appropriately in JavaScript. With ES2022, private methods use the `#` prefix (true JavaScript private methods). With older ES levels or `underscored_private: true`, they use `_` prefix:
 
 <div data-controller="combo" data-options='{
   "eslevel": 2022,
@@ -64,6 +64,8 @@ class Calculator
   end
 end
 ```
+
+Calls to private methods (with or without explicit `self`) are automatically prefixed to match the method definition.
 
 ### Method Calls vs Property Access
 
@@ -444,7 +446,8 @@ The `preset` mode enables:
 | Pattern | Works Well | Needs Care |
 |---------|------------|------------|
 | Classes | ✓ Directly translates | |
-| Methods | ✓ Normal methods | Private with underscore |
+| Methods | ✓ Normal methods | |
+| Private methods | ✓ `#` prefix (ES2022) or `_` prefix | |
 | Arrays | ✓ Most operations | `<<` needs pragma |
 | Hashes | ✓ Symbol keys | `.each` needs pragma |
 | Blocks | ✓ Arrow functions | Use noes2015 for `this` |

@@ -132,4 +132,48 @@ describe "ES2022 support" do
       to_js_fn('x.last').must_equal('x.at(-1)')
     end
   end
+
+  describe :PrivateMethods do
+    it "should convert private methods to #methods" do
+      to_js( 'class C; def foo; helper; end; private; def helper; 1; end; end' ).
+        must_equal 'class C {get foo() {return this.#helper}; get #helper() {return 1}}'
+    end
+
+    it "should handle private method calls with arguments" do
+      to_js( 'class C; def foo; helper(1, 2); end; private; def helper(a, b); a + b; end; end' ).
+        must_equal 'class C {get foo() {return this.#helper(1, 2)}; #helper(a, b) {a + b}}'
+    end
+
+    it "should handle explicit self receiver for private methods" do
+      to_js( 'class C; def foo; self.helper; end; private; def helper; 1; end; end' ).
+        must_equal 'class C {get foo() {return this.#helper}; get #helper() {return 1}}'
+    end
+
+    it "should handle private setters" do
+      to_js( 'class C; def set(v); self.internal = v; end; private; def internal=(v); @v = v; end; end' ).
+        must_equal 'class C {#v; set(v) {this.#internal = v}; set #internal(v) {this.#v = v}}'
+    end
+
+    it "should handle multiple private methods" do
+      to_js( 'class C; private; def a; 1; end; def b; a; end; end' ).
+        must_equal 'class C {get #a() {return 1}; get #b() {return this.#a}}'
+    end
+
+    it "should handle public after private" do
+      to_js( 'class C; private; def priv; 1; end; public; def pub; priv; end; end' ).
+        must_equal 'class C {get #priv() {return 1}; get pub() {return this.#priv}}'
+    end
+  end
+
+  describe :PrivateMethodsUnderscored do
+    it "should convert private methods to _methods with underscored_private" do
+      to_js_underscored( 'class C; def foo; helper; end; private; def helper; 1; end; end' ).
+        must_equal 'class C {get foo() {return this._helper}; get _helper() {return 1}}'
+    end
+
+    it "should handle explicit self receiver with underscored_private" do
+      to_js_underscored( 'class C; def foo; self.helper; end; private; def helper; 1; end; end' ).
+        must_equal 'class C {get foo() {return this._helper}; get _helper() {return 1}}'
+    end
+  end
 end

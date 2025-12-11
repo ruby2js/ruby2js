@@ -156,6 +156,32 @@ triggers on `false`).
 * `@x` {{ caret }} `this.#x` (unless the `underscored_private` option is set to `true`)
 * `@@x` {{ caret }} `ClassName.#x`
 * `self.a = []` {{ caret }} `static a = []` (within a class)
+* `private` {{ caret }} methods after `private` use `#` prefix (e.g., `#helper()`)
+
+Private method support allows you to use Ruby's `private` keyword to mark methods as private:
+
+```ruby
+class Calculator
+  def calculate(x)
+    helper(x)      # Calls this.#helper(x)
+  end
+
+  private
+
+  def helper(x)    # Becomes #helper(x)
+    x * 2
+  end
+end
+```
+
+Both implicit and explicit `self` calls to private methods are correctly prefixed:
+
+```ruby
+helper(x)       # => this.#helper(x)
+self.helper(x)  # => this.#helper(x)
+```
+
+When `underscored_private: true` is set, private methods use `_` prefix instead of `#`.
 
 When the `functions` filter is enabled, the following additional conversions are
 made:

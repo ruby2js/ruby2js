@@ -464,7 +464,12 @@ Ruby2JS.convert("color 'red'",
 
 ## Underscored private
 
-Private fields in JavaScript classes differ from instance variables in Ruby classes in that subclasses can't access private fields in parent classes.  The `underscored_private` (`underscored_ivars` in the configuration file) option makes such variables public but prefixed with an underscore instead.
+Private fields in JavaScript classes differ from instance variables in Ruby classes in that subclasses can't access private fields in parent classes.  The `underscored_private` (`underscored_ivars` in the configuration file) option makes such variables and methods public but prefixed with an underscore instead.
+
+This option affects:
+- **Instance variables**: `@x` becomes `this._x` instead of `this.#x`
+- **Class variables**: `@@x` becomes `ClassName._x` instead of `ClassName.#x`
+- **Private methods**: Methods after `private` use `_helper()` instead of `#helper()`
 
 ```ruby
 # Configuration
@@ -473,8 +478,13 @@ underscored_ivars
 ```
 
 ```ruby
-puts Ruby2JS.convert('class C; def initialize; @a=1; end; end', eslevel: 2020,
+puts Ruby2JS.convert('class C; def initialize; @a=1; end; end', eslevel: 2022,
   underscored_private: true)
+
+# Private methods example
+puts Ruby2JS.convert('class C; private; def helper; 1; end; end', eslevel: 2022,
+  underscored_private: true)
+# => class C {get _helper() {return 1}}
 ```
 
 ## Width

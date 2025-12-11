@@ -144,11 +144,32 @@ module Ruby2JS
       # resolve anonymous receivers against rbstack
       receiver ||= @rbstack.map {|rb| rb[method]}.compact.last || nil # Pragma: logical
       autobind = nil
+      private_prefix = nil
+
+      # Also check for private methods when receiver is explicit self
+      if receiver&.type == :self
+        # For setters (method=), check the @rbstack entry without the =
+        lookup_key = method.to_s.end_with?('=') ? method.to_s[0..-2].to_sym : method
+        rbstack_entry = @rbstack.map {|rb| rb[lookup_key]}.compact.last
+        if rbstack_entry&.type == :private_method
+          private_prefix = rbstack_entry.children.first
+        end
+      end
 
       if receiver
         if receiver.type == :autobind
           autobind = receiver = receiver.children.first
           autobind = nil unless @autobind
+        end
+
+        # Handle private methods - extract prefix and inner receiver
+        if receiver.type == :private_method
+          private_prefix = receiver.children.first
+          receiver = receiver.children[1]
+          if receiver.type == :autobind
+            autobind = receiver = receiver.children.first
+            autobind = nil unless @autobind
+          end
         end
 
         group_receiver = receiver.type == :send &&
@@ -266,7 +287,10 @@ module Ruby2JS
         multi_assign_declarations if @state == :statement
 
         (group_receiver ? group(receiver) : parse(receiver))
-        put "#{ '.' if receiver }#{ method.to_s.sub(/=$/, ' =') } "
+        # Apply private prefix if present (setter name without = plus ' =')
+        setter_name = method.to_s.sub(/=$/, '')
+        setter_name = "#{private_prefix}#{setter_name}" if private_prefix
+        put "#{ '.' if receiver }#{ setter_name } = "
         parse args.first, (@state == :method ? :method : :expression)
 
       elsif method == :new
@@ -362,18 +386,20 @@ module Ruby2JS
 
         # :send! and :call force method call output (with parens)
         # :await preserves is_method? from the underlying node via updated()
+        # Apply private method prefix if present
+        method_name = private_prefix ? "#{private_prefix}#{method}" : method
         if not @ast.is_method? and ![:send!, :call].include?(@ast.type)
           if receiver
             (group_receiver ? group(receiver) : parse(receiver))
-            put ".#{ method }"
+            put ".#{ method_name }"
           elsif @ast.type == :attr
-            put method
+            put method_name
           else
-            parse @ast.updated(:lvasgn, [method]), @state
+            parse @ast.updated(:lvasgn, [method_name]), @state
           end
         else
           (group_receiver ? group(receiver) : parse(receiver))
-          put "#{ '.' if receiver && method}#{ method }"
+          put "#{ '.' if receiver && method_name}#{ method_name }"
 
           if args.length <= 1
             put "("; parse_all(*args, join: ', '); put ')'
