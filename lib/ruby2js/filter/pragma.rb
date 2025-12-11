@@ -47,6 +47,7 @@ module Ruby2JS
         'array' => :array,
         'hash' => :hash,
         'string' => :string,
+        'set' => :set,
         # Behavior pragmas
         'method' => :method,         # proc.call → fn()
         'self' => :self_pragma,      # self → this (avoid conflict with :self)
@@ -318,21 +319,27 @@ module Ruby2JS
             return process target
           end
 
-        # << - Array: push, String: +=
+        # << - Array: push, Set: add, String: +=
         when :<<
           if pragma?(node, :array) && args.length == 1
             # target.push(arg)
             return process s(:send, target, :push, args.first)
+          elsif pragma?(node, :set) && args.length == 1
+            # target.add(arg)
+            return process s(:send, target, :add, args.first)
           elsif pragma?(node, :string) && args.length == 1
             # target += arg (returns new string)
             return process s(:op_asgn, target, :+, args.first)
           end
 
-        # .include? - Array: includes(), String: includes(), Hash: 'key' in obj
+        # .include? - Array: includes(), String: includes(), Set: has(), Hash: 'key' in obj
         when :include?
           if pragma?(node, :hash) && args.length == 1
             # arg in target (uses :in? synthetic type)
             return process s(:in?, args.first, target)
+          elsif pragma?(node, :set) && args.length == 1
+            # target.has(arg) - Set membership check
+            return process s(:send, target, :has, args.first)
           end
           # Note: array and string both use .includes() which functions filter handles
 

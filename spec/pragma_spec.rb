@@ -247,6 +247,24 @@ describe Ruby2JS::Filter::Pragma do
     end
   end
 
+  describe "set pragma" do
+    it "should convert << to add" do
+      to_js('s << item # Pragma: set').
+        must_equal 's.add(item)'
+    end
+
+    it "should convert include? to has" do
+      to_js('s.include?(item) # Pragma: set').
+        must_equal 's.has(item)'
+    end
+
+    it "should not affect << without pragma" do
+      # Without pragma, << becomes push (array default)
+      to_js('s << item').
+        must_equal 's.push(item)'
+    end
+  end
+
   describe "string pragma" do
     it "should convert dup to no-op" do
       to_js('x = str.dup # Pragma: string').

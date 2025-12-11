@@ -191,6 +191,23 @@ obj.include?(key) # Pragma: hash
 **When to use:** When you need hash-specific operations like the `in` operator
 for key checking.
 
+### `set`
+
+Specifies that the receiver is a Set.
+
+```ruby
+s << item # Pragma: set
+# => s.add(item)
+
+s.include?(item) # Pragma: set
+# => s.has(item)
+```
+
+**When to use:** When working with JavaScript `Set` objects. Ruby's `Set#<<`
+becomes `.push()` by default (array behavior), and `Set#include?` becomes
+`.includes()`. Use this pragma to get the correct Set methods: `.add()` and
+`.has()`.
+
 ### `string`
 
 Specifies that the receiver is a String.

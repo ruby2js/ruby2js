@@ -80,7 +80,7 @@ module Ruby2JS
                 args_node.children.each do |arg|
                   case arg.type
                   when :arg, :optarg, :restarg, :kwarg, :kwoptarg, :kwrestarg
-                    constructor_args << arg.children.first if arg.children.first
+                    constructor_args << arg.children.first if arg.children.first # Pragma: set
                   end
                 end
               end
@@ -88,7 +88,7 @@ module Ruby2JS
               base_node = s(:autobind, s(:self))
               # Wrap private setters so send.rb can apply the prefix
               if method_visibility == :private
-                private_methods << prop
+                private_methods << prop # Pragma: set
                 prefix = (es2022 and !underscored_private) ? '#' : '_'
                 base_node = s(:private_method, prefix, base_node)
               end
@@ -102,7 +102,7 @@ module Ruby2JS
 
               # Wrap private methods so send.rb can apply the prefix
               if method_visibility == :private
-                private_methods << prop
+                private_methods << prop # Pragma: set
                 prefix = (es2022 and !underscored_private) ? '#' : '_'
                 base_node = s(:private_method, prefix, base_node)
               end
@@ -120,7 +120,7 @@ module Ruby2JS
 
               # Wrap private async methods
               if method_visibility == :private
-                private_methods << prop
+                private_methods << prop # Pragma: set
                 prefix = (es2022 and !underscored_private) ? '#' : '_'
                 base_node = s(:private_method, prefix, base_node)
               end
@@ -189,7 +189,7 @@ module Ruby2JS
           # Only hoist ivasgn to class field if RHS doesn't reference constructor args
           references_args = lambda do |node|
             next false unless ast_node?(node)
-            next true if node.type == :lvar && constructor_args.include?(node.children.first)
+            next true if node.type == :lvar && constructor_args.include?(node.children.first) # Pragma: set
             node.children.any? { |child| references_args.call(child) }
           end
 
