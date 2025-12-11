@@ -6,6 +6,26 @@ module Ruby2JS
     module Pragma
       include SEXP
 
+      # Ensure pragma runs before functions and esm filters so that
+      # pragmas like skip, entries, method are processed first
+      def self.reorder(filters)
+        dominated = [
+          defined?(Ruby2JS::Filter::Functions) ? Ruby2JS::Filter::Functions : nil,
+          defined?(Ruby2JS::Filter::ESM) ? Ruby2JS::Filter::ESM : nil
+        ].compact.select { |f| filters.include?(f) }
+
+        return filters if dominated.empty?
+
+        filters = filters.dup
+        pragma = filters.delete(Ruby2JS::Filter::Pragma)
+
+        # Find the earliest position of any dominated filter
+        earliest_index = dominated.map { |f| filters.index(f) }.min
+        filters.insert(earliest_index, pragma)
+
+        filters
+      end
+
       # Mapping from pragma comment text to internal symbol
       PRAGMAS = {
         '??' => :nullish,

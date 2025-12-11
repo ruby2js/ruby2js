@@ -32,10 +32,10 @@ export class Counter
   def initialize(element)
     @element = element
     @count = 0
-    @element.addEventListener('click') { increment }
+    @element.addEventListener('click') { increment() }
   end
 
-  def increment
+  def increment()
     @count += 1
     @element.textContent = "Count: #{@count}"
   end
@@ -240,7 +240,7 @@ Use pragmas to control `||` vs `??`:
 
 <div data-controller="combo" data-options='{
   "eslevel": 2022,
-  "filters": ["functions"]
+  "filters": ["functions", "pragma"]
 }'></div>
 
 ```ruby
@@ -253,7 +253,7 @@ enabled ||= true # Pragma: logical
 
 ### Property Access vs Method Calls
 
-Ruby2JS uses parentheses to distinguish:
+Ruby2JS uses parentheses to distinguish between property access and method calls. **This is one of the most important concepts for JavaScript-first development.**
 
 <div data-controller="combo" data-options='{
   "eslevel": 2022,
@@ -261,7 +261,7 @@ Ruby2JS uses parentheses to distinguish:
 }'></div>
 
 ```ruby
-# No parens = property access
+# No parens = property access (getter)
 len = obj.length
 first = arr.first
 
@@ -273,13 +273,40 @@ result = obj.process()
 obj.set(42)
 ```
 
+**This applies to your own methods too.** When defining methods:
+- `def foo` — becomes a getter, accessed as `obj.foo`
+- `def foo()` — becomes a method, called as `obj.foo()`
+
+When calling methods (especially in callbacks):
+
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["functions"]
+}'></div>
+
+```ruby
+class Widget
+  def setup()
+    # WRONG: increment without parens just returns the getter
+    # @button.addEventListener('click') { increment }
+
+    # RIGHT: use parens to actually call the method
+    @button.addEventListener('click') { increment() }
+  end
+
+  def increment()
+    @count += 1
+  end
+end
+```
+
 ### Skipping Ruby-Only Code
 
 Use `# Pragma: skip` liberally:
 
 <div data-controller="combo" data-options='{
   "eslevel": 2022,
-  "filters": ["esm", "functions", "pragma"]
+  "filters": ["pragma", "esm", "functions"]
 }'></div>
 
 ```ruby
@@ -300,7 +327,7 @@ When Ruby2JS can't infer types:
 
 <div data-controller="combo" data-options='{
   "eslevel": 2022,
-  "filters": ["functions", "pragma"]
+  "filters": ["pragma", "functions"]
 }'></div>
 
 ```ruby

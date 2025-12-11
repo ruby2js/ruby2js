@@ -16,11 +16,11 @@ Pragmas provide line-level control over transpilation. They're implemented as Ru
 
 <div data-controller="combo" data-options='{
   "eslevel": 2022,
-  "filters": ["functions", "pragma"]
+  "filters": ["pragma", "functions"]
 }'></div>
 
 ```ruby
-# Without pragma: || becomes ?? in ES2022
+# Without pragma: ||= becomes ??= in value contexts
 x ||= default
 
 # With pragma: force nullish coalescing
@@ -58,7 +58,7 @@ The most common pragma—skip code that only makes sense in Ruby:
 
 <div data-controller="combo" data-options='{
   "eslevel": 2022,
-  "filters": ["functions", "pragma"]
+  "filters": ["pragma", "functions"]
 }'></div>
 
 ```ruby
@@ -86,7 +86,7 @@ When Ruby2JS can't infer whether something is an Array or Hash:
 
 <div data-controller="combo" data-options='{
   "eslevel": 2022,
-  "filters": ["functions", "pragma"]
+  "filters": ["pragma", "functions"]
 }'></div>
 
 ```ruby
@@ -106,7 +106,7 @@ Ruby's hash iteration doesn't map directly to JavaScript:
 
 <div data-controller="combo" data-options='{
   "eslevel": 2022,
-  "filters": ["functions", "pragma"]
+  "filters": ["pragma", "functions"]
 }'></div>
 
 ```ruby
@@ -126,7 +126,7 @@ When storing functions in variables:
 
 <div data-controller="combo" data-options='{
   "eslevel": 2022,
-  "filters": ["functions", "pragma"]
+  "filters": ["pragma", "functions"]
 }'></div>
 
 ```ruby
@@ -146,7 +146,7 @@ Ruby's `||` treats only `nil` and `false` as falsy. JavaScript's `||` also treat
 
 <div data-controller="combo" data-options='{
   "eslevel": 2022,
-  "filters": ["functions", "pragma"]
+  "filters": ["pragma", "functions"]
 }'></div>
 
 ```ruby
@@ -163,7 +163,7 @@ Arrow functions capture `this` lexically. DOM handlers often need dynamic `this`
 
 <div data-controller="combo" data-options='{
   "eslevel": 2022,
-  "filters": ["functions", "pragma"]
+  "filters": ["pragma", "functions"]
 }'></div>
 
 ```ruby
@@ -182,7 +182,7 @@ These examples come from Ruby2JS's own self-hosting codebase.
 
 <div data-controller="combo" data-options='{
   "eslevel": 2022,
-  "filters": ["functions", "pragma"]
+  "filters": ["pragma", "functions"]
 }'></div>
 
 ```ruby
@@ -195,7 +195,7 @@ vars = {}
 
 <div data-controller="combo" data-options='{
   "eslevel": 2022,
-  "filters": ["functions", "pragma"]
+  "filters": ["pragma", "functions"]
 }'></div>
 
 ```ruby
@@ -209,7 +209,7 @@ vars = @vars.select { |key, value| value == :pending }.keys() # Pragma: entries
 
 <div data-controller="combo" data-options='{
   "eslevel": 2022,
-  "filters": ["functions", "pragma"]
+  "filters": ["pragma", "functions"]
 }'></div>
 
 ```ruby
@@ -218,21 +218,20 @@ handler = ->(x, y) { x + y }
 result = handler.call(1, 2) # Pragma: method
 ```
 
-### Conditional Blocks
+### Skipping Multiple Items
 
 <div data-controller="combo" data-options='{
   "eslevel": 2022,
-  "filters": ["functions", "pragma"]
+  "filters": ["pragma", "functions"]
 }'></div>
 
 ```ruby
-# Entire block excluded from JS output
-unless defined?(RUBY2JS_SELFHOST) # Pragma: skip
-  require 'parser/current'
+# Skip individual lines - each needs its own pragma
+require 'parser/current' # Pragma: skip
+require 'json' # Pragma: skip
 
-  def parse_with_comments(source)
-    # Ruby-only implementation
-  end
+def parse_with_comments(source) # Pragma: skip
+  # Ruby-only implementation
 end
 
 def shared_method
@@ -240,18 +239,20 @@ def shared_method
 end
 ```
 
+Note: The skip pragma works on individual statements and method definitions. For conditional blocks, use Ruby's `defined?` guard which translates to a runtime check.
+
 ### Multiple Pragmas
 
-One line can have multiple pragmas:
+One line can have multiple pragmas. Note that not all combinations work together—some pragmas operate on different parts of the expression:
 
 <div data-controller="combo" data-options='{
   "eslevel": 2022,
-  "filters": ["functions", "pragma"]
+  "filters": ["pragma", "functions"]
 }'></div>
 
 ```ruby
-walk = ->(node) { process(node) }
-result ||= walk.call(child) # Pragma: method # Pragma: logical
+# entries + hash work together for hash operations
+result = options.select { |k, v| v > 0 }.keys() # Pragma: entries # Pragma: hash
 ```
 
 ## Best Practices

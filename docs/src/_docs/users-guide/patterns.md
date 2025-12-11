@@ -35,7 +35,7 @@ class Greeter
 end
 ```
 
-Note: Instance variables become underscore-prefixed properties by default (configurable via `underscored_private` option).
+Note: With ES2022, instance variables become private fields (`#name`). With older ES levels or `underscored_private: true`, they use underscore prefix (`_name`).
 
 ### Private Methods
 
@@ -137,8 +137,8 @@ Ruby hashes become JavaScript objects:
 ```ruby
 options = { name: "test", count: 42 }
 name = options[:name]
-keys = options.keys
-values = options.values
+keys = options.keys()
+values = options.values()
 ```
 
 ### Rich Object Literals
@@ -174,7 +174,7 @@ Ruby's `.each` on hashes needs special handling:
 
 <div data-controller="combo" data-options='{
   "eslevel": 2022,
-  "filters": ["functions", "pragma"]
+  "filters": ["pragma", "functions"]
 }'></div>
 
 ```ruby
@@ -407,7 +407,7 @@ Use `# Pragma: skip` to exclude Ruby-only code from JS output:
 
 <div data-controller="combo" data-options='{
   "eslevel": 2022,
-  "filters": ["functions", "pragma"]
+  "filters": ["pragma", "functions"]
 }'></div>
 
 ```ruby

@@ -273,8 +273,10 @@ Ruby2JS.convert(code, filters: [Ruby2JS::Filter::Pragma])
 
 ### Combining with Other Filters
 
-The pragma filter works alongside other filters. It processes pragmas before
-other transformations occur.
+The pragma filter works alongside other filters. It automatically reorders
+itself to run before the Functions and ESM filters, ensuring pragmas like
+`skip`, `entries`, and `method` are processed correctly regardless of the
+order filters are specified.
 
 ## Background
 

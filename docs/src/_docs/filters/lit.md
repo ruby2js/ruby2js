@@ -30,7 +30,7 @@ class SimpleGreeting < LitElement
 
   def render
     <<~HTML
-      <p>Hello, #{name}!</p>
+      <p>Hello, #{@name}!</p>
     HTML
   end
 end
