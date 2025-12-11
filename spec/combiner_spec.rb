@@ -194,6 +194,98 @@ describe Ruby2JS::Filter::Combiner do
     end
   end
 
+  describe 'import deduplication' do
+    def to_js_with_esm(string, file: nil)
+      require 'ruby2js/filter/esm'
+      opts = { eslevel: 2022, filters: [Ruby2JS::Filter::Combiner, Ruby2JS::Filter::ESM] }
+      opts[:file] = file if file
+      Ruby2JS.convert(string, **opts).to_s
+    end
+
+    it "should deduplicate identical default imports" do
+      result = to_js_with_esm(<<~RUBY)
+        import React, from: 'react'
+        x = 1
+        import React, from: 'react'
+        y = 2
+      RUBY
+      _(result).must_include 'import React from "react"'
+      _(result.scan('import React').length).must_equal 1
+    end
+
+    it "should merge named imports from same module" do
+      result = to_js_with_esm(<<~RUBY)
+        import [useState], from: 'react'
+        x = 1
+        import [useEffect], from: 'react'
+        y = 2
+      RUBY
+      _(result).must_include 'import { useState, useEffect } from "react"'
+      _(result.scan('from "react"').length).must_equal 1
+    end
+
+    it "should merge default and named imports from same module" do
+      result = to_js_with_esm(<<~RUBY)
+        import React, from: 'react'
+        x = 1
+        import [useState], from: 'react'
+        y = 2
+      RUBY
+      _(result).must_include 'import React, { useState } from "react"'
+      _(result.scan('from "react"').length).must_equal 1
+    end
+
+    it "should keep imports from different modules separate" do
+      result = to_js_with_esm(<<~RUBY)
+        import React, from: 'react'
+        import Vue, from: 'vue'
+      RUBY
+      _(result).must_include 'import React from "react"'
+      _(result).must_include 'import Vue from "vue"'
+    end
+
+    it "should deduplicate imports in inlined files" do
+      require 'ruby2js/filter/esm'
+      require 'ruby2js/filter/require'
+      require 'fileutils'
+
+      Dir.mktmpdir do |dir|
+        File.write("#{dir}/main.rb", <<~RUBY)
+          require_relative 'a'
+          require_relative 'b'
+        RUBY
+        File.write("#{dir}/a.rb", <<~RUBY)
+          import React, from: 'react'
+          x = 1
+        RUBY
+        File.write("#{dir}/b.rb", <<~RUBY)
+          import React, from: 'react'
+          y = 2
+        RUBY
+
+        result = Ruby2JS.convert(File.read("#{dir}/main.rb"),
+          eslevel: 2022,
+          file: "#{dir}/main.rb",
+          filters: [Ruby2JS::Filter::Require, Ruby2JS::Filter::Combiner, Ruby2JS::Filter::ESM]
+        ).to_s
+
+        _(result).must_include 'import React from "react"'
+        _(result.scan('import React').length).must_equal 1
+        _(result).must_include 'let x = 1'
+        _(result).must_include 'let y = 2'
+      end
+    end
+  end
+
+  describe 'filter reorder' do
+    it "should reorder combiner to run after ESM" do
+      require 'ruby2js/filter/esm'
+      filters = [Ruby2JS::Filter::Combiner, Ruby2JS::Filter::ESM]
+      reordered = Ruby2JS::Filter::Combiner.reorder(filters)
+      _(reordered.index(Ruby2JS::Filter::Combiner)).must_be :>, reordered.index(Ruby2JS::Filter::ESM)
+    end
+  end
+
   describe Ruby2JS::Filter::DEFAULTS do
     it "should NOT include Combiner (it's for self-hosting only)" do
       _(Ruby2JS::Filter::DEFAULTS).wont_include Ruby2JS::Filter::Combiner

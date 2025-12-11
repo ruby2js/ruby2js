@@ -23,6 +23,28 @@ module Ruby2JS
     module Combiner
       include SEXP
 
+      # Ensure combiner runs after ESM filter so that import statements
+      # have been converted to :import nodes before we try to deduplicate them
+      def self.reorder(filters)
+        esm_filter = defined?(Ruby2JS::Filter::ESM) ? Ruby2JS::Filter::ESM : nil
+        return filters unless esm_filter && filters.include?(esm_filter)
+
+        combiner_index = filters.index(Ruby2JS::Filter::Combiner)
+        esm_index = filters.index(esm_filter)
+
+        return filters unless combiner_index && esm_index
+        return filters if combiner_index > esm_index  # Already after ESM
+
+        # Move combiner to after ESM
+        filters = filters.dup
+        filters.delete_at(combiner_index)
+        # esm_index may have shifted if combiner was before it
+        esm_index = filters.index(esm_filter)
+        filters.insert(esm_index + 1, Ruby2JS::Filter::Combiner)
+
+        filters
+      end
+
       # Process the entire AST after all children are processed
       # We need to find and merge duplicate module/class definitions
       # Note: Only handles statement-level :begin, not expression grouping
@@ -58,13 +80,15 @@ module Ruby2JS
         result
       end
 
-      # Merge duplicate module and class definitions
+      # Merge duplicate module/class definitions and deduplicate imports
       def merge_definitions(nodes)
         # Flatten any nested :begin nodes first
         nodes = flatten_begins(nodes)
 
         # Track definitions by their full name (including nesting)
         definitions = {}  # name => [index, node]
+        # Track imports by module path for deduplication
+        imports = {}  # path => [index, node]
         result = []
 
         nodes.each_with_index do |node, index|
@@ -83,6 +107,21 @@ module Ruby2JS
             else
               # First occurrence - track it
               definitions[name_key] = [result.length, node]
+              result << node
+            end
+          elsif node.type == :import || is_import_send?(node)
+            import_key = import_path(node)
+
+            if imports[import_key]
+              # Merge into existing import
+              orig_index, orig_node = imports[import_key]
+              merged = merge_imports(orig_node, node)
+              result[orig_index] = merged
+              imports[import_key] = [orig_index, merged]
+              # Don't add this node to result (it's been merged)
+            else
+              # First occurrence - track it
+              imports[import_key] = [result.length, node]
               result << node
             end
           else
@@ -151,6 +190,100 @@ module Ruby2JS
         return [] if body.nil?
         return body.children.to_a if body.type == :begin
         [body]
+      end
+
+      # Check if a :send node is an import statement
+      # e.g., (send nil :import (const nil :React) (hash (pair (sym :from) (str "react"))))
+      def is_import_send?(node)
+        node.type == :send &&
+          node.children[0].nil? &&
+          node.children[1] == :import
+      end
+
+      # Extract the module path from an import node for deduplication
+      # Handles both :import nodes and :send nodes with :import method
+      def import_path(node)
+        if node.type == :send && node.children[1] == :import
+          # :send import - look for hash with :from key
+          hash_node = node.children.find { |c| c.respond_to?(:type) && c.type == :hash }
+          if hash_node
+            from_pair = hash_node.children.find { |p| p.children[0].children[0] == :from }
+            return from_pair.children[1].children[0] if from_pair
+          end
+          # Fallback to string argument
+          str_node = node.children.find { |c| c.respond_to?(:type) && c.type == :str }
+          return str_node.children[0] if str_node
+          return node.to_s
+        end
+
+        # :import node
+        path = node.children[0]
+        if path.is_a?(Array)
+          # Find the 'from:' pair
+          from_pair = path.find { |p| p.respond_to?(:type) && p.type == :pair &&
+                                      p.children[0].children[0] == :from rescue false }
+          from_pair ? from_pair.children[1].children[0] : path[0].to_s
+        elsif path.is_a?(String)
+          path
+        else
+          path.to_s
+        end
+      end
+
+      # Merge two import statements for the same module
+      # Combines default imports and named imports
+      def merge_imports(orig, new_import)
+        # Extract path and imports from both nodes
+        orig_path = orig.children[0]
+        orig_imports = orig.children[1..-1]
+        new_imports = new_import.children[1..-1]
+
+        # If both are identical (same path, same imports), just return original
+        return orig if orig_imports == new_imports
+
+        # If one has no imports (side-effect import), prefer the one with imports
+        return orig if new_imports.empty?
+        return new_import if orig_imports.empty?
+
+        # Merge imports - combine default and named imports
+        merged_imports = merge_import_specifiers(orig_imports, new_imports)
+
+        s(:import, orig_path, *merged_imports)
+      end
+
+      # Merge import specifiers (default imports and named imports)
+      def merge_import_specifiers(orig, new_specs)
+        # Separate default imports (single const) from named imports (arrays)
+        orig_default = orig.find { |i| !i.is_a?(Array) && i.respond_to?(:type) && i.type == :const }
+        new_default = new_specs.find { |i| !i.is_a?(Array) && i.respond_to?(:type) && i.type == :const }
+
+        orig_named = orig.find { |i| i.is_a?(Array) }
+        new_named = new_specs.find { |i| i.is_a?(Array) }
+
+        result = []
+
+        # Use the default import from either (they should be the same if both exist)
+        result << (orig_default || new_default) if orig_default || new_default
+
+        # Merge named imports
+        if orig_named || new_named
+          all_named = (orig_named || []) + (new_named || [])
+          # Deduplicate by const name
+          seen = {}
+          unique_named = all_named.select do |spec|
+            next false unless spec.respond_to?(:type)
+            name = spec.children[1]
+            if seen[name]
+              false
+            else
+              seen[name] = true
+              true
+            end
+          end
+          result << unique_named unless unique_named.empty?
+        end
+
+        result
       end
 
       # Reorder class body: static fields (cvasgn) must come before
