@@ -374,5 +374,121 @@ describe Ruby2JS::Filter::Pragma do
       js.wont_include 'loc'
       js.must_include 'name'
     end
+
+    it "should not leave empty semicolons when skipping" do
+      code = <<~RUBY
+        require 'json' # Pragma: skip
+        require 'yaml' # Pragma: skip
+        x = 1
+      RUBY
+      js = to_js(code)
+      js.wont_match(/^;/)
+      js.wont_match(/;\s*;/)
+      js.must_equal 'let x = 1'
+    end
+
+    it "should not leave empty semicolons for skipped methods" do
+      code = <<~RUBY
+        def skip_me # Pragma: skip
+          true
+        end
+        def keep_me
+          false
+        end
+      RUBY
+      js = to_js(code)
+      js.wont_match(/^;/)
+      js.must_include 'keep_me'
+      js.wont_include 'skip_me'
+    end
+
+    it "should skip if blocks with pragma" do
+      code = <<~RUBY
+        if true # Pragma: skip
+          x = 1
+        end
+        y = 2
+      RUBY
+      js = to_js(code)
+      js.wont_include 'x'
+      js.must_include 'y'
+    end
+
+    it "should skip unless blocks with pragma" do
+      code = <<~RUBY
+        unless defined?(RUBY2JS_SELFHOST) # Pragma: skip
+          require 'parser/current'
+        end
+        x = 1
+      RUBY
+      js = to_js(code)
+      js.wont_include 'RUBY2JS_SELFHOST'
+      js.wont_include 'parser'
+      js.must_include 'x'
+    end
+
+    it "should skip begin blocks with pragma" do
+      code = <<~RUBY
+        begin # Pragma: skip
+          x = 1
+        end
+        y = 2
+      RUBY
+      js = to_js(code)
+      js.wont_include 'x'
+      js.must_include 'y'
+    end
+
+    it "should skip while loops with pragma" do
+      code = <<~RUBY
+        while true # Pragma: skip
+          x = 1
+        end
+        y = 2
+      RUBY
+      js = to_js(code)
+      js.wont_include 'while'
+      js.must_include 'y'
+    end
+
+    it "should skip case statements with pragma" do
+      code = <<~RUBY
+        case x # Pragma: skip
+        when 1
+          puts "one"
+        end
+        y = 2
+      RUBY
+      js = to_js(code)
+      js.wont_include 'switch'
+      js.wont_include 'one'
+      js.must_include 'y'
+    end
+  end
+
+  describe "multiple pragmas on same line" do
+    it "should apply both logical and method pragmas" do
+      # Both pragmas should work: logical forces ||, method converts .call to ()
+      to_js('x ||= fn.call(y) # Pragma: logical # Pragma: method').
+        must_equal 'x ||= fn(y)'
+    end
+
+    it "should apply pragmas regardless of order" do
+      to_js('x ||= fn.call(y) # Pragma: method # Pragma: logical').
+        must_equal 'x ||= fn(y)'
+    end
+
+    it "should apply entries and hash pragmas together" do
+      code = 'result = options.select { |k, v| v > 0 }.keys() # Pragma: entries # Pragma: hash'
+      js = to_js(code)
+      js.must_include 'Object.entries'
+      js.must_include 'Object.fromEntries'
+      js.must_include '.keys()'
+    end
+
+    it "should apply nullish and method pragmas together" do
+      to_js('x ||= fn.call(y) # Pragma: ?? # Pragma: method').
+        must_equal 'x ??= fn(y)'
+    end
   end
 end

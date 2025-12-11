@@ -109,6 +109,7 @@ Removes statements from the JavaScript output entirely. Works with:
 - Method definitions (`def`)
 - Class method definitions (`def self.method`)
 - Alias declarations (`alias`)
+- Block structures: `if`/`unless`, `begin`, `while`/`until`, `case`
 
 This is useful when a Ruby file contains code that shouldn't be included in
 the JavaScript output (e.g., Ruby-specific methods, native Ruby gems, runtime
@@ -135,6 +136,12 @@ end
 
 alias loc location # Pragma: skip
 # => (no output)
+
+unless defined?(RUBY2JS_SELFHOST) # Pragma: skip
+  require 'parser/current'
+  # Ruby-only code block
+end
+# => (no output - entire block removed)
 
 require 'my_module'  # No pragma, will be processed normally
 # => import ... (if ESM filter is active)
@@ -250,7 +257,19 @@ x = a || b # Pragma: ??
 
 ### Multiple Pragmas
 
-You can use different pragmas on different lines:
+You can use multiple pragmas on the same line, and they will all be applied:
+
+```ruby
+# Both logical and method pragmas apply
+x ||= fn.call(y) # Pragma: logical # Pragma: method
+# => x ||= fn(y)
+
+# Nullish and method together
+x ||= fn.call(y) # Pragma: ?? # Pragma: method
+# => x ??= fn(y)
+```
+
+You can also use different pragmas on different lines:
 
 ```ruby
 options ||= {} # Pragma: ??

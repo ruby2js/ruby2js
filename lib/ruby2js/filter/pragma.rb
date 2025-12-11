@@ -71,40 +71,41 @@ module Ruby2JS
         raw_comments[@pragma_scanned_count..].each do |comment|
           text = comment.respond_to?(:text) ? comment.text : comment.to_s
 
-          # Match "# Pragma: <name>" pattern (case insensitive)
-          if text =~ /#\s*Pragma:\s*(\S+)/i
-            pragma_name = $1
+          # Match all "# Pragma: <name>" patterns (case insensitive)
+          # Use scan to find ALL pragmas on a line, not just the first
+          text.scan(/#\s*Pragma:\s*(\S+)/i).each do |match|
+            pragma_name = match[0]
             pragma_sym = PRAGMAS[pragma_name]
 
-            if pragma_sym
-              # Get the source buffer name and line number of the comment
-              source_name = nil
-              line = nil
+            next unless pragma_sym
 
-              if comment.respond_to?(:loc) && comment.loc
-                loc = comment.loc
-                if loc.respond_to?(:expression) && loc.expression
-                  source_name = loc.expression.source_buffer&.name
-                  line = loc.line
-                elsif loc.respond_to?(:line)
-                  line = loc.line
-                end
-              elsif comment.respond_to?(:location)
-                loc = comment.location
-                line = loc.respond_to?(:start_line) ? loc.start_line : loc.line
-                # Try to get source buffer name from location
-                if loc.respond_to?(:source_buffer)
-                  source_name = loc.source_buffer&.name
-                end
+            # Get the source buffer name and line number of the comment
+            source_name = nil
+            line = nil
+
+            if comment.respond_to?(:loc) && comment.loc
+              loc = comment.loc
+              if loc.respond_to?(:expression) && loc.expression
+                source_name = loc.expression.source_buffer&.name
+                line = loc.line
+              elsif loc.respond_to?(:line)
+                line = loc.line
               end
-
-              next unless line
-
-              # Use [source_name, line] as key to avoid cross-file collisions
-              key = [source_name, line]
-              @pragmas[key] ||= Set.new
-              @pragmas[key] << pragma_sym
+            elsif comment.respond_to?(:location)
+              loc = comment.location
+              line = loc.respond_to?(:start_line) ? loc.start_line : loc.line
+              # Try to get source buffer name from location
+              if loc.respond_to?(:source_buffer)
+                source_name = loc.source_buffer&.name
+              end
             end
+
+            next unless line
+
+            # Use [source_name, line] as key to avoid cross-file collisions
+            key = [source_name, line]
+            @pragmas[key] ||= Set.new
+            @pragmas[key] << pragma_sym
           end
         end
 
@@ -200,6 +201,46 @@ module Ruby2JS
 
       # Handle alias with skip pragma
       def on_alias(node)
+        if pragma?(node, :skip)
+          return s(:hide)
+        end
+        super
+      end
+
+      # Handle if/unless with skip pragma (remove entire block)
+      def on_if(node)
+        if pragma?(node, :skip)
+          return s(:hide)
+        end
+        super
+      end
+
+      # Handle begin blocks with skip pragma
+      def on_kwbegin(node)
+        if pragma?(node, :skip)
+          return s(:hide)
+        end
+        super
+      end
+
+      # Handle while loops with skip pragma
+      def on_while(node)
+        if pragma?(node, :skip)
+          return s(:hide)
+        end
+        super
+      end
+
+      # Handle until loops with skip pragma
+      def on_until(node)
+        if pragma?(node, :skip)
+          return s(:hide)
+        end
+        super
+      end
+
+      # Handle case statements with skip pragma
+      def on_case(node)
         if pragma?(node, :skip)
           return s(:hide)
         end

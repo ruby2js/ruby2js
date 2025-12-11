@@ -33,6 +33,9 @@ module Ruby2JS
         statements.compact!
       end
 
+      # Filter out :hide nodes before output to avoid empty semicolons
+      statements = statements.reject { |s| s.respond_to?(:type) && s.type == :hide }
+
       parse_all(*statements, state: state, join: @sep)
     end
 

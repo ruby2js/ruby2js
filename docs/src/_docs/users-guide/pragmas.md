@@ -218,7 +218,9 @@ handler = ->(x, y) { x + y }
 result = handler.call(1, 2) # Pragma: method
 ```
 
-### Skipping Multiple Items
+### Skipping Code Blocks
+
+The skip pragma works on both individual statements and entire block structures:
 
 <div data-controller="combo" data-options='{
   "eslevel": 2022,
@@ -226,12 +228,19 @@ result = handler.call(1, 2) # Pragma: method
 }'></div>
 
 ```ruby
-# Skip individual lines - each needs its own pragma
+# Skip individual statements
 require 'parser/current' # Pragma: skip
 require 'json' # Pragma: skip
 
-def parse_with_comments(source) # Pragma: skip
-  # Ruby-only implementation
+# Skip entire conditional blocks
+unless defined?(RUBY2JS_SELFHOST) # Pragma: skip
+  require 'prism'
+  def ruby_only_method; end
+end
+
+# Skip method definitions
+def respond_to?(method) # Pragma: skip
+  true
 end
 
 def shared_method
@@ -239,11 +248,9 @@ def shared_method
 end
 ```
 
-Note: The skip pragma works on individual statements and method definitions. For conditional blocks, use Ruby's `defined?` guard which translates to a runtime check.
-
 ### Multiple Pragmas
 
-One line can have multiple pragmas. Note that not all combinations work together—some pragmas operate on different parts of the expression:
+One line can have multiple pragmas, and they will all be applied:
 
 <div data-controller="combo" data-options='{
   "eslevel": 2022,
@@ -251,6 +258,9 @@ One line can have multiple pragmas. Note that not all combinations work together
 }'></div>
 
 ```ruby
+# logical + method work together
+x ||= fn.call(y) # Pragma: logical # Pragma: method
+
 # entries + hash work together for hash operations
 result = options.select { |k, v| v > 0 }.keys() # Pragma: entries # Pragma: hash
 ```

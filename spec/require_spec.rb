@@ -31,9 +31,9 @@ describe Ruby2JS::Filter::Require do
     it "should skip requires with Pragma: skip comment" do
       # test8_skip.rb has: require 'json' # Pragma: skip
       # followed by: require_relative 'test2'
-      # The 'json' require should be skipped (produces ;), test2 should be inlined
+      # The 'json' require should be skipped entirely, test2 should be inlined
       to_js( 'require "require/test8_skip"' ).
-        must_equal '; console.log("test2")'
+        must_equal 'console.log("test2")'
     end
   end
   
