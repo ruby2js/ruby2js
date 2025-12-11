@@ -36,7 +36,52 @@ require_relative '../../ruby2js/serializer'
 # Converter (main conversion logic + all handlers)
 require_relative '../../ruby2js/converter'
 
-# CLI for command-line usage
+# ============================================================================
+# Initialize Prism at module load time
+# ============================================================================
+
+await initPrism()
+
+# ============================================================================
+# Simple convert function for easy usage
+# ============================================================================
+
+# Convert Ruby source to JavaScript
+# @param source [String] Ruby source code
+# @param options [Object] Optional settings (eslevel, underscored_private, etc.)
+# @return [String] JavaScript output
+export def convert(source, options = {})
+  prism_parse = getPrismParse()
+  parse_result = prism_parse(source)
+
+  if parse_result.errors && parse_result.errors.length > 0
+    raise parse_result.errors[0].message
+  end
+
+  walker = Ruby2JS::PrismWalker.new(source, options[:file])
+  ast = walker.visit(parse_result.value)
+
+  # Associate comments with AST nodes
+  source_buffer = walker.source_buffer
+  wrapped_comments = (parse_result.comments || []).map do |c|
+    PrismComment.new(c, source, source_buffer)
+  end
+  comments = associateComments(ast, wrapped_comments)
+
+  # Create and run converter
+  converter = Ruby2JS::Converter.new(ast, comments, options)
+  converter.eslevel = options[:eslevel] || 2022
+  converter.underscored_private = options[:underscored_private] if options[:underscored_private]
+  converter.namespace = Ruby2JS::Namespace.new
+
+  # Enable vertical whitespace if source has newlines
+  converter.enable_vertical_whitespace if source.include?("\n")
+
+  converter.convert
+  converter.to_s!
+end
+
+# CLI for command-line usage (must come after convert() is defined)
 require_relative 'cli'
 
 # Export the Ruby2JS module

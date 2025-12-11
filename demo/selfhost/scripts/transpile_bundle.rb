@@ -50,6 +50,7 @@ js = Ruby2JS.convert(source,
 
 # Add preamble for ES module compatibility
 preamble = <<~JS
+#!/usr/bin/env node
 // Ruby2JS Self-hosted Bundle
 // Generated from lib/ruby2js/selfhost/bundle.rb
 //
@@ -58,6 +59,20 @@ preamble = <<~JS
 // - Be imported: import { convert } from './ruby2js.mjs'
 //
 // External dependencies: @ruby/prism only
+
+// Suppress the "WASI is an experimental feature" warning from @ruby/prism
+// while allowing all other warnings through. This MUST run before any
+// imports that load @ruby/prism (which uses WASI internally).
+if (typeof process !== 'undefined' && process.emit) {
+  const originalEmit = process.emit.bind(process);
+  process.emit = function(event, ...args) {
+    if (event === 'warning' && args[0]?.name === 'ExperimentalWarning' &&
+        args[0]?.message?.includes('WASI')) {
+      return false;
+    }
+    return originalEmit(event, ...args);
+  };
+}
 
 // Preamble: Ruby built-ins needed by the transpiled code
 class NotImplementedError extends Error {

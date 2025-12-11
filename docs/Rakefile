@@ -170,72 +170,32 @@ task :install do
   end
 end
 
-# Selfhost demo - builds and copies the self-hosted converter demo
+# Selfhost demo - builds and copies the unified ruby2js.mjs bundle
 selfhost_dir = "#{dest}/selfhost"
 selfhost_source = "#{root}/demo/selfhost"
-selfhost_dist = "#{selfhost_dir}/dist"
 
 directory dest
 directory selfhost_dir => dest
-directory selfhost_dist => selfhost_dir
 
-# Build transpiled files in demo/selfhost
-selfhost_source_dist = "#{selfhost_source}/dist"
-directory selfhost_source_dist
+# Dependencies for the unified bundle
+selfhost_bundle_deps = Rake::FileList.new(
+  "#{root}/lib/ruby2js/node.rb",
+  "#{root}/lib/ruby2js/prism_walker.rb",
+  "#{root}/lib/ruby2js/prism_walker/*.rb",
+  "#{root}/lib/ruby2js/converter.rb",
+  "#{root}/lib/ruby2js/converter/*.rb",
+  "#{root}/lib/ruby2js/serializer.rb",
+  "#{root}/lib/ruby2js/namespace.rb",
+  "#{root}/lib/ruby2js/selfhost/*.rb",
+  "#{root}/lib/ruby2js/filter/selfhost.rb",
+  "#{root}/lib/ruby2js/filter/selfhost/*.rb"
+)
 
-selfhost_walker_deps = Rake::FileList.new("#{root}/lib/ruby2js/node.rb", "#{root}/lib/ruby2js/prism_walker.rb", "#{root}/lib/ruby2js/prism_walker/*.rb")
-selfhost_converter_deps = Rake::FileList.new("#{root}/lib/ruby2js/converter.rb", "#{root}/lib/ruby2js/converter/*.rb", "#{root}/lib/ruby2js/serializer.rb")
-selfhost_filter_deps = Rake::FileList.new("#{root}/lib/ruby2js/filter/selfhost.rb", "#{root}/lib/ruby2js/filter/selfhost/*.rb")
-
-file "#{selfhost_source}/dist/walker.mjs" => [selfhost_source_dist, *selfhost_walker_deps, *selfhost_filter_deps] do
+# Build unified bundle in demo/selfhost
+file "#{selfhost_source}/ruby2js.mjs" => selfhost_bundle_deps do
   Dir.chdir(selfhost_source) do
-    sh "npm run build:walker"
+    sh "npm run build:bundle"
   end
-end
-
-file "#{selfhost_source}/dist/converter.mjs" => [selfhost_source_dist, *selfhost_converter_deps, *selfhost_filter_deps] do
-  Dir.chdir(selfhost_source) do
-    sh "npm run build:converter"
-  end
-end
-
-selfhost_namespace_deps = Rake::FileList.new("#{root}/lib/ruby2js/namespace.rb")
-
-file "#{selfhost_source}/dist/namespace.mjs" => [selfhost_source_dist, *selfhost_namespace_deps, *selfhost_filter_deps] do
-  Dir.chdir(selfhost_source) do
-    sh "npm run build:namespace"
-  end
-end
-
-# Copy dist files to docs
-file "#{selfhost_dist}/walker.mjs" => [selfhost_dist, "#{selfhost_source}/dist/walker.mjs"] do
-  cp "#{selfhost_source}/dist/walker.mjs", "#{selfhost_dist}/walker.mjs"
-end
-
-file "#{selfhost_dist}/converter.mjs" => [selfhost_dist, "#{selfhost_source}/dist/converter.mjs"] do
-  cp "#{selfhost_source}/dist/converter.mjs", "#{selfhost_dist}/converter.mjs"
-end
-
-file "#{selfhost_dist}/namespace.mjs" => [selfhost_dist, "#{selfhost_source}/dist/namespace.mjs"] do
-  cp "#{selfhost_source}/dist/namespace.mjs", "#{selfhost_dist}/namespace.mjs"
-end
-
-# Runtime dependencies
-selfhost_runtime_deps = Rake::FileList.new("#{root}/lib/ruby2js/selfhost/runtime.rb")
-
-file "#{selfhost_source}/dist/runtime.mjs" => [selfhost_source_dist, *selfhost_runtime_deps, *selfhost_filter_deps] do
-  Dir.chdir(selfhost_source) do
-    sh "npm run build:runtime"
-  end
-end
-
-# Copy runtime.mjs (transpiled from lib/ruby2js/selfhost/runtime.rb)
-file "#{selfhost_dist}/runtime.mjs" => [selfhost_dist, "#{selfhost_source}/dist/runtime.mjs"] do
-  # Browser version needs different Prism import path
-  content = File.read("#{selfhost_source}/dist/runtime.mjs")
-  content.sub!('from "@ruby/prism"', 'from "../prism_browser.mjs"')
-  File.write("#{selfhost_dist}/runtime.mjs", content)
-  File.chmod(0644, "#{selfhost_dist}/runtime.mjs")
 end
 
 # Install selfhost npm dependencies if needed (provides @ruby/prism)
@@ -246,7 +206,7 @@ file selfhost_prism_source do
   end
 end
 
-# Copy @ruby/prism module (needed for browser)
+# Copy @ruby/prism module (needed for browser to load WASM)
 prism_dir = "#{selfhost_dir}/node_modules/@ruby/prism"
 directory "#{selfhost_dir}/node_modules/@ruby" => selfhost_dir
 
@@ -254,19 +214,21 @@ file prism_dir => ["#{selfhost_dir}/node_modules/@ruby", selfhost_prism_source] 
   cp_r selfhost_prism_source, prism_dir
 end
 
-# Note: index.html is checked into docs/src/demo/selfhost/ directly
-
 # Copy browser-compatible Prism loader
 file "#{selfhost_dir}/prism_browser.mjs" => [selfhost_dir, "#{selfhost_source}/prism_browser.mjs"] do
   cp "#{selfhost_source}/prism_browser.mjs", "#{selfhost_dir}/prism_browser.mjs"
 end
 
+# Copy the unified bundle
+file "#{selfhost_dir}/ruby2js.mjs" => [selfhost_dir, "#{selfhost_source}/ruby2js.mjs"] do
+  cp "#{selfhost_source}/ruby2js.mjs", "#{selfhost_dir}/ruby2js.mjs"
+end
+
+# Note: index.html is checked into docs/src/demo/selfhost/ directly
+
 task :selfhost => [
   "#{selfhost_dir}/prism_browser.mjs",
-  "#{selfhost_dist}/walker.mjs",
-  "#{selfhost_dist}/converter.mjs",
-  "#{selfhost_dist}/namespace.mjs",
-  "#{selfhost_dist}/runtime.mjs",
+  "#{selfhost_dir}/ruby2js.mjs",
   prism_dir
 ] do
   # Ensure all files are world-readable (needed for nginx in Docker)

@@ -34,3 +34,7 @@ test/
 
 # Plans/docs not needed for build
 plans/
+
+# Selfhost generated outputs (regenerated via npm run build:*)
+demo/selfhost/dist/
+demo/selfhost/ruby2js.mjs

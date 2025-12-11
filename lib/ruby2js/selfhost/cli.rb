@@ -7,8 +7,14 @@
 #   node ruby2js.mjs [options] [file]
 #   echo "puts 'hello'" | node ruby2js.mjs [options]
 
-import "*", as: :fs, from: 'fs'
-import [fileURLToPath], from: 'url'
+# Dynamic imports for Node.js-only modules (these will only be loaded when CLI runs)
+fs = nil
+fileURLToPath = nil
+
+if typeof(window) == 'undefined'
+  fs = await import('fs')
+  fileURLToPath = (await import('url')).fileURLToPath
+end
 
 # ============================================================================
 # AST Formatting and Inspection
@@ -52,7 +58,7 @@ def format_prism_node(node, indent = '', options = {})
     if formatted.include?("\n")
       props.push("#{indent}  #{key}:\n#{formatted}")
     else
-      props.push("#{indent}  #{key}: #{formatted.trim}")
+      props.push("#{indent}  #{key}: #{formatted.trim()}")
     end
   end
 
@@ -354,26 +360,8 @@ async def run_cli
       console.log(format_ast(ast))
 
     else
-      # Full conversion to JavaScript
-      walker = Ruby2JS::PrismWalker.new(source, file)
-      ast = walker.visit(parse_result.value)
-
-      # Use walker's source buffer for comment association
-      source_buffer = walker.source_buffer
-
-      # Wrap and associate comments with AST nodes
-      wrapped_comments = (parse_result.comments || []).map do |c|
-        PrismComment.new(c, source, source_buffer)
-      end
-      comments = associateComments(ast, wrapped_comments)
-
-      converter = Ruby2JS::Converter.new(ast, comments, {})
-      converter.eslevel = eslevel
-      converter.underscored_private = true
-      converter.namespace = Ruby2JS::Namespace.new
-
-      converter.convert
-      console.log(converter.to_s!)
+      # Full conversion to JavaScript using the convert() function
+      console.log(convert(source, { eslevel: eslevel, underscored_private: true, file: file }))
     end
 
   rescue => e
@@ -389,6 +377,7 @@ end
 
 # Check if this module is being run directly (not imported)
 # In Node.js, compare process.argv[1] with the module URL
-if process.argv[1] == fileURLToPath(import.meta.url)
+# Only run in Node.js environment (where process exists)
+if typeof(window) == 'undefined' && process.argv[1] == fileURLToPath(import.meta.url)
   run_cli()
 end

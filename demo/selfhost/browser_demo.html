@@ -354,114 +354,22 @@ end</textarea>
 
   <script type="module">
     // Self-hosted Ruby2JS demo
-    // Uses @ruby/prism for parsing and the transpiled Ruby2JS converter
-    //
-    // All runtime classes are now transpiled from Ruby source files in
-    // lib/ruby2js/selfhost/ - no more hand-written JavaScript!
+    // Prism WASM is loaded automatically when the module is imported
 
-    // Import browser Prism loader (handles WASM loading)
-    import { loadPrism } from './prism_browser.mjs';
+    import { convert } from './ruby2js.mjs';
 
-    // Import runtime classes (transpiled from lib/ruby2js/selfhost/runtime.rb)
-    import {
-      PrismSourceBuffer,
-      PrismSourceRange,
-      PrismComment,
-      CommentsMap,
-      associateComments,
-      Hash
-    } from './dist/runtime.mjs';
-
-    // Import Namespace (transpiled from lib/ruby2js/namespace.rb)
-    import { Namespace } from './dist/namespace.mjs';
-
-    // Set up globals before importing walker/converter
-    globalThis.PrismSourceBuffer = PrismSourceBuffer;
-    globalThis.PrismSourceRange = PrismSourceRange;
-    globalThis.Hash = Hash;
-    globalThis.Namespace = Namespace;
-
-    // Initialize
     const input = document.getElementById('input');
     const output = document.getElementById('output');
     const status = document.getElementById('status');
 
-    let prismParse = null;
-    let WalkerModule = null;
-    let ConverterModule = null;
+    status.className = 'success';
+    status.textContent = 'Ready! Edit the Ruby code to see the JavaScript output.';
 
-    async function init() {
+    function doConvert() {
       try {
-        // Load Prism WASM
-        status.textContent = 'Loading Prism WebAssembly...';
-        prismParse = await loadPrism();
-
-        // Set up Prism global (walker needs it)
-        // Note: For browser, we need to import from prism_browser which re-exports Prism
-        const prismModule = await import('./prism_browser.mjs');
-        globalThis.Prism = prismModule;
-
-        // Load walker module
-        status.textContent = 'Loading walker...';
-        const walkerImport = await import('./dist/walker.mjs');
-        WalkerModule = walkerImport.Ruby2JS;
-
-        // Set up Ruby2JS.Node before loading converter
-        globalThis.Ruby2JS = {
-          Node: WalkerModule.Node,
-          ast_node(obj) {
-            return typeof obj === 'object' && obj !== null && 'type' in obj && 'children' in obj;
-          }
-        };
-
-        // Load converter module
-        status.textContent = 'Loading converter...';
-        const converterImport = await import('./dist/converter.mjs');
-        ConverterModule = converterImport.Ruby2JS;
-
-        status.className = 'success';
-        status.textContent = 'Ready! Edit the Ruby code to see the JavaScript output.';
-
-        // Initial conversion
-        convert();
+        output.value = convert(input.value);
       } catch (e) {
-        status.className = 'error';
-        status.textContent = `Error loading: ${e.message}`;
-        console.error(e);
-      }
-    }
-
-    function convert() {
-      if (!prismParse || !WalkerModule || !ConverterModule) {
-        return;
-      }
-
-      const source = input.value;
-
-      try {
-        // Parse with Prism
-        const parseResult = prismParse(source);
-
-        // Walk to create Parser-compatible AST
-        const walker = new WalkerModule.PrismWalker(source, null);
-        const ast = walker.visit(parseResult.value);
-
-        // Create converter
-        const converter = new ConverterModule.Converter(ast, {}, {});
-        converter.namespace = new Namespace();
-
-        // Enable vertical whitespace if source has newlines
-        if (source.includes("\n")) {
-          converter.enable_vertical_whitespace;
-        }
-
-        // Convert (getter)
-        converter.convert;
-
-        // Get output (to_s is a getter)
-        output.value = converter.to_s;
-      } catch (e) {
-        output.value = `// Error: ${e.message}\n// ${e.stack?.split('\n').slice(0,3).join('\n// ')}`;
+        output.value = `// Error: ${e.message}`;
         console.error(e);
       }
     }
@@ -470,10 +378,11 @@ end</textarea>
     let debounceTimer;
     input.addEventListener('input', () => {
       clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(convert, 150);
+      debounceTimer = setTimeout(doConvert, 150);
     });
 
-    init();
+    // Initial conversion
+    doConvert();
   </script>
 </body>
 </html>

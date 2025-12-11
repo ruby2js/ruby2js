@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <base href="/demo/selfhost/">
   <title>Ruby2JS Self-Hosted Demo</title>
   <style>
     :root {
@@ -354,116 +355,22 @@ end</textarea>
 
   <script type="module">
     // Self-hosted Ruby2JS demo
-    // Uses @ruby/prism for parsing and the transpiled Ruby2JS converter
+    // Prism WASM is loaded automatically when the module is imported
 
-    // Import shared runtime (single source of truth)
-    import {
-      Prism,
-      PrismSourceBuffer,
-      PrismSourceRange,
-      PrismComment,
-      CommentsMap,
-      associateComments,
-      initPrism,
-      setupGlobals
-    } from '/demo/selfhost/dist/runtime.mjs';
+    import { convert } from './ruby2js.mjs';
 
-    // Set up globals before importing walker
-    setupGlobals();
-
-    // Note: Ruby polyfills (rindex, compact, first, last, etc.) are included
-    // in the transpiled walker.mjs and converter.mjs modules
-
-    // Import Namespace from transpiled module
-    const { Namespace } = await import('/demo/selfhost/dist/namespace.mjs');
-    globalThis.Namespace = Namespace;
-
-    // Initialize
     const input = document.getElementById('input');
     const output = document.getElementById('output');
     const status = document.getElementById('status');
 
-    let prismParse = null;
-    let WalkerModule = null;
-    let ConverterModule = null;
+    status.className = 'success';
+    status.textContent = 'Ready! Edit the Ruby code to see the JavaScript output.';
 
-    async function init() {
+    function doConvert() {
       try {
-        // Load Prism WASM (using shared runtime's initPrism)
-        status.textContent = 'Loading Prism WebAssembly...';
-        prismParse = await initPrism();
-
-        // Load walker module
-        status.textContent = 'Loading walker...';
-        const walkerImport = await import('/demo/selfhost/dist/walker.mjs');
-        WalkerModule = walkerImport.Ruby2JS;
-
-        // Set up Ruby2JS.Node before loading converter
-        globalThis.Ruby2JS = {
-          Node: WalkerModule.Node,
-          ast_node(obj) {
-            return typeof obj === 'object' && obj !== null && 'type' in obj && 'children' in obj;
-          }
-        };
-
-        // Load converter module
-        status.textContent = 'Loading converter...';
-        const converterImport = await import('/demo/selfhost/dist/converter.mjs');
-        ConverterModule = converterImport.Ruby2JS;
-
-        status.className = 'success';
-        status.textContent = 'Ready! Edit the Ruby code to see the JavaScript output.';
-
-        // Initial conversion
-        convert();
+        output.value = convert(input.value);
       } catch (e) {
-        status.className = 'error';
-        status.textContent = `Error loading: ${e.message}`;
-        console.error(e);
-      }
-    }
-
-    function convert() {
-      if (!prismParse || !WalkerModule || !ConverterModule) {
-        return;
-      }
-
-      const source = input.value;
-
-      try {
-        // Parse with Prism
-        const parseResult = prismParse(source);
-
-        // Walk to create Parser-compatible AST
-        const walker = new WalkerModule.PrismWalker(source, null);
-        const ast = walker.visit(parseResult.value);
-
-        // Use walker's source buffer for comment association
-        // This ensures AST nodes and comments share the same buffer reference
-        const sourceBuffer = walker.source_buffer;
-
-        // Wrap Prism comments and associate with AST nodes
-        const wrappedComments = (parseResult.comments || []).map(
-          c => new PrismComment(c, source, sourceBuffer)
-        );
-        const commentsMap = associateComments(ast, wrappedComments);
-
-        // Create converter with comments
-        const converter = new ConverterModule.Converter(ast, commentsMap, {});
-        converter.namespace = new Namespace();
-
-        // Enable vertical whitespace if source has newlines
-        if (source.includes("\n")) {
-          converter.enable_vertical_whitespace;
-        }
-
-        // Convert (getter)
-        converter.convert;
-
-        // Get output (to_s is a getter)
-        output.value = converter.to_s;
-      } catch (e) {
-        output.value = `// Error: ${e.message}\n// ${e.stack?.split('\n').slice(0,3).join('\n// ')}`;
+        output.value = `// Error: ${e.message}`;
         console.error(e);
       }
     }
@@ -472,10 +379,11 @@ end</textarea>
     let debounceTimer;
     input.addEventListener('input', () => {
       clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(convert, 150);
+      debounceTimer = setTimeout(doConvert, 150);
     });
 
-    init();
+    // Initial conversion
+    doConvert();
   </script>
 </body>
 </html>
