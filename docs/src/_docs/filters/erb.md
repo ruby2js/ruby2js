@@ -7,9 +7,6 @@ category: erb
 
 The **ERB** filter transforms compiled ERB or HERB template output into JavaScript render functions. It converts instance variable references to destructured parameters, making templates usable as standalone JavaScript functions.
 
-{% rendercontent "docs/note", title: "ES Level Requirement" %}
-This filter requires `eslevel: 2015` or newer for object destructuring in function parameters.
-{% endrendercontent %}
 
 ## How It Works
 
@@ -46,7 +43,7 @@ require "ruby2js/filter/erb"
 template = "<h1><%= @title %></h1><p><%= @content %></p>"
 erb_src = ERB.new(template).src
 
-puts Ruby2JS.convert(erb_src, filters: [:erb], eslevel: 2015)
+puts Ruby2JS.convert(erb_src, filters: [:erb], eslevel: 2020)
 ```
 
 ```javascript
@@ -78,7 +75,7 @@ template = <<~ERB
 ERB
 
 erb_src = ERB.new(template).src
-puts Ruby2JS.convert(erb_src, filters: [:erb, :functions], eslevel: 2015)
+puts Ruby2JS.convert(erb_src, filters: [:erb, :functions], eslevel: 2020)
 ```
 
 ```javascript
@@ -109,7 +106,7 @@ require "ruby2js/filter/erb"
 template = "<h1><%= @title %></h1>"
 herb_src = Herb::Engine.new(template).src
 
-puts Ruby2JS.convert(herb_src, filters: [:erb], eslevel: 2015)
+puts Ruby2JS.convert(herb_src, filters: [:erb], eslevel: 2020)
 ```
 
 ```javascript
@@ -157,7 +154,7 @@ template = <<~ERB
 ERB
 
 src = Ruby2JS::Erubi.new(template).src
-puts Ruby2JS.convert(src, filters: [:erb], eslevel: 2015)
+puts Ruby2JS.convert(src, filters: [:erb], eslevel: 2020)
 ```
 
 ```javascript

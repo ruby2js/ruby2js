@@ -4,7 +4,7 @@ This file provides guidance to Claude Code when working with the Ruby2JS codebas
 
 ## Project Overview
 
-Ruby2JS is a Ruby to JavaScript transpiler. It parses Ruby source code and generates equivalent JavaScript, with configurable output for different ES levels (ES5 through ES2022) and optional filters for framework-specific transformations.
+Ruby2JS is a Ruby to JavaScript transpiler. It parses Ruby source code and generates equivalent JavaScript, with configurable output for different ES levels (ES2020 through ES2025) and optional filters for framework-specific transformations.
 
 **Website:** https://www.ruby2js.com/
 **Documentation:** https://www.ruby2js.com/docs/
@@ -52,7 +52,7 @@ Override with environment variable: `RUBY2JS_PARSER=prism` or `RUBY2JS_PARSER=pa
 Each Ruby AST node type has a handler in `lib/ruby2js/converter/`:
 
 - `send.rb` - Method calls, operators
-- `class.rb`, `class2.rb` - Class definitions (ES5 and ES2015+)
+- `class.rb`, `class2.rb` - Class definitions
 - `def.rb` - Method definitions
 - `if.rb`, `case.rb`, `while.rb` - Control flow
 - `hash.rb`, `array.rb` - Data structures

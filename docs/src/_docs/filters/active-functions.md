@@ -22,7 +22,6 @@ Note: this filter is currently under active (😏) development with more functio
 * `value.delete_prefix(prefix)` {{ caret }} `delete_prefix$(value, prefix)`
 * `value.delete_suffix(suffix)` {{ caret }} `delete_suffix$(value, suffix)`
 
-Note: these conversions are only done if `eslevel` >= 2015. Import statements
-will be added to the top of the code output automatically. By default they
+Import statements will be added to the top of the code output automatically. By default they
 will be `@ruby2js/active-functions`, but you can pass an `import_from_skypack: true` option to `convert` to use the Skypack CDN instead.
 

@@ -180,13 +180,6 @@ describe Ruby2JS::Filter::Pragma do
         must_equal '[1, ...a]'
     end
 
-    it "should use concat without spread or guard at ES5" do
-      # At ES5, no spread and no ??, so just use concat
-      # NOTE: This test documents current (incorrect) behavior - ES5 should use concat not spread
-      # The base converter has a bug where splat produces spread even at ES5
-      to_js('[1, *a] # Pragma: guard', eslevel: 2009).
-        must_equal '[1, ...a]'
-    end
   end
 
   describe "multiple pragmas" do

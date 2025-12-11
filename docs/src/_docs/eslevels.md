@@ -5,20 +5,15 @@ top_section: Introduction
 category: eslevels
 ---
 
-By default, Ruby2JS targets **ES2020**, which provides a good balance of modern JavaScript features and broad browser/runtime support. ES2020 includes `let`/`const`, arrow functions, template literals, classes, spread syntax, optional chaining (`?.`), and nullish coalescing (`??`).
+By default, Ruby2JS targets **ES2020**, which is the minimum supported version. ES2020 includes `let`/`const`, arrow functions, template literals, classes, spread syntax, optional chaining (`?.`), and nullish coalescing (`??`).
 
-By passing an `eslevel` option to the `convert` method, you can target a different ECMAScript version. Every newer level enables older levels, so for example `2021` will enable ES2015, ES2016, etc.
-
-{% rendercontent "docs/note", type: "warning" %}
-**Note:** ES levels prior to ES2020 (ES2015-ES2019) are still supported but are no longer the default. If you need to target older JavaScript environments, explicitly set `eslevel: 2015` or the appropriate version.
-{% endrendercontent %}
+By passing an `eslevel` option to the `convert` method, you can target a newer ECMAScript version. Every newer level enables older levels, so for example `2021` will enable ES2020 features plus ES2021-specific features.
 
 {% capture caret %}<sl-icon name="caret-right-fill"></sl-icon>{% endcapture %}
 
-## ES2015 support
+## Baseline Features (ES2015-ES2019)
 
-When option `eslevel: 2015` is provided, the following additional
-conversions are made:
+The following features are always available since ES2020 is the minimum supported version:
 
 {:.functions-list}
 * `"#{a}"` {{ caret }} <code>`${a}`</code>
@@ -42,53 +37,33 @@ conversions are made:
 * `(b..a).to_a` {{ caret }} `Array.from({length: (a-b+1)}, (_, idx) => idx+b)`
 * `hash => {a:, b:}` {{ caret }} `let { a, b } = hash`
 
-ES2015 class support includes constructors, super, methods, class methods,
+Class support includes constructors, super, methods, class methods,
 instance methods, instance variables, class variables, getters, setters,
 attr_accessor, attr_reader, attr_writer, etc.
 
-Additionally, the `functions` filter will provide the following conversions:
+Additionally, the `functions` filter provides the following conversions:
 
 {:.functions-list}
 * `Array(x)` {{ caret }} `Array.from(x)`
 * `.inject(n) {}` {{ caret }} `.reduce(() => {}, n)`
 * `a[0..2] = v` {{ caret }} `a.splice(0, 3, ...v)`
-
-Keyword arguments and optional keyword arguments will be mapped to
-parameter destructuring.
-
-Classes defined with a `method_missing` method will emit a `Proxy` object
-for each instance that will forward calls.  Note that in order to forward
-arguments, this proxy will return a function that will need to be called,
-making it impossible to proxy attributes/getters.  As a special accommodation,
-if the `method_missing` method is defined to only accept a single parameter
-it will be called with only the method name, and it is free to return
-either values or functions.
-
-## ES2016 support
-
-When option `eslevel: 2016` is provided, the following additional
-conversion is made:
-
-{:.functions-list}
 * `a ** b` {{ caret }} `a ** b`
-
-Additionally the following conversions is added to the `functions` filter:
-
-{:.functions-list}
 * `.include?` {{ caret }} `.includes`
-
-## ES2017 support
-
-When option `eslevel: 2017` is provided, the following additional
-conversions are made by the `functions` filter:
-
-{:.functions-list}
 * `.values()` {{ caret }} `Object.values()`
 * `.entries()` {{ caret }} `Object.entries()`
 * `.each_pair {}` {{ caret }} `for (let [key, value] of Object.entries()) {}`
 * `include M` {{ caret }} `Object.defineProperties(..., Object.getOwnPropertyDescriptors(M))`
+* `.merge` {{ caret }} `{...a, ...b}`
+* `.flatten` {{ caret }} `.flat(Infinity)`
+* `.lstrip` {{ caret }} `.trimEnd`
+* `.rstrip` {{ caret }} `.trimStart`
+* `a.to_h` {{ caret }} `Object.fromEntries(a)`
+* `Hash[a]` {{ caret }} `Object.fromEntries(a)`
+* `a&.b` {{ caret }} `a?.b`
+* `.scan` {{ caret }} `Array.from(str.matchAll(/.../g), s => s.slice(1))`
+* `a.nil? ? b : a` {{ caret }} `a ?? b`
 
-async support:
+Async support:
 
 {:.functions-list}
 * `async def` {{ caret }} `async function`
@@ -97,41 +72,17 @@ async support:
 * `async ->` {{ caret }} `async =>`
 * `foo bar, async do...end` {{ caret }} `foo(bar, async () => {})`
 
-## ES2018 support
+Keyword arguments and optional keyword arguments are mapped to parameter destructuring.
+Rest arguments can be used with keyword arguments and optional keyword arguments.
+`rescue` without a variable maps to `catch` without a variable.
 
-When option `eslevel: 2018` is provided, the following additional
-conversion is made by the `functions` filter:
-
-{:.functions-list}
-* `.merge` {{ caret }} `{...a, ...b}`
-
-Additionally, rest arguments can now be used with keyword arguments and
-optional keyword arguments.
-
-## ES2019 support
-
-When option `eslevel: 2019` is provided, the following additional
-conversion is made by the `functions` filter:
-
-{:.functions-list}
-* `.flatten` {{ caret }} `.flat(Infinity)`
-* `.lstrip` {{ caret }} `.trimEnd`
-* `.rstrip` {{ caret }} `.trimStart`
-* `a.to_h` {{ caret }} `Object.fromEntries(a)`
-* `Hash[a]` {{ caret }} `Object.fromEntries(a)`
-
-Additionally, `rescue` without a variable will map to `catch` without a
-variable.
-
-## ES2020 support
-
-When option `eslevel: 2020` is provided, the following additional
-conversions are made:
-
-{:.functions-list}
-* `a&.b` {{ caret }} `a?.b`
-* `.scan` {{ caret }} `Array.from(str.matchAll(/.../g), s => s.slice(1))`
-* `a.nil? ? b : a` {{ caret }} `a ?? b`
+Classes defined with a `method_missing` method will emit a `Proxy` object
+for each instance that will forward calls. Note that in order to forward
+arguments, this proxy will return a function that will need to be called,
+making it impossible to proxy attributes/getters. As a special accommodation,
+if the `method_missing` method is defined to only accept a single parameter
+it will be called with only the method name, and it is free to return
+either values or functions.
 
 ## ES2021 support
 
@@ -143,7 +94,7 @@ conversions are made:
 * `x &&= 1` {{ caret }} `x &&= 1`
 * `x = y if x.nil?` {{ caret }} `x ??= y`
 * `1000000.000001` {{ caret }} `1_000_000.000_001`
-* `'.gsub' {{ caret }} `.replaceAll`
+* `.gsub` {{ caret }} `.replaceAll`
 
 The `x = y if x.nil?` pattern provides an idiomatic Ruby way to express
 nullish assignment. This is useful when you want nullish semantics (only

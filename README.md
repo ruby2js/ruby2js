@@ -57,7 +57,7 @@ echo "puts 'hello'" | ruby2js --preset
 ## Features
 
 - **[Filters](https://www.ruby2js.com/docs/filters)** - Transform Ruby methods to JavaScript equivalents (e.g., `.each` → `.forEach`)
-- **[ES Level Support](https://www.ruby2js.com/docs/eslevels)** - Target specific JavaScript versions (ES5 through ES2022+)
+- **[ES Level Support](https://www.ruby2js.com/docs/eslevels)** - Target specific JavaScript versions (ES2020 through ES2025)
 - **[Framework Integrations](https://www.ruby2js.com/docs/integrations)** - Rails, Stimulus, React, Lit, and more
 - **[Live Demo](https://ruby2js.com/demo?preset=true)** - Try it in your browser (runs entirely client-side via Opal)
 

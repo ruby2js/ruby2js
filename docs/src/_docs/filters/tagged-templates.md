@@ -11,7 +11,6 @@ Works nicely with squiggly heredocs for multiline templates as well. If you
 need to configure the tag names yourself, pass a `template_literal_tags`
 option to `convert` with an array of tag name symbols.
 
-_Note: these conversions are only done if eslevel >= 2015_
 
 {% rendercontent "docs/note", extra_margin: true %}
 More examples of how this filter works are in the [specs file](https://github.com/ruby2js/ruby2js/blob/master/spec/tagged_templates_spec.rb).
