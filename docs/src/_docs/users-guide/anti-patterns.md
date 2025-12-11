@@ -3,7 +3,7 @@ order: 9.3
 title: Anti-Patterns
 top_section: User's Guide
 category: users-guide-anti-patterns
-next_page_order: 10
+next_page_order: 9.4
 ---
 
 # Anti-Patterns to Avoid
