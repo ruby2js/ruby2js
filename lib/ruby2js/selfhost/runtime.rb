@@ -120,12 +120,12 @@ export associateComments = ->(ast, comments) do
 
     if node.children
       node.children.each do |child|
-        collect_nodes(child, depth + 1) if child&.type
+        collect_nodes(child, depth + 1) if child&.type # Pragma: method
       end
     end
   end
 
-  collect_nodes(ast, 0)
+  collect_nodes(ast, 0) # Pragma: method
 
   nodes_by_pos.sort! do |a, b|
     cmp = a[0] - b[0]

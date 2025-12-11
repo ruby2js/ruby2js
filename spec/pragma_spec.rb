@@ -491,4 +491,55 @@ describe Ruby2JS::Filter::Pragma do
         must_equal 'x ??= fn(y)'
     end
   end
+
+  describe "pragma filter reorder" do
+    it "should position pragma immediately after require filter" do
+      require 'ruby2js/filter/require'
+      require 'ruby2js/filter/functions'
+      require 'ruby2js/filter/esm'
+
+      filters = [
+        Ruby2JS::Filter::Pragma,
+        Ruby2JS::Filter::Require,
+        Ruby2JS::Filter::Functions,
+        Ruby2JS::Filter::ESM
+      ]
+
+      reordered = Ruby2JS::Filter::Pragma.reorder(filters)
+
+      # Pragma should be immediately after Require
+      require_idx = reordered.index(Ruby2JS::Filter::Require)
+      pragma_idx = reordered.index(Ruby2JS::Filter::Pragma)
+      _(pragma_idx).must_equal require_idx + 1
+    end
+
+    it "should work with pragmas in inlined files" do
+      require 'ruby2js/filter/require'
+      require 'ruby2js/filter/functions'
+      require 'fileutils'
+
+      # Create temp files
+      Dir.mktmpdir do |dir|
+        # Main file that requires helper
+        File.write("#{dir}/main.rb", "require_relative 'helper'")
+
+        # Helper file with pragma
+        File.write("#{dir}/helper.rb", "x = obj.dup # Pragma: hash")
+
+        js = Ruby2JS.convert(File.read("#{dir}/main.rb"),
+          eslevel: 2021,
+          file: "#{dir}/main.rb",
+          filters: [
+            Ruby2JS::Filter::Pragma,
+            Ruby2JS::Filter::Require,
+            Ruby2JS::Filter::Functions
+          ]
+        ).to_s
+
+        # Pragma should be applied to inlined file
+        _(js).must_include '{...obj}'
+        _(js).wont_include 'obj.dup'
+      end
+    end
+  end
 end

@@ -6,22 +6,30 @@ module Ruby2JS
     module Pragma
       include SEXP
 
-      # Ensure pragma runs before functions and esm filters so that
-      # pragmas like skip, entries, method are processed first
+      # Ensure pragma runs after require but before other filters so that
+      # pragmas like skip, entries, method, hash are processed correctly.
+      # Pragma runs AFTER require so it can process pragmas in inlined files.
       def self.reorder(filters)
-        dominated = [
-          defined?(Ruby2JS::Filter::Functions) ? Ruby2JS::Filter::Functions : nil,
-          defined?(Ruby2JS::Filter::ESM) ? Ruby2JS::Filter::ESM : nil
-        ].compact.select { |f| filters.include?(f) }
+        # Find the require filter position (or start of filters if not present)
+        require_filter = defined?(Ruby2JS::Filter::Require) ? Ruby2JS::Filter::Require : nil
+        require_index = require_filter ? filters.index(require_filter) : nil
 
-        return filters if dominated.empty?
+        # If require filter exists and pragma comes before it, move pragma after require
+        pragma_index = filters.index(Ruby2JS::Filter::Pragma)
+        return filters unless pragma_index
 
-        filters = filters.dup
-        pragma = filters.delete(Ruby2JS::Filter::Pragma)
-
-        # Find the earliest position of any dominated filter
-        earliest_index = dominated.map { |f| filters.index(f) }.min
-        filters.insert(earliest_index, pragma)
+        if require_index && pragma_index < require_index
+          # Move pragma to right after require
+          filters = filters.dup
+          filters.delete_at(pragma_index)
+          # require_index shifted by 1 since we removed pragma before it
+          filters.insert(require_index, Ruby2JS::Filter::Pragma)
+        elsif require_index && pragma_index > require_index + 1
+          # Pragma is after require but not immediately after - move it
+          filters = filters.dup
+          filters.delete_at(pragma_index)
+          filters.insert(require_index + 1, Ruby2JS::Filter::Pragma)
+        end
 
         filters
       end
