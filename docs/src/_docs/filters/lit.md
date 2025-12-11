@@ -10,10 +10,14 @@ The **Lit** filter makes it easier to build
 from Lit's documentation, rewritten in Ruby2JS (and you can inspect the compiled
 output to see nearly identical code.)
 
+{% rendercontent "docs/note" %}
+It is recommended to use the [camelCase](./camelCase) filter alongside the Lit filter. This allows you to write idiomatic Ruby (e.g., `custom_element`) which will be automatically converted to JavaScript conventions (e.g., `customElements.define`).
+{% endrendercontent %}
+
 <div data-controller="combo" data-options='{
   "eslevel": 2022,
   "autoexports": "default",
-  "filters": ["esm", "lit", "functions"]
+  "filters": ["esm", "lit", "functions", "camelCase"]
 }'></div>
 
 ```ruby
