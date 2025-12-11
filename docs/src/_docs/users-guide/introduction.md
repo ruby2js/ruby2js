@@ -13,7 +13,7 @@ Ruby2JS enables a powerful development pattern: write Ruby code that runs native
 **Try it now** — edit the Ruby code below and see the JavaScript output update live:
 
 <div data-controller="combo" data-options='{
-  "eslevel": 2022,
+  "eslevel": 2020,
   "filters": ["esm", "functions"]
 }'></div>
 
@@ -86,31 +86,28 @@ The key insight is that **Ruby2JS pragmas are just comments** - they have no eff
 
 ## Example: A Dual-Target Class
 
-This class works identically in Ruby and when transpiled to JavaScript. Notice how private methods get an underscore prefix, instance variables become properties, and Ruby's `.round` becomes appropriate JavaScript:
+This class works identically in Ruby and when transpiled to JavaScript. Notice how instance variables become properties, default parameters work naturally, and string interpolation becomes template literals:
 
 <div data-controller="combo" data-options='{
-  "eslevel": 2022,
+  "eslevel": 2020,
   "filters": ["functions"]
 }'></div>
 
 ```ruby
 class Calculator
-  def initialize(precision = 2)
-    @precision = precision
+  def initialize(name = "Calculator")
+    @name = name
+    @history = []
   end
 
   def add(a, b)
-    round(a + b)
+    result = a + b
+    @history.push("#{a} + #{b} = #{result}")
+    result
   end
 
-  def multiply(a, b)
-    round(a * b)
-  end
-
-  private
-
-  def round(value)
-    value.round(@precision)
+  def last_operation
+    @history.last || "No operations yet"
   end
 end
 ```

@@ -52,11 +52,22 @@ module Ruby2JS
         index = 0
 
         # capture constructor, method names for automatic self referencing
+        constructor_args = Set.new
         body.each do |m|
           if m.type == :def
             prop = m.children.first
             if prop == :initialize and !@rbstack.last[:initialize]
               constructor = m.children[2..-1]
+              # Collect constructor parameter names
+              args_node = m.children[1]
+              if args_node&.type == :args
+                args_node.children.each do |arg|
+                  case arg.type
+                  when :arg, :optarg, :restarg, :kwarg, :kwoptarg, :kwrestarg
+                    constructor_args << arg.children.first if arg.children.first
+                  end
+                end
+              end
             elsif prop.to_s.end_with? '='
               @rbstack.last[prop.to_s[0..-2].to_sym] = s(:autobind, s(:self))
             else
@@ -134,7 +145,16 @@ module Ruby2JS
           end
 
           # process leading initializers in constructor
+          # Only hoist ivasgn to class field if RHS doesn't reference constructor args
+          references_args = lambda do |node|
+            next false unless ast_node?(node)
+            next true if node.type == :lvar && constructor_args.include?(node.children.first)
+            node.children.any? { |child| references_args.call(child) }
+          end
+
           while constructor.length > 0 and constructor.first.type == :ivasgn
+            break if references_args.call(constructor.first.children.last)
+
             put(index == 0 ? @nl : @sep)
             index += 1
             statement = constructor.shift

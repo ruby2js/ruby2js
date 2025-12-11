@@ -1,5 +1,6 @@
 require 'minitest/autorun'
 require 'ruby2js/filter/functions'
+require 'ruby2js/filter/cjs'
 
 describe "ES2022 support" do
   
@@ -43,6 +44,21 @@ describe "ES2022 support" do
     it "should handle multiple assignments" do
       to_js( 'class C; def initialize; @a, @b = 1, 2; end; end' ).
         must_equal 'class C {#a; #b; constructor() {[this.#a, this.#b] = [1, 2]}}'
+    end
+
+    it "should not hoist ivar assignments that reference constructor args" do
+      to_js( 'class C; def initialize(name); @name=name; end; end' ).
+        must_equal 'class C {#name; constructor(name) {this.#name = name}}'
+    end
+
+    it "should hoist literals but not arg references in mixed constructor" do
+      to_js( 'class C; def initialize(x); @a=1; @b=[]; @x=x; end; end' ).
+        must_equal 'class C {#a = 1; #b = []; #x; constructor(x) {this.#x = x}}'
+    end
+
+    it "should not hoist when arg is used in expression" do
+      to_js( 'class C; def initialize(name); @name=name.upcase; end; end' ).
+        must_equal 'class C {#name; constructor(name) {this.#name = name.upcase}}'
     end
 
     it "should do short circuit assign - nullish (default)" do
