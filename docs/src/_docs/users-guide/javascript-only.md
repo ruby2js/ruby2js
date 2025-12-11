@@ -213,6 +213,29 @@ async def load_data
 end
 ```
 
+## First-Class Functions
+
+In JavaScript, functions are first-class citizens and can be called directly with parentheses. In Ruby, procs and lambdas require `.call()` or `.()`. For JavaScript-only code, you can skip the Ruby ceremony and call functions directly:
+
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["functions"]
+}'></div>
+
+```ruby
+# Lambda becomes arrow function
+double = ->(x) { x * 2 }
+
+# Ruby style (works but unnecessary)
+result = double.call(5)
+result = double.(5)
+
+# JavaScript style (preferred for JS-only)
+result = double(5)
+```
+
+All three Ruby syntaxes (`proc`, `lambda`, `->`) become JavaScript arrow functions. For JavaScript-only code, prefer calling them directly with parentheses.
+
 ## Patterns for JavaScript-Only Code
 
 ### Entry Point Guard
