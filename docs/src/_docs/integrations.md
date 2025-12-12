@@ -48,12 +48,9 @@ filter and [autoexports](/docs/options#auto-exports) and
 
 # Web Components
 
-Filters are available for [jQuery](/docs/filters/jquery), [Lit](/docs/filters/lit),
+Filters are available for [Lit](/docs/filters/lit),
 [React](/docs/filters/react), and [Stimulus](/docs/filters/stimulus).  The
 [React](/docs/filters/react) filter also supports Preact.
-
-A [Vue](/docs/filters/vue) filter is available, but it has not yet been
-upgraded to support Vue3.
 
 # Node.js
 
