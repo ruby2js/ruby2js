@@ -21,6 +21,17 @@ bundle exec rake          # build demo assets (Opal + selfhost)
 bin/bridgetown start      # run the site's dev server
 ```
 
+## Previewing Drafts
+
+To preview posts with `published: false` or future-dated posts:
+
+```sh
+bin/bridgetown start --unpublished --future
+```
+
+- `--unpublished` — renders posts with `published: false` in frontmatter
+- `--future` — renders posts with dates in the future
+
 To deploy the site, simply run `bundle exec rake deploy` and it will generate production output to the `output` folder which can be deployed on any web server.
 
 Currently the ruby2js.com website is hosted by Render.
