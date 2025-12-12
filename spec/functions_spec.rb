@@ -964,4 +964,29 @@ describe Ruby2JS::Filter::Functions do
       to_js( '"name".downcase.to_sym' ).must_equal '"name".toLowerCase()'
     end
   end
+
+  describe "Class.new { }.new object literal" do
+    it "should convert anonymous class instantiation to object literal" do
+      to_js_2015( 'Class.new do def foo; 1; end; end.new' ).must_equal '{get foo() {return 1}}'
+    end
+
+    it "should handle methods with arguments as shorthand methods" do
+      to_js_2015( 'Class.new do def add(a, b); a + b; end; end.new' ).must_equal '{add(a, b) {a + b}}'
+    end
+
+    it "should handle getter and setter pairs" do
+      to_js_2015( 'Class.new do def foo; @foo; end; def foo=(v); @foo = v; end; end.new' ).
+        must_equal '{get foo() {return this._foo}, set foo(v) {this._foo = v}}'
+    end
+
+    it "should preserve class syntax when inheritance is used" do
+      to_js_2015( 'Class.new(Parent) do def foo; 1; end; end.new' ).
+        must_equal 'new class extends Parent {get foo() {return 1}}'
+    end
+
+    it "should handle assignment to variable" do
+      to_js_2015( 'obj = Class.new do def foo; 1; end; end.new' ).
+        must_equal 'let obj = {get foo() {return 1}}'
+    end
+  end
 end

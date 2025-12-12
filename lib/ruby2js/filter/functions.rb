@@ -76,6 +76,68 @@ module Ruby2JS
         target, method, *args = node.children
         return super if excluded?(method) and method != :call
 
+        # Class.new { }.new -> object literal {}
+        # Transform anonymous class instantiation to object literal
+        if method == :new and target and target.type == :block
+          block_call = target.children[0]
+          if block_call.type == :send and
+             block_call.children[0]&.type == :const and
+             block_call.children[0].children == [nil, :Class] and
+             block_call.children[1] == :new and
+             block_call.children.length == 2  # no inheritance
+
+            # Extract body from block
+            body = target.children[2]
+            body = body.children if body&.type == :begin
+            body = [body].compact unless body.is_a?(Array)
+
+            # Convert method definitions to hash pairs
+            pairs = []
+            body.each do |m|
+              next unless m.type == :def
+              name = m.children[0]
+              method_args = m.children[1]
+              method_body = m.children[2]
+
+              if name.to_s.end_with?('=')
+                # Setter: def foo=(v) -> prop with set
+                base_name = name.to_s[0..-2].to_sym
+                setter = s(:defm, nil, method_args, method_body)
+
+                # Check if there's already a getter for this property
+                existing = pairs.find { |p| p.children[0].type == :prop && p.children[0].children[0] == base_name }
+                if existing
+                  # Merge with existing getter
+                  pairs.delete(existing)
+                  pairs << s(:pair, s(:prop, base_name),
+                    {get: existing.children[1][:get], set: setter})
+                else
+                  pairs << s(:pair, s(:prop, base_name), {set: setter})
+                end
+              elsif !m.is_method? and method_args.children.empty?
+                # Getter: def foo (no parens, no args) -> prop with get
+                getter = s(:defm, nil, method_args, s(:autoreturn, method_body))
+
+                # Check if there's already a setter for this property
+                existing = pairs.find { |p| p.children[0].type == :prop && p.children[0].children[0] == name }
+                if existing
+                  # Merge with existing setter
+                  pairs.delete(existing)
+                  pairs << s(:pair, s(:prop, name),
+                    {get: getter, set: existing.children[1][:set]})
+                else
+                  pairs << s(:pair, s(:prop, name), {get: getter})
+                end
+              else
+                # Regular method with args/parens -> shorthand method syntax
+                pairs << s(:pair, s(:sym, name), s(:defm, nil, method_args, method_body))
+              end
+            end
+
+            return process s(:hash, *pairs)
+          end
+        end
+
         # debugger as a standalone statement -> JS debugger statement
         if method == :debugger and target.nil? and args.empty?
           return s(:debugger)
