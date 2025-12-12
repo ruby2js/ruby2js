@@ -30,7 +30,7 @@ module Ruby2JS
         else
           parse @ast.updated(:class2)
         end
-        @namespace.leave unless @ast.type == :class_module
+        @namespace.leave() unless @ast.type == :class_module
         return
       end
 
@@ -338,7 +338,7 @@ module Ruby2JS
         @class_name = class_name
         @class_parent = class_parent
         @namespace.defineProps @rbstack.pop
-        @namespace.leave unless @ast.type == :class_module
+        @namespace.leave() unless @ast.type == :class_module
       end
     end
 

@@ -27,12 +27,12 @@ module Ruby2JS
         args.first.children.length == 1
 
       collapsible = true if args.length == 1 and args.first.type == :class_module and
-        args.first.children.length == 3 and nonprop[args.first.children.last]
+        args.first.children.length == 3 and nonprop.call(args.first.children.last)
 
       if not collapsible and args.all? {|arg|
           case arg.type
           when :pair, :hash, :class_module
-            arg.children.all? {|child| nonprop[child]}
+            arg.children.all? {|child| nonprop.call(child)}
           when :const
             false
           else
@@ -80,7 +80,7 @@ module Ruby2JS
               end
 
             elsif modname.type == :hash and
-              modname.children.all? {|child| nonprop[child]}
+              modname.children.all? {|child| nonprop.call(child)}
 
               s(:begin, *modname.children.map {|pair|
                 if pair.children.first.type == :prop
@@ -94,7 +94,7 @@ module Ruby2JS
               })
 
             elsif modname.type == :class_module and
-              modname.children[2..-1].all? {|child| nonprop[child]}
+              modname.children[2..-1].all? {|child| nonprop.call(child)}
 
               s(:begin, *modname.children[2..-1].map {|pair|
                   s(:send, target, :[]=, s(:sym, pair.children.first),

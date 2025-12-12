@@ -2,7 +2,8 @@
   "description": "Manifest of specs for selfhost testing",
   "ready": [
     "transliteration_spec.rb",
-    "serializer_spec.rb"
+    "serializer_spec.rb",
+    "namespace_spec.rb"
   ],
   "partial": [
   ],

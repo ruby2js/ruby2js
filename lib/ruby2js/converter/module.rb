@@ -19,7 +19,7 @@ module Ruby2JS
           parse @ast.updated(:hash, [])
         end
 
-        @namespace.leave
+        @namespace.leave()
         return
       end
 
@@ -40,7 +40,7 @@ module Ruby2JS
           parse @ast.updated(:class_module, [name, nil, *body])
         end
 
-        @namespace.leave
+        @namespace.leave()
         return
       end
 
@@ -92,7 +92,7 @@ module Ruby2JS
         parse s(:send, name.children.first, "#{name.children.last}=", body)
       end
 
-      @namespace.leave
+      @namespace.leave()
     end
   end
 end
