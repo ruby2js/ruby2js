@@ -6,10 +6,10 @@
     "namespace_spec.rb"
   ],
   "partial": [
+    "functions_spec.rb"
   ],
   "blocked": {
     "comments_spec.rb": "needs filters (Ruby2JS.Filter.Functions)",
-    "functions_spec.rb": "needs filters",
     "esm_spec.rb": "needs filters",
     "camelcase_spec.rb": "needs filters",
     "react_spec.rb": "needs filters",

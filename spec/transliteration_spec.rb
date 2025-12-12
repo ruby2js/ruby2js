@@ -932,6 +932,20 @@ describe Ruby2JS do
       to_js( 'module M; module N; end; module N::O; end; end' ).
         must_equal('const M = {N: {}}; M.N.O = {}')
     end
+
+    it "should handle nested modules with constants" do
+      # When inner module contains constants, it uses IIFE pattern
+      # The IIFE should not emit a const declaration since it's a hash value
+      to_js( 'module A; module B; X = 1; end; end' ).
+        must_equal('const A = {B: (() => {const X = 1; return {X}})()}')
+      to_js( 'module A; module B; X = 1; def foo; 1; end; end; end' ).
+        must_equal('const A = {B: (() => {const X = 1; function foo() {1}; return {X, foo}})()}')
+    end
+
+    it "should handle deeply nested modules with constants" do
+      to_js( 'module A; module B; module C; X = 1; end; end; end' ).
+        must_equal('const A = {B: {C: (() => {const X = 1; return {X}})()}}')
+    end
   end
 
   describe 'allocation' do

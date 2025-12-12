@@ -8,7 +8,14 @@ module Ruby2JS
     handle :super, :zsuper do |*args|
       method = @instance_method || @class_method
 
-      unless method and @class_parent
+      # If no class parent (e.g., in a module), skip super call
+      # This allows transpiling modules that use super in initialize
+      unless @class_parent
+        return
+      end
+
+      # Require method context when we have a class parent
+      unless method
         raise Error.new("super outside of a method", @ast)
       end
 

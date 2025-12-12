@@ -81,7 +81,8 @@ module Ruby2JS
 
       body = s(:send, s(:block, s(:send, nil, :proc), s(:args),
         s(:begin, *body)), :[])
-      if not name
+      if not name or @ast.type == :module_hash
+        # module_hash is used when module appears as hash value - don't emit const declaration
         parse body
       elsif extend
         parse s(:assign, name, body)
