@@ -34,6 +34,22 @@ async function ensurePrismInitialized() {
   }
 }
 
+// Load transpiled filters on demand
+let functionsFilterLoaded = false;
+async function loadFunctionsFilter() {
+  if (functionsFilterLoaded) return;
+  try {
+    const filterModule = await import('./dist/functions_filter.mjs');
+    // Register the filter in Ruby2JS.Filter namespace
+    globalThis.Ruby2JS.Filter = globalThis.Ruby2JS.Filter || {};
+    globalThis.Ruby2JS.Filter.Functions = filterModule.default;
+    functionsFilterLoaded = true;
+    console.log('  (Functions filter loaded)');
+  } catch (e) {
+    console.log(`  Warning: Could not load Functions filter: ${e.message}`);
+  }
+}
+
 // Colors for output
 const colors = {
   green: '\x1b[32m',
@@ -78,6 +94,11 @@ async function runSpec(specName) {
 
   try {
     await ensurePrismInitialized();
+
+    // Load Functions filter if running functions_spec
+    if (specName === 'functions_spec.rb') {
+      await loadFunctionsFilter();
+    }
 
     // Reset test state before running each spec
     resetTests();

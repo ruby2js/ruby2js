@@ -69,6 +69,34 @@ const Ruby2JS = {
   ast_node: (obj) => typeof obj === 'object' && obj !== null && 'type' in obj && 'children' in obj
 };
 
+// Filter infrastructure functions (these get bound by FilterProcessor at runtime)
+// Default implementations return false/do nothing
+let excluded = () => false;
+let included = () => false;
+let process = (node) => node;
+
+// AST node creation helpers
+function s(type, ...children) {
+  return {
+    type,
+    children,
+    updated: function(newType, newChildren) {
+      return s(newType ?? this.type, ...(newChildren ?? this.children));
+    },
+    is_method() {
+      // Default to false for synthetic nodes
+      return this._is_method ?? false;
+    },
+    get first() { return this.children[0]; },
+    get last() { return this.children[this.children.length - 1]; }
+  };
+}
+
+function S(type, ...children) {
+  // S updates the current node - same as s for our purposes
+  return s(type, ...children);
+}
+
 JS
 
 # Fix issues in transpiled output:
@@ -96,6 +124,15 @@ postamble = <<~JS
 
 // Register the filter
 DEFAULTS.push(Functions);
+
+// Setup function to bind filter infrastructure
+Functions._setup = function(opts) {
+  if (opts.excluded) excluded = opts.excluded;
+  if (opts.included) included = opts.included;
+  if (opts.process) process = opts.process;
+  if (opts.s) { /* s is already defined */ }
+  if (opts.S) { /* S is already defined */ }
+};
 
 // Export the filter for ES module usage
 export { Functions as default, Functions };

@@ -106,8 +106,21 @@ class FilterProcessor {
     filter.process = this.process.bind(this);
 
     // Add excluded/included checkers
-    filter.excluded = (method) => Ruby2JS.Filter._excluded.has(method);
-    filter.included = (method) => Ruby2JS.Filter._included.has(method);
+    const excludedFn = (method) => Ruby2JS.Filter._excluded.has(method);
+    const includedFn = (method) => Ruby2JS.Filter._included.has(method);
+    filter.excluded = excludedFn;
+    filter.included = includedFn;
+
+    // Call _setup if filter has it (for transpiled filters with module-level functions)
+    if (typeof filter._setup === 'function') {
+      filter._setup({
+        excluded: excludedFn,
+        included: includedFn,
+        process: this.process.bind(this),
+        s: SEXP.s,
+        S: SEXP.S.bind(this)
+      });
+    }
   }
 
   process(node) {
