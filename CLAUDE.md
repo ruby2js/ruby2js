@@ -30,10 +30,11 @@ JavaScript Output
 ### Parser Selection
 
 Ruby2JS supports two parsers:
-- **Prism** (Ruby 3.3+) - Auto-detected when available, uses `Prism::Translation::Parser` for AST compatibility
-- **whitequark/parser gem** - Fallback for older Ruby versions
+- **Prism** (Ruby 3.4+) - Auto-detected when available
+- **Translation** (Ruby 3.3), uses `Prism::Translation::Parser` for AST compatibility
+- **whitequark/parser gem** - Fallback for older Ruby versions and Opal
 
-Override with environment variable: `RUBY2JS_PARSER=prism` or `RUBY2JS_PARSER=parser`
+Override with environment variable: `RUBY2JS_PARSER=prism` or `RUBY2JS_PARSER=parser` or `RUBY2JS_PARSER=translation`
 
 ### Key Components
 
@@ -91,12 +92,23 @@ RUBY_VERSION=3.3 bundle exec rake test
 1. Create or edit file in `lib/ruby2js/converter/`
 2. Use `handle :node_type do |*args| ... end`
 3. Add tests in `spec/`
+4. Update docs in `docs/src/_docs/` if the change affects user-facing behavior
 
 ### Adding to a Filter
 
 1. Edit the filter in `lib/ruby2js/filter/`
 2. Add handling in `on_send` or `on_block` methods
 3. Add tests
+4. Update the filter's documentation page in `docs/src/_docs/filters/`
+
+### Fixing Bugs
+
+When fixing significant bugs in `lib/ruby2js/converter/` or `lib/ruby2js/filter/`:
+
+1. Add a test case that reproduces the bug
+2. Fix the bug
+3. Verify the test passes
+4. Update documentation if the fix changes expected behavior
 
 ### Debugging AST
 
@@ -129,32 +141,42 @@ bin/ruby2js --filter functions --filter esm -e 'puts "hello"'
 ```bash
 cd demo/selfhost
 
-# Basic conversion (reads from stdin)
-echo 'self.foo ||= 1' | node ruby2js.mjs --stdin
+# Basic conversion (inline code or stdin)
+node ruby2js.mjs -e 'self.foo ||= 1'
+echo 'self.foo ||= 1' | node ruby2js.mjs
 
-# Show Prism AST (raw JS Prism output)
-echo 'self.foo' | node ruby2js.mjs --stdin --ast
+# Show AST (s-expression format, like Ruby CLI)
+node ruby2js.mjs --ast -e 'self.foo'
 
-# Show Walker AST (after PrismWalker transforms to Parser-compatible format)
-echo 'self.foo' | node ruby2js.mjs --stdin --walker-ast
+# Show raw Prism AST (JavaScript objects)
+node ruby2js.mjs --prism-ast -e 'self.foo'
 
-# Find a node type in the AST
-echo 'self.foo ||= 1' | node ruby2js.mjs --stdin --find OrAssignNode
+# Find nodes matching a pattern in Prism AST
+node ruby2js.mjs --find=OrAssign -e 'self.foo ||= 1'
 
 # Inspect specific property paths
-echo 'self.foo ||= 1' | node ruby2js.mjs --stdin --inspect "value.name.receiver"
+node ruby2js.mjs --inspect=root.statements.body[0] -e 'self.foo ||= 1'
+
+# ES level and comparison options (aligned with Ruby CLI)
+node ruby2js.mjs --es2022 --identity -e 'x == y'
 ```
 
 These tools help debug differences between Ruby and JS converters, especially for self-hosting work.
 
+## Documentation
+
+The documentation source is in `docs/src/_docs/` and includes:
+
+- **Reference docs** - Filter documentation, conversion details, options
+- **[User's Guide](https://www.ruby2js.com/docs/users-guide/introduction)** - Patterns, pragmas, anti-patterns, dual-target and JS-only development
+
+When trying to understand how a feature is intended to work, review the relevant documentation pages. Each page has live demos showing expected input/output.
+
 ## Online Demo
 
-The ruby2js.com demo runs in the browser using Opal (Ruby compiled to JavaScript). The demo code is in `docs/src/demo/`.
+Two demos are available at ruby2js.com:
 
-## Plans
+- **[Opal-based demo](https://www.ruby2js.com/demo/)** - Full filter support, uses Opal (Ruby compiled to JavaScript), ~5MB
+- **[Self-hosted demo](https://www.ruby2js.com/demo/selfhost/)** - Basic transliteration, uses transpiled Ruby2JS, ~200KB + Prism WASM
 
-See `plans/` directory for future work:
-- `PRISM_MIGRATION.md` - Prism parser integration (complete)
-- `ECMASCRIPT_UPDATES.md` - ES2023/2024/2025 feature support
-- `RUBY_FEATURE_GAPS.md` - Missing Ruby language features
-- `SELF_HOSTING.md` - Transpiling Ruby2JS to JavaScript for browser use
+The demo code is in `docs/src/demo/`. The self-hosted version uses the unified `ruby2js.mjs` bundle from `demo/selfhost/`.
