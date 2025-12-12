@@ -26,8 +26,7 @@ module Ruby2JS
       add_args = true
 
       if @class_method
-        parse @class_parent
-        put '.'
+        put 'super.'
         put method.children[0]
         add_args = method.is_method?
       elsif method.children[0] == :constructor

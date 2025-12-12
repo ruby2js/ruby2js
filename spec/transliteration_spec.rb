@@ -697,6 +697,15 @@ describe Ruby2JS do
         must_equal 'class A {}; class B extends A {foo(x) {super.foo(3)}}'
     end
 
+    it "should handle super in class methods" do
+      to_js('class A; end; class B < A; def self.foo(x); super; end; end').
+        must_equal 'class A {}; class B extends A {static foo(x) {super.foo(x)}}'
+      to_js('class A; end; class B < A; def self.foo(x); super(3); end; end').
+        must_equal 'class A {}; class B extends A {static foo(x) {super.foo(3)}}'
+      to_js('class A; end; class B < A; def self.bar; super; end; end').
+        must_equal 'class A {}; class B extends A {static get bar() {return super.bar}}'
+    end
+
     it "should parse class with class variables" do
       to_js('class Person; @@count=0; end').
         must_equal 'class Person {}; Person._count = 0'
