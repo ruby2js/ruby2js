@@ -6,9 +6,9 @@ category: users-guide-patterns
 next_page_order: 9.2
 ---
 
-# Dual-Target Patterns
+# Patterns
 
-This guide covers patterns that work well when writing Ruby code that will run both natively and as transpiled JavaScript.
+This guide covers patterns that work well when writing Ruby code for JavaScript. These patterns apply whether you're writing dual-target code (runs in both Ruby and JavaScript) or JavaScript-only code.
 
 {% toc %}
 
@@ -69,7 +69,7 @@ Calls to private methods (with or without explicit `self`) are automatically pre
 
 ### Method Calls vs Property Access
 
-Ruby2JS distinguishes between method calls and property access based on parentheses:
+Ruby2JS uses parentheses to distinguish between property access and method calls. **This is one of the most important concepts.**
 
 <div data-controller="combo" data-options='{
   "eslevel": 2022,
@@ -77,15 +77,43 @@ Ruby2JS distinguishes between method calls and property access based on parenthe
 }'></div>
 
 ```ruby
-# No parens, no args - becomes property access
+# No parens = property access (getter)
 len = obj.length
 first = arr.first
 
-# Empty parens - becomes method call
+# Empty parens = method call
+item = list.pop()
 result = obj.process()
 
-# Parens with args - always method call
+# Parens with args = always method call
 obj.set(42)
+```
+
+**This applies to your own methods too.** When defining methods:
+- `def foo` — becomes a getter, accessed as `obj.foo`
+- `def foo()` — becomes a method, called as `obj.foo()`
+
+When calling methods (especially in callbacks):
+
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["functions"]
+}'></div>
+
+```ruby
+class Widget
+  def setup()
+    # WRONG: increment without parens just returns the getter
+    # @button.addEventListener('click') { increment }
+
+    # RIGHT: use parens to actually call the method
+    @button.addEventListener('click') { increment() }
+  end
+
+  def increment()
+    @count += 1
+  end
+end
 ```
 
 ## Data Structures
@@ -361,43 +389,71 @@ ends = str.end_with?("World")
 replaced = str.gsub(/o/, "0")
 ```
 
-## Module Organization
+## Modules
 
-### Exports
-
-Using the ESM filter:
+Ruby's `module` keyword works for namespacing in both Ruby and JavaScript:
 
 <div data-controller="combo" data-options='{
   "eslevel": 2022,
-  "filters": ["esm", "functions"]
+  "filters": ["functions"]
 }'></div>
 
 ```ruby
-export class MyClass
-  def process(x)
-    x * 2
+module Utils
+  def self.format(str)
+    str.upcase
   end
 end
-
-export def helper_method(x)
-  x + 1
-end
-
-export DEFAULT_VALUE = 42
 ```
 
-### Imports
+Modules with constants use an IIFE pattern:
 
 <div data-controller="combo" data-options='{
   "eslevel": 2022,
-  "filters": ["esm", "functions"]
+  "filters": ["functions"]
 }'></div>
 
 ```ruby
-import React, from: 'react'
-import [useState, useEffect], from: 'react'
-import MyModule, from: './my_module'
+module Config
+  VERSION = "1.0"
+
+  def self.load
+    # ...
+  end
+end
 ```
+
+Nested modules work too:
+
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["functions"]
+}'></div>
+
+```ruby
+module App
+  module Models
+    class User
+    end
+  end
+end
+```
+
+## Organizing Files
+
+For dual-target code, the **require** filter bundles multiple files:
+
+```ruby
+# main.rb
+require_relative 'utils'
+require_relative 'config'
+
+# Works in Ruby, inlined for JavaScript
+```
+
+This pattern works in Ruby natively and produces a single bundled JavaScript file. See [Require Filter](/docs/filters/require) for details.
+
+For JavaScript-only code, use ESM imports instead. See [JavaScript-Only](/docs/users-guide/javascript-only).
 
 ## Ruby-Only Code
 
@@ -422,31 +478,33 @@ def works_in_both
 end
 ```
 
-## Recommended Filter Combination
+## Recommended Filters
 
-For dual-target code, we recommend:
+The most commonly used filters:
+
+- **functions** - Ruby method → JS method mappings (`.select` → `.filter`, etc.)
+- **pragma** - Line-level control via comments
+- **return** - Implicit returns in methods
+- **require** - Bundle multiple files (for dual-target code)
+
+For JavaScript-only code, add:
+- **esm** - ES module imports/exports
+
+The `preset` option enables sensible defaults:
 
 ```ruby
 # ruby2js: preset
-
-# Or explicitly:
-# ruby2js: filters: functions, esm, pragma, return
 ```
 
-The `preset` mode enables:
-- **functions** - Ruby method → JS method mappings
-- **esm** - ES module imports/exports
-- **pragma** - Line-level control via comments (e.g., `# Pragma: ??` for nullish coalescing)
-- **return** - Implicit returns in methods
-- ES2022 features
-- Identity comparison (`==` → `===`)
+See [Options](/docs/options) for configuration details.
 
 ## Summary
 
 | Pattern | Works Well | Needs Care |
 |---------|------------|------------|
 | Classes | ✓ Directly translates | |
-| Methods | ✓ Normal methods | |
+| Methods | ✓ Normal methods | Parens matter |
+| Modules | ✓ Namespacing | |
 | Private methods | ✓ `#` prefix (ES2022) or `_` prefix | |
 | Arrays | ✓ Most operations | `<<` needs pragma |
 | Hashes | ✓ Symbol keys | `.each` needs pragma |
@@ -455,4 +513,4 @@ The `preset` mode enables:
 | Control flow | ✓ if/unless/case | |
 | Type checks | | Avoid `is_a?` |
 
-See [Anti-Patterns](/docs/users-guide/anti-patterns) for patterns to avoid, and [Pragmas](/docs/users-guide/pragmas) for fine-grained control.
+See [Anti-Patterns](/docs/users-guide/anti-patterns) for patterns to avoid, [Pragmas](/docs/users-guide/pragmas) for fine-grained control, and [JavaScript-Only](/docs/users-guide/javascript-only) for ESM, async/await, and JavaScript APIs.

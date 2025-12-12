@@ -238,6 +238,8 @@ All three Ruby syntaxes (`proc`, `lambda`, `->`) become JavaScript arrow functio
 
 ## Patterns for JavaScript-Only Code
 
+For common patterns (classes, methods, blocks, data structures), see [Patterns](/docs/users-guide/patterns). This section covers JavaScript-specific patterns.
+
 ### Entry Point Guard
 
 For modules that can be both imported and run directly:
@@ -290,76 +292,6 @@ count ||= 0 # Pragma: ??
 
 # When you need falsy-check (false, 0, ""), use ||
 enabled ||= true # Pragma: logical
-```
-
-### Property Access vs Method Calls
-
-Ruby2JS uses parentheses to distinguish between property access and method calls. **This is one of the most important concepts for JavaScript-only development.**
-
-<div data-controller="combo" data-options='{
-  "eslevel": 2022,
-  "filters": ["functions"]
-}'></div>
-
-```ruby
-# No parens = property access (getter)
-len = obj.length
-first = arr.first
-
-# Empty parens = method call
-item = list.pop()
-result = obj.process()
-
-# Parens with args = always method call
-obj.set(42)
-```
-
-**This applies to your own methods too.** When defining methods:
-- `def foo` — becomes a getter, accessed as `obj.foo`
-- `def foo()` — becomes a method, called as `obj.foo()`
-
-When calling methods (especially in callbacks):
-
-<div data-controller="combo" data-options='{
-  "eslevel": 2022,
-  "filters": ["functions"]
-}'></div>
-
-```ruby
-class Widget
-  def setup()
-    # WRONG: increment without parens just returns the getter
-    # @button.addEventListener('click') { increment }
-
-    # RIGHT: use parens to actually call the method
-    @button.addEventListener('click') { increment() }
-  end
-
-  def increment()
-    @count += 1
-  end
-end
-```
-
-### Skipping Ruby-Only Code
-
-Use `# Pragma: skip` liberally:
-
-<div data-controller="combo" data-options='{
-  "eslevel": 2022,
-  "filters": ["pragma", "esm", "functions"]
-}'></div>
-
-```ruby
-require 'json' # Pragma: skip
-
-def to_sexp # Pragma: skip
-  # Ruby debugging only
-end
-
-def process(data)
-  data.map { |x| x * 2 }
-end
 ```
 
 ### Type Disambiguation
@@ -483,20 +415,7 @@ str = obj.to_s!
 
 ### Arrow Functions and `this`
 
-Blocks become arrow functions, which capture `this` lexically:
-
-<div data-controller="combo" data-options='{
-  "eslevel": 2022,
-  "filters": ["functions", "pragma"]
-}'></div>
-
-```ruby
-# Arrow function - this is outer scope
-element.on("click") { handle(this) }
-
-# Traditional function - this is the element
-element.on("click") { handle(this) } # Pragma: noes2015
-```
+Blocks become arrow functions, which capture `this` lexically. For DOM event handlers where you need dynamic `this`, use `# Pragma: noes2015`. See [When You Need `this`](/docs/users-guide/patterns#when-you-need-this) in Patterns.
 
 ### Import Hoisting
 
@@ -504,33 +423,11 @@ Ruby2JS hoists imports to the top of the output. Be aware when inlining multiple
 
 ### Property Getters
 
-Methods without parentheses become getters:
-
-<div data-controller="combo" data-options='{
-  "eslevel": 2022,
-  "filters": ["functions"]
-}'></div>
-
-```ruby
-class Token
-  def initialize(text)
-    @text = text
-  end
-
-  # Becomes a getter, accessed as: token.text
-  def text
-    @text
-  end
-
-  # Empty parens = method call: token.getText()
-  def getText()
-    @text
-  end
-end
-```
+Methods without parentheses become getters. See [Method Calls vs Property Access](/docs/users-guide/patterns#method-calls-vs-property-access) in Patterns.
 
 ## See Also
 
+- [Patterns](/docs/users-guide/patterns) - Common patterns for all Ruby2JS code
 - [ESM Filter](/docs/filters/esm) - ES module syntax
 - [Require Filter](/docs/filters/require) - File bundling
 - [Functions Filter](/docs/filters/functions) - Ruby→JS mappings

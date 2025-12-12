@@ -6,15 +6,15 @@ category: users-guide-intro
 next_page_order: 9.1
 ---
 
-# Dual-Target Ruby Development
+# Writing Ruby for JavaScript
 
-Ruby2JS enables a powerful development pattern: write Ruby code that runs natively in Ruby **and** transpiles to JavaScript. This "dual-target" approach lets you maintain a single codebase that works in both environments.
+Ruby2JS transpiles Ruby code to JavaScript. There are two main approaches, and understanding when to use each will help you get the most out of Ruby2JS.
 
-**Try it now** — edit the Ruby code below and see the JavaScript output update live:
+**Try it now** — edit the Ruby code below and see the JavaScript output:
 
 <div data-controller="combo" data-options='{
-  "eslevel": 2020,
-  "filters": ["esm", "functions"]
+  "eslevel": 2022,
+  "filters": ["functions"]
 }'></div>
 
 ```ruby
@@ -31,104 +31,85 @@ end
 
 {% toc %}
 
-## Why Dual-Target?
+## Two Approaches
 
-### Use Cases
+### Dual-Target Development
 
-**Shared Business Logic**
-: Validation rules, calculations, and data transformations can run on the server (Ruby) and client (JavaScript) from the same source.
+Write Ruby code that runs **both** natively in Ruby and as transpiled JavaScript. The same source file works in both environments.
 
-**Isomorphic Applications**
-: The same rendering or processing code works server-side and browser-side.
+**Best for:**
+- Shared validation logic (server and client)
+- Isomorphic rendering
+- Libraries that work in Ruby and JavaScript
+- Gradual migration from Ruby to JavaScript
 
-**Universal Libraries**
-: Date handling, formatting, parsing utilities that work everywhere.
+**Key constraint:** Code must avoid Ruby-specific features that don't translate (metaprogramming, `eval`, etc.)
 
-**Cross-Platform Tools**
-: A CLI tool (Ruby) and browser interface (JavaScript) sharing core logic.
+### JavaScript-Only Development
 
-**Gradual Migration**
-: Move functionality from Ruby to JavaScript incrementally.
+Write Ruby code designed **exclusively** to become JavaScript. The Ruby code won't run in Ruby—it's just a nicer syntax for writing JavaScript.
 
-### The Ruby2JS Approach
+**Best for:**
+- Browser applications and SPAs
+- Node.js tools and CLI utilities
+- Using JavaScript APIs directly (DOM, fetch, etc.)
+- Portions of the Ruby2JS self-hosted transpiler
 
-Unlike Opal (which compiles Ruby to JavaScript with a runtime), Ruby2JS produces **idiomatic JavaScript** that reads like hand-written code. This means:
+**Key advantage:** Full access to JavaScript APIs and idioms without dual-target constraints.
 
-- **Small output size** - no runtime overhead
-- **Debuggable output** - the JavaScript looks like JavaScript
-- **Framework-friendly** - works with React, Vue, Stimulus, etc.
-- **No runtime required** - just the transpiled code
+## Choosing Your Approach
 
-## How It Works
+| Factor | Dual-Target | JavaScript-Only |
+|--------|-------------|-----------------|
+| Ruby execution | Production use | None |
+| JavaScript APIs | Wrapped or avoided | Used directly |
+| ESM imports/exports | No (use require) | Yes |
+| Pragmas needed | Occasional | Common |
+| Code complexity | Simpler patterns | Full flexibility |
+
+**Not sure?** Start with dual-target patterns. They work for JavaScript-only too, and you can add JavaScript-specific features as needed.
+
+## How Ruby2JS Works
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Single Ruby Source                           │
-│    (with optional pragma annotations for edge cases)            │
+│                         Ruby Source                              │
 └─────────────────────────────────────────────────────────────────┘
                               │
               ┌───────────────┴───────────────┐
               ▼                               ▼
     ┌─────────────────┐             ┌─────────────────┐
-    │  Ruby Runtime   │             │  Ruby2JS with   │
-    │  (pragmas are   │             │  filters        │
-    │   just comments)│             │                 │
+    │  Ruby Runtime   │             │    Ruby2JS      │
+    │  (dual-target)  │             │   Transpiler    │
     └─────────────────┘             └─────────────────┘
               │                               │
               ▼                               ▼
     ┌─────────────────┐             ┌─────────────────┐
-    │  Ruby Behavior  │             │  JS Behavior    │
-    │  (server-side)  │             │  (browser/node) │
+    │  Ruby Behavior  │             │  JavaScript     │
     └─────────────────┘             └─────────────────┘
 ```
 
-The key insight is that **Ruby2JS pragmas are just comments** - they have no effect when code runs in Ruby. This means the same source file works in both environments without conditional compilation.
+For dual-target code, pragmas (special comments) let you handle edge cases without affecting Ruby execution—Ruby sees them as comments.
 
-## Example: A Dual-Target Class
+## The Ruby2JS Approach
 
-This class works identically in Ruby and when transpiled to JavaScript. Notice how instance variables become properties, default parameters work naturally, and string interpolation becomes template literals:
+Unlike Opal (which compiles Ruby to JavaScript with a runtime), Ruby2JS produces **idiomatic JavaScript** that reads like hand-written code:
 
-<div data-controller="combo" data-options='{
-  "eslevel": 2020,
-  "filters": ["functions"]
-}'></div>
+- **Small output** - No runtime library required
+- **Readable** - The JavaScript looks like JavaScript
+- **Framework-friendly** - Works with React, Vue, Stimulus, etc.
+- **Fast** - Generated code runs at native JavaScript speed
 
-```ruby
-class Calculator
-  def initialize(name = "Calculator")
-    @name = name
-    @history = []
-  end
-
-  def add(a, b)
-    result = a + b
-    @history.push("#{a} + #{b} = #{result}")
-    result
-  end
-
-  def last_operation
-    @history.last || "No operations yet"
-  end
-end
-```
-
-## When Dual-Target Works Best
-
-Dual-target development works best when your code:
-
-- Uses **data structures** that exist in both languages (arrays, hashes/objects, strings, numbers)
-- Relies on **pure functions** without side effects
-- Follows **patterns** that translate cleanly (classes, methods, blocks)
-- Avoids **Ruby-specific features** like `method_missing`, `define_method`, or `eval`
+The trade-off: Ruby's dynamic features (`method_missing`, `define_method`, `eval`) can't be supported. See [Anti-Patterns](/docs/users-guide/anti-patterns) for what to avoid.
 
 ## What You'll Learn
 
 This guide covers:
 
-1. **[Patterns](/docs/users-guide/patterns)** - How to write Ruby that transpiles cleanly
+1. **[Patterns](/docs/users-guide/patterns)** - Common patterns that work well
 2. **[Pragmas](/docs/users-guide/pragmas)** - Fine-grained control over specific lines
 3. **[Anti-Patterns](/docs/users-guide/anti-patterns)** - What to avoid
-4. **[Build Setup](/docs/users-guide/build-setup)** - Integrating Ruby2JS into your workflow
+4. **[JavaScript-Only](/docs/users-guide/javascript-only)** - ESM, async/await, and JavaScript APIs
 
 ## Prerequisites
 
