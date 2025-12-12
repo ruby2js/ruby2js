@@ -62,8 +62,8 @@ class RubyController < DemoController
     # populate editor with initial contents
     self.contents = contents if contents
 
-    # focus on the editor
-    @rubyEditor.focus()
+    # focus on the editor without scrolling page
+    @rubyEditor.focus(preventScroll: true)
 
     # do an initial conversion as soon as Ruby2JS comes online
     await ruby2js_ready
