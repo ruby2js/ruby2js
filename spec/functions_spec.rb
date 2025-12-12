@@ -306,6 +306,31 @@ describe Ruby2JS::Filter::Functions do
       to_js( 'a.slice!(mark.first + 1..-1)' ).must_equal 'a.splice(mark[0] + 1)'
     end
 
+    it "should handle array multiplication" do
+      # Single element array: use Array(n).fill(element)
+      to_js( '["x"] * 5' ).must_equal 'Array(5).fill("x")'
+      to_js( '[1] * n' ).must_equal 'Array(n).fill(1)'
+      # Multi-element array: use Array.from with flatMap
+      to_js( '[1, 2] * 3' ).must_equal 'Array.from({length: 3}, () => ([1, 2])).flat()'
+      to_js( '["a", "b"] * n' ).must_equal 'Array.from({length: n}, () => (["a", "b"])).flat()'
+    end
+
+    it "should handle array concatenation with +" do
+      to_js( '[1, 2] + [3]' ).must_equal '[1, 2].concat([3])'
+      to_js( 'a + [1, 2]' ).must_equal 'a.concat([1, 2])'
+      to_js( '["x"] * 3 + ["y"]' ).must_equal 'Array(3).fill("x").concat(["y"])'
+    end
+
+    it "should handle compact on arrays" do
+      to_js( 'a.compact' ).must_equal 'a.filter(x => x != null)'
+    end
+
+    it "should not convert compact with block to filter" do
+      # compact with a block is NOT the array compact method
+      # e.g., serializer.compact { } should remain as compact, not become filter
+      to_js( 'obj.compact { puts "x" }' ).must_equal 'obj.compact(() => console.log("x"))'
+    end
+
     it "should handle range assignment" do
       to_js_2015( 'a[0..2] = v' ).must_equal 'a.splice(0, 2 - 0 + 1, ...v)'
       to_js_2015( 'a[0...2] = v' ).must_equal 'a.splice(0, 2 - 0, ...v)'

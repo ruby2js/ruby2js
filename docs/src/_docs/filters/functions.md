@@ -23,6 +23,7 @@ If you set the `eslevel` option to `2021` or newer, the Functions filter enables
 * `.chars` {{ caret }} `Array.from()`
 * `.chr` {{ caret }} `fromCharCode`
 * `.clear` {{ caret }} `.length = 0`
+* `.compact` {{ caret }} `.filter(x => x != null)`
 * `debugger` {{ caret }} `debugger` (JS debugger statement)
 * `.define_method` {{ caret }} `klass.prototype.meth = function ...`
 * `.delete` {{ caret }} `delete target[arg]`
@@ -112,6 +113,9 @@ If you set the `eslevel` option to `2021` or newer, the Functions filter enables
 * `[/r/, n]=` {{ caret }} `.replace(/r/, ...)`
 * `(1..2).each {|i| ...}` {{ caret }} `for (let i=1; i<=2; i+=1)`
 * `"string" * length` {{ caret }} `"string".repeat(length)`
+* `[element] * n` {{ caret }} `Array(n).fill(element)`
+* `[a, b] * n` {{ caret }} `Array.from({length: n}, () => [a, b]).flat()`
+* `array + [elements]` {{ caret }} `array.concat([elements])`
 * `@foo.call(args)` {{ caret }} `this._foo(args)`
 * `@@foo.call(args)` {{ caret }} `this.constructor._foo(args)`
 * `Array(x)` {{ caret }} `Array.from(x)`

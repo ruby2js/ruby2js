@@ -673,6 +673,34 @@ module Ruby2JS
         elsif method == :* and target.type == :str
           process S(:send, target, :repeat, args.first)
 
+        elsif method == :* and target.type == :array and args.length == 1
+          # [a, b] * n => Array.from({length: n}, () => [a, b]).flat()
+          # For single-element arrays: [a] * n => Array(n).fill(a)
+          if target.children.length == 1
+            # Single element: Array(n).fill(element)
+            process S(:send, s(:send, s(:const, nil, :Array), nil, args.first),
+              :fill, target.children.first)
+          else
+            # Multiple elements: Array.from({length: n}, () => [a, b]).flat()
+            # Array.from with length object and mapper, then flatten
+            # Use send! to force method call syntax (with parens)
+            length_obj = s(:hash, s(:pair, s(:sym, :length), args.first))
+            mapper = s(:block, s(:send, nil, :proc), s(:args), target)
+            process S(:send!,
+              s(:send, s(:const, nil, :Array), :from, length_obj, mapper),
+              :flat)
+          end
+
+        elsif method == :+ and target.type == :array and args.length == 1 and args.first.type == :array
+          # [a, b] + [c] => [...[a, b], ...[c]] or [a, b].concat([c])
+          # Using concat for clarity
+          process S(:send, target, :concat, args.first)
+
+        elsif method == :+ and args.length == 1 and args.first.type == :array
+          # expr + [c] where expr might be an array - use concat
+          # This handles cases like Array(n).fill(x) + [y]
+          process S(:send, target, :concat, args.first)
+
         elsif [:is_a?, :kind_of?].include? method and args.length == 1
           if args[0].type == :const
             parent = args[0].children.last
@@ -888,6 +916,15 @@ module Ruby2JS
           block = s(:block, s(:send, nil, :proc), node.children[1],
             s(:autoreturn, *node.children[2..-1]))
           process call.updated(nil, [*call.children, block])
+
+        elsif method == :compact and call.children.length == 2
+          # compact with a block is NOT the array compact method
+          # (e.g., serializer.compact { ... } should not become filter)
+          # Skip on_send processing by constructing the call node directly
+          target = call.children.first
+          processed_call = call.updated(nil, [process(target), :compact])
+          node.updated nil, [processed_call, process(node.children[1]),
+            *process_all(node.children[2..-1])]
 
         elsif method == :select and call.children.length == 2
           call = call.updated nil, [call.children.first, :filter]

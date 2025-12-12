@@ -149,8 +149,21 @@ module Ruby2JS
       @tokens.insert(index, *items)
     end
 
-    def slice!(range)
-      @tokens.slice!(range)
+    # Slice from start index to end of array (for selfhost compatibility)
+    # In Ruby: receives a Range like (n..-1)
+    # In JS: functions filter converts slice!(n..-1) to splice(n) at call site,
+    #        so this method receives just the start index
+    def slice!(arg)
+      # Ruby: arg is a Range; JS: arg is just the start index
+      # Check for Range by seeing if it responds to begin (works in both Ruby and JS)
+      if arg.respond_to?(:begin)
+        start_idx = arg.begin
+      else
+        start_idx = arg
+      end
+      result = @tokens[start_idx..-1] || []
+      @tokens = @tokens[0...start_idx] || []
+      result
     end
 
     # For selfhost: functions filter transforms slice!(range) calls to splice(start)
@@ -395,6 +408,17 @@ module Ruby2JS
 
     # wrap long statements in curly braces
     def wrap(open = '{', close = '}', &block)
+      # Handle case where only a block is passed (for JS compatibility where
+      # block parameter becomes a regular positional argument)
+      # In JS, functions are callable - check for Proc in Ruby or function type in JS
+      unless block
+        if open.is_a?(Proc)
+          block = open
+          open = '{'
+          close = '}'
+        end
+      end
+
       puts open
       mark = output_location
       block.() # Explicit call syntax for selfhost compatibility
@@ -478,6 +502,14 @@ module Ruby2JS
 
     def to_str
       @str ||= to_s
+    end
+
+    # JavaScript compatibility: explicit toString method
+    # Uses direct @str access to avoid potential recursion from functions filter
+    def toString(_=nil)
+      return @str if @str
+      respace
+      @str = @lines.map(&:to_s).join(@nl)
     end
 
     BASE64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'

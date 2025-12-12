@@ -207,6 +207,29 @@ Array.prototype.must_equal = function(expected) {
   return this;
 };
 
+// Number assertions
+Number.prototype.must_equal = function(expected) {
+  if (this.valueOf() !== expected) {
+    throw new Error(`Expected ${expected} but got ${this.valueOf()}`);
+  }
+  return this;
+};
+
+// Ruby's send method - call methods dynamically by name
+if (!Object.prototype.send) {
+  Object.defineProperty(Object.prototype, 'send', {
+    value: function(methodName, ...args) {
+      const method = this[methodName];
+      if (typeof method === 'function') {
+        return method.apply(this, args);
+      }
+      throw new Error(`undefined method '${methodName}' for ${this.constructor.name}`);
+    },
+    writable: true,
+    configurable: true
+  });
+}
+
 export function runTests() {
   console.log(`\nTests: ${testCount}, Passed: ${passCount}, Failed: ${failCount}, Skipped: ${skipCount}`);
   if (failures.length > 0) {

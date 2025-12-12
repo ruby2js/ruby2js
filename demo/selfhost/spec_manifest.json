@@ -1,14 +1,10 @@
 {
   "description": "Manifest of specs for selfhost testing",
   "ready": [
-    "transliteration_spec.rb"
+    "transliteration_spec.rb",
+    "serializer_spec.rb"
   ],
   "partial": [
-    {
-      "spec": "serializer_spec.rb",
-      "reason": "Some Line class methods and polyfills missing",
-      "expected_pass": 6
-    }
   ],
   "blocked": {
     "comments_spec.rb": "needs filters (Ruby2JS.Filter.Functions)",
