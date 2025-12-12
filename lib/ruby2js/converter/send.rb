@@ -202,6 +202,37 @@ module Ruby2JS
           args.first.children.first.to_s =~ /^[a-zA-Z]\w*$/
         then
           put ".#{args.first.children.first}"
+        elsif args.length == 1 and [:irange, :erange].include? args.first.type
+          # Range indexing: arr[0..-2] or arr[0...-2]
+          range = args.first
+          start_node, end_node = range.children
+
+          put '.slice('
+          parse start_node
+
+          if end_node
+            if range.type == :irange && end_node.type == :int && end_node.children.first == -1
+              # Special case: arr[n..-1] → arr.slice(n) (to end)
+              # No second argument needed
+            else
+              put ', '
+              if range.type == :irange
+                # Inclusive range: arr[0..-2] → arr.slice(0, -1)
+                if end_node.type == :int
+                  # Can calculate at transpile time
+                  put (end_node.children.first + 1).to_s
+                else
+                  # Need runtime calculation
+                  parse end_node
+                  put ' + 1'
+                end
+              else
+                # Exclusive range: arr[0...-2] → arr.slice(0, -2)
+                parse end_node
+              end
+            end
+          end
+          put ')'
         else
           put '['; parse_all(*args, join: ', '); put ']'
         end

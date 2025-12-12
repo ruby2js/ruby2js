@@ -42,7 +42,14 @@ describe Ruby2JS do
     it "should parse array" do
       to_js( "[1, [2, 3]]" ).must_equal '[1, [2, 3]]'
     end
-    
+
+    it "should convert range indexing to slice" do
+      to_js( 'str[0..-2]' ).must_equal 'str.slice(0, -1)'
+      to_js( 'str[2..-1]' ).must_equal 'str.slice(2)'
+      to_js( 'str[0...-2]' ).must_equal 'str.slice(0, -2)'
+      to_js( 'str[1..3]' ).must_equal 'str.slice(1, 4)'
+    end
+
     it "should parse global variables" do
       to_js( "$a = 1" ).must_equal 'let $a = 1'
     end

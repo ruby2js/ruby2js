@@ -153,6 +153,25 @@ items.push(4)
 items << 5 # Pragma: array
 ```
 
+### Range Indexing
+
+Ruby's range indexing translates to JavaScript's `slice()`:
+
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["functions"]
+}'></div>
+
+```ruby
+str = "hello"
+str[0..-2]    # all but last char
+str[2..-1]    # from index 2 to end
+str[1..3]     # characters 1-3 (inclusive)
+str[0...-2]   # exclusive range (up to but not -2)
+```
+
+This works for both strings and arrays.
+
 ### Hashes/Objects
 
 Ruby hashes become JavaScript objects:
@@ -507,6 +526,7 @@ See [Options](/docs/options) for configuration details.
 | Modules | ✓ Namespacing | |
 | Private methods | ✓ `#` prefix (ES2022) or `_` prefix | |
 | Arrays | ✓ Most operations | `<<` needs pragma |
+| Range indexing | ✓ `[0..-2]` → `.slice()` | |
 | Hashes | ✓ Symbol keys | `.each` needs pragma |
 | Blocks | ✓ Arrow functions | Use noes2015 for `this` |
 | Strings | ✓ Interpolation | |
