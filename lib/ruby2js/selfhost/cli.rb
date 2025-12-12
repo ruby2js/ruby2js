@@ -206,8 +206,9 @@ async def run_cli
 
   args = process.argv[2..-1] || []
   output_mode = 'js'
-  eslevel = 2020
+  options = { eslevel: 2020 }
   file = nil
+  inline_code = nil
   search_pattern = nil
   inspect_path = nil
   verbose = false
@@ -218,13 +219,42 @@ async def run_cli
     arg = args[i]
 
     if arg == '--ast'
-      output_mode = 'prism-ast'
-    elsif arg == '--walker-ast'
       output_mode = 'walker-ast'
+    elsif arg == '--prism-ast'
+      output_mode = 'prism-ast'
     elsif arg == '--js'
       output_mode = 'js'
+    elsif arg == '-e'
+      i += 1
+      inline_code = args[i]
     elsif arg.start_with?('--eslevel=')
-      eslevel = parseInt(arg.split('=')[1], 10)
+      options[:eslevel] = parseInt(arg.split('=')[1], 10)
+    elsif arg == '--es2015'
+      options[:eslevel] = 2015
+    elsif arg == '--es2016'
+      options[:eslevel] = 2016
+    elsif arg == '--es2017'
+      options[:eslevel] = 2017
+    elsif arg == '--es2018'
+      options[:eslevel] = 2018
+    elsif arg == '--es2019'
+      options[:eslevel] = 2019
+    elsif arg == '--es2020'
+      options[:eslevel] = 2020
+    elsif arg == '--es2021'
+      options[:eslevel] = 2021
+    elsif arg == '--es2022'
+      options[:eslevel] = 2022
+    elsif arg == '--identity'
+      options[:comparison] = :identity
+    elsif arg == '--equality'
+      options[:comparison] = :equality
+    elsif arg == '--underscored_private'
+      options[:underscored_private] = true
+    elsif arg == '--strict'
+      options[:strict] = true
+    elsif arg == '--nullish'
+      options[:or] = :nullish
     elsif arg == '--verbose' || arg == '-v'
       verbose = true
     elsif arg == '--loc'
@@ -236,7 +266,7 @@ async def run_cli
     elsif arg.start_with?('--find=')
       search_pattern = arg.split('=')[1]
       output_mode = 'find'
-    elsif arg == '--inspect' || arg == '-i'
+    elsif arg == '--inspect'
       i += 1
       inspect_path = args[i] || 'root'
       output_mode = 'inspect'
@@ -249,39 +279,47 @@ async def run_cli
 
         Usage:
           node ruby2js.mjs [options] [file]
+          node ruby2js.mjs -e "puts 'hello'"
           echo "puts 'hello'" | node ruby2js.mjs [options]
 
         Output Modes:
           --js              Output JavaScript (default)
-          --ast             Output raw Prism AST
-          --walker-ast      Output AST after walker (Parser-compatible s-expression)
+          --ast             Output AST (Parser-compatible s-expression format)
+          --prism-ast       Output raw Prism AST (verbose object format)
           --find=PATTERN    Find nodes matching PATTERN (regex) in Prism AST
           --inspect=PATH    Inspect node at PATH (e.g., "root.statements.body[0]")
 
-        Options:
+        Conversion Options:
+          -e CODE           Evaluate inline Ruby code
           --eslevel=NNNN    Set ECMAScript level (default: 2020)
-          --verbose, -v     Show all properties including internal ones
-          --loc             Show location information
+          --es2015 .. --es2022  Set ECMAScript level
+          --identity        Use === for == comparisons
+          --equality        Use == for == comparisons
+          --underscored_private  Prefix private properties with underscore (@foo -> _foo)
+          --strict          Add "use strict" to output
+          --nullish         Use ?? for 'or' operator
+
+        Debug Options:
+          --verbose, -v     Show all AST properties including internal ones
+          --loc             Show location information in AST output
           --help, -h        Show this help
 
         Examples:
           # Convert Ruby to JavaScript
+          node ruby2js.mjs -e "puts 'hello'"
           echo "puts 'hello'" | node ruby2js.mjs
 
-          # View Prism AST
-          echo "self.p ||= 1" | node ruby2js.mjs --ast
+          # Use specific ES level
+          node ruby2js.mjs --es2022 -e "class Foo; @x = 1; end"
 
-          # View walker output (s-expression)
-          echo "self.p ||= 1" | node ruby2js.mjs --walker-ast
+          # View AST (s-expression format)
+          node ruby2js.mjs --ast -e "self.p ||= 1"
 
-          # Find all nodes containing "Write" in type name
-          echo "self.p ||= 1" | node ruby2js.mjs --find=Write
+          # View raw Prism AST
+          node ruby2js.mjs --prism-ast -e "@a = 1"
 
-          # Inspect a specific node to see all its properties
-          echo "self.p ||= 1" | node ruby2js.mjs --inspect=root.statements.body[0]
-
-          # Verbose AST output (shows internal properties)
-          echo "@a = 1" | node ruby2js.mjs --ast --verbose
+          # Find nodes in Prism AST
+          node ruby2js.mjs --find=Write -e "self.p ||= 1"
       HELP
       process.exit(0)
     elsif !arg.start_with?('-')
@@ -293,10 +331,13 @@ async def run_cli
 
   # Read source
   source = nil
-  if file
+  if inline_code
+    source = inline_code
+  elsif file
     source = fs.readFileSync(file, 'utf-8')
+    options[:file] = file
   elsif process.stdin.isTTY
-    console.error('Error: No input. Provide a file or pipe Ruby code via stdin.')
+    console.error('Error: No input. Provide a file, use -e CODE, or pipe Ruby code via stdin.')
     console.error('Use --help for usage information.')
     process.exit(1)
   else
@@ -355,13 +396,13 @@ async def run_cli
       console.log(inspect_prism_node(node))
 
     when 'walker-ast'
-      walker = Ruby2JS::PrismWalker.new(source, file)
+      walker = Ruby2JS::PrismWalker.new(source, options[:file])
       ast = walker.visit(parse_result.value)
       console.log(format_ast(ast))
 
     else
       # Full conversion to JavaScript using the convert() function
-      console.log(convert(source, { eslevel: eslevel, underscored_private: true, file: file }))
+      console.log(convert(source, options))
     end
 
   rescue => e

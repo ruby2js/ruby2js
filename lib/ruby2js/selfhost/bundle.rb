@@ -71,6 +71,9 @@ export def convert(source, options = {})
   # Create and run converter
   converter = Ruby2JS::Converter.new(ast, comments, options)
   converter.eslevel = options[:eslevel] || 2022
+  converter.comparison = options[:comparison] if options[:comparison]
+  converter.or = options[:or] if options[:or]
+  converter.strict = options[:strict] if options[:strict]
   converter.underscored_private = options[:underscored_private] if options[:underscored_private]
   converter.namespace = Ruby2JS::Namespace.new
 

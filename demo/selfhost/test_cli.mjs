@@ -78,17 +78,17 @@ test('method with arguments', () => {
 
 console.log('\nAST modes:');
 
-test('--ast shows Prism AST', () => {
+test('--ast shows s-expression', () => {
   const output = run('x = 1', '--ast');
-  if (!output.includes('ProgramNode') || !output.includes('LocalVariableWriteNode')) {
-    throw new Error(`Expected Prism AST output, got '${output}'`);
+  if (!output.includes('s(:lvasgn') || !output.includes('"x"')) {
+    throw new Error(`Expected s-expression AST, got '${output}'`);
   }
 });
 
-test('--walker-ast shows s-expression', () => {
-  const output = run('x = 1', '--walker-ast');
-  if (!output.includes('s(:lvasgn') || !output.includes('"x"')) {
-    throw new Error(`Expected s-expression AST, got '${output}'`);
+test('--prism-ast shows Prism AST', () => {
+  const output = run('x = 1', '--prism-ast');
+  if (!output.includes('ProgramNode') || !output.includes('LocalVariableWriteNode')) {
+    throw new Error(`Expected Prism AST output, got '${output}'`);
   }
 });
 
@@ -98,6 +98,20 @@ test('--help shows usage', () => {
   const output = run('', '--help');
   if (!output.includes('Usage:') || !output.includes('--ast')) {
     throw new Error(`Expected help output, got '${output}'`);
+  }
+});
+
+test('-e inline code', () => {
+  const output = execSync(`node ${cli} -e 'puts "hello"'`, { encoding: 'utf-8' }).trim();
+  if (output !== 'puts("hello")') {
+    throw new Error(`Expected 'puts("hello")', got '${output}'`);
+  }
+});
+
+test('--underscored_private', () => {
+  const output = execSync(`node ${cli} --underscored_private -e '@x = 1'`, { encoding: 'utf-8' }).trim();
+  if (!output.includes('_x')) {
+    throw new Error(`Expected underscored private, got '${output}'`);
   }
 });
 
