@@ -54,7 +54,9 @@ When a class definition is encountered that derives from
  * References to instance variables will cause entries to be added to the
    `static properties` property if not already present, and simple type
    inferencing will be used to determine the type. (To bypass this for
-   truly internal state, use a prefixed ivar name like `@_x`.)
+   truly internal state, use a prefixed ivar name like `@_x`.) When
+   referencing properties in templates, use `@name` or `self.name` syntax
+   to ensure they are correctly prefixed with `this.` in the output.
 
  * `@styles` assignments, `self.styles` assignments and `self.styles` methods
    that return a string will have that string mapped to a
