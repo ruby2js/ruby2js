@@ -953,6 +953,13 @@ describe Ruby2JS do
       to_js( 'module A; module B; module C; X = 1; end; end; end' ).
         must_equal('const A = {B: {C: (() => {const X = 1; return {X}})()}}')
     end
+
+    it "should strip ? and ! from method names in module return hash" do
+      to_js( 'module M; def valid?; true; end; end' ).
+        must_equal('const M = {valid() {true}}')
+      to_js( 'module M; def clear!; x; end; end' ).
+        must_equal('const M = {clear() {let x}}')
+    end
   end
 
   describe 'allocation' do

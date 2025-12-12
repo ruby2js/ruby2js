@@ -68,7 +68,9 @@ module Ruby2JS
         if node.type == :casgn and node.children.first == nil
           symbols << node.children[1]
         elsif node.type == :def
-          symbols << node.children.first
+          # Strip ? and ! from method names (they're stripped in def transpilation)
+          method_name = node.children.first.to_s.sub(/[?!]$/, '').to_sym
+          symbols << method_name
         elsif node.type == :class and node.children.first.children.first == nil
           symbols << node.children.first.children.last
         elsif node.type == :module
