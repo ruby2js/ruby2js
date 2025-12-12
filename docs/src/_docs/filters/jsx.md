@@ -1,16 +1,18 @@
 ---
-order: 34
+order: 17
 title: JSX
-top_section: Deprecations
+top_section: Filters
 category: jsx
 ---
 
-{% rendercontent "docs/note", type: "warning" %}
-This filter has been deprecated and will be removed in Ruby2JS 6.0.
-{% endrendercontent %}
+The **JSX** filter converts Wunderbar-style element calls and `React.createElement` calls into JSX syntax.
 
-The **jsx** filter will convert the types of scripts suitable for processing
-by the [react](react) filter into JSX.
+This filter is useful when you want human-readable JSX output, particularly for:
+- Exporting Ruby2JS code for maintenance by JavaScript developers
+- Generating JSX for use with build tools that expect JSX input
+- Improving readability of React component output
+
+It works in conjunction with the [React](react) filter.
 
 This is generally not necessarily if the sources are being converted for
 processing in the browser or by processing in Node.js for SSR purposes.

@@ -1,5 +1,3 @@
-# TODO: This feature is deprecated.
-
 require 'ruby2js'
 
 # Convert Wunderbar syntax to JSX
