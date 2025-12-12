@@ -113,6 +113,28 @@ let failures = [];
 // Store before hooks per describe level
 let beforeHooks = [];
 
+// Reset test state between spec runs
+export function resetTests() {
+  currentDescribe = [];
+  testCount = 0;
+  passCount = 0;
+  failCount = 0;
+  skipCount = 0;
+  failures = [];
+  beforeHooks = [];
+}
+
+// Get current test results without logging
+export function getTestResults() {
+  return {
+    total: testCount,
+    passed: passCount,
+    failed: failCount,
+    skipped: skipCount,
+    failures: failures.slice() // return a copy
+  };
+}
+
 export function describe(name, fn) {
   // Handle different name types: functions use .name, objects need special handling
   let displayName;
@@ -251,4 +273,6 @@ globalThis.it = it;
 globalThis.skip = skip;
 globalThis.before = before;
 globalThis.runTests = runTests;
+globalThis.resetTests = resetTests;
+globalThis.getTestResults = getTestResults;
 globalThis.initPrism = initPrism;

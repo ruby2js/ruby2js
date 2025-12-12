@@ -8,6 +8,7 @@
 //   --skip-transpile  Skip transpilation (use pre-built dist/*.mjs files)
 //   --ready-only      Only run "ready" specs (skip partial and blocked)
 //   --partial-only    Only run "partial" specs (skip ready and blocked)
+//   --verbose         Show failure details for all specs (including partial)
 
 import { execSync } from 'child_process';
 import { readFileSync, existsSync } from 'fs';
@@ -19,9 +20,10 @@ const manifest = JSON.parse(readFileSync(join(__dirname, 'spec_manifest.json'), 
 const skipTranspile = process.argv.includes('--skip-transpile');
 const readyOnly = process.argv.includes('--ready-only');
 const partialOnly = process.argv.includes('--partial-only');
+const verbose = process.argv.includes('--verbose');
 
 // Import test harness for running specs in-process
-import { initPrism, runTests, describe, it, skip, before } from './test_harness.mjs';
+import { initPrism, runTests, resetTests, getTestResults, describe, it, skip, before } from './test_harness.mjs';
 
 // Initialize Prism once at startup
 let prismInitialized = false;
@@ -77,46 +79,22 @@ async function runSpec(specName) {
   try {
     await ensurePrismInitialized();
 
-    // Reset global test state in test_harness (we need to import it fresh)
-    // Since we can't easily reset the module, we'll capture results via runTests
-    const specModule = await import(specPath + '?t=' + Date.now()); // Cache bust
+    // Reset test state before running each spec
+    resetTests();
 
-    // runTests() returns success and logs stats - we need to capture these
-    // The test_harness module tracks state globally, so we just call runTests
-    // But we need to suppress its console output and parse the results
+    // Import and run the spec (cache bust to ensure fresh import)
+    const specModule = await import(specPath + '?t=' + Date.now());
 
-    // Capture console output
-    const logs = [];
-    const originalLog = console.log;
-    console.log = (...args) => logs.push(args.join(' '));
-
-    const success = runTests();
-
-    console.log = originalLog;
-
-    // Parse the captured output
-    const output = logs.join('\n');
-    const match = output.match(/Tests: (\d+), Passed: (\d+), Failed: (\d+), Skipped: (\d+)/);
-
-    if (match) {
-      return {
-        total: parseInt(match[1]),
-        passed: parseInt(match[2]),
-        failed: parseInt(match[3]),
-        skipped: parseInt(match[4]),
-        exitCode: success ? 0 : 1,
-        output
-      };
-    }
+    // Get results directly from test harness
+    const results = getTestResults();
 
     return {
-      total: 0,
-      passed: 0,
-      failed: 0,
-      skipped: 0,
-      exitCode: success ? 0 : 1,
-      output,
-      error: 'Could not parse test output'
+      total: results.total,
+      passed: results.passed,
+      failed: results.failed,
+      skipped: results.skipped,
+      failures: results.failures,
+      exitCode: results.failed === 0 ? 0 : 1
     };
   } catch (e) {
     return {
@@ -124,11 +102,31 @@ async function runSpec(specName) {
       passed: 0,
       failed: 0,
       skipped: 0,
+      failures: [],
       exitCode: 1,
-      output: e.stack || e.message,
-      error: e.message
+      error: e.message,
+      stack: e.stack
     };
   }
+}
+
+// Format failure details for display
+function formatFailures(failures, maxShow = 10) {
+  if (!failures || failures.length === 0) return '';
+
+  let output = '\n    Failures:\n';
+  const toShow = failures.slice(0, maxShow);
+
+  for (const f of toShow) {
+    output += `\n      ${f.name}\n`;
+    output += `        ${f.error.message.split('\n').join('\n        ')}\n`;
+  }
+
+  if (failures.length > maxShow) {
+    output += `\n      ... and ${failures.length - maxShow} more failures\n`;
+  }
+
+  return output;
 }
 
 async function main() {
@@ -167,10 +165,11 @@ async function main() {
         log('red', `✗ ${result.passed} passed, ${result.failed} failed`);
         overallSuccess = false;
         results.ready.push({ spec: specName, status: 'failed', ...result });
-        // Show failure details
-        const failureMatch = result.output.match(/Failures:[\s\S]*?(?=\n\nTests:|$)/);
-        if (failureMatch) {
-          console.log(colors.red + failureMatch[0].trim() + colors.reset);
+        // Always show failure details for ready specs
+        if (result.failures && result.failures.length > 0) {
+          console.log(colors.red + formatFailures(result.failures) + colors.reset);
+        } else if (result.error) {
+          console.log(colors.red + `\n    Error: ${result.error}\n` + colors.reset);
         }
       }
     }
@@ -180,6 +179,9 @@ async function main() {
   // Run "partial" specs - report but don't fail CI
   if (manifest.partial.length > 0 && !readyOnly) {
     log('bold', '▶ PARTIAL SPECS (informational, won\'t fail CI):');
+    if (!verbose) {
+      log('blue', '  (use --verbose to see failure details)');
+    }
     console.log('');
 
     for (const entry of manifest.partial) {
@@ -204,6 +206,13 @@ async function main() {
           ? 'as expected'
           : 'needs work';
         log('yellow', `⚠ ${result.passed} passed, ${result.failed} failed (${status})`);
+
+        // Show failure details in verbose mode
+        if (verbose && result.failures && result.failures.length > 0) {
+          console.log(colors.yellow + formatFailures(result.failures, 5) + colors.reset);
+        } else if (verbose && result.error) {
+          console.log(colors.yellow + `\n    Error: ${result.error}\n` + colors.reset);
+        }
       }
 
       if (reason) {

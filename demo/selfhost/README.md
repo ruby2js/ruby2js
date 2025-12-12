@@ -10,7 +10,7 @@ A single `ruby2js.mjs` bundle provides the full converter for both CLI and brows
 - Classes, methods, blocks, string interpolation
 - Arrays, hashes, if/else/case, loops, operators
 - Comments (preserved in output)
-- Full transliteration test suite (245 tests passing)
+- Full transliteration and serializer test suites passing
 
 **Not yet supported:**
 - Filters (functions, camelCase, esm, etc.)
@@ -78,6 +78,32 @@ The unified bundle is transpiled from Ruby source files:
 | `npm run build:prism-browser` | Regenerate prism_browser.mjs |
 | `npm run build:spec` | Transpile test specs |
 | `npm run clean` | Remove generated files |
+
+## Spec Runner Options
+
+The spec runner (`run_all_specs.mjs`) supports several options:
+
+```bash
+# Run all specs (ready specs must pass, partial are informational)
+node run_all_specs.mjs
+
+# Show failure details for partial specs
+node run_all_specs.mjs --verbose
+
+# Only run ready specs (CI mode)
+node run_all_specs.mjs --ready-only
+
+# Only run partial specs (development mode)
+node run_all_specs.mjs --partial-only
+
+# Skip transpilation (use pre-built dist/*.mjs files)
+node run_all_specs.mjs --skip-transpile
+```
+
+Spec status is tracked in `spec_manifest.json`:
+- **ready**: Must pass (CI fails if they don't)
+- **partial**: Run but don't fail CI (in development)
+- **blocked**: Skipped with explanation (waiting on dependencies)
 
 ## CLI Usage
 
@@ -160,8 +186,9 @@ filters: [
 
 ## Known Limitations
 
-- **2 tests skipped**: Proc source location (JavaScript limitation)
+- **Some tests skipped**: Proc source location and similar JavaScript limitations
 - **No filters**: The `functions`, `camelCase`, `esm`, etc. filters are not yet transpiled
+- **Blocked specs**: Some specs require filters - see `spec_manifest.json` for details
 
 ## Future Work
 

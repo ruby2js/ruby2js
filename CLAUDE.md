@@ -180,3 +180,79 @@ Two demos are available at ruby2js.com:
 - **[Self-hosted demo](https://www.ruby2js.com/demo/selfhost/)** - Basic transliteration, uses transpiled Ruby2JS, ~200KB + Prism WASM
 
 The demo code is in `docs/src/demo/`. The self-hosted version uses the unified `ruby2js.mjs` bundle from `demo/selfhost/`.
+
+## Selfhost Testing
+
+The selfhost project (`demo/selfhost/`) transpiles Ruby2JS itself to JavaScript, enabling the converter to run in browsers. Ruby specs are also transpiled and run against the JS converter.
+
+### Spec Manifest Categories
+
+The `demo/selfhost/spec_manifest.json` tracks which specs work with the selfhost converter:
+
+- **ready**: Specs that must pass (CI fails if they don't)
+- **partial**: Specs being worked on (failures are informational)
+- **blocked**: Specs waiting on dependencies (e.g., filters not yet transpiled)
+
+### Running Selfhost Tests
+
+```bash
+cd demo/selfhost
+
+# Run all specs
+node run_all_specs.mjs
+
+# Run with failure details for partial specs
+node run_all_specs.mjs --verbose
+
+# Run only ready specs (for CI)
+node run_all_specs.mjs --ready-only
+
+# Run only partial specs (for development)
+node run_all_specs.mjs --partial-only
+
+# Skip transpilation (use pre-built files)
+node run_all_specs.mjs --skip-transpile
+```
+
+### Debugging a Specific Spec
+
+To debug a failing spec with full details:
+
+```bash
+cd demo/selfhost
+
+# Rebuild everything
+npm run build
+
+# Transpile just one spec
+bundle exec ruby scripts/transpile_spec.rb ../../spec/serializer_spec.rb > dist/serializer_spec.mjs
+
+# Run it directly to see all failures
+node -e "
+import('./test_harness.mjs').then(async h => {
+  await h.initPrism();
+  await import('./dist/serializer_spec.mjs');
+  h.runTests();
+});
+"
+```
+
+### Common Failure Patterns
+
+1. **Transpilation bug**: The Ruby-to-JS conversion produces incorrect code
+   - Check `lib/ruby2js/filter/` for filter issues
+   - Check `lib/ruby2js/converter/` for conversion issues
+   - Use `bin/ruby2js --ast` vs `--filtered-ast` to see where transformation happens
+
+2. **Missing polyfill**: A Ruby method has no JS equivalent in the test harness
+   - Add to `demo/selfhost/test_harness.mjs`
+
+3. **Runtime incompatibility**: Code works in Ruby but not in JS
+   - Fix in source Ruby file (`lib/ruby2js/*.rb`) with dual-compatible code
+   - Example: `arg.is_a?(Range)` won't work in JS; use `arg.respond_to?(:begin)` instead
+
+### Promoting Specs
+
+When a partial spec passes all tests:
+1. Move it from `partial` to `ready` in `spec_manifest.json`
+2. Commit and push - CI will now enforce it passes
