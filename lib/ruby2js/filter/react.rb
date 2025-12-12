@@ -1,22 +1,31 @@
-# TODO: This feature is deprecated.
-
-# A filter to support usage of React.  Overview of translations provided:
-#   * classes that inherit from React are converted to React.createClass
-#     calls.
-#   * Wunderbar style element definitions are converted to
-#     React.createElement calls.
+# A filter to support React and Preact component development.
+#
+# Two component styles are supported:
+#
+#   1. Function components with hooks (modern, recommended):
+#      class Foo < React        -> function Foo(props) { ... }
+#      class Foo < Preact       -> Uses useState for state management
+#
+#   2. Class components (for lifecycle methods):
+#      class Foo < React::Component  -> class Foo extends React.Component
+#      class Foo < Preact::Component -> class Foo extends Preact.Component
+#
+# Element creation uses Wunderbar-style DSL:
+#   _div class: "container" do   -> React.createElement("div", {className: "container"},
+#     _p "Hello"                 ->   React.createElement("p", null, "Hello"))
+#   end
+#
+# Variable mappings:
+#   @x   -> state variable (useState hook or this.state.x)
+#   @@x  -> this.props.x
+#   $x   -> this.refs.x
+#   ~x   -> this.refs.x
+#   ~(x) -> document.querySelector(x)
 #
 # Related files:
-#   spec/react_spec.rb contains a specification
-#   demo/react-tutorial.rb contains a working sample
-#
-# Conversions provided:
-#  *  $x becomes this.refs.x
-#  *  @x becomes this.state.x
-#  * @@x becomes this.props.x
-#  *  ~x becomes this.refs.x
-#  * ~(x) becomes document.querySelector(x)
-#  * ~"x" becomes document.querySelector("x")
+#   spec/react_spec.rb - specifications
+#   spec/hook_spec.rb  - hook-specific tests
+#   spec/preact_spec.rb - Preact tests
 #
 require 'ruby2js'
 require 'ruby2js/jsx'
