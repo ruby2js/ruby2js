@@ -21,6 +21,7 @@ module Ruby2JS
         super
         @stim_scope = []
         @stim_subclasses = []
+        @stim_outlets = Set.new
       end
 
       def on_module(node)
@@ -49,6 +50,7 @@ module Ruby2JS
         @stim_targets = Set.new
         @stim_values = Set.new
         @stim_classes = Set.new
+        @stim_outlets = Set.new
         stim_walk(node)
 
         if modules_enabled?
@@ -97,7 +99,7 @@ module Ruby2JS
         end
 
         unless @stim_targets.empty?
-          targets = nodes.find_index {|child| 
+          targets = nodes.find_index {|child|
             child.type == :send and child.children[0..1] == [s(:self), :targets=]
           }
 
@@ -107,6 +109,20 @@ module Ruby2JS
             @stim_targets.merge(nodes[targets].children[2].children)
             nodes[targets] = nodes[targets].updated(nil,
               [*nodes[targets].children[0..1], s(:array, *@stim_targets)])
+          end
+        end
+
+        unless @stim_outlets.empty?
+          outlets = nodes.find_index {|child|
+            child.type == :send and child.children[0..1] == [s(:self), :outlets=]
+          }
+
+          if outlets == nil
+            nodes.unshift s(:send, s(:self), :outlets=, s(:array, *@stim_outlets))
+          elsif nodes[outlets].children[2].type == :array
+            @stim_outlets.merge(nodes[outlets].children[2].children)
+            nodes[outlets] = nodes[outlets].updated(nil,
+              [*nodes[outlets].children[0..1], s(:array, *@stim_outlets)])
           end
         end
 
@@ -125,6 +141,11 @@ module Ruby2JS
         props += @stim_classes.map do |name|
           name = name.children.first
           ["#{name}Class", "has#{name[0].upcase}#{name[1..-1]}Class"]
+        end
+
+        props += @stim_outlets.map do |name|
+          name = name.children.first
+          ["#{name}Outlet", "#{name}Outlets", "has#{name[0].upcase}#{name[1..-1]}Outlet"]
         end
 
         props = props.flatten.map {|prop| [prop.to_sym, s(:self)]}.to_h
@@ -147,17 +168,20 @@ module Ruby2JS
           if child.type == :send and child.children.length == 2 and
             [nil, s(:self), s(:send, nil, :this)].include? child.children[0]
 
-            if child.children[1] =~ /^has([A-Z]\w*)(Target|Value|Class)$/
+            if child.children[1] =~ /^has([A-Z]\w*)(Target|Value|Class|Outlet)$/
               name = s(:str, $1[0].downcase + $1[1..-1])
               @stim_targets.add name if $2 == 'Target'
               @stim_values.add name if $2 == 'Value'
               @stim_classes.add name if $2 == 'Class'
+              @stim_outlets.add name if $2 == 'Outlet'
             elsif child.children[1] =~ /^(\w+)Targets?$/
               @stim_targets.add s(:str, $1)
             elsif child.children[1] =~ /^(\w+)Value=?$/
               @stim_values.add s(:str, $1)
             elsif child.children[1] =~ /^(\w+)Class$/
               @stim_classes.add s(:str, $1)
+            elsif child.children[1] =~ /^(\w+)Outlets?$/
+              @stim_outlets.add s(:str, $1)
             end
 
           elsif child.type == :send and child.children.length == 3 and
@@ -175,6 +199,8 @@ module Ruby2JS
           elsif child.type == :def
             if child.children[0] =~ /^(\w+)ValueChanged$/
               @stim_values.add s(:str, $1)
+            elsif child.children[0] =~ /^(\w+)Outlet(Connected|Disconnected)$/
+              @stim_outlets.add s(:str, $1)
             end
           end
 
