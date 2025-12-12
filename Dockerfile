@@ -66,6 +66,9 @@ server {
     # Upgrade insecure requests - fixes mixed content when behind HTTPS proxy
     add_header Content-Security-Policy "upgrade-insecure-requests" always;
 
+    # Always revalidate - with HTTP/2 and 304 responses, overhead is negligible
+    add_header Cache-Control "no-cache, must-revalidate" always;
+
     # Strip trailing slashes (per Bridgetown docs)
     # Use $scheme://$http_host to preserve the port in redirects
     rewrite ^(.+)/+$ $scheme://$http_host$1 permanent;
@@ -73,12 +76,6 @@ server {
     # Clean URLs - serve index.html from directories, or .html files
     location / {
         try_files $uri $uri/index.html $uri.html /index.html;
-    }
-
-    # Cache static assets (including ES modules and WebAssembly)
-    location ~* \.(js|mjs|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|wasm)$ {
-        expires 1y;
-        add_header Cache-Control "public, immutable";
     }
 
     # Custom error page
