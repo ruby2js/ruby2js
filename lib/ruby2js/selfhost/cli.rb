@@ -21,16 +21,23 @@ end
 # ============================================================================
 
 # Format Prism AST node for display (verbose mode shows all properties)
-def format_prism_node(node, indent = '', options = {})
+def format_prism_node(node, indent = '', options = {}, seen = nil)
   verbose = options[:verbose] || false
   show_loc = options[:showLoc] || false
+  seen ||= []
 
   return "#{indent}null" if node.nil? || node == undefined
   return "#{indent}#{JSON.stringify(node)}" unless node.is_a?(Object)
 
+  # Detect circular references
+  if seen.include?(node)
+    return "#{indent}[Circular]"
+  end
+  seen.push(node)
+
   if Array.isArray(node)
     return "#{indent}[]" if node.length == 0
-    items = node.map { |item| format_prism_node(item, indent + '  ', options) }
+    items = node.map { |item| format_prism_node(item, indent + '  ', options, seen) }
     return "#{indent}[\n#{items.join(",\n")}\n#{indent}]"
   end
 
@@ -54,7 +61,7 @@ def format_prism_node(node, indent = '', options = {})
     next if !show_loc && (key == 'location' || key.end_with?('Loc'))
     next if value.nil? || value == undefined
 
-    formatted = format_prism_node(value, indent + '  ', options)
+    formatted = format_prism_node(value, indent + '  ', options, seen)
     if formatted.include?("\n")
       props.push("#{indent}  #{key}:\n#{formatted}")
     else
