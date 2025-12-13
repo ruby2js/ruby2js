@@ -47,7 +47,7 @@ module Ruby2JS
             if left.type == :prop
               if right[:get]
                 get_comments = @comments[right[:get]]
-                unless get_comments.nil? || get_comments.empty?
+                if get_comments && !get_comments.empty?
                   (puts ''; singleton = false) if singleton
                   comments(right[:get]).each {|comment| put comment}
                 end
@@ -59,7 +59,7 @@ module Ruby2JS
 
               if right[:set]
                 set_comments = @comments[right[:set]]
-                unless set_comments.nil? || set_comments.empty?
+                if set_comments && !set_comments.empty?
                   (puts ''; singleton = false) if singleton
                   comments(right[:set]).each {|comment| put comment}
                 end

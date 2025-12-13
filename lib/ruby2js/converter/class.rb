@@ -313,7 +313,7 @@ module Ruby2JS
         end
 
         init_comments = @comments[init]
-        unless init_comments.nil? || init_comments.empty?
+        if init_comments && !init_comments.empty?
           @comments[constructor] = init_comments
           @comments[init] = []  # prevent duplicate output
         end
