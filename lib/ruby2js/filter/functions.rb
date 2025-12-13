@@ -7,8 +7,9 @@ module Ruby2JS
     module Functions
       include SEXP
 
-      # require explicit opt-in to to class => constructor mapping
-      Filter.exclude :class, :call
+      # require explicit opt-in to call => direct invocation mapping
+      # (JS uses Function.prototype.call() which would break)
+      Filter.exclude :call
 
       # Methods that convert only when is_method? is true (parentheses present)
       # OR when explicitly included via include: option.
@@ -729,20 +730,107 @@ module Ruby2JS
         elsif [:is_a?, :kind_of?].include? method and args.length == 1
           if args[0].type == :const
             parent = args[0].children.last
-            parent = :Number if parent == :Float
-            parent = :Object if parent == :Hash
-            parent = :Function if parent == :Proc
-            parent = :Error if parent == :Exception
-            parent = :RegExp if parent == :Regexp
             if parent == :Array
+              # Array.isArray(obj)
               S(:send, s(:const, nil, :Array), :isArray, target)
-            elsif [:Arguments, :Boolean, :Date, :Error, :Function, :Number,
-                :Object, :RegExp, :String].include? parent
-              S(:send, s(:send, s(:attr, s(:attr, s(:const, nil, Object),
-                :prototype), :toString), :call, target), :===,
-                s(:str, "[object #{parent.to_s}]"))
+            elsif parent == :Integer
+              # typeof obj === "number" && Number.isInteger(obj)
+              S(:and,
+                s(:send, s(:send, nil, :typeof, target), :===, s(:str, "number")),
+                s(:send, s(:const, nil, :Number), :isInteger, target))
+            elsif [:Float, :Numeric].include? parent
+              # typeof obj === "number"
+              S(:send, s(:send, nil, :typeof, target), :===, s(:str, "number"))
+            elsif parent == :String
+              # typeof obj === "string"
+              S(:send, s(:send, nil, :typeof, target), :===, s(:str, "string"))
+            elsif parent == :Symbol
+              # typeof obj === "symbol"
+              S(:send, s(:send, nil, :typeof, target), :===, s(:str, "symbol"))
+            elsif parent == :Hash
+              # typeof obj === "object" && obj !== null && !Array.isArray(obj)
+              S(:and,
+                s(:and,
+                  s(:send, s(:send, nil, :typeof, target), :===, s(:str, "object")),
+                  s(:send, target, :'!==', s(:nil))),
+                s(:send, s(:send, s(:const, nil, :Array), :isArray, target), :'!'))
+            elsif parent == :NilClass
+              # obj === null || obj === undefined
+              S(:or,
+                s(:send, target, :===, s(:nil)),
+                s(:send, target, :===, s(:send, nil, :undefined)))
+            elsif parent == :TrueClass
+              # obj === true
+              S(:send, target, :===, s(:true))
+            elsif parent == :FalseClass
+              # obj === false
+              S(:send, target, :===, s(:false))
+            elsif parent == :Boolean
+              # typeof obj === "boolean"
+              S(:send, s(:send, nil, :typeof, target), :===, s(:str, "boolean"))
+            elsif parent == :Proc || parent == :Function
+              # typeof obj === "function"
+              S(:send, s(:send, nil, :typeof, target), :===, s(:str, "function"))
+            elsif parent == :Regexp
+              # obj instanceof RegExp
+              S(:instanceof, target, s(:const, nil, :RegExp))
+            elsif parent == :Exception || parent == :Error
+              # obj instanceof Error
+              S(:instanceof, target, s(:const, nil, :Error))
             else
-              super
+              # User-defined classes: obj instanceof ClassName
+              S(:instanceof, target, args[0])
+            end
+          else
+            super
+          end
+
+        elsif method == :instance_of? and args.length == 1
+          # instance_of? checks exact class (not subclasses)
+          # obj.instance_of?(Foo) => obj.constructor === Foo
+          if args[0].type == :const
+            parent = args[0].children.last
+            if parent == :Array
+              # For Array, check constructor directly
+              S(:send, s(:attr, target, :constructor), :===, s(:const, nil, :Array))
+            elsif parent == :Integer
+              # typeof + isInteger + not float
+              S(:and,
+                s(:and,
+                  s(:send, s(:send, nil, :typeof, target), :===, s(:str, "number")),
+                  s(:send, s(:const, nil, :Number), :isInteger, target)),
+                s(:send, s(:send, target, :%, s(:int, 1)), :===, s(:int, 0)))
+            elsif [:Float, :Numeric].include? parent
+              # For Float, check it's a number but NOT an integer
+              S(:and,
+                s(:send, s(:send, nil, :typeof, target), :===, s(:str, "number")),
+                s(:send, s(:send, s(:const, nil, :Number), :isInteger, target), :'!'))
+            elsif parent == :String
+              S(:send, s(:send, nil, :typeof, target), :===, s(:str, "string"))
+            elsif parent == :Symbol
+              S(:send, s(:send, nil, :typeof, target), :===, s(:str, "symbol"))
+            elsif parent == :Hash
+              # Check it's a plain object (constructor === Object)
+              S(:send, s(:attr, target, :constructor), :===, s(:const, nil, :Object))
+            elsif parent == :NilClass
+              S(:or,
+                s(:send, target, :===, s(:nil)),
+                s(:send, target, :===, s(:send, nil, :undefined)))
+            elsif parent == :TrueClass
+              S(:send, target, :===, s(:true))
+            elsif parent == :FalseClass
+              S(:send, target, :===, s(:false))
+            elsif parent == :Boolean
+              S(:send, s(:send, nil, :typeof, target), :===, s(:str, "boolean"))
+            elsif parent == :Proc || parent == :Function
+              S(:send, s(:send, nil, :typeof, target), :===, s(:str, "function"))
+            elsif parent == :Regexp
+              S(:send, s(:attr, target, :constructor), :===, s(:const, nil, :RegExp))
+            elsif parent == :Exception || parent == :Error
+              S(:send, s(:attr, target, :constructor), :===, s(:const, nil, :Error))
+            else
+              # User-defined classes: obj.constructor === ClassName
+              S(:send, s(:attr, target, :constructor), :===, args[0])
             end
           else
             super
@@ -794,6 +882,13 @@ module Ruby2JS
 
         elsif method == :class and args.length==0 and not node.is_method?
           process node.updated(:attr, [target, :constructor])
+
+        elsif method == :superclass and args.length==0 and not node.is_method?
+          # Foo.superclass => Object.getPrototypeOf(Foo.prototype).constructor
+          process S(:attr,
+            s(:send, s(:const, nil, :Object), :getPrototypeOf,
+              s(:attr, target, :prototype)),
+            :constructor)
 
         elsif method == :new and target == s(:const, nil, :Exception)
           process S(:send, s(:const, nil, :Error), :new, *args)

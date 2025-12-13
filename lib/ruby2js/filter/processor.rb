@@ -231,6 +231,7 @@ module Ruby2JS
       def on_defp(node); self.on_defs(node); end
       def on_for_of(node); self.on_for(node); end
       def on_in?(node); self.on_send(node); end
+      def on_instanceof(node); self.on_send(node); end
       def on_method(node); self.on_send(node); end
       def on_module_hash(node); self.on_module(node); end
       def on_nullish_or(node); self.on_or(node); end

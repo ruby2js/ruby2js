@@ -667,16 +667,14 @@ describe Ruby2JS::Filter::Functions do
   end
 
   describe 'instance tests' do
-    it "should map is_a?" do
+    it "should map is_a? Boolean" do
       to_js( 'true.is_a? Boolean' ).
-        must_equal 'Object.prototype.toString.call(true) === ' +
-                   '"[object Boolean]"'
+        must_equal 'typeof true === "boolean"'
     end
 
-    it "should map kind_of?" do
+    it "should map kind_of? Regexp" do
       to_js( '/a/.kind_of? RegExp' ).
-        must_equal 'Object.prototype.toString.call(/a/) === ' +
-                   '"[object RegExp]"'
+        must_equal '/a/ instanceof RegExp'
     end
 
     it "should map kind_of? Array" do
@@ -686,8 +684,62 @@ describe Ruby2JS::Filter::Functions do
 
     it "should map kind_of? Float" do
       to_js( '3.2.kind_of? Float' ).
-        must_equal 'Object.prototype.toString.call(3.2) === ' +
-                   '"[object Number]"'
+        must_equal 'typeof 3.2 === "number"'
+    end
+
+    it "should map is_a? Integer" do
+      to_js( '3.is_a? Integer' ).
+        must_equal 'typeof 3 === "number" && Number.isInteger(3)'
+    end
+
+    it "should map is_a? String" do
+      to_js( '"x".is_a? String' ).
+        must_equal 'typeof "x" === "string"'
+    end
+
+    it "should map is_a? Hash" do
+      to_js( '{}.is_a? Hash' ).
+        must_equal 'typeof {} === "object" && {} !== null && !Array.isArray({})'
+    end
+
+    it "should map is_a? to instanceof for user classes" do
+      to_js( 'x.is_a? MyClass' ).
+        must_equal 'x instanceof MyClass'
+    end
+
+    it "should map instance_of? to constructor check" do
+      to_js( 'x.instance_of? MyClass' ).
+        must_equal 'x.constructor === MyClass'
+    end
+
+    it "should map instance_of? Array" do
+      to_js( 'x.instance_of? Array' ).
+        must_equal 'x.constructor === Array'
+    end
+
+    it "should map instance_of? Hash to Object constructor" do
+      to_js( 'x.instance_of? Hash' ).
+        must_equal 'x.constructor === Object'
+    end
+
+    it "should map respond_to? to in check" do
+      to_js( 'x.respond_to? :foo' ).
+        must_equal '"foo" in x'
+    end
+
+    it "should map .class to constructor" do
+      to_js( 'x.class' ).
+        must_equal 'x.constructor'
+    end
+
+    it "should map .class.name to constructor.name" do
+      to_js( 'x.class.name' ).
+        must_equal 'x.constructor.name'
+    end
+
+    it "should map superclass to prototype chain" do
+      to_js( 'Foo.superclass' ).
+        must_equal 'Object.getPrototypeOf(Foo.prototype).constructor'
     end
   end
 

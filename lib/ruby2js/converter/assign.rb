@@ -48,7 +48,8 @@ module Ruby2JS
           shadow = [s(:shadowarg, :$$)]
         elsif collapsible or
           (%i(send const).include? target.type and
-          target.children.length == 2 and target.children[0] == nil)
+          target.children.length == 2 and target.children[0] == nil) or
+          (target.type == :attr and target.children.length == 2)
         then
           copy = []
           shadow = []

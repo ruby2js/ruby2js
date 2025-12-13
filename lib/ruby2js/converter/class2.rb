@@ -20,7 +20,28 @@ module Ruby2JS
         m&.type == :begin ? m.children : m
       end.compact
 
-      proxied = body.find do |node| 
+      # Anonymous classes with include/extend need special handling:
+      # wrap in IIFE with temp variable so we can reference the class
+      if name.nil?
+        has_include = body.any? do |m|
+          m.type == :send && m.children[0].nil? &&
+            [:include, :extend].include?(m.children[1])
+        end
+
+        if has_include
+          # Transform: Class.new { include Foo }
+          # Into: (() => { let _class = class {}; Object.assign(_class.prototype, Foo); return _class })()
+          temp_name = s(:const, nil, :_class)
+          return parse s(:send,
+            s(:block, s(:send, nil, :lambda), s(:args),
+              s(:begin,
+                s(:lvasgn, :_class, @ast.updated(:class2, [temp_name, inheritance, *body])),
+                s(:return, s(:lvar, :_class)))),
+            :[])
+        end
+      end
+
+      proxied = body.find do |node|
         node.type == :def and node.children.first == :method_missing
       end
 
@@ -357,6 +378,10 @@ module Ruby2JS
                 m = m.updated(:begin, m.children[2..-1].map {|mname|
                   @namespace.defineProps @namespace.find(mname)
                   s(:assign, s(:attr, name, :prototype), mname)
+                })
+              elsif m.children[1] == :extend
+                m = m.updated(:begin, m.children[2..-1].map {|mname|
+                  s(:assign, name, mname)
                 })
               end
 

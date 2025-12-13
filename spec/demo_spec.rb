@@ -44,12 +44,12 @@ describe "demo" do
     describe "exclude/include" do
       it "should work without options" do
         to_js("x.class; x.downcase()", %w(--filter functions)).
-          must_equal('x.class; x.toLowerCase()')
+          must_equal('x.constructor; x.toLowerCase()')
       end
 
-      it "should work with an option once included" do
-        to_js("x.class; x.downcase()", %w(--filter functions --include class)).
-          must_equal('x.constructor; x.toLowerCase()')
+      it "should work with an option once excluded" do
+        to_js("x.class; x.downcase()", %w(--filter functions --exclude class)).
+          must_equal('x.class; x.toLowerCase()')
       end
 
       it "should work with an option when all are included" do
@@ -62,9 +62,9 @@ describe "demo" do
           must_equal('x.constructor; x.downcase()')
       end
 
-      it "should work with an option when all are included" do
+      it "should work with an option when excluded" do
         to_js("x.class; x.downcase()", %w(--filter functions --exclude downcase)).
-          must_equal('x.class; x.downcase()')
+          must_equal('x.constructor; x.downcase()')
       end
     end
 

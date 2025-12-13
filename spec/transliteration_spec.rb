@@ -633,7 +633,22 @@ describe Ruby2JS do
 
     it "should parse include" do
       to_js('class Employee; include Person; end').
-        must_equal 'class Employee {}; (() => {let $0 = Employee.prototype; return Object.defineProperties($0, Object.getOwnPropertyDescriptors(Person))})()'
+        must_equal 'class Employee {}; Object.defineProperties(Employee.prototype, Object.getOwnPropertyDescriptors(Person))'
+    end
+
+    it "should parse extend" do
+      to_js('class Employee; extend Person; end').
+        must_equal 'class Employee {}; Object.defineProperties(Employee, Object.getOwnPropertyDescriptors(Person))'
+    end
+
+    it "should parse include in anonymous class" do
+      to_js('filter = Class.new { include Foo }').
+        must_equal 'let filter = (() => {let _class = class _class {}; Object.defineProperties(_class.prototype, Object.getOwnPropertyDescriptors(Foo)); return _class})()'
+    end
+
+    it "should parse multiple includes" do
+      to_js('class Employee; include A; include B; end').
+        must_equal 'class Employee {}; Object.defineProperties(Employee.prototype, Object.getOwnPropertyDescriptors(A)); Object.defineProperties(Employee.prototype, Object.getOwnPropertyDescriptors(B))'
     end
 
     it "should parse class with attr_accessor" do

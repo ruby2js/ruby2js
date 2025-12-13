@@ -83,81 +83,43 @@ However, `public_send` is not specifically handled (treated the same as `send`),
 
 ### `is_a?`, `kind_of?`, `instance_of?`
 
-Ruby's type checking doesn't translate directly:
+These methods are fully supported with the functions filter:
 
 ```ruby
-# Problematic
-if obj.is_a?(Array)
-  # ...
-end
+obj.is_a?(MyClass)    # => obj instanceof MyClass
+obj.kind_of?(MyClass) # => obj instanceof MyClass
+obj.instance_of?(MyClass) # => obj.constructor === MyClass
 ```
 
-**Alternatives:**
+Built-in types are handled specially:
 
 ```ruby
-# Use JavaScript's Array.isArray
-if Array.isArray(obj)
-  # ...
-end
-
-# Or duck typing
-if obj.respond_to?(:each)
-  # ...
-end
-```
-
-If you need these methods in Ruby but not JS:
-
-```ruby
-def is_a?(klass) # Pragma: skip
-  # Ruby-only implementation
-end
+obj.is_a?(Array)   # => Array.isArray(obj)
+obj.is_a?(String)  # => typeof obj === "string"
+obj.is_a?(Integer) # => typeof obj === "number" && Number.isInteger(obj)
+obj.is_a?(Float)   # => typeof obj === "number"
+obj.is_a?(Hash)    # => typeof obj === "object" && obj !== null && !Array.isArray(obj)
 ```
 
 ### `respond_to?`
 
-Method existence checks are Ruby-specific:
+Method/property existence checks work:
 
 ```ruby
-# Problematic
-if obj.respond_to?(:save)
-  obj.save
-end
-```
-
-**Alternatives:**
-
-```ruby
-# Check for property existence (for known patterns)
-if 'save' in obj  # JavaScript: key in object
-  obj.save
-end
-
-# Or skip the method definition entirely
-def respond_to?(method) # Pragma: skip
-  # ...
-end
+obj.respond_to?(:save)  # => "save" in obj
+obj.respond_to?("save") # => "save" in obj
 ```
 
 ### `class` and `superclass`
 
-These have different meanings in JS:
+These are supported with the functions filter:
 
 ```ruby
-# Ruby
-obj.class        # => SomeClass
-obj.class.name   # => "SomeClass"
+obj.class        # => obj.constructor
+obj.class.name   # => obj.constructor.name
+obj.class == Foo # => obj.constructor === Foo
 
-# JavaScript equivalent
-obj.constructor       # => function
-obj.constructor.name  # => "SomeClass"
-```
-
-Use `# Pragma: proto` if you need constructor access:
-
-```ruby
-obj.class # Pragma: proto
-# => obj.constructor
+Foo.superclass   # => Object.getPrototypeOf(Foo.prototype).constructor
 ```
 
 ## Ruby-Specific Features
@@ -296,10 +258,9 @@ end
 
 ### Module Mixins
 
-`include` and `extend` don't translate directly:
+`include` and `extend` are supported:
 
 ```ruby
-# Problematic
 module Loggable
   def log(msg)
     puts msg
@@ -307,22 +268,30 @@ module Loggable
 end
 
 class MyClass
-  include Loggable
+  include Loggable  # Add instance methods
+end
+
+class MyClass
+  extend Loggable   # Add class methods
 end
 ```
 
-**Alternative:** Use composition or explicit delegation:
+Generates:
+
+```javascript
+const Loggable = {log(msg) {console.log(msg)}};
+
+class MyClass {}
+Object.defineProperties(MyClass.prototype, Object.getOwnPropertyDescriptors(Loggable));
+
+class MyClass {}
+Object.defineProperties(MyClass, Object.getOwnPropertyDescriptors(Loggable));
+```
+
+This also works with anonymous classes:
 
 ```ruby
-class MyClass
-  def initialize
-    @logger = Logger.new
-  end
-
-  def log(msg)
-    @logger.log(msg)
-  end
-end
+filter = Class.new { include Loggable }
 ```
 
 ### `prepend`
@@ -401,8 +370,8 @@ str.force_encoding("UTF-8")
 
 ## Summary: Safe vs Unsafe
 
-| Feature | Status | Alternative |
-|---------|--------|-------------|
+| Feature | Status | Notes |
+|---------|--------|-------|
 | Classes, methods | ✅ Safe | |
 | Blocks as lambdas | ✅ Safe | |
 | Arrays, hashes | ✅ Safe | Mind `<<`, `.dup` |
@@ -410,12 +379,16 @@ str.force_encoding("UTF-8")
 | Control flow | ✅ Safe | Except `retry`, `redo` |
 | `define_method` | ✅ Safe | In class bodies |
 | `send` | ✅ Safe | Static or dynamic names |
+| `include`/`extend` | ✅ Safe | Module mixins |
+| `is_a?`, `kind_of?` | ✅ Safe | Maps to `instanceof` |
+| `instance_of?` | ✅ Safe | Exact type check |
+| `respond_to?` | ✅ Safe | Property existence |
+| `.class` | ✅ Safe | Returns constructor |
+| `superclass` | ✅ Safe | Parent class |
+| Symbols | ⚠️ Caution | Work as strings |
 | `method_missing` | ❌ Avoid | Explicit methods |
 | `eval` | ❌ Avoid | Restructure |
-| `is_a?`, `kind_of?` | ⚠️ Pragma skip | Duck typing |
-| `respond_to?` | ⚠️ Pragma skip | Property checks |
-| Symbols | ⚠️ Work as strings | |
-| `include`/`extend` | ❌ Avoid | Composition |
+| `prepend` | ❌ Avoid | MRO incompatible |
 | `retry`/`redo` | ❌ Avoid | Explicit loops |
 | `catch`/`throw` | ❌ Avoid | Break/return |
 

@@ -9,12 +9,12 @@ describe 'Ruby2JS::Filter.exclude' do
   end
   
   describe 'default exclude' do
-    it "should default to NOT mapping class to constructor" do
-      to_js( 'a.class' ).must_equal 'a.class'
+    it "should default to mapping class to constructor" do
+      to_js( 'a.class' ).must_equal 'a.constructor'
     end
 
-    it "should be able to OPT IN to mapping class to constructor" do
-      to_js( 'a.class', include: :class ).must_equal 'a.constructor'
+    it "should be able to OPT OUT of mapping class to constructor" do
+      to_js( 'a.class', exclude: :class ).must_equal 'a.class'
     end
 
     it "should be able to OPT IN to all mappings" do
