@@ -7,10 +7,13 @@ import {
   Prism,
   PrismSourceBuffer,
   PrismSourceRange,
+  PrismComment,
   Hash,
   setupGlobals,
+  associateComments,
   initPrism as sharedInitPrism,
-  getPrismParse
+  getPrismParse,
+  convert as bundleConvert
 } from './ruby2js.mjs';
 
 // Set up globals
@@ -168,95 +171,72 @@ export async function initPrism() {
   return await sharedInitPrism();
 }
 
-// Updated convert that uses the initialized parser
+// Convert function that delegates to bundle's convert, with filter preprocessing
+// The bundle's Pipeline expects Ruby-style modules for `include`, but transpiled
+// filters are JS objects. We preprocess filters using FilterProcessor, then pass
+// the filtered AST to Pipeline (with empty filters array).
 Ruby2JS.convert = function(source, opts = {}) {
   // Default eslevel to 2020 (same as Ruby2JS default)
   if (opts.eslevel === undefined) {
     opts.eslevel = 2020;
   }
 
+  // If no filters, delegate directly to bundle's convert
+  if (!opts.filters || opts.filters.length === 0) {
+    try {
+      const result = bundleConvert(source, opts);
+      return { toString: () => result };
+    } catch (e) {
+      return { toString: () => `[ERROR: ${e.message}]`, error: e };
+    }
+  }
+
+  // With filters: preprocess AST with FilterProcessor, then use Pipeline
   const prismParse = getPrismParse();
   if (!prismParse) {
-    return {
-      toString() {
-        return `[ERROR: Prism not initialized. Call initPrism() first]`;
-      }
-    };
+    return { toString: () => `[ERROR: Prism not initialized. Call initPrism() first]` };
   }
 
   try {
-    // Step 1: Parse Ruby source using Prism WASM
+    // Parse source
     const parseResult = prismParse(source);
-
-    // Step 2: Walk Prism AST to create Parser-compatible AST
     const walker = new Ruby2JS.PrismWalker(source, opts.file || null);
     let ast = walker.visit(parseResult.value);
 
-    // Step 3: Extract comments
-    const comments = {};
-    if (parseResult.comments) {
-      comments[ast] = parseResult.comments;
-      comments._raw = parseResult.comments;
-    }
+    // Associate comments
+    const source_buffer = walker.source_buffer;
+    const wrapped_comments = (parseResult.comments || []).map(c =>
+      new PrismComment(c, source, source_buffer)
+    );
+    const comments = associateComments(ast, wrapped_comments);
 
-    // Step 3.5: Apply filters if specified
-    if (opts.filters && Array.isArray(opts.filters)) {
-      for (const filter of opts.filters) {
-        if (!filter) continue;
+    // Apply filters using FilterProcessor (handles transpiled JS filters)
+    for (const filter of opts.filters) {
+      if (!filter) continue;
 
-        // Always call _setup to update options (module-level vars in transpiled filters)
-        if (typeof filter._setup === 'function') {
-          const excludedFn = (method) => Ruby2JS.Filter._excluded.has(method);
-          const includedFn = (method) => Ruby2JS.Filter._included.has(method);
-          filter._setup({
-            excluded: excludedFn,
-            included: includedFn,
-            _options: opts
-          });
-        }
+      // Call _setup to update options
+      if (typeof filter._setup === 'function') {
+        const excludedFn = (method) => Ruby2JS.Filter._excluded.has(method);
+        const includedFn = (method) => Ruby2JS.Filter._included.has(method);
+        filter._setup({ excluded: excludedFn, included: includedFn, _options: opts });
+      }
 
-        if (typeof filter.on_send === 'function' || typeof filter.on_block === 'function') {
-          // Filter uses on_<type> handlers - wrap with FilterProcessor
-          const processor = new FilterProcessor(filter, opts);
-          ast = processor.process(ast);
-        }
+      if (typeof filter.on_send === 'function' || typeof filter.on_block === 'function') {
+        const processor = new FilterProcessor(filter, opts);
+        ast = processor.process(ast);
       }
     }
 
-    // Step 4: Create converter and generate JavaScript
-    const converter = new Ruby2JS.Converter(ast, comments, {});
-
-    // Apply options
-    if (opts.eslevel) converter.eslevel = opts.eslevel;
-    if (opts.comparison) converter.comparison = opts.comparison;
-    if (opts.strict) converter.strict = opts.strict;
-    if (opts.binding) converter.binding = opts.binding;
-    if (opts.ivars) converter.ivars = opts.ivars;
-
-    // Set up namespace for class/module tracking
-    converter.namespace = new Ruby2JS.Namespace();
-
-    // Enable vertical whitespace if source has newlines (matches Ruby2JS.convert)
-    if (source.includes("\n")) {
-      converter.enable_vertical_whitespace;
-    }
-
-    // convert is a getter (no-arg method becomes getter in ES6 class)
-    converter.convert;
-
-    return {
-      toString() {
-        // to_s is also a getter
-        return converter.to_s;
-      }
-    };
+    // Use Pipeline for converter setup (with empty filters - already applied)
+    const pipeline_options = { ...opts, source, filters: [] };
+    const pipeline = new Ruby2JS.Pipeline(ast, comments, {
+      filters: [],
+      options: pipeline_options
+    });
+    const result = pipeline.run;
+    return { toString: () => result.to_s };
   } catch (e) {
-    return {
-      toString() {
-        return `[ERROR: ${e.message}]`;
-      },
-      error: e
-    };
+    return { toString: () => `[ERROR: ${e.message}]`, error: e };
   }
 };
 
