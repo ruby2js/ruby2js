@@ -15,7 +15,10 @@ module Ruby2JS
       if var.type == :lvar
         name = var.children.first
         receiver = @rbstack.map {|rb| rb[name]}.compact.last
-        if receiver
+        # Only convert to property assignment if it's a setter (not a regular getter/method)
+        is_setter = receiver&.type == :setter ||
+          (receiver&.type == :private_method && receiver.children[1]&.type == :setter)
+        if is_setter
           var = s(:attr, nil, name)
         end
       end

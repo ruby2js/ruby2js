@@ -160,6 +160,10 @@ module Ruby2JS
         if receiver.type == :autobind
           autobind = receiver = receiver.children.first
           autobind = nil unless @autobind
+        elsif receiver.type == :setter
+          # Setter markers are only used by vasgn.rb/opasgn.rb for assignment;
+          # for method calls, just extract the actual receiver
+          receiver = receiver.children.first
         end
 
         # Handle private methods - extract prefix and inner receiver
@@ -169,6 +173,8 @@ module Ruby2JS
           if receiver.type == :autobind
             autobind = receiver = receiver.children.first
             autobind = nil unless @autobind
+          elsif receiver.type == :setter
+            receiver = receiver.children.first
           end
         end
 

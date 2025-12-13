@@ -126,29 +126,32 @@ module Ruby2JS
           end
         end
 
-        props = [:element, :application]
+        # Read-only properties use s(:self)
+        readonly_props = [:element, :application]
 
-        props += @stim_targets.map do |name|
+        readonly_props += @stim_targets.map do |name|
           name = name.children.first
           ["#{name}Target", "#{name}Targets", "has#{name[0].upcase}#{name[1..-1]}Target"]
         end
 
-        props += @stim_values.map do |name|
-          name = name.children.first
-          ["#{name}Value", "has#{name[0].upcase}#{name[1..-1]}Value"]
-        end
-
-        props += @stim_classes.map do |name|
+        readonly_props += @stim_classes.map do |name|
           name = name.children.first
           ["#{name}Class", "has#{name[0].upcase}#{name[1..-1]}Class"]
         end
 
-        props += @stim_outlets.map do |name|
+        readonly_props += @stim_outlets.map do |name|
           name = name.children.first
           ["#{name}Outlet", "#{name}Outlets", "has#{name[0].upcase}#{name[1..-1]}Outlet"]
         end
 
-        props = props.flatten.map {|prop| [prop.to_sym, s(:self)]}.to_h
+        # Value properties are read-write, use s(:setter, s(:self)) to support assignment
+        value_props = @stim_values.map do |name|
+          name = name.children.first
+          ["#{name}Value", "has#{name[0].upcase}#{name[1..-1]}Value"]
+        end
+
+        props = readonly_props.flatten.map {|prop| [prop.to_sym, s(:self)]}.to_h
+        props.merge!(value_props.flatten.map {|prop| [prop.to_sym, s(:setter, s(:self))]}.to_h)
 
         props[:initialize] = s(:autobind, s(:self))
 
