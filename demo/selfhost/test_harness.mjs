@@ -18,6 +18,10 @@ setupGlobals(Ruby2JS);
 globalThis.Namespace = Ruby2JS.Namespace;
 globalThis.Ruby2JS = Ruby2JS;
 
+// Alias Parser.AST.Node to Ruby2JS.Node so transpiled SEXP.s works
+// (Ruby source uses Parser gem's AST nodes, JS uses Ruby2JS.Node)
+globalThis.Parser = { AST: { Node: Ruby2JS.Node } };
+
 // ============================================================================
 // Filter Infrastructure
 // ============================================================================

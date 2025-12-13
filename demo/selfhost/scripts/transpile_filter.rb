@@ -48,14 +48,28 @@ preamble = <<~JS
 // Generated from #{filter_file}
 //
 // This is an ES module that exports the filter for use with the selfhost test harness.
+// It imports shared infrastructure from the bundle to minimize duplication.
 
-// Setup: SEXP placeholder (Ruby's include SEXP provides s/S/ast_node helpers)
-const SEXP = {};
+// Import from the transpiled bundle - this provides:
+// - Ruby2JS.ast_node (AST node check)
+// - Ruby2JS.Filter.SEXP (s, S, ast_node helpers)
+// - Ruby2JS.Filter.Processor (AST walker with process/process_children/process_all)
+// - Array polyfills (none, all, any, compact, etc.)
+import { Ruby2JS } from '../ruby2js.mjs';
+
+// Alias Parser.AST.Node to Ruby2JS.Node so transpiled code works
+// (Ruby source uses Parser gem's AST nodes, JS uses Ruby2JS.Node)
+const Parser = { AST: { Node: Ruby2JS.Node } };
+
+// Get SEXP helpers from transpiled bundle
+const SEXP = Ruby2JS.Filter.SEXP;
+const s = SEXP.s.bind(SEXP);
+const S = s;
 
 // Setup: make include() a no-op (Ruby's include SEXP doesn't apply in JS)
 const include = () => {};
 
-// Setup: Filter global for exclude/include calls
+// Setup: Filter global for exclude/include calls (no-op, handled by test harness)
 const Filter = {
   exclude: (...methods) => {},
   include: (...methods) => {}
@@ -71,46 +85,16 @@ if (!RegExp.escape) {
   };
 }
 
-// Setup: Ruby2JS namespace for ast_node helper
-const Ruby2JS = {
-  ast_node: (obj) => typeof obj === 'object' && obj !== null && 'type' in obj && 'children' in obj
-};
-
-// Filter infrastructure functions (these get bound by FilterProcessor at runtime)
-// Default implementations return false/do nothing
+// Filter infrastructure functions (bound by FilterProcessor at runtime)
+// Default implementations return false/do nothing until bound
 let excluded = () => false;
 let included = () => false;
 let process = (node) => node;
+let process_all = (nodes) => nodes ? nodes.map(node => process(node)) : [];
 let _options = {};
 
-// Process all nodes in an array (like Ruby's process_all)
-function process_all(nodes) {
-  if (!nodes) return [];
-  return nodes.map(node => process(node));
-}
-
-// Ruby enumerable polyfills for arrays (none?, all?, any? with blocks)
-if (!Array.prototype.none) {
-  Object.defineProperty(Array.prototype, 'none', {
-    value: function(fn) { return !this.some(fn); },
-    configurable: true
-  });
-}
-if (!Array.prototype.all) {
-  Object.defineProperty(Array.prototype, 'all', {
-    value: function(fn) { return this.every(fn); },
-    configurable: true
-  });
-}
-if (!Array.prototype.any) {
-  Object.defineProperty(Array.prototype, 'any', {
-    value: function(fn) { return this.some(fn); },
-    configurable: true
-  });
-}
-
 // ES level helper functions - use getter pattern so Ruby's `es2020` (no parens) works in JS
-// When Ruby2JS transpiles `es2020`, it becomes `es2020` not `es2020()`, so we use getters
+// These must be globals because filters use them without `this.` prefix
 let _eslevel = 0;
 Object.defineProperty(globalThis, 'es2015', { get: () => _eslevel >= 2015, configurable: true });
 Object.defineProperty(globalThis, 'es2016', { get: () => _eslevel >= 2016, configurable: true });
@@ -130,6 +114,7 @@ const filterContext = {
 };
 
 // AST node structural comparison (Ruby's == compares structure, JS's === compares references)
+// This is unique to filter testing - not in the Ruby sources
 function nodesEqual(a, b) {
   if (a === b) return true;
   if (!a || !b) return false;
@@ -141,45 +126,6 @@ function nodesEqual(a, b) {
     if (!nodesEqual(a.children[i], b.children[i])) return false;
   }
   return true;
-}
-
-// AST node creation helpers
-function s(type, ...children) {
-  // send! is a special marker meaning "this is definitely a method call (with parens)"
-  const isSendBang = type === "send!";
-  const actualType = isSendBang ? "send" : type;
-
-  return {
-    type: actualType,
-    children,
-    // Mark this as a synthetic node (created programmatically by filter)
-    _is_synthetic: true,
-    updated: function(newType, newChildren) {
-      return s(newType ?? this.type, ...(newChildren ?? this.children));
-    },
-    is_method() {
-      // Ruby's is_method? has specific rules:
-      // 1. :attr types always return false (property access, not method call)
-      // 2. :call types always return true
-      // 3. For nodes without location info (synthetic), return true
-      // 4. For nodes with location info, check for '(' after selector
-      if (type === "attr") return false;
-      if (type === "call") return true;
-      // For csend (safe navigation) without args, treat as property access
-      // This handles cases like a&.length where we want a?.length not a?.length()
-      // Regular send uses :send! for method calls and :attr for property accesses
-      if (type === "csend" && children.length === 2) return false;
-      // Synthetic nodes with args default to method call (matching Ruby behavior)
-      return true;
-    },
-    get first() { return this.children[0]; },
-    get last() { return this.children[this.children.length - 1]; }
-  };
-}
-
-function S(type, ...children) {
-  // S updates the current node - same as s for our purposes
-  return s(type, ...children);
 }
 
 JS
@@ -245,10 +191,13 @@ js = js.gsub(
 postamble = <<~JS
 
 // Register the filter
-DEFAULTS.push(Functions);
+DEFAULTS.push(#{filter_name});
+
+// Register in Ruby2JS.Filter namespace for specs
+Ruby2JS.Filter.#{filter_name} = #{filter_name};
 
 // Setup function to bind filter infrastructure
-Functions._setup = function(opts) {
+#{filter_name}._setup = function(opts) {
   if (opts.excluded) excluded = opts.excluded;
   if (opts.included) included = opts.included;
   if (opts.process) process = opts.process;
@@ -259,7 +208,7 @@ Functions._setup = function(opts) {
 };
 
 // Export the filter for ES module usage
-export { Functions as default, Functions };
+export { #{filter_name} as default, #{filter_name} };
 JS
 
 puts preamble + js + postamble
