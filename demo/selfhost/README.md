@@ -2,7 +2,19 @@
 
 This directory contains Ruby2JS running entirely in JavaScript, using the actual Ruby2JS converter transpiled from Ruby source.
 
-## Status: Unified Bundle Complete
+## Goals
+
+The goal is **not** to create a separate JavaScript implementation of Ruby2JS. That approach—while it could pass the same test suite—would require maintaining two different codebases in perpetuity.
+
+Instead, the goal is to:
+
+1. **Identify gaps** in Ruby2JS's ability to transpile Ruby to JavaScript
+2. **Fix those gaps** in the Ruby implementation so it can transpile itself
+3. **Produce two compatible implementations from one source**: the original Ruby and the transpiled JavaScript
+
+This "dogfooding" approach ensures that improvements benefit all Ruby2JS users, not just the selfhost. When a Ruby pattern doesn't transpile correctly, we fix the converter or filters—making Ruby2JS better for everyone.
+
+## Status: Filters In Progress
 
 A single `ruby2js.mjs` bundle provides the full converter for both CLI and browser use. The same code is tested in CI, runs in Node.js CLI, and works in browsers.
 
@@ -10,11 +22,16 @@ A single `ruby2js.mjs` bundle provides the full converter for both CLI and brows
 - Classes, methods, blocks, string interpolation
 - Arrays, hashes, if/else/case, loops, operators
 - Comments (preserved in output)
-- Full transliteration and serializer test suites passing
+- Full transliteration, serializer, and namespace test suites passing
+- **Functions filter**: 123/191 tests passing (64%)
+
+**In Progress:**
+- Functions filter (partial support, transpiled from Ruby source)
+- Filter infrastructure (SEXP helpers, FilterProcessor base class)
 
 **Not yet supported:**
-- Filters (functions, camelCase, esm, etc.)
-- Other configuration options
+- Other filters (camelCase, esm, react, stimulus, etc.)
+- Full configuration options
 
 ## Architecture
 
@@ -45,28 +62,51 @@ npm test
 
 ## Key Files
 
-| File | Description |
-|------|-------------|
-| `ruby2js.mjs` | Unified bundle - CLI and importable module |
-| `prism_browser.mjs` | Browser WASM loader for Prism |
-| `browser_demo.html` | Browser demo page |
-| `test_harness.mjs` | Test framework for specs |
-| `run_all_specs.mjs` | Manifest-driven spec runner for CI |
-| `dist/` | Transpiled test specs only |
+| File | LOC | Description |
+|------|-----|-------------|
+| `ruby2js.mjs` | 15,218 | Unified bundle - CLI and importable module |
+| `prism_browser.mjs` | 231 | Browser WASM loader for Prism |
+| `browser_demo.html` | 388 | Browser demo page |
+| `test_harness.mjs` | 435 | Test framework for specs |
+| `run_all_specs.mjs` | 309 | Manifest-driven spec runner for CI |
+| `spec_manifest.json` | 36 | Spec status tracking (ready/partial/blocked) |
+| `dist/` | — | Transpiled specs and filters |
+
+### Scripts
+
+| File | LOC | Description |
+|------|-----|-------------|
+| `scripts/transpile_bundle.rb` | 87 | Transpiles Ruby2JS bundle to JS |
+| `scripts/transpile_filter.rb` | 207 | Transpiles filters (e.g., functions) to JS |
+| `scripts/transpile_spec.rb` | 39 | Transpiles RSpec files to JS |
+| `scripts/transpile_prism_browser.rb` | 28 | Transpiles browser Prism loader |
+| `scripts/test_handlers.rb` | 94 | Test helper for converter handlers |
+
+### Transpiled Output (dist/)
+
+| File | LOC | Description |
+|------|-----|-------------|
+| `dist/functions_filter.mjs` | 2,040 | Transpiled Functions filter |
+| `dist/functions_spec.mjs` | 1,077 | Transpiled Functions filter tests |
+| `dist/transliteration_spec.mjs` | 1,391 | Transpiled transliteration tests |
+| `dist/serializer_spec.mjs` | 333 | Transpiled serializer tests |
+| `dist/namespace_spec.mjs` | 62 | Transpiled namespace tests |
 
 ## Source Files
 
 The unified bundle is transpiled from Ruby source files:
 
-| Ruby Source | JavaScript Output |
-|-------------|-------------------|
-| `lib/ruby2js/selfhost/bundle.rb` | `ruby2js.mjs` |
-| `lib/ruby2js/selfhost/runtime.rb` | (inlined in bundle) |
-| `lib/ruby2js/selfhost/cli.rb` | (inlined in bundle) |
-| `lib/ruby2js/selfhost/prism_browser.rb` | `prism_browser.mjs` |
-| `lib/ruby2js/namespace.rb` | (inlined in bundle) |
-| `lib/ruby2js/prism_walker.rb` | (inlined in bundle) |
-| `lib/ruby2js/converter.rb` + handlers | (inlined in bundle) |
+| Ruby Source | LOC | JavaScript Output |
+|-------------|-----|-------------------|
+| `lib/ruby2js/selfhost/bundle.rb` | 94 | `ruby2js.mjs` |
+| `lib/ruby2js/selfhost/runtime.rb` | 176 | (inlined in bundle) |
+| `lib/ruby2js/selfhost/cli.rb` | 424 | (inlined in bundle) |
+| `lib/ruby2js/selfhost/prism_browser.rb` | 117 | `prism_browser.mjs` |
+| `lib/ruby2js/namespace.rb` | 86 | (inlined in bundle) |
+| `lib/ruby2js/prism_walker.rb` | 261 | (inlined in bundle) |
+| `lib/ruby2js/converter.rb` + handlers | 548+ | (inlined in bundle) |
+| `lib/ruby2js/filter/processor.rb` | 333 | (in bundle, for filter base class) |
+| `lib/ruby2js/filter/functions.rb` | 1,455 | `dist/functions_filter.mjs` |
 
 ## npm Scripts
 
@@ -187,13 +227,16 @@ filters: [
 ## Known Limitations
 
 - **Some tests skipped**: Proc source location and similar JavaScript limitations
-- **No filters**: The `functions`, `camelCase`, `esm`, etc. filters are not yet transpiled
-- **Blocked specs**: Some specs require filters - see `spec_manifest.json` for details
+- **Partial filter support**: Functions filter is 64% passing (123/191 tests)
+- **Blocked specs**: Most filter specs still blocked - see `spec_manifest.json` for details
+- **Super handling**: Ruby's `super` in filter methods needs manual fixup in transpiled output
 
 ## Future Work
 
-1. Transpile filters to JavaScript
-2. Add configuration options
+1. Complete Functions filter (remaining 68 failing tests)
+2. Transpile additional filters (camelCase, esm, react, etc.)
+3. Add configuration options
+4. Reduce manual fixups needed in `transpile_filter.rb`
 
 ## References
 
