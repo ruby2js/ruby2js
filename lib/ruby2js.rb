@@ -70,6 +70,7 @@ require 'ruby2js/converter'
 require 'ruby2js/filter'
 require 'ruby2js/filter/processor'
 require 'ruby2js/namespace'
+require 'ruby2js/pipeline'
 
 module Ruby2JS
   class SyntaxError < RuntimeError
@@ -122,6 +123,7 @@ module Ruby2JS
     Filter.autoregister unless RUBY_ENGINE == 'opal'
     options = options.dup
 
+    # Handle different source types (Ruby-specific: Proc handling)
     if Proc === source
       file, line = source.source_location
       source = IO.read(file)
@@ -136,7 +138,7 @@ module Ruby2JS
       ast, comments = parse(source, options[:file])
     end
 
-    # return empty result for empty source
+    # Return empty result for empty source
     if ast.nil?
       ruby2js = Converter.new(ast, comments)
       ruby2js.eslevel = options[:eslevel] || @@eslevel_default
@@ -144,7 +146,9 @@ module Ruby2JS
       return ruby2js
     end
 
-    # check if magic comment is present
+    # Parse magic comments
+    disable_autoimports = false
+    disable_autoexports = false
     raw_comments = comments[:_raw] || []
     first_comment = raw_comments.first
     if first_comment
@@ -165,6 +169,7 @@ module Ruby2JS
       disable_autoexports = comment_text.include?(" autoexports: false")
     end
 
+    # Load config file (Ruby-specific)
     unless RUBY_ENGINE == 'opal'
       unless options.key?(:config_file) || !File.exist?("config/ruby2js.rb")
         options[:config_file] ||= "config/ruby2js.rb"
@@ -175,6 +180,7 @@ module Ruby2JS
       end
     end
 
+    # Apply preset defaults
     if options[:preset]
       options[:eslevel] ||= @@eslevel_preset_default
       options[:filters] = Filter::PRESET_FILTERS + Array(options[:filters]).uniq
@@ -188,100 +194,36 @@ module Ruby2JS
     options[:strict] = @@strict_default if options[:strict] == nil
     options[:module] ||= @@module_default || :esm
 
-    namespace = Namespace.new
-
+    # Resolve filter modules (Ruby-specific: requires filter files)
     filters = Filter.require_filters(options[:filters] || Filter::DEFAULTS)
 
-    unless filters.empty?
-      filter_options = options.merge({ filters: filters })
-      filters.dup.each do |filter|
-        filters = filter.reorder(filters) if filter.respond_to? :reorder
-      end
+    # Ruby-specific: resolve binding/ivars before pipeline
+    binding_val = options[:binding]
+    ivars = options[:ivars]
 
-      filter = Filter::Processor
-      filters.reverse.each do |mod|
-        filter = Class.new(filter) { include mod }
-      end
-      filter = filter.new(comments)
-
-      filter.disable_autoimports = disable_autoimports
-      filter.disable_autoexports = disable_autoexports
-      filter.options = filter_options
-      filter.namespace = namespace
-      ast = filter.process(ast)
-
-      # Re-associate comments with filtered AST (filters may create new node objects)
-      # This may fail if the AST contains synthetic nodes without location info,
-      # in which case we fall back to the original (possibly stale) comments hash
-      raw_comments = comments[:_raw]
-      if raw_comments && !raw_comments.empty?
-        begin
-          if defined?(Parser::Source::Comment)
-            new_comments = Parser::Source::Comment.associate(ast, raw_comments)
-          else
-            # For prism-direct, use our own association method
-            new_comments = associate_comments(ast, raw_comments)
-          end
-          # Only update if we found associations; otherwise keep original
-          # (transformed AST may lack location info entirely)
-          if new_comments && !new_comments.empty?
-            comments.clear
-            comments.merge!(new_comments)
-            comments[:_raw] = raw_comments
-          end
-        rescue NoMethodError
-          # Synthetic nodes without location info cause associate to fail
-          # Keep original comments hash, which may not associate properly
-        end
-      end
-
-      unless filter.prepend_list.empty?
-        prepend = filter.prepend_list.sort_by { |ast| ast.type == :import ? 0 : 1 }
-        prepend.reject! { |ast| ast.type == :import } if filter.disable_autoimports
-        if defined?(Parser::AST::Node)
-          ast = Parser::AST::Node.new(:begin, [*prepend, ast])
-        else
-          ast = Ruby2JS::Node.new(:begin, [*prepend, ast])
-        end
-        # Register the new :begin node with empty comments to prevent it from
-        # inheriting comments from its first child with location info.
-        # Without this, comments from the original code get output before
-        # the prepended polyfills/imports.
-        comments[ast] = []
-      end
-    end
-
-    ruby2js = Ruby2JS::Converter.new(ast, comments)
-
-    ruby2js.binding = options[:binding]
-    ruby2js.ivars = options[:ivars]
-    ruby2js.eslevel = options[:eslevel]
-    ruby2js.strict = options[:strict]
-    ruby2js.comparison = options[:comparison] || :equality
-    ruby2js.or = options[:or] || :auto
-    # truthy option: :ruby (only false/nil are falsy) or :js (standard JS truthiness)
-    ruby2js.truthy = options[:truthy] || :js
-    ruby2js.nullish_to_s = options[:nullish_to_s] || false
-    ruby2js.module_type = options[:module] || :esm
-    ruby2js.underscored_private = (options[:eslevel] < 2022) || options[:underscored_private]
-
-    ruby2js.namespace = namespace
-
-    if ruby2js.binding and not ruby2js.ivars
-      ruby2js.ivars = ruby2js.binding.eval \
+    if binding_val and not ivars
+      ivars = binding_val.eval \
         'Hash[instance_variables.map {|var| [var, instance_variable_get(var)]}]'
-    elsif options[:scope] and not ruby2js.ivars
+    elsif options[:scope] and not ivars
       scope = options.delete(:scope)
-      ruby2js.ivars = Hash[scope.instance_variables.map { |var|
+      ivars = Hash[scope.instance_variables.map { |var|
         [var, scope.instance_variable_get(var)] }]
     end
 
-    ruby2js.width = options[:width] if options[:width]
+    # Build pipeline options
+    pipeline_options = options.merge(
+      source: source,
+      disable_autoimports: disable_autoimports,
+      disable_autoexports: disable_autoexports,
+      binding: binding_val,
+      ivars: ivars
+    )
 
-    ruby2js.enable_vertical_whitespace if source.include? "\n"
+    # Run pipeline (transpilable orchestration)
+    pipeline = Pipeline.new(ast, comments, filters: filters, options: pipeline_options)
+    ruby2js = pipeline.run
 
-    ruby2js.convert
-
+    # Ruby-specific: timestamp from file modification time
     ruby2js.timestamp options[:file]
 
     ruby2js.file_name = options[:file] || ''

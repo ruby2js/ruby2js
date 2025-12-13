@@ -41,7 +41,8 @@ Override with environment variable: `RUBY2JS_PARSER=prism` or `RUBY2JS_PARSER=pa
 | Directory | Purpose |
 |-----------|---------|
 | `lib/ruby2js.rb` | Entry point, `Ruby2JS.convert()` method |
-| `lib/ruby2js/converter.rb` | Base converter class, orchestration |
+| `lib/ruby2js/pipeline.rb` | Transpilable orchestration (filter chain, converter setup) |
+| `lib/ruby2js/converter.rb` | Base converter class, AST → JavaScript |
 | `lib/ruby2js/converter/` | ~60 handlers for AST node types |
 | `lib/ruby2js/filter.rb` | Filter base class and registration |
 | `lib/ruby2js/filter/` | ~23 filters (functions, esm, react, etc.) |

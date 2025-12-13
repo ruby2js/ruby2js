@@ -23,7 +23,7 @@ A single `ruby2js.mjs` bundle provides the full converter for both CLI and brows
 - Arrays, hashes, if/else/case, loops, operators
 - Comments (preserved in output)
 - Full transliteration, serializer, and namespace test suites passing
-- **Functions filter**: 123/191 tests passing (64%)
+- **Functions filter**: 122/202 tests passing (60%)
 
 **In Progress:**
 - Functions filter (partial support, transpiled from Ruby source)
@@ -46,6 +46,10 @@ PrismWalker (transpiled from lib/ruby2js/prism_walker.rb)
        ↓
 Parser-compatible AST (Ruby2JS::Node format)
        ↓
+Pipeline (transpiled from lib/ruby2js/pipeline.rb)
+  ├─ Filter chain (optional)
+  └─ Converter setup
+       ↓
 Converter (transpiled from lib/ruby2js/converter.rb + handlers)
        ↓
 JavaScript Output
@@ -64,7 +68,7 @@ npm test
 
 | File | LOC | Description |
 |------|-----|-------------|
-| `ruby2js.mjs` | 15,218 | Unified bundle - CLI and importable module |
+| `ruby2js.mjs` | 15,408 | Unified bundle - CLI and importable module |
 | `prism_browser.mjs` | 231 | Browser WASM loader for Prism |
 | `browser_demo.html` | 388 | Browser demo page |
 | `test_harness.mjs` | 435 | Test framework for specs |
@@ -105,6 +109,7 @@ The unified bundle is transpiled from Ruby source files:
 | `lib/ruby2js/namespace.rb` | 86 | (inlined in bundle) |
 | `lib/ruby2js/prism_walker.rb` | 261 | (inlined in bundle) |
 | `lib/ruby2js/converter.rb` + handlers | 548+ | (inlined in bundle) |
+| `lib/ruby2js/pipeline.rb` | 160 | (inlined in bundle) |
 | `lib/ruby2js/filter/processor.rb` | 333 | (in bundle, for filter base class) |
 | `lib/ruby2js/filter/functions.rb` | 1,455 | `dist/functions_filter.mjs` |
 
@@ -227,16 +232,16 @@ filters: [
 ## Known Limitations
 
 - **Some tests skipped**: Proc source location and similar JavaScript limitations
-- **Partial filter support**: Functions filter is 64% passing (123/191 tests)
+- **Partial filter support**: Functions filter is 60% passing (122/202 tests)
 - **Blocked specs**: Most filter specs still blocked - see `spec_manifest.json` for details
 - **Super handling**: Ruby's `super` in filter methods needs manual fixup in transpiled output
 
 ## Future Work
 
-1. Complete Functions filter (remaining 68 failing tests)
+1. Complete Functions filter (remaining 80 failing tests)
 2. Transpile additional filters (camelCase, esm, react, etc.)
 3. Add configuration options
-4. Reduce manual fixups needed in `transpile_filter.rb`
+4. Reduce manual fixups needed in `transpile_filter.rb` (especially `super` handling)
 
 ## References
 

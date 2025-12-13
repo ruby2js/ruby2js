@@ -883,8 +883,9 @@ module Ruby2JS
         elsif method == :class and args.length==0 and not node.is_method?
           process node.updated(:attr, [target, :constructor])
 
-        elsif method == :superclass and args.length==0 and not node.is_method?
+        elsif method == :superclass and args.length==0 and target&.type == :const and not node.is_method?
           # Foo.superclass => Object.getPrototypeOf(Foo.prototype).constructor
+          # Only applies to constants (class names), not to variables like node.superclass
           process S(:attr,
             s(:send, s(:const, nil, :Object), :getPrototypeOf,
               s(:attr, target, :prototype)),

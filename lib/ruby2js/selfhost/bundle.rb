@@ -39,6 +39,9 @@ require_relative '../../ruby2js/converter'
 # Filter Processor (AST walker, SEXP helpers, type aliasing)
 require_relative '../../ruby2js/filter/processor'
 
+# Pipeline (orchestration: filters + converter)
+require_relative '../../ruby2js/pipeline'
+
 # ============================================================================
 # Initialize Prism at module load time
 # ============================================================================
@@ -46,12 +49,12 @@ require_relative '../../ruby2js/filter/processor'
 await initPrism()
 
 # ============================================================================
-# Simple convert function for easy usage
+# Convert function using Pipeline
 # ============================================================================
 
 # Convert Ruby source to JavaScript
 # @param source [String] Ruby source code
-# @param options [Object] Optional settings (eslevel, underscored_private, etc.)
+# @param options [Object] Optional settings (eslevel, filters, etc.)
 # @return [String] JavaScript output
 export def convert(source, options = {})
   prism_parse = getPrismParse()
@@ -71,20 +74,14 @@ export def convert(source, options = {})
   end
   comments = associateComments(ast, wrapped_comments)
 
-  # Create and run converter
-  converter = Ruby2JS::Converter.new(ast, comments, options)
-  converter.eslevel = options[:eslevel] || 2022
-  converter.comparison = options[:comparison] if options[:comparison]
-  converter.or = options[:or] if options[:or]
-  converter.strict = options[:strict] if options[:strict]
-  converter.underscored_private = options[:underscored_private] if options[:underscored_private]
-  converter.namespace = Ruby2JS::Namespace.new
+  # Build pipeline options
+  pipeline_options = options.merge(source: source)
 
-  # Enable vertical whitespace if source has newlines
-  converter.enable_vertical_whitespace if source.include?("\n")
-
-  converter.convert
-  converter.to_s!
+  # Run pipeline (handles filters if provided, converter setup, execution)
+  filters = options[:filters] || []
+  pipeline = Ruby2JS::Pipeline.new(ast, comments, filters: filters, options: pipeline_options)
+  result = pipeline.run
+  result.to_s!
 end
 
 # CLI for command-line usage (must come after convert() is defined)
