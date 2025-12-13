@@ -83,6 +83,7 @@ const DEFAULTS = [];
 let excluded = () => false;
 let included = () => false;
 let process = (node) => node;
+let process_children = (node) => node;  // Processes child nodes, bound at runtime
 let process_all = (nodes) => nodes ? nodes.map(node => process(node)) : [];
 let _options = {};
 
@@ -132,15 +133,15 @@ js = js.gsub(/^const Ruby2JS = \{Filter: \(\(\) => \{\n/, '')
 js = js.gsub(/\n  DEFAULTS\.push\(Functions\);\n  return \{Functions\}\n\}\)\(\)\}$/, '')
 
 # Fix incomplete expressions from 'super' calls that become empty
-# In Ruby filters, super calls the next filter or returns the node unchanged
-# Replace empty ternary else branches with 'node'
-js = js.gsub(/: (\s*}\s*(?:else|$))/, ': node\1')
-js = js.gsub(/: (\s*;)/, ': node\1')
-# Replace empty assignments with processChildren(node) or node
-js = js.gsub(/= ;/, '= this.processChildren ? this.processChildren(node) : node;')
-# Replace empty return statements
-js = js.gsub(/return (\s*}\s*(?:else|$))/, 'return node\1')
-js = js.gsub(/return (\s*;)/, 'return node\1')
+# In Ruby filters, super calls the next filter which processes children
+# Replace empty ternary else branches with process_children(node) to match Ruby behavior
+js = js.gsub(/: (\s*}\s*(?:else|$))/, ': process_children(node)\1')
+js = js.gsub(/: (\s*;)/, ': process_children(node)\1')
+# Replace empty assignments with process_children(node)
+js = js.gsub(/= ;/, '= process_children(node);')
+# Replace empty return statements with process_children(node)
+js = js.gsub(/return (\s*}\s*(?:else|$))/, 'return process_children(node)\1')
+js = js.gsub(/return (\s*;)/, 'return process_children(node)\1')
 
 # Replace this._options with _options (module-level variable)
 js = js.gsub(/this\._options/, '_options')
@@ -194,6 +195,7 @@ Ruby2JS.Filter.#{filter_name} = #{filter_name};
   if (opts.excluded) excluded = opts.excluded;
   if (opts.included) included = opts.included;
   if (opts.process) process = opts.process;
+  if (opts.process_children) process_children = opts.process_children;
   if (opts._options) {
     _options = opts._options;
     _eslevel = opts._options.eslevel || 0;

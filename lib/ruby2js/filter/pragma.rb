@@ -256,11 +256,6 @@ module Ruby2JS
         super
       end
 
-      # Pass through deff nodes without re-triggering pragma checks
-      def on_deff(node)
-        process_children(node)
-      end
-
       # Handle array splat with guard pragma -> ensure array even if null
       # [*a] with guard pragma becomes (a ?? [])
       def on_array(node)
