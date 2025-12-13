@@ -13,9 +13,17 @@ module Ruby2JS
         # and not marked as :masgn (from parallel assignment like `scope, @scope = ...`)
         # This handles cases where `scope` should be a new local var, not a call to self.scope=
         # Skip setter lookup if: already a real local var, or marked from parallel assignment
+        # Additionally, only convert if the rbstack entry is a :setter (not a regular getter/method)
         unless @vars[name] == true || @vars[name] == :masgn
           receiver = @rbstack.map {|rb| rb[name]}.compact.last
-          return parse s(:attr, receiver, "#{name}=", value) if receiver
+          # Check if this is a setter marker (directly or wrapped in :private_method)
+          is_setter = receiver&.type == :setter ||
+            (receiver&.type == :private_method && receiver.children[1]&.type == :setter)
+          if is_setter
+            # Extract the actual receiver for parsing
+            actual_receiver = receiver.type == :private_method ? receiver.children[1].children.first : receiver.children.first
+            return parse s(:attr, actual_receiver, "#{name}=", value)
+          end
         end
       end
 

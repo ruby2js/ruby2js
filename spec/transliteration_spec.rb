@@ -831,6 +831,13 @@ describe Ruby2JS do
         must_equal 'class C {set a(x) {this._a = x}; b() {this.a++}}'
     end
 
+    it "should not confuse getter methods with setter assignments (issue #277)" do
+      # When a getter method exists, local variable assignment should create
+      # a local variable, not call a setter
+      to_js('class C; def var2; "x"; end; def test; var2 = "abc"; puts var2; end; end').
+        must_equal 'class C {get var2() {return "x"}; get test() {let var2 = "abc"; return puts(var2)}}'
+    end
+
     it "should prefix bind references to methods as properties" do
       to_js('class C; def m1(); end; def m2; m1; end; end').
         must_equal 'class C {m1() {}; get m2() {return this.m1.bind(this)}}'

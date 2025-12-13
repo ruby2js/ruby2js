@@ -85,7 +85,8 @@ module Ruby2JS
                 end
               end
             elsif prop.to_s.end_with? '='
-              base_node = s(:autobind, s(:self))
+              # Use :setter marker so vasgn.rb can distinguish setters from regular methods
+              base_node = s(:setter, s(:self))
               # Wrap private setters so send.rb can apply the prefix
               if method_visibility == :private
                 private_methods << prop # Pragma: set
