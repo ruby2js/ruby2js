@@ -64,6 +64,13 @@ const Filter = {
 // Setup: DEFAULTS array for filter registration
 const DEFAULTS = [];
 
+// Polyfill: RegExp.escape (not in JS standard)
+if (!RegExp.escape) {
+  RegExp.escape = function(str) {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  };
+}
+
 // Setup: Ruby2JS namespace for ast_node helper
 const Ruby2JS = {
   ast_node: (obj) => typeof obj === 'object' && obj !== null && 'type' in obj && 'children' in obj
@@ -74,9 +81,45 @@ const Ruby2JS = {
 let excluded = () => false;
 let included = () => false;
 let process = (node) => node;
+let _options = {};
+
+// ES level helper functions - use getter pattern so Ruby's `es2020` (no parens) works in JS
+// When Ruby2JS transpiles `es2020`, it becomes `es2020` not `es2020()`, so we use getters
+let _eslevel = 0;
+Object.defineProperty(globalThis, 'es2015', { get: () => _eslevel >= 2015, configurable: true });
+Object.defineProperty(globalThis, 'es2016', { get: () => _eslevel >= 2016, configurable: true });
+Object.defineProperty(globalThis, 'es2017', { get: () => _eslevel >= 2017, configurable: true });
+Object.defineProperty(globalThis, 'es2018', { get: () => _eslevel >= 2018, configurable: true });
+Object.defineProperty(globalThis, 'es2019', { get: () => _eslevel >= 2019, configurable: true });
+Object.defineProperty(globalThis, 'es2020', { get: () => _eslevel >= 2020, configurable: true });
+Object.defineProperty(globalThis, 'es2021', { get: () => _eslevel >= 2021, configurable: true });
+Object.defineProperty(globalThis, 'es2022', { get: () => _eslevel >= 2022, configurable: true });
+
+// Wrapper to provide 'this' context with _options for filter functions
+const filterContext = {
+  get _options() { return _options; }
+};
+
+// AST node structural comparison (Ruby's == compares structure, JS's === compares references)
+function nodesEqual(a, b) {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  if (typeof a !== 'object' || typeof b !== 'object') return a === b;
+  if (a.type !== b.type) return false;
+  if (!a.children || !b.children) return false;
+  if (a.children.length !== b.children.length) return false;
+  for (let i = 0; i < a.children.length; i++) {
+    if (!nodesEqual(a.children[i], b.children[i])) return false;
+  }
+  return true;
+}
 
 // AST node creation helpers
 function s(type, ...children) {
+  // For send nodes, is_method should be true if there are args (children beyond target & method)
+  // This ensures console.log("hi") outputs the args
+  const hasArgs = type === "send" && children.length > 2;
+
   return {
     type,
     children,
@@ -84,8 +127,9 @@ function s(type, ...children) {
       return s(newType ?? this.type, ...(newChildren ?? this.children));
     },
     is_method() {
-      // Default to false for synthetic nodes
-      return this._is_method ?? false;
+      // For send nodes with args, treat as method call
+      // For others, check _is_method flag
+      return hasArgs || (this._is_method ?? false);
     },
     get first() { return this.children[0]; },
     get last() { return this.children[this.children.length - 1]; }
@@ -118,6 +162,28 @@ js = js.gsub(/= ;/, '= this.processChildren ? this.processChildren(node) : node;
 js = js.gsub(/return (\s*}\s*(?:else|$))/, 'return node\1')
 js = js.gsub(/return (\s*;)/, 'return node\1')
 
+# Replace this._options with _options (module-level variable)
+js = js.gsub(/this\._options/, '_options')
+
+# Replace AST node comparisons with nodesEqual (Ruby == compares structure, JS === compares refs)
+# Pattern: target === s(...)  becomes  nodesEqual(target, s(...))
+js = js.gsub(/(\w+) === (s\([^)]+\))/, 'nodesEqual(\1, \2)')
+
+# Fix the compact polyfill to use non-mutating filter (needed for frozen arrays from PrismWalker)
+js = js.gsub(
+  /Object\.defineProperty\(Array\.prototype, "compact", \{\n  get\(\) \{\n    let i = this\.length - 1;\n\n    while \(i >= 0\) \{\n      if \(this\[i\] === null \|\| this\[i\] === undefined\) this\.splice\(i, 1\);\n      i--\n    \};\n\n    return this\n  \},\n\n  configurable: true\n\}\);/,
+  'Object.defineProperty(Array.prototype, "compact", { get() { return this.filter(x => x !== null && x !== undefined); }, configurable: true });'
+)
+
+# Fix Hash.keys pattern: VAR_TO_ASSIGN.keys.includes() -> Object.keys(VAR_TO_ASSIGN).includes()
+js = js.gsub(/(\w+)\.keys\.includes\(/, 'Object.keys(\1).includes(')
+
+# Fix Ruby Regexp class usage to JavaScript RegExp
+js = js.gsub(/\bRegexp\./, 'RegExp.')
+
+# Fix spread of regopt node - need to spread .children, not the node itself
+js = js.gsub(/\.\.\.before\.children\.last\)/, '...(before.children.last.children || []))')
+
 # The filter is now exposed as Functions variable (it's defined inside)
 
 postamble = <<~JS
@@ -130,8 +196,10 @@ Functions._setup = function(opts) {
   if (opts.excluded) excluded = opts.excluded;
   if (opts.included) included = opts.included;
   if (opts.process) process = opts.process;
-  if (opts.s) { /* s is already defined */ }
-  if (opts.S) { /* S is already defined */ }
+  if (opts._options) {
+    _options = opts._options;
+    _eslevel = opts._options.eslevel || 0;
+  }
 };
 
 // Export the filter for ES module usage

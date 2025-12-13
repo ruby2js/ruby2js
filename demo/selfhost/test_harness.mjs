@@ -136,6 +136,11 @@ class FilterProcessor {
 
     if (typeof this._filter[handler] === 'function') {
       replacement = this._filter[handler](node);
+      // If handler returned a new node, process its children too
+      // This ensures nested S() calls get filtered (e.g., sub! creating sub nodes)
+      if (replacement && replacement !== node) {
+        replacement = this.processChildren(replacement);
+      }
     } else {
       // Default: process children
       replacement = this.processChildren(node);
@@ -205,10 +210,18 @@ Ruby2JS.convert = function(source, opts = {}) {
       for (const filter of opts.filters) {
         if (!filter) continue;
 
-        if (typeof filter.process === 'function') {
-          // Filter has its own process method
-          ast = filter.process(ast, opts);
-        } else if (typeof filter.on_send === 'function' || typeof filter.on_block === 'function') {
+        // Always call _setup to update options (module-level vars in transpiled filters)
+        if (typeof filter._setup === 'function') {
+          const excludedFn = (method) => Ruby2JS.Filter._excluded.has(method);
+          const includedFn = (method) => Ruby2JS.Filter._included.has(method);
+          filter._setup({
+            excluded: excludedFn,
+            included: includedFn,
+            _options: opts
+          });
+        }
+
+        if (typeof filter.on_send === 'function' || typeof filter.on_block === 'function') {
           // Filter uses on_<type> handlers - wrap with FilterProcessor
           const processor = new FilterProcessor(filter, opts);
           ast = processor.process(ast);
