@@ -39,7 +39,7 @@ module Ruby2JS
       filter_options = @options.merge({ filters: @filters })
 
       # Allow filters to reorder themselves
-      filters = @filters.dup
+      filters = [*@filters]
       filters.each do |filter|
         filters = filter.reorder(filters) if filter.respond_to?(:reorder)
       end

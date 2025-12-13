@@ -82,6 +82,11 @@ class NotImplementedError extends Error {
   }
 }
 
+// Parser stub - the Ruby source uses defined?(Parser::AST::Node) checks
+// which transpile to typeof Parser.AST.Node !== 'undefined'.
+// We define Parser with AST.Node = undefined so the check safely returns false.
+const Parser = { AST: { Node: undefined } };
+
 JS
 
 puts preamble + js

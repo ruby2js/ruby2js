@@ -7,9 +7,6 @@
 # Used by both the main Ruby2JS and the selfhost bundle.
 
 module Ruby2JS
-  # Note: Ruby2JS.ast_node? is defined in ruby2js.rb, not here
-  # The Processor class has its own ast_node? instance method below
-
   module Filter
     DEFAULTS = []
 
@@ -30,7 +27,7 @@ module Ruby2JS
 
       # Check if object is an AST node (works with both Parser::AST::Node and Ruby2JS::Node)
       def ast_node?(obj)
-        Ruby2JS.ast_node?(obj)
+        obj.respond_to?(:type) && obj.respond_to?(:children) && obj.respond_to?(:updated)
       end
     end
 
@@ -44,12 +41,12 @@ module Ruby2JS
         @comments = comments
         @ast = nil
         @exclude_methods = []
-        @prepend_list = Set.new
+        @prepend_list = []
       end
 
       # Check if object is an AST node (works with both Parser::AST::Node and Ruby2JS::Node)
       def ast_node?(obj)
-        Ruby2JS.ast_node?(obj)
+        obj.respond_to?(:type) && obj.respond_to?(:children) && obj.respond_to?(:updated)
       end
 
       # Instance methods for include/exclude tracking (moved from Filter module)

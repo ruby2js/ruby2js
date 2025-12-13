@@ -7,9 +7,14 @@ module Ruby2JS
 
     handle :array do |*items|
       splat = items.rindex { |a| a.type == :splat }
-      if splat and items.length == 1
-        item = items[splat].children.first
-        parse item
+      if splat
+        # Array contains splat - must use [...x] syntax to preserve copy semantics
+        # [*x] in Ruby creates a new array, so we need [...x] in JS
+        if items.length <= 1
+          put '['; parse_all(*items, join: ', '); put ']'
+        else
+          self._compact { puts '['; parse_all(*items, join: ",#{@ws}"); sput ']' }
+        end
       else
         if items.length <= 1
           put '['; parse_all(*items, join: ', '); put ']'

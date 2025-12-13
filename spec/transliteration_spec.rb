@@ -219,8 +219,14 @@ describe Ruby2JS do
       to_js( "[*a,1,2,*b,3,4,*c]" ).
         must_equal "[...a, 1, 2, ...b, 3, 4, ...c]"
     end
+
+    it "should preserve copy semantics for single splat" do
+      # [*x] in Ruby creates a shallow copy, must not optimize away the array
+      to_js( "b = [*a]" ).
+        must_equal "let b = [...a]"
+    end
   end
-  
+
   describe 'boolean' do
     it "should parse boolean" do
       to_js( "true; false" ).must_equal 'true; false'

@@ -150,7 +150,7 @@ describe Ruby2JS::Filter::Pragma do
   describe "guard pragma" do
     it "should guard splat array against null" do
       to_js('[*a] # Pragma: guard').
-        must_equal 'a ?? []'
+        must_equal '[...a ?? []]'
     end
 
     it "should guard splat in mixed array" do
@@ -158,9 +158,10 @@ describe Ruby2JS::Filter::Pragma do
         must_equal '[1, ...a ?? [], 2]'
     end
 
-    it "should not guard splat without pragma" do
+    it "should preserve array wrapper without pragma" do
+      # [*a] in Ruby always creates a new array (shallow copy)
       to_js('[*a]').
-        must_equal 'a'
+        must_equal '[...a]'
     end
 
     it "should handle multiple splats with guard" do
