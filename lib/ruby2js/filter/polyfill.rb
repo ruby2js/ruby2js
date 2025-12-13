@@ -178,6 +178,23 @@ module Ruby2JS
           define_property_getter(:Object, :to_a,
             s(:return, s(:send, s(:const, nil, :Object), :entries, s(:self)))
           )
+
+        when :regexp_escape
+          # if (!RegExp.escape) { RegExp.escape = function(str) { return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') } }
+          s(:if,
+            s(:send, s(:attr, s(:const, nil, :RegExp), :escape), :!),
+            s(:send, s(:const, nil, :RegExp), :[]=, s(:str, 'escape'),
+              s(:deff, nil, s(:args, s(:arg, :str)),
+                s(:return,
+                  s(:send, s(:lvar, :str), :replace,
+                    s(:regexp, s(:str, '[.*+?^${}()|[\\]\\\\]'), s(:regopt, :g)),
+                    s(:str, '\\$&')
+                  )
+                )
+              )
+            ),
+            nil
+          )
         end
       end
 
@@ -250,6 +267,13 @@ module Ruby2JS
             if args.empty?
               add_polyfill(:object_to_a)
               return s(:attr, process(target), :to_a)
+            end
+
+          when :escape
+            # Regexp.escape(str) => RegExp.escape(str) with polyfill for pre-ES2025
+            if target == s(:const, nil, :Regexp) && args.length == 1
+              add_polyfill(:regexp_escape) unless es2025
+              return s(:send, s(:const, nil, :RegExp), :escape, process(args.first))
             end
           end
         end

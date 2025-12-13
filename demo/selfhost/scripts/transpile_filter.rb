@@ -78,13 +78,6 @@ const Filter = {
 // Setup: DEFAULTS array for filter registration
 const DEFAULTS = [];
 
-// Polyfill: RegExp.escape (not in JS standard)
-if (!RegExp.escape) {
-  RegExp.escape = function(str) {
-    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  };
-}
-
 // Filter infrastructure functions (bound by FilterProcessor at runtime)
 // Default implementations return false/do nothing until bound
 let excluded = () => false;

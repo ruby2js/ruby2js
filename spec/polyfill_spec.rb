@@ -125,6 +125,26 @@ describe Ruby2JS::Filter::Polyfill do
     end
   end
 
+  describe 'Regexp.escape' do
+    it 'should add polyfill for pre-ES2025' do
+      js = to_js('Regexp.escape(str)', eslevel: 2024)
+      _(js).must_include 'if (!RegExp.escape)'
+      _(js).must_include 'RegExp.escape(str)'
+    end
+
+    it 'should not add polyfill for ES2025' do
+      js = to_js('Regexp.escape(str)', eslevel: 2025)
+      _(js).wont_include 'if (!RegExp.escape)'
+      _(js).must_include 'RegExp.escape(str)'
+    end
+
+    it 'should convert Regexp to RegExp' do
+      js = to_js('Regexp.escape("hello")', eslevel: 2024)
+      _(js).must_include 'RegExp.escape("hello")'
+      _(js).wont_include 'Regexp.escape'
+    end
+  end
+
   describe 'multiple polyfills' do
     it 'should add multiple polyfills when needed' do
       js = to_js('arr.first; arr.last; str.chomp')

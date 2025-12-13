@@ -17,8 +17,8 @@ If you set the `eslevel` option to `2021` or newer, the Functions filter enables
 
 {:.functions-list}
 * `.abs` {{ caret }} `Math.abs()`
-* `.all?` {{ caret }} `.every`
-* `.any?` {{ caret }} `.some`
+* `.all?` {{ caret }} `.every` (with block) or `.every(Boolean)` (without block)
+* `.any?` {{ caret }} `.some` (with block) or `.some(Boolean)` (without block)
 * `.ceil` {{ caret }} `Math.ceil()`
 * `.chars` {{ caret }} `Array.from()`
 * `.chr` {{ caret }} `fromCharCode`
@@ -63,6 +63,7 @@ If you set the `eslevel` option to `2021` or newer, the Functions filter enables
 * `.min` {{ caret }} `Math.min.apply(Math)`
 * `.min_by {}` {{ caret }} `.reduce()`
 * `.negative?` {{ caret }} `< 0`
+* `.none?` {{ caret }} `!.some` (with block) or `!.some(Boolean)` (without block)
 * `[-n] = x` {{ caret }} `[*.length-n] = x` for literal negative index assignment
 * `.new(size,default)` {{ caret }} `== .new(size).fill(default)`
 * `.nil?` {{ caret }} `== null`
@@ -78,6 +79,7 @@ If you set the `eslevel` option to `2021` or newer, the Functions filter enables
 * `.round` {{ caret }} `Math.round()`
 * `.rstrip` {{ caret }} `.replace(/s+$/, "")`
 * `.scan` {{ caret }} `.match(//g)`
+* `.send` {{ caret }} dynamic method dispatch `obj.send(:foo, x)` becomes `obj.foo(x)` or `obj[method](x)`
 * `.sort_by {}` {{ caret }} `.toSorted()` (ES2023+) or `.slice().sort()` fallback
 * `.sum` {{ caret }} `.reduce((a, b) => a + b, 0)`
 * `.reduce(:+)` {{ caret }} `.reduce((a, b) => a + b)` (symbol-to-proc for operators)
@@ -138,6 +140,7 @@ If you set the `eslevel` option to `2021` or newer, the Functions filter enables
 * `raise Exception.new(...)` will be replaced with `throw new Error(...)`
 * `block_given?` will check for the presence of optional argument `_implicitBlockYield` which is a function made accessible through the use of `yield` in a method body.
 * `alias_method` works both inside of a class definition as well as called directly on a class name (e.g. `MyClass.alias_method`)
+* `define_method` and `method_defined?` work inside class bodies (with or without explicit receiver), including inside loops like `[:a, :b].each { |m| define_method(m) { ... } }`
 * Block parameter destructuring is supported: `.map {|k, v| ...}` becomes `.map(([k, v]) => ...)`
 
 ## Methods Requiring Parentheses

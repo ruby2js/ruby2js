@@ -31,22 +31,27 @@ end
 
 ### `define_method`
 
-Runtime method definition isn't supported:
+`define_method` is supported inside class bodies, including inside loops:
 
 ```ruby
-# Won't work
-%w[red green blue].each do |color|
-  define_method("#{color}?") { @color == color }
+# This works
+class Color
+  %w[red green blue].each do |color|
+    define_method("#{color}?") { @color == color }
+  end
 end
 ```
 
-**Alternative:** Define methods explicitly:
+Becomes:
 
-```ruby
-def red?; @color == "red"; end
-def green?; @color == "green"; end
-def blue?; @color == "blue"; end
+```javascript
+class Color {};
+for (let color of ["red", "green", "blue"]) {
+  Color.prototype[`${color}?`] = function() { return this._color == color }
+}
 ```
+
+However, `define_method` at the top level (outside a class) or with complex metaprogramming may not translate correctly.
 
 ### `eval` and `instance_eval`
 
@@ -62,21 +67,17 @@ instance_eval(&block)
 
 ### `send` and `public_send`
 
-Dynamic method dispatch is problematic:
+Basic `send` is supported:
 
 ```ruby
-# Won't work reliably
-obj.send(method_name, *args)
+# Static method name - works
+obj.send(:foo, x, y)      # => obj.foo(x, y)
+
+# Dynamic method name - works
+obj.send(method_name, x)  # => obj[method_name](x)
 ```
 
-**Alternative:** Use explicit conditionals or a dispatch table:
-
-```ruby
-case method_name
-when :add then obj.add(*args)
-when :remove then obj.remove(*args)
-end
-```
+However, `public_send` is not specifically handled (treated the same as `send`), and complex dispatch patterns may not translate correctly.
 
 ## Type Introspection
 
@@ -407,8 +408,9 @@ str.force_encoding("UTF-8")
 | Arrays, hashes | ✅ Safe | Mind `<<`, `.dup` |
 | String interpolation | ✅ Safe | |
 | Control flow | ✅ Safe | Except `retry`, `redo` |
+| `define_method` | ✅ Safe | In class bodies |
+| `send` | ✅ Safe | Static or dynamic names |
 | `method_missing` | ❌ Avoid | Explicit methods |
-| `define_method` | ❌ Avoid | Explicit methods |
 | `eval` | ❌ Avoid | Restructure |
 | `is_a?`, `kind_of?` | ⚠️ Pragma skip | Duck typing |
 | `respond_to?` | ⚠️ Pragma skip | Property checks |

@@ -42,6 +42,16 @@ The Polyfill filter automatically reorders itself to run before the Functions fi
 |------|---------------------|
 | `.to_a` | Property getter returning `Object.entries(this)` |
 
+### RegExp Methods
+
+| Ruby | JavaScript Polyfill |
+|------|---------------------|
+| `Regexp.escape(str)` | `RegExp.escape(str)` with polyfill for pre-ES2025 |
+
+{% rendercontent "docs/note", title: "ES2025 Native Support" %}
+`RegExp.escape` is a native JavaScript method in ES2025+. The polyfill is only added for earlier ES levels.
+{% endrendercontent %}
+
 ## Examples
 
 ```ruby

@@ -416,9 +416,26 @@ describe Ruby2JS::Filter::Functions do
       to_js( 'h.member?(:foo)' ).must_equal '"foo" in h'
     end
 
-    it "should handle any?" do
+    it "should handle any? with block" do
       to_js( 'a.any? {|i| i==0}' ).
         must_equal 'a.some(i => i == 0)'
+    end
+
+    it "should handle any? without block" do
+      to_js( 'a.any?' ).must_equal 'a.some(Boolean)'
+    end
+
+    it "should handle all? without block" do
+      to_js( 'a.all?' ).must_equal 'a.every(Boolean)'
+    end
+
+    it "should handle none? with block" do
+      to_js( 'a.none? {|i| i==0}' ).
+        must_equal '!a.some(i => i == 0)'
+    end
+
+    it "should handle none? without block" do
+      to_js( 'a.none?' ).must_equal '!a.some(Boolean)'
     end
 
     it "should handle map" do
@@ -880,6 +897,21 @@ describe Ruby2JS::Filter::Functions do
         must_equal 'this.constructor.prototype.foo = myblock'
       to_js_2020( 'define_method(name, myblock)').
         must_equal 'this.constructor.prototype[name] = myblock'
+    end
+
+    it "should handle define_method inside loops" do
+      to_js_2020( 'class Klass; [:a, :b].each { |m| define_method(m) { } }; end').
+        must_equal 'class Klass {}; for (let m of ["a", "b"]) {Klass.prototype[m] = function() {}}'
+    end
+
+    it "should handle method_defined? in class body" do
+      to_js_2020( 'class Klass; method_defined?(:foo); end').
+        must_equal 'class Klass {}; "foo" in Klass.prototype'
+    end
+
+    it "should handle method_defined? inside loops" do
+      to_js_2020( 'class Klass; [:a, :b].each { |m| define_method(m) { } unless method_defined?(m) }; end').
+        must_include 'Klass.prototype'
     end
 
     it "should handle method(:name)" do

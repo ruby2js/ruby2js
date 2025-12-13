@@ -447,6 +447,18 @@ module Ruby2JS
         elsif method == :negative? and args.length == 0
           process S(:send, target, :<, s(:int, 0))
 
+        elsif method == :any? and args.length == 0
+          # arr.any? => arr.some(Boolean)
+          process S(:send, target, :some, s(:const, nil, :Boolean))
+
+        elsif method == :all? and args.length == 0
+          # arr.all? => arr.every(Boolean)
+          process S(:send, target, :every, s(:const, nil, :Boolean))
+
+        elsif method == :none? and args.length == 0
+          # arr.none? => !arr.some(Boolean)
+          process S(:send, S(:send, target, :some, s(:const, nil, :Boolean)), :!)
+
         elsif [:start_with?, :end_with?].include? method and args.length == 1
           if method == :start_with?
             process S(:send, target, :startsWith, *args)
@@ -787,7 +799,8 @@ module Ruby2JS
           process S(:send, s(:const, nil, :Error), :new, *args)
 
         elsif method == :escape and target == s(:const, nil, :Regexp) and es2025
-          # Regexp.escape(str) => RegExp.escape(str)
+          # Regexp.escape(str) => RegExp.escape(str) for ES2025+
+          # (polyfill filter handles pre-ES2025 with polyfill)
           process S(:send, s(:const, nil, :RegExp), :escape, *args)
 
         elsif method == :block_given? and target == nil and args.length == 0
@@ -962,6 +975,13 @@ module Ruby2JS
           call = call.updated nil, [call.children.first, :every]
           node.updated nil, [process(call), process(node.children[1]),
             s(:autoreturn, *process_all(node.children[2..-1]))]
+
+        elsif method == :none? and call.children.length == 2
+          # arr.none? { |x| cond } => !arr.some(x => cond)
+          call = call.updated nil, [call.children.first, :some]
+          some_result = node.updated nil, [process(call), process(node.children[1]),
+            s(:autoreturn, *process_all(node.children[2..-1]))]
+          s(:send, some_result, :!)
 
         elsif method == :find and call.children.length == 2
           node.updated nil, [process(call), process(node.children[1]),
@@ -1389,6 +1409,9 @@ module Ruby2JS
         body.each_with_index do |child, i|
           # alias_method without receiver -> add class name as receiver
           if child.type == :send and child.children[0..1] == [nil, :alias_method]
+            body[i] = child.updated(:send, [name, *child.children[1..-1]])
+          # method_defined? without receiver -> add class name as receiver
+          elsif child.type == :send and child.children[0..1] == [nil, :method_defined?]
             body[i] = child.updated(:send, [name, *child.children[1..-1]])
           # define_method without receiver -> add class name as receiver
           elsif child.type == :block
