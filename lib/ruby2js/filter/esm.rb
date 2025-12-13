@@ -391,20 +391,20 @@ module Ruby2JS
         name = camelCase(name) if respond_to?(:camelCase)
         name.to_sym
       end
-    end
 
-    private
+      private
 
-    def find_autoimport(token)
-      return nil if @esm_autoimports.nil?
-      return nil if @esm_explicit_tokens.include?(token)
+      def find_autoimport(token)
+        return nil if @esm_autoimports.nil?
+        return nil if @esm_explicit_tokens.include?(token)
 
-      token = camelCase(token) if respond_to?(:camelCase)
+        token = camelCase(token) if respond_to?(:camelCase)
 
-      if @esm_autoimports[token]
-        [@esm_autoimports[token], s(:const, nil, token)]
-      elsif found_key = @esm_autoimports.keys.find {|key| key.is_a?(Array) && key.include?(token)}
-        [@esm_autoimports[found_key], found_key.map {|key| s(:const, nil, key)}]
+        if @esm_autoimports[token]
+          [@esm_autoimports[token], s(:const, nil, token)]
+        elsif found_key = @esm_autoimports.keys.find {|key| key.is_a?(Array) && key.include?(token)}
+          [@esm_autoimports[found_key], found_key.map {|key| s(:const, nil, key)}]
+        end
       end
     end
 

@@ -67,7 +67,20 @@ Ruby2JS.ast_node = Ruby2JS.ast_node || function(obj) {
 const SEXP = {
   // Create a new AST node
   s(type, ...children) {
-    return { type, children, updated: nodeUpdated };
+    return {
+      type,
+      children,
+      updated: nodeUpdated,
+      is_method() {
+        // For synthetic nodes, default to method call for send/csend with args
+        if (type === 'attr') return false;
+        if (type === 'call') return true;
+        if (type === 'csend' && children.length === 2) return false;
+        return true;
+      },
+      get first() { return children[0]; },
+      get last() { return children[children.length - 1]; }
+    };
   },
   // Update current @ast node
   S(type, ...children) {
@@ -81,11 +94,15 @@ const SEXP = {
 
 // Node updated method - creates new node with optional type/children changes
 function nodeUpdated(newType, newChildren) {
+  const type = newType ?? this.type;
+  const children = newChildren ?? this.children;
   return {
-    type: newType ?? this.type,
-    children: newChildren ?? this.children,
+    type,
+    children,
     updated: nodeUpdated,
-    is_method: this.is_method
+    is_method: this.is_method,
+    get first() { return children[0]; },
+    get last() { return children[children.length - 1]; }
   };
 }
 
@@ -126,6 +143,41 @@ class FilterProcessor {
   process(node) {
     if (!Ruby2JS.ast_node(node)) return node;
 
+    // Block-pass expansion: Convert send with block_pass to block node
+    // a.map(&:method) → block(send(a, :map), args(arg(:item)), return(attr(lvar(:item), :method)))
+    // Note: The inner attr/send node is processed recursively to convert methods like to_i → parseInt
+    if ((node.type === 'send' || node.type === 'csend') &&
+        node.children.length > 2 &&
+        Ruby2JS.ast_node(node.children[node.children.length - 1]) &&
+        node.children[node.children.length - 1].type === 'block_pass') {
+      const blockPass = node.children[node.children.length - 1];
+      if (Ruby2JS.ast_node(blockPass.children[0]) && blockPass.children[0].type === 'sym') {
+        const method = blockPass.children[0].children[0];
+        const callType = node.type === 'csend' ? 'csend' : 'send';
+        const callWithoutBlockPass = SEXP.s(callType, ...node.children.slice(0, -1));
+
+        // Binary operators like :< :> :+ etc
+        const BINARY_OPERATORS = ['+', '-', '*', '/', '%', '**', '&', '|', '^', '<<', '>>',
+                                  '==', '===', '!=', '<', '>', '<=', '>=', '<=>', '=~'];
+        if (BINARY_OPERATORS.includes(method)) {
+          // a.sort(&:<) → a.sort((a, b) => a < b)
+          // Process inner send to convert operators
+          const innerSend = this.process(SEXP.s('send', SEXP.s('lvar', 'a'), method, SEXP.s('lvar', 'b')));
+          node = SEXP.s('block', callWithoutBlockPass,
+            SEXP.s('args', SEXP.s('arg', 'a'), SEXP.s('arg', 'b')),
+            SEXP.s('return', innerSend));
+        } else {
+          // a.map(&:method) → a.map(item => item.method)
+          // Process inner send to convert methods like to_i → parseInt
+          // Use 'send' (not 'attr') so filter methods like to_i get converted
+          const innerSend = this.process(SEXP.s('send', SEXP.s('lvar', 'item'), method));
+          node = SEXP.s('block', callWithoutBlockPass,
+            SEXP.s('args', SEXP.s('arg', 'item')),
+            SEXP.s('return', innerSend));
+        }
+      }
+    }
+
     const prevAst = this._ast;
     this._ast = node;
     this._filter._ast = node;
@@ -136,13 +188,17 @@ class FilterProcessor {
 
     if (typeof this._filter[handler] === 'function') {
       replacement = this._filter[handler](node);
-      // If handler returned a new node, process its children too
-      // This ensures nested S() calls get filtered (e.g., sub! creating sub nodes)
+      // Ruby filter model:
+      // - If handler returns a NEW node (transformed), use it as-is (handler processed children it wanted)
+      // - If handler returns the SAME node (unchanged), process children (handler didn't handle this case)
       if (replacement && replacement !== node) {
-        replacement = this.processChildren(replacement);
+        // Handler transformed the node - use as-is
+      } else {
+        // Handler returned same node or null - process children
+        replacement = this.processChildren(node);
       }
     } else {
-      // Default: process children
+      // No handler: process children recursively
       replacement = this.processChildren(node);
     }
 
@@ -181,6 +237,11 @@ export async function initPrism() {
 
 // Updated convert that uses the initialized parser
 Ruby2JS.convert = function(source, opts = {}) {
+  // Default eslevel to 2020 (same as Ruby2JS default)
+  if (opts.eslevel === undefined) {
+    opts.eslevel = 2020;
+  }
+
   const prismParse = getPrismParse();
   if (!prismParse) {
     return {

@@ -1337,6 +1337,38 @@ module Ruby2JS
         end
       end
 
+      # Recursively add class name as receiver to define_method and method_defined? calls
+      # This handles define_method/method_defined? inside loops like:
+      #   %i[a b].each { |t| define_method(t) { ... } unless method_defined?(t) }
+      def add_class_receiver(node, class_name)
+        return node unless ast_node?(node)
+
+        if node.type == :block
+          call = node.children.first
+          if call.type == :send and call.children[0..1] == [nil, :define_method]
+            new_call = call.updated(:send, [class_name, *call.children[1..-1]])
+            return node.updated(:block, [new_call, *node.children[1..-1].map { |c| add_class_receiver(c, class_name) }])
+          end
+        elsif node.type == :send and node.children[0..1] == [nil, :method_defined?]
+          return node.updated(:send, [class_name, *node.children[1..-1]])
+        end
+
+        # Recursively process children
+        new_children = node.children.map do |child|
+          if ast_node?(child)
+            add_class_receiver(child, class_name)
+          else
+            child
+          end
+        end
+
+        if new_children != node.children
+          node.updated(nil, new_children)
+        else
+          node
+        end
+      end
+
       def on_class(node)
         name, inheritance, *body = node.children
         body.compact!
@@ -1351,7 +1383,13 @@ module Ruby2JS
             if call.type == :send and call.children[0..1] == [nil, :define_method]
               new_call = call.updated(:send, [name, *call.children[1..-1]])
               body[i] = child.updated(:block, [new_call, *child.children[1..-1]])
+            else
+              # Recursively search for define_method/method_defined? inside nested blocks (e.g., .each loops)
+              body[i] = add_class_receiver(child, name)
             end
+          elsif child.type == :begin
+            # Process children of begin node (class body wrapped in begin)
+            body[i] = add_class_receiver(child, name)
           end
         end
 

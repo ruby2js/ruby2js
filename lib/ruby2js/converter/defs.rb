@@ -37,7 +37,9 @@ module Ruby2JS
           set: s(:block, s(:send, nil, :proc), args,
           body)})
       else
-        node = s(:send, target, "#{method}=", s(:def, nil, args, body))
+        # Strip ? or ! from method name before adding = suffix
+        clean_method = method.to_s.sub(/[?!]$/, '')
+        node = s(:send, target, "#{clean_method}=", s(:def, nil, args, body))
       end
 
       @comments[node] = @comments[@ast] if @comments[@ast]

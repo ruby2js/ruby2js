@@ -145,47 +145,7 @@ module Ruby2JS
       end
     end
 
-    #
-    # instance level overrides
-    #
-
-    # determine if a method is NOT to be processed
-    def excluded?(method)
-      if @included
-        not @included.include? method
-      else
-        return true if @exclude_methods.flatten.include? method
-        @excluded&.include? method
-      end
-    end
-
-    # indicate that all methods are to be processed
-    def include_all
-      @included = nil
-      @excluded = []
-    end
-
-    # indicate that only the specified methods are to be processed
-    def include_only(*methods)
-      @included = methods.flatten
-    end
-
-    # indicate that the specified methods are to be processed
-    def include(*methods)
-      if @included
-        @included += methods.flatten
-      else
-        @excluded -= methods.flatten
-      end
-    end
-
-    # indicate that the specified methods are not to be processed
-    def exclude(*methods)
-      if @included
-        @included -= methods.flatten
-      else
-        @excluded += methods.flatten
-      end
-    end
+    # Instance level methods (excluded?, include_all, include_only, include, exclude)
+    # have been moved to Processor class in filter/processor.rb
   end
 end

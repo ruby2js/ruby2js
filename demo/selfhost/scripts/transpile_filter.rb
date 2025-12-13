@@ -83,6 +83,32 @@ let included = () => false;
 let process = (node) => node;
 let _options = {};
 
+// Process all nodes in an array (like Ruby's process_all)
+function process_all(nodes) {
+  if (!nodes) return [];
+  return nodes.map(node => process(node));
+}
+
+// Ruby enumerable polyfills for arrays (none?, all?, any? with blocks)
+if (!Array.prototype.none) {
+  Object.defineProperty(Array.prototype, 'none', {
+    value: function(fn) { return !this.some(fn); },
+    configurable: true
+  });
+}
+if (!Array.prototype.all) {
+  Object.defineProperty(Array.prototype, 'all', {
+    value: function(fn) { return this.every(fn); },
+    configurable: true
+  });
+}
+if (!Array.prototype.any) {
+  Object.defineProperty(Array.prototype, 'any', {
+    value: function(fn) { return this.some(fn); },
+    configurable: true
+  });
+}
+
 // ES level helper functions - use getter pattern so Ruby's `es2020` (no parens) works in JS
 // When Ruby2JS transpiles `es2020`, it becomes `es2020` not `es2020()`, so we use getters
 let _eslevel = 0;
@@ -94,6 +120,9 @@ Object.defineProperty(globalThis, 'es2019', { get: () => _eslevel >= 2019, confi
 Object.defineProperty(globalThis, 'es2020', { get: () => _eslevel >= 2020, configurable: true });
 Object.defineProperty(globalThis, 'es2021', { get: () => _eslevel >= 2021, configurable: true });
 Object.defineProperty(globalThis, 'es2022', { get: () => _eslevel >= 2022, configurable: true });
+Object.defineProperty(globalThis, 'es2023', { get: () => _eslevel >= 2023, configurable: true });
+Object.defineProperty(globalThis, 'es2024', { get: () => _eslevel >= 2024, configurable: true });
+Object.defineProperty(globalThis, 'es2025', { get: () => _eslevel >= 2025, configurable: true });
 
 // Wrapper to provide 'this' context with _options for filter functions
 const filterContext = {
@@ -116,20 +145,32 @@ function nodesEqual(a, b) {
 
 // AST node creation helpers
 function s(type, ...children) {
-  // For send nodes, is_method should be true if there are args (children beyond target & method)
-  // This ensures console.log("hi") outputs the args
-  const hasArgs = type === "send" && children.length > 2;
+  // send! is a special marker meaning "this is definitely a method call (with parens)"
+  const isSendBang = type === "send!";
+  const actualType = isSendBang ? "send" : type;
 
   return {
-    type,
+    type: actualType,
     children,
+    // Mark this as a synthetic node (created programmatically by filter)
+    _is_synthetic: true,
     updated: function(newType, newChildren) {
       return s(newType ?? this.type, ...(newChildren ?? this.children));
     },
     is_method() {
-      // For send nodes with args, treat as method call
-      // For others, check _is_method flag
-      return hasArgs || (this._is_method ?? false);
+      // Ruby's is_method? has specific rules:
+      // 1. :attr types always return false (property access, not method call)
+      // 2. :call types always return true
+      // 3. For nodes without location info (synthetic), return true
+      // 4. For nodes with location info, check for '(' after selector
+      if (type === "attr") return false;
+      if (type === "call") return true;
+      // For csend (safe navigation) without args, treat as property access
+      // This handles cases like a&.length where we want a?.length not a?.length()
+      // Regular send uses :send! for method calls and :attr for property accesses
+      if (type === "csend" && children.length === 2) return false;
+      // Synthetic nodes with args default to method call (matching Ruby behavior)
+      return true;
     },
     get first() { return this.children[0]; },
     get last() { return this.children[this.children.length - 1]; }
@@ -181,8 +222,23 @@ js = js.gsub(/(\w+)\.keys\.includes\(/, 'Object.keys(\1).includes(')
 # Fix Ruby Regexp class usage to JavaScript RegExp
 js = js.gsub(/\bRegexp\./, 'RegExp.')
 
+# Fix Ruby Object constant becoming JS Object constructor
+# s("const", null, Object) should be s("const", null, "Object")
+js = js.gsub(/s\("const", null, Object\)/, 's("const", null, "Object")')
+
 # Fix spread of regopt node - need to spread .children, not the node itself
-js = js.gsub(/\.\.\.before\.children\.last\)/, '...(before.children.last.children || []))')
+# Pattern: ...before.children.last) or ...arg.children.last) where the node is a regopt
+js = js.gsub(/\.\.\.(before|arg)\.children\.last\)/, '...(\1.children.last.children || []))')
+
+# Add each_with_index handling in on_block (it's only in on_send, but blocks need it too)
+# Insert before the final "return node" in on_block
+js = js.gsub(
+  /(\} else \{\n        return node\n      \}\n    \};\n\n    \/\/ compact with a block)/,
+  '} else if (method === "each_with_index") {' + "\n" +
+  '        call = call.updated(null, [call.children.first, "forEach"]);' + "\n" +
+  '        return node.updated(null, [process(call), ...node.children.slice(1)])' + "\n" +
+  '      \\1'
+)
 
 # The filter is now exposed as Functions variable (it's defined inside)
 

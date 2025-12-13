@@ -36,6 +36,9 @@ require_relative '../../ruby2js/serializer'
 # Converter (main conversion logic + all handlers)
 require_relative '../../ruby2js/converter'
 
+# Filter Processor (AST walker, SEXP helpers, type aliasing)
+require_relative '../../ruby2js/filter/processor'
+
 # ============================================================================
 # Initialize Prism at module load time
 # ============================================================================
