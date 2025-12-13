@@ -479,6 +479,19 @@ module Ruby2JS
         elsif method == :respond_to? and args.length == 1
           process S(:in?, args.first, target)
 
+        elsif method == :send and args.length >= 1
+          # target.send(:method, arg1, arg2) => target.method(arg1, arg2)
+          # target.send(method_var, arg1) => target[method_var](arg1)
+          method_name = args.first
+          method_args = args[1..-1]
+          if method_name.type == :sym
+            # Static method name: target.send(:foo, x) => target.foo(x)
+            process S(:send, target, method_name.children.first, *method_args)
+          else
+            # Dynamic method name: target.send(m, x) => target[m](x)
+            process S(:send!, S(:send, target, :[], method_name), nil, *method_args)
+          end
+
         elsif [:has_key?, :key?, :member?].include?(method) and args.length == 1
           # hash.has_key?(k) => k in hash
           process S(:in?, args.first, target)

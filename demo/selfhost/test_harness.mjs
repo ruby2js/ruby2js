@@ -63,34 +63,8 @@ Ruby2JS.ast_node = Ruby2JS.ast_node || function(obj) {
   return typeof obj === 'object' && obj !== null && 'type' in obj && 'children' in obj;
 };
 
-// SEXP module - AST node creation helpers
-const SEXP = {
-  // Create a new AST node
-  s(type, ...children) {
-    return {
-      type,
-      children,
-      updated: nodeUpdated,
-      is_method() {
-        // For synthetic nodes, default to method call for send/csend with args
-        if (type === 'attr') return false;
-        if (type === 'call') return true;
-        if (type === 'csend' && children.length === 2) return false;
-        return true;
-      },
-      get first() { return children[0]; },
-      get last() { return children[children.length - 1]; }
-    };
-  },
-  // Update current @ast node
-  S(type, ...children) {
-    return this._ast.updated(type, children);
-  },
-  // Check if object is an AST node
-  ast_node(obj) {
-    return Ruby2JS.ast_node(obj);
-  }
-};
+// Use SEXP from the transpiled bundle
+const SEXP = Ruby2JS.Filter.SEXP;
 
 // Node updated method - creates new node with optional type/children changes
 function nodeUpdated(newType, newChildren) {
@@ -106,21 +80,51 @@ function nodeUpdated(newType, newChildren) {
   };
 }
 
-// FilterProcessor - walks AST and dispatches to on_<type> methods
+// Wrap s() to add nodeUpdated if the transpiled version doesn't have it
+const originalS = SEXP.s.bind(SEXP);
+SEXP.s = function(type, ...children) {
+  const node = originalS(type, ...children);
+  if (!node.updated) {
+    node.updated = nodeUpdated;
+  }
+  return node;
+};
+
+// FilterProcessor - thin wrapper that uses transpiled Ruby2JS.Filter.Processor
+// Copies filter methods onto a Processor instance and delegates to it
 class FilterProcessor {
   constructor(filter, options = {}) {
+    // Create a Processor instance (it expects comments as constructor arg)
+    this._processor = new Ruby2JS.Filter.Processor({});
+    this._processor.options = options;
     this._filter = filter;
-    this._options = options;
-    this._ast = null;
 
-    // Bind SEXP methods to the filter
+    // Copy filter's on_<type> methods onto the processor
+    for (const key of Object.keys(filter)) {
+      if (key.startsWith('on_') && typeof filter[key] === 'function') {
+        this._processor[key] = filter[key].bind(filter);
+      }
+    }
+
+    // Also check prototype for methods
+    const proto = Object.getPrototypeOf(filter);
+    if (proto) {
+      for (const key of Object.getOwnPropertyNames(proto)) {
+        if (key.startsWith('on_') && typeof filter[key] === 'function') {
+          this._processor[key] = filter[key].bind(filter);
+        }
+      }
+    }
+
+    // Bind SEXP methods to the filter for creating nodes
     filter.s = SEXP.s;
-    filter.S = SEXP.S.bind(this);
-    filter.ast_node = SEXP.ast_node;
+    filter.S = (type, ...children) => this._processor._ast?.updated(type, children);
+    filter.ast_node = Ruby2JS.ast_node;
     filter._options = options;
 
     // Bind process to filter for recursive calls
-    filter.process = this.process.bind(this);
+    filter.process = (node) => this._processor.process(node);
+    filter.process_children = (node) => this._processor.process_children(node);
 
     // Add excluded/included checkers
     const excludedFn = (method) => Ruby2JS.Filter._excluded.has(method);
@@ -133,95 +137,20 @@ class FilterProcessor {
       filter._setup({
         excluded: excludedFn,
         included: includedFn,
-        process: this.process.bind(this),
+        process: filter.process,
+        process_children: filter.process_children,
         s: SEXP.s,
-        S: SEXP.S.bind(this)
+        S: filter.S
       });
     }
   }
 
   process(node) {
-    if (!Ruby2JS.ast_node(node)) return node;
-
-    // Block-pass expansion: Convert send with block_pass to block node
-    // a.map(&:method) → block(send(a, :map), args(arg(:item)), return(attr(lvar(:item), :method)))
-    // Note: The inner attr/send node is processed recursively to convert methods like to_i → parseInt
-    if ((node.type === 'send' || node.type === 'csend') &&
-        node.children.length > 2 &&
-        Ruby2JS.ast_node(node.children[node.children.length - 1]) &&
-        node.children[node.children.length - 1].type === 'block_pass') {
-      const blockPass = node.children[node.children.length - 1];
-      if (Ruby2JS.ast_node(blockPass.children[0]) && blockPass.children[0].type === 'sym') {
-        const method = blockPass.children[0].children[0];
-        const callType = node.type === 'csend' ? 'csend' : 'send';
-        const callWithoutBlockPass = SEXP.s(callType, ...node.children.slice(0, -1));
-
-        // Binary operators like :< :> :+ etc
-        const BINARY_OPERATORS = ['+', '-', '*', '/', '%', '**', '&', '|', '^', '<<', '>>',
-                                  '==', '===', '!=', '<', '>', '<=', '>=', '<=>', '=~'];
-        if (BINARY_OPERATORS.includes(method)) {
-          // a.sort(&:<) → a.sort((a, b) => a < b)
-          // Process inner send to convert operators
-          const innerSend = this.process(SEXP.s('send', SEXP.s('lvar', 'a'), method, SEXP.s('lvar', 'b')));
-          node = SEXP.s('block', callWithoutBlockPass,
-            SEXP.s('args', SEXP.s('arg', 'a'), SEXP.s('arg', 'b')),
-            SEXP.s('return', innerSend));
-        } else {
-          // a.map(&:method) → a.map(item => item.method)
-          // Process inner send to convert methods like to_i → parseInt
-          // Use 'send' (not 'attr') so filter methods like to_i get converted
-          const innerSend = this.process(SEXP.s('send', SEXP.s('lvar', 'item'), method));
-          node = SEXP.s('block', callWithoutBlockPass,
-            SEXP.s('args', SEXP.s('arg', 'item')),
-            SEXP.s('return', innerSend));
-        }
-      }
-    }
-
-    const prevAst = this._ast;
-    this._ast = node;
-    this._filter._ast = node;
-
-    // Dispatch to handler method
-    const handler = `on_${node.type}`;
-    let replacement;
-
-    if (typeof this._filter[handler] === 'function') {
-      replacement = this._filter[handler](node);
-      // Ruby filter model:
-      // - If handler returns a NEW node (transformed), use it as-is (handler processed children it wanted)
-      // - If handler returns the SAME node (unchanged), process children (handler didn't handle this case)
-      if (replacement && replacement !== node) {
-        // Handler transformed the node - use as-is
-      } else {
-        // Handler returned same node or null - process children
-        replacement = this.processChildren(node);
-      }
-    } else {
-      // No handler: process children recursively
-      replacement = this.processChildren(node);
-    }
-
-    this._ast = prevAst;
-    this._filter._ast = prevAst;
-
-    return replacement ?? node;
+    return this._processor.process(node);
   }
 
   processChildren(node) {
-    if (!Ruby2JS.ast_node(node)) return node;
-
-    let changed = false;
-    const newChildren = node.children.map(child => {
-      if (Ruby2JS.ast_node(child)) {
-        const processed = this.process(child);
-        if (processed !== child) changed = true;
-        return processed;
-      }
-      return child;
-    });
-
-    return changed ? node.updated(null, newChildren) : node;
+    return this._processor.process_children(node);
   }
 }
 

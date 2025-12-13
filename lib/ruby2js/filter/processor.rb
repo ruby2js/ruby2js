@@ -175,7 +175,7 @@ module Ruby2JS
           replacement = process_children(node)
         end
 
-        replacement
+        return replacement
       ensure
         @ast = ast
       end
@@ -215,39 +215,39 @@ module Ruby2JS
       end
 
       # handle all of the 'invented/synthetic' ast types
-      def on_assign(node); process_children(node); end
-      def on_async(node); on_def(node); end
-      def on_asyncs(node); on_defs(node); end
-      def on_attr(node); on_send(node); end
-      def on_autoreturn(node); on_return(node); end
-      def on_await(node); on_send(node); end
-      def on_call(node); on_send(node); end
-      def on_class_extend(node); on_send(node); end
-      def on_class_hash(node); on_class(node); end
-      def on_class_module(node); on_send(node); end
-      def on_constructor(node); on_def(node); end
-      def on_deff(node); on_def(node); end
-      def on_defm(node); on_defs(node); end
-      def on_defp(node); on_defs(node); end
-      def on_for_of(node); on_for(node); end
-      def on_in?(node); on_send(node); end
-      def on_method(node); on_send(node); end
-      def on_module_hash(node); on_module(node); end
-      def on_nullish_or(node); on_or(node); end
-      def on_nullish_asgn(node); on_or_asgn(node); end
-      def on_logical_or(node); on_or(node); end
-      def on_logical_asgn(node); on_or_asgn(node); end
-      def on_prop(node); on_array(node); end
-      def on_prototype(node); on_begin(node); end
-      def on_send!(node); on_send(node); end
-      def on_sendw(node); on_send(node); end
-      def on_undefined?(node); on_defined?(node); end
-      def on_defineProps(node); process_children(node); end
-      def on_hide(node); on_begin(node); end
-      def on_xnode(node); process_children(node); end
-      def on_export(node); process_children(node); end
-      def on_import(node); process_children(node); end
-      def on_taglit(node); on_pair(node); end
+      def on_assign(node); self.process_children(node); end
+      def on_async(node); self.on_def(node); end
+      def on_asyncs(node); self.on_defs(node); end
+      def on_attr(node); self.on_send(node); end
+      def on_autoreturn(node); self.on_return(node); end
+      def on_await(node); self.on_send(node); end
+      def on_call(node); self.on_send(node); end
+      def on_class_extend(node); self.on_send(node); end
+      def on_class_hash(node); self.on_class(node); end
+      def on_class_module(node); self.on_send(node); end
+      def on_constructor(node); self.on_def(node); end
+      def on_deff(node); self.on_def(node); end
+      def on_defm(node); self.on_defs(node); end
+      def on_defp(node); self.on_defs(node); end
+      def on_for_of(node); self.on_for(node); end
+      def on_in?(node); self.on_send(node); end
+      def on_method(node); self.on_send(node); end
+      def on_module_hash(node); self.on_module(node); end
+      def on_nullish_or(node); self.on_or(node); end
+      def on_nullish_asgn(node); self.on_or_asgn(node); end
+      def on_logical_or(node); self.on_or(node); end
+      def on_logical_asgn(node); self.on_or_asgn(node); end
+      def on_prop(node); self.on_array(node); end
+      def on_prototype(node); self.on_begin(node); end
+      def on_send!(node); self.on_send(node); end
+      def on_sendw(node); self.on_send(node); end
+      def on_undefined?(node); self.on_defined?(node); end
+      def on_defineProps(node); self.process_children(node); end
+      def on_hide(node); self.on_begin(node); end
+      def on_xnode(node); self.process_children(node); end
+      def on_export(node); self.process_children(node); end
+      def on_import(node); self.process_children(node); end
+      def on_taglit(node); self.on_pair(node); end
 
       # Default handlers that process children
       def on_nil(node); node; end
