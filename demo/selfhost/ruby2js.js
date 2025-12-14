@@ -6767,10 +6767,10 @@ const Ruby2JS = (() => {
             cvars = new Set;
 
             walk = (ast) => {
-              if (ast.type === "ivar") ivars.push(ast.children.first);
-              if (ast.type === "ivasgn") ivars.push(ast.children.first);
-              if (ast.type === "cvar") cvars.push(ast.children.first);
-              if (ast.type === "cvasgn") cvars.push(ast.children.first);
+              if (ast.type === "ivar") ivars.add(ast.children.first);
+              if (ast.type === "ivasgn") ivars.add(ast.children.first);
+              if (ast.type === "cvar") cvars.add(ast.children.first);
+              if (ast.type === "cvasgn") cvars.add(ast.children.first);
 
               for (let child of ast.children) {
                 if (this.ast_node(child)) walk(child)
@@ -6779,15 +6779,15 @@ const Ruby2JS = (() => {
               if (ast.type === "send" && ast.children.first === null) {
                 if (ast.children[1] === "attr_accessor") {
                   return ast.children.slice(2).forEach((child_sym, index2) => (
-                    ivars << `@${child_sym.children.first ?? ""}`
+                    ivars.add(`@${child_sym.children.first ?? ""}`)
                   ))
                 } else if (ast.children[1] === "attr_reader") {
                   return ast.children.slice(2).forEach((child_sym, index2) => (
-                    ivars << `@${child_sym.children.first ?? ""}`
+                    ivars.add(`@${child_sym.children.first ?? ""}`)
                   ))
                 } else if (ast.children[1] === "attr_writer") {
                   return ast.children.slice(2).forEach((child_sym, index2) => (
-                    ivars << `@${child_sym.children.first ?? ""}`
+                    ivars.add(`@${child_sym.children.first ?? ""}`)
                   ))
                 }
               }
@@ -6805,7 +6805,7 @@ const Ruby2JS = (() => {
               }
             };
 
-            for (let cvar of cvars.to_a.sort()) {
+            for (let cvar of [...cvars].sort()) {
               this.put(index === 0 ? this._nl : this._sep);
               index++;
               this.put("static \#$" + (cvar ?? "").toString().slice(2))
@@ -6833,7 +6833,7 @@ const Ruby2JS = (() => {
               delete ivars[statement.children.first]
             };
 
-            for (let ivar of ivars.to_a.sort()) {
+            for (let ivar of [...ivars].sort()) {
               this.put(index === 0 ? this._nl : this._sep);
               index++;
               this.put("#" + (ivar ?? "").toString().slice(1))

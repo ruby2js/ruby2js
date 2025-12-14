@@ -20,6 +20,13 @@ const SEXP = Ruby2JS.Filter.SEXP;
 const s = SEXP.s.bind(SEXP);
 const S = s;
 
+// AST node type checker (Ruby's ast_node? method)
+// Checks if an object is an AST node (has type and children properties)
+const ast_node = (node) => {
+  if (!node || typeof node !== 'object') return false;
+  return 'type' in node && 'children' in node;
+};
+
 // Setup: make include() a no-op (Ruby's include SEXP doesn't apply in JS)
 const include = () => {};
 

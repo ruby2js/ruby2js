@@ -6,7 +6,7 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const cli = join(__dirname, 'ruby2js.mjs');
+const cli = join(__dirname, 'ruby2js-cli.js');
 
 // Simple test framework
 let passed = 0;
@@ -123,6 +123,96 @@ test('WASI warning is suppressed', () => {
     throw new Error(`WASI warning should be suppressed, got stderr: '${stderr}'`);
   }
 });
+
+console.log('\nFilters (CLI):');
+
+test('--filter functions converts puts', () => {
+  const output = execSync(`node ${cli} --filter functions -e 'puts "hello"'`, { encoding: 'utf-8' }).trim();
+  if (output !== 'console.log("hello")') {
+    throw new Error(`Expected 'console.log("hello")', got '${output}'`);
+  }
+});
+
+test('--filter functions converts class with puts', () => {
+  const output = execSync(`node ${cli} --filter functions -e 'class Foo; def bar; puts "hi"; end; end'`, { encoding: 'utf-8' }).trim();
+  if (!output.includes('console.log')) {
+    throw new Error(`Expected console.log in class, got '${output}'`);
+  }
+});
+
+console.log('\nFilters (API - browser-like):');
+
+// This test mimics what the browser demo does
+await (async () => {
+  try {
+    const { convert, Ruby2JS, initPrism, PrismComment, associateComments } = await import('./ruby2js.js');
+    const filterModule = await import('./filters/functions.js');
+    const functionsFilter = filterModule.default;
+
+    const source = 'class Foo; def bar; puts "hello"; end; end';
+    const options = { eslevel: 2022 };
+
+    // Apply filter manually (like browser demo)
+    const prismParse = await initPrism();
+    const parseResult = prismParse(source);
+
+    const walker = new Ruby2JS.PrismWalker(source, null);
+    let ast = walker.visit(parseResult.value);
+
+    // Set up filter infrastructure
+    const processor = new Ruby2JS.Filter.Processor({});
+    processor.options = options;
+
+    for (const key of Object.keys(functionsFilter)) {
+      if (key.startsWith('on_') && typeof functionsFilter[key] === 'function') {
+        processor[key] = functionsFilter[key].bind(functionsFilter);
+      }
+    }
+
+    functionsFilter.process = (node) => processor.process(node);
+    functionsFilter.process_children = (node) => processor.process_children(node);
+    functionsFilter.s = Ruby2JS.Filter.SEXP.s.bind(Ruby2JS.Filter.SEXP);
+    functionsFilter._options = options;
+
+    if (typeof functionsFilter._setup === 'function') {
+      functionsFilter._setup({
+        process: functionsFilter.process,
+        process_children: functionsFilter.process_children,
+        excluded: () => false,
+        included: () => false,
+        _options: options
+      });
+    }
+
+    ast = processor.process(ast);
+
+    // Run through pipeline
+    const sourceBuffer = walker.source_buffer;
+    const wrappedComments = (parseResult.comments || []).map(c =>
+      new PrismComment(c, source, sourceBuffer)
+    );
+    const comments = associateComments(ast, wrappedComments);
+
+    const pipeline = new Ruby2JS.Pipeline(ast, comments, {
+      filters: [],
+      options: { ...options, source }
+    });
+
+    const output = pipeline.run.to_s;
+
+    if (!output.includes('console.log')) {
+      throw new Error(`Expected console.log, got '${output}'`);
+    }
+
+    passed++;
+    console.log('  \u2713 programmatic filter API works');
+  } catch (e) {
+    failed++;
+    console.log('  \u2717 programmatic filter API works');
+    console.log(`    ${e.message}`);
+    if (process.env.DEBUG) console.log(e.stack);
+  }
+})();
 
 // Summary
 console.log('\n' + '-'.repeat(40));

@@ -41,14 +41,14 @@ prism_browser_deps = FileList["#{ROOT}/lib/ruby2js/selfhost/prism_browser.rb"]
 # Bundle dependencies (includes CLI)
 bundle_deps = FileList["#{ROOT}/lib/ruby2js/selfhost/bundle.rb", "#{ROOT}/lib/ruby2js/selfhost/cli.rb"]
 
-desc "Build prism_browser.mjs (in selfhost root for correct node_modules paths)"
-file "#{SELFHOST}/prism_browser.mjs" => [*prism_browser_deps, *selfhost_deps] do
-  sh bundle_exec("ruby #{SELFHOST}/scripts/transpile_prism_browser.rb > #{SELFHOST}/prism_browser.mjs")
+desc "Build prism_browser.js (in selfhost root for correct node_modules paths)"
+file "#{SELFHOST}/prism_browser.js" => [*prism_browser_deps, *selfhost_deps] do
+  sh bundle_exec("ruby #{SELFHOST}/scripts/transpile_prism_browser.rb > #{SELFHOST}/prism_browser.js")
 end
 
-desc "Build ruby2js.mjs (unified bundle for CLI, browser, and tests)"
-file "#{SELFHOST}/ruby2js.mjs" => [*bundle_deps, *runtime_deps, *namespace_deps, *walker_deps, *converter_deps, *selfhost_deps] do
-  sh bundle_exec("ruby #{SELFHOST}/scripts/transpile_bundle.rb > #{SELFHOST}/ruby2js.mjs")
+desc "Build ruby2js.js (library for CLI, browser, and tests)"
+file "#{SELFHOST}/ruby2js.js" => [*bundle_deps, *runtime_deps, *namespace_deps, *walker_deps, *converter_deps, *selfhost_deps] do
+  sh bundle_exec("ruby #{SELFHOST}/scripts/transpile_bundle.rb > #{SELFHOST}/ruby2js.js")
 end
 
 # Dynamically create spec file tasks based on manifest
@@ -77,8 +77,8 @@ manifest['partial'].each do |entry|
   end
 end
 
-# Core build targets (unified bundle and prism_browser)
-CORE_TARGETS = ["#{SELFHOST}/ruby2js.mjs", "#{SELFHOST}/prism_browser.mjs"]
+# Core build targets (library and prism_browser)
+CORE_TARGETS = ["#{SELFHOST}/ruby2js.js", "#{SELFHOST}/prism_browser.js"]
 
 desc "Build all transpiled files (bundle, prism_browser, specs)"
 task :build => CORE_TARGETS do
@@ -117,7 +117,7 @@ task :npm_install do
 end
 
 desc "Run walker unit tests"
-task :test_walker => [:npm_install, "#{SELFHOST}/ruby2js.mjs"] do
+task :test_walker => [:npm_install, "#{SELFHOST}/ruby2js.js"] do
   Dir.chdir(SELFHOST) do
     sh "node test_walker.mjs"
   end
@@ -154,8 +154,8 @@ task :ci => [:build_ready, :build_partial, :test_walker, :test_ready, :test_part
 desc "Clean dist directory and generated files"
 task :clean do
   rm_rf DIST
-  rm_f "#{SELFHOST}/ruby2js.mjs"
-  rm_f "#{SELFHOST}/prism_browser.mjs"
+  rm_f "#{SELFHOST}/ruby2js.js"
+  rm_f "#{SELFHOST}/prism_browser.js"
 end
 
 task :default => :test

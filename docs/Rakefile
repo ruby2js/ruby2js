@@ -183,7 +183,7 @@ directory selfhost_dir => dest
 # This ensures dependency tracking is in one place
 task :selfhost_build do
   Dir.chdir(selfhost_source) do
-    sh "bundle exec rake -f Rakefile #{selfhost_source}/ruby2js.mjs #{selfhost_source}/prism_browser.mjs"
+    sh "bundle exec rake -f Rakefile #{selfhost_source}/ruby2js.js #{selfhost_source}/prism_browser.js"
   end
 end
 
@@ -207,12 +207,19 @@ end
 
 # Copy browser-compatible Prism loader
 task :selfhost_copy_prism_browser => [selfhost_dir, :selfhost_build] do
-  cp "#{selfhost_source}/prism_browser.mjs", "#{selfhost_dir}/prism_browser.mjs"
+  cp "#{selfhost_source}/prism_browser.js", "#{selfhost_dir}/prism_browser.js"
 end
 
-# Copy the unified bundle
+# Copy the library bundle
 task :selfhost_copy_bundle => [selfhost_dir, :selfhost_build] do
-  cp "#{selfhost_source}/ruby2js.mjs", "#{selfhost_dir}/ruby2js.mjs"
+  cp "#{selfhost_source}/ruby2js.js", "#{selfhost_dir}/ruby2js.js"
+end
+
+# Copy filters directory
+task :selfhost_copy_filters => [selfhost_dir, :selfhost_build] do
+  filters_dir = "#{selfhost_dir}/filters"
+  mkdir_p filters_dir unless File.exist?(filters_dir)
+  cp "#{selfhost_source}/filters/functions.js", "#{filters_dir}/functions.js"
 end
 
 # Note: index.html is checked into docs/src/demo/selfhost/ directly
@@ -220,10 +227,10 @@ end
 task :selfhost => [
   :selfhost_copy_prism_browser,
   :selfhost_copy_bundle,
+  :selfhost_copy_filters,
   :selfhost_copy_prism
 ] do
   # Ensure all files are world-readable (needed for nginx in Docker)
-  FileUtils.chmod_R(0644, Dir.glob("#{selfhost_dir}/**/*.mjs"))
   FileUtils.chmod_R(0644, Dir.glob("#{selfhost_dir}/**/*.js"))
   FileUtils.chmod_R(0644, Dir.glob("#{selfhost_dir}/**/*.wasm"))
 end

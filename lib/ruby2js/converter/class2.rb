@@ -163,10 +163,10 @@ module Ruby2JS
 
           # find ivars and cvars
           walk = proc do |ast|
-            ivars << ast.children.first if ast.type === :ivar
-            ivars << ast.children.first if ast.type === :ivasgn
-            cvars << ast.children.first if ast.type === :cvar
-            cvars << ast.children.first if ast.type === :cvasgn
+            ivars << ast.children.first if ast.type === :ivar # Pragma: set
+            ivars << ast.children.first if ast.type === :ivasgn # Pragma: set
+            cvars << ast.children.first if ast.type === :cvar # Pragma: set
+            cvars << ast.children.first if ast.type === :cvasgn # Pragma: set
 
             ast.children.each do |child|
               walk.call(child) if ast_node?(child)
@@ -175,15 +175,15 @@ module Ruby2JS
             if ast.type == :send and ast.children.first == nil
               if ast.children[1] == :attr_accessor
                 ast.children[2..-1].each_with_index do |child_sym, index2|
-                  ivars << :"@#{child_sym.children.first}"
+                  ivars << :"@#{child_sym.children.first}" # Pragma: set
                 end
               elsif ast.children[1] == :attr_reader
                 ast.children[2..-1].each_with_index do |child_sym, index2|
-                  ivars << :"@#{child_sym.children.first}"
+                  ivars << :"@#{child_sym.children.first}" # Pragma: set
                 end
               elsif ast.children[1] == :attr_writer
                 ast.children[2..-1].each_with_index do |child_sym, index2|
-                  ivars << :"@#{child_sym.children.first}"
+                  ivars << :"@#{child_sym.children.first}" # Pragma: set
                 end
               end
             end
@@ -201,7 +201,7 @@ module Ruby2JS
               cvars.delete m.children.first if m.type == :cvasgn
             end
           end
-          cvars.to_a.sort.each do |cvar|
+          [*cvars].sort.each do |cvar|
             put(index == 0 ? @nl : @sep)
             index += 1
             put 'static #$' + cvar.to_s[2..-1]
@@ -230,7 +230,7 @@ module Ruby2JS
           end
 
           # emit additional instance declarations
-          ivars.to_a.sort.each do |ivar|
+          [*ivars].sort.each do |ivar|
             put(index == 0 ? @nl : @sep)
             index += 1
             put '#' + ivar.to_s[1..-1]
