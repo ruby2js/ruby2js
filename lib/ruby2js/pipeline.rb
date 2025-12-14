@@ -103,7 +103,9 @@ module Ruby2JS
       return unless @filter_instance
       return if @filter_instance.prepend_list.empty?
 
-      prepend = @filter_instance.prepend_list.sort_by { |node| node.type == :import ? 0 : 1 }
+      # Deduplicate imports (same node object added multiple times, e.g., from require filter)
+      prepend = @filter_instance.prepend_list.uniq
+      prepend = prepend.sort_by { |node| node.type == :import ? 0 : 1 }
 
       if @filter_instance.disable_autoimports
         prepend = prepend.reject { |node| node.type == :import }

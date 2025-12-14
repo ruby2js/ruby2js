@@ -228,6 +228,9 @@ task :selfhost => [
   FileUtils.chmod_R(0644, Dir.glob("#{selfhost_dir}/**/*.wasm"))
 end
 
+desc "Build livedemo.js (for CI smoke test)"
+task :livedemo => "#{dest}/livedemo.js"
+
 task :default => [
   "#{dest}/index.erb",
   "#{dest}/editor.js",
