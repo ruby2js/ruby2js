@@ -65,8 +65,8 @@ module Ruby2JS
 
         when :array_compact
           # Object.defineProperty(Array.prototype, 'compact', {get() {...}, configurable: true})
-          # Loops backwards removing null/undefined, returns this
-          # Using while loop: let i = this.length - 1; while (i >= 0) { ...; i-- }
+          # Mutating version for compact! - loops backwards removing null/undefined, returns this
+          # Note: When functions filter is active, compact → filter() (non-mutating) is used instead
           define_property_getter(:Array, :compact,
             s(:begin,
               s(:lvasgn, :i, s(:send, s(:attr, s(:self), :length), :-, s(:int, 1))),

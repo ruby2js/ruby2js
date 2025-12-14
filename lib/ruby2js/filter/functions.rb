@@ -166,6 +166,7 @@ module Ruby2JS
           S(:call, process(target), nil, *process_all(args))
 
         elsif method == :keys and args.length == 0 and parens_or_included?(node, method)
+          # hash.keys → Object.keys(hash)
           process S(:send, s(:const, nil, :Object), :keys, target)
 
         # define_method(name, block_var) inside a method body
@@ -1460,6 +1461,11 @@ module Ruby2JS
           # Requires explicit receiver (receiver is added by on_class for calls without one)
           process node.updated(:send, [s(:attr, call.children[0], :prototype), :[]=,
             call.children[2], s(:deff, nil, *node.children[1..-1])])
+
+        elsif method == :each_with_index and call.children.length == 2
+          # array.each_with_index { |item, i| ... } => array.forEach((item, i) => ...)
+          call = call.updated(nil, [call.children.first, :forEach])
+          node.updated(nil, [process(call), *node.children[1..-1].map { |c| process(c) }])
 
         else
           super

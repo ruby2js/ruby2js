@@ -16,7 +16,7 @@ module Ruby2JS
         end
 
       end
-      
+
       put name
     end
   end

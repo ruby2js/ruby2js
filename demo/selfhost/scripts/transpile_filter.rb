@@ -25,7 +25,7 @@ js = Ruby2JS.convert(source,
   comparison: :identity,
   underscored_private: true,
   nullish_to_s: true,
-  include: [:call],
+  include: [:call, :keys],
   file: filter_file,
   filters: [
     Ruby2JS::Filter::Pragma,
@@ -151,15 +151,18 @@ js = js.gsub(/this\._options/, '_options')
 js = js.gsub(/(\w+) === (s\([^)]+\))/, 'nodesEqual(\1, \2)')
 
 # Fix the compact polyfill to use non-mutating filter (needed for frozen arrays from PrismWalker)
+# The polyfill provides a mutating version for compact!, but selfhost needs non-mutating
 js = js.gsub(
   /Object\.defineProperty\(Array\.prototype, "compact", \{\n  get\(\) \{\n    let i = this\.length - 1;\n\n    while \(i >= 0\) \{\n      if \(this\[i\] === null \|\| this\[i\] === undefined\) this\.splice\(i, 1\);\n      i--\n    \};\n\n    return this\n  \},\n\n  configurable: true\n\}\);/,
   'Object.defineProperty(Array.prototype, "compact", { get() { return this.filter(x => x !== null && x !== undefined); }, configurable: true });'
 )
 
-# Fix Hash.keys pattern: VAR_TO_ASSIGN.keys.includes() -> Object.keys(VAR_TO_ASSIGN).includes()
-js = js.gsub(/(\w+)\.keys\.includes\(/, 'Object.keys(\1).includes(')
+# NOTE: Hash.keys is now handled via include: [:keys] option
 
 # Fix Ruby Regexp class usage to JavaScript RegExp
+# Note: This gsub is needed because Regexp → RegExp conversion in the main
+# converter is ES-level dependent (only for ES2025+), but for selfhost we
+# always want RegExp since we're running in modern JavaScript.
 js = js.gsub(/\bRegexp\./, 'RegExp.')
 
 # Fix Ruby Object constant becoming JS Object constructor
@@ -170,15 +173,7 @@ js = js.gsub(/s\("const", null, Object\)/, 's("const", null, "Object")')
 # Pattern: ...before.children.last) or ...arg.children.last) where the node is a regopt
 js = js.gsub(/\.\.\.(before|arg)\.children\.last\)/, '...(\1.children.last.children || []))')
 
-# Add each_with_index handling in on_block (it's only in on_send, but blocks need it too)
-# Insert before the final "return node" in on_block
-js = js.gsub(
-  /(\} else \{\n        return node\n      \}\n    \};\n\n    \/\/ compact with a block)/,
-  '} else if (method === "each_with_index") {' + "\n" +
-  '        call = call.updated(null, [call.children.first, "forEach"]);' + "\n" +
-  '        return node.updated(null, [process(call), ...node.children.slice(1)])' + "\n" +
-  '      \\1'
-)
+# NOTE: each_with_index block handling is now in functions filter
 
 # The filter is now exposed as Functions variable (it's defined inside)
 
