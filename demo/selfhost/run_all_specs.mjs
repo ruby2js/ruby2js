@@ -39,7 +39,7 @@ let functionsFilterLoaded = false;
 async function loadFunctionsFilter() {
   if (functionsFilterLoaded) return;
   try {
-    const filterModule = await import('./dist/functions_filter.mjs');
+    const filterModule = await import('./filters/functions.js');
     // Register the filter in Ruby2JS.Filter namespace
     globalThis.Ruby2JS.Filter = globalThis.Ruby2JS.Filter || {};
     globalThis.Ruby2JS.Filter.Functions = filterModule.default;
