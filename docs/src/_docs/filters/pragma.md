@@ -1,5 +1,5 @@
 ---
-order: 19
+order: 25
 title: Pragma
 top_section: Filters
 category: pragma

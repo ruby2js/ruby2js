@@ -1,5 +1,5 @@
 ---
-order: 17
+order: 23
 title: Phlex
 top_section: Filters
 category: phlex

@@ -1,5 +1,5 @@
 ---
-order: 25
+order: 29
 title: Stimulus
 top_section: Filters
 category: stimulus

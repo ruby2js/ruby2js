@@ -1,5 +1,5 @@
 ---
-order: 17
+order: 19
 title: JSX
 top_section: Filters
 category: jsx

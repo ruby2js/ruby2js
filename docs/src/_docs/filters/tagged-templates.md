@@ -1,5 +1,5 @@
 ---
-order: 26
+order: 30
 title: Tagged Templates
 top_section: Filters
 category: tagged-templates
