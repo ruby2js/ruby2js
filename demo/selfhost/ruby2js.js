@@ -48,14 +48,7 @@ Object.defineProperty(
 
 Object.defineProperty(Array.prototype, "compact", {
   get() {
-    let i = this.length - 1;
-
-    while (i >= 0) {
-      if (this[i] === null || this[i] === undefined) this.splice(i, 1);
-      i--
-    };
-
-    return this
+    return this.filter(x => x !== null && x !== undefined)
   },
 
   configurable: true
@@ -3630,7 +3623,12 @@ const Ruby2JS = (() => {
 
       if (props) {
         if (props) this.combine_properties(statements);
-        statements.compact
+
+        statements.splice(
+          0,
+          statements.length,
+          ...statements.filter(x => x !== null)
+        )
       };
 
       statements = statements.filter(s => (
@@ -3950,13 +3948,13 @@ const Ruby2JS = (() => {
         return
       };
 
-      body.compact;
+      body.splice(0, body.length, ...body.filter(x => x !== null));
 
       if (body.length === 1 && body.first.type === "begin") {
         body = body.first.children.slice()
       };
 
-      body.compact;
+      body.splice(0, body.length, ...body.filter(x => x !== null));
       let visible = this._namespace.getOwnProps();
 
       body.splice(...[0, body.length].concat(body.map((m) => {
@@ -4206,7 +4204,7 @@ const Ruby2JS = (() => {
           )
         )
       } else {
-        body.compact;
+        body.splice(0, body.length, ...body.filter(x => x !== null));
         let methods = 0;
         let start = 0;
 
@@ -4395,13 +4393,13 @@ const Ruby2JS = (() => {
         return
       };
 
-      body.compact;
+      body.splice(0, body.length, ...body.filter(x => x !== null));
 
       if (body.length === 1 && body.first.type === "begin") {
         body = body.first.children.slice()
       };
 
-      body.compact;
+      body.splice(0, body.length, ...body.filter(x => x !== null));
       let visible = this._namespace.getOwnProps();
 
       body.splice(...[0, body.length].concat(body.map((m) => {
@@ -4651,7 +4649,7 @@ const Ruby2JS = (() => {
           )
         )
       } else {
-        body.compact;
+        body.splice(0, body.length, ...body.filter(x => x !== null));
         let methods = 0;
         let start = 0;
 
@@ -4840,13 +4838,13 @@ const Ruby2JS = (() => {
         return
       };
 
-      body.compact;
+      body.splice(0, body.length, ...body.filter(x => x !== null));
 
       if (body.length === 1 && body.first.type === "begin") {
         body = body.first.children.slice()
       };
 
-      body.compact;
+      body.splice(0, body.length, ...body.filter(x => x !== null));
       let visible = this._namespace.getOwnProps();
 
       body.splice(...[0, body.length].concat(body.map((m) => {
@@ -5096,7 +5094,7 @@ const Ruby2JS = (() => {
           )
         )
       } else {
-        body.compact;
+        body.splice(0, body.length, ...body.filter(x => x !== null));
         let methods = 0;
         let start = 0;
 
@@ -5285,13 +5283,13 @@ const Ruby2JS = (() => {
         return
       };
 
-      body.compact;
+      body.splice(0, body.length, ...body.filter(x => x !== null));
 
       if (body.length === 1 && body.first.type === "begin") {
         body = body.first.children.slice()
       };
 
-      body.compact;
+      body.splice(0, body.length, ...body.filter(x => x !== null));
       let visible = this._namespace.getOwnProps();
 
       body.splice(...[0, body.length].concat(body.map((m) => {
@@ -5541,7 +5539,7 @@ const Ruby2JS = (() => {
           )
         )
       } else {
-        body.compact;
+        body.splice(0, body.length, ...body.filter(x => x !== null));
         let methods = 0;
         let start = 0;
 
@@ -5921,7 +5919,7 @@ const Ruby2JS = (() => {
     };
 
     on_class2(name, inheritance, ...body) {
-      body.compact;
+      body.splice(0, body.length, ...body.filter(x => x !== null));
 
       while (body.length === 1 && body.first.type === "begin") {
         body = body.first.children
@@ -6553,7 +6551,7 @@ const Ruby2JS = (() => {
         }
       };
 
-      return this.put(name)
+      return name === "Regexp" && receiver === null ? this.put("RegExp") : this.put(name)
     };
 
     on_cvar($var) {

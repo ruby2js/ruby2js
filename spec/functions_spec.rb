@@ -325,6 +325,10 @@ describe Ruby2JS::Filter::Functions do
       to_js( 'a.compact' ).must_equal 'a.filter(x => x != null)'
     end
 
+    it "should handle compact! on arrays (mutating)" do
+      to_js( 'a.compact!' ).must_equal 'a.splice(0, a.length, ...a.filter(x => x != null))'
+    end
+
     it "should not convert compact with block to filter" do
       # compact with a block is NOT the array compact method
       # e.g., serializer.compact { } should remain as compact, not become filter

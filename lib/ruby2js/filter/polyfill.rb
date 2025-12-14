@@ -66,7 +66,7 @@ module Ruby2JS
         when :array_compact
           # Object.defineProperty(Array.prototype, 'compact', {get() {...}, configurable: true})
           # Non-mutating: returns new array without null/undefined (matches Ruby's compact)
-          # For compact! (mutating), use splice-based approach separately
+          # For compact! (mutating), the Functions filter converts it to splice-based code
           define_property_getter(:Array, :compact,
             s(:return,
               s(:send, s(:self), :filter,

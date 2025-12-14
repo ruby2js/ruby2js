@@ -24,6 +24,7 @@ If you set the `eslevel` option to `2021` or newer, the Functions filter enables
 * `.chr` {{ caret }} `fromCharCode`
 * `.clear` {{ caret }} `.length = 0`
 * `.compact` {{ caret }} `.filter(x => x != null)`
+* `.compact!` {{ caret }} `.splice(0, a.length, ...a.filter(x => x != null))` (mutating)
 * `debugger` {{ caret }} `debugger` (JS debugger statement)
 * `.define_method` {{ caret }} `klass.prototype.meth = function ...`
 * `.delete` {{ caret }} `delete target[arg]`

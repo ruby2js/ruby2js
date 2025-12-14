@@ -858,10 +858,20 @@ module Ruby2JS
 
         elsif method==:compact and args.length == 0
           # array.compact -> array.filter(x => x != null)
-          # This removes nil/null values from the array
+          # This removes nil/null values from the array (non-mutating)
           process s(:send, target, :filter,
             s(:block, s(:send, nil, :proc), s(:args, s(:arg, :x)),
               s(:send, s(:lvar, :x), :'!=', s(:nil))))
+
+        elsif method==:compact! and args.length == 0
+          # array.compact! -> array.splice(0, array.length, ...array.filter(x => x != null))
+          # This mutates the array in place, removing nil/null values
+          process s(:send, target, :splice,
+            s(:int, 0),
+            s(:attr, target, :length),
+            s(:splat, s(:send, target, :filter,
+              s(:block, s(:send, nil, :proc), s(:args, s(:arg, :x)),
+                s(:send, s(:lvar, :x), :'!=', s(:nil))))))
 
         elsif method==:to_h and args.length==0
           process node.updated(nil, [s(:const, nil, :Object), :fromEntries,

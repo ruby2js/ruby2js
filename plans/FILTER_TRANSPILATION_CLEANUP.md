@@ -119,6 +119,12 @@ Object.defineProperty(Array.prototype, "compact", {
 
 **Rationale**: Ruby's `compact` returns a new array; `compact!` mutates. The polyfill should match Ruby semantics.
 
+**Additional fix (2024-12-14)**: Added `compact!` handling to Functions filter. When Ruby code uses `compact!`, it now transpiles to:
+```javascript
+array.splice(0, array.length, ...array.filter(x => x != null))
+```
+This mutates the array in place, matching Ruby's `compact!` semantics.
+
 #### 1.3 Handle `super` in Filter Methods
 
 **Location**: `lib/ruby2js/filter/selfhost/converter.rb` or new filter
