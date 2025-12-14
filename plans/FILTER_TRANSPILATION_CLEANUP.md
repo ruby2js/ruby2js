@@ -273,10 +273,10 @@ No gsubs. No preamble. No postamble.
 
 ## Implementation Order
 
-### Immediate (Low Risk, High Value)
+### Immediate (Low Risk, High Value) ✅ COMPLETE
 
-1. **Fix polyfill `compact`** - Simple change, correct semantics
-2. **Fix `Regexp` → `RegExp`** - Simple change, always correct
+1. ✅ **Fix polyfill `compact`** - Changed to non-mutating `filter()` approach
+2. ✅ **Fix `Regexp` → `RegExp`** - Now always converts in const.rb
 
 ### Short Term (Selfhost Infrastructure)
 
@@ -305,22 +305,21 @@ Verify 183+ functions filter tests still pass.
 
 ## Success Criteria
 
-### Phase 1: Syntactically Valid JavaScript
+### Phase 1: Syntactically Valid JavaScript ✅ COMPLETE
 
-All filters and their specs must transpile to syntactically valid JavaScript (parseable by Node.js).
+All 27 filters transpile to syntactically valid JavaScript (verified 2024-12-14):
 
-**Filters to transpile** (29 total):
 ```
-action_cable.rb      active_functions.rb  active_support.rb
-alpine.rb            camelCase.rb         cjs.rb
-combiner.rb          erb.rb               esm.rb
-functions.rb         haml.rb              jest.rb
-jsx.rb               lit-element.rb       lit.rb
-node.rb              nokogiri.rb          phlex.rb
-polyfill.rb          pragma.rb            processor.rb
-react.rb             require.rb           return.rb
-securerandom.rb      stimulus.rb          tagged_templates.rb
-turbo.rb
+✓ action_cable    ✓ active_functions  ✓ active_support
+✓ alpine          ✓ camelCase         ✓ cjs
+✓ combiner        ✓ erb               ✓ esm
+✓ functions       ✓ haml              ✓ jest
+✓ jsx             ✓ lit-element       ✓ lit
+✓ node            ✓ nokogiri          ✓ phlex
+✓ polyfill        ✓ pragma            ⊘ processor (base class, skipped)
+✓ react           ✓ require           ✓ return
+✓ securerandom    ⊘ selfhost (loader, skipped)
+✓ stimulus        ✓ tagged_templates  ✓ turbo
 ```
 
 **Specs to transpile** (corresponding `spec/*_spec.rb` files).

@@ -7,10 +7,6 @@ describe "ES2025 support" do
     _(Ruby2JS.convert(string, eslevel: 2025, filters: [Ruby2JS::Filter::Functions]).to_s)
   end
 
-  def to_js_2024(string)
-    _(Ruby2JS.convert(string, eslevel: 2024, filters: [Ruby2JS::Filter::Functions]).to_s)
-  end
-
   describe :eslevel do
     it "should report es2025" do
       Ruby2JS.convert('', eslevel: 2025).eslevel.must_equal 2025
@@ -24,10 +20,6 @@ describe "ES2025 support" do
 
     it "should handle string literals" do
       to_js('Regexp.escape("hello.world")').must_equal 'RegExp.escape("hello.world")'
-    end
-
-    it "should not convert Regexp.escape without ES2025" do
-      to_js_2024('Regexp.escape(str)').must_equal 'Regexp.escape(str)'
     end
   end
 end

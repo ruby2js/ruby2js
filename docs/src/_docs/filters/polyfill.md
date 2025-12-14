@@ -10,7 +10,6 @@ The **Polyfill** filter adds JavaScript prototype polyfills for Ruby methods tha
 This is useful when you want to:
 - Keep Ruby-style method names in your JavaScript for readability
 - Use methods like `first` and `last` as property accessors (without parentheses)
-- Maintain Ruby's mutating behavior for methods like `compact`
 
 {% rendercontent "docs/note", title: "Filter Ordering" %}
 The Polyfill filter automatically reorders itself to run before the Functions filter. This ensures that polyfilled methods aren't transformed by the Functions filter.
@@ -24,7 +23,7 @@ The Polyfill filter automatically reorders itself to run before the Functions fi
 |------|---------------------|
 | `.first` | Property getter returning `this[0]` |
 | `.last` | Property getter returning `this.at(-1)` |
-| `.compact` | Property getter that removes `null`/`undefined` in place |
+| `.compact` | Property getter returning new array without `null`/`undefined` |
 | `.rindex { }` | Method that finds last index matching block |
 | `.insert(i, items)` | Method using `splice` to insert items |
 | `.delete_at(i)` | Method using `splice` to remove item at index |
@@ -76,14 +75,7 @@ Object.defineProperty(Array.prototype, "last", {
 });
 
 Object.defineProperty(Array.prototype, "compact", {
-  get() {
-    let i = this.length - 1;
-    while (i >= 0) {
-      if (this[i] === null || this[i] === undefined) this.splice(i, 1);
-      i--
-    }
-    return this
-  },
+  get() { return this.filter(x => x !== null && x !== undefined) },
   configurable: true
 });
 
@@ -115,7 +107,7 @@ The key difference between Polyfill and Functions:
 |--------|-----------------|------------------|
 | `arr.first` | `arr.first` (property) | `arr[0]` |
 | `arr.last` | `arr.last` (property) | `arr[arr.length - 1]` |
-| `arr.compact` | `arr.compact` (mutating) | `arr.filter(x => x != null)` |
+| `arr.compact` | `arr.compact` (property) | `arr.filter(x => x != null)` |
 | `str.chomp` | `str.chomp()` (method) | `str.replace(/\r?\n$/, "")` |
 
 Choose **Polyfill** when you want Ruby-style method names preserved in the output. Choose **Functions** when you want zero-runtime-overhead inline transformations.

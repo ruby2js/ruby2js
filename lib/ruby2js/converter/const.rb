@@ -17,7 +17,12 @@ module Ruby2JS
 
       end
 
-      put name
+      # Ruby's Regexp is JavaScript's RegExp
+      if name == :Regexp && receiver.nil?
+        put :RegExp
+      else
+        put name
+      end
     end
   end
 end

@@ -85,7 +85,7 @@ str.gsub(/a/, 'b')  # => str.replace(/a/g, 'b')
 ```ruby
 # With polyfill filter:
 arr.first        # => arr.first (property, via Object.defineProperty)
-arr.compact      # => arr.compact (mutating, like Ruby)
+arr.compact      # => arr.compact (property, returns new array)
 ```
 
 **Pragmas** give line-level control for edge cases:

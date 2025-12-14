@@ -65,25 +65,20 @@ module Ruby2JS
 
         when :array_compact
           # Object.defineProperty(Array.prototype, 'compact', {get() {...}, configurable: true})
-          # Mutating version for compact! - loops backwards removing null/undefined, returns this
-          # Note: When functions filter is active, compact → filter() (non-mutating) is used instead
+          # Non-mutating: returns new array without null/undefined (matches Ruby's compact)
+          # For compact! (mutating), use splice-based approach separately
           define_property_getter(:Array, :compact,
-            s(:begin,
-              s(:lvasgn, :i, s(:send, s(:attr, s(:self), :length), :-, s(:int, 1))),
-              s(:while, s(:send, s(:lvar, :i), :>=, s(:int, 0)),
-                s(:begin,
-                  s(:if,
-                    s(:or,
-                      s(:send, s(:send, s(:self), :[], s(:lvar, :i)), :===, s(:nil)),
-                      s(:send, s(:send, s(:self), :[], s(:lvar, :i)), :===, s(:lvar, :undefined))
-                    ),
-                    s(:send, s(:self), :splice, s(:lvar, :i), s(:int, 1)),
-                    nil
-                  ),
-                  s(:op_asgn, s(:lvasgn, :i), :-, s(:int, 1))
+            s(:return,
+              s(:send, s(:self), :filter,
+                s(:block,
+                  s(:send, nil, :lambda),
+                  s(:args, s(:arg, :x)),
+                  s(:and,
+                    s(:send, s(:lvar, :x), :"!==", s(:nil)),
+                    s(:send, s(:lvar, :x), :"!==", s(:lvar, :undefined))
+                  )
                 )
-              ),
-              s(:return, s(:self))
+              )
             )
           )
 
