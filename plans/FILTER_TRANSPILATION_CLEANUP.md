@@ -352,7 +352,52 @@ node --check filters/<name>.js
 | Category | Status | Tests |
 |----------|--------|-------|
 | Ready specs | ✅ 3/3 passing | 290 tests (transliteration, serializer, namespace) |
-| functions filter | 91% | 183/202 passing |
+| functions filter | 91% | 184/203 passing (19 failures) |
+
+#### Functions Filter Failure Analysis
+
+The 19 remaining failures fall into these categories:
+
+| Category | Count | Description |
+|----------|-------|-------------|
+| **Block-pass (`&:method`)** | 3 | Symbol-to-proc not expanded to arrow functions |
+| **Metaprogramming** | 5 | Missing class context (`prototype` vs `ClassName.prototype`) |
+| **Class.new object literal** | 4 | Anonymous class → object literal not implemented |
+| **Runtime errors** | 2 | Transpiled filter code crashes (matchAll, null type) |
+| **Safe navigation** | 1 | `?.empty?` → `?.length()` instead of `?.length == 0` |
+| **Loop/break** | 1 | `loop { break }` pattern not handled |
+| **Minor** | 2 | Extra `+0` in rand, test infrastructure issue |
+
+**Detailed failures:**
+
+1. **Block-pass / symbol-to-proc** (3 failures):
+   - `a.all?(&:ready)` → should be `a.every(item => item.ready)`
+   - `a.map(&:to_i)` → should be `a.map(item => parseInt(item))`
+   - `a.sort(&:<)` → should be `a.sort((a, b) => a < b)`
+
+   *Root cause*: Symbol-to-proc expansion not implemented in selfhost filter
+
+2. **Metaprogramming context** (5 failures):
+   - `method_defined?`, `alias_method`, `define_method` produce bare `prototype` instead of `ClassName.prototype`
+
+   *Root cause*: Class name context not tracked during filter processing
+
+3. **Class.new object literal** (4 failures):
+   - `Class.new { def foo; 1; end }.new` should become `{get foo() {return 1}}`
+
+   *Root cause*: Feature not implemented in selfhost filter
+
+4. **Runtime errors** (2 failures):
+   - Regular expression index assignment: `matchAll` undefined
+   - Exception constructor: null type error
+
+   *Root cause*: Transpiled filter code has bugs in edge cases
+
+5. **Other** (4 failures):
+   - Safe navigation with `empty?`: parentheses issue
+   - `rand(n)` produces extra `+ 0`
+   - `loop { break }` not recognized
+   - Test infrastructure: `DEFAULTS.includes` check
 
 **Blocked on filter loading**: Other filter specs (return, camelCase, esm, etc.) need their corresponding filters loaded by the test harness. Currently only the functions filter is loaded.
 
@@ -360,10 +405,10 @@ node --check filters/<name>.js
 
 | Filter | Syntax Valid | Tests Passing | Notes |
 |--------|--------------|---------------|-------|
-| functions | ✓ | 183/202 (91%) | Loaded and tested |
-| return | ✓ | 11/25* | *needs return filter loaded |
-| camelCase | ✓ | 1/19* | *needs camelCase filter loaded |
-| esm | ✓ | 1/40* | *needs esm filter loaded |
+| functions | ✓ | 184/203 (91%) | Loaded and tested |
+| return | ✓ | TBD | needs filter loaded |
+| camelCase | ✓ | TBD | needs filter loaded |
+| esm | ✓ | TBD | needs filter loaded |
 | ... | ✓ | TBD | Need filter loading infrastructure |
 
 ## Completion Criteria

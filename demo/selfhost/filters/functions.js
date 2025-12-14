@@ -89,7 +89,13 @@ Object.defineProperty(
   {get() {return this[0]}, configurable: true}
 );
 
-Object.defineProperty(Array.prototype, "compact", { get() { return this.filter(x => x !== null && x !== undefined); }, configurable: true });
+Object.defineProperty(Array.prototype, "compact", {
+  get() {
+    return this.filter(x => x !== null && x !== undefined)
+  },
+
+  configurable: true
+});
 
 Object.defineProperty(
   Array.prototype,
@@ -127,12 +133,12 @@ if (!RegExp.escape) {
     // Check if a REQUIRE_PARENS method should convert:
     // - Always convert if node.is_method? (has parentheses)
     // - Also convert if explicitly included via include: option
-    // Check if method was explicitly included via include: option
     function parens_or_included(node, method) {
       if (node.is_method()) return true;
       return explicitly_included(method)
     };
 
+    // Check if method was explicitly included via include: option
     // Check if a method was explicitly included via the include: or include_all: option
     function explicitly_included(method) {
       return _options.include_all ?? _options.include?.includes(method)
@@ -163,12 +169,6 @@ if (!RegExp.escape) {
 
     };
 
-    // Handle empty? specially for csend - we want obj?.length === 0
-    // not obj.length?.==(0)
-    // process csend (safe navigation) nodes the same as send nodes
-    // so method names get converted (e.g., include? -> includes)
-    // then restore the csend type if needed
-    // Handle &.call -> ccall (conditional call) for optional chaining
     function on_csend(node) {
       let [target, method, ...args] = node.children;
 
@@ -192,117 +192,12 @@ if (!RegExp.escape) {
       return result
     };
 
-    // Class.new { }.new -> object literal {}
-    // Transform anonymous class instantiation to object literal
-    // no inheritance
-    // Extract body from block
-    // Convert method definitions to hash pairs
-    // Setter: def foo=(v) -> prop with set
-    // Check if there's already a getter for this property
-    // Merge with existing getter
-    // Getter: def foo (no parens, no args) -> prop with get
-    // Check if there's already a setter for this property
-    // Merge with existing setter
-    // Regular method with args/parens -> shorthand method syntax
-    // debugger as a standalone statement -> JS debugger statement
-    // typeof(x) -> typeof x (JS type checking operator)
-    // hash.keys → Object.keys(hash)
-    // define_method(name, block_var) inside a method body
-    // -> this.constructor.prototype[name] = block_var
-    // identify groups
-    // rewrite regex
-    // 
-    // arr[-1] = x => arr[arr.length - 1] = x
-    // input: arr[start..finish] = value or arr[start...finish] = value
-    // output: arr.splice(start, length, ...value)
-    // exclusive range: start...finish
-    // no finish means to end of array
-    // inclusive range: start..finish
-    // start..-1 means from start to end
-    // Spread the value if it's an array-like
-    // (x ?? '').toString() - nil-safe conversion matching Ruby's nil.to_s => ""
-    // String(x ?? '') - nil-safe conversion matching Ruby's String(nil) => ""
-    // Wrap the argument in nullish coalescing, then let the converter handle it
-    // Array.from(str.matchAll(/.../g), s => s.slice(1))
-    // (str.match(/.../g) || []).map(s => s.match(/.../).slice(1))
-    // str.match(/.../g)
-    // arr.any? => arr.some(Boolean)
-    // arr.all? => arr.every(Boolean)
-    // arr.none? => !arr.some(Boolean)
-    // target.send(:method, arg1, arg2) => target.method(arg1, arg2)
-    // target.send(method_var, arg1) => target[method_var](arg1)
-    // Static method name: target.send(:foo, x) => target.foo(x)
-    // Dynamic method name: target.send(m, x) => target[m](x)
-    // hash.has_key?(k) => k in hash
-    // Ruby's join defaults to "", JS defaults to ","
-    // JSON.generate(x) / JSON.dump(x) => JSON.stringify(x)
-    // JSON.parse(x) / JSON.load(x) => JSON.parse(x)
-    // resolve negative literal indexes
-    // str[start, length] => str.slice(start, start + length)
-    // Ruby's 2-arg slice: str[start, length] extracts length chars starting at start
-    // Handle negative start index (only for literal integers)
-    // No need for the last argument if it's -1
-    // This means take all to the end of array
-    // input: a.slice!(start..-1)
-    // output: a.splice(start)
-    // input: a.slice!(start..finish)
-    // output: a.splice(start, finish - start + 1)
-    // input: a.slice!(start...finish)
-    // output: a.splice(start, finish - start)
-    // input: a.slice!(index) or a.slice!(start, length)
-    // output: a.splice(index, 1) or a.splice(start, length)
-    // input: a.reverse!
-    // output: a.splice(0, a.length, *a.reverse)
-    // [a, b] * n => Array.from({length: n}, () => [a, b]).flat()
-    // For single-element arrays: [a] * n => Array(n).fill(a)
-    // Single element: Array(n).fill(element)
-    // Multiple elements: Array.from({length: n}, () => [a, b]).flat()
-    // Array.from with length object and mapper, then flatten
-    // Use send! to force method call syntax (with parens)
-    // [a, b] + [c] => [...[a, b], ...[c]] or [a, b].concat([c])
-    // Using concat for clarity
-    // expr + [c] where expr might be an array - use concat
-    // This handles cases like Array(n).fill(x) + [y]
-    // Array.isArray(obj)
-    // typeof obj === "number" && Number.isInteger(obj)
-    // typeof obj === "number"
-    // typeof obj === "string"
-    // typeof obj === "symbol"
-    // typeof obj === "object" && obj !== null && !Array.isArray(obj)
-    // obj === null || obj === undefined
-    // obj === true
-    // obj === false
-    // typeof obj === "boolean"
-    // typeof obj === "function"
-    // obj instanceof RegExp
-    // obj instanceof Error
-    // User-defined classes: obj instanceof ClassName
-    // instance_of? checks exact class (not subclasses)
-    // obj.instance_of?(Foo) => obj.constructor === Foo
-    // For Array, check constructor directly
-    // typeof + isInteger + not float
-    // For Float, check it's a number but NOT an integer
-    // Check it's a plain object (constructor === Object)
-    // User-defined classes: obj.constructor === ClassName
-    // prevent chained delete methods from being converted to undef
-    // array.compact -> array.filter(x => x != null)
-    // This removes nil/null values from the array
-    // Only convert to lastIndexOf when no block - with block, keep rindex
-    // Foo.superclass => Object.getPrototypeOf(Foo.prototype).constructor
-    // Only applies to constants (class names), not to variables like node.superclass
-    // RegExp.escape(str) => RegExp.escape(str) for ES2025+
-    // (polyfill filter handles pre-ES2025 with polyfill)
-    // reduce(:+) → reduce((a, b) => a + b)
-    // reduce(:merge) → reduce((a, b) => ({...a, ...b}))
-    // Hash merge: spread both objects
-    // Arithmetic/other operators: a.op(b) or a op b
-    // .freeze → Object.freeze(target), bare freeze → Object.freeze(this)
-    // .to_sym is a no-op - symbols are strings in JS
-    // .reject(&:method) → .filter with negated block
-    // reject(&:empty?) → filter(item => !item.empty())
-    // method(:name) => this.name.bind(this) or this[name].bind(this)
-    // method(:foo) => this.foo.bind(this)
-    // method(name) => this[name].bind(this)
+    // Handle empty? specially for csend - we want obj?.length === 0
+    // not obj.length?.==(0)
+    // process csend (safe navigation) nodes the same as send nodes
+    // so method names get converted (e.g., include? -> includes)
+    // then restore the csend type if needed
+    // Handle &.call -> ccall (conditional call) for optional chaining
     function on_send(node) {
       let body, index, regex, tokens, groups, stack, group, prepend, append, expr, neg_index, new_index, range, value, start, finish, len, arg, pattern, gpattern, before, after, method_name, method_args, i, length, start_expr, end_expr, final, length_obj, mapper, parent, multiplier, raw, op, block_pass, name_arg;
       let [target, method, ...args] = node.children;
@@ -1291,6 +1186,21 @@ if (!RegExp.escape) {
           s("args", s("arg", "x")),
           s("send", s("lvar", "x"), "!=", s("nil"))
         )))
+      } else if (method === "compact!" && args.length === 0) {
+        return process(s(
+          "send",
+          target,
+          "splice",
+          s("int", 0),
+          s("attr", target, "length"),
+
+          s("splat", s("send", target, "filter", s(
+            "block",
+            s("send", null, "proc"),
+            s("args", s("arg", "x")),
+            s("send", s("lvar", "x"), "!=", s("nil"))
+          )))
+        ))
       } else if (method === "to_h" && args.length === 0) {
         return process(node.updated(
           null,
@@ -1530,62 +1440,119 @@ if (!RegExp.escape) {
       }
     };
 
-    // compact with a block is NOT the array compact method
-    // (e.g., serializer.compact { ... } should not become filter)
-    // Skip on_send processing by constructing the call node directly
-    // arr.reject { |x| cond } => arr.filter(x => !(cond))
-    // Process the body first, then negate - use :send with :! to wrap
-    // arr.none? { |x| cond } => !arr.some(x => cond)
-    // Ruby's flat_map → JavaScript's flatMap
-    // array.group_by { |x| x.category }
-    // array.group_by { |k, v| k.to_s }  # with destructuring
-    // Check if we have multiple args (destructuring case)
-    // Multiple args: use destructuring and push the whole item as array
-    // Create mlhs for destructuring: ([a, b]) => ...
-    // Push the reconstructed array [a, b]
-    // Single arg: simple case
-    // ES2024+: Object.groupBy(array, x => x.category)
-    // For destructuring, wrap args in mlhs: ([a, b]) => ...
-    // Pre-ES2024: array.reduce((acc, x) => { const key = ...; (acc[key] = acc[key] || []).push(x); return acc }, {})
-    // Build: (acc[key] = acc[key] || []).push(item)
-    // Build the reduce block body
-    // array.sort_by { |x| x.name } => array.slice().sort((a, b) => ...)
-    // With ES2023+: array.toSorted((a, b) => ...)
-    // Create two argument names for the comparison function
-    // Replace references to the block argument with arg_a and arg_b
-    // Build comparison: key_a < key_b ? -1 : key_a > key_b ? 1 : 0
-    // Use toSorted for ES2023+
-    // Use slice().sort() for older versions
-    // Use :send! for slice to force method call output
-    // array.max_by { |x| x.score } => array.reduce((a, b) => key(a) > key(b) ? a : b)
-    // Build: a, b => key(a) >= key(b) ? a : b
-    // array.min_by { |x| x.score } => array.reduce((a, b) => key(a) <= key(b) ? a : b)
-    // Build: a, b => key(a) <= key(b) ? a : b
-    // (a..b).map { |i| ... }
-    // Calculate length: end - start + 1 for irange, end - start for erange
-    // (0..n) or (0...n) - length is just end+1 or end
-    // Both are literals - compute length
-    // (1..n) - length is just n
-    // General case: end - start + 1 (irange) or end - start (erange)
-    // If starting from 0, use simpler form: Array.from({length}, (_, i) => ...)
-    // General case: need to offset the index
-    // Array.from({length}, (_, $i) => { let i = $i + start; return ... })
-    // For destructuring (multiple args), wrap in mlhs: ([a, b]) => ...
-    // input: a.map! {expression}
-    // output: a.splice(0, a.length, *a.map {expression})
-    // input: loop {statements}
-    // output: while(true) {statements}
-    // input: n.times { |i| ... }
-    // output: for (let i = 0; i < n; i++) { ... }
-    // If no block variable provided, create a dummy one
-    // Convert to range iteration: (0...n).each { |var| body }
-    // restore delete methods that are prematurely mapped to undef
-    // (a..b).step(n) {|v| ...}
-    // i.step(j, n).each {|v| ...}
-    // (a..b).each {|v| ...}
-    // Object.entries(a).forEach(([key, value]) => {})
-    // Requires explicit receiver (receiver is added by on_class for calls without one)
-    // array.each_with_index { |item, i| ... } => array.forEach((item, i) => ...)
+    // Class.new { }.new -> object literal {}
+    // Transform anonymous class instantiation to object literal
+    // no inheritance
+    // Extract body from block
+    // Convert method definitions to hash pairs
+    // Setter: def foo=(v) -> prop with set
+    // Check if there's already a getter for this property
+    // Merge with existing getter
+    // Getter: def foo (no parens, no args) -> prop with get
+    // Check if there's already a setter for this property
+    // Merge with existing setter
+    // Regular method with args/parens -> shorthand method syntax
+    // debugger as a standalone statement -> JS debugger statement
+    // typeof(x) -> typeof x (JS type checking operator)
+    // hash.keys → Object.keys(hash)
+    // define_method(name, block_var) inside a method body
+    // -> this.constructor.prototype[name] = block_var
+    // identify groups
+    // rewrite regex
+    // 
+    // arr[-1] = x => arr[arr.length - 1] = x
+    // input: arr[start..finish] = value or arr[start...finish] = value
+    // output: arr.splice(start, length, ...value)
+    // exclusive range: start...finish
+    // no finish means to end of array
+    // inclusive range: start..finish
+    // start..-1 means from start to end
+    // Spread the value if it's an array-like
+    // (x ?? '').toString() - nil-safe conversion matching Ruby's nil.to_s => ""
+    // String(x ?? '') - nil-safe conversion matching Ruby's String(nil) => ""
+    // Wrap the argument in nullish coalescing, then let the converter handle it
+    // Array.from(str.matchAll(/.../g), s => s.slice(1))
+    // (str.match(/.../g) || []).map(s => s.match(/.../).slice(1))
+    // str.match(/.../g)
+    // arr.any? => arr.some(Boolean)
+    // arr.all? => arr.every(Boolean)
+    // arr.none? => !arr.some(Boolean)
+    // target.send(:method, arg1, arg2) => target.method(arg1, arg2)
+    // target.send(method_var, arg1) => target[method_var](arg1)
+    // Static method name: target.send(:foo, x) => target.foo(x)
+    // Dynamic method name: target.send(m, x) => target[m](x)
+    // hash.has_key?(k) => k in hash
+    // Ruby's join defaults to "", JS defaults to ","
+    // JSON.generate(x) / JSON.dump(x) => JSON.stringify(x)
+    // JSON.parse(x) / JSON.load(x) => JSON.parse(x)
+    // resolve negative literal indexes
+    // str[start, length] => str.slice(start, start + length)
+    // Ruby's 2-arg slice: str[start, length] extracts length chars starting at start
+    // Handle negative start index (only for literal integers)
+    // No need for the last argument if it's -1
+    // This means take all to the end of array
+    // input: a.slice!(start..-1)
+    // output: a.splice(start)
+    // input: a.slice!(start..finish)
+    // output: a.splice(start, finish - start + 1)
+    // input: a.slice!(start...finish)
+    // output: a.splice(start, finish - start)
+    // input: a.slice!(index) or a.slice!(start, length)
+    // output: a.splice(index, 1) or a.splice(start, length)
+    // input: a.reverse!
+    // output: a.splice(0, a.length, *a.reverse)
+    // [a, b] * n => Array.from({length: n}, () => [a, b]).flat()
+    // For single-element arrays: [a] * n => Array(n).fill(a)
+    // Single element: Array(n).fill(element)
+    // Multiple elements: Array.from({length: n}, () => [a, b]).flat()
+    // Array.from with length object and mapper, then flatten
+    // Use send! to force method call syntax (with parens)
+    // [a, b] + [c] => [...[a, b], ...[c]] or [a, b].concat([c])
+    // Using concat for clarity
+    // expr + [c] where expr might be an array - use concat
+    // This handles cases like Array(n).fill(x) + [y]
+    // Array.isArray(obj)
+    // typeof obj === "number" && Number.isInteger(obj)
+    // typeof obj === "number"
+    // typeof obj === "string"
+    // typeof obj === "symbol"
+    // typeof obj === "object" && obj !== null && !Array.isArray(obj)
+    // obj === null || obj === undefined
+    // obj === true
+    // obj === false
+    // typeof obj === "boolean"
+    // typeof obj === "function"
+    // obj instanceof RegExp
+    // obj instanceof Error
+    // User-defined classes: obj instanceof ClassName
+    // instance_of? checks exact class (not subclasses)
+    // obj.instance_of?(Foo) => obj.constructor === Foo
+    // For Array, check constructor directly
+    // typeof + isInteger + not float
+    // For Float, check it's a number but NOT an integer
+    // Check it's a plain object (constructor === Object)
+    // User-defined classes: obj.constructor === ClassName
+    // prevent chained delete methods from being converted to undef
+    // array.compact -> array.filter(x => x != null)
+    // This removes nil/null values from the array (non-mutating)
+    // array.compact! -> array.splice(0, array.length, ...array.filter(x => x != null))
+    // This mutates the array in place, removing nil/null values
+    // Only convert to lastIndexOf when no block - with block, keep rindex
+    // Foo.superclass => Object.getPrototypeOf(Foo.prototype).constructor
+    // Only applies to constants (class names), not to variables like node.superclass
+    // RegExp.escape(str) => RegExp.escape(str) for ES2025+
+    // (polyfill filter handles pre-ES2025 with polyfill)
+    // reduce(:+) → reduce((a, b) => a + b)
+    // reduce(:merge) → reduce((a, b) => ({...a, ...b}))
+    // Hash merge: spread both objects
+    // Arithmetic/other operators: a.op(b) or a op b
+    // .freeze → Object.freeze(target), bare freeze → Object.freeze(this)
+    // .to_sym is a no-op - symbols are strings in JS
+    // .reject(&:method) → .filter with negated block
+    // reject(&:empty?) → filter(item => !item.empty())
+    // method(:name) => this.name.bind(this) or this[name].bind(this)
+    // method(:foo) => this.foo.bind(this)
+    // method(name) => this[name].bind(this)
     function on_block(node) {
       let block, target, processed_call, processed_body, negated_body, some_result, args, block_body, item_to_push, reduce_arg, arg_name, callback_args, callback, acc_key, acc_key_or_empty, assign_and_push, reduce_body, reduce_block, arg_a, arg_b, key_a, key_b, comparison, compare_block, range, start_node, end_node, length, temp_var, callback_body, processed_args, count, result, step;
       let call = node.children.first;
@@ -2127,10 +2094,65 @@ if (!RegExp.escape) {
       }
     };
 
+    // compact with a block is NOT the array compact method
+    // (e.g., serializer.compact { ... } should not become filter)
+    // Skip on_send processing by constructing the call node directly
+    // arr.reject { |x| cond } => arr.filter(x => !(cond))
+    // Process the body first, then negate - use :send with :! to wrap
+    // arr.none? { |x| cond } => !arr.some(x => cond)
+    // Ruby's flat_map → JavaScript's flatMap
+    // array.group_by { |x| x.category }
+    // array.group_by { |k, v| k.to_s }  # with destructuring
+    // Check if we have multiple args (destructuring case)
+    // Multiple args: use destructuring and push the whole item as array
+    // Create mlhs for destructuring: ([a, b]) => ...
+    // Push the reconstructed array [a, b]
+    // Single arg: simple case
+    // ES2024+: Object.groupBy(array, x => x.category)
+    // For destructuring, wrap args in mlhs: ([a, b]) => ...
+    // Pre-ES2024: array.reduce((acc, x) => { const key = ...; (acc[key] = acc[key] || []).push(x); return acc }, {})
+    // Build: (acc[key] = acc[key] || []).push(item)
+    // Build the reduce block body
+    // array.sort_by { |x| x.name } => array.slice().sort((a, b) => ...)
+    // With ES2023+: array.toSorted((a, b) => ...)
+    // Create two argument names for the comparison function
+    // Replace references to the block argument with arg_a and arg_b
+    // Build comparison: key_a < key_b ? -1 : key_a > key_b ? 1 : 0
+    // Use toSorted for ES2023+
+    // Use slice().sort() for older versions
+    // Use :send! for slice to force method call output
+    // array.max_by { |x| x.score } => array.reduce((a, b) => key(a) > key(b) ? a : b)
+    // Build: a, b => key(a) >= key(b) ? a : b
+    // array.min_by { |x| x.score } => array.reduce((a, b) => key(a) <= key(b) ? a : b)
+    // Build: a, b => key(a) <= key(b) ? a : b
+    // (a..b).map { |i| ... }
+    // Calculate length: end - start + 1 for irange, end - start for erange
+    // (0..n) or (0...n) - length is just end+1 or end
+    // Both are literals - compute length
+    // (1..n) - length is just n
+    // General case: end - start + 1 (irange) or end - start (erange)
+    // If starting from 0, use simpler form: Array.from({length}, (_, i) => ...)
+    // General case: need to offset the index
+    // Array.from({length}, (_, $i) => { let i = $i + start; return ... })
+    // For destructuring (multiple args), wrap in mlhs: ([a, b]) => ...
+    // input: a.map! {expression}
+    // output: a.splice(0, a.length, *a.map {expression})
+    // input: loop {statements}
+    // output: while(true) {statements}
+    // input: n.times { |i| ... }
+    // output: for (let i = 0; i < n; i++) { ... }
+    // If no block variable provided, create a dummy one
+    // Convert to range iteration: (0...n).each { |var| body }
+    // restore delete methods that are prematurely mapped to undef
+    // (a..b).step(n) {|v| ...}
+    // i.step(j, n).each {|v| ...}
+    // (a..b).each {|v| ...}
+    // Object.entries(a).forEach(([key, value]) => {})
+    // Requires explicit receiver (receiver is added by on_class for calls without one)
+    // array.each_with_index { |item, i| ... } => array.forEach((item, i) => ...)
     // Recursively add class name as receiver to define_method and method_defined? calls
     // This handles define_method/method_defined? inside loops like:
     //   %i[a b].each { |t| define_method(t) { ... } unless method_defined?(t) }
-    // Recursively process children
     function add_class_receiver(node, class_name) {
       if (!ast_node(node)) return node;
 
@@ -2162,14 +2184,10 @@ if (!RegExp.escape) {
       ) : node
     };
 
-    // alias_method without receiver -> add class name as receiver
-    // method_defined? without receiver -> add class name as receiver
-    // define_method without receiver -> add class name as receiver
-    // Recursively search for define_method/method_defined? inside nested blocks (e.g., .each loops)
-    // Process children of begin node (class body wrapped in begin)
+    // Recursively process children
     function on_class(node) {
       let [name, inheritance, ...body] = node.children;
-      body.compact;
+      body.splice(0, body.length, ...body.filter(x => x !== null));
 
       body.forEach((child, i) => {
         if (child.type === "send" && child.children[0] === null && child.children[1] === "alias_method") {
@@ -2221,7 +2239,7 @@ if (!RegExp.escape) {
           ))
         };
 
-        if (body.length > 1) body = [s("begin", ...body)];
+        if (body.length() > 1) body = [s("begin", ...body)];
         return S("class", name, s("const", null, "Error"), ...body)
       } else {
         if (body.length > 1) body = [s("begin", ...body)];
@@ -2244,6 +2262,11 @@ if (!RegExp.escape) {
     }
   })();
 
+  // alias_method without receiver -> add class name as receiver
+  // method_defined? without receiver -> add class name as receiver
+  // define_method without receiver -> add class name as receiver
+  // Recursively search for define_method/method_defined? inside nested blocks (e.g., .each loops)
+  // Process children of begin node (class body wrapped in begin)
 // Register the filter
 DEFAULTS.push(Functions);
 
