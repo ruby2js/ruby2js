@@ -12,6 +12,12 @@
     "./ruby2js.js": "./ruby2js.js",
     "./filters/*": "./filters/*"
   },
+  "files": [
+    "ruby2js.js",
+    "ruby2js-cli.js",
+    "prism_browser.js",
+    "filters/"
+  ],
   "scripts": {
     "build": "mkdir -p dist filters && npm run build:prism-browser && npm run build:bundle && npm run build:spec && npm run build:filters",
     "build:prism-browser": "bundle exec ruby scripts/transpile_prism_browser.rb > prism_browser.js",
@@ -22,7 +28,8 @@
     "test:cli": "node test_cli.mjs",
     "test:walker": "node test_walker.mjs",
     "test:all-specs": "node run_all_specs.mjs",
-    "clean": "rm -rf dist filters ruby2js.js ruby2js-cli.js prism_browser.js"
+    "clean": "rm -rf dist filters ruby2js.js ruby2js-cli.js prism_browser.js",
+    "pack": "npm run build:prism-browser && npm run build:bundle && npm run build:filters && npm pack"
   },
   "keywords": ["ruby", "javascript", "transpiler"],
   "author": "Sam Ruby",
