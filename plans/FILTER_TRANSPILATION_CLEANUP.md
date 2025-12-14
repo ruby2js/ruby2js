@@ -322,7 +322,11 @@ All 27 filters transpile to syntactically valid JavaScript (verified 2024-12-14)
 ✓ stimulus        ✓ tagged_templates  ✓ turbo
 ```
 
-**Specs to transpile** (corresponding `spec/*_spec.rb` files).
+**Specs status** (48/51 transpile to valid JS):
+- 48 specs transpile successfully
+- 3 expected failures: execjs_spec (skip statement issue), selfhost_spec_spec, selfhost_walker_spec (meta specs)
+
+**Note on ExecJS**: The ExecJS module will need a completely different implementation in JavaScript—it will likely reduce to `eval`. This allows writing code that works in both Ruby (using ExecJS to run JS) and JavaScript (using eval directly) environments.
 
 **Validation**: For each transpiled file, run:
 ```bash
@@ -337,14 +341,24 @@ node --check filters/<name>.js
 
 ### Phase 3: Functional Tests
 
-Run each filter's spec suite and report pass/fail status:
+**Current test results** (2024-12-14):
+
+| Category | Status | Tests |
+|----------|--------|-------|
+| Ready specs | ✅ 3/3 passing | 290 tests (transliteration, serializer, namespace) |
+| functions filter | 91% | 183/202 passing |
+
+**Blocked on filter loading**: Other filter specs (return, camelCase, esm, etc.) need their corresponding filters loaded by the test harness. Currently only the functions filter is loaded.
+
+**Next step**: Enhance test harness to auto-load filter based on spec name, then generate full matrix:
 
 | Filter | Syntax Valid | Tests Passing | Notes |
 |--------|--------------|---------------|-------|
-| functions | ✓ | 183/202 | Baseline |
-| esm | ? | ?/? | TBD |
-| camelCase | ? | ?/? | TBD |
-| ... | | | |
+| functions | ✓ | 183/202 (91%) | Loaded and tested |
+| return | ✓ | 11/25* | *needs return filter loaded |
+| camelCase | ✓ | 1/19* | *needs camelCase filter loaded |
+| esm | ✓ | 1/40* | *needs esm filter loaded |
+| ... | ✓ | TBD | Need filter loading infrastructure |
 
 ## Completion Criteria
 

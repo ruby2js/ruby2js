@@ -10,8 +10,9 @@
   ],
   "blocked": {
     "comments_spec.rb": "needs filters (Ruby2JS.Filter.Functions)",
-    "esm_spec.rb": "needs filters",
-    "camelcase_spec.rb": "needs filters",
+    "return_spec.rb": "needs return filter loaded",
+    "camelcase_spec.rb": "needs camelCase filter loaded",
+    "esm_spec.rb": "needs esm filter loaded",
     "react_spec.rb": "needs filters",
     "stimulus_spec.rb": "needs filters",
     "jquery_spec.rb": "needs filters",
@@ -28,7 +29,6 @@
     "nokogiri_spec.rb": "needs filters",
     "pragma_spec.rb": "needs filters",
     "preact_spec.rb": "needs filters",
-    "return_spec.rb": "needs filters",
     "securerandom_spec.rb": "needs filters",
     "tagged_templates_spec.rb": "needs filters",
     "vue_spec.rb": "needs filters"
