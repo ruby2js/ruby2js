@@ -90,7 +90,9 @@ jobs:
 
     - name: Install docs dependencies
       working-directory: docs
-      run: yarn install
+      run: |
+        bundle install
+        yarn install
 
     - name: Build livedemo.js
       working-directory: docs
