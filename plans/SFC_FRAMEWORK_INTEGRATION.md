@@ -1,6 +1,6 @@
-# SFC Framework Integration Plan: Vue, Svelte, Astro
+# SFC Framework Integration Plan: Vue, Svelte, Astro, Phlex
 
-## Status: Planning 📋
+## Status: Planning 📋 (Phlex filter: Beta ✅)
 
 Use native framework compilers to parse single-file components, extract script sections, convert Ruby to JavaScript using self-hosted Ruby2JS, and let framework compilers handle the rest.
 
@@ -179,6 +179,105 @@ featured = posts.select { |p| p.featured }.first(3)
 
 ---
 
+### Phlex (.phlex.rb files)
+
+**Status:** Beta filter available (`ruby2js/filter/phlex`)
+
+**Current capabilities (ERB-replacement level):**
+- HTML element DSL → string concatenation
+- Static and dynamic attributes
+- Loops and conditionals
+- Instance variables as destructured render parameters
+
+**Example Ruby Phlex component:**
+```ruby
+# components/card_component.phlex.rb
+class CardComponent < Phlex::HTML
+  def initialize(title:, items:)
+    @title = title
+    @items = items
+  end
+
+  def view_template
+    div(class: "card") do
+      h1 { @title }
+      ul do
+        @items.each do |item|
+          li { item.name }
+        end
+      end
+    end
+  end
+end
+```
+
+**Current output (with phlex + functions filters):**
+```javascript
+class CardComponent extends Phlex.HTML {
+  render({ items, title }) {
+    let _phlex_out = "";
+    _phlex_out += `<div class="card">`;
+    _phlex_out += "<h1>";
+    _phlex_out += String(title);
+    _phlex_out += "</h1>";
+    _phlex_out += "<ul>";
+
+    for (let item of items) {
+      _phlex_out += "<li>";
+      _phlex_out += String(item.name);
+      _phlex_out += "</li>"
+    };
+
+    _phlex_out += "</ul>";
+    _phlex_out += "</div>";
+    return _phlex_out
+  }
+}
+```
+
+**Planned: Component composition via ES modules**
+
+```ruby
+# With Vite plugin
+class PageComponent < Phlex::HTML
+  def view_template
+    render HeaderComponent.new(title: @title)
+    div { @content }
+    render FooterComponent.new
+  end
+end
+```
+
+```javascript
+// Output with Vite plugin
+import HeaderComponent from './header_component.phlex.rb';
+import FooterComponent from './footer_component.phlex.rb';
+
+export function render({ content, title }) {
+  let _phlex_out = "";
+  _phlex_out += HeaderComponent.render({ title });
+  _phlex_out += "<div>";
+  _phlex_out += String(content);
+  _phlex_out += "</div>";
+  _phlex_out += FooterComponent.render({});
+  return _phlex_out
+}
+```
+
+**Implementation notes:**
+- Pure Ruby DSL (no template syntax to parse)
+- Component composition = ES module imports
+- No runtime needed beyond bundled JS
+- Works with any rendering context (SSR, client-side, etc.)
+
+**Why Phlex may be the best starting point:**
+- Phlex users have already chosen Ruby for views - natural audience
+- No competing JS ecosystem to displace (unlike Vue/Svelte)
+- Simpler integration (pure Ruby files, no embedded scripts)
+- Beta filter already covers core functionality
+
+---
+
 ## Vite Plugin Architecture
 
 All three frameworks use Vite. A unified plugin structure:
@@ -201,6 +300,9 @@ export function ruby2js(options = {}) {
       }
       if (id.endsWith('.astro')) {
         return transformAstro(code, options);
+      }
+      if (id.endsWith('.phlex.rb')) {
+        return transformPhlex(code, options);
       }
     }
   }
@@ -252,11 +354,28 @@ async function transformSvelte(code, options) {
 async function transformAstro(code, options) {
   const { parse } = await import('@astrojs/compiler');
   const ast = await parse(code);
-  
+
   // Extract frontmatter and script tags
   // Convert each Ruby section to JS
-  
+
   return result;
+}
+
+async function transformPhlex(code, options) {
+  // Phlex components are pure Ruby - convert entire file
+  const js = convert(code, {
+    ...options,
+    filters: ['phlex', 'functions', 'esm']
+  });
+
+  // Analyze for component references (render OtherComponent.new)
+  // Add import statements for referenced components
+  // Export the render function as default
+
+  return {
+    code: js,
+    map: null  // TODO: source maps
+  };
 }
 ```
 
@@ -340,6 +459,8 @@ $count = 5                  # → $count = 5 (store set)
 
 ## Implementation Phases
 
+These phases are **parallel tracks**, not a strict sequence. Priority should follow community interest. Phlex may be the most promising starting point since its users have already chosen Ruby for views.
+
 ### Phase 1: Core Infrastructure
 - [ ] Add `plain_properties` option to Ruby2JS
 - [ ] Self-host `functions` filter
@@ -366,7 +487,19 @@ $count = 5                  # → $count = 5 (store set)
 - [ ] Client-side script conversion
 - [ ] Test with various UI framework islands
 
-### Phase 5: Polish
+### Phase 5: Phlex Integration
+- [x] Create Phlex filter (ERB-replacement level) - **DONE (Beta)**
+- [x] HTML element DSL transformation - **DONE**
+- [x] Static and dynamic attributes - **DONE**
+- [x] Loops and conditionals - **DONE**
+- [x] Instance variables as parameters - **DONE**
+- [x] Documentation - **DONE**
+- [ ] Create Vite plugin for .phlex.rb files
+- [ ] Component composition (`render OtherComponent.new`)
+- [ ] ES module import/export generation
+- [ ] Test with component hierarchies
+
+### Phase 6: Polish
 - [ ] Unified plugin with framework auto-detection
 - [ ] Source maps support
 - [ ] Error messages with original Ruby line numbers
