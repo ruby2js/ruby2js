@@ -1,0 +1,368 @@
+# Filter Transpilation Cleanup Plan
+
+## Goal
+
+Make filter transpilation a clean, declarative process: just specify which filters to apply in what order, with no manual gsubs or preambles. The transpile script should become:
+
+```ruby
+js = Ruby2JS.convert(source,
+  eslevel: 2022,
+  filters: [...],
+  # options
+).to_s
+puts js
+```
+
+## Current State
+
+`demo/selfhost/scripts/transpile_filter.rb` has:
+- **~90 lines of preamble** (imports, helper functions, infrastructure)
+- **12 gsub operations** (post-processing fixes)
+- **~20 lines of postamble** (registration, exports)
+
+## Analysis
+
+### Gsubs to Eliminate
+
+| # | Pattern | Purpose | Classification |
+|---|---------|---------|----------------|
+| 1 | Remove `const Ruby2JS = {Filter: (() => {` | Fix module wrapper | Selfhost-specific |
+| 2 | Remove `return {Functions}` IIFE tail | Fix module wrapper | Selfhost-specific |
+| 3-6 | Fix empty ternary/assignment/return from `super` | Handle Ruby filter super calls | **General-use** (affects all filters) |
+| 7 | `this._options` → `_options` | Module-level options | Selfhost-specific |
+| 8 | `x === s(...)` → `nodesEqual(x, s(...))` | AST structural comparison | Selfhost-specific |
+| 9 | Fix mutating `compact` polyfill | Non-mutating compact for frozen arrays | **General-use** (polyfill filter) |
+| 10 | `Regexp.` → `RegExp.` | Ruby constant to JS | **General-use** (converter) |
+| 11 | `s("const", null, Object)` → `s("const", null, "Object")` | Quote Object constant | Selfhost-specific |
+| 12 | Spread regopt node fix | Children spread issue | Selfhost-specific |
+
+### Preamble Items
+
+| Item | Purpose | Classification |
+|------|---------|----------------|
+| Import statement | Load ruby2js.js | Selfhost-specific (ESM output) |
+| Parser.AST.Node alias | Bridge Ruby Parser gem API | Selfhost-specific |
+| SEXP helpers (s, S) | AST construction | Selfhost-specific |
+| `ast_node` function | Check if value is AST node | Selfhost-specific |
+| `include = () => {}` | No-op for Ruby's include | Selfhost-specific |
+| Filter.exclude/include | No-op stubs | Selfhost-specific |
+| DEFAULTS array | Filter registration | Selfhost-specific |
+| Filter infrastructure | excluded, included, process, etc. | Selfhost-specific |
+| ES level getters | es2015-es2025 property checks | Selfhost-specific |
+| `nodesEqual` function | AST structural comparison | Selfhost-specific |
+
+### Postamble Items
+
+| Item | Purpose | Classification |
+|------|---------|----------------|
+| DEFAULTS.push | Register filter | Selfhost-specific |
+| Ruby2JS.Filter.X assignment | Namespace registration | Selfhost-specific |
+| `_setup` function | Bind infrastructure at runtime | Selfhost-specific |
+| ES module export | ESM compatibility | Selfhost-specific |
+
+## Proposed Changes
+
+### Phase 1: General-Use Improvements
+
+These changes benefit all Ruby2JS users, not just selfhost.
+
+#### 1.1 Fix `Regexp` → `RegExp` in Converter
+
+**Location**: `lib/ruby2js/converter/const.rb` (or new converter)
+
+**Current**: Only converts at ES2025+ level.
+
+**Change**: Always convert `Regexp` → `RegExp` (it's the same thing in JS).
+
+```ruby
+# In converter, when encountering Regexp constant
+handle :const do |*args|
+  # ...existing code...
+  if name == :Regexp
+    put 'RegExp'
+    return
+  end
+  # ...
+end
+```
+
+**Rationale**: There's no reason to emit `Regexp` in JavaScript output; it doesn't exist.
+
+#### 1.2 Fix Polyfill `compact` to be Non-Mutating
+
+**Location**: `lib/ruby2js/filter/polyfill.rb`
+
+**Current**: The polyfill modifies the array in place (like `compact!`).
+
+**Change**: Use `filter()` for non-mutating behavior:
+
+```ruby
+# Change from:
+Object.defineProperty(Array.prototype, "compact", {
+  get() {
+    let i = this.length - 1;
+    while (i >= 0) {
+      if (this[i] === null || this[i] === undefined) this.splice(i, 1);
+      i--
+    };
+    return this
+  },
+  configurable: true
+});
+
+# To:
+Object.defineProperty(Array.prototype, "compact", {
+  get() { return this.filter(x => x !== null && x !== undefined); },
+  configurable: true
+});
+```
+
+**Rationale**: Ruby's `compact` returns a new array; `compact!` mutates. The polyfill should match Ruby semantics.
+
+#### 1.3 Handle `super` in Filter Methods
+
+**Location**: `lib/ruby2js/filter/selfhost/converter.rb` or new filter
+
+**Problem**: Ruby filters use `super` to delegate to the next filter in the chain. When transpiled, `super` becomes empty because JS classes don't have the same filter chain mechanism.
+
+**Current gsubs**:
+```ruby
+js = js.gsub(/: (\s*}\s*(?:else|$))/, ': process_children(node)\1')
+js = js.gsub(/: (\s*;)/, ': process_children(node)\1')
+js = js.gsub(/= ;/, '= process_children(node);')
+js = js.gsub(/return (\s*}\s*(?:else|$))/, 'return process_children(node)\1')
+js = js.gsub(/return (\s*;)/, 'return process_children(node)\1')
+```
+
+**Solution**: Add AST-level handling in selfhost filter to detect `super` calls in filter `on_*` methods and replace with `process_children(node)`.
+
+This is tricky because:
+- `super` with no args should become `process_children(node)`
+- `super(x)` should become `process(x)`
+
+**Classification**: While this affects "all filters", it's only relevant when transpiling filters to JS, which is a selfhost-specific use case.
+
+### Phase 2: Selfhost Filter Module Infrastructure
+
+Create a new filter: `lib/ruby2js/filter/selfhost/filter.rb`
+
+This filter would be applied when transpiling a Ruby2JS filter to JavaScript. It handles:
+
+#### 2.1 Module Structure Detection
+
+Detect the Ruby filter module pattern:
+```ruby
+module Ruby2JS
+  module Filter
+    module Functions
+      # ...
+    end
+    DEFAULTS << Functions
+  end
+end
+```
+
+Transform to JS class/object with proper exports.
+
+#### 2.2 Generate Preamble
+
+When the filter detects it's processing a Ruby2JS filter, prepend:
+
+```javascript
+import { Ruby2JS } from '../ruby2js.js';
+
+const Parser = { AST: { Node: Ruby2JS.Node } };
+const SEXP = Ruby2JS.Filter.SEXP;
+const s = SEXP.s.bind(SEXP);
+const S = s;
+
+const ast_node = (node) => {
+  if (!node || typeof node !== 'object') return false;
+  return 'type' in node && 'children' in node;
+};
+
+// ... rest of infrastructure
+```
+
+#### 2.3 Handle `this._options` → `_options`
+
+Transform instance variable access to module-level variable.
+
+#### 2.4 Handle AST Comparisons
+
+Transform `node === s(:type, ...)` to `nodesEqual(node, s(:type, ...))`.
+
+This requires pattern detection:
+- LHS is a variable or property access
+- RHS is an `s(...)` call
+- Operator is `===` or `==`
+
+#### 2.5 Handle `super` Calls
+
+As described in 1.3, but implemented in the AST.
+
+#### 2.6 Generate Postamble
+
+Append filter registration and ES module export:
+
+```javascript
+DEFAULTS.push(FilterName);
+Ruby2JS.Filter.FilterName = FilterName;
+
+FilterName._setup = function(opts) {
+  // ... bind infrastructure
+};
+
+export { FilterName as default, FilterName };
+```
+
+### Phase 3: Handle Edge Cases
+
+#### 3.1 Object Constant Quoting
+
+Pattern: `s("const", null, Object)` where `Object` is the JS global.
+
+**Solution**: In the selfhost filter, when creating `s()` calls with constant references to JS globals (`Object`, `Array`, `String`, etc.), quote them as strings.
+
+#### 3.2 Regopt Node Spread
+
+Pattern: `...arg.children.last` where `last` is a regopt node.
+
+**Problem**: Regopt nodes need `.children` to be spread, not the node itself.
+
+**Solution**: Detect spread of `.last` or similar on children arrays and wrap appropriately:
+```javascript
+...(arg.children.last.children || [])
+```
+
+### Phase 4: Remove gsubs from transpile_filter.rb
+
+After implementing Phases 1-3, update `transpile_filter.rb` to:
+
+```ruby
+#!/usr/bin/env ruby
+require 'ruby2js'
+require 'ruby2js/filter/selfhost'
+require 'ruby2js/filter/selfhost/filter'  # NEW
+# ... other requires
+
+filter_file = ARGV[0] || raise("Usage: transpile_filter.rb <filter_file>")
+source = File.read(filter_file)
+
+js = Ruby2JS.convert(source,
+  eslevel: 2022,
+  comparison: :identity,
+  underscored_private: true,
+  selfhost_filter: true,  # NEW: enables filter-specific handling
+  filters: [
+    Ruby2JS::Filter::Pragma,
+    Ruby2JS::Filter::Selfhost::Filter,  # NEW
+    Ruby2JS::Filter::Selfhost::Core,
+    Ruby2JS::Filter::Selfhost::Converter,
+    Ruby2JS::Filter::Polyfill,
+    Ruby2JS::Filter::Functions,
+    Ruby2JS::Filter::Return,
+    Ruby2JS::Filter::ESM
+  ]
+).to_s
+
+puts js
+```
+
+No gsubs. No preamble. No postamble.
+
+## Implementation Order
+
+### Immediate (Low Risk, High Value)
+
+1. **Fix polyfill `compact`** - Simple change, correct semantics
+2. **Fix `Regexp` → `RegExp`** - Simple change, always correct
+
+### Short Term (Selfhost Infrastructure)
+
+3. **Create `selfhost/filter.rb`** - New filter for filter transpilation
+4. **Move preamble generation** - Into the new filter
+5. **Move postamble generation** - Into the new filter
+6. **Handle `this._options`** - In new filter
+
+### Medium Term (Complex AST Handling)
+
+7. **Handle `super` calls** - Requires AST pattern matching
+8. **Handle AST comparisons** - Requires pattern detection
+9. **Handle Object constant quoting** - Edge case
+10. **Handle regopt spread** - Edge case
+
+### Validation
+
+After each phase, run:
+```bash
+cd demo/selfhost
+npm run build:filters
+npm test
+```
+
+Verify 183+ functions filter tests still pass.
+
+## Success Criteria
+
+### Phase 1: Syntactically Valid JavaScript
+
+All filters and their specs must transpile to syntactically valid JavaScript (parseable by Node.js).
+
+**Filters to transpile** (29 total):
+```
+action_cable.rb      active_functions.rb  active_support.rb
+alpine.rb            camelCase.rb         cjs.rb
+combiner.rb          erb.rb               esm.rb
+functions.rb         haml.rb              jest.rb
+jsx.rb               lit-element.rb       lit.rb
+node.rb              nokogiri.rb          phlex.rb
+polyfill.rb          pragma.rb            processor.rb
+react.rb             require.rb           return.rb
+securerandom.rb      stimulus.rb          tagged_templates.rb
+turbo.rb
+```
+
+**Specs to transpile** (corresponding `spec/*_spec.rb` files).
+
+**Validation**: For each transpiled file, run:
+```bash
+node --check filters/<name>.js
+```
+
+### Phase 2: Clean Transpilation Process
+
+1. `transpile_filter.rb` has no gsubs
+2. `transpile_filter.rb` has no heredoc preamble/postamble
+3. Filter transpilation is purely declarative (specify filters, get output)
+
+### Phase 3: Functional Tests
+
+Run each filter's spec suite and report pass/fail status:
+
+| Filter | Syntax Valid | Tests Passing | Notes |
+|--------|--------------|---------------|-------|
+| functions | ✓ | 183/202 | Baseline |
+| esm | ? | ?/? | TBD |
+| camelCase | ? | ?/? | TBD |
+| ... | | | |
+
+## Completion Criteria
+
+The plan is complete when:
+
+1. **All 29 filters** transpile to syntactically valid JavaScript
+2. **All filter specs** transpile to syntactically valid JavaScript
+3. **Pass/fail matrix** is generated for all filter test suites
+4. **No manual post-processing** required in transpile scripts
+
+At that point, we can assess which filters are ready for production use and prioritize fixing the remaining failures based on user demand.
+
+## Next Steps After Completion
+
+Based on the pass/fail matrix:
+
+1. Identify filters with high pass rates (>90%) - candidates for immediate release
+2. Identify filters with common failure patterns - may indicate missing selfhost handling
+3. Prioritize fixes based on filter popularity/demand
+4. Consider which filters are essential for the npm package vs. optional
