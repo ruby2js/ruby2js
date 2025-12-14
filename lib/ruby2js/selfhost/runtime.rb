@@ -6,10 +6,10 @@
 # support needed by the selfhosted converter.
 
 # Conditionally load Prism based on environment:
-# - Browser: use prism_browser.mjs (fetch + WASI polyfill)
+# - Browser: use prism_browser.js (fetch + WASI polyfill)
 # - Node.js: use @ruby/prism (native WASI)
 Prism = if typeof(window) != 'undefined'
-  await import('./prism_browser.mjs')
+  await import('./prism_browser.js')
 else
   await import('@ruby/prism')
 end

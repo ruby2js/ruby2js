@@ -1,5 +1,5 @@
 #!/usr/bin/env ruby
-# Transpile bundle.rb - creates a standalone ruby2js.mjs with all sources inlined
+# Transpile bundle.rb - creates ruby2js.js library with all sources inlined
 #
 # The bundle.rb uses require_relative to pull in all necessary sources:
 # - runtime (source buffer, source range, comments)
@@ -8,8 +8,12 @@
 # - prism_walker (Prism AST to Parser-compatible format)
 # - serializer (output formatting)
 # - converter (main conversion + all handlers)
+# - filter/processor (filter infrastructure)
+# - pipeline (orchestration)
 #
 # The Require filter processes these require_relative calls and inlines the code.
+#
+# Output: ruby2js.js (library only, no CLI)
 
 $LOAD_PATH.unshift File.expand_path('../../../lib', __dir__)
 
@@ -50,19 +54,18 @@ js = Ruby2JS.convert(source,
 
 # Add preamble for ES module compatibility
 preamble = <<~JS
-#!/usr/bin/env node
-// Ruby2JS Self-hosted Bundle
+// Ruby2JS Self-hosted Library
 // Generated from lib/ruby2js/selfhost/bundle.rb
 //
-// This is a standalone JavaScript module that can:
-// - Run as CLI: node ruby2js.mjs [options] [file]
-// - Be imported: import { convert } from './ruby2js.mjs'
+// This is the core Ruby2JS library. Import it to convert Ruby to JavaScript:
+//   import { convert, Ruby2JS } from './ruby2js.js'
+//
+// For CLI usage, see ruby2js-cli.js
 //
 // External dependencies: @ruby/prism only
 
 // Suppress the "WASI is an experimental feature" warning from @ruby/prism
-// while allowing all other warnings through. This MUST run before any
-// imports that load @ruby/prism (which uses WASI internally).
+// This MUST run before any imports that load @ruby/prism (which uses WASI internally).
 if (typeof process !== 'undefined' && process.emit) {
   const originalEmit = process.emit.bind(process);
   process.emit = function(event, ...args) {

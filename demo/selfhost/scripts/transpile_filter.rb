@@ -55,7 +55,7 @@ preamble = <<~JS
 // - Ruby2JS.Filter.SEXP (s, S, ast_node helpers)
 // - Ruby2JS.Filter.Processor (AST walker with process/process_children/process_all)
 // - Array polyfills (none, all, any, compact, etc.)
-import { Ruby2JS } from '../ruby2js.mjs';
+import { Ruby2JS } from '../ruby2js.js';
 
 // Alias Parser.AST.Node to Ruby2JS.Node so transpiled code works
 // (Ruby source uses Parser gem's AST nodes, JS uses Ruby2JS.Node)

@@ -1,22 +1,36 @@
 {
-  "name": "ruby2js-selfhost",
-  "version": "1.0.0",
+  "name": "ruby2js",
+  "version": "6.0.0-beta",
   "type": "module",
-  "description": "Self-hosted Ruby2JS converter running in Node.js",
+  "description": "Ruby to JavaScript transpiler",
+  "main": "ruby2js.js",
+  "bin": {
+    "ruby2js": "./ruby2js-cli.js"
+  },
+  "exports": {
+    ".": "./ruby2js.js",
+    "./ruby2js.js": "./ruby2js.js",
+    "./filters/*": "./filters/*"
+  },
   "scripts": {
-    "build": "mkdir -p dist && npm run build:prism-browser && npm run build:bundle && npm run build:spec",
-    "build:prism-browser": "bundle exec ruby scripts/transpile_prism_browser.rb > prism_browser.mjs",
-    "build:bundle": "bundle exec ruby scripts/transpile_bundle.rb > ruby2js.mjs",
-    "build:spec": "bundle exec ruby scripts/transpile_spec.rb ../../spec/transliteration_spec.rb > dist/transliteration_spec.mjs",
+    "build": "mkdir -p dist filters && npm run build:prism-browser && npm run build:bundle && npm run build:spec && npm run build:filters",
+    "build:prism-browser": "bundle exec ruby scripts/transpile_prism_browser.rb > prism_browser.js",
+    "build:bundle": "bundle exec ruby scripts/transpile_bundle.rb > ruby2js.js",
+    "build:spec": "bundle exec ruby scripts/transpile_spec.rb ../../spec/transliteration_spec.rb > dist/transliteration_spec.js",
+    "build:filters": "bundle exec ruby scripts/transpile_filter.rb ../../lib/ruby2js/filter/functions.rb > filters/functions.js",
     "test": "npm run test:cli && npm run test:walker && npm run test:all-specs",
     "test:cli": "node test_cli.mjs",
     "test:walker": "node test_walker.mjs",
     "test:all-specs": "node run_all_specs.mjs",
-    "clean": "rm -rf dist ruby2js.mjs prism_browser.mjs"
+    "clean": "rm -rf dist filters ruby2js.js ruby2js-cli.js prism_browser.js"
   },
   "keywords": ["ruby", "javascript", "transpiler"],
   "author": "Sam Ruby",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ruby2js/ruby2js"
+  },
   "dependencies": {
     "@ruby/prism": "^1.6.0"
   }

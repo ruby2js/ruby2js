@@ -1,12 +1,12 @@
-# Ruby2JS Self-hosted Bundle
+# Ruby2JS Self-hosted Library - for CLI see ruby2js-cli.js
 #
 # This file uses require_relative to inline all necessary sources into a single
 # JavaScript module. The Ruby2JS Require filter processes these require_relative
 # calls and inlines the actual code content.
 #
-# The resulting ruby2js.mjs can be:
-#   - Run as a CLI: node ruby2js.mjs [options] [file]
-#   - Imported in browser: import { convert } from './ruby2js.mjs'
+# The resulting ruby2js.js is a library that can be:
+#   - Imported in Node.js: import { convert } from './ruby2js.js'
+#   - Imported in browser: import { convert } from './ruby2js.js'
 #
 # External dependencies: @ruby/prism only
 
@@ -83,9 +83,6 @@ export def convert(source, options = {})
   result = pipeline.run
   result.to_s!
 end
-
-# CLI for command-line usage (must come after convert() is defined)
-require_relative 'cli'
 
 # Export the Ruby2JS module
 export [Ruby2JS]
