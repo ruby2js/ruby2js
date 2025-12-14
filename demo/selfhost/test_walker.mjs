@@ -2,7 +2,7 @@
 // Tests that the JavaScript walker correctly transforms Prism AST to Parser-compatible AST
 
 // Import from the unified bundle (same code used by CLI and browser)
-import { Ruby2JS, setupGlobals, initPrism } from './ruby2js.mjs';
+import { Ruby2JS, setupGlobals, initPrism } from './ruby2js.js';
 
 // Set up globals
 setupGlobals(Ruby2JS);

@@ -14,7 +14,7 @@ import {
   initPrism as sharedInitPrism,
   getPrismParse,
   convert as bundleConvert
-} from './ruby2js.mjs';
+} from './ruby2js.js';
 
 // Set up globals
 setupGlobals(Ruby2JS);

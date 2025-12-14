@@ -1,4 +1,4 @@
-import { convert, Ruby2JS } from './ruby2js.mjs';
+import { convert, Ruby2JS } from './ruby2js.js';
 import Functions from './dist/functions_filter.mjs';
 
 // Try using bundle's convert directly with a filter

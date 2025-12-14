@@ -1,5 +1,5 @@
 // Debug why converter produces extra blank lines
-import { Ruby2JS, initPrism, getPrismParse } from './ruby2js.mjs';
+import { Ruby2JS, initPrism, getPrismParse } from './ruby2js.js';
 await initPrism();
 
 const { Converter, Serializer, Line, Token, PrismWalker } = Ruby2JS;

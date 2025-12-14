@@ -1,6 +1,6 @@
 // Test the transpiled Serializer class directly
 // Import from the unified bundle (same code used by CLI and browser)
-import { Ruby2JS, initPrism } from './ruby2js.mjs';
+import { Ruby2JS, initPrism } from './ruby2js.js';
 await initPrism();
 
 const { Serializer, Token, Line } = Ruby2JS;

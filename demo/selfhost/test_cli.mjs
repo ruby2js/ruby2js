@@ -1,4 +1,4 @@
-// CLI smoke tests for ruby2js.mjs
+// CLI smoke tests for ruby2js-cli.js
 // Tests that the CLI works correctly end-to-end
 
 import { execSync } from 'child_process';
