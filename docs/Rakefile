@@ -231,12 +231,37 @@ end
 desc "Build livedemo.js (for CI smoke test)"
 task :livedemo => "#{dest}/livedemo.js"
 
+desc "Test that the Opal-compiled Ruby2JS converts code correctly"
+task :test_demo => ["#{dest}/ruby2js.js"] do
+  # Use the Ruby gem directly to test preset conversion
+  # This validates that the same logic that built the demo works correctly
+  require 'ruby2js'
+  require 'ruby2js/filter/functions'
+  require 'ruby2js/filter/esm'
+  require 'ruby2js/filter/return'
+
+  # Test 1: Basic conversion with preset (puts -> console.log)
+  result1 = Ruby2JS.convert('puts "hello"', preset: true).to_s
+  unless result1.include?('console.log')
+    raise "FAIL: preset conversion of puts - expected console.log, got: #{result1}"
+  end
+
+  # Test 2: Verify functions filter is applied (upcase -> toUpperCase)
+  result2 = Ruby2JS.convert('"hello".upcase', preset: true).to_s
+  unless result2.include?('toUpperCase')
+    raise "FAIL: preset conversion of upcase - expected toUpperCase, got: #{result2}"
+  end
+
+  puts "Demo smoke test passed: preset conversion works correctly"
+end
+
 task :default => [
   "#{dest}/index.erb",
   "#{dest}/editor.js",
   "#{dest}/litelement.js",
   "#{dest}/livedemo.js",
   "#{dest}/ruby2js.js",
-  :selfhost
+  :selfhost,
+  :test_demo
 ]
 

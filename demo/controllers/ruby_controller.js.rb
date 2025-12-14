@@ -29,7 +29,7 @@ class RubyController < DemoController
     # parse options provided (if any)
     if element.dataset.options
       begin
-        options = JSON.parse(element.dataset.options)
+        @options = JSON.parse(element.dataset.options)
       rescue => e
         puts e.message
       end
