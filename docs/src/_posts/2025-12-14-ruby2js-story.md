@@ -100,7 +100,7 @@ The self-hosting work was particularly significant—proving that Ruby2JS can ha
 After 11 years:
 
 - **1,901 total commits**
-- **19 releases** (v3.6.0 through v5.1.2, with 6.0 in beta)
+- **19 releases** (v3.6.0 through v5.1.2, with an upcoming 6.0 beta)
 - **~60 AST node handlers**
 - **~23 filters** (functions, esm, camelCase, react, stimulus, and more)
 
