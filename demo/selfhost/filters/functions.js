@@ -165,7 +165,7 @@ if (!RegExp.escape) {
     };
 
     function initialize(...args) {
-      this._jsx = false;
+      let _jsx = false;
 
     };
 
@@ -334,7 +334,11 @@ if (!RegExp.escape) {
 
           if (token[1] === "capture") {
             groups.push(token.dup());
-            if (groups.length === index && stack.length !== 0) return process_children(node);
+
+            if (groups.length === index && stack.length !== 0) {
+              return process_children(node)
+            };
+
             stack.push(groups.last)
           } else if (token[1] === "close") {
             stack.pop()[stack.pop().length - 1] = token.last
@@ -771,7 +775,10 @@ if (!RegExp.escape) {
         } else {
           return process_children(node)
         }
-      } else if (method === "[]" && nodesEqual(target, s("const", null, "Hash"))) {
+      } else if (method === "[]" && nodesEqual(
+        target,
+        s("const", null, "Hash")
+      )) {
         return s(
           "send",
           s("const", null, "Object"),
@@ -1231,17 +1238,15 @@ if (!RegExp.escape) {
 
           "constructor"
         ))
-      } else if (method === "new" && nodesEqual(target, s(
-        "const",
-        null,
-        "Exception"
-      ))) {
+      } else if (method === "new" && nodesEqual(
+        target,
+        s("const", null, "Exception")
+      )) {
         return process(S("send", s("const", null, "Error"), "new", ...args))
-      } else if (method === "escape" && nodesEqual(target, s(
-        "const",
-        null,
-        "Regexp"
-      )) && es2025) {
+      } else if (method === "escape" && nodesEqual(
+        target,
+        s("const", null, "Regexp")
+      ) && es2025) {
         return process(S(
           "send",
           s("const", null, "RegExp"),
@@ -1352,14 +1357,14 @@ if (!RegExp.escape) {
           s("send", s("lvar", "a"), op, s("lvar", "b"))
         )))
       } else if (method === "method_defined?" && args.length >= 1) {
-        if (args[1] === s("false")) {
+        if (nodesEqual(args[1], s("false"))) {
           return process(S(
             "send",
             s("attr", target, "prototype"),
             "hasOwnProperty",
             args[0]
           ))
-        } else if (args.length === 1 || args[1] === s("true")) {
+        } else if (args.length === 1 || nodesEqual(args[1], s("true"))) {
           return process(S("in?", args[0], s("attr", target, "prototype")))
         } else {
           return process(S(
@@ -1377,11 +1382,10 @@ if (!RegExp.escape) {
           args[0],
           s("attr", s("attr", target, "prototype"), args[1].children[0])
         ))
-      } else if (method === "new" && args.length === 2 && nodesEqual(target, s(
-        "const",
-        null,
-        "Array"
-      ))) {
+      } else if (method === "new" && args.length === 2 && nodesEqual(
+        target,
+        s("const", null, "Array")
+      )) {
         return s(
           "send",
           S("send", target, "new", args.first),
@@ -1916,7 +1920,10 @@ if (!RegExp.escape) {
             ...node.children.slice(1)
           )
         ))]))
-      } else if (node.children[0] === s("send", null, "loop") && node.children[1] === s("args")) {
+      } else if (nodesEqual(node.children[0], s("send", null, "loop")) && nodesEqual(
+        node.children[1],
+        s("args")
+      )) {
         return S("while", s("true"), process(node.children[2]))
       } else if (method === "times" && call.children.length === 2) {
         count = call.children[0];
@@ -2245,7 +2252,7 @@ if (!RegExp.escape) {
         return S("class", name, s("const", null, "Error"), ...body)
       } else {
         if (body.length > 1) body = [s("begin", ...body)];
-        return process_children(node)
+        return process(S("class", name, inheritance, ...body))
       }
     };
 

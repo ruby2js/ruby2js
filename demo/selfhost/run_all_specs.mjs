@@ -34,23 +34,43 @@ async function ensurePrismInitialized() {
   }
 }
 
+// Map spec names to filter file names (when they differ)
+const SPEC_TO_FILTER_MAP = {
+  'camelcase_spec.rb': 'camelCase.js',
+  'cjs_spec.rb': 'cjs.js',
+};
+
 // Load transpiled filters on demand
-let functionsFilterLoaded = false;
-async function loadFunctionsFilter() {
-  if (functionsFilterLoaded) return;
+const loadedFilters = new Set();
+async function loadFilterForSpec(specName) {
+  // Derive filter name from spec name: functions_spec.rb -> functions.js
+  const baseName = specName.replace('_spec.rb', '');
+  const filterFile = SPEC_TO_FILTER_MAP[specName] || `${baseName}.js`;
+  const filterPath = `./filters/${filterFile}`;
+
+  if (loadedFilters.has(filterFile)) return true;
+
   try {
-    const filterModule = await import('./filters/functions.js');
+    const filterModule = await import(filterPath + '?t=' + Date.now());
+    const filterName = filterModule.default?.name || baseName.charAt(0).toUpperCase() + baseName.slice(1);
+
     // Register the filter in Ruby2JS.Filter namespace
     globalThis.Ruby2JS.Filter = globalThis.Ruby2JS.Filter || {};
-    globalThis.Ruby2JS.Filter.Functions = filterModule.default;
+    globalThis.Ruby2JS.Filter[filterName] = filterModule.default;
+
     // Also push to DEFAULTS array (for tests that check DEFAULTS.includes)
-    if (!globalThis.Ruby2JS.Filter.DEFAULTS.includes(filterModule.default)) {
+    if (filterModule.default && !globalThis.Ruby2JS.Filter.DEFAULTS.includes(filterModule.default)) {
       globalThis.Ruby2JS.Filter.DEFAULTS.push(filterModule.default);
     }
-    functionsFilterLoaded = true;
-    console.log('  (Functions filter loaded)');
+
+    loadedFilters.add(filterFile);
+    process.stdout.write(`(${filterName} filter loaded) `);
+    return true;
   } catch (e) {
-    console.log(`  Warning: Could not load Functions filter: ${e.message}`);
+    if (e.code !== 'ERR_MODULE_NOT_FOUND') {
+      console.log(`  Warning: Could not load filter ${filterFile}: ${e.message}`);
+    }
+    return false;
   }
 }
 
@@ -99,10 +119,8 @@ async function runSpec(specName) {
   try {
     await ensurePrismInitialized();
 
-    // Load Functions filter if running functions_spec
-    if (specName === 'functions_spec.rb') {
-      await loadFunctionsFilter();
-    }
+    // Try to load the corresponding filter for this spec
+    await loadFilterForSpec(specName);
 
     // Reset test state before running each spec
     resetTests();

@@ -7,6 +7,7 @@ require 'ruby2js'
 require 'ruby2js/filter/combiner'
 require 'ruby2js/filter/pragma'
 require 'ruby2js/filter/selfhost'
+require 'ruby2js/filter/selfhost/filter'
 require 'ruby2js/filter/polyfill'
 require 'ruby2js/filter/functions'
 require 'ruby2js/filter/return'
@@ -18,6 +19,8 @@ source = File.read(filter_file)
 # Skip requires that are external dependencies
 source = source.gsub(/^require ['"]ruby2js['"]/) { "#{$&} # Pragma: skip" }
 source = source.gsub(/^require ['"]regexp_parser.*['"]/) { "#{$&} # Pragma: skip" }
+source = source.gsub(/^require ['"]pathname['"]/) { "#{$&} # Pragma: skip" }
+source = source.gsub(/^require ['"]set['"]/) { "#{$&} # Pragma: skip" }
 source = source.gsub(/^require_relative ['"]\.\.\/filter['"]/) { "#{$&} # Pragma: skip" }
 
 js = Ruby2JS.convert(source,
@@ -30,6 +33,7 @@ js = Ruby2JS.convert(source,
   filters: [
     Ruby2JS::Filter::Pragma,
     Ruby2JS::Filter::Combiner,
+    Ruby2JS::Filter::Selfhost::Filter,
     Ruby2JS::Filter::Selfhost::Core,
     Ruby2JS::Filter::Selfhost::Converter,
     Ruby2JS::Filter::Polyfill,
@@ -39,8 +43,14 @@ js = Ruby2JS.convert(source,
   ]
 ).to_s
 
-# Extract the filter name from file
-filter_name = File.basename(filter_file, '.rb').split('_').map(&:capitalize).join
+# Extract the filter name from transpiled output (matches the Ruby module name)
+# Look for: const FilterName = (() => {
+if match = js.match(/^\s*const\s+(\w+)\s*=\s*\(\(\)\s*=>\s*\{/m)
+  filter_name = match[1]
+else
+  # Fallback: derive from filename
+  filter_name = File.basename(filter_file, '.rb').split('_').map(&:capitalize).join
+end
 
 # Add ES module wrapper for selfhost use
 preamble = <<~JS
@@ -137,7 +147,7 @@ JS
 
 # Replace the problematic module wrapper pattern
 js = js.gsub(/^const Ruby2JS = \{Filter: \(\(\) => \{\n/, '')
-js = js.gsub(/\n  DEFAULTS\.push\(Functions\);\n  return \{Functions\}\n\}\)\(\)\}$/, '')
+js = js.gsub(/\n  DEFAULTS\.push\(#{filter_name}\);\n  return \{#{filter_name}\}\n\}\)\(\)\}$/, '')
 
 # Fix incomplete expressions from 'super' calls that become empty
 # In Ruby filters, super calls the next filter which processes children
@@ -150,12 +160,7 @@ js = js.gsub(/= ;/, '= process_children(node);')
 js = js.gsub(/return (\s*}\s*(?:else|$))/, 'return process_children(node)\1')
 js = js.gsub(/return (\s*;)/, 'return process_children(node)\1')
 
-# Replace this._options with _options (module-level variable)
-js = js.gsub(/this\._options/, '_options')
-
-# Replace AST node comparisons with nodesEqual (Ruby == compares structure, JS === compares refs)
-# Pattern: target === s(...)  becomes  nodesEqual(target, s(...))
-js = js.gsub(/(\w+) === (s\([^)]+\))/, 'nodesEqual(\1, \2)')
+# NOTE: this._options and nodesEqual are now handled at AST level by selfhost/filter.rb
 
 # Fix the compact polyfill to use non-mutating filter (needed for frozen arrays from PrismWalker)
 # The polyfill provides a mutating version for compact!, but selfhost needs non-mutating

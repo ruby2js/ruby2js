@@ -112,6 +112,8 @@ module Ruby2JS
       rgroup = Converter::LOGICAL.include?( right.type ) &&
         op_index < operator_index( right.type )
       rgroup = true if right.type == :begin
+      # Assignment on RHS needs parentheses in JS: a && b = c -> a && (b = c)
+      rgroup = true if %i[lvasgn ivasgn cvasgn gvasgn masgn].include?(right.type)
 
       # Determine whether to use ?? or ||
       # :auto (default) - context-aware: || in boolean contexts, ?? in value contexts

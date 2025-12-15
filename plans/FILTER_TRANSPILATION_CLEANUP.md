@@ -347,69 +347,59 @@ node --check filters/<name>.js
 
 ### Phase 3: Functional Tests
 
-**Current test results** (2024-12-14, updated):
+**Current test results** (2024-12-14, latest):
 
 | Category | Status | Tests |
 |----------|--------|-------|
 | Ready specs | ✅ 3/3 passing | 290 tests (transliteration, serializer, namespace) |
-| functions filter | 92% | 187/203 passing (16 failures) |
+| Partial specs | 6 filters tested | See matrix below |
 
-#### Recent Fixes (2024-12-14)
+#### Filter Test Matrix
 
-- ✅ Fixed `Array.prototype.must_include` missing in test harness
-- ✅ Fixed extra `+0` in `rand(0..n)` - rewrote Ruby source to avoid `!= s(:int, 0)` structural comparison
-- ✅ Fixed safe navigation `empty?` producing `?.length()` - fixed `S()` binding to preserve AST location
-- ✅ Fixed DEFAULTS.includes test - push filter to DEFAULTS when loading
+| Filter | Syntax Valid | Tests Passing | Pass Rate | Notes |
+|--------|--------------|---------------|-----------|-------|
+| functions | ✓ | 189/203 | 93% | High coverage |
+| camelCase | ✓ | 17/19 | 89% | Near ready |
+| tagged_templates | ✓ | 6/7 | 86% | Near ready |
+| return | ✓ | 8/25 | 32% | Needs work |
+| esm | ✓ | 4/40 | 10% | Needs work |
+| cjs | ✓ | 1/19 | 5% | Needs work |
 
-#### Functions Filter Failure Analysis
+#### Blocked Filters
 
-The 16 remaining failures fall into these categories:
+These filters have transpilation issues that need selfhost improvements:
+
+| Filter | Issue |
+|--------|-------|
+| polyfill | `self.reorder` class method doesn't transpile to IIFE context |
+| pragma | `self.reorder` class method doesn't transpile to IIFE context |
+| securerandom | `extend SEXP` Ruby DSL not supported |
+| node | `extend SEXP` Ruby DSL not supported |
+
+#### Recent Progress (2024-12-14)
+
+**AST-level transformations added to `selfhost/filter.rb`:**
+- ✅ `nodesEqual` - AST structural comparison (`x == s(...)` → `nodesEqual(x, s(...))`)
+- ✅ Instance variable to module-level (`@options` → `_options`)
+- ✅ Writer method renaming (`def options=` → `def set_options`)
+
+**Converter improvements:**
+- ✅ Fixed assignment in logical expressions (parentheses for `a && (b = c)`)
+- ✅ Fixed `respond_to?` with implicit self target
+- ✅ Dynamic filter name extraction from transpiled output
+
+**Test harness improvements:**
+- ✅ Auto-load filters based on spec name
+- ✅ Filter-to-file mapping for non-standard names (e.g., `camelcase_spec.rb` → `camelCase.js`)
+
+#### Functions Filter Failure Analysis (14 remaining)
 
 | Category | Count | Description |
 |----------|-------|-------------|
-| **Block-pass (`&:method`)** | 4 | Symbol-to-proc not expanded to arrow functions |
-| **Metaprogramming** | 5 | Missing class context (`prototype` vs `ClassName.prototype`) |
-| **Class.new object literal** | 4 | Anonymous class → object literal not implemented |
-| **Runtime errors** | 2 | Transpiled filter code crashes (matchAll, body.length()) |
-| **method_defined? conditional** | 1 | Unnecessary if/else wrapper |
-
-**Detailed failures:**
-
-1. **Block-pass / symbol-to-proc** (4 failures):
-   - `a.all?(&:ready)` → should be `a.every(item => item.ready)`
-   - `a.map(&:to_i)` → should be `a.map(item => parseInt(item))`
-   - `a.sort(&:<)` → should be `a.sort((a, b) => a < b)`
-   - `loop { break }` block-pass pattern
-
-   *Root cause*: Symbol-to-proc expansion not implemented in selfhost filter
-
-2. **Metaprogramming context** (5 failures):
-   - `method_defined?`, `alias_method`, `define_method` produce bare `prototype` instead of `ClassName.prototype`
-
-   *Root cause*: Class name context not tracked during filter processing
-
-3. **Class.new object literal** (4 failures):
-   - `Class.new { def foo; 1; end }.new` should become `{get foo() {return 1}}`
-
-   *Root cause*: Feature not implemented in selfhost filter
-
-4. **Runtime errors** (2 failures):
-   - Regular expression index assignment: `matchAll` undefined (requires Regexp::Scanner port)
-   - Exception constructor: `body.length()` should be `body.length` (transpilation bug, root cause unknown)
-
-   *Root cause*: Transpiled filter code has bugs in edge cases
-
-**Blocked on filter loading**: Other filter specs (return, camelCase, esm, etc.) need their corresponding filters loaded by the test harness. Currently only the functions filter is loaded.
-
-**Next step**: Enhance test harness to auto-load filter based on spec name, then generate full matrix:
-
-| Filter | Syntax Valid | Tests Passing | Notes |
-|--------|--------------|---------------|-------|
-| functions | ✓ | 184/203 (91%) | Loaded and tested |
-| return | ✓ | TBD | needs filter loaded |
-| camelCase | ✓ | TBD | needs filter loaded |
-| esm | ✓ | TBD | needs filter loaded |
-| ... | ✓ | TBD | Need filter loading infrastructure |
+| **Block-pass (`&:method`)** | 3 | Symbol-to-proc not expanded |
+| **Metaprogramming** | 5 | Missing class context |
+| **Class.new object literal** | 4 | Anonymous class → object literal |
+| **Runtime errors** | 2 | matchAll undefined, body.length() |
 
 ## Completion Criteria
 

@@ -6,31 +6,32 @@
     "namespace_spec.rb"
   ],
   "partial": [
-    "functions_spec.rb"
+    "functions_spec.rb",
+    "return_spec.rb",
+    "camelcase_spec.rb",
+    "esm_spec.rb",
+    "tagged_templates_spec.rb",
+    "cjs_spec.rb"
   ],
   "blocked": {
     "comments_spec.rb": "needs filters (Ruby2JS.Filter.Functions)",
-    "return_spec.rb": "needs return filter loaded",
-    "camelcase_spec.rb": "needs camelCase filter loaded",
-    "esm_spec.rb": "needs esm filter loaded",
+    "polyfill_spec.rb": "self.reorder method doesn't transpile",
+    "pragma_spec.rb": "self.reorder method doesn't transpile",
+    "securerandom_spec.rb": "extend SEXP doesn't transpile",
+    "node_spec.rb": "extend SEXP doesn't transpile",
     "react_spec.rb": "needs filters",
     "stimulus_spec.rb": "needs filters",
     "jquery_spec.rb": "needs filters",
     "underscore_spec.rb": "needs filters",
     "active_functions_spec.rb": "needs filters",
     "active_support_spec.rb": "needs filters",
-    "cjs_spec.rb": "needs filters",
     "erb_spec.rb": "needs filters",
     "jsx_spec.rb": "needs filters",
     "lit_spec.rb": "needs filters",
     "matchAll_spec.rb": "needs filters",
     "minitest_jasmine_spec.rb": "needs filters",
-    "node_spec.rb": "needs filters",
     "nokogiri_spec.rb": "needs filters",
-    "pragma_spec.rb": "needs filters",
     "preact_spec.rb": "needs filters",
-    "securerandom_spec.rb": "needs filters",
-    "tagged_templates_spec.rb": "needs filters",
     "vue_spec.rb": "needs filters"
   }
 }
