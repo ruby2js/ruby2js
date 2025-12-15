@@ -37,4 +37,7 @@ plans/
 
 # Selfhost generated outputs (regenerated via npm run build:*)
 demo/selfhost/dist/
+demo/selfhost/ruby2js.js
 demo/selfhost/ruby2js.mjs
+demo/selfhost/prism_browser.js
+demo/selfhost/filters/
