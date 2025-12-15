@@ -34,7 +34,7 @@ export const Filter = {
 // Setup: DEFAULTS array for filter registration
 export const DEFAULTS = [];
 
-// Filter infrastructure functions (bound by FilterProcessor at runtime)
+// Filter infrastructure functions (bound by Pipeline via _setup at runtime)
 // Default implementations return false/do nothing until bound
 // Note: 'process' renamed to 'processNode' to avoid conflict with Node.js global
 export let excluded = () => false;

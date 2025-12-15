@@ -65,106 +65,16 @@ if (!Object.prototype.to_a) {
   });
 }
 
-// Add ast_node helper if not present
+// Export SEXP globally for transpiled filters
+// (Bundle's SEXP.s already creates Node instances with updated() method)
+const SEXP = Ruby2JS.Filter.SEXP;
+Ruby2JS.SEXP = SEXP;
+globalThis.SEXP = SEXP;
+
+// AST node type checker - used by transpiled filters (e.g., Ruby2JS.ast_node(node))
 Ruby2JS.ast_node = Ruby2JS.ast_node || function(obj) {
   return typeof obj === 'object' && obj !== null && 'type' in obj && 'children' in obj;
 };
-
-// Use SEXP from the transpiled bundle
-const SEXP = Ruby2JS.Filter.SEXP;
-
-// Node updated method - creates new node with optional type/children changes
-function nodeUpdated(newType, newChildren) {
-  const type = newType ?? this.type;
-  const children = newChildren ?? this.children;
-  return {
-    type,
-    children,
-    updated: nodeUpdated,
-    is_method: this.is_method,
-    get first() { return children[0]; },
-    get last() { return children[children.length - 1]; }
-  };
-}
-
-// Wrap s() to add nodeUpdated if the transpiled version doesn't have it
-const originalS = SEXP.s.bind(SEXP);
-SEXP.s = function(type, ...children) {
-  const node = originalS(type, ...children);
-  if (!node.updated) {
-    node.updated = nodeUpdated;
-  }
-  return node;
-};
-
-// FilterProcessor - thin wrapper that uses transpiled Ruby2JS.Filter.Processor
-// Copies filter methods onto a Processor instance and delegates to it
-class FilterProcessor {
-  constructor(filter, options = {}) {
-    // Create a Processor instance (it expects comments as constructor arg)
-    this._processor = new Ruby2JS.Filter.Processor({});
-    this._processor.options = options;
-    this._filter = filter;
-
-    // Copy filter's on_<type> methods onto the processor
-    for (const key of Object.keys(filter)) {
-      if (key.startsWith('on_') && typeof filter[key] === 'function') {
-        this._processor[key] = filter[key].bind(filter);
-      }
-    }
-
-    // Also check prototype for methods
-    const proto = Object.getPrototypeOf(filter);
-    if (proto) {
-      for (const key of Object.getOwnPropertyNames(proto)) {
-        if (key.startsWith('on_') && typeof filter[key] === 'function') {
-          this._processor[key] = filter[key].bind(filter);
-        }
-      }
-    }
-
-    // Bind SEXP methods to the filter for creating nodes
-    filter.s = SEXP.s;
-    filter.S = (type, ...children) => this._processor._ast?.updated(type, children);
-    filter.ast_node = Ruby2JS.ast_node;
-    filter._options = options;
-
-    // Bind process to filter for recursive calls
-    filter.process = (node) => this._processor.process(node);
-    filter.process_children = (node) => this._processor.process_children(node);
-
-    // Add excluded/included checkers
-    const excludedFn = (method) => Ruby2JS.Filter._excluded.has(method);
-    const includedFn = (method) => Ruby2JS.Filter._included.has(method);
-    filter.excluded = excludedFn;
-    filter.included = includedFn;
-
-    // Call _setup if filter has it (for transpiled filters with module-level functions)
-    if (typeof filter._setup === 'function') {
-      filter._setup({
-        excluded: excludedFn,
-        included: includedFn,
-        process: filter.process,
-        process_children: filter.process_children,
-        s: SEXP.s,
-        S: filter.S
-      });
-    }
-  }
-
-  process(node) {
-    return this._processor.process(node);
-  }
-
-  processChildren(node) {
-    return this._processor.process_children(node);
-  }
-}
-
-// Export for use by transpiled filters
-Ruby2JS.FilterProcessor = FilterProcessor;
-Ruby2JS.SEXP = SEXP;
-globalThis.SEXP = SEXP;
 
 // Re-export initPrism from bundle (already initialized at module load)
 export async function initPrism() {
