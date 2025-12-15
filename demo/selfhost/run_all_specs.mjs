@@ -11,7 +11,7 @@
 //   --verbose         Show failure details for all specs (including partial)
 
 import { execSync } from 'child_process';
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync, existsSync, readdirSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
@@ -42,29 +42,57 @@ const SPEC_TO_FILTER_MAP = {
 
 // Load transpiled filters on demand
 const loadedFilters = new Set();
+
+// Load all available filters at startup
+async function loadAllFilters() {
+  const filtersDir = join(__dirname, 'filters');
+  if (!existsSync(filtersDir)) return;
+
+  const filterFiles = readdirSync(filtersDir).filter(f => f.endsWith('.js'));
+  for (const filterFile of filterFiles) {
+    if (loadedFilters.has(filterFile)) continue;
+    try {
+      await import(`./filters/${filterFile}?t=${Date.now()}`);
+      loadedFilters.add(filterFile);
+    } catch (e) {
+      // Filter failed to load, ignore (might have dependencies not yet available)
+    }
+  }
+}
+
 async function loadFilterForSpec(specName) {
   // Derive filter name from spec name: functions_spec.rb -> functions.js
   const baseName = specName.replace('_spec.rb', '');
   const filterFile = SPEC_TO_FILTER_MAP[specName] || `${baseName}.js`;
   const filterPath = `./filters/${filterFile}`;
 
-  if (loadedFilters.has(filterFile)) return true;
+  // Check if filter already loaded (case-insensitive check for loadedFilters)
+  const alreadyLoaded = [...loadedFilters].some(f => f.toLowerCase() === filterFile.toLowerCase());
+  if (alreadyLoaded) {
+    // Find the actual filter name in Ruby2JS.Filter (case-insensitive)
+    const filterNames = Object.keys(globalThis.Ruby2JS.Filter || {});
+    const actualName = filterNames.find(n => n.toLowerCase() === baseName.toLowerCase());
+    if (actualName) {
+      process.stdout.write(`(${actualName} filter loaded) `);
+    }
+    return true;
+  }
 
   try {
     // Import the filter module - this triggers registerFilter() which sets up Ruby2JS.Filter[name]
     await import(filterPath + '?t=' + Date.now());
 
-    // Get the filter name from the registered filter (registerFilter already did the setup)
-    const filterName = baseName.charAt(0).toUpperCase() + baseName.slice(1);
-    const registeredFilter = globalThis.Ruby2JS.Filter?.[filterName];
+    // Find the filter name (case-insensitive search)
+    const filterNames = Object.keys(globalThis.Ruby2JS.Filter || {});
+    const actualName = filterNames.find(n => n.toLowerCase() === baseName.toLowerCase());
 
-    if (!registeredFilter) {
-      console.log(`  Warning: Filter ${filterName} not found after loading ${filterFile}`);
+    if (!actualName) {
+      console.log(`  Warning: Filter for ${baseName} not found after loading ${filterFile}`);
       return false;
     }
 
     loadedFilters.add(filterFile);
-    process.stdout.write(`(${filterName} filter loaded) `);
+    process.stdout.write(`(${actualName} filter loaded) `);
     return true;
   } catch (e) {
     if (e.code !== 'ERR_MODULE_NOT_FOUND') {
@@ -118,6 +146,9 @@ async function runSpec(specName) {
 
   try {
     await ensurePrismInitialized();
+
+    // Load all available filters (needed for specs with cross-filter dependencies)
+    await loadAllFilters();
 
     // Try to load the corresponding filter for this spec
     await loadFilterForSpec(specName);

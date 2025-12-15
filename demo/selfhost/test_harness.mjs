@@ -21,6 +21,23 @@ setupGlobals(Ruby2JS);
 globalThis.Namespace = Ruby2JS.Namespace;
 globalThis.Ruby2JS = Ruby2JS;
 
+// Provide a require shim for transpiled specs that use inline require
+// (e.g., require 'ruby2js/filter/return' inside a function)
+// Filters should already be loaded by run_all_specs.mjs, so this is a no-op
+globalThis.require = function(path) {
+  // Extract filter name from path like "ruby2js/filter/return"
+  const match = path.match(/ruby2js\/filter\/(\w+)/);
+  if (match) {
+    const filterName = match[1].charAt(0).toUpperCase() + match[1].slice(1);
+    if (!Ruby2JS.Filter[filterName]) {
+      throw new Error(`Filter ${filterName} not loaded. Load it via run_all_specs.mjs or import manually.`);
+    }
+    // Filter already loaded, nothing to do
+    return;
+  }
+  throw new Error(`require not supported for: ${path}`);
+};
+
 // Alias Parser.AST.Node to Ruby2JS.Node so transpiled SEXP.s works
 // (Ruby source uses Parser gem's AST nodes, JS uses Ruby2JS.Node)
 globalThis.Parser = { AST: { Node: Ruby2JS.Node } };
