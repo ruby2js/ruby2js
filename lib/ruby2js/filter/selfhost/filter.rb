@@ -35,7 +35,6 @@ module Ruby2JS
         def initialize(*args)
           super
           @selfhost_filter_name = nil
-          @selfhost_in_filter_method = false
         end
 
         # Skip require/require_relative for external dependencies
@@ -193,25 +192,17 @@ module Ruby2JS
         # (lib/ruby2js/converter/module.rb) which transforms it to a regular
         # function that's included in the returned object.
 
-        # Track when we're in a filter method (on_X)
+        # Transform writer methods: def options=(x) → def set_options(x)
+        # Note: This is a simple renaming; the preamble provides a proxy if needed
         def on_def(node)
           method_name = node.children[0]
 
-          # Transform writer methods: def options=(x) → def set_options(x)
-          # Note: This is a simple renaming; the preamble provides a proxy if needed
           if method_name.to_s.end_with?('=')
             new_name = "set_#{method_name.to_s.chomp('=')}"
             node = node.updated(nil, [new_name.to_sym, *node.children[1..-1]])
           end
 
-          # Track if we're in an on_* method (filter handler)
-          was_in_filter_method = @selfhost_in_filter_method
-          @selfhost_in_filter_method = method_name.to_s.start_with?('on_')
-
-          result = super(node)
-
-          @selfhost_in_filter_method = was_in_filter_method
-          result
+          super(node)
         end
 
         # Transform instance variables to module-level variables
