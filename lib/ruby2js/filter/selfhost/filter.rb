@@ -31,6 +31,16 @@ module Ruby2JS
           set
         ].freeze
 
+        # Methods that should always be property access (no parentheses) in JS.
+        # When nodes are created with s(), they lack location info, so is_method?
+        # returns true and parentheses get added. We convert these to :attr nodes
+        # to force property access.
+        #
+        # TODO: Revisit this - it's specific to selfhost transpilation. A more general
+        # solution might be to have s() preserve some location metadata or to have
+        # is_method? check the source_map option to know when we're doing selfhost.
+        ALWAYS_PROPERTIES = %i[length size count].freeze
+
         # Track if we're inside a filter module (Ruby2JS::Filter::X)
         def initialize(*args)
           super
@@ -92,6 +102,13 @@ module Ruby2JS
           if @selfhost_filter_name && target.nil? &&
              [:process_all, :process_children].include?(method_name)
             return process node.updated(nil, [s(:self), method_name, *args])
+          end
+
+          # Convert length/size/count to :attr nodes to ensure property access.
+          # Without this, nodes created with s() (no location info) get is_method?=true
+          # and output as method calls like body.length() instead of body.length.
+          if target && args.empty? && ALWAYS_PROPERTIES.include?(method_name)
+            return s(:attr, process(target), method_name)
           end
 
           super
