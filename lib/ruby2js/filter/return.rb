@@ -29,7 +29,8 @@ module Ruby2JS
 
         # Don't wrap Class.new blocks - they contain method definitions, not return values
         if call.type == :send and call.children[0]&.type == :const and
-           call.children[0].children == [nil, :Class] and call.children[1] == :new
+           call.children[0].children[0].nil? and call.children[0].children[1] == :Class and
+           call.children[1] == :new
           return node
         end
 
