@@ -14,23 +14,24 @@ Instead, the goal is to:
 
 This "dogfooding" approach ensures that improvements benefit all Ruby2JS users, not just the selfhost. When a Ruby pattern doesn't transpile correctly, we fix the converter or filters—making Ruby2JS better for everyone.
 
-## Status: Filters In Progress
+## Status: Filters Working
 
-A single `ruby2js.mjs` bundle provides the full converter for both CLI and browser use. The same code is tested in CI, runs in Node.js CLI, and works in browsers.
+A single `ruby2js.js` bundle provides the full converter for both CLI and browser use. The same code is tested in CI, runs in Node.js CLI, and works in browsers.
 
 **Supported:**
 - Classes, methods, blocks, string interpolation
 - Arrays, hashes, if/else/case, loops, operators
 - Comments (preserved in output)
-- Full transliteration, serializer, and namespace test suites passing
-- **Functions filter**: 122/202 tests passing (60%)
+- Full transliteration, serializer, and namespace test suites passing (291 tests)
+- **Functions filter**: 190/203 tests passing (94%)
 
-**In Progress:**
-- Functions filter (partial support, transpiled from Ruby source)
-- Filter infrastructure (SEXP helpers, FilterProcessor base class)
+**Filter Infrastructure:**
+- Filter runtime bundled into `ruby2js.js` (no separate imports needed)
+- `Selfhost::Filter` generates imports, registration, and exports automatically
+- Transpile script is pure declarative (45 lines, no gsubs or manual wrappers)
 
-**Not yet supported:**
-- Other filters (camelCase, esm, react, stimulus, etc.)
+**Not yet fully tested:**
+- Other filters (camelCase at 89%, tagged_templates at 86%, others need work)
 - Full configuration options
 
 ## Architecture
@@ -66,25 +67,28 @@ npm test
 
 ## Key Files
 
-| File | LOC | Description |
-|------|-----|-------------|
-| `ruby2js.mjs` | 15,408 | Unified bundle - CLI and importable module |
-| `prism_browser.mjs` | 231 | Browser WASM loader for Prism |
-| `browser_demo.html` | 388 | Browser demo page |
-| `test_harness.mjs` | 435 | Test framework for specs |
-| `run_all_specs.mjs` | 309 | Manifest-driven spec runner for CI |
-| `spec_manifest.json` | 36 | Spec status tracking (ready/partial/blocked) |
-| `dist/` | — | Transpiled specs and filters |
+| File | Description |
+|------|-------------|
+| `ruby2js.js` | Generated bundle - converter + filter runtime (regenerate via `npm run build:bundle`) |
+| `filter_runtime.js` | Filter runtime source (appended to ruby2js.js during build) |
+| `prism_browser.js` | Generated browser WASM loader (regenerate via `npm run build:prism-browser`) |
+| `ruby2js-cli.js` | CLI wrapper for Node.js |
+| `browser_demo.html` | Browser demo page |
+| `test_harness.mjs` | Test framework for specs |
+| `run_all_specs.mjs` | Manifest-driven spec runner for CI |
+| `spec_manifest.json` | Spec status tracking (ready/partial/blocked) |
+| `filters/` | Generated transpiled filters (regenerate via `npm run build:filters`) |
+| `dist/` | Generated transpiled specs |
 
 ### Scripts
 
-| File | LOC | Description |
-|------|-----|-------------|
-| `scripts/transpile_bundle.rb` | 87 | Transpiles Ruby2JS bundle to JS |
-| `scripts/transpile_filter.rb` | 207 | Transpiles filters (e.g., functions) to JS |
-| `scripts/transpile_spec.rb` | 39 | Transpiles RSpec files to JS |
-| `scripts/transpile_prism_browser.rb` | 28 | Transpiles browser Prism loader |
-| `scripts/test_handlers.rb` | 94 | Test helper for converter handlers |
+| File | Description |
+|------|-------------|
+| `scripts/transpile_bundle.rb` | Transpiles Ruby2JS bundle to JS (includes filter runtime) |
+| `scripts/transpile_filter.rb` | Transpiles filters - pure declarative, 45 lines |
+| `scripts/transpile_spec.rb` | Transpiles RSpec files to JS |
+| `scripts/transpile_prism_browser.rb` | Transpiles browser Prism loader |
+| `scripts/test_handlers.rb` | Test helper for converter handlers |
 
 ### Transpiled Output (dist/)
 
@@ -176,7 +180,7 @@ Import directly from the bundle:
 
 ```html
 <script type="module">
-  import { convert } from './ruby2js.mjs';
+  import { convert } from './ruby2js.js';
 
   const js = convert('puts "hello"');
   console.log(js); // console.log("hello")
@@ -196,12 +200,23 @@ The bundle exports:
 
 ```javascript
 import {
+  // Core conversion
   convert,           // Main conversion function
   Ruby2JS,           // Module with internal classes
   initPrism,         // Initialize Prism parser
   getPrismParse,     // Get the Prism parse function
-  // Plus runtime classes for advanced usage
-} from './ruby2js.mjs';
+
+  // Filter runtime (for transpiled filters)
+  Parser,            // Parser.AST.Node alias
+  SEXP, s, S,        // AST construction helpers
+  ast_node,          // Check if value is AST node
+  Filter, DEFAULTS,  // Filter registration
+  processNode,       // Process AST node through filter chain
+  process_children,  // Process children of a node
+  nodesEqual,        // Structural AST comparison
+  registerFilter,    // Register a filter
+  // ... and more
+} from './ruby2js.js';
 
 // Simple usage
 const js = convert(rubySource, { eslevel: 2022 });
@@ -232,16 +247,15 @@ filters: [
 ## Known Limitations
 
 - **Some tests skipped**: Proc source location and similar JavaScript limitations
-- **Partial filter support**: Functions filter is 60% passing (122/202 tests)
-- **Blocked specs**: Most filter specs still blocked - see `spec_manifest.json` for details
-- **Super handling**: Ruby's `super` in filter methods needs manual fixup in transpiled output
+- **Functions filter**: 13 remaining failures (block-pass, metaprogramming, Class.new patterns)
+- **Other filters**: camelCase (89%), tagged_templates (86%) near ready; others need work
 
 ## Future Work
 
-1. Complete Functions filter (remaining 80 failing tests)
-2. Transpile additional filters (camelCase, esm, react, etc.)
-3. Add configuration options
-4. Reduce manual fixups needed in `transpile_filter.rb` (especially `super` handling)
+1. Complete Functions filter (13 remaining failures)
+2. Promote high-passing filters (camelCase, tagged_templates) to ready status
+3. Fix common patterns in lower-passing filters (esm, cjs, pragma)
+4. Add configuration options for browser/Node.js environments
 
 ## References
 

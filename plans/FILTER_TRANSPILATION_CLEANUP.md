@@ -419,9 +419,39 @@ These filters have transpilation issues that need selfhost improvements:
 **Selfhost::Filter now handles:**
 - ✅ Skipping external requires (`ruby2js`, `regexp_parser`, `pathname`, `set`)
 - ✅ Skipping `require_relative '../filter'` and `'./filter'`
-- ✅ Generating import from `filter_runtime.js` with all needed exports
+- ✅ Generating import from `ruby2js.js` with all needed exports
 - ✅ Generating `registerFilter()` call
 - ✅ Generating default and named exports
+
+#### Additional Progress (2024-12-14, later)
+
+**Filter runtime merged into ruby2js.js:**
+- ✅ `filter_runtime.js` content now appended to `ruby2js.js` by `transpile_bundle.rb`
+- ✅ Filters import from single `../ruby2js.js` instead of separate runtime file
+- ✅ Renamed `process` to `processNode` to avoid Node.js global conflict
+- ✅ Filters get `const process = node => processNode(node)` wrapper for compatibility
+
+**Generated files removed from git:**
+- ✅ Added to `.gitignore`: `ruby2js.js`, `prism_browser.js`, `filters/`
+- ✅ These are regenerated via `npm run build`
+- ✅ Reduces repo size by ~21K lines of generated code
+
+**Final transpiled filter structure:**
+```javascript
+import { Parser, SEXP, s, S, ast_node, include, Filter, DEFAULTS,
+         excluded, included, processNode, process_children, process_all,
+         _options, filterContext, nodesEqual, registerFilter, Ruby2JS
+       } from "../ruby2js.js";
+const process = node => processNode(node);
+
+const Functions = (() => {
+  // filter code...
+})();
+
+registerFilter("Functions", Functions);
+export default Functions;
+export { Functions }
+```
 
 #### Functions Filter Failure Analysis (13 remaining)
 
