@@ -3,7 +3,10 @@
 # Selfhost Filter Filter - Transformations for Filter transpilation
 #
 # Handles patterns specific to transpiling Ruby2JS filters to JavaScript:
+# - Skip external requires (ruby2js, regexp_parser, etc.)
 # - Module wrapper: Ruby2JS::Filter::X → X class/object
+# - Generate import from filter_runtime.js
+# - Generate filter registration and export
 # - super calls → process_children(node) or process(arg)
 # - Writer methods: def options=(x) → setter or regular method
 # - AST comparisons: x == s(...) → nodesEqual(x, s(...))
@@ -20,6 +23,14 @@ module Ruby2JS
       module Filter
         include SEXP
 
+        # External dependencies that should be skipped (not transpiled)
+        SKIP_REQUIRES = %w[
+          ruby2js
+          regexp_parser
+          pathname
+          set
+        ].freeze
+
         # Track if we're inside a filter module (Ruby2JS::Filter::X)
         def initialize(*args)
           super
@@ -27,7 +38,53 @@ module Ruby2JS
           @selfhost_in_filter_method = false
         end
 
-        # Unwrap Ruby2JS::Filter::X module structure
+        # Skip require/require_relative for external dependencies
+        # Also handle AST structural comparisons (nodesEqual)
+        def on_send(node)
+          target, method_name, *args = node.children
+
+          # Handle require 'external_dep'
+          if target.nil? && method_name == :require && args.length == 1
+            if args.first.type == :str
+              path = args.first.children.first
+              if SKIP_REQUIRES.any? { |dep| path == dep || path.start_with?("#{dep}/") }
+                return s(:hide)
+              end
+            end
+          end
+
+          # Handle require_relative '../filter'
+          if target.nil? && method_name == :require_relative && args.length == 1
+            if args.first.type == :str
+              path = args.first.children.first
+              if path == '../filter' || path == './filter'
+                return s(:hide)
+              end
+            end
+          end
+
+          # Handle == or === with s(...) on RHS
+          if [:==, :===].include?(method_name) && args.length == 1 && target
+            rhs = args[0]
+            if rhs.type == :send && rhs.children[0].nil? && rhs.children[1] == :s
+              # x == s(...) → nodesEqual(x, s(...))
+              return process s(:send, nil, :nodesEqual, target, rhs)
+            end
+          end
+
+          # Handle != with s(...) on RHS
+          if method_name == :!= && args.length == 1 && target
+            rhs = args[0]
+            if rhs.type == :send && rhs.children[0].nil? && rhs.children[1] == :s
+              # x != s(...) → !nodesEqual(x, s(...))
+              return process s(:send, s(:send, nil, :nodesEqual, target, rhs), :'!')
+            end
+          end
+
+          super
+        end
+
+        # Unwrap Ruby2JS::Filter::X module structure and generate wrapper
         # Input:
         #   module Ruby2JS
         #     module Filter
@@ -37,7 +94,11 @@ module Ruby2JS
         #       DEFAULTS << Functions
         #     end
         #   end
-        # Output: just the Functions module content (without DEFAULTS)
+        # Output:
+        #   import { ... } from 'filter_runtime.js'
+        #   const Functions = (() => { ... })()
+        #   registerFilter('Functions', Functions)
+        #   export { Functions as default, Functions }
         def on_module(node)
           name_node = node.children[0]
           body = node.children[1..-1]
@@ -65,9 +126,41 @@ module Ruby2JS
                 filter_modules = filter_body.select { |n| n&.type == :module }
 
                 if filter_modules.length == 1
-                  # Return just the filter module, processed
                   @selfhost_filter_name = filter_modules.first.children[0].children[1]
-                  return process(filter_modules.first)
+                  filter_name = @selfhost_filter_name.to_s
+
+                  # Build the complete output with import, filter, registration, export
+                  return s(:begin,
+                    # Import from filter_runtime.js
+                    s(:import,
+                      '../filter_runtime.js',
+                      [s(:const, nil, :Parser),
+                       s(:const, nil, :SEXP),
+                       s(:const, nil, :s),
+                       s(:const, nil, :S),
+                       s(:const, nil, :ast_node),
+                       s(:const, nil, :include),
+                       s(:const, nil, :Filter),
+                       s(:const, nil, :DEFAULTS),
+                       s(:const, nil, :excluded),
+                       s(:const, nil, :included),
+                       s(:const, nil, :process),
+                       s(:const, nil, :process_children),
+                       s(:const, nil, :process_all),
+                       s(:const, nil, :_options),
+                       s(:const, nil, :filterContext),
+                       s(:const, nil, :nodesEqual),
+                       s(:const, nil, :registerFilter),
+                       s(:const, nil, :Ruby2JS)]
+                    ),
+                    # The filter module itself
+                    process(filter_modules.first),
+                    # Register the filter
+                    s(:send, nil, :registerFilter, s(:str, filter_name), s(:const, nil, filter_name.to_sym)),
+                    # Export the filter
+                    s(:export, :default, s(:const, nil, filter_name.to_sym)),
+                    s(:export, s(:array, s(:const, nil, filter_name.to_sym)))
+                  )
                 end
               end
             end
@@ -123,36 +216,6 @@ module Ruby2JS
 
           @selfhost_in_filter_method = was_in_filter_method
           result
-        end
-
-        # Transform AST structural comparisons
-        # x == s(:type, ...) → nodesEqual(x, s(:type, ...))
-        # x != s(:type, ...) → !nodesEqual(x, s(:type, ...))
-        def on_send(node)
-          target, method_name, *args = node.children
-
-          # Handle == or === with s(...) on RHS
-          if [:==, :===].include?(method_name) && args.length == 1 && target
-            rhs = args[0]
-            if rhs.type == :send && rhs.children[0].nil? && rhs.children[1] == :s
-              # x == s(...) → nodesEqual(x, s(...))
-              return process s(:send, nil, :nodesEqual, target, rhs)
-            end
-          end
-
-          # Handle != with s(...) on RHS
-          if method_name == :!= && args.length == 1 && target
-            rhs = args[0]
-            if rhs.type == :send && rhs.children[0].nil? && rhs.children[1] == :s
-              # x != s(...) → !nodesEqual(x, s(...))
-              return process s(:send, s(:send, nil, :nodesEqual, target, rhs), :'!')
-            end
-          end
-
-          # Transform @options → _options (instance var to module var)
-          # This is handled by ivar transformation below
-
-          super
         end
 
         # Transform instance variables to module-level variables

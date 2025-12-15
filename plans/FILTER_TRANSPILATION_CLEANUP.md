@@ -339,11 +339,13 @@ All 27 filters transpile to syntactically valid JavaScript (verified 2024-12-14)
 node --check filters/<name>.js
 ```
 
-### Phase 2: Clean Transpilation Process
+### Phase 2: Clean Transpilation Process ✅ COMPLETE
 
-1. `transpile_filter.rb` has no gsubs
-2. `transpile_filter.rb` has no heredoc preamble/postamble
-3. Filter transpilation is purely declarative (specify filters, get output)
+1. ✅ `transpile_filter.rb` has no gsubs
+2. ✅ `transpile_filter.rb` has no heredoc preamble/postamble
+3. ✅ Filter transpilation is purely declarative (specify filters, get output)
+
+The transpile script is now 45 lines of pure Ruby2JS configuration - no manual string manipulation.
 
 ### Phase 3: Functional Tests
 
@@ -406,13 +408,20 @@ These filters have transpilation issues that need selfhost improvements:
 - ✅ Object constant quoting (1 gsub) - no longer appears in output
 - ✅ Regopt spread fix (1 gsub) - fixed at source in functions.rb
 
-**Remaining gsubs (source preprocessing only - acceptable):**
-- 5 gsubs that add `# Pragma: skip` to require statements (these pre-process the source, not post-process output)
+**Remaining gsubs:**
+- ✅ NONE - All gsubs eliminated!
 
 **Preamble/Postamble eliminated:**
 - ✅ Created shared `filter_runtime.js` module with all runtime infrastructure
-- ✅ Transpile script reduced from ~185 lines to ~73 lines
+- ✅ Transpile script reduced from ~185 lines to ~45 lines (pure declarative conversion)
 - ✅ Generated output now just has: import statement + filter code + registration + export
+
+**Selfhost::Filter now handles:**
+- ✅ Skipping external requires (`ruby2js`, `regexp_parser`, `pathname`, `set`)
+- ✅ Skipping `require_relative '../filter'` and `'./filter'`
+- ✅ Generating import from `filter_runtime.js` with all needed exports
+- ✅ Generating `registerFilter()` call
+- ✅ Generating default and named exports
 
 #### Functions Filter Failure Analysis (13 remaining)
 
