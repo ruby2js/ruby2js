@@ -174,8 +174,12 @@ async function main() {
 
     if (arg === '--ast') {
       outputMode = 'walker-ast';
+    } else if (arg === '--filtered-ast') {
+      outputMode = 'filtered-ast';
     } else if (arg === '--prism-ast') {
       outputMode = 'prism-ast';
+    } else if (arg === '--compare') {
+      outputMode = 'compare';
     } else if (arg === '--js') {
       outputMode = 'js';
     } else if (arg === '-e') {
@@ -243,7 +247,9 @@ Usage:
 Output Modes:
   --js              Output JavaScript (default)
   --ast             Output AST (Parser-compatible s-expression format)
+  --filtered-ast    Output AST after filters are applied
   --prism-ast       Output raw Prism AST (verbose object format)
+  --compare         Compare JS CLI output with Ruby CLI output (requires ruby2js in PATH)
   --find=PATTERN    Find nodes matching PATTERN (regex) in Prism AST
   --inspect=PATH    Inspect node at PATH (e.g., "root.statements.body[0]")
 
@@ -367,6 +373,95 @@ Examples:
         const walker = new Ruby2JS.PrismWalker(source, options.file);
         const ast = walker.visit(parseResult.value);
         console.log(formatAst(ast));
+        break;
+      }
+
+      case 'filtered-ast': {
+        // Get AST after filters are applied
+        const walker = new Ruby2JS.PrismWalker(source, options.file);
+        let ast = walker.visit(parseResult.value);
+
+        if (loadedFilters.length > 0) {
+          options.filters = loadedFilters;
+        }
+
+        // Use Pipeline to apply filters
+        const sourceBuffer = walker.source_buffer;
+        const wrappedComments = (parseResult.comments || []).map(c =>
+          new PrismComment(c, source, sourceBuffer)
+        );
+        const comments = associateComments(ast, wrappedComments);
+
+        const pipeline = new Ruby2JS.Pipeline(ast, comments, {
+          filters: loadedFilters,
+          options: { ...options, source }
+        });
+
+        // Access the filtered AST (pipeline.run applies filters before conversion)
+        // We need to apply filters without running the converter
+        if (loadedFilters.length > 0) {
+          pipeline.apply_filters;
+        }
+        console.log(formatAst(pipeline._ast));
+        break;
+      }
+
+      case 'compare': {
+        // Compare JS CLI output with Ruby CLI output
+        const { execSync } = await import('child_process');
+        const scriptDir = path.dirname(fileURLToPath(import.meta.url));
+        const rubyCliPath = path.join(scriptDir, '../../bin/ruby2js');
+
+        // Build Ruby CLI args
+        const rubyArgs = [];
+        if (options.eslevel) rubyArgs.push(`--es${options.eslevel}`);
+        if (options.comparison === 'identity') rubyArgs.push('--identity');
+        if (options.comparison === 'equality') rubyArgs.push('--equality');
+        for (const name of filterNames) rubyArgs.push('--filter', name);
+
+        // Get Ruby CLI output
+        let rubyOutput;
+        try {
+          rubyOutput = execSync(`${rubyCliPath} ${rubyArgs.join(' ')} -e '${source.replace(/'/g, "'\\''")}'`, {
+            encoding: 'utf-8',
+            cwd: scriptDir
+          }).trim();
+        } catch (e) {
+          rubyOutput = `[Ruby CLI Error: ${e.message}]`;
+        }
+
+        // Get JS CLI output
+        let jsOutput;
+        try {
+          if (loadedFilters.length > 0) {
+            options.filters = loadedFilters;
+          }
+          jsOutput = convert(source, { ...options, filters: loadedFilters }).trim();
+        } catch (e) {
+          jsOutput = `[JS CLI Error: ${e.message}]`;
+        }
+
+        // Compare
+        console.log('=== Ruby CLI ===');
+        console.log(rubyOutput);
+        console.log('\n=== JS CLI ===');
+        console.log(jsOutput);
+        console.log('\n=== Match ===');
+        console.log(rubyOutput === jsOutput ? '✓ Output matches' : '✗ Output differs');
+
+        if (rubyOutput !== jsOutput) {
+          // Show character-level diff hint
+          const minLen = Math.min(rubyOutput.length, jsOutput.length);
+          for (let i = 0; i < minLen; i++) {
+            if (rubyOutput[i] !== jsOutput[i]) {
+              console.log(`  First difference at position ${i}: Ruby='${rubyOutput.slice(i, i+20)}...' JS='${jsOutput.slice(i, i+20)}...'`);
+              break;
+            }
+          }
+          if (rubyOutput.length !== jsOutput.length) {
+            console.log(`  Length: Ruby=${rubyOutput.length}, JS=${jsOutput.length}`);
+          }
+        }
         break;
       }
 
