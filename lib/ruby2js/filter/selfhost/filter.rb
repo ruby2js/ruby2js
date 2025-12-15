@@ -27,8 +27,54 @@ module Ruby2JS
           @selfhost_in_filter_method = false
         end
 
-        # Note: Module wrapper transformation is still handled by gsubs in transpile_filter.rb
-        # TODO: Move module wrapper handling to AST level
+        # Unwrap Ruby2JS::Filter::X module structure
+        # Input:
+        #   module Ruby2JS
+        #     module Filter
+        #       module Functions
+        #         ...
+        #       end
+        #       DEFAULTS << Functions
+        #     end
+        #   end
+        # Output: just the Functions module content (without DEFAULTS)
+        def on_module(node)
+          name_node = node.children[0]
+          body = node.children[1..-1]
+
+          # Check if this is `module Ruby2JS`
+          if name_node&.type == :const &&
+             name_node.children[0].nil? &&
+             name_node.children[1] == :Ruby2JS
+
+            # Look for inner `module Filter`
+            inner = body.first
+            inner = inner.children.first if inner&.type == :begin && inner.children.length == 1
+
+            if inner&.type == :module
+              filter_name_node = inner.children[0]
+              if filter_name_node&.type == :const &&
+                 filter_name_node.children[0].nil? &&
+                 filter_name_node.children[1] == :Filter
+
+                # Found module Ruby2JS::Filter - extract the inner filter module
+                filter_body = inner.children[1..-1]
+                filter_body = filter_body.first.children if filter_body.first&.type == :begin
+
+                # Find the actual filter module (skip DEFAULTS << X)
+                filter_modules = filter_body.select { |n| n&.type == :module }
+
+                if filter_modules.length == 1
+                  # Return just the filter module, processed
+                  @selfhost_filter_name = filter_modules.first.children[0].children[1]
+                  return process(filter_modules.first)
+                end
+              end
+            end
+          end
+
+          super
+        end
 
         # Transform super calls in filter methods
         # - super with no args → process_children(node)

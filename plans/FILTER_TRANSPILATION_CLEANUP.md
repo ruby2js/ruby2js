@@ -358,7 +358,7 @@ node --check filters/<name>.js
 
 | Filter | Syntax Valid | Tests Passing | Pass Rate | Notes |
 |--------|--------------|---------------|-----------|-------|
-| functions | ✓ | 189/203 | 93% | High coverage |
+| functions | ✓ | 190/203 | 94% | High coverage |
 | camelCase | ✓ | 17/19 | 89% | Near ready |
 | tagged_templates | ✓ | 6/7 | 86% | Near ready |
 | return | ✓ | 8/25 | 32% | Needs work |
@@ -385,24 +385,37 @@ These filters have transpilation issues that need selfhost improvements:
 - ✅ Instance variable to module-level (`@options` → `_options`)
 - ✅ Writer method renaming (`def options=` → `def set_options`)
 - ✅ Singleton methods (`def self.X` → `function X`) - fixes IIFE context issue (moved to main converter `lib/ruby2js/converter/module.rb`, test added to `spec/transliteration_spec.rb`)
+- ✅ Module wrapper unwrapping (`module Ruby2JS::Filter::X` → `const X = ...`)
+- ✅ Super call handling (`super` → `process_children(node)`)
 
 **Converter improvements:**
 - ✅ Fixed assignment in logical expressions (parentheses for `a && (b = c)`)
 - ✅ Fixed `respond_to?` with implicit self target
 - ✅ Dynamic filter name extraction from transpiled output
+- ✅ Property access for `.length`, `.children`, `.type` (ensures no `()` in JS)
 
 **Test harness improvements:**
 - ✅ Auto-load filters based on spec name
 - ✅ Filter-to-file mapping for non-standard names (e.g., `camelcase_spec.rb` → `camelCase.js`)
 
-#### Functions Filter Failure Analysis (14 remaining)
+**Gsubs eliminated:**
+- ✅ Module wrapper removal (2 gsubs)
+- ✅ Super call fixes (5 gsubs)
+- ✅ Regexp → RegExp (1 gsub) - already handled by converter
+
+**Remaining gsubs (3):**
+- Compact polyfill fix - edge case for frozen arrays
+- Object constant quoting (`s("const", null, Object)` → `s("const", null, "Object")`)
+- Regopt spread fix (`...arg.children.last)` → `...(arg.children.last.children || [])`)
+
+#### Functions Filter Failure Analysis (13 remaining)
 
 | Category | Count | Description |
 |----------|-------|-------------|
 | **Block-pass (`&:method`)** | 3 | Symbol-to-proc not expanded |
 | **Metaprogramming** | 5 | Missing class context |
 | **Class.new object literal** | 4 | Anonymous class → object literal |
-| **Runtime errors** | 2 | matchAll undefined, body.length() |
+| **Runtime errors** | 1 | matchAll undefined |
 
 ## Completion Criteria
 

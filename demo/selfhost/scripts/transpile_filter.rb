@@ -141,25 +141,8 @@ function nodesEqual(a, b) {
 
 JS
 
-# Fix issues in transpiled output:
-# 1. Remove the const Ruby2JS = { assignment wrapper
-# 2. Remove the trailing return {Functions} and IIFE wrapper
-
-# Replace the problematic module wrapper pattern
-js = js.gsub(/^const Ruby2JS = \{Filter: \(\(\) => \{\n/, '')
-js = js.gsub(/\n  DEFAULTS\.push\(#{filter_name}\);\n  return \{#{filter_name}\}\n\}\)\(\)\}$/, '')
-
-# Fix incomplete expressions from 'super' calls that become empty
-# In Ruby filters, super calls the next filter which processes children
-# Replace empty ternary else branches with process_children(node) to match Ruby behavior
-js = js.gsub(/: (\s*}\s*(?:else|$))/, ': process_children(node)\1')
-js = js.gsub(/: (\s*;)/, ': process_children(node)\1')
-# Replace empty assignments with process_children(node)
-js = js.gsub(/= ;/, '= process_children(node);')
-# Replace empty return statements with process_children(node)
-js = js.gsub(/return (\s*}\s*(?:else|$))/, 'return process_children(node)\1')
-js = js.gsub(/return (\s*;)/, 'return process_children(node)\1')
-
+# NOTE: Module wrapper is now unwrapped at AST level by selfhost/filter.rb
+# NOTE: super calls are now handled at AST level by selfhost/filter.rb
 # NOTE: this._options and nodesEqual are now handled at AST level by selfhost/filter.rb
 
 # Fix the compact polyfill to use non-mutating filter (needed for frozen arrays from PrismWalker)
@@ -170,12 +153,7 @@ js = js.gsub(
 )
 
 # NOTE: Hash.keys is now handled via include: [:keys] option
-
-# Fix Ruby Regexp class usage to JavaScript RegExp
-# Note: This gsub is needed because Regexp → RegExp conversion in the main
-# converter is ES-level dependent (only for ES2025+), but for selfhost we
-# always want RegExp since we're running in modern JavaScript.
-js = js.gsub(/\bRegexp\./, 'RegExp.')
+# NOTE: Regexp → RegExp is now handled unconditionally in lib/ruby2js/converter/const.rb
 
 # Fix Ruby Object constant becoming JS Object constructor
 # s("const", null, Object) should be s("const", null, "Object")

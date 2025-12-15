@@ -40,6 +40,10 @@ module Ruby2JS
         # getOwnProps is a method on Namespace class that returns an object
         ALWAYS_METHODS = %i[pop shift is_method? reverse sort getOwnProps dup chomp].freeze
 
+        # Properties that should always be accessed without () in JS
+        # Even though Ruby calls them as methods, they're properties in JS
+        ALWAYS_PROPERTIES = %i[length children type].freeze
+
         # Transform method("on_#{name}") to use cleaned name without ? or !
         # This handles the handler registration loop in Converter#initialize
         def on_send(node)
@@ -59,6 +63,14 @@ module Ruby2JS
           # Don't re-process - just update the type and return (avoids infinite loop)
           if target && ALWAYS_METHODS.include?(method_name) && args.empty?
             return node.updated(:call, node.children)
+          end
+
+          # Force .length, .children, .type to always be property access
+          # In Ruby these are methods; in JS they're properties (no parens)
+          # Mark as :attr type so converter doesn't add parentheses
+          # Only apply when there's a target and we've actually processed this node
+          if target && ALWAYS_PROPERTIES.include?(method_name) && args.empty? && node.type == :send
+            return process(node.updated(:attr, [target, method_name]))
           end
 
           # Transform Ruby2JS::Node.new(...) to new globalThis.Ruby2JS.Node(...)
