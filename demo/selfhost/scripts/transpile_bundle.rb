@@ -88,8 +88,19 @@ class NotImplementedError extends Error {
 // Parser stub - the Ruby source uses defined?(Parser::AST::Node) checks
 // which transpile to typeof Parser.AST.Node !== 'undefined'.
 // We define Parser with AST.Node = undefined so the check safely returns false.
-const Parser = { AST: { Node: undefined } };
+// Note: This is reassigned and exported by filter_runtime section at end of file.
+export let Parser = { AST: { Node: undefined } };
 
 JS
 
-puts preamble + js
+# Append filter runtime (provides exports for transpiled filters)
+filter_runtime_file = File.expand_path('../filter_runtime.js', __dir__)
+filter_runtime = File.read(filter_runtime_file)
+
+# Remove the import, change Parser to reassignment, remove duplicate Ruby2JS export
+filter_runtime = filter_runtime
+  .sub(/import \{ Ruby2JS \} from '\.\/ruby2js\.js';\n+/, '')
+  .sub(/export const Parser =/, 'Parser =')
+  .sub(/\n\/\/ Re-export Ruby2JS.*\nexport \{ Ruby2JS \};/, '')
+
+puts preamble + js + "\n\n// Filter Runtime Infrastructure\n" + filter_runtime

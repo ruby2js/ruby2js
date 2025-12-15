@@ -85,4 +85,5 @@ export def convert(source, options = {})
 end
 
 # Export the Ruby2JS module
+# Note: Filter runtime exports are appended by transpile_bundle.rb
 export [Ruby2JS]

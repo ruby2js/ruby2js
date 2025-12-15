@@ -35,11 +35,12 @@ export const DEFAULTS = [];
 
 // Filter infrastructure functions (bound by FilterProcessor at runtime)
 // Default implementations return false/do nothing until bound
+// Note: 'process' renamed to 'processNode' to avoid conflict with Node.js global
 export let excluded = () => false;
 export let included = () => false;
-export let process = (node) => node;
+export let processNode = (node) => node;
 export let process_children = (node) => node;
-export let process_all = (nodes) => nodes ? nodes.map(node => process(node)) : [];
+export let process_all = (nodes) => nodes ? nodes.map(node => processNode(node)) : [];
 export let _options = {};
 
 // ES level helper functions - use getter pattern so Ruby's `es2020` (no parens) works in JS
@@ -81,7 +82,7 @@ export function createSetup(filterObj) {
   return function(opts) {
     if (opts.excluded) excluded = opts.excluded;
     if (opts.included) included = opts.included;
-    if (opts.process) process = opts.process;
+    if (opts.process) processNode = opts.process;
     if (opts.process_children) process_children = opts.process_children;
     if (opts.S) S = opts.S;
     if (opts._options) {

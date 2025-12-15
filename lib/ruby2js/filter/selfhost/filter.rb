@@ -131,9 +131,10 @@ module Ruby2JS
 
                   # Build the complete output with import, filter, registration, export
                   return s(:begin,
-                    # Import from filter_runtime.js
+                    # Import from ruby2js.js (filter runtime is bundled there)
+                    # Path is relative to filters/ directory
                     s(:import,
-                      '../filter_runtime.js',
+                      '../ruby2js.js',
                       [s(:const, nil, :Parser),
                        s(:const, nil, :SEXP),
                        s(:const, nil, :s),
@@ -144,7 +145,7 @@ module Ruby2JS
                        s(:const, nil, :DEFAULTS),
                        s(:const, nil, :excluded),
                        s(:const, nil, :included),
-                       s(:const, nil, :process),
+                       s(:const, nil, :processNode),
                        s(:const, nil, :process_children),
                        s(:const, nil, :process_all),
                        s(:const, nil, :_options),
@@ -153,6 +154,9 @@ module Ruby2JS
                        s(:const, nil, :registerFilter),
                        s(:const, nil, :Ruby2JS)]
                     ),
+                    # Wrapper function for process (filters use process() but runtime uses processNode to avoid Node.js conflict)
+                    # Must be a function wrapper, not direct alias, because processNode gets reassigned by _setup
+                    s(:casgn, nil, :process, s(:block, s(:send, nil, :lambda), s(:args, s(:arg, :node)), s(:send, nil, :processNode, s(:lvar, :node)))),
                     # The filter module itself
                     process(filter_modules.first),
                     # Register the filter
