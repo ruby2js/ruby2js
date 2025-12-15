@@ -43,6 +43,10 @@ async function loadFunctionsFilter() {
     // Register the filter in Ruby2JS.Filter namespace
     globalThis.Ruby2JS.Filter = globalThis.Ruby2JS.Filter || {};
     globalThis.Ruby2JS.Filter.Functions = filterModule.default;
+    // Also push to DEFAULTS array (for tests that check DEFAULTS.includes)
+    if (!globalThis.Ruby2JS.Filter.DEFAULTS.includes(filterModule.default)) {
+      globalThis.Ruby2JS.Filter.DEFAULTS.push(filterModule.default);
+    }
     functionsFilterLoaded = true;
     console.log('  (Functions filter loaded)');
   } catch (e) {

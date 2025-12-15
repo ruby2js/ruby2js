@@ -945,8 +945,9 @@ module Ruby2JS
               end
             end
             raw = s(:send, s(:send, s(:const, nil, :Math), :random), :*, multiplier)
-            if range.children.first != s(:int, 0)
-              raw = s(:send, raw, :+, range.children.first)
+            first = range.children.first
+            unless first.type == :int && first.children.first == 0
+              raw = s(:send, raw, :+, first)
             end
             process S(:send, nil, :parseInt, raw)
           else

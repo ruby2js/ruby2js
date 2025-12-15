@@ -64,7 +64,7 @@ const Parser = { AST: { Node: Ruby2JS.Node } };
 // Get SEXP helpers from transpiled bundle
 const SEXP = Ruby2JS.Filter.SEXP;
 const s = SEXP.s.bind(SEXP);
-const S = s;
+let S = s;  // S is reassigned by _setup to use @ast.updated() for location preservation
 
 // AST node type checker (Ruby's ast_node? method)
 // Checks if an object is an AST node (has type and children properties)
@@ -198,6 +198,7 @@ Ruby2JS.Filter.#{filter_name} = #{filter_name};
   if (opts.included) included = opts.included;
   if (opts.process) process = opts.process;
   if (opts.process_children) process_children = opts.process_children;
+  if (opts.S) S = opts.S;  // S uses @ast.updated() for location preservation
   if (opts._options) {
     _options = opts._options;
     _eslevel = opts._options.eslevel || 0;

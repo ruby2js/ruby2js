@@ -366,6 +366,13 @@ Array.prototype.must_equal = function(expected) {
   return this;
 };
 
+Array.prototype.must_include = function(item) {
+  if (!this.includes(item)) {
+    throw new Error(`Expected array to include ${item}`);
+  }
+  return this;
+};
+
 // Number assertions
 Number.prototype.must_equal = function(expected) {
   if (this.valueOf() !== expected) {

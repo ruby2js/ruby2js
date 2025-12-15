@@ -347,33 +347,39 @@ node --check filters/<name>.js
 
 ### Phase 3: Functional Tests
 
-**Current test results** (2024-12-14):
+**Current test results** (2024-12-14, updated):
 
 | Category | Status | Tests |
 |----------|--------|-------|
 | Ready specs | ✅ 3/3 passing | 290 tests (transliteration, serializer, namespace) |
-| functions filter | 91% | 184/203 passing (19 failures) |
+| functions filter | 92% | 187/203 passing (16 failures) |
+
+#### Recent Fixes (2024-12-14)
+
+- ✅ Fixed `Array.prototype.must_include` missing in test harness
+- ✅ Fixed extra `+0` in `rand(0..n)` - rewrote Ruby source to avoid `!= s(:int, 0)` structural comparison
+- ✅ Fixed safe navigation `empty?` producing `?.length()` - fixed `S()` binding to preserve AST location
+- ✅ Fixed DEFAULTS.includes test - push filter to DEFAULTS when loading
 
 #### Functions Filter Failure Analysis
 
-The 19 remaining failures fall into these categories:
+The 16 remaining failures fall into these categories:
 
 | Category | Count | Description |
 |----------|-------|-------------|
-| **Block-pass (`&:method`)** | 3 | Symbol-to-proc not expanded to arrow functions |
+| **Block-pass (`&:method`)** | 4 | Symbol-to-proc not expanded to arrow functions |
 | **Metaprogramming** | 5 | Missing class context (`prototype` vs `ClassName.prototype`) |
 | **Class.new object literal** | 4 | Anonymous class → object literal not implemented |
-| **Runtime errors** | 2 | Transpiled filter code crashes (matchAll, null type) |
-| **Safe navigation** | 1 | `?.empty?` → `?.length()` instead of `?.length == 0` |
-| **Loop/break** | 1 | `loop { break }` pattern not handled |
-| **Minor** | 2 | Extra `+0` in rand, test infrastructure issue |
+| **Runtime errors** | 2 | Transpiled filter code crashes (matchAll, body.length()) |
+| **method_defined? conditional** | 1 | Unnecessary if/else wrapper |
 
 **Detailed failures:**
 
-1. **Block-pass / symbol-to-proc** (3 failures):
+1. **Block-pass / symbol-to-proc** (4 failures):
    - `a.all?(&:ready)` → should be `a.every(item => item.ready)`
    - `a.map(&:to_i)` → should be `a.map(item => parseInt(item))`
    - `a.sort(&:<)` → should be `a.sort((a, b) => a < b)`
+   - `loop { break }` block-pass pattern
 
    *Root cause*: Symbol-to-proc expansion not implemented in selfhost filter
 
@@ -388,16 +394,10 @@ The 19 remaining failures fall into these categories:
    *Root cause*: Feature not implemented in selfhost filter
 
 4. **Runtime errors** (2 failures):
-   - Regular expression index assignment: `matchAll` undefined
-   - Exception constructor: null type error
+   - Regular expression index assignment: `matchAll` undefined (requires Regexp::Scanner port)
+   - Exception constructor: `body.length()` should be `body.length` (transpilation bug, root cause unknown)
 
    *Root cause*: Transpiled filter code has bugs in edge cases
-
-5. **Other** (4 failures):
-   - Safe navigation with `empty?`: parentheses issue
-   - `rand(n)` produces extra `+ 0`
-   - `loop { break }` not recognized
-   - Test infrastructure: `DEFAULTS.includes` check
 
 **Blocked on filter loading**: Other filter specs (return, camelCase, esm, etc.) need their corresponding filters loaded by the test harness. Currently only the functions filter is loaded.
 

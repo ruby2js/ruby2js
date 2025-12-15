@@ -18,7 +18,7 @@ const Parser = { AST: { Node: Ruby2JS.Node } };
 // Get SEXP helpers from transpiled bundle
 const SEXP = Ruby2JS.Filter.SEXP;
 const s = SEXP.s.bind(SEXP);
-const S = s;
+let S = s;  // S is reassigned by _setup to use @ast.updated() for location preservation
 
 // AST node type checker (Ruby's ast_node? method)
 // Checks if an object is an AST node (has type and children properties)
@@ -199,7 +199,7 @@ if (!RegExp.escape) {
     // then restore the csend type if needed
     // Handle &.call -> ccall (conditional call) for optional chaining
     function on_send(node) {
-      let body, index, regex, tokens, groups, stack, group, prepend, append, expr, neg_index, new_index, range, value, start, finish, len, arg, pattern, gpattern, before, after, method_name, method_args, i, length, start_expr, end_expr, final, length_obj, mapper, parent, multiplier, raw, op, block_pass, name_arg;
+      let body, index, regex, tokens, groups, stack, group, prepend, append, expr, neg_index, new_index, range, value, start, finish, len, arg, pattern, gpattern, before, after, method_name, method_args, i, length, start_expr, end_expr, final, length_obj, mapper, parent, multiplier, raw, first, op, block_pass, name_arg;
       let [target, method, ...args] = node.children;
       if (excluded(method) && method !== "call") return process_children(node);
 
@@ -1307,8 +1307,10 @@ if (!RegExp.escape) {
             multiplier
           );
 
-          if (range.children.first !== s("int", 0)) {
-            raw = s("send", raw, "+", range.children.first)
+          first = range.children.first;
+
+          if (first.type !== "int" || first.children.first !== 0) {
+            raw = s("send", raw, "+", first)
           };
 
           return process(S("send", null, "parseInt", raw))
@@ -2279,6 +2281,7 @@ Functions._setup = function(opts) {
   if (opts.included) included = opts.included;
   if (opts.process) process = opts.process;
   if (opts.process_children) process_children = opts.process_children;
+  if (opts.S) S = opts.S;  // S uses @ast.updated() for location preservation
   if (opts._options) {
     _options = opts._options;
     _eslevel = opts._options.eslevel || 0;
