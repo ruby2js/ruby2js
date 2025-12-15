@@ -54,21 +54,9 @@ module Ruby2JS
           super
         end
 
-        # Transform singleton methods (def self.X) to regular functions
-        # In Ruby modules, def self.X creates a module method
-        # In JS IIFE context, this.X = ... fails because this is undefined
-        # Transform to regular function so it gets included in the returned object
-        def on_defs(node)
-          target, method_name, args, body = node.children
-
-          # Only transform def self.X (target is :self)
-          if target.type == :self
-            # Convert to regular function definition
-            return process s(:def, method_name, args, body)
-          end
-
-          super
-        end
+        # Note: def self.X in modules is now handled by the main converter
+        # (lib/ruby2js/converter/module.rb) which transforms it to a regular
+        # function that's included in the returned object.
 
         # Track when we're in a filter method (on_X)
         def on_def(node)

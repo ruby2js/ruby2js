@@ -126,22 +126,12 @@ Object.defineProperty(
       return filters
     };
 
-    // Ensure pragma runs after require but before other filters so that
-    // pragmas like skip, entries, method, hash are processed correctly.
-    // Pragma runs AFTER require so it can process pragmas in inlined files.
-    // Find the require filter position (or start of filters if not present)
-    // If require filter exists and pragma comes before it, move pragma after require
-    // Move pragma to right after require
-    // require_index shifted by 1 since we removed pragma before it
-    // Pragma is after require but not immediately after - move it
     // Mapping from pragma comment text to internal symbol
     const PRAGMAS = Object.freeze({
       "??": "nullish",
       nullish: "nullish",
       "||": "logical",
       logical: "logical",
-
-      // || stays as || (for boolean false handling)
       noes2015: "noes2015",
       function: "noes2015",
       guard: "guard",
@@ -154,22 +144,14 @@ Object.defineProperty(
 
       // Behavior pragmas
       method: "method",
-
-      // proc.call → fn()
       self: "self_pragma",
-
-      // self → this (avoid conflict with :self)
       proto: "proto",
-
-      // .class → .constructor
       entries: "entries",
 
-      // Object.entries for hash iteration
       // Statement control pragmas
       skip: "skip"
     });
 
-    // skip statement (require, def, defs, alias)
     function initialize(...args) {
       ;
       let _pragmas = {};
@@ -186,6 +168,11 @@ Object.defineProperty(
     // Scan all comments for pragma patterns and build [source, line] => Set<pragma> map
     // Re-scans when new comments are added (e.g., from require filter merging files)
     // Uses both source buffer name and line number to avoid collisions across files
+    // Process only new comments (from index @pragma_scanned_count onwards)
+    // Use scan to find ALL pragmas on a line, not just the first
+    // Get the source buffer name and line number of the comment
+    // Try to get source buffer name from location
+    // Use [source_name, line] as key to avoid cross-file collisions
     function scan_pragmas() {
       let raw_comments = _comments["_raw"] ?? [];
       if (raw_comments.length === _pragma_scanned_count) return;
@@ -232,12 +219,9 @@ Object.defineProperty(
       return _pragma_scanned_count
     };
 
-    // Process only new comments (from index @pragma_scanned_count onwards)
-    // Use scan to find ALL pragmas on a line, not just the first
-    // Get the source buffer name and line number of the comment
-    // Try to get source buffer name from location
-    // Use [source_name, line] as key to avoid cross-file collisions
     // Check if a node's line has a specific pragma
+    // Try with source name first, then fall back to nil source for compatibility
+    // Fallback: check without source name (for backward compatibility)
     function pragma(node, pragma_sym) {
       let scan_pragmas;
       let [source_name, line] = node_source_and_line(node);
@@ -248,8 +232,6 @@ Object.defineProperty(
       return _pragmas[key_no_source]?.includes(pragma_sym)
     };
 
-    // Try with source name first, then fall back to nil source for compatibility
-    // Fallback: check without source name (for backward compatibility)
     // Get the source buffer name and line number for a node
     function node_source_and_line(node) {
       if (typeof node !== "object" || node === null || !("loc" in node) || !node.loc) {
@@ -277,6 +259,7 @@ Object.defineProperty(
     };
 
     // Handle || with nullish pragma -> ?? or with logical pragma -> || (forces logical)
+    // Force || even when @or option would normally use ??
     function on_or(node) {
       if (pragma(node, "nullish") && es2020) {
         return process(s("nullish_or", ...node.children))
@@ -287,10 +270,10 @@ Object.defineProperty(
       }
     };
 
-    // Force || even when @or option would normally use ??
     // Handle ||= with nullish pragma -> ??= or with logical pragma -> ||= (forces logical)
     // Note: We check es2020 here because ?? is available then.
     // The converter will decide whether to use ??= (ES2021+) or expand to a = a ?? b
+    // Force ||= even when @or option would normally use ??=
     function on_or_asgn(node) {
       if (pragma(node, "nullish") && es2020) {
         return process(s("nullish_asgn", ...node.children))
@@ -301,8 +284,10 @@ Object.defineProperty(
       }
     };
 
-    // Force ||= even when @or option would normally use ??=
     // Handle def with skip pragma (remove method definition) or noes2015 pragma
+    // Skip pragma: remove method definition entirely
+    // Convert anonymous def to deff (forces function syntax)
+    // Don't re-process - just update type and process children
     function on_def(node) {
       if (pragma(node, "skip")) return s("hide");
 
@@ -312,9 +297,6 @@ Object.defineProperty(
       ) : process_children(node)
     };
 
-    // Skip pragma: remove method definition entirely
-    // Convert anonymous def to deff (forces function syntax)
-    // Don't re-process - just update type and process children
     // Handle defs (class methods like self.foo) with skip pragma
     function on_defs(node) {
       if (pragma(node, "skip")) return s("hide");
@@ -359,6 +341,9 @@ Object.defineProperty(
 
     // Handle array splat with guard pragma -> ensure array even if null
     // [*a] with guard pragma becomes (a ?? [])
+    // Look for splat nodes
+    // Replace splat contents with (contents ?? [])
+    // Process the guarded items, then return without re-checking pragma
     function on_array(node) {
       let items, changed, guarded_items;
 
@@ -385,10 +370,24 @@ Object.defineProperty(
       }
     };
 
-    // Look for splat nodes
-    // Replace splat contents with (contents ?? [])
-    // Process the guarded items, then return without re-checking pragma
     // Handle send nodes with type disambiguation and behavior pragmas
+    // Skip pragma: remove require/require_relative statements
+    // Type disambiguation for ambiguous methods
+    // .dup - Array: .slice(), Hash: {...obj}, String: str (no-op in JS)
+    // target.slice() - creates shallow copy of array
+    // {...target}
+    // No-op for strings in JS (they're immutable)
+    // << - Array: push, Set: add, String: +=
+    // target.push(arg)
+    // target.add(arg)
+    // target += arg (returns new string)
+    // .include? - Array: includes(), String: includes(), Set: has(), Hash: 'key' in obj
+    // arg in target (uses :in? synthetic type)
+    // target.has(arg) - Set membership check
+    // Note: array and string both use .includes() which functions filter handles
+    // .call - with method pragma, convert proc.call(args) to proc(args)
+    // Direct invocation using :call type with nil method
+    // .class - with proto pragma, use .constructor instead
     function on_send(node) {
       let [target, method, ...args] = node.children;
 
@@ -449,23 +448,6 @@ Object.defineProperty(
       return process_children(node)
     };
 
-    // Skip pragma: remove require/require_relative statements
-    // Type disambiguation for ambiguous methods
-    // .dup - Array: .slice(), Hash: {...obj}, String: str (no-op in JS)
-    // target.slice() - creates shallow copy of array
-    // {...target}
-    // No-op for strings in JS (they're immutable)
-    // << - Array: push, Set: add, String: +=
-    // target.push(arg)
-    // target.add(arg)
-    // target += arg (returns new string)
-    // .include? - Array: includes(), String: includes(), Set: has(), Hash: 'key' in obj
-    // arg in target (uses :in? synthetic type)
-    // target.has(arg) - Set membership check
-    // Note: array and string both use .includes() which functions filter handles
-    // .call - with method pragma, convert proc.call(args) to proc(args)
-    // Direct invocation using :call type with nil method
-    // .class - with proto pragma, use .constructor instead
     // Handle self with self pragma -> this
     function on_self(node) {
       return pragma(node, "self_pragma") ? s("send", null, "this") : process_children(node)
@@ -475,6 +457,18 @@ Object.defineProperty(
     // hash.each { |k,v| } -> Object.entries(hash).forEach(([k,v]) => {})
     // hash.map { |k,v| } -> Object.entries(hash).map(([k,v]) => {})
     // hash.select { |k,v| } -> Object.fromEntries(Object.entries(hash).filter(([k,v]) => {}))
+    // Transform to use :deff which forces function syntax
+    // Transform: hash.each { |k,v| body }
+    // Into: Object.entries(hash).forEach(([k,v]) => body)
+    // Wrap args in destructuring array pattern if multiple args
+    // Create new block without location to avoid re-triggering pragma
+    // Transform: hash.map { |k,v| expr }
+    // Into: Object.entries(hash).map(([k,v]) => expr)
+    // Create new block without location to avoid re-triggering pragma
+    // Transform: hash.select { |k,v| expr }
+    // Into: Object.fromEntries(Object.entries(hash).filter(([k,v]) => expr))
+    // Create a new block node without location info to avoid re-triggering pragma
+    // Process the inner block first, then wrap with fromEntries
     function on_block(node) {
       let target, method;
       let [call, args, body] = node.children;
@@ -584,18 +578,6 @@ Object.defineProperty(
     }
   })();
 
-  // Transform to use :deff which forces function syntax
-  // Transform: hash.each { |k,v| body }
-  // Into: Object.entries(hash).forEach(([k,v]) => body)
-  // Wrap args in destructuring array pattern if multiple args
-  // Create new block without location to avoid re-triggering pragma
-  // Transform: hash.map { |k,v| expr }
-  // Into: Object.entries(hash).map(([k,v]) => expr)
-  // Create new block without location to avoid re-triggering pragma
-  // Transform: hash.select { |k,v| expr }
-  // Into: Object.fromEntries(Object.entries(hash).filter(([k,v]) => expr))
-  // Create a new block node without location info to avoid re-triggering pragma
-  // Process the inner block first, then wrap with fromEntries
 // Register the filter
 DEFAULTS.push(Pragma);
 

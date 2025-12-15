@@ -109,8 +109,6 @@ Object.defineProperty(
       return filters
     };
 
-    // Ensure polyfill runs before functions filter so that
-    // the polyfill methods can be transformed by functions
     function initialize(comments) {
       ;
       let _polyfills_added = new Set

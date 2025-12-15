@@ -9264,6 +9264,10 @@ const Ruby2JS = (() => {
       rgroup = Converter.LOGICAL.includes(right.type) && op_index < this.operator_index(right.type);
       if (right.type === "begin") rgroup = true;
 
+      if (["lvasgn", "ivasgn", "cvasgn", "gvasgn", "masgn"].includes(right.type)) {
+        rgroup = true
+      };
+
       let use_nullish = (() => {
         switch (this._or) {
         case "logical":
@@ -9379,6 +9383,10 @@ const Ruby2JS = (() => {
       if (left && left.type === "begin") lgroup = true;
       rgroup = Converter.LOGICAL.includes(right.type) && op_index < this.operator_index(right.type);
       if (right.type === "begin") rgroup = true;
+
+      if (["lvasgn", "ivasgn", "cvasgn", "gvasgn", "masgn"].includes(right.type)) {
+        rgroup = true
+      };
 
       let use_nullish = (() => {
         switch (this._or) {
@@ -9730,8 +9738,9 @@ const Ruby2JS = (() => {
       let symbols = [];
       let visibility = "public";
       let omit = [];
+      body = [...body];
 
-      for (let node of body) {
+      body.forEach((node, i) => {
         if (node.type === "send" && node.children.first === null) {
           if (["public", "private", "protected"].includes(node.children[1])) {
             if (node.children.length === 2) {
@@ -9747,7 +9756,7 @@ const Ruby2JS = (() => {
           }
         };
 
-        if (visibility !== "public") continue;
+        if (visibility !== "public") return;
 
         if (node.type === "casgn" && node.children.first === null) {
           symbols.push(node.children[1])
@@ -9758,12 +9767,24 @@ const Ruby2JS = (() => {
           );
 
           symbols.push(method_name)
+        } else if (node.type === "defs" && node.children.first.type === "self") {
+          let method_name = (node.children[1] ?? "").toString().replace(
+            /[?!]$/m,
+            ""
+          );
+
+          symbols.push(method_name);
+
+          body[i] = node.updated(
+            "def",
+            [node.children[1], ...node.children.slice(2)]
+          )
         } else if (node.type === "class" && node.children.first.children.first === null) {
           symbols.push(node.children.first.children.last)
         } else if (node.type === "module") {
           symbols.push(node.children.first.children.last)
         }
-      };
+      });
 
       body = body.filter(node => !(omit.includes(node))).concat([this.s(
         "return",
@@ -9855,8 +9876,9 @@ const Ruby2JS = (() => {
       let symbols = [];
       let visibility = "public";
       let omit = [];
+      body = [...body];
 
-      for (let node of body) {
+      body.forEach((node, i) => {
         if (node.type === "send" && node.children.first === null) {
           if (["public", "private", "protected"].includes(node.children[1])) {
             if (node.children.length === 2) {
@@ -9872,7 +9894,7 @@ const Ruby2JS = (() => {
           }
         };
 
-        if (visibility !== "public") continue;
+        if (visibility !== "public") return;
 
         if (node.type === "casgn" && node.children.first === null) {
           symbols.push(node.children[1])
@@ -9883,12 +9905,24 @@ const Ruby2JS = (() => {
           );
 
           symbols.push(method_name)
+        } else if (node.type === "defs" && node.children.first.type === "self") {
+          let method_name = (node.children[1] ?? "").toString().replace(
+            /[?!]$/m,
+            ""
+          );
+
+          symbols.push(method_name);
+
+          body[i] = node.updated(
+            "def",
+            [node.children[1], ...node.children.slice(2)]
+          )
         } else if (node.type === "class" && node.children.first.children.first === null) {
           symbols.push(node.children.first.children.last)
         } else if (node.type === "module") {
           symbols.push(node.children.first.children.last)
         }
-      };
+      });
 
       body = body.filter(node => !(omit.includes(node))).concat([this.s(
         "return",

@@ -44,11 +44,12 @@ module Ruby2JS
         return
       end
 
-      symbols = [] 
+      symbols = []
       visibility = :public
       omit = []
+      body = [*body]  # Copy array so we can modify defs nodes (works in Ruby and JS)
 
-      body.each do |node|
+      body.each_with_index do |node, i|
         if node.type == :send and node.children.first == nil
           if [:public, :private, :protected].include? node.children[1]
             if node.children.length == 2
@@ -57,7 +58,7 @@ module Ruby2JS
             elsif node.children[1] == :public
               omit << node
               node.children[2..-1].each do |sym|
-                symbols << sym.children.first if sym.type == :sym 
+                symbols << sym.children.first if sym.type == :sym
               end
             end
           end
@@ -71,6 +72,13 @@ module Ruby2JS
           # Strip ? and ! from method names (they're stripped in def transpilation)
           method_name = node.children.first.to_s.sub(/[?!]$/, '').to_sym
           symbols << method_name
+        elsif node.type == :defs and node.children.first.type == :self
+          # Convert singleton method (def self.X) to regular function
+          # In IIFE context, this.X = ... fails because this is undefined
+          method_name = node.children[1].to_s.sub(/[?!]$/, '').to_sym
+          symbols << method_name
+          # Transform defs to def for IIFE-safe output
+          body[i] = node.updated(:def, [node.children[1], *node.children[2..-1]])
         elsif node.type == :class and node.children.first.children.first == nil
           symbols << node.children.first.children.last
         elsif node.type == :module

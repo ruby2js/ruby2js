@@ -988,6 +988,13 @@ describe Ruby2JS do
       to_js( 'module M; def clear!; x; end; end' ).
         must_equal('const M = {clear() {let x}}')
     end
+
+    it "should convert module singleton methods to functions" do
+      # def self.X in a module should become a function in the returned object
+      # (not this.X = ... which fails in IIFE strict mode context)
+      to_js( 'module M; X = 1; def self.foo(x); x + 1; end; end' ).
+        must_equal('const M = (() => {const X = 1; function foo(x) {x + 1}; return {X, foo}})()')
+    end
   end
 
   describe 'allocation' do

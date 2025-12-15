@@ -384,7 +384,7 @@ These filters have transpilation issues that need selfhost improvements:
 - ✅ `nodesEqual` - AST structural comparison (`x == s(...)` → `nodesEqual(x, s(...))`)
 - ✅ Instance variable to module-level (`@options` → `_options`)
 - ✅ Writer method renaming (`def options=` → `def set_options`)
-- ✅ Singleton methods (`def self.X` → `function X`) - fixes IIFE context issue
+- ✅ Singleton methods (`def self.X` → `function X`) - fixes IIFE context issue (moved to main converter `lib/ruby2js/converter/module.rb`, test added to `spec/transliteration_spec.rb`)
 
 **Converter improvements:**
 - ✅ Fixed assignment in logical expressions (parentheses for `a && (b = c)`)
