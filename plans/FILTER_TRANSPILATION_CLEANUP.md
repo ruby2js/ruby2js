@@ -409,6 +409,11 @@ These filters have transpilation issues that need selfhost improvements:
 **Remaining gsubs (source preprocessing only - acceptable):**
 - 5 gsubs that add `# Pragma: skip` to require statements (these pre-process the source, not post-process output)
 
+**Preamble/Postamble eliminated:**
+- ✅ Created shared `filter_runtime.js` module with all runtime infrastructure
+- ✅ Transpile script reduced from ~185 lines to ~73 lines
+- ✅ Generated output now just has: import statement + filter code + registration + export
+
 #### Functions Filter Failure Analysis (13 remaining)
 
 | Category | Count | Description |
