@@ -208,7 +208,8 @@ module Ruby2JS
               return super if groups.length == index and not stack.empty?
               stack.push groups.last
             elsif token[1] == :close
-              stack.pop[-1]=token.last
+              popped = stack.pop
+              popped[-1] = token.last
             end
           end
           group = groups[index-1]

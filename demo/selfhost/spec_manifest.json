@@ -3,10 +3,10 @@
   "ready": [
     "transliteration_spec.rb",
     "serializer_spec.rb",
-    "namespace_spec.rb"
+    "namespace_spec.rb",
+    "functions_spec.rb"
   ],
   "partial": [
-    "functions_spec.rb",
     "return_spec.rb",
     "camelcase_spec.rb",
     "esm_spec.rb",

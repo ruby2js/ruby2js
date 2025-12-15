@@ -81,6 +81,20 @@ module Ruby2JS
             end
           end
 
+          # Redirect Regexp::Scanner.scan(...) to scanRegexpGroups(...)
+          # The regexp_parser gem isn't available in JS, so we use our minimal scanner.
+          if target&.type == :const && method_name == :scan
+            const_parent = target.children[0]
+            const_name = target.children[1]
+            if const_parent&.type == :const &&
+               const_parent.children[0].nil? &&
+               const_parent.children[1] == :Regexp &&
+               const_name == :Scanner
+              # Regexp::Scanner.scan(x) → scanRegexpGroups(x)
+              return process s(:send, nil, :scanRegexpGroups, *args)
+            end
+          end
+
           # Handle != with s(...) on RHS
           if method_name == :!= && args.length == 1 && target
             rhs = args[0]
@@ -222,6 +236,7 @@ module Ruby2JS
                        s(:const, nil, :filterContext),
                        s(:const, nil, :nodesEqual),
                        s(:const, nil, :registerFilter),
+                       s(:const, nil, :scanRegexpGroups),
                        s(:const, nil, :Ruby2JS)]
                     ),
                     # The filter as a class extending Filter.Processor (enables proper super calls)

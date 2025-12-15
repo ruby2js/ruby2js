@@ -42,6 +42,49 @@ require_relative '../../ruby2js/filter/processor'
 # Pipeline (orchestration: filters + converter)
 require_relative '../../ruby2js/pipeline'
 
+# Regexp Scanner (minimal regex group parsing for selfhost filters)
+# Inlined directly to avoid require_relative processing issues
+def scanRegexpGroups(pattern)
+  tokens = []
+  stack = []
+  i = 0
+
+  while i < pattern.length
+    char = pattern[i]
+
+    if char == '\\'
+      i += 2
+    elsif char == '['
+      i += 1
+      while i < pattern.length && pattern[i] != ']'
+        i += 1 if pattern[i] == '\\'
+        i += 1
+      end
+      i += 1
+    elsif char == '('
+      if pattern[i + 1] != '?'
+        token = [:group, :capture, "(", i, nil]
+        tokens << token
+        stack << token
+      else
+        stack << nil
+      end
+      i += 1
+    elsif char == ')'
+      group = stack.pop()
+      if group
+        group[4] = i + 1
+        tokens << [:group, :close, ")", i, i + 1]
+      end
+      i += 1
+    else
+      i += 1
+    end
+  end
+
+  return tokens
+end
+
 # ============================================================================
 # Initialize Prism at module load time
 # ============================================================================

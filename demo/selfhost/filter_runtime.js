@@ -5,6 +5,13 @@
 
 import { Ruby2JS } from './ruby2js.js';
 
+// Array.prototype.dup - Ruby's dup creates a shallow copy
+if (!Array.prototype.dup) {
+  Array.prototype.dup = function() {
+    return this.slice();
+  };
+}
+
 // Alias Parser.AST.Node to Ruby2JS.Node so transpiled code works
 // (Ruby source uses Parser gem's AST nodes, JS uses Ruby2JS.Node)
 export const Parser = { AST: { Node: Ruby2JS.Node } };
@@ -114,3 +121,6 @@ export function registerFilter(name, filterObj) {
 
 // Re-export Ruby2JS for filters that need it
 export { Ruby2JS };
+
+// Export scanRegexpGroups (defined in bundle, used by Functions filter for regex group parsing)
+export { scanRegexpGroups };
