@@ -77,8 +77,19 @@ manifest['partial'].each do |entry|
   end
 end
 
-# Core build targets (library and prism_browser)
-CORE_TARGETS = ["#{SELFHOST}/ruby2js.js", "#{SELFHOST}/prism_browser.js"]
+# Filter dependencies
+filter_deps = FileList["#{ROOT}/lib/ruby2js/filter/*.rb"]
+filters_dir = "#{SELFHOST}/filters"
+
+directory filters_dir
+
+desc "Build filters/functions.js"
+file "#{filters_dir}/functions.js" => [filters_dir, "#{SELFHOST}/ruby2js.js", *filter_deps, *selfhost_deps] do
+  sh bundle_exec("ruby #{SELFHOST}/scripts/transpile_filter.rb #{ROOT}/lib/ruby2js/filter/functions.rb > #{filters_dir}/functions.js")
+end
+
+# Core build targets (library, prism_browser, and filters)
+CORE_TARGETS = ["#{SELFHOST}/ruby2js.js", "#{SELFHOST}/prism_browser.js", "#{filters_dir}/functions.js"]
 
 desc "Build all transpiled files (bundle, prism_browser, specs)"
 task :build => CORE_TARGETS do
@@ -154,6 +165,7 @@ task :ci => [:build_ready, :build_partial, :test_walker, :test_ready, :test_part
 desc "Clean dist directory and generated files"
 task :clean do
   rm_rf DIST
+  rm_rf "#{SELFHOST}/filters"
   rm_f "#{SELFHOST}/ruby2js.js"
   rm_f "#{SELFHOST}/prism_browser.js"
 end
