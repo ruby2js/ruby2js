@@ -10,6 +10,7 @@ module Ruby2JS
 
       def initialize(*args)
         @esm_require_seen = {}
+        @esm_explicit_tokens = []
         super
       end
 
@@ -19,7 +20,7 @@ module Ruby2JS
         @esm_autoexports_option = @esm_autoexports # preserve for require-to-import
         @esm_autoimports = options[:autoimports]
         @esm_defs = options[:defs] || {}
-        @esm_explicit_tokens = Set.new
+        @esm_explicit_tokens = []
         @esm_top = nil
         @esm_require_recursive = options[:require_recursive]
 
@@ -85,18 +86,21 @@ module Ruby2JS
       end
 
       def on_class(node)
+        @esm_explicit_tokens ||= []
         @esm_explicit_tokens << node.children.first.children.last
 
         super
       end
 
       def on_def(node)
+        @esm_explicit_tokens ||= []
         @esm_explicit_tokens << node.children.first
 
         super
       end
 
       def on_lvasgn(node)
+        @esm_explicit_tokens ||= []
         @esm_explicit_tokens << node.children.first
 
         super
@@ -104,6 +108,7 @@ module Ruby2JS
 
       def on_send(node)
         target, method, *args = node.children
+        found_import = nil  # declare for conditional assignment below
 
         # import.meta => s(:attr, nil, :"import.meta")
         # This bypasses jsvar escaping of the reserved word 'import'
@@ -158,6 +163,7 @@ module Ruby2JS
             args[0].children[2].children[2].type == :str
             # import name from "file.js"
             #  => import name from "file.js"
+            @esm_explicit_tokens ||= []
             @esm_explicit_tokens << args[0].children[1]
 
             s(:import,
@@ -176,6 +182,7 @@ module Ruby2JS
             # import Some, [ More, Stuff ], from: "file.js"
             #   => import Some, { More, Stuff } from "file.js"
             imports = []
+            @esm_explicit_tokens ||= []
             if %i(const send str).include? args[0].type
               @esm_explicit_tokens << args[0].children.last
               imports << process(args.shift)
@@ -191,7 +198,7 @@ module Ruby2JS
         elsif method == :export          
           s(:export, *process_all(args))
         elsif target.nil? and found_import = find_autoimport(method)
-          prepend_list << s(:import, found_import[0], found_import[1])
+          self.prepend_list << s(:import, found_import[0], found_import[1])
           super
         else
           super
@@ -199,8 +206,9 @@ module Ruby2JS
       end
 
       def on_const(node)
+        found_import = nil  # declare for conditional assignment below
         if node.children.first == nil and found_import = find_autoimport(node.children.last)
-          prepend_list << s(:import, found_import[0], found_import[1])
+          self.prepend_list << s(:import, found_import[0], found_import[1])
 
           values = @esm_defs[node.children.last]
           
@@ -395,10 +403,12 @@ module Ruby2JS
       private
 
       def find_autoimport(token)
-        return nil if @esm_autoimports.nil?
+        return nil unless @esm_autoimports  # truthy check handles both nil and undefined in JS
+        @esm_explicit_tokens ||= []
         return nil if @esm_explicit_tokens.include?(token)
 
         token = camelCase(token) if respond_to?(:camelCase)
+        found_key = nil  # declare for conditional assignment below
 
         if @esm_autoimports[token]
           [@esm_autoimports[token], s(:const, nil, token)]

@@ -1,6 +1,14 @@
 // Minimal test harness for selfhosted specs
 // Provides describe/it/must_equal compatible with transpiled Minitest specs
 
+// Polyfill for Ruby's Array#uniq - returns new array with unique elements
+if (!Array.prototype.uniq) {
+  Object.defineProperty(Array.prototype, "uniq", {
+    get() { return [...new Set(this)] },
+    configurable: true
+  });
+}
+
 // Import from the unified bundle (same code used by CLI and browser)
 import {
   Ruby2JS,
@@ -218,6 +226,21 @@ String.prototype.must_include = function(substring) {
 String.prototype.must_match = function(pattern) {
   if (!pattern.test(this.valueOf())) {
     throw new Error(`Expected "${this.valueOf()}" to match ${pattern}`);
+  }
+  return this;
+};
+
+// Negative assertions for String
+String.prototype.wont_include = function(substring) {
+  if (this.includes(substring)) {
+    throw new Error(`Expected "${this.valueOf()}" NOT to include "${substring}"`);
+  }
+  return this;
+};
+
+String.prototype.wont_match = function(pattern) {
+  if (pattern.test(this.valueOf())) {
+    throw new Error(`Expected "${this.valueOf()}" NOT to match ${pattern}`);
   }
   return this;
 };

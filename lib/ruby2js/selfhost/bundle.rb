@@ -116,6 +116,8 @@ export def convert(source, options = {})
     PrismComment.new(c, source, source_buffer)
   end
   comments = associateComments(ast, wrapped_comments)
+  # Store raw comments for filters that need them (e.g., pragma filter)
+  comments[:_raw] = wrapped_comments
 
   # Build pipeline options
   pipeline_options = options.merge(source: source)

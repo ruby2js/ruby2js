@@ -1,5 +1,4 @@
 require 'ruby2js'
-require 'set'
 
 module Ruby2JS
   module Filter
@@ -96,7 +95,8 @@ module Ruby2JS
               loc = comment.loc
               if loc.respond_to?(:expression) && loc.expression
                 source_name = loc.expression.source_buffer&.name
-                line = loc.line
+                # Use expression.line explicitly for JS compatibility (JS loc doesn't have line getter)
+                line = loc.expression.line
               elsif loc.respond_to?(:line)
                 line = loc.line
               end
@@ -112,9 +112,10 @@ module Ruby2JS
             next unless line
 
             # Use [source_name, line] as key to avoid cross-file collisions
+            # Use Array instead of Set for JS compatibility (JS Set uses .add/.has, not <</.include?)
             key = [source_name, line]
-            @pragmas[key] ||= Set.new
-            @pragmas[key] << pragma_sym
+            @pragmas[key] ||= []
+            @pragmas[key] << pragma_sym unless @pragmas[key].include?(pragma_sym)
           end
         end
 

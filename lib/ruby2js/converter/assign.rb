@@ -29,11 +29,18 @@ module Ruby2JS
       collapsible = true if args.length == 1 and args.first.type == :class_module and
         args.first.children.length == 3 and nonprop.call(args.first.children.last)
 
-      if not collapsible and args.all? {|arg|
+      # Check if target is a prototype (include/extend uses X.prototype as target)
+      # Prototype assignments need defineProperties to copy getters without invoking them
+      is_prototype_target = target.type == :attr && target.children[1] == :prototype
+
+      if not collapsible and not is_prototype_target and args.all? {|arg|
           case arg.type
           when :pair, :hash, :class_module
             arg.children.all? {|child| nonprop.call(child)}
           when :const
+            # Constants (module/class names) may have getters, so we need
+            # Object.defineProperties to copy them without invoking the getters.
+            # This is important for Ruby's include/extend which copy module methods.
             false
           else
             true

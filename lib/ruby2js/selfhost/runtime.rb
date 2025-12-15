@@ -92,13 +92,10 @@ export class PrismComment
       end_offset: end_
     }
 
+    # Use PrismSourceRange for expression so it has the line getter
     @loc = {
       start_offset: start,
-      expression: {
-        source_buffer: sourceBuffer,
-        begin_pos: start,
-        end_pos: end_
-      }
+      expression: PrismSourceRange.new(sourceBuffer, start, end_)
     }
   end
 

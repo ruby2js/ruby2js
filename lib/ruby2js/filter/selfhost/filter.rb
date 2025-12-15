@@ -277,31 +277,44 @@ module Ruby2JS
           super(node)
         end
 
-        # Transform instance variables
-        # Most instance variables become module-level: @foo → _foo
-        # Exception: @options becomes this._options (instance property set by Pipeline)
+        # Transform instance variables to this._foo properties
+        # This ensures they persist across method calls (unlike local let variables)
         def on_ivar(node)
           var_name = node.children[0].to_s
-          if var_name == '@options'
-            # @options → this._options (uses instance property from Filter.Processor)
-            s(:attr, s(:self), :_options)
-          else
-            # @foo → _foo (module-level variable)
-            new_name = var_name.sub(/^@/, '_')
-            s(:lvar, new_name.to_sym)
-          end
+          new_name = var_name.sub(/^@/, '_')
+          s(:attr, s(:self), new_name.to_sym)
         end
 
         def on_ivasgn(node)
           var_name = node.children[0].to_s
           value = node.children[1]
-          if var_name == '@options'
-            # @options = x → this._options = x
-            s(:send, s(:attr, s(:self), :_options), :'=', process(value))
-          else
-            # @foo = x → _foo = x
+          new_name = var_name.sub(/^@/, '_')
+          # Use send with setter method: this._foo = value → (send (self) :_foo= value)
+          s(:send, s(:self), "#{new_name}=".to_sym, process(value))
+        end
+
+        # Handle @foo ||= value → this._foo ??= value
+        def on_or_asgn(node)
+          target, value = node.children
+          if target.type == :ivasgn
+            var_name = target.children[0].to_s
             new_name = var_name.sub(/^@/, '_')
-            s(:lvasgn, new_name.to_sym, process(value))
+            # Transform to (or_asgn (attr (self) :_foo) value) which becomes this._foo ??= value
+            node.updated(nil, [s(:attr, s(:self), new_name.to_sym), process(value)])
+          else
+            super
+          end
+        end
+
+        # Handle @foo &&= value → this._foo &&= value
+        def on_and_asgn(node)
+          target, value = node.children
+          if target.type == :ivasgn
+            var_name = target.children[0].to_s
+            new_name = var_name.sub(/^@/, '_')
+            node.updated(nil, [s(:attr, s(:self), new_name.to_sym), process(value)])
+          else
+            super
           end
         end
       end

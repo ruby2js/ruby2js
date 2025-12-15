@@ -45,7 +45,11 @@ module Ruby2JS
       end
 
       # Build filter chain using mixins
-      # Each filter module is included into an anonymous class
+      # Each filter module is included into an anonymous class.
+      # In Ruby: Class.new(parent) { include mod }
+      # In JS: Use Object.defineProperties to properly copy getters without invoking them
+      # (Object.assign would invoke getters, which fails for methods like scan_pragmas
+      # that access instance variables before the instance is created)
       filter_class = Filter::Processor
       filters.reverse.each do |mod|
         filter_class = Class.new(filter_class) { include mod }

@@ -90,7 +90,15 @@ module Ruby2JS
         end
       end
 
+      # Setter that delegates to set_options for proper inheritance.
+      # In selfhost, filters override set_options() and call super.set_options().
       def options=(options)
+        set_options(options)
+      end
+
+      # Contains the actual options processing logic.
+      # Subclass filters override this and call super.set_options(options).
+      def set_options(options)
         @options = options
 
         @included = Filter.included_methods
