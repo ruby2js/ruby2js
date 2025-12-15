@@ -91,9 +91,10 @@ module Ruby2JS
         # Transform anonymous class instantiation to object literal
         if method == :new and target and target.type == :block
           block_call = target.children[0]
+          const_node = block_call.children[0]
           if block_call.type == :send and
-             block_call.children[0]&.type == :const and
-             block_call.children[0].children == [nil, :Class] and
+             const_node&.type == :const and
+             const_node.children[0].nil? and const_node.children[1] == :Class and
              block_call.children[1] == :new and
              block_call.children.length == 2  # no inheritance
 
@@ -116,10 +117,12 @@ module Ruby2JS
                 setter = s(:defm, nil, method_args, method_body)
 
                 # Check if there's already a getter for this property
-                existing = pairs.find { |p| p.children[0].type == :prop && p.children[0].children[0] == base_name }
-                if existing
+                # Use explicit != -1 check (Ruby returns nil, JS returns -1 when not found)
+                existing_idx = pairs.find_index { |p| p.children[0].type == :prop && p.children[0].children[0] == base_name } || -1
+                if existing_idx != -1
                   # Merge with existing getter
-                  pairs.delete(existing)
+                  existing = pairs[existing_idx]
+                  pairs.slice!(existing_idx)
                   pairs << s(:pair, s(:prop, base_name),
                     {get: existing.children[1][:get], set: setter})
                 else
@@ -130,10 +133,12 @@ module Ruby2JS
                 getter = s(:defm, nil, method_args, s(:autoreturn, method_body))
 
                 # Check if there's already a setter for this property
-                existing = pairs.find { |p| p.children[0].type == :prop && p.children[0].children[0] == name }
-                if existing
+                # Use explicit != -1 check (Ruby returns nil, JS returns -1 when not found)
+                existing_idx = pairs.find_index { |p| p.children[0].type == :prop && p.children[0].children[0] == name } || -1
+                if existing_idx != -1
                   # Merge with existing setter
-                  pairs.delete(existing)
+                  existing = pairs[existing_idx]
+                  pairs.slice!(existing_idx)
                   pairs << s(:pair, s(:prop, name),
                     {get: getter, set: existing.children[1][:set]})
                 else

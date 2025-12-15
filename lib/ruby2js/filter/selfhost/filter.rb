@@ -104,11 +104,41 @@ module Ruby2JS
             return process node.updated(nil, [s(:self), method_name, *args])
           end
 
+          # Convert es2015..es2025 to this.es20XX - these are instance methods
+          # on Processor that check @options[:eslevel]. Ruby resolves them via
+          # method lookup but JS needs explicit this.
+          if @selfhost_filter_name && target.nil? && args.empty? &&
+             [:es2015, :es2016, :es2017, :es2018, :es2019,
+              :es2020, :es2021, :es2022, :es2023, :es2024, :es2025].include?(method_name)
+            return s(:attr, s(:self), method_name)
+          end
+
+          # Convert S(...) to this.S(...) - S creates nodes with location preserved
+          # from @ast. Ruby resolves it via method lookup, but JS needs explicit this.
+          if @selfhost_filter_name && target.nil? && method_name == :S
+            return process node.updated(nil, [s(:self), method_name, *args])
+          end
+
           # Convert length/size/count to :attr nodes to ensure property access.
           # Without this, nodes created with s() (no location info) get is_method?=true
           # and output as method calls like body.length() instead of body.length.
           if target && args.empty? && ALWAYS_PROPERTIES.include?(method_name)
             return s(:attr, process(target), method_name)
+          end
+
+          super
+        end
+
+        # Handle csend (safe navigation) nodes for ALWAYS_PROPERTIES
+        def on_csend(node)
+          target, method_name, *args = node.children
+
+          # Convert length/size/count to :csend_attr for property access
+          # (csend_attr is like attr but produces ?. instead of .)
+          if target && args.empty? && ALWAYS_PROPERTIES.include?(method_name)
+            # Use :csend with no args - the converter will output target?.length
+            # The key is that without args and with :csend, it becomes property access
+            return node.updated(:csend, [process(target), method_name])
           end
 
           super
@@ -232,20 +262,32 @@ module Ruby2JS
           super(node)
         end
 
-        # Transform instance variables to module-level variables
-        # @options → _options, @eslevel → _eslevel, etc.
+        # Transform instance variables
+        # Most instance variables become module-level: @foo → _foo
+        # Exception: @options becomes this._options (instance property set by Pipeline)
         def on_ivar(node)
           var_name = node.children[0].to_s
-          # @foo → _foo
-          new_name = var_name.sub(/^@/, '_')
-          s(:lvar, new_name.to_sym)
+          if var_name == '@options'
+            # @options → this._options (uses instance property from Filter.Processor)
+            s(:attr, s(:self), :_options)
+          else
+            # @foo → _foo (module-level variable)
+            new_name = var_name.sub(/^@/, '_')
+            s(:lvar, new_name.to_sym)
+          end
         end
 
         def on_ivasgn(node)
           var_name = node.children[0].to_s
           value = node.children[1]
-          new_name = var_name.sub(/^@/, '_')
-          s(:lvasgn, new_name.to_sym, process(value))
+          if var_name == '@options'
+            # @options = x → this._options = x
+            s(:send, s(:attr, s(:self), :_options), :'=', process(value))
+          else
+            # @foo = x → _foo = x
+            new_name = var_name.sub(/^@/, '_')
+            s(:lvasgn, new_name.to_sym, process(value))
+          end
         end
       end
 

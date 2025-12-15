@@ -196,13 +196,19 @@ module Ruby2JS
         end
       end
 
-      # Helper to create nodes
+      # Helper to create nodes without location info
       def s(type, *children)
         if defined?(Parser::AST::Node)
           Parser::AST::Node.new(type, children)
         else
           Ruby2JS::Node.new(type, children)
         end
+      end
+
+      # Helper to create nodes preserving location from @ast
+      # (S is also in SEXP module, but having it on Processor allows this.S() in JS)
+      def S(type, *args)
+        @ast.updated(type, args)
       end
 
       # Process all children of a node (like process_children but returns array)
