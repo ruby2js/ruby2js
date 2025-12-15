@@ -80,6 +80,20 @@ module Ruby2JS
             end
           end
 
+          # Inside filters, convert process(...) to this.process(...)
+          # Ruby resolves process to self.process via method lookup, but JS
+          # would use the module-level process closure which isn't bound properly.
+          # By using this.process(), we use the inherited method from Filter.Processor.
+          if @selfhost_filter_name && target.nil? && method_name == :process
+            return process node.updated(nil, [s(:self), method_name, *args])
+          end
+
+          # Also convert process_all(...) and process_children(...) to this.*
+          if @selfhost_filter_name && target.nil? &&
+             [:process_all, :process_children].include?(method_name)
+            return process node.updated(nil, [s(:self), method_name, *args])
+          end
+
           super
         end
 
@@ -157,19 +171,15 @@ module Ruby2JS
                        s(:const, nil, :DEFAULTS),
                        s(:const, nil, :excluded),
                        s(:const, nil, :included),
-                       s(:const, nil, :processNode),
-                       s(:const, nil, :process_children),
-                       s(:const, nil, :process_all),
                        s(:const, nil, :_options),
                        s(:const, nil, :filterContext),
                        s(:const, nil, :nodesEqual),
                        s(:const, nil, :registerFilter),
                        s(:const, nil, :Ruby2JS)]
                     ),
-                    # Wrapper function for process (filters use process() but runtime uses processNode to avoid Node.js conflict)
-                    # Must be a function wrapper, not direct alias, because processNode gets reassigned by _setup
-                    s(:casgn, nil, :process, s(:block, s(:send, nil, :lambda), s(:args, s(:arg, :node)), s(:send, nil, :processNode, s(:lvar, :node)))),
                     # The filter as a class extending Filter.Processor (enables proper super calls)
+                    # Note: process(), process_all(), process_children() are now called via this.*
+                    # so they use the inherited methods from Filter.Processor
                     process(filter_class),
                     # Register the filter (pass prototype for Object.assign compatibility)
                     s(:send, nil, :registerFilter, s(:str, filter_name), s(:attr, s(:const, nil, filter_name.to_sym), :prototype)),

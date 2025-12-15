@@ -106,7 +106,8 @@ export function registerFilter(name, filterObj) {
       }
     }
   }
-  DEFAULTS.push(filterObj);
+  // Push to Ruby2JS.Filter.DEFAULTS (the one tests check), not the local DEFAULTS
+  Ruby2JS.Filter.DEFAULTS.push(filterObj);
   Ruby2JS.Filter[name] = filterObj;
   filterObj._setup = createSetup(filterObj);
 }
