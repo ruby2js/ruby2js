@@ -398,15 +398,16 @@ These filters have transpilation issues that need selfhost improvements:
 - ✅ Auto-load filters based on spec name
 - ✅ Filter-to-file mapping for non-standard names (e.g., `camelcase_spec.rb` → `camelCase.js`)
 
-**Gsubs eliminated:**
-- ✅ Module wrapper removal (2 gsubs)
-- ✅ Super call fixes (5 gsubs)
-- ✅ Regexp → RegExp (1 gsub) - already handled by converter
+**Gsubs eliminated (all 11 post-processing gsubs):**
+- ✅ Module wrapper removal (2 gsubs) - AST unwrapping in selfhost/filter.rb
+- ✅ Super call fixes (5 gsubs) - AST transformation in selfhost/filter.rb
+- ✅ Regexp → RegExp (1 gsub) - handled by converter/const.rb
+- ✅ Compact polyfill fix (1 gsub) - polyfill already generates correct version
+- ✅ Object constant quoting (1 gsub) - no longer appears in output
+- ✅ Regopt spread fix (1 gsub) - fixed at source in functions.rb
 
-**Remaining gsubs (3):**
-- Compact polyfill fix - edge case for frozen arrays
-- Object constant quoting (`s("const", null, Object)` → `s("const", null, "Object")`)
-- Regopt spread fix (`...arg.children.last)` → `...(arg.children.last.children || [])`)
+**Remaining gsubs (source preprocessing only - acceptable):**
+- 5 gsubs that add `# Pragma: skip` to require statements (these pre-process the source, not post-process output)
 
 #### Functions Filter Failure Analysis (13 remaining)
 

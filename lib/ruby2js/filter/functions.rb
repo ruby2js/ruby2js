@@ -376,7 +376,7 @@ module Ruby2JS
             pattern = pattern.gsub(/\\./, '').gsub(/\[.*\]/, '')
 
             gpattern = arg.updated(:regexp, [*arg.children[0...-1],
-              s(:regopt, :g, *arg.children.last)])
+              s(:regopt, :g, *arg.children.last.children)])
           else
             gpattern = s(:send, s(:const, nil, :RegExp), :new, arg, s(:str, 'g'))
           end
@@ -405,7 +405,7 @@ module Ruby2JS
           before, after = args
           if before.type == :regexp
             before = before.updated(:regexp, [*before.children[0...-1],
-              s(:regopt, :g, *before.children.last)])
+              s(:regopt, :g, *before.children.last.children)])
           elsif before.type == :str and not es2021
             before = before.updated(:regexp,
               [s(:str, Regexp.escape(before.children.first)), s(:regopt, :g)])

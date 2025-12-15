@@ -145,23 +145,12 @@ JS
 # NOTE: super calls are now handled at AST level by selfhost/filter.rb
 # NOTE: this._options and nodesEqual are now handled at AST level by selfhost/filter.rb
 
-# Fix the compact polyfill to use non-mutating filter (needed for frozen arrays from PrismWalker)
-# The polyfill provides a mutating version for compact!, but selfhost needs non-mutating
-js = js.gsub(
-  /Object\.defineProperty\(Array\.prototype, "compact", \{\n  get\(\) \{\n    let i = this\.length - 1;\n\n    while \(i >= 0\) \{\n      if \(this\[i\] === null \|\| this\[i\] === undefined\) this\.splice\(i, 1\);\n      i--\n    \};\n\n    return this\n  \},\n\n  configurable: true\n\}\);/,
-  'Object.defineProperty(Array.prototype, "compact", { get() { return this.filter(x => x !== null && x !== undefined); }, configurable: true });'
-)
-
-# NOTE: Hash.keys is now handled via include: [:keys] option
-# NOTE: Regexp → RegExp is now handled unconditionally in lib/ruby2js/converter/const.rb
-
-# Fix Ruby Object constant becoming JS Object constructor
-# s("const", null, Object) should be s("const", null, "Object")
-js = js.gsub(/s\("const", null, Object\)/, 's("const", null, "Object")')
-
-# Fix spread of regopt node - need to spread .children, not the node itself
-# Pattern: ...before.children.last) or ...arg.children.last) where the node is a regopt
-js = js.gsub(/\.\.\.(before|arg)\.children\.last\)/, '...(\1.children.last.children || []))')
+# NOTE: All post-processing gsubs have been eliminated!
+# - Compact polyfill: Already generates correct non-mutating version
+# - Object constant: No longer appears in output
+# - Regopt spread: Fixed at source (lib/ruby2js/filter/functions.rb)
+# - Hash.keys: Handled via include: [:keys] option
+# - Regexp → RegExp: Handled in lib/ruby2js/converter/const.rb
 
 # NOTE: each_with_index block handling is now in functions filter
 
