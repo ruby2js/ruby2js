@@ -33,16 +33,9 @@ module Ruby2JS
           super
         end
 
-        # Methods that are always method calls in Ruby, never property accesses
-        # These need to be marked as :call type to ensure they get () in JS
-        # is_method? is critical - Ruby's is_method? becomes is_method in JS, must be called with ()
-        # reverse is needed because arr.reverse.each becomes for-of loop in JS
-        # getOwnProps is a method on Namespace class that returns an object
-        ALWAYS_METHODS = %i[pop shift is_method? reverse sort getOwnProps dup chomp].freeze
-
-        # Properties that should always be accessed without () in JS
-        # Even though Ruby calls them as methods, they're properties in JS
-        ALWAYS_PROPERTIES = %i[length children type].freeze
+        # Methods that must be called with () in JS even when called without args in Ruby
+        # Note: reverse, pop, shift, sort, dup are now handled by FORCE_PARENS in functions filter
+        ALWAYS_METHODS = %i[is_method? getOwnProps chomp].freeze
 
         # Transform method("on_#{name}") to use cleaned name without ? or !
         # This handles the handler registration loop in Converter#initialize
@@ -57,20 +50,10 @@ module Ruby2JS
             return process node.updated(nil, [s(:self), method_name, *args])
           end
 
-          # Force .pop, .shift to always be method calls
-          # In Ruby these are always methods; in JS they could be property access
-          # Mark as :call type so converter adds parentheses
-          # Don't re-process - just update the type and return (avoids infinite loop)
+          # Force certain methods to always have () in JS output
+          # Without this, is_method? heuristics may treat them as property access
           if target && ALWAYS_METHODS.include?(method_name) && args.empty?
             return node.updated(:call, node.children)
-          end
-
-          # Force .length, .children, .type to always be property access
-          # In Ruby these are methods; in JS they're properties (no parens)
-          # Mark as :attr type so converter doesn't add parentheses
-          # Only apply when there's a target and we've actually processed this node
-          if target && ALWAYS_PROPERTIES.include?(method_name) && args.empty? && node.type == :send
-            return process(node.updated(:attr, [target, method_name]))
           end
 
           # Transform Ruby2JS::Node.new(...) to new globalThis.Ruby2JS.Node(...)

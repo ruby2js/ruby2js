@@ -73,9 +73,19 @@ module Ruby2JS
         result
       end
 
+      # Methods that always need () in JS even when called without args/parens in Ruby
+      # These return values and must be called as methods, not accessed as properties
+      FORCE_PARENS = %i[reverse pop shift sort dup clone].freeze
+
       def on_send(node)
         target, method, *args = node.children
         return super if excluded?(method) and method != :call
+
+        # Force certain methods to always have () in JS output
+        # Without this, is_method? heuristics treat them as property access
+        if target && FORCE_PARENS.include?(method) && args.empty? && !node.is_method?
+          return super node.updated(:call, node.children)
+        end
 
         # Class.new { }.new -> object literal {}
         # Transform anonymous class instantiation to object literal

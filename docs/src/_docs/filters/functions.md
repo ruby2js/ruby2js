@@ -144,6 +144,22 @@ If you set the `eslevel` option to `2021` or newer, the Functions filter enables
 * `define_method` and `method_defined?` work inside class bodies (with or without explicit receiver), including inside loops like `[:a, :b].each { |m| define_method(m) { ... } }`
 * Block parameter destructuring is supported: `.map {|k, v| ...}` becomes `.map(([k, v]) => ...)`
 
+## Methods Always Called with Parentheses
+
+Ruby allows calling methods without parentheses, but JavaScript requires them for
+methods that return values. The following methods always output with `()` in JS,
+even when written without parentheses in Ruby:
+
+`reverse`, `pop`, `shift`, `sort`, `dup`, `clone`
+
+```ruby
+arr.reverse.each { |x| puts x }
+# => for (let x of arr.reverse()) { console.log(x) }
+
+x = arr.pop
+# => let x = arr.pop()
+```
+
 ## Methods Requiring Parentheses
 
 Some Ruby method names like `keys`, `values`, `index`, `max`, etc. could also be
