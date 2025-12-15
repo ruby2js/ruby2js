@@ -51,16 +51,16 @@ async function loadFilterForSpec(specName) {
   if (loadedFilters.has(filterFile)) return true;
 
   try {
-    const filterModule = await import(filterPath + '?t=' + Date.now());
-    const filterName = filterModule.default?.name || baseName.charAt(0).toUpperCase() + baseName.slice(1);
+    // Import the filter module - this triggers registerFilter() which sets up Ruby2JS.Filter[name]
+    await import(filterPath + '?t=' + Date.now());
 
-    // Register the filter in Ruby2JS.Filter namespace
-    globalThis.Ruby2JS.Filter = globalThis.Ruby2JS.Filter || {};
-    globalThis.Ruby2JS.Filter[filterName] = filterModule.default;
+    // Get the filter name from the registered filter (registerFilter already did the setup)
+    const filterName = baseName.charAt(0).toUpperCase() + baseName.slice(1);
+    const registeredFilter = globalThis.Ruby2JS.Filter?.[filterName];
 
-    // Also push to DEFAULTS array (for tests that check DEFAULTS.includes)
-    if (filterModule.default && !globalThis.Ruby2JS.Filter.DEFAULTS.includes(filterModule.default)) {
-      globalThis.Ruby2JS.Filter.DEFAULTS.push(filterModule.default);
+    if (!registeredFilter) {
+      console.log(`  Warning: Filter ${filterName} not found after loading ${filterFile}`);
+      return false;
     }
 
     loadedFilters.add(filterFile);

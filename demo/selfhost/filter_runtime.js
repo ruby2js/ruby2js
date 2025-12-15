@@ -24,10 +24,11 @@ export const ast_node = (node) => {
 // Setup: make include() a no-op (Ruby's include SEXP doesn't apply in JS)
 export const include = () => {};
 
-// Setup: Filter global for exclude/include calls (no-op, handled by test harness)
+// Setup: Filter global for exclude/include calls and Processor base class
 export const Filter = {
   exclude: (...methods) => {},
-  include: (...methods) => {}
+  include: (...methods) => {},
+  Processor: Ruby2JS.Filter.Processor  // Base class for filter inheritance
 };
 
 // Setup: DEFAULTS array for filter registration
@@ -93,7 +94,18 @@ export function createSetup(filterObj) {
 }
 
 // Register a filter in the Ruby2JS namespace
+// Class-based filters have non-enumerable prototype methods, so we make them enumerable
+// for compatibility with Object.assign in the pipeline
 export function registerFilter(name, filterObj) {
+  // Make all prototype methods enumerable so Object.assign can copy them
+  for (const key of Object.getOwnPropertyNames(filterObj)) {
+    if (key !== 'constructor') {
+      const desc = Object.getOwnPropertyDescriptor(filterObj, key);
+      if (desc && !desc.enumerable) {
+        Object.defineProperty(filterObj, key, { ...desc, enumerable: true });
+      }
+    }
+  }
   DEFAULTS.push(filterObj);
   Ruby2JS.Filter[name] = filterObj;
   filterObj._setup = createSetup(filterObj);

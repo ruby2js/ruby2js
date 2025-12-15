@@ -300,8 +300,14 @@ Examples:
     for (const name of filterNames) {
       try {
         const filterPath = path.join(scriptDir, 'filters', `${name}.js`);
-        const filterModule = await import(filterPath);
-        loadedFilters.push(filterModule.default);
+        await import(filterPath);  // This registers the filter
+        // Use the registered filter (prototype with enumerable methods) not the class
+        const capitalizedName = name.charAt(0).toUpperCase() + name.slice(1);
+        const registeredFilter = Ruby2JS.Filter[capitalizedName];
+        if (!registeredFilter) {
+          throw new Error(`Filter '${name}' not found after loading`);
+        }
+        loadedFilters.push(registeredFilter);
       } catch (e) {
         console.error(`Error loading filter '${name}': ${e.message}`);
         process.exit(1);

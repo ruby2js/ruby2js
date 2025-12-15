@@ -310,11 +310,11 @@ module Ruby2JS
             # preserve csend type for optional chaining
             call_type = node.type == :csend ? :csend : :send
             if BINARY_OPERATORS.include?(method)
-              return on_block s(:block, s(call_type, *node.children[0..-2]),
+              return self.on_block s(:block, s(call_type, *node.children[0..-2]),
                 s(:args, s(:arg, :a), s(:arg, :b)), s(:return,
                 process(s(:send, s(:lvar, :a), method, s(:lvar, :b)))))
             else
-              return on_block s(:block, s(call_type, *node.children[0..-2]),
+              return self.on_block s(:block, s(call_type, *node.children[0..-2]),
                 s(:args, s(:arg, :item)), s(:return,
                 process(s(:attr, s(:lvar, :item), method))))
             end
@@ -324,7 +324,7 @@ module Ruby2JS
       end
 
       def on_csend(node)
-        on_send(node)
+        self.on_send(node)
       end
     end
   end

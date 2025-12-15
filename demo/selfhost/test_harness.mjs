@@ -171,70 +171,17 @@ export async function initPrism() {
   return await sharedInitPrism();
 }
 
-// Convert function that delegates to bundle's convert, with filter preprocessing
-// The bundle's Pipeline expects Ruby-style modules for `include`, but transpiled
-// filters are JS objects. We preprocess filters using FilterProcessor, then pass
-// the filtered AST to Pipeline (with empty filters array).
+// Convert function - delegates to bundle's convert which uses Pipeline
+// Pipeline now correctly handles class-based filters via Object.assign
 Ruby2JS.convert = function(source, opts = {}) {
   // Default eslevel to 2020 (same as Ruby2JS default)
   if (opts.eslevel === undefined) {
     opts.eslevel = 2020;
   }
 
-  // If no filters, delegate directly to bundle's convert
-  if (!opts.filters || opts.filters.length === 0) {
-    try {
-      const result = bundleConvert(source, opts);
-      return { toString: () => result };
-    } catch (e) {
-      return { toString: () => `[ERROR: ${e.message}]`, error: e };
-    }
-  }
-
-  // With filters: preprocess AST with FilterProcessor, then use Pipeline
-  const prismParse = getPrismParse();
-  if (!prismParse) {
-    return { toString: () => `[ERROR: Prism not initialized. Call initPrism() first]` };
-  }
-
   try {
-    // Parse source
-    const parseResult = prismParse(source);
-    const walker = new Ruby2JS.PrismWalker(source, opts.file || null);
-    let ast = walker.visit(parseResult.value);
-
-    // Associate comments
-    const source_buffer = walker.source_buffer;
-    const wrapped_comments = (parseResult.comments || []).map(c =>
-      new PrismComment(c, source, source_buffer)
-    );
-    const comments = associateComments(ast, wrapped_comments);
-
-    // Apply filters using FilterProcessor (handles transpiled JS filters)
-    for (const filter of opts.filters) {
-      if (!filter) continue;
-
-      // Call _setup to update options
-      if (typeof filter._setup === 'function') {
-        const excludedFn = (method) => Ruby2JS.Filter._excluded.has(method);
-        const includedFn = (method) => Ruby2JS.Filter._included.has(method);
-        filter._setup({ excluded: excludedFn, included: includedFn, _options: opts });
-      }
-
-      if (typeof filter.on_send === 'function' || typeof filter.on_block === 'function') {
-        const processor = new FilterProcessor(filter, opts);
-        ast = processor.process(ast);
-      }
-    }
-
-    // Use Pipeline for converter setup (with empty filters - already applied)
-    const pipeline_options = { ...opts, source, filters: [] };
-    const pipeline = new Ruby2JS.Pipeline(ast, comments, {
-      filters: [],
-      options: pipeline_options
-    });
-    const result = pipeline.run;
-    return { toString: () => result.to_s };
+    const result = bundleConvert(source, opts);
+    return { toString: () => result };
   } catch (e) {
     return { toString: () => `[ERROR: ${e.message}]`, error: e };
   }

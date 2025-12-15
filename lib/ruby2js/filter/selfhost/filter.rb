@@ -4,10 +4,10 @@
 #
 # Handles patterns specific to transpiling Ruby2JS filters to JavaScript:
 # - Skip external requires (ruby2js, regexp_parser, etc.)
-# - Module wrapper: Ruby2JS::Filter::X → X class/object
-# - Generate import from filter_runtime.js
+# - Module wrapper: Ruby2JS::Filter::X → class X extends Filter.Processor
+# - Generate import from ruby2js.js
 # - Generate filter registration and export
-# - super calls → process_children(node) or process(arg)
+# - super calls work naturally via class inheritance
 # - Writer methods: def options=(x) → setter or regular method
 # - AST comparisons: x == s(...) → nodesEqual(x, s(...))
 # - Instance variable options: @options → _options
@@ -129,7 +129,20 @@ module Ruby2JS
                   @selfhost_filter_name = filter_modules.first.children[0].children[1]
                   filter_name = @selfhost_filter_name.to_s
 
-                  # Build the complete output with import, filter, registration, export
+                  # Extract the filter module body
+                  filter_mod = filter_modules.first
+                  filter_mod_body = filter_mod.children[1..-1]
+                  filter_mod_body = filter_mod_body.first.children if filter_mod_body.first&.type == :begin
+
+                  # Convert module to class extending Filter.Processor
+                  # This allows super to work properly in JavaScript
+                  filter_class = s(:class,
+                    s(:const, nil, filter_name.to_sym),
+                    s(:const, s(:const, nil, :Filter), :Processor),
+                    s(:begin, *filter_mod_body)
+                  )
+
+                  # Build the complete output with import, filter class, registration, export
                   return s(:begin,
                     # Import from ruby2js.js (filter runtime is bundled there)
                     # Path is relative to filters/ directory
@@ -157,10 +170,10 @@ module Ruby2JS
                     # Wrapper function for process (filters use process() but runtime uses processNode to avoid Node.js conflict)
                     # Must be a function wrapper, not direct alias, because processNode gets reassigned by _setup
                     s(:casgn, nil, :process, s(:block, s(:send, nil, :lambda), s(:args, s(:arg, :node)), s(:send, nil, :processNode, s(:lvar, :node)))),
-                    # The filter module itself
-                    process(filter_modules.first),
-                    # Register the filter
-                    s(:send, nil, :registerFilter, s(:str, filter_name), s(:const, nil, filter_name.to_sym)),
+                    # The filter as a class extending Filter.Processor (enables proper super calls)
+                    process(filter_class),
+                    # Register the filter (pass prototype for Object.assign compatibility)
+                    s(:send, nil, :registerFilter, s(:str, filter_name), s(:attr, s(:const, nil, filter_name.to_sym), :prototype)),
                     # Export the filter
                     s(:export, :default, s(:const, nil, filter_name.to_sym)),
                     s(:export, s(:array, s(:const, nil, filter_name.to_sym)))
@@ -173,29 +186,8 @@ module Ruby2JS
           super
         end
 
-        # Transform super calls in filter methods
-        # - super with no args → process_children(node)
-        # - super(arg) → process(arg)
-        def on_zsuper(node)
-          # zsuper is Ruby's `super` with implicit args
-          # In filter context, replace with process_children(node)
-          if @selfhost_in_filter_method
-            return s(:send, nil, :process_children, s(:lvar, :node))
-          end
-          super
-        end
-
-        def on_super(node)
-          args = node.children
-          if @selfhost_in_filter_method && args.length == 1
-            # super(arg) → process(arg)
-            return s(:send, nil, :process, args[0])
-          elsif @selfhost_in_filter_method && args.empty?
-            # super() → process_children(node)
-            return s(:send, nil, :process_children, s(:lvar, :node))
-          end
-          super
-        end
+        # super calls now work naturally since filters are transpiled as classes
+        # extending Filter.Processor. No transformation needed.
 
         # Note: def self.X in modules is now handled by the main converter
         # (lib/ruby2js/converter/module.rb) which transforms it to a regular
