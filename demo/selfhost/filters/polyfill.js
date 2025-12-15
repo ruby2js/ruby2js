@@ -99,11 +99,7 @@ Object.defineProperty(
   const Polyfill = (() => {
     include(SEXP);
 
-    // Ensure polyfill runs before functions filter so that
-    // the polyfill methods can be transformed by functions
-    this.reorder = (filters) => {
-      // Ensure polyfill runs before functions filter so that
-      // the polyfill methods can be transformed by functions
+    function reorder(filters) {
       if (typeof Ruby2JS.Filter.Functions !== 'undefined' && filters.includes(Ruby2JS.Filter.Functions)) {
         filters = filters.dup();
         let polyfill = delete filters[Ruby2JS.Filter.Polyfill];
@@ -113,6 +109,8 @@ Object.defineProperty(
       return filters
     };
 
+    // Ensure polyfill runs before functions filter so that
+    // the polyfill methods can be transformed by functions
     function initialize(comments) {
       ;
       let _polyfills_added = new Set
@@ -156,6 +154,21 @@ Object.defineProperty(
     };
 
     // Generate polyfill AST nodes
+    // Object.defineProperty(Array.prototype, 'first', {get() { return this[0] }, configurable: true})
+    // Object.defineProperty(Array.prototype, 'last', {get() { return this.at(-1) }, configurable: true})
+    // Object.defineProperty(Array.prototype, 'compact', {get() {...}, configurable: true})
+    // Non-mutating: returns new array without null/undefined (matches Ruby's compact)
+    // For compact! (mutating), the Functions filter converts it to splice-based code
+    // if (!Array.prototype.rindex) { Array.prototype.rindex = function(fn) {...} }
+    // Using while loop: let i = this.length - 1; while (i >= 0) { ...; i-- }
+    // if (!Array.prototype.insert) { Array.prototype.insert = function(index, ...items) {...} }
+    // if (!Array.prototype.delete_at) { Array.prototype.delete_at = function(index) {...} }
+    // if (!String.prototype.chomp) { String.prototype.chomp = function(suffix) {...} }
+    // if (!String.prototype.count) { String.prototype.count = function(chars) {...} }
+    // Counts occurrences of any character in chars string
+    // for (const c of this) { if (chars.includes(c)) count++ }
+    // Object.defineProperty(Object.prototype, 'to_a', {get() { return Object.entries(this) }, configurable: true})
+    // if (!RegExp.escape) { RegExp.escape = function(str) { return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') } }
     function polyfill_ast(name) {
       switch (name) {
       case "array_first":
@@ -394,21 +407,6 @@ Object.defineProperty(
       }
     };
 
-    // Object.defineProperty(Array.prototype, 'first', {get() { return this[0] }, configurable: true})
-    // Object.defineProperty(Array.prototype, 'last', {get() { return this.at(-1) }, configurable: true})
-    // Object.defineProperty(Array.prototype, 'compact', {get() {...}, configurable: true})
-    // Non-mutating: returns new array without null/undefined (matches Ruby's compact)
-    // For compact! (mutating), the Functions filter converts it to splice-based code
-    // if (!Array.prototype.rindex) { Array.prototype.rindex = function(fn) {...} }
-    // Using while loop: let i = this.length - 1; while (i >= 0) { ...; i-- }
-    // if (!Array.prototype.insert) { Array.prototype.insert = function(index, ...items) {...} }
-    // if (!Array.prototype.delete_at) { Array.prototype.delete_at = function(index) {...} }
-    // if (!String.prototype.chomp) { String.prototype.chomp = function(suffix) {...} }
-    // if (!String.prototype.count) { String.prototype.count = function(chars) {...} }
-    // Counts occurrences of any character in chars string
-    // for (const c of this) { if (chars.includes(c)) count++ }
-    // Object.defineProperty(Object.prototype, 'to_a', {get() { return Object.entries(this) }, configurable: true})
-    // if (!RegExp.escape) { RegExp.escape = function(str) { return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') } }
     // Helper to add a polyfill only once
     function add_polyfill(name) {
       if (_polyfills_added.includes(name)) return;
@@ -416,6 +414,14 @@ Object.defineProperty(
       return prepend_list << polyfill_ast(name)
     };
 
+    // Only process calls with a receiver
+    // Use :attr for property access (no parens) - it's a getter
+    // Use :attr for property access (no parens) - it's a getter
+    // rindex with block (block handled separately)
+    // Use :attr for property access (no parens) - it's a getter
+    // String#count(chars) - count occurrences of any char in chars
+    // Hash#to_a / Object#to_a - convert to array of entries
+    // RegExp.escape(str) => RegExp.escape(str) with polyfill for pre-ES2025
     function on_send(node) {
       let [target, method, ...args] = node.children;
 
@@ -527,14 +533,6 @@ Object.defineProperty(
       return process_children(node)
     };
 
-    // Only process calls with a receiver
-    // Use :attr for property access (no parens) - it's a getter
-    // Use :attr for property access (no parens) - it's a getter
-    // rindex with block (block handled separately)
-    // Use :attr for property access (no parens) - it's a getter
-    // String#count(chars) - count occurrences of any char in chars
-    // Hash#to_a / Object#to_a - convert to array of entries
-    // RegExp.escape(str) => RegExp.escape(str) with polyfill for pre-ES2025
     // Handle .first/.last when already converted to attr by another filter
     // (e.g., selfhost/converter transforms these before polyfill runs)
     function on_attr(node) {
@@ -557,6 +555,7 @@ Object.defineProperty(
     };
 
     // Handle rindex with block
+    // Process the block but keep as :send! to prevent further transformation
     function on_block(node) {
       let target, method;
       let call = node.children.first;
@@ -579,6 +578,7 @@ Object.defineProperty(
     };
 
     return {
+      reorder,
       initialize,
       define_property_getter,
       define_prototype_method,
@@ -590,7 +590,6 @@ Object.defineProperty(
     }
   })();
 
-  // Process the block but keep as :send! to prevent further transformation
 // Register the filter
 DEFAULTS.push(Polyfill);
 

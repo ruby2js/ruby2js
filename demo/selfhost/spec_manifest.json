@@ -11,12 +11,12 @@
     "camelcase_spec.rb",
     "esm_spec.rb",
     "tagged_templates_spec.rb",
-    "cjs_spec.rb"
+    "cjs_spec.rb",
+    "polyfill_spec.rb",
+    "pragma_spec.rb"
   ],
   "blocked": {
     "comments_spec.rb": "needs filters (Ruby2JS.Filter.Functions)",
-    "polyfill_spec.rb": "self.reorder method doesn't transpile",
-    "pragma_spec.rb": "self.reorder method doesn't transpile",
     "securerandom_spec.rb": "extend SEXP doesn't transpile",
     "node_spec.rb": "extend SEXP doesn't transpile",
     "react_spec.rb": "needs filters",

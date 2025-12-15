@@ -352,7 +352,7 @@ node --check filters/<name>.js
 | Category | Status | Tests |
 |----------|--------|-------|
 | Ready specs | ✅ 3/3 passing | 290 tests (transliteration, serializer, namespace) |
-| Partial specs | 6 filters tested | See matrix below |
+| Partial specs | 8 filters tested | See matrix below |
 
 #### Filter Test Matrix
 
@@ -364,6 +364,8 @@ node --check filters/<name>.js
 | return | ✓ | 8/25 | 32% | Needs work |
 | esm | ✓ | 4/40 | 10% | Needs work |
 | cjs | ✓ | 1/19 | 5% | Needs work |
+| polyfill | ✓ | 0/0 | N/A | No spec tests |
+| pragma | ✓ | 0/71 | 0% | Needs work |
 
 #### Blocked Filters
 
@@ -371,10 +373,10 @@ These filters have transpilation issues that need selfhost improvements:
 
 | Filter | Issue |
 |--------|-------|
-| polyfill | `self.reorder` class method doesn't transpile to IIFE context |
-| pragma | `self.reorder` class method doesn't transpile to IIFE context |
 | securerandom | `extend SEXP` Ruby DSL not supported |
 | node | `extend SEXP` Ruby DSL not supported |
+| combiner | Ruby2JS constant redeclaration |
+| react | Empty `let ;` statement from super |
 
 #### Recent Progress (2024-12-14)
 
@@ -382,6 +384,7 @@ These filters have transpilation issues that need selfhost improvements:
 - ✅ `nodesEqual` - AST structural comparison (`x == s(...)` → `nodesEqual(x, s(...))`)
 - ✅ Instance variable to module-level (`@options` → `_options`)
 - ✅ Writer method renaming (`def options=` → `def set_options`)
+- ✅ Singleton methods (`def self.X` → `function X`) - fixes IIFE context issue
 
 **Converter improvements:**
 - ✅ Fixed assignment in logical expressions (parentheses for `a && (b = c)`)

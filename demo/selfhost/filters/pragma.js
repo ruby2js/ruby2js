@@ -107,13 +107,7 @@ Object.defineProperty(
   const Pragma = (() => {
     include(SEXP);
 
-    // Ensure pragma runs after require but before other filters so that
-    // pragmas like skip, entries, method, hash are processed correctly.
-    // Pragma runs AFTER require so it can process pragmas in inlined files.
-    this.reorder = (filters) => {
-      // Ensure pragma runs after require but before other filters so that
-      // pragmas like skip, entries, method, hash are processed correctly.
-      // Pragma runs AFTER require so it can process pragmas in inlined files.
+    function reorder(filters) {
       let require_filter = typeof Ruby2JS.Filter.Require !== 'undefined' ? Ruby2JS.Filter.Require : null;
       let require_index = require_filter ? filters.indexOf(require_filter) : null;
       let pragma_index = filters.indexOf(Ruby2JS.Filter.Pragma);
@@ -132,6 +126,9 @@ Object.defineProperty(
       return filters
     };
 
+    // Ensure pragma runs after require but before other filters so that
+    // pragmas like skip, entries, method, hash are processed correctly.
+    // Pragma runs AFTER require so it can process pragmas in inlined files.
     // Find the require filter position (or start of filters if not present)
     // If require filter exists and pragma comes before it, move pragma after require
     // Move pragma to right after require
@@ -563,6 +560,7 @@ Object.defineProperty(
     };
 
     return {
+      reorder,
       PRAGMAS,
       initialize,
       set_options,
