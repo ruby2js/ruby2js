@@ -83,4 +83,12 @@ transpile_directory(
 )
 puts
 
+# Transpile helpers
+puts "Helpers:"
+transpile_directory(
+  File.join(DEMO_ROOT, 'app/helpers'),
+  File.join(DIST_DIR, 'helpers')
+)
+puts
+
 puts "=== Build Complete ==="

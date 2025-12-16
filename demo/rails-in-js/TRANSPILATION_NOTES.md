@@ -348,3 +348,43 @@ OPTIONS = {
   ]
 }
 ```
+
+## Helper Modules
+
+Rails-like helpers are implemented as transpiled Ruby modules:
+
+### Path Helpers
+
+```ruby
+export module PathHelpers
+  def self.articles_path
+    '/articles'
+  end
+
+  def self.article_path(article)
+    id = extract_id(article)
+    "/articles/#{id}"
+  end
+
+  def self.extract_id(obj)
+    # Works with both objects {id: 5} and primitives (5)
+    (obj && obj.id) || obj
+  end
+end
+```
+
+Usage: `PathHelpers.article_path(article)` or `PathHelpers.article_path(5)`
+
+### View Helpers
+
+```ruby
+export module ViewHelpers
+  def self.link_to(text, path, options = {})
+    onclick = options[:onclick] || "navigate('#{path}')"
+    style = options[:style] ? " style=\"#{options[:style]}\"" : ''
+    "<a onclick=\"#{onclick}\"#{style}>#{text}</a>"
+  end
+end
+```
+
+Usage: `ViewHelpers.link_to('Articles', '/articles', style: 'color: blue;')`
