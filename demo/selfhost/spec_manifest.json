@@ -5,7 +5,8 @@
     "serializer_spec.rb",
     "namespace_spec.rb",
     "functions_spec.rb",
-    "return_spec.rb"
+    "return_spec.rb",
+    "active_support_spec.rb"
   ],
   "partial": [
     "camelcase_spec.rb",
@@ -14,7 +15,8 @@
     "cjs_spec.rb",
     "polyfill_spec.rb",
     "pragma_spec.rb",
-    "comments_spec.rb"
+    "comments_spec.rb",
+    "erb_spec.rb"
   ],
   "blocked": {
     "securerandom_spec.rb": "extend SEXP doesn't transpile",
@@ -24,8 +26,6 @@
     "jquery_spec.rb": "needs filters",
     "underscore_spec.rb": "needs filters",
     "active_functions_spec.rb": "needs filters",
-    "active_support_spec.rb": "needs filters",
-    "erb_spec.rb": "needs filters",
     "jsx_spec.rb": "needs filters",
     "lit_spec.rb": "needs filters",
     "matchAll_spec.rb": "needs filters",
