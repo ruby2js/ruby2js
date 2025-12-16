@@ -1,0 +1,1 @@
+{"version":3,"file":"config/routes.rb","sources":["config/routes.rb"],"names":[],"mappings":"","sourcesContent":["# Routes configuration - idiomatic Rails\nRails.application.routes.draw do\n  root \"articles#index\"\n\n  resources :articles do\n    resources :comments, only: [:create, :destroy]\n  end\nend\n"]}

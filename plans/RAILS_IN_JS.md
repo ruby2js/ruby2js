@@ -275,13 +275,40 @@ Stage 1 was implemented in two phases:
 - Created module-based architecture (IIFE pattern) for controllers and routes
 - Built path helpers, view rendering, and form handling
 
-**Phase 2a: Rails Filters** (see `plans/RAILS_FILTERS.md`)
+**Phase 1b: Rails Filters** (see `plans/RAILS_FILTERS.md`)
 - Created `rails/model` filter - transforms `has_many`, `belongs_to`, `validates`, callbacks
 - Created `rails/controller` filter - transforms `before_action`, `params`, `redirect_to`
 - Created `rails/routes` filter - transforms `Rails.application.routes.draw`, `resources`
 - Created `rails/schema` filter - transforms `ActiveRecord::Schema.define`, `create_table`
+- Created `rails/seeds` filter - auto-detects model references, generates imports
 
 The demo now uses **idiomatic Rails syntax** in `app/` that the Rails filters transform to the micro-framework runtime. This allows writing standard Rails code that transpiles to browser-ready JavaScript.
+
+**Phase 1c: Developer Experience - Logging & Debugging** (unplanned, emerged as killer feature)
+
+During development, logging emerged as a surprisingly powerful feature that gives the demo a true Rails feel.
+
+- **SQL Logging** - All database operations log to console in Rails style:
+  ```
+  Article Load  SELECT * FROM articles
+  Article Create  INSERT INTO articles (title, body, ...) VALUES (?, ?, ...) [["title","Hello"],["body","..."]]
+  ```
+
+- **Rails.logger Support** - Created `rails/logger` filter:
+  ```ruby
+  Rails.logger.debug "debug message"  # → console.debug("debug message")
+  Rails.logger.info "info message"    # → console.info("info message")
+  Rails.logger.warn "warning!"        # → console.warn("warning!")
+  Rails.logger.error "error!"         # → console.error("error!")
+  ```
+
+- **Sourcemaps** - Debug Ruby in the browser! The build script generates sourcemaps with embedded Ruby source:
+  - Open DevTools → Sources → find `app/models/article.rb`
+  - Set breakpoints directly in Ruby code
+  - Step through Ruby source when breakpoints hit
+  - See Ruby variable names and expressions
+
+  This is a significant "wow factor" - developers debug in the language they wrote, not the transpiled output.
 
 ### Models
 
@@ -778,10 +805,11 @@ Same blog functionality, demonstrating that the view layer is pluggable (ERB or 
 
 | Component | Lines (est.) | Stage |
 |-----------|-------------|-------|
-| ActiveRecord base | 600-800 | 1 |
-| Controller base | 200-300 | 1 |
-| Router | 150-200 | 1 |
-| ERB parser | 100-150 | 1 |
+| ActiveRecord base | 600-800 | 1a |
+| Controller base | 200-300 | 1a |
+| Router | 150-200 | 1a |
+| ERB parser | 100-150 | 1a |
+| Sourcemap generation | 20 | 1c |
 | Dev server (hot reload) | 100 | 2 |
 | Browser reload client | 30 | 2 |
 | Build script | 100 | 2 |
@@ -808,6 +836,8 @@ Same blog functionality, demonstrating that the view layer is pluggable (ERB or 
 | Rails/Controller | ✅ Complete | None |
 | Rails/Routes | ✅ Complete | None |
 | Rails/Schema | ✅ Complete | None |
+| Rails/Seeds | ✅ Complete | None |
+| Rails/Logger | ✅ Complete | None |
 
 ---
 
@@ -918,11 +948,43 @@ Each stage has two types of success criteria: **selfhost hardening** (primary) a
 After Stage 3:
 
 - **Oxidizer conventions** - `resources :x, from: :y`, smart link helpers
-- **Turbo/Hotwire** - Real-time updates
 - **More associations** - `has_one`, `has_many :through`
 - **Database migrations** - Schema versioning
 - **Production deployment** - Cloudflare Workers, Deno Deploy
 - **rubymonolith/demo** - Full port as stretch goal
+
+### Hotwire Integration
+
+Hotwire (Turbo + Stimulus) is a natural fit for Rails-in-JS since it's already JavaScript-based:
+
+**Stimulus** - Ruby2JS already has a `stimulus` filter that transforms Ruby controller classes to Stimulus-compatible JavaScript. This should work out of the box with minimal adaptation.
+
+**Turbo Drive** - Could replace or enhance the current Router, providing:
+- Automatic link interception and fetch-based navigation
+- Form submission handling
+- Progress bar and loading states
+- Browser history management
+
+**Turbo Frames** - Partial page updates within `<turbo-frame>` elements:
+- Controllers could render individual frames
+- Frame-scoped navigation without full page loads
+
+**Turbo Streams** - Real-time DOM updates via the pattern:
+```javascript
+Turbo.renderStreamMessage(`
+  <turbo-stream action="append" target="comments">
+    <template>${commentHTML}</template>
+  </turbo-stream>
+`)
+```
+
+Stream actions (`append`, `prepend`, `replace`, `update`, `remove`, `before`, `after`) provide fine-grained control for CRUD operations. This pattern works well with Rails-in-JS since we control both the "server" (in-browser controller) and client.
+
+**Implementation approach:**
+1. Import `@hotwired/turbo` from CDN or npm
+2. Adapt controller `render` to optionally return Turbo Stream responses
+3. Use Turbo Drive for navigation (replacing or complementing current Router)
+4. Stimulus controllers remain Ruby, transpiled via existing filter
 
 ---
 

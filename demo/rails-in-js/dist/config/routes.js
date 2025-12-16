@@ -26,3 +26,4 @@ setupFormHandlers([
 
 Application.configure({schema: Schema, seeds: Seeds});
 export { Application }
+//# sourceMappingURL=routes.js.map

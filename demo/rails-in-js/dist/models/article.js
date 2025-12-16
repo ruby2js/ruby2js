@@ -19,3 +19,4 @@ export class Article extends ApplicationRecord {
     return this.validates_length_of("body", {minimum: 10})
   }
 }
+//# sourceMappingURL=article.js.map

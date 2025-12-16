@@ -13,3 +13,4 @@ export class Comment extends ApplicationRecord {
     return this.validates_presence_of("body")
   }
 }
+//# sourceMappingURL=comment.js.map

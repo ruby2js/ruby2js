@@ -6,3 +6,4 @@ export const Schema = (() => {
 
   return {create_tables}
 })()
+//# sourceMappingURL=schema.js.map

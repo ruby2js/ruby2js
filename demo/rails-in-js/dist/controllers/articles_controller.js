@@ -41,3 +41,4 @@ export const ArticlesController = (() => {
 
   return {index, show, $new, create, edit, update, destroy}
 })()
+//# sourceMappingURL=articles_controller.js.map

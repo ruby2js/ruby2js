@@ -6,6 +6,7 @@
 # - Routes: Rails.application.routes.draw, resources
 # - Schema: ActiveRecord::Schema.define, create_table
 # - Seeds: module Seeds with def self.run, auto-imports models
+# - Logger: Rails.logger.debug/info/warn/error -> console.debug/info/warn/error
 #
 # Usage:
 #   require 'ruby2js/filter/rails'
@@ -16,9 +17,11 @@
 #   require 'ruby2js/filter/rails/routes'
 #   require 'ruby2js/filter/rails/schema'
 #   require 'ruby2js/filter/rails/seeds'
+#   require 'ruby2js/filter/rails/logger'
 
 require 'ruby2js/filter/rails/model'
 require 'ruby2js/filter/rails/controller'
 require 'ruby2js/filter/rails/routes'
 require 'ruby2js/filter/rails/schema'
 require 'ruby2js/filter/rails/seeds'
+require 'ruby2js/filter/rails/logger'

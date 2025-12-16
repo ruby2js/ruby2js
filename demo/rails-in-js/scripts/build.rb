@@ -3,6 +3,7 @@
 # Transpiles Ruby models and controllers to JavaScript
 
 require 'fileutils'
+require 'json'
 
 # Ensure we're using the local ruby2js
 $LOAD_PATH.unshift File.expand_path('../../../lib', __dir__)
@@ -50,11 +51,28 @@ def transpile_file(src_path, dest_path)
   puts "Transpiling: #{File.basename(src_path)}"
   source = File.read(src_path)
 
-  js = Ruby2JS.convert(source, OPTIONS.merge(file: src_path)).to_s
+  # Use relative path for cleaner display in browser debugger
+  relative_src = src_path.sub(DEMO_ROOT + '/', '')
+  result = Ruby2JS.convert(source, OPTIONS.merge(file: relative_src))
+  js = result.to_s
 
   FileUtils.mkdir_p(File.dirname(dest_path))
-  File.write(dest_path, js)
+
+  # Generate sourcemap
+  map_path = "#{dest_path}.map"
+  sourcemap = result.sourcemap
+  # Include original Ruby source so browser doesn't need to fetch .rb files
+  sourcemap[:sourcesContent] = [source]
+  # Ensure sources array has the file (some filters generate new code without mappings)
+  sourcemap[:sources] = [relative_src] if sourcemap[:sources].empty?
+
+  # Add sourcemap reference to JS file
+  js_with_map = "#{js}\n//# sourceMappingURL=#{File.basename(map_path)}"
+  File.write(dest_path, js_with_map)
+  File.write(map_path, JSON.generate(sourcemap))
+
   puts "  -> #{dest_path}"
+  puts "  -> #{map_path}"
 end
 
 def transpile_erb_file(src_path, dest_path)

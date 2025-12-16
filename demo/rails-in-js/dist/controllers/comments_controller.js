@@ -17,3 +17,4 @@ export const CommentsController = (() => {
 
   return {create, destroy}
 })()
+//# sourceMappingURL=comments_controller.js.map
