@@ -76,6 +76,38 @@ async function test() {
     const comment = new Comment({ id: 1, article_id: 1, commenter: 'Alice', body: 'Nice post!' });
     console.log(`   OK - Created comment with id=${comment.id}, commenter="${comment.commenter}"`);
 
+    console.log('\n9. Testing Article.create (full CRUD workflow)...');
+    // Update mock to support INSERT
+    let lastInsertId = 0;
+    globalThis.DB = {
+      exec(sql) {
+        console.log(`     DB.exec: ${sql.slice(0, 40)}...`);
+        if (sql.includes('last_insert_rowid')) {
+          return [{ values: [[++lastInsertId]] }];
+        }
+        return [{ columns: ['id', 'title', 'body', 'created_at', 'updated_at'], values: [] }];
+      },
+      prepare(sql) {
+        console.log(`     DB.prepare: ${sql.slice(0, 40)}...`);
+        return {
+          bind(params) {},
+          step() { return false; },
+          getAsObject() { return {}; },
+          free() {}
+        };
+      },
+      run(sql, params) {
+        console.log(`     DB.run: ${sql.slice(0, 40)}...`);
+      }
+    };
+
+    const newArticle = Article.create({
+      title: 'New Post',
+      body: 'This is a test article with enough content to pass validation!'
+    });
+    console.log(`   Created article: id=${newArticle.id}, title="${newArticle.title}"`);
+    console.log(`   created_at: ${newArticle.created_at}`);
+
     console.log('\n=== All Tests Passed ===');
   } catch (e) {
     console.error('\n=== TEST FAILED ===');
