@@ -995,6 +995,14 @@ describe Ruby2JS do
       to_js( 'module M; X = 1; def self.foo(x); x + 1; end; end' ).
         must_equal('const M = (() => {const X = 1; function foo(x) {x + 1}; return {X, foo}})()')
     end
+
+    it "should escape JS reserved words in function names" do
+      # Reserved words like 'new' must be prefixed with $ to be valid JS identifiers
+      to_js( 'module M; def self.new; 1; end; end' ).
+        must_equal('const M = (() => {function $new() {1}; return {$new}})()')
+      to_js( 'module M; def self.delete(x); x; end; end' ).
+        must_equal('const M = (() => {function $delete(x) {x}; return {$delete}})()')
+    end
   end
 
   describe 'allocation' do

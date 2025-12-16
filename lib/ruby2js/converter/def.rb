@@ -223,7 +223,7 @@ module Ruby2JS
           put @prop
           @prop = nil
         elsif name
-          put "function #{name.to_s.sub(/[?!]$/, '')}"
+          put "function #{jsvar(name.to_s.sub(/[?!]$/, ''))}"
         else
           put 'function'
         end
