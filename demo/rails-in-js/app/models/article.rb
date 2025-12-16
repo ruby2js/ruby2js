@@ -1,5 +1,5 @@
-import ApplicationRecord from './application_record.js'
-import Comment from './comment.js'
+import [ApplicationRecord], './application_record.js'
+import [Comment], './comment.js'
 
 # Article model
 export class Article < ApplicationRecord
@@ -9,7 +9,7 @@ export class Article < ApplicationRecord
 
   # has_many :comments, dependent: :destroy
   def comments
-    Comment.where(article_id: @id)
+    Comment.where(article_id: self.id)
   end
 
   def validate
@@ -18,29 +18,29 @@ export class Article < ApplicationRecord
     self.validates_length_of(:body, minimum: 10)
   end
 
-  # Attribute accessors
+  # Attribute accessors - use self. to access parent getters
   def title
-    @attributes['title']
+    self.attributes['title']
   end
 
   def title=(value)
-    @attributes['title'] = value
+    self.attributes['title'] = value
   end
 
   def body
-    @attributes['body']
+    self.attributes['body']
   end
 
   def body=(value)
-    @attributes['body'] = value
+    self.attributes['body'] = value
   end
 
   def created_at
-    @attributes['created_at']
+    self.attributes['created_at']
   end
 
   def updated_at
-    @attributes['updated_at']
+    self.attributes['updated_at']
   end
 
   # Destroy associated comments

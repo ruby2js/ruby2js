@@ -1,4 +1,4 @@
-import ApplicationRecord from './application_record.js'
+import [ApplicationRecord], './application_record.js'
 
 # Comment model
 # Note: Article is referenced at runtime, not imported to avoid circular dependency
@@ -9,7 +9,7 @@ export class Comment < ApplicationRecord
 
   # belongs_to :article
   def article
-    Article.find(@attributes['article_id'])
+    Article.find(self.attributes['article_id'])
   end
 
   def validate
@@ -17,40 +17,40 @@ export class Comment < ApplicationRecord
     self.validates_presence_of(:body)
   end
 
-  # Attribute accessors
+  # Attribute accessors - use self. to access parent getters
   def commenter
-    @attributes['commenter']
+    self.attributes['commenter']
   end
 
   def commenter=(value)
-    @attributes['commenter'] = value
+    self.attributes['commenter'] = value
   end
 
   def body
-    @attributes['body']
+    self.attributes['body']
   end
 
   def body=(value)
-    @attributes['body'] = value
+    self.attributes['body'] = value
   end
 
   def article_id
-    @attributes['article_id']
+    self.attributes['article_id']
   end
 
   def article_id=(value)
-    @attributes['article_id'] = value
+    self.attributes['article_id'] = value
   end
 
   def status
-    @attributes['status']
+    self.attributes['status']
   end
 
   def status=(value)
-    @attributes['status'] = value
+    self.attributes['status'] = value
   end
 
   def created_at
-    @attributes['created_at']
+    self.attributes['created_at']
   end
 end

@@ -97,7 +97,7 @@ export class ApplicationRecord
   end
 
   def save
-    return false unless is_valid()
+    return false unless is_valid
 
     if @persisted
       do_update  # Access as getter

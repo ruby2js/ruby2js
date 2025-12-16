@@ -128,7 +128,7 @@ export class ApplicationRecord {
   };
 
   get save() {
-    if (!this.is_valid()) return false;
+    if (!this.is_valid) return false;
     return this.#persisted ? this.#do_update : this.#do_insert
   };
 
