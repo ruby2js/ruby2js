@@ -1,4 +1,5 @@
 require 'ruby2js'
+require 'ruby2js/inflector'
 
 module Ruby2JS
   module Filter
@@ -26,9 +27,9 @@ module Ruby2JS
           # Check if this is a controller (inherits from ApplicationController or *Controller)
           return super unless controller_class?(class_name, superclass)
 
-          # Extract controller name (e.g., ArticlesController -> Article for views)
+          # Extract controller name (e.g., ArticlesController -> Article, PeopleController -> Person)
           @rails_controller_plural = class_name.children.last.to_s.sub(/Controller$/, '').downcase
-          @rails_controller_name = @rails_controller_plural.sub(/s$/, '').capitalize
+          @rails_controller_name = Ruby2JS::Inflector.singularize(@rails_controller_plural).capitalize
           @rails_controller = true
 
           # First pass: collect before_actions, private methods, and model references

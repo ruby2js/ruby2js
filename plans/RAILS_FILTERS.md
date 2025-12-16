@@ -90,6 +90,8 @@ Filters become an **abstraction layer** - Rails developers write natural Ruby, f
    - `create` → `(params)`
    - `index`, `new` → `()`
 
+6. **Rails-compatible inflector**: Added `lib/ruby2js/inflector.rb` (~70 lines) with Rails-compatible singularize rules. Handles irregular plurals (People→Person, Children→Child) correctly.
+
 ## Filter Specifications
 
 ---
@@ -218,10 +220,9 @@ end
 
 #### Current Limitations
 
-1. **Singular/plural inference**: Uses simple `s$` strip (Articles → Article). Irregular plurals not handled.
-2. **Import paths**: Hardcoded convention `../models/` and `../views/`. Not configurable.
-3. **Only standard RESTful actions**: Custom actions work but don't get special parameter handling.
-4. **View module must exist**: Filter assumes `{Resource}Views` module exists with matching methods.
+1. **Import paths**: Hardcoded convention `../models/` and `../views/`. Not configurable.
+2. **Only standard RESTful actions**: Custom actions work but don't get special parameter handling.
+3. **View module must exist**: Filter assumes `{Resource}Views` module exists with matching methods.
 
 #### Detection
 
@@ -880,8 +881,10 @@ Schema DSL for database setup.
 - [ ] Demo works with idiomatic controller (pending demo update)
 
 **Files created:**
-- `lib/ruby2js/filter/rails/controller.rb` (564 lines)
+- `lib/ruby2js/filter/rails/controller.rb` (~570 lines)
+- `lib/ruby2js/inflector.rb` (~70 lines) - Rails-compatible singularize
 - `spec/rails_controller_spec.rb` (19 tests, 74 assertions)
+- `spec/inflector_spec.rb` (11 tests, 36 assertions)
 
 ### Phase 2 Complete When:
 
@@ -945,7 +948,6 @@ Based on Phase 1 implementation experience:
 3. **Partial support:** Which Rails features are out of scope?
 4. **View helper methods:** `link_to`, `form_with` - filter or runtime?
 5. **Testing Rails code:** Can we run the same tests in Ruby and JS?
-6. **Irregular plurals:** How to handle Person/People, Child/Children? (NEW)
 
 ---
 
