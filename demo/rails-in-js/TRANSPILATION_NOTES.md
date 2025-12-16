@@ -191,6 +191,47 @@ value.to_s.strip.empty?
 value.to_s.strip.length == 0
 ```
 
+### 7. Module Instance Variables
+
+**Issue**: Instance variables (`@var`) in modules transpile to `this.#var` which doesn't work correctly in an IIFE context.
+
+**Workaround**: Use local variables within the module or avoid module-level state:
+
+```ruby
+# Instead of:
+export module Routes
+  @routes = []
+  def self.add(route)
+    @routes.push(route)
+  end
+end
+
+# Use closures or pass state explicitly:
+export module Routes
+  def self.create_router
+    routes = []
+    {
+      add: ->(route) { routes.push(route) },
+      routes: -> { routes }
+    }
+  end
+end
+```
+
+### 8. `chomp` Method
+
+**Issue**: Ruby's `String#chomp` doesn't have a direct JS equivalent.
+
+**Workaround**: Use `replace` with a regex:
+
+```ruby
+# Instead of:
+name.chomp('s')
+
+# Use:
+name.gsub(/s$/, '')
+```
+
 ## Recommended Code Style for Dual-Target Ruby/JS
 
 1. **Always use explicit `self.`** for accessing instance methods/getters within methods

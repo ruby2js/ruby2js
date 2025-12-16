@@ -46,9 +46,9 @@
       }
     };
 
-    // === Database Setup ===
+    // === Database Setup (using transpiled Schema) ===
     let db;
-    let Article, Comment;
+    let Article, Comment, Schema;
 
     async function initDatabase() {
       const SQL = await window.initSqlJs({
@@ -57,39 +57,10 @@
       db = new SQL.Database();
       window.DB = db;
 
-      // Create schema
-      db.run(`
-        CREATE TABLE articles (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          title TEXT NOT NULL,
-          body TEXT,
-          created_at TEXT,
-          updated_at TEXT
-        )
-      `);
-
-      db.run(`
-        CREATE TABLE comments (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          article_id INTEGER NOT NULL,
-          commenter TEXT,
-          body TEXT,
-          status TEXT DEFAULT 'pending',
-          created_at TEXT,
-          FOREIGN KEY (article_id) REFERENCES articles(id)
-        )
-      `);
-
-      // Seed data
-      const now = new Date().toISOString();
-      db.run(`INSERT INTO articles (title, body, created_at, updated_at) VALUES (?, ?, ?, ?)`,
-        ['Hello Rails', 'I am on Rails! This is my first blog post using the Rails-in-JS demo. It demonstrates that you can write Ruby code that transpiles to JavaScript and runs entirely in the browser.', now, now]);
-      db.run(`INSERT INTO articles (title, body, created_at, updated_at) VALUES (?, ?, ?, ?)`,
-        ['Getting Started with Ruby2JS', 'Ruby2JS is a Ruby to JavaScript transpiler. It parses Ruby source code and generates equivalent JavaScript. This demo shows how you can build a full Rails-like application that runs in JavaScript.', now, now]);
-      db.run(`INSERT INTO comments (article_id, commenter, body, status, created_at) VALUES (?, ?, ?, ?, ?)`,
-        [1, 'Alice', 'Great post! Welcome to the world of Rails-in-JS.', 'approved', now]);
-      db.run(`INSERT INTO comments (article_id, commenter, body, status, created_at) VALUES (?, ?, ?, ?, ?)`,
-        [1, 'Bob', 'This is really cool. Looking forward to more posts!', 'approved', now]);
+      // Load and run transpiled schema
+      const schemaModule = await import('./dist/config/schema.js');
+      Schema = schemaModule.Schema;
+      Schema.create_tables(db);
     }
 
     // === Load Transpiled Models ===
@@ -99,6 +70,9 @@
       Comment = models.Comment;
       window.Article = Article;
       window.Comment = Comment;
+
+      // Seed data using transpiled Schema (needs models loaded first)
+      Schema.seed_data();
     }
 
     // === Controllers (transpiled from Ruby) ===

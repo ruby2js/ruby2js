@@ -1,66 +1,71 @@
 # Routes configuration
 # Defines URL patterns and maps them to controllers/actions
 
-Routes = {
-  routes: [],
+export module Routes
+  @routes = []
+  @parent_resource = nil
 
-  root: ->(controller_action) {
+  def self.routes
+    @routes
+  end
+
+  def self.root(controller_action)
     controller, action = controller_action.split('#')
-    Routes.routes << {
+    @routes.push({
       method: 'GET',
       path: /^\/$/,
       controller: controller,
       action: action
-    }
-  },
+    })
+  end
 
-  resources: ->(name, options = {}, &block) {
+  def self.resources(name, options = {}, &block)
     # Standard RESTful routes
-    Routes.routes << { method: 'GET',    path: Regexp.new("^/#{name}$"),              controller: name, action: 'index' }
-    Routes.routes << { method: 'GET',    path: Regexp.new("^/#{name}/new$"),          controller: name, action: 'new' }
-    Routes.routes << { method: 'GET',    path: Regexp.new("^/#{name}/(\\d+)$"),       controller: name, action: 'show' }
-    Routes.routes << { method: 'GET',    path: Regexp.new("^/#{name}/(\\d+)/edit$"),  controller: name, action: 'edit' }
-    Routes.routes << { method: 'POST',   path: Regexp.new("^/#{name}$"),              controller: name, action: 'create' }
-    Routes.routes << { method: 'PATCH',  path: Regexp.new("^/#{name}/(\\d+)$"),       controller: name, action: 'update' }
-    Routes.routes << { method: 'PUT',    path: Regexp.new("^/#{name}/(\\d+)$"),       controller: name, action: 'update' }
-    Routes.routes << { method: 'DELETE', path: Regexp.new("^/#{name}/(\\d+)$"),       controller: name, action: 'destroy' }
+    @routes.push({ method: 'GET',    path: Regexp.new("^/#{name}$"),              controller: name, action: 'list' })
+    @routes.push({ method: 'GET',    path: Regexp.new("^/#{name}/new$"),          controller: name, action: 'new_form' })
+    @routes.push({ method: 'GET',    path: Regexp.new("^/#{name}/(\\d+)$"),       controller: name, action: 'show' })
+    @routes.push({ method: 'GET',    path: Regexp.new("^/#{name}/(\\d+)/edit$"),  controller: name, action: 'edit' })
+    @routes.push({ method: 'POST',   path: Regexp.new("^/#{name}$"),              controller: name, action: 'create' })
+    @routes.push({ method: 'PATCH',  path: Regexp.new("^/#{name}/(\\d+)$"),       controller: name, action: 'update' })
+    @routes.push({ method: 'PUT',    path: Regexp.new("^/#{name}/(\\d+)$"),       controller: name, action: 'update' })
+    @routes.push({ method: 'DELETE', path: Regexp.new("^/#{name}/(\\d+)$"),       controller: name, action: 'destroy' })
 
     # Handle nested resources via block
     if block
       @parent_resource = name
-      block.call
+      block.call()
       @parent_resource = nil
     end
-  },
+  end
 
   # For nested resources
-  nested_resources: ->(name, options = {}) {
+  def self.nested_resources(name, options = {})
     parent = @parent_resource
-    only = options[:only] || [:index, :show, :new, :create, :edit, :update, :destroy]
+    only = options[:only] || [:list, :show, :new_form, :create, :edit, :update, :destroy]
 
     if only.include?(:create)
-      Routes.routes << {
+      @routes.push({
         method: 'POST',
         path: Regexp.new("^/#{parent}/(\\d+)/#{name}$"),
         controller: name,
         action: 'create',
         parent: parent
-      }
+      })
     end
 
     if only.include?(:destroy)
-      Routes.routes << {
+      @routes.push({
         method: 'DELETE',
         path: Regexp.new("^/#{parent}/(\\d+)/#{name}/(\\d+)$"),
         controller: name,
         action: 'destroy',
         parent: parent
-      }
+      })
     end
-  },
+  end
 
-  match: ->(method, path) {
-    Routes.routes.each do |route|
+  def self.match(method, path)
+    @routes.each do |route|
       next unless route[:method] == method
       match_result = path.match(route[:path])
       if match_result
@@ -72,9 +77,9 @@ Routes = {
       end
     end
     nil
-  },
+  end
 
-  extract_params: ->(match_result, route) {
+  def self.extract_params(match_result, route)
     params = {}
     if route[:parent]
       # Nested resource: first capture is parent_id, second is id
@@ -85,11 +90,11 @@ Routes = {
       params['id'] = match_result[1].to_i if match_result[1]
     end
     params
-  }
-}
+  end
+end
 
 # Define application routes
-Routes.root('articles#index')
+Routes.root('articles#list')
 Routes.resources('articles') do
   Routes.nested_resources('comments', only: [:create, :destroy])
 end

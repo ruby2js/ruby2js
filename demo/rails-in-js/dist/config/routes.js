@@ -1,70 +1,73 @@
-// Routes configuration
-// Defines URL patterns and maps them to controllers/actions
-const Routes = {
-  routes: [],
+export const Routes = (() => {
+  this.#routes = [];
+  this.#parent_resource = null;
 
-  root(controller_action) {
+  function routes() {
+    return this.#routes
+  };
+
+  function root(controller_action) {
     let [controller, action] = controller_action.split("#");
 
-    return Routes.routes << {
+    return this.#routes.push({
       method: "GET",
       path: /^\/$/m,
       controller,
       action
-    }
-  },
+    })
+  };
 
-  resources(name, options={}, block) {
-    Routes.routes.push({
+  function resources(name, options={}, block) {
+    this.#routes.push({
       method: "GET",
       path: new RegExp(`^/${name}$`),
       controller: name,
-      action: "index"
+      action: "list"
     });
 
-    Routes.routes.push({
+    this.#routes.push({
       method: "GET",
       path: new RegExp(`^/${name}/new$`),
       controller: name,
-      action: "new"
+      action: "new_form"
     });
 
-    Routes.routes.push({
+    this.#routes.push({
       method: "GET",
       path: new RegExp(`^/${name}/(\\d+)$`),
       controller: name,
       action: "show"
     });
 
-    Routes.routes.push({
+    this.#routes.push({
       method: "GET",
       path: new RegExp(`^/${name}/(\\d+)/edit$`),
       controller: name,
       action: "edit"
     });
 
-    Routes.routes.push({
+    this.#routes.push({
       method: "POST",
       path: new RegExp(`^/${name}$`),
       controller: name,
       action: "create"
     });
 
-    Routes.routes.push({
+    this.#routes.push({
       method: "PATCH",
       path: new RegExp(`^/${name}/(\\d+)$`),
       controller: name,
       action: "update"
     });
 
-    Routes.routes.push({
+    this.#routes.push({
       method: "PUT",
       path: new RegExp(`^/${name}/(\\d+)$`),
       controller: name,
       action: "update"
     });
 
-    Routes.routes.push({
+    this.#routes.push({
       method: "DELETE",
       path: new RegExp(`^/${name}/(\\d+)$`),
       controller: name,
@@ -77,18 +80,15 @@ const Routes = {
       this.#parent_resource = null;
       return this.#parent_resource
     }
-  },
+  };
 
-  // Standard RESTful routes
-  // Handle nested resources via block
-  // For nested resources
-  nested_resources(name, options={}) {
+  function nested_resources(name, options={}) {
     let parent = this.#parent_resource;
 
     let only = options.only ?? [
-      "index",
+      "list",
       "show",
-      "new",
+      "new_form",
       "create",
       "edit",
       "update",
@@ -96,7 +96,7 @@ const Routes = {
     ];
 
     if (only.includes("create")) {
-      Routes.routes.push({
+      this.#routes.push({
         method: "POST",
         path: new RegExp(`^/${parent}/(\\d+)/${name}$`),
         controller: name,
@@ -106,18 +106,18 @@ const Routes = {
     };
 
     if (only.includes("destroy")) {
-      return Routes.routes << {
+      return this.#routes.push({
         method: "DELETE",
         path: new RegExp(`^/${parent}/(\\d+)/${name}/(\\d+)$`),
         controller: name,
         action: "destroy",
         parent
-      }
+      })
     }
-  },
+  };
 
-  match(method, path) {
-    for (let route of Routes.routes) {
+  function match(method, path) {
+    for (let route of this.#routes) {
       if (route.method != method) continue;
       let match_result = path.match(route.path);
 
@@ -131,9 +131,9 @@ const Routes = {
     };
 
     return null
-  },
+  };
 
-  extract_params(match_result, route) {
+  function extract_params(match_result, route) {
     let params = {};
 
     if (route.parent) {
@@ -147,13 +147,27 @@ const Routes = {
     };
 
     return params
-  }
-};
+  };
 
+  return {
+    routes,
+    root,
+    resources,
+    nested_resources,
+    match,
+    extract_params
+  }
+})();
+
+// Routes configuration
+// Defines URL patterns and maps them to controllers/actions
+// Standard RESTful routes
+// Handle nested resources via block
+// For nested resources
 // Nested resource: first capture is parent_id, second is id
 // Regular resource: first capture is id
 // Define application routes
-Routes.root("articles#index");
+Routes.root("articles#list");
 
 Routes.resources(
   "articles",
