@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Test Transpiled Models</title>
+</head>
+<body>
+  <h1>Test Transpiled Models</h1>
+  <pre id="output"></pre>
+
+  <script type="module">
+    const output = document.getElementById('output');
+    function log(msg) {
+      output.textContent += msg + '\n';
+      console.log(msg);
+    }
+
+    // Polyfills
+    window.Time = {
+      now() {
+        return { toString() { return new Date().toISOString(); } };
+      }
+    };
+
+    // Import sql.js
+    import initSqlJs from 'https://cdn.jsdelivr.net/npm/sql.js@1.11.0/+esm';
+
+    async function run() {
+      try {
+        log('Initializing sql.js...');
+        const SQL = await initSqlJs({
+          locateFile: file => `https://sql.js.org/dist/${file}`
+        });
+        const db = new SQL.Database();
+        window.DB = db;
+
+        log('Creating schema...');
+        db.run(`
+          CREATE TABLE articles (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            body TEXT,
+            created_at TEXT,
+            updated_at TEXT
+          )
+        `);
+
+        db.run(`
+          CREATE TABLE comments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            article_id INTEGER NOT NULL,
+            commenter TEXT,
+            body TEXT,
+            status TEXT DEFAULT 'pending',
+            created_at TEXT
+          )
+        `);
+
+        log('Loading transpiled models...');
+
+        // Import the transpiled models
+        const { Article, Comment } = await import('./dist/models/index.js');
+        window.Article = Article;
+        window.Comment = Comment;
+
+        log('Testing Article.create...');
+        const article = Article.create({
+          title: 'Hello World',
+          body: 'This is my first blog post using transpiled Ruby code!'
+        });
+        log(`Created article id=${article.id}, title="${article.title}"`);
+
+        log('\nTesting Article.all...');
+        const articles = Article.all;  // getter, not method
+        log(`Found ${articles.length} article(s)`);
+
+        log('\nTesting Article.find...');
+        const found = Article.find(article.id);
+        log(`Found: id=${found.id}, title="${found.title}"`);
+
+        log('\nTesting Comment.create...');
+        const comment = Comment.create({
+          article_id: article.id,
+          commenter: 'Alice',
+          body: 'Great post!'
+        });
+        log(`Created comment id=${comment.id}, commenter="${comment.commenter}"`);
+
+        log('\nAll tests passed!');
+      } catch (e) {
+        log(`ERROR: ${e.message}`);
+        log(`Stack: ${e.stack}`);
+        console.error(e);
+      }
+    }
+
+    run();
+  </script>
+</body>
+</html>

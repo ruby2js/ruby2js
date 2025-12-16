@@ -84,26 +84,24 @@ class ApplicationController
   end
 
   # before_action support
-  class << self
-    def before_actions
-      @before_actions ||= []
-    end
+  def self.before_actions
+    @before_actions ||= []
+  end
 
-    def before_action(method_name, options = {})
-      before_actions << { method: method_name, options: options }
-    end
+  def self.before_action(method_name, options = {})
+    self.before_actions << { method: method_name, options: options }
+  end
 
-    def run_before_actions(controller, action)
-      before_actions.each do |ba|
-        only = ba[:options][:only]
-        except = ba[:options][:except]
+  def self.run_before_actions(controller, action)
+    self.before_actions.each do |ba|
+      only = ba[:options][:only]
+      except = ba[:options][:except]
 
-        should_run = true
-        should_run = only.include?(action) if only
-        should_run = !except.include?(action) if except
+      should_run = true
+      should_run = only.include?(action) if only
+      should_run = !except.include?(action) if except
 
-        controller.send(ba[:method]) if should_run
-      end
+      controller.send(ba[:method]) if should_run
     end
   end
 end

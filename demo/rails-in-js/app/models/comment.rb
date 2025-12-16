@@ -1,14 +1,20 @@
-# Comment model
-class Comment < ApplicationRecord
-  # belongs_to :article
+import ApplicationRecord from './application_record.js'
 
+# Comment model
+# Note: Article is referenced at runtime, not imported to avoid circular dependency
+export class Comment < ApplicationRecord
+  def self.table_name
+    'comments'
+  end
+
+  # belongs_to :article
   def article
     Article.find(@attributes['article_id'])
   end
 
   def validate
-    validates_presence_of :commenter
-    validates_presence_of :body
+    self.validates_presence_of(:commenter)
+    self.validates_presence_of(:body)
   end
 
   # Attribute accessors

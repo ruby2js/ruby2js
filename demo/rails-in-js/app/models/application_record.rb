@@ -1,15 +1,6 @@
 # Base class for all models
 # Transpiled to JavaScript, runs on sql.js
-class ApplicationRecord
-  class << self
-    attr_accessor :table_name, :columns
-
-    def inherited(subclass)
-      subclass.table_name = subclass.name.downcase + 's'
-      subclass.columns = []
-    end
-  end
-
+export class ApplicationRecord
   attr_accessor :id, :attributes, :errors
 
   def initialize(attrs = {})
@@ -17,7 +8,8 @@ class ApplicationRecord
     @errors = []
     @persisted = false
 
-    attrs.each do |key, value|
+    Object.keys(attrs).each do |key|
+      value = attrs[key]
       @attributes[key.to_s] = value
       @id = value if key.to_s == 'id'
     end
@@ -27,72 +19,72 @@ class ApplicationRecord
 
   # Class methods
   def self.all
-    sql = "SELECT * FROM #{table_name}"
+    sql = "SELECT * FROM #{self.table_name}"
     results = DB.exec(sql)
     return [] unless results.length > 0
-    result_to_models(results[0])
+    self.result_to_models(results[0])
   end
 
   def self.find(id)
-    stmt = DB.prepare("SELECT * FROM #{table_name} WHERE id = ?")
+    stmt = DB.prepare("SELECT * FROM #{self.table_name} WHERE id = ?")
     stmt.bind([id])
-    if stmt.step
-      obj = stmt.getAsObject
-      stmt.free
-      new(obj)
+    if stmt.step()
+      obj = stmt.getAsObject()
+      stmt.free()
+      self.new(obj)
     else
-      stmt.free
-      raise "#{name} not found with id=#{id}"
+      stmt.free()
+      raise "#{self.name} not found with id=#{id}"
     end
   end
 
   def self.find_by(conditions)
-    where_clause, values = build_where(conditions)
-    stmt = DB.prepare("SELECT * FROM #{table_name} WHERE #{where_clause} LIMIT 1")
+    where_clause, values = self.build_where(conditions)
+    stmt = DB.prepare("SELECT * FROM #{self.table_name} WHERE #{where_clause} LIMIT 1")
     stmt.bind(values)
-    if stmt.step
-      obj = stmt.getAsObject
-      stmt.free
-      new(obj)
+    if stmt.step()
+      obj = stmt.getAsObject()
+      stmt.free()
+      self.new(obj)
     else
-      stmt.free
+      stmt.free()
       nil
     end
   end
 
   def self.where(conditions)
-    where_clause, values = build_where(conditions)
-    stmt = DB.prepare("SELECT * FROM #{table_name} WHERE #{where_clause}")
+    where_clause, values = self.build_where(conditions)
+    stmt = DB.prepare("SELECT * FROM #{self.table_name} WHERE #{where_clause}")
     stmt.bind(values)
     results = []
-    while stmt.step
-      results << new(stmt.getAsObject)
+    while stmt.step()
+      results << self.new(stmt.getAsObject())
     end
-    stmt.free
+    stmt.free()
     results
   end
 
   def self.create(attrs)
-    record = new(attrs)
-    record.save
+    record = self.new(attrs)
+    record.save  # Access as getter, not method call
     record
   end
 
   def self.count
-    result = DB.exec("SELECT COUNT(*) FROM #{table_name}")
+    result = DB.exec("SELECT COUNT(*) FROM #{self.table_name}")
     result[0].values[0][0]
   end
 
   def self.first
-    result = DB.exec("SELECT * FROM #{table_name} ORDER BY id ASC LIMIT 1")
+    result = DB.exec("SELECT * FROM #{self.table_name} ORDER BY id ASC LIMIT 1")
     return nil unless result.length > 0 && result[0].values.length > 0
-    result_to_models(result[0])[0]
+    self.result_to_models(result[0])[0]
   end
 
   def self.last
-    result = DB.exec("SELECT * FROM #{table_name} ORDER BY id DESC LIMIT 1")
+    result = DB.exec("SELECT * FROM #{self.table_name} ORDER BY id DESC LIMIT 1")
     return nil unless result.length > 0 && result[0].values.length > 0
-    result_to_models(result[0])[0]
+    self.result_to_models(result[0])[0]
   end
 
   # Instance methods
@@ -105,20 +97,20 @@ class ApplicationRecord
   end
 
   def save
-    return false unless valid?
+    return false unless is_valid()
 
     if @persisted
-      do_update
+      do_update  # Access as getter
     else
-      do_insert
+      do_insert  # Access as getter
     end
   end
 
   def update(attrs)
-    attrs.each do |key, value|
-      @attributes[key.to_s] = value
+    Object.keys(attrs).each do |key|
+      @attributes[key.to_s] = attrs[key]
     end
-    save
+    save  # Access as getter
   end
 
   def destroy
@@ -128,10 +120,10 @@ class ApplicationRecord
     true
   end
 
-  def valid?
+  def is_valid
     @errors = []
-    validate
-    @errors.empty?
+    validate  # Access as getter
+    @errors.length == 0
   end
 
   def validate
@@ -141,22 +133,22 @@ class ApplicationRecord
   # Validation helpers
   def validates_presence_of(field)
     value = @attributes[field.to_s]
-    if value.nil? || value.to_s.strip.empty?
-      @errors << "#{field} can't be blank"
+    if value.nil? || value.to_s.strip.length == 0
+      @errors.push("#{field} can't be blank")
     end
   end
 
   def validates_length_of(field, options)
     value = @attributes[field.to_s].to_s
     if options[:minimum] && value.length < options[:minimum]
-      @errors << "#{field} is too short (minimum is #{options[:minimum]} characters)"
+      @errors.push("#{field} is too short (minimum is #{options[:minimum]} characters)")
     end
   end
 
   private
 
   def do_insert
-    now = Time.now.to_s
+    now = Time.now().to_s
     @attributes['created_at'] = now
     @attributes['updated_at'] = now
 
@@ -164,11 +156,11 @@ class ApplicationRecord
     placeholders = []
     values = []
 
-    @attributes.each do |key, value|
+    Object.keys(@attributes).each do |key|
       next if key == 'id'
       cols << key
       placeholders << '?'
-      values << value
+      values << @attributes[key]
     end
 
     sql = "INSERT INTO #{self.class.table_name} (#{cols.join(', ')}) VALUES (#{placeholders.join(', ')})"
@@ -182,15 +174,15 @@ class ApplicationRecord
   end
 
   def do_update
-    @attributes['updated_at'] = Time.now.to_s
+    @attributes['updated_at'] = Time.now().to_s
 
     sets = []
     values = []
 
-    @attributes.each do |key, value|
+    Object.keys(@attributes).each do |key|
       next if key == 'id'
       sets << "#{key} = ?"
-      values << value
+      values << @attributes[key]
     end
     values << @id
 
@@ -202,9 +194,9 @@ class ApplicationRecord
   def self.build_where(conditions)
     clauses = []
     values = []
-    conditions.each do |key, value|
+    Object.keys(conditions).each do |key|
       clauses << "#{key} = ?"
-      values << value
+      values << conditions[key]
     end
     [clauses.join(' AND '), values]
   end
@@ -216,7 +208,7 @@ class ApplicationRecord
       columns.each_with_index do |col, i|
         obj[col] = row[i]
       end
-      new(obj)
+      self.new(obj)
     end
   end
 end

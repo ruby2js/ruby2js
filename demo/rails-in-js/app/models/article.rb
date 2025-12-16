@@ -1,15 +1,21 @@
-# Article model
-class Article < ApplicationRecord
-  # has_many :comments, dependent: :destroy
+import ApplicationRecord from './application_record.js'
+import Comment from './comment.js'
 
+# Article model
+export class Article < ApplicationRecord
+  def self.table_name
+    'articles'
+  end
+
+  # has_many :comments, dependent: :destroy
   def comments
     Comment.where(article_id: @id)
   end
 
   def validate
-    validates_presence_of :title
-    validates_presence_of :body
-    validates_length_of :body, minimum: 10
+    self.validates_presence_of(:title)
+    self.validates_presence_of(:body)
+    self.validates_length_of(:body, minimum: 10)
   end
 
   # Attribute accessors
@@ -39,7 +45,7 @@ class Article < ApplicationRecord
 
   # Destroy associated comments
   def destroy
-    comments.each(&:destroy)
+    comments.each { |c| c.destroy }
     super
   end
 end
