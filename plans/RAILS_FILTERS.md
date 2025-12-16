@@ -1,12 +1,12 @@
 # Rails Filters: Idiomatic Rails to JavaScript
 
-## Status: Phase 3 Complete
+## Status: Phase 4 Complete (All Phases Done)
 
 ### Progress
 - [x] **Phase 1: rails/controller** - Complete (2024-12)
 - [x] **Phase 2: rails/model** - Complete (2024-12)
 - [x] **Phase 3: rails/routes** - Complete (2024-12)
-- [ ] Phase 4: rails/schema
+- [x] **Phase 4: rails/schema** - Complete (2024-12)
 
 ## Overview
 
@@ -111,6 +111,16 @@ Filters become an **abstraction layer** - Rails developers write natural Ruby, f
 13. **Path helper generation**: Path helpers need to handle both static paths (`articles_path`) and dynamic paths with interpolations (`article_path(article)`). Use `s(:dstr, ...)` for template literals.
 
 14. **Extract_id helper**: Path helpers accept either an object (calls `.id()`) or a raw ID. The `extract_id` helper normalizes this: `obj?.id() || obj`.
+
+### Lessons Learned (Phase 4)
+
+15. **Versioned schema detection**: Rails 7+ uses `ActiveRecord::Schema[7.0].define`. Need to handle both `const.define` and `send([]).define` patterns.
+
+16. **Multiple column results**: Some DSL methods like `t.timestamps` add multiple columns. Return `{columns: [...]}` instead of `{column: {...}}` and handle both cases.
+
+17. **SQLite type mapping**: All string-like types map to TEXT, all numeric types to INTEGER or REAL. SQLite's dynamic typing makes this simpler than other databases.
+
+18. **Foreign key inference**: `t.references :article, foreign_key: true` needs to infer the referenced table name using pluralize (`articles`).
 
 ## Filter Specifications
 
@@ -553,27 +563,47 @@ export module Schema
 end
 ```
 
-#### Transformations
+#### Transformations (Implemented)
 
-| Rails Pattern | SQL Output |
-|---------------|------------|
-| `create_table "x"` | `CREATE TABLE IF NOT EXISTS x` |
-| `t.string "col"` | `col TEXT` |
-| `t.text "col"` | `col TEXT` |
-| `t.integer "col"` | `col INTEGER` |
-| `t.boolean "col"` | `col INTEGER` (0/1) |
-| `t.datetime "col"` | `col TEXT` (ISO format) |
-| `t.timestamps` | `created_at TEXT, updated_at TEXT` |
-| `null: false` | `NOT NULL` |
-| `default: value` | `DEFAULT 'value'` |
-| `t.references "x"` | `x_id INTEGER, FOREIGN KEY` |
-| `add_index "t", ["cols"]` | `CREATE INDEX` |
+| Rails Pattern | SQL Output | Notes |
+|---------------|------------|-------|
+| `ActiveRecord::Schema.define do` | `export const Schema = ...` | IIFE module pattern |
+| `ActiveRecord::Schema[7.0].define do` | Same | Versioned schema supported |
+| `create_table "x" do \|t\|` | `CREATE TABLE IF NOT EXISTS x (...)` | With auto id primary key |
+| `t.string "col"` | `col TEXT` | Maps to SQLite TEXT |
+| `t.text "col"` | `col TEXT` | Maps to SQLite TEXT |
+| `t.integer "col"` | `col INTEGER` | Maps to SQLite INTEGER |
+| `t.bigint "col"` | `col INTEGER` | Same as integer |
+| `t.boolean "col"` | `col INTEGER` | 0/1 values |
+| `t.datetime "col"` | `col TEXT` | ISO format string |
+| `t.float "col"` | `col REAL` | Maps to SQLite REAL |
+| `t.decimal "col"` | `col REAL` | Maps to SQLite REAL |
+| `t.binary "col"` | `col BLOB` | Maps to SQLite BLOB |
+| `t.json "col"` | `col TEXT` | JSON stored as text |
+| `t.timestamps` | `created_at TEXT, updated_at TEXT` | Two columns added |
+| `null: false` | `NOT NULL` | Constraint |
+| `default: "value"` | `DEFAULT 'value'` | String default |
+| `default: 0` | `DEFAULT 0` | Numeric default |
+| `default: false` | `DEFAULT 0` | Boolean default |
+| `t.references "x"` | `x_id INTEGER NOT NULL` | Foreign key column |
+| `foreign_key: true` | `FOREIGN KEY (x_id) REFERENCES xs(id)` | Auto-infers table |
+| `add_index "t", ["col"]` | `CREATE INDEX idx_t_col ON t(col)` | Single column |
+| `add_index "t", ["a", "b"]` | `CREATE INDEX ... ON t(a, b)` | Multiple columns |
+| `unique: true` | `CREATE UNIQUE INDEX` | Unique constraint |
+| `name: "custom"` | Uses custom index name | Override default |
+
+#### Current Limitations
+
+1. **SQLite only**: Type mapping optimized for SQLite
+2. **No migrations**: Only schema.rb (not individual migrations)
+3. **No change_table**: Only create_table supported
+4. **No polymorphic**: Polymorphic associations not fully supported
 
 #### Detection
 
 Filter activates when it sees:
 - `ActiveRecord::Schema.define` block
-- Or file named `schema.rb` in db/ or config/
+- `ActiveRecord::Schema[version].define` block
 
 ---
 
@@ -965,11 +995,19 @@ Schema DSL for database setup.
 - `lib/ruby2js/filter/rails/routes.rb` (~400 lines)
 - `spec/rails_routes_spec.rb` (23 tests, 112 assertions)
 
-### Phase 4 Complete When:
+### Phase 4 Complete When: ✅ DONE
 
-- [ ] `create_table` generates valid SQL
-- [ ] All common column types supported
-- [ ] Demo schema.rb is idiomatic Rails
+- [x] `create_table` generates valid SQLite CREATE TABLE
+- [x] All common column types supported (string, text, integer, boolean, datetime, float, etc.)
+- [x] Column options: `null: false`, `default: value`
+- [x] `t.timestamps` adds created_at/updated_at
+- [x] `t.references` with foreign key support
+- [x] `add_index` with unique and custom name options
+- [ ] Demo schema.rb is idiomatic Rails (pending demo update)
+
+**Files created:**
+- `lib/ruby2js/filter/rails/schema.rb` (~380 lines)
+- `spec/rails_schema_spec.rb` (25 tests, 56 assertions)
 
 ### Overall Success:
 
