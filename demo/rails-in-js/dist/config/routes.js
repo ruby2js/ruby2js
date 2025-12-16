@@ -1,114 +1,28 @@
-export const Routes = (() => {
-  function routes() {
-    return [
-      {path: "/", controller: "ArticlesController", action: "index!"},
+import { Router, Application, setupFormHandlers } from "../lib/rails.js";
+import { Schema } from "./schema.js";
+import { Seeds } from "../db/seeds.js";
+import { ArticlesController } from "../controllers/articles_controller.js";
+import { CommentsController } from "../controllers/comments_controller.js";
+Router.root("/articles");
 
-      {
-        path: "/articles",
-        controller: "ArticlesController",
-        action: "index!",
-        method: "GET"
-      },
+Router.resources("articles", ArticlesController, {nested: [{
+  name: "comments",
+  controller: CommentsController,
+  only: ["create", "destroy"]
+}]});
 
-      {
-        path: "/articles/new",
-        controller: "ArticlesController",
-        action: "$new",
-        method: "GET"
-      },
+setupFormHandlers([
+  {
+    resource: "articles",
+    confirmDelete: "Are you sure you want to delete this article?"
+  },
 
-      {
-        path: "/articles",
-        controller: "ArticlesController",
-        action: "create",
-        method: "POST"
-      },
-
-      {
-        path: "/articles/:id",
-        controller: "ArticlesController",
-        action: "show",
-        method: "GET"
-      },
-
-      {
-        path: "/articles/:id/edit",
-        controller: "ArticlesController",
-        action: "edit",
-        method: "GET"
-      },
-
-      {
-        path: "/articles/:id",
-        controller: "ArticlesController",
-        action: "update",
-        method: "PATCH"
-      },
-
-      {
-        path: "/articles/:id",
-        controller: "ArticlesController",
-        action: "destroy",
-        method: "DELETE"
-      },
-
-      {
-        path: "/articles/:article_id/comments",
-        controller: "CommentsController",
-        action: "create",
-        method: "POST"
-      },
-
-      {
-        path: "/articles/:article_id/comments/:id",
-        controller: "CommentsController",
-        action: "destroy",
-        method: "DELETE"
-      }
-    ]
-  };
-
-  function root_path() {
-    return "/"
-  };
-
-  function articles_path() {
-    return "/articles"
-  };
-
-  function new_article_path() {
-    return "/articles/new"
-  };
-
-  function article_path(article) {
-    return `/articles/${extract_id(article)}`
-  };
-
-  function edit_article_path(article) {
-    return `/articles/${extract_id(article)}/edit`
-  };
-
-  function comments_path(article) {
-    return `/articles/${extract_id(article)}/comments`
-  };
-
-  function comment_path(article, comment) {
-    return `/articles/${extract_id(article)}/comments/${extract_id(comment)}`
-  };
-
-  function extract_id(obj) {
-    return obj?.id() || obj
-  };
-
-  return {
-    routes,
-    root_path,
-    articles_path,
-    new_article_path,
-    article_path,
-    edit_article_path,
-    comments_path,
-    comment_path,
-    extract_id
+  {
+    resource: "comments",
+    parent: "articles",
+    confirmDelete: "Delete this comment?"
   }
-})()
+]);
+
+Application.configure({schema: Schema, seeds: Seeds});
+export { Application }

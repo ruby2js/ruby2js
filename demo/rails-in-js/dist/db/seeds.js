@@ -1,5 +1,7 @@
 // Database seeds - idiomatic Rails
 // Seeds the database with sample data for development
+import { Article, Comment } from "../models/index.js";
+
 export const Seeds = (() => {
   function run() {
     // Only seed if no articles exist

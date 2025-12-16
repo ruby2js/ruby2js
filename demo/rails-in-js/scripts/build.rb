@@ -28,6 +28,7 @@ OPTIONS = {
     Ruby2JS::Filter::Rails::Controller,
     Ruby2JS::Filter::Rails::Routes,
     Ruby2JS::Filter::Rails::Schema,
+    Ruby2JS::Filter::Rails::Seeds,
     Ruby2JS::Filter::Functions,
     Ruby2JS::Filter::ESM,
     Ruby2JS::Filter::Return
@@ -98,6 +99,19 @@ end
 FileUtils.mkdir_p(DIST_DIR)
 
 puts "=== Building Rails-in-JS Demo ==="
+puts
+
+# Copy static lib files (rails.js framework)
+puts "Library:"
+lib_src = File.join(DEMO_ROOT, 'lib')
+lib_dest = File.join(DIST_DIR, 'lib')
+FileUtils.mkdir_p(lib_dest)
+Dir.glob(File.join(lib_src, '*.js')).each do |src_path|
+  dest_path = File.join(lib_dest, File.basename(src_path))
+  FileUtils.cp(src_path, dest_path)
+  puts "  Copying: #{File.basename(src_path)}"
+  puts "    -> #{dest_path}"
+end
 puts
 
 # Transpile models

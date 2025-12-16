@@ -23,6 +23,8 @@ module Ruby2JS
           @rails_routes_list = []
           @rails_path_helpers = []
           @rails_route_nesting = []
+          @rails_resources = []  # Track resources for Router.resources() generation
+          @rails_root_path = nil
           super
         end
 
@@ -48,6 +50,8 @@ module Ruby2JS
           @rails_routes_list = []
           @rails_path_helpers = []
           @rails_route_nesting = []
+          @rails_resources = []
+          @rails_root_path = nil
 
           result
         end
@@ -133,6 +137,9 @@ module Ruby2JS
           controller_name = "#{controller.capitalize}Controller"
           action_name = transform_action_name(action.to_sym)
 
+          # Track root path for Router.root() generation
+          @rails_root_path = "/#{controller}"
+
           @rails_routes_list << {
             path: '/',
             controller: controller_name,
@@ -210,6 +217,24 @@ module Ruby2JS
 
           controller_name = "#{resource_name.to_s.split('_').map(&:capitalize).join}Controller"
           singular_name = Ruby2JS::Inflector.singularize(resource_name.to_s)
+
+          # Track resource for Router.resources() generation
+          resource_info = {
+            name: resource_name.to_s,
+            controller_name: controller_name,
+            controller_file: "#{resource_name}_controller",
+            only: only_actions,
+            nested: []
+          }
+
+          # If nested, add to parent; otherwise add to top level
+          if @rails_route_nesting.any?
+            parent_name = @rails_route_nesting.last[:path].to_s
+            parent = @rails_resources.find { |r| r[:name] == parent_name }
+            parent[:nested] << resource_info if parent
+          else
+            @rails_resources << resource_info
+          end
 
           # Generate routes for each action
           RESTFUL_ROUTES.each do |route|
@@ -402,26 +427,133 @@ module Ruby2JS
         end
 
         def build_routes_module
-          methods = []
+          statements = []
 
-          # Build routes array method
-          methods << build_routes_method
+          # Import Router, Application, setupFormHandlers from rails.js
+          # Wrap in array to get named imports: import { X, Y } from "..."
+          statements << s(:import, '../lib/rails.js',
+            [s(:const, nil, :Router),
+             s(:const, nil, :Application),
+             s(:const, nil, :setupFormHandlers)])
 
-          # Build path helper methods
-          @rails_path_helpers.each do |helper|
-            methods << build_path_helper(helper)
+          # Import Schema
+          statements << s(:import, './schema.js',
+            [s(:const, nil, :Schema)])
+
+          # Import Seeds
+          statements << s(:import, '../db/seeds.js',
+            [s(:const, nil, :Seeds)])
+
+          # Import controllers - collect all controllers from resources
+          all_controllers = collect_all_controllers(@rails_resources)
+          all_controllers.each do |ctrl|
+            statements << s(:import, "../controllers/#{ctrl[:controller_file]}.js",
+              [s(:const, nil, ctrl[:controller_name].to_sym)])
           end
 
-          # Add extract_id helper if any path helpers have params
-          if @rails_path_helpers.any? { |h| h[:params].any? }
-            methods << build_extract_id_helper
+          # Generate Router.root() if defined
+          if @rails_root_path
+            statements << s(:send,
+              s(:const, nil, :Router), :root,
+              s(:str, @rails_root_path))
           end
 
-          module_body = methods.length == 1 ? methods.first : s(:begin, *methods)
+          # Generate Router.resources() calls for each top-level resource
+          @rails_resources.each do |resource|
+            statements << build_router_resources_call(resource)
+          end
 
-          # Export the module
-          process(s(:send, nil, :export,
-            s(:module, s(:const, nil, :Routes), module_body)))
+          # Generate setupFormHandlers() call
+          statements << build_setup_form_handlers
+
+          # Generate Application.configure()
+          statements << s(:send,
+            s(:const, nil, :Application), :configure,
+            s(:hash,
+              s(:pair, s(:sym, :schema), s(:const, nil, :Schema)),
+              s(:pair, s(:sym, :seeds), s(:const, nil, :Seeds))))
+
+          # Export Application
+          statements << s(:export,
+            s(:array, s(:const, nil, :Application)))
+
+          process(s(:begin, *statements))
+        end
+
+        def collect_all_controllers(resources, result = [])
+          resources.each do |resource|
+            result << resource
+            collect_all_controllers(resource[:nested], result)
+          end
+          result
+        end
+
+        def build_router_resources_call(resource)
+          args = [
+            s(:str, resource[:name]),
+            s(:const, nil, resource[:controller_name].to_sym)
+          ]
+
+          # Build options hash if needed
+          options = []
+
+          if resource[:only]
+            only_array = resource[:only].map { |a| s(:str, a.to_s) }
+            options << s(:pair, s(:sym, :only), s(:array, *only_array))
+          end
+
+          if resource[:nested].any?
+            nested_configs = resource[:nested].map do |nested|
+              nested_pairs = [
+                s(:pair, s(:sym, :name), s(:str, nested[:name])),
+                s(:pair, s(:sym, :controller), s(:const, nil, nested[:controller_name].to_sym))
+              ]
+              if nested[:only]
+                only_array = nested[:only].map { |a| s(:str, a.to_s) }
+                nested_pairs << s(:pair, s(:sym, :only), s(:array, *only_array))
+              end
+              s(:hash, *nested_pairs)
+            end
+            options << s(:pair, s(:sym, :nested), s(:array, *nested_configs))
+          end
+
+          args << s(:hash, *options) if options.any?
+
+          s(:send, s(:const, nil, :Router), :resources, *args)
+        end
+
+        def build_setup_form_handlers
+          configs = []
+
+          collect_form_handler_configs(@rails_resources, nil, configs)
+
+          config_nodes = configs.map do |cfg|
+            pairs = [s(:pair, s(:sym, :resource), s(:str, cfg[:resource]))]
+            pairs << s(:pair, s(:sym, :parent), s(:str, cfg[:parent])) if cfg[:parent]
+            pairs << s(:pair, s(:sym, :confirmDelete), s(:str, cfg[:confirm_delete]))
+            s(:hash, *pairs)
+          end
+
+          s(:send, nil, :setupFormHandlers, s(:array, *config_nodes))
+        end
+
+        def collect_form_handler_configs(resources, parent_name, result)
+          resources.each do |resource|
+            singular = Ruby2JS::Inflector.singularize(resource[:name])
+            confirm_msg = if parent_name
+                            "Delete this #{singular}?"
+                          else
+                            "Are you sure you want to delete this #{singular}?"
+                          end
+
+            result << {
+              resource: resource[:name],
+              parent: parent_name,
+              confirm_delete: confirm_msg
+            }
+
+            collect_form_handler_configs(resource[:nested], resource[:name], result)
+          end
         end
 
         def build_routes_method

@@ -5,6 +5,7 @@
 # - Controller: before_action, params, render, redirect_to
 # - Routes: Rails.application.routes.draw, resources
 # - Schema: ActiveRecord::Schema.define, create_table
+# - Seeds: module Seeds with def self.run, auto-imports models
 #
 # Usage:
 #   require 'ruby2js/filter/rails'
@@ -14,8 +15,10 @@
 #   require 'ruby2js/filter/rails/controller'
 #   require 'ruby2js/filter/rails/routes'
 #   require 'ruby2js/filter/rails/schema'
+#   require 'ruby2js/filter/rails/seeds'
 
 require 'ruby2js/filter/rails/model'
 require 'ruby2js/filter/rails/controller'
 require 'ruby2js/filter/rails/routes'
 require 'ruby2js/filter/rails/schema'
+require 'ruby2js/filter/rails/seeds'

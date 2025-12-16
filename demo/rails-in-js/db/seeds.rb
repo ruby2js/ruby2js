@@ -1,7 +1,7 @@
 # Database seeds - idiomatic Rails
 # Seeds the database with sample data for development
 
-export module Seeds
+module Seeds
   def self.run
     # Only seed if no articles exist
     return if Article.all.length > 0
