@@ -1,0 +1,15 @@
+{
+  "name": "rails-in-js",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Rails-like app running in JavaScript (Stage 0 prototype)",
+  "scripts": {
+    "test:sql": "node sql_prototype.mjs",
+    "test:ar": "node active_record_test.mjs",
+    "test:mvc": "node mvc_sketch.mjs",
+    "test": "npm run test:sql && npm run test:ar && npm run test:mvc"
+  },
+  "dependencies": {
+    "sql.js": "^1.11.0"
+  }
+}
