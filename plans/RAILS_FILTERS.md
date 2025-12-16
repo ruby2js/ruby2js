@@ -1,11 +1,11 @@
 # Rails Filters: Idiomatic Rails to JavaScript
 
-## Status: Phase 2 Complete
+## Status: Phase 3 Complete
 
 ### Progress
 - [x] **Phase 1: rails/controller** - Complete (2024-12)
 - [x] **Phase 2: rails/model** - Complete (2024-12)
-- [ ] Phase 3: rails/routes
+- [x] **Phase 3: rails/routes** - Complete (2024-12)
 - [ ] Phase 4: rails/schema
 
 ## Overview
@@ -101,6 +101,16 @@ Filters become an **abstraction layer** - Rails developers write natural Ruby, f
 9. **Scope lambda extraction**: Rails scopes use `-> { query }` lambda syntax. The lambda body needs to be extracted and transformed, with implicit `self` calls converted to explicit `this.method()` calls.
 
 10. **Private method preservation**: Private methods referenced by callbacks need to be preserved in the output class. Track which methods are used and only include those.
+
+### Lessons Learned (Phase 3)
+
+11. **Block handling for routes**: The `on_block` handler is needed for DSL constructs like `Rails.application.routes.draw do`. The call node, args, and body are separate children of the block node.
+
+12. **Nesting state tracking**: Nested resources require tracking the current nesting stack to build correct paths (`:article_id`) and pass correct params to path helpers.
+
+13. **Path helper generation**: Path helpers need to handle both static paths (`articles_path`) and dynamic paths with interpolations (`article_path(article)`). Use `s(:dstr, ...)` for template literals.
+
+14. **Extract_id helper**: Path helpers accept either an object (calls `.id()`) or a raw ID. The `extract_id` helper normalizes this: `obj?.id() || obj`.
 
 ## Filter Specifications
 
@@ -443,23 +453,40 @@ export module Routes
 end
 ```
 
-#### Transformations
+#### Transformations (Implemented)
 
-| Rails Pattern | Micro-framework Output |
-|---------------|----------------------|
-| `Rails.application.routes.draw do` | `export module Routes` |
-| `root "x#y"` | Route entry + `root_path` helper |
-| `resources :articles` | 7 RESTful route entries + path helpers |
-| `resources :x, only: [...]` | Subset of routes |
-| Nested `resources` | Prefixed paths with parent param |
-| `get 'path', to: 'c#a'` | Single route entry |
-| `post`, `patch`, `delete` | Route with method |
+| Rails Pattern | JavaScript Output | Notes |
+|---------------|-------------------|-------|
+| `Rails.application.routes.draw do` | `export const Routes = (() => {...})()` | IIFE module pattern |
+| `root "articles#index"` | `{path: "/", controller: "ArticlesController", action: "index!"}` | Plus `root_path()` helper |
+| `resources :articles` | 7 route entries + path helpers | All RESTful routes |
+| `resources :x, only: [...]` | Subset of routes | Filters to specified actions |
+| `resources :x, except: [...]` | Routes without excluded | Excludes specified actions |
+| Nested `resources` | `/articles/:article_id/comments` | Parent param in path |
+| `get 'path', to: 'c#a'` | `{path: "/path", method: "GET", ...}` | Custom route |
+| `post`, `patch`, `put`, `delete` | Route with HTTP method | All verbs supported |
+| Path helpers | `articles_path()`, `article_path(article)` | Generated for all routes |
+| `extract_id(obj)` | `obj?.id() \|\| obj` | Helper for path params |
+
+#### Action Name Mapping
+
+| Rails Action | JavaScript Action | Reason |
+|--------------|-------------------|--------|
+| `index` | `index!` | Avoids Functions filter collision |
+| `new` | `$new` | Reserved word escaping |
+| Others | Same name | No transformation needed |
+
+#### Current Limitations
+
+1. **No namespace/scope support**: `namespace :admin do` not implemented
+2. **No member/collection routes**: `member do` blocks not supported
+3. **No constraints**: Route constraints not implemented
+4. **No concerns**: Routing concerns not supported
 
 #### Detection
 
 Filter activates when it sees:
 - `Rails.application.routes.draw` block
-- Or file named `routes.rb` in config/
 
 ---
 
@@ -924,12 +951,19 @@ Schema DSL for database setup.
 - `spec/rails_model_spec.rb` (21 tests, 78 assertions)
 - `spec/inflector_spec.rb` - Added pluralize tests (22 tests, 72 assertions)
 
-### Phase 3 Complete When:
+### Phase 3 Complete When: ✅ DONE
 
-- [ ] `resources :x` generates all 7 RESTful routes
-- [ ] Nested resources work
-- [ ] Path helpers are generated and usable
-- [ ] Demo routes.rb is idiomatic Rails
+- [x] `resources :x` generates all 7 RESTful routes
+- [x] Nested resources work with parent param (`:article_id`)
+- [x] Path helpers generated for all routes
+- [x] `only:` and `except:` options respected
+- [x] Custom routes (`get`, `post`, `patch`, `put`, `delete`)
+- [x] `root` route support
+- [ ] Demo routes.rb is idiomatic Rails (pending demo update)
+
+**Files created:**
+- `lib/ruby2js/filter/rails/routes.rb` (~400 lines)
+- `spec/rails_routes_spec.rb` (23 tests, 112 assertions)
 
 ### Phase 4 Complete When:
 
