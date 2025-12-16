@@ -74,4 +74,13 @@ transpile_directory(
 )
 puts
 
+# Transpile views
+puts "Views:"
+transpile_directory(
+  File.join(DEMO_ROOT, 'app/views'),
+  File.join(DIST_DIR, 'views'),
+  '*.rb'  # Only .rb files, not .erb
+)
+puts
+
 puts "=== Build Complete ==="

@@ -1,8 +1,7 @@
 <h1>New Article</h1>
 
-<% if @article.errors.length > 0 %>
+<% if @article.errors && @article.errors.length > 0 %>
   <div class="errors">
-    <h3>Errors:</h3>
     <ul>
       <% @article.errors.each do |error| %>
         <li><%= error %></li>
@@ -11,18 +10,16 @@
   </div>
 <% end %>
 
-<form action="/articles" method="post">
+<form onsubmit="return createArticle(event)">
   <p>
-    <label for="title">Title:</label>
-    <input type="text" name="article[title]" id="title" value="<%= @article.title %>">
+    <label>Title:</label>
+    <input type="text" id="title" value="<%= @article.title || '' %>" required>
   </p>
   <p>
-    <label for="body">Body:</label>
-    <textarea name="article[body]" id="body"><%= @article.body %></textarea>
+    <label>Body:</label>
+    <textarea id="body" required><%= @article.body || '' %></textarea>
   </p>
-  <p>
-    <button type="submit">Create Article</button>
-  </p>
+  <button type="submit">Create Article</button>
 </form>
 
-<p><a href="/articles">Back to Articles</a></p>
+<p><a onclick="navigate('/articles')">Back to Articles</a></p>

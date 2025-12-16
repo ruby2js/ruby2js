@@ -201,6 +201,56 @@ value.to_s.strip.length == 0
 6. **Avoid `class << self`** - use `def self.` pattern
 7. **Be explicit about parentheses** to control getter vs method transpilation
 
+## View Transpilation
+
+Views are written in Ruby as module functions that return HTML strings:
+
+```ruby
+export module ArticleViews
+  def self.escape_html(str)
+    return '' if str.nil?
+    String(str).gsub('&', '&amp;').gsub('<', '&lt;').gsub('>', '&gt;').gsub('"', '&quot;')
+  end
+
+  def self.index(locals)
+    articles = locals[:articles]
+    html = '<h1>Articles</h1>'
+    articles.each do |article|
+      html += %{<div class="article">#{escape_html(article.title)}</div>}
+    end
+    html
+  end
+end
+```
+
+Transpiles to:
+```javascript
+export const ArticleViews = (() => {
+  function escape_html(str) {
+    if (str == null) return "";
+    return String(str).replaceAll("&", "&amp;")...
+  };
+
+  function index(locals) {
+    let articles = locals.articles;
+    let html = "<h1>Articles</h1>";
+    for (let article of articles) {
+      html += `<div class="article">${escape_html(article.title)}</div>`
+    };
+    return html
+  };
+
+  return {escape_html, index}
+})()
+```
+
+Key patterns:
+- Use `module` instead of `class` for view collections
+- Use `self.` for all module methods
+- Hash access `locals[:articles]` becomes property access `locals.articles`
+- String interpolation `#{}` becomes template literals `${}`
+- Ruby's `%{}` strings work well for HTML (avoid escaping quotes)
+
 ## Filters Used
 
 This demo uses the following Ruby2JS filters:

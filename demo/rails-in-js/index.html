@@ -101,100 +101,20 @@
       window.Comment = Comment;
     }
 
-    // === Views ===
-    function escapeHTML(str) {
-      if (str === null || str === undefined) return '';
-      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    // === Views (transpiled from Ruby) ===
+    let ArticleViews;
+
+    async function loadViews() {
+      const viewsModule = await import('./dist/views/articles.js');
+      ArticleViews = viewsModule.ArticleViews;
     }
 
+    // View routing - maps template names to transpiled Ruby view functions
     const views = {
-      'articles/index': (locals) => {
-        let html = '<h1>Articles</h1>';
-        for (const article of locals.articles) {
-          html += `
-            <div class="article">
-              <h2><a onclick="navigate('/articles/${article.id}')">${escapeHTML(article.title)}</a></h2>
-              <p>${escapeHTML((article.body || '').slice(0, 150))}...</p>
-              <p class="meta">Created: ${article.created_at}</p>
-            </div>`;
-        }
-        html += '<p><a onclick="navigate(\'/articles/new\')">New Article</a></p>';
-        return html;
-      },
-
-      'articles/show': (locals) => {
-        const article = locals.article;
-        let html = `
-          <h1>${escapeHTML(article.title)}</h1>
-          <p>${escapeHTML(article.body)}</p>
-          <p class="meta">Created: ${article.created_at}<br>Updated: ${article.updated_at}</p>
-          <p>
-            <a onclick="navigate('/articles/${article.id}/edit')">Edit</a> |
-            <a onclick="navigate('/articles')">Back to Articles</a> |
-            <a onclick="deleteArticle(${article.id})" style="color: red;">Delete</a>
-          </p>
-          <hr>
-          <h2>Comments</h2>`;
-
-        const comments = article.comments;  // getter access
-        for (const comment of comments) {
-          html += `
-            <div class="comment">
-              <p><strong>${escapeHTML(comment.commenter)}</strong> says:</p>
-              <p>${escapeHTML(comment.body)}</p>
-              <button class="danger" onclick="deleteComment(${article.id}, ${comment.id})">Delete</button>
-            </div>`;
-        }
-
-        html += `
-          <h3>Add a Comment</h3>
-          <form onsubmit="return createComment(event, ${article.id})">
-            <p><label>Your Name:</label><input type="text" id="commenter" required></p>
-            <p><label>Comment:</label><textarea id="comment_body" required></textarea></p>
-            <button type="submit">Add Comment</button>
-          </form>`;
-        return html;
-      },
-
-      'articles/new': (locals) => {
-        const article = locals.article || { title: '', body: '', errors: [] };
-        let html = '<h1>New Article</h1>';
-        if (article.errors && article.errors.length > 0) {
-          html += '<div class="errors"><ul>';
-          for (const error of article.errors) {
-            html += `<li>${escapeHTML(error)}</li>`;
-          }
-          html += '</ul></div>';
-        }
-        html += `
-          <form onsubmit="return createArticle(event)">
-            <p><label>Title:</label><input type="text" id="title" value="${escapeHTML(article.title || '')}" required></p>
-            <p><label>Body:</label><textarea id="body" required>${escapeHTML(article.body || '')}</textarea></p>
-            <button type="submit">Create Article</button>
-          </form>
-          <p><a onclick="navigate('/articles')">Back to Articles</a></p>`;
-        return html;
-      },
-
-      'articles/edit': (locals) => {
-        const article = locals.article;
-        let html = '<h1>Edit Article</h1>';
-        if (article.errors && article.errors.length > 0) {
-          html += '<div class="errors"><ul>';
-          for (const error of article.errors) {
-            html += `<li>${escapeHTML(error)}</li>`;
-          }
-          html += '</ul></div>';
-        }
-        html += `
-          <form onsubmit="return updateArticle(event, ${article.id})">
-            <p><label>Title:</label><input type="text" id="title" value="${escapeHTML(article.title)}" required></p>
-            <p><label>Body:</label><textarea id="body" required>${escapeHTML(article.body)}</textarea></p>
-            <button type="submit">Update Article</button>
-          </form>
-          <p><a onclick="navigate('/articles/${article.id}')">Cancel</a> | <a onclick="navigate('/articles')">Back to Articles</a></p>`;
-        return html;
-      }
+      'articles/index': (locals) => ArticleViews.index(locals),
+      'articles/show': (locals) => ArticleViews.show(locals),
+      'articles/new': (locals) => ArticleViews.new_article(locals),
+      'articles/edit': (locals) => ArticleViews.edit(locals)
     };
 
     // === Router ===
@@ -322,6 +242,7 @@
       try {
         await initDatabase();
         await loadModels();
+        await loadViews();
         document.getElementById('loading').style.display = 'none';
         document.getElementById('app').style.display = 'block';
 
