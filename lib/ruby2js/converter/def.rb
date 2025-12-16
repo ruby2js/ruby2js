@@ -6,7 +6,7 @@ module Ruby2JS
     #     (arg :x)
     #   (...)
 
-    handle :def, :defm, :async, :deff do |name, args, body=nil|
+    handle :def, :defm, :async, :deff, :defget do |name, args, body=nil|
       body ||= s(:begin)
 
       # Detect endless method (def foo(x) = expr) and wrap body in autoreturn

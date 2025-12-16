@@ -17,7 +17,7 @@
 
 <h2>Comments</h2>
 
-<% @article.comments().each do |comment| %>
+<% @article.comments.each do |comment| %>
   <div class="comment">
     <p><strong><%= comment.commenter %></strong> says:</p>
     <p><%= comment.body %></p>

@@ -4,7 +4,7 @@ import { ApplicationRecord } from "./application_record.js";
 export class Comment extends ApplicationRecord {
   static table_name = "comments";
 
-  article() {
+  get article() {
     return Article.find(this._attributes["article_id".toString()])
   };
 

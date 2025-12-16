@@ -326,13 +326,14 @@ module Ruby2JS
         end
 
         def generate_has_many_method(assoc)
-          # has_many :comments -> def comments; Comment.where({article_id: this._id}); end
+          # has_many :comments -> get comments() { return Comment.where({article_id: this._id}) }
+          # Use :defget for getter (no parentheses needed when accessing)
           # Use :attr for property access (no parentheses) to access inherited property
           association_name = assoc[:name]
           class_name = assoc[:options][:class_name] || Ruby2JS::Inflector.singularize(association_name.to_s).capitalize
           foreign_key = assoc[:options][:foreign_key] || "#{@rails_model_name.downcase}_id"
 
-          s(:def, association_name,
+          s(:defget, association_name,
             s(:args),
             s(:autoreturn,
               s(:send,
@@ -345,13 +346,14 @@ module Ruby2JS
         end
 
         def generate_has_one_method(assoc)
-          # has_one :profile -> def profile; Profile.find_by({user_id: this._id}); end
+          # has_one :profile -> get profile() { return Profile.find_by({user_id: this._id}) }
+          # Use :defget for getter (no parentheses needed when accessing)
           # Use :attr for property access (no parentheses) to access inherited property
           association_name = assoc[:name]
           class_name = assoc[:options][:class_name] || association_name.to_s.capitalize
           foreign_key = assoc[:options][:foreign_key] || "#{@rails_model_name.downcase}_id"
 
-          s(:def, association_name,
+          s(:defget, association_name,
             s(:args),
             s(:autoreturn,
               s(:send,
@@ -364,7 +366,8 @@ module Ruby2JS
         end
 
         def generate_belongs_to_method(assoc)
-          # belongs_to :article -> def article; Article.find(this._attributes['article_id']); end
+          # belongs_to :article -> get article() { return Article.find(this._attributes['article_id']) }
+          # Use :defget for getter (no parentheses needed when accessing)
           # Use :attr for property access to _attributes, bracket notation for key
           association_name = assoc[:name]
           class_name = assoc[:options][:class_name] || association_name.to_s.capitalize
@@ -378,7 +381,7 @@ module Ruby2JS
           # Handle optional: true
           if assoc[:options][:optional]
             # Return nil if foreign key is nil
-            s(:def, association_name,
+            s(:defget, association_name,
               s(:args),
               s(:autoreturn,
                 s(:if,
@@ -389,7 +392,7 @@ module Ruby2JS
                     fk_access),
                   s(:nil))))
           else
-            s(:def, association_name,
+            s(:defget, association_name,
               s(:args),
               s(:autoreturn,
                 s(:send,
@@ -408,9 +411,10 @@ module Ruby2JS
           return nil if dependent_destroy.empty?
 
           # Generate: this.comments.forEach(c => c.destroy()); super.destroy();
+          # Use :attr for property access since associations are getters
           destroy_calls = dependent_destroy.map do |assoc|
             s(:send,
-              s(:send, s(:self), assoc[:name]),
+              s(:attr, s(:self), assoc[:name]),
               :each,
               s(:block,
                 s(:send, nil, :lambda),

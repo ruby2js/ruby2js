@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Ruby2JS ruby.wasm PoC (Base + Pack)</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 800px; margin: 2em auto; padding: 0 1em; }
+    pre { background: #f5f5f5; padding: 1em; overflow-x: auto; }
+    .loading { color: #666; }
+    .success { color: green; }
+    .error { color: red; }
+    #output { margin-top: 1em; }
+    #timing { margin-top: 1em; font-size: 0.9em; color: #666; }
+  </style>
+</head>
+<body>
+  <h1>Ruby2JS + ruby.wasm PoC (Base + Pack)</h1>
+  <p>Using pre-built base WASM (47MB) with ruby2js packed on top</p>
+
+  <p id="status" class="loading">Loading ruby.wasm...</p>
+  <div id="timing"></div>
+  <div id="output"></div>
+
+  <script type="module">
+    import { DefaultRubyVM } from "https://cdn.jsdelivr.net/npm/@ruby/wasm-wasi@2.7.2/dist/browser/+esm";
+
+    const startTime = performance.now();
+    const timing = document.getElementById('timing');
+    const status = document.getElementById('status');
+    const output = document.getElementById('output');
+
+    function log(message) {
+      console.log(message);
+      const div = document.createElement('div');
+      div.innerHTML = message;
+      output.appendChild(div);
+    }
+
+    function updateStatus(message, cssClass) {
+      status.textContent = message;
+      status.className = cssClass;
+    }
+
+    function updateTiming(label) {
+      const elapsed = ((performance.now() - startTime) / 1000).toFixed(2);
+      timing.innerHTML += `<div>${label}: ${elapsed}s</div>`;
+    }
+
+    try {
+      updateStatus('Fetching ruby2js-final.wasm (47MB)...', 'loading');
+      const response = await fetch('./ruby2js-final.wasm');
+      updateTiming('Fetch started');
+
+      updateStatus('Compiling WebAssembly...', 'loading');
+      const module = await WebAssembly.compileStreaming(response);
+      updateTiming('WASM compiled');
+
+      updateStatus('Initializing Ruby VM...', 'loading');
+      const { vm } = await DefaultRubyVM(module);
+      updateTiming('Ruby VM initialized');
+
+      // Test Ruby version
+      log('<h3>Step 1: Ruby Environment</h3>');
+      const rubyVersion = vm.eval('RUBY_VERSION').toString();
+      log(`<pre>Ruby version: ${rubyVersion}</pre>`);
+
+      const platform = vm.eval('RUBY_PLATFORM').toString();
+      log(`<pre>Platform: ${platform}</pre>`);
+
+      // Check if Prism is available
+      const hasPrism = vm.eval(`defined?(Prism) ? 'yes' : 'no'`).toString();
+      log(`<pre>Prism available: ${hasPrism}</pre>`);
+
+      // Load Ruby2JS
+      log('<h3>Step 2: Load Ruby2JS</h3>');
+
+      vm.eval(`
+        require "/bundle/setup"
+
+        # Add ruby2js to load path
+        $LOAD_PATH.unshift "/bundle/gems/ruby2js"
+
+        # Force Prism parser
+        ENV['RUBY2JS_PARSER'] = 'prism'
+
+        require "ruby2js"
+      `);
+      log('<pre class="success">Ruby2JS loaded!</pre>');
+      updateTiming('Ruby2JS loaded');
+
+      // Test conversion
+      log('<h3>Step 3: Test Conversion</h3>');
+
+      const testCases = [
+        'puts "Hello from Ruby2JS!"',
+        'x = [1, 2, 3].map { |n| n * 2 }',
+        'class Foo; def bar; @x = 1; end; end',
+      ];
+
+      for (const ruby of testCases) {
+        const js = vm.eval(`Ruby2JS.convert(${JSON.stringify(ruby)}).to_s`).toString();
+        log(`<pre><b>Ruby:</b> ${ruby}\n<b>JS:</b> ${js}</pre>`);
+      }
+
+      updateTiming('Conversions complete');
+      updateStatus('Success! Ruby2JS works with base + pack approach', 'success');
+
+    } catch (error) {
+      console.error(error);
+      log(`<pre class="error">Error: ${error.message}\n${error.stack}</pre>`);
+      updateStatus('Error occurred', 'error');
+    }
+  </script>
+</body>
+</html>

@@ -195,16 +195,18 @@ export class ApplicationRecord
     cols = []
     placeholders = []
     values = []
+    bindings = []
 
     Object.keys(@_attributes).each do |key|
       next if key == 'id'
       cols << key
       placeholders << '?'
       values << @_attributes[key]
+      bindings << [key, @_attributes[key]]
     end
 
     sql = "INSERT INTO #{self.class.table_name} (#{cols.join(', ')}) VALUES (#{placeholders.join(', ')})"
-    console.debug("  #{self.class.name} Create  #{sql}")
+    console.debug("  #{self.class.name} Create  #{sql}  #{JSON.stringify(bindings)}")
     DB.run(sql, values)
 
     id_result = DB.exec('SELECT last_insert_rowid()')
@@ -221,16 +223,19 @@ export class ApplicationRecord
 
     sets = []
     values = []
+    bindings = []
 
     Object.keys(@_attributes).each do |key|
       next if key == 'id'
       sets << "#{key} = ?"
       values << @_attributes[key]
+      bindings << [key, @_attributes[key]]
     end
     values << @_id
+    bindings << ['id', @_id]
 
     sql = "UPDATE #{self.class.table_name} SET #{sets.join(', ')} WHERE id = ?"
-    console.debug("  #{self.class.name} Update  #{sql}  [[\"id\", #{@_id}]]")
+    console.debug("  #{self.class.name} Update  #{sql}  #{JSON.stringify(bindings)}")
     DB.run(sql, values)
     console.log("  #{self.class.name} Update (id: #{@_id})")
     true

@@ -4,12 +4,12 @@ import { ApplicationRecord } from "./application_record.js";
 export class Article extends ApplicationRecord {
   static table_name = "articles";
 
-  comments() {
+  get comments() {
     return Comment.where({article_id: this._id})
   };
 
   destroy() {
-    this.comments().forEach(record => record.destroy());
+    this.comments.forEach(record => record.destroy());
     return super.destroy()
   };
 

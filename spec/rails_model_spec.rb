@@ -30,13 +30,13 @@ describe Ruby2JS::Filter::Rails::Model do
   end
 
   describe "has_many" do
-    it "generates association method" do
+    it "generates association getter" do
       result = to_js(<<~RUBY)
         class Article < ApplicationRecord
           has_many :comments
         end
       RUBY
-      assert_includes result, 'comments()'
+      assert_includes result, 'get comments()'
       assert_includes result, 'Comment.where({article_id: this._id})'
     end
 
@@ -46,7 +46,7 @@ describe Ruby2JS::Filter::Rails::Model do
           has_many :reviews, class_name: 'Comment'
         end
       RUBY
-      assert_includes result, 'reviews()'
+      assert_includes result, 'get reviews()'
       assert_includes result, 'Comment.where({article_id: this._id})'
     end
 
@@ -66,19 +66,20 @@ describe Ruby2JS::Filter::Rails::Model do
         end
       RUBY
       assert_includes result, 'destroy()'
-      assert_includes result, 'this.comments()'
+      # Associations are getters, so accessed without parentheses
+      assert_includes result, 'this.comments.'
       assert_includes result, '.destroy()'
     end
   end
 
   describe "belongs_to" do
-    it "generates association method" do
+    it "generates association getter" do
       result = to_js(<<~RUBY)
         class Comment < ApplicationRecord
           belongs_to :article
         end
       RUBY
-      assert_includes result, 'article()'
+      assert_includes result, 'get article()'
       # Access via _attributes property with bracket notation
       assert_includes result, 'this._attributes["article_id"'
       assert_includes result, 'Article.find('
@@ -90,7 +91,7 @@ describe Ruby2JS::Filter::Rails::Model do
           belongs_to :author, optional: true
         end
       RUBY
-      assert_includes result, 'author()'
+      assert_includes result, 'get author()'
       # Should check for nil before finding
       assert_includes result, 'this._attributes["author_id"'
       assert_includes result, '?'
@@ -102,7 +103,7 @@ describe Ruby2JS::Filter::Rails::Model do
           belongs_to :creator, class_name: 'User'
         end
       RUBY
-      assert_includes result, 'creator()'
+      assert_includes result, 'get creator()'
       assert_includes result, 'this._attributes["creator_id"'
       assert_includes result, 'User.find('
     end

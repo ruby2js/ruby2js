@@ -259,7 +259,7 @@ module Ruby2JS
             end
           end
 
-          if %i[def defm deff async].include? m.type
+          if %i[def defm deff defget async].include? m.type
             @prop = m.children.first
 
             if @prop == :initialize and !@rbstack.last[:initialize]
@@ -271,9 +271,9 @@ module Ruby2JS
               end
 
               m = m.updated(m.type, [@prop, m.children[1], s(:begin, *constructor)])
-            elsif not m.is_method? and !%i[defm deff].include?(m.type)
+            elsif m.type == :defget or (not m.is_method? and !%i[defm deff].include?(m.type))
               @prop = "get #{@prop}"
-              m = m.updated(m.type, [*m.children[0..1], 
+              m = m.updated(m.type, [*m.children[0..1],
                 s(:autoreturn, m.children[2])])
             elsif @prop.to_s.end_with? '='
               @prop = @prop.to_s.sub('=', '').to_sym

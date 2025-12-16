@@ -208,16 +208,18 @@ export class ApplicationRecord {
     let cols = [];
     let placeholders = [];
     let values = [];
+    let bindings = [];
 
     for (let key of Object.keys(this.#_attributes)) {
       if (key == "id") continue;
       cols.push(key);
       placeholders.push("?");
-      values.push(this.#_attributes[key])
+      values.push(this.#_attributes[key]);
+      bindings.push([key, this.#_attributes[key]])
     };
 
     let sql = `INSERT INTO ${this.constructor.table_name} (${cols.join(", ")}) VALUES (${placeholders.join(", ")})`;
-    console.debug(`  ${this.constructor.name} Create  ${sql}`);
+    console.debug(`  ${this.constructor.name} Create  ${sql}  ${JSON.stringify(bindings)}`);
     DB.run(sql, values);
     let id_result = DB.exec("SELECT last_insert_rowid()");
     this.#_id = id_result[0].values[0][0];
@@ -234,16 +236,19 @@ export class ApplicationRecord {
     this.#_attributes.updated_at = Time.now().toString();
     let sets = [];
     let values = [];
+    let bindings = [];
 
     for (let key of Object.keys(this.#_attributes)) {
       if (key == "id") continue;
       sets.push(`${key} = ?`);
-      values.push(this.#_attributes[key])
+      values.push(this.#_attributes[key]);
+      bindings.push([key, this.#_attributes[key]])
     };
 
     values.push(this.#_id);
+    bindings.push(["id", this.#_id]);
     let sql = `UPDATE ${this.constructor.table_name} SET ${sets.join(", ")} WHERE id = ?`;
-    console.debug(`  ${this.constructor.name} Update  ${sql}  [["id", ${this.#_id}]]`);
+    console.debug(`  ${this.constructor.name} Update  ${sql}  ${JSON.stringify(bindings)}`);
     DB.run(sql, values);
     console.log(`  ${this.constructor.name} Update (id: ${this.#_id})`);
     return true

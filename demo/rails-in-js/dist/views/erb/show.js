@@ -22,7 +22,7 @@ export function render({ article }) {
 
 `;
 
-  for (let comment of article.comments()) {
+  for (let comment of article.comments) {
     _buf += `  <div class="comment">\n    <p><strong>`;
     _buf += String(comment.commenter);
     _buf += `</strong> says:</p>\n    <p>`;
