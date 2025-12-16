@@ -1,0 +1,540 @@
+require 'ruby2js'
+require 'ruby2js/inflector'
+
+module Ruby2JS
+  module Filter
+    module Rails
+      module Model
+        include SEXP
+
+        # Callback types we support
+        CALLBACKS = %i[
+          before_validation after_validation
+          before_save after_save
+          before_create after_create
+          before_update after_update
+          before_destroy after_destroy
+        ].freeze
+
+        def initialize(*args)
+          @rails_model = nil
+          @rails_model_name = nil
+          @rails_model_processing = false
+          @rails_associations = []
+          @rails_validations = []
+          @rails_callbacks = Hash.new { |h, k| h[k] = [] }
+          @rails_scopes = []
+          @rails_model_private_methods = {}
+          super
+        end
+
+        # Detect model class and transform
+        def on_class(node)
+          class_name, superclass, body = node.children
+
+          # Skip if already processing (prevent infinite recursion)
+          return super if @rails_model_processing
+
+          # Check if this is an ActiveRecord model
+          return super unless model_class?(class_name, superclass)
+
+          @rails_model_name = class_name.children.last.to_s
+          @rails_model = true
+          @rails_model_processing = true
+
+          # First pass: collect DSL declarations
+          collect_model_metadata(body)
+
+          # Second pass: transform body
+          transformed_body = transform_model_body(body)
+
+          # Build the exported class
+          result = process(s(:send, nil, :export,
+            node.updated(nil, [class_name, superclass, transformed_body])))
+
+          @rails_model = nil
+          @rails_model_name = nil
+          @rails_model_processing = false
+          @rails_associations = []
+          @rails_validations = []
+          @rails_callbacks = Hash.new { |h, k| h[k] = [] }
+          @rails_scopes = []
+          @rails_model_private_methods = {}
+
+          result
+        end
+
+        private
+
+        def model_class?(class_name, superclass)
+          return false unless class_name&.type == :const
+          return false unless superclass&.type == :const
+
+          superclass_str = superclass.children.last.to_s
+          superclass_str == 'ApplicationRecord' || superclass_str == 'ActiveRecord::Base'
+        end
+
+        def collect_model_metadata(body)
+          return unless body
+
+          children = body.type == :begin ? body.children : [body]
+
+          in_private = false
+          children.each do |child|
+            next unless child
+
+            # Track private section
+            if child.type == :send && child.children[0].nil? && child.children[1] == :private
+              in_private = true
+              next
+            end
+
+            # Collect private methods
+            if in_private && child.type == :def
+              method_name = child.children[0]
+              @rails_model_private_methods[method_name] = child
+              next
+            end
+
+            next unless child.type == :send && child.children[0].nil?
+
+            method_name = child.children[1]
+            args = child.children[2..-1]
+
+            case method_name
+            when :has_many, :has_one
+              collect_association(:has_many, args) if method_name == :has_many
+              collect_association(:has_one, args) if method_name == :has_one
+            when :belongs_to
+              collect_association(:belongs_to, args)
+            when :validates
+              collect_validation(args)
+            when :scope
+              collect_scope(args)
+            when *CALLBACKS
+              collect_callback(method_name, args)
+            end
+          end
+        end
+
+        def collect_association(type, args)
+          return if args.empty?
+
+          name = args.first.children[0] if args.first.type == :sym
+          return unless name
+
+          options = {}
+          args[1..-1].each do |arg|
+            next unless arg.type == :hash
+            arg.children.each do |pair|
+              key = pair.children[0]
+              value = pair.children[1]
+              if key.type == :sym
+                options[key.children[0]] = extract_value(value)
+              end
+            end
+          end
+
+          @rails_associations << {
+            type: type,
+            name: name,
+            options: options
+          }
+        end
+
+        def collect_validation(args)
+          return if args.empty?
+
+          # First args are attribute names (symbols)
+          attributes = []
+          validations = {}
+
+          args.each do |arg|
+            if arg.type == :sym
+              attributes << arg.children[0]
+            elsif arg.type == :hash
+              arg.children.each do |pair|
+                key = pair.children[0]
+                value = pair.children[1]
+                if key.type == :sym
+                  validations[key.children[0]] = extract_validation_value(value)
+                end
+              end
+            end
+          end
+
+          attributes.each do |attr|
+            @rails_validations << {
+              attribute: attr,
+              validations: validations
+            }
+          end
+        end
+
+        def collect_scope(args)
+          return if args.size < 2
+
+          name = args[0].children[0] if args[0].type == :sym
+          lambda_node = args[1]
+
+          return unless name && lambda_node
+
+          # Extract the lambda body
+          body = if lambda_node.type == :block
+                   lambda_node.children[2]
+                 elsif lambda_node.type == :send && lambda_node.children[1] == :lambda
+                   # -> { } produces send nil :lambda with block
+                   nil
+                 end
+
+          @rails_scopes << {
+            name: name,
+            body: lambda_node
+          }
+        end
+
+        def collect_callback(type, args)
+          args.each do |arg|
+            if arg.type == :sym
+              @rails_callbacks[type] << arg.children[0]
+            end
+          end
+        end
+
+        def extract_value(node)
+          case node.type
+          when :sym then node.children[0]
+          when :str then node.children[0]
+          when :int then node.children[0]
+          when :true then true
+          when :false then false
+          when :nil then nil
+          else node
+          end
+        end
+
+        def extract_validation_value(node)
+          case node.type
+          when :true then true
+          when :false then false
+          when :hash
+            result = {}
+            node.children.each do |pair|
+              key = pair.children[0]
+              value = pair.children[1]
+              if key.type == :sym
+                result[key.children[0]] = extract_value(value)
+              end
+            end
+            result
+          else
+            extract_value(node)
+          end
+        end
+
+        def transform_model_body(body)
+          children = body ? (body.type == :begin ? body.children : [body]) : []
+          transformed = []
+
+          # Add table_name method
+          table_name = Ruby2JS::Inflector.pluralize(@rails_model_name.downcase)
+          transformed << s(:defs, s(:self), :table_name,
+            s(:args),
+            s(:autoreturn, s(:str, table_name)))
+
+          in_private = false
+          children.each do |child|
+            next unless child
+
+            # Skip private keyword
+            if child.type == :send && child.children[0].nil? && child.children[1] == :private
+              in_private = true
+              next
+            end
+
+            # Skip DSL declarations (already collected)
+            if child.type == :send && child.children[0].nil?
+              method = child.children[1]
+              next if %i[has_many has_one belongs_to validates scope].include?(method)
+              next if CALLBACKS.include?(method)
+            end
+
+            # Keep non-private methods
+            if child.type == :def && !in_private
+              transformed << process(child)
+            elsif !in_private && child.type != :def
+              # Pass through other class-level code
+              transformed << process(child)
+            end
+          end
+
+          # Generate association methods
+          @rails_associations.each do |assoc|
+            transformed << generate_association_method(assoc)
+          end
+
+          # Generate destroy method if any dependent: :destroy associations
+          destroy_method = generate_destroy_method
+          transformed << destroy_method if destroy_method
+
+          # Generate validate method
+          validate_method = generate_validate_method
+          transformed << validate_method if validate_method
+
+          # Generate callback methods
+          @rails_callbacks.each do |callback_type, methods|
+            next if methods.empty?
+            callback_method = generate_callback_method(callback_type, methods)
+            transformed << callback_method if callback_method
+          end
+
+          # Generate scope methods
+          @rails_scopes.each do |scope|
+            transformed << generate_scope_method(scope)
+          end
+
+          # Keep private methods that aren't inlined elsewhere
+          @rails_model_private_methods.each do |name, node|
+            # Check if used in callbacks
+            used_in_callbacks = @rails_callbacks.values.flatten.include?(name)
+            if used_in_callbacks
+              # Transform and include the method
+              transformed << process(node)
+            end
+          end
+
+          transformed.compact.length == 1 ? transformed.first : s(:begin, *transformed.compact)
+        end
+
+        def generate_association_method(assoc)
+          case assoc[:type]
+          when :has_many
+            generate_has_many_method(assoc)
+          when :has_one
+            generate_has_one_method(assoc)
+          when :belongs_to
+            generate_belongs_to_method(assoc)
+          end
+        end
+
+        def generate_has_many_method(assoc)
+          # has_many :comments -> def comments; Comment.where({article_id: self.id}); end
+          association_name = assoc[:name]
+          class_name = assoc[:options][:class_name] || Ruby2JS::Inflector.singularize(association_name.to_s).capitalize
+          foreign_key = assoc[:options][:foreign_key] || "#{@rails_model_name.downcase}_id"
+
+          s(:def, association_name,
+            s(:args),
+            s(:autoreturn,
+              s(:send,
+                s(:const, nil, class_name.to_sym),
+                :where,
+                s(:hash,
+                  s(:pair,
+                    s(:sym, foreign_key.to_sym),
+                    s(:send, s(:self), :id))))))
+        end
+
+        def generate_has_one_method(assoc)
+          # has_one :profile -> def profile; Profile.find_by({user_id: self.id}); end
+          association_name = assoc[:name]
+          class_name = assoc[:options][:class_name] || association_name.to_s.capitalize
+          foreign_key = assoc[:options][:foreign_key] || "#{@rails_model_name.downcase}_id"
+
+          s(:def, association_name,
+            s(:args),
+            s(:autoreturn,
+              s(:send,
+                s(:const, nil, class_name.to_sym),
+                :find_by,
+                s(:hash,
+                  s(:pair,
+                    s(:sym, foreign_key.to_sym),
+                    s(:send, s(:self), :id))))))
+        end
+
+        def generate_belongs_to_method(assoc)
+          # belongs_to :author -> def author; Author.find(self.author_id); end
+          association_name = assoc[:name]
+          class_name = assoc[:options][:class_name] || association_name.to_s.capitalize
+          foreign_key = assoc[:options][:foreign_key] || "#{association_name}_id"
+
+          # Handle optional: true
+          if assoc[:options][:optional]
+            # Return nil if foreign key is nil
+            s(:def, association_name,
+              s(:args),
+              s(:autoreturn,
+                s(:if,
+                  s(:send, s(:self), foreign_key.to_sym),
+                  s(:send,
+                    s(:const, nil, class_name.to_sym),
+                    :find,
+                    s(:send, s(:self), foreign_key.to_sym)),
+                  s(:nil))))
+          else
+            s(:def, association_name,
+              s(:args),
+              s(:autoreturn,
+                s(:send,
+                  s(:const, nil, class_name.to_sym),
+                  :find,
+                  s(:send, s(:self), foreign_key.to_sym))))
+          end
+        end
+
+        def generate_destroy_method
+          # Find associations with dependent: :destroy
+          dependent_destroy = @rails_associations.select do |assoc|
+            assoc[:options][:dependent] == :destroy
+          end
+
+          return nil if dependent_destroy.empty?
+
+          # Generate: this.comments.forEach(c => c.destroy()); super.destroy();
+          destroy_calls = dependent_destroy.map do |assoc|
+            s(:send,
+              s(:send, s(:self), assoc[:name]),
+              :each,
+              s(:block,
+                s(:send, nil, :lambda),
+                s(:args, s(:arg, :record)),
+                s(:send, s(:lvar, :record), :destroy)))
+          end
+
+          # Add super.destroy() call
+          destroy_calls << s(:zsuper)
+
+          s(:def, :destroy,
+            s(:args),
+            s(:autoreturn, *destroy_calls))
+        end
+
+        def generate_validate_method
+          return nil if @rails_validations.empty?
+
+          validation_calls = []
+
+          @rails_validations.each do |v|
+            attr = v[:attribute]
+            v[:validations].each do |validation_type, options|
+              call = case validation_type
+                     when :presence
+                       if options == true
+                         s(:send, nil, :validates_presence_of, s(:str, attr.to_s))
+                       end
+                     when :length
+                       if options.is_a?(Hash)
+                         opts = options.map do |k, val|
+                           s(:pair, s(:sym, k), s(:int, val))
+                         end
+                         s(:send, nil, :validates_length_of, s(:str, attr.to_s), s(:hash, *opts))
+                       end
+                     when :uniqueness
+                       if options == true
+                         s(:send, nil, :validates_uniqueness_of, s(:str, attr.to_s))
+                       end
+                     when :format
+                       if options.is_a?(Hash) && options[:with]
+                         # Handle regex format validation
+                         s(:send, nil, :validates_format_of, s(:str, attr.to_s), s(:hash,
+                           s(:pair, s(:sym, :with), s(:regexp, s(:str, options[:with].to_s), s(:regopt)))))
+                       end
+                     when :numericality
+                       if options == true
+                         s(:send, nil, :validates_numericality_of, s(:str, attr.to_s))
+                       elsif options.is_a?(Hash)
+                         opts = options.map do |k, val|
+                           value_node = case val
+                                        when Integer then s(:int, val)
+                                        when true then s(:true)
+                                        when false then s(:false)
+                                        else s(:str, val.to_s)
+                                        end
+                           s(:pair, s(:sym, k), value_node)
+                         end
+                         s(:send, nil, :validates_numericality_of, s(:str, attr.to_s), s(:hash, *opts))
+                       end
+                     when :inclusion
+                       if options.is_a?(Hash) && options[:in]
+                         values = options[:in]
+                         if values.is_a?(Array)
+                           array_node = s(:array, *values.map { |v| s(:str, v.to_s) })
+                           s(:send, nil, :validates_inclusion_of, s(:str, attr.to_s), s(:hash,
+                             s(:pair, s(:sym, :in), array_node)))
+                         end
+                       end
+                     end
+              validation_calls << call if call
+            end
+          end
+
+          return nil if validation_calls.empty?
+
+          s(:def, :validate,
+            s(:args),
+            s(:begin, *validation_calls))
+        end
+
+        def generate_callback_method(callback_type, methods)
+          # Generate callback method that calls all registered methods
+          calls = methods.map do |method_name|
+            s(:send, nil, method_name)
+          end
+
+          body = calls.length == 1 ? calls.first : s(:begin, *calls)
+
+          s(:def, callback_type,
+            s(:args),
+            body)
+        end
+
+        def generate_scope_method(scope)
+          # scope :published, -> { where(status: 'published') }
+          # becomes: def self.published; self.where({status: 'published'}); end
+
+          body = if scope[:body].type == :block
+                   # -> { where(...) } is a block with lambda send
+                   transform_scope_body(scope[:body].children[2])
+                 else
+                   s(:nil)
+                 end
+
+          s(:defs, s(:self), scope[:name],
+            s(:args),
+            s(:autoreturn, body))
+        end
+
+        def transform_scope_body(node)
+          return node unless node.respond_to?(:type)
+
+          case node.type
+          when :send
+            target, method, *args = node.children
+
+            # Transform implicit self calls (where, order, limit, etc.)
+            if target.nil?
+              new_args = args.map { |a| transform_scope_body(a) }
+              s(:send, s(:self), method, *new_args)
+            else
+              new_target = transform_scope_body(target)
+              new_args = args.map { |a| transform_scope_body(a) }
+              s(:send, new_target, method, *new_args)
+            end
+          else
+            if node.children.any?
+              new_children = node.children.map do |c|
+                c.respond_to?(:type) ? transform_scope_body(c) : c
+              end
+              node.updated(nil, new_children)
+            else
+              node
+            end
+          end
+        end
+      end
+    end
+
+    DEFAULTS.push Rails::Model
+  end
+end

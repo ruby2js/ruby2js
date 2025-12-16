@@ -5,7 +5,8 @@
 
 module Ruby2JS
   module Inflector
-    IRREGULARS = {
+    # Plural -> Singular mapping
+    IRREGULARS_SINGULAR = {
       'people' => 'person',
       'men' => 'man',
       'women' => 'woman',
@@ -22,6 +23,26 @@ module Ruby2JS
       'testes' => 'testis',
       'oxen' => 'ox',
       'quizzes' => 'quiz',
+    }.freeze
+
+    # Singular -> Plural mapping
+    IRREGULARS_PLURAL = {
+      'person' => 'people',
+      'man' => 'men',
+      'woman' => 'women',
+      'child' => 'children',
+      'sex' => 'sexes',
+      'move' => 'moves',
+      'zombie' => 'zombies',
+      'octopus' => 'octopi',
+      'virus' => 'viri',
+      'alias' => 'aliases',
+      'status' => 'statuses',
+      'axis' => 'axes',
+      'crisis' => 'crises',
+      'testis' => 'testes',
+      'ox' => 'oxen',
+      'quiz' => 'quizzes',
     }.freeze
 
     UNCOUNTABLES = %w[
@@ -59,16 +80,59 @@ module Ruby2JS
       [/s$/i, ''],
     ].freeze
 
+    # Order matters - first match wins (more specific rules first)
+    PLURALS = [
+      [/(quiz)$/i, '\1zes'],
+      [/^(oxen)$/i, '\1'],
+      [/^(ox)$/i, '\1en'],
+      [/^(m|l)ice$/i, '\1ice'],
+      [/^(m|l)ouse$/i, '\1ice'],
+      [/(matr|vert|ind)(?:ix|ex)$/i, '\1ices'],
+      [/(x|ch|ss|sh)$/i, '\1es'],
+      [/([^aeiouy]|qu)y$/i, '\1ies'],
+      [/(hive)$/i, '\1s'],
+      [/(?:([^f])fe|([lr])f)$/i, '\1\2ves'],
+      [/sis$/i, 'ses'],
+      [/([ti])a$/i, '\1a'],
+      [/([ti])um$/i, '\1a'],
+      [/(buffal|tomat)o$/i, '\1oes'],
+      [/(bu)s$/i, '\1ses'],
+      [/(alias|status)$/i, '\1es'],
+      [/(octop|vir)i$/i, '\1i'],
+      [/(octop|vir)us$/i, '\1i'],
+      [/^(ax|test)is$/i, '\1es'],
+      [/s$/i, 's'],
+      [/$/, 's'],
+    ].freeze
+
     def self.singularize(word)
       lower = word.downcase
       return word if UNCOUNTABLES.include?(lower)
 
-      if irregular = IRREGULARS[lower]
+      if irregular = IRREGULARS_SINGULAR[lower]
         # Preserve original capitalization
         return word[0] == word[0].upcase ? irregular.capitalize : irregular
       end
 
       SINGULARS.each do |(rule, replacement)|
+        if word.match?(rule)
+          return word.sub(rule, replacement)
+        end
+      end
+
+      word
+    end
+
+    def self.pluralize(word)
+      lower = word.downcase
+      return word if UNCOUNTABLES.include?(lower)
+
+      if irregular = IRREGULARS_PLURAL[lower]
+        # Preserve original capitalization
+        return word[0] == word[0].upcase ? irregular.capitalize : irregular
+      end
+
+      PLURALS.each do |(rule, replacement)|
         if word.match?(rule)
           return word.sub(rule, replacement)
         end

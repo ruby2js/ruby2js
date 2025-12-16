@@ -72,4 +72,75 @@ describe Ruby2JS::Inflector do
       _(Ruby2JS::Inflector.singularize('lice')).must_equal 'louse'
     end
   end
+
+  describe 'pluralize' do
+    it "handles regular singulars" do
+      _(Ruby2JS::Inflector.pluralize('article')).must_equal 'articles'
+      _(Ruby2JS::Inflector.pluralize('comment')).must_equal 'comments'
+      _(Ruby2JS::Inflector.pluralize('user')).must_equal 'users'
+      _(Ruby2JS::Inflector.pluralize('post')).must_equal 'posts'
+    end
+
+    it "handles irregular singulars" do
+      _(Ruby2JS::Inflector.pluralize('person')).must_equal 'people'
+      _(Ruby2JS::Inflector.pluralize('man')).must_equal 'men'
+      _(Ruby2JS::Inflector.pluralize('woman')).must_equal 'women'
+      _(Ruby2JS::Inflector.pluralize('child')).must_equal 'children'
+    end
+
+    it "preserves capitalization for irregulars" do
+      _(Ruby2JS::Inflector.pluralize('Person')).must_equal 'People'
+      _(Ruby2JS::Inflector.pluralize('Child')).must_equal 'Children'
+    end
+
+    it "handles words ending in -y" do
+      _(Ruby2JS::Inflector.pluralize('category')).must_equal 'categories'
+      _(Ruby2JS::Inflector.pluralize('query')).must_equal 'queries'
+      _(Ruby2JS::Inflector.pluralize('story')).must_equal 'stories'
+    end
+
+    it "handles words ending in -y with vowel before" do
+      _(Ruby2JS::Inflector.pluralize('day')).must_equal 'days'
+      _(Ruby2JS::Inflector.pluralize('key')).must_equal 'keys'
+    end
+
+    it "handles words ending in -x, -ch, -ss, -sh" do
+      _(Ruby2JS::Inflector.pluralize('box')).must_equal 'boxes'
+      _(Ruby2JS::Inflector.pluralize('match')).must_equal 'matches'
+      _(Ruby2JS::Inflector.pluralize('wish')).must_equal 'wishes'
+      _(Ruby2JS::Inflector.pluralize('bus')).must_equal 'buses'
+    end
+
+    it "handles words ending in -f/-fe" do
+      _(Ruby2JS::Inflector.pluralize('knife')).must_equal 'knives'
+      _(Ruby2JS::Inflector.pluralize('wife')).must_equal 'wives'
+      _(Ruby2JS::Inflector.pluralize('half')).must_equal 'halves'
+      _(Ruby2JS::Inflector.pluralize('wolf')).must_equal 'wolves'
+    end
+
+    it "handles special cases" do
+      _(Ruby2JS::Inflector.pluralize('quiz')).must_equal 'quizzes'
+      _(Ruby2JS::Inflector.pluralize('matrix')).must_equal 'matrices'
+      _(Ruby2JS::Inflector.pluralize('index')).must_equal 'indices'
+      _(Ruby2JS::Inflector.pluralize('status')).must_equal 'statuses'
+      _(Ruby2JS::Inflector.pluralize('alias')).must_equal 'aliases'
+    end
+
+    it "handles uncountables" do
+      _(Ruby2JS::Inflector.pluralize('equipment')).must_equal 'equipment'
+      _(Ruby2JS::Inflector.pluralize('information')).must_equal 'information'
+      _(Ruby2JS::Inflector.pluralize('fish')).must_equal 'fish'
+      _(Ruby2JS::Inflector.pluralize('sheep')).must_equal 'sheep'
+    end
+
+    it "handles -ouse/-ice" do
+      _(Ruby2JS::Inflector.pluralize('mouse')).must_equal 'mice'
+      _(Ruby2JS::Inflector.pluralize('louse')).must_equal 'lice'
+    end
+
+    it "handles words already plural" do
+      _(Ruby2JS::Inflector.pluralize('articles')).must_equal 'articles'
+      _(Ruby2JS::Inflector.pluralize('buses')).must_equal 'buses'
+    end
+  end
 end
