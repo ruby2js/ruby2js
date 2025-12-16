@@ -2,8 +2,9 @@
   "name": "rails-in-js",
   "version": "0.1.0",
   "type": "module",
-  "description": "Rails-like app running in JavaScript (Stage 0 prototype)",
+  "description": "Rails-like app running in JavaScript - Ruby2JS selfhost demo",
   "scripts": {
+    "start": "npx serve -p 3000",
     "test:sql": "node sql_prototype.mjs",
     "test:ar": "node active_record_test.mjs",
     "test:mvc": "node mvc_sketch.mjs",

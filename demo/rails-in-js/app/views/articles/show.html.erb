@@ -1,0 +1,44 @@
+<h1><%= @article.title %></h1>
+
+<p><%= @article.body %></p>
+
+<p class="meta">
+  Created: <%= @article.created_at %><br>
+  Updated: <%= @article.updated_at %>
+</p>
+
+<p>
+  <a href="/articles/<%= @article.id %>/edit">Edit</a> |
+  <a href="/articles">Back to Articles</a>
+</p>
+
+<hr>
+
+<h2>Comments</h2>
+
+<% @article.comments.each do |comment| %>
+  <div class="comment">
+    <p><strong><%= comment.commenter %></strong> says:</p>
+    <p><%= comment.body %></p>
+    <form action="/articles/<%= @article.id %>/comments/<%= comment.id %>" method="post" style="display: inline;">
+      <input type="hidden" name="_method" value="delete">
+      <button type="submit" onclick="return confirm('Are you sure?')">Delete Comment</button>
+    </form>
+  </div>
+<% end %>
+
+<h3>Add a Comment</h3>
+
+<form action="/articles/<%= @article.id %>/comments" method="post">
+  <p>
+    <label for="commenter">Your Name:</label>
+    <input type="text" name="comment[commenter]" id="commenter">
+  </p>
+  <p>
+    <label for="body">Comment:</label>
+    <textarea name="comment[body]" id="body"></textarea>
+  </p>
+  <p>
+    <button type="submit">Add Comment</button>
+  </p>
+</form>

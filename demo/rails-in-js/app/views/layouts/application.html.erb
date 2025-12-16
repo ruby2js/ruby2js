@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Rails-in-JS Blog</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; }
+    h1 { color: #333; }
+    a { color: #0066cc; }
+    .article { margin-bottom: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 4px; }
+    .comment { margin: 10px 0; padding: 10px; background: #f9f9f9; border-radius: 4px; }
+    form { margin: 20px 0; }
+    label { display: block; margin: 10px 0 5px; }
+    input[type="text"], textarea { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+    textarea { min-height: 100px; }
+    button { background: #0066cc; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }
+    button:hover { background: #0052a3; }
+    .errors { color: red; margin: 10px 0; }
+    .meta { color: #666; font-size: 0.9em; }
+    nav { margin-bottom: 20px; padding: 10px 0; border-bottom: 1px solid #ddd; }
+    nav a { margin-right: 15px; }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="/">Home</a>
+    <a href="/articles">Articles</a>
+    <a href="/articles/new">New Article</a>
+  </nav>
+  <%= yield %>
+</body>
+</html>

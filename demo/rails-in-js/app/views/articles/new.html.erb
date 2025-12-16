@@ -1,0 +1,28 @@
+<h1>New Article</h1>
+
+<% if @article.errors.length > 0 %>
+  <div class="errors">
+    <h3>Errors:</h3>
+    <ul>
+      <% @article.errors.each do |error| %>
+        <li><%= error %></li>
+      <% end %>
+    </ul>
+  </div>
+<% end %>
+
+<form action="/articles" method="post">
+  <p>
+    <label for="title">Title:</label>
+    <input type="text" name="article[title]" id="title" value="<%= @article.title %>">
+  </p>
+  <p>
+    <label for="body">Body:</label>
+    <textarea name="article[body]" id="body"><%= @article.body %></textarea>
+  </p>
+  <p>
+    <button type="submit">Create Article</button>
+  </p>
+</form>
+
+<p><a href="/articles">Back to Articles</a></p>

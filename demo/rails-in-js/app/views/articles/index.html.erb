@@ -1,0 +1,11 @@
+<h1>Articles</h1>
+
+<% @articles.each do |article| %>
+  <div class="article">
+    <h2><a href="/articles/<%= article.id %>"><%= article.title %></a></h2>
+    <p><%= article.body.to_s[0, 100] %>...</p>
+    <p class="meta">Created: <%= article.created_at %></p>
+  </div>
+<% end %>
+
+<p><a href="/articles/new">New Article</a></p>

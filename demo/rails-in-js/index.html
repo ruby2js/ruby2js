@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Rails-in-JS Blog</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; }
+    h1 { color: #333; }
+    a { color: #0066cc; cursor: pointer; }
+    .article { margin-bottom: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 4px; }
+    .comment { margin: 10px 0; padding: 10px; background: #f9f9f9; border-radius: 4px; }
+    form { margin: 20px 0; }
+    label { display: block; margin: 10px 0 5px; font-weight: bold; }
+    input[type="text"], textarea { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+    textarea { min-height: 100px; }
+    button { background: #0066cc; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; margin-right: 10px; }
+    button:hover { background: #0052a3; }
+    button.danger { background: #cc0000; }
+    button.danger:hover { background: #990000; }
+    .errors { color: red; margin: 10px 0; padding: 10px; background: #fee; border-radius: 4px; }
+    .meta { color: #666; font-size: 0.9em; }
+    nav { margin-bottom: 20px; padding: 10px 0; border-bottom: 1px solid #ddd; }
+    nav a { margin-right: 15px; }
+    #loading { text-align: center; padding: 40px; }
+    #app { display: none; }
+  </style>
+</head>
+<body>
+  <div id="loading">Loading Rails-in-JS...</div>
+  <div id="app">
+    <nav>
+      <a onclick="navigate('/')">Home</a>
+      <a onclick="navigate('/articles')">Articles</a>
+      <a onclick="navigate('/articles/new')">New Article</a>
+    </nav>
+    <main id="content"></main>
+  </div>
+
+  <script type="module">
+    import initSqlJs from 'https://cdn.jsdelivr.net/npm/sql.js@1.11.0/+esm';
+
+    // === Database Setup ===
+    let db;
+
+    async function initDatabase() {
+      const SQL = await initSqlJs({
+        locateFile: file => `https://sql.js.org/dist/${file}`
+      });
+      db = new SQL.Database();
+
+      // Create schema
+      db.run(`
+        CREATE TABLE articles (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          title TEXT NOT NULL,
+          body TEXT,
+          created_at TEXT,
+          updated_at TEXT
+        )
+      `);
+
+      db.run(`
+        CREATE TABLE comments (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          article_id INTEGER NOT NULL,
+          commenter TEXT,
+          body TEXT,
+          status TEXT DEFAULT 'pending',
+          created_at TEXT,
+          FOREIGN KEY (article_id) REFERENCES articles(id)
+        )
+      `);
+
+      // Seed data
+      const now = new Date().toISOString();
+      db.run(`INSERT INTO articles (title, body, created_at, updated_at) VALUES (?, ?, ?, ?)`,
+        ['Hello Rails', 'I am on Rails! This is my first blog post using the Rails-in-JS demo. It demonstrates that you can write Ruby code that transpiles to JavaScript and runs entirely in the browser.', now, now]);
+      db.run(`INSERT INTO articles (title, body, created_at, updated_at) VALUES (?, ?, ?, ?)`,
+        ['Getting Started with Ruby2JS', 'Ruby2JS is a Ruby to JavaScript transpiler. It parses Ruby source code and generates equivalent JavaScript. This demo shows how you can build a full Rails-like application that runs in JavaScript.', now, now]);
+      db.run(`INSERT INTO comments (article_id, commenter, body, status, created_at) VALUES (?, ?, ?, ?, ?)`,
+        [1, 'Alice', 'Great post! Welcome to the world of Rails-in-JS.', 'approved', now]);
+      db.run(`INSERT INTO comments (article_id, commenter, body, status, created_at) VALUES (?, ?, ?, ?, ?)`,
+        [1, 'Bob', 'This is really cool. Looking forward to more posts!', 'approved', now]);
+    }
+
+    // === Simple ORM ===
+    class Article {
+      static all() {
+        const result = db.exec('SELECT * FROM articles ORDER BY id DESC');
+        if (!result.length) return [];
+        return result[0].values.map(row => new Article({
+          id: row[0], title: row[1], body: row[2], created_at: row[3], updated_at: row[4]
+        }));
+      }
+
+      static find(id) {
+        const stmt = db.prepare('SELECT * FROM articles WHERE id = ?');
+        stmt.bind([id]);
+        if (stmt.step()) {
+          const row = stmt.get();
+          stmt.free();
+          return new Article({ id: row[0], title: row[1], body: row[2], created_at: row[3], updated_at: row[4] });
+        }
+        stmt.free();
+        throw new Error(`Article not found: ${id}`);
+      }
+
+      static create(attrs) {
+        const article = new Article(attrs);
+        article.save();
+        return article;
+      }
+
+      constructor(attrs = {}) {
+        this.id = attrs.id || null;
+        this.title = attrs.title || '';
+        this.body = attrs.body || '';
+        this.created_at = attrs.created_at || null;
+        this.updated_at = attrs.updated_at || null;
+        this.errors = [];
+      }
+
+      validate() {
+        this.errors = [];
+        if (!this.title || this.title.trim() === '') this.errors.push('Title cannot be blank');
+        if (!this.body || this.body.trim() === '') this.errors.push('Body cannot be blank');
+        if (this.body && this.body.length < 10) this.errors.push('Body is too short (minimum 10 characters)');
+        return this.errors.length === 0;
+      }
+
+      save() {
+        if (!this.validate()) return false;
+        const now = new Date().toISOString();
+        if (this.id) {
+          this.updated_at = now;
+          db.run('UPDATE articles SET title = ?, body = ?, updated_at = ? WHERE id = ?',
+            [this.title, this.body, this.updated_at, this.id]);
+        } else {
+          this.created_at = now;
+          this.updated_at = now;
+          db.run('INSERT INTO articles (title, body, created_at, updated_at) VALUES (?, ?, ?, ?)',
+            [this.title, this.body, this.created_at, this.updated_at]);
+          const result = db.exec('SELECT last_insert_rowid()');
+          this.id = result[0].values[0][0];
+        }
+        return true;
+      }
+
+      destroy() {
+        // Delete comments first
+        db.run('DELETE FROM comments WHERE article_id = ?', [this.id]);
+        db.run('DELETE FROM articles WHERE id = ?', [this.id]);
+      }
+
+      get comments() {
+        const result = db.exec('SELECT * FROM comments WHERE article_id = ? ORDER BY id', [this.id]);
+        if (!result.length) return [];
+        return result[0].values.map(row => new Comment({
+          id: row[0], article_id: row[1], commenter: row[2], body: row[3], status: row[4], created_at: row[5]
+        }));
+      }
+    }
+
+    class Comment {
+      static create(attrs) {
+        const comment = new Comment(attrs);
+        comment.save();
+        return comment;
+      }
+
+      constructor(attrs = {}) {
+        this.id = attrs.id || null;
+        this.article_id = attrs.article_id;
+        this.commenter = attrs.commenter || '';
+        this.body = attrs.body || '';
+        this.status = attrs.status || 'pending';
+        this.created_at = attrs.created_at || null;
+      }
+
+      save() {
+        const now = new Date().toISOString();
+        this.created_at = now;
+        db.run('INSERT INTO comments (article_id, commenter, body, status, created_at) VALUES (?, ?, ?, ?, ?)',
+          [this.article_id, this.commenter, this.body, this.status, this.created_at]);
+        const result = db.exec('SELECT last_insert_rowid()');
+        this.id = result[0].values[0][0];
+        return true;
+      }
+
+      destroy() {
+        db.run('DELETE FROM comments WHERE id = ?', [this.id]);
+      }
+    }
+
+    // === Views ===
+    function escapeHTML(str) {
+      if (str === null || str === undefined) return '';
+      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    const views = {
+      'articles/index': (locals) => {
+        let html = '<h1>Articles</h1>';
+        for (const article of locals.articles) {
+          html += `
+            <div class="article">
+              <h2><a onclick="navigate('/articles/${article.id}')">${escapeHTML(article.title)}</a></h2>
+              <p>${escapeHTML((article.body || '').slice(0, 150))}...</p>
+              <p class="meta">Created: ${article.created_at}</p>
+            </div>`;
+        }
+        html += '<p><a onclick="navigate(\'/articles/new\')">New Article</a></p>';
+        return html;
+      },
+
+      'articles/show': (locals) => {
+        const article = locals.article;
+        let html = `
+          <h1>${escapeHTML(article.title)}</h1>
+          <p>${escapeHTML(article.body)}</p>
+          <p class="meta">Created: ${article.created_at}<br>Updated: ${article.updated_at}</p>
+          <p>
+            <a onclick="navigate('/articles/${article.id}/edit')">Edit</a> |
+            <a onclick="navigate('/articles')">Back to Articles</a> |
+            <a onclick="deleteArticle(${article.id})" style="color: red;">Delete</a>
+          </p>
+          <hr>
+          <h2>Comments</h2>`;
+
+        for (const comment of article.comments) {
+          html += `
+            <div class="comment">
+              <p><strong>${escapeHTML(comment.commenter)}</strong> says:</p>
+              <p>${escapeHTML(comment.body)}</p>
+              <button class="danger" onclick="deleteComment(${article.id}, ${comment.id})">Delete</button>
+            </div>`;
+        }
+
+        html += `
+          <h3>Add a Comment</h3>
+          <form onsubmit="return createComment(event, ${article.id})">
+            <p><label>Your Name:</label><input type="text" id="commenter" required></p>
+            <p><label>Comment:</label><textarea id="comment_body" required></textarea></p>
+            <button type="submit">Add Comment</button>
+          </form>`;
+        return html;
+      },
+
+      'articles/new': (locals) => {
+        const article = locals.article || { title: '', body: '', errors: [] };
+        let html = '<h1>New Article</h1>';
+        if (article.errors && article.errors.length > 0) {
+          html += '<div class="errors"><ul>';
+          for (const error of article.errors) {
+            html += `<li>${escapeHTML(error)}</li>`;
+          }
+          html += '</ul></div>';
+        }
+        html += `
+          <form onsubmit="return createArticle(event)">
+            <p><label>Title:</label><input type="text" id="title" value="${escapeHTML(article.title)}" required></p>
+            <p><label>Body:</label><textarea id="body" required>${escapeHTML(article.body)}</textarea></p>
+            <button type="submit">Create Article</button>
+          </form>
+          <p><a onclick="navigate('/articles')">Back to Articles</a></p>`;
+        return html;
+      },
+
+      'articles/edit': (locals) => {
+        const article = locals.article;
+        let html = '<h1>Edit Article</h1>';
+        if (article.errors && article.errors.length > 0) {
+          html += '<div class="errors"><ul>';
+          for (const error of article.errors) {
+            html += `<li>${escapeHTML(error)}</li>`;
+          }
+          html += '</ul></div>';
+        }
+        html += `
+          <form onsubmit="return updateArticle(event, ${article.id})">
+            <p><label>Title:</label><input type="text" id="title" value="${escapeHTML(article.title)}" required></p>
+            <p><label>Body:</label><textarea id="body" required>${escapeHTML(article.body)}</textarea></p>
+            <button type="submit">Update Article</button>
+          </form>
+          <p><a onclick="navigate('/articles/${article.id}')">Cancel</a> | <a onclick="navigate('/articles')">Back to Articles</a></p>`;
+        return html;
+      }
+    };
+
+    // === Router ===
+    const routes = [
+      { path: /^\/$/, handler: () => navigate('/articles') },
+      { path: /^\/articles$/, handler: indexArticles },
+      { path: /^\/articles\/new$/, handler: newArticle },
+      { path: /^\/articles\/(\d+)$/, handler: (m) => showArticle(parseInt(m[1])) },
+      { path: /^\/articles\/(\d+)\/edit$/, handler: (m) => editArticle(parseInt(m[1])) },
+    ];
+
+    function navigate(path) {
+      history.pushState({}, '', path);
+      dispatch(path);
+    }
+
+    function dispatch(path) {
+      for (const route of routes) {
+        const match = path.match(route.path);
+        if (match) {
+          route.handler(match);
+          return;
+        }
+      }
+      document.getElementById('content').innerHTML = '<h1>404 Not Found</h1>';
+    }
+
+    // === Controller Actions ===
+    function indexArticles() {
+      const articles = Article.all();
+      render('articles/index', { articles });
+    }
+
+    function showArticle(id) {
+      try {
+        const article = Article.find(id);
+        render('articles/show', { article });
+      } catch (e) {
+        document.getElementById('content').innerHTML = '<h1>Article Not Found</h1>';
+      }
+    }
+
+    function newArticle() {
+      render('articles/new', { article: new Article() });
+    }
+
+    function editArticle(id) {
+      const article = Article.find(id);
+      render('articles/edit', { article });
+    }
+
+    window.createArticle = function(event) {
+      event.preventDefault();
+      const article = new Article({
+        title: document.getElementById('title').value,
+        body: document.getElementById('body').value
+      });
+      if (article.save()) {
+        navigate(`/articles/${article.id}`);
+      } else {
+        render('articles/new', { article });
+      }
+      return false;
+    };
+
+    window.updateArticle = function(event, id) {
+      event.preventDefault();
+      const article = Article.find(id);
+      article.title = document.getElementById('title').value;
+      article.body = document.getElementById('body').value;
+      if (article.save()) {
+        navigate(`/articles/${article.id}`);
+      } else {
+        render('articles/edit', { article });
+      }
+      return false;
+    };
+
+    window.deleteArticle = function(id) {
+      if (confirm('Are you sure you want to delete this article?')) {
+        const article = Article.find(id);
+        article.destroy();
+        navigate('/articles');
+      }
+    };
+
+    window.createComment = function(event, articleId) {
+      event.preventDefault();
+      Comment.create({
+        article_id: articleId,
+        commenter: document.getElementById('commenter').value,
+        body: document.getElementById('comment_body').value
+      });
+      navigate(`/articles/${articleId}`);
+      return false;
+    };
+
+    window.deleteComment = function(articleId, commentId) {
+      if (confirm('Delete this comment?')) {
+        const comment = new Comment({ id: commentId });
+        comment.destroy();
+        navigate(`/articles/${articleId}`);
+      }
+    };
+
+    window.navigate = navigate;
+
+    function render(template, locals) {
+      const viewFn = views[template];
+      if (viewFn) {
+        document.getElementById('content').innerHTML = viewFn(locals);
+      }
+    }
+
+    // === Initialize ===
+    async function init() {
+      await initDatabase();
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('app').style.display = 'block';
+
+      // Handle browser back/forward
+      window.addEventListener('popstate', () => dispatch(location.pathname));
+
+      // Initial route
+      dispatch(location.pathname || '/articles');
+    }
+
+    init();
+  </script>
+</body>
+</html>
