@@ -526,6 +526,153 @@ The demo toggle changes from "Ruby Module / ERB" to "ERB / Phlex" (once Phlex is
 
 ---
 
+## Compile-Time Optimizations
+
+A key advantage of filters: shift complexity from runtime to compile-time. The micro-framework runtime becomes thinner.
+
+### Opportunities
+
+| Currently Runtime | Compile-Time Alternative | Benefit |
+|-------------------|-------------------------|---------|
+| `get table_name()` method | Inline `"articles"` literal | Eliminate method call |
+| Manual attribute accessors | Auto-generate from schema | Less boilerplate, fewer errors |
+| `before_action` callback mechanism | Inline code at action start | No callback registration/invocation |
+| Path helpers as methods | Inline static paths as literals | Eliminate method calls |
+| Association method bodies | Generate with inlined class refs | Direct references, no lookup |
+| Validation definitions | Generate validation code directly | No DSL interpretation at runtime |
+
+### before_action Inlining
+
+Instead of runtime callback registration:
+
+```ruby
+# Input
+class ArticlesController < ApplicationController
+  before_action :set_article, only: [:show, :edit, :update, :destroy]
+
+  def show; end
+
+  private
+  def set_article
+    @article = Article.find(params[:id])
+  end
+end
+```
+
+Filter inlines directly:
+
+```ruby
+# Output (before further transformation)
+export module ArticlesController
+  def self.show(id)
+    article = Article.find(id)  # inlined from set_article
+    ArticleViews.show({ article: article })
+  end
+end
+```
+
+No callback array, no action filtering, no runtime overhead.
+
+### Schema-Driven Code Generation
+
+If `rails/schema` filter shares column metadata with `rails/model` filter:
+
+```ruby
+# Schema input
+create_table "articles" do |t|
+  t.string "title", null: false
+  t.text "body"
+  t.integer "view_count", default: 0
+  t.timestamps
+end
+```
+
+Model filter auto-generates:
+
+```ruby
+# Generated (no manual accessors needed)
+export class Article < ApplicationRecord
+  # Columns known at compile time
+  COLUMNS = ['id', 'title', 'body', 'view_count', 'created_at', 'updated_at']
+
+  # Auto-generated accessors with type awareness
+  def title
+    self.attributes['title']
+  end
+
+  def title=(value)
+    self.attributes['title'] = String(value)
+  end
+
+  def view_count
+    self.attributes['view_count']
+  end
+
+  def view_count=(value)
+    self.attributes['view_count'] = Number(value) || 0
+  end
+
+  # ... etc
+end
+```
+
+Benefits:
+- No manual accessor definitions in model files
+- Type coercion based on column type
+- Column list available without runtime introspection
+- INSERT/UPDATE statements use known columns
+
+### Path Helper Inlining
+
+Static paths become literals:
+
+```ruby
+# Input
+redirect_to articles_path
+
+# Output (static path)
+{ redirect: "/articles" }
+```
+
+Dynamic paths use minimal interpolation:
+
+```ruby
+# Input
+redirect_to article_path(@article)
+
+# Output (no method call)
+{ redirect: "/articles/#{article.id}" }
+```
+
+### What Stays Runtime
+
+Some things must remain runtime:
+- SQL execution (operates on runtime data)
+- Query building with dynamic conditions (`where(status: params[:status])`)
+- ApplicationRecord base CRUD operations
+- View rendering (template execution)
+
+But ApplicationRecord becomes a **thin runtime library** rather than a framework - most configuration is compiled away.
+
+### Filter Communication
+
+For schema-driven generation, filters need to share metadata:
+
+```ruby
+# Option 1: Shared context during transpilation
+Ruby2JS.convert(source, filters: [...], schema: parsed_schema)
+
+# Option 2: Filter pipeline passes metadata forward
+# rails/schema populates context, rails/model reads it
+
+# Option 3: Convention-based file loading
+# rails/model filter reads db/schema.rb automatically
+```
+
+Design decision: TBD based on implementation experience.
+
+---
+
 ## Filter Interaction
 
 ### Naming Conventions
