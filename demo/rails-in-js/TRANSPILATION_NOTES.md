@@ -212,7 +212,7 @@ export module ArticleViews
     String(str).gsub('&', '&amp;').gsub('<', '&lt;').gsub('>', '&gt;').gsub('"', '&quot;')
   end
 
-  def self.index(locals)
+  def self.list(locals)
     articles = locals[:articles]
     html = '<h1>Articles</h1>'
     articles.each do |article|
@@ -231,7 +231,7 @@ export const ArticleViews = (() => {
     return String(str).replaceAll("&", "&amp;")...
   };
 
-  function index(locals) {
+  function list(locals) {
     let articles = locals.articles;
     let html = "<h1>Articles</h1>";
     for (let article of articles) {
@@ -240,7 +240,7 @@ export const ArticleViews = (() => {
     return html
   };
 
-  return {escape_html, index}
+  return {escape_html, list}
 })()
 ```
 
@@ -250,6 +250,43 @@ Key patterns:
 - Hash access `locals[:articles]` becomes property access `locals.articles`
 - String interpolation `#{}` becomes template literals `${}`
 - Ruby's `%{}` strings work well for HTML (avoid escaping quotes)
+- **Avoid naming methods `index`** - the Functions filter converts `index` to `indexOf` (Ruby's String#index maps to JS indexOf). Use `list` instead.
+
+## Controller Transpilation
+
+Controllers use the same module pattern as views:
+
+```ruby
+import [Article], '../models/article.js'
+import [ArticleViews], '../views/articles.js'
+
+export module ArticlesController
+  def self.list
+    articles = Article.all
+    ArticleViews.list({ articles: articles })
+  end
+
+  def self.show(id)
+    article = Article.find(id)
+    ArticleViews.show({ article: article })
+  end
+
+  def self.create(title, body)
+    article = Article.create({ title: title, body: body })
+    if article.id
+      { success: true, id: article.id }
+    else
+      { success: false, html: ArticleViews.new_article({ article: article }) }
+    end
+  end
+end
+```
+
+Key patterns:
+- Controllers import models and views, then compose them
+- Return HTML strings for read operations (list, show, edit forms)
+- Return result objects for write operations (create, update, destroy)
+- Use `list` instead of `index` to avoid Functions filter collision
 
 ## Filters Used
 

@@ -1,38 +1,19 @@
-// Comments controller - handles comment CRUD (nested under articles)
-class CommentsController extends ApplicationController {
-  #article;
-  #comment;
+import { Comment } from "../models/comment.js";
 
-  // POST /articles/:article_id/comments
-  get create() {
-    this.#comment = new Comment(this.#comment_params);
-    this.#comment.article_id = this.#article.id;
-    this.#comment.save;
-    return redirect_to(this.#article)
+// Comments controller - SPA-friendly version
+// Handles comment CRUD (nested under articles)
+export const CommentsController = (() => {
+  function create(article_id, commenter, body) {
+    let comment = Comment.create({article_id, commenter, body});
+    return {success: true, article_id}
   };
 
-  // DELETE /articles/:article_id/comments/:id
-  get destroy() {
-    this.#comment = Comment.where({article_id: this.#article.id}).find(c => (
-      c.id == parseInt(params.id)
-    ));
-
-    if (this.#comment) this.#comment.destroy;
-    return redirect_to(this.#article)
+  function destroy(article_id, comment_id) {
+    let comments = Comment.where({article_id});
+    let comment = comments.find(c => c.id == comment_id);
+    if (comment) comment.destroy;
+    return {success: true, article_id}
   };
 
-  get #set_article() {
-    this.#article = Article.find(params.article_id);
-    return this.#article
-  };
-
-  get #comment_params() {
-    return params.require("comment").permit(
-      "commenter",
-      "body",
-      "status"
-    )
-  }
-};
-
-CommentsController.before_action("set_article")
+  return {create, destroy}
+})()

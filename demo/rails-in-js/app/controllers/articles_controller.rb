@@ -1,67 +1,53 @@
-# Articles controller - handles article CRUD
-class ArticlesController < ApplicationController
-  before_action :set_article, only: [:show, :edit, :update, :destroy]
+# Articles controller - SPA-friendly version
+# Uses direct model/view calls instead of Rails conventions
 
-  # GET /articles
-  def index
-    @articles = Article.all
-    set_instance_variable('articles', @articles)
-    render :index
+import [Article], '../models/article.js'
+import [ArticleViews], '../views/articles.js'
+
+export module ArticlesController
+  def self.list
+    articles = Article.all
+    ArticleViews.list({ articles: articles })
   end
 
-  # GET /articles/:id
-  def show
-    set_instance_variable('article', @article)
-    render :show
+  def self.show(id)
+    article = Article.find(id)
+    ArticleViews.show({ article: article })
   end
 
-  # GET /articles/new
-  def new
-    @article = Article.new
-    set_instance_variable('article', @article)
-    render :new
+  def self.new_form
+    article = { title: '', body: '', errors: [] }
+    ArticleViews.new_article({ article: article })
   end
 
-  # POST /articles
-  def create
-    @article = Article.new(article_params)
-    if @article.save
-      redirect_to @article
+  def self.edit(id)
+    article = Article.find(id)
+    ArticleViews.edit({ article: article })
+  end
+
+  def self.create(title, body)
+    article = Article.create({ title: title, body: body })
+    if article.id
+      { success: true, id: article.id }
     else
-      set_instance_variable('article', @article)
-      render :new, status: :unprocessable_entity
+      { success: false, html: ArticleViews.new_article({ article: article }) }
     end
   end
 
-  # GET /articles/:id/edit
-  def edit
-    set_instance_variable('article', @article)
-    render :edit
-  end
-
-  # PATCH/PUT /articles/:id
-  def update
-    if @article.update(article_params)
-      redirect_to @article
+  def self.update(id, title, body)
+    article = Article.find(id)
+    article.title = title
+    article.body = body
+    if article.save
+      { success: true, id: article.id }
     else
-      set_instance_variable('article', @article)
-      render :edit, status: :unprocessable_entity
+      { success: false, html: ArticleViews.edit({ article: article }) }
     end
   end
 
-  # DELETE /articles/:id
-  def destroy
-    @article.destroy
-    redirect_to '/articles'
-  end
-
-  private
-
-  def set_article
-    @article = Article.find(params[:id])
-  end
-
-  def article_params
-    params.require(:article).permit(:title, :body)
+  def self.destroy(id)
+    article = Article.find(id)
+    article.destroy
+    { success: true }
   end
 end

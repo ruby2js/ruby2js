@@ -7,7 +7,7 @@ export module ArticleViews
     String(str).gsub('&', '&amp;').gsub('<', '&lt;').gsub('>', '&gt;').gsub('"', '&quot;')
   end
 
-  def self.index(locals)
+  def self.list(locals)
     articles = locals[:articles]
     html = '<h1>Articles</h1>'
 

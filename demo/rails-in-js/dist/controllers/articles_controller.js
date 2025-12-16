@@ -1,73 +1,54 @@
-// Articles controller - handles article CRUD
-class ArticlesController extends ApplicationController {
-  #article;
-  #articles;
+import { Article } from "../models/article.js";
+import { ArticleViews } from "../views/articles.js";
 
-  // GET /articles
-  get index() {
-    this.#articles = Article.all;
-    set_instance_variable("articles", this.#articles);
-    return render("index")
+// Articles controller - SPA-friendly version
+// Uses direct model/view calls instead of Rails conventions
+export const ArticlesController = (() => {
+  function list() {
+    let articles = Article.all;
+    return ArticleViews.list({articles})
   };
 
-  // GET /articles/:id
-  get show() {
-    set_instance_variable("article", this.#article);
-    return render("show")
+  function show(id) {
+    let article = Article.find(id);
+    return ArticleViews.show({article})
   };
 
-  // GET /articles/new
-  get new() {
-    this.#article = new Article;
-    set_instance_variable("article", this.#article);
-    return render("new")
+  function new_form() {
+    let article = {title: "", body: "", errors: []};
+    return ArticleViews.new_article({article})
   };
 
-  // POST /articles
-  get create() {
-    this.#article = new Article(this.#article_params);
+  function edit(id) {
+    let article = Article.find(id);
+    return ArticleViews.edit({article})
+  };
 
-    if (this.#article.save) {
-      return redirect_to(this.#article)
-    } else {
-      set_instance_variable("article", this.#article);
-      return render("new", {status: "unprocessable_entity"})
+  function create(title, body) {
+    let article = Article.create({title, body});
+
+    return article.id ? {success: true, id: article.id} : {
+      success: false,
+      html: ArticleViews.new_article({article})
     }
   };
 
-  // GET /articles/:id/edit
-  get edit() {
-    set_instance_variable("article", this.#article);
-    return render("edit")
-  };
+  function update(id, title, body) {
+    let article = Article.find(id);
+    article.title = title;
+    article.body = body;
 
-  // PATCH/PUT /articles/:id
-  get update() {
-    if (this.#article.update(this.#article_params)) {
-      return redirect_to(this.#article)
-    } else {
-      set_instance_variable("article", this.#article);
-      return render("edit", {status: "unprocessable_entity"})
+    return article.save ? {success: true, id: article.id} : {
+      success: false,
+      html: ArticleViews.edit({article})
     }
   };
 
-  // DELETE /articles/:id
-  get destroy() {
-    this.#article.destroy;
-    return redirect_to("/articles")
+  function destroy(id) {
+    let article = Article.find(id);
+    article.destroy;
+    return {success: true}
   };
 
-  get #set_article() {
-    this.#article = Article.find(params.id);
-    return this.#article
-  };
-
-  get #article_params() {
-    return params.require("article").permit("title", "body")
-  }
-};
-
-ArticlesController.before_action(
-  "set_article",
-  {only: ["show", "edit", "update", "destroy"]}
-)
+  return {list, show, new_form, edit, create, update, destroy}
+})()

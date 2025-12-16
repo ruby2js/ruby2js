@@ -10,7 +10,7 @@ export const ArticleViews = (() => {
     ).replaceAll("\"", "&quot;")
   };
 
-  function index(locals) {
+  function list(locals) {
     let articles = locals.articles;
     let html = "<h1>Articles</h1>";
 
@@ -112,5 +112,5 @@ export const ArticleViews = (() => {
     return html
   };
 
-  return {escape_html, index, show, new_article, edit}
+  return {escape_html, list, show, new_article, edit}
 })()

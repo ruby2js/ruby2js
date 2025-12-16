@@ -101,21 +101,15 @@
       window.Comment = Comment;
     }
 
-    // === Views (transpiled from Ruby) ===
-    let ArticleViews;
+    // === Controllers (transpiled from Ruby) ===
+    let ArticlesController, CommentsController;
 
-    async function loadViews() {
-      const viewsModule = await import('./dist/views/articles.js');
-      ArticleViews = viewsModule.ArticleViews;
+    async function loadControllers() {
+      const articlesModule = await import('./dist/controllers/articles_controller.js');
+      const commentsModule = await import('./dist/controllers/comments_controller.js');
+      ArticlesController = articlesModule.ArticlesController;
+      CommentsController = commentsModule.CommentsController;
     }
-
-    // View routing - maps template names to transpiled Ruby view functions
-    const views = {
-      'articles/index': (locals) => ArticleViews.index(locals),
-      'articles/show': (locals) => ArticleViews.show(locals),
-      'articles/new': (locals) => ArticleViews.new_article(locals),
-      'articles/edit': (locals) => ArticleViews.edit(locals)
-    };
 
     // === Router ===
     const routes = [
@@ -142,107 +136,93 @@
       document.getElementById('content').innerHTML = '<h1>404 Not Found</h1>';
     }
 
-    // === Controller Actions ===
+    // === Controller Actions (using transpiled Ruby controllers) ===
     function indexArticles() {
-      const articles = Article.all;  // getter access
-      render('articles/index', { articles });
+      const html = ArticlesController.list();
+      document.getElementById('content').innerHTML = html;
     }
 
     function showArticle(id) {
       try {
-        const article = Article.find(id);
-        render('articles/show', { article });
+        const html = ArticlesController.show(id);
+        document.getElementById('content').innerHTML = html;
       } catch (e) {
         document.getElementById('content').innerHTML = '<h1>Article Not Found</h1>';
       }
     }
 
     function newArticle() {
-      render('articles/new', { article: { title: '', body: '', errors: [] } });
+      const html = ArticlesController.new_form();
+      document.getElementById('content').innerHTML = html;
     }
 
     function editArticle(id) {
-      const article = Article.find(id);
-      render('articles/edit', { article });
+      const html = ArticlesController.edit(id);
+      document.getElementById('content').innerHTML = html;
     }
 
     window.createArticle = function(event) {
       event.preventDefault();
-      const article = Article.create({
-        title: document.getElementById('title').value,
-        body: document.getElementById('body').value
-      });
-      if (article.id) {
-        navigate(`/articles/${article.id}`);
+      const result = ArticlesController.create(
+        document.getElementById('title').value,
+        document.getElementById('body').value
+      );
+      if (result.success) {
+        navigate(`/articles/${result.id}`);
       } else {
-        render('articles/new', { article });
+        document.getElementById('content').innerHTML = result.html;
       }
       return false;
     };
 
     window.updateArticle = function(event, id) {
       event.preventDefault();
-      const article = Article.find(id);
-      article.title = document.getElementById('title').value;
-      article.body = document.getElementById('body').value;
-      const saved = article.save;  // getter access
-      if (saved) {
-        navigate(`/articles/${article.id}`);
+      const result = ArticlesController.update(
+        id,
+        document.getElementById('title').value,
+        document.getElementById('body').value
+      );
+      if (result.success) {
+        navigate(`/articles/${result.id}`);
       } else {
-        render('articles/edit', { article });
+        document.getElementById('content').innerHTML = result.html;
       }
       return false;
     };
 
     window.deleteArticle = function(id) {
       if (confirm('Are you sure you want to delete this article?')) {
-        const article = Article.find(id);
-        article.destroy;  // getter access
+        ArticlesController.destroy(id);
         navigate('/articles');
       }
     };
 
     window.createComment = function(event, articleId) {
       event.preventDefault();
-      Comment.create({
-        article_id: articleId,
-        commenter: document.getElementById('commenter').value,
-        body: document.getElementById('comment_body').value
-      });
+      CommentsController.create(
+        articleId,
+        document.getElementById('commenter').value,
+        document.getElementById('comment_body').value
+      );
       navigate(`/articles/${articleId}`);
       return false;
     };
 
     window.deleteComment = function(articleId, commentId) {
       if (confirm('Delete this comment?')) {
-        const stmt = db.prepare('SELECT * FROM comments WHERE id = ?');
-        stmt.bind([commentId]);
-        if (stmt.step()) {
-          const comment = new Comment(stmt.getAsObject());
-          stmt.free();
-          comment.destroy;  // getter access
-        } else {
-          stmt.free();
-        }
+        CommentsController.destroy(articleId, commentId);
         navigate(`/articles/${articleId}`);
       }
     };
 
     window.navigate = navigate;
 
-    function render(template, locals) {
-      const viewFn = views[template];
-      if (viewFn) {
-        document.getElementById('content').innerHTML = viewFn(locals);
-      }
-    }
-
     // === Initialize ===
     async function init() {
       try {
         await initDatabase();
         await loadModels();
-        await loadViews();
+        await loadControllers();
         document.getElementById('loading').style.display = 'none';
         document.getElementById('app').style.display = 'block';
 
