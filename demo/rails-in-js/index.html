@@ -23,6 +23,10 @@
     #loading { text-align: center; padding: 40px; }
     #app { display: none; }
     .transpiled-badge { background: #4CAF50; color: white; padding: 2px 8px; border-radius: 3px; font-size: 0.8em; margin-left: 10px; }
+    .view-toggle { float: right; font-size: 0.9em; }
+    .view-toggle button { padding: 4px 8px; margin-left: 5px; cursor: pointer; }
+    .view-toggle button.active { background: #0066cc; color: white; }
+    .view-toggle button:not(.active) { background: #eee; color: #333; }
   </style>
 </head>
 <body>
@@ -33,6 +37,11 @@
       <a onclick="navigate('/articles')">Articles</a>
       <a onclick="navigate('/articles/new')">New Article</a>
       <span class="transpiled-badge">Transpiled Ruby</span>
+      <span class="view-toggle">
+        Views:
+        <button id="btn-ruby" class="active" onclick="setViewMode('ruby')">Ruby Module</button>
+        <button id="btn-erb" onclick="setViewMode('erb')">ERB</button>
+      </span>
     </nav>
     <main id="content"></main>
   </div>
@@ -76,14 +85,30 @@
     }
 
     // === Controllers (transpiled from Ruby) ===
-    let ArticlesController, CommentsController;
+    let ArticlesController, ArticlesErbController, CommentsController;
+    let currentViewMode = 'ruby';  // 'ruby' or 'erb'
+
+    // Get the active controller based on view mode
+    function getArticlesController() {
+      return currentViewMode === 'erb' ? ArticlesErbController : ArticlesController;
+    }
 
     async function loadControllers() {
       const articlesModule = await import('./dist/controllers/articles_controller.js');
+      const articlesErbModule = await import('./dist/controllers/articles_erb_controller.js');
       const commentsModule = await import('./dist/controllers/comments_controller.js');
       ArticlesController = articlesModule.ArticlesController;
+      ArticlesErbController = articlesErbModule.ArticlesErbController;
       CommentsController = commentsModule.CommentsController;
     }
+
+    window.setViewMode = function(mode) {
+      currentViewMode = mode;
+      document.getElementById('btn-ruby').classList.toggle('active', mode === 'ruby');
+      document.getElementById('btn-erb').classList.toggle('active', mode === 'erb');
+      // Re-dispatch current route to refresh with new view
+      dispatch(location.pathname);
+    };
 
     // === Router ===
     const routes = [
@@ -112,13 +137,13 @@
 
     // === Controller Actions (using transpiled Ruby controllers) ===
     function indexArticles() {
-      const html = ArticlesController.list();
+      const html = getArticlesController().list();
       document.getElementById('content').innerHTML = html;
     }
 
     function showArticle(id) {
       try {
-        const html = ArticlesController.show(id);
+        const html = getArticlesController().show(id);
         document.getElementById('content').innerHTML = html;
       } catch (e) {
         document.getElementById('content').innerHTML = '<h1>Article Not Found</h1>';
@@ -126,18 +151,18 @@
     }
 
     function newArticle() {
-      const html = ArticlesController.new_form();
+      const html = getArticlesController().new_form();
       document.getElementById('content').innerHTML = html;
     }
 
     function editArticle(id) {
-      const html = ArticlesController.edit(id);
+      const html = getArticlesController().edit(id);
       document.getElementById('content').innerHTML = html;
     }
 
     window.createArticle = function(event) {
       event.preventDefault();
-      const result = ArticlesController.create(
+      const result = getArticlesController().create(
         document.getElementById('title').value,
         document.getElementById('body').value
       );
@@ -151,7 +176,7 @@
 
     window.updateArticle = function(event, id) {
       event.preventDefault();
-      const result = ArticlesController.update(
+      const result = getArticlesController().update(
         id,
         document.getElementById('title').value,
         document.getElementById('body').value
@@ -166,7 +191,7 @@
 
     window.deleteArticle = function(id) {
       if (confirm('Are you sure you want to delete this article?')) {
-        ArticlesController.destroy(id);
+        getArticlesController().destroy(id);
         navigate('/articles');
       }
     };

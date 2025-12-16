@@ -329,6 +329,73 @@ Key patterns:
 - Return result objects for write operations (create, update, destroy)
 - Use `list` instead of `index` to avoid Functions filter collision
 
+## ERB Template Transpilation
+
+The demo supports two view approaches:
+
+### 1. Ruby Module Views (Original)
+Views are written as Ruby modules with methods that return HTML strings:
+
+```ruby
+export module ArticleViews
+  def self.list(locals)
+    articles = locals[:articles]
+    html = '<h1>Articles</h1>'
+    articles.each { |a| html += "<div>#{a.title}</div>" }
+    html
+  end
+end
+```
+
+### 2. ERB Template Views (New)
+Standard ERB templates can be transpiled to JavaScript render functions:
+
+```erb
+<!-- app/views/articles/list.html.erb -->
+<h1>Articles</h1>
+<% @articles.each do |article| %>
+  <div><%= article.title %></div>
+<% end %>
+```
+
+Transpiles to:
+
+```javascript
+export function render({ articles }) {
+  let _buf = "";
+  _buf += "<h1>Articles</h1>\n";
+  for (let article of articles) {
+    _buf += `  <div>${String(article.title)}</div>\n`;
+  }
+  return _buf;
+}
+```
+
+### ERB Filter Details
+
+The ERB filter (`Ruby2JS::Filter::Erb`) transforms ERB buffer patterns:
+- Detects `_erbout = +''` or `_buf = ::String.new` initialization
+- Converts instance variables (`@articles`) to destructured parameters
+- Transforms buffer concatenation (`<<`) to string concatenation (`+=`)
+- Wraps output in a `render` function with proper parameters
+
+### Build Script ERB Support
+
+The build script uses `Ruby2JS::Erubi` to compile ERB templates:
+
+```ruby
+require 'ruby2js/filter/erb'
+require 'ruby2js/erubi'
+
+template = File.read('list.html.erb')
+ruby_src = Ruby2JS::Erubi.new(template).src
+js = Ruby2JS.convert(ruby_src, filters: [Ruby2JS::Filter::Erb, ...])
+```
+
+### Switching Between View Types
+
+The demo includes a toggle to switch between Ruby module views and ERB views at runtime, demonstrating both approaches work equivalently.
+
 ## Filters Used
 
 This demo uses the following Ruby2JS filters:

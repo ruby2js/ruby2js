@@ -18,6 +18,7 @@ export const Schema = (() => {
         body TEXT,
         status TEXT DEFAULT 'pending',
         created_at TEXT,
+        updated_at TEXT,
         FOREIGN KEY (article_id) REFERENCES articles(id)
       )
     `)
