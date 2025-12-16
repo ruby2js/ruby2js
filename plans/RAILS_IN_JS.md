@@ -193,12 +193,13 @@ Location within the Ruby2JS repo keeps it close to selfhost, making gap iteratio
 |-------|-------------|----------|
 | 0 | Validation (de-risk assumptions) | ~1-2 days |
 | 1 | Classic Blog (ERB) - Core Functionality | ~1 week |
-| 2 | Developer Experience (hot reload, build) | ~3-4 days |
+| 2a | Dev Server with hot reload | ~1-2 days |
+| 2b | Browser live transpilation | Deferred until selfhost ready |
 | 3 | Full Rails Getting Started features | ~1 week |
 | 4 | Phlex equivalent | ~2-3 days |
 | **Total** | | **~4 weeks** |
 
-## Five-Stage Plan
+## Six-Stage Plan
 
 ---
 
@@ -528,106 +529,146 @@ blog/
 
 ---
 
-## Stage 2: Developer Experience
+## Stage 2a: Dev Server with Hot Reload
 
-**Timeline:** ~3-4 days
-**Goal:** Full development workflow with hot reload and production builds
+**Timeline:** ~1-2 days
+**Goal:** Hot reload development workflow with dual transpilation backend
 
-### Three Ways to Run
+### Approach
 
-| Command | Hot Reload | Live Transpile | Use Case |
-|---------|------------|----------------|----------|
-| `npm run dev` | ✅ | ✅ | Development |
-| `python -m http.server` | ❌ | ✅ | Quick testing |
-| `npm run build` → nginx | ❌ | ❌ | Production |
+A Node.js dev server that watches for file changes and triggers rebuilds. Supports two transpilation backends via command-line flag:
 
-### Hot Reload Dev Server (~120 lines)
+```bash
+# Default: use Ruby for transpilation (full functionality)
+npm run dev
 
-```javascript
-// dev-server.mjs
-import { createServer } from 'http';
-import { WebSocketServer } from 'ws';
-import { watch } from 'chokidar';
-
-// Static file server + WebSocket + file watcher
-// When .rb/.erb changes → notify browser → auto refresh
+# Selfhost: use JavaScript transpilation (for testing/iteration)
+npm run dev -- --selfhost
 ```
+
+This lets us iterate on selfhost support incrementally while maintaining a working dev environment.
+
+### Two Ways to Run
+
+| Command | Hot Reload | Transpilation | Use Case |
+|---------|------------|---------------|----------|
+| `npm run dev` | ✅ | Ruby (shell to build.rb) | Full development |
+| `npm run dev -- --selfhost` | ✅ | JavaScript (selfhost) | Selfhost testing |
 
 ### Implementation Tasks
 
-#### Dev Server (~100 lines)
+#### Dev Server (~150 lines)
 
-- [ ] Static file server for app/, runtime/, etc.
-- [ ] Proper MIME types for .rb, .erb, .wasm
+- [ ] Static file server for dist/, lib/, etc.
+- [ ] Proper MIME types for .js, .wasm, .html
 - [ ] WebSocket server for reload notifications
-- [ ] File watcher (chokidar) on app/ directory
-- [ ] Broadcast "reload" on .rb/.erb changes
+- [ ] File watcher (chokidar) on app/, config/, db/ directories
+- [ ] On change: rebuild → notify browser
+
+#### Transpilation Backends
+
+- [ ] Default: `child_process.exec('ruby scripts/build.rb')`
+- [ ] `--selfhost`: JavaScript-based transpilation using selfhost ruby2js.mjs
+  - Initially may not support all Rails filters
+  - Serves as continuous integration test for selfhost correctness
+  - Output can be compared against Ruby backend for verification
 
 #### Browser Reload Client (~30 lines)
 
 - [ ] WebSocket connection to dev server
 - [ ] Listen for "reload" messages
-- [ ] Trigger page refresh (or smart module reload)
+- [ ] Trigger page refresh
 
-#### Production Build Script (~100 lines)
+#### npm Scripts
 
-- [ ] `npm run build` command
-- [ ] Walk app/ directory
-- [ ] Transpile each .rb/.erb file
-- [ ] Bundle into dist/app.mjs
-- [ ] Copy runtime dependencies to dist/
-- [ ] Generate dist/index.html (no Ruby2JS needed)
-
-#### Mode Detection (~50 lines)
-
-- [ ] Check if dist/app.mjs exists
-- [ ] Production: load pre-built bundle
-- [ ] Development: load Ruby2JS and transpile
+- [ ] `npm run dev` - Start dev server with Ruby backend
+- [ ] `npm run build` - One-shot build (existing scripts/build.rb)
 
 ### Deliverables
 
-**Development mode (`npm run dev`):**
 ```bash
 $ npm run dev
 Dev server: http://localhost:3000
-Watching app/ for changes...
+Watching for changes...
+Using Ruby transpilation (default)
 
 # Edit app/models/article.rb, save
+# Console: Rebuilding... done (0.3s)
 # Browser auto-refreshes
-# See changes instantly
 ```
 
-**Production mode (`npm run build`):**
 ```bash
-$ npm run build
-Transpiling app/models/article.rb
-Transpiling app/models/comment.rb
-...
-Bundle created: dist/app.mjs (loading: 45KB)
+$ npm run dev -- --selfhost
+Dev server: http://localhost:3000
+Watching for changes...
+Using selfhost transpilation (experimental)
 
-$ npx serve dist/
-# or deploy dist/ to nginx, S3, GitHub Pages
+# Same workflow, but transpilation happens in Node.js
+# Useful for testing selfhost filter coverage
 ```
 
-### File Structure After Stage 2
+### Selfhost Testing Workflow
+
+The `--selfhost` flag creates a feedback loop for hardening selfhost:
+
+1. Run `npm run dev -- --selfhost`
+2. If output differs from Ruby backend, we've found a selfhost gap
+3. Fix the gap in Ruby2JS filters/converter
+4. Re-transpile filters to JS
+5. Repeat until `--selfhost` produces identical output
+
+### File Structure After Stage 2a
 
 ```
-blog/
-├── app/                    ← Ruby source (always present)
-│   ├── models/
-│   ├── controllers/
-│   └── views/
-├── runtime/                ← JS runtime
-├── index.html              ← Entry point (detects mode)
-├── ruby2js.mjs             ← Self-hosted transpiler
-├── dev-server.mjs          ← Hot reload server
-├── build.mjs               ← Production bundler
-├── package.json            ← npm run dev, npm run build
+rails-in-js/
+├── app/                    ← Ruby source
+├── config/
+├── db/
+├── lib/                    ← JS runtime (rails.js)
+├── scripts/
+│   └── build.rb            ← Ruby transpilation
+├── dev-server.mjs          ← Hot reload server (NEW)
+├── package.json            ← npm scripts (NEW)
+├── index.html              ← Entry point
 └── dist/                   ← Generated (git-ignored)
-    ├── index.html
-    ├── runtime/
-    └── app.mjs
 ```
+
+---
+
+## Stage 2b: Browser Live Transpilation
+
+**Timeline:** Deferred until selfhost ready
+**Goal:** True browser-based transpilation without server involvement
+**Prerequisite:** Stage 2a's `--selfhost` mode works correctly for all Rails filters
+
+### Approach
+
+Once selfhost transpilation is proven via Stage 2a, move transpilation from Node server to browser:
+
+1. Browser loads ruby2js.mjs + Prism WASM (~500KB)
+2. Fetches raw .rb files from app/
+3. Transpiles client-side
+4. Executes resulting JavaScript
+
+### Why Defer?
+
+- Stage 2a's `--selfhost` flag must produce correct output first
+- Rails filters (Model, Controller, Routes, Schema, Seeds, Logger) need to work in selfhost
+- No point loading 500KB in browser if transpilation produces wrong results
+
+### Implementation Tasks (Future)
+
+- [ ] Package ruby2js.mjs with Rails filters for browser
+- [ ] Prism WASM initialization in browser
+- [ ] Fetch .rb files and transpile on demand
+- [ ] Module caching (avoid re-transpiling unchanged files)
+- [ ] Dev server becomes optional (can use any static server)
+
+### Success Criteria
+
+- [ ] `npm run dev -- --selfhost` produces identical output to Ruby backend
+- [ ] All Rails filters transpiled and working in selfhost
+- [ ] Browser demo works with `python -m http.server` (no Node required)
 
 ---
 
@@ -887,19 +928,33 @@ Each stage has two types of success criteria: **selfhost hardening** (primary) a
 - [x] Data persists across page reloads (IndexedDB)
 - [x] Works when served by any static file server
 
-### Stage 2 Complete When:
-
-**Selfhost Hardening:**
-- [ ] Build script uses selfhost transpilation
-- [ ] ESM filter handles all module patterns needed
+### Stage 2a Complete When:
 
 **Demo Functionality:**
 - [ ] All Stage 1 criteria
 - [ ] `npm run dev` starts hot reload server
-- [ ] Edit .rb file → browser auto-refreshes → see changes
-- [ ] `npm run build` produces working dist/
-- [ ] dist/ works when served by any static file server
-- [ ] dist/ loads fast (no Ruby2JS/Prism overhead)
+- [ ] Edit .rb file → rebuild triggers → browser auto-refreshes
+- [ ] `npm run build` works (wraps existing scripts/build.rb)
+- [ ] `--selfhost` flag attempts JS-based transpilation
+
+**Selfhost Testing:**
+- [ ] `--selfhost` mode runs without crashing
+- [ ] Output can be compared against Ruby backend
+- [ ] Gaps documented for future selfhost work
+
+### Stage 2b Complete When:
+
+**Prerequisite:** Stage 2a's `--selfhost` produces identical output to Ruby backend
+
+**Selfhost Hardening:**
+- [ ] All Rails filters (Model, Controller, Routes, Schema, Seeds, Logger) work in selfhost
+- [ ] ESM filter handles all module patterns needed
+
+**Demo Functionality:**
+- [ ] Browser loads ruby2js.mjs + Prism WASM
+- [ ] Transpiles .rb files client-side
+- [ ] Works with any static file server (no Node required)
+- [ ] dist/ loads fast (no Ruby2JS/Prism overhead in production mode)
 
 ### Stage 3 Complete When:
 
@@ -909,7 +964,7 @@ Each stage has two types of success criteria: **selfhost hardening** (primary) a
 - [ ] Any discovered gaps are fixed in Ruby2JS
 
 **Demo Functionality:**
-- [ ] All Stage 2 criteria
+- [ ] All Stage 2a criteria
 - [ ] User can "log in" (session persists)
 - [ ] Flash messages display and clear
 - [ ] Rich text editing works (Trix)
@@ -938,7 +993,7 @@ Each stage has two types of success criteria: **selfhost hardening** (primary) a
 3. **Node.js framework:** Raw `http`, Hono, or none for v1?
 4. **Testing:** Port Rails system tests, or separate JS tests?
 5. **Demo hosting:** GitHub Pages? Standalone download?
-6. ~~**Hot reload:** Add file watching for true Rails-like development experience?~~ **Resolved:** Stage 2 includes dev server with hot reload
+6. ~~**Hot reload:** Add file watching for true Rails-like development experience?~~ **Resolved:** Stage 2a includes dev server with hot reload
 7. **CI Integration:** Add rails-in-js tests to CI? (Leaning yes, decide after Stage 1)
 
 ---
