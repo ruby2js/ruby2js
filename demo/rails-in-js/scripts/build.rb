@@ -7,6 +7,7 @@ require 'fileutils'
 # Ensure we're using the local ruby2js
 $LOAD_PATH.unshift File.expand_path('../../../lib', __dir__)
 require 'ruby2js'
+require 'ruby2js/filter/rails'
 require 'ruby2js/filter/functions'
 require 'ruby2js/filter/esm'
 require 'ruby2js/filter/return'
@@ -17,10 +18,16 @@ DEMO_ROOT = File.expand_path('..', __dir__)
 DIST_DIR = File.join(DEMO_ROOT, 'dist')
 
 # Common transpilation options for Ruby files
+# Rails filters run first to transform idiomatic Rails to micro-framework,
+# then Functions/ESM/Return handle the JavaScript output
 OPTIONS = {
   eslevel: 2022,
   include: [:class, :call],
   filters: [
+    Ruby2JS::Filter::Rails::Model,
+    Ruby2JS::Filter::Rails::Controller,
+    Ruby2JS::Filter::Rails::Routes,
+    Ruby2JS::Filter::Rails::Schema,
     Ruby2JS::Filter::Functions,
     Ruby2JS::Filter::ESM,
     Ruby2JS::Filter::Return
@@ -117,23 +124,16 @@ transpile_directory(
 )
 puts
 
-# Transpile views (both Ruby modules and ERB templates)
+# Transpile views (ERB templates only)
 puts "Views:"
 
-# First, transpile the Ruby view module if it exists
-view_module = File.join(DEMO_ROOT, 'app/views/articles.rb')
-if File.exist?(view_module)
-  transpile_file(view_module, File.join(DIST_DIR, 'views/articles.js'))
-end
-
-# Also transpile ERB templates
 erb_dir = File.join(DEMO_ROOT, 'app/views/articles')
 if Dir.exist?(erb_dir)
   renders = transpile_erb_directory(erb_dir, File.join(DIST_DIR, 'views/erb'))
 
   # Create a combined module that exports all render functions
   erb_views_js = <<~JS
-    // ERB-based article views - auto-generated from .html.erb templates
+    // Article views - auto-generated from .html.erb templates
     // Each exported function is a render function that takes { article } or { articles }
 
   JS
@@ -142,25 +142,23 @@ if Dir.exist?(erb_dir)
   render_exports = []
   Dir.glob(File.join(erb_dir, '*.html.erb')).sort.each do |erb_path|
     name = File.basename(erb_path, '.html.erb')
-    # Convert snake_case to name (list, show, new_article, edit)
     erb_views_js += "import { render as #{name}_render } from './erb/#{name}.js';\n"
     render_exports << "#{name}: #{name}_render"
   end
 
-  # Map ERB template names to match ArticleViews API
-  # new.html.erb -> new_article (to match ArticleViews.new_article)
+  # Export ArticleViews with method names matching controller expectations
   erb_views_js += <<~JS
 
-    // Export with API matching ArticleViews
-    export const ArticleErbViews = {
+    // Export ArticleViews - method names match controller action names
+    export const ArticleViews = {
       #{render_exports.join(",\n  ")},
-      // Alias: new_article points to new (matches Ruby module API)
-      new_article: new_render
+      // $new alias for 'new' (JS reserved word handling)
+      $new: new_render
     };
   JS
 
-  File.write(File.join(DIST_DIR, 'views/article_erb_views.js'), erb_views_js)
-  puts "  -> dist/views/article_erb_views.js (combined ERB module)"
+  File.write(File.join(DIST_DIR, 'views/articles.js'), erb_views_js)
+  puts "  -> dist/views/articles.js (combined ERB module)"
 end
 puts
 
@@ -169,6 +167,14 @@ puts "Helpers:"
 transpile_directory(
   File.join(DEMO_ROOT, 'app/helpers'),
   File.join(DIST_DIR, 'helpers')
+)
+puts
+
+# Transpile db (seeds)
+puts "Database:"
+transpile_directory(
+  File.join(DEMO_ROOT, 'db'),
+  File.join(DIST_DIR, 'db')
 )
 puts
 

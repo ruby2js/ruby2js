@@ -1,175 +1,114 @@
 export const Routes = (() => {
-  this.#routes = [];
-  this.#parent_resource = null;
-
   function routes() {
-    return this.#routes
-  };
+    return [
+      {path: "/", controller: "ArticlesController", action: "index!"},
 
-  function root(controller_action) {
-    let [controller, action] = controller_action.split("#");
+      {
+        path: "/articles",
+        controller: "ArticlesController",
+        action: "index!",
+        method: "GET"
+      },
 
-    return this.#routes.push({
-      method: "GET",
-      path: /^\/$/m,
-      controller,
-      action
-    })
-  };
+      {
+        path: "/articles/new",
+        controller: "ArticlesController",
+        action: "$new",
+        method: "GET"
+      },
 
-  function resources(name, options={}, block) {
-    this.#routes.push({
-      method: "GET",
-      path: new RegExp(`^/${name}$`),
-      controller: name,
-      action: "list"
-    });
-
-    this.#routes.push({
-      method: "GET",
-      path: new RegExp(`^/${name}/new$`),
-      controller: name,
-      action: "new_form"
-    });
-
-    this.#routes.push({
-      method: "GET",
-      path: new RegExp(`^/${name}/(\\d+)$`),
-      controller: name,
-      action: "show"
-    });
-
-    this.#routes.push({
-      method: "GET",
-      path: new RegExp(`^/${name}/(\\d+)/edit$`),
-      controller: name,
-      action: "edit"
-    });
-
-    this.#routes.push({
-      method: "POST",
-      path: new RegExp(`^/${name}$`),
-      controller: name,
-      action: "create"
-    });
-
-    this.#routes.push({
-      method: "PATCH",
-      path: new RegExp(`^/${name}/(\\d+)$`),
-      controller: name,
-      action: "update"
-    });
-
-    this.#routes.push({
-      method: "PUT",
-      path: new RegExp(`^/${name}/(\\d+)$`),
-      controller: name,
-      action: "update"
-    });
-
-    this.#routes.push({
-      method: "DELETE",
-      path: new RegExp(`^/${name}/(\\d+)$`),
-      controller: name,
-      action: "destroy"
-    });
-
-    if (block) {
-      this.#parent_resource = name;
-      block();
-      this.#parent_resource = null;
-      return this.#parent_resource
-    }
-  };
-
-  function nested_resources(name, options={}) {
-    let parent = this.#parent_resource;
-
-    let only = options.only ?? [
-      "list",
-      "show",
-      "new_form",
-      "create",
-      "edit",
-      "update",
-      "destroy"
-    ];
-
-    if (only.includes("create")) {
-      this.#routes.push({
-        method: "POST",
-        path: new RegExp(`^/${parent}/(\\d+)/${name}$`),
-        controller: name,
+      {
+        path: "/articles",
+        controller: "ArticlesController",
         action: "create",
-        parent
-      })
-    };
+        method: "POST"
+      },
 
-    if (only.includes("destroy")) {
-      return this.#routes.push({
-        method: "DELETE",
-        path: new RegExp(`^/${parent}/(\\d+)/${name}/(\\d+)$`),
-        controller: name,
+      {
+        path: "/articles/:id",
+        controller: "ArticlesController",
+        action: "show",
+        method: "GET"
+      },
+
+      {
+        path: "/articles/:id/edit",
+        controller: "ArticlesController",
+        action: "edit",
+        method: "GET"
+      },
+
+      {
+        path: "/articles/:id",
+        controller: "ArticlesController",
+        action: "update",
+        method: "PATCH"
+      },
+
+      {
+        path: "/articles/:id",
+        controller: "ArticlesController",
         action: "destroy",
-        parent
-      })
-    }
-  };
+        method: "DELETE"
+      },
 
-  function match(method, path) {
-    for (let route of this.#routes) {
-      if (route.method != method) continue;
-      let match_result = path.match(route.path);
+      {
+        path: "/articles/:article_id/comments",
+        controller: "CommentsController",
+        action: "create",
+        method: "POST"
+      },
 
-      if (match_result) {
-        return {
-          controller: route.controller,
-          action: route.action,
-          params: extract_params(match_result, route)
-        }
+      {
+        path: "/articles/:article_id/comments/:id",
+        controller: "CommentsController",
+        action: "destroy",
+        method: "DELETE"
       }
-    };
-
-    return null
+    ]
   };
 
-  function extract_params(match_result, route) {
-    let params = {};
+  function root_path() {
+    return "/"
+  };
 
-    if (route.parent) {
-      if (match_result[1]) {
-        params[`${route.parent.toString().chomp("s")}_id`] = parseInt(match_result[1])
-      };
+  function articles_path() {
+    return "/articles"
+  };
 
-      if (match_result[2]) params.id = parseInt(match_result[2])
-    } else if (match_result[1]) {
-      params.id = parseInt(match_result[1])
-    };
+  function new_article_path() {
+    return "/articles/new"
+  };
 
-    return params
+  function article_path(article) {
+    return `/articles/${extract_id(article)}`
+  };
+
+  function edit_article_path(article) {
+    return `/articles/${extract_id(article)}/edit`
+  };
+
+  function comments_path(article) {
+    return `/articles/${extract_id(article)}/comments`
+  };
+
+  function comment_path(article, comment) {
+    return `/articles/${extract_id(article)}/comments/${extract_id(comment)}`
+  };
+
+  function extract_id(obj) {
+    return obj?.id() || obj
   };
 
   return {
     routes,
-    root,
-    resources,
-    nested_resources,
-    match,
-    extract_params
+    root_path,
+    articles_path,
+    new_article_path,
+    article_path,
+    edit_article_path,
+    comments_path,
+    comment_path,
+    extract_id
   }
-})();
-
-// Routes configuration
-// Defines URL patterns and maps them to controllers/actions
-// Standard RESTful routes
-// Handle nested resources via block
-// For nested resources
-// Nested resource: first capture is parent_id, second is id
-// Regular resource: first capture is id
-// Define application routes
-Routes.root("articles#list");
-
-Routes.resources(
-  "articles",
-  () => Routes.nested_resources("comments", {only: ["create", "destroy"]})
-)
+})()

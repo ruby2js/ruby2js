@@ -49,8 +49,17 @@ module Ruby2JS
           transformed_body = transform_model_body(body)
 
           # Build the exported class
-          result = process(s(:send, nil, :export,
-            node.updated(nil, [class_name, superclass, transformed_body])))
+          exported_class = s(:send, nil, :export,
+            node.updated(nil, [class_name, superclass, transformed_body]))
+
+          # Generate import for superclass (ApplicationRecord or ActiveRecord::Base)
+          superclass_name = superclass.children.last.to_s
+          superclass_file = superclass_name.gsub(/([A-Z])/, '_\1').downcase.sub(/^_/, '')
+          import_node = s(:send, nil, :import,
+            s(:array, s(:const, nil, superclass_name.to_sym)),
+            s(:str, "./#{superclass_file}.js"))
+
+          result = process(s(:begin, import_node, exported_class))
 
           @rails_model = nil
           @rails_model_name = nil
@@ -236,11 +245,10 @@ module Ruby2JS
           children = body ? (body.type == :begin ? body.children : [body]) : []
           transformed = []
 
-          # Add table_name method
+          # Add table_name as a static getter (not a method) so it can be accessed as this.table_name
           table_name = Ruby2JS::Inflector.pluralize(@rails_model_name.downcase)
-          transformed << s(:defs, s(:self), :table_name,
-            s(:args),
-            s(:autoreturn, s(:str, table_name)))
+          transformed << s(:send, s(:self), :table_name=,
+            s(:str, table_name))
 
           in_private = false
           children.each do |child|
@@ -318,7 +326,8 @@ module Ruby2JS
         end
 
         def generate_has_many_method(assoc)
-          # has_many :comments -> def comments; Comment.where({article_id: self.id}); end
+          # has_many :comments -> def comments; Comment.where({article_id: this._id}); end
+          # Use :attr for property access (no parentheses) to access inherited property
           association_name = assoc[:name]
           class_name = assoc[:options][:class_name] || Ruby2JS::Inflector.singularize(association_name.to_s).capitalize
           foreign_key = assoc[:options][:foreign_key] || "#{@rails_model_name.downcase}_id"
@@ -332,11 +341,12 @@ module Ruby2JS
                 s(:hash,
                   s(:pair,
                     s(:sym, foreign_key.to_sym),
-                    s(:send, s(:self), :id))))))
+                    s(:attr, s(:self), :_id))))))
         end
 
         def generate_has_one_method(assoc)
-          # has_one :profile -> def profile; Profile.find_by({user_id: self.id}); end
+          # has_one :profile -> def profile; Profile.find_by({user_id: this._id}); end
+          # Use :attr for property access (no parentheses) to access inherited property
           association_name = assoc[:name]
           class_name = assoc[:options][:class_name] || association_name.to_s.capitalize
           foreign_key = assoc[:options][:foreign_key] || "#{@rails_model_name.downcase}_id"
@@ -350,14 +360,20 @@ module Ruby2JS
                 s(:hash,
                   s(:pair,
                     s(:sym, foreign_key.to_sym),
-                    s(:send, s(:self), :id))))))
+                    s(:attr, s(:self), :_id))))))
         end
 
         def generate_belongs_to_method(assoc)
-          # belongs_to :author -> def author; Author.find(self.author_id); end
+          # belongs_to :article -> def article; Article.find(this._attributes['article_id']); end
+          # Use :attr for property access to _attributes, bracket notation for key
           association_name = assoc[:name]
           class_name = assoc[:options][:class_name] || association_name.to_s.capitalize
           foreign_key = assoc[:options][:foreign_key] || "#{association_name}_id"
+
+          # Access foreign key from _attributes - use :attr for property access
+          # Use .to_s to force bracket notation (Ruby2JS optimizes literal strings to dot notation)
+          fk_access = s(:send, s(:attr, s(:self), :_attributes), :[],
+            s(:send, s(:str, foreign_key), :to_s))
 
           # Handle optional: true
           if assoc[:options][:optional]
@@ -366,11 +382,11 @@ module Ruby2JS
               s(:args),
               s(:autoreturn,
                 s(:if,
-                  s(:send, s(:self), foreign_key.to_sym),
+                  fk_access,
                   s(:send,
                     s(:const, nil, class_name.to_sym),
                     :find,
-                    s(:send, s(:self), foreign_key.to_sym)),
+                    fk_access),
                   s(:nil))))
           else
             s(:def, association_name,
@@ -379,7 +395,7 @@ module Ruby2JS
                 s(:send,
                   s(:const, nil, class_name.to_sym),
                   :find,
-                  s(:send, s(:self), foreign_key.to_sym))))
+                  fk_access)))
           end
         end
 
@@ -421,28 +437,28 @@ module Ruby2JS
               call = case validation_type
                      when :presence
                        if options == true
-                         s(:send, nil, :validates_presence_of, s(:str, attr.to_s))
+                         s(:send, s(:self), :validates_presence_of, s(:str, attr.to_s))
                        end
                      when :length
                        if options.is_a?(Hash)
                          opts = options.map do |k, val|
                            s(:pair, s(:sym, k), s(:int, val))
                          end
-                         s(:send, nil, :validates_length_of, s(:str, attr.to_s), s(:hash, *opts))
+                         s(:send, s(:self), :validates_length_of, s(:str, attr.to_s), s(:hash, *opts))
                        end
                      when :uniqueness
                        if options == true
-                         s(:send, nil, :validates_uniqueness_of, s(:str, attr.to_s))
+                         s(:send, s(:self), :validates_uniqueness_of, s(:str, attr.to_s))
                        end
                      when :format
                        if options.is_a?(Hash) && options[:with]
                          # Handle regex format validation
-                         s(:send, nil, :validates_format_of, s(:str, attr.to_s), s(:hash,
+                         s(:send, s(:self), :validates_format_of, s(:str, attr.to_s), s(:hash,
                            s(:pair, s(:sym, :with), s(:regexp, s(:str, options[:with].to_s), s(:regopt)))))
                        end
                      when :numericality
                        if options == true
-                         s(:send, nil, :validates_numericality_of, s(:str, attr.to_s))
+                         s(:send, s(:self), :validates_numericality_of, s(:str, attr.to_s))
                        elsif options.is_a?(Hash)
                          opts = options.map do |k, val|
                            value_node = case val
@@ -453,14 +469,14 @@ module Ruby2JS
                                         end
                            s(:pair, s(:sym, k), value_node)
                          end
-                         s(:send, nil, :validates_numericality_of, s(:str, attr.to_s), s(:hash, *opts))
+                         s(:send, s(:self), :validates_numericality_of, s(:str, attr.to_s), s(:hash, *opts))
                        end
                      when :inclusion
                        if options.is_a?(Hash) && options[:in]
                          values = options[:in]
                          if values.is_a?(Array)
                            array_node = s(:array, *values.map { |v| s(:str, v.to_s) })
-                           s(:send, nil, :validates_inclusion_of, s(:str, attr.to_s), s(:hash,
+                           s(:send, s(:self), :validates_inclusion_of, s(:str, attr.to_s), s(:hash,
                              s(:pair, s(:sym, :in), array_node)))
                          end
                        end

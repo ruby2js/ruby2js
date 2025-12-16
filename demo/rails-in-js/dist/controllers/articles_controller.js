@@ -1,12 +1,11 @@
+// Articles controller - idiomatic Rails
 import { Article } from "../models/article.js";
 import { ArticleViews } from "../views/articles.js";
 
-// Articles controller - SPA-friendly version
-// Uses direct model/view calls instead of Rails conventions
 export const ArticlesController = (() => {
-  function list() {
+  function index() {
     let articles = Article.all;
-    return ArticleViews.list({articles})
+    return ArticleViews.index({articles})
   };
 
   function show(id) {
@@ -14,9 +13,14 @@ export const ArticlesController = (() => {
     return ArticleViews.show({article})
   };
 
-  function new_form() {
-    let article = {title: "", body: "", errors: []};
-    return ArticleViews.new_article({article})
+  function $new() {
+    let article = new Article;
+    return ArticleViews.$new({article})
+  };
+
+  function create(params) {
+    let article = new Article(params);
+    return article.save ? {redirect: `/articles/${article.id}`} : {render: "new_article"}
   };
 
   function edit(id) {
@@ -24,31 +28,16 @@ export const ArticlesController = (() => {
     return ArticleViews.edit({article})
   };
 
-  function create(title, body) {
-    let article = Article.create({title, body});
-
-    return article.id ? {success: true, id: article.id} : {
-      success: false,
-      html: ArticleViews.new_article({article})
-    }
-  };
-
-  function update(id, title, body) {
+  function update(id, params) {
     let article = Article.find(id);
-    article.title = title;
-    article.body = body;
-
-    return article.save ? {success: true, id: article.id} : {
-      success: false,
-      html: ArticleViews.edit({article})
-    }
+    return article.update(params) ? {redirect: `/articles/${article.id}`} : {render: "edit"}
   };
 
   function destroy(id) {
     let article = Article.find(id);
     article.destroy;
-    return {success: true}
+    return {redirect: "/articles"}
   };
 
-  return {list, show, new_form, edit, create, update, destroy}
+  return {index, show, $new, create, edit, update, destroy}
 })()

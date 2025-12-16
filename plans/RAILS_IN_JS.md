@@ -1,6 +1,6 @@
 # Rails-in-JS: Running Rails Applications in JavaScript
 
-## Status: Planning
+## Status: Stage 1 Complete
 
 Run Rails applications entirely in JavaScript - either in the browser (with sql.js) or Node.js. The `app/` directory feels like Rails; the runtime is JavaScript.
 
@@ -242,10 +242,10 @@ const result = db.exec("SELECT * FROM articles");
 
 ### Stage 0 Complete When:
 
-- [ ] Confident that ERB/Phlex filters work in selfhost (or gaps identified)
-- [ ] Confident that sql.js meets ActiveRecord needs
-- [ ] No obvious blockers discovered
-- [ ] Ready to commit to Stage 1
+- [x] Confident that ERB/Phlex filters work in selfhost (or gaps identified)
+- [x] Confident that sql.js meets ActiveRecord needs
+- [x] No obvious blockers discovered
+- [x] Ready to commit to Stage 1
 
 ### Stage 0 Outcome
 
@@ -260,10 +260,28 @@ const result = db.exec("SELECT * FROM articles");
 
 ## Stage 1: Classic Blog with ERB - Core Functionality
 
-**Timeline:** ~1 week
+**Status:** Complete
 **Goal:** Article/Comment CRUD with associations, running in browser
 
 At the end of this stage, you can serve the app with any static server (nginx, `python -m http.server`, etc.) and it works via live transpilation with manual refresh.
+
+### Implementation Approach
+
+Stage 1 was implemented in two phases:
+
+**Phase 1a: Micro-Framework Runtime**
+- Built JavaScript runtime with Rails-like APIs (`ApplicationRecord`, `ApplicationController`, etc.)
+- Implemented sql.js integration for SQLite in browser
+- Created module-based architecture (IIFE pattern) for controllers and routes
+- Built path helpers, view rendering, and form handling
+
+**Phase 2a: Rails Filters** (see `plans/RAILS_FILTERS.md`)
+- Created `rails/model` filter - transforms `has_many`, `belongs_to`, `validates`, callbacks
+- Created `rails/controller` filter - transforms `before_action`, `params`, `redirect_to`
+- Created `rails/routes` filter - transforms `Rails.application.routes.draw`, `resources`
+- Created `rails/schema` filter - transforms `ActiveRecord::Schema.define`, `create_table`
+
+The demo now uses **idiomatic Rails syntax** in `app/` that the Rails filters transform to the micro-framework runtime. This allows writing standard Rails code that transpiles to browser-ready JavaScript.
 
 ### Models
 
@@ -786,6 +804,10 @@ Same blog functionality, demonstrating that the view layer is pluggable (ERB or 
 | Functions | ✅ Exists | None |
 | ESM | ✅ Exists | None |
 | ActiveSupport | ✅ Exists | None |
+| Rails/Model | ✅ Complete | None |
+| Rails/Controller | ✅ Complete | None |
+| Rails/Routes | ✅ Complete | None |
+| Rails/Schema | ✅ Complete | None |
 
 ---
 
@@ -811,29 +833,29 @@ Each stage has two types of success criteria: **selfhost hardening** (primary) a
 ### Stage 0 Complete When:
 
 **Selfhost Hardening:**
-- [ ] ERB filter tested in selfhost (works or gaps identified)
-- [ ] Phlex filter tested in selfhost (works or gaps identified)
-- [ ] ActiveSupport basics tested in selfhost
+- [x] ERB filter tested in selfhost (works or gaps identified)
+- [x] Phlex filter tested in selfhost (works or gaps identified)
+- [x] ActiveSupport basics tested in selfhost
 
 **Validation:**
-- [ ] sql.js prototype demonstrates feasibility
-- [ ] No blocking issues discovered
-- [ ] Clear path forward for Stage 1
+- [x] sql.js prototype demonstrates feasibility
+- [x] No blocking issues discovered
+- [x] Clear path forward for Stage 1
 
 ### Stage 1 Complete When:
 
 **Selfhost Hardening:**
-- [ ] ERB filter works in selfhost
-- [ ] Core class/method patterns transpile correctly
-- [ ] Any discovered gaps are fixed in Ruby2JS
+- [x] ERB filter works in selfhost
+- [x] Core class/method patterns transpile correctly
+- [x] Any discovered gaps are fixed in Ruby2JS
 
 **Demo Functionality:**
-- [ ] Can create, read, update, delete articles
-- [ ] Can add and remove comments on articles
-- [ ] Validations prevent invalid data
-- [ ] Navigation works (browser back/forward)
-- [ ] Data persists across page reloads (IndexedDB)
-- [ ] Works when served by any static file server
+- [x] Can create, read, update, delete articles
+- [x] Can add and remove comments on articles
+- [x] Validations prevent invalid data
+- [x] Navigation works (browser back/forward)
+- [x] Data persists across page reloads (IndexedDB)
+- [x] Works when served by any static file server
 
 ### Stage 2 Complete When:
 

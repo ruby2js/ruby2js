@@ -1,48 +1,56 @@
 // Base class for all models
 // Transpiled to JavaScript, runs on sql.js
 export class ApplicationRecord {
-  #attributes = {};
-  #errors = [];
-  #persisted = false;
-  #id;
+  #_attributes = {};
+  #_errors = [];
+  #_persisted = false;
+  #_id;
 
+  // Use underscore-prefixed properties instead of private fields
+  // so subclasses can access them (JS private fields don't inherit)
   get id() {
-    return this.#id
+    return this.#_id
   };
 
-  set id(id) {
-    this.#id = id
+  set id(value) {
+    this.#_id = value;
+    return this.#_id
+  };
+
+  // Expose internal properties for subclass access (JS private fields don't inherit)
+  get _id() {
+    return this.#_id
+  };
+
+  get _attributes() {
+    return this.#_attributes
   };
 
   get attributes() {
-    return this.#attributes
-  };
-
-  set attributes(attributes) {
-    this.#attributes = attributes
+    return this.#_attributes
   };
 
   get errors() {
-    return this.#errors
-  };
-
-  set errors(errors) {
-    this.#errors = errors
+    return this.#_errors
   };
 
   constructor(attrs={}) {
     for (let key of Object.keys(attrs)) {
       let value = attrs[key];
-      this.#attributes[key.toString()] = value;
-      if (key.toString() == "id") this.#id = value
+      this.#_attributes[key.toString()] = value;
+
+      // Also set as direct property for easy access (article.title instead of article._attributes['title'])
+      this[key] = value;
+      if (key.toString() == "id") this.#_id = value
     };
 
-    if (this.#id) this.#persisted = true
+    if (this.#_id) this.#_persisted = true
   };
 
   // Class methods
   static get all() {
     let sql = `SELECT * FROM ${this.table_name}`;
+    console.debug(`  ${this.name} Load  ${sql}`);
     let results = DB.exec(sql);
     if (results.length <= 0) return [];
     return this.result_to_models(results[0])
@@ -50,7 +58,9 @@ export class ApplicationRecord {
 
   static find(id) {
     let obj;
-    let stmt = DB.prepare(`SELECT * FROM ${this.table_name} WHERE id = ?`);
+    let sql = `SELECT * FROM ${this.table_name} WHERE id = ?`;
+    console.debug(`  ${this.name} Load  ${sql}  [["id", ${id}]]`);
+    let stmt = DB.prepare(sql);
     stmt.bind([id]);
 
     if (stmt.step()) {
@@ -59,6 +69,7 @@ export class ApplicationRecord {
       return new this(obj)
     } else {
       stmt.free();
+      console.error(`  ${this.name} not found with id=${id}`);
       return (() => { throw `${this.name} not found with id=${id}` })()
     }
   };
@@ -66,7 +77,9 @@ export class ApplicationRecord {
   static find_by(conditions) {
     let obj;
     let [where_clause, values] = this.build_where(conditions);
-    let stmt = DB.prepare(`SELECT * FROM ${this.table_name} WHERE ${where_clause} LIMIT 1`);
+    let sql = `SELECT * FROM ${this.table_name} WHERE ${where_clause} LIMIT 1`;
+    console.debug(`  ${this.name} Load  ${sql}  ${JSON.stringify(values)}`);
+    let stmt = DB.prepare(sql);
     stmt.bind(values);
 
     if (stmt.step()) {
@@ -81,7 +94,9 @@ export class ApplicationRecord {
 
   static where(conditions) {
     let [where_clause, values] = this.build_where(conditions);
-    let stmt = DB.prepare(`SELECT * FROM ${this.table_name} WHERE ${where_clause}`);
+    let sql = `SELECT * FROM ${this.table_name} WHERE ${where_clause}`;
+    console.debug(`  ${this.name} Load  ${sql}  ${JSON.stringify(values)}`);
+    let stmt = DB.prepare(sql);
     stmt.bind(values);
     let results = [];
 
@@ -120,23 +135,23 @@ export class ApplicationRecord {
 
   // Instance methods
   persisted() {
-    return this.#persisted
+    return this.#_persisted
   };
 
   new_record() {
-    return !this.#persisted
+    return !this.#_persisted
   };
 
   get save() {
     if (!this.is_valid) return false;
-    return this.#persisted ? this.#do_update : this.#do_insert
+    return this.#_persisted ? this.#do_update : this.#do_insert
   };
 
   // Access as getter
   update(attrs) {
     // Access as getter
     for (let key of Object.keys(attrs)) {
-      this.#attributes[key.toString()] = attrs[key]
+      this.#_attributes[key.toString()] = attrs[key]
     };
 
     return this.save
@@ -144,23 +159,24 @@ export class ApplicationRecord {
 
   // Access as getter
   get destroy() {
-    if (!this.#persisted) return false;
-
-    DB.run(
-      `DELETE FROM ${this.constructor.table_name} WHERE id = ?`,
-      [this.#id]
-    );
-
-    this.#persisted = false;
+    if (!this.#_persisted) return false;
+    let sql = `DELETE FROM ${this.constructor.table_name} WHERE id = ?`;
+    console.debug(`  ${this.constructor.name} Destroy  ${sql}  [["id", ${this.#_id}]]`);
+    DB.run(sql, [this.#_id]);
+    this.#_persisted = false;
     return true
   };
 
   get is_valid() {
-    this.#errors = [];
-    this.validate;
+    this.#_errors = [];
+    this.validate();
 
-    // Access as getter
-    return this.#errors.length == 0
+    // Call as method - subclasses define validate()
+    if (this.#_errors.length > 0) {
+      console.warn("  Validation failed:", this.#_errors)
+    };
+
+    return this.#_errors.length == 0
   };
 
   get validate() {
@@ -170,59 +186,66 @@ export class ApplicationRecord {
   // Override in subclasses
   // Validation helpers
   validates_presence_of(field) {
-    let value = this.#attributes[field.toString()];
+    let value = this.#_attributes[field.toString()];
 
     if (value == null || value.toString().trim().length == 0) {
-      return this.#errors.push(`${field} can't be blank`)
+      return this.#_errors.push(`${field} can't be blank`)
     }
   };
 
   validates_length_of(field, options) {
-    let value = this.#attributes[field.toString()].toString();
+    let value = this.#_attributes[field.toString()].toString();
 
     if (options.minimum && value.length < options.minimum) {
-      return this.#errors.push(`${field} is too short (minimum is ${options.minimum} characters)`)
+      return this.#_errors.push(`${field} is too short (minimum is ${options.minimum} characters)`)
     }
   };
 
   get #do_insert() {
     let now = Time.now().toString();
-    this.#attributes.created_at = now;
-    this.#attributes.updated_at = now;
+    this.#_attributes.created_at = now;
+    this.#_attributes.updated_at = now;
     let cols = [];
     let placeholders = [];
     let values = [];
 
-    for (let key of Object.keys(this.#attributes)) {
+    for (let key of Object.keys(this.#_attributes)) {
       if (key == "id") continue;
       cols.push(key);
       placeholders.push("?");
-      values.push(this.#attributes[key])
+      values.push(this.#_attributes[key])
     };
 
     let sql = `INSERT INTO ${this.constructor.table_name} (${cols.join(", ")}) VALUES (${placeholders.join(", ")})`;
+    console.debug(`  ${this.constructor.name} Create  ${sql}`);
     DB.run(sql, values);
     let id_result = DB.exec("SELECT last_insert_rowid()");
-    this.#id = id_result[0].values[0][0];
-    this.#attributes.id = this.#id;
-    this.#persisted = true;
+    this.#_id = id_result[0].values[0][0];
+    this.#_attributes.id = this.#_id;
+    this.id = this.#_id;
+
+    // Also set as direct property
+    this.#_persisted = true;
+    console.log(`  ${this.constructor.name} Create (id: ${this.#_id})`);
     return true
   };
 
   get #do_update() {
-    this.#attributes.updated_at = Time.now().toString();
+    this.#_attributes.updated_at = Time.now().toString();
     let sets = [];
     let values = [];
 
-    for (let key of Object.keys(this.#attributes)) {
+    for (let key of Object.keys(this.#_attributes)) {
       if (key == "id") continue;
       sets.push(`${key} = ?`);
-      values.push(this.#attributes[key])
+      values.push(this.#_attributes[key])
     };
 
-    values.push(this.#id);
+    values.push(this.#_id);
     let sql = `UPDATE ${this.constructor.table_name} SET ${sets.join(", ")} WHERE id = ?`;
+    console.debug(`  ${this.constructor.name} Update  ${sql}  [["id", ${this.#_id}]]`);
     DB.run(sql, values);
+    console.log(`  ${this.constructor.name} Update (id: ${this.#_id})`);
     return true
   };
 

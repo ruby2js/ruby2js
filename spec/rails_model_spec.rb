@@ -17,10 +17,10 @@ describe Ruby2JS::Filter::Rails::Model do
       assert_includes result, 'class Article extends ApplicationRecord'
     end
 
-    it "generates table_name method" do
+    it "generates table_name property" do
       result = to_js('class Article < ApplicationRecord; end')
-      assert_includes result, 'static table_name()'
-      assert_includes result, '"articles"'
+      # Static property assignment (not method)
+      assert_includes result, 'table_name = "articles"'
     end
 
     it "handles irregular plural for table name" do
@@ -37,7 +37,7 @@ describe Ruby2JS::Filter::Rails::Model do
         end
       RUBY
       assert_includes result, 'comments()'
-      assert_includes result, 'Comment.where({article_id: this.id()})'
+      assert_includes result, 'Comment.where({article_id: this._id})'
     end
 
     it "supports class_name option" do
@@ -47,7 +47,7 @@ describe Ruby2JS::Filter::Rails::Model do
         end
       RUBY
       assert_includes result, 'reviews()'
-      assert_includes result, 'Comment.where({article_id: this.id()})'
+      assert_includes result, 'Comment.where({article_id: this._id})'
     end
 
     it "supports foreign_key option" do
@@ -56,7 +56,7 @@ describe Ruby2JS::Filter::Rails::Model do
           has_many :comments, foreign_key: 'post_id'
         end
       RUBY
-      assert_includes result, 'Comment.where({post_id: this.id()})'
+      assert_includes result, 'Comment.where({post_id: this._id})'
     end
 
     it "handles dependent destroy" do
@@ -79,7 +79,9 @@ describe Ruby2JS::Filter::Rails::Model do
         end
       RUBY
       assert_includes result, 'article()'
-      assert_includes result, 'Article.find(this.article_id())'
+      # Access via _attributes property with bracket notation
+      assert_includes result, 'this._attributes["article_id"'
+      assert_includes result, 'Article.find('
     end
 
     it "handles optional: true" do
@@ -90,7 +92,7 @@ describe Ruby2JS::Filter::Rails::Model do
       RUBY
       assert_includes result, 'author()'
       # Should check for nil before finding
-      assert_includes result, 'this.author_id()'
+      assert_includes result, 'this._attributes["author_id"'
       assert_includes result, '?'
     end
 
@@ -101,7 +103,8 @@ describe Ruby2JS::Filter::Rails::Model do
         end
       RUBY
       assert_includes result, 'creator()'
-      assert_includes result, 'User.find(this.creator_id())'
+      assert_includes result, 'this._attributes["creator_id"'
+      assert_includes result, 'User.find('
     end
   end
 

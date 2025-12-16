@@ -1,22 +1,21 @@
-# Comments controller - SPA-friendly version
-# Handles comment CRUD (nested under articles)
-
-import [Comment], '../models/comment.js'
-
-export module CommentsController
-  def self.create(article_id, commenter, body)
-    comment = Comment.create({
-      article_id: article_id,
-      commenter: commenter,
-      body: body
-    })
-    { success: true, article_id: article_id }
+# Comments controller - idiomatic Rails
+class CommentsController < ApplicationController
+  def create
+    @article = Article.find(params[:article_id])
+    @comment = @article.comments.create(comment_params)
+    redirect_to @article
   end
 
-  def self.destroy(article_id, comment_id)
-    comments = Comment.where({ article_id: article_id })
-    comment = comments.find { |c| c.id == comment_id }
-    comment.destroy if comment
-    { success: true, article_id: article_id }
+  def destroy
+    @article = Article.find(params[:article_id])
+    @comment = @article.comments.find(params[:id])
+    @comment.destroy
+    redirect_to @article
+  end
+
+  private
+
+  def comment_params
+    params.require(:comment).permit(:commenter, :body)
   end
 end

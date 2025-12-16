@@ -17,6 +17,7 @@ module Ruby2JS
           @rails_before_actions = []
           @rails_private_methods = {}
           @rails_model_refs = Set.new
+          @rails_needs_views = false
           super
         end
 
@@ -196,6 +197,29 @@ module Ruby2JS
           args = node.children[1]
           body = node.children[2]
 
+          # Collect params keys accessed in the method body (e.g., params[:article_id])
+          params_keys = collect_params_keys(body)
+
+          # Also collect params keys from before_action methods
+          @rails_before_actions.each do |ba|
+            should_run = if ba[:only]
+                           ba[:only].include?(method_name)
+                         elsif ba[:except]
+                           !ba[:except].include?(method_name)
+                         else
+                           true
+                         end
+
+            if should_run
+              method_node = @rails_private_methods[ba[:method]]
+              if method_node
+                params_keys.concat(collect_params_keys(method_node.children[2]))
+              end
+            end
+          end
+
+          params_keys = params_keys.uniq
+
           # Collect instance variables from body AND before_action methods
           ivars = collect_instance_variables(body)
 
@@ -228,6 +252,7 @@ module Ruby2JS
 
           # Generate view call
           view_call = generate_view_call(method_name, ivars)
+          @rails_needs_views = true if view_call
 
           # Build method body - flatten any :begin nodes
           body_statements = []
@@ -259,19 +284,30 @@ module Ruby2JS
                         else method_name
                         end
 
-          # Add parameters based on action type:
-          # - show, edit, update, destroy need id
-          # - create, update need params (for strong params)
-          output_args = case method_name
-                        when :show, :edit, :destroy
-                          s(:args, s(:arg, :id))
-                        when :update
-                          s(:args, s(:arg, :id), s(:arg, :params))
-                        when :create
-                          s(:args, s(:arg, :params))
-                        else
-                          args
-                        end
+          # Build method parameters from:
+          # 1. Any extra params[:key] accesses (like article_id for nested resources)
+          # 2. Standard RESTful params (id for show/edit/destroy, params for create/update)
+          param_args = []
+
+          # Add extra params keys found in method body (like article_id for nested resources)
+          # Exclude :id because it's handled by standard RESTful routing
+          extra_params = params_keys - [:id]
+          extra_params.sort.each do |key|
+            param_args << s(:arg, key)
+          end
+
+          # Add standard params based on action type
+          case method_name
+          when :show, :edit, :destroy
+            param_args << s(:arg, :id)
+          when :update
+            param_args << s(:arg, :id)
+            param_args << s(:arg, :params)
+          when :create
+            param_args << s(:arg, :params)
+          end
+
+          output_args = s(:args, *param_args)
 
           # Create class method (defs with self)
           s(:defs, s(:self), output_name, output_args, final_body)
@@ -293,6 +329,32 @@ module Ruby2JS
           end
 
           node.children.each { |child| collect_ivars_recursive(child, ivars) }
+        end
+
+        # Collect params[:key] accesses to determine method parameters
+        def collect_params_keys(node)
+          keys = []
+          collect_params_keys_recursive(node, keys)
+          keys
+        end
+
+        def collect_params_keys_recursive(node, keys)
+          return unless node.respond_to?(:type) && node.respond_to?(:children)
+
+          # Match params[:key] pattern
+          if node.type == :send
+            target, method, *args = node.children
+
+            if target&.type == :send &&
+               target.children[0].nil? &&
+               target.children[1] == :params &&
+               method == :[] &&
+               args.first&.type == :sym
+              keys << args.first.children[0]
+            end
+          end
+
+          node.children.each { |child| collect_params_keys_recursive(child, keys) }
         end
 
         def transform_ivars_to_locals(node)
@@ -366,7 +428,7 @@ module Ruby2JS
                    resource = ivar_name.downcase
                    s(:dstr,
                      s(:str, "/#{resource}s/"),
-                     s(:begin, s(:send, s(:lvar, ivar_name.to_sym), :id)))
+                     s(:begin, s(:attr, s(:lvar, ivar_name.to_sym), :id)))
 
                  when :send
                    # redirect_to articles_path -> "/articles"
@@ -517,11 +579,13 @@ module Ruby2JS
               s(:str, "../models/#{model_file}.js"))
           end
 
-          # Import the view module
-          view_module = "#{@rails_controller_name}Views"
-          imports << s(:send, nil, :import,
-            s(:array, s(:const, nil, view_module.to_sym)),
-            s(:str, "../views/#{@rails_controller_plural}.js"))
+          # Import the view module only if views are used
+          if @rails_needs_views
+            view_module = "#{@rails_controller_name}Views"
+            imports << s(:send, nil, :import,
+              s(:array, s(:const, nil, view_module.to_sym)),
+              s(:str, "../views/#{@rails_controller_plural}.js"))
+          end
 
           imports
         end

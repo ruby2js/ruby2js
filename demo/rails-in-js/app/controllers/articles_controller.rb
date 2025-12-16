@@ -1,53 +1,50 @@
-# Articles controller - SPA-friendly version
-# Uses direct model/view calls instead of Rails conventions
+# Articles controller - idiomatic Rails
+class ArticlesController < ApplicationController
+  before_action :set_article, only: [:show, :edit, :update, :destroy]
 
-import [Article], '../models/article.js'
-import [ArticleViews], '../views/articles.js'
-
-export module ArticlesController
-  def self.list
-    articles = Article.all
-    ArticleViews.list({ articles: articles })
+  def index
+    @articles = Article.all
   end
 
-  def self.show(id)
-    article = Article.find(id)
-    ArticleViews.show({ article: article })
+  def show
   end
 
-  def self.new_form
-    article = { title: '', body: '', errors: [] }
-    ArticleViews.new_article({ article: article })
+  def new
+    @article = Article.new
   end
 
-  def self.edit(id)
-    article = Article.find(id)
-    ArticleViews.edit({ article: article })
-  end
-
-  def self.create(title, body)
-    article = Article.create({ title: title, body: body })
-    if article.id
-      { success: true, id: article.id }
+  def create
+    @article = Article.new(article_params)
+    if @article.save
+      redirect_to @article
     else
-      { success: false, html: ArticleViews.new_article({ article: article }) }
+      render :new
     end
   end
 
-  def self.update(id, title, body)
-    article = Article.find(id)
-    article.title = title
-    article.body = body
-    if article.save
-      { success: true, id: article.id }
+  def edit
+  end
+
+  def update
+    if @article.update(article_params)
+      redirect_to @article
     else
-      { success: false, html: ArticleViews.edit({ article: article }) }
+      render :edit
     end
   end
 
-  def self.destroy(id)
-    article = Article.find(id)
-    article.destroy
-    { success: true }
+  def destroy
+    @article.destroy
+    redirect_to articles_path
+  end
+
+  private
+
+  def set_article
+    @article = Article.find(params[:id])
+  end
+
+  def article_params
+    params.require(:article).permit(:title, :body)
   end
 end

@@ -1,18 +1,18 @@
-import { Comment } from "../models/comment.js";
+// Comments controller - idiomatic Rails
+import { Article } from "../models/article.js";
 
-// Comments controller - SPA-friendly version
-// Handles comment CRUD (nested under articles)
 export const CommentsController = (() => {
-  function create(article_id, commenter, body) {
-    let comment = Comment.create({article_id, commenter, body});
-    return {success: true, article_id}
+  function create(article_id, params) {
+    let article = Article.find(article_id);
+    let comment = article.comments.create(params);
+    return {redirect: `/articles/${article.id}`}
   };
 
-  function destroy(article_id, comment_id) {
-    let comments = Comment.where({article_id});
-    let comment = comments.find(c => c.id == comment_id);
-    if (comment) comment.destroy;
-    return {success: true, article_id}
+  function destroy(article_id, id) {
+    let article = Article.find(article_id);
+    let comment = article.comments.find(id);
+    comment.destroy;
+    return {redirect: `/articles/${article.id}`}
   };
 
   return {create, destroy}

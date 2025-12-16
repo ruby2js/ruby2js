@@ -23,10 +23,6 @@
     #loading { text-align: center; padding: 40px; }
     #app { display: none; }
     .transpiled-badge { background: #4CAF50; color: white; padding: 2px 8px; border-radius: 3px; font-size: 0.8em; margin-left: 10px; }
-    .view-toggle { float: right; font-size: 0.9em; }
-    .view-toggle button { padding: 4px 8px; margin-left: 5px; cursor: pointer; }
-    .view-toggle button.active { background: #0066cc; color: white; }
-    .view-toggle button:not(.active) { background: #eee; color: #333; }
   </style>
 </head>
 <body>
@@ -36,12 +32,7 @@
       <a onclick="navigate('/')">Home</a>
       <a onclick="navigate('/articles')">Articles</a>
       <a onclick="navigate('/articles/new')">New Article</a>
-      <span class="transpiled-badge">Transpiled Ruby</span>
-      <span class="view-toggle">
-        Views:
-        <button id="btn-ruby" class="active" onclick="setViewMode('ruby')">Ruby Module</button>
-        <button id="btn-erb" onclick="setViewMode('erb')">ERB</button>
-      </span>
+      <span class="transpiled-badge">Transpiled Ruby → JS</span>
     </nav>
     <main id="content"></main>
   </div>
@@ -73,6 +64,7 @@
     }
 
     // === Load Transpiled Models ===
+    let Seeds;
     async function loadModels() {
       const models = await import('./dist/models/index.js');
       Article = models.Article;
@@ -80,35 +72,25 @@
       window.Article = Article;
       window.Comment = Comment;
 
-      // Seed data using transpiled Schema (needs models loaded first)
-      Schema.seed_data();
+      // Load and run seeds (needs models loaded first)
+      const seedsModule = await import('./dist/db/seeds.js');
+      Seeds = seedsModule.Seeds;
+      Seeds.run();
     }
 
     // === Controllers (transpiled from Ruby) ===
-    let ArticlesController, ArticlesErbController, CommentsController;
-    let currentViewMode = 'ruby';  // 'ruby' or 'erb'
+    let ArticlesController, CommentsController;
 
-    // Get the active controller based on view mode
     function getArticlesController() {
-      return currentViewMode === 'erb' ? ArticlesErbController : ArticlesController;
+      return ArticlesController;
     }
 
     async function loadControllers() {
       const articlesModule = await import('./dist/controllers/articles_controller.js');
-      const articlesErbModule = await import('./dist/controllers/articles_erb_controller.js');
       const commentsModule = await import('./dist/controllers/comments_controller.js');
       ArticlesController = articlesModule.ArticlesController;
-      ArticlesErbController = articlesErbModule.ArticlesErbController;
       CommentsController = commentsModule.CommentsController;
     }
-
-    window.setViewMode = function(mode) {
-      currentViewMode = mode;
-      document.getElementById('btn-ruby').classList.toggle('active', mode === 'ruby');
-      document.getElementById('btn-erb').classList.toggle('active', mode === 'erb');
-      // Re-dispatch current route to refresh with new view
-      dispatch(location.pathname);
-    };
 
     // === Router ===
     const routes = [
@@ -125,6 +107,7 @@
     }
 
     function dispatch(path) {
+      console.log(`Started GET "${path}"`);
       for (const route of routes) {
         const match = path.match(route.path);
         if (match) {
@@ -132,84 +115,112 @@
           return;
         }
       }
+      console.warn('  No route matched');
       document.getElementById('content').innerHTML = '<h1>404 Not Found</h1>';
     }
 
     // === Controller Actions (using transpiled Ruby controllers) ===
     function indexArticles() {
-      const html = getArticlesController().list();
+      console.log('Processing ArticlesController#index');
+      const html = getArticlesController().index();
+      console.log('  Rendering articles/index');
       document.getElementById('content').innerHTML = html;
     }
 
     function showArticle(id) {
+      console.log(`Processing ArticlesController#show (id: ${id})`);
       try {
         const html = getArticlesController().show(id);
+        console.log('  Rendering articles/show');
         document.getElementById('content').innerHTML = html;
       } catch (e) {
+        console.error('  Error:', e.message || e);
         document.getElementById('content').innerHTML = '<h1>Article Not Found</h1>';
       }
     }
 
     function newArticle() {
-      const html = getArticlesController().new_form();
+      console.log('Processing ArticlesController#new');
+      const html = getArticlesController().$new();
+      console.log('  Rendering articles/new');
       document.getElementById('content').innerHTML = html;
     }
 
     function editArticle(id) {
+      console.log(`Processing ArticlesController#edit (id: ${id})`);
       const html = getArticlesController().edit(id);
+      console.log('  Rendering articles/edit');
       document.getElementById('content').innerHTML = html;
     }
 
     window.createArticle = function(event) {
       event.preventDefault();
-      const result = getArticlesController().create(
-        document.getElementById('title').value,
-        document.getElementById('body').value
-      );
-      if (result.success) {
-        navigate(`/articles/${result.id}`);
-      } else {
-        document.getElementById('content').innerHTML = result.html;
+      const params = {
+        title: document.getElementById('title').value,
+        body: document.getElementById('body').value
+      };
+      console.log('Processing ArticlesController#create');
+      console.log('  Parameters:', params);
+      const result = getArticlesController().create(params);
+      if (result.redirect) {
+        console.log(`  Redirected to ${result.redirect}`);
+        navigate(result.redirect);
+      } else if (result.render) {
+        console.log('  Rendering articles/new (validation failed)');
+        const html = getArticlesController().$new();
+        document.getElementById('content').innerHTML = html;
       }
       return false;
     };
 
     window.updateArticle = function(event, id) {
       event.preventDefault();
-      const result = getArticlesController().update(
-        id,
-        document.getElementById('title').value,
-        document.getElementById('body').value
-      );
-      if (result.success) {
-        navigate(`/articles/${result.id}`);
-      } else {
-        document.getElementById('content').innerHTML = result.html;
+      const params = {
+        title: document.getElementById('title').value,
+        body: document.getElementById('body').value
+      };
+      console.log(`Processing ArticlesController#update (id: ${id})`);
+      console.log('  Parameters:', params);
+      const result = getArticlesController().update(id, params);
+      if (result.redirect) {
+        console.log(`  Redirected to ${result.redirect}`);
+        navigate(result.redirect);
+      } else if (result.render) {
+        console.log('  Rendering articles/edit (validation failed)');
+        const html = getArticlesController().edit(id);
+        document.getElementById('content').innerHTML = html;
       }
       return false;
     };
 
     window.deleteArticle = function(id) {
       if (confirm('Are you sure you want to delete this article?')) {
+        console.log(`Processing ArticlesController#destroy (id: ${id})`);
         getArticlesController().destroy(id);
+        console.log('  Redirected to /articles');
         navigate('/articles');
       }
     };
 
     window.createComment = function(event, articleId) {
       event.preventDefault();
-      CommentsController.create(
-        articleId,
-        document.getElementById('commenter').value,
-        document.getElementById('comment_body').value
-      );
+      const params = {
+        commenter: document.getElementById('commenter').value,
+        body: document.getElementById('comment_body').value
+      };
+      console.log(`Processing CommentsController#create (article_id: ${articleId})`);
+      console.log('  Parameters:', params);
+      CommentsController.create(articleId, params);
+      console.log(`  Redirected to /articles/${articleId}`);
       navigate(`/articles/${articleId}`);
       return false;
     };
 
     window.deleteComment = function(articleId, commentId) {
       if (confirm('Delete this comment?')) {
+        console.log(`Processing CommentsController#destroy (article_id: ${articleId}, id: ${commentId})`);
         CommentsController.destroy(articleId, commentId);
+        console.log(`  Redirected to /articles/${articleId}`);
         navigate(`/articles/${articleId}`);
       }
     };
