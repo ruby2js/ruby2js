@@ -37,9 +37,8 @@
     <main id="content"></main>
   </div>
 
+  <script src="./node_modules/sql.js/dist/sql-wasm.js"></script>
   <script type="module">
-    import initSqlJs from 'https://cdn.jsdelivr.net/npm/sql.js@1.11.0/+esm';
-
     // === Polyfills for Ruby runtime ===
     window.Time = {
       now() {
@@ -52,8 +51,8 @@
     let Article, Comment;
 
     async function initDatabase() {
-      const SQL = await initSqlJs({
-        locateFile: file => `https://sql.js.org/dist/${file}`
+      const SQL = await window.initSqlJs({
+        locateFile: file => `./node_modules/sql.js/dist/${file}`
       });
       db = new SQL.Database();
       window.DB = db;
