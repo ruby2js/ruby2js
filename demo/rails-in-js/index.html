@@ -22,15 +22,17 @@
     nav a { margin-right: 15px; }
     #loading { text-align: center; padding: 40px; }
     #app { display: none; }
+    .transpiled-badge { background: #4CAF50; color: white; padding: 2px 8px; border-radius: 3px; font-size: 0.8em; margin-left: 10px; }
   </style>
 </head>
 <body>
-  <div id="loading">Loading Rails-in-JS...</div>
+  <div id="loading">Loading Rails-in-JS...<br><small>Powered by transpiled Ruby code</small></div>
   <div id="app">
     <nav>
       <a onclick="navigate('/')">Home</a>
       <a onclick="navigate('/articles')">Articles</a>
       <a onclick="navigate('/articles/new')">New Article</a>
+      <span class="transpiled-badge">Transpiled Ruby</span>
     </nav>
     <main id="content"></main>
   </div>
@@ -38,14 +40,23 @@
   <script type="module">
     import initSqlJs from 'https://cdn.jsdelivr.net/npm/sql.js@1.11.0/+esm';
 
+    // === Polyfills for Ruby runtime ===
+    window.Time = {
+      now() {
+        return { toString() { return new Date().toISOString(); } };
+      }
+    };
+
     // === Database Setup ===
     let db;
+    let Article, Comment;
 
     async function initDatabase() {
       const SQL = await initSqlJs({
         locateFile: file => `https://sql.js.org/dist/${file}`
       });
       db = new SQL.Database();
+      window.DB = db;
 
       // Create schema
       db.run(`
@@ -82,113 +93,13 @@
         [1, 'Bob', 'This is really cool. Looking forward to more posts!', 'approved', now]);
     }
 
-    // === Simple ORM ===
-    class Article {
-      static all() {
-        const result = db.exec('SELECT * FROM articles ORDER BY id DESC');
-        if (!result.length) return [];
-        return result[0].values.map(row => new Article({
-          id: row[0], title: row[1], body: row[2], created_at: row[3], updated_at: row[4]
-        }));
-      }
-
-      static find(id) {
-        const stmt = db.prepare('SELECT * FROM articles WHERE id = ?');
-        stmt.bind([id]);
-        if (stmt.step()) {
-          const row = stmt.get();
-          stmt.free();
-          return new Article({ id: row[0], title: row[1], body: row[2], created_at: row[3], updated_at: row[4] });
-        }
-        stmt.free();
-        throw new Error(`Article not found: ${id}`);
-      }
-
-      static create(attrs) {
-        const article = new Article(attrs);
-        article.save();
-        return article;
-      }
-
-      constructor(attrs = {}) {
-        this.id = attrs.id || null;
-        this.title = attrs.title || '';
-        this.body = attrs.body || '';
-        this.created_at = attrs.created_at || null;
-        this.updated_at = attrs.updated_at || null;
-        this.errors = [];
-      }
-
-      validate() {
-        this.errors = [];
-        if (!this.title || this.title.trim() === '') this.errors.push('Title cannot be blank');
-        if (!this.body || this.body.trim() === '') this.errors.push('Body cannot be blank');
-        if (this.body && this.body.length < 10) this.errors.push('Body is too short (minimum 10 characters)');
-        return this.errors.length === 0;
-      }
-
-      save() {
-        if (!this.validate()) return false;
-        const now = new Date().toISOString();
-        if (this.id) {
-          this.updated_at = now;
-          db.run('UPDATE articles SET title = ?, body = ?, updated_at = ? WHERE id = ?',
-            [this.title, this.body, this.updated_at, this.id]);
-        } else {
-          this.created_at = now;
-          this.updated_at = now;
-          db.run('INSERT INTO articles (title, body, created_at, updated_at) VALUES (?, ?, ?, ?)',
-            [this.title, this.body, this.created_at, this.updated_at]);
-          const result = db.exec('SELECT last_insert_rowid()');
-          this.id = result[0].values[0][0];
-        }
-        return true;
-      }
-
-      destroy() {
-        // Delete comments first
-        db.run('DELETE FROM comments WHERE article_id = ?', [this.id]);
-        db.run('DELETE FROM articles WHERE id = ?', [this.id]);
-      }
-
-      get comments() {
-        const result = db.exec('SELECT * FROM comments WHERE article_id = ? ORDER BY id', [this.id]);
-        if (!result.length) return [];
-        return result[0].values.map(row => new Comment({
-          id: row[0], article_id: row[1], commenter: row[2], body: row[3], status: row[4], created_at: row[5]
-        }));
-      }
-    }
-
-    class Comment {
-      static create(attrs) {
-        const comment = new Comment(attrs);
-        comment.save();
-        return comment;
-      }
-
-      constructor(attrs = {}) {
-        this.id = attrs.id || null;
-        this.article_id = attrs.article_id;
-        this.commenter = attrs.commenter || '';
-        this.body = attrs.body || '';
-        this.status = attrs.status || 'pending';
-        this.created_at = attrs.created_at || null;
-      }
-
-      save() {
-        const now = new Date().toISOString();
-        this.created_at = now;
-        db.run('INSERT INTO comments (article_id, commenter, body, status, created_at) VALUES (?, ?, ?, ?, ?)',
-          [this.article_id, this.commenter, this.body, this.status, this.created_at]);
-        const result = db.exec('SELECT last_insert_rowid()');
-        this.id = result[0].values[0][0];
-        return true;
-      }
-
-      destroy() {
-        db.run('DELETE FROM comments WHERE id = ?', [this.id]);
-      }
+    // === Load Transpiled Models ===
+    async function loadModels() {
+      const models = await import('./dist/models/index.js');
+      Article = models.Article;
+      Comment = models.Comment;
+      window.Article = Article;
+      window.Comment = Comment;
     }
 
     // === Views ===
@@ -226,7 +137,8 @@
           <hr>
           <h2>Comments</h2>`;
 
-        for (const comment of article.comments) {
+        const comments = article.comments;  // getter access
+        for (const comment of comments) {
           html += `
             <div class="comment">
               <p><strong>${escapeHTML(comment.commenter)}</strong> says:</p>
@@ -257,8 +169,8 @@
         }
         html += `
           <form onsubmit="return createArticle(event)">
-            <p><label>Title:</label><input type="text" id="title" value="${escapeHTML(article.title)}" required></p>
-            <p><label>Body:</label><textarea id="body" required>${escapeHTML(article.body)}</textarea></p>
+            <p><label>Title:</label><input type="text" id="title" value="${escapeHTML(article.title || '')}" required></p>
+            <p><label>Body:</label><textarea id="body" required>${escapeHTML(article.body || '')}</textarea></p>
             <button type="submit">Create Article</button>
           </form>
           <p><a onclick="navigate('/articles')">Back to Articles</a></p>`;
@@ -313,7 +225,7 @@
 
     // === Controller Actions ===
     function indexArticles() {
-      const articles = Article.all();
+      const articles = Article.all;  // getter access
       render('articles/index', { articles });
     }
 
@@ -327,7 +239,7 @@
     }
 
     function newArticle() {
-      render('articles/new', { article: new Article() });
+      render('articles/new', { article: { title: '', body: '', errors: [] } });
     }
 
     function editArticle(id) {
@@ -337,11 +249,11 @@
 
     window.createArticle = function(event) {
       event.preventDefault();
-      const article = new Article({
+      const article = Article.create({
         title: document.getElementById('title').value,
         body: document.getElementById('body').value
       });
-      if (article.save()) {
+      if (article.id) {
         navigate(`/articles/${article.id}`);
       } else {
         render('articles/new', { article });
@@ -354,7 +266,8 @@
       const article = Article.find(id);
       article.title = document.getElementById('title').value;
       article.body = document.getElementById('body').value;
-      if (article.save()) {
+      const saved = article.save;  // getter access
+      if (saved) {
         navigate(`/articles/${article.id}`);
       } else {
         render('articles/edit', { article });
@@ -365,7 +278,7 @@
     window.deleteArticle = function(id) {
       if (confirm('Are you sure you want to delete this article?')) {
         const article = Article.find(id);
-        article.destroy();
+        article.destroy;  // getter access
         navigate('/articles');
       }
     };
@@ -383,8 +296,15 @@
 
     window.deleteComment = function(articleId, commentId) {
       if (confirm('Delete this comment?')) {
-        const comment = new Comment({ id: commentId });
-        comment.destroy();
+        const stmt = db.prepare('SELECT * FROM comments WHERE id = ?');
+        stmt.bind([commentId]);
+        if (stmt.step()) {
+          const comment = new Comment(stmt.getAsObject());
+          stmt.free();
+          comment.destroy;  // getter access
+        } else {
+          stmt.free();
+        }
         navigate(`/articles/${articleId}`);
       }
     };
@@ -400,15 +320,21 @@
 
     // === Initialize ===
     async function init() {
-      await initDatabase();
-      document.getElementById('loading').style.display = 'none';
-      document.getElementById('app').style.display = 'block';
+      try {
+        await initDatabase();
+        await loadModels();
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('app').style.display = 'block';
 
-      // Handle browser back/forward
-      window.addEventListener('popstate', () => dispatch(location.pathname));
+        // Handle browser back/forward
+        window.addEventListener('popstate', () => dispatch(location.pathname));
 
-      // Initial route
-      dispatch(location.pathname || '/articles');
+        // Initial route
+        dispatch(location.pathname || '/articles');
+      } catch (e) {
+        document.getElementById('loading').innerHTML = `<p style="color: red;">Error: ${e.message}</p><pre>${e.stack}</pre>`;
+        console.error(e);
+      }
     }
 
     init();
