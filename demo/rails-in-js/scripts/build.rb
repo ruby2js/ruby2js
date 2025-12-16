@@ -63,8 +63,15 @@ def transpile_file(src_path, dest_path)
   sourcemap = result.sourcemap
   # Include original Ruby source so browser doesn't need to fetch .rb files
   sourcemap[:sourcesContent] = [source]
-  # Ensure sources array has the file (some filters generate new code without mappings)
-  sourcemap[:sources] = [relative_src] if sourcemap[:sources].empty?
+
+  # Compute relative path from sourcemap location back to source file
+  # e.g., from dist/controllers/ back to app/controllers/article.rb -> ../../app/controllers/article.rb
+  map_dir = File.dirname(dest_path).sub(DEMO_ROOT + '/', '')
+  depth = map_dir.split('/').length
+  source_from_map = ('../' * depth) + relative_src
+
+  # Update sources array with correct relative path
+  sourcemap[:sources] = [source_from_map]
 
   # Add sourcemap reference to JS file
   js_with_map = "#{js}\n//# sourceMappingURL=#{File.basename(map_path)}"
