@@ -4,6 +4,8 @@
   "type": "module",
   "description": "Rails-like app running in JavaScript - Ruby2JS selfhost demo",
   "scripts": {
+    "dev": "node dev-server.mjs",
+    "build": "ruby scripts/build.rb",
     "start": "npx serve -p 3000",
     "test:sql": "node sql_prototype.mjs",
     "test:ar": "node active_record_test.mjs",
@@ -12,5 +14,9 @@
   },
   "dependencies": {
     "sql.js": "^1.11.0"
+  },
+  "devDependencies": {
+    "chokidar": "^3.5.3",
+    "ws": "^8.14.2"
   }
 }

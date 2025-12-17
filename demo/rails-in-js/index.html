@@ -21,5 +21,32 @@
     import { Application } from './dist/config/routes.js';
     Application.start();
   </script>
+
+  <!-- Hot reload client (connects to dev server WebSocket) -->
+  <script>
+    (function() {
+      // Only connect if running on localhost (dev server)
+      if (location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') return;
+
+      const ws = new WebSocket(`ws://${location.host}`);
+
+      ws.onmessage = function(event) {
+        const data = JSON.parse(event.data);
+        if (data.type === 'reload') {
+          console.log('[dev] Reloading...');
+          location.reload();
+        }
+      };
+
+      ws.onopen = function() {
+        console.log('[dev] Hot reload connected');
+      };
+
+      ws.onclose = function() {
+        console.log('[dev] Hot reload disconnected, retrying in 2s...');
+        setTimeout(function() { location.reload(); }, 2000);
+      };
+    })();
+  </script>
 </body>
 </html>
