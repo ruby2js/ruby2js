@@ -257,6 +257,16 @@ describe Ruby2JS::Filter::ESM do
     end
   end
 
+  describe "__FILE__" do
+    it "should convert __FILE__ to import.meta.url" do
+      to_js('__FILE__').must_equal 'import.meta.url'
+    end
+
+    it "should convert __FILE__ in expressions" do
+      to_js('puts __FILE__').must_equal 'puts(import.meta.url)'
+    end
+  end
+
   describe Ruby2JS::Filter::DEFAULTS do
     it "should include ESM" do
       _(Ruby2JS::Filter::DEFAULTS).must_include Ruby2JS::Filter::ESM

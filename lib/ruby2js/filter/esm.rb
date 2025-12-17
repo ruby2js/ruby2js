@@ -106,6 +106,12 @@ module Ruby2JS
         super
       end
 
+      # Map Ruby's __FILE__ to ESM equivalent
+      # import.meta.url returns the full URL (file:///path/to/file.js)
+      def on___FILE__(node)
+        s(:attr, s(:attr, nil, :"import.meta"), :url)
+      end
+
       def on_send(node)
         target, method, *args = node.children
         found_import = nil  # declare for conditional assignment below

@@ -112,6 +112,16 @@ describe Ruby2JS::Filter::CJS do
     end
   end
 
+  describe "__FILE__" do
+    it "should convert __FILE__ to __filename" do
+      to_js('__FILE__').must_equal '__filename'
+    end
+
+    it "should convert __FILE__ in expressions" do
+      to_js('puts __FILE__').must_equal 'puts(__filename)'
+    end
+  end
+
   describe Ruby2JS::Filter::DEFAULTS do
     it "should include CJS" do
       _(Ruby2JS::Filter::DEFAULTS).must_include Ruby2JS::Filter::CJS

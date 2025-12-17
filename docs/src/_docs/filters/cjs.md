@@ -14,6 +14,18 @@ The **CJS** filter maps export statements to their CommonJS counterparts.
 * `export default async proc` to `module.exports = async`
 * `export default` to `module.exports =`
 
+## \_\_FILE\_\_
+
+Ruby's `__FILE__` constant is converted to `__filename`, which is available in Node.js CommonJS modules:
+
+```ruby
+__FILE__
+# => __filename
+
+puts __FILE__
+# => puts(__filename)
+```
+
 {% rendercontent "docs/note", extra_margin: true %}
 More examples of how this filter works are in the [specs file](https://github.com/ruby2js/ruby2js/blob/master/spec/cjs_spec.rb).
 {% endrendercontent %}

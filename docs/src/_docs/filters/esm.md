@@ -47,6 +47,25 @@ URL.new("./data.json", import.meta.url)
 # => new URL("./data.json", import.meta.url)
 ```
 
+### \_\_FILE\_\_
+
+Ruby's `__FILE__` constant is converted to `import.meta.url`, which provides the URL of the current module in ES modules:
+
+```ruby
+__FILE__
+# => import.meta.url
+
+puts __FILE__
+# => puts(import.meta.url)
+```
+
+Note: `import.meta.url` returns a `file://` URL (e.g., `file:///path/to/file.js`). To get just the file path, you can use:
+
+```ruby
+URL.new(import.meta.url).pathname
+# => new URL(import.meta.url).pathname
+```
+
 ### export
 
 ```ruby

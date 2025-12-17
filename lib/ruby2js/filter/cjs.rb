@@ -12,6 +12,12 @@ module Ruby2JS
         @cjs_autoexports = !@disable_autoexports && options[:autoexports]
       end
 
+      # Map Ruby's __FILE__ to CJS equivalent
+      # __filename is available in Node.js CommonJS modules
+      def on___FILE__(node)
+        s(:gvar, :__filename)
+      end
+
       def process(node)
         return super unless @cjs_autoexports
 
