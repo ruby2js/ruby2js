@@ -86,7 +86,13 @@ directory filters_dir
 # Map spec names to filter names (when they differ)
 SPEC_TO_FILTER = {
   'camelcase_spec.rb' => 'camelCase',
-  'cjs_spec.rb' => 'cjs'
+  'cjs_spec.rb' => 'cjs',
+  'rails_logger_spec.rb' => 'rails/logger',
+  'rails_model_spec.rb' => 'rails/model',
+  'rails_controller_spec.rb' => 'rails/controller',
+  'rails_routes_spec.rb' => 'rails/routes',
+  'rails_schema_spec.rb' => 'rails/schema',
+  'rails_seeds_spec.rb' => 'rails/seeds'
 }
 
 # Derive filter name from spec name
@@ -107,7 +113,11 @@ manifest_filters.each do |name|
   src = "#{ROOT}/lib/ruby2js/filter/#{name}.rb"
   output = "#{filters_dir}/#{name}.js"
 
+  # Handle subdirectory filters (e.g., rails/logger)
+  output_dir = File.dirname(output)
+
   file output => [filters_dir, "#{SELFHOST}/ruby2js.js", src, *selfhost_deps] do
+    mkdir_p output_dir unless File.exist?(output_dir)
     sh bundle_exec("ruby #{SELFHOST}/scripts/transpile_filter.rb #{src} > #{output}")
   end
 end
