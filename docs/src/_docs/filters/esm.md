@@ -154,22 +154,24 @@ puts Ruby2JS.convert('require "lib/main.rb"',
 If the [Require filter](require) is included in the filter chain **before** the ESM filter, it will inline required files instead of converting them to imports. This is useful when you want to bundle all code into a single file rather than keeping separate modules.
 {% endrendercontent %}
 
-### Browser vs Node.js
+### Ruby-Only Feature
 
-The require-to-import conversion with export detection requires filesystem access to read and parse the required files. This functionality is available in:
+The require-to-import conversion with export detection requires filesystem access to read and parse the required files. This functionality is only available when running Ruby2JS in **Ruby** (using Ruby's `File` class).
 
-- **Ruby** - Full support using Ruby's `File` class
-- **Node.js** - Full support using the `fs` and `path` modules
-
-In **browser** environments, filesystem access is not available. When running in a browser, `require` statements are converted to simple imports without export detection:
+In **browser**, **Opal**, and **selfhost** (JavaScript) environments, `require` statements are converted to simple side-effect imports without export detection:
 
 ```ruby
 require "lib/myclass.rb"
-# Browser: import "lib/myclass.rb"
-# Node.js: import { MyClass } from "./lib/myclass.rb"  (with export detection)
+# Ruby:     import { MyClass } from "./lib/myclass.rb"  (with export detection)
+# Selfhost: import "lib/myclass.rb"  (simple import)
 ```
 
-This means browser-based transpilation will generate imports that may need manual adjustment for named vs default exports.
+For selfhost and browser environments, use explicit `import` statements instead of `require` to get proper named imports:
+
+```ruby
+import [ MyClass ], from: "lib/myclass.rb"
+# => import { MyClass } from "lib/myclass.rb"
+```
 
 ## Autoimports
 

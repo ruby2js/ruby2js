@@ -136,9 +136,7 @@ module Ruby2JS
           args.length == 1 and
           args[0].type == :str
         then
-          # File analysis requires filesystem access (not available in browser)
-          # Note: defined?(Window) is truthy in browser JS, falsy in Ruby/Node.js
-          if @options[:file] and not defined?(Window)
+          if @options[:file]
             return convert_require_to_import(node, method, args[0].children.first)
           else
             # Simple conversion without file analysis
@@ -245,79 +243,40 @@ module Ruby2JS
       # Convert require/require_relative to import statement by parsing the file
       # and detecting its exports
       def convert_require_to_import(node, method, basename)
-        # Check for Ruby's File class (not JS File API or browser)
-        # Note: RUBY_VERSION is defined in selfhost bundle, so we check for File class
-        if defined?(File) and File.respond_to?(:expand_path)
-          base_dirname = File.dirname(File.expand_path(@options[:file]))
-        else
-          # Node.js implementation
-          # Note: use variables to hide module names from Opal's static require analysis
-          path_mod = 'path'; url_mod_name = 'url'
-          path = require(path_mod)
-          url_mod = require(url_mod_name)
-          file_path = @options[:file]
-          # Convert file:// URL to path if needed (import.meta.url returns file:// URLs)
-          if file_path.start_with?('file://')
-            file_path = url_mod.fileURLToPath(file_path)
-          end
-          base_dirname = path.dirname(path.resolve(file_path))
-        end
+        base_dirname = File.dirname(File.expand_path(@options[:file]))
         collect_imports_from_file(base_dirname, basename, base_dirname, node)
       end
 
       # Recursively collect imports from a file
       def collect_imports_from_file(base_dirname, basename, current_dirname, fallback_node)
-        # Define platform-specific file operations
-        # Check for Ruby's File class (not JS File API or browser)
-        if defined?(File) and File.respond_to?(:join)
-          path_join = ->(a, b) { File.join(a, b) }
-          file_exists = ->(f) { File.file?(f) }
-          real_path = ->(f) { File.realpath(f) }
-          read_file = ->(f) { File.read(f) }
-          dir_name = ->(f) { File.dirname(f) }
-          relative_path = ->(from, to) { Pathname.new(to).relative_path_from(Pathname.new(from)).to_s }
-        else
-          # Node.js implementation
-          # Note: use variables to hide module names from Opal's static require analysis
-          fs_mod = 'fs'; path_mod = 'path'
-          fs = require(fs_mod)
-          path = require(path_mod)
-          path_join = ->(a, b) { path.join(a, b) }
-          file_exists = ->(f) { fs.existsSync(f) and fs.statSync(f).isFile() }
-          real_path = ->(f) { fs.realpathSync(f) }
-          read_file = ->(f) { fs.readFileSync(f, 'utf8') }
-          dir_name = ->(f) { path.dirname(f) }
-          relative_path = ->(from, to) { path.relative(from, to) }
-        end
+        filename = File.join(current_dirname, basename)
 
-        filename = path_join.(current_dirname, basename)
-
-        if not file_exists.(filename) and file_exists.(filename + ".rb")
+        if not File.file?(filename) and File.file?(filename + ".rb")
           filename += '.rb'
-        elsif not file_exists.(filename) and file_exists.(filename + ".js.rb")
+        elsif not File.file?(filename) and File.file?(filename + ".js.rb")
           filename += '.js.rb'
         end
 
-        return fallback_node unless file_exists.(filename)
+        return fallback_node unless File.file?(filename)
 
-        realpath = real_path.(filename)
+        realpath = File.realpath(filename)
 
         # If we've already seen this file, return a reference to it
         if @esm_require_seen[realpath]
           imports = @esm_require_seen[realpath]
-          importname = relative_path.(base_dirname, filename)
+          importname = Pathname.new(filename).relative_path_from(Pathname.new(base_dirname)).to_s
           importname = "./#{importname}" unless importname.start_with?('.')
           return s(:import, importname, *imports)
         end
 
         # Parse the file to find exports
-        ast, _comments = Ruby2JS.parse(read_file.(filename), filename)
+        ast, _comments = Ruby2JS.parse(File.read(filename), filename)
         children = ast.type == :begin ? ast.children : [ast]
 
         named_exports = []
         default_exports = []
         recursive_imports = []
-        file_dirname = dir_name.(filename)
+        file_dirname = File.dirname(filename)
 
         children.each do |child|
           next unless child
@@ -383,7 +342,7 @@ module Ruby2JS
           all_imports = []
           # Add current file's import first (before its dependencies)
           unless imports.empty?
-            importname = relative_path.(base_dirname, filename)
+            importname = Pathname.new(filename).relative_path_from(Pathname.new(base_dirname)).to_s
             importname = "./#{importname}" unless importname.start_with?('.')
             all_imports << s(:import, importname, *imports)
           end
@@ -398,7 +357,7 @@ module Ruby2JS
         return fallback_node if imports.empty?
 
         # Generate import statement
-        importname = relative_path.(base_dirname, filename)
+        importname = Pathname.new(filename).relative_path_from(Pathname.new(base_dirname)).to_s
         importname = "./#{importname}" unless importname.start_with?('.')
 
         s(:import, importname, *imports)
@@ -459,13 +418,8 @@ module Ruby2JS
 
         if @esm_autoimports[token]
           [@esm_autoimports[token], s(:const, nil, token)]
-        elsif found_key = @esm_autoimports.keys.find {|key| key.respond_to?(:each) && key.include?(token)}
-          # Ruby: array keys like [:func, :another]
+        elsif found_key = @esm_autoimports.keys.find {|key| key.is_a?(Array) && key.include?(token)}
           [@esm_autoimports[found_key], found_key.map {|key| s(:const, nil, key)}]
-        elsif found_key = @esm_autoimports.keys.find {|key| key.is_a?(String) && key.include?(',') && key.split(',').include?(token.to_s)}
-          # JS: stringified array keys like "func,another" - split to recover array
-          key_array = found_key.split(',')
-          [@esm_autoimports[found_key], key_array.map {|key| s(:const, nil, key.to_sym)}]
         end
       end
     end
