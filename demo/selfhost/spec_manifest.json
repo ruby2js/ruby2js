@@ -11,7 +11,9 @@
     "rails_controller_spec.rb",
     "esm_spec.rb",
     "rails_model_spec.rb",
-    "rails_seeds_spec.rb"
+    "rails_seeds_spec.rb",
+    "rails_routes_spec.rb",
+    "rails_schema_spec.rb"
   ],
   "partial": [
     "camelcase_spec.rb",
@@ -20,9 +22,7 @@
     "polyfill_spec.rb",
     "pragma_spec.rb",
     "comments_spec.rb",
-    "erb_spec.rb",
-    "rails_routes_spec.rb",
-    "rails_schema_spec.rb"
+    "erb_spec.rb"
   ],
   "blocked": {
     "securerandom_spec.rb": "extend SEXP doesn't transpile",

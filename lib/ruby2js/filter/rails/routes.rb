@@ -36,6 +36,12 @@ module Ruby2JS
           # Check for Rails.application.routes.draw
           return super unless routes_draw_block?(call)
 
+          # Initialize state if needed (JS compatibility - constructor may not run in filter pipeline)
+          @rails_resources ||= []
+          @rails_routes_list ||= []
+          @rails_path_helpers ||= []
+          @rails_route_nesting ||= []
+
           @rails_routes = true
           @rails_routes_list = []
           @rails_path_helpers = []
@@ -205,11 +211,12 @@ module Ruby2JS
           except_actions = options[:except]
 
           # Determine which actions to generate
+          # Note: use select/reject for JS compatibility (&= and -= don't work on arrays in JS)
           actions = RESTFUL_ROUTES.map { |r| r[:action] }
           if only_actions
-            actions &= only_actions
+            actions = actions.select { |a| only_actions.include?(a) }
           elsif except_actions
-            actions -= except_actions
+            actions = actions.reject { |a| except_actions.include?(a) }
           end
 
           # Build path prefix from nesting
@@ -278,11 +285,12 @@ module Ruby2JS
           except_actions = options[:except]
 
           # Singular resources don't have index
+          # Note: use select/reject for JS compatibility (&= and -= don't work on arrays in JS)
           actions = [:show, :new, :create, :edit, :update, :destroy]
           if only_actions
-            actions &= only_actions
+            actions = actions.select { |a| only_actions.include?(a) }
           elsif except_actions
-            actions -= except_actions
+            actions = actions.reject { |a| except_actions.include?(a) }
           end
 
           path_prefix = @rails_route_nesting.map { |n| "/#{n[:path]}/:#{n[:param]}" }.join
@@ -484,7 +492,7 @@ module Ruby2JS
         def collect_all_controllers(resources, result = [])
           resources.each do |resource|
             result << resource
-            collect_all_controllers(resource[:nested], result)
+            collect_all_controllers(resource[:nested] || [], result)
           end
           result
         end
@@ -503,7 +511,7 @@ module Ruby2JS
             options << s(:pair, s(:sym, :only), s(:array, *only_array))
           end
 
-          if resource[:nested].any?
+          if resource[:nested]&.any?
             nested_configs = resource[:nested].map do |nested|
               nested_pairs = [
                 s(:pair, s(:sym, :name), s(:str, nested[:name])),
@@ -553,7 +561,7 @@ module Ruby2JS
               confirm_delete: confirm_msg
             }
 
-            collect_form_handler_configs(resource[:nested], resource[:name], result)
+            collect_form_handler_configs(resource[:nested] || [], resource[:name], result)
           end
         end
 

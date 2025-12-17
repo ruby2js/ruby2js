@@ -68,12 +68,23 @@ module Ruby2JS
           # Check for ActiveRecord::Schema or ActiveRecord::Schema[version]
           if target&.type == :const
             # ActiveRecord::Schema.define
-            return target.children == [s(:const, nil, :ActiveRecord), :Schema]
+            # Note: compare children individually for JS compatibility (=== compares references, not values)
+            children = target.children
+            return children.length == 2 &&
+                   children[0]&.type == :const &&
+                   children[0].children[0].nil? &&
+                   children[0].children[1] == :ActiveRecord &&
+                   children[1] == :Schema
           elsif target&.type == :send && target.children[1] == :[]
             # ActiveRecord::Schema[7.0].define
             schema_const = target.children[0]
-            return schema_const&.type == :const &&
-                   schema_const.children == [s(:const, nil, :ActiveRecord), :Schema]
+            return false unless schema_const&.type == :const
+            children = schema_const.children
+            return children.length == 2 &&
+                   children[0]&.type == :const &&
+                   children[0].children[0].nil? &&
+                   children[0].children[1] == :ActiveRecord &&
+                   children[1] == :Schema
           end
 
           false
@@ -150,7 +161,8 @@ module Ruby2JS
                 # Handle single column
                 columns << result[:column] if result[:column]
                 # Handle multiple columns (timestamps)
-                columns.concat(result[:columns]) if result[:columns]
+                # Note: use push(*arr) for JS compatibility (JS concat returns new array, doesn't modify in place)
+                columns.push(*result[:columns]) if result[:columns]
                 # Handle foreign keys
                 foreign_keys << result[:foreign_key] if result[:foreign_key]
               end
