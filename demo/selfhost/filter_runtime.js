@@ -12,6 +12,17 @@ if (!Array.prototype.dup) {
   };
 }
 
+// String.prototype.capitalize - Ruby's capitalize (first char upper, rest lower)
+if (!String.prototype.capitalize) {
+  Object.defineProperty(String.prototype, 'capitalize', {
+    get() {
+      if (this.length === 0) return '';
+      return this.charAt(0).toUpperCase() + this.slice(1).toLowerCase();
+    },
+    configurable: true
+  });
+}
+
 // Alias Parser.AST.Node to Ruby2JS.Node so transpiled code works
 // (Ruby source uses Parser gem's AST nodes, JS uses Ruby2JS.Node)
 export const Parser = { AST: { Node: Ruby2JS.Node } };

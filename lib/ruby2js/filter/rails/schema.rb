@@ -26,10 +26,11 @@ module Ruby2JS
         }.freeze
 
         def initialize(*args)
+          # Note: super must be called first for JS class compatibility
+          super
           @rails_schema = nil
           @rails_tables = []
           @rails_indexes = []
-          super
         end
 
         # Detect ActiveRecord::Schema.define block

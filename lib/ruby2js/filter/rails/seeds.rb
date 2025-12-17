@@ -7,9 +7,10 @@ module Ruby2JS
         include SEXP
 
         def initialize(*args)
+          # Note: super must be called first for JS class compatibility
+          super
           @rails_seeds = nil
           @rails_seeds_models = []
-          super
         end
 
         # Detect module Seeds with def self.run

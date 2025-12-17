@@ -183,11 +183,12 @@ module Ruby2JS
             end
           end
 
+          # Note: use push instead of << for JS compatibility
           attributes.each do |attr|
-            @rails_validations << {
+            @rails_validations.push({
               attribute: attr,
               validations: validations
-            }
+            })
           end
         end
 
@@ -199,18 +200,11 @@ module Ruby2JS
 
           return unless name && lambda_node
 
-          # Extract the lambda body
-          body = if lambda_node.type == :block
-                   lambda_node.children[2]
-                 elsif lambda_node.type == :send && lambda_node.children[1] == :lambda
-                   # -> { } produces send nil :lambda with block
-                   nil
-                 end
-
-          @rails_scopes << {
+          # Note: use push instead of << for JS compatibility (autoreturn + << = bitwise shift)
+          @rails_scopes.push({
             name: name,
             body: lambda_node
-          }
+          })
         end
 
         def collect_callback(type, args)
@@ -236,9 +230,10 @@ module Ruby2JS
         end
 
         def extract_validation_value(node)
+          # Note: use explicit returns for JS compatibility (case-as-expression doesn't transpile well)
           case node.type
-          when :true then true
-          when :false then false
+          when :true then return true
+          when :false then return false
           when :hash
             result = {}
             node.children.each do |pair|
@@ -248,9 +243,9 @@ module Ruby2JS
                 result[key.children[0]] = extract_value(value)
               end
             end
-            result
+            return result
           else
-            extract_value(node)
+            return extract_value(node)
           end
         end
 
@@ -317,14 +312,16 @@ module Ruby2JS
           end
 
           # Keep private methods that aren't inlined elsewhere
-          # Note: use keys loop for JS compatibility (hash.each doesn't work with for...of)
+          # Note: collect all callback method names for lookup
+          all_callback_methods = []
+          @rails_callbacks.keys.each do |cb_type|
+            methods = @rails_callbacks[cb_type]
+            methods.each { |m| all_callback_methods.push(m) }
+          end
+
           @rails_model_private_methods.keys.each do |name|
             node = @rails_model_private_methods[name]
             # Check if used in callbacks
-            # Note: use Object.values() for JS compatibility
-            all_callback_methods = Object.respond_to?(:values) ?
-              Object.values(@rails_callbacks).flatten :
-              @rails_callbacks.values.flatten
             used_in_callbacks = all_callback_methods.include?(name)
             if used_in_callbacks
               # Transform and include the method
@@ -458,55 +455,66 @@ module Ruby2JS
 
           @rails_validations.each do |v|
             attr = v[:attribute]
-            v[:validations].each do |validation_type, options|
-              call = case validation_type
-                     when :presence
-                       if options == true
-                         s(:send, s(:self), :validates_presence_of, s(:str, attr.to_s))
-                       end
-                     when :length
-                       if options.is_a?(Hash)
-                         opts = options.map do |k, val|
-                           s(:pair, s(:sym, k), s(:int, val))
-                         end
-                         s(:send, s(:self), :validates_length_of, s(:str, attr.to_s), s(:hash, *opts))
-                       end
-                     when :uniqueness
-                       if options == true
-                         s(:send, s(:self), :validates_uniqueness_of, s(:str, attr.to_s))
-                       end
-                     when :format
-                       if options.is_a?(Hash) && options[:with]
-                         # Handle regex format validation
-                         s(:send, s(:self), :validates_format_of, s(:str, attr.to_s), s(:hash,
-                           s(:pair, s(:sym, :with), s(:regexp, s(:str, options[:with].to_s), s(:regopt)))))
-                       end
-                     when :numericality
-                       if options == true
-                         s(:send, s(:self), :validates_numericality_of, s(:str, attr.to_s))
-                       elsif options.is_a?(Hash)
-                         opts = options.map do |k, val|
-                           value_node = case val
-                                        when Integer then s(:int, val)
-                                        when true then s(:true)
-                                        when false then s(:false)
-                                        else s(:str, val.to_s)
-                                        end
-                           s(:pair, s(:sym, k), value_node)
-                         end
-                         s(:send, s(:self), :validates_numericality_of, s(:str, attr.to_s), s(:hash, *opts))
-                       end
-                     when :inclusion
-                       if options.is_a?(Hash) && options[:in]
-                         values = options[:in]
-                         if values.is_a?(Array)
-                           array_node = s(:array, *values.map { |v| s(:str, v.to_s) })
-                           s(:send, s(:self), :validates_inclusion_of, s(:str, attr.to_s), s(:hash,
-                             s(:pair, s(:sym, :in), array_node)))
-                         end
-                       end
-                     end
-              validation_calls << call if call
+            # Note: use keys loop for JS compatibility (hash.each doesn't work with for...of)
+            # Note: push directly to avoid case-as-expression which doesn't transpile to JS
+            v[:validations].keys.each do |validation_type|
+              options = v[:validations][validation_type]
+              case validation_type
+              when :presence
+                if options == true
+                  validation_calls.push(s(:send, s(:self), :validates_presence_of, s(:str, attr.to_s)))
+                end
+              when :length
+                if options.is_a?(Hash)
+                  # Note: use keys loop for JS compatibility (hash.map doesn't work in JS)
+                  opts = options.keys.map do |k|
+                    val = options[k]
+                    s(:pair, s(:sym, k), s(:int, val))
+                  end
+                  validation_calls.push(s(:send, s(:self), :validates_length_of, s(:str, attr.to_s), s(:hash, *opts)))
+                end
+              when :uniqueness
+                if options == true
+                  validation_calls.push(s(:send, s(:self), :validates_uniqueness_of, s(:str, attr.to_s)))
+                end
+              when :format
+                if options.is_a?(Hash) && options[:with]
+                  # Handle regex format validation
+                  validation_calls.push(s(:send, s(:self), :validates_format_of, s(:str, attr.to_s), s(:hash,
+                    s(:pair, s(:sym, :with), s(:regexp, s(:str, options[:with].to_s), s(:regopt))))))
+                end
+              when :numericality
+                if options == true
+                  validation_calls.push(s(:send, s(:self), :validates_numericality_of, s(:str, attr.to_s)))
+                elsif options.is_a?(Hash)
+                  # Note: use keys loop for JS compatibility (hash.map doesn't work in JS)
+                  opts = options.keys.map do |k|
+                    val = options[k]
+                    # Note: use if/elsif instead of case-as-expression for JS compatibility
+                    value_node = nil
+                    if val.is_a?(Integer)
+                      value_node = s(:int, val)
+                    elsif val == true
+                      value_node = s(:true)
+                    elsif val == false
+                      value_node = s(:false)
+                    else
+                      value_node = s(:str, val.to_s)
+                    end
+                    s(:pair, s(:sym, k), value_node)
+                  end
+                  validation_calls.push(s(:send, s(:self), :validates_numericality_of, s(:str, attr.to_s), s(:hash, *opts)))
+                end
+              when :inclusion
+                if options.is_a?(Hash) && options[:in]
+                  values = options[:in]
+                  if values.is_a?(Array)
+                    array_node = s(:array, *values.map { |v| s(:str, v.to_s) })
+                    validation_calls.push(s(:send, s(:self), :validates_inclusion_of, s(:str, attr.to_s), s(:hash,
+                      s(:pair, s(:sym, :in), array_node))))
+                  end
+                end
+              end
             end
           end
 
@@ -547,6 +555,7 @@ module Ruby2JS
         end
 
         def transform_scope_body(node)
+          # Note: explicit returns for JS compatibility (case-as-expression doesn't transpile well)
           return node unless node.respond_to?(:type)
 
           case node.type
@@ -554,22 +563,23 @@ module Ruby2JS
             target, method, *args = node.children
 
             # Transform implicit self calls (where, order, limit, etc.)
-            if target.nil?
+            # Note: use == nil for JS compatibility (nil? doesn't exist in JS)
+            if target == nil
               new_args = args.map { |a| transform_scope_body(a) }
-              s(:send, s(:self), method, *new_args)
+              return s(:send, s(:self), method, *new_args)
             else
               new_target = transform_scope_body(target)
               new_args = args.map { |a| transform_scope_body(a) }
-              s(:send, new_target, method, *new_args)
+              return s(:send, new_target, method, *new_args)
             end
           else
             if node.children.any?
               new_children = node.children.map do |c|
                 c.respond_to?(:type) ? transform_scope_body(c) : c
               end
-              node.updated(nil, new_children)
+              return node.updated(nil, new_children)
             else
-              node
+              return node
             end
           end
         end

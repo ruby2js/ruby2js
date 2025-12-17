@@ -11,6 +11,8 @@ module Ruby2JS
         RESTFUL_ACTIONS = %i[index show new create edit update destroy].freeze
 
         def initialize(*args)
+          # Note: super must be called first for JS class compatibility
+          super
           @rails_controller = nil
           @rails_controller_name = nil
           @rails_controller_plural = nil
@@ -18,12 +20,17 @@ module Ruby2JS
           @rails_private_methods = {}
           @rails_model_refs = Set.new
           @rails_needs_views = false
-          super
         end
 
         # Detect controller class and transform to module
         def on_class(node)
           class_name, superclass, body = node.children
+
+          # Initialize state if needed (JS compatibility - constructor may not run in filter pipeline)
+          @rails_before_actions ||= []
+          @rails_private_methods ||= {}
+          @rails_model_refs ||= Set.new
+          @rails_needs_views ||= false
 
           # Check if this is a controller (inherits from ApplicationController or *Controller)
           return super unless controller_class?(class_name, superclass)
@@ -135,12 +142,13 @@ module Ruby2JS
             end
           end
 
+          # Note: use push instead of << for JS compatibility
           if method_name
-            @rails_before_actions << {
+            @rails_before_actions.push({
               method: method_name,
               only: only_actions,
               except: except_actions
-            }
+            })
           end
         end
 
@@ -255,18 +263,19 @@ module Ruby2JS
           @rails_needs_views = true if view_call
 
           # Build method body - flatten any :begin nodes
+          # Note: use push(*arr) instead of concat for JS compatibility (JS concat returns new array)
           body_statements = []
-          body_statements.concat(before_code) if before_code.any?
+          body_statements.push(*before_code) if before_code.any?
 
           if transformed_body
             if transformed_body.type == :begin
-              body_statements.concat(transformed_body.children)
+              body_statements.push(*transformed_body.children)
             else
-              body_statements << transformed_body
+              body_statements.push(transformed_body)
             end
           end
 
-          body_statements << view_call if view_call
+          body_statements.push(view_call) if view_call
 
           # Wrap in autoreturn for implicit return behavior
           final_body = if body_statements.empty?
@@ -291,20 +300,23 @@ module Ruby2JS
 
           # Add extra params keys found in method body (like article_id for nested resources)
           # Exclude :id because it's handled by standard RESTful routing
-          extra_params = params_keys - [:id]
+          # Note: use filter instead of - for JS array compatibility
+          extra_params = params_keys.select { |k| k != :id }
+          # Note: use push instead of << for JS compatibility
           extra_params.sort.each do |key|
-            param_args << s(:arg, key)
+            param_args.push(s(:arg, key))
           end
 
           # Add standard params based on action type
+          # Note: use push instead of << for JS compatibility
           case method_name
           when :show, :edit, :destroy
-            param_args << s(:arg, :id)
+            param_args.push(s(:arg, :id))
           when :update
-            param_args << s(:arg, :id)
-            param_args << s(:arg, :params)
+            param_args.push(s(:arg, :id))
+            param_args.push(s(:arg, :params))
           when :create
-            param_args << s(:arg, :params)
+            param_args.push(s(:arg, :params))
           end
 
           output_args = s(:args, *param_args)
@@ -322,10 +334,11 @@ module Ruby2JS
         def collect_ivars_recursive(node, ivars)
           return unless node.respond_to?(:type) && node.respond_to?(:children)
 
+          # Note: use .add() for JS Set compatibility (Ruby Set supports both << and add)
           if node.type == :ivasgn
-            ivars << node.children[0].to_s.sub(/^@/, '').to_sym
+            ivars.add(node.children[0].to_s.sub(/^@/, '').to_sym)
           elsif node.type == :ivar
-            ivars << node.children[0].to_s.sub(/^@/, '').to_sym
+            ivars.add(node.children[0].to_s.sub(/^@/, '').to_sym)
           end
 
           node.children.each { |child| collect_ivars_recursive(child, ivars) }
@@ -358,50 +371,52 @@ module Ruby2JS
         end
 
         def transform_ivars_to_locals(node)
+          # Note: explicit returns for JS compatibility (case-as-expression doesn't transpile well)
           return node unless node.respond_to?(:type)
 
           case node.type
           when :ivasgn
             # @articles = x -> articles = x
-            ivar_name = node.children[0].to_s.sub(/^@/, '').to_sym
-            value = transform_ivars_to_locals(node.children[1])
-            s(:lvasgn, ivar_name, value)
+            # Note: use unique var names per case to avoid JS temporal dead zone in switch
+            asgn_name = node.children[0].to_s.sub(/^@/, '').to_sym
+            asgn_value = transform_ivars_to_locals(node.children[1])
+            return s(:lvasgn, asgn_name, asgn_value)
 
           when :ivar
             # @articles -> articles
-            ivar_name = node.children[0].to_s.sub(/^@/, '').to_sym
-            s(:lvar, ivar_name)
+            ref_name = node.children[0].to_s.sub(/^@/, '').to_sym
+            return s(:lvar, ref_name)
 
           when :send
             # Check for redirect_to, render, params, and strong params
             target, method, *args = node.children
 
             if target.nil? && method == :redirect_to
-              transform_redirect_to(args)
+              return transform_redirect_to(args)
             elsif target.nil? && method == :render
-              transform_render(args)
+              return transform_render(args)
             elsif target&.type == :send &&
                   target.children[0].nil? &&
                   target.children[1] == :params &&
                   method == :[]
               # params[:id] -> id (method parameter)
               if args.first&.type == :sym
-                s(:lvar, args.first.children[0])
+                return s(:lvar, args.first.children[0])
               else
-                node
+                return node
               end
             elsif target.nil? && method.to_s.end_with?('_params')
               # article_params -> inline the method body (strong params)
-              transform_strong_params_call(method)
+              return transform_strong_params_call(method)
             elsif strong_params_chain?(node)
               # params.require(:article).permit(:title, :body) -> params
-              s(:lvar, :params)
+              return s(:lvar, :params)
             else
               # Process children recursively
               new_children = node.children.map do |c|
                 c.respond_to?(:type) ? transform_ivars_to_locals(c) : c
               end
-              node.updated(nil, new_children)
+              return node.updated(nil, new_children)
             end
 
           else
@@ -409,9 +424,9 @@ module Ruby2JS
               new_children = node.children.map do |c|
                 c.respond_to?(:type) ? transform_ivars_to_locals(c) : c
               end
-              node.updated(nil, new_children)
+              return node.updated(nil, new_children)
             else
-              node
+              return node
             end
           end
         end
@@ -560,8 +575,9 @@ module Ruby2JS
           if node.type == :const && node.children[0].nil?
             const_name = node.children[1].to_s
             # Skip known non-model constants
+            # Note: use .add() for JS Set compatibility (Ruby Set supports both << and add)
             unless %w[ApplicationController].include?(const_name) || const_name.end_with?('Controller', 'Views')
-              @rails_model_refs << const_name
+              @rails_model_refs.add(const_name)
             end
           end
 

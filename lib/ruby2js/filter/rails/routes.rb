@@ -19,13 +19,14 @@ module Ruby2JS
         ].freeze
 
         def initialize(*args)
+          # Note: super must be called first for JS class compatibility
+          super
           @rails_routes = nil
           @rails_routes_list = []
           @rails_path_helpers = []
           @rails_route_nesting = []
           @rails_resources = []  # Track resources for Router.resources() generation
           @rails_root_path = nil
-          super
         end
 
         # Detect Rails.application.routes.draw block
