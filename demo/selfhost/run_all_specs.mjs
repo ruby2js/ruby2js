@@ -39,6 +39,13 @@ const SPEC_TO_FILTER_MAP = {
   'camelcase_spec.rb': 'camelCase.js',
   'cjs_spec.rb': 'cjs.js',
   'tagged_templates_spec.rb': 'tagged_templates.js',
+  // Rails filters are in a subdirectory
+  'rails_model_spec.rb': 'rails/model.js',
+  'rails_controller_spec.rb': 'rails/controller.js',
+  'rails_routes_spec.rb': 'rails/routes.js',
+  'rails_schema_spec.rb': 'rails/schema.js',
+  'rails_logger_spec.rb': 'rails/logger.js',
+  'rails_seeds_spec.rb': 'rails/seeds.js',
 };
 
 // Load transpiled filters on demand

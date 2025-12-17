@@ -199,9 +199,28 @@ module Ruby2JS
                 # Find the actual filter module (skip DEFAULTS << X)
                 filter_modules = filter_body.select { |n| n&.type == :module }
 
+                # Check for nested namespace modules (e.g., Rails::Model)
+                # If we have one module that contains only modules, it's a namespace
+                namespace_name = nil
+                if filter_modules.length == 1
+                  potential_namespace = filter_modules.first
+                  ns_body = potential_namespace.children[1..-1]
+                  ns_body = ns_body.first.children if ns_body.first&.type == :begin
+                  inner_modules = ns_body.select { |n| n&.type == :module }
+
+                  # If namespace contains modules and no direct method definitions, descend into it
+                  has_methods = ns_body.any? { |n| n&.type == :def || n&.type == :defs }
+                  if inner_modules.length >= 1 && !has_methods
+                    namespace_name = potential_namespace.children[0].children[1].to_s
+                    filter_modules = inner_modules
+                    filter_body = ns_body
+                  end
+                end
+
                 if filter_modules.length == 1
                   @selfhost_filter_name = filter_modules.first.children[0].children[1]
                   filter_name = @selfhost_filter_name.to_s
+                  full_filter_name = namespace_name ? "#{namespace_name}_#{filter_name}" : filter_name
 
                   # Extract the filter module body
                   filter_mod = filter_modules.first
@@ -211,17 +230,20 @@ module Ruby2JS
                   # Convert module to class extending Filter.Processor
                   # This allows super to work properly in JavaScript
                   filter_class = s(:class,
-                    s(:const, nil, filter_name.to_sym),
+                    s(:const, nil, full_filter_name.to_sym),
                     s(:const, s(:const, nil, :Filter), :Processor),
                     s(:begin, *filter_mod_body)
                   )
 
-                  # Build the complete output with import, filter class, registration, export
-                  return s(:begin,
+                  # Build output statements
+                  # Import path is relative to filter location:
+                  # - filters/foo.js imports from ../ruby2js.js
+                  # - filters/rails/foo.js imports from ../../ruby2js.js
+                  import_path = namespace_name ? '../../ruby2js.js' : '../ruby2js.js'
+                  output_statements = [
                     # Import from ruby2js.js (filter runtime is bundled there)
-                    # Path is relative to filters/ directory
                     s(:import,
-                      '../ruby2js.js',
+                      import_path,
                       [s(:const, nil, :Parser),
                        s(:const, nil, :SEXP),
                        s(:const, nil, :s),
@@ -244,11 +266,30 @@ module Ruby2JS
                     # so they use the inherited methods from Filter.Processor
                     process(filter_class),
                     # Register the filter (pass prototype for Object.assign compatibility)
-                    s(:send, nil, :registerFilter, s(:str, filter_name), s(:attr, s(:const, nil, filter_name.to_sym), :prototype)),
-                    # Export the filter
-                    s(:export, :default, s(:const, nil, filter_name.to_sym)),
-                    s(:export, s(:array, s(:const, nil, filter_name.to_sym)))
-                  )
+                    s(:send, nil, :registerFilter, s(:str, full_filter_name), s(:attr, s(:const, nil, full_filter_name.to_sym), :prototype))
+                  ]
+
+                  # For namespaced filters (e.g., Rails::Model), also register under Ruby2JS.Filter.Rails.Model
+                  if namespace_name
+                    # Ruby2JS.Filter.Rails = Ruby2JS.Filter.Rails || {}
+                    output_statements << s(:op_asgn,
+                      s(:attr, s(:attr, s(:const, nil, :Ruby2JS), :Filter), namespace_name.to_sym),
+                      :'||',
+                      s(:hash)
+                    )
+                    # Ruby2JS.Filter.Rails.Model = Rails_Model
+                    output_statements << s(:send,
+                      s(:attr, s(:attr, s(:const, nil, :Ruby2JS), :Filter), namespace_name.to_sym),
+                      "#{filter_name}=".to_sym,
+                      s(:const, nil, full_filter_name.to_sym)
+                    )
+                  end
+
+                  # Export the filter
+                  output_statements << s(:export, :default, s(:const, nil, full_filter_name.to_sym))
+                  output_statements << s(:export, s(:array, s(:const, nil, full_filter_name.to_sym)))
+
+                  return s(:begin, *output_statements)
                 end
               end
             end
