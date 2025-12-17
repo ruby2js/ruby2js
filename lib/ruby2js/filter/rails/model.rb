@@ -17,20 +17,29 @@ module Ruby2JS
         ].freeze
 
         def initialize(*args)
+          # Note: super must come first for JS compatibility (derived class constructor rule)
+          super
           @rails_model = nil
           @rails_model_name = nil
           @rails_model_processing = false
           @rails_associations = []
           @rails_validations = []
-          @rails_callbacks = Hash.new { |h, k| h[k] = [] }
+          # Note: use plain hash for JS compatibility (Hash.new with block doesn't transpile)
+          @rails_callbacks = {}
           @rails_scopes = []
           @rails_model_private_methods = {}
-          super
         end
 
         # Detect model class and transform
         def on_class(node)
           class_name, superclass, body = node.children
+
+          # Initialize state if needed (JS compatibility - constructor may not run in filter pipeline)
+          @rails_associations ||= []
+          @rails_validations ||= []
+          @rails_callbacks ||= {}
+          @rails_scopes ||= []
+          @rails_model_private_methods ||= {}
 
           # Skip if already processing (prevent infinite recursion)
           return super if @rails_model_processing
@@ -66,7 +75,8 @@ module Ruby2JS
           @rails_model_processing = false
           @rails_associations = []
           @rails_validations = []
-          @rails_callbacks = Hash.new { |h, k| h[k] = [] }
+          # Note: use plain hash for JS compatibility (Hash.new with block doesn't transpile)
+          @rails_callbacks = {}
           @rails_scopes = []
           @rails_model_private_methods = {}
 
@@ -144,11 +154,12 @@ module Ruby2JS
             end
           end
 
-          @rails_associations << {
+          # Note: use push instead of << for JS compatibility (autoreturn + << = bitwise shift)
+          @rails_associations.push({
             type: type,
             name: name,
             options: options
-          }
+          })
         end
 
         def collect_validation(args)
@@ -203,9 +214,11 @@ module Ruby2JS
         end
 
         def collect_callback(type, args)
+          # Initialize key if needed (JS compatibility - no Hash.new with default)
+          @rails_callbacks[type] ||= []
           args.each do |arg|
             if arg.type == :sym
-              @rails_callbacks[type] << arg.children[0]
+              @rails_callbacks[type].push(arg.children[0])
             end
           end
         end
@@ -290,7 +303,9 @@ module Ruby2JS
           transformed << validate_method if validate_method
 
           # Generate callback methods
-          @rails_callbacks.each do |callback_type, methods|
+          # Note: use keys loop for JS compatibility (hash.each doesn't work with for...of)
+          @rails_callbacks.keys.each do |callback_type|
+            methods = @rails_callbacks[callback_type]
             next if methods.empty?
             callback_method = generate_callback_method(callback_type, methods)
             transformed << callback_method if callback_method
@@ -302,9 +317,15 @@ module Ruby2JS
           end
 
           # Keep private methods that aren't inlined elsewhere
-          @rails_model_private_methods.each do |name, node|
+          # Note: use keys loop for JS compatibility (hash.each doesn't work with for...of)
+          @rails_model_private_methods.keys.each do |name|
+            node = @rails_model_private_methods[name]
             # Check if used in callbacks
-            used_in_callbacks = @rails_callbacks.values.flatten.include?(name)
+            # Note: use Object.values() for JS compatibility
+            all_callback_methods = Object.respond_to?(:values) ?
+              Object.values(@rails_callbacks).flatten :
+              @rails_callbacks.values.flatten
+            used_in_callbacks = all_callback_methods.include?(name)
             if used_in_callbacks
               # Transform and include the method
               transformed << process(node)

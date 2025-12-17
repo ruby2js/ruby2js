@@ -211,7 +211,37 @@ export function assert_equal(expected, actual) {
   }
 }
 
+export function assert_includes(collection, item) {
+  if (typeof collection === 'string') {
+    if (!collection.includes(item)) {
+      throw new Error(`Expected "${collection}" to include "${item}"`);
+    }
+  } else if (Array.isArray(collection)) {
+    if (!collection.includes(item)) {
+      throw new Error(`Expected array to include ${JSON.stringify(item)}`);
+    }
+  } else {
+    throw new Error(`assert_includes expects string or array, got ${typeof collection}`);
+  }
+}
+
+export function refute_includes(collection, item) {
+  if (typeof collection === 'string') {
+    if (collection.includes(item)) {
+      throw new Error(`Expected "${collection}" NOT to include "${item}"`);
+    }
+  } else if (Array.isArray(collection)) {
+    if (collection.includes(item)) {
+      throw new Error(`Expected array NOT to include ${JSON.stringify(item)}`);
+    }
+  } else {
+    throw new Error(`refute_includes expects string or array, got ${typeof collection}`);
+  }
+}
+
 globalThis.assert_equal = assert_equal;
+globalThis.assert_includes = assert_includes;
+globalThis.refute_includes = refute_includes;
 
 // before hooks - store to run before each test
 export function before(fn) {

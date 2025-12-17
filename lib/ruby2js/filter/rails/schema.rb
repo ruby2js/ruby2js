@@ -156,11 +156,12 @@ module Ruby2JS
             end
           end
 
-          @rails_tables << {
+          # Note: use push instead of << for JS compatibility (autoreturn + << = bitwise shift)
+          @rails_tables.push({
             name: table_name,
             columns: columns,
             foreign_keys: foreign_keys
-          }
+          })
         end
 
         def process_column(node, table_name)
@@ -322,12 +323,13 @@ module Ruby2JS
 
           index_name = options[:name] || "idx_#{table_name}_#{columns.join('_')}"
 
-          @rails_indexes << {
+          # Note: use push instead of << for JS compatibility (autoreturn + << = bitwise shift)
+          @rails_indexes.push({
             table: table_name,
             columns: columns,
             name: index_name,
             unique: options[:unique]
-          }
+          })
         end
 
         def extract_table_options(args)
