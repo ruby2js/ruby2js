@@ -202,6 +202,17 @@ export function skip(reason) {
   throw new Error('SKIP');
 }
 
+// Minitest assert-style assertions
+export function assert_equal(expected, actual) {
+  const exp = typeof expected === 'object' ? JSON.stringify(expected) : expected;
+  const act = typeof actual === 'object' ? JSON.stringify(actual) : actual;
+  if (exp !== act) {
+    throw new Error(`Expected:\n  "${expected}"\nbut got:\n  "${actual}"`);
+  }
+}
+
+globalThis.assert_equal = assert_equal;
+
 // before hooks - store to run before each test
 export function before(fn) {
   beforeHooks.push(fn);

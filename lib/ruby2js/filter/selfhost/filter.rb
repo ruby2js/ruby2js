@@ -277,11 +277,11 @@ module Ruby2JS
                       :'||',
                       s(:hash)
                     )
-                    # Ruby2JS.Filter.Rails.Model = Rails_Model
+                    # Ruby2JS.Filter.Rails.Model = Rails_Model.prototype
                     output_statements << s(:send,
                       s(:attr, s(:attr, s(:const, nil, :Ruby2JS), :Filter), namespace_name.to_sym),
                       "#{filter_name}=".to_sym,
-                      s(:const, nil, full_filter_name.to_sym)
+                      s(:attr, s(:const, nil, full_filter_name.to_sym), :prototype)
                     )
                   end
 

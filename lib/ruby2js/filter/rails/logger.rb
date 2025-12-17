@@ -33,9 +33,10 @@ module Ruby2JS
         def rails_logger?(node)
           return false unless node&.type == :send
           target, method = node.children
+          # Note: use explicit element comparison for JS compatibility (array == array compares refs in JS)
           method == :logger &&
             target&.type == :const &&
-            target.children == [nil, :Rails]
+            target.children[0].nil? && target.children[1] == :Rails
         end
       end
     end
