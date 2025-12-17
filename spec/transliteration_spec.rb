@@ -496,6 +496,21 @@ describe Ruby2JS do
         must_equal 'switch (a) {case 1: ; break; case 2: let b}'
     end
 
+    it "should handle case statement with splat array" do
+      to_js( 'case x; when *ITEMS; puts :match; end' ).
+        must_equal 'if (ITEMS.includes(x)) {puts("match")}'
+    end
+
+    it "should handle case statement with splat and else" do
+      to_js( 'case x; when *ITEMS; puts :match; else; puts :no; end' ).
+        must_equal 'if (ITEMS.includes(x)) {puts("match")} else {puts("no")}'
+    end
+
+    it "should handle case statement with splat and other values" do
+      to_js( 'case x; when 1, *ITEMS; puts :match; end' ).
+        must_equal 'if (x === 1 || ITEMS.includes(x)) {puts("match")}'
+    end
+
     it "should handle a for loop" do
       to_js( 'a = {}; b = {}; for i in a; b[i] = a[i]; end' ).
         must_equal 'let a = {}; let b = {}; for (let i in a) {b[i] = a[i]}'

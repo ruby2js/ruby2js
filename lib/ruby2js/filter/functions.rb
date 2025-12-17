@@ -320,7 +320,13 @@ module Ruby2JS
           if not target
             process S(:undef, args.first)
           elsif args.first.type == :str
-            process S(:undef, S(:attr, target, args.first.children.first))
+            key = args.first.children.first
+            # Use bracket notation if key is not a valid JS identifier
+            if key =~ /\A[a-zA-Z_$][a-zA-Z0-9_$]*\z/
+              process S(:undef, S(:attr, target, key))
+            else
+              process S(:undef, S(:send, target, :[], args.first))
+            end
           else
             process S(:undef, S(:send, target, :[], args.first))
           end

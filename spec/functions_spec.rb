@@ -668,6 +668,18 @@ describe Ruby2JS::Filter::Functions do
       to_js( 'delete a.x' ).must_equal 'delete a.x'
     end
 
+    it "should handle delete with key containing space" do
+      to_js( 'a.delete "NOT NULL"' ).must_equal 'delete a["NOT NULL"]'
+    end
+
+    it "should handle delete with key containing hyphen" do
+      to_js( 'a.delete "content-type"' ).must_equal 'delete a["content-type"]'
+    end
+
+    it "should handle delete with key starting with number" do
+      to_js( 'a.delete "123key"' ).must_equal 'delete a["123key"]'
+    end
+
     it "should not map delete blocks" do
       to_js( 'HTTP.delete("x") {}' ).
         must_equal 'HTTP.delete("x", () => {})'
