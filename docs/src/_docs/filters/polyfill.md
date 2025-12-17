@@ -24,6 +24,7 @@ The Polyfill filter automatically reorders itself to run before the Functions fi
 | `.first` | Property getter returning `this[0]` |
 | `.last` | Property getter returning `this.at(-1)` |
 | `.compact` | Property getter returning new array without `null`/`undefined` |
+| `.uniq` | Property getter returning `[...new Set(this)]` (duplicates removed) |
 | `.rindex { }` | Method that finds last index matching block |
 | `.insert(i, items)` | Method using `splice` to insert items |
 | `.delete_at(i)` | Method using `splice` to remove item at index |
@@ -58,6 +59,7 @@ The Polyfill filter automatically reorders itself to run before the Functions fi
 arr.first
 arr.last
 arr.compact
+arr.uniq
 str.chomp("\n")
 hash.to_a
 ```
@@ -79,6 +81,11 @@ Object.defineProperty(Array.prototype, "compact", {
   configurable: true
 });
 
+Object.defineProperty(Array.prototype, "uniq", {
+  get() { return [...new Set(this)] },
+  configurable: true
+});
+
 if (!String.prototype.chomp) {
   String.prototype.chomp = function(suffix) {
     if (suffix === undefined) return this.replace(/\r?\n$/m, "");
@@ -95,6 +102,7 @@ Object.defineProperty(Object.prototype, "to_a", {
 arr.first;
 arr.last;
 arr.compact;
+arr.uniq;
 str.chomp("\n");
 hash.to_a
 ```
@@ -108,6 +116,7 @@ The key difference between Polyfill and Functions:
 | `arr.first` | `arr.first` (property) | `arr[0]` |
 | `arr.last` | `arr.last` (property) | `arr[arr.length - 1]` |
 | `arr.compact` | `arr.compact` (property) | `arr.filter(x => x != null)` |
+| `arr.uniq` | `arr.uniq` (property) | `[...new Set(arr)]` |
 | `str.chomp` | `str.chomp()` (method) | `str.replace(/\r?\n$/, "")` |
 
 Choose **Polyfill** when you want Ruby-style method names preserved in the output. Choose **Functions** when you want zero-runtime-overhead inline transformations.

@@ -54,6 +54,20 @@ describe Ruby2JS::Filter::Polyfill do
     end
   end
 
+  describe 'Array#uniq' do
+    it 'should add polyfill and use property access' do
+      js = to_js('arr.uniq')
+      _(js).must_include 'Object.defineProperty(Array.prototype, "uniq"'
+      _(js).must_include 'arr.uniq'
+      _(js).wont_include 'arr.uniq()'
+    end
+
+    it 'should use Set spread in polyfill' do
+      js = to_js('arr.uniq')
+      _(js).must_include '[...new Set(this)]'
+    end
+  end
+
   describe 'Array#rindex' do
     it 'should add polyfill for rindex with block' do
       js = to_js('arr.rindex { |x| x > 0 }')

@@ -181,7 +181,11 @@ async function runSelfhostBuild() {
           eslevel: 2022,
           file: relative(__dirname, srcPath),
           filters: selfhostFilters,
-          autoexports: true
+          autoexports: true,
+          autoimports: {
+            ApplicationRecord: './application_record.js',
+            ApplicationController: './application_controller.js'
+          }
         });
 
         // Ensure destination directory exists

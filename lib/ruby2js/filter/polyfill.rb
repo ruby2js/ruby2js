@@ -82,6 +82,13 @@ module Ruby2JS
             )
           )
 
+        when :array_uniq
+          # Object.defineProperty(Array.prototype, 'uniq', {get() { return [...new Set(this)] }, configurable: true})
+          # Non-mutating: returns new array with duplicates removed (matches Ruby's uniq)
+          define_property_getter(:Array, :uniq,
+            s(:return, s(:array, s(:splat, s(:send, s(:const, nil, :Set), :new, s(:self)))))
+          )
+
         when :array_rindex
           # if (!Array.prototype.rindex) { Array.prototype.rindex = function(fn) {...} }
           # Using while loop: let i = this.length - 1; while (i >= 0) { ...; i-- }
@@ -234,6 +241,13 @@ module Ruby2JS
               return s(:attr, process(target), :compact)
             end
 
+          when :uniq
+            if args.empty?
+              add_polyfill(:array_uniq)
+              # Use :attr for property access (no parens) - it's a getter
+              return s(:attr, process(target), :uniq)
+            end
+
           when :insert
             add_polyfill(:array_insert)
             return s(:send!, process(target), :insert, *args.map { |a| process(a) })
@@ -288,6 +302,8 @@ module Ruby2JS
           add_polyfill(:array_last)
         when :compact
           add_polyfill(:array_compact)
+        when :uniq
+          add_polyfill(:array_uniq)
         end
 
         super
