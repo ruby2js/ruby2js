@@ -95,7 +95,6 @@ function runRubyBuild() {
 }
 
 // Selfhost build using JavaScript-based transpilation
-// Note: This is experimental and doesn't include Rails filters yet
 let selfhostConverter = null;
 let selfhostFilters = [];
 
@@ -110,15 +109,35 @@ async function initSelfhost() {
     await module.initPrism();
     selfhostConverter = module;
 
-    // Load available filters (same ones Ruby build uses, minus Rails-specific)
+    // Load core filters
     const { Functions } = await import(join(filtersPath, 'functions.js'));
     const { ESM } = await import(join(filtersPath, 'esm.js'));
     const { Return } = await import(join(filtersPath, 'return.js'));
 
-    // Pass .prototype because Pipeline expects objects with methods, not classes
-    selfhostFilters = [Functions.prototype, ESM.prototype, Return.prototype];
+    // Load Rails filters
+    const { Rails_Model } = await import(join(filtersPath, 'rails/model.js'));
+    const { Rails_Controller } = await import(join(filtersPath, 'rails/controller.js'));
+    const { Rails_Routes } = await import(join(filtersPath, 'rails/routes.js'));
+    const { Rails_Schema } = await import(join(filtersPath, 'rails/schema.js'));
+    const { Rails_Logger } = await import(join(filtersPath, 'rails/logger.js'));
+    const { Rails_Seeds } = await import(join(filtersPath, 'rails/seeds.js'));
 
-    console.log('\x1b[32m[selfhost]\x1b[0m Initialized with filters: functions, esm, return');
+    // Pass .prototype because Pipeline expects objects with methods, not classes
+    selfhostFilters = [
+      // Rails filters first (they transform high-level patterns)
+      Rails_Model.prototype,
+      Rails_Controller.prototype,
+      Rails_Routes.prototype,
+      Rails_Schema.prototype,
+      Rails_Logger.prototype,
+      Rails_Seeds.prototype,
+      // Then core filters
+      Functions.prototype,
+      ESM.prototype,
+      Return.prototype
+    ];
+
+    console.log('\x1b[32m[selfhost]\x1b[0m Initialized with filters: rails/*, functions, esm, return');
   } catch (err) {
     console.error('\x1b[31m[selfhost]\x1b[0m Failed to initialize:', err.message);
     throw err;
@@ -176,7 +195,7 @@ async function runSelfhostBuild() {
       try {
         const source = await readFile(srcPath, 'utf-8');
 
-        // Transpile with selfhost (uses functions/esm/return filters, no Rails filters)
+        // Transpile with selfhost
         const js = selfhostConverter.convert(source, {
           eslevel: 2022,
           file: relative(__dirname, srcPath),
@@ -221,8 +240,8 @@ async function runSelfhostBuild() {
     (errorCount > 0 ? ` (\x1b[31m${errorCount} errors\x1b[0m)` : ''));
 
   if (errorCount > 0) {
-    console.log('\x1b[33m[selfhost]\x1b[0m Note: Rails filters not available in selfhost yet');
-    console.log('\x1b[33m[selfhost]\x1b[0m Run without --selfhost for full functionality');
+    console.log('\x1b[33m[selfhost]\x1b[0m Some files failed to transpile');
+    console.log('\x1b[33m[selfhost]\x1b[0m Run without --selfhost if Ruby backend produces better results');
   }
 }
 
