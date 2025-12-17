@@ -477,11 +477,19 @@ module Ruby2JS
           # arr.none? => !arr.some(Boolean)
           process S(:send, S(:send, target, :some, s(:const, nil, :Boolean)), :!)
 
-        elsif [:start_with?, :end_with?].include? method and args.length == 1
-          if method == :start_with?
-            process S(:send, target, :startsWith, *args)
+        elsif [:start_with?, :end_with?].include? method and args.length >= 1
+          js_method = method == :start_with? ? :startsWith : :endsWith
+          if args.length == 1
+            process S(:send, target, js_method, *args)
           else
-            process S(:send, target, :endsWith, *args)
+            # Multiple args: str.start_with?('a', 'b') => ['a', 'b'].some(p => str.startsWith(p))
+            process S(:send,
+              S(:array, *args),
+              :some,
+              S(:block,
+                S(:send, nil, :proc),
+                S(:args, S(:arg, :_p)),
+                S(:send, target, js_method, S(:lvar, :_p))))
           end
 
         elsif method == :clear and args.length == 0 and parens_or_included?(node, method)

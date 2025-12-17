@@ -3,8 +3,8 @@
 // Usage: node dev-server.mjs [--selfhost] [--port=3000]
 
 import { createServer } from 'http';
-import { readFile, stat } from 'fs/promises';
-import { join, extname } from 'path';
+import { readFile, stat, writeFile, mkdir } from 'fs/promises';
+import { join, extname, relative, dirname as pathDirname } from 'path';
 import { watch } from 'chokidar';
 import { WebSocketServer } from 'ws';
 import { exec } from 'child_process';
@@ -56,10 +56,7 @@ async function runBuild() {
 
   if (selfhost) {
     console.log('\x1b[33m[selfhost]\x1b[0m Transpiling with JavaScript...');
-    // TODO: Implement selfhost transpilation
-    // For now, fall back to Ruby with a warning
-    console.log('\x1b[33m[selfhost]\x1b[0m Not yet implemented, using Ruby backend');
-    await runRubyBuild();
+    await runSelfhostBuild();
   } else {
     await runRubyBuild();
   }
@@ -95,6 +92,134 @@ function runRubyBuild() {
       }
     });
   });
+}
+
+// Selfhost build using JavaScript-based transpilation
+// Note: This is experimental and doesn't include Rails filters yet
+let selfhostConverter = null;
+let selfhostFilters = [];
+
+async function initSelfhost() {
+  if (selfhostConverter) return;
+
+  const selfhostPath = join(__dirname, '../selfhost/ruby2js.mjs');
+  const filtersPath = join(__dirname, '../selfhost/filters');
+
+  try {
+    const module = await import(selfhostPath);
+    await module.initPrism();
+    selfhostConverter = module;
+
+    // Load available filters (same ones Ruby build uses, minus Rails-specific)
+    const { Functions } = await import(join(filtersPath, 'functions.js'));
+    const { ESM } = await import(join(filtersPath, 'esm.js'));
+    const { Return } = await import(join(filtersPath, 'return.js'));
+
+    // Pass .prototype because Pipeline expects objects with methods, not classes
+    selfhostFilters = [Functions.prototype, ESM.prototype, Return.prototype];
+
+    console.log('\x1b[32m[selfhost]\x1b[0m Initialized with filters: functions, esm, return');
+  } catch (err) {
+    console.error('\x1b[31m[selfhost]\x1b[0m Failed to initialize:', err.message);
+    throw err;
+  }
+}
+
+async function runSelfhostBuild() {
+  try {
+    await initSelfhost();
+  } catch {
+    console.log('\x1b[33m[selfhost]\x1b[0m Falling back to Ruby backend');
+    return runRubyBuild();
+  }
+
+  const distDir = join(__dirname, 'dist');
+  let fileCount = 0;
+  let errorCount = 0;
+
+  // Define source directories and their output mappings
+  const sources = [
+    { src: 'app/models', dest: 'models' },
+    { src: 'app/controllers', dest: 'controllers' },
+    { src: 'app/helpers', dest: 'helpers' },
+    { src: 'config', dest: 'config' },
+    { src: 'db', dest: 'db' }
+  ];
+
+  for (const { src, dest } of sources) {
+    const srcDir = join(__dirname, src);
+    const destDir = join(distDir, dest);
+
+    try {
+      await mkdir(destDir, { recursive: true });
+    } catch {}
+
+    // Find all .rb files
+    const pattern = join(srcDir, '**/*.rb');
+    let files;
+    try {
+      // Use exec to find files since glob may not be available
+      files = await new Promise((resolve, reject) => {
+        exec(`find "${srcDir}" -name "*.rb" 2>/dev/null`, (err, stdout) => {
+          if (err && !stdout) resolve([]);
+          else resolve(stdout.trim().split('\n').filter(f => f));
+        });
+      });
+    } catch {
+      files = [];
+    }
+
+    for (const srcPath of files) {
+      const relativePath = relative(srcDir, srcPath);
+      const destPath = join(destDir, relativePath.replace(/\.rb$/, '.js'));
+
+      try {
+        const source = await readFile(srcPath, 'utf-8');
+
+        // Transpile with selfhost (uses functions/esm/return filters, no Rails filters)
+        const js = selfhostConverter.convert(source, {
+          eslevel: 2022,
+          file: relative(__dirname, srcPath),
+          filters: selfhostFilters,
+          autoexports: true
+        });
+
+        // Ensure destination directory exists
+        await mkdir(pathDirname(destPath), { recursive: true });
+        await writeFile(destPath, js);
+        fileCount++;
+      } catch (err) {
+        errorCount++;
+        console.error(`\x1b[31m[error]\x1b[0m ${relative(__dirname, srcPath)}: ${err.message}`);
+      }
+    }
+  }
+
+  // Copy lib files (these are pure JS, no transpilation needed)
+  const libSrc = join(__dirname, 'lib');
+  const libDest = join(distDir, 'lib');
+  try {
+    await mkdir(libDest, { recursive: true });
+    const libFiles = await new Promise((resolve, reject) => {
+      exec(`find "${libSrc}" -name "*.js" 2>/dev/null`, (err, stdout) => {
+        if (err && !stdout) resolve([]);
+        else resolve(stdout.trim().split('\n').filter(f => f));
+      });
+    });
+    for (const f of libFiles) {
+      const content = await readFile(f);
+      await writeFile(join(libDest, relative(libSrc, f)), content);
+      fileCount++;
+    }
+  } catch {}
+
+  console.log(`\x1b[32m[selfhost]\x1b[0m Transpiled ${fileCount} files` +
+    (errorCount > 0 ? ` (\x1b[31m${errorCount} errors\x1b[0m)` : ''));
+
+  if (errorCount > 0) {
+    console.log('\x1b[33m[selfhost]\x1b[0m Note: Rails filters not available in selfhost yet');
+    console.log('\x1b[33m[selfhost]\x1b[0m Run without --selfhost for full functionality');
+  }
 }
 
 function notifyClients() {

@@ -205,11 +205,15 @@ describe Ruby2JS::Filter::Functions do
     it 'should handle start_with?' do
       to_js( 'x.start_with?(y)' ).must_equal "x.startsWith(y)"
       to_js( 'x.start_with?("z")' ).must_equal "x.startsWith(\"z\")"
+      # Multiple arguments: any prefix matches
+      to_js( 'x.start_with?("a", "b")' ).must_equal '["a", "b"].some(_p => x.startsWith(_p))'
     end
 
     it 'should handle end_with?' do
       to_js( 'x.end_with?(y)' ).must_equal "x.endsWith(y)"
       to_js( 'x.end_with?("z")' ).must_equal "x.endsWith(\"z\")"
+      # Multiple arguments: any suffix matches
+      to_js( 'x.end_with?("a", "b")' ).must_equal '["a", "b"].some(_p => x.endsWith(_p))'
     end
 
     it 'should handle strip/lstrip/rstrip' do
