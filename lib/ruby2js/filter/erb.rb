@@ -7,15 +7,23 @@ module Ruby2JS
 
       # Track instance variables found during AST traversal
       def initialize(*args)
-        @erb_ivars = Set.new
+        # Note: super must be called first for JS class compatibility
+        super
+        # Note: use Array instead of Set for JS compatibility (Set doesn't have push)
+        @erb_ivars = []
         @erb_bufvar = nil
         @erb_block_var = nil  # Track current block variable (e.g., 'f' in form_for)
         @erb_model_name = nil # Track model name for form_for (e.g., 'user')
-        super
       end
 
       # Main entry point - detect ERB/HERB output patterns and transform
       def on_begin(node)
+        # Initialize state if needed (JS compatibility - constructor may not run in filter pipeline)
+        @erb_ivars ||= []
+        @erb_bufvar ||= nil
+        @erb_block_var ||= nil
+        @erb_model_name ||= nil
+
         # Check if this looks like ERB/HERB output:
         # - First statement assigns to _erbout or _buf
         # - Last statement returns the buffer
@@ -37,7 +45,8 @@ module Ruby2JS
         @erb_bufvar = bufvar
 
         # Collect all instance variables used in the template
-        @erb_ivars = Set.new
+        # Note: use Array instead of Set for JS compatibility
+        @erb_ivars = []
         collect_ivars(node)
 
         # Transform the body, converting ivars to property access on 'data' param
@@ -51,7 +60,8 @@ module Ruby2JS
           args = s(:args)
         else
           # Create destructuring pattern: { title, content }
-          kwargs = @erb_ivars.to_a.sort.map do |ivar|
+          # Note: use uniq.sort for Array (was .to_a.sort for Set)
+          kwargs = @erb_ivars.uniq.sort.map do |ivar|
             prop_name = ivar.to_s[1..-1].to_sym  # @title -> title
             s(:kwarg, prop_name)
           end
@@ -400,7 +410,8 @@ module Ruby2JS
         return unless Ruby2JS.ast_node?(node)
 
         if node.type == :ivar
-          @erb_ivars << node.children.first
+          # Note: use push instead of << for JS compatibility
+          @erb_ivars.push(node.children.first)
         end
 
         node.children.each do |child|

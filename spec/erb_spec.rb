@@ -108,7 +108,9 @@ describe Ruby2JS::Filter::Erb do
   end
 
   describe 'Ruby2JS::Erubi' do
+    # Skip Erubi tests in selfhost - Erubi parser not yet implemented in JS
     it "should compile simple ERB templates" do
+      return skip() unless defined?(Ruby2JS::Erubi)
       result = erb_to_js('<h1><%= @title %></h1>')
       result.must_include 'function render({ title })'
       result.must_include '_buf += "<h1>"'
@@ -116,6 +118,7 @@ describe Ruby2JS::Filter::Erb do
     end
 
     it "should handle block expressions like form_for" do
+      return skip() unless defined?(Ruby2JS::Erubi)
       result = erb_to_js('<%= form_for @user do |f| %><%= f.text_field :name %><% end %>')
       result.must_include 'function render({ user })'
       # The form_for block should generate HTML form tags (escaped in JS string)
@@ -127,30 +130,35 @@ describe Ruby2JS::Filter::Erb do
     end
 
     it "should handle mixed static and dynamic content" do
+      return skip() unless defined?(Ruby2JS::Erubi)
       result = erb_to_js('<div class="container"><%= @content %></div>')
       result.must_include 'container'
       result.must_include 'String(content)'
     end
 
     it "should handle form builder label method" do
+      return skip() unless defined?(Ruby2JS::Erubi)
       result = erb_to_js('<%= form_for @user do |f| %><%= f.label :email %><% end %>')
       result.must_include 'user_email'
       result.must_include '>Email</label>'
     end
 
     it "should handle various input types" do
+      return skip() unless defined?(Ruby2JS::Erubi)
       result = erb_to_js('<%= form_for @user do |f| %><%= f.email_field :email %><%= f.password_field :password %><% end %>')
       result.must_include 'type=\\"email\\"'
       result.must_include 'type=\\"password\\"'
     end
 
     it "should handle textarea" do
+      return skip() unless defined?(Ruby2JS::Erubi)
       result = erb_to_js('<%= form_for @post do |f| %><%= f.text_area :body %><% end %>')
       result.must_include '<textarea'
       result.must_include 'post[body]'
     end
 
     it "should handle submit with custom label" do
+      return skip() unless defined?(Ruby2JS::Erubi)
       result = erb_to_js('<%= form_for @user do |f| %><%= f.submit "Create Account" %><% end %>')
       result.must_include 'type=\\"submit\\"'
       result.must_include 'Create Account'

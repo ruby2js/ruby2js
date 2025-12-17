@@ -70,7 +70,7 @@ Ruby2JS.Filter = Ruby2JS.Filter || {};
 // Global include/exclude tracking for filters
 Ruby2JS.Filter._included = new Set();
 Ruby2JS.Filter._excluded = new Set();
-Ruby2JS.Filter.DEFAULTS = [];
+Ruby2JS.Filter.DEFAULTS = Ruby2JS.Filter.DEFAULTS || [];
 
 Ruby2JS.Filter.include = function(...methods) {
   methods.forEach(m => Ruby2JS.Filter._included.add(m));
@@ -200,7 +200,7 @@ export function it(name, fn) {
   } catch (e) {
     if (e.message === 'SKIP') {
       skipCount++;
-      passCount--; // Undo the implicit pass
+      // Note: passCount was never incremented (fn() threw before the passCount++ line)
     } else {
       failCount++;
       failures.push({ name: fullName, error: e });
