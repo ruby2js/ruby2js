@@ -194,7 +194,8 @@ Location within the Ruby2JS repo keeps it close to selfhost, making gap iteratio
 | 0 | Validation (de-risk assumptions) | ~1-2 days |
 | 1 | Classic Blog (ERB) - Core Functionality | ~1 week |
 | 2a | Dev Server with hot reload | ~1-2 days |
-| 2b | Browser live transpilation | Deferred until selfhost ready |
+| 2b | Downloadable demo tarball | ~1 day |
+| 2c | Browser live transpilation | Deferred until selfhost ready |
 | 3 | Full Rails Getting Started features | ~1 week |
 | 4 | Phlex equivalent | ~2-3 days |
 | **Total** | | **~4 weeks** |
@@ -635,11 +636,99 @@ rails-in-js/
 
 ---
 
-## Stage 2b: Browser Live Transpilation
+## Stage 2b: Downloadable Demo Tarball
+
+**Timeline:** ~1 day
+**Goal:** Ruby-free downloadable demo with selfhost hot reload
+**Prerequisite:** Rails filters working in selfhost (Stage 2a `--selfhost` mode)
+
+### Approach
+
+Create a downloadable tarball that anyone can run without installing Ruby:
+
+```bash
+curl https://ruby2js.com/demo/rails-in-js.tar.gz | tar xz
+cd rails-in-js
+npm install
+npm run dev
+```
+
+The tarball includes:
+- Pre-built `dist/` (transpiled from Ruby source)
+- Ruby source files in `app/`, `config/`, `db/` (for editing)
+- Selfhost converter and filters (for hot reload transpilation)
+- Modified dev-server that uses local selfhost paths
+
+### Implementation Tasks
+
+#### Dockerfile Addition
+
+- [ ] Build rails-in-js demo during Docker build (`ruby scripts/build.rb`)
+- [ ] Copy selfhost files into tarball (ruby2js.mjs, filters/)
+- [ ] Create tarball with correct structure
+- [ ] Place tarball in nginx output directory
+
+#### Package Restructure
+
+- [ ] Create `selfhost/` directory within rails-in-js for standalone use
+- [ ] Modify dev-server.mjs paths for standalone mode (detect if selfhost is local)
+- [ ] Update package.json: default `npm run dev` uses selfhost mode
+- [ ] Add `npm run dev:ruby` for Ruby-based transpilation (development)
+
+#### Tarball Contents
+
+```
+rails-in-js/
+├── package.json          # Modified for selfhost-only mode
+├── index.html
+├── dev-server.mjs        # Hot reload server
+├── app/                  # Ruby source (editable)
+│   ├── models/
+│   ├── controllers/
+│   ├── helpers/
+│   └── views/
+├── config/
+├── db/
+├── lib/                  # JS runtime (rails.js)
+├── dist/                 # Pre-built (for immediate use)
+├── public/
+└── selfhost/             # Bundled transpiler
+    ├── ruby2js.mjs       # Main converter
+    ├── filter_runtime.js
+    └── filters/          # Transpiled filters
+        ├── functions.js
+        ├── esm.js
+        ├── return.js
+        └── rails/
+            ├── model.js
+            ├── controller.js
+            ├── routes.js
+            ├── schema.js
+            ├── seeds.js
+            └── logger.js
+```
+
+#### Documentation
+
+- [ ] README.md explains the demo and how to edit Ruby files
+- [ ] Link from ruby2js.com demo page
+- [ ] Blog post announcing downloadable demo
+
+### Success Criteria
+
+- [ ] Tarball downloadable from ruby2js.com
+- [ ] `npm install && npm run dev` works without Ruby
+- [ ] Editing .rb files triggers hot reload with selfhost transpilation
+- [ ] Demo fully functional (CRUD articles/comments)
+- [ ] Sourcemaps work for debugging Ruby in browser
+
+---
+
+## Stage 2c: Browser Live Transpilation
 
 **Timeline:** Deferred until selfhost ready
 **Goal:** True browser-based transpilation without server involvement
-**Prerequisite:** Stage 2a's `--selfhost` mode works correctly for all Rails filters
+**Prerequisite:** Stage 2b's selfhost mode works correctly for all Rails filters
 
 ### Approach
 
@@ -652,7 +741,7 @@ Once selfhost transpilation is proven via Stage 2a, move transpilation from Node
 
 ### Why Defer?
 
-- Stage 2a's `--selfhost` flag must produce correct output first
+- Stage 2b's downloadable demo must work first (proves selfhost is ready)
 - Rails filters (Model, Controller, Routes, Schema, Seeds, Logger) need to work in selfhost
 - No point loading 500KB in browser if transpilation produces wrong results
 
@@ -944,7 +1033,21 @@ Each stage has two types of success criteria: **selfhost hardening** (primary) a
 
 ### Stage 2b Complete When:
 
-**Prerequisite:** Stage 2a's `--selfhost` produces identical output to Ruby backend
+**Prerequisite:** Stage 2a's `--selfhost` mode works for Rails filters
+
+**Selfhost Hardening:**
+- [ ] All Rails filters work in selfhost transpilation
+- [ ] Gaps discovered during testing are fixed
+
+**Demo Functionality:**
+- [ ] Tarball downloadable from ruby2js.com/demo/rails-in-js.tar.gz
+- [ ] `npm install && npm run dev` works without Ruby installed
+- [ ] Hot reload works with selfhost transpilation
+- [ ] Full CRUD functionality works out of the box
+
+### Stage 2c Complete When:
+
+**Prerequisite:** Stage 2b's selfhost produces identical output to Ruby backend
 
 **Selfhost Hardening:**
 - [ ] All Rails filters (Model, Controller, Routes, Schema, Seeds, Logger) work in selfhost
