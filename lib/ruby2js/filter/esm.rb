@@ -251,8 +251,10 @@ module Ruby2JS
           base_dirname = File.dirname(File.expand_path(@options[:file]))
         else
           # Node.js implementation
-          path = require('path')
-          url_mod = require('url')
+          # Note: use variables to hide module names from Opal's static require analysis
+          path_mod = 'path'; url_mod_name = 'url'
+          path = require(path_mod)
+          url_mod = require(url_mod_name)
           file_path = @options[:file]
           # Convert file:// URL to path if needed (import.meta.url returns file:// URLs)
           if file_path.start_with?('file://')
@@ -276,8 +278,10 @@ module Ruby2JS
           relative_path = ->(from, to) { Pathname.new(to).relative_path_from(Pathname.new(from)).to_s }
         else
           # Node.js implementation
-          fs = require('fs')
-          path = require('path')
+          # Note: use variables to hide module names from Opal's static require analysis
+          fs_mod = 'fs'; path_mod = 'path'
+          fs = require(fs_mod)
+          path = require(path_mod)
           path_join = ->(a, b) { path.join(a, b) }
           file_exists = ->(f) { fs.existsSync(f) and fs.statSync(f).isFile() }
           real_path = ->(f) { fs.realpathSync(f) }
