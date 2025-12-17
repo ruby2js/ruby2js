@@ -101,7 +101,7 @@ let selfhostFilters = [];
 async function initSelfhost() {
   if (selfhostConverter) return;
 
-  const selfhostPath = join(__dirname, '../selfhost/ruby2js.mjs');
+  const selfhostPath = join(__dirname, '../selfhost/ruby2js.js');
   const filtersPath = join(__dirname, '../selfhost/filters');
 
   try {

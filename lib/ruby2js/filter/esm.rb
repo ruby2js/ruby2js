@@ -44,11 +44,28 @@ module Ruby2JS
 
         @esm_top = list
 
-        return super unless @esm_autoexports
+        # Process the AST first (let other filters transform it)
+        result = super
+
+        # Then apply autoexports to the processed result
+        return result unless @esm_autoexports
+
+        # Re-extract the list from the processed result
+        list = [result]
+        while list.length == 1 and list.first.respond_to?(:type) and list.first.type == :begin
+          list = list.first.children.dup
+        end
+
+        # Skip autoexports if any child is already an export or import
+        # (another filter like Rails::Seeds may have already handled exports)
+        has_exports = list.any? { |c| c.respond_to?(:type) && [:export, :import].include?(c.type) }
+        return result if has_exports
 
         replaced = []
         list.map! do |child|
           replacement = child
+
+          next child unless child.respond_to?(:type)
 
           if [:module, :class].include? child.type and
             child.children.first.type == :const and
@@ -82,7 +99,7 @@ module Ruby2JS
         end
 
         @esm_autoexports = false
-        process s(:begin, *list)
+        s(:begin, *list)
       end
 
       def on_class(node)
