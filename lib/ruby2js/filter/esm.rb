@@ -418,8 +418,13 @@ module Ruby2JS
 
         if @esm_autoimports[token]
           [@esm_autoimports[token], s(:const, nil, token)]
-        elsif found_key = @esm_autoimports.keys.find {|key| key.is_a?(Array) && key.include?(token)}
+        elsif found_key = @esm_autoimports.keys.find {|key| key.respond_to?(:each) && key.include?(token)}
+          # Ruby: array keys like [:func, :another]
           [@esm_autoimports[found_key], found_key.map {|key| s(:const, nil, key)}]
+        elsif found_key = @esm_autoimports.keys.find {|key| key.is_a?(String) && key.include?(',') && key.split(',').include?(token.to_s)}
+          # JS: stringified array keys like "func,another" - split to recover array
+          key_array = found_key.split(',')
+          [@esm_autoimports[found_key], key_array.map {|key| s(:const, nil, key.to_sym)}]
         end
       end
     end
