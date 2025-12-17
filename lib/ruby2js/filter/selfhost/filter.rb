@@ -52,6 +52,15 @@ module Ruby2JS
         def on_send(node)
           target, method_name, *args = node.children
 
+          # Skip Ruby2JS.module_default = :xxx
+          # This is a Ruby-side setting that doesn't apply in JS context
+          if target&.type == :const &&
+             target.children[0].nil? &&
+             target.children[1] == :Ruby2JS &&
+             method_name == :module_default=
+            return s(:hide)
+          end
+
           # Handle require 'external_dep'
           if target.nil? && method_name == :require && args.length == 1
             if args.first.type == :str

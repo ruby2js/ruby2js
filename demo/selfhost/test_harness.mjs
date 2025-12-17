@@ -24,6 +24,10 @@ import {
   convert as bundleConvert
 } from './ruby2js.js';
 
+// Import Node.js module system for require shim
+import { createRequire } from 'module';
+const nodeRequire = createRequire(import.meta.url);
+
 // Set up globals
 setupGlobals(Ruby2JS);
 globalThis.Namespace = Ruby2JS.Namespace;
@@ -32,7 +36,13 @@ globalThis.Ruby2JS = Ruby2JS;
 // Provide a require shim for transpiled specs that use inline require
 // (e.g., require 'ruby2js/filter/return' inside a function)
 // Filters should already be loaded by run_all_specs.mjs, so this is a no-op
+
 globalThis.require = function(path) {
+  // Handle Node.js built-in modules (used by ESM filter for file analysis)
+  if (path === 'fs' || path === 'path' || path === 'url') {
+    return nodeRequire(path);
+  }
+
   // Extract filter name from path like "ruby2js/filter/return"
   const match = path.match(/ruby2js\/filter\/(\w+)/);
   if (match) {

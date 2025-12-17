@@ -63,21 +63,29 @@ describe Ruby2JS::Filter::ESM do
     end
 
     it "should convert require to import with explicit exports" do
+      # Skip in browser context (no filesystem access) or selfhost (no Ruby2JS.parse)
+      return skip() if defined?(Window) or !Ruby2JS.respond_to?(:parse)
       to_js('require "require/test4.rb"', file: __FILE__).
         must_equal 'import Whoa, { Foo } from "./require/test4.rb"'
     end
 
     it "should convert require to import with auto exports" do
+      # Skip in browser context (no filesystem access) or selfhost (no Ruby2JS.parse)
+      return skip() if defined?(Window) or !Ruby2JS.respond_to?(:parse)
       to_js('require "require/test5.rb"', file: __FILE__, autoexports: true).
         must_equal 'import { Foo } from "./require/test5.rb"'
     end
 
     it "should convert require to import with auto exports default" do
+      # Skip in browser context (no filesystem access) or selfhost (no Ruby2JS.parse)
+      return skip() if defined?(Window) or !Ruby2JS.respond_to?(:parse)
       to_js('require "require/test5.rb"', file: __FILE__, autoexports: :default).
         must_equal 'import Foo from "./require/test5.rb"'
     end
 
     it "should handle require_recursive" do
+      # Skip in browser context (no filesystem access) or selfhost (no Ruby2JS.parse)
+      return skip() if defined?(Window) or !Ruby2JS.respond_to?(:parse)
       to_js('require "require/test7.rb"', file: __FILE__, autoexports: :default, require_recursive: true).
         must_equal 'import A from "./require/sub1/test8.rb"; ' +
           'import B from "./require/sub1/sub2/test9.rb"; ' +
@@ -207,6 +215,8 @@ describe Ruby2JS::Filter::ESM do
     end
 
     it "should handle autoimport as a proc" do
+      # Skip in selfhost - Ruby procs don't translate to JS
+      return skip() unless defined?(Proc)
       to_js('Foo.bar', autoimports: proc {|name| "#{name.downcase}.js"}).
         must_equal 'import Foo from "foo.js"; Foo.bar'
     end
@@ -217,6 +227,9 @@ describe Ruby2JS::Filter::ESM do
     end
 
     it "should not autoimport if magic comment is present" do
+      # Skip in selfhost - pragma filter is auto-applied in Ruby but not in selfhost
+      # (selfhost only applies explicitly listed filters)
+      return skip() unless Ruby2JS.respond_to?(:parse)
       to_js("# autoimports: false\nfunc(1)", autoimports: {[:func, :another] => 'func.js'}).
         must_equal "// autoimports: false\nfunc(1)"
     end
