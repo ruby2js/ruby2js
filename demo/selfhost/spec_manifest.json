@@ -7,7 +7,8 @@
     "functions_spec.rb",
     "return_spec.rb",
     "active_support_spec.rb",
-    "rails_logger_spec.rb"
+    "rails_logger_spec.rb",
+    "rails_controller_spec.rb"
   ],
   "partial": [
     "camelcase_spec.rb",
@@ -19,7 +20,6 @@
     "comments_spec.rb",
     "erb_spec.rb",
     "rails_model_spec.rb",
-    "rails_controller_spec.rb",
     "rails_routes_spec.rb",
     "rails_schema_spec.rb",
     "rails_seeds_spec.rb"

@@ -29,21 +29,28 @@ module Ruby2JS
         end
       end
 
-      # in Ruby regular expressions, ^ and $ apply to each line
-      if parts.first.type == :str and parts.first.children[0].start_with?('^')
-        if opts.include? :m or opts.include? 'm'
-          if parts.first.children[0].gsub(/\\./, '').gsub(/\[.*?\]/, '').include? '.'
-            opts = [*opts, :s] unless opts.include? :s or opts.include? 's'
-          end
-        else
+      # Ruby's /m flag makes . match newlines (JS /s does this)
+      # Ruby's ^ and $ always match line boundaries (like JS /m)
+      # So: Ruby /m with . should become JS /s (replacing /m)
+      # Ruby without /m with ^ or $ should add JS /m
+      has_ruby_m = opts.include?(:m) || opts.include?('m')
+      if has_ruby_m
+        # Check if regex contains . (but not escaped \. or inside [])
+        all_str = parts.select { |p| p.type == :str }.map { |p| p.children[0] }.join
+        if all_str.gsub(/\\./, '').gsub(/\[.*?\]/, '').include?('.')
+          # Replace Ruby /m with JS /s for dot behavior
+          opts = opts.reject { |o| o == :m || o == 'm' }
+          opts = [*opts, :s] unless opts.include?(:s) || opts.include?('s')
+        end
+      end
+
+      # Ruby ^ and $ match line boundaries by default; JS needs /m for this
+      if parts.first.type == :str && parts.first.children[0].start_with?('^')
+        unless opts.include?(:m) || opts.include?('m')
           opts = [*opts, :m]
         end
-      elsif parts.last.type == :str and parts.last.children[0].end_with?('$')
-        if opts.include? :m or opts.include? 'm'
-          if parts.last.children[0].gsub(/\\./, '').gsub(/\[.*?\]/, '').include? '.'
-            opts = [*opts, :s] unless opts.include? :s or opts.include? 's'
-          end
-        else
+      elsif parts.last.type == :str && parts.last.children[0].end_with?('$')
+        unless opts.include?(:m) || opts.include?('m')
           opts = [*opts, :m]
         end
       end

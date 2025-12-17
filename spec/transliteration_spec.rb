@@ -1169,7 +1169,9 @@ describe Ruby2JS do
 
   describe 'regular expressions' do
     it "should handle regular expressions with options" do
-      to_js( '/a.*b/im' ).must_equal "/a.*b/im"
+      # Ruby /m makes . match newlines; JS /s does this (JS /m is for ^/$ anchors)
+      # Ruby /m is replaced with JS /s when regex contains unescaped .
+      to_js( '/a.*b/im' ).must_equal "/a.*b/is"
     end
 
     it "should handle %regular expressions" do
@@ -1211,8 +1213,8 @@ describe Ruby2JS do
       to_js( "/x$/" ).must_equal '/x$/m'
       to_js( "Regexp.new('^$')" ).must_equal '/^$/m'
 
-      to_js( "/^./m" ).must_equal '/^./ms'
-      to_js( "/.$/m" ).must_equal '/.$/ms'
+      to_js( "/^./m" ).must_equal '/^./sm'
+      to_js( "/.$/m" ).must_equal '/.$/sm'
       to_js( "Regexp.new('^$', 'm')" ).must_equal '/^$/m'
     end
 

@@ -245,7 +245,8 @@ module Ruby2JS
               method_node = @rails_private_methods[ba[:method]]
               if method_node
                 before_ivars = collect_instance_variables(method_node.children[2])
-                ivars.concat(before_ivars)
+                # Note: use push(*arr) for JS compatibility (concat returns new array in JS)
+                ivars.push(*before_ivars)
               end
             end
           end
@@ -326,19 +327,20 @@ module Ruby2JS
         end
 
         def collect_instance_variables(node)
-          ivars = Set.new
+          # Note: use Array instead of Set for JS compatibility (Set.to_a polyfill doesn't work for Sets)
+          ivars = []
           collect_ivars_recursive(node, ivars)
-          ivars.to_a.sort
+          ivars.uniq.sort
         end
 
         def collect_ivars_recursive(node, ivars)
           return unless node.respond_to?(:type) && node.respond_to?(:children)
 
-          # Note: use .add() for JS Set compatibility (Ruby Set supports both << and add)
+          # Note: use .push() for JS compatibility
           if node.type == :ivasgn
-            ivars.add(node.children[0].to_s.sub(/^@/, '').to_sym)
+            ivars.push(node.children[0].to_s.sub(/^@/, '').to_sym)
           elsif node.type == :ivar
-            ivars.add(node.children[0].to_s.sub(/^@/, '').to_sym)
+            ivars.push(node.children[0].to_s.sub(/^@/, '').to_sym)
           end
 
           node.children.each { |child| collect_ivars_recursive(child, ivars) }
@@ -434,35 +436,35 @@ module Ruby2JS
         def transform_redirect_to(args)
           return s(:hash, s(:pair, s(:sym, :redirect), s(:str, '/'))) if args.empty?
 
-          target = args.first
+          # Note: use args[0] instead of args.first for JS compatibility
+          target = args[0]
 
-          path = case target.type
-                 when :ivar
-                   # redirect_to @article -> "/articles/#{article.id}"
-                   ivar_name = target.children[0].to_s.sub(/^@/, '')
-                   resource = ivar_name.downcase
-                   s(:dstr,
-                     s(:str, "/#{resource}s/"),
-                     s(:begin, s(:attr, s(:lvar, ivar_name.to_sym), :id)))
-
-                 when :send
-                   # redirect_to articles_path -> "/articles"
-                   if target.children[0].nil? && target.children[1].to_s.end_with?('_path')
-                     path_helper = target.children[1].to_s
-                     if path_helper == 'articles_path'
-                       s(:str, '/articles')
-                     elsif path_helper =~ /^(\w+)_path$/
-                       s(:str, "/#{$1}s")
-                     else
-                       s(:str, '/')
-                     end
-                   else
-                     transform_ivars_to_locals(target)
-                   end
-
-                 else
-                   transform_ivars_to_locals(target)
-                 end
+          # Note: avoid case-as-expression for JS compatibility (doesn't transpile correctly)
+          path = nil
+          if target.type == :ivar
+            # redirect_to @article -> "/articles/#{article.id}"
+            ivar_name = target.children[0].to_s.sub(/^@/, '')
+            resource = ivar_name.downcase
+            path = s(:dstr,
+              s(:str, "/#{resource}s/"),
+              s(:begin, s(:attr, s(:lvar, ivar_name.to_sym), :id)))
+          elsif target.type == :send
+            # redirect_to articles_path -> "/articles"
+            if target.children[0].nil? && target.children[1].to_s.end_with?('_path')
+              path_helper = target.children[1].to_s
+              if path_helper == 'articles_path'
+                path = s(:str, '/articles')
+              elsif path_helper =~ /^(\w+)_path$/
+                path = s(:str, "/#{$1}s")
+              else
+                path = s(:str, '/')
+              end
+            else
+              path = transform_ivars_to_locals(target)
+            end
+          else
+            path = transform_ivars_to_locals(target)
+          end
 
           s(:hash, s(:pair, s(:sym, :redirect), path))
         end

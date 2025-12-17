@@ -54,10 +54,13 @@ module Ruby2JS
           end
         end
 
-        def collect_seeds_model_references(node, visited = {})
+        def collect_seeds_model_references(node, visited = nil)
+          # Note: use Array for tracking visited nodes (object_id doesn't exist in JS,
+          # and Set.include? becomes .includes() which doesn't exist on JS Set)
+          visited = [] if visited.nil?
           return unless node.respond_to?(:type) && node.respond_to?(:children)
-          return if visited[node.object_id]
-          visited[node.object_id] = true
+          return if visited.include?(node)
+          visited.push(node)
 
           case node.type
           when :const
