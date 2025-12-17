@@ -1,4 +1,3 @@
-gem 'minitest'
 require 'minitest/autorun'
 require 'ruby2js/filter/rails/schema'
 require 'ruby2js/filter/esm'

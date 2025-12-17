@@ -133,8 +133,10 @@ function transpileSpec(specName) {
   }
 
   try {
-    execSync(`bundle exec ruby scripts/transpile_spec.rb ${specPath} > ${outputPath}`, {
-      cwd: __dirname,
+    // Run from repo root to use correct Gemfile
+    const repoRoot = join(__dirname, '../..');
+    execSync(`bundle exec ruby demo/selfhost/scripts/transpile_spec.rb spec/${specName} > demo/selfhost/${outputPath}`, {
+      cwd: repoRoot,
       stdio: ['pipe', 'pipe', 'pipe']
     });
     return true;
