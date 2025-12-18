@@ -17,6 +17,7 @@ export class SelfhostBuilder {
   // Shared converter state (initialized once across all instances)
   static converter = null;
   static filters = [];
+  static erbFilters = [];  // Separate filter chain for ERB templates
 
   constructor(distDir) {
     this.distDir = distDir || join(SelfhostBuilder.DEMO_ROOT, 'dist');
@@ -36,6 +37,7 @@ export class SelfhostBuilder {
     const { Functions } = await import(join(filtersPath, 'functions.js'));
     const { ESM } = await import(join(filtersPath, 'esm.js'));
     const { Return } = await import(join(filtersPath, 'return.js'));
+    const { Erb } = await import(join(filtersPath, 'erb.js'));
 
     // Load Rails filters
     const { Rails_Model } = await import(join(filtersPath, 'rails/model.js'));
@@ -56,6 +58,13 @@ export class SelfhostBuilder {
       Rails_Seeds.prototype,
       ESM.prototype,
       Rails_Logger.prototype,
+      Functions.prototype,
+      Return.prototype
+    ];
+
+    // ERB filter chain: erb handles link_to/form helpers, functions for iterators
+    SelfhostBuilder.erbFilters = [
+      Erb.prototype,
       Functions.prototype,
       Return.prototype
     ];
@@ -163,39 +172,33 @@ export class SelfhostBuilder {
     return 0;
   }
 
-  // Compile ERB template to JavaScript render function code
+  // Compile ERB template to Ruby code (like Ruby2JS::Erubi), then transpile to JavaScript
+  // This mimics the Ruby ERB compilation pipeline so we can use the erb filter
   compileERBToCode(template, viewName) {
-    const ivarPattern = /@(\w+)/g;
-    const ivars = new Set();
-    let match;
-    while ((match = ivarPattern.exec(template)) !== null) {
-      ivars.add(match[1]);
-    }
-
-    let code = 'export function render(';
-    if (ivars.size > 0) {
-      code += '{ ' + [...ivars].sort().join(', ') + ' }';
-    }
-    code += ') {\n';
-    code += '  let _buf = "";\n';
+    // Step 1: Parse ERB and generate Ruby code like Erubi does
+    // Format: _buf = ::String.new; _buf << 'literal'.freeze; _buf << ( expr ).to_s; ... _buf.to_s
+    let rubyCode = "_buf = ::String.new\n";
 
     let pos = 0;
     while (pos < template.length) {
       const erbStart = template.indexOf('<%', pos);
 
       if (erbStart === -1) {
+        // No more ERB tags, add remaining text
         const text = template.slice(pos);
         if (text) {
-          code += '  _buf += ' + JSON.stringify(text) + ';\n';
+          rubyCode += `_buf << '${this.escapeRubyString(text)}'.freeze\n`;
         }
         break;
       }
 
+      // Add text before ERB tag
       if (erbStart > pos) {
         const text = template.slice(pos, erbStart);
-        code += '  _buf += ' + JSON.stringify(text) + ';\n';
+        rubyCode += `_buf << '${this.escapeRubyString(text)}'.freeze\n`;
       }
 
+      // Find end of ERB tag
       const erbEnd = template.indexOf('%>', erbStart);
       if (erbEnd === -1) {
         throw new Error('Unclosed ERB tag');
@@ -203,6 +206,7 @@ export class SelfhostBuilder {
 
       let tag = template.slice(erbStart + 2, erbEnd);
 
+      // Handle -%> (trim trailing newline)
       const trimTrailing = tag.endsWith('-');
       if (trimTrailing) {
         tag = tag.slice(0, -1);
@@ -211,49 +215,42 @@ export class SelfhostBuilder {
       tag = tag.trim();
 
       if (tag.startsWith('=')) {
-        let expr = tag.slice(1).trim();
-        expr = expr.replace(/@(\w+)/g, '$1');
-        code += '  _buf += String(' + expr + ');\n';
+        // Output expression: <%= expr %>
+        const expr = tag.slice(1).trim();
+        rubyCode += `_buf << ( ${expr} ).to_s\n`;
       } else if (tag.startsWith('-')) {
-        let expr = tag.slice(1).trim();
-        expr = expr.replace(/@(\w+)/g, '$1');
-        code += '  _buf += (' + expr + ');\n';
+        // Unescaped output: <%- expr %> (same as <%= for our purposes)
+        const expr = tag.slice(1).trim();
+        rubyCode += `_buf << ( ${expr} ).to_s\n`;
       } else {
-        if (tag.includes('.each')) {
-          const eachMatch = tag.match(/(\S+)\.each\s+do\s+\|(\w+)\|/);
-          if (eachMatch) {
-            let collection = eachMatch[1].replace(/@(\w+)/g, '$1');
-            code += '  for (let ' + eachMatch[2] + ' of ' + collection + ') {\n';
-          }
-        } else if (tag === 'end') {
-          code += '  };\n';
-        } else if (tag.startsWith('if ')) {
-          let cond = tag.slice(3).replace(/@(\w+)/g, '$1');
-          code += '  if (' + cond + ') {\n';
-        } else if (tag.startsWith('elsif ')) {
-          let cond = tag.slice(6).replace(/@(\w+)/g, '$1');
-          code += '  } else if (' + cond + ') {\n';
-        } else if (tag === 'else') {
-          code += '  } else {\n';
-        } else if (tag.startsWith('unless ')) {
-          let cond = tag.slice(7).replace(/@(\w+)/g, '$1');
-          code += '  if (!(' + cond + ')) {\n';
-        } else {
-          let jsCode = tag.replace(/@(\w+)/g, '$1');
-          code += '  ' + jsCode + ';\n';
-        }
+        // Code block: <% code %>
+        rubyCode += `${tag}\n`;
       }
 
       pos = erbEnd + 2;
+      // Handle -%> trimming
       if (trimTrailing && pos < template.length && template[pos] === '\n') {
         pos++;
       }
     }
 
-    code += '  return _buf\n';
-    code += '}\n';
+    rubyCode += "_buf.to_s\n";
 
-    return code;
+    // Step 2: Transpile Ruby code through selfhost converter with erb filter
+    const js = SelfhostBuilder.converter.convert(rubyCode, {
+      eslevel: 2022,
+      filters: SelfhostBuilder.erbFilters
+    });
+
+    // Step 3: Add export keyword
+    return js.replace(/^function render/, 'export function render');
+  }
+
+  // Escape string for Ruby single-quoted string literal
+  escapeRubyString(str) {
+    return str
+      .replace(/\\/g, '\\\\')
+      .replace(/'/g, "\\'");
   }
 
   async transpileErbDirectory(srcDir, destDir) {
@@ -380,8 +377,10 @@ export const ArticleViews = {
 }
 
 // CLI entry point
-const isMain = import.meta.url === `file://${process.argv[1]}` ||
-               import.meta.url === `file://${resolve(process.argv[1])}`;
+const isMain = process.argv[1] && (
+  import.meta.url === `file://${process.argv[1]}` ||
+  import.meta.url === `file://${resolve(process.argv[1])}`
+);
 if (isMain) {
   const distDir = process.argv[2] ? resolve(process.argv[2]) : undefined;
   const builder = new SelfhostBuilder(distDir);

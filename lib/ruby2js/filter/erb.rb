@@ -544,7 +544,7 @@ module Ruby2JS
 
       # Recursively collect all instance variables in the AST
       def collect_ivars(node)
-        return unless Ruby2JS.ast_node?(node)
+        return unless ast_node?(node)
 
         if node.type == :ivar
           # Note: use push instead of << for JS compatibility
@@ -552,7 +552,7 @@ module Ruby2JS
         end
 
         node.children.each do |child|
-          collect_ivars(child) if Ruby2JS.ast_node?(child)
+          collect_ivars(child) if ast_node?(child)
         end
       end
     end

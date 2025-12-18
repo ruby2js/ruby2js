@@ -19,7 +19,8 @@ module Ruby2JS
       # not be escaped (poor man's HEREDOC)
       strings = children.select {|child| child.type==:str}.
         map {|child| child.children.last}.join
-      heredoc = (strings.length > 40 and strings.scan("\n").length > 3)
+      # Note: use (scan || []) pattern for JS compatibility where match() returns null
+      heredoc = (strings.length > 40 and (strings.scan("\n") || []).length > 3)
 
       put '`'
       children.each do |child|
