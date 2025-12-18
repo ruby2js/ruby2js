@@ -52,7 +52,16 @@ module Ruby2JS
       # that access instance variables before the instance is created)
       filter_class = Filter::Processor
       filters.reverse.each do |mod|
+        parent_class = filter_class
         filter_class = Class.new(filter_class) { include mod }
+
+        # For JS selfhost: wrap methods to inject correct _parent for dynamic super lookup
+        # Ruby's super is dynamic, but JS super is lexically bound to original class.
+        # wrapMethodsWithParent is defined in the JS preamble (transpile_bundle.rb)
+        # In Ruby: globalThis is not defined, so this is a no-op
+        if defined?(globalThis)
+          wrapMethodsWithParent(filter_class.prototype, parent_class.prototype)
+        end
       end
       @filter_instance = filter_class.new(@comments)
 

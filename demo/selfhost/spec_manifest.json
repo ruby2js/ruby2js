@@ -3,9 +3,7 @@
   "ready": [
     "transliteration_spec.rb",
     "serializer_spec.rb",
-    "namespace_spec.rb"
-  ],
-  "partial": [
+    "namespace_spec.rb",
     "functions_spec.rb",
     "return_spec.rb",
     "active_support_spec.rb",
@@ -14,28 +12,18 @@
     "esm_spec.rb",
     "rails_model_spec.rb",
     "rails_seeds_spec.rb",
-    "rails_routes_spec.rb",
     "rails_schema_spec.rb",
+    "cjs_spec.rb"
+  ],
+  "partial": [
+    "rails_routes_spec.rb",
     "camelcase_spec.rb",
     "tagged_templates_spec.rb",
-    "cjs_spec.rb",
     "polyfill_spec.rb",
     "pragma_spec.rb",
     "comments_spec.rb",
     "erb_spec.rb"
   ],
-  "partial_notes": {
-    "functions_spec.rb": "needs _parent for super calls in filter composition",
-    "return_spec.rb": "needs _parent for super calls in filter composition",
-    "active_support_spec.rb": "needs _parent for super calls in filter composition",
-    "rails_logger_spec.rb": "needs _parent for super calls in filter composition",
-    "rails_controller_spec.rb": "needs _parent for super calls in filter composition",
-    "esm_spec.rb": "needs _parent for super calls in filter composition",
-    "rails_model_spec.rb": "needs _parent for super calls in filter composition",
-    "rails_seeds_spec.rb": "needs _parent for super calls in filter composition",
-    "rails_routes_spec.rb": "needs _parent for super calls in filter composition",
-    "rails_schema_spec.rb": "needs _parent for super calls in filter composition"
-  },
   "blocked": {
     "securerandom_spec.rb": "extend SEXP doesn't transpile",
     "node_spec.rb": "extend SEXP doesn't transpile",

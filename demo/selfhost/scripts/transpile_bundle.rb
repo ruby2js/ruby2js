@@ -85,6 +85,31 @@ class NotImplementedError extends Error {
   }
 }
 
+// Helper for filter composition: wrap methods to inject correct _parent for super calls
+// Ruby's super is dynamic, but JS super is lexically bound. When methods are copied
+// via Object.defineProperties, we need each method to have its own parent reference.
+// This MUST be a regular function (not arrow) so `this` binds to the calling instance.
+function wrapMethodsWithParent(proto, parentProto) {
+  for (const key of Object.getOwnPropertyNames(proto)) {
+    if (key === 'constructor') continue;
+    const desc = Object.getOwnPropertyDescriptor(proto, key);
+    if (typeof desc.value !== 'function') continue;
+
+    const originalFn = desc.value;
+    // Regular function preserves dynamic `this` binding
+    desc.value = function(...args) {
+      const oldParent = this._parent;
+      this._parent = parentProto;
+      try {
+        return originalFn.apply(this, args);
+      } finally {
+        this._parent = oldParent;
+      }
+    };
+    Object.defineProperty(proto, key, desc);
+  }
+}
+
 // Parser stub - the Ruby source uses defined?(Parser::AST::Node) checks
 // which transpile to typeof Parser.AST.Node !== 'undefined'.
 // We define Parser with AST.Node = undefined so the check safely returns false.
