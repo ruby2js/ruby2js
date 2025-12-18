@@ -21,28 +21,43 @@ module Ruby2JS
         raw_comments = @comments[:_raw] || []
         return false if raw_comments.empty?
 
-        # Get the line number of the node
+        # Get the line number and file of the node
         line = nil
+        node_file = nil
         if node.respond_to?(:loc) && node.loc
           loc = node.loc
           if loc.respond_to?(:expression) && loc.expression
             line = loc.expression.line
+            # Get source file name for comparison
+            if loc.expression.respond_to?(:source_buffer) && loc.expression.source_buffer.respond_to?(:name)
+              node_file = loc.expression.source_buffer.name
+            end
           elsif loc.respond_to?(:line)
             line = loc.line
           end
         end
         return false unless line
 
-        # Check for Pragma: skip comment on this line
+        # Check for Pragma: skip comment on this line IN THE SAME FILE
         raw_comments.any? do |comment|
           comment_line = nil
+          comment_file = nil
           if comment.respond_to?(:loc) && comment.loc
             comment_line = comment.loc.line
+            # Get comment's source file
+            if comment.loc.respond_to?(:expression) && comment.loc.expression
+              expr = comment.loc.expression
+              if expr.respond_to?(:source_buffer) && expr.source_buffer.respond_to?(:name)
+                comment_file = expr.source_buffer.name
+              end
+            end
           elsif comment.respond_to?(:location)
             loc = comment.location
             comment_line = loc.respond_to?(:start_line) ? loc.start_line : loc.line
           end
           next false unless comment_line == line
+          # Must be from the same file (when file info is available)
+          next false if node_file && comment_file && node_file != comment_file
 
           text = comment.respond_to?(:text) ? comment.text : comment.to_s
           text =~ /#\s*Pragma:\s*skip/i

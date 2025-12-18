@@ -21,6 +21,9 @@ require_relative 'runtime'
 # Namespace tracking for class/module scope
 require_relative '../../ruby2js/namespace'
 
+# Inflector for singularize/pluralize (used by Rails filters)
+require_relative '../../ruby2js/inflector'
+
 # AST node representation
 require_relative '../../ruby2js/node'
 
