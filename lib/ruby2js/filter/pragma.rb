@@ -5,31 +5,20 @@ module Ruby2JS
     module Pragma
       include SEXP
 
-      # Ensure pragma runs after require but before other filters so that
-      # pragmas like skip, entries, method, hash are processed correctly.
-      # Pragma runs AFTER require so it can process pragmas in inlined files.
+      # Ensure pragma runs before other filters so that pragmas like skip,
+      # entries, method, hash, set are processed first.
+      #
+      # Filter chain: filters.reverse, then include into class chain.
+      # Last filter included has highest method resolution priority.
+      # So pragma should be first in the array (last after reverse).
       def self.reorder(filters)
-        # Find the require filter position (or start of filters if not present)
-        require_filter = defined?(Ruby2JS::Filter::Require) ? Ruby2JS::Filter::Require : nil
-        require_index = require_filter ? filters.index(require_filter) : nil
-
-        # If require filter exists and pragma comes before it, move pragma after require
         pragma_index = filters.index(Ruby2JS::Filter::Pragma)
         return filters unless pragma_index
+        return filters if pragma_index == 0  # Already first
 
-        if require_index && pragma_index < require_index
-          # Move pragma to right after require
-          filters = filters.dup
-          filters.delete_at(pragma_index)
-          # require_index shifted by 1 since we removed pragma before it
-          filters.insert(require_index, Ruby2JS::Filter::Pragma)
-        elsif require_index && pragma_index > require_index + 1
-          # Pragma is after require but not immediately after - move it
-          filters = filters.dup
-          filters.delete_at(pragma_index)
-          filters.insert(require_index + 1, Ruby2JS::Filter::Pragma)
-        end
-
+        filters = filters.dup
+        filters.delete_at(pragma_index)
+        filters.unshift(Ruby2JS::Filter::Pragma)
         filters
       end
 
@@ -338,6 +327,14 @@ module Ruby2JS
             return process s(:send, target, :has, args.first)
           end
           # Note: array and string both use .includes() which functions filter handles
+
+        # .delete - Set: delete (keep as method), Hash: delete keyword
+        when :delete
+          if pragma?(node, :set) && args.length == 1
+            # Transform to (:call (:attr target :delete) nil arg) which produces target.delete(arg)
+            # This structure isn't recognized by functions filter, so it won't be converted to delete keyword
+            return process s(:call, s(:attr, target, :delete), nil, *args)
+          end
 
         # .call - with method pragma, convert proc.call(args) to proc(args)
         when :call

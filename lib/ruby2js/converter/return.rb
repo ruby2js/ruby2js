@@ -26,7 +26,12 @@ module Ruby2JS
 
       return if block.empty?
       return unless block.last
-      if EXPRESSIONS.include? block.last.type
+
+      # Don't add return to << sends - they convert to .push() only in statement context
+      # Adding return would put them in expression context where << outputs as invalid JS
+      is_push_send = block.last.type == :send && block.last.children[1] == :<<
+
+      if EXPRESSIONS.include?(block.last.type) && !is_push_send
         block.push @ast.updated(:return, [block.pop])
 
       elsif block.last.type == :if

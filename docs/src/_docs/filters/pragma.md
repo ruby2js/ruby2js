@@ -201,7 +201,7 @@ for key checking.
 
 ### `set`
 
-Specifies that the receiver is a Set.
+Specifies that the receiver is a Set (or Map).
 
 ```ruby
 s << item # Pragma: set
@@ -209,12 +209,18 @@ s << item # Pragma: set
 
 s.include?(item) # Pragma: set
 # => s.has(item)
+
+s.delete(item) # Pragma: set
+# => s.delete(item)
 ```
 
-**When to use:** When working with JavaScript `Set` objects. Ruby's `Set#<<`
-becomes `.push()` by default (array behavior), and `Set#include?` becomes
-`.includes()`. Use this pragma to get the correct Set methods: `.add()` and
-`.has()`.
+**When to use:** When working with JavaScript `Set` or `Map` objects. By default:
+- `<<` becomes `.push()` (array behavior)
+- `.include?` becomes `.includes()` (array/string behavior)
+- `.delete()` becomes `delete obj[key]` (hash/object behavior)
+
+Use this pragma to get the correct Set/Map methods: `.add()`, `.has()`, and
+`.delete()`.
 
 ### `string`
 

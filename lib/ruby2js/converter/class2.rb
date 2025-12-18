@@ -198,7 +198,7 @@ module Ruby2JS
           # emit additional class declarations
           unless cvars.empty?
             body.each do |m|
-              cvars.delete m.children.first if m.type == :cvasgn
+              cvars.delete m.children.first if m.type == :cvasgn # Pragma: set
             end
           end
           [*cvars].sort.each do |cvar|
@@ -226,7 +226,7 @@ module Ruby2JS
             put ' = '
             parse statement.children.last
 
-            ivars.delete statement.children.first
+            ivars.delete statement.children.first # Pragma: set
           end
 
           # emit additional instance declarations

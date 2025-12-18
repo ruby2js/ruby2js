@@ -264,6 +264,25 @@ describe Ruby2JS::Filter::Pragma do
       to_js('s << item').
         must_equal 's.push(item)'
     end
+
+    it "should keep delete as method call" do
+      require 'ruby2js/filter/functions'
+      # Without pragma, delete becomes delete keyword (hash default)
+      # With set pragma, keep as method call for Set/Map
+      _(Ruby2JS.convert('s.delete(item) # Pragma: set',
+        eslevel: 2021,
+        filters: [Ruby2JS::Filter::Pragma, Ruby2JS::Filter::Functions]
+      ).to_s).must_equal 's.delete(item)'
+    end
+
+    it "should not affect delete without pragma" do
+      require 'ruby2js/filter/functions'
+      # Without pragma, delete becomes delete keyword (hash default)
+      _(Ruby2JS.convert('h.delete(key)',
+        eslevel: 2021,
+        filters: [Ruby2JS::Filter::Pragma, Ruby2JS::Filter::Functions]
+      ).to_s).must_equal 'delete h[key]'
+    end
   end
 
   describe "string pragma" do
@@ -505,24 +524,23 @@ describe Ruby2JS::Filter::Pragma do
   end
 
   describe "pragma filter reorder" do
-    it "should position pragma immediately after require filter" do
+    it "should position pragma first in filter list" do
       require 'ruby2js/filter/require'
       require 'ruby2js/filter/functions'
       require 'ruby2js/filter/esm'
 
       filters = [
-        Ruby2JS::Filter::Pragma,
         Ruby2JS::Filter::Require,
         Ruby2JS::Filter::Functions,
+        Ruby2JS::Filter::Pragma,
         Ruby2JS::Filter::ESM
       ]
 
       reordered = Ruby2JS::Filter::Pragma.reorder(filters)
 
-      # Pragma should be immediately after Require
-      require_idx = reordered.index(Ruby2JS::Filter::Require)
+      # Pragma should be first so it has highest method resolution priority
       pragma_idx = reordered.index(Ruby2JS::Filter::Pragma)
-      _(pragma_idx).must_equal require_idx + 1
+      _(pragma_idx).must_equal 0
     end
 
     it "should work with pragmas in inlined files" do
