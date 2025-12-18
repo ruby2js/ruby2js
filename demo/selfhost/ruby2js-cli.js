@@ -303,17 +303,23 @@ Examples:
   if (filterNames.length > 0) {
     const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 
+    // Normalize name for comparison (remove underscores, slashes, lowercase)
+    const normalize = s => s.toLowerCase().replace(/[_/]/g, '');
+
     for (const name of filterNames) {
       try {
         const filterPath = path.join(scriptDir, 'filters', `${name}.js`);
-        await import(filterPath);  // This registers the filter
-        // Use the registered filter (prototype with enumerable methods) not the class
-        const capitalizedName = name.charAt(0).toUpperCase() + name.slice(1);
-        const registeredFilter = Ruby2JS.Filter[capitalizedName];
-        if (!registeredFilter) {
-          throw new Error(`Filter '${name}' not found after loading`);
+        await import(filterPath);  // This registers the filter via registerFilter()
+
+        // Find the filter in Ruby2JS.Filter using normalized comparison
+        // (handles rails/model -> Rails_Model, camelCase -> Camelcase, etc.)
+        const availableFilters = Object.keys(Ruby2JS.Filter || {});
+        const actualName = availableFilters.find(n => normalize(n) === normalize(name));
+
+        if (!actualName) {
+          throw new Error(`Filter '${name}' not found after loading (available: ${availableFilters.join(', ')})`);
         }
-        loadedFilters.push(registeredFilter);
+        loadedFilters.push(Ruby2JS.Filter[actualName]);
       } catch (e) {
         console.error(`Error loading filter '${name}': ${e.message}`);
         process.exit(1);

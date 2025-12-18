@@ -590,7 +590,7 @@ module Ruby2JS
           imports = []
 
           # Import each referenced model
-          @rails_model_refs.to_a.sort.each do |model|
+          [*@rails_model_refs].sort.each do |model|
             model_file = model.downcase
             imports << s(:send, nil, :import,
               s(:array, s(:const, nil, model.to_sym)),

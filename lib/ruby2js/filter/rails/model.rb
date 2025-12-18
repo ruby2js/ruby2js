@@ -72,7 +72,7 @@ module Ruby2JS
 
           # Generate imports for associated models
           model_import_nodes = []
-          @rails_model_refs.to_a.sort.each do |model|
+          [*@rails_model_refs].sort.each do |model|
             model_file = model.downcase
             model_import_nodes.push(s(:send, nil, :import,
               s(:array, s(:const, nil, model.to_sym)),
