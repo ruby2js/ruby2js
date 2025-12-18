@@ -460,6 +460,16 @@ module Ruby2JS
               [s(:const, nil, ctrl[:controller_name].to_sym)])
           end
 
+          # Generate extract_id helper if we have path helpers with params
+          if @rails_path_helpers.any? { |h| h[:params].any? }
+            statements << build_extract_id_helper
+          end
+
+          # Generate path helper functions
+          @rails_path_helpers.each do |helper|
+            statements << build_path_helper(helper)
+          end
+
           # Generate Router.root() if defined
           if @rails_root_path
             statements << s(:send,
@@ -482,9 +492,12 @@ module Ruby2JS
               s(:pair, s(:sym, :schema), s(:const, nil, :Schema)),
               s(:pair, s(:sym, :seeds), s(:const, nil, :Seeds))))
 
-          # Export Application
-          statements << s(:export,
-            s(:array, s(:const, nil, :Application)))
+          # Export Application and path helpers
+          exports = [s(:const, nil, :Application)]
+          @rails_path_helpers.each do |helper|
+            exports << s(:const, nil, helper[:name])
+          end
+          statements << s(:export, s(:array, *exports))
 
           process(s(:begin, *statements))
         end
@@ -626,22 +639,24 @@ module Ruby2JS
 
           args = params.map { |p| s(:arg, p) }
 
-          s(:defs, s(:self), helper[:name],
+          # Use regular function definition (not class method)
+          s(:def, helper[:name],
             s(:args, *args),
             s(:autoreturn, body))
         end
 
         def build_extract_id_helper
-          # def self.extract_id(obj)
-          #   (obj && obj.id) || obj
-          # end
-          s(:defs, s(:self), :extract_id,
+          # function extract_id(obj) {
+          #   return (obj && obj.id) || obj
+          # }
+          # Handles both objects with id property and raw id values
+          s(:def, :extract_id,
             s(:args, s(:arg, :obj)),
             s(:autoreturn,
               s(:or,
                 s(:and,
                   s(:lvar, :obj),
-                  s(:send, s(:lvar, :obj), :id)),
+                  s(:attr, s(:lvar, :obj), :id)),
                 s(:lvar, :obj))))
         end
       end
