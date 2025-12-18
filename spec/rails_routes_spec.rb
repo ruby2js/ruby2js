@@ -17,7 +17,8 @@ describe Ruby2JS::Filter::Rails::Routes do
           root 'home#index'
         end
       RUBY
-      assert_includes result, 'export { Application }'
+      # Now exports Application plus path helpers
+      assert_includes result, 'export { Application, root_path }'
     end
   end
 
@@ -167,7 +168,94 @@ describe Ruby2JS::Filter::Rails::Routes do
           root 'home#index'
         end
       RUBY
-      assert_includes result, 'export { Application }'
+      assert_includes result, 'export { Application'
+    end
+
+    it "exports path helpers" do
+      result = to_js(<<~RUBY)
+        Rails.application.routes.draw do
+          resources :articles
+        end
+      RUBY
+      assert_includes result, 'articles_path'
+      assert_includes result, 'article_path'
+      assert_includes result, 'new_article_path'
+      assert_includes result, 'edit_article_path'
+    end
+  end
+
+  describe "path helpers" do
+    it "generates collection path helper" do
+      result = to_js(<<~RUBY)
+        Rails.application.routes.draw do
+          resources :articles
+        end
+      RUBY
+      assert_includes result, 'function articles_path()'
+      assert_includes result, 'return "/articles"'
+    end
+
+    it "generates member path helper with extract_id" do
+      result = to_js(<<~RUBY)
+        Rails.application.routes.draw do
+          resources :articles
+        end
+      RUBY
+      assert_includes result, 'function article_path(article)'
+      assert_includes result, 'extract_id(article)'
+    end
+
+    it "generates new path helper" do
+      result = to_js(<<~RUBY)
+        Rails.application.routes.draw do
+          resources :articles
+        end
+      RUBY
+      assert_includes result, 'function new_article_path()'
+      assert_includes result, 'return "/articles/new"'
+    end
+
+    it "generates edit path helper" do
+      result = to_js(<<~RUBY)
+        Rails.application.routes.draw do
+          resources :articles
+        end
+      RUBY
+      assert_includes result, 'function edit_article_path(article)'
+      assert_includes result, '/edit'
+    end
+
+    it "generates extract_id helper" do
+      result = to_js(<<~RUBY)
+        Rails.application.routes.draw do
+          resources :articles
+        end
+      RUBY
+      assert_includes result, 'function extract_id(obj)'
+      assert_includes result, 'obj.id'
+    end
+
+    it "generates nested resource path helpers" do
+      result = to_js(<<~RUBY)
+        Rails.application.routes.draw do
+          resources :articles do
+            resources :comments, only: [:create, :destroy]
+          end
+        end
+      RUBY
+      assert_includes result, 'function comments_path(article)'
+      assert_includes result, '/articles/'
+      assert_includes result, '/comments'
+    end
+
+    it "generates root_path helper" do
+      result = to_js(<<~RUBY)
+        Rails.application.routes.draw do
+          root 'articles#index'
+        end
+      RUBY
+      assert_includes result, 'function root_path()'
+      assert_includes result, 'return "/"'
     end
   end
 end

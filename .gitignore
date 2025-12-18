@@ -8,6 +8,7 @@ node_modules
 # Selfhost generated outputs (regenerated via npm run build:*)
 demo/selfhost/dist/
 demo/rails-in-js/dist/
+demo/rails-in-js/dist-selfhost/
 demo/selfhost/ruby2js.js
 demo/selfhost/ruby2js.mjs
 demo/selfhost/prism_browser.js

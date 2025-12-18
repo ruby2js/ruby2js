@@ -23,6 +23,6 @@
 </form>
 
 <p>
-  <a onclick="navigate('/articles/<%= @article.id %>')">Cancel</a> |
-  <a onclick="navigate('/articles')">Back to Articles</a>
+  <%= link_to "Cancel", article_path(@article) %> |
+  <%= link_to "Back to Articles", articles_path %>
 </p>

@@ -2,10 +2,10 @@
 
 <% @articles.each do |article| %>
   <div class="article">
-    <h2><a onclick="navigate('/articles/<%= article.id %>')"><%= article.title %></a></h2>
-    <p><%= (article.body || '').slice(0, 100) %>...</p>
+    <h2><%= link_to article.title, article_path(article) %></h2>
+    <p><%= truncate(article.body, length: 100) %></p>
     <p class="meta">Created: <%= article.created_at %></p>
   </div>
 <% end %>
 
-<p><a onclick="navigate('/articles/new')">New Article</a></p>
+<p><%= link_to "New Article", new_article_path %></p>

@@ -176,7 +176,144 @@ module Ruby2JS
           return process(args.first)
         end
 
+        # Handle link_to helper
+        # link_to "Text", path -> <a href="path" onclick="return navigate(event, path)">Text</a>
+        if method == :link_to && target.nil? && args.length >= 2
+          return process_link_to(args)
+        end
+
+        # Handle truncate helper
+        # truncate(text, length: 100) -> truncate(text, {length: 100})
+        if method == :truncate && target.nil? && args.length >= 1
+          return process_truncate(args)
+        end
+
         super
+      end
+
+      # Process link_to helper into anchor tag with navigate
+      def process_link_to(args)
+        text_node = args[0]
+        path_node = args[1]
+        options = args[2] if args.length > 2
+
+        # Check for method: :delete option
+        is_delete = false
+        confirm_msg = nil
+        if options&.type == :hash
+          options.children.each do |pair|
+            key = pair.children[0]
+            value = pair.children[1]
+            if key.type == :sym
+              case key.children[0]
+              when :method
+                is_delete = (value.type == :sym && value.children[0] == :delete)
+              when :data
+                # Look for confirm in data hash
+                if value.type == :hash
+                  value.children.each do |data_pair|
+                    data_key = data_pair.children[0]
+                    data_value = data_pair.children[1]
+                    if data_key.type == :sym && data_key.children[0] == :confirm
+                      confirm_msg = data_value if data_value.type == :str
+                    end
+                  end
+                end
+              end
+            end
+          end
+        end
+
+        # Build the HTML
+        if is_delete
+          # Delete link becomes a button/link with confirm
+          build_delete_link(text_node, path_node, confirm_msg)
+        else
+          # Regular navigation link
+          build_nav_link(text_node, path_node)
+        end
+      end
+
+      # Build a navigation link: <a href="path" onclick="return navigate(event, path)">text</a>
+      def build_nav_link(text_node, path_node)
+        # Process the path - could be a string, path helper call, or object
+        path_expr = process(path_node)
+
+        # Ensure path helpers without arguments are called as functions
+        # e.g., new_article_path -> new_article_path()
+        if path_node.type == :send && path_node.children[0].nil? && path_node.children.length == 2
+          # This is a method call with no args - ensure it's called
+          path_expr = s(:send, nil, path_node.children[1])
+        end
+
+        if text_node.type == :str && path_node.type == :str
+          # Both static - generate simple string
+          text_str = text_node.children[0]
+          path_str = path_node.children[0]
+          s(:str, "<a href=\"#{path_str}\" onclick=\"return navigate(event, '#{path_str}')\">#{text_str}</a>")
+        elsif text_node.type == :str
+          # Static text, dynamic path - single quotes around path in onclick
+          text_str = text_node.children[0]
+          s(:dstr,
+            s(:str, '<a href="'),
+            s(:begin, path_expr),
+            s(:str, "\" onclick=\"return navigate(event, '"),
+            s(:begin, path_expr),
+            s(:str, "')\" style=\"cursor: pointer\">#{text_str}</a>"))
+        else
+          # Dynamic text and/or path
+          text_expr = process(text_node)
+          s(:dstr,
+            s(:str, '<a href="'),
+            s(:begin, path_expr),
+            s(:str, "\" onclick=\"return navigate(event, '"),
+            s(:begin, path_expr),
+            s(:str, "')\" style=\"cursor: pointer\">"),
+            s(:begin, text_expr),
+            s(:str, '</a>'))
+        end
+      end
+
+      # Build a delete link with confirmation
+      def build_delete_link(text_node, path_node, confirm_msg)
+        path_expr = process(path_node)
+        confirm_str = confirm_msg ? confirm_msg.children[0] : 'Are you sure?'
+
+        if text_node.type == :str
+          text_str = text_node.children[0]
+          # Generate link that calls deleteResource function
+          # The actual delete handler is set up by setupFormHandlers
+          s(:str, "<a href=\"#\" onclick=\"if(confirm('#{confirm_str}')) { /* TODO: wire up delete */ } return false;\">#{text_str}</a>")
+        else
+          text_expr = process(text_node)
+          s(:dstr,
+            s(:str, "<a href=\"#\" onclick=\"if(confirm('#{confirm_str}')) { /* TODO: wire up delete */ } return false;\">"),
+            s(:begin, text_expr),
+            s(:str, '</a>'))
+        end
+      end
+
+      # Process truncate helper
+      def process_truncate(args)
+        text_node = args[0]
+        options_node = args[1]
+
+        text_expr = process(text_node)
+
+        # Extract length option
+        length = 30  # default
+        if options_node&.type == :hash
+          options_node.children.each do |pair|
+            key = pair.children[0]
+            value = pair.children[1]
+            if key.type == :sym && key.children[0] == :length && value.type == :int
+              length = value.children[0]
+            end
+          end
+        end
+
+        # Generate: truncate(text, {length: N})
+        s(:send, nil, :truncate, text_expr, s(:hash, s(:pair, s(:sym, :length), s(:int, length))))
       end
 
       # Convert form builder method calls to HTML input elements

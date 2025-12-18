@@ -165,6 +165,49 @@ describe Ruby2JS::Filter::Erb do
     end
   end
 
+  describe 'link_to helper' do
+    it "should convert static link_to to anchor with navigate" do
+      erb_src = '_erbout = +\'\'; _erbout.<<(( link_to("Articles", "/articles") ).to_s); _erbout'
+      result = to_js(erb_src)
+      # Output is a JS string with escaped quotes
+      result.must_include '<a href=\"/articles\"'
+      result.must_include 'onclick=\"return navigate(event'
+      result.must_include '>Articles</a>'
+    end
+
+    it "should convert link_to with path helper to anchor with navigate" do
+      erb_src = '_erbout = +\'\'; _erbout.<<(( link_to("View", article_path(article)) ).to_s); _erbout'
+      result = to_js(erb_src)
+      # Template literal output - quotes not escaped
+      result.must_include '<a href="'
+      result.must_include 'article_path(article)'
+      result.must_include 'navigate(event'
+      result.must_include '>View</a>'
+    end
+
+    it "should handle link_to with dynamic text" do
+      erb_src = '_erbout = +\'\'; _erbout.<<(( link_to(@article.title, article_path(@article)) ).to_s); _erbout'
+      result = to_js(erb_src)
+      # Template literal output - quotes not escaped
+      result.must_include '<a href="'
+      result.must_include '</a>'
+    end
+  end
+
+  describe 'truncate helper' do
+    it "should convert truncate with length option" do
+      erb_src = '_erbout = +\'\'; _erbout.<<(( truncate(@body, length: 100) ).to_s); _erbout'
+      result = to_js(erb_src)
+      result.must_include 'truncate(body, {length: 100})'
+    end
+
+    it "should use default length when not specified" do
+      erb_src = '_erbout = +\'\'; _erbout.<<(( truncate(@body) ).to_s); _erbout'
+      result = to_js(erb_src)
+      result.must_include 'truncate(body, {length: 30})'
+    end
+  end
+
   describe Ruby2JS::Filter::DEFAULTS do
     it "should include Erb" do
       _(Ruby2JS::Filter::DEFAULTS).must_include Ruby2JS::Filter::Erb

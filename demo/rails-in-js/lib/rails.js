@@ -298,8 +298,10 @@ export class Application {
         Router.dispatch(location.pathname);
       });
 
-      // Expose navigate globally for onclick handlers
-      window.navigate = (path) => Router.navigate(path);
+      // Expose helpers globally for onclick handlers
+      window.navigate = navigate;
+      window.submitForm = submitForm;
+      window.truncate = truncate;
 
       // Initial route
       Router.dispatch(location.pathname || '/');
@@ -318,6 +320,47 @@ function singularize(word) {
   if (/(?:x|ch|sh|ss)es$/.test(word)) return word.slice(0, -2);
   if (word.endsWith('s')) return word.slice(0, -1);
   return word;
+}
+
+// Navigation helper - prevents default, catches errors, logs issues
+// Usage: <a href="/path" onclick="return navigate(event, '/path')">
+export function navigate(event, path) {
+  event?.preventDefault?.();
+  try {
+    history.pushState({}, '', path);
+    Router.dispatch(path);
+  } catch (e) {
+    console.error('Navigation error:', e);
+  }
+  return false;
+}
+
+// Form submission helper - prevents default, catches errors
+// Usage: <form onsubmit="return submitForm(event, handler)">
+export function submitForm(event, handler) {
+  event?.preventDefault?.();
+  try {
+    const result = handler(event);
+    if (result?.redirect) {
+      console.log(`  Redirected to ${result.redirect}`);
+      history.pushState({}, '', result.redirect);
+      Router.dispatch(result.redirect);
+    } else if (result?.render) {
+      // Re-render handled by caller
+    }
+    return result;
+  } catch (e) {
+    console.error('Form submission error:', e);
+  }
+  return false;
+}
+
+// Text truncation helper (Rails view helper equivalent)
+export function truncate(text, options = {}) {
+  const length = options.length || 30;
+  const omission = options.omission || '...';
+  if (!text || text.length <= length) return text || '';
+  return text.slice(0, length - omission.length) + omission;
 }
 
 // Convenience function to set up form handlers on window
