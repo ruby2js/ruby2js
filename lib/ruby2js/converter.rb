@@ -263,10 +263,19 @@ module Ruby2JS
         next nil if text =~ /#\s*Pragma:/i
 
         if text.start_with? '=begin'
+          # Convert =begin...=end to JS comments
+          # Note: \A/\Z are Ruby-only anchors, not valid in JS.
+          # Use ^/$ which work in both Ruby (default) and JS (with multiline flag).
           if text.include? '*/'
-            text.sub(/\A=begin/, '').sub(/^=end\Z/, '').gsub(/^/, '//')
+            # Contains */, so can't use /* */ - convert each line to //
+            result = text.sub(/^=begin/, '').sub(/^=end$/, '').gsub(/^/, '//')
+            # JS gsub(^) matches at end of string after final \n, Ruby doesn't.
+            # Strip trailing // only if string ends with it (no newline after).
+            result = result[0..-3] if result.end_with?('//')
+            result
           else
-            text.sub(/\A=begin/, '/*').sub(/^=end\Z/, '*/')
+            # Safe to use /* */, just replace markers
+            text.sub(/^=begin/, '/*').sub(/^=end$/, '*/')
           end
         else
           # Handle comments - ensure they have // prefix
