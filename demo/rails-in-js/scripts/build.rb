@@ -16,7 +16,7 @@ require 'ruby2js/filter/erb'
 require 'ruby2js/erubi'
 
 DEMO_ROOT = File.expand_path('..', __dir__)
-DIST_DIR = File.join(DEMO_ROOT, 'dist')
+DIST_DIR = ARGV[0] ? File.expand_path(ARGV[0]) : File.join(DEMO_ROOT, 'dist')
 
 # Common transpilation options for Ruby files
 # Rails filters run first to transform idiomatic Rails to micro-framework,
