@@ -238,9 +238,24 @@ module Ruby2JS
         list = comment_list
       end
 
-      if @comments.key?(comment_key) && @comments[comment_key]
-        @comments[comment_key] -= list
+      # Remove retrieved comments so they don't appear again
+      # Ruby version uses Hash with -= array subtraction
+      unless defined?(RUBY2JS_SELFHOST) # Pragma: skip
+        if @comments.key?(comment_key) && @comments[comment_key]
+          @comments[comment_key] -= list
+        end
       end
+
+      # JS selfhost: Map-based removal
+      # Note: We set to empty array instead of deleting because the functions filter
+      # transforms .delete(key) to `delete obj[key]` which doesn't work for Maps.
+      # The find_comment_entry forEach loop skips entries with value.length == 0.
+      if defined?(RUBY2JS_SELFHOST) # Pragma: delete
+        if @comments && @comments.respond_to?(:has) && @comments.has(comment_key)
+          remaining = @comments.get(comment_key).filter { |c| !list.include?(c) }
+          @comments.set(comment_key, remaining)
+        end
+      end # Pragma: keep
 
       list.map do |comment|
         # Skip pragma comments - they're directives, not documentation
@@ -322,6 +337,29 @@ module Ruby2JS
           end
         end
       end
+
+      # JS selfhost: first-child location lookup for synthetic nodes (e.g., export wrapping class)
+      # Note: Using forEach on Map (avoiding .entries which gets transformed by functions filter)
+      if defined?(RUBY2JS_SELFHOST) # Pragma: delete
+        if !ast.loc || !ast.loc.is_a?(Object) || !ast.loc[:expression]
+          first_loc = find_first_location(ast)
+          if first_loc && @comments && @comments.respond_to?(:forEach)
+            result = nil
+            @comments.forEach do |value, key|
+              next if result  # Already found a match
+              next if key == "_raw" || !value || value.length == 0
+              next if !key || !key.is_a?(Object) || !key.loc
+              next if !key.loc.is_a?(Object) || !key.loc[:expression]
+              key_expr = key.loc[:expression]
+              next if !key_expr || key_expr.source_buffer != first_loc.source_buffer
+              if key_expr.begin_pos <= first_loc.begin_pos + 1
+                result = [value, key]
+              end
+            end
+            return result if result
+          end
+        end
+      end # Pragma: keep
 
       [[], ast]
     end

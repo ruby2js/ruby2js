@@ -115,13 +115,18 @@ export associateComments = ->(ast, comments) do
   nodes_by_pos = []
 
   collect_nodes = ->(node, depth) do
-    return unless node && node.loc
-    start_pos = node.loc.start_offset
+    return unless node
 
-    if start_pos && node.type != :begin
-      nodes_by_pos.push([start_pos, depth, node])
+    # Only add node to list if it has location info
+    if node.loc
+      # Use bracket notation to prevent camelCase conversion
+      start_pos = node.loc['start_offset']
+      if start_pos != undefined && node.type != :begin
+        nodes_by_pos.push([start_pos, depth, node])
+      end
     end
 
+    # Always recurse into children (even if current node has no loc)
     if node.children
       node.children.each do |child|
         collect_nodes(child, depth + 1) if child&.type # Pragma: method
@@ -137,7 +142,8 @@ export associateComments = ->(ast, comments) do
   end
 
   comments.each do |comment|
-    comment_end = comment.location.end_offset
+    # Use bracket notation to prevent camelCase conversion
+    comment_end = comment.location['end_offset']
     candidate = nodes_by_pos.find { |item| item[0] >= comment_end }
     next unless candidate
     node = candidate[2]
@@ -156,6 +162,8 @@ export setupGlobals = ->(ruby2js_module) do
   globalThis.Hash = Hash
   globalThis.RUBY_VERSION = "3.4.0"
   globalThis.RUBY2JS_PARSER = "prism"
+  # Mark this as selfhost environment for JS-specific code paths
+  globalThis.RUBY2JS_SELFHOST = true
   # Set up Ruby2JS global with Node class for prism_walker
   globalThis.Ruby2JS = ruby2js_module if ruby2js_module
 end

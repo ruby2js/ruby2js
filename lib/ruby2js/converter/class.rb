@@ -191,7 +191,7 @@ module Ruby2JS
           raise Error.new("class #{ m.type } not supported", @ast)
         end
 
-        # associate comments
+        # associate comments - MOVE (not copy) to prevent duplicates
         if node and @comments[m]
           if node.is_a?(Array)
             node[0] = m.updated(node.first.type, node.first.children)
@@ -200,6 +200,11 @@ module Ruby2JS
             node = m.updated(node.type, node.children)
             @comments[node] = @comments[m]
           end
+          # Clear source to prevent duplicate output
+          # Use set(key, []) for Map compatibility (selfhost uses Map, not Hash)
+          # Note: Ruby Hash supports []= and delete; JS Map needs .set() and .delete()
+          # The functions filter transforms .delete to delete keyword, which doesn't work for Map
+          @comments.respond_to?(:set) ? @comments.set(m, []) : @comments.delete(m)
         end
 
         node
@@ -263,12 +268,16 @@ module Ruby2JS
               end
             end
 
+            # MOVE (not copy) comments to prevent duplicates
             if @comments[node]
               if replacement.is_a?(Array)
                 @comments[replacement.first] = @comments[node]
               else
                 @comments[replacement] = @comments[node]
               end
+              # Clear source to prevent duplicate output
+              # Use set(key, []) for Map compatibility (selfhost uses Map, not Hash)
+              @comments.respond_to?(:set) ? @comments.set(node, []) : @comments.delete(node)
             end
             replacement
           end

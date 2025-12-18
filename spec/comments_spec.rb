@@ -170,5 +170,60 @@ describe Ruby2JS::Filter::Functions do
       js.must_include "// comment before class"
       js.must_include "class Greeter"
     end
+
+    it "should not duplicate comments" do
+      js = Ruby2JS.convert(<<-EOF, filters: [Ruby2JS::Filter::Functions]).to_s
+        #statement
+        statement
+
+        #class
+        class Class
+        end
+      EOF
+
+      # Count occurrences of each comment
+      statement_count = js.scan("//statement").length
+      class_count = js.scan("//class").length
+
+      _(statement_count).must_equal 1, "statement comment should appear exactly once, got #{statement_count}"
+      _(class_count).must_equal 1, "class comment should appear exactly once, got #{class_count}"
+    end
+  end
+
+  describe 'comments with esm filter' do
+    def to_js_esm(string)
+      require 'ruby2js/filter/esm'
+      _(Ruby2JS.convert(string, filters: [Ruby2JS::Filter::ESM, Ruby2JS::Filter::Functions]).to_s)
+    end
+
+    it "should preserve comment before export class" do
+      js = to_js_esm %{
+        # comment before export
+        export class Exported
+        end
+      }
+
+      js.must_include "// comment before export"
+      js.must_include "export class Exported"
+    end
+
+    it "should preserve comment on class inside module" do
+      require 'ruby2js/filter/esm'
+      # Note: Class needs a body to trigger multiline output (single-line output has no place for comments)
+      js = Ruby2JS.convert(<<-EOF, filters: [Ruby2JS::Filter::ESM, Ruby2JS::Filter::Functions]).to_s
+        module MyModule
+          # class comment
+          class Greeter
+            def greet
+              "hello"
+            end
+          end
+        end
+      EOF
+
+      # Comment should appear exactly once (bug was duplicating comments 3x)
+      class_comment_count = js.scan("// class comment").length
+      _(class_comment_count).must_equal 1, "class comment should appear exactly once, got #{class_comment_count}"
+    end
   end
 end

@@ -112,28 +112,46 @@ module Ruby2JS
 
     def reassociate_comments
       raw_comments = @comments[:_raw]
-      return unless raw_comments && !raw_comments.empty?
+      return if raw_comments.nil? || raw_comments.length == 0
 
       begin
         # Use Parser gem's associate if available (Ruby), otherwise our own (JS selfhost)
-        new_comments = if defined?(Parser) && defined?(Parser::Source::Comment)
-          Parser::Source::Comment.associate(@ast, raw_comments)
-        elsif defined?(Ruby2JS) && Ruby2JS.respond_to?(:associate_comments)
-          Ruby2JS.associate_comments(@ast, raw_comments)
-        else
-          # Selfhost: use global associateComments function
-          associateComments(@ast, raw_comments)
+        # Note: Ruby uses defined? for safe constant checking; JS needs optional chaining
+        new_comments = nil
+        unless defined?(RUBY2JS_SELFHOST) # Pragma: skip
+          if defined?(Parser) && defined?(Parser::Source::Comment)
+            new_comments = Parser::Source::Comment.associate(@ast, raw_comments)
+          elsif defined?(Ruby2JS) && Ruby2JS.respond_to?(:associate_comments)
+            new_comments = Ruby2JS.associate_comments(@ast, raw_comments)
+          else
+            new_comments = associateComments(@ast, raw_comments)
+          end
         end
 
-        if new_comments && !new_comments.empty?
-          @comments.clear
-          @comments.merge!(new_comments)
-          @comments[:_raw] = raw_comments
+        # JS selfhost: use associateComments directly
+        new_comments = associateComments(@ast, raw_comments) # Pragma: only-js
+
+        # Ruby: use Hash methods
+        unless defined?(RUBY2JS_SELFHOST) # Pragma: skip
+          if new_comments && !new_comments.empty?
+            @comments.clear
+            @comments.merge!(new_comments)
+            @comments[:_raw] = raw_comments
+          end
         end
-      rescue NoMethodError
+
+        # JS selfhost: use Map methods (size not empty, set())
+        # Note: Using forEach loop to clear and repopulate (avoiding .clear which
+        # the functions filter transforms to .length=0 which doesn't work for Maps)
+        if new_comments && new_comments.size != 0 # Pragma: only-js
+          @comments.forEach { |_, key| @comments.delete(key) } # Pragma: only-js
+          new_comments.forEach { |value, key| @comments.set(key, value) } # Pragma: only-js
+          @comments.set("_raw", raw_comments) # Pragma: only-js
+        end # Pragma: only-js
+      rescue NoMethodError # Pragma: skip
         # Synthetic nodes without location info cause associate to fail
         # Keep original comments hash
-      end
+      end # Pragma: skip
     end
 
     def handle_prepend_list
