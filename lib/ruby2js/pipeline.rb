@@ -11,6 +11,31 @@
 # remain in ruby2js.rb which delegates to this class.
 
 module Ruby2JS
+  # Helper for filter composition: wrap methods to inject correct _parent for super calls.
+  # Ruby's super is dynamic, but JS super is lexically bound. When methods are copied
+  # via Object.defineProperties, we need each method to have its own parent reference.
+  # This function only runs in JS context (guarded by defined?(globalThis) at call site).
+  # Uses Function.new to create regular functions with dynamic `this` binding.
+  def self.wrapMethodsWithParent(proto, parent_proto)
+    Object.getOwnPropertyNames(proto).each do |key|
+      next if key == 'constructor'
+      desc = Object.getOwnPropertyDescriptor(proto, key)
+      next unless typeof(desc.value) == 'function'
+
+      original_fn = desc.value
+      desc.value = Function.new { |*args|
+        old_parent = self._parent
+        self._parent = parent_proto
+        begin
+          return original_fn.apply(self, args)
+        ensure
+          self._parent = old_parent
+        end
+      }
+      Object.defineProperty(proto, key, desc)
+    end
+  end
+
   class Pipeline
     attr_reader :ast, :comments, :options
     attr_accessor :namespace
@@ -57,10 +82,9 @@ module Ruby2JS
 
         # For JS selfhost: wrap methods to inject correct _parent for dynamic super lookup
         # Ruby's super is dynamic, but JS super is lexically bound to original class.
-        # wrapMethodsWithParent is defined in the JS preamble (transpile_bundle.rb)
         # In Ruby: globalThis is not defined, so this is a no-op
         if defined?(globalThis)
-          wrapMethodsWithParent(filter_class.prototype, parent_class.prototype)
+          Ruby2JS.wrapMethodsWithParent(filter_class.prototype, parent_class.prototype)
         end
       end
       @filter_instance = filter_class.new(@comments)

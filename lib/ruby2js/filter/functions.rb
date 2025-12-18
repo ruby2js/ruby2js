@@ -1071,8 +1071,10 @@ module Ruby2JS
 
         # Function.new { } => function() {} (regular function, not arrow)
         # This is needed when you need dynamic `this` binding (e.g., for filter composition)
+        # Note: Use element-by-element comparison for JS compatibility (JS compares arrays by reference)
         if call.children[0]&.type == :const &&
-           call.children[0].children == [nil, :Function] &&
+           call.children[0].children[0] == nil &&
+           call.children[0].children[1] == :Function &&
            method == :new
           args = node.children[1]
           body = node.children[2]
