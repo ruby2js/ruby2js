@@ -1069,6 +1069,17 @@ module Ruby2JS
         method = call.children[1]
         return super if excluded?(method)
 
+        # Function.new { } => function() {} (regular function, not arrow)
+        # This is needed when you need dynamic `this` binding (e.g., for filter composition)
+        if call.children[0]&.type == :const &&
+           call.children[0].children == [nil, :Function] &&
+           method == :new
+          args = node.children[1]
+          body = node.children[2]
+          # Use :deff to force regular function syntax instead of arrow function
+          return process(node.updated(:deff, [nil, args, body]))
+        end
+
         if [:setInterval, :setTimeout, :set_interval, :set_timeout].include? method
           return super unless call.children.first == nil
           block = process s(:block, s(:send, nil, :proc), *node.children[1..-1])

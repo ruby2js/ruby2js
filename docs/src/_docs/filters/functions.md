@@ -124,6 +124,36 @@ If you set the `eslevel` option to `2021` or newer, the Functions filter enables
 * `Array(x)` {{ caret }} `Array.from(x)`
 * `delete x` {{ caret }} `delete x` (note lack of parenthesis)
 
+## Regular Functions with `Function.new`
+
+By default, Ruby blocks become JavaScript arrow functions (`=>`), which have
+lexical `this` binding. When you need a regular `function` with dynamic `this`
+binding (e.g., for DOM event handlers, method composition, or prototype methods),
+use `Function.new`:
+
+```ruby
+fn = Function.new { |x| x * 2 }
+# => let fn = function(x) {x * 2}
+
+callback = Function.new { handle_click(this) }
+# => let callback = function() {handle_click(this)}
+```
+
+Compare with regular procs (arrow functions):
+
+```ruby
+fn = proc { |x| x * 2 }
+# => let fn = x => x * 2
+```
+
+**When to use `Function.new`:**
+* jQuery/DOM event handlers where `this` should refer to the element
+* Method composition with dynamic super calls
+* Situations where `this` must be determined at call time, not definition time
+
+**Alternative:** You can also use the [Pragma filter](/docs/filters/pragma) with
+`# Pragma: function` to force regular function syntax for any block.
+
 ## Additional Features
 
 * `.sub!` and `.gsub!` become equivalent `x = x.replace` statements

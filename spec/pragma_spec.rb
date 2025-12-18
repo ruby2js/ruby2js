@@ -112,14 +112,14 @@ describe Ruby2JS::Filter::Pragma do
     end
   end
 
-  describe "noes2015 pragma" do
+  describe "function pragma" do
     it "should force function syntax for blocks" do
-      to_js('items.each { |item| process(item) } # Pragma: noes2015').
+      to_js('items.each { |item| process(item) } # Pragma: function').
         must_equal 'items.each(function(item) {process(item)})'
     end
 
-    it "should accept 'function' as pragma name" do
-      to_js('items.each { |item| process(item) } # Pragma: function').
+    it "should accept 'noes2015' as legacy pragma name" do
+      to_js('items.each { |item| process(item) } # Pragma: noes2015').
         must_equal 'items.each(function(item) {process(item)})'
     end
 

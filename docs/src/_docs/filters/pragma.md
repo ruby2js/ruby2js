@@ -55,7 +55,7 @@ x = flag || default # Pragma: ||
 want the fallback to execute for `false`, not just `null`/`undefined`. For
 example, boolean flags where `false` should trigger the default assignment.
 
-### `noes2015` (or `function`)
+### `function` (or `noes2015`)
 
 Forces traditional `function` syntax instead of arrow functions.
 
@@ -64,7 +64,7 @@ DOM event handlers and jQuery callbacks typically need dynamic `this` binding
 to reference the element that triggered the event.
 
 ```ruby
-element.on("click") { handle_click(this) } # Pragma: noes2015
+element.on("click") { handle_click(this) } # Pragma: function
 # => element.on("click", function() {handle_click(this)})
 
 items.each { |item| process(item) } # Pragma: function
@@ -79,6 +79,14 @@ items.each { |item| process(item) }
 
 **When to use:** jQuery event handlers, DOM callbacks, or any situation where
 you need `this` to refer to the calling context rather than the lexical scope.
+
+**Alternative:** You can also use `Function.new { }` (with the [Functions
+filter](/docs/filters/functions)) to get the same result without a pragma:
+
+```ruby
+fn = Function.new { |x| x * 2 }
+# => let fn = function(x) {x * 2}
+```
 
 ### `guard`
 
@@ -290,7 +298,7 @@ You can also use different pragmas on different lines:
 
 ```ruby
 options ||= {} # Pragma: ??
-element.on("click") { handle(this) } # Pragma: noes2015
+element.on("click") { handle(this) } # Pragma: function
 ```
 
 ### Filter Loading

@@ -6,7 +6,8 @@ module Ruby2JS
     handle :ivar do |var|
       if self.ivars and self.ivars.include? var
         # Use js_hostvalue in JS context, hostvalue in Ruby context
-        node_type = defined?(Function) ? :js_hostvalue : :hostvalue
+        # Note: defined?(globalThis) is true in JS but not Ruby
+        node_type = defined?(globalThis) ? :js_hostvalue : :hostvalue
         parse s(node_type, self.ivars[var])
       elsif underscored_private
         parse s(:attr, s(:self), var.to_s.sub('@', '_'))

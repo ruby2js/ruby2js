@@ -72,6 +72,12 @@ require 'ruby2js/filter/processor'
 require 'ruby2js/namespace'
 require 'ruby2js/pipeline'
 
+# Function is an alias for Proc in Ruby.
+# In JavaScript, Function.new { } produces a regular function() instead of an arrow =>.
+# Regular functions have dynamic `this` binding, while arrow functions capture `this` lexically.
+# Use Function.new when you need dynamic `this` (e.g., for method composition, event handlers).
+Function = Proc unless defined?(Function)
+
 module Ruby2JS
   class SyntaxError < RuntimeError
     attr_reader :diagnostic

@@ -841,7 +841,7 @@ describe Ruby2JS do
       to_js('def self.prop=(prop); @prop=prop; end').
         must_equal 'Object.defineProperty(this, "prop", {enumerable: true, configurable: true, set(prop) {this._prop = prop}})'
       # JS selfhost: combine_properties doesn't merge getter/setter into single defineProperty
-      unless defined? Function
+      unless defined? globalThis
         to_js('def self.prop; @prop; end; def self.prop=(prop); @prop=prop; end').
           must_equal 'Object.defineProperty(this, "prop", {enumerable: true, configurable: true, get() {return this._prop}, set(prop) {this._prop = prop}})'
       end
@@ -1154,14 +1154,14 @@ describe Ruby2JS do
   describe 'procs' do
     it "should handle procs" do
       # JS doesn't have Proc objects or source_location
-      skip "JS doesn't support Proc source location" if defined? Function
+      skip "JS doesn't support Proc source location" if defined? globalThis
       source = Proc.new { c + 1 }
       to_js( source ).must_equal "c + 1"
     end
 
     it "should handle lambdas" do
       # JS doesn't have Proc objects or source_location
-      skip "JS doesn't support Proc source location" if defined? Function
+      skip "JS doesn't support Proc source location" if defined? globalThis
       source = lambda { c + 1 }
       to_js( source ).must_equal "c + 1"
     end
@@ -1348,20 +1348,20 @@ describe Ruby2JS do
   describe 'execution' do
     it "should handle tic marks" do
       # In JS context, pass an empty object; in Ruby, use binding
-      b = defined?(Function) ? {} : binding
+      b = defined?(globalThis) ? {} : binding
       to_js( '`1+2`', binding: b ).must_equal '3'
     end
 
     it "should handle execute strings" do
       # In JS context, pass an empty object; in Ruby, use binding
-      b = defined?(Function) ? {} : binding
+      b = defined?(globalThis) ? {} : binding
       to_js( '%x(3*4)', binding: b ).must_equal '12'
     end
 
     it "should evaluate variables using the binding" do
       foo = "console.log('hi there')"
       # In JS context, pass object with variable; in Ruby, use binding
-      b = defined?(Function) ? {foo: foo} : binding
+      b = defined?(globalThis) ? {foo: foo} : binding
       to_js( '%x(foo)', binding: b ).must_equal foo
     end
   end
@@ -1374,7 +1374,7 @@ describe Ruby2JS do
       to_js( '@x', ivars: {:@x => [true, false, nil]} ).
         must_equal '[true, false, null]'
       # Rational is Ruby-only, skip in JS context
-      unless defined? Function
+      unless defined? globalThis
         to_js( '@x', ivars: {:@x => Rational(5,4)} ).must_equal '1'
       end
     end

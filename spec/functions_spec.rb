@@ -1135,4 +1135,31 @@ describe Ruby2JS::Filter::Functions do
         must_equal 'let obj = {get foo() {return 1}}'
     end
   end
+
+  describe "Function.new" do
+    it "should convert Function.new to regular function" do
+      to_js( 'fn = Function.new { |x| x * 2 }' ).
+        must_equal 'let fn = function(x) {x * 2}'
+    end
+
+    it "should convert Function.new with multiple args" do
+      to_js( 'fn = Function.new { |a, b| a + b }' ).
+        must_equal 'let fn = function(a, b) {a + b}'
+    end
+
+    it "should convert Function.new with no args" do
+      to_js( 'fn = Function.new { 42 }' ).
+        must_equal 'let fn = function() {42}'
+    end
+
+    it "should leave proc as arrow function" do
+      to_js( 'fn = proc { |x| x * 2 }' ).
+        must_equal 'let fn = x => x * 2'
+    end
+
+    it "should leave Proc.new as arrow function" do
+      to_js( 'fn = Proc.new { |x| x * 2 }' ).
+        must_equal 'let fn = x => x * 2'
+    end
+  end
 end

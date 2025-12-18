@@ -7,7 +7,7 @@ module Ruby2JS
     handle :xstr do |*children|
       if @binding
         str = eval capture { parse_all(*children) }
-        if defined? Function
+        if defined?(globalThis)
           # JavaScript context: binding is an object, use eval with Function
           # Create a function that has access to binding's properties
           keys = Object.keys(@binding)

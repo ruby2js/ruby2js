@@ -39,8 +39,8 @@ module Ruby2JS
         'nullish' => :nullish,
         '||' => :logical,
         'logical' => :logical,       # || stays as || (for boolean false handling)
-        'noes2015' => :noes2015,
-        'function' => :noes2015,
+        'noes2015' => :function,    # legacy alias
+        'function' => :function,
         'guard' => :guard,
         # Type disambiguation pragmas
         'array' => :array,
@@ -192,7 +192,7 @@ module Ruby2JS
           return s(:hide)
         end
 
-        if node.children[0].nil? && pragma?(node, :noes2015)
+        if node.children[0].nil? && pragma?(node, :function)
           # Convert anonymous def to deff (forces function syntax)
           # Don't re-process - just update type and process children
           node.updated(:deff, process_all(node.children))
@@ -372,7 +372,7 @@ module Ruby2JS
       def on_block(node)
         call, args, body = node.children
 
-        if pragma?(node, :noes2015)
+        if pragma?(node, :function)
           # Transform to use :deff which forces function syntax
           function = node.updated(:deff, [nil, args, body])
           return process s(call.type, *call.children, function)

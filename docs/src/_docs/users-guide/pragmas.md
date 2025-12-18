@@ -47,7 +47,7 @@ This is the key insight: pragmas let you fine-tune JavaScript output without aff
 | `method` | Direct invocation | `fn.call(x) # Pragma: method` |
 | `logical` or `\|\|` | Force `\|\|` | `x \|\|= y # Pragma: logical` |
 | `??` or `nullish` | Force `??` | `x \|\|= y # Pragma: ??` |
-| `noes2015` or `function` | Traditional function | `{ this } # Pragma: noes2015` |
+| `function` or `noes2015` | Traditional function | `{ this } # Pragma: function` |
 
 For complete documentation, see the [Pragma Filter](/docs/filters/pragma) reference.
 
@@ -172,7 +172,14 @@ Arrow functions capture `this` lexically. DOM handlers often need dynamic `this`
 element.on("click") { clicked(this) }
 
 # Traditional function - this is the element
-element.on("click") { clicked(this) } # Pragma: noes2015
+element.on("click") { clicked(this) } # Pragma: function
+```
+
+**Alternative:** Use `Function.new` for functions that need dynamic `this`:
+
+```ruby
+callback = Function.new { clicked(this) }
+element.on("click", callback)
 ```
 
 ## Real-World Examples
@@ -320,7 +327,7 @@ alias :kind_of? :is_a? # Pragma: skip
 | **Exclusion** | `skip` | Ruby-only code |
 | **Type hints** | `array`, `hash`, `set`, `string` | Ambiguous operations |
 | **Iteration** | `entries` | Hash `.each`, `.select`, `.map` |
-| **Functions** | `method`, `noes2015` | Callables, DOM handlers |
+| **Functions** | `method`, `function` | Callables, DOM handlers |
 | **Operators** | `??`, `logical`, `guard` | OR semantics, splat safety |
 
 ## See Also
