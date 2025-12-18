@@ -67,7 +67,7 @@ module Ruby2JS
 
   # Line holds tokens for a single output line
   class Line
-    attr_accessor :indent
+    attr_accessor :indent, :tokens
 
     def initialize(*tokens)
       @tokens = tokens
@@ -526,7 +526,9 @@ module Ruby2JS
           @mappings += ',' unless @mappings == ''
         end
 
-        diffs = mark.zip(@mark).map { |a, b| a - b }
+        # Compute differences between mark and @mark
+        diffs = []
+        mark.each_with_index { |a, i| diffs.push(a - @mark[i]) }
       end
 
       while @mark[0] < mark[0]
@@ -572,15 +574,16 @@ module Ruby2JS
 
       @lines.each_with_index do |line, row|
         col = line.indent
-        line.each do |token|
+        line.tokens.each do |token|
           if token.respond_to?(:loc) && token.loc && token.loc.respond_to?(:expression) && token.loc.expression
             pos = token.loc.expression.begin_pos
 
             buffer = token.loc.expression.source_buffer
-            source_index = sources.index(buffer)
-            unless source_index
+            # Use find_index with block for JS compatibility (converts to findIndex)
+            source_index = sources.find_index { |s| s == buffer }
+            if source_index.nil? || source_index == -1
               source_index = sources.length
-              timestamp buffer.name
+              timestamp buffer.name unless defined?(globalThis) # Pragma: skip
               sources.push(buffer)
             end
 
@@ -595,9 +598,10 @@ module Ruby2JS
             end
 
             if name
-              index = names.find_index(name)
+              # Use block form for JS compatibility (findIndex with callback)
+              index = names.find_index { |n| n == name }
 
-              unless index
+              if index.nil? || index == -1
                 index = names.length
                 names.push(name)
               end

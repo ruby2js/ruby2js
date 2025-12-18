@@ -100,8 +100,8 @@ await initPrism()
 
 # Convert Ruby source to JavaScript
 # @param source [String] Ruby source code
-# @param options [Object] Optional settings (eslevel, filters, etc.)
-# @return [String] JavaScript output
+# @param options [Object] Optional settings (eslevel, filters, file, etc.)
+# @return [Serializer] Result object with .toString() and .sourcemap methods
 export def convert(source, options = {})
   prism_parse = getPrismParse()
   parse_result = prism_parse(source)
@@ -129,7 +129,12 @@ export def convert(source, options = {})
   filters = options[:filters] || []
   pipeline = Ruby2JS::Pipeline.new(ast, comments, filters: filters, options: pipeline_options)
   result = pipeline.run
-  result.to_s!
+
+  # Set file name for sourcemap generation
+  result.file_name = options[:file] if options[:file]
+
+  # Return result object (has .toString() and .sourcemap methods)
+  result
 end
 
 # Export the Ruby2JS module

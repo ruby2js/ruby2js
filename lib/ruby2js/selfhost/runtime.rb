@@ -41,10 +41,20 @@ export class PrismSourceBuffer
     idx == -1 ? @lineOffsets.length : idx
   end
 
+  # Alias for Ruby snake_case convention (used by serializer.rb)
+  def line_for_position(pos)
+    lineForPosition(pos)
+  end
+
   def columnForPosition(pos)
     lineIdx = @lineOffsets.findIndex { |offset| offset > pos }
     lineIdx = @lineOffsets.length if lineIdx == -1
     pos - @lineOffsets[lineIdx - 1]
+  end
+
+  # Alias for Ruby snake_case convention (used by serializer.rb)
+  def column_for_position(pos)
+    columnForPosition(pos)
   end
 end
 

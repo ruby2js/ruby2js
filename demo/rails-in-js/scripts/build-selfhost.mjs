@@ -81,16 +81,18 @@ export class SelfhostBuilder {
     });
   }
 
-  async transpileFile(srcPath, destPath) {
+  async transpileFile(srcPath, destPath, generateSourcemap = true) {
     const source = await readFile(srcPath, 'utf-8');
     const relativeSrc = relative(SelfhostBuilder.DEMO_ROOT, srcPath);
 
-    const js = SelfhostBuilder.converter.convert(source, {
+    const result = SelfhostBuilder.converter.convert(source, {
       eslevel: 2022,
       file: relativeSrc,
       filters: SelfhostBuilder.filters,
       autoexports: true
     });
+
+    let js = result.toString();
 
     // Validate JavaScript syntax
     try {
@@ -105,6 +107,24 @@ export class SelfhostBuilder {
     }
 
     await mkdir(pathDirname(destPath), { recursive: true });
+
+    // Generate sourcemap if requested
+    if (generateSourcemap) {
+      try {
+        const sourcemap = result.sourcemap;  // getter, not a method
+        if (sourcemap) {
+          const mapPath = destPath + '.map';
+          const mapFilename = mapPath.split('/').pop();
+          // Add sourcemap reference to JS file
+          js += `\n//# sourceMappingURL=${mapFilename}\n`;
+          await writeFile(mapPath, JSON.stringify(sourcemap));
+        }
+      } catch (err) {
+        // Sourcemap generation is optional, log but don't fail
+        console.error(`\x1b[33m[sourcemap]\x1b[0m ${relativeSrc}: ${err.message}`);
+      }
+    }
+
     await writeFile(destPath, js);
 
     return js;
@@ -237,13 +257,13 @@ export class SelfhostBuilder {
     rubyCode += "_buf.to_s\n";
 
     // Step 2: Transpile Ruby code through selfhost converter with erb filter
-    const js = SelfhostBuilder.converter.convert(rubyCode, {
+    const result = SelfhostBuilder.converter.convert(rubyCode, {
       eslevel: 2022,
       filters: SelfhostBuilder.erbFilters
     });
 
     // Step 3: Add export keyword
-    return js.replace(/^function render/, 'export function render');
+    return result.toString().replace(/^function render/, 'export function render');
   }
 
   // Escape string for Ruby single-quoted string literal

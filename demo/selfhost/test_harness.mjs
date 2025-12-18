@@ -126,7 +126,8 @@ Ruby2JS.convert = function(source, opts = {}) {
 
   try {
     const result = bundleConvert(source, opts);
-    return { toString: () => result };
+    // Result is now a Serializer object with toString() and sourcemap() methods
+    return result;
   } catch (e) {
     return { toString: () => `[ERROR: ${e.message}]`, error: e };
   }
