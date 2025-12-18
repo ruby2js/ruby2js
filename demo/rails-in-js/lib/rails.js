@@ -313,15 +313,6 @@ export class Application {
   }
 }
 
-// Simple singularize for common Rails conventions
-function singularize(word) {
-  if (word.endsWith('ies')) return word.slice(0, -3) + 'y';
-  // Only remove 'es' for words ending in x, ch, sh, ss + es
-  if (/(?:x|ch|sh|ss)es$/.test(word)) return word.slice(0, -2);
-  if (word.endsWith('s')) return word.slice(0, -1);
-  return word;
-}
-
 // Navigation helper - prevents default, catches errors, logs issues
 // Usage: <a href="/path" onclick="return navigate(event, '/path')">
 export function navigate(event, path) {
@@ -364,45 +355,43 @@ export function truncate(text, options = {}) {
 }
 
 // Convenience function to set up form handlers on window
+// handlerName is pre-computed at transpile time using Ruby's Inflector
 export function setupFormHandlers(config) {
-  config.forEach(({ resource, parent, confirmDelete }) => {
-    const singular = singularize(resource);
-    const capitalName = singular.charAt(0).toUpperCase() + singular.slice(1);
-
+  config.forEach(({ resource, handlerName, parent, confirmDelete }) => {
     if (parent) {
       // Nested resource handlers
-      window[`create${capitalName}`] = function(event, parentId) {
+      window[`create${handlerName}`] = function(event, parentId) {
         event.preventDefault();
         try {
           FormHandler.createNested(resource, parent, event, parentId);
         } catch(e) {
-          console.error(`Error in create${capitalName}:`, e);
+          console.error(`Error in create${handlerName}:`, e);
         }
         return false;
       };
-      window[`delete${capitalName}`] = (parentId, id) =>
+      window[`delete${handlerName}`] = (parentId, id) =>
         FormHandler.destroyNested(resource, parent, parentId, id, confirmDelete);
     } else {
       // Regular resource handlers
-      window[`create${capitalName}`] = function(event) {
+      window[`create${handlerName}`] = function(event) {
         event.preventDefault();
         try {
           FormHandler.create(resource, event);
         } catch(e) {
-          console.error(`Error in create${capitalName}:`, e);
+          console.error(`Error in create${handlerName}:`, e);
         }
         return false;
       };
-      window[`update${capitalName}`] = function(event, id) {
+      window[`update${handlerName}`] = function(event, id) {
         event.preventDefault();
         try {
           FormHandler.update(resource, event, id);
         } catch(e) {
-          console.error(`Error in update${capitalName}:`, e);
+          console.error(`Error in update${handlerName}:`, e);
         }
         return false;
       };
-      window[`delete${capitalName}`] = (id) =>
+      window[`delete${handlerName}`] = (id) =>
         FormHandler.destroy(resource, id, confirmDelete);
     }
   });

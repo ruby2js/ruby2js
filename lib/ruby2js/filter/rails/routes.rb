@@ -550,7 +550,10 @@ module Ruby2JS
           collect_form_handler_configs(@rails_resources, nil, configs)
 
           config_nodes = configs.map do |cfg|
-            pairs = [s(:pair, s(:sym, :resource), s(:str, cfg[:resource]))]
+            pairs = [
+              s(:pair, s(:sym, :resource), s(:str, cfg[:resource])),
+              s(:pair, s(:sym, :handlerName), s(:str, cfg[:handler_name]))
+            ]
             pairs << s(:pair, s(:sym, :parent), s(:str, cfg[:parent])) if cfg[:parent]
             pairs << s(:pair, s(:sym, :confirmDelete), s(:str, cfg[:confirm_delete]))
             s(:hash, *pairs)
@@ -562,6 +565,8 @@ module Ruby2JS
         def collect_form_handler_configs(resources, parent_name, result)
           resources.each do |resource|
             singular = Ruby2JS::Inflector.singularize(resource[:name])
+            # Capitalize for handler names (e.g., "Article" for createArticle)
+            handler_name = singular.capitalize
             confirm_msg = if parent_name
                             "Delete this #{singular}?"
                           else
@@ -570,6 +575,7 @@ module Ruby2JS
 
             result << {
               resource: resource[:name],
+              handler_name: handler_name,
               parent: parent_name,
               confirm_delete: confirm_msg
             }
