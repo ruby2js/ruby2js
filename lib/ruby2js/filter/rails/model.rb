@@ -28,6 +28,7 @@ module Ruby2JS
           @rails_callbacks = {}
           @rails_scopes = []
           @rails_model_private_methods = {}
+          @rails_model_refs = Set.new
         end
 
         # Detect model class and transform
@@ -40,6 +41,7 @@ module Ruby2JS
           @rails_callbacks ||= {}
           @rails_scopes ||= []
           @rails_model_private_methods ||= {}
+          @rails_model_refs ||= Set.new
 
           # Skip if already processing (prevent infinite recursion)
           return super if @rails_model_processing
@@ -68,7 +70,16 @@ module Ruby2JS
             s(:array, s(:const, nil, superclass_name.to_sym)),
             s(:str, "./#{superclass_file}.js"))
 
-          result = process(s(:begin, import_node, exported_class))
+          # Generate imports for associated models
+          model_import_nodes = []
+          @rails_model_refs.to_a.sort.each do |model|
+            model_file = model.downcase
+            model_import_nodes.push(s(:send, nil, :import,
+              s(:array, s(:const, nil, model.to_sym)),
+              s(:str, "./#{model_file}.js")))
+          end
+
+          result = process(s(:begin, import_node, *model_import_nodes, exported_class))
 
           @rails_model = nil
           @rails_model_name = nil
@@ -79,6 +90,7 @@ module Ruby2JS
           @rails_callbacks = {}
           @rails_scopes = []
           @rails_model_private_methods = {}
+          @rails_model_refs = Set.new
 
           result
         end
@@ -344,23 +356,49 @@ module Ruby2JS
         end
 
         def generate_has_many_method(assoc)
-          # has_many :comments -> get comments() { return Comment.where({article_id: this._id}) }
-          # Use :defget for getter (no parentheses needed when accessing)
-          # Use :attr for property access (no parentheses) to access inherited property
+          # has_many :comments -> get comments() {
+          #   let records = Comment.where({article_id: this._id});
+          #   records.create = (params) => Comment.create(Object.assign({article_id: this._id}, params));
+          #   return records;
+          # }
           association_name = assoc[:name]
           class_name = assoc[:options][:class_name] || Ruby2JS::Inflector.singularize(association_name.to_s).capitalize
           foreign_key = assoc[:options][:foreign_key] || "#{@rails_model_name.downcase}_id"
 
-          s(:defget, association_name,
-            s(:args),
-            s(:autoreturn,
+          # Track model reference for import generation
+          @rails_model_refs.add(class_name)
+
+          # Build the where call
+          where_call = s(:send,
+            s(:const, nil, class_name.to_sym),
+            :where,
+            s(:hash,
+              s(:pair,
+                s(:sym, foreign_key.to_sym),
+                s(:attr, s(:self), :_id))))
+
+          # Build the create lambda: (params) => Model.create(Object.assign({fk: this._id}, params))
+          create_lambda = s(:block,
+            s(:send, nil, :lambda),
+            s(:args, s(:arg, :params)),
+            s(:send,
+              s(:const, nil, class_name.to_sym),
+              :create,
               s(:send,
-                s(:const, nil, class_name.to_sym),
-                :where,
+                s(:const, nil, :Object),
+                :assign,
                 s(:hash,
                   s(:pair,
                     s(:sym, foreign_key.to_sym),
-                    s(:attr, s(:self), :_id))))))
+                    s(:attr, s(:self), :_id))),
+                s(:lvar, :params))))
+
+          s(:defget, association_name,
+            s(:args),
+            s(:begin,
+              s(:lvasgn, :records, where_call),
+              s(:send, s(:lvar, :records), :[]=, s(:str, 'create'), create_lambda),
+              s(:return, s(:lvar, :records))))
         end
 
         def generate_has_one_method(assoc)
@@ -370,6 +408,9 @@ module Ruby2JS
           association_name = assoc[:name]
           class_name = assoc[:options][:class_name] || association_name.to_s.capitalize
           foreign_key = assoc[:options][:foreign_key] || "#{@rails_model_name.downcase}_id"
+
+          # Track model reference for import generation
+          @rails_model_refs.add(class_name)
 
           s(:defget, association_name,
             s(:args),
@@ -390,6 +431,9 @@ module Ruby2JS
           association_name = assoc[:name]
           class_name = assoc[:options][:class_name] || association_name.to_s.capitalize
           foreign_key = assoc[:options][:foreign_key] || "#{association_name}_id"
+
+          # Track model reference for import generation
+          @rails_model_refs.add(class_name)
 
           # Access foreign key from _attributes - use :attr for property access
           # Use .to_s to force bracket notation (Ruby2JS optimizes literal strings to dot notation)

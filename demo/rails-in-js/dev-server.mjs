@@ -123,25 +123,136 @@ async function initSelfhost() {
     const { Rails_Seeds } = await import(join(filtersPath, 'rails/seeds.js'));
 
     // Pass .prototype because Pipeline expects objects with methods, not classes
+    // IMPORTANT: ESM must come before any filter with on_send (Logger, Functions)
+    // to properly convert import/export calls to import/export nodes
     selfhostFilters = [
-      // Rails filters first (they transform high-level patterns)
+      // Rails filters that add imports/exports (as send nodes)
       Rails_Model.prototype,
       Rails_Controller.prototype,
       Rails_Routes.prototype,
       Rails_Schema.prototype,
-      Rails_Logger.prototype,
       Rails_Seeds.prototype,
-      // Then core filters
-      Functions.prototype,
+      // ESM converts import/export sends to proper nodes - must be before on_send filters
       ESM.prototype,
+      // Filters with on_send handlers
+      Rails_Logger.prototype,
+      Functions.prototype,
+      // Other filters
       Return.prototype
     ];
 
-    console.log('\x1b[32m[selfhost]\x1b[0m Initialized with filters: rails/*, functions, esm, return');
+    console.log('\x1b[32m[selfhost]\x1b[0m Initialized with filters: rails/model,controller,routes,schema,seeds, esm, logger, functions, return');
   } catch (err) {
     console.error('\x1b[31m[selfhost]\x1b[0m Failed to initialize:', err.message);
     throw err;
   }
+}
+
+// Compile ERB template to JavaScript render function code
+// This is a build-time version of erb_runtime.mjs's compileERB
+function compileERBToCode(template, viewName) {
+  // Collect instance variables used (for function signature)
+  const ivarPattern = /@(\w+)/g;
+  const ivars = new Set();
+  let match;
+  while ((match = ivarPattern.exec(template)) !== null) {
+    ivars.add(match[1]);
+  }
+
+  let code = 'export function render(';
+  if (ivars.size > 0) {
+    code += '{ ' + [...ivars].sort().join(', ') + ' }';
+  }
+  code += ') {\n';
+  code += '  let _buf = "";\n';
+
+  let pos = 0;
+  while (pos < template.length) {
+    const erbStart = template.indexOf('<%', pos);
+
+    if (erbStart === -1) {
+      // No more ERB tags, add remaining text
+      const text = template.slice(pos);
+      if (text) {
+        code += '  _buf += ' + JSON.stringify(text) + ';\n';
+      }
+      break;
+    }
+
+    // Add text before ERB tag
+    if (erbStart > pos) {
+      const text = template.slice(pos, erbStart);
+      code += '  _buf += ' + JSON.stringify(text) + ';\n';
+    }
+
+    // Find end of ERB tag
+    const erbEnd = template.indexOf('%>', erbStart);
+    if (erbEnd === -1) {
+      throw new Error('Unclosed ERB tag');
+    }
+
+    let tag = template.slice(erbStart + 2, erbEnd);
+
+    // Handle -%> (trim trailing newline)
+    const trimTrailing = tag.endsWith('-');
+    if (trimTrailing) {
+      tag = tag.slice(0, -1);
+    }
+
+    tag = tag.trim();
+
+    if (tag.startsWith('=')) {
+      // Output expression: <%= expr %>
+      let expr = tag.slice(1).trim();
+      // Convert @ivar to ivar
+      expr = expr.replace(/@(\w+)/g, '$1');
+      code += '  _buf += String(' + expr + ');\n';
+    } else if (tag.startsWith('-')) {
+      // Unescaped output: <%- expr %>
+      let expr = tag.slice(1).trim();
+      expr = expr.replace(/@(\w+)/g, '$1');
+      code += '  _buf += (' + expr + ');\n';
+    } else {
+      // Code block: <% code %>
+      // Convert Ruby to JS
+      if (tag.includes('.each')) {
+        // Convert Ruby each to JS for-of
+        const eachMatch = tag.match(/(\S+)\.each\s+do\s+\|(\w+)\|/);
+        if (eachMatch) {
+          let collection = eachMatch[1].replace(/@(\w+)/g, '$1');
+          code += '  for (let ' + eachMatch[2] + ' of ' + collection + ') {\n';
+        }
+      } else if (tag === 'end') {
+        code += '  };\n';
+      } else if (tag.startsWith('if ')) {
+        let cond = tag.slice(3).replace(/@(\w+)/g, '$1');
+        code += '  if (' + cond + ') {\n';
+      } else if (tag.startsWith('elsif ')) {
+        let cond = tag.slice(6).replace(/@(\w+)/g, '$1');
+        code += '  } else if (' + cond + ') {\n';
+      } else if (tag === 'else') {
+        code += '  } else {\n';
+      } else if (tag.startsWith('unless ')) {
+        let cond = tag.slice(7).replace(/@(\w+)/g, '$1');
+        code += '  if (!(' + cond + ')) {\n';
+      } else {
+        // Other code - convert @ivar to ivar
+        let jsCode = tag.replace(/@(\w+)/g, '$1');
+        code += '  ' + jsCode + ';\n';
+      }
+    }
+
+    pos = erbEnd + 2;
+    // Handle -%> trimming
+    if (trimTrailing && pos < template.length && template[pos] === '\n') {
+      pos++;
+    }
+  }
+
+  code += '  return _buf\n';
+  code += '}\n';
+
+  return code;
 }
 
 async function runSelfhostBuild() {
@@ -196,16 +307,27 @@ async function runSelfhostBuild() {
         const source = await readFile(srcPath, 'utf-8');
 
         // Transpile with selfhost
+        // Note: Don't use autoimports - the Rails filters handle imports properly
+        // Autoimports can cause duplicate/circular imports
         const js = selfhostConverter.convert(source, {
           eslevel: 2022,
           file: relative(__dirname, srcPath),
           filters: selfhostFilters,
-          autoexports: true,
-          autoimports: {
-            ApplicationRecord: './application_record.js',
-            ApplicationController: './application_controller.js'
-          }
+          autoexports: true
         });
+
+        // Validate JavaScript syntax before writing
+        try {
+          // Use dynamic import to validate ES module syntax
+          const dataUrl = `data:text/javascript,${encodeURIComponent(js)}`;
+          await import(dataUrl);
+        } catch (syntaxErr) {
+          // Extract just the syntax error, not the data URL noise
+          const match = syntaxErr.message.match(/^(.+?)(?:\n|$)/);
+          const shortErr = match ? match[1] : syntaxErr.message;
+          console.error(`\x1b[31m[syntax]\x1b[0m ${relative(__dirname, srcPath)}: ${shortErr}`);
+          // Still write the file so we can inspect it
+        }
 
         // Ensure destination directory exists
         await mkdir(pathDirname(destPath), { recursive: true });
@@ -235,6 +357,96 @@ async function runSelfhostBuild() {
       fileCount++;
     }
   } catch {}
+
+  // Generate models/index.js that re-exports all models
+  const modelsDir = join(distDir, 'models');
+  try {
+    const modelFiles = await new Promise((resolve) => {
+      exec(`find "${modelsDir}" -maxdepth 1 -name "*.js" 2>/dev/null`, (err, stdout) => {
+        if (err && !stdout) resolve([]);
+        else resolve(stdout.trim().split('\n').filter(f => f));
+      });
+    });
+
+    const models = modelFiles
+      .map(f => f.split('/').pop().replace('.js', ''))
+      .filter(name => name !== 'application_record' && name !== 'index')
+      .sort();
+
+    if (models.length > 0) {
+      const indexJs = models.map(name => {
+        const className = name.split('_').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join('');
+        return `export { ${className} } from './${name}.js';`;
+      }).join('\n') + '\n';
+
+      await writeFile(join(modelsDir, 'index.js'), indexJs);
+      fileCount++;
+    }
+  } catch {}
+
+  // Generate views from ERB templates
+  const erbDir = join(__dirname, 'app/views/articles');
+  const viewsDir = join(distDir, 'views');
+  const erbOutDir = join(viewsDir, 'erb');
+
+  try {
+    await mkdir(erbOutDir, { recursive: true });
+
+    // Find all ERB files
+    const erbFiles = await new Promise((resolve) => {
+      exec(`find "${erbDir}" -name "*.html.erb" 2>/dev/null`, (err, stdout) => {
+        if (err && !stdout) resolve([]);
+        else resolve(stdout.trim().split('\n').filter(f => f));
+      });
+    });
+
+    const viewNames = [];
+
+    for (const erbPath of erbFiles) {
+      const basename = erbPath.split('/').pop().replace('.html.erb', '');
+      viewNames.push(basename);
+
+      try {
+        const template = await readFile(erbPath, 'utf-8');
+        const js = compileERBToCode(template, basename);
+        const destPath = join(erbOutDir, `${basename}.js`);
+        await writeFile(destPath, js);
+        fileCount++;
+      } catch (err) {
+        errorCount++;
+        console.error(`\x1b[31m[erb]\x1b[0m ${basename}.html.erb: ${err.message}`);
+      }
+    }
+
+    // Generate combined views/articles.js module
+    if (viewNames.length > 0) {
+      viewNames.sort();
+      let articlesJs = `// Article views - auto-generated from .html.erb templates
+// Each exported function is a render function that takes { article } or { articles }
+
+`;
+      for (const name of viewNames) {
+        articlesJs += `import { render as ${name}_render } from './erb/${name}.js';\n`;
+      }
+
+      articlesJs += `
+// Export ArticleViews - method names match controller action names
+export const ArticleViews = {
+`;
+      for (const name of viewNames) {
+        articlesJs += `  ${name}: ${name}_render,\n`;
+      }
+      articlesJs += `  // $new alias for 'new' (JS reserved word handling)
+  $new: new_render
+};
+`;
+
+      await writeFile(join(viewsDir, 'articles.js'), articlesJs);
+      fileCount++;
+    }
+  } catch (err) {
+    console.error(`\x1b[31m[erb]\x1b[0m Failed to process views: ${err.message}`);
+  }
 
   console.log(`\x1b[32m[selfhost]\x1b[0m Transpiled ${fileCount} files` +
     (errorCount > 0 ? ` (\x1b[31m${errorCount} errors\x1b[0m)` : ''));

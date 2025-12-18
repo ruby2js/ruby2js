@@ -27,14 +27,14 @@
 
 <h3>Add a Comment</h3>
 
-<form onsubmit="return createComment(event, <%= @article.id %>)">
+<form onsubmit="event.preventDefault(); createComment(event, <%= @article.id %>); return false">
   <p>
     <label>Your Name:</label>
-    <input type="text" id="commenter" required>
+    <input type="text" name="commenter" required>
   </p>
   <p>
     <label>Comment:</label>
-    <textarea id="comment_body" required></textarea>
+    <textarea name="body" required></textarea>
   </p>
   <button type="submit">Add Comment</button>
 </form>

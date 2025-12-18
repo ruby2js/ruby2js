@@ -10,14 +10,14 @@
   </div>
 <% end %>
 
-<form onsubmit="return updateArticle(event, <%= @article.id %>)">
+<form onsubmit="event.preventDefault(); updateArticle(event, <%= @article.id %>); return false">
   <p>
     <label>Title:</label>
-    <input type="text" id="title" value="<%= @article.title %>" required>
+    <input type="text" name="title" value="<%= @article.title %>" required>
   </p>
   <p>
     <label>Body:</label>
-    <textarea id="body" required><%= @article.body %></textarea>
+    <textarea name="body" required><%= @article.body %></textarea>
   </p>
   <button type="submit">Update Article</button>
 </form>

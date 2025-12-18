@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "node dev-server.mjs",
     "build": "ruby scripts/build.rb",
+    "build:selfhost": "node scripts/build-selfhost.mjs",
     "start": "npx serve -p 3000",
     "test:sql": "node sql_prototype.mjs",
     "test:ar": "node active_record_test.mjs",

@@ -120,7 +120,8 @@ def transpile_directory(src_dir, dest_dir, pattern = '**/*.rb')
   end
 end
 
-# Create dist directory
+# Clean and create dist directory
+FileUtils.rm_rf(DIST_DIR)
 FileUtils.mkdir_p(DIST_DIR)
 
 puts "=== Building Rails-in-JS Demo ==="
@@ -145,6 +146,23 @@ transpile_directory(
   File.join(DEMO_ROOT, 'app/models'),
   File.join(DIST_DIR, 'models')
 )
+
+# Generate models/index.js that re-exports all models (except ApplicationRecord)
+models_dir = File.join(DIST_DIR, 'models')
+model_files = Dir.glob(File.join(models_dir, '*.js'))
+  .map { |f| File.basename(f, '.js') }
+  .reject { |name| name == 'application_record' || name == 'index' }
+  .sort
+
+if model_files.any?
+  index_js = model_files.map do |name|
+    class_name = name.split('_').map(&:capitalize).join
+    "export { #{class_name} } from './#{name}.js';"
+  end.join("\n") + "\n"
+
+  File.write(File.join(models_dir, 'index.js'), index_js)
+  puts "  -> #{File.join(models_dir, 'index.js')} (re-exports)"
+end
 puts
 
 # Transpile controllers
