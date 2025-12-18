@@ -466,62 +466,8 @@ Examples:
       }
 
       default: {
-        // JavaScript output
-        if (loadedFilters.length > 0) {
-          // Apply filters manually
-          const walker = new Ruby2JS.PrismWalker(source, options.file);
-          let ast = walker.visit(parseResult.value);
-
-          for (const filter of loadedFilters) {
-            // Create a Processor instance and bind filter methods
-            const processor = new Ruby2JS.Filter.Processor({});
-            processor.options = options;
-
-            // Copy filter's on_* methods onto processor
-            for (const key of Object.keys(filter)) {
-              if (key.startsWith('on_') && typeof filter[key] === 'function') {
-                processor[key] = filter[key].bind(filter);
-              }
-            }
-
-            // Bind infrastructure to filter
-            filter.process = (node) => processor.process(node);
-            filter.process_children = (node) => processor.process_children(node);
-            filter.s = Ruby2JS.Filter.SEXP.s.bind(Ruby2JS.Filter.SEXP);
-            filter._options = options;
-
-            // Call _setup to bind module-level functions
-            if (typeof filter._setup === 'function') {
-              filter._setup({
-                process: filter.process,
-                process_children: filter.process_children,
-                excluded: () => false,
-                included: () => false,
-                _options: options
-              });
-            }
-
-            // Apply filter
-            ast = processor.process(ast);
-          }
-
-          // Use Pipeline for final conversion (no filters - already applied)
-          const sourceBuffer = walker.source_buffer;
-          const wrappedComments = (parseResult.comments || []).map(c =>
-            new PrismComment(c, source, sourceBuffer)
-          );
-          const comments = associateComments(ast, wrappedComments);
-
-          const pipeline = new Ruby2JS.Pipeline(ast, comments, {
-            filters: [],
-            options: { ...options, source }
-          });
-
-          console.log(pipeline.run.to_s);
-        } else {
-          // No filters - use convert() directly
-          console.log(convert(source, options));
-        }
+        // JavaScript output - use convert() with filters (same pipeline as build scripts)
+        console.log(convert(source, { ...options, filters: loadedFilters }));
       }
     }
   } catch (e) {

@@ -61,6 +61,10 @@ module Ruby2JS
 
           method_name, method_args = method_info
 
+          # Skip transformation for initialize (constructor) - JS requires native super()
+          # before accessing 'this' in derived class constructors
+          return super if method_name == :initialize
+
           # Get args from enclosing method for zsuper (super with implicit args)
           # Extract arg names from the args node
           args = extract_arg_references(method_args)
@@ -73,6 +77,11 @@ module Ruby2JS
           return super unless method_info
 
           method_name, _ = method_info
+
+          # Skip transformation for initialize (constructor) - JS requires native super()
+          # before accessing 'this' in derived class constructors
+          return super if method_name == :initialize
+
           args = process_all(node.children)
           dynamic_super_call(method_name, args)
         end
