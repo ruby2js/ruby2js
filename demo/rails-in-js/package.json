@@ -12,6 +12,7 @@
     "test:sql": "node sql_prototype.mjs",
     "test:ar": "node active_record_test.mjs",
     "test:mvc": "node mvc_sketch.mjs",
+    "test:smoke": "node scripts/smoke-test.mjs",
     "test": "npm run test:sql && npm run test:ar && npm run test:mvc"
   },
   "dependencies": {
