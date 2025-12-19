@@ -111,48 +111,96 @@ module Ruby2JS
     end
 
     def reassociate_comments
-      raw_comments = @comments[:_raw]
-      # Use falsy check to handle both nil (Ruby) and undefined (JS selfhost)
+      # Access _raw: Ruby Hash uses [], JS Map uses .get() via pragma
+      raw_comments = @comments[:_raw] # Pragma: map
       return unless raw_comments && raw_comments.length > 0
 
-      begin
-        # Use Parser gem's associate if available (Ruby), otherwise our own (JS selfhost)
-        # Note: Ruby uses defined? for safe constant checking; JS needs optional chaining
-        new_comments = nil
-        unless defined?(RUBY2JS_SELFHOST) # Pragma: skip
-          if defined?(Parser) && defined?(Parser::Source::Comment)
-            new_comments = Parser::Source::Comment.associate(@ast, raw_comments)
-          elsif defined?(Ruby2JS) && Ruby2JS.respond_to?(:associate_comments)
-            new_comments = Ruby2JS.associate_comments(@ast, raw_comments)
-          else
-            new_comments = associateComments(@ast, raw_comments)
-          end
+      # Simple post-filter association:
+      # 1. Collect all nodes with location from filtered AST
+      # 2. Sort by source position
+      # 3. Associate each comment with the next node after it
+
+      # Collect nodes with location info
+      nodes = []
+      collect_located_nodes(@ast, nodes)
+
+      # Sort by start position (use assignment for JS compatibility)
+      nodes = nodes.sort_by { |n| node_start_pos(n) }
+
+      # Build new comments map: associate each comment with next node
+      # Clear existing entries (but preserve _raw)
+      # Note: Can't use # Pragma: map for clear because we need to preserve _raw
+      if @comments.respond_to?(:set)
+        # JS Map: save _raw, clear, restore
+        saved_raw = @comments[:_raw] # Pragma: map
+        @comments.clear() # Pragma: map
+        @comments[:_raw] = saved_raw if saved_raw # Pragma: map
+      else
+        # Ruby Hash
+        @comments.clear
+      end
+
+      raw_comments.each do |comment|
+        comment_end = comment_end_pos(comment)
+        next unless comment_end
+
+        # Find first node that starts at or after comment ends
+        target = nodes.find { |n| node_start_pos(n) >= comment_end }
+        next unless target
+
+        # Add comment to target's list
+        # Ruby Hash: @comments[target] ||= []; @comments[target].push(comment)
+        # JS Map: existing = @comments.get(target) || []; existing.push(comment); @comments.set(target, existing)
+        if @comments.respond_to?(:set)
+          existing = @comments[target] || [] # Pragma: map
+          existing.push(comment)
+          @comments[target] = existing # Pragma: map
+        else
+          @comments[target] ||= []
+          @comments[target].push(comment)
         end
+      end
 
-        # JS selfhost: use associateComments directly
-        new_comments = associateComments(@ast, raw_comments) # Pragma: only-js
+      # Re-add _raw
+      @comments[:_raw] = raw_comments # Pragma: map
+    end
 
-        # Ruby: use Hash methods
-        unless defined?(RUBY2JS_SELFHOST) # Pragma: skip
-          if new_comments && !new_comments.empty?
-            @comments.clear
-            @comments.merge!(new_comments)
-            @comments[:_raw] = raw_comments
-          end
-        end
+    # Recursively collect all nodes with location info
+    def collect_located_nodes(node, result)
+      return unless node.respond_to?(:type) && node.respond_to?(:children)
 
-        # JS selfhost: use Map methods (size not empty, set())
-        # Note: Clear old entries by setting to empty (delete gets transformed by functions
-        # filter to `delete obj[key]` which doesn't work for Maps - they need .delete() method)
-        if new_comments && new_comments.size != 0 # Pragma: only-js
-          @comments.forEach { |_, key| @comments.set(key, []) unless key == "_raw" } # Pragma: only-js
-          new_comments.forEach { |value, key| @comments.set(key, value) } # Pragma: only-js
-          @comments.set("_raw", raw_comments) # Pragma: only-js
-        end # Pragma: only-js
-      rescue NoMethodError # Pragma: skip
-        # Synthetic nodes without location info cause associate to fail
-        # Keep original comments hash
-      end # Pragma: skip
+      # Add this node if it has location info (skip :begin nodes like Parser does)
+      if node.type != :begin && node_start_pos(node)
+        result.push(node)
+      end
+
+      # Recurse into children
+      node.children.each do |child|
+        collect_located_nodes(child, result) if child.respond_to?(:type)
+      end
+    end
+
+    # Get start position from a node's location
+    def node_start_pos(node)
+      return nil unless node.respond_to?(:loc) && node.loc
+      if node.loc.respond_to?(:expression) && node.loc.expression
+        node.loc.expression.begin_pos
+      elsif node.loc.respond_to?(:[]) && node.loc[:expression]
+        node.loc[:expression].begin_pos
+      else
+        nil
+      end
+    end
+
+    # Get end position from a comment's location
+    def comment_end_pos(comment)
+      if comment.loc&.respond_to?(:expression) && comment.loc.expression
+        comment.loc.expression.end_pos
+      elsif comment.respond_to?(:location) && comment.location
+        comment.location.end_offset
+      else
+        nil
+      end
     end
 
     def handle_prepend_list

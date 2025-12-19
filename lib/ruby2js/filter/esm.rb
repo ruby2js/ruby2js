@@ -261,7 +261,7 @@ module Ruby2JS
                   next unless key.respond_to?(:loc) && key.loc&.respond_to?(:expression)
                   key_loc = key.loc.expression
                   if key_loc && key_loc.begin_pos == child_loc.begin_pos
-                    child_comments.concat(value) if value.is_a?(Array)
+                    child_comments.push(*value) if value.is_a?(Array)
                     @comments.set(key, [])
                   end
                 end
@@ -271,27 +271,28 @@ module Ruby2JS
                   next unless key.respond_to?(:loc) && key.loc&.respond_to?(:expression)
                   key_loc = key.loc.expression
                   if key_loc && key_loc.begin_pos == child_loc.begin_pos
-                    child_comments.concat(value) if value.is_a?(Array)
+                    child_comments.push(*value) if value.is_a?(Array)
                     @comments[key] = []
                   end
                 end
               end
             end
           end
-          result = s(:export, *process_all(args))
+          # Use node.updated to preserve location for comment re-association
+          result = node.updated(:export, process_all(args))
           # Combine comments from send node and child node
           node_comments = @comments.respond_to?(:get) ? @comments.get(node) : @comments[node]
           all_comments = []
-          all_comments.concat(node_comments) if node_comments
-          all_comments.concat(child_comments)
-          if all_comments.any?
-            if @comments.respond_to?(:set)
-              @comments.set(result, all_comments)
-              @comments.set(node, [])
-            else
-              @comments[result] = all_comments
-              @comments[node] = []
-            end
+          all_comments.push(*node_comments) if node_comments
+          all_comments.push(*child_comments)
+          # Always set comments on result (even if empty) to prevent
+          # first-child-location lookup from stealing comments from internal nodes
+          if @comments.respond_to?(:set)
+            @comments.set(result, all_comments)
+            @comments.set(node, [])
+          else
+            @comments[result] = all_comments
+            @comments[node] = []
           end
           result
         elsif target.nil? and found_import = find_autoimport(method)

@@ -36,6 +36,7 @@ module Ruby2JS
         'hash' => :hash,
         'string' => :string,
         'set' => :set,
+        'map' => :map,               # JS Map: []/[]= → get/set, key? → has
         # Behavior pragmas
         'method' => :method,         # proc.call → fn()
         'self' => :self_pragma,      # self → this (avoid conflict with :self)
@@ -328,12 +329,41 @@ module Ruby2JS
           end
           # Note: array and string both use .includes() which functions filter handles
 
-        # .delete - Set: delete (keep as method), Hash: delete keyword
+        # .delete - Set/Map: delete (keep as method), Hash: delete keyword
         when :delete
-          if pragma?(node, :set) && args.length == 1
+          if (pragma?(node, :set) || pragma?(node, :map)) && args.length == 1
             # Transform to (:call (:attr target :delete) nil arg) which produces target.delete(arg)
             # This structure isn't recognized by functions filter, so it won't be converted to delete keyword
             return process s(:call, s(:attr, target, :delete), nil, *args)
+          end
+
+        # .clear - Set/Map: clear (keep as method), Array: length = 0
+        when :clear
+          if (pragma?(node, :set) || pragma?(node, :map)) && args.length == 0
+            # Transform to (:call (:attr target :clear) nil) which produces target.clear()
+            # This structure isn't recognized by functions filter, so it won't be converted to length = 0
+            return process s(:call, s(:attr, target, :clear), nil)
+          end
+
+        # [] - Map: get (keep as method call), Hash/Array: bracket access
+        when :[]
+          if pragma?(node, :map) && args.length == 1
+            # target.get(key)
+            return process s(:send, target, :get, args.first)
+          end
+
+        # []= - Map: set (keep as method call), Hash/Array: bracket assignment
+        when :[]=
+          if pragma?(node, :map) && args.length == 2
+            # target.set(key, value)
+            return process s(:send, target, :set, *args)
+          end
+
+        # .key? - Map: has, Hash: 'key' in obj
+        when :key?
+          if pragma?(node, :map) && args.length == 1
+            # target.has(key)
+            return process s(:send, target, :has, args.first)
           end
 
         # .call - with method pragma, convert proc.call(args) to proc(args)

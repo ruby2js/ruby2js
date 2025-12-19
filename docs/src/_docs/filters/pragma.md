@@ -212,15 +212,50 @@ s.include?(item) # Pragma: set
 
 s.delete(item) # Pragma: set
 # => s.delete(item)
+
+s.clear() # Pragma: set
+# => s.clear()
 ```
 
 **When to use:** When working with JavaScript `Set` or `Map` objects. By default:
 - `<<` becomes `.push()` (array behavior)
 - `.include?` becomes `.includes()` (array/string behavior)
 - `.delete()` becomes `delete obj[key]` (hash/object behavior)
+- `.clear()` becomes `.length = 0` (array behavior)
 
-Use this pragma to get the correct Set/Map methods: `.add()`, `.has()`, and
-`.delete()`.
+Use this pragma to get the correct Set methods: `.add()`, `.has()`,
+`.delete()`, and `.clear()`.
+
+### `map`
+
+Specifies that the receiver is a JavaScript `Map` object.
+
+```ruby
+m[key] # Pragma: map
+# => m.get(key)
+
+m[key] = value # Pragma: map
+# => m.set(key, value)
+
+m.key?(key) # Pragma: map
+# => m.has(key)
+
+m.delete(key) # Pragma: map
+# => m.delete(key)
+
+m.clear # Pragma: map
+# => m.clear()
+```
+
+**When to use:** When working with JavaScript `Map` objects. By default:
+- `hash[key]` becomes bracket access `hash[key]` (object behavior)
+- `hash[key] = value` becomes `hash[key] = value` (object behavior)
+- `.key?()` becomes `key in obj` (object behavior)
+- `.delete()` becomes `delete obj[key]` (object behavior)
+- `.clear()` becomes `.length = 0` (array behavior)
+
+Use this pragma to get the correct Map methods: `.get()`, `.set()`, `.has()`,
+`.delete()`, and `.clear()`.
 
 ### `string`
 

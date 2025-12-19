@@ -119,6 +119,8 @@ export def convert(source, options = {})
     PrismComment.new(c, source, source_buffer)
   end
   comments = associateComments(ast, wrapped_comments)
+  # Store raw comments for reassociate_comments (matches Ruby pipeline)
+  comments.set("_raw", wrapped_comments)
 
   # Build pipeline options
   pipeline_options = options.merge(source: source)

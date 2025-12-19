@@ -87,6 +87,8 @@ module Ruby2JS
     # NOTE: export is a synthetic 
 
     handle :export do |*args|
+      # Output comments for export node
+      comments(@ast).each { |comment| put comment }
       put 'export '
 
       # Clear comments from children to prevent duplication

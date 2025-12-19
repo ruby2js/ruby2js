@@ -81,6 +81,7 @@ module Ruby2JS
 
       # Store comments for debugging (class variable for access after conversion)
       @@last_comments = @comments
+
       @varstack = []
       @scope = ast
       @inner = nil
@@ -310,102 +311,16 @@ module Ruby2JS
 
     private
 
-    # Find comments for an AST node using multiple lookup strategies:
-    # 1. Direct lookup by object identity
-    # 2. Location-based lookup (for nodes recreated by filters with same location)
-    # 3. First-child location lookup (for synthetic nodes wrapping real content)
+    # Find comments for an AST node by direct identity lookup.
+    # The pipeline's reassociate_comments handles position-based association,
+    # so we only need simple direct lookup here.
     # Returns [comment_list, comment_key] where comment_key is used for removal
     def find_comment_entry(ast)
-      # First try direct lookup by object identity
+      # Direct lookup by object identity
       # Ruby uses Hash ([]), JS selfhost uses Map (.get())
       comment_list = @comments.respond_to?(:get) ? @comments.get(ast) : @comments[ast]
-      # Return early if there's an explicit non-empty entry.
-      # Non-empty entries are definitive - use them directly.
-      # Empty entries might be from filters that replaced nodes; in that case,
-      # fall through to location-based lookup to find the original comments.
-      # Note: The Pragma: hash comment triggers `in` operator in JS, but that
-      # doesn't work for object keys. The selfhost version skips the complex
-      # location-based lookup below anyway (Pragma: skip), so we just check
-      # if comment_list is a non-empty array for the early return.
-      return [comment_list, ast] if comment_list.is_a?(Array) && !comment_list.empty?
-
-      # If ast has location info, try location-based lookup
-      # This handles cases where filters created new nodes with same location
-      # Skip complex location-based comment lookup in self-hosted JS version
-      # The location-based lookup requires Hash with object keys (Map in JS)
-      # For simplicity, selfhost version only uses direct lookup above
-      unless defined?(RUBY2JS_SELFHOST) # Pragma: skip
-        if ast.loc && ast.loc.respond_to?(:expression) && ast.loc.expression
-          expression = ast.loc.expression
-          @comments.each do |key, value|
-            next if key == :_raw || value.nil? || value.empty?
-            next unless key.respond_to?(:loc) && key.loc&.respond_to?(:expression)
-            key_expr = key.loc.expression
-            next unless key_expr
-            if key_expr.source_buffer == expression.source_buffer &&
-               key_expr.begin_pos == expression.begin_pos &&
-               key_expr.end_pos == expression.end_pos
-              return [value, key]
-            end
-          end
-        end
-
-        # For synthetic nodes (no location), try to find comments via first child with location
-        if !ast.loc || !ast.loc.respond_to?(:expression) || !ast.loc.expression
-          first_loc = find_first_location(ast)
-          if first_loc
-            @comments.each do |key, value|
-              next if key == :_raw || value.nil? || value.empty?
-              next unless key.respond_to?(:loc) && key.loc&.respond_to?(:expression)
-              key_expr = key.loc.expression
-              next unless key_expr && key_expr.source_buffer == first_loc.source_buffer
-              # If the key starts at or near where our content starts, use its comments
-              if key_expr.begin_pos <= first_loc.begin_pos + 1
-                return [value, key]
-              end
-            end
-          end
-        end
-      end
-
-      # JS selfhost: first-child location lookup for synthetic nodes (e.g., export wrapping class)
-      # Note: Using forEach on Map (avoiding .entries which gets transformed by functions filter)
-      if defined?(RUBY2JS_SELFHOST) # Pragma: delete
-        if !ast.loc || !ast.loc.is_a?(Object) || !ast.loc[:expression]
-          first_loc = find_first_location(ast)
-          if first_loc && @comments && @comments.respond_to?(:forEach)
-            result = nil
-            @comments.forEach do |value, key|
-              next if result  # Already found a match
-              next if key == "_raw" || !value || value.length == 0
-              next if !key || !key.is_a?(Object) || !key.loc
-              next if !key.loc.is_a?(Object) || !key.loc[:expression]
-              key_expr = key.loc[:expression]
-              next if !key_expr || key_expr.source_buffer != first_loc.source_buffer
-              if key_expr.begin_pos <= first_loc.begin_pos + 1
-                result = [value, key]
-              end
-            end
-            return result if result
-          end
-        end
-      end # Pragma: keep
-
+      return [comment_list, ast] if comment_list.is_a?(Array)
       [[], ast]
-    end
-
-    # Find the first source location in an AST tree (depth-first)
-    def find_first_location(ast)
-      return nil unless ast.respond_to?(:children)
-      if ast.loc && ast.loc.respond_to?(:expression) && ast.loc.expression
-        return ast.loc.expression
-      end
-      ast.children.each do |child|
-        next unless self.ast_node?(child)
-        loc = find_first_location(child)
-        return loc if loc
-      end
-      nil
     end
 
     # Check if obj is an AST node (has type and children)

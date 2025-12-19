@@ -78,7 +78,45 @@ module Ruby2JS
           method_name = node.children[1].to_s.sub(/[?!]$/, '').to_sym
           symbols << method_name
           # Transform defs to def for IIFE-safe output
-          body[i] = node.updated(:def, [node.children[1], *node.children[2..-1]])
+          new_node = node.updated(:def, [node.children[1], *node.children[2..-1]])
+          # Transfer comments from original defs node to new def node
+          # Use location-based lookup since object identity may differ in selfhost
+          node_comments = nil
+          node_loc = node.loc&.expression
+          if node_loc
+            if @comments.respond_to?(:forEach)
+              # JS selfhost: iterate Map to find by location
+              @comments.forEach do |value, key|
+                next if node_comments  # Already found
+                next unless key.respond_to?(:loc) && key.loc&.respond_to?(:expression)
+                key_loc = key.loc&.expression
+                if key_loc && key_loc.begin_pos == node_loc.begin_pos
+                  node_comments = value
+                  @comments.set(key, [])
+                end
+              end
+            else
+              # Ruby: iterate Hash to find by location
+              @comments.each do |key, value|
+                next if node_comments  # Already found
+                next unless key.respond_to?(:loc) && key.loc&.respond_to?(:expression)
+                key_loc = key.loc&.expression
+                if key_loc && key_loc.begin_pos == node_loc.begin_pos
+                  node_comments = value
+                  @comments[key] = []
+                  break
+                end
+              end
+            end
+          end
+          if node_comments && (node_comments.is_a?(Array) ? node_comments.any? : node_comments)
+            if @comments.respond_to?(:set)
+              @comments.set(new_node, node_comments)
+            else
+              @comments[new_node] = node_comments
+            end
+          end
+          body[i] = new_node
         elsif node.type == :class and node.children.first.children.first == nil
           symbols << node.children.first.children.last
         elsif node.type == :module
