@@ -17,19 +17,19 @@ describe Ruby2JS::Filter::Rails::Routes do
           root 'home#index'
         end
       RUBY
-      # Now exports Application plus path helpers
-      assert_includes result, 'export { Application, root_path }'
+      # Now exports Application, routes, plus path helpers
+      assert_includes result, 'export { Application, routes, root_path }'
     end
   end
 
   describe "imports" do
-    it "imports Router, Application, and setupFormHandlers from rails.js" do
+    it "imports Router, Application, formData, and handleFormResult from rails.js" do
       result = to_js(<<~RUBY)
         Rails.application.routes.draw do
           root 'articles#index'
         end
       RUBY
-      assert_includes result, 'import { Router, Application, setupFormHandlers } from "../lib/rails.js"'
+      assert_includes result, 'import { Router, Application, formData, handleFormResult } from "../lib/rails.js"'
     end
 
     it "imports Schema and Seeds" do
@@ -125,19 +125,21 @@ describe Ruby2JS::Filter::Rails::Routes do
     end
   end
 
-  describe "setupFormHandlers" do
-    it "generates setupFormHandlers for resources" do
+  describe "routes dispatch object" do
+    it "generates routes object for resources" do
       result = to_js(<<~RUBY)
         Rails.application.routes.draw do
           resources :articles
         end
       RUBY
-      assert_includes result, 'setupFormHandlers(['
-      assert_includes result, 'resource: "articles"'
-      assert_includes result, 'confirmDelete:'
+      assert_includes result, 'const routes = {'
+      assert_includes result, 'articles: {'
+      assert_includes result, 'article: {'
+      assert_includes result, 'ArticlesController.create(formData(event))'
+      assert_includes result, 'ArticlesController.destroy(id)'
     end
 
-    it "includes parent for nested resources" do
+    it "generates nested routes for nested resources" do
       result = to_js(<<~RUBY)
         Rails.application.routes.draw do
           resources :articles do
@@ -145,8 +147,10 @@ describe Ruby2JS::Filter::Rails::Routes do
           end
         end
       RUBY
-      assert_includes result, 'resource: "comments"'
-      assert_includes result, 'parent: "articles"'
+      assert_includes result, 'article_comments: {'
+      assert_includes result, 'article_comment: {'
+      assert_includes result, 'CommentsController.create(parentId, formData(event))'
+      assert_includes result, 'CommentsController.destroy(parentId, id)'
     end
   end
 
