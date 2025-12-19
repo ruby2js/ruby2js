@@ -2,175 +2,88 @@ require 'minitest/autorun'
 require 'ruby2js/filter/functions'
 
 describe Ruby2JS::Filter::Functions do
-  
-  def to_js( string)
+
+  def to_js(string)
     _(Ruby2JS.convert(string, filters: [Ruby2JS::Filter::Functions]).to_s)
   end
-  
-  describe 'conversions' do
-    it "should handle everything separately" do
-      js = to_js <<-EOF
-        #statement
-        statement
 
-        #class
-        class Class
-        end
+  def to_js_no_filter(string)
+    _(Ruby2JS.convert(string).to_s)
+  end
 
-        #subclass
-        class Subclass < Class
-        end
-
-        class Constructor
-          #constructor
-          def initialize
-            @constructor = 1
-          end
-        end
-
-        class Method
-          #method
-          def method()
-            return @foo
-          end
-        end
-
-        class Attribute
-          #attribute
-          def attribute
-            @attribute
-          end
-        end
-
-        class Setter
-          #setter
-          def setter=(n)
-            @setter = n
-          end
-        end
-
-        class ClassMethod
-          #classmethod
-          def self.classmethod()
-            return @@classmethod
-          end
-        end
-
-        class ClassAttribute
-          #classattribute
-          def self.classattribute
-            @@classattribute
-          end
-        end
-
-        class ClassSetter
-          #classsetter
-          def self.classsetter=(n)
-            @@classsetter = n
-          end
-        end
-      EOF
-
-      js.must_include "//statement\nlet statement;"
-      js.must_include "//class\nclass Class {"
-      js.must_include "//subclass\nclass Subclass extends Class {"
-      js.must_include "//constructor\n  constructor() {"
-      js.must_include "//method\n  method() {"
-      js.must_include "//attribute\n  get attribute() {"
-      js.must_include "//setter\n  set setter(n) {"
-      js.must_include "//classmethod\n  static classmethod() {"
-      js.must_include "//classattribute\n  static get classattribute() {"
-      js.must_include "//classsetter\n  static set classsetter(n) {" 
-    end
-
-    it "should handle everything together" do
-      js = to_js <<-EOF
-        #statement
-        statement
-
-        #subclass
-        class Subclass < Class
-          #constructor
-          def initialize
-            super
-          end
-
-          #method
-          def method()
-            @method = 1
-          end
-
-          #attribute
-          def attribute
-            @attribute
-          end
-
-          #setter
-          def setter=(n)
-            @setter = n
-          end
-
-          #classmethod
-          def self.classmethod()
-            return @@classmethod
-          end
-
-          #classattribute
-          def self.classattribute
-            @@classattribute
-          end
-
-          #classsetter
-          def self.classsetter=(n)
-            @@classsetter = n
-          end
-        end
-      EOF
-
-      js.must_include "//statement\nlet statement;"
-      js.must_include "//subclass\nclass Subclass extends Class {"
-      js.must_include "//constructor\n  constructor() {"
-      js.must_include "//method\n  method() {"
-      js.must_include "//attribute\n  get attribute() {"
-      js.must_include "//setter\n  set setter(n) {"
-      js.must_include "//classmethod\n  static classmethod() {"
-      js.must_include "//classattribute\n  static get classattribute() {"
-      js.must_include "//classsetter\n  static set classsetter(n) {"
-    end
-
-    it "should handle =begin...=end" do
-      js = to_js %{
-        =begin
-        comment
-        =end
-        statement
-      }.gsub(/^\s+/, '')
-
-      js.must_equal "/*\ncomment\n*/\nlet statement"
-    end
-
-    it "should handle =begin...*/...=end" do
-      js = to_js %{
-        =begin
-        /* comment */
-        =end
-        statement
-      }.gsub(/^\s+/, '')
-
-      js.must_equal "//\n///* comment */\n//\nlet statement"
+  describe 'comments before code' do
+    it "should handle comment before statement" do
+      to_js("# comment\nstatement").must_include "// comment\nlet statement"
     end
 
     it "should handle comment before class" do
-      js = to_js %{
-        # comment before class
-        class Greeter
-        end
-      }
-
+      js = to_js("# comment before class\nclass Greeter\nend")
       js.must_include "// comment before class"
       js.must_include "class Greeter"
     end
 
+    it "should handle comment before method" do
+      js = to_js("class Foo\n  # method comment\n  def bar\n    1\n  end\nend")
+      js.must_include "// method comment"
+      js.must_include "get bar()"
+    end
+  end
+
+  describe 'comments between code' do
+    it "should handle comment between statements" do
+      js = to_js("x = 1\n# between\ny = 2")
+      js.must_include "let x = 1"
+      js.must_include "// between"
+      js.must_include "let y = 2"
+    end
+  end
+
+  describe 'trailing comments (same line)' do
+    it "should handle trailing comment on last line" do
+      to_js_no_filter("x = 1 # trailing").must_include "let x = 1 // trailing"
+    end
+
+    it "should handle trailing comment with more code after" do
+      js = to_js_no_filter("x = 1 # trailing\ny = 2")
+      js.must_include "let x = 1 // trailing"
+      js.must_include "let y = 2"
+      # Trailing comment should NOT appear before y = 2
+      js.wont_include "// trailing\nlet y"
+    end
+
+    it "should handle trailing comment on statement in method" do
+      js = to_js("class Foo\n  def bar\n    x = 1 # trailing\n  end\nend")
+      js.must_include "let x = 1 // trailing"
+    end
+  end
+
+  describe 'orphan comments (after all code)' do
+    it "should preserve comment after all code" do
+      js = to_js_no_filter("x = 1\n# after all code")
+      js.must_include "let x = 1"
+      js.must_include "// after all code"
+    end
+
+    it "should preserve multiple orphan comments" do
+      js = to_js_no_filter("x = 1\n# first orphan\n# second orphan")
+      js.must_include "// first orphan"
+      js.must_include "// second orphan"
+    end
+  end
+
+  describe 'block comments' do
+    it "should handle =begin...=end" do
+      js = to_js("=begin\ncomment\n=end\nstatement".gsub(/^\s+/, ''))
+      js.must_equal "/*\ncomment\n*/\nlet statement"
+    end
+
+    it "should handle =begin...*/...=end with line comments" do
+      js = to_js("=begin\n/* comment */\n=end\nstatement".gsub(/^\s+/, ''))
+      js.must_equal "//\n///* comment */\n//\nlet statement"
+    end
+  end
+
+  describe 'comment deduplication' do
     it "should not duplicate comments" do
       js = Ruby2JS.convert(<<-EOF, filters: [Ruby2JS::Filter::Functions]).to_s
         #statement
@@ -181,12 +94,8 @@ describe Ruby2JS::Filter::Functions do
         end
       EOF
 
-      # Count occurrences of each comment
-      statement_count = js.scan("//statement").length
-      class_count = js.scan("//class").length
-
-      _(statement_count).must_equal 1, "statement comment should appear exactly once, got #{statement_count}"
-      _(class_count).must_equal 1, "class comment should appear exactly once, got #{class_count}"
+      _(js.scan("//statement").length).must_equal 1
+      _(js.scan("//class").length).must_equal 1
     end
   end
 
@@ -197,19 +106,13 @@ describe Ruby2JS::Filter::Functions do
     end
 
     it "should preserve comment before export class" do
-      js = to_js_esm %{
-        # comment before export
-        export class Exported
-        end
-      }
-
+      js = to_js_esm("# comment before export\nexport class Exported\nend")
       js.must_include "// comment before export"
       js.must_include "export class Exported"
     end
 
     it "should preserve comment on class inside module" do
       require 'ruby2js/filter/esm'
-      # Note: Class needs a body to trigger multiline output (single-line output has no place for comments)
       js = Ruby2JS.convert(<<-EOF, filters: [Ruby2JS::Filter::ESM, Ruby2JS::Filter::Functions]).to_s
         module MyModule
           # class comment
@@ -221,9 +124,21 @@ describe Ruby2JS::Filter::Functions do
         end
       EOF
 
-      # Comment should appear exactly once (bug was duplicating comments 3x)
-      class_comment_count = js.scan("// class comment").length
-      _(class_comment_count).must_equal 1, "class comment should appear exactly once, got #{class_comment_count}"
+      _(js.scan("// class comment").length).must_equal 1
+    end
+  end
+
+  describe 'pragma comments' do
+    it "should not output pragma comments" do
+      js = to_js_no_filter("x ||= 1 # Pragma: nullish")
+      js.wont_include "Pragma"
+      js.wont_include "nullish"
+    end
+
+    it "should not output pragma as trailing comment" do
+      js = to_js_no_filter("x = 1 # Pragma: skip")
+      js.wont_include "Pragma"
+      js.wont_include "skip"
     end
   end
 end

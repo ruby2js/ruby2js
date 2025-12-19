@@ -124,6 +124,17 @@ module Ruby2JS
     def convert
       scope @ast
 
+      # Output orphan comments (comments after all code)
+      orphan_list = @comments.respond_to?(:get) ? @comments.get(:_orphan) : @comments[:_orphan]
+      if orphan_list
+        orphan_list.each do |comment|
+          text = comment.respond_to?(:text) ? comment.text : comment.to_s
+          next if text =~ /#\s*Pragma:/i
+          # Add newline before orphan comment, then output comment
+          sput text.sub(/^#/, '//')
+        end
+      end
+
       if @strict
         if @sep == '; '
           @lines.first.unshift "\"use strict\"#@sep"
@@ -332,6 +343,43 @@ module Ruby2JS
       obj.respond_to?(:type) && obj.respond_to?(:children)
     end
 
+    # Output trailing comment for a node (on same line)
+    def trailing_comment(ast)
+      trailing_list = @comments.respond_to?(:get) ? @comments.get(:_trailing) : @comments[:_trailing]
+      return unless trailing_list
+
+      # Find trailing comment for this node
+      # Match by type + location (type prevents :begin from matching its first child)
+      ast_type = ast.type
+      ast_begin = node_begin_pos(ast)
+      # Note: Use explicit nil check because begin_pos can be 0 (falsy in JS)
+      return if ast_begin.nil?
+
+      trailing_list.each do |entry|
+        node, comment = entry
+        node_begin = node_begin_pos(node)
+        next unless node.type == ast_type && node_begin == ast_begin
+        text = comment.respond_to?(:text) ? comment.text : comment.to_s
+        # Skip pragma comments
+        return if text =~ /#\s*Pragma:/i
+        # Append to current line (space + // + comment text without #)
+        put ' ' + text.sub(/^#/, '//')
+      end
+    end
+
+    # Get begin_pos from a node's location (safe for both Ruby and JS)
+    def node_begin_pos(node)
+      return nil unless node.respond_to?(:loc) && node.loc
+      loc = node.loc
+      if loc.respond_to?(:expression) && loc.expression
+        loc.expression.begin_pos
+      elsif loc.respond_to?(:[]) && loc[:expression]
+        loc[:expression].begin_pos
+      else
+        nil
+      end
+    end
+
     public
 
     def parse(ast, state=:expression)
@@ -350,6 +398,11 @@ module Ruby2JS
       end
 
       handler.call(*ast.children)
+
+      # Output trailing comments on same line (after statement)
+      if state == :statement
+        trailing_comment(ast)
+      end
     ensure
       @ast = oldast
       @state = oldstate

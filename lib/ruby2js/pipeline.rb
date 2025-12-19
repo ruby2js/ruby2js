@@ -52,6 +52,9 @@ module Ruby2JS
 
     def run
       apply_filters if @filters && !@filters.empty?
+      # Always reassociate comments (for trailing/orphan comment handling)
+      # even when no filters are applied
+      reassociate_comments unless @filters && !@filters.empty?
       create_converter
       configure_converter
       execute_converter
@@ -115,10 +118,13 @@ module Ruby2JS
       raw_comments = @comments[:_raw] # Pragma: map
       return unless raw_comments && raw_comments.length > 0
 
-      # Simple post-filter association:
+      # Comment association strategy:
       # 1. Collect all nodes with location from filtered AST
       # 2. Sort by source position
-      # 3. Associate each comment with the next node after it
+      # 3. For each comment:
+      #    - If on same line as a node that ends before it: trailing comment
+      #    - Else if there's a next node: associate with next node
+      #    - Else: orphan comment (output at end)
 
       # Collect nodes with location info
       nodes = []
@@ -140,24 +146,59 @@ module Ruby2JS
         @comments.clear
       end
 
+      trailing_comments = []
+      orphan_comments = []
+
       raw_comments.each do |comment|
+        comment_line = comment_line_number(comment)
         comment_end = comment_end_pos(comment)
-        next unless comment_end
+        next unless comment_end && comment_line
 
-        # Find first node that starts at or after comment ends
-        target = nodes.find { |n| node_start_pos(n) >= comment_end }
-        next unless target
+        # Check if this is a trailing comment (same line as a node that ends before it)
+        same_line_node = nodes.find do |n|
+          node_line = node_line_number(n)
+          node_end = node_end_pos(n)
+          node_line && node_end && node_line == comment_line && node_end <= comment_end
+        end
 
-        # Add comment to target's list
-        # Ruby Hash: @comments[target] ||= []; @comments[target].push(comment)
-        # JS Map: existing = @comments.get(target) || []; existing.push(comment); @comments.set(target, existing)
-        if @comments.respond_to?(:set)
-          existing = @comments[target] || [] # Pragma: map
-          existing.push(comment)
-          @comments[target] = existing # Pragma: map
+        if same_line_node
+          # Trailing comment - store separately with node reference
+          trailing_comments.push([same_line_node, comment])
         else
-          @comments[target] ||= []
-          @comments[target].push(comment)
+          # Find first node that starts at or after comment ends
+          target = nodes.find { |n| node_start_pos(n) >= comment_end }
+
+          if target
+            # Add comment to target's list
+            if @comments.respond_to?(:set)
+              existing = @comments[target] || [] # Pragma: map
+              existing.push(comment)
+              @comments[target] = existing # Pragma: map
+            else
+              @comments[target] ||= []
+              @comments[target].push(comment)
+            end
+          else
+            # No target - orphan comment
+            orphan_comments.push(comment)
+          end
+        end
+      end
+
+      # Store trailing and orphan comments under special keys
+      if trailing_comments.length > 0
+        if @comments.respond_to?(:set)
+          @comments[:_trailing] = trailing_comments # Pragma: map
+        else
+          @comments[:_trailing] = trailing_comments
+        end
+      end
+
+      if orphan_comments.length > 0
+        if @comments.respond_to?(:set)
+          @comments[:_orphan] = orphan_comments # Pragma: map
+        else
+          @comments[:_orphan] = orphan_comments
         end
       end
 
@@ -170,7 +211,8 @@ module Ruby2JS
       return unless node.respond_to?(:type) && node.respond_to?(:children)
 
       # Add this node if it has location info (skip :begin nodes like Parser does)
-      if node.type != :begin && node_start_pos(node)
+      # Note: Use explicit nil check because start_pos can be 0 (falsy in JS)
+      if node.type != :begin && !node_start_pos(node).nil?
         result.push(node)
       end
 
@@ -192,12 +234,47 @@ module Ruby2JS
       end
     end
 
+    # Get end position from a node's location
+    def node_end_pos(node)
+      return nil unless node.respond_to?(:loc) && node.loc
+      if node.loc.respond_to?(:expression) && node.loc.expression
+        node.loc.expression.end_pos
+      elsif node.loc.respond_to?(:[]) && node.loc[:expression]
+        node.loc[:expression].end_pos
+      else
+        nil
+      end
+    end
+
+    # Get line number from a node's location
+    def node_line_number(node)
+      return nil unless node.respond_to?(:loc) && node.loc
+      if node.loc.respond_to?(:expression) && node.loc.expression
+        node.loc.expression.line
+      elsif node.loc.respond_to?(:[]) && node.loc[:start_line]
+        node.loc[:start_line]
+      else
+        nil
+      end
+    end
+
     # Get end position from a comment's location
     def comment_end_pos(comment)
       if comment.loc&.respond_to?(:expression) && comment.loc.expression
         comment.loc.expression.end_pos
       elsif comment.respond_to?(:location) && comment.location
         comment.location.end_offset
+      else
+        nil
+      end
+    end
+
+    # Get line number from a comment's location
+    def comment_line_number(comment)
+      if comment.loc&.respond_to?(:expression) && comment.loc.expression
+        comment.loc.expression.line
+      elsif comment.respond_to?(:location) && comment.location
+        comment.location.start_line
       else
         nil
       end
