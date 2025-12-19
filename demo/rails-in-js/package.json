@@ -5,8 +5,9 @@
   "description": "Rails-like app running in JavaScript - Ruby2JS selfhost demo",
   "scripts": {
     "dev": "node dev-server.mjs",
-    "build": "ruby scripts/build.rb",
-    "build:selfhost": "node scripts/build-selfhost.mjs",
+    "dev:ruby": "node dev-server.mjs --ruby",
+    "build": "node scripts/build-selfhost.mjs",
+    "build:ruby": "ruby scripts/build.rb",
     "start": "npx serve -p 3000",
     "test:sql": "node sql_prototype.mjs",
     "test:ar": "node active_record_test.mjs",

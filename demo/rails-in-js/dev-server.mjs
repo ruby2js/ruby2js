@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Dev server for Rails-in-JS with hot reload
-// Usage: node dev-server.mjs [--selfhost] [--port=3000]
+// Usage: node dev-server.mjs [--ruby] [--port=3000]
 
 import { createServer } from 'http';
 import { readFile, stat } from 'fs/promises';
@@ -17,7 +17,7 @@ const __dirname = dirname(__filename);
 
 // Parse command line arguments
 const args = process.argv.slice(2);
-const selfhost = args.includes('--selfhost');
+const useRuby = args.includes('--ruby');
 const portArg = args.find(a => a.startsWith('--port='));
 const PORT = portArg ? parseInt(portArg.split('=')[1]) : 3000;
 
@@ -58,11 +58,11 @@ async function runBuild() {
   building = true;
   const startTime = Date.now();
 
-  if (selfhost) {
-    console.log('\x1b[33m[selfhost]\x1b[0m Transpiling with JavaScript...');
-    await runSelfhostBuild();
-  } else {
+  if (useRuby) {
+    console.log('\x1b[33m[ruby]\x1b[0m Transpiling with Ruby...');
     await runRubyBuild();
+  } else {
+    await runSelfhostBuild();
   }
 
   const elapsed = Date.now() - startTime;
@@ -106,8 +106,8 @@ async function runSelfhostBuild() {
     }
     await builder.build();
   } catch (err) {
-    console.error('\x1b[31m[selfhost]\x1b[0m Build failed:', err.message);
-    console.log('\x1b[33m[selfhost]\x1b[0m Falling back to Ruby backend');
+    console.error('\x1b[31m[build]\x1b[0m Build failed:', err.message);
+    console.log('\x1b[33m[build]\x1b[0m Falling back to Ruby backend');
     return runRubyBuild();
   }
 }
@@ -234,7 +234,7 @@ server.listen(PORT, () => {
   console.log('\x1b[1m=== Rails-in-JS Dev Server ===\x1b[0m');
   console.log('');
   console.log(`  \x1b[32m➜\x1b[0m  Local:   http://localhost:${PORT}/`);
-  console.log(`  \x1b[36m➜\x1b[0m  Mode:    ${selfhost ? 'selfhost (experimental)' : 'Ruby transpilation'}`);
+  console.log(`  \x1b[36m➜\x1b[0m  Mode:    ${useRuby ? 'Ruby transpilation' : 'JavaScript (selfhost)'}`);
   console.log('');
   console.log('Watching for changes in app/, config/, db/');
   console.log('Press Ctrl+C to stop');

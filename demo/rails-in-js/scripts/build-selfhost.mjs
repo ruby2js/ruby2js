@@ -262,8 +262,8 @@ export class SelfhostBuilder {
       filters: SelfhostBuilder.erbFilters
     });
 
-    // Step 3: Add export keyword
-    return result.toString().replace(/^function render/, 'export function render');
+    // Step 3: Add export keyword (use multiline flag to match after imports)
+    return result.toString().replace(/^function render/m, 'export function render');
   }
 
   // Escape string for Ruby single-quoted string literal
