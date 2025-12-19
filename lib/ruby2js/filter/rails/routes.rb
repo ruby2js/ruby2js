@@ -580,13 +580,13 @@ module Ruby2JS
               collection_methods = []
 
               if !resource[:only] || resource[:only].include?(:create)
-                # create(parent_id, params) - parent id first, then params
+                # create(parent_id, params) - async, parent id first, then params
                 controller_call = s(:send, controller, :create,
                   s(:lvar, :parentId),
                   s(:send, nil, :formData, s(:lvar, :event)))
                 collection_methods << s(:pair, s(:sym, :post),
                   s(:block,
-                    s(:send, nil, :proc),
+                    s(:send, nil, :async),
                     s(:args, s(:arg, :event), s(:arg, :parentId)),
                     wrap_with_result_handler(controller_call)))
               end
@@ -598,13 +598,13 @@ module Ruby2JS
               member_methods = []
 
               if !resource[:only] || resource[:only].include?(:destroy)
-                # destroy(parent_id, id) - parent id first, then id
+                # destroy(parent_id, id) - async, parent id first, then id
                 controller_call = s(:send, controller, :destroy,
                   s(:lvar, :parentId),
                   s(:lvar, :id))
                 member_methods << s(:pair, s(:sym, :delete),
                   s(:block,
-                    s(:send, nil, :proc),
+                    s(:send, nil, :async),
                     s(:args, s(:arg, :parentId), s(:arg, :id)),
                     wrap_with_result_handler(controller_call)))
               end
@@ -626,12 +626,12 @@ module Ruby2JS
               end
 
               if !resource[:only] || resource[:only].include?(:create)
-                # post: (event) => { let result = Controller.create(...); handleFormResult(result); return false }
+                # post: async (event) => { let result = await Controller.create(...); handleFormResult(result); return false }
                 controller_call = s(:send, controller, :create,
                   s(:send, nil, :formData, s(:lvar, :event)))
                 collection_methods << s(:pair, s(:sym, :post),
                   s(:block,
-                    s(:send, nil, :proc),
+                    s(:send, nil, :async),
                     s(:args, s(:arg, :event)),
                     wrap_with_result_handler(controller_call)))
               end
@@ -651,12 +651,12 @@ module Ruby2JS
               end
 
               if !resource[:only] || resource[:only].include?(:update)
-                # update(id, params) - id first, then params
+                # update(id, params) - async, id first, then params
                 controller_call = s(:send, controller, :update,
                   s(:lvar, :id),
                   s(:send, nil, :formData, s(:lvar, :event)))
                 update_block = s(:block,
-                  s(:send, nil, :proc),
+                  s(:send, nil, :async),
                   s(:args, s(:arg, :event), s(:arg, :id)),
                   wrap_with_result_handler(controller_call))
                 member_methods << s(:pair, s(:sym, :put), update_block)
@@ -664,11 +664,11 @@ module Ruby2JS
               end
 
               if !resource[:only] || resource[:only].include?(:destroy)
-                # destroy(id) - plain id
+                # destroy(id) - async
                 controller_call = s(:send, controller, :destroy, s(:lvar, :id))
                 member_methods << s(:pair, s(:sym, :delete),
                   s(:block,
-                    s(:send, nil, :proc),
+                    s(:send, nil, :async),
                     s(:args, s(:arg, :id)),
                     wrap_with_result_handler(controller_call)))
               end
@@ -683,13 +683,21 @@ module Ruby2JS
           end
         end
 
-        # Wrap a controller call with result handling
-        # Generates: { let result = controllerCall; handleFormResult(result); return false }
+        # Wrap a controller call with result handling (async)
+        # Generates: { let result = await controllerCall; handleFormResult(result); return false }
         def wrap_with_result_handler(controller_call)
           s(:begin,
-            s(:lvasgn, :result, controller_call),
+            s(:lvasgn, :result, controller_call.updated(:await)),
             s(:send, nil, :handleFormResult, s(:lvar, :result)),
             s(:return, s(:false)))
+        end
+
+        # Create an async block (arrow function)
+        def async_block(args_node, body)
+          s(:block,
+            s(:send, nil, :async),
+            args_node,
+            body)
         end
 
         def build_routes_method

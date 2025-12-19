@@ -117,6 +117,13 @@ module Ruby2JS
             end
           end
           body[i] = new_node
+        elsif node.type == :asyncs and node.children.first.type == :self
+          # Convert async singleton method (async def self.X) to regular async function
+          # In IIFE context, this.X = ... fails because this is undefined
+          method_name = node.children[1].to_s.sub(/[?!]$/, '').to_sym
+          symbols << method_name
+          # Transform asyncs to async for IIFE-safe output
+          body[i] = node.updated(:async, [node.children[1], *node.children[2..-1]])
         elsif node.type == :class and node.children.first.children.first == nil
           symbols << node.children.first.children.last
         elsif node.type == :module

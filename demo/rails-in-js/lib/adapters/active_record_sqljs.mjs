@@ -39,14 +39,62 @@ export function getDatabase() {
 
 // Base class for ActiveRecord models
 export class ActiveRecord {
-  static tableName = null;  // Override in subclass
-  static columns = [];      // Override in subclass
+  static table_name = null;  // Override in subclass (Ruby convention)
+  static columns = [];       // Override in subclass
+
+  // Getter to support both tableName and table_name (JS vs Ruby convention)
+  static get tableName() {
+    return this.table_name;
+  }
 
   constructor(attributes = {}) {
     this.id = attributes.id || null;
     this.attributes = { ...attributes };
     this._persisted = !!attributes.id;
     this._changes = {};
+    this._errors = [];
+
+    // Set attribute accessors for direct property access (article.title)
+    for (const [key, value] of Object.entries(attributes)) {
+      if (key !== 'id' && !(key in this)) {
+        this[key] = value;
+      }
+    }
+  }
+
+  // --- Validation ---
+
+  get errors() {
+    return this._errors;
+  }
+
+  get isValid() {
+    this._errors = [];
+    this.validate();
+    if (this._errors.length > 0) {
+      console.warn('  Validation failed:', this._errors);
+    }
+    return this._errors.length === 0;
+  }
+
+  // Override in subclass to add validations
+  validate() {}
+
+  validates_presence_of(field) {
+    const value = this.attributes[field];
+    if (value == null || String(value).trim().length === 0) {
+      this._errors.push(`${field} can't be blank`);
+    }
+  }
+
+  validates_length_of(field, options) {
+    const value = String(this.attributes[field] || '');
+    if (options.minimum && value.length < options.minimum) {
+      this._errors.push(`${field} is too short (minimum is ${options.minimum} characters)`);
+    }
+    if (options.maximum && value.length > options.maximum) {
+      this._errors.push(`${field} is too long (maximum is ${options.maximum} characters)`);
+    }
   }
 
   // --- Class Methods (finders) ---
@@ -133,6 +181,8 @@ export class ActiveRecord {
   }
 
   async save() {
+    if (!this.isValid) return false;
+
     if (this._persisted) {
       return this._update();
     } else {
@@ -174,6 +224,10 @@ export class ActiveRecord {
   // --- Private helpers ---
 
   _insert() {
+    const now = new Date().toISOString();
+    this.attributes.created_at = now;
+    this.attributes.updated_at = now;
+
     const cols = [];
     const placeholders = [];
     const values = [];
@@ -186,16 +240,20 @@ export class ActiveRecord {
     }
 
     const sql = `INSERT INTO ${this.constructor.tableName} (${cols.join(', ')}) VALUES (${placeholders.join(', ')})`;
+    console.debug(`  ${this.constructor.name} Create  ${sql}`, values);
     db.run(sql, values);
 
     const idResult = db.exec('SELECT last_insert_rowid()');
     this.id = idResult[0].values[0][0];
     this.attributes.id = this.id;
     this._persisted = true;
+    console.log(`  ${this.constructor.name} Create (id: ${this.id})`);
     return true;
   }
 
   _update() {
+    this.attributes.updated_at = new Date().toISOString();
+
     const sets = [];
     const values = [];
 
@@ -207,7 +265,9 @@ export class ActiveRecord {
     values.push(this.id);
 
     const sql = `UPDATE ${this.constructor.tableName} SET ${sets.join(', ')} WHERE id = ?`;
+    console.debug(`  ${this.constructor.name} Update  ${sql}`, values);
     db.run(sql, values);
+    console.log(`  ${this.constructor.name} Update (id: ${this.id})`);
     return true;
   }
 

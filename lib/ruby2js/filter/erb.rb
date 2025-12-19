@@ -71,10 +71,12 @@ module Ruby2JS
         end
 
         # Add import for path helpers if any were used
-        # Path is relative from views/erb/*.js to config/routes.js
+        # Path is relative from views/erb/*.js to config/paths.js
+        # Note: using paths.js instead of routes.js to avoid circular dependencies
+        # (routes.js imports controllers, which import views, which would import routes.js)
         unless @erb_path_helpers.empty?
           helpers = @erb_path_helpers.uniq.sort.map { |name| s(:const, nil, name) }
-          self.prepend_list << s(:import, '../../config/routes.js', helpers)
+          self.prepend_list << s(:import, '../../config/paths.js', helpers)
         end
 
         # Wrap in arrow function or regular function

@@ -26,6 +26,11 @@ module Ruby2JS
           @rails_private_methods = {}
           @rails_model_refs = Set.new
           @rails_needs_views = false
+          # Model associations for preloading (model_name -> [association_names])
+          # TODO: Auto-detect from model files or configuration
+          @rails_model_associations = {
+            article: [:comments]
+          }
         end
 
         # Detect controller class and transform to module
@@ -311,6 +316,13 @@ module Ruby2JS
             end
           end
 
+          # Preload associations for show/edit actions (async database support)
+          # For each ivar that's a model, preload its has_many associations
+          if %i[show edit].include?(method_name) && view_call
+            preloads = generate_association_preloads(ivars)
+            body_statements.push(*preloads) if preloads.any?
+          end
+
           body_statements.push(view_call) if view_call
 
           # Wrap in autoreturn for implicit return behavior
@@ -547,6 +559,35 @@ module Ruby2JS
             # More complex render - pass through for now
             nil
           end
+        end
+
+        # Generate association preloads for async database support
+        # For show/edit actions, preload has_many associations so views can iterate
+        def generate_association_preloads(ivars)
+          preloads = []
+
+          # Infer model name from controller name (ArticlesController -> Article)
+          model_name = @rails_controller_name.to_s.sub(/Controller$/, '')
+          singular_model = Ruby2JS::Inflector.singularize(model_name).downcase.to_sym
+
+          # If we have a singular model variable (e.g., :article), preload its associations
+          if ivars.include?(singular_model)
+            # Look up associations for this model from tracked has_many relationships
+            associations = @rails_model_associations[singular_model] || []
+
+            associations.each do |assoc_name|
+              # Generate: article.comments = await article.comments
+              # The getter returns a Promise, so await it and store back via setter
+              # Note: await is s(:send, nil, :await, expr) not s(:await, expr)
+              await_expr = s(:send, nil, :await, s(:attr, s(:lvar, singular_model), assoc_name))
+              preloads << s(:send,
+                s(:lvar, singular_model),
+                "#{assoc_name}=".to_sym,
+                await_expr)
+            end
+          end
+
+          preloads
         end
 
         def generate_before_action_code(action_name)
