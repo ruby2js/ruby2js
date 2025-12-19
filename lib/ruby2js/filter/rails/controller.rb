@@ -55,7 +55,15 @@ module Ruby2JS
             s(:module, class_name, transformed_body)))
 
           result = if imports.any?
-                     s(:begin, *imports, export_module)
+                     begin_node = s(:begin, *imports, export_module)
+                     # Set empty comments on the begin node to prevent it from
+                     # inheriting comments from its first child via first-loc lookup
+                     if @comments.respond_to?(:set)
+                       @comments.set(begin_node, [])
+                     else
+                       @comments[begin_node] = []
+                     end
+                     begin_node
                    else
                      export_module
                    end

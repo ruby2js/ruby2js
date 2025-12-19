@@ -80,7 +80,18 @@ module Ruby2JS
 
           if replacement != child
             replaced << replacement
-            @comments[replacement] = @comments[child] if @comments[child]
+            # Move comments from child to export wrapper to avoid duplication
+            # Use Map methods for selfhost (JS), bracket notation for Ruby
+            child_comments = @comments.respond_to?(:get) ? @comments.get(child) : @comments[child]
+            if child_comments
+              if @comments.respond_to?(:set)
+                @comments.set(replacement, child_comments)
+                @comments.set(child, [])
+              else
+                @comments[replacement] = child_comments
+                @comments[child] = []
+              end
+            end
           end
 
           replacement
@@ -90,7 +101,17 @@ module Ruby2JS
           list.map! do |child|
             if child == replaced.first
               replacement = s(:export, s(:send, nil, :default, *child.children))
-              @comments[replacement] = @comments[child] if @comments[child]
+              # Move comments from child to export wrapper to avoid duplication
+              child_comments = @comments.respond_to?(:get) ? @comments.get(child) : @comments[child]
+              if child_comments
+                if @comments.respond_to?(:set)
+                  @comments.set(replacement, child_comments)
+                  @comments.set(child, [])
+                else
+                  @comments[replacement] = child_comments
+                  @comments[child] = []
+                end
+              end
               replacement
             else
               child
@@ -99,7 +120,15 @@ module Ruby2JS
         end
 
         @esm_autoexports = false
-        s(:begin, *list)
+        result = s(:begin, *list)
+        # Set empty comments on the begin node to prevent it from inheriting
+        # comments from its first child via first-loc lookup
+        if @comments.respond_to?(:set)
+          @comments.set(result, [])
+        else
+          @comments[result] = []
+        end
+        result
       end
 
       def on_class(node)
@@ -218,8 +247,49 @@ module Ruby2JS
 
             s(:import, args[0].children, *imports) unless args[0].nil?
           end
-        elsif method == :export          
-          s(:export, *process_all(args))
+        elsif method == :export
+          # Move comments from the send node to export wrapper to avoid duplication
+          # Comments are on `node` (the send expression), not the child
+          # Clear comments from any node matching the child's location BEFORE processing
+          # This prevents first-loc lookup from finding them during nested conversion
+          # Note: Filter processing creates new node objects, so we match by location
+          child = args[0]
+          if child && child.respond_to?(:loc) && child.loc&.respond_to?(:expression)
+            child_loc = child.loc.expression
+            if child_loc
+              if @comments.respond_to?(:forEach)
+                # JS selfhost: iterate Map and clear matching entries
+                @comments.forEach do |value, key|
+                  next unless key.respond_to?(:loc) && key.loc&.respond_to?(:expression)
+                  key_loc = key.loc.expression
+                  if key_loc && key_loc.begin_pos == child_loc.begin_pos
+                    @comments.set(key, [])
+                  end
+                end
+              else
+                # Ruby: iterate Hash and clear matching entries
+                @comments.each do |key, value|
+                  next unless key.respond_to?(:loc) && key.loc&.respond_to?(:expression)
+                  key_loc = key.loc.expression
+                  if key_loc && key_loc.begin_pos == child_loc.begin_pos
+                    @comments[key] = []
+                  end
+                end
+              end
+            end
+          end
+          result = s(:export, *process_all(args))
+          node_comments = @comments.respond_to?(:get) ? @comments.get(node) : @comments[node]
+          if node_comments
+            if @comments.respond_to?(:set)
+              @comments.set(result, node_comments)
+              @comments.set(node, [])
+            else
+              @comments[result] = node_comments
+              @comments[node] = []
+            end
+          end
+          result
         elsif target.nil? and found_import = find_autoimport(method)
           self.prepend_list << s(:import, found_import[0], found_import[1])
           super
@@ -252,7 +322,20 @@ module Ruby2JS
       end
 
       def on_export(node)
-        s(:export, *process_all(node.children))
+        # Move comments from child to export wrapper to avoid duplication
+        result = s(:export, *process_all(node.children))
+        child = node.children.first
+        child_comments = child && (@comments.respond_to?(:get) ? @comments.get(child) : @comments[child])
+        if child_comments
+          if @comments.respond_to?(:set)
+            @comments.set(result, child_comments)
+            @comments.set(child, [])
+          else
+            @comments[result] = child_comments
+            @comments[child] = []
+          end
+        end
+        result
       end
 
       private

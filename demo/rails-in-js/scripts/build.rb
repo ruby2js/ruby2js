@@ -74,7 +74,7 @@ def transpile_file(src_path, dest_path)
   sourcemap[:sources] = [source_from_map]
 
   # Add sourcemap reference to JS file
-  js_with_map = "#{js}\n//# sourceMappingURL=#{File.basename(map_path)}"
+  js_with_map = "#{js}\n//# sourceMappingURL=#{File.basename(map_path)}\n"
   File.write(dest_path, js_with_map)
   File.write(map_path, JSON.generate(sourcemap))
 

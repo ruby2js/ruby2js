@@ -141,10 +141,10 @@ module Ruby2JS
         end
 
         # JS selfhost: use Map methods (size not empty, set())
-        # Note: Using forEach loop to clear and repopulate (avoiding .clear which
-        # the functions filter transforms to .length=0 which doesn't work for Maps)
+        # Note: Clear old entries by setting to empty (delete gets transformed by functions
+        # filter to `delete obj[key]` which doesn't work for Maps - they need .delete() method)
         if new_comments && new_comments.size != 0 # Pragma: only-js
-          @comments.forEach { |_, key| @comments.delete(key) } # Pragma: only-js
+          @comments.forEach { |_, key| @comments.set(key, []) unless key == "_raw" } # Pragma: only-js
           new_comments.forEach { |value, key| @comments.set(key, value) } # Pragma: only-js
           @comments.set("_raw", raw_comments) # Pragma: only-js
         end # Pragma: only-js
@@ -178,7 +178,12 @@ module Ruby2JS
 
       # Register empty comments for the new :begin node to prevent
       # it from inheriting comments from its first child
-      @comments[@ast] = []
+      # Use Map.set() for selfhost JS, bracket notation for Ruby
+      if @comments.respond_to?(:set)
+        @comments.set(@ast, [])
+      else
+        @comments[@ast] = []
+      end
     end
 
     def create_converter

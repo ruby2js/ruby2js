@@ -19,9 +19,11 @@ npm run dev
 | Command | Description |
 |---------|-------------|
 | `npm run dev` | Start dev server with hot reload (Ruby transpilation) |
-| `npm run dev -- --selfhost` | Dev server using JS-based transpilation (experimental) |
+| `npm run dev -- --selfhost` | Dev server using JS-based transpilation |
 | `npm run build` | One-shot build (transpile all Ruby files) |
 | `npm run start` | Serve with npx serve (no hot reload) |
+
+Both transpilation modes (Ruby and selfhost) produce **identical output**, verified by automated diff comparison.
 
 ## How It Works
 
@@ -60,7 +62,8 @@ rails-in-js/
 │   └── rails.js          # JavaScript runtime (ApplicationRecord, etc.)
 ├── dist/                 # Generated JavaScript (git-ignored)
 ├── scripts/
-│   └── build.rb          # Ruby transpilation script
+│   ├── build.rb          # Ruby transpilation script
+│   └── build-selfhost.mjs # JavaScript transpilation script
 ├── dev-server.mjs        # Hot reload dev server
 ├── index.html            # Entry point
 └── package.json
@@ -78,7 +81,6 @@ The build generates sourcemaps so you can debug Ruby in the browser:
 ## Known Limitations
 
 - Database resets on page reload (IndexedDB persistence not yet implemented)
-- `--selfhost` mode falls back to Ruby (JS-based Rails filters not yet available)
 
 ## See Also
 

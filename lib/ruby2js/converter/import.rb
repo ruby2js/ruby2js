@@ -89,6 +89,17 @@ module Ruby2JS
     handle :export do |*args|
       put 'export '
 
+      # Clear comments from children to prevent duplication
+      # (comments were already emitted for the export node itself)
+      args.each do |arg|
+        next unless arg.respond_to?(:type)
+        if @comments.respond_to?(:set)
+          @comments.set(arg, [])
+        else
+          @comments[arg] = []
+        end
+      end
+
       node = args.first
       final_export = false
 
