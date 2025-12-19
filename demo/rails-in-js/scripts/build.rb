@@ -141,70 +141,44 @@ def generate_application_record(dest_dir)
   puts "  -> models/application_record.js (wrapper for ActiveRecord)"
 end
 
-def generate_paths_module(config_dir)
-  # Read routes.js and extract path helper functions
-  routes_path = File.join(config_dir, 'routes.js')
-  return unless File.exist?(routes_path)
+def transpile_routes_files(src_path, dest_dir)
+  # Generate paths.js first (with only path helpers)
+  puts "Transpiling: routes.rb -> paths.js"
+  source = File.read(src_path)
+  relative_src = src_path.sub(DEMO_ROOT + '/', '')
 
-  routes_js = File.read(routes_path)
+  paths_options = OPTIONS.merge(file: relative_src, paths_only: true)
+  result = Ruby2JS.convert(source, paths_options)
+  paths_js = result.to_s
 
-  # Extract helper functions and extract_id function
-  # Look for function declarations with path helper names
-  helpers = []
+  paths_path = File.join(dest_dir, 'paths.js')
+  FileUtils.mkdir_p(dest_dir)
+  File.write(paths_path, paths_js)
+  puts "  -> #{paths_path}"
 
-  # Match any function that ends in _path or is extract_id
-  # The function body can span multiple lines and may contain template strings
-  routes_js.scan(/^function\s+(\w+_path|extract_id)\s*\([^)]*\)\s*\{.*?\n\};?/m) do |match|
-    helpers << $&
-  end
+  # Generate sourcemap for paths.js
+  map_path = "#{paths_path}.map"
+  sourcemap = result.sourcemap
+  sourcemap[:sourcesContent] = [source]
+  File.write(map_path, JSON.generate(sourcemap))
+  puts "  -> #{map_path}"
 
-  if helpers.any?
-    # Create paths.js with just the helper functions
-    paths_js = <<~JS
-      // Path helpers - extracted to avoid circular dependencies
-      // views/erb/*.js import from here, routes.js re-exports these
+  # Generate routes.js (imports path helpers from paths.js)
+  puts "Transpiling: routes.rb -> routes.js"
+  routes_options = OPTIONS.merge(file: relative_src, paths_file: './paths.js')
+  result = Ruby2JS.convert(source, routes_options)
+  routes_js = result.to_s
 
-    JS
+  routes_path = File.join(dest_dir, 'routes.js')
+  File.write(routes_path, routes_js)
+  puts "  -> #{routes_path}"
 
-    helpers.each do |helper|
-      # Add export keyword to each function
-      paths_js += "export #{helper}\n\n"
-    end
-
-    File.write(File.join(config_dir, 'paths.js'), paths_js)
-    puts "  -> #{File.join(config_dir, 'paths.js')} (path helpers)"
-
-    # Update routes.js to import from paths.js and re-export
-    # Remove the helper function definitions
-    updated_routes = routes_js
-    helpers.each do |helper|
-      updated_routes = updated_routes.gsub(helper, '')
-    end
-
-    # Find the helper names for import/export
-    helper_names = helpers.map { |h| h.match(/function\s+(\w+)/)[1] }
-
-    # Add import at the top (after first import line)
-    import_line = "import { #{helper_names.join(', ')} } from './paths.js';\n"
-
-    # Insert after first import block
-    if updated_routes.include?("import {")
-      # Find end of imports section (first non-import line)
-      lines = updated_routes.lines
-      import_end = 0
-      lines.each_with_index do |line, i|
-        import_end = i if line.start_with?('import ')
-      end
-      lines.insert(import_end + 1, import_line)
-      updated_routes = lines.join
-    end
-
-    # Clean up multiple blank lines
-    updated_routes = updated_routes.gsub(/\n{3,}/, "\n\n")
-
-    File.write(routes_path, updated_routes)
-    puts "  -> #{routes_path} (updated to import from paths.js)"
-  end
+  # Generate sourcemap for routes.js
+  map_path = "#{routes_path}.map"
+  sourcemap = result.sourcemap
+  sourcemap[:sourcesContent] = [source]
+  File.write(map_path, JSON.generate(sourcemap))
+  puts "  -> #{map_path}"
 end
 
 # Map DATABASE env var to adapter source file
@@ -320,16 +294,21 @@ transpile_directory(
 )
 puts
 
-# Transpile config
+# Transpile config (skip routes.rb, handled separately)
 puts "Config:"
 transpile_directory(
   File.join(DEMO_ROOT, 'config'),
-  File.join(DIST_DIR, 'config')
+  File.join(DIST_DIR, 'config'),
+  '**/*.rb',
+  skip: ['routes.rb']
 )
 
-# Generate paths.js to avoid circular dependencies
-# (views import path helpers, controllers import views, routes import controllers)
-generate_paths_module(File.join(DIST_DIR, 'config'))
+# Transpile routes.rb into both paths.js and routes.js
+# (paths.js avoids circular dependencies - views import from paths.js, routes.js imports from paths.js)
+transpile_routes_files(
+  File.join(DEMO_ROOT, 'config/routes.rb'),
+  File.join(DIST_DIR, 'config')
+)
 puts
 
 # Transpile views (ERB templates only)

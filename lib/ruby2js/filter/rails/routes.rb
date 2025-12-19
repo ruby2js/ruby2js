@@ -436,6 +436,12 @@ module Ruby2JS
         end
 
         def build_routes_module
+          # Check if we should generate only path helpers (for paths.js)
+          # This is set via @options[:paths_only]
+          if @options[:paths_only]
+            return build_paths_only_module
+          end
+
           statements = []
 
           # Import Router, Application, formData, handleFormResult from rails.js
@@ -461,14 +467,27 @@ module Ruby2JS
               [s(:const, nil, ctrl[:controller_name].to_sym)])
           end
 
-          # Generate extract_id helper if we have path helpers with params
-          if @rails_path_helpers.any? { |h| h[:params].any? }
-            statements << build_extract_id_helper
-          end
+          # Check if we should import from paths.js or inline path helpers
+          if @options[:paths_file]
+            # Import path helpers from paths.js
+            helper_names = []
+            helper_names << :extract_id if @rails_path_helpers.any? { |h| h[:params].any? }
+            @rails_path_helpers.each { |h| helper_names << h[:name] }
 
-          # Generate path helper functions
-          @rails_path_helpers.each do |helper|
-            statements << build_path_helper(helper)
+            if helper_names.any?
+              statements << s(:import, @options[:paths_file],
+                helper_names.map { |name| s(:const, nil, name) })
+            end
+          else
+            # Generate extract_id helper if we have path helpers with params
+            if @rails_path_helpers.any? { |h| h[:params].any? }
+              statements << build_extract_id_helper
+            end
+
+            # Generate path helper functions
+            @rails_path_helpers.each do |helper|
+              statements << build_path_helper(helper)
+            end
           end
 
           # Generate Router.root() if defined
@@ -780,6 +799,31 @@ module Ruby2JS
                   s(:lvar, :obj),
                   s(:attr, s(:lvar, :obj), :id)),
                 s(:lvar, :obj))))
+        end
+
+        # Build a module with only path helpers (for paths.js)
+        def build_paths_only_module
+          statements = []
+
+          # Generate extract_id helper if we have path helpers with params
+          if @rails_path_helpers.any? { |h| h[:params].any? }
+            statements << build_extract_id_helper
+          end
+
+          # Generate path helper functions
+          @rails_path_helpers.each do |helper|
+            statements << build_path_helper(helper)
+          end
+
+          # Export all helpers
+          exports = []
+          exports << s(:const, nil, :extract_id) if @rails_path_helpers.any? { |h| h[:params].any? }
+          @rails_path_helpers.each do |helper|
+            exports << s(:const, nil, helper[:name])
+          end
+          statements << s(:export, s(:array, *exports))
+
+          process(s(:begin, *statements))
         end
       end
     end

@@ -163,16 +163,19 @@ module Ruby2JS
             new_children = node.children.map do |c|
               c.respond_to?(:type) ? wrap_ar_operations(c) : c
             end
-            node.updated(nil, new_children)
+            # Note: explicit return for JS switch/case compatibility
+            return node.updated(nil, new_children)
 
           else
             if node.children.any?
-              new_children = node.children.map do |c|
+              # Note: use different variable name to avoid JS TDZ error in switch/case
+              mapped_children = node.children.map do |c|
                 c.respond_to?(:type) ? wrap_ar_operations(c) : c
               end
-              node.updated(nil, new_children)
+              # Note: explicit return for JS switch/case compatibility
+              return node.updated(nil, mapped_children)
             else
-              node
+              return node
             end
           end
         end

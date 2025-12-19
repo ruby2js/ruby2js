@@ -573,7 +573,7 @@ module Ruby2JS
           # If we have a singular model variable (e.g., :article), preload its associations
           if ivars.include?(singular_model)
             # Look up associations for this model from tracked has_many relationships
-            associations = @rails_model_associations[singular_model] || []
+            associations = (@rails_model_associations || {})[singular_model] || []
 
             associations.each do |assoc_name|
               # Generate: article.comments = await article.comments
