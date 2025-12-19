@@ -79,7 +79,15 @@ module Ruby2JS
               s(:str, "./#{model_file}.js")))
           end
 
-          result = process(s(:begin, import_node, *model_import_nodes, exported_class))
+          begin_node = s(:begin, import_node, *model_import_nodes, exported_class)
+          result = process(begin_node)
+          # Set empty comments on processed begin node to prevent first-location lookup
+          # from incorrectly inheriting comments from child nodes
+          if @comments.respond_to?(:set)
+            @comments.set(result, [])
+          else
+            @comments[result] = []
+          end
 
           @rails_model = nil
           @rails_model_name = nil

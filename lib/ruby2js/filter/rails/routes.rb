@@ -500,7 +500,16 @@ module Ruby2JS
           end
           statements << s(:export, s(:array, *exports))
 
-          process(s(:begin, *statements))
+          begin_node = s(:begin, *statements)
+          result = process(begin_node)
+          # Set empty comments on processed begin node to prevent first-location lookup
+          # from incorrectly inheriting comments from child nodes
+          if @comments.respond_to?(:set)
+            @comments.set(result, [])
+          else
+            @comments[result] = []
+          end
+          result
         end
 
         def collect_all_controllers(resources, result = [])

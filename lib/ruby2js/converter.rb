@@ -57,10 +57,30 @@ module Ruby2JS
 
     attr_accessor :binding, :ivars, :namespace
 
+    # Class variable to store last comments for debugging
+    # Note: In Ruby this is @@, in JS selfhost this becomes a static property
+    @@last_comments = nil
+
+    def self.last_comments
+      @@last_comments
+    end
+
+    def self.last_comments=(value)
+      @@last_comments = value
+    end
+
+    # Expose comments hash for debugging (named differently from comments method)
+    def comments_hash
+      @comments
+    end
+
     def initialize( ast, comments, vars = {} )
       super()
 
       @ast, @comments, @vars = ast, comments, vars.dup # Pragma: hash
+
+      # Store comments for debugging (class variable for access after conversion)
+      @@last_comments = @comments
       @varstack = []
       @scope = ast
       @inner = nil

@@ -220,6 +220,7 @@ async def run_cli
   inspect_path = nil
   verbose = false
   show_loc = false
+  show_comments = false
 
   i = 0
   while i < args.length
@@ -227,6 +228,8 @@ async def run_cli
 
     if arg == '--ast'
       output_mode = 'walker-ast'
+    elsif arg == '--show-comments'
+      show_comments = true
     elsif arg == '--prism-ast'
       output_mode = 'prism-ast'
     elsif arg == '--js'
@@ -309,6 +312,7 @@ async def run_cli
         Debug Options:
           --verbose, -v     Show all AST properties including internal ones
           --loc             Show location information in AST output
+          --show-comments   Show comments map after conversion
           --help, -h        Show this help
 
         Examples:
@@ -409,7 +413,35 @@ async def run_cli
 
     else
       # Full conversion to JavaScript using the convert() function
-      console.log(convert(source, options))
+      result = convert(source, options)
+
+      if show_comments
+        console.log("=== Comments Map ===")
+        # Access comments from the converter
+        # Note: comments are consumed during conversion, so this shows remaining
+        comments_map = Ruby2JS::Converter.last_comments
+        if comments_map && comments_map.size > 0
+          has_entries = false
+          comments_map.forEach do |value, key|
+            next if key == "_raw" || !value || value.length == 0
+            has_entries = true
+            node_desc = if key && key.type
+              "s(:#{key.type}, ...)"
+            else
+              key.to_s[0, 50]
+            end
+            console.log("  #{node_desc}")
+            value.each { |c| console.log("    => #{JSON.stringify(c.text || c)}") }
+          end
+          console.log("(all comments empty)") unless has_entries
+        else
+          console.log("(no comments)")
+        end
+        console.log("")
+        console.log("=== JavaScript Output ===")
+      end
+
+      console.log(result)
     end
 
   rescue => e

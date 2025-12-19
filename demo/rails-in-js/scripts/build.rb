@@ -24,6 +24,7 @@ DIST_DIR = ARGV[0] ? File.expand_path(ARGV[0]) : File.join(DEMO_ROOT, 'dist')
 OPTIONS = {
   eslevel: 2022,
   include: [:class, :call],
+  autoexports: true,
   filters: [
     Ruby2JS::Filter::Rails::Model,
     Ruby2JS::Filter::Rails::Controller,

@@ -112,7 +112,8 @@ module Ruby2JS
 
     def reassociate_comments
       raw_comments = @comments[:_raw]
-      return if raw_comments.nil? || raw_comments.length == 0
+      # Use falsy check to handle both nil (Ruby) and undefined (JS selfhost)
+      return unless raw_comments && raw_comments.length > 0
 
       begin
         # Use Parser gem's associate if available (Ruby), otherwise our own (JS selfhost)

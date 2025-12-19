@@ -71,6 +71,23 @@ module Ruby2JS
     # For compatibility with kind_of? checks
     alias :kind_of? :is_a? # Pragma: skip
 
+    # Deep equality check - transpiles to JavaScript for selfhost
+    # Used by conditionally_equals in logical.rb
+    def equals(other)
+      return false unless other.respond_to?(:type) && other.respond_to?(:children)
+      return false unless type == other.type
+      return false unless children.length == other.children.length
+      children.each_with_index do |child, i|
+        other_child = other.children[i]
+        if child.respond_to?(:equals)
+          return false unless child.equals(other_child)
+        else
+          return false unless child == other_child
+        end
+      end
+      true
+    end
+
     # Equality based on type and children
     def ==(other) # Pragma: skip
       return false unless other.respond_to?(:type) && other.respond_to?(:children)

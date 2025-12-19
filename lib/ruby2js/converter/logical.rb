@@ -229,7 +229,10 @@ module Ruby2JS
     # determine if two trees are identical, modulo conditionalilties
     # in other words a.b == a&.b
     def conditionally_equals(left, right)
-      if left == right
+      # Use .equals for deep comparison (works in both Ruby and JavaScript)
+      if left.respond_to?(:equals) && left.equals(right)
+        true
+      elsif left == right
         true
       elsif !left.respond_to?(:type) or !left or !right or left.type != :csend or right.type != :send
         false

@@ -50,14 +50,35 @@ module Ruby2JS
           # Generate imports for models and views
           imports = generate_imports.map { |node| process(node) }
 
+          # Get comments from original class node BEFORE processing
+          # (processing may lose the association)
+          original_comments = @comments.respond_to?(:get) ? @comments.get(node) : @comments[node]
+          original_comments = original_comments.is_a?(Array) ? original_comments.dup : []
+
+          # Clear comments from original node to prevent duplication
+          if @comments.respond_to?(:set)
+            @comments.set(node, [])
+          else
+            @comments[node] = []
+          end
+
           # Build the export module
-          export_module = process(s(:send, nil, :export,
-            s(:module, class_name, transformed_body)))
+          export_node = s(:send, nil, :export,
+            s(:module, class_name, transformed_body))
+          export_module = process(export_node)
+
+          # Set comments on export_module so they appear after imports, before export
+          if original_comments.any?
+            if @comments.respond_to?(:set)
+              @comments.set(export_module, original_comments)
+            else
+              @comments[export_module] = original_comments
+            end
+          end
 
           result = if imports.any?
                      begin_node = s(:begin, *imports, export_module)
-                     # Set empty comments on the begin node to prevent it from
-                     # inheriting comments from its first child via first-loc lookup
+                     # Set empty comments on the begin node to prevent first-child-with-location
                      if @comments.respond_to?(:set)
                        @comments.set(begin_node, [])
                      else

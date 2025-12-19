@@ -155,6 +155,14 @@ def parse_request(env=ENV)
     @output_filtered_ast = true
   end
 
+  opts.on("--show-comments", "Show the comments map after filtering") do
+    @show_comments = true
+  end
+
+  opts.on("--filter-trace", "Show AST after each filter is applied") do
+    @filter_trace = true
+  end
+
   opts.on("-e CODE", "Evaluate inline Ruby code") do |code|
     @inline_code = code
   end
@@ -236,6 +244,35 @@ if (not defined? Wunderbar or not env['SERVER_PORT']) and not @live
     source = $stdin.read
   end
 
+  # Helper to format comments map for debugging
+  def dump_comments_map(comments_hash)
+    return "(no comments)" if comments_hash.nil? || comments_hash.empty?
+
+    lines = []
+    comments_hash.each do |node, comment_list|
+      next if node == :_raw || comment_list.nil? || comment_list.empty?
+
+      # Format the node
+      node_desc = if node.respond_to?(:type)
+        loc_info = ""
+        if node.loc && node.loc.respond_to?(:expression) && node.loc.expression
+          loc = node.loc.expression
+          loc_info = " @#{loc.begin_pos}-#{loc.end_pos}"
+        end
+        "s(:#{node.type}, ...)#{loc_info}"
+      else
+        node.inspect[0, 50]
+      end
+
+      # Format comments
+      comment_texts = comment_list.map { |c| c.respond_to?(:text) ? c.text : c.to_s }
+      lines << "  #{node_desc}"
+      comment_texts.each { |t| lines << "    => #{t.inspect}" }
+    end
+
+    lines.empty? ? "(all comments empty)" : lines.join("\n")
+  end
+
   if @output_ast
     # Output raw parsed AST
     ast, _comments = Ruby2JS.parse(source, options[:file])
@@ -244,6 +281,43 @@ if (not defined? Wunderbar or not env['SERVER_PORT']) and not @live
     # Output AST after filters applied
     conv = Ruby2JS.convert(source, options)
     puts format_ast(conv.ast)
+  elsif @filter_trace
+    # Show AST after each filter
+    require 'ruby2js/filter'
+
+    ast, comments = Ruby2JS.parse(source, options[:file])
+    puts "=== Parsed AST ==="
+    puts format_ast(ast)
+    puts
+
+    # Apply filters one at a time
+    if options[:filters] && !options[:filters].empty?
+      options[:filters].each do |filter|
+        filter_name = filter.to_s.split('::').last
+
+        # Create a converter with just this filter
+        single_filter_opts = options.merge(filters: [filter])
+        conv = Ruby2JS.convert(source, single_filter_opts)
+
+        puts "=== After #{filter_name} filter ==="
+        puts format_ast(conv.ast)
+        puts
+      end
+    end
+
+    # Final output
+    conv = Ruby2JS.convert(source, options)
+    puts "=== JavaScript Output ==="
+    puts conv.to_s
+  elsif @show_comments
+    # Show comments map after filtering
+    conv = Ruby2JS.convert(source, options)
+
+    puts "=== Comments Map ==="
+    puts dump_comments_map(conv.comments_hash)
+    puts
+    puts "=== JavaScript Output ==="
+    puts conv.to_s
   elsif @provide_sourcemap
     conv = Ruby2JS.convert(source, options)
     puts(

@@ -165,6 +165,7 @@ async function main() {
   let inspectPath = null;
   let verbose = false;
   let showLoc = false;
+  let showComments = false;
   const filterNames = [];
 
   // Parse arguments
@@ -222,6 +223,8 @@ async function main() {
       verbose = true;
     } else if (arg === '--loc') {
       showLoc = true;
+    } else if (arg === '--show-comments') {
+      showComments = true;
     } else if (arg === '--find' || arg === '-f') {
       i++;
       searchPattern = args[i];
@@ -267,6 +270,7 @@ Conversion Options:
 Debug Options:
   --verbose, -v     Show all AST properties including internal ones
   --loc             Show location information in AST output
+  --show-comments   Show comments map after conversion
   --help, -h        Show this help
 
 Examples:
@@ -442,7 +446,7 @@ Examples:
           if (loadedFilters.length > 0) {
             options.filters = loadedFilters;
           }
-          jsOutput = convert(source, { ...options, filters: loadedFilters }).trim();
+          jsOutput = convert(source, { ...options, filters: loadedFilters }).toString().trim();
         } catch (e) {
           jsOutput = `[JS CLI Error: ${e.message}]`;
         }
@@ -473,7 +477,30 @@ Examples:
 
       default: {
         // JavaScript output - use convert() with filters (same pipeline as build scripts)
-        console.log(convert(source, { ...options, filters: loadedFilters }).toString());
+        const result = convert(source, { ...options, filters: loadedFilters });
+
+        if (showComments) {
+          console.log('=== Comments Map ===');
+          // Access comments from the converter's class variable
+          const commentsMap = Ruby2JS.Converter.last_comments;
+          if (commentsMap && commentsMap.size > 0) {
+            let hasEntries = false;
+            commentsMap.forEach((value, key) => {
+              if (key === '_raw' || !value || value.length === 0) return;
+              hasEntries = true;
+              const nodeDesc = (key && key.type) ? `s(:${key.type}, ...)` : String(key).slice(0, 50);
+              console.log(`  ${nodeDesc}`);
+              value.forEach(c => console.log(`    => ${JSON.stringify(c.text || c)}`));
+            });
+            if (!hasEntries) console.log('(all comments empty)');
+          } else {
+            console.log('(no comments)');
+          }
+          console.log('');
+          console.log('=== JavaScript Output ===');
+        }
+
+        console.log(result.toString());
       }
     }
   } catch (e) {
