@@ -1,15 +1,16 @@
 # Database configuration
 # Adapter is selected at build time, not runtime
+# Override with DATABASE=<adapter> environment variable
 
 development:
-  adapter: sqljs
+  adapter: dexie
   database: rails_in_js_dev
 
 production:
-  adapter: sqljs
+  adapter: dexie
   database: rails_in_js
 
-# Alternative: Dexie.js for smaller bundle size (~50KB vs ~2.7MB)
+# Alternative: sql.js for full SQL support (larger bundle ~2.7MB vs ~50KB)
 # development:
-#   adapter: dexie
+#   adapter: sqljs
 #   database: rails_in_js_dev

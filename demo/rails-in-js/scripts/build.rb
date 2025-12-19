@@ -215,9 +215,33 @@ ADAPTER_FILES = {
   'indexeddb' => 'active_record_dexie.mjs'
 }.freeze
 
+def load_database_config
+  env = ENV.fetch('RAILS_ENV', ENV.fetch('NODE_ENV', 'development'))
+
+  # Priority 1: DATABASE environment variable
+  if ENV['DATABASE']
+    puts "  Using DATABASE=#{ENV['DATABASE']} from environment"
+    return ENV['DATABASE'].downcase
+  end
+
+  # Priority 2: config/database.yml
+  config_path = File.join(DEMO_ROOT, 'config/database.yml')
+  if File.exist?(config_path)
+    require 'yaml'
+    config = YAML.load_file(config_path)
+    if config && config[env] && config[env]['adapter']
+      puts "  Using config/database.yml [#{env}]"
+      return config[env]['adapter'].downcase
+    end
+  end
+
+  # Default: sqljs
+  puts "  Using default adapter: sqljs"
+  'sqljs'
+end
+
 def copy_database_adapter(src_dir, dest_dir)
-  # Get adapter from environment, default to sqljs
-  database = ENV.fetch('DATABASE', 'sqljs').downcase
+  database = load_database_config
   adapter_file = ADAPTER_FILES[database]
 
   unless adapter_file
@@ -229,7 +253,7 @@ def copy_database_adapter(src_dir, dest_dir)
   adapter_dest = File.join(dest_dir, 'active_record.mjs')
   FileUtils.mkdir_p(dest_dir)
   FileUtils.cp(adapter_src, adapter_dest)
-  puts "  Copying: #{adapter_file} -> active_record.mjs (DATABASE=#{database})"
+  puts "  Adapter: #{database} -> lib/active_record.mjs"
 end
 
 # Clean and create dist directory
