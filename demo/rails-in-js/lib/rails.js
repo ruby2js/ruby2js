@@ -253,7 +253,7 @@ export class FormHandler {
 export class Application {
   static schema = null;
   static seeds = null;
-  static sqlJsPath = './node_modules/sql.js/dist';
+  static sqlJsPath = '/node_modules/sql.js/dist';
 
   // Configure the application
   static configure(options) {
@@ -352,6 +352,28 @@ export function truncate(text, options = {}) {
   const omission = options.omission || '...';
   if (!text || text.length <= length) return text || '';
   return text.slice(0, length - omission.length) + omission;
+}
+
+// Extract form data from a submit event
+// Returns a params object with all form field values
+export function formData(event) {
+  event?.preventDefault?.();
+  const form = event?.target;
+  if (!form) return {};
+  return FormHandler.extractParams(form);
+}
+
+// Handle form submission result (redirect or render)
+// Call this after the controller method returns
+export function handleFormResult(result, rerenderFn = null) {
+  if (result?.redirect) {
+    console.log(`  Redirected to ${result.redirect}`);
+    Router.navigate(result.redirect);
+  } else if (result?.render && rerenderFn) {
+    console.log(`  Re-rendering form (validation failed)`);
+    rerenderFn();
+  }
+  return false;
 }
 
 // Convenience function to set up form handlers on window

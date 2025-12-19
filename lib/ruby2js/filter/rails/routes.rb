@@ -438,12 +438,13 @@ module Ruby2JS
         def build_routes_module
           statements = []
 
-          # Import Router, Application, setupFormHandlers from rails.js
+          # Import Router, Application, formData, handleFormResult from rails.js
           # Wrap in array to get named imports: import { X, Y } from "..."
           statements << s(:import, '../lib/rails.js',
             [s(:const, nil, :Router),
              s(:const, nil, :Application),
-             s(:const, nil, :setupFormHandlers)])
+             s(:const, nil, :formData),
+             s(:const, nil, :handleFormResult)])
 
           # Import Schema
           statements << s(:import, './schema.js',
@@ -482,8 +483,8 @@ module Ruby2JS
             statements << build_router_resources_call(resource)
           end
 
-          # Generate setupFormHandlers() call
-          statements << build_setup_form_handlers
+          # Generate routes dispatch object
+          statements << build_routes_dispatch_object
 
           # Generate Application.configure()
           statements << s(:send,
@@ -492,8 +493,8 @@ module Ruby2JS
               s(:pair, s(:sym, :schema), s(:const, nil, :Schema)),
               s(:pair, s(:sym, :seeds), s(:const, nil, :Seeds))))
 
-          # Export Application and path helpers
-          exports = [s(:const, nil, :Application)]
+          # Export Application, routes, and path helpers
+          exports = [s(:const, nil, :Application), s(:const, nil, :routes)]
           @rails_path_helpers.each do |helper|
             exports << s(:const, nil, helper[:name])
           end
@@ -544,44 +545,142 @@ module Ruby2JS
           s(:send, s(:const, nil, :Router), :resources, *args)
         end
 
-        def build_setup_form_handlers
-          configs = []
+        def build_routes_dispatch_object
+          # Build routes dispatch object with route names as keys
+          # Structure: routes.articles.post(event), routes.article.delete(id), etc.
+          pairs = []
 
-          collect_form_handler_configs(@rails_resources, nil, configs)
+          collect_routes_entries(@rails_resources, nil, pairs)
 
-          config_nodes = configs.map do |cfg|
-            pairs = [
-              s(:pair, s(:sym, :resource), s(:str, cfg[:resource])),
-              s(:pair, s(:sym, :handlerName), s(:str, cfg[:handler_name]))
-            ]
-            pairs << s(:pair, s(:sym, :parent), s(:str, cfg[:parent])) if cfg[:parent]
-            pairs << s(:pair, s(:sym, :confirmDelete), s(:str, cfg[:confirm_delete]))
-            s(:hash, *pairs)
-          end
-
-          s(:send, nil, :setupFormHandlers, s(:array, *config_nodes))
+          s(:casgn, nil, :routes, s(:hash, *pairs))
         end
 
-        def collect_form_handler_configs(resources, parent_name, result)
+        def collect_routes_entries(resources, parent_info, pairs)
           resources.each do |resource|
-            singular = Ruby2JS::Inflector.singularize(resource[:name])
-            # Capitalize for handler names (e.g., "Article" for createArticle)
-            handler_name = singular.capitalize
-            confirm_msg = if parent_name
-                            "Delete this #{singular}?"
-                          else
-                            "Are you sure you want to delete this #{singular}?"
-                          end
+            plural = resource[:name]
+            singular = Ruby2JS::Inflector.singularize(plural)
+            controller = s(:const, nil, resource[:controller_name].to_sym)
 
-            result << {
-              resource: resource[:name],
-              handler_name: handler_name,
-              parent: parent_name,
-              confirm_delete: confirm_msg
-            }
+            if parent_info
+              # Nested resource: article_comments, article_comment
+              parent_singular = parent_info[:singular]
+              parent_id_param = "#{parent_singular}_id".to_sym
 
-            collect_form_handler_configs(resource[:nested] || [], resource[:name], result)
+              # Collection route: article_comments (post)
+              collection_name = "#{parent_singular}_#{plural}".to_sym
+              collection_methods = []
+
+              if !resource[:only] || resource[:only].include?(:create)
+                # create(parent_id, params) - parent id first, then params
+                controller_call = s(:send, controller, :create,
+                  s(:lvar, :parentId),
+                  s(:send, nil, :formData, s(:lvar, :event)))
+                collection_methods << s(:pair, s(:sym, :post),
+                  s(:block,
+                    s(:send, nil, :proc),
+                    s(:args, s(:arg, :event), s(:arg, :parentId)),
+                    wrap_with_result_handler(controller_call)))
+              end
+
+              pairs << s(:pair, s(:sym, collection_name), s(:hash, *collection_methods)) if collection_methods.any?
+
+              # Member route: article_comment (delete)
+              member_name = "#{parent_singular}_#{singular}".to_sym
+              member_methods = []
+
+              if !resource[:only] || resource[:only].include?(:destroy)
+                # destroy(parent_id, id) - parent id first, then id
+                controller_call = s(:send, controller, :destroy,
+                  s(:lvar, :parentId),
+                  s(:lvar, :id))
+                member_methods << s(:pair, s(:sym, :delete),
+                  s(:block,
+                    s(:send, nil, :proc),
+                    s(:args, s(:arg, :parentId), s(:arg, :id)),
+                    wrap_with_result_handler(controller_call)))
+              end
+
+              pairs << s(:pair, s(:sym, member_name), s(:hash, *member_methods)) if member_methods.any?
+            else
+              # Top-level resource: articles, article
+
+              # Collection route: articles (get, post)
+              collection_methods = []
+
+              if !resource[:only] || resource[:only].include?(:index)
+                # Use :index! to bypass functions filter (which transforms .index() to .indexOf())
+                collection_methods << s(:pair, s(:sym, :get),
+                  s(:block,
+                    s(:send, nil, :proc),
+                    s(:args),
+                    s(:send, controller, :index!)))
+              end
+
+              if !resource[:only] || resource[:only].include?(:create)
+                # post: (event) => { let result = Controller.create(...); handleFormResult(result); return false }
+                controller_call = s(:send, controller, :create,
+                  s(:send, nil, :formData, s(:lvar, :event)))
+                collection_methods << s(:pair, s(:sym, :post),
+                  s(:block,
+                    s(:send, nil, :proc),
+                    s(:args, s(:arg, :event)),
+                    wrap_with_result_handler(controller_call)))
+              end
+
+              pairs << s(:pair, s(:sym, plural.to_sym), s(:hash, *collection_methods)) if collection_methods.any?
+
+              # Member route: article (get, put, patch, delete)
+              member_methods = []
+
+              if !resource[:only] || resource[:only].include?(:show)
+                # show(id) - plain id
+                member_methods << s(:pair, s(:sym, :get),
+                  s(:block,
+                    s(:send, nil, :proc),
+                    s(:args, s(:arg, :id)),
+                    s(:send, controller, :show, s(:lvar, :id))))
+              end
+
+              if !resource[:only] || resource[:only].include?(:update)
+                # update(id, params) - id first, then params
+                controller_call = s(:send, controller, :update,
+                  s(:lvar, :id),
+                  s(:send, nil, :formData, s(:lvar, :event)))
+                update_block = s(:block,
+                  s(:send, nil, :proc),
+                  s(:args, s(:arg, :event), s(:arg, :id)),
+                  wrap_with_result_handler(controller_call))
+                member_methods << s(:pair, s(:sym, :put), update_block)
+                member_methods << s(:pair, s(:sym, :patch), update_block)
+              end
+
+              if !resource[:only] || resource[:only].include?(:destroy)
+                # destroy(id) - plain id
+                controller_call = s(:send, controller, :destroy, s(:lvar, :id))
+                member_methods << s(:pair, s(:sym, :delete),
+                  s(:block,
+                    s(:send, nil, :proc),
+                    s(:args, s(:arg, :id)),
+                    wrap_with_result_handler(controller_call)))
+              end
+
+              pairs << s(:pair, s(:sym, singular.to_sym), s(:hash, *member_methods)) if member_methods.any?
+            end
+
+            # Process nested resources
+            if resource[:nested]&.any?
+              collect_routes_entries(resource[:nested], { singular: singular, plural: plural }, pairs)
+            end
           end
+        end
+
+        # Wrap a controller call with result handling
+        # Generates: { let result = controllerCall; handleFormResult(result); return false }
+        def wrap_with_result_handler(controller_call)
+          s(:begin,
+            s(:lvasgn, :result, controller_call),
+            s(:send, nil, :handleFormResult, s(:lvar, :result)),
+            s(:return, s(:false)))
         end
 
         def build_routes_method

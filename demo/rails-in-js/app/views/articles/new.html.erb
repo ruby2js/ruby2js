@@ -10,7 +10,7 @@
   </div>
 <% end %>
 
-<form onsubmit="event.preventDefault(); createArticle(event); return false">
+<form onsubmit="return routes.articles.post(event)">
   <p>
     <label>Title:</label>
     <input type="text" name="title" value="<%= @article.title || '' %>" required>

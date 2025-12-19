@@ -14,6 +14,7 @@ module Ruby2JS
         @erb_bufvar = nil
         @erb_block_var = nil  # Track current block variable (e.g., 'f' in form_for)
         @erb_model_name = nil # Track model name for form_for (e.g., 'user')
+        @erb_path_helpers = [] # Track path helper usage for imports
       end
 
       # Main entry point - detect ERB/HERB output patterns and transform
@@ -23,6 +24,7 @@ module Ruby2JS
         @erb_bufvar ||= nil
         @erb_block_var ||= nil
         @erb_model_name ||= nil
+        @erb_path_helpers ||= []
 
         # Check if this looks like ERB/HERB output:
         # - First statement assigns to _erbout or _buf
@@ -66,6 +68,13 @@ module Ruby2JS
             s(:kwarg, prop_name)
           end
           args = s(:args, *kwargs)
+        end
+
+        # Add import for path helpers if any were used
+        # Path is relative from views/erb/*.js to config/routes.js
+        unless @erb_path_helpers.empty?
+          helpers = @erb_path_helpers.uniq.sort.map { |name| s(:const, nil, name) }
+          self.prepend_list << s(:import, '../../config/routes.js', helpers)
         end
 
         # Wrap in arrow function or regular function
@@ -186,6 +195,11 @@ module Ruby2JS
         # truncate(text, length: 100) -> truncate(text, {length: 100})
         if method == :truncate && target.nil? && args.length >= 1
           return process_truncate(args)
+        end
+
+        # Track path helper usage for imports (e.g., article_path, new_article_path)
+        if target.nil? && method.to_s.end_with?('_path') && @erb_bufvar
+          @erb_path_helpers << method unless @erb_path_helpers.include?(method)
         end
 
         super

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>Rails-in-JS Blog</title>
-  <link rel="stylesheet" href="./public/styles.css">
+  <link rel="stylesheet" href="/public/styles.css">
 </head>
 <body>
   <div id="loading">Loading Rails-in-JS...<br><small>Powered by transpiled Ruby code</small></div>
@@ -17,9 +17,10 @@
     <main id="content"></main>
   </div>
 
-  <script src="./node_modules/sql.js/dist/sql-wasm.js"></script>
+  <script src="/node_modules/sql.js/dist/sql-wasm.js"></script>
   <script type="module">
-    import { Application } from './dist/config/routes.js';
+    import { Application, routes } from '/dist/config/routes.js';
+    window.routes = routes;
     Application.start();
   </script>
 
