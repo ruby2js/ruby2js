@@ -134,7 +134,21 @@ module Ruby2JS
       file, line = source.source_location
       source = IO.read(file)
       ast, comments = parse(source)
-      ast = find_block(ast, line)
+      ast, block_range = find_block(ast, line)
+      # Filter _raw comments to only those within the block's source range.
+      # This preserves trailing/orphan comments inside the block while
+      # excluding comments from the surrounding file.
+      if comments.is_a?(Hash) && comments[:_raw] && block_range
+        comments[:_raw] = comments[:_raw].select do |comment|
+          loc = comment.loc
+          if loc.respond_to?(:expression) && loc.expression
+            pos = loc.expression.begin_pos
+            pos >= block_range[0] && pos <= block_range[1]
+          else
+            false
+          end
+        end
+      end
       options[:file] ||= file
     elsif source.respond_to?(:type) && source.respond_to?(:children)
       # AST node passed directly (Parser::AST::Node or Ruby2JS::Node)
@@ -484,8 +498,10 @@ module Ruby2JS
     [ast, comments_hash]
   end
 
+  # Find a block at the given line and return [body_ast, block_range]
+  # block_range is [begin_pos, end_pos] of the full block for comment filtering
   def self.find_block(ast, line)
-    return nil unless ast.respond_to?(:type) && ast.respond_to?(:children)
+    return [nil, nil] unless ast.respond_to?(:type) && ast.respond_to?(:children)
 
     if ast.type == :block
       loc = ast.loc
@@ -499,16 +515,24 @@ module Ruby2JS
       else
         nil
       end
-      return ast.children.last if node_line == line
+      if node_line == line
+        # Return body and the block's source range for comment filtering
+        block_range = if loc.respond_to?(:expression) && loc.expression
+          [loc.expression.begin_pos, loc.expression.end_pos]
+        else
+          nil
+        end
+        return [ast.children.last, block_range]
+      end
     end
 
     ast.children.each do |child|
       if child.respond_to?(:type) && child.respond_to?(:children)
-        block = find_block(child, line)
-        return block if block
+        body, range = find_block(child, line)
+        return [body, range] if body
       end
     end
 
-    nil
+    [nil, nil]
   end
 end
