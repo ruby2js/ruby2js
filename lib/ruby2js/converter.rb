@@ -299,14 +299,15 @@ module Ruby2JS
       # First try direct lookup by object identity
       # Ruby uses Hash ([]), JS selfhost uses Map (.get())
       comment_list = @comments.respond_to?(:get) ? @comments.get(ast) : @comments[ast]
-      # Return early if there's an explicit entry (even if empty).
-      # Empty entries are used to prevent synthetic nodes from inheriting
-      # comments from their children (e.g., prepended polyfills/imports).
+      # Return early if there's an explicit non-empty entry.
+      # Non-empty entries are definitive - use them directly.
+      # Empty entries might be from filters that replaced nodes; in that case,
+      # fall through to location-based lookup to find the original comments.
       # Note: The Pragma: hash comment triggers `in` operator in JS, but that
       # doesn't work for object keys. The selfhost version skips the complex
       # location-based lookup below anyway (Pragma: skip), so we just check
-      # if comment_list is an array for the early return.
-      return [comment_list, ast] if comment_list.is_a?(Array)
+      # if comment_list is a non-empty array for the early return.
+      return [comment_list, ast] if comment_list.is_a?(Array) && !comment_list.empty?
 
       # If ast has location info, try location-based lookup
       # This handles cases where filters created new nodes with same location
