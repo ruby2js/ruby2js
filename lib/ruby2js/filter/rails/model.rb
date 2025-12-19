@@ -359,6 +359,7 @@ module Ruby2JS
           # has_many :comments -> get comments() {
           #   let records = Comment.where({article_id: this._id});
           #   records.create = (params) => Comment.create(Object.assign({article_id: this._id}, params));
+          #   records.find = (id) => Comment.find(id);
           #   return records;
           # }
           association_name = assoc[:name]
@@ -393,11 +394,22 @@ module Ruby2JS
                     s(:attr, s(:self), :_id))),
                 s(:lvar, :params))))
 
+          # Build the find lambda: (id) => Model.find(id)
+          # This overrides Array.prototype.find to provide Rails-like find-by-id behavior
+          find_lambda = s(:block,
+            s(:send, nil, :lambda),
+            s(:args, s(:arg, :id)),
+            s(:send,
+              s(:const, nil, class_name.to_sym),
+              :find!,
+              s(:lvar, :id)))
+
           s(:defget, association_name,
             s(:args),
             s(:begin,
               s(:lvasgn, :records, where_call),
               s(:send, s(:lvar, :records), :[]=, s(:str, 'create'), create_lambda),
+              s(:send, s(:lvar, :records), :[]=, s(:str, 'find'), find_lambda),
               s(:return, s(:lvar, :records))))
         end
 
