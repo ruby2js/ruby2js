@@ -13,6 +13,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const DEMO_ROOT = join(__dirname, '..');
 
+// Parse command line options
+const showDiff = process.argv.includes('--diff') || process.argv.includes('-d');
+
 // ANSI colors
 const GREEN = '\x1b[32m';
 const RED = '\x1b[31m';
@@ -29,6 +32,55 @@ function pass(msg) { log(`  ✓ ${msg}`, GREEN); }
 function fail(msg) { log(`  ✗ ${msg}`, RED); }
 function warn(msg) { log(`  ⚠ ${msg}`, YELLOW); }
 function info(msg) { log(`  ${msg}`, CYAN); }
+
+// Simple unified diff output
+function showUnifiedDiff(content1, content2, label1, label2, filename) {
+  const lines1 = content1.split('\n');
+  const lines2 = content2.split('\n');
+
+  console.log(`\n${CYAN}--- ${label1}/${filename}${RESET}`);
+  console.log(`${CYAN}+++ ${label2}/${filename}${RESET}`);
+
+  // Find first and last differing lines for context
+  let firstDiff = -1;
+  let lastDiff = -1;
+  const maxLen = Math.max(lines1.length, lines2.length);
+
+  for (let i = 0; i < maxLen; i++) {
+    if (lines1[i] !== lines2[i]) {
+      if (firstDiff === -1) firstDiff = i;
+      lastDiff = i;
+    }
+  }
+
+  if (firstDiff === -1) return; // No diff (shouldn't happen)
+
+  // Show context around differences
+  const contextLines = 3;
+  const start = Math.max(0, firstDiff - contextLines);
+  const end = Math.min(maxLen, lastDiff + contextLines + 1);
+
+  console.log(`${CYAN}@@ -${start + 1},${lines1.length} +${start + 1},${lines2.length} @@${RESET}`);
+
+  for (let i = start; i < end; i++) {
+    const line1 = lines1[i];
+    const line2 = lines2[i];
+
+    if (line1 === line2) {
+      // Context line (same in both)
+      console.log(` ${line1 ?? ''}`);
+    } else {
+      // Show removed line (from file1)
+      if (line1 !== undefined) {
+        console.log(`${RED}-${line1}${RESET}`);
+      }
+      // Show added line (from file2)
+      if (line2 !== undefined) {
+        console.log(`${GREEN}+${line2}${RESET}`);
+      }
+    }
+  }
+}
 
 // Collect all .js files in a directory recursively
 function collectJsFiles(dir, files = []) {
@@ -131,7 +183,7 @@ function compareDirs(dir1, dir2, label1 = 'dir1', label2 = 'dir2') {
     const norm2 = content2.replace(/\/\/# sourceMappingURL=.*$/gm, '').trim();
 
     if (norm1 !== norm2) {
-      differences.contentDiff.push(f);
+      differences.contentDiff.push({ file: f, content1: norm1, content2: norm2 });
     }
   }
 
@@ -258,8 +310,14 @@ async function runTests() {
     }
 
     if (comparison.differences.contentDiff.length > 0) {
-      for (const f of comparison.differences.contentDiff) {
-        fail(`Content differs: ${f}`);
+      for (const diff of comparison.differences.contentDiff) {
+        fail(`Content differs: ${diff.file}`);
+        if (showDiff) {
+          showUnifiedDiff(diff.content1, diff.content2, 'ruby', 'selfhost', diff.file);
+        }
+      }
+      if (!showDiff && comparison.differences.contentDiff.length > 0) {
+        info('Run with --diff to see differences');
       }
       failed++;
     } else if (comparison.differences.onlyIn1.length === 0 && comparison.differences.onlyIn2.length === 0) {
