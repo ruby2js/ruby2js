@@ -307,14 +307,28 @@ end
 
 ## Implementation Phases
 
-### Phase 1: Database Adapters (Current)
+### Phase 1: Database Adapters ✅ COMPLETE
 
 See [DEXIE_SUPPORT.md](./DEXIE_SUPPORT.md).
 
-1. Extract sql.js to `lib/adapters/active_record_sqljs.mjs`
-2. Create `lib/adapters/active_record_dexie.mjs`
-3. Build process copies selected adapter
-4. Environment variable override: `DATABASE=dexie`
+**Completed:**
+1. ✅ Extract sql.js to `lib/adapters/active_record_sqljs.mjs`
+2. ✅ Build process copies selected adapter to `dist/lib/active_record.mjs`
+3. ✅ Generate `ApplicationRecord` wrapper at build time (deleted `app/models/application_record.rb`)
+4. ✅ Add validation helpers to adapter (validates_presence_of, validates_length_of)
+5. ✅ Make all controller actions async with await for database operations
+6. ✅ Make seeds filter async with await for Article.all, Article.create, etc.
+7. ✅ Add association preloading for show/edit actions (article.comments = await...)
+8. ✅ Fix circular dependency by extracting path helpers to `config/paths.js`
+9. ✅ Add `:await` to GROUP_OPERATORS for proper parenthesization
+10. ✅ Make routes dispatch handlers async
+11. ✅ Handle `:asyncs` nodes in IIFE module converter
+
+12. ✅ Create `lib/adapters/active_record_dexie.mjs` (IndexedDB alternative ~50KB vs sql.js ~2.7MB)
+13. ✅ Add DATABASE environment variable selection in build scripts
+14. ✅ Test with Dexie adapter
+
+**Phase 1 Complete!** Both sql.js and Dexie adapters work with identical ActiveRecord API.
 
 ### Phase 2: Target Infrastructure
 

@@ -292,8 +292,8 @@ export class Application {
     // Make DB available globally for sql.js compatibility
     window.DB = adapter.getDatabase();
 
-    // For sql.js: run schema SQL
-    if (this.schema && this.schema.create_tables && adapter.execSQL) {
+    // For sql.js: run schema SQL (skip for Dexie which uses defineSchema instead)
+    if (this.schema && this.schema.create_tables && !adapter.openDatabase) {
       this.schema.create_tables(window.DB);
     }
 

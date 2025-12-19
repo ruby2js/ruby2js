@@ -207,13 +207,29 @@ def generate_paths_module(config_dir)
   end
 end
 
+# Map DATABASE env var to adapter source file
+ADAPTER_FILES = {
+  'sqljs' => 'active_record_sqljs.mjs',
+  'sql.js' => 'active_record_sqljs.mjs',
+  'dexie' => 'active_record_dexie.mjs',
+  'indexeddb' => 'active_record_dexie.mjs'
+}.freeze
+
 def copy_database_adapter(src_dir, dest_dir)
-  # Copy the sql.js adapter (default) to dist/lib/active_record.mjs
-  adapter_src = File.join(src_dir, 'adapters/active_record_sqljs.mjs')
+  # Get adapter from environment, default to sqljs
+  database = ENV.fetch('DATABASE', 'sqljs').downcase
+  adapter_file = ADAPTER_FILES[database]
+
+  unless adapter_file
+    valid = ADAPTER_FILES.keys.join(', ')
+    abort "Unknown DATABASE adapter: #{database}. Valid options: #{valid}"
+  end
+
+  adapter_src = File.join(src_dir, 'adapters', adapter_file)
   adapter_dest = File.join(dest_dir, 'active_record.mjs')
   FileUtils.mkdir_p(dest_dir)
   FileUtils.cp(adapter_src, adapter_dest)
-  puts "  Copying: active_record_sqljs.mjs -> active_record.mjs"
+  puts "  Copying: #{adapter_file} -> active_record.mjs (DATABASE=#{database})"
 end
 
 # Clean and create dist directory
