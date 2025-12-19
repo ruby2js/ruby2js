@@ -2,12 +2,14 @@
 // Selfhost build script for Rails-in-JS
 // Transpiles Ruby files to JavaScript using the selfhost (JavaScript-based) converter
 
-import { readFile, writeFile, mkdir, rm } from 'fs/promises';
+import { readFile, writeFile, mkdir, rm, copyFile } from 'fs/promises';
+import { existsSync } from 'fs';
 import { join, relative, dirname as pathDirname, resolve } from 'path';
 import { exec } from 'child_process';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { ErbCompiler } from '../../selfhost/lib/erb_compiler.js';
+import yaml from 'js-yaml';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -21,8 +23,92 @@ export class SelfhostBuilder {
   static erbFilters = [];  // Separate filter chain for ERB templates
   static ErbCompiler = null;  // Transpiled from lib/erb_compiler.rb
 
-  constructor(distDir) {
+  constructor(distDir, options = {}) {
     this.distDir = distDir || join(SelfhostBuilder.DEMO_ROOT, 'dist');
+    this.options = options;
+  }
+
+  // Parse DATABASE_URL into config object
+  static parseDatabaseUrl(url) {
+    const parsed = new URL(url);
+    return {
+      adapter: parsed.protocol.replace(':', '').replace('postgres', 'pg'),
+      host: parsed.hostname,
+      port: parsed.port || undefined,
+      database: parsed.pathname.slice(1),
+      username: parsed.username || undefined,
+      password: parsed.password || undefined,
+      ...Object.fromEntries(parsed.searchParams)
+    };
+  }
+
+  // Load database configuration from environment or config file
+  async loadDatabaseConfig() {
+    const env = process.env.NODE_ENV || 'development';
+
+    // Priority 1: DATABASE_URL environment variable
+    if (process.env.DATABASE_URL) {
+      console.log(`  Using DATABASE_URL from environment`);
+      return SelfhostBuilder.parseDatabaseUrl(process.env.DATABASE_URL);
+    }
+
+    // Priority 2: DATABASE environment variable (adapter name only)
+    if (process.env.DATABASE) {
+      console.log(`  Using DATABASE=${process.env.DATABASE} from environment`);
+      return { adapter: process.env.DATABASE };
+    }
+
+    // Priority 3: config/database.yml
+    const configPath = join(SelfhostBuilder.DEMO_ROOT, 'config/database.yml');
+    if (existsSync(configPath)) {
+      try {
+        const configText = await readFile(configPath, 'utf8');
+        const config = yaml.load(configText);
+        if (config && config[env]) {
+          console.log(`  Using config/database.yml [${env}]`);
+          return config[env];
+        }
+      } catch (err) {
+        console.warn(`  Warning: Could not parse database.yml: ${err.message}`);
+      }
+    }
+
+    // Default: sql.js
+    console.log(`  Using default adapter: sqljs`);
+    return { adapter: 'sqljs', database: 'rails_in_js' };
+  }
+
+  // Copy the appropriate database adapter to dist/lib/
+  async copyDatabaseAdapter() {
+    const dbConfig = await this.loadDatabaseConfig();
+    const adapter = dbConfig.adapter || 'sqljs';
+
+    const adapterFile = `active_record_${adapter}.mjs`;
+    const srcPath = join(SelfhostBuilder.DEMO_ROOT, 'lib/adapters', adapterFile);
+    const destPath = join(this.distDir, 'lib/active_record.mjs');
+
+    if (!existsSync(srcPath)) {
+      throw new Error(`Unknown database adapter: ${adapter} (${srcPath} not found)`);
+    }
+
+    // Read adapter source
+    let adapterCode = await readFile(srcPath, 'utf8');
+
+    // Inject configuration
+    adapterCode = adapterCode.replace(
+      'const DB_CONFIG = {};',
+      `const DB_CONFIG = ${JSON.stringify(dbConfig)};`
+    );
+
+    await mkdir(pathDirname(destPath), { recursive: true });
+    await writeFile(destPath, adapterCode);
+
+    console.log(`  Adapter: ${adapter} -> lib/active_record.mjs`);
+    if (dbConfig.database) {
+      console.log(`  Database: ${dbConfig.database}`);
+    }
+
+    return { adapter, config: dbConfig };
   }
 
   async init() {
@@ -282,6 +368,12 @@ export const ArticleViews = {
 
     let totalFiles = 0;
 
+    console.log('Database:');
+    const { adapter } = await this.copyDatabaseAdapter();
+    this.databaseAdapter = adapter;
+    totalFiles += 1;
+    console.log();
+
     console.log('Library:');
     totalFiles += await this.copyLibFiles();
     console.log();
@@ -315,7 +407,7 @@ export const ArticleViews = {
     );
     console.log();
 
-    console.log('Database:');
+    console.log('Schema & Seeds:');
     totalFiles += await this.transpileDirectory(
       join(SelfhostBuilder.DEMO_ROOT, 'db'),
       join(this.distDir, 'db')

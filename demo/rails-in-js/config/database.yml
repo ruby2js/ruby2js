@@ -1,0 +1,15 @@
+# Database configuration
+# Adapter is selected at build time, not runtime
+
+development:
+  adapter: sqljs
+  database: rails_in_js_dev
+
+production:
+  adapter: sqljs
+  database: rails_in_js
+
+# Alternative: Dexie.js for smaller bundle size (~50KB vs ~2.7MB)
+# development:
+#   adapter: dexie
+#   database: rails_in_js_dev

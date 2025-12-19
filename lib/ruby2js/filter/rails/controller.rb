@@ -10,6 +10,12 @@ module Ruby2JS
         # Standard RESTful action names
         RESTFUL_ACTIONS = %i[index show new create edit update destroy].freeze
 
+        # ActiveRecord class methods that should be awaited
+        AR_CLASS_METHODS = %i[all find find_by where first last count create create!].freeze
+
+        # ActiveRecord instance methods that should be awaited
+        AR_INSTANCE_METHODS = %i[save save! update update! destroy destroy! reload].freeze
+
         def initialize(*args)
           # Note: super must be called first for JS class compatibility
           super
@@ -351,8 +357,8 @@ module Ruby2JS
 
           output_args = s(:args, *param_args)
 
-          # Create class method (defs with self)
-          s(:defs, s(:self), output_name, output_args, final_body)
+          # Create async class method (asyncs with self for async/await support)
+          s(:asyncs, s(:self), output_name, output_args, final_body)
         end
 
         def collect_instance_variables(node)
@@ -443,11 +449,14 @@ module Ruby2JS
               # params.require(:article).permit(:title, :body) -> params
               return s(:lvar, :params)
             else
-              # Process children recursively
+              # Process children recursively first
               new_children = node.children.map do |c|
                 c.respond_to?(:type) ? transform_ivars_to_locals(c) : c
               end
-              return node.updated(nil, new_children)
+              transformed = node.updated(nil, new_children)
+
+              # Wrap model operations with await
+              return wrap_with_await_if_needed(transformed)
             end
 
           else
@@ -460,6 +469,31 @@ module Ruby2JS
               return node
             end
           end
+        end
+
+        # Wrap ActiveRecord operations with await for async database support
+        def wrap_with_await_if_needed(node)
+          return node unless node.type == :send
+
+          target, method, *_args = node.children
+
+          # Check for class method calls on model constants (e.g., Article.find)
+          if target&.type == :const && target.children[0].nil?
+            const_name = target.children[1].to_s
+            # Convert Set to Array for JS compatibility (Set.include? doesn't exist in JS)
+            model_refs_array = @rails_model_refs ? [*@rails_model_refs] : []
+            if model_refs_array.include?(const_name) && AR_CLASS_METHODS.include?(method)
+              # Use updated(:await) to preserve send structure while adding await
+              return node.updated(:await)
+            end
+          end
+
+          # Check for instance method calls on local variables (e.g., article.save)
+          if target&.type == :lvar && AR_INSTANCE_METHODS.include?(method)
+            return node.updated(:await)
+          end
+
+          node
         end
 
         def transform_redirect_to(args)

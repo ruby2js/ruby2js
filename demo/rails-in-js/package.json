@@ -16,10 +16,12 @@
     "test": "npm run test:sql && npm run test:ar && npm run test:mvc"
   },
   "dependencies": {
+    "dexie": "^4.0.10",
     "sql.js": "^1.11.0"
   },
   "devDependencies": {
     "chokidar": "^3.5.3",
+    "js-yaml": "^4.1.0",
     "ws": "^8.14.2"
   }
 }

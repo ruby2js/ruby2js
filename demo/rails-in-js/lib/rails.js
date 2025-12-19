@@ -254,6 +254,7 @@ export class Application {
   static schema = null;
   static seeds = null;
   static sqlJsPath = '/node_modules/sql.js/dist';
+  static activeRecordModule = null;
 
   // Configure the application
   static configure(options) {
@@ -262,26 +263,47 @@ export class Application {
     if (options.sqlJsPath) this.sqlJsPath = options.sqlJsPath;
   }
 
-  // Initialize the database
+  // Initialize the database using the adapter
   static async initDatabase() {
-    const SQL = await window.initSqlJs({
-      locateFile: file => `${this.sqlJsPath}/${file}`
-    });
-    window.DB = new SQL.Database();
+    // Import the adapter (selected at build time)
+    const adapter = await import('./active_record.mjs');
+    this.activeRecordModule = adapter;
 
-    // Time polyfill for Ruby compatibility
-    window.Time = {
-      now() {
-        return { toString() { return new Date().toISOString(); } };
+    // Initialize with config (adapter reads its own config, but we can override)
+    await adapter.initDatabase({ sqlJsPath: this.sqlJsPath });
+
+    // For Dexie adapter: define schema and open database
+    if (adapter.defineSchema) {
+      // Register table schemas from the schema module
+      if (this.schema && this.schema.tableSchemas) {
+        for (const [table, schema] of Object.entries(this.schema.tableSchemas)) {
+          adapter.registerSchema(table, schema);
+        }
+      } else {
+        // Fallback: define schemas manually for the demo
+        // TODO: Update rails/schema filter to generate tableSchemas for Dexie
+        adapter.registerSchema('articles', '++id, title, created_at, updated_at');
+        adapter.registerSchema('comments', '++id, article_id, created_at, updated_at');
       }
-    };
+      adapter.defineSchema(1);
+      await adapter.openDatabase();
+    }
 
-    if (this.schema) {
+    // Make DB available globally for sql.js compatibility
+    window.DB = adapter.getDatabase();
+
+    // For sql.js: run schema SQL
+    if (this.schema && this.schema.create_tables && adapter.execSQL) {
       this.schema.create_tables(window.DB);
     }
 
+    // Run seeds if present
     if (this.seeds) {
-      this.seeds.run();
+      if (this.seeds.run.constructor.name === 'AsyncFunction') {
+        await this.seeds.run();
+      } else {
+        this.seeds.run();
+      }
     }
   }
 
