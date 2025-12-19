@@ -316,13 +316,17 @@ module Ruby2JS
     nodes_by_pos = []
 
     collect_nodes = proc do |node, depth|
-      next unless node && node.loc
-      start_pos = node.loc.start_offset
+      next unless node
 
-      if start_pos && node.type != :begin
-        nodes_by_pos << [start_pos, depth, node]
+      # Only add node if it has location info
+      if node.loc
+        start_pos = node.loc.start_offset
+        if start_pos && node.type != :begin
+          nodes_by_pos << [start_pos, depth, node]
+        end
       end
 
+      # Always recurse into children (even if parent has no loc)
       if node.children
         node.children.each do |child|
           collect_nodes.(child, depth + 1) if child.respond_to?(:type) && child.respond_to?(:children)

@@ -473,7 +473,7 @@ Examples:
 
       default: {
         // JavaScript output - use convert() with filters (same pipeline as build scripts)
-        console.log(convert(source, { ...options, filters: loadedFilters }));
+        console.log(convert(source, { ...options, filters: loadedFilters }).toString());
       }
     }
   } catch (e) {

@@ -248,30 +248,30 @@ module Ruby2JS
             s(:import, args[0].children, *imports) unless args[0].nil?
           end
         elsif method == :export
-          # Move comments from the send node to export wrapper to avoid duplication
-          # Comments are on `node` (the send expression), not the child
-          # Clear comments from any node matching the child's location BEFORE processing
-          # This prevents first-loc lookup from finding them during nested conversion
-          # Note: Filter processing creates new node objects, so we match by location
+          # Collect comments from child nodes BEFORE processing
+          # Comments may be on the child (class/module) node, not the send node
           child = args[0]
+          child_comments = []
           if child && child.respond_to?(:loc) && child.loc&.respond_to?(:expression)
             child_loc = child.loc.expression
             if child_loc
               if @comments.respond_to?(:forEach)
-                # JS selfhost: iterate Map and clear matching entries
+                # JS selfhost: iterate Map and collect/clear matching entries
                 @comments.forEach do |value, key|
                   next unless key.respond_to?(:loc) && key.loc&.respond_to?(:expression)
                   key_loc = key.loc.expression
                   if key_loc && key_loc.begin_pos == child_loc.begin_pos
+                    child_comments.concat(value) if value.is_a?(Array)
                     @comments.set(key, [])
                   end
                 end
               else
-                # Ruby: iterate Hash and clear matching entries
+                # Ruby: iterate Hash and collect/clear matching entries
                 @comments.each do |key, value|
                   next unless key.respond_to?(:loc) && key.loc&.respond_to?(:expression)
                   key_loc = key.loc.expression
                   if key_loc && key_loc.begin_pos == child_loc.begin_pos
+                    child_comments.concat(value) if value.is_a?(Array)
                     @comments[key] = []
                   end
                 end
@@ -279,13 +279,17 @@ module Ruby2JS
             end
           end
           result = s(:export, *process_all(args))
+          # Combine comments from send node and child node
           node_comments = @comments.respond_to?(:get) ? @comments.get(node) : @comments[node]
-          if node_comments
+          all_comments = []
+          all_comments.concat(node_comments) if node_comments
+          all_comments.concat(child_comments)
+          if all_comments.any?
             if @comments.respond_to?(:set)
-              @comments.set(result, node_comments)
+              @comments.set(result, all_comments)
               @comments.set(node, [])
             else
-              @comments[result] = node_comments
+              @comments[result] = all_comments
               @comments[node] = []
             end
           end
