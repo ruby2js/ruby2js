@@ -1,0 +1,28 @@
+# Ruby2JS Transpilation Configuration
+# See https://www.ruby2js.com/docs/options for all available options
+
+default: &default
+  # ECMAScript target level
+  eslevel: 2022
+
+  # Method conversion opt-ins
+  include:
+    - class
+    - call
+
+  # Auto-export top-level declarations
+  autoexports: true
+
+  # Comparison operator style: equality (==) or identity (===)
+  comparison: identity
+
+development:
+  <<: *default
+
+production:
+  <<: *default
+  # Add "use strict" directive in production
+  strict: true
+
+test:
+  <<: *default

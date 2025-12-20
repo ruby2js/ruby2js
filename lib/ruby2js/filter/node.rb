@@ -6,30 +6,31 @@ module Ruby2JS
       include SEXP
 
       # Lazy-initialized import nodes (avoids need for extend SEXP)
+      # Using node: prefix for compatibility with Node.js 16+, Bun, and Deno
       def import_child_process
-        @import_child_process ||= s(:import, ['child_process'],
+        @import_child_process ||= s(:import, ['node:child_process'],
             s(:attr, nil, :child_process))
       end
 
       def import_fs
-        @import_fs ||= s(:import, ['fs'], s(:attr, nil, :fs))
+        @import_fs ||= s(:import, ['node:fs'], s(:attr, nil, :fs))
       end
 
       def import_fs_promises
-        @import_fs_promises ||= s(:import, ['fs/promises'], s(:attr, nil, :fs))
+        @import_fs_promises ||= s(:import, ['node:fs/promises'], s(:attr, nil, :fs))
       end
 
       # For existsSync - no async equivalent, always use sync version
       def import_fs_sync
-        @import_fs_sync ||= s(:import, ['fs'], s(:attr, nil, :fsSync))
+        @import_fs_sync ||= s(:import, ['node:fs'], s(:attr, nil, :fsSync))
       end
 
       def import_os
-        @import_os ||= s(:import, ['os'], s(:attr, nil, :os))
+        @import_os ||= s(:import, ['node:os'], s(:attr, nil, :os))
       end
 
       def import_path
-        @import_path ||= s(:import, ['path'], s(:attr, nil, :path))
+        @import_path ||= s(:import, ['node:path'], s(:attr, nil, :path))
       end
 
       def setup_argv

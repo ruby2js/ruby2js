@@ -7,6 +7,7 @@
 
 require 'fileutils'
 require 'json'
+require 'yaml'
 
 # Ensure we're using the local ruby2js
 $LOAD_PATH.unshift File.expand_path('../../../lib', __dir__)
@@ -28,6 +29,9 @@ class SelfhostBuilder
 
   # Browser databases - these run in the browser with IndexedDB or WASM
   BROWSER_DATABASES = ['dexie', 'indexeddb', 'sqljs', 'sql.js'].freeze
+
+  # Server-side JavaScript runtimes
+  SERVER_RUNTIMES = ['node', 'bun', 'deno'].freeze
 
   # Map DATABASE env var to adapter source file
   ADAPTER_FILES = {
@@ -75,7 +79,8 @@ class SelfhostBuilder
   def initialize(dist_dir = nil)
     @dist_dir = dist_dir || File.join(DEMO_ROOT, 'dist')
     @database = nil  # Set during build from config
-    @target = nil    # Derived from database: 'browser' or 'node'
+    @target = nil    # Derived from database: 'browser' or 'server'
+    @runtime = nil   # For server targets: 'node', 'bun', or 'deno'
   end
 
   # Note: Using explicit () on all method calls for JS transpilation compatibility
@@ -91,9 +96,18 @@ class SelfhostBuilder
     puts("Database Adapter:")
     db_config = self.load_database_config()
     @database = db_config['adapter'] || db_config[:adapter] || 'sqljs'
-    @target = BROWSER_DATABASES.include?(@database) ? 'browser' : 'node'
+    @target = BROWSER_DATABASES.include?(@database) ? 'browser' : 'server'
     self.copy_database_adapter(db_config)
     puts("  Target: #{@target}")
+
+    # Set runtime for server targets
+    if @target == 'server'
+      @runtime = self.load_runtime_config()
+      unless SERVER_RUNTIMES.include?(@runtime)
+        raise "Unknown runtime: #{@runtime}. Valid options: #{SERVER_RUNTIMES.join(', ')}"
+      end
+      puts("  Runtime: #{@runtime}")
+    end
     puts("")
 
     # Copy target-specific lib files (rails.js framework)
@@ -156,6 +170,64 @@ class SelfhostBuilder
     puts("=== Build Complete ===")
   end
 
+  def load_ruby2js_config()
+    env = ENV['RAILS_ENV'] || ENV['NODE_ENV'] || 'development'
+    config_path = File.join(DEMO_ROOT, 'config/ruby2js.yml')
+
+    return {} unless File.exist?(config_path)
+
+    # Ruby 3.4+ requires aliases: true for YAML anchors
+    config = YAML.load_file(config_path, aliases: true)
+
+    # Support environment-specific or flat config
+    if config.key?(env)
+      config[env]
+    elsif config.key?('default')
+      config['default']
+    else
+      config
+    end
+  end
+
+  def build_options()
+    base = self.load_ruby2js_config()
+
+    # Start with hardcoded OPTIONS as base
+    options = OPTIONS.dup
+
+    # Merge YAML config values (string keys converted to symbols)
+    base.each do |key, value|
+      sym_key = key.to_s.to_sym
+      # Don't override filters - they're hardcoded for the demo
+      next if sym_key == :filters
+      options[sym_key] = value
+    end
+
+    options
+  end
+
+  def load_runtime_config()
+    # Priority 1: RUNTIME environment variable
+    if ENV['RUNTIME']
+      return ENV['RUNTIME'].downcase
+    end
+
+    # Priority 2: database.yml runtime key
+    db_config = self.load_database_config()
+    if db_config['runtime']
+      return db_config['runtime'].downcase
+    end
+
+    # Priority 3: ruby2js.yml runtime key
+    r2js_config = self.load_ruby2js_config()
+    if r2js_config['runtime']
+      return r2js_config['runtime'].downcase
+    end
+
+    # Default: node
+    'node'
+  end
+
   def load_database_config()
     # Use || instead of fetch for JS compatibility
     env = ENV['RAILS_ENV'] || ENV['NODE_ENV'] || 'development'
@@ -169,7 +241,6 @@ class SelfhostBuilder
     # Priority 2: config/database.yml
     config_path = File.join(DEMO_ROOT, 'config/database.yml')
     if File.exist?(config_path)
-      require 'yaml'
       config = YAML.load_file(config_path)
       if config && config[env] && config[env]['adapter']
         puts("  Using config/database.yml [#{env}]")
@@ -210,12 +281,19 @@ class SelfhostBuilder
     lib_dest = File.join(@dist_dir, 'lib')
     FileUtils.mkdir_p(lib_dest)
 
-    # Copy target-specific files (rails.js from targets/browser or targets/node)
-    target_src = File.join(DEMO_ROOT, 'lib/targets', @target)
+    # Determine source directory: browser or runtime-specific server target
+    if @target == 'browser'
+      target_dir = 'browser'
+    else
+      target_dir = @runtime  # node, bun, or deno
+    end
+
+    # Copy target-specific files (rails.js from targets/browser, node, bun, or deno)
+    target_src = File.join(DEMO_ROOT, 'lib/targets', target_dir)
     Dir.glob(File.join(target_src, '*.js')).each do |src_path|
       dest_path = File.join(lib_dest, File.basename(src_path))
       FileUtils.cp(src_path, dest_path)
-      puts("  Copying: targets/#{@target}/#{File.basename(src_path)}")
+      puts("  Copying: targets/#{target_dir}/#{File.basename(src_path)}")
       puts("    -> #{dest_path}")
     end
 
@@ -235,7 +313,8 @@ class SelfhostBuilder
 
     # Use relative path for cleaner display in browser debugger
     relative_src = src_path.sub(DEMO_ROOT + '/', '')
-    result = Ruby2JS.convert(source, OPTIONS.merge(file: relative_src))
+    options = self.build_options().merge(file: relative_src)
+    result = Ruby2JS.convert(source, options)
     js = result.to_s
 
     FileUtils.mkdir_p(File.dirname(dest_path))
@@ -348,10 +427,11 @@ class SelfhostBuilder
     dest_dir = File.join(@dist_dir, 'config')
     source = File.read(src_path)
     relative_src = src_path.sub(DEMO_ROOT + '/', '')
+    base_options = self.build_options()
 
     # Generate paths.js first (with only path helpers)
     puts("Transpiling: routes.rb -> paths.js")
-    paths_options = OPTIONS.merge(file: relative_src, paths_only: true)
+    paths_options = base_options.merge(file: relative_src, paths_only: true)
     result = Ruby2JS.convert(source, paths_options)
     paths_js = result.to_s
 
@@ -369,7 +449,7 @@ class SelfhostBuilder
 
     # Generate routes.js (imports path helpers from paths.js)
     puts("Transpiling: routes.rb -> routes.js")
-    routes_options = OPTIONS.merge(file: relative_src, paths_file: './paths.js')
+    routes_options = base_options.merge(file: relative_src, paths_file: './paths.js')
     result = Ruby2JS.convert(source, routes_options)
     routes_js = result.to_s
 

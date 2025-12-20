@@ -1,6 +1,6 @@
 # Rails-in-JS Demo
 
-A Rails-like blog application running entirely in JavaScript. Ruby source files are transpiled to JavaScript via Ruby2JS, demonstrating that idiomatic Rails code can run in the browser **or** as a Node.js server.
+A Rails-like blog application running entirely in JavaScript. Ruby source files are transpiled to JavaScript via Ruby2JS, demonstrating that idiomatic Rails code can run in the browser **or** as a server on Node.js, Bun, or Deno.
 
 ## Quick Start
 
@@ -12,11 +12,13 @@ npm run dev           # Start dev server with hot reload
 # Open http://localhost:3000
 ```
 
-### Node.js Server
+### Server (Node.js / Bun / Deno)
 
 ```bash
 npm install
 npm run dev:node      # Build for Node.js and start server
+npm run dev:bun       # Build for Bun and start server
+npm run dev:deno      # Build for Deno and start server
 # Open http://localhost:3000
 ```
 
@@ -24,14 +26,16 @@ npm run dev:node      # Build for Node.js and start server
 
 The same Ruby source code can be transpiled to run on different platforms:
 
-| Target | Database | Use Case |
-|--------|----------|----------|
-| **Browser** | sql.js (WebAssembly SQLite) | SPA with client-side storage |
-| **Browser** | Dexie (IndexedDB) | SPA with persistent storage |
-| **Node.js** | better-sqlite3 | Development server, testing |
-| **Node.js** | PostgreSQL | Production server |
+| Target | Runtime | Database | Use Case |
+|--------|---------|----------|----------|
+| **Browser** | - | sql.js (SQLite WASM) | SPA with client-side storage |
+| **Browser** | - | Dexie (IndexedDB) | SPA with persistent storage |
+| **Server** | Node.js | better-sqlite3 | Development server, testing |
+| **Server** | Node.js | PostgreSQL | Production server |
+| **Server** | Bun | better-sqlite3 | Fast development server |
+| **Server** | Deno | better-sqlite3 | Secure runtime |
 
-The target is determined by the database adapter in `config/database.yml` or the `DATABASE` environment variable.
+The target is determined by the database adapter in `config/database.yml` or the `DATABASE` environment variable. The runtime can be set via the `RUNTIME` environment variable (node, bun, or deno).
 
 ## Available Commands
 
@@ -39,12 +43,18 @@ The target is determined by the database adapter in `config/database.yml` or the
 |---------|-------------|
 | `npm run dev` | Browser dev server with hot reload |
 | `npm run dev:node` | Build for Node.js and start server |
+| `npm run dev:bun` | Build for Bun and start server |
+| `npm run dev:deno` | Build for Deno and start server |
 | `npm run build` | One-shot browser build (selfhost transpilation) |
 | `npm run build:ruby` | One-shot browser build (Ruby transpilation) |
 | `npm run build:node` | Build for Node.js with SQLite |
+| `npm run build:bun` | Build for Bun with SQLite |
+| `npm run build:deno` | Build for Deno with SQLite |
 | `npm run build:pg` | Build for Node.js with PostgreSQL |
 | `npm run start` | Serve browser build (npx serve) |
 | `npm run start:node` | Start Node.js server (after build) |
+| `npm run start:bun` | Start Bun server (after build) |
+| `npm run start:deno` | Start Deno server (after build) |
 
 Both transpilation modes (Ruby and selfhost) produce **identical output**, verified by automated diff comparison.
 
@@ -90,7 +100,9 @@ rails-in-js/
 │   │   └── active_record_pg.mjs         # Node: PostgreSQL
 │   └── targets/          # Target-specific runtimes
 │       ├── browser/rails.js  # History API routing, DOM updates
-│       └── node/rails.js     # HTTP server, request handling
+│       ├── node/rails.js     # HTTP server (http.createServer)
+│       ├── bun/rails.js      # HTTP server (Bun.serve)
+│       └── deno/rails.js     # HTTP server (Deno.serve)
 ├── dist/                 # Generated JavaScript (git-ignored)
 ├── scripts/
 │   ├── build.rb          # Ruby transpilation script

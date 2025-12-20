@@ -1,9 +1,5 @@
-// Rails-in-JS Micro Framework - Node.js Target
-// Provides routing, controller dispatch, and form handling for HTTP servers
-
-import http from 'node:http';
-import { parse as parseUrl } from 'node:url';
-import { StringDecoder } from 'node:string_decoder';
+// Rails-in-JS Micro Framework - Bun Target
+// Provides routing, controller dispatch, and form handling for Bun.serve
 
 export class Router {
   static routes = [];
@@ -100,11 +96,11 @@ export class Router {
     return null;
   }
 
-  // Dispatch an HTTP request to the appropriate controller action
-  static async dispatch(req, res) {
-    const parsedUrl = parseUrl(req.url, true);
-    const path = parsedUrl.pathname;
-    const method = this.normalizeMethod(req);
+  // Dispatch a Fetch API request to the appropriate controller action
+  static async dispatch(req) {
+    const url = new URL(req.url);
+    const path = url.pathname;
+    const method = this.normalizeMethod(req, url);
 
     console.log(`Started ${method} "${path}"`);
 
@@ -112,17 +108,16 @@ export class Router {
 
     if (!result) {
       console.warn('  No route matched');
-      res.writeHead(404, { 'Content-Type': 'text/html' });
-      res.end('<h1>404 Not Found</h1>');
-      return;
+      return new Response('<h1>404 Not Found</h1>', {
+        status: 404,
+        headers: { 'Content-Type': 'text/html' }
+      });
     }
 
     const { route, match } = result;
 
     if (route.redirect) {
-      res.writeHead(302, { Location: route.redirect });
-      res.end();
-      return;
+      return Response.redirect(route.redirect, 302);
     }
 
     const { controller, controllerName, action } = route;
@@ -147,15 +142,13 @@ export class Router {
 
         if (method === 'POST') {
           const result = await controller.create(parentId, params);
-          return this.handleResult(res, result, `/${route.parentName}/${parentId}`);
+          return this.handleResult(result, `/${route.parentName}/${parentId}`);
         } else if (method === 'PATCH') {
           const result = await controller.update(parentId, id, params);
-          return this.handleResult(res, result, `/${route.parentName}/${parentId}`);
+          return this.handleResult(result, `/${route.parentName}/${parentId}`);
         } else if (method === 'DELETE') {
           await controller.destroy(parentId, id);
-          res.writeHead(302, { Location: `/${route.parentName}/${parentId}` });
-          res.end();
-          return;
+          return Response.redirect(`/${route.parentName}/${parentId}`, 302);
         } else {
           html = id ? await controller[actionMethod](parentId, id) : await controller[actionMethod](parentId);
         }
@@ -164,102 +157,88 @@ export class Router {
 
         if (method === 'POST') {
           const result = await controller.create(params);
-          return this.handleResult(res, result, `/${controllerName}`);
+          return this.handleResult(result, `/${controllerName}`);
         } else if (method === 'PATCH') {
           const result = await controller.update(id, params);
-          return this.handleResult(res, result, `/${controllerName}/${id}`);
+          return this.handleResult(result, `/${controllerName}/${id}`);
         } else if (method === 'DELETE') {
           await controller.destroy(id);
-          res.writeHead(302, { Location: `/${controllerName}` });
-          res.end();
-          return;
+          return Response.redirect(`/${controllerName}`, 302);
         } else {
           html = id ? await controller[actionMethod](id) : await controller[actionMethod]();
         }
       }
 
       console.log(`  Rendering ${controllerName}/${action}`);
-      this.sendHtml(res, html);
+      return this.htmlResponse(html);
     } catch (e) {
       console.error('  Error:', e.message || e);
-      res.writeHead(500, { 'Content-Type': 'text/html' });
-      res.end(`<h1>500 Internal Server Error</h1><pre>${e.stack}</pre>`);
+      return new Response(`<h1>500 Internal Server Error</h1><pre>${e.stack}</pre>`, {
+        status: 500,
+        headers: { 'Content-Type': 'text/html' }
+      });
     }
   }
 
   // Normalize HTTP method (handle _method override for browsers without PATCH/DELETE)
-  static normalizeMethod(req) {
+  static normalizeMethod(req, url) {
     let method = req.method.toUpperCase();
     // Check for _method override in query string
-    const parsedUrl = parseUrl(req.url, true);
-    if (parsedUrl.query._method) {
-      method = parsedUrl.query._method.toUpperCase();
+    const methodOverride = url.searchParams.get('_method');
+    if (methodOverride) {
+      method = methodOverride.toUpperCase();
     }
     return method;
   }
 
   // Parse request body (form data or JSON)
-  static parseBody(req) {
-    return new Promise((resolve, reject) => {
-      const decoder = new StringDecoder('utf-8');
-      let body = '';
+  static async parseBody(req) {
+    const contentType = req.headers.get('content-type') || '';
 
-      req.on('data', chunk => {
-        body += decoder.write(chunk);
-      });
-
-      req.on('end', () => {
-        body += decoder.end();
-
-        const contentType = req.headers['content-type'] || '';
-
-        if (contentType.includes('application/json')) {
-          try {
-            resolve(JSON.parse(body));
-          } catch (e) {
-            resolve({});
-          }
-        } else {
-          // Parse URL-encoded form data
-          const params = {};
-          const pairs = body.split('&');
-          for (const pair of pairs) {
-            const [key, value] = pair.split('=');
-            if (key) {
-              params[decodeURIComponent(key)] = decodeURIComponent(value || '');
-            }
-          }
-          resolve(params);
-        }
-      });
-
-      req.on('error', reject);
-    });
-  }
-
-  // Handle controller result (redirect or render)
-  static handleResult(res, result, defaultRedirect) {
-    if (result.redirect) {
-      console.log(`  Redirected to ${result.redirect}`);
-      res.writeHead(302, { Location: result.redirect });
-      res.end();
-    } else if (result.render) {
-      // Validation failed, re-render form
-      this.sendHtml(res, result.html || '<h1>Validation Error</h1>');
+    if (contentType.includes('application/json')) {
+      try {
+        return await req.json();
+      } catch (e) {
+        return {};
+      }
     } else {
-      res.writeHead(302, { Location: defaultRedirect });
-      res.end();
+      // Parse URL-encoded form data
+      const text = await req.text();
+      const params = {};
+      const pairs = text.split('&');
+      for (const pair of pairs) {
+        const [key, value] = pair.split('=');
+        if (key) {
+          params[decodeURIComponent(key)] = decodeURIComponent(value || '');
+        }
+      }
+      return params;
     }
   }
 
-  // Send HTML response with proper headers
-  static sendHtml(res, html) {
-    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-    res.end(html);
+  // Handle controller result (redirect or render)
+  static handleResult(result, defaultRedirect) {
+    if (result.redirect) {
+      console.log(`  Redirected to ${result.redirect}`);
+      return Response.redirect(result.redirect, 302);
+    } else if (result.render) {
+      // Validation failed, re-render form
+      return this.htmlResponse(result.html || '<h1>Validation Error</h1>');
+    } else {
+      return Response.redirect(defaultRedirect, 302);
+    }
+  }
+
+  // Create HTML response with proper headers
+  static htmlResponse(html) {
+    return new Response(html, {
+      status: 200,
+      headers: { 'Content-Type': 'text/html; charset=utf-8' }
+    });
   }
 }
 
-// Application base class for Node.js
+// Application base class for Bun
 export class Application {
   static schema = null;
   static seeds = null;
@@ -298,7 +277,7 @@ export class Application {
     }
   }
 
-  // Start the HTTP server
+  // Start the HTTP server using Bun.serve
   static async start(port = null) {
     const listenPort = port || process.env.PORT || 3000;
 
@@ -306,14 +285,14 @@ export class Application {
       await this.initDatabase();
       console.log('Database initialized');
 
-      const server = http.createServer(async (req, res) => {
-        await Router.dispatch(req, res);
+      const server = Bun.serve({
+        port: listenPort,
+        async fetch(req) {
+          return await Router.dispatch(req);
+        }
       });
 
-      server.listen(listenPort, () => {
-        console.log(`Server running at http://localhost:${listenPort}/`);
-      });
-
+      console.log(`Server running at http://localhost:${server.port}/`);
       return server;
     } catch (e) {
       console.error('Failed to start server:', e);
@@ -330,33 +309,33 @@ export function truncate(text, options = {}) {
   return text.slice(0, length - omission.length) + omission;
 }
 
-// Navigate helper - for Node.js, this just returns the path
+// Navigate helper - for Bun, this just returns the path
 // Used in generated code to maintain API compatibility
 export function navigate(event, path) {
-  // In Node.js context, navigation is handled via HTTP redirects
+  // In server context, navigation is handled via HTTP redirects
   // This function is here for API compatibility with browser version
   return path;
 }
 
-// Form submission helper - for Node.js, forms are handled via HTTP
+// Form submission helper - for Bun, forms are handled via HTTP
 export function submitForm(event, handler) {
-  // In Node.js context, form submission is handled via HTTP POST
+  // In server context, form submission is handled via HTTP POST
   // This function is here for API compatibility with browser version
   return false;
 }
 
-// Extract form data - for Node.js, data comes from request body
+// Extract form data - for Bun, data comes from request body
 export function formData(event) {
-  // In Node.js context, form data is parsed in Router.parseBody
+  // In server context, form data is parsed in Router.parseBody
   return {};
 }
 
-// Handle form result - for Node.js, this is handled in Router.handleResult
+// Handle form result - for Bun, this is handled in Router.handleResult
 export function handleFormResult(result, rerenderFn = null) {
   return false;
 }
 
-// Setup form handlers - no-op in Node.js (forms handled via HTTP)
+// Setup form handlers - no-op in Bun (forms handled via HTTP)
 export function setupFormHandlers(config) {
-  // Form handlers are handled by Router.dispatch in Node.js
+  // Form handlers are handled by Router.dispatch in Bun
 }
