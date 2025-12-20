@@ -365,13 +365,15 @@ See [DEXIE_SUPPORT.md](./DEXIE_SUPPORT.md).
 
 **Phase 1 Complete!** Both sql.js and Dexie adapters work with identical ActiveRecord API.
 
-### Phase 2: Target Infrastructure
+### Phase 2: Target Infrastructure ✅ COMPLETE
 
-1. Create `lib/targets/browser/` and `lib/targets/node/` directories
-2. Extract browser-specific router to `lib/targets/browser/router.mjs`
-3. Create Node.js router with http.createServer
-4. Build process derives target from DATABASE and copies appropriate files
-5. Update build script to use derived target (browser for dexie/sqljs, node otherwise)
+1. ✅ Create `lib/targets/browser/` and `lib/targets/node/` directories
+2. ✅ Extract browser-specific router to `lib/targets/browser/rails.js`
+3. ✅ Create Node.js router with http.createServer in `lib/targets/node/rails.js`
+4. ✅ Build process derives target from DATABASE and copies appropriate files
+5. ✅ Update build script to use derived target (browser for dexie/sqljs, node otherwise)
+
+**Phase 2 Complete!** Target-specific runtime files are copied based on database adapter.
 
 ### Phase 3: Filter Updates
 
