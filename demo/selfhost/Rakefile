@@ -197,6 +197,7 @@ task :test_partial => :npm_install do
 end
 
 RAILS_IN_JS = File.join(File.dirname(SELFHOST), 'rails-in-js')
+BUILD_MJS = File.join(RAILS_IN_JS, 'scripts/build.mjs')
 
 desc "Install npm dependencies for rails-in-js demo"
 task :npm_install_rails_in_js do
@@ -205,8 +206,13 @@ task :npm_install_rails_in_js do
   end
 end
 
+desc "Transpile build.rb to build.mjs for selfhost builds"
+file BUILD_MJS => [File.join(RAILS_IN_JS, 'scripts/build.rb'), "#{ROOT}/lib/ruby2js/filter/selfhost_build.rb"] do
+  sh bundle_exec("ruby #{ROOT}/bin/ruby2js --filter selfhost_build --filter esm --filter node --filter functions --filter return --autoexports #{RAILS_IN_JS}/scripts/build.rb > #{BUILD_MJS}")
+end
+
 desc "Run rails-in-js smoke tests (compares Ruby vs selfhost builds)"
-task :test_smoke => [:npm_install, :npm_install_rails_in_js, "#{SELFHOST}/ruby2js.js", :build_filters] do
+task :test_smoke => [:npm_install, :npm_install_rails_in_js, "#{SELFHOST}/ruby2js.js", :build_filters, BUILD_MJS] do
   Dir.chdir(RAILS_IN_JS) do
     sh "npm run test:smoke"
   end
@@ -224,6 +230,7 @@ task :clean do
   rm_rf "#{SELFHOST}/filters"
   rm_f "#{SELFHOST}/ruby2js.js"
   rm_f "#{SELFHOST}/prism_browser.js"
+  rm_f BUILD_MJS
 end
 
 task :default => :test
