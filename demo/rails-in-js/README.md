@@ -1,27 +1,50 @@
 # Rails-in-JS Demo
 
-A Rails-like blog application running entirely in JavaScript. Ruby source files are transpiled to JavaScript via Ruby2JS, demonstrating that idiomatic Rails code can run in the browser.
+A Rails-like blog application running entirely in JavaScript. Ruby source files are transpiled to JavaScript via Ruby2JS, demonstrating that idiomatic Rails code can run in the browser **or** as a Node.js server.
 
 ## Quick Start
 
+### Browser (Default)
+
 ```bash
-# Install dependencies
 npm install
-
-# Start dev server with hot reload
-npm run dev
-
+npm run dev           # Start dev server with hot reload
 # Open http://localhost:3000
 ```
+
+### Node.js Server
+
+```bash
+npm install
+npm run dev:node      # Build for Node.js and start server
+# Open http://localhost:3000
+```
+
+## Target Platforms
+
+The same Ruby source code can be transpiled to run on different platforms:
+
+| Target | Database | Use Case |
+|--------|----------|----------|
+| **Browser** | sql.js (WebAssembly SQLite) | SPA with client-side storage |
+| **Browser** | Dexie (IndexedDB) | SPA with persistent storage |
+| **Node.js** | better-sqlite3 | Development server, testing |
+| **Node.js** | PostgreSQL | Production server |
+
+The target is determined by the database adapter in `config/database.yml` or the `DATABASE` environment variable.
 
 ## Available Commands
 
 | Command | Description |
 |---------|-------------|
-| `npm run dev` | Start dev server with hot reload (Ruby transpilation) |
-| `npm run dev -- --selfhost` | Dev server using JS-based transpilation |
-| `npm run build` | One-shot build (transpile all Ruby files) |
-| `npm run start` | Serve with npx serve (no hot reload) |
+| `npm run dev` | Browser dev server with hot reload |
+| `npm run dev:node` | Build for Node.js and start server |
+| `npm run build` | One-shot browser build (selfhost transpilation) |
+| `npm run build:ruby` | One-shot browser build (Ruby transpilation) |
+| `npm run build:node` | Build for Node.js with SQLite |
+| `npm run build:pg` | Build for Node.js with PostgreSQL |
+| `npm run start` | Serve browser build (npx serve) |
+| `npm run start:node` | Start Node.js server (after build) |
 
 Both transpilation modes (Ruby and selfhost) produce **identical output**, verified by automated diff comparison.
 
@@ -54,18 +77,27 @@ rails-in-js/
 │   ├── models/           # Ruby ActiveRecord-style models
 │   └── views/articles/   # ERB templates
 ├── config/
+│   ├── database.yml      # Database configuration (determines target)
 │   ├── routes.rb         # Rails-style routing
 │   └── schema.rb         # Database schema
 ├── db/
 │   └── seeds.rb          # Seed data
 ├── lib/
-│   └── rails.js          # JavaScript runtime (ApplicationRecord, etc.)
+│   ├── adapters/         # Database adapters (copied to dist/lib/active_record.mjs)
+│   │   ├── active_record_sqljs.mjs      # Browser: sql.js (SQLite WASM)
+│   │   ├── active_record_dexie.mjs      # Browser: Dexie (IndexedDB)
+│   │   ├── active_record_better_sqlite3.mjs  # Node: SQLite
+│   │   └── active_record_pg.mjs         # Node: PostgreSQL
+│   └── targets/          # Target-specific runtimes
+│       ├── browser/rails.js  # History API routing, DOM updates
+│       └── node/rails.js     # HTTP server, request handling
 ├── dist/                 # Generated JavaScript (git-ignored)
 ├── scripts/
 │   ├── build.rb          # Ruby transpilation script
-│   └── build-selfhost.mjs # JavaScript transpilation script
-├── dev-server.mjs        # Hot reload dev server
-├── index.html            # Entry point
+│   └── build.mjs         # JavaScript (selfhost) transpilation script
+├── dev-server.mjs        # Hot reload dev server (browser)
+├── server.mjs            # Node.js server entry point
+├── index.html            # Browser entry point
 └── package.json
 ```
 

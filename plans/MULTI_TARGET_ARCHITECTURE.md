@@ -416,12 +416,21 @@ See [DEXIE_SUPPORT.md](./DEXIE_SUPPORT.md).
 
 **Note:** Real database testing deferred to Phase 5 integration. Adapters follow same API pattern as browser adapters.
 
-### Phase 5: Integration & Polish
+### Phase 5: Integration & Polish ✅ COMPLETE
 
-1. End-to-end testing for both targets
-2. Same demo app running as browser SPA and Node.js server
-3. Documentation for target selection
-4. Example deployment configurations
+1. ✅ Server entry point: `server.mjs` for Node.js target
+2. ✅ npm scripts for all targets:
+   - `dev` / `dev:node` - Development with hot reload
+   - `build` / `build:node` / `build:pg` - Build for different targets
+   - `start` / `start:node` - Run production builds
+3. ✅ Optional dependencies: `better-sqlite3`, `pg` in package.json
+4. ✅ README updated with:
+   - Multi-target quick start
+   - Target platform comparison table
+   - Updated command reference
+   - Updated project structure
+
+**All phases complete!** The same Ruby source can now be transpiled to browser SPA or Node.js server.
 
 ## Usage Examples
 

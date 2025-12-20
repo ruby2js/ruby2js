@@ -6,9 +6,13 @@
   "scripts": {
     "dev": "node dev-server.mjs",
     "dev:ruby": "node dev-server.mjs --ruby",
+    "dev:node": "DATABASE=better_sqlite3 npm run build:ruby && node server.mjs",
     "build": "node scripts/build.mjs",
     "build:ruby": "ruby scripts/build.rb",
+    "build:node": "DATABASE=better_sqlite3 ruby scripts/build.rb",
+    "build:pg": "DATABASE=pg ruby scripts/build.rb",
     "start": "npx serve -p 3000",
+    "start:node": "node server.mjs",
     "test:sql": "node sql_prototype.mjs",
     "test:ar": "node active_record_test.mjs",
     "test:mvc": "node mvc_sketch.mjs",
@@ -18,6 +22,10 @@
   "dependencies": {
     "dexie": "^4.0.10",
     "sql.js": "^1.11.0"
+  },
+  "optionalDependencies": {
+    "better-sqlite3": "^11.0.0",
+    "pg": "^8.13.0"
   },
   "devDependencies": {
     "chokidar": "^3.5.3",
