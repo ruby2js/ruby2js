@@ -1,6 +1,6 @@
 # Node Filter Selfhost: Enabling Ruby Build Script Transpilation
 
-## Status: Stage 5 In Progress
+## Status: Stage 6 Pending (Verification)
 
 Enable the Node filter to run in selfhost, allowing `build.rb` to be transpiled to JavaScript. This eliminates the need for a hand-maintained `build-selfhost.mjs` and enables the Rails-in-JS demo to run with zero Ruby dependency.
 
@@ -11,8 +11,8 @@ Enable the Node filter to run in selfhost, allowing `build.rb` to be transpiled 
 ## Why This Matters
 
 The Rails-in-JS demo currently requires two build scripts:
-- `build.rb` - Ruby version (authoritative)
-- `build-selfhost.mjs` - Hand-maintained JavaScript version
+- `build.rb` - Ruby version (authoritative, ~380 lines)
+- `build-selfhost.mjs` - Hand-maintained JavaScript version (~500 lines)
 
 This duplication is:
 1. Error-prone (scripts can drift)
@@ -20,6 +20,39 @@ This duplication is:
 3. Doesn't fully prove selfhost works
 
 With Node filter in selfhost, we can transpile `build.rb` → `build.mjs`, proving Ruby2JS can transpile its own build tooling.
+
+## Maintainability Analysis
+
+### The Trade-off
+
+| Approach | Total Code | Maintenance Pattern |
+|----------|------------|---------------------|
+| Hand-maintained | `build.rb` (~380) + `build-selfhost.mjs` (~500) = **~880 lines** | Sync two implementations manually |
+| Filter | `build.rb` (~380) + `selfhost_build.rb` (~170) = **~550 lines** | Maintain transformation rules |
+
+### Filter Approach Advantages
+
+1. **Less code overall** (~330 fewer lines)
+2. **Single source of truth** for build logic
+3. **Changes may "just work"** - when `build.rb` changes, transpilation might succeed without filter updates
+4. **No drift** - impossible for implementations to diverge
+
+### Filter Approach Disadvantages
+
+1. **Indirection** - debugging requires understanding filter transformations
+2. **Implicit constraints** - `build.rb` must use patterns the filter handles
+3. **Filter is specialized** - ~170 lines that only serve one file
+
+### The Deciding Factor: Dogfooding
+
+The maintainability math is close, but dogfooding tips the balance decisively:
+
+1. **Every edge case you hit, users hit** - filter improvements (named imports, `.prototype`, `initPrism()`) came from real transpilation needs
+2. **Confidence signal** - "Ruby2JS can transpile its own build tooling" is meaningful proof
+3. **Forces honesty** - if the transpiler can't handle your own code, that's worth knowing
+4. **Improvements compound** - fixes for `build.rb` benefit other users with similar patterns
+
+**Conclusion:** The filter approach is worth the indirection cost because it improves the product while reducing maintenance.
 
 ## Completed Work
 
@@ -96,9 +129,9 @@ Once Stage 5 is complete:
 | Dependency | Status | Notes |
 |------------|--------|-------|
 | Node filter without extend SEXP | ✅ Complete | Commit `82f4986` |
-| selfhost_build filter | ✅ Complete | Handles YAML, requires, constants |
+| selfhost_build filter | ✅ Complete | Handles YAML, requires, constants, exports |
 | ESM/CJS __dir__ support | ✅ Complete | `import.meta.dirname` / `__dirname` |
-| Selfhost named exports | ⏳ Blocking | Need to handle non-default exports |
+| Selfhost named exports | ✅ Complete | Filter generates `{ X }` imports and `.prototype` |
 
 ## Files Modified
 
@@ -119,23 +152,15 @@ Once Stage 5 is complete:
 4. `npm run test:smoke` shows no diff
 5. Hand-maintained `build-selfhost.mjs` deleted
 
-## Key Insight
+## Architectural Bridging
 
-~~The transpiled `build.mjs` cannot be a drop-in replacement~~ **UPDATE: The `selfhost_build` filter now handles all the architectural differences:**
+The `selfhost_build` filter handles all differences between Ruby and JS execution models:
 
-1. **Ruby2JS.convert** - ✅ Filter generates `import * as Ruby2JS` with `await Ruby2JS.initPrism()`
-2. **Export patterns** - ✅ Filter generates named imports `{ X }` for selfhost modules
-3. **Filter loading** - ✅ Filter adds `.prototype` to filter constants
+| Difference | Ruby Pattern | JS Output |
+|------------|--------------|-----------|
+| Module loading | `require 'ruby2js'` | `import * as Ruby2JS from ...; await Ruby2JS.initPrism()` |
+| Export style | `require 'ruby2js/filter/X'` | `import { X } from ...` (named imports) |
+| Pipeline format | `Ruby2JS::Filter::X` | `X.prototype` |
+| Main script check | `__FILE__ == $0` | `` import.meta.url == `file://${process.argv[1]}` `` |
 
-The transpiled version should now be functionally equivalent to the hand-written version, with the filter handling:
-- Top-level await for async initialization
-- Named imports for selfhost's export pattern
-- Prototype references for pipeline compatibility
-- ESM main script check via `$0` → template literal
-
-## Next Steps
-
-Test the transpiled `build.mjs` end-to-end:
-1. Transpile `build.rb` with the updated filter
-2. Run `node scripts/build.mjs` and compare output with `ruby scripts/build.rb`
-3. If successful, the hand-written `build-selfhost.mjs` can be deleted
+These transformations enable the transpiled version to be functionally equivalent to the hand-written version.
