@@ -122,10 +122,6 @@ The build generates sourcemaps so you can debug Ruby in the browser:
 3. Set breakpoints directly in Ruby code
 4. Step through Ruby source when debugging
 
-## Known Limitations
-
-- Database resets on page reload (IndexedDB persistence not yet implemented)
-
 ## See Also
 
 - [Rails-in-JS Plan](../../plans/RAILS_IN_JS.md) - Full project plan and roadmap
