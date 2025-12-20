@@ -9,6 +9,7 @@ node_modules
 demo/selfhost/dist/
 demo/rails-in-js/dist/
 demo/rails-in-js/dist-selfhost/
+demo/rails-in-js/scripts/build.mjs
 demo/selfhost/ruby2js.js
 demo/selfhost/ruby2js.mjs
 demo/selfhost/prism_browser.js

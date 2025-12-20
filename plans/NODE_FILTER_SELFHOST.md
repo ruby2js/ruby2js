@@ -1,6 +1,6 @@
 # Node Filter Selfhost: Enabling Ruby Build Script Transpilation
 
-## Status: Stage 6 Pending (Verification)
+## Status: ✅ COMPLETE
 
 Enable the Node filter to run in selfhost, allowing `build.rb` to be transpiled to JavaScript. This eliminates the need for a hand-maintained `build-selfhost.mjs` and enables the Rails-in-JS demo to run with zero Ruby dependency.
 
@@ -116,13 +116,24 @@ Updated `selfhost_build.rb` filter to handle all export and initialization diffe
 - `$0` → template literal for ESM main script check
 - Remove `fileutils` require (handled by Node filter)
 
-### Stage 6: Wire Up and Verify ⏳ PENDING
+### Stage 6: Wire Up and Verify ✅ COMPLETE
 
-Once Stage 5 is complete:
-1. Test `node scripts/build.mjs` produces same output as `ruby scripts/build.rb`
-2. Update dev-server to import from `build.mjs`
-3. Run smoke tests
-4. Delete `build-selfhost.mjs`
+**Transpile command:**
+```bash
+bin/ruby2js --filter selfhost_build --filter esm --filter node --filter functions --filter return \
+  --autoexports demo/rails-in-js/scripts/build.rb > demo/rails-in-js/scripts/build.mjs
+```
+
+Notes:
+- Filter order matters - `selfhost_build` must come first to handle `require` statements before other filters process them.
+- `--autoexports` is required to export the `SelfhostBuilder` class.
+- Fixed ESM filter bug where autoexports was incorrectly skipped when imports were present (commit pending).
+
+**Completed steps:**
+1. ✅ `node demo/rails-in-js/scripts/build.mjs` produces same output as `ruby demo/rails-in-js/scripts/build.rb`
+2. ✅ Updated dev-server to import from `build.mjs`
+3. ✅ Smoke tests pass (7/7)
+4. ✅ Deleted `build-selfhost.mjs`
 
 ## Dependencies
 

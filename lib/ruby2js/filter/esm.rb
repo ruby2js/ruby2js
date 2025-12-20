@@ -56,9 +56,10 @@ module Ruby2JS
           list = list.first.children.dup
         end
 
-        # Skip autoexports if any child is already an export or import
+        # Skip autoexports if any child is already an export
         # (another filter like Rails::Seeds may have already handled exports)
-        has_exports = list.any? { |c| c.respond_to?(:type) && [:export, :import].include?(c.type) }
+        # Note: imports should NOT prevent autoexports - only explicit exports should
+        has_exports = list.any? { |c| c.respond_to?(:type) && c.type == :export }
         return result if has_exports
 
         replaced = []

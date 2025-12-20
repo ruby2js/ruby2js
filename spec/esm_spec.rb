@@ -179,6 +179,11 @@ describe Ruby2JS::Filter::ESM do
       to_js('module Foo; BAR = 1; def baz; BAR; end; end', autoexports: true).
         must_include 'export const Foo = '
     end
+
+    it "should autoexport even when imports are present" do
+      to_js("import 'foo.js'; class Bar; end", autoexports: true).
+        must_equal 'import "foo.js"; export class Bar {}'
+    end
   end
 
   describe "autoexports default option" do
