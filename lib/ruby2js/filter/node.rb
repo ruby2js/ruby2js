@@ -53,6 +53,20 @@ module Ruby2JS
         end
       end
 
+      # Helper for fs.glob - async returns iterator, needs Array.fromAsync
+      def fs_glob_call(*args)
+        if async?
+          prepend_list << IMPORT_FS_PROMISES
+          # await Array.fromAsync(fs.glob(pattern))
+          S(:send, nil, :await,
+            s(:send, s(:const, nil, :Array), :fromAsync,
+              s(:send, s(:attr, nil, :fs), :glob, *args)))
+        else
+          prepend_list << IMPORT_FS
+          s(:send, s(:attr, nil, :fs), :globSync, *args)
+        end
+      end
+
       def on_send(node)
         target, method, *args = node.children
 
@@ -296,6 +310,10 @@ module Ruby2JS
           elsif method == :tmpdir and args.length == 0
             prepend_list << IMPORT_OS
             S(:send!, s(:attr, nil, :os), :tmpdir)
+          elsif [:exist?, :exists?].include? method and args.length == 1
+            fs_exists_call(process(args.first))
+          elsif method == :glob and args.length == 1
+            fs_glob_call(process(args.first))
 
           else
             super

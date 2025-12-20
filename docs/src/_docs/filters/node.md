@@ -16,6 +16,8 @@ The **Node** filter provides a number of convenience methods and variables which
 * `ARGV` {{ caret }} `process.argv.slice(2)`
 * `Dir.chdir` {{ caret }} `process.chdir`
 * `Dir.entries` {{ caret }} `fs.readdirSync`
+* `Dir.exist?` {{ caret }} `fs.existsSync`
+* `Dir.glob` {{ caret }} `fs.globSync` *(Node 22+)*
 * `Dir.home` {{ caret }} `os.homedir()`
 * `Dir.mkdir` {{ caret }} `fs.mkdirSync`
 * `Dir.mktmpdir` {{ caret }} `fs.mkdtempSync`
@@ -77,8 +79,9 @@ In async mode:
 * `FileUtils.rm_rf("foo")` {{ caret }} `await fs.rm("foo", {recursive: true, force: true})`
 * `FileUtils.cp("src", "dest")` {{ caret }} `await fs.copyFile("src", "dest")`
 * `Dir.entries("foo")` {{ caret }} `await fs.readdir("foo")`
+* `Dir.glob("**/*.rb")` {{ caret }} `await Array.fromAsync(fs.glob("**/*.rb"))` *(Node 22+)*
 
-Note: `File.exist?` always uses `fs.existsSync` (imported as `fsSync` in async mode) because `fs/promises` has no equivalent.
+Note: `File.exist?` and `Dir.exist?` always use `fs.existsSync` (imported as `fsSync` in async mode) because `fs/promises` has no equivalent.
 
 {% rendercontent "docs/note", extra_margin: true %}
 For `__FILE__` and `__dir__` transformations, use the [ESM filter](/docs/filters/esm) which maps these to `import.meta.url` and `import.meta.dirname`.

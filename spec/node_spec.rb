@@ -188,6 +188,16 @@ describe Ruby2JS::Filter::Node do
       to_js( 'Dir.mktmpdir("foo")' ).
         must_equal 'const fs = require("fs"); fs.mkdtempSync("foo")'
     end
+
+    it 'should handle Dir.exist?' do
+      to_js( 'Dir.exist?("foo")' ).
+        must_equal 'const fs = require("fs"); fs.existsSync("foo")'
+    end
+
+    it 'should handle Dir.glob' do
+      to_js( 'Dir.glob("**/*.rb")' ).
+        must_equal 'const fs = require("fs"); fs.globSync("**/*.rb")'
+    end
   end
 
   describe 'path' do
@@ -358,6 +368,16 @@ describe Ruby2JS::Filter::Node do
     it 'should keep existsSync even in async mode' do
       to_js_async( 'File.exist?("foo")' ).
         must_equal 'import fsSync from "fs"; fsSync.existsSync("foo")'
+    end
+
+    it 'should keep existsSync for Dir.exist? in async mode' do
+      to_js_async( 'Dir.exist?("foo")' ).
+        must_equal 'import fsSync from "fs"; fsSync.existsSync("foo")'
+    end
+
+    it 'should use Array.fromAsync for Dir.glob in async mode' do
+      to_js_async( 'Dir.glob("**/*.rb")' ).
+        must_equal 'import fs from "fs/promises"; await Array.fromAsync(fs.glob("**/*.rb"))'
     end
   end
 
