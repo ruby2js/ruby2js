@@ -192,11 +192,11 @@ class SelfhostBuilder
   def build_options()
     base = self.load_ruby2js_config()
 
-    # Start with hardcoded OPTIONS as base
-    options = OPTIONS.dup
+    # Start with hardcoded OPTIONS as base (using spread for JS compatibility)
+    options = { **OPTIONS }
 
     # Merge YAML config values (string keys converted to symbols)
-    base.each do |key, value|
+    base.each do |key, value| # Pragma: entries
       sym_key = key.to_s.to_sym
       # Don't override filters - they're hardcoded for the demo
       next if sym_key == :filters

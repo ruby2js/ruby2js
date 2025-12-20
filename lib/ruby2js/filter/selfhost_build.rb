@@ -11,7 +11,7 @@ module Ruby2JS
       end
 
       def import_fs_for_yaml
-        @import_fs_for_yaml ||= s(:import, ['fs'], s(:attr, nil, :fs))
+        @import_fs_for_yaml ||= s(:import, ['node:fs'], s(:attr, nil, :fs))
       end
 
       # Map filter file names to export names
@@ -35,8 +35,9 @@ module Ruby2JS
           return s(:begin)
         end
 
-        # YAML.load_file(path) → yaml.load(fs.readFileSync(path, 'utf8'))
-        if target == s(:const, nil, :YAML) && method == :load_file && args.length == 1
+        # YAML.load_file(path) or YAML.load_file(path, opts) → yaml.load(fs.readFileSync(path, 'utf8'))
+        # Note: js-yaml supports anchors by default, so we ignore the aliases: true option
+        if target == s(:const, nil, :YAML) && method == :load_file && args.length >= 1
           prepend_list << import_yaml
           prepend_list << import_fs_for_yaml
           return S(:send, s(:attr, nil, :yaml), :load,
