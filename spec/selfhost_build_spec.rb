@@ -39,7 +39,7 @@ describe Ruby2JS::Filter::SelfhostBuild do
   describe 'ruby2js requires' do
     it 'should transform require ruby2js' do
       to_js('require "ruby2js"').
-        must_equal 'import Ruby2JS from "../selfhost/ruby2js.js"'
+        must_equal 'import Ruby2JS from "../../selfhost/ruby2js.js"'
     end
 
     it 'should use custom selfhost_path option' do
@@ -47,14 +47,14 @@ describe Ruby2JS::Filter::SelfhostBuild do
         must_equal 'import Ruby2JS from "./converter.js"'
     end
 
-    it 'should transform require ruby2js/filter/rails' do
-      to_js('require "ruby2js/filter/rails"').
-        must_equal 'import Rails from "../selfhost/filters/rails.js"'
+    it 'should transform require ruby2js/filter/rails/model' do
+      to_js('require "ruby2js/filter/rails/model"').
+        must_equal 'import Rails_Model from "../../selfhost/filters/rails/model.js"'
     end
 
     it 'should transform require ruby2js/filter/functions' do
       to_js('require "ruby2js/filter/functions"').
-        must_equal 'import Functions from "../selfhost/filters/functions.js"'
+        must_equal 'import Functions from "../../selfhost/filters/functions.js"'
     end
 
     it 'should use custom selfhost_filters option' do

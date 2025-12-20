@@ -1,6 +1,9 @@
 #!/usr/bin/env ruby
 # Build script for Rails-in-JS demo
 # Transpiles Ruby models and controllers to JavaScript
+#
+# Can be run directly: ruby scripts/build.rb [dist_dir]
+# Or transpiled to JS and imported as: import { SelfhostBuilder } from './build.mjs'
 
 require 'fileutils'
 require 'json'
@@ -8,371 +11,376 @@ require 'json'
 # Ensure we're using the local ruby2js
 $LOAD_PATH.unshift File.expand_path('../../../lib', __dir__)
 require 'ruby2js'
-require 'ruby2js/filter/rails'
+# Explicitly require each Rails sub-filter for JS transpilation compatibility
+require 'ruby2js/filter/rails/model'
+require 'ruby2js/filter/rails/controller'
+require 'ruby2js/filter/rails/routes'
+require 'ruby2js/filter/rails/schema'
+require 'ruby2js/filter/rails/seeds'
 require 'ruby2js/filter/functions'
 require 'ruby2js/filter/esm'
 require 'ruby2js/filter/return'
 require 'ruby2js/filter/erb'
 require_relative '../lib/erb_compiler'
 
-DEMO_ROOT = File.expand_path('..', __dir__)
-DIST_DIR = ARGV[0] ? File.expand_path(ARGV[0]) : File.join(DEMO_ROOT, 'dist')
+class SelfhostBuilder
+  DEMO_ROOT = File.expand_path('..', __dir__)
 
-# Common transpilation options for Ruby files
-# Rails filters run first to transform idiomatic Rails to micro-framework,
-# then Functions/ESM/Return handle the JavaScript output
-OPTIONS = {
-  eslevel: 2022,
-  include: [:class, :call],
-  autoexports: true,
-  filters: [
-    Ruby2JS::Filter::Rails::Model,
-    Ruby2JS::Filter::Rails::Controller,
-    Ruby2JS::Filter::Rails::Routes,
-    Ruby2JS::Filter::Rails::Schema,
-    Ruby2JS::Filter::Rails::Seeds,
-    Ruby2JS::Filter::Functions,
-    Ruby2JS::Filter::ESM,
-    Ruby2JS::Filter::Return
-  ]
-}
+  # Map DATABASE env var to adapter source file
+  ADAPTER_FILES = {
+    'sqljs' => 'active_record_sqljs.mjs',
+    'sql.js' => 'active_record_sqljs.mjs',
+    'dexie' => 'active_record_dexie.mjs',
+    'indexeddb' => 'active_record_dexie.mjs'
+  }.freeze
 
-# Options for ERB templates
-ERB_OPTIONS = {
-  eslevel: 2022,
-  include: [:class, :call],
-  filters: [
-    Ruby2JS::Filter::Erb,
-    Ruby2JS::Filter::Functions,
-    Ruby2JS::Filter::Return
-  ]
-}
+  # Common transpilation options for Ruby files
+  OPTIONS = {
+    eslevel: 2022,
+    include: [:class, :call],
+    autoexports: true,
+    filters: [
+      Ruby2JS::Filter::Rails::Model,
+      Ruby2JS::Filter::Rails::Controller,
+      Ruby2JS::Filter::Rails::Routes,
+      Ruby2JS::Filter::Rails::Schema,
+      Ruby2JS::Filter::Rails::Seeds,
+      Ruby2JS::Filter::Functions,
+      Ruby2JS::Filter::ESM,
+      Ruby2JS::Filter::Return
+    ]
+  }.freeze
 
-def transpile_file(src_path, dest_path)
-  puts "Transpiling: #{File.basename(src_path)}"
-  source = File.read(src_path)
+  # Options for ERB templates
+  ERB_OPTIONS = {
+    eslevel: 2022,
+    include: [:class, :call],
+    filters: [
+      Ruby2JS::Filter::Erb,
+      Ruby2JS::Filter::Functions,
+      Ruby2JS::Filter::Return
+    ]
+  }.freeze
 
-  # Use relative path for cleaner display in browser debugger
-  relative_src = src_path.sub(DEMO_ROOT + '/', '')
-  result = Ruby2JS.convert(source, OPTIONS.merge(file: relative_src))
-  js = result.to_s
-
-  FileUtils.mkdir_p(File.dirname(dest_path))
-
-  # Generate sourcemap
-  map_path = "#{dest_path}.map"
-  sourcemap = result.sourcemap
-  # Include original Ruby source so browser doesn't need to fetch .rb files
-  sourcemap[:sourcesContent] = [source]
-
-  # Compute relative path from sourcemap location back to source file
-  # e.g., from dist/controllers/ back to app/controllers/article.rb -> ../../app/controllers/article.rb
-  map_dir = File.dirname(dest_path).sub(DEMO_ROOT + '/', '')
-  depth = map_dir.split('/').length
-  source_from_map = ('../' * depth) + relative_src
-
-  # Update sources array with correct relative path
-  sourcemap[:sources] = [source_from_map]
-
-  # Add sourcemap reference to JS file
-  js_with_map = "#{js}\n//# sourceMappingURL=#{File.basename(map_path)}\n"
-  File.write(dest_path, js_with_map)
-  File.write(map_path, JSON.generate(sourcemap))
-
-  puts "  -> #{dest_path}"
-  puts "  -> #{map_path}"
-end
-
-def transpile_erb_file(src_path, dest_path)
-  puts "Transpiling ERB: #{File.basename(src_path)}"
-  template = File.read(src_path)
-
-  # Convert ERB to Ruby, then to JavaScript
-  # Note: Don't pass file: src_path because Prism would try to read the ERB file
-  # instead of using the Ruby source
-  ruby_src = ErbCompiler.new(template).src
-  js = Ruby2JS.convert(ruby_src, ERB_OPTIONS).to_s
-
-  # Add export keyword to make it importable
-  js = js.sub(/^function render/, 'export function render')
-
-  FileUtils.mkdir_p(File.dirname(dest_path))
-  File.write(dest_path, js)
-  puts "  -> #{dest_path}"
-  js
-end
-
-def transpile_erb_directory(src_dir, dest_dir)
-  # Collect all ERB templates and their transpiled render functions
-  renders = {}
-
-  Dir.glob(File.join(src_dir, '**/*.html.erb')).each do |src_path|
-    basename = File.basename(src_path, '.html.erb')
-    js = transpile_erb_file(src_path, File.join(dest_dir, "#{basename}.js"))
-    renders[basename] = js
+  def initialize(dist_dir = nil)
+    @dist_dir = dist_dir || File.join(DEMO_ROOT, 'dist')
   end
 
-  renders
-end
+  # Note: Using explicit () on all method calls for JS transpilation compatibility
+  def build()
+    # Clean and create dist directory
+    FileUtils.rm_rf(@dist_dir)
+    FileUtils.mkdir_p(@dist_dir)
 
-def transpile_directory(src_dir, dest_dir, pattern = '**/*.rb', skip: [])
-  Dir.glob(File.join(src_dir, pattern)).each do |src_path|
-    basename = File.basename(src_path)
-    next if skip.include?(basename)
+    puts("=== Building Rails-in-JS Demo ===")
+    puts("")
 
-    relative = src_path.sub(src_dir + '/', '')
-    dest_path = File.join(dest_dir, relative.sub(/\.rb$/, '.js'))
-    transpile_file(src_path, dest_path)
-  end
-end
+    # Copy database adapter
+    puts("Database Adapter:")
+    db_config = self.load_database_config()
+    self.copy_database_adapter(db_config)
+    puts("")
 
-def generate_application_record(dest_dir)
-  wrapper = <<~JS
-    // ApplicationRecord - wraps ActiveRecord from adapter
-    // This file is generated by the build script
-    import { ActiveRecord } from '../lib/active_record.mjs';
+    # Copy static lib files (rails.js framework)
+    puts("Library:")
+    self.copy_lib_files()
+    puts("")
 
-    export class ApplicationRecord extends ActiveRecord {
-      // Subclasses (Article, Comment) extend this and add their own validations
-    }
-  JS
-  FileUtils.mkdir_p(dest_dir)
-  File.write(File.join(dest_dir, 'application_record.js'), wrapper)
-  puts "  -> models/application_record.js (wrapper for ActiveRecord)"
-end
+    # Generate ApplicationRecord wrapper and transpile models
+    puts("Models:")
+    self.generate_application_record()
+    self.transpile_directory(
+      File.join(DEMO_ROOT, 'app/models'),
+      File.join(@dist_dir, 'models'),
+      '**/*.rb',
+      skip: ['application_record.rb']
+    )
+    self.generate_models_index()
+    puts("")
 
-def transpile_routes_files(src_path, dest_dir)
-  # Generate paths.js first (with only path helpers)
-  puts "Transpiling: routes.rb -> paths.js"
-  source = File.read(src_path)
-  relative_src = src_path.sub(DEMO_ROOT + '/', '')
+    # Transpile controllers
+    puts("Controllers:")
+    self.transpile_directory(
+      File.join(DEMO_ROOT, 'app/controllers'),
+      File.join(@dist_dir, 'controllers')
+    )
+    puts("")
 
-  paths_options = OPTIONS.merge(file: relative_src, paths_only: true)
-  result = Ruby2JS.convert(source, paths_options)
-  paths_js = result.to_s
+    # Transpile config (skip routes.rb, handled separately)
+    puts("Config:")
+    self.transpile_directory(
+      File.join(DEMO_ROOT, 'config'),
+      File.join(@dist_dir, 'config'),
+      '**/*.rb',
+      skip: ['routes.rb']
+    )
+    self.transpile_routes_files()
+    puts("")
 
-  paths_path = File.join(dest_dir, 'paths.js')
-  FileUtils.mkdir_p(dest_dir)
-  File.write(paths_path, paths_js)
-  puts "  -> #{paths_path}"
+    # Transpile views (ERB templates only)
+    puts("Views:")
+    self.transpile_erb_directory()
+    puts("")
 
-  # Generate sourcemap for paths.js
-  map_path = "#{paths_path}.map"
-  sourcemap = result.sourcemap
-  sourcemap[:sourcesContent] = [source]
-  File.write(map_path, JSON.generate(sourcemap))
-  puts "  -> #{map_path}"
+    # Transpile helpers
+    puts("Helpers:")
+    self.transpile_directory(
+      File.join(DEMO_ROOT, 'app/helpers'),
+      File.join(@dist_dir, 'helpers')
+    )
+    puts("")
 
-  # Generate routes.js (imports path helpers from paths.js)
-  puts "Transpiling: routes.rb -> routes.js"
-  routes_options = OPTIONS.merge(file: relative_src, paths_file: './paths.js')
-  result = Ruby2JS.convert(source, routes_options)
-  routes_js = result.to_s
+    # Transpile db (seeds)
+    puts("Database:")
+    self.transpile_directory(
+      File.join(DEMO_ROOT, 'db'),
+      File.join(@dist_dir, 'db')
+    )
+    puts("")
 
-  routes_path = File.join(dest_dir, 'routes.js')
-  File.write(routes_path, routes_js)
-  puts "  -> #{routes_path}"
-
-  # Generate sourcemap for routes.js
-  map_path = "#{routes_path}.map"
-  sourcemap = result.sourcemap
-  sourcemap[:sourcesContent] = [source]
-  File.write(map_path, JSON.generate(sourcemap))
-  puts "  -> #{map_path}"
-end
-
-# Map DATABASE env var to adapter source file
-ADAPTER_FILES = {
-  'sqljs' => 'active_record_sqljs.mjs',
-  'sql.js' => 'active_record_sqljs.mjs',
-  'dexie' => 'active_record_dexie.mjs',
-  'indexeddb' => 'active_record_dexie.mjs'
-}.freeze
-
-def load_database_config
-  env = ENV.fetch('RAILS_ENV', ENV.fetch('NODE_ENV', 'development'))
-
-  # Priority 1: DATABASE environment variable
-  if ENV['DATABASE']
-    puts "  Using DATABASE=#{ENV['DATABASE']} from environment"
-    return { 'adapter' => ENV['DATABASE'].downcase }
+    puts("=== Build Complete ===")
   end
 
-  # Priority 2: config/database.yml
-  config_path = File.join(DEMO_ROOT, 'config/database.yml')
-  if File.exist?(config_path)
-    require 'yaml'
-    config = YAML.load_file(config_path)
-    if config && config[env] && config[env]['adapter']
-      puts "  Using config/database.yml [#{env}]"
-      return config[env]
+  def load_database_config()
+    # Use || instead of fetch for JS compatibility
+    env = ENV['RAILS_ENV'] || ENV['NODE_ENV'] || 'development'
+
+    # Priority 1: DATABASE environment variable
+    if ENV['DATABASE']
+      puts("  Using DATABASE=#{ENV['DATABASE']} from environment")
+      return { 'adapter' => ENV['DATABASE'].downcase }
+    end
+
+    # Priority 2: config/database.yml
+    config_path = File.join(DEMO_ROOT, 'config/database.yml')
+    if File.exist?(config_path)
+      require 'yaml'
+      config = YAML.load_file(config_path)
+      if config && config[env] && config[env]['adapter']
+        puts("  Using config/database.yml [#{env}]")
+        return config[env]
+      end
+    end
+
+    # Default: sqljs
+    puts("  Using default adapter: sqljs")
+    { 'adapter' => 'sqljs', 'database' => 'rails_in_js' }
+  end
+
+  def copy_database_adapter(db_config)
+    adapter = db_config['adapter'] || db_config[:adapter] || 'sqljs'
+    adapter_file = ADAPTER_FILES[adapter]
+
+    unless adapter_file
+      valid = ADAPTER_FILES.keys.join(', ')
+      raise "Unknown DATABASE adapter: #{adapter}. Valid options: #{valid}"
+    end
+
+    adapter_src = File.join(DEMO_ROOT, 'lib/adapters', adapter_file)
+    adapter_dest = File.join(@dist_dir, 'lib/active_record.mjs')
+    FileUtils.mkdir_p(File.dirname(adapter_dest))
+
+    # Read adapter and inject config
+    adapter_code = File.read(adapter_src)
+    adapter_code = adapter_code.sub('const DB_CONFIG = {};', "const DB_CONFIG = #{JSON.generate(db_config)};")
+    File.write(adapter_dest, adapter_code)
+
+    puts("  Adapter: #{adapter} -> lib/active_record.mjs")
+    if db_config['database'] || db_config[:database]
+      puts("  Database: #{db_config['database'] || db_config[:database]}")
     end
   end
 
-  # Default: sqljs
-  puts "  Using default adapter: sqljs"
-  { 'adapter' => 'sqljs', 'database' => 'rails_in_js' }
-end
+  def copy_lib_files()
+    lib_src = File.join(DEMO_ROOT, 'lib')
+    lib_dest = File.join(@dist_dir, 'lib')
+    FileUtils.mkdir_p(lib_dest)
 
-def copy_database_adapter(src_dir, dest_dir, db_config)
-  adapter = db_config['adapter'] || db_config[:adapter] || 'sqljs'
-  adapter_file = ADAPTER_FILES[adapter]
-
-  unless adapter_file
-    valid = ADAPTER_FILES.keys.join(', ')
-    abort "Unknown DATABASE adapter: #{adapter}. Valid options: #{valid}"
+    Dir.glob(File.join(lib_src, '*.js')).each do |src_path|
+      dest_path = File.join(lib_dest, File.basename(src_path))
+      FileUtils.cp(src_path, dest_path)
+      puts("  Copying: #{File.basename(src_path)}")
+      puts("    -> #{dest_path}")
+    end
   end
 
-  adapter_src = File.join(src_dir, 'adapters', adapter_file)
-  adapter_dest = File.join(dest_dir, 'active_record.mjs')
-  FileUtils.mkdir_p(dest_dir)
+  def transpile_file(src_path, dest_path)
+    puts("Transpiling: #{File.basename(src_path)}")
+    source = File.read(src_path)
 
-  # Read adapter and inject config (like selfhost does)
-  adapter_code = File.read(adapter_src)
-  adapter_code = adapter_code.sub('const DB_CONFIG = {};', "const DB_CONFIG = #{JSON.generate(db_config)};")
-  File.write(adapter_dest, adapter_code)
+    # Use relative path for cleaner display in browser debugger
+    relative_src = src_path.sub(DEMO_ROOT + '/', '')
+    result = Ruby2JS.convert(source, OPTIONS.merge(file: relative_src))
+    js = result.to_s
 
-  puts "  Adapter: #{adapter} -> lib/active_record.mjs"
-  if db_config['database'] || db_config[:database]
-    puts "  Database: #{db_config['database'] || db_config[:database]}"
+    FileUtils.mkdir_p(File.dirname(dest_path))
+
+    # Generate sourcemap
+    map_path = "#{dest_path}.map"
+    sourcemap = result.sourcemap
+    sourcemap[:sourcesContent] = [source]
+
+    # Compute relative path from sourcemap location back to source file
+    map_dir = File.dirname(dest_path).sub(DEMO_ROOT + '/', '')
+    depth = map_dir.split('/').length
+    source_from_map = ('../' * depth) + relative_src
+
+    sourcemap[:sources] = [source_from_map]
+
+    # Add sourcemap reference to JS file
+    js_with_map = "#{js}\n//# sourceMappingURL=#{File.basename(map_path)}\n"
+    File.write(dest_path, js_with_map)
+    File.write(map_path, JSON.generate(sourcemap))
+
+    puts("  -> #{dest_path}")
+    puts("  -> #{map_path}")
+  end
+
+  def transpile_erb_file(src_path, dest_path)
+    puts("Transpiling ERB: #{File.basename(src_path)}")
+    template = File.read(src_path)
+
+    ruby_src = ErbCompiler.new(template).src
+    js = Ruby2JS.convert(ruby_src, ERB_OPTIONS).to_s
+    js = js.sub(/^function render/, 'export function render')
+
+    FileUtils.mkdir_p(File.dirname(dest_path))
+    File.write(dest_path, js)
+    puts("  -> #{dest_path}")
+    js
+  end
+
+  def transpile_erb_directory()
+    erb_dir = File.join(DEMO_ROOT, 'app/views/articles')
+    return unless Dir.exist?(erb_dir)
+
+    renders = {}
+    Dir.glob(File.join(erb_dir, '**/*.html.erb')).each do |src_path|
+      basename = File.basename(src_path, '.html.erb')
+      js = self.transpile_erb_file(src_path, File.join(@dist_dir, 'views/erb', "#{basename}.js"))
+      renders[basename] = js
+    end
+
+    # Create a combined module that exports all render functions
+    erb_views_js = <<~JS
+      // Article views - auto-generated from .html.erb templates
+      // Each exported function is a render function that takes { article } or { articles }
+
+    JS
+
+    render_exports = []
+    Dir.glob(File.join(erb_dir, '*.html.erb')).sort.each do |erb_path|
+      name = File.basename(erb_path, '.html.erb')
+      erb_views_js += "import { render as #{name}_render } from './erb/#{name}.js';\n"
+      render_exports << "#{name}: #{name}_render"
+    end
+
+    erb_views_js += <<~JS
+
+      // Export ArticleViews - method names match controller action names
+      export const ArticleViews = {
+        #{render_exports.join(",\n  ")},
+        // $new alias for 'new' (JS reserved word handling)
+        $new: new_render
+      };
+    JS
+
+    File.write(File.join(@dist_dir, 'views/articles.js'), erb_views_js)
+    puts("  -> dist/views/articles.js (combined ERB module)")
+  end
+
+  def transpile_directory(src_dir, dest_dir, pattern = '**/*.rb', skip: [])
+    Dir.glob(File.join(src_dir, pattern)).each do |src_path|
+      basename = File.basename(src_path)
+      next if skip.include?(basename)
+
+      relative = src_path.sub(src_dir + '/', '')
+      dest_path = File.join(dest_dir, relative.sub(/\.rb$/, '.js'))
+      self.transpile_file(src_path, dest_path)
+    end
+  end
+
+  def generate_application_record()
+    wrapper = <<~JS
+      // ApplicationRecord - wraps ActiveRecord from adapter
+      // This file is generated by the build script
+      import { ActiveRecord } from '../lib/active_record.mjs';
+
+      export class ApplicationRecord extends ActiveRecord {
+        // Subclasses (Article, Comment) extend this and add their own validations
+      }
+    JS
+    dest_dir = File.join(@dist_dir, 'models')
+    FileUtils.mkdir_p(dest_dir)
+    File.write(File.join(dest_dir, 'application_record.js'), wrapper)
+    puts("  -> models/application_record.js (wrapper for ActiveRecord)")
+  end
+
+  def transpile_routes_files()
+    src_path = File.join(DEMO_ROOT, 'config/routes.rb')
+    dest_dir = File.join(@dist_dir, 'config')
+    source = File.read(src_path)
+    relative_src = src_path.sub(DEMO_ROOT + '/', '')
+
+    # Generate paths.js first (with only path helpers)
+    puts("Transpiling: routes.rb -> paths.js")
+    paths_options = OPTIONS.merge(file: relative_src, paths_only: true)
+    result = Ruby2JS.convert(source, paths_options)
+    paths_js = result.to_s
+
+    paths_path = File.join(dest_dir, 'paths.js')
+    FileUtils.mkdir_p(dest_dir)
+    File.write(paths_path, paths_js)
+    puts("  -> #{paths_path}")
+
+    # Generate sourcemap for paths.js
+    map_path = "#{paths_path}.map"
+    sourcemap = result.sourcemap
+    sourcemap[:sourcesContent] = [source]
+    File.write(map_path, JSON.generate(sourcemap))
+    puts("  -> #{map_path}")
+
+    # Generate routes.js (imports path helpers from paths.js)
+    puts("Transpiling: routes.rb -> routes.js")
+    routes_options = OPTIONS.merge(file: relative_src, paths_file: './paths.js')
+    result = Ruby2JS.convert(source, routes_options)
+    routes_js = result.to_s
+
+    routes_path = File.join(dest_dir, 'routes.js')
+    File.write(routes_path, routes_js)
+    puts("  -> #{routes_path}")
+
+    # Generate sourcemap for routes.js
+    map_path = "#{routes_path}.map"
+    sourcemap = result.sourcemap
+    sourcemap[:sourcesContent] = [source]
+    File.write(map_path, JSON.generate(sourcemap))
+    puts("  -> #{map_path}")
+  end
+
+  def generate_models_index()
+    models_dir = File.join(@dist_dir, 'models')
+    model_files = Dir.glob(File.join(models_dir, '*.js'))
+      .map { |f| File.basename(f, '.js') }
+      .reject { |name| name == 'application_record' || name == 'index' }
+      .sort
+
+    return unless model_files.any?
+
+    index_js = model_files.map do |name|
+      # Use explicit capitalization for JS compatibility
+      class_name = name.split('_').map { |s| s[0].upcase + s[1..-1] }.join
+      "export { #{class_name} } from './#{name}.js';"
+    end.join("\n") + "\n"
+
+    File.write(File.join(models_dir, 'index.js'), index_js)
+    puts("  -> #{File.join(models_dir, 'index.js')} (re-exports)")
   end
 end
 
-# Clean and create dist directory
-FileUtils.rm_rf(DIST_DIR)
-FileUtils.mkdir_p(DIST_DIR)
-
-puts "=== Building Rails-in-JS Demo ==="
-puts
-
-# Copy database adapter
-puts "Database Adapter:"
-db_config = load_database_config
-copy_database_adapter(
-  File.join(DEMO_ROOT, 'lib'),
-  File.join(DIST_DIR, 'lib'),
-  db_config
-)
-puts
-
-# Copy static lib files (rails.js framework)
-puts "Library:"
-lib_src = File.join(DEMO_ROOT, 'lib')
-lib_dest = File.join(DIST_DIR, 'lib')
-FileUtils.mkdir_p(lib_dest)
-Dir.glob(File.join(lib_src, '*.js')).each do |src_path|
-  dest_path = File.join(lib_dest, File.basename(src_path))
-  FileUtils.cp(src_path, dest_path)
-  puts "  Copying: #{File.basename(src_path)}"
-  puts "    -> #{dest_path}"
+# CLI entry point - only run if this file is executed directly
+if __FILE__ == $0
+  dist_dir = ARGV[0] ? File.expand_path(ARGV[0]) : nil
+  builder = SelfhostBuilder.new(dist_dir)
+  builder.build()
 end
-puts
-
-# Generate ApplicationRecord wrapper and transpile models
-puts "Models:"
-generate_application_record(File.join(DIST_DIR, 'models'))
-transpile_directory(
-  File.join(DEMO_ROOT, 'app/models'),
-  File.join(DIST_DIR, 'models'),
-  '**/*.rb',
-  skip: ['application_record.rb']
-)
-
-# Generate models/index.js that re-exports all models (except ApplicationRecord)
-models_dir = File.join(DIST_DIR, 'models')
-model_files = Dir.glob(File.join(models_dir, '*.js'))
-  .map { |f| File.basename(f, '.js') }
-  .reject { |name| name == 'application_record' || name == 'index' }
-  .sort
-
-if model_files.any?
-  index_js = model_files.map do |name|
-    class_name = name.split('_').map(&:capitalize).join
-    "export { #{class_name} } from './#{name}.js';"
-  end.join("\n") + "\n"
-
-  File.write(File.join(models_dir, 'index.js'), index_js)
-  puts "  -> #{File.join(models_dir, 'index.js')} (re-exports)"
-end
-puts
-
-# Transpile controllers
-puts "Controllers:"
-transpile_directory(
-  File.join(DEMO_ROOT, 'app/controllers'),
-  File.join(DIST_DIR, 'controllers')
-)
-puts
-
-# Transpile config (skip routes.rb, handled separately)
-puts "Config:"
-transpile_directory(
-  File.join(DEMO_ROOT, 'config'),
-  File.join(DIST_DIR, 'config'),
-  '**/*.rb',
-  skip: ['routes.rb']
-)
-
-# Transpile routes.rb into both paths.js and routes.js
-# (paths.js avoids circular dependencies - views import from paths.js, routes.js imports from paths.js)
-transpile_routes_files(
-  File.join(DEMO_ROOT, 'config/routes.rb'),
-  File.join(DIST_DIR, 'config')
-)
-puts
-
-# Transpile views (ERB templates only)
-puts "Views:"
-
-erb_dir = File.join(DEMO_ROOT, 'app/views/articles')
-if Dir.exist?(erb_dir)
-  renders = transpile_erb_directory(erb_dir, File.join(DIST_DIR, 'views/erb'))
-
-  # Create a combined module that exports all render functions
-  erb_views_js = <<~JS
-    // Article views - auto-generated from .html.erb templates
-    // Each exported function is a render function that takes { article } or { articles }
-
-  JS
-
-  # Import individual render functions and re-export with proper names
-  render_exports = []
-  Dir.glob(File.join(erb_dir, '*.html.erb')).sort.each do |erb_path|
-    name = File.basename(erb_path, '.html.erb')
-    erb_views_js += "import { render as #{name}_render } from './erb/#{name}.js';\n"
-    render_exports << "#{name}: #{name}_render"
-  end
-
-  # Export ArticleViews with method names matching controller expectations
-  erb_views_js += <<~JS
-
-    // Export ArticleViews - method names match controller action names
-    export const ArticleViews = {
-      #{render_exports.join(",\n  ")},
-      // $new alias for 'new' (JS reserved word handling)
-      $new: new_render
-    };
-  JS
-
-  File.write(File.join(DIST_DIR, 'views/articles.js'), erb_views_js)
-  puts "  -> dist/views/articles.js (combined ERB module)"
-end
-puts
-
-# Transpile helpers
-puts "Helpers:"
-transpile_directory(
-  File.join(DEMO_ROOT, 'app/helpers'),
-  File.join(DIST_DIR, 'helpers')
-)
-puts
-
-# Transpile db (seeds)
-puts "Database:"
-transpile_directory(
-  File.join(DEMO_ROOT, 'db'),
-  File.join(DIST_DIR, 'db')
-)
-puts
-
-puts "=== Build Complete ==="

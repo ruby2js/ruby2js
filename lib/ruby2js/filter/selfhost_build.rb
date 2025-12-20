@@ -59,7 +59,8 @@ module Ruby2JS
         # require 'ruby2js' → import { Ruby2JS } from selfhost path
         if target.nil? && method == :require && args.length == 1 &&
            args.first.type == :str && args.first.children.first == 'ruby2js'
-          selfhost_path = @options[:selfhost_path] || '../selfhost/ruby2js.js'
+          # Default path assumes script is in demo/*/scripts/ relative to demo/selfhost/
+          selfhost_path = @options[:selfhost_path] || '../../selfhost/ruby2js.js'
           return s(:import, [selfhost_path], s(:attr, nil, :Ruby2JS))
         end
 
@@ -69,9 +70,11 @@ module Ruby2JS
           req_path = args.first.children.first
           if req_path.start_with?('ruby2js/filter/')
             filter_name = req_path.sub('ruby2js/filter/', '')
-            selfhost_filters = @options[:selfhost_filters] || '../selfhost/filters'
-            # Convert filter name to export name (e.g., esm → ESM, functions → Functions)
-            export_name = filter_to_export_name(filter_name.split('/').last)
+            selfhost_filters = @options[:selfhost_filters] || '../../selfhost/filters'
+            # For paths like 'rails/model', export as 'Rails_Model' to match selfhost
+            # For simple paths like 'functions', export as 'Functions'
+            parts = filter_name.split('/')
+            export_name = parts.map { |p| filter_to_export_name(p) }.join('_')
             return s(:import, ["#{selfhost_filters}/#{filter_name}.js"],
               s(:attr, nil, export_name.to_sym))
           end
@@ -81,6 +84,15 @@ module Ruby2JS
         if target.nil? && method == :require_relative && args.length == 1 &&
            args.first.type == :str
           rel_path = args.first.children.first
+
+          # Special case: erb_compiler should come from selfhost (named export)
+          if rel_path.include?('erb_compiler')
+            selfhost_path = @options[:selfhost_path] || '../../selfhost/ruby2js.js'
+            selfhost_base = File.dirname(selfhost_path)
+            return s(:import, ["#{selfhost_base}/lib/erb_compiler.js"],
+              s(:array, s(:const, nil, :ErbCompiler)))
+          end
+
           # Convert .rb to .js, or add .js if no extension
           js_path = if rel_path.end_with?('.rb')
             rel_path.sub(/\.rb$/, '.js')

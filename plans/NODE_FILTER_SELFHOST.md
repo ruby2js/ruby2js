@@ -1,6 +1,6 @@
 # Node Filter Selfhost: Enabling Ruby Build Script Transpilation
 
-## Status: Stage 1 Complete
+## Status: Stage 5 In Progress
 
 Enable the Node filter to run in selfhost, allowing `build.rb` to be transpiled to JavaScript. This eliminates the need for a hand-maintained `build-selfhost.mjs` and enables the Rails-in-JS demo to run with zero Ruby dependency.
 
@@ -35,129 +35,108 @@ With Node filter in selfhost, we can transpile `build.rb` → `build.mjs`, provi
 | Dir.glob | `cc879bd` | `fs.globSync()` (Node 22+) |
 | Remove extend SEXP | `82f4986` | Lazy initialization unblocks selfhost |
 
-The Node filter now covers all file operations used in `build.rb` and no longer uses `extend SEXP`.
+### Stage 2: Transpile Node Filter to Selfhost ⏭️ SKIPPED
+
+Not needed. The Node filter is only required at transpilation time (Ruby), not runtime (JS).
+
+### Stage 3: SelfhostBuild Filter ✅
+
+Created `lib/ruby2js/filter/selfhost_build.rb` to handle build-script-specific transformations:
+
+| Transformation | Ruby | JavaScript |
+|----------------|------|------------|
+| YAML.load_file | `YAML.load_file(path)` | `yaml.load(fs.readFileSync(path, 'utf8'))` |
+| YAML.dump | `YAML.dump(obj)` | `yaml.dump(obj)` |
+| $LOAD_PATH | `$LOAD_PATH.unshift(...)` | Removed |
+| require ruby2js | `require 'ruby2js'` | `import Ruby2JS from '../../selfhost/ruby2js.js'` |
+| require filters | `require 'ruby2js/filter/rails/model'` | `import Rails_Model from '../../selfhost/filters/rails/model.js'` |
+| require_relative | `require_relative '../lib/foo'` | `import '../lib/foo.js'` |
+| erb_compiler | `require_relative '../lib/erb_compiler'` | `import { ErbCompiler } from '../../selfhost/lib/erb_compiler.js'` |
+| Filter constants | `Ruby2JS::Filter::Rails::Model` | `Rails_Model` |
+
+### Stage 4: Restructure build.rb ✅
+
+Refactored `build.rb` to export a `SelfhostBuilder` class with:
+- Constructor taking `dist_dir`
+- `build()` method for full builds
+- Explicit `()` on all method calls for JS compatibility
+- Explicit Rails sub-filter requires for correct imports
 
 ## Remaining Work
 
-### Stage 2: Transpile Node Filter to Selfhost
+### Stage 5: Fix Selfhost Export Issues 🔄 IN PROGRESS
 
-**Goal:** Get `node_spec.rb` passing in selfhost.
+The transpiled `build.mjs` has import issues because selfhost modules use named exports, not default exports:
 
-```bash
-# Transpile the filter
-bundle exec ruby demo/selfhost/scripts/transpile_filter.rb \
-  lib/ruby2js/filter/node.rb > demo/selfhost/filters/node.js
+| Module | Current Import | Needed Import |
+|--------|----------------|---------------|
+| ruby2js.js | `import Ruby2JS from ...` | Named or init pattern |
+| filters/*.js | `import X from ...` | `import { X } from ...` |
 
-# Run tests
-cd demo/selfhost
-node run_all_specs.mjs --partial-only
-```
+**Options:**
+1. Update selfhost_build filter to detect named vs default exports
+2. Add default exports to selfhost modules
+3. Use the hand-written build-selfhost.mjs pattern (dynamic imports with destructuring)
 
-**Potential issues:**
-- Prism AST differences
-- Missing method mappings
-- Import/export handling
+**Additional runtime issues found:**
+- `process.env.fetch()` doesn't exist in JS (need `process.env.X || default`)
+- `hash.keys` needs Functions filter to convert to `Object.keys(hash)`
+- CLI check `$0` doesn't exist in JS
 
-**Update spec_manifest.json:**
-```json
-{
-  "partial": [
-    "node_spec.rb",  // Move from blocked
-    ...
-  ]
-}
-```
+### Stage 6: Wire Up and Verify ⏳ PENDING
 
-### Stage 3: Handle YAML Dependency
-
-`build.rb` uses `YAML.load_file` for `config/database.yml`. Options:
-
-| Approach | Pros | Cons |
-|----------|------|------|
-| Add YAML filter | Clean Ruby code | New filter to maintain |
-| Use js-yaml directly | Already a devDependency | Ruby code becomes JS-aware |
-| Inline config | No YAML needed | Less flexible |
-
-**Recommended:** Create minimal YAML filter that maps:
-- `YAML.load_file(path)` → `jsyaml.load(fs.readFileSync(path, 'utf8'))`
-- `YAML.dump(obj)` → `jsyaml.dump(obj)`
-
-### Stage 4: Structure build.rb for Import
-
-The dev server needs to import `SelfhostBuilder` class:
-
-```javascript
-import { SelfhostBuilder } from './scripts/build.mjs';
-```
-
-Ensure `build.rb` exports a class that can be imported:
-
-```ruby
-class SelfhostBuilder
-  def initialize
-    # ...
-  end
-
-  def build_all
-    # ...
-  end
-
-  def build_file(path)
-    # Hot reload support
-  end
-end
-```
-
-### Stage 5: Transpile and Verify
-
-```bash
-# Transpile build.rb
-bin/ruby2js --filter node --filter functions --filter esm \
-  demo/rails-in-js/scripts/build.rb > demo/rails-in-js/scripts/build.mjs
-
-# Run smoke test
-cd demo/rails-in-js
-npm run test:smoke
-```
-
-The smoke test already compares Ruby vs selfhost output - it should pass with no diff.
-
-### Stage 6: Delete Hand-Maintained Script
-
-Once `build.mjs` is generated from `build.rb`:
-
-1. Update `package.json` to use transpiled script
-2. Delete hand-maintained `build-selfhost.mjs`
-3. Update dev-server to import from `build.mjs`
+Once Stage 5 is complete:
+1. Test `node scripts/build.mjs` produces same output as `ruby scripts/build.rb`
+2. Update dev-server to import from `build.mjs`
+3. Run smoke tests
+4. Delete `build-selfhost.mjs`
 
 ## Dependencies
 
 | Dependency | Status | Notes |
 |------------|--------|-------|
 | Node filter without extend SEXP | ✅ Complete | Commit `82f4986` |
-| Node filter in selfhost | ⏳ Pending | Stage 2 |
-| YAML filter or workaround | ⏳ Pending | Stage 3 |
-| js-yaml package | ✅ Available | Already devDependency |
-| fs.glob (Node 22+) | ✅ Available | Node 23.11.0 installed |
+| selfhost_build filter | ✅ Complete | Handles YAML, requires, constants |
+| ESM/CJS __dir__ support | ✅ Complete | `import.meta.dirname` / `__dirname` |
+| Selfhost named exports | ⏳ Blocking | Need to handle non-default exports |
+
+## Files Modified
+
+| File | Change |
+|------|--------|
+| `lib/ruby2js/filter/selfhost_build.rb` | New filter for build script transpilation |
+| `spec/selfhost_build_spec.rb` | Tests for selfhost_build filter |
+| `lib/ruby2js/filter/esm.rb` | Added `__dir__` → `import.meta.dirname` |
+| `lib/ruby2js/filter/cjs.rb` | Added `__dir__` → `__dirname` |
+| `demo/rails-in-js/scripts/build.rb` | Restructured as SelfhostBuilder class |
+| `demo/rails-in-js/scripts/build.mjs` | Generated (not yet working) |
 
 ## Success Criteria
 
-1. `node_spec.rb` passes in selfhost (partial → ready)
+1. ~~`node_spec.rb` passes in selfhost~~ (not needed)
 2. `build.rb` transpiles to working `build.mjs`
 3. `npm run dev` works with transpiled build script
 4. `npm run test:smoke` shows no diff
 5. Hand-maintained `build-selfhost.mjs` deleted
 
-## Open Questions
+## Key Insight
 
-1. **Should build.mjs be checked in or generated?**
-   - Generated: Always in sync, but requires transpile step
-   - Checked in: Works without Ruby, but can drift
+The transpiled `build.mjs` cannot be a drop-in replacement for the hand-written `build-selfhost.mjs` because:
 
-2. **Hot reload architecture**
-   - Does transpiled `build.rb` need to match `SelfhostBuilder` interface exactly?
-   - Or should dev-server be updated to work with simpler interface?
+1. **Ruby2JS.convert** - The Ruby version calls Ruby's Ruby2JS, but the JS version needs the selfhost converter with async initialization
+2. **Export patterns** - Selfhost uses named exports and requires initialization (`initPrism()`)
+3. **Filter loading** - Selfhost filters need `.prototype` passed to the pipeline
 
-3. **YAML config vs environment variables**
-   - Could eliminate YAML dependency by using `DATABASE=sqljs` env var
-   - Already supported, just needs to be the default path
+The hand-written version exists because it uses a fundamentally different architecture suited to JS:
+- `async init()` method to load Prism WASM and filters
+- Dynamic imports with destructuring for named exports
+- `SelfhostBuilder.converter.convert()` instead of `Ruby2JS.convert()`
+
+## Recommendation
+
+**Keep build-selfhost.mjs hand-maintained** but use the transpiled version as a reference to keep them in sync. The architectural differences between Ruby and JS execution models make full automation impractical without significant selfhost changes.
+
+Alternatively, modify selfhost to:
+1. Add default exports alongside named exports
+2. Create a `Ruby2JS.convert()` facade that handles initialization
+3. This would enable the transpiled version to work
