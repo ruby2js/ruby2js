@@ -155,10 +155,20 @@ module Ruby2JS
         next unless comment_end && comment_line
 
         # Check if this is a trailing comment (same line as a node that ends before it)
-        same_line_node = nodes.find do |n|
+        # Find the node with the largest end_pos (outermost/statement-level) to avoid
+        # matching child nodes like `self` instead of the full `self['id'] = @_id`
+        comment_start = comment_start_pos(comment)
+        same_line_node = nil
+        best_end = -1
+        nodes.each do |n|
           node_line = node_line_number(n)
           node_end = node_end_pos(n)
-          node_line && node_end && node_line == comment_line && node_end <= comment_end
+          next unless node_line && node_end && node_line == comment_line
+          next unless comment_start.nil? || node_end <= comment_start
+          if node_end > best_end
+            best_end = node_end
+            same_line_node = n
+          end
         end
 
         if same_line_node
@@ -264,6 +274,17 @@ module Ruby2JS
         comment.loc.expression.end_pos
       elsif comment.respond_to?(:location) && comment.location
         comment.location.end_offset
+      else
+        nil
+      end
+    end
+
+    # Get start position from a comment's location
+    def comment_start_pos(comment)
+      if comment.loc&.respond_to?(:expression) && comment.loc.expression
+        comment.loc.expression.begin_pos
+      elsif comment.respond_to?(:location) && comment.location
+        comment.location.start_offset
       else
         nil
       end
