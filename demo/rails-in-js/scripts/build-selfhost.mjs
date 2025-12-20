@@ -44,7 +44,7 @@ export class SelfhostBuilder {
 
   // Load database configuration from environment or config file
   async loadDatabaseConfig() {
-    const env = process.env.NODE_ENV || 'development';
+    const env = process.env.RAILS_ENV || process.env.NODE_ENV || 'development';
 
     // Priority 1: DATABASE_URL environment variable
     if (process.env.DATABASE_URL) {

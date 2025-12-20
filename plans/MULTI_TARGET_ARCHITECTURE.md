@@ -43,22 +43,69 @@ DATABASE=dexie                       No adapter abstraction
 
 ## Configuration
 
+### config/database.yml (Primary)
+
+The adapter in `config/database.yml` determines both database and target:
+
+```yaml
+development:
+  adapter: dexie
+  database: my_app_dev
+
+test:
+  adapter: sqljs
+  database: my_app_test
+
+production:
+  adapter: pg
+  host: localhost
+  port: 5432
+  database: my_app_production
+  pool: 5
+```
+
+| Adapter | Target | Use Case |
+|---------|--------|----------|
+| `dexie` | browser | IndexedDB wrapper (~50KB) |
+| `sqljs` | browser | Full SQL support (~2.7MB WASM) |
+| `better_sqlite3` | node | Development, sync API |
+| `sqlite3` | node | Development, async API |
+| `pg` | node | Production PostgreSQL |
+| `mysql2` | node | Production MySQL |
+
 ### Environment Variables
 
-Primary configuration via environment variables:
+`RAILS_ENV` or `NODE_ENV` selects which config to use:
 
 ```bash
-# Browser SPA (default)
-TARGET=browser DATABASE=dexie npm run build
+# Development (default) → reads development.adapter → dexie → browser
+npm run dev
 
-# Node.js server with PostgreSQL
-TARGET=node DATABASE=pg npm run build
+# Production → reads production.adapter → pg → node
+RAILS_ENV=production npm run build
+# or
+NODE_ENV=production npm run build
+```
 
-# Node.js with SQLite for development
-TARGET=node DATABASE=better_sqlite3 npm run dev
+Priority: `RAILS_ENV` > `NODE_ENV` > `'development'`
+
+**Optional overrides:**
+
+```bash
+# Override adapter for quick testing (without editing yaml)
+DATABASE=sqljs npm run dev
 
 # Production with DATABASE_URL (standard 12-factor pattern)
-TARGET=node DATABASE_URL=postgres://user:pass@host:5432/myapp npm run build
+DATABASE_URL=postgres://user:pass@host:5432/myapp npm run build
+```
+
+### Build Script Logic
+
+```javascript
+const env = process.env.RAILS_ENV || process.env.NODE_ENV || 'development';
+const dbConfig = yaml.load(fs.readFileSync('config/database.yml', 'utf8'));
+const database = process.env.DATABASE || dbConfig[env]?.adapter || 'dexie';
+const target = ['dexie', 'sqljs'].includes(database) ? 'browser' : 'node';
 ```
 
 `DATABASE_URL` can be used at build time or runtime:
@@ -221,21 +268,7 @@ this.render('articles/show');
 
 ### Active Record
 
-See [DEXIE_SUPPORT.md](./DEXIE_SUPPORT.md) for database adapter details.
-
-**Browser adapters:**
-| Adapter | Use Case |
-|---------|----------|
-| `dexie` | Default, IndexedDB wrapper (~50KB) |
-| `sqljs` | Full SQL support (~2.7MB WASM) |
-
-**Node.js adapters:**
-| Adapter | Use Case |
-|---------|----------|
-| `better_sqlite3` | Development, sync API |
-| `sqlite3` | Development, async API |
-| `pg` | Production PostgreSQL |
-| `mysql2` | Production MySQL |
+See [DEXIE_SUPPORT.md](./DEXIE_SUPPORT.md) for database adapter details. The database adapter determines the target environment — see the Configuration section above for the full mapping.
 
 ## Architecture
 
@@ -280,24 +313,26 @@ demo/rails-in-js/
 
 ### Filter Integration
 
-Filters receive target options:
+Filters receive database option (from config/database.yml) and derive target:
 
 ```ruby
-# Ruby2JS.convert options
+# Ruby2JS.convert options (database read from config/database.yml)
 Ruby2JS.convert(source, {
   filters: [:rails_routes, :rails_controller, :erb],
-  target: 'browser',      # or 'node'
-  database: 'dexie',      # adapter name
-  dbConfig: { ... }       # connection details
+  database: 'dexie',      # from database.yml[env].adapter
+  dbConfig: { ... }       # from database.yml[env]
 })
 ```
 
-Each filter checks `@options[:target]` to generate appropriate code:
+Each filter derives target from database to generate appropriate code:
 
 ```ruby
 # lib/ruby2js/filter/rails/routes.rb
+BROWSER_DATABASES = %w[dexie sqljs]
+
 def on_send(node)
-  if @options[:target] == 'node'
+  target = BROWSER_DATABASES.include?(@options[:database]) ? 'browser' : 'node'
+  if target == 'node'
     generate_http_server(node)
   else
     generate_history_api(node)
@@ -335,20 +370,20 @@ See [DEXIE_SUPPORT.md](./DEXIE_SUPPORT.md).
 1. Create `lib/targets/browser/` and `lib/targets/node/` directories
 2. Extract browser-specific router to `lib/targets/browser/router.mjs`
 3. Create Node.js router with http.createServer
-4. Build process copies target-appropriate files
-5. Environment variable: `TARGET=browser|node`
+4. Build process derives target from DATABASE and copies appropriate files
+5. Update build script to use derived target (browser for dexie/sqljs, node otherwise)
 
 ### Phase 3: Filter Updates
 
-1. Add `target` option to `rails/routes` filter
-   - Browser: History API routing
-   - Node: HTTP server generation
+1. Update `rails/routes` filter to derive target from database
+   - Browser (dexie/sqljs): History API routing
+   - Node (pg/mysql2/sqlite): HTTP server generation
 
-2. Add `target` option to `rails/controller` filter
+2. Update `rails/controller` filter to derive target from database
    - Browser: DOM updates, pushState
    - Node: HTTP responses, res.redirect
 
-3. Add `target` option to `erb` filter
+3. Update `erb` filter to derive target from database
    - Browser: onClick handlers for navigation
    - Node: Traditional href attributes
 
@@ -372,7 +407,7 @@ See [DEXIE_SUPPORT.md](./DEXIE_SUPPORT.md).
 
 ```bash
 npm run dev
-# → TARGET=browser DATABASE=dexie
+# → NODE_ENV=development → database.yml[development].adapter=dexie → browser
 # → Serves SPA at localhost:3000
 # → Client-side routing, IndexedDB storage
 ```
@@ -380,16 +415,17 @@ npm run dev
 ### Node.js Development
 
 ```bash
-TARGET=node DATABASE=better_sqlite3 npm run dev
+# With database.yml configured for better_sqlite3 in development:
+npm run dev
 # → Runs HTTP server at localhost:3000
-# → Traditional request/response
-# → SQLite file storage
+# → Traditional request/response, SQLite file storage
 ```
 
 ### Node.js Production
 
 ```bash
-TARGET=node DATABASE=pg NODE_ENV=production npm run build
+RAILS_ENV=production npm run build
+# → database.yml[production].adapter=pg → node target
 # → Generates server.mjs with PostgreSQL adapter
 # → Deploy to any Node.js host
 ```
@@ -401,7 +437,7 @@ FROM node:20-alpine
 WORKDIR /app
 COPY . .
 RUN npm install
-RUN TARGET=node NODE_ENV=production npm run build
+RUN RAILS_ENV=production npm run build
 CMD ["node", "dist/server.mjs"]
 ```
 
@@ -421,12 +457,11 @@ services:
 ## Success Criteria
 
 1. Same Ruby source deploys to browser and Node.js
-2. Database adapter selected via `DATABASE` env var
-3. Target runtime selected via `TARGET` env var
-4. No target-switching code in generated output
-5. Browser bundle excludes all Node.js code
-6. Node.js bundle excludes browser-specific code
-7. Both targets pass identical functional tests
+2. Database adapter read from `config/database.yml` (target derived automatically)
+3. No target-switching code in generated output
+4. Browser bundle excludes all Node.js code
+5. Node.js bundle excludes browser-specific code
+6. Both targets pass identical functional tests
 
 ## Timeline
 
