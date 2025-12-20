@@ -365,12 +365,16 @@ module Ruby2JS
 
         def generate_has_many_method(assoc)
           # has_many :comments -> get comments() {
-          #   let records = Comment.where({article_id: this._id});
-          #   records.create = (params) => Comment.create(Object.assign({article_id: this._id}, params));
+          #   // Return cached if preloaded, otherwise fetch async
+          #   if (this._comments) return this._comments;
+          #   let records = Comment.where({article_id: this.id});
+          #   records.create = (params) => Comment.create(Object.assign({article_id: this.id}, params));
           #   records.find = (id) => Comment.find(id);
           #   return records;
           # }
+          # Also generates set comments(val) for preloading
           association_name = assoc[:name]
+          cache_name = "_#{association_name}".to_sym
           class_name = assoc[:options][:class_name] || Ruby2JS::Inflector.singularize(association_name.to_s).capitalize
           foreign_key = assoc[:options][:foreign_key] || "#{@rails_model_name.downcase}_id"
 
@@ -384,9 +388,9 @@ module Ruby2JS
             s(:hash,
               s(:pair,
                 s(:sym, foreign_key.to_sym),
-                s(:attr, s(:self), :_id))))
+                s(:attr, s(:self), :id))))
 
-          # Build the create lambda: (params) => Model.create(Object.assign({fk: this._id}, params))
+          # Build the create lambda: (params) => Model.create(Object.assign({fk: this.id}, params))
           create_lambda = s(:block,
             s(:send, nil, :lambda),
             s(:args, s(:arg, :params)),
@@ -399,7 +403,7 @@ module Ruby2JS
                 s(:hash,
                   s(:pair,
                     s(:sym, foreign_key.to_sym),
-                    s(:attr, s(:self), :_id))),
+                    s(:attr, s(:self), :id))),
                 s(:lvar, :params))))
 
           # Build the find lambda: (id) => Model.find(id)
@@ -412,13 +416,28 @@ module Ruby2JS
               :find!,
               s(:lvar, :id)))
 
-          s(:defget, association_name,
+          # Getter: returns cache if set, otherwise fetches async
+          getter = s(:defget, association_name,
             s(:args),
             s(:begin,
+              # if (this._comments) return this._comments;
+              s(:if,
+                s(:attr, s(:self), cache_name),
+                s(:return, s(:attr, s(:self), cache_name)),
+                nil),
               s(:lvasgn, :records, where_call),
               s(:send, s(:lvar, :records), :[]=, s(:str, 'create'), create_lambda),
               s(:send, s(:lvar, :records), :[]=, s(:str, 'find'), find_lambda),
               s(:return, s(:lvar, :records))))
+
+          # Setter: allows preloading with article.comments = await Comment.where(...)
+          # Use method name with = suffix, class2 converter handles this as a setter
+          setter_name = "#{association_name}=".to_sym
+          setter = s(:def, setter_name,
+            s(:args, s(:arg, :value)),
+            s(:send, s(:self), "#{cache_name}=".to_sym, s(:lvar, :value)))
+
+          s(:begin, getter, setter)
         end
 
         def generate_has_one_method(assoc)
@@ -441,7 +460,7 @@ module Ruby2JS
                 s(:hash,
                   s(:pair,
                     s(:sym, foreign_key.to_sym),
-                    s(:attr, s(:self), :_id))))))
+                    s(:attr, s(:self), :id))))))
         end
 
         def generate_belongs_to_method(assoc)

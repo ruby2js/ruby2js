@@ -10,6 +10,12 @@ module Ruby2JS
         # Standard RESTful action names
         RESTFUL_ACTIONS = %i[index show new create edit update destroy].freeze
 
+        # ActiveRecord class methods that should be awaited
+        AR_CLASS_METHODS = %i[all find find_by where first last count create create!].freeze
+
+        # ActiveRecord instance methods that should be awaited
+        AR_INSTANCE_METHODS = %i[save save! update update! destroy destroy! reload].freeze
+
         def initialize(*args)
           # Note: super must be called first for JS class compatibility
           super
@@ -20,6 +26,11 @@ module Ruby2JS
           @rails_private_methods = {}
           @rails_model_refs = Set.new
           @rails_needs_views = false
+          # Model associations for preloading (model_name -> [association_names])
+          # TODO: Auto-detect from model files or configuration
+          @rails_model_associations = {
+            article: [:comments]
+          }
         end
 
         # Detect controller class and transform to module
@@ -31,6 +42,11 @@ module Ruby2JS
           @rails_private_methods ||= {}
           @rails_model_refs ||= Set.new
           @rails_needs_views ||= false
+          # Model associations for preloading (model_name -> [association_names])
+          # NOTE: This must be in on_class (not just initialize) for JS compatibility
+          @rails_model_associations ||= {
+            article: [:comments]
+          }
 
           # Check if this is a controller (inherits from ApplicationController or *Controller)
           return super unless controller_class?(class_name, superclass)
@@ -305,6 +321,13 @@ module Ruby2JS
             end
           end
 
+          # Preload associations for show/edit actions (async database support)
+          # For each ivar that's a model, preload its has_many associations
+          if %i[show edit].include?(method_name) && view_call
+            preloads = generate_association_preloads(ivars)
+            body_statements.push(*preloads) if preloads.any?
+          end
+
           body_statements.push(view_call) if view_call
 
           # Wrap in autoreturn for implicit return behavior
@@ -351,8 +374,8 @@ module Ruby2JS
 
           output_args = s(:args, *param_args)
 
-          # Create class method (defs with self)
-          s(:defs, s(:self), output_name, output_args, final_body)
+          # Create async class method (asyncs with self for async/await support)
+          s(:asyncs, s(:self), output_name, output_args, final_body)
         end
 
         def collect_instance_variables(node)
@@ -443,11 +466,14 @@ module Ruby2JS
               # params.require(:article).permit(:title, :body) -> params
               return s(:lvar, :params)
             else
-              # Process children recursively
+              # Process children recursively first
               new_children = node.children.map do |c|
                 c.respond_to?(:type) ? transform_ivars_to_locals(c) : c
               end
-              return node.updated(nil, new_children)
+              transformed = node.updated(nil, new_children)
+
+              # Wrap model operations with await
+              return wrap_with_await_if_needed(transformed)
             end
 
           else
@@ -460,6 +486,31 @@ module Ruby2JS
               return node
             end
           end
+        end
+
+        # Wrap ActiveRecord operations with await for async database support
+        def wrap_with_await_if_needed(node)
+          return node unless node.type == :send
+
+          target, method, *_args = node.children
+
+          # Check for class method calls on model constants (e.g., Article.find)
+          if target&.type == :const && target.children[0].nil?
+            const_name = target.children[1].to_s
+            # Convert Set to Array for JS compatibility (Set.include? doesn't exist in JS)
+            model_refs_array = @rails_model_refs ? [*@rails_model_refs] : []
+            if model_refs_array.include?(const_name) && AR_CLASS_METHODS.include?(method)
+              # Use updated(:await) to preserve send structure while adding await
+              return node.updated(:await)
+            end
+          end
+
+          # Check for instance method calls on local variables (e.g., article.save)
+          if target&.type == :lvar && AR_INSTANCE_METHODS.include?(method)
+            return node.updated(:await)
+          end
+
+          node
         end
 
         def transform_redirect_to(args)
@@ -513,6 +564,35 @@ module Ruby2JS
             # More complex render - pass through for now
             nil
           end
+        end
+
+        # Generate association preloads for async database support
+        # For show/edit actions, preload has_many associations so views can iterate
+        def generate_association_preloads(ivars)
+          preloads = []
+
+          # Infer model name from controller name (ArticlesController -> Article)
+          model_name = @rails_controller_name.to_s.sub(/Controller$/, '')
+          singular_model = Ruby2JS::Inflector.singularize(model_name).downcase.to_sym
+
+          # If we have a singular model variable (e.g., :article), preload its associations
+          if ivars.include?(singular_model)
+            # Look up associations for this model from tracked has_many relationships
+            associations = (@rails_model_associations || {})[singular_model] || []
+
+            associations.each do |assoc_name|
+              # Generate: article.comments = await article.comments
+              # The getter returns a Promise, so await it and store back via setter
+              # Note: await is s(:send, nil, :await, expr) not s(:await, expr)
+              await_expr = s(:send, nil, :await, s(:attr, s(:lvar, singular_model), assoc_name))
+              preloads << s(:send,
+                s(:lvar, singular_model),
+                "#{assoc_name}=".to_sym,
+                await_expr)
+            end
+          end
+
+          preloads
         end
 
         def generate_before_action_code(action_name)

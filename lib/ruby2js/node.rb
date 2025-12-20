@@ -38,6 +38,7 @@ module Ruby2JS
     def is_method?
       return false if @type == :attr
       return true if @type == :call
+      return true if @type == :await  # await implies function call, not property access
       return true unless @location
 
       if @location.respond_to?(:selector)

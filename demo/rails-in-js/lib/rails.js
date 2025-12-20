@@ -97,7 +97,7 @@ export class Router {
   }
 
   // Dispatch a path to the appropriate controller action
-  static dispatch(path) {
+  static async dispatch(path) {
     console.log(`Started GET "${path}"`);
 
     const result = this.match(path, 'GET');
@@ -126,11 +126,11 @@ export class Router {
         // Nested resource: first capture is parent_id, second is id
         const parentId = parseInt(match[1]);
         const id = match[2] ? parseInt(match[2]) : null;
-        html = id ? controller[actionMethod](parentId, id) : controller[actionMethod](parentId);
+        html = id ? await controller[actionMethod](parentId, id) : await controller[actionMethod](parentId);
       } else {
         // Regular resource: first capture is id
         const id = match[1] ? parseInt(match[1]) : null;
-        html = id ? controller[actionMethod](id) : controller[actionMethod]();
+        html = id ? await controller[actionMethod](id) : await controller[actionMethod]();
       }
 
       console.log(`  Rendering ${controllerName}/${action}`);
@@ -142,16 +142,16 @@ export class Router {
   }
 
   // Navigate to a new path
-  static navigate(path) {
+  static async navigate(path) {
     history.pushState({}, '', path);
-    this.dispatch(path);
+    await this.dispatch(path);
   }
 }
 
 // Form submission handlers
 export class FormHandler {
   // Handle resource creation
-  static create(controllerName, event) {
+  static async create(controllerName, event) {
     event.preventDefault();
     const controller = Router.controllers[controllerName];
     const form = event.target;
@@ -160,13 +160,13 @@ export class FormHandler {
     console.log(`Processing ${controller.name}#create`);
     console.log('  Parameters:', params);
 
-    const result = controller.create(params);
-    this.handleResult(result, controllerName, 'new', controller);
+    const result = await controller.create(params);
+    await this.handleResult(result, controllerName, 'new', controller);
     return false;
   }
 
   // Handle resource update
-  static update(controllerName, event, id) {
+  static async update(controllerName, event, id) {
     event.preventDefault();
     const controller = Router.controllers[controllerName];
     const form = event.target;
@@ -175,25 +175,25 @@ export class FormHandler {
     console.log(`Processing ${controller.name}#update (id: ${id})`);
     console.log('  Parameters:', params);
 
-    const result = controller.update(id, params);
-    this.handleResult(result, controllerName, 'edit', controller, id);
+    const result = await controller.update(id, params);
+    await this.handleResult(result, controllerName, 'edit', controller, id);
     return false;
   }
 
   // Handle resource deletion
-  static destroy(controllerName, id, confirmMsg = 'Are you sure?') {
+  static async destroy(controllerName, id, confirmMsg = 'Are you sure?') {
     if (!confirm(confirmMsg)) return;
 
     const controller = Router.controllers[controllerName];
     console.log(`Processing ${controller.name}#destroy (id: ${id})`);
 
-    controller.destroy(id);
+    await controller.destroy(id);
     console.log(`  Redirected to /${controllerName}`);
-    Router.navigate(`/${controllerName}`);
+    await Router.navigate(`/${controllerName}`);
   }
 
   // Handle nested resource creation
-  static createNested(controllerName, parentName, event, parentId) {
+  static async createNested(controllerName, parentName, event, parentId) {
     event.preventDefault();
     const controller = Router.controllers[controllerName];
     const form = event.target;
@@ -202,22 +202,22 @@ export class FormHandler {
     console.log(`Processing ${controller.name}#create (${parentName}_id: ${parentId})`);
     console.log('  Parameters:', params);
 
-    controller.create(parentId, params);
+    await controller.create(parentId, params);
     console.log(`  Redirected to /${parentName}/${parentId}`);
-    Router.navigate(`/${parentName}/${parentId}`);
+    await Router.navigate(`/${parentName}/${parentId}`);
     return false;
   }
 
   // Handle nested resource deletion
-  static destroyNested(controllerName, parentName, parentId, id, confirmMsg = 'Delete this item?') {
+  static async destroyNested(controllerName, parentName, parentId, id, confirmMsg = 'Delete this item?') {
     if (!confirm(confirmMsg)) return;
 
     const controller = Router.controllers[controllerName];
     console.log(`Processing ${controller.name}#destroy (${parentName}_id: ${parentId}, id: ${id})`);
 
-    controller.destroy(parentId, id);
+    await controller.destroy(parentId, id);
     console.log(`  Redirected to /${parentName}/${parentId}`);
-    Router.navigate(`/${parentName}/${parentId}`);
+    await Router.navigate(`/${parentName}/${parentId}`);
   }
 
   // Extract form parameters
@@ -236,14 +236,14 @@ export class FormHandler {
   }
 
   // Handle controller result (redirect or render)
-  static handleResult(result, controllerName, action, controller, id = null) {
+  static async handleResult(result, controllerName, action, controller, id = null) {
     if (result.redirect) {
       console.log(`  Redirected to ${result.redirect}`);
-      Router.navigate(result.redirect);
+      await Router.navigate(result.redirect);
     } else if (result.render) {
       console.log(`  Rendering ${controllerName}/${action} (validation failed)`);
       const actionMethod = action === 'new' ? '$new' : action;
-      const html = id ? controller[actionMethod](id) : controller[actionMethod]();
+      const html = id ? await controller[actionMethod](id) : await controller[actionMethod]();
       document.getElementById('content').innerHTML = html;
     }
   }
@@ -254,6 +254,7 @@ export class Application {
   static schema = null;
   static seeds = null;
   static sqlJsPath = '/node_modules/sql.js/dist';
+  static activeRecordModule = null;
 
   // Configure the application
   static configure(options) {
@@ -262,26 +263,47 @@ export class Application {
     if (options.sqlJsPath) this.sqlJsPath = options.sqlJsPath;
   }
 
-  // Initialize the database
+  // Initialize the database using the adapter
   static async initDatabase() {
-    const SQL = await window.initSqlJs({
-      locateFile: file => `${this.sqlJsPath}/${file}`
-    });
-    window.DB = new SQL.Database();
+    // Import the adapter (selected at build time)
+    const adapter = await import('./active_record.mjs');
+    this.activeRecordModule = adapter;
 
-    // Time polyfill for Ruby compatibility
-    window.Time = {
-      now() {
-        return { toString() { return new Date().toISOString(); } };
+    // Initialize with config (adapter reads its own config, but we can override)
+    await adapter.initDatabase({ sqlJsPath: this.sqlJsPath });
+
+    // For Dexie adapter: define schema and open database
+    if (adapter.defineSchema) {
+      // Register table schemas from the schema module
+      if (this.schema && this.schema.tableSchemas) {
+        for (const [table, schema] of Object.entries(this.schema.tableSchemas)) {
+          adapter.registerSchema(table, schema);
+        }
+      } else {
+        // Fallback: define schemas manually for the demo
+        // TODO: Update rails/schema filter to generate tableSchemas for Dexie
+        adapter.registerSchema('articles', '++id, title, created_at, updated_at');
+        adapter.registerSchema('comments', '++id, article_id, created_at, updated_at');
       }
-    };
+      adapter.defineSchema(1);
+      await adapter.openDatabase();
+    }
 
-    if (this.schema) {
+    // Make DB available globally for sql.js compatibility
+    window.DB = adapter.getDatabase();
+
+    // For sql.js: run schema SQL (skip for Dexie which uses defineSchema instead)
+    if (this.schema && this.schema.create_tables && !adapter.openDatabase) {
       this.schema.create_tables(window.DB);
     }
 
+    // Run seeds if present
     if (this.seeds) {
-      this.seeds.run();
+      if (this.seeds.run.constructor.name === 'AsyncFunction') {
+        await this.seeds.run();
+      } else {
+        this.seeds.run();
+      }
     }
   }
 
@@ -294,8 +316,8 @@ export class Application {
       document.getElementById('app').style.display = 'block';
 
       // Handle browser back/forward
-      window.addEventListener('popstate', () => {
-        Router.dispatch(location.pathname);
+      window.addEventListener('popstate', async () => {
+        await Router.dispatch(location.pathname);
       });
 
       // Expose helpers globally for onclick handlers
@@ -304,7 +326,7 @@ export class Application {
       window.truncate = truncate;
 
       // Initial route
-      Router.dispatch(location.pathname || '/');
+      await Router.dispatch(location.pathname || '/');
     } catch (e) {
       document.getElementById('loading').innerHTML =
         `<p style="color: red;">Error: ${e.message}</p><pre>${e.stack}</pre>`;
@@ -315,11 +337,11 @@ export class Application {
 
 // Navigation helper - prevents default, catches errors, logs issues
 // Usage: <a href="/path" onclick="return navigate(event, '/path')">
-export function navigate(event, path) {
+export async function navigate(event, path) {
   event?.preventDefault?.();
   try {
     history.pushState({}, '', path);
-    Router.dispatch(path);
+    await Router.dispatch(path);
   } catch (e) {
     console.error('Navigation error:', e);
   }
@@ -328,14 +350,14 @@ export function navigate(event, path) {
 
 // Form submission helper - prevents default, catches errors
 // Usage: <form onsubmit="return submitForm(event, handler)">
-export function submitForm(event, handler) {
+export async function submitForm(event, handler) {
   event?.preventDefault?.();
   try {
-    const result = handler(event);
+    const result = await handler(event);
     if (result?.redirect) {
       console.log(`  Redirected to ${result.redirect}`);
       history.pushState({}, '', result.redirect);
-      Router.dispatch(result.redirect);
+      await Router.dispatch(result.redirect);
     } else if (result?.render) {
       // Re-render handled by caller
     }

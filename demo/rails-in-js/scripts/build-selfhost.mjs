@@ -2,12 +2,14 @@
 // Selfhost build script for Rails-in-JS
 // Transpiles Ruby files to JavaScript using the selfhost (JavaScript-based) converter
 
-import { readFile, writeFile, mkdir, rm } from 'fs/promises';
+import { readFile, writeFile, mkdir, rm, copyFile } from 'fs/promises';
+import { existsSync } from 'fs';
 import { join, relative, dirname as pathDirname, resolve } from 'path';
 import { exec } from 'child_process';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { ErbCompiler } from '../../selfhost/lib/erb_compiler.js';
+import yaml from 'js-yaml';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -21,8 +23,92 @@ export class SelfhostBuilder {
   static erbFilters = [];  // Separate filter chain for ERB templates
   static ErbCompiler = null;  // Transpiled from lib/erb_compiler.rb
 
-  constructor(distDir) {
+  constructor(distDir, options = {}) {
     this.distDir = distDir || join(SelfhostBuilder.DEMO_ROOT, 'dist');
+    this.options = options;
+  }
+
+  // Parse DATABASE_URL into config object
+  static parseDatabaseUrl(url) {
+    const parsed = new URL(url);
+    return {
+      adapter: parsed.protocol.replace(':', '').replace('postgres', 'pg'),
+      host: parsed.hostname,
+      port: parsed.port || undefined,
+      database: parsed.pathname.slice(1),
+      username: parsed.username || undefined,
+      password: parsed.password || undefined,
+      ...Object.fromEntries(parsed.searchParams)
+    };
+  }
+
+  // Load database configuration from environment or config file
+  async loadDatabaseConfig() {
+    const env = process.env.NODE_ENV || 'development';
+
+    // Priority 1: DATABASE_URL environment variable
+    if (process.env.DATABASE_URL) {
+      console.log(`  Using DATABASE_URL from environment`);
+      return SelfhostBuilder.parseDatabaseUrl(process.env.DATABASE_URL);
+    }
+
+    // Priority 2: DATABASE environment variable (adapter name only)
+    if (process.env.DATABASE) {
+      console.log(`  Using DATABASE=${process.env.DATABASE} from environment`);
+      return { adapter: process.env.DATABASE };
+    }
+
+    // Priority 3: config/database.yml
+    const configPath = join(SelfhostBuilder.DEMO_ROOT, 'config/database.yml');
+    if (existsSync(configPath)) {
+      try {
+        const configText = await readFile(configPath, 'utf8');
+        const config = yaml.load(configText);
+        if (config && config[env]) {
+          console.log(`  Using config/database.yml [${env}]`);
+          return config[env];
+        }
+      } catch (err) {
+        console.warn(`  Warning: Could not parse database.yml: ${err.message}`);
+      }
+    }
+
+    // Default: sql.js
+    console.log(`  Using default adapter: sqljs`);
+    return { adapter: 'sqljs', database: 'rails_in_js' };
+  }
+
+  // Copy the appropriate database adapter to dist/lib/
+  async copyDatabaseAdapter() {
+    const dbConfig = await this.loadDatabaseConfig();
+    const adapter = dbConfig.adapter || 'sqljs';
+
+    const adapterFile = `active_record_${adapter}.mjs`;
+    const srcPath = join(SelfhostBuilder.DEMO_ROOT, 'lib/adapters', adapterFile);
+    const destPath = join(this.distDir, 'lib/active_record.mjs');
+
+    if (!existsSync(srcPath)) {
+      throw new Error(`Unknown database adapter: ${adapter} (${srcPath} not found)`);
+    }
+
+    // Read adapter source
+    let adapterCode = await readFile(srcPath, 'utf8');
+
+    // Inject configuration
+    adapterCode = adapterCode.replace(
+      'const DB_CONFIG = {};',
+      `const DB_CONFIG = ${JSON.stringify(dbConfig)};`
+    );
+
+    await mkdir(pathDirname(destPath), { recursive: true });
+    await writeFile(destPath, adapterCode);
+
+    console.log(`  Adapter: ${adapter} -> lib/active_record.mjs`);
+    if (dbConfig.database) {
+      console.log(`  Database: ${dbConfig.database}`);
+    }
+
+    return { adapter, config: dbConfig };
   }
 
   async init() {
@@ -135,11 +221,19 @@ export class SelfhostBuilder {
     return js;
   }
 
-  async transpileDirectory(srcDir, destDir) {
+  async transpileDirectory(srcDir, destDir, options = {}) {
     let count = 0;
     const files = await this.findFiles(srcDir, '*.rb');
+    const skip = options.skip || [];
 
     for (const srcPath of files) {
+      const basename = srcPath.split('/').pop();
+
+      // Skip files in the skip list
+      if (skip.includes(basename)) {
+        continue;
+      }
+
       const relativePath = relative(srcDir, srcPath);
       const destPath = join(destDir, relativePath.replace(/\.rb$/, '.js'));
 
@@ -153,6 +247,55 @@ export class SelfhostBuilder {
     }
 
     return count;
+  }
+
+  // Transpile routes.rb into both paths.js and routes.js
+  // This avoids circular dependencies (views import from paths.js, routes.js imports from paths.js)
+  async transpileRoutesFiles(srcPath, destDir) {
+    const source = await readFile(srcPath, 'utf-8');
+    const relativeSrc = relative(SelfhostBuilder.DEMO_ROOT, srcPath);
+
+    await mkdir(destDir, { recursive: true });
+
+    // Generate paths.js first (with only path helpers)
+    console.log(`  ${relativeSrc} -> ${relative(SelfhostBuilder.DEMO_ROOT, join(destDir, 'paths.js'))}`);
+    const pathsResult = SelfhostBuilder.converter.convert(source, {
+      eslevel: 2022,
+      file: relativeSrc,
+      filters: SelfhostBuilder.filters,
+      autoexports: true,
+      paths_only: true
+    });
+    await writeFile(join(destDir, 'paths.js'), pathsResult.toString());
+
+    // Generate routes.js (imports path helpers from paths.js)
+    console.log(`  ${relativeSrc} -> ${relative(SelfhostBuilder.DEMO_ROOT, join(destDir, 'routes.js'))}`);
+    const routesResult = SelfhostBuilder.converter.convert(source, {
+      eslevel: 2022,
+      file: relativeSrc,
+      filters: SelfhostBuilder.filters,
+      autoexports: true,
+      paths_file: './paths.js'
+    });
+    await writeFile(join(destDir, 'routes.js'), routesResult.toString());
+
+    return 2;
+  }
+
+  async generateApplicationRecord() {
+    const wrapper = `// ApplicationRecord - wraps ActiveRecord from adapter
+// This file is generated by the build script
+import { ActiveRecord } from '../lib/active_record.mjs';
+
+export class ApplicationRecord extends ActiveRecord {
+  // Subclasses (Article, Comment) extend this and add their own validations
+}
+`;
+    const destPath = join(this.distDir, 'models/application_record.js');
+    await mkdir(join(this.distDir, 'models'), { recursive: true });
+    await writeFile(destPath, wrapper);
+    console.log(`  -> models/application_record.js (wrapper for ActiveRecord)`);
+    return 1;
   }
 
   async copyLibFiles() {
@@ -282,14 +425,24 @@ export const ArticleViews = {
 
     let totalFiles = 0;
 
+    console.log('Database:');
+    const { adapter } = await this.copyDatabaseAdapter();
+    this.databaseAdapter = adapter;
+    totalFiles += 1;
+    console.log();
+
     console.log('Library:');
     totalFiles += await this.copyLibFiles();
     console.log();
 
     console.log('Models:');
+    // Generate ApplicationRecord wrapper (uses ActiveRecord from adapter)
+    totalFiles += await this.generateApplicationRecord();
+    // Transpile model classes (skip application_record.rb if it exists)
     totalFiles += await this.transpileDirectory(
       join(SelfhostBuilder.DEMO_ROOT, 'app/models'),
-      join(this.distDir, 'models')
+      join(this.distDir, 'models'),
+      { skip: ['application_record.rb'] }
     );
     totalFiles += await this.generateModelsIndex();
     console.log();
@@ -309,13 +462,20 @@ export const ArticleViews = {
     console.log();
 
     console.log('Config:');
+    // Transpile config files (skip routes.rb, handled separately)
     totalFiles += await this.transpileDirectory(
       join(SelfhostBuilder.DEMO_ROOT, 'config'),
+      join(this.distDir, 'config'),
+      { skip: ['routes.rb'] }
+    );
+    // Transpile routes.rb into both paths.js and routes.js
+    totalFiles += await this.transpileRoutesFiles(
+      join(SelfhostBuilder.DEMO_ROOT, 'config/routes.rb'),
       join(this.distDir, 'config')
     );
     console.log();
 
-    console.log('Database:');
+    console.log('Schema & Seeds:');
     totalFiles += await this.transpileDirectory(
       join(SelfhostBuilder.DEMO_ROOT, 'db'),
       join(this.distDir, 'db')

@@ -6,6 +6,9 @@ module Ruby2JS
       module Seeds
         include SEXP
 
+        # ActiveRecord class methods that should be awaited
+        AR_CLASS_METHODS = %i[all find find_by where first last count create create!].freeze
+
         def initialize(*args)
           # Note: super must be called first for JS class compatibility
           super
@@ -89,8 +92,11 @@ module Ruby2JS
             statements << s(:import, '../models/index.js', model_consts)
           end
 
+          # Transform the module to make run async and wrap AR operations with await
+          transformed_module = transform_seeds_module(module_node)
+
           # Add the export module Seeds (let ESM filter handle the rest)
-          statements << s(:export, module_node)
+          statements << s(:export, transformed_module)
 
           begin_node = s(:begin, *statements)
           result = process(begin_node)
@@ -102,6 +108,76 @@ module Ruby2JS
             @comments[result] = []
           end
           result
+        end
+
+        def transform_seeds_module(module_node)
+          name, body = module_node.children
+          return module_node unless body
+
+          children = body.type == :begin ? body.children : [body]
+          transformed_children = children.map do |child|
+            if child&.type == :defs &&
+               child.children[0]&.type == :self &&
+               child.children[1] == :run
+              # Transform def self.run to async function with await wrappers
+              transform_run_method(child)
+            else
+              child
+            end
+          end
+
+          new_body = transformed_children.length == 1 ? transformed_children.first : s(:begin, *transformed_children)
+          module_node.updated(nil, [name, new_body])
+        end
+
+        def transform_run_method(node)
+          # node is: s(:defs, s(:self), :run, s(:args), body)
+          _self_node, method_name, args, body = node.children
+
+          # Transform body to wrap AR operations with await
+          transformed_body = wrap_ar_operations(body)
+
+          # Return async singleton method
+          s(:asyncs, s(:self), method_name, args, transformed_body)
+        end
+
+        def wrap_ar_operations(node)
+          return node unless node.respond_to?(:type)
+
+          case node.type
+          when :send
+            target, method, *args = node.children
+
+            # Check for class method calls on model constants (e.g., Article.create)
+            if target&.type == :const && target.children[0].nil?
+              const_name = target.children[1].to_s
+              if @rails_seeds_models.include?(const_name) && AR_CLASS_METHODS.include?(method)
+                # Wrap with await, process children first
+                new_args = args.map { |a| wrap_ar_operations(a) }
+                new_node = node.updated(nil, [target, method, *new_args])
+                return new_node.updated(:await)
+              end
+            end
+
+            # Process children recursively
+            new_children = node.children.map do |c|
+              c.respond_to?(:type) ? wrap_ar_operations(c) : c
+            end
+            # Note: explicit return for JS switch/case compatibility
+            return node.updated(nil, new_children)
+
+          else
+            if node.children.any?
+              # Note: use different variable name to avoid JS TDZ error in switch/case
+              mapped_children = node.children.map do |c|
+                c.respond_to?(:type) ? wrap_ar_operations(c) : c
+              end
+              # Note: explicit return for JS switch/case compatibility
+              return node.updated(nil, mapped_children)
+            else
+              return node
+            end
+          end
         end
       end
     end

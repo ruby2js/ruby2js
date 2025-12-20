@@ -4,6 +4,14 @@
   <meta charset="UTF-8">
   <title>Rails-in-JS Blog</title>
   <link rel="stylesheet" href="/public/styles.css">
+  <!-- Import map for ES module dependencies -->
+  <script type="importmap">
+  {
+    "imports": {
+      "dexie": "/node_modules/dexie/dist/dexie.mjs"
+    }
+  }
+  </script>
 </head>
 <body>
   <div id="loading">Loading Rails-in-JS...<br><small>Powered by transpiled Ruby code</small></div>

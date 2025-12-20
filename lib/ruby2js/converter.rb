@@ -37,7 +37,7 @@ module Ruby2JS
       :=== => :'!=='
     }
 
-    GROUP_OPERATORS = [:begin, :dstr, :dsym, :and, :or, :nullish, :casgn, :if]
+    GROUP_OPERATORS = [:begin, :dstr, :dsym, :and, :or, :nullish, :casgn, :if, :await]
 
     VASGN = [:cvasgn, :ivasgn, :gvasgn, :lvasgn]
 
@@ -494,6 +494,7 @@ unless defined?(RUBY2JS_SELFHOST) # Pragma: skip
           def is_method?
             return false if type == :attr
             return true if type == :call
+            return true if type == :await  # await implies function call, not property access
             return true unless loc
 
             if loc.respond_to? :selector
