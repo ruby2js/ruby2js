@@ -1,7 +1,4 @@
 require 'ruby2js'
-require 'set'
-
-Ruby2JS.module_default ||= :cjs
 
 module Ruby2JS
   module Filter
@@ -14,21 +11,53 @@ module Ruby2JS
 
       IMPORT_FS = s(:import, ['fs'], s(:attr, nil, :fs))
 
+      IMPORT_FS_PROMISES = s(:import, ['fs/promises'], s(:attr, nil, :fs))
+
+      # For existsSync - no async equivalent, always use sync version
+      IMPORT_FS_SYNC = s(:import, ['fs'], s(:attr, nil, :fsSync))
+
       IMPORT_OS = s(:import, ['os'], s(:attr, nil, :os))
 
       IMPORT_PATH = s(:import, ['path'], s(:attr, nil, :path))
 
-      SETUP_ARGV = s(:lvasgn, :ARGV, s(:send, s(:attr, 
+      SETUP_ARGV = s(:lvasgn, :ARGV, s(:send, s(:attr,
           s(:attr, nil, :process), :argv), :slice, s(:int, 2)))
+
+      # Helper to check if async mode is enabled
+      def async?
+        @options[:async]
+      end
+
+      # Helper to generate fs calls - handles sync vs async
+      def fs_call(method, *args)
+        if async?
+          prepend_list << IMPORT_FS_PROMISES
+          # Remove Sync suffix for async methods
+          async_method = method.to_s.sub(/Sync$/, '').to_sym
+          S(:send, nil, :await,
+            s(:send, s(:attr, nil, :fs), async_method, *args))
+        else
+          prepend_list << IMPORT_FS
+          s(:send, s(:attr, nil, :fs), method, *args)
+        end
+      end
+
+      # Special case for existsSync - no async equivalent
+      def fs_exists_call(*args)
+        if async?
+          prepend_list << IMPORT_FS_SYNC
+          S(:send, s(:attr, nil, :fsSync), :existsSync, *args)
+        else
+          prepend_list << IMPORT_FS
+          S(:send, s(:attr, nil, :fs), :existsSync, *args)
+        end
+      end
 
       def on_send(node)
         target, method, *args = node.children
 
         if target == nil
-          if method == :__dir__ and args.length == 0
-            S(:attr, nil, :__dirname)
-
-          elsif method == :exit and args.length <= 1
+          if method == :exit and args.length <= 1
             s(:send, s(:attr, nil, :process), :exit, *process_all(args));
 
           elsif method == :system
@@ -45,8 +74,8 @@ module Ruby2JS
             end
 
           elsif \
-            method == :require and args.length == 1 and 
-            args.first.type == :str and 
+            method == :require and args.length == 1 and
+            args.first.type == :str and
             %w(fileutils tmpdir).include? args.first.children.first
           then
             s(:begin)
@@ -60,80 +89,63 @@ module Ruby2JS
           target.type == :const and target.children.first == nil
         then
           if method == :read and args.length == 1
-            prepend_list << IMPORT_FS
-            S(:send, s(:attr, nil, :fs), :readFileSync, *process_all(args),
-              s(:str, 'utf8'))
+            fs_call(:readFileSync, *process_all(args), s(:str, 'utf8'))
 
           elsif method == :write and args.length == 2
-            prepend_list << IMPORT_FS
-            S(:send, s(:attr, nil, :fs), :writeFileSync, *process_all(args))
+            fs_call(:writeFileSync, *process_all(args))
 
           elsif target.children.last == :IO
             super
 
           elsif [:exist?, :exists?].include? method and args.length == 1
-            prepend_list << IMPORT_FS
-            S(:send, s(:attr, nil, :fs), :existsSync, process(args.first))
+            fs_exists_call(process(args.first))
 
           elsif method == :readlink and args.length == 1
-            prepend_list << IMPORT_FS
-            S(:send, s(:attr, nil, :fs), :readlinkSync, process(args.first))
+            fs_call(:readlinkSync, process(args.first))
 
           elsif method == :realpath and args.length == 1
-            prepend_list << IMPORT_FS
-            S(:send, s(:attr, nil, :fs), :realpathSync, process(args.first))
+            fs_call(:realpathSync, process(args.first))
 
           elsif method == :rename and args.length == 2
-            prepend_list << IMPORT_FS
-            S(:send, s(:attr, nil, :fs), :renameSync, *process_all(args))
+            fs_call(:renameSync, *process_all(args))
 
           elsif \
-            [:chmod, :lchmod].include? method and 
+            [:chmod, :lchmod].include? method and
             args.length > 1 and args.first.type == :int
           then
-            prepend_list << IMPORT_FS
-
             S(:begin, *args[1..-1].map{|file|
-              S(:send, s(:attr, nil, :fs), method.to_s + 'Sync', process(file),
+              fs_call(method.to_s + 'Sync', process(file),
                 s(:octal, *args.first.children))
             })
 
           elsif \
-            [:chown, :lchown].include? method and args.length > 2 and 
+            [:chown, :lchown].include? method and args.length > 2 and
             args[0].type == :int and args[1].type == :int
           then
-            prepend_list << IMPORT_FS
-
             S(:begin, *args[2..-1].map{|file|
-              s(:send, s(:attr, nil, :fs), method.to_s + 'Sync', process(file),
+              fs_call(method.to_s + 'Sync', process(file),
                 *process_all(args[0..1]))
             })
 
-          elsif [:ln, :link].include? method and args.length == 2
-            prepend_list << IMPORT_FS
-            s(:send, s(:attr, nil, :fs), :linkSync, *process_all(args))
-            
+          elsif method == :link and args.length == 2
+            fs_call(:linkSync, *process_all(args))
+
           elsif method == :symlink and args.length == 2
-            prepend_list << IMPORT_FS
-            S(:send, s(:attr, nil, :fs), :symlinkSync, *process_all(args))
-            
+            fs_call(:symlinkSync, *process_all(args))
+
           elsif method == :truncate and args.length == 2
-            prepend_list << IMPORT_FS
-            S(:send, s(:attr, nil, :fs), :truncateSync, *process_all(args))
-            
+            fs_call(:truncateSync, *process_all(args))
+
           elsif [:stat, :lstat].include? method and args.length == 1
-            prepend_list << IMPORT_FS
-            S(:send, s(:attr, nil, :fs), method.to_s + 'Sync',
-              process(args.first))
+            fs_call(method.to_s + 'Sync', process(args.first))
 
           elsif method == :unlink and args.length == 1
-            prepend_list << IMPORT_FS
             S(:begin, *args.map{|file|
-              S(:send, s(:attr, nil, :fs), :unlinkSync, process(file))
+              fs_call(:unlinkSync, process(file))
             })
 
           elsif target.children.last == :File
-            if method == :absolute_path
+            if method == :absolute_path or method == :expand_path
               prepend_list << IMPORT_PATH
               S(:send, s(:attr, nil, :path), :resolve,
                 *process_all(args.reverse))
@@ -171,21 +183,32 @@ module Ruby2JS
               [arg]
             end
           end
-            
+
           if [:cp, :copy].include? method and args.length == 2
-            prepend_list << IMPORT_FS
-            s(:send, s(:attr, nil, :fs), :copyFileSync, *process_all(args))
-            
+            fs_call(:copyFileSync, *process_all(args))
+
           elsif [:mv, :move].include? method and args.length == 2
-            prepend_list << IMPORT_FS
-            S(:send, s(:attr, nil, :fs), :renameSync, *process_all(args))
+            fs_call(:renameSync, *process_all(args))
 
           elsif method == :mkdir and args.length == 1
-            prepend_list << IMPORT_FS
             S(:begin, *list[args.last].map {|file|
-              s(:send, s(:attr, nil, :fs), :mkdirSync, process(file))
+              fs_call(:mkdirSync, process(file))
             })
-            
+
+          elsif method == :mkdir_p and args.length == 1
+            S(:begin, *list[args.last].map {|file|
+              fs_call(:mkdirSync, process(file),
+                s(:hash, s(:pair, s(:sym, :recursive), s(:true))))
+            })
+
+          elsif method == :rm_rf and args.length == 1
+            S(:begin, *list[args.last].map {|file|
+              fs_call(:rmSync, process(file),
+                s(:hash,
+                  s(:pair, s(:sym, :recursive), s(:true)),
+                  s(:pair, s(:sym, :force), s(:true))))
+            })
+
           elsif method == :cd and args.length == 1
             S(:send, s(:attr, nil, :process), :chdir, *process_all(args))
 
@@ -193,52 +216,51 @@ module Ruby2JS
             S(:send!, s(:attr, nil, :process), :cwd)
 
           elsif method == :rmdir and args.length == 1
-            prepend_list << IMPORT_FS
             S(:begin, *list[args.last].map {|file|
-              s(:send, s(:attr, nil, :fs), :rmdirSync, process(file))
+              fs_call(:rmdirSync, process(file))
             })
 
           elsif method == :ln and args.length == 2
-            prepend_list << IMPORT_FS
-            S(:send, s(:attr, nil, :fs), :linkSync, *process_all(args))
-            
+            fs_call(:linkSync, *process_all(args))
+
           elsif method == :ln_s and args.length == 2
-            prepend_list << IMPORT_FS
-            S(:send, s(:attr, nil, :fs), :symlinkSync, *process_all(args))
-            
+            fs_call(:symlinkSync, *process_all(args))
+
           elsif method == :rm and args.length == 1
-            prepend_list << IMPORT_FS
             S(:begin, *list[args.last].map {|file|
-              s(:send, s(:attr, nil, :fs), :unlinkSync, process(file))
+              fs_call(:unlinkSync, process(file))
             })
 
           elsif \
             method == :chmod and args.length == 2 and args.first.type == :int
           then
-            prepend_list << IMPORT_FS
-
             S(:begin, *list[args.last].map {|file|
-              S(:send, s(:attr, nil, :fs), method.to_s + 'Sync', process(file),
+              fs_call(:chmodSync, process(file),
                 s(:octal, *args.first.children))
             })
 
           elsif \
-            method == :chown and args.length == 3 and 
+            method == :chown and args.length == 3 and
             args[0].type == :int and args[1].type == :int
           then
-            prepend_list << IMPORT_FS
-
             S(:begin, *list[args.last].map {|file|
-              s(:send, s(:attr, nil, :fs), method.to_s + 'Sync', process(file),
-                *process_all(args[0..1]))})
+              fs_call(:chownSync, process(file), *process_all(args[0..1]))
+            })
 
           elsif method == :touch
-            prepend_list << IMPORT_FS
-
             S(:begin, *list[args.first].map {|file|
-              S(:send, s(:attr, nil, :fs), :closeSync,
-                s(:send, s(:attr, nil, :fs), :openSync, file,
-                s(:str, "w")))})
+              if async?
+                prepend_list << IMPORT_FS_PROMISES
+                # For async: await fs.writeFile(file, '', {flag: 'a'})
+                S(:send, nil, :await,
+                  s(:send, s(:attr, nil, :fs), :writeFile, file, s(:str, ''),
+                    s(:hash, s(:pair, s(:sym, :flag), s(:str, 'a')))))
+              else
+                prepend_list << IMPORT_FS
+                S(:send, s(:attr, nil, :fs), :closeSync,
+                  s(:send, s(:attr, nil, :fs), :openSync, file, s(:str, "w")))
+              end
+            })
 
           else
             super
@@ -253,16 +275,12 @@ module Ruby2JS
           elsif method == :pwd and args.length == 0
             S(:send!, s(:attr, nil, :process), :cwd)
           elsif method == :entries
-            prepend_list << IMPORT_FS
-            S(:send, s(:attr, nil, :fs), :readdirSync, *process_all(args))
+            fs_call(:readdirSync, *process_all(args))
           elsif method == :mkdir and args.length == 1
-            prepend_list << IMPORT_FS
-            S(:send, s(:attr, nil, :fs), :mkdirSync, process(args.first))
+            fs_call(:mkdirSync, process(args.first))
           elsif method == :rmdir and args.length == 1
-            prepend_list << IMPORT_FS
-            S(:send, s(:attr, nil, :fs), :rmdirSync, process(args.first))
+            fs_call(:rmdirSync, process(args.first))
           elsif method == :mktmpdir and args.length <=1
-            prepend_list << IMPORT_FS
             if args.length == 0
               prefix = s(:str, 'd')
             elsif args.first.type == :array
@@ -271,7 +289,7 @@ module Ruby2JS
               prefix = args.first
             end
 
-            S(:send, s(:attr, nil, :fs), :mkdtempSync, process(prefix))
+            fs_call(:mkdtempSync, process(prefix))
           elsif method == :home and args.length == 0
             prepend_list << IMPORT_OS
             S(:send!, s(:attr, nil, :os), :homedir)
@@ -299,7 +317,7 @@ module Ruby2JS
         then
           s(:begin,
             s(:gvasgn, :$oldwd, s(:send, s(:attr, nil, :process), :cwd)),
-            s(:kwbegin, s(:ensure, 
+            s(:kwbegin, s(:ensure,
               s(:begin, process(call), process(node.children.last)),
               s(:send, s(:attr, nil, :process), :chdir, s(:gvar, :$oldwd)))))
         else
@@ -365,24 +383,6 @@ module Ruby2JS
 
         s(:send, s(:attr, nil, :child_process), :execSync, command,
           s(:hash, s(:pair, s(:sym, :encoding), s(:str, 'utf8'))))
-      end
-
-      def on___FILE__(node)
-        s(:attr, nil, :__filename)
-      end
-
-      # Handle __FILE__ from Prism::Translation::Parser which produces :str nodes
-      def on_str(node)
-        # Prism converts __FILE__ to s(:str, filename) where filename matches buffer name
-        # Only check if location has expression method (Parser::AST::Node style)
-        if node.loc.respond_to?(:expression) && node.loc.expression
-          source = node.loc.expression.source
-          buffer_name = node.loc.expression.source_buffer.name
-          if source == '__FILE__' && node.children.first == buffer_name
-            return s(:attr, nil, :__filename)
-          end
-        end
-        super
       end
     end
 

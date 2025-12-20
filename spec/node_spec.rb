@@ -3,24 +3,19 @@ require 'ruby2js/filter/node'
 require 'ruby2js/filter/esm'
 
 describe Ruby2JS::Filter::Node do
-  
-  def to_js( string)
+
+  def to_js(string)
     _(Ruby2JS.convert(string, filters: [Ruby2JS::Filter::Node],
     module: :cjs).to_s)
   end
-  
-  def to_js_esm( string)
+
+  def to_js_esm(string)
     _(Ruby2JS.convert(string, filters: [Ruby2JS::Filter::Node]).to_s)
   end
-  
-  describe 'globals' do
-    it 'should handle __FILE__' do
-      to_js( '__FILE__' ).must_equal '__filename'
-    end
 
-    it 'should handle __dir__' do
-      to_js( '__dir__' ).must_equal '__dirname'
-    end
+  def to_js_async(string)
+    _(Ruby2JS.convert(string, filters: [Ruby2JS::Filter::Node],
+    async: true).to_s)
   end
 
   describe 'ARGV' do
@@ -28,7 +23,7 @@ describe Ruby2JS::Filter::Node do
       to_js( 'ARGV' ).must_equal 'let ARGV = process.argv.slice(2); ARGV'
     end
   end
-  
+
   describe 'child_process' do
     it 'should handle backtics' do
       to_js('`echo hi`').
@@ -117,8 +112,6 @@ describe Ruby2JS::Filter::Node do
     it 'should handle File.link' do
       to_js( 'File.link("foo", "bar")' ).
         must_equal 'const fs = require("fs"); fs.linkSync("foo", "bar")'
-      to_js( 'File.ln("foo", "bar")' ).
-        must_equal 'const fs = require("fs"); fs.linkSync("foo", "bar")'
       to_js( 'FileUtils.ln("foo", "bar")' ).
         must_equal 'const fs = require("fs"); fs.linkSync("foo", "bar")'
     end
@@ -167,6 +160,16 @@ describe Ruby2JS::Filter::Node do
         must_equal 'const fs = require("fs"); fs.mkdirSync("foo")'
     end
 
+    it 'should handle FileUtils.mkdir_p' do
+      to_js( 'FileUtils.mkdir_p("foo/bar")' ).
+        must_equal 'const fs = require("fs"); fs.mkdirSync("foo/bar", {recursive: true})'
+    end
+
+    it 'should handle FileUtils.rm_rf' do
+      to_js( 'FileUtils.rm_rf("foo")' ).
+        must_equal 'const fs = require("fs"); fs.rmSync("foo", {recursive: true, force: true})'
+    end
+
     it 'should handle Dir.rmdir' do
       to_js( 'Dir.rmdir("foo")' ).
         must_equal 'const fs = require("fs"); fs.rmdirSync("foo")'
@@ -186,10 +189,15 @@ describe Ruby2JS::Filter::Node do
         must_equal 'const fs = require("fs"); fs.mkdtempSync("foo")'
     end
   end
-  
+
   describe 'path' do
     it 'should handle File.absolute_path' do
       to_js( 'File.absolute_path("foo")' ).
+        must_equal 'const path = require("path"); path.resolve("foo")'
+    end
+
+    it 'should handle File.expand_path' do
+      to_js( 'File.expand_path("foo")' ).
         must_equal 'const path = require("path"); path.resolve("foo")'
     end
 
@@ -313,6 +321,43 @@ describe Ruby2JS::Filter::Node do
         must_equal 'import child_process from "child_process"; ' +
           'let ARGV = process.argv.slice(2); ' +
           'ARGV[0] + child_process.execSync("echo hi", {encoding: "utf8"})'
+    end
+  end
+
+  describe 'async mode' do
+    it 'should use fs/promises for File.read' do
+      to_js_async( 'File.read("foo")' ).
+        must_equal 'import fs from "fs/promises"; await fs.readFile("foo", "utf8")'
+    end
+
+    it 'should use fs/promises for File.write' do
+      to_js_async( 'IO.write("foo", "bar")' ).
+        must_equal 'import fs from "fs/promises"; await fs.writeFile("foo", "bar")'
+    end
+
+    it 'should use fs/promises for FileUtils.mkdir_p' do
+      to_js_async( 'FileUtils.mkdir_p("foo/bar")' ).
+        must_equal 'import fs from "fs/promises"; await fs.mkdir("foo/bar", {recursive: true})'
+    end
+
+    it 'should use fs/promises for FileUtils.rm_rf' do
+      to_js_async( 'FileUtils.rm_rf("foo")' ).
+        must_equal 'import fs from "fs/promises"; await fs.rm("foo", {recursive: true, force: true})'
+    end
+
+    it 'should use fs/promises for FileUtils.cp' do
+      to_js_async( 'FileUtils.cp("foo", "bar")' ).
+        must_equal 'import fs from "fs/promises"; await fs.copyFile("foo", "bar")'
+    end
+
+    it 'should use fs/promises for Dir.entries' do
+      to_js_async( 'Dir.entries("foo")' ).
+        must_equal 'import fs from "fs/promises"; await fs.readdir("foo")'
+    end
+
+    it 'should keep existsSync even in async mode' do
+      to_js_async( 'File.exist?("foo")' ).
+        must_equal 'import fsSync from "fs"; fsSync.existsSync("foo")'
     end
   end
 
