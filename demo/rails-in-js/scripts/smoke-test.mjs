@@ -12,6 +12,7 @@ import { dirname } from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const DEMO_ROOT = join(__dirname, '..');
+const PROJECT_ROOT = join(DEMO_ROOT, '../..');  // ruby2js root where Gemfile lives
 
 // Parse command line options
 const showDiff = process.argv.includes('--diff') || process.argv.includes('-d');
@@ -206,8 +207,9 @@ async function runTests() {
     // Test 1: Ruby build
     log('1. Ruby build', BOLD);
     try {
-      execSync(`ruby scripts/build.rb "${rubyDist}"`, {
-        cwd: DEMO_ROOT,
+      // Run from PROJECT_ROOT where Gemfile lives, with path to build script
+      execSync(`bundle exec ruby demo/rails-in-js/scripts/build.rb "${rubyDist}"`, {
+        cwd: PROJECT_ROOT,
         encoding: 'utf8',
         stdio: ['pipe', 'pipe', 'pipe']
       });
