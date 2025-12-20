@@ -88,8 +88,10 @@ def transpile_erb_file(src_path, dest_path)
   template = File.read(src_path)
 
   # Convert ERB to Ruby, then to JavaScript
+  # Note: Don't pass file: src_path because Prism would try to read the ERB file
+  # instead of using the Ruby source from Erubi
   ruby_src = Ruby2JS::Erubi.new(template).src
-  js = Ruby2JS.convert(ruby_src, ERB_OPTIONS.merge(file: src_path)).to_s
+  js = Ruby2JS.convert(ruby_src, ERB_OPTIONS).to_s
 
   # Add export keyword to make it importable
   js = js.sub(/^function render/, 'export function render')

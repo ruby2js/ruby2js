@@ -207,24 +207,37 @@ export class SelfhostBuilder {
         // No more ERB tags, add remaining text
         const text = template.slice(pos);
         if (text) {
-          rubyCode += `_buf << '${this.escapeRubyString(text)}'.freeze\n`;
+          rubyCode += `_buf << ${this.emitRubyString(text)}\n`;
         }
         break;
       }
 
-      // Add text before ERB tag
-      if (erbStart > pos) {
-        const text = template.slice(pos, erbStart);
-        rubyCode += `_buf << '${this.escapeRubyString(text)}'.freeze\n`;
-      }
-
-      // Find end of ERB tag
+      // Find end of ERB tag first to check if this is a code block
       const erbEnd = template.indexOf('%>', erbStart);
       if (erbEnd === -1) {
         throw new Error('Unclosed ERB tag');
       }
 
       let tag = template.slice(erbStart + 2, erbEnd);
+      const isCodeBlock = !tag.trim().startsWith('=') && !tag.trim().startsWith('-');
+
+      // Add text before ERB tag
+      if (erbStart > pos) {
+        let text = template.slice(pos, erbStart);
+        // For code blocks, strip trailing whitespace on the same line as <% %>
+        // This matches Ruby Erubi behavior where leading indent before <% %> is not included
+        if (isCodeBlock && text.includes('\n')) {
+          // Find the last newline and check if everything after is whitespace
+          const lastNewline = text.lastIndexOf('\n');
+          const afterNewline = text.slice(lastNewline + 1);
+          if (/^\s*$/.test(afterNewline)) {
+            text = text.slice(0, lastNewline + 1);
+          }
+        }
+        if (text) {
+          rubyCode += `_buf << ${this.emitRubyString(text)}\n`;
+        }
+      }
 
       // Handle -%> (trim trailing newline)
       const trimTrailing = tag.endsWith('-');
@@ -234,22 +247,34 @@ export class SelfhostBuilder {
 
       tag = tag.trim();
 
+      // isCodeBlock was already computed above for whitespace stripping
+      let isOutputExpr = false;
       if (tag.startsWith('=')) {
         // Output expression: <%= expr %>
         const expr = tag.slice(1).trim();
         rubyCode += `_buf << ( ${expr} ).to_s\n`;
+        isOutputExpr = true;
       } else if (tag.startsWith('-')) {
         // Unescaped output: <%- expr %> (same as <%= for our purposes)
         const expr = tag.slice(1).trim();
         rubyCode += `_buf << ( ${expr} ).to_s\n`;
+        isOutputExpr = true;
       } else {
         // Code block: <% code %>
         rubyCode += `${tag}\n`;
       }
 
       pos = erbEnd + 2;
-      // Handle -%> trimming
-      if (trimTrailing && pos < template.length && template[pos] === '\n') {
+      // Trim trailing newline after code blocks (like Erubi does by default)
+      // This matches Ruby's behavior where <% %> doesn't leave extra newlines
+      if ((trimTrailing || isCodeBlock) && pos < template.length && template[pos] === '\n') {
+        pos++;
+      }
+
+      // For output expressions, if followed by a newline, add it as a separate literal
+      // This matches Ruby Erubi which splits the newline after output expressions
+      if (isOutputExpr && pos < template.length && template[pos] === '\n') {
+        rubyCode += `_buf << ${this.emitRubyString('\n')}\n`;
         pos++;
       }
     }
@@ -271,6 +296,15 @@ export class SelfhostBuilder {
     return str
       .replace(/\\/g, '\\\\')
       .replace(/'/g, "\\'");
+  }
+
+  // Emit a Ruby string literal matching Erubi's format
+  // Multi-line strings use single quotes with actual newlines (triggering template literals)
+  // Single-line strings use single quotes with .freeze
+  emitRubyString(str) {
+    // Always use single-quoted strings with proper escaping
+    // The actual newlines in the source trigger multi-line detection for template literals
+    return `'${this.escapeRubyString(str)}'.freeze`;
   }
 
   async transpileErbDirectory(srcDir, destDir) {

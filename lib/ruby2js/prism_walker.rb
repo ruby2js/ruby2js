@@ -147,6 +147,21 @@ module Ruby2JS
       Node.new(type, children)
     end
 
+    # Compute line number at a given offset (1-based)
+    # Works in both Ruby and JavaScript (where Prism location doesn't have start_line)
+    def line_at_offset(offset)
+      @source[0, offset].count("\n") + 1
+    end
+
+    # Check if a Prism node spans multiple lines in source
+    # This is used for template literal detection in multi-line strings
+    def node_multiline?(node)
+      loc = node.location
+      start_line = line_at_offset(loc.start_offset)
+      end_line = line_at_offset(loc.start_offset + loc.length)
+      start_line != end_line
+    end
+
     # Create a new AST node with location from Prism node
     def sl(node, type, *children, endless: false)
       loc = node.location

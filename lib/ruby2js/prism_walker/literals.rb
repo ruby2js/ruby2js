@@ -29,7 +29,8 @@ module Ruby2JS
       is_heredoc = opening&.start_with?('<<')
 
       # Check if string actually spans multiple lines in source (not just contains \n escape)
-      is_multiline = node.location.start_line != node.location.end_line
+      # Uses node_multiline? helper which works in both Ruby and JavaScript
+      is_multiline = node_multiline?(node)
 
       if is_heredoc && node.unescaped.empty?
         # Empty heredocs should be dstr (dynamic string) with no children
@@ -43,8 +44,8 @@ module Ruby2JS
         parts.each_with_index do |part, i|
           if part == "\n"
             # Append newline to previous part if exists, otherwise create new part
-            if children.last
-              children[-1] = s(:str, children.last.children.first + "\n")
+            if children[-1]
+              children[-1] = s(:str, children[-1].children[0] + "\n")
             else
               children << s(:str, "\n")
             end
@@ -53,8 +54,8 @@ module Ruby2JS
           end
         end
         # Handle trailing newline
-        if node.unescaped.end_with?("\n") && children.last && !children.last.children.first.end_with?("\n")
-          children[-1] = s(:str, children.last.children.first + "\n")
+        if node.unescaped.end_with?("\n") && children[-1] && !children[-1].children[0].end_with?("\n")
+          children[-1] = s(:str, children[-1].children[0] + "\n")
         end
         sl(node, :dstr, *children)
       else

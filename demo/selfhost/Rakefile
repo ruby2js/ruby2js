@@ -196,11 +196,27 @@ task :test_partial => :npm_install do
   end
 end
 
+RAILS_IN_JS = File.join(File.dirname(SELFHOST), 'rails-in-js')
+
+desc "Install npm dependencies for rails-in-js demo"
+task :npm_install_rails_in_js do
+  Dir.chdir(RAILS_IN_JS) do
+    sh "npm install" unless File.exist?('node_modules/sql.js')
+  end
+end
+
+desc "Run rails-in-js smoke tests (compares Ruby vs selfhost builds)"
+task :test_smoke => [:npm_install, :npm_install_rails_in_js, "#{SELFHOST}/ruby2js.js", :build_filters] do
+  Dir.chdir(RAILS_IN_JS) do
+    sh "npm run test:smoke"
+  end
+end
+
 desc "Build and run all tests"
 task :test => [:build, :test_walker, :test_specs]
 
 desc "Build and run CI tests (ready must pass, partial informational)"
-task :ci => [:build_ready, :build_partial, :test_walker, :test_ready, :test_partial]
+task :ci => [:build_ready, :build_partial, :test_walker, :test_ready, :test_partial, :test_smoke]
 
 desc "Clean dist directory and generated files"
 task :clean do
