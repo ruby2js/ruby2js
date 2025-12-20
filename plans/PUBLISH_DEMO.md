@@ -245,6 +245,23 @@ The smoke test must:
 ### 6.2 Update blog post Quick Start
 - [ ] Update URL in `~/git/intertwingly/src/3393.md`
 
+## Constraints
+
+### Development workflow must be preserved
+After this plan is executed, developers must still be able to:
+```bash
+git clone https://github.com/ruby2js/ruby2js.git
+cd ruby2js/demo/ruby2js-on-rails
+npm install
+npm run dev
+```
+
+This means:
+- The demo directory structure must work both in-repo and as a standalone tarball
+- In-repo: references `../selfhost/` for the transpiler
+- Tarball: includes `vendor/ruby2js/` with pre-transpiled framework
+- The publish script creates the vendor structure; the repo uses symlinks or path resolution that works in both contexts
+
 ## Dependencies
 
 - Selfhost build must be complete and working
