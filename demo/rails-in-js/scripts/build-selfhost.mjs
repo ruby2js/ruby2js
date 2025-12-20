@@ -195,9 +195,10 @@ export class SelfhostBuilder {
   // Compile ERB template to Ruby code (like Ruby2JS::Erubi), then transpile to JavaScript
   // This mimics the Ruby ERB compilation pipeline so we can use the erb filter
   compileERBToCode(template, viewName) {
-    // Step 1: Parse ERB and generate Ruby code like Erubi does
+    // Step 1: Parse ERB and generate Ruby code exactly like Erubi does
     // Format: _buf = ::String.new; _buf << 'literal'.freeze; _buf << ( expr ).to_s; ... _buf.to_s
-    let rubyCode = "_buf = ::String.new\n";
+    // Key: buffer operations use semicolons, code blocks use newlines
+    let rubyCode = "_buf = ::String.new;";
 
     let pos = 0;
     while (pos < template.length) {
@@ -207,7 +208,7 @@ export class SelfhostBuilder {
         // No more ERB tags, add remaining text
         const text = template.slice(pos);
         if (text) {
-          rubyCode += `_buf << ${this.emitRubyString(text)}\n`;
+          rubyCode += ` _buf << ${this.emitRubyString(text)};`;
         }
         break;
       }
@@ -235,7 +236,7 @@ export class SelfhostBuilder {
           }
         }
         if (text) {
-          rubyCode += `_buf << ${this.emitRubyString(text)}\n`;
+          rubyCode += ` _buf << ${this.emitRubyString(text)};`;
         }
       }
 
@@ -252,16 +253,16 @@ export class SelfhostBuilder {
       if (tag.startsWith('=')) {
         // Output expression: <%= expr %>
         const expr = tag.slice(1).trim();
-        rubyCode += `_buf << ( ${expr} ).to_s\n`;
+        rubyCode += ` _buf << ( ${expr} ).to_s;`;
         isOutputExpr = true;
       } else if (tag.startsWith('-')) {
         // Unescaped output: <%- expr %> (same as <%= for our purposes)
         const expr = tag.slice(1).trim();
-        rubyCode += `_buf << ( ${expr} ).to_s\n`;
+        rubyCode += ` _buf << ( ${expr} ).to_s;`;
         isOutputExpr = true;
       } else {
-        // Code block: <% code %>
-        rubyCode += `${tag}\n`;
+        // Code block: <% code %> - use newline, not semicolon
+        rubyCode += ` ${tag}\n`;
       }
 
       pos = erbEnd + 2;
@@ -274,12 +275,12 @@ export class SelfhostBuilder {
       // For output expressions, if followed by a newline, add it as a separate literal
       // This matches Ruby Erubi which splits the newline after output expressions
       if (isOutputExpr && pos < template.length && template[pos] === '\n') {
-        rubyCode += `_buf << ${this.emitRubyString('\n')}\n`;
+        rubyCode += ` _buf << ${this.emitRubyString('\n')};`;
         pos++;
       }
     }
 
-    rubyCode += "_buf.to_s\n";
+    rubyCode += "\n_buf.to_s";
 
     // Step 2: Transpile Ruby code through selfhost converter with erb filter
     const result = SelfhostBuilder.converter.convert(rubyCode, {
