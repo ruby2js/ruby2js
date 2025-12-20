@@ -50,18 +50,27 @@ module Ruby2JS
           return S(:send, s(:attr, nil, :yaml), :dump, process(args.first))
         end
 
-        # require 'yaml' or 'json' → remove (yaml handled by import above, json built-in)
+        # require 'yaml', 'json', or 'fileutils' → remove
+        # (yaml handled by import above, json built-in, fileutils replaced by node filter)
         if target.nil? && method == :require && args.length == 1 &&
-           args.first.type == :str && %w[yaml json].include?(args.first.children.first)
+           args.first.type == :str && %w[yaml json fileutils].include?(args.first.children.first)
           return s(:begin)
         end
 
-        # require 'ruby2js' → import { Ruby2JS } from selfhost path
+        # require 'ruby2js' → import * as Ruby2JS from selfhost path; await Ruby2JS.initPrism()
         if target.nil? && method == :require && args.length == 1 &&
            args.first.type == :str && args.first.children.first == 'ruby2js'
           # Default path assumes script is in demo/*/scripts/ relative to demo/selfhost/
           selfhost_path = @options[:selfhost_path] || '../../selfhost/ruby2js.js'
-          return s(:import, [selfhost_path], s(:attr, nil, :Ruby2JS))
+          # Namespace import with async initialization for selfhost
+          # Note: await is s(:send, nil, :await, expr) not s(:await, expr)
+          # Path array format: [as_pair, from_pair] for "import * as X from Y"
+          return s(:begin,
+            s(:import,
+              [s(:pair, s(:sym, :as), s(:const, nil, :Ruby2JS)),
+               s(:pair, s(:sym, :from), s(:str, selfhost_path))],
+              s(:str, '*')),
+            s(:send, nil, :await, s(:send, s(:const, nil, :Ruby2JS), :initPrism)))
         end
 
         # require 'ruby2js/filter/rails' → import Rails filters
@@ -75,8 +84,9 @@ module Ruby2JS
             # For simple paths like 'functions', export as 'Functions'
             parts = filter_name.split('/')
             export_name = parts.map { |p| filter_to_export_name(p) }.join('_')
+            # Use named import { X } since selfhost modules use named exports
             return s(:import, ["#{selfhost_filters}/#{filter_name}.js"],
-              s(:attr, nil, export_name.to_sym))
+              s(:array, s(:const, nil, export_name.to_sym)))
           end
         end
 
@@ -106,7 +116,7 @@ module Ruby2JS
       end
 
       def on_const(node)
-        # Ruby2JS::Filter::Rails::Model → Rails_Model (matching selfhost exports)
+        # Ruby2JS::Filter::Rails::Model → Rails_Model.prototype (matching selfhost usage)
         if node.children.first&.type == :const
           parts = []
           n = node
@@ -115,20 +125,36 @@ module Ruby2JS
             n = n.children.first
           end
 
-          # Ruby2JS::Filter::X → X (matching selfhost exports)
+          # Ruby2JS::Filter::X → X.prototype (selfhost pipeline expects prototype objects)
           if parts[0] == :Ruby2JS && parts[1] == :Filter && parts.length >= 3
             if parts.length == 3
-              # Ruby2JS::Filter::ESM → ESM, Ruby2JS::Filter::Functions → Functions
+              # Ruby2JS::Filter::ESM → ESM.prototype
               export_name = filter_to_export_name(parts[2].to_s)
-              return s(:const, nil, export_name.to_sym)
+              # Use :attr for property access (no parentheses) instead of :send
+              return s(:attr, s(:const, nil, export_name.to_sym), :prototype)
             else
-              # Ruby2JS::Filter::Rails::Model → Rails_Model
+              # Ruby2JS::Filter::Rails::Model → Rails_Model.prototype
               filter_parts = parts[2..-1].map { |p| filter_to_export_name(p.to_s) }
-              return s(:const, nil, filter_parts.join('_').to_sym)
+              return s(:attr, s(:const, nil, filter_parts.join('_').to_sym), :prototype)
             end
           end
         end
 
+        super
+      end
+
+      def on_gvar(node)
+        # $0 → `file://${process.argv[1]}` for ESM main script check
+        # This works with __FILE__ → import.meta.url conversion from ESM filter
+        if node.children.first == :$0
+          # Build: `file://${process.argv[1]}`
+          return s(:dstr,
+            s(:str, 'file://'),
+            s(:begin, s(:send,
+              s(:attr, s(:attr, nil, :process), :argv),
+              :[],
+              s(:int, 1))))
+        end
         super
       end
 

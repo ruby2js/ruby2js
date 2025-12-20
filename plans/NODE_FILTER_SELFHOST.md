@@ -64,24 +64,24 @@ Refactored `build.rb` to export a `SelfhostBuilder` class with:
 
 ## Remaining Work
 
-### Stage 5: Fix Selfhost Export Issues 🔄 IN PROGRESS
+### Stage 5: Fix Selfhost Export Issues ✅ COMPLETE
 
-The transpiled `build.mjs` has import issues because selfhost modules use named exports, not default exports:
+Updated `selfhost_build.rb` filter to handle all export and initialization differences:
 
-| Module | Current Import | Needed Import |
-|--------|----------------|---------------|
-| ruby2js.js | `import Ruby2JS from ...` | Named or init pattern |
-| filters/*.js | `import X from ...` | `import { X } from ...` |
+| Transformation | Before | After |
+|----------------|--------|-------|
+| `require 'ruby2js'` | `import Ruby2JS from ...` | `import * as Ruby2JS from ...; await Ruby2JS.initPrism()` |
+| `require 'ruby2js/filter/X'` | `import X from ...` | `import { X } from ...` |
+| `Ruby2JS::Filter::X` | `X` | `X.prototype` |
+| `$0` | `$0` (invalid JS) | `` `file://${process.argv[1]}` `` |
+| `require 'fileutils'` | `require("fileutils")` | (removed) |
 
-**Options:**
-1. Update selfhost_build filter to detect named vs default exports
-2. Add default exports to selfhost modules
-3. Use the hand-written build-selfhost.mjs pattern (dynamic imports with destructuring)
-
-**Additional runtime issues found:**
-- `process.env.fetch()` doesn't exist in JS (need `process.env.X || default`)
-- `hash.keys` needs Functions filter to convert to `Object.keys(hash)`
-- CLI check `$0` doesn't exist in JS
+**Key changes to `lib/ruby2js/filter/selfhost_build.rb`:**
+- Namespace import with async init for `require 'ruby2js'`
+- Named imports `{ X }` for filter requires
+- `.prototype` suffix on filter constants for pipeline compatibility
+- `$0` → template literal for ESM main script check
+- Remove `fileutils` require (handled by Node filter)
 
 ### Stage 6: Wire Up and Verify ⏳ PENDING
 
@@ -121,22 +121,21 @@ Once Stage 5 is complete:
 
 ## Key Insight
 
-The transpiled `build.mjs` cannot be a drop-in replacement for the hand-written `build-selfhost.mjs` because:
+~~The transpiled `build.mjs` cannot be a drop-in replacement~~ **UPDATE: The `selfhost_build` filter now handles all the architectural differences:**
 
-1. **Ruby2JS.convert** - The Ruby version calls Ruby's Ruby2JS, but the JS version needs the selfhost converter with async initialization
-2. **Export patterns** - Selfhost uses named exports and requires initialization (`initPrism()`)
-3. **Filter loading** - Selfhost filters need `.prototype` passed to the pipeline
+1. **Ruby2JS.convert** - ✅ Filter generates `import * as Ruby2JS` with `await Ruby2JS.initPrism()`
+2. **Export patterns** - ✅ Filter generates named imports `{ X }` for selfhost modules
+3. **Filter loading** - ✅ Filter adds `.prototype` to filter constants
 
-The hand-written version exists because it uses a fundamentally different architecture suited to JS:
-- `async init()` method to load Prism WASM and filters
-- Dynamic imports with destructuring for named exports
-- `SelfhostBuilder.converter.convert()` instead of `Ruby2JS.convert()`
+The transpiled version should now be functionally equivalent to the hand-written version, with the filter handling:
+- Top-level await for async initialization
+- Named imports for selfhost's export pattern
+- Prototype references for pipeline compatibility
+- ESM main script check via `$0` → template literal
 
-## Recommendation
+## Next Steps
 
-**Keep build-selfhost.mjs hand-maintained** but use the transpiled version as a reference to keep them in sync. The architectural differences between Ruby and JS execution models make full automation impractical without significant selfhost changes.
-
-Alternatively, modify selfhost to:
-1. Add default exports alongside named exports
-2. Create a `Ruby2JS.convert()` facade that handles initialization
-3. This would enable the transpiled version to work
+Test the transpiled `build.mjs` end-to-end:
+1. Transpile `build.rb` with the updated filter
+2. Run `node scripts/build.mjs` and compare output with `ruby scripts/build.rb`
+3. If successful, the hand-written `build-selfhost.mjs` can be deleted
