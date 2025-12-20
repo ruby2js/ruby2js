@@ -26,6 +26,9 @@ require_relative '../lib/erb_compiler'
 class SelfhostBuilder
   DEMO_ROOT = File.expand_path('..', __dir__)
 
+  # Browser databases - these run in the browser with IndexedDB or WASM
+  BROWSER_DATABASES = ['dexie', 'indexeddb', 'sqljs', 'sql.js'].freeze
+
   # Map DATABASE env var to adapter source file
   ADAPTER_FILES = {
     'sqljs' => 'active_record_sqljs.mjs',
@@ -64,6 +67,8 @@ class SelfhostBuilder
 
   def initialize(dist_dir = nil)
     @dist_dir = dist_dir || File.join(DEMO_ROOT, 'dist')
+    @database = nil  # Set during build from config
+    @target = nil    # Derived from database: 'browser' or 'node'
   end
 
   # Note: Using explicit () on all method calls for JS transpilation compatibility
@@ -75,13 +80,16 @@ class SelfhostBuilder
     puts("=== Building Rails-in-JS Demo ===")
     puts("")
 
-    # Copy database adapter
+    # Copy database adapter and derive target
     puts("Database Adapter:")
     db_config = self.load_database_config()
+    @database = db_config['adapter'] || db_config[:adapter] || 'sqljs'
+    @target = BROWSER_DATABASES.include?(@database) ? 'browser' : 'node'
     self.copy_database_adapter(db_config)
+    puts("  Target: #{@target}")
     puts("")
 
-    # Copy static lib files (rails.js framework)
+    # Copy target-specific lib files (rails.js framework)
     puts("Library:")
     self.copy_lib_files()
     puts("")
@@ -192,11 +200,21 @@ class SelfhostBuilder
   end
 
   def copy_lib_files()
-    lib_src = File.join(DEMO_ROOT, 'lib')
     lib_dest = File.join(@dist_dir, 'lib')
     FileUtils.mkdir_p(lib_dest)
 
-    Dir.glob(File.join(lib_src, '*.js')).each do |src_path|
+    # Copy target-specific files (rails.js from targets/browser or targets/node)
+    target_src = File.join(DEMO_ROOT, 'lib/targets', @target)
+    Dir.glob(File.join(target_src, '*.js')).each do |src_path|
+      dest_path = File.join(lib_dest, File.basename(src_path))
+      FileUtils.cp(src_path, dest_path)
+      puts("  Copying: targets/#{@target}/#{File.basename(src_path)}")
+      puts("    -> #{dest_path}")
+    end
+
+    # Copy shared lib files (erb_runtime.mjs, etc.) - exclude old rails.js
+    lib_src = File.join(DEMO_ROOT, 'lib')
+    Dir.glob(File.join(lib_src, '*.mjs')).each do |src_path|
       dest_path = File.join(lib_dest, File.basename(src_path))
       FileUtils.cp(src_path, dest_path)
       puts("  Copying: #{File.basename(src_path)}")
