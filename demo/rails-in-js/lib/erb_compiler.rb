@@ -93,9 +93,9 @@ class ErbCompiler
   private
 
   # Emit a Ruby string literal using double quotes
-  # Double-quoted strings only need to escape " and \
+  # Escape \, ", and newlines to keep strings on single lines
   def emit_ruby_string(str)
-    escaped = str.gsub("\\", "\\\\").gsub('"', '\\"')
+    escaped = str.gsub("\\", "\\\\").gsub('"', '\\"').gsub("\n", "\\n")
     "\"#{escaped}\""
   end
 end
