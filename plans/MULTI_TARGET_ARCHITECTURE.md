@@ -395,12 +395,26 @@ See [DEXIE_SUPPORT.md](./DEXIE_SUPPORT.md).
 
 **Phase 3 Complete!** ERB filter generates target-appropriate HTML based on database option.
 
-### Phase 4: Node.js Adapters
+### Phase 4: Node.js Adapters ✅ COMPLETE
 
-1. Create `lib/adapters/active_record_pg.mjs`
-2. Create `lib/adapters/active_record_mysql2.mjs`
-3. Create `lib/adapters/active_record_better_sqlite3.mjs`
-4. Test with real databases
+1. ✅ Create `lib/adapters/active_record_better_sqlite3.mjs`
+   - Synchronous SQLite via better-sqlite3 package
+   - WAL mode enabled for better concurrency
+   - Uses `globalThis.Time` instead of `window.Time`
+
+2. ✅ Create `lib/adapters/active_record_pg.mjs`
+   - PostgreSQL via node-postgres (pg) package
+   - Connection pooling with configurable pool size
+   - Supports `DATABASE_URL` environment variable (12-factor apps)
+   - Parameterized queries with `$1, $2, ...` placeholders
+
+3. ⏸️ `active_record_mysql2.mjs` (deferred - same pattern as pg)
+
+4. ✅ Update `build.rb` ADAPTER_FILES mapping:
+   - `better_sqlite3`, `sqlite3` → `active_record_better_sqlite3.mjs`
+   - `pg`, `postgres`, `postgresql` → `active_record_pg.mjs`
+
+**Note:** Real database testing deferred to Phase 5 integration. Adapters follow same API pattern as browser adapters.
 
 ### Phase 5: Integration & Polish
 

@@ -31,10 +31,17 @@ class SelfhostBuilder
 
   # Map DATABASE env var to adapter source file
   ADAPTER_FILES = {
+    # Browser adapters
     'sqljs' => 'active_record_sqljs.mjs',
     'sql.js' => 'active_record_sqljs.mjs',
     'dexie' => 'active_record_dexie.mjs',
-    'indexeddb' => 'active_record_dexie.mjs'
+    'indexeddb' => 'active_record_dexie.mjs',
+    # Node.js adapters
+    'better_sqlite3' => 'active_record_better_sqlite3.mjs',
+    'sqlite3' => 'active_record_better_sqlite3.mjs',  # Alias
+    'pg' => 'active_record_pg.mjs',
+    'postgres' => 'active_record_pg.mjs',
+    'postgresql' => 'active_record_pg.mjs'
   }.freeze
 
   # Common transpilation options for Ruby files
