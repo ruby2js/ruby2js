@@ -158,6 +158,7 @@ module Ruby2JS
         # Find the node with the largest end_pos (outermost/statement-level) to avoid
         # matching child nodes like `self` instead of the full `self['id'] = @_id`
         comment_start = comment_start_pos(comment)
+        comment_source = comment_source_name(comment)
         same_line_node = nil
         best_end = -1
         nodes.each do |n|
@@ -165,6 +166,9 @@ module Ruby2JS
           node_end = node_end_pos(n)
           next unless node_line && node_end && node_line == comment_line
           next unless comment_start.nil? || node_end <= comment_start
+          # Ensure comment and node are from the same source file (when multi-file)
+          node_source = node_source_name(n)
+          next if comment_source && node_source && comment_source != node_source
           if node_end > best_end
             best_end = node_end
             same_line_node = n
@@ -285,6 +289,29 @@ module Ruby2JS
         comment.loc.expression.begin_pos
       elsif comment.respond_to?(:location) && comment.location
         comment.location.start_offset
+      else
+        nil
+      end
+    end
+
+    # Get source buffer name from a comment's location
+    def comment_source_name(comment)
+      if comment.loc&.respond_to?(:expression) && comment.loc.expression
+        comment.loc.expression.source_buffer&.name
+      elsif comment.respond_to?(:location) && comment.location&.respond_to?(:source_buffer)
+        comment.location.source_buffer&.name
+      else
+        nil
+      end
+    end
+
+    # Get source buffer name from a node's location
+    def node_source_name(node)
+      return nil unless node.respond_to?(:loc) && node.loc
+      if node.loc.respond_to?(:expression) && node.loc.expression
+        node.loc.expression.source_buffer&.name
+      elsif node.loc.respond_to?(:source_buffer)
+        node.loc.source_buffer&.name
       else
         nil
       end
