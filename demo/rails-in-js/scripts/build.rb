@@ -195,7 +195,7 @@ def load_database_config
   # Priority 1: DATABASE environment variable
   if ENV['DATABASE']
     puts "  Using DATABASE=#{ENV['DATABASE']} from environment"
-    return ENV['DATABASE'].downcase
+    return { 'adapter' => ENV['DATABASE'].downcase }
   end
 
   # Priority 2: config/database.yml
@@ -205,29 +205,37 @@ def load_database_config
     config = YAML.load_file(config_path)
     if config && config[env] && config[env]['adapter']
       puts "  Using config/database.yml [#{env}]"
-      return config[env]['adapter'].downcase
+      return config[env]
     end
   end
 
   # Default: sqljs
   puts "  Using default adapter: sqljs"
-  'sqljs'
+  { 'adapter' => 'sqljs', 'database' => 'rails_in_js' }
 end
 
-def copy_database_adapter(src_dir, dest_dir)
-  database = load_database_config
-  adapter_file = ADAPTER_FILES[database]
+def copy_database_adapter(src_dir, dest_dir, db_config)
+  adapter = db_config['adapter'] || db_config[:adapter] || 'sqljs'
+  adapter_file = ADAPTER_FILES[adapter]
 
   unless adapter_file
     valid = ADAPTER_FILES.keys.join(', ')
-    abort "Unknown DATABASE adapter: #{database}. Valid options: #{valid}"
+    abort "Unknown DATABASE adapter: #{adapter}. Valid options: #{valid}"
   end
 
   adapter_src = File.join(src_dir, 'adapters', adapter_file)
   adapter_dest = File.join(dest_dir, 'active_record.mjs')
   FileUtils.mkdir_p(dest_dir)
-  FileUtils.cp(adapter_src, adapter_dest)
-  puts "  Adapter: #{database} -> lib/active_record.mjs"
+
+  # Read adapter and inject config (like selfhost does)
+  adapter_code = File.read(adapter_src)
+  adapter_code = adapter_code.sub('const DB_CONFIG = {};', "const DB_CONFIG = #{JSON.generate(db_config)};")
+  File.write(adapter_dest, adapter_code)
+
+  puts "  Adapter: #{adapter} -> lib/active_record.mjs"
+  if db_config['database'] || db_config[:database]
+    puts "  Database: #{db_config['database'] || db_config[:database]}"
+  end
 end
 
 # Clean and create dist directory
@@ -239,9 +247,11 @@ puts
 
 # Copy database adapter
 puts "Database Adapter:"
+db_config = load_database_config
 copy_database_adapter(
   File.join(DEMO_ROOT, 'lib'),
-  File.join(DIST_DIR, 'lib')
+  File.join(DIST_DIR, 'lib'),
+  db_config
 )
 puts
 

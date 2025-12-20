@@ -52,8 +52,8 @@ describe Ruby2JS::Filter::Rails::Controller do
       RUBY
 
       result = to_js(source)
-      _(result).must_include 'function show(id)'
-      _(result).must_include 'let article = Article.find(id)'
+      _(result).must_include 'async function show(id)'
+      _(result).must_include 'let article = await Article.find(id)'
     end
 
     it "renames new action to $new (reserved word)" do
@@ -98,7 +98,7 @@ describe Ruby2JS::Filter::Rails::Controller do
       RUBY
 
       result = to_js(source)
-      _(result).must_include 'let articles = Article.all'
+      _(result).must_include 'let articles = await Article.all()'
       _(result).wont_include '@articles'
     end
 
@@ -237,8 +237,8 @@ describe Ruby2JS::Filter::Rails::Controller do
       RUBY
 
       result = to_js(source)
-      _(result).must_include 'function show(id)'
-      _(result).must_include 'let article = Article.find(id)'
+      _(result).must_include 'async function show(id)'
+      _(result).must_include 'let article = await Article.find(id)'
     end
 
     it "respects only: constraint" do
@@ -263,9 +263,9 @@ describe Ruby2JS::Filter::Rails::Controller do
 
       result = to_js(source)
       # index should NOT have set_article code
-      _(result).must_match(/function index\(\).*?let articles = Article\.all/m)
+      _(result).must_match(/async function index\(\).*?let articles = await Article\.all\(\)/m)
       # show SHOULD have set_article code
-      _(result).must_match(/function show\(id\).*?let article = Article\.find\(id\)/m)
+      _(result).must_match(/async function show\(id\).*?let article = await Article\.find\(id\)/m)
     end
 
     it "collects ivars from before_action methods" do

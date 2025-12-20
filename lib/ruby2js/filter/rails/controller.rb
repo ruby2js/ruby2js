@@ -42,6 +42,11 @@ module Ruby2JS
           @rails_private_methods ||= {}
           @rails_model_refs ||= Set.new
           @rails_needs_views ||= false
+          # Model associations for preloading (model_name -> [association_names])
+          # NOTE: This must be in on_class (not just initialize) for JS compatibility
+          @rails_model_associations ||= {
+            article: [:comments]
+          }
 
           # Check if this is a controller (inherits from ApplicationController or *Controller)
           return super unless controller_class?(class_name, superclass)

@@ -36,7 +36,7 @@ describe Ruby2JS::Filter::Rails::Model do
         end
       RUBY
       assert_includes result, 'get comments()'
-      assert_includes result, 'Comment.where({article_id: this._id})'
+      assert_includes result, 'Comment.where({article_id: this.id})'
     end
 
     it "supports class_name option" do
@@ -46,7 +46,7 @@ describe Ruby2JS::Filter::Rails::Model do
         end
       RUBY
       assert_includes result, 'get reviews()'
-      assert_includes result, 'Comment.where({article_id: this._id})'
+      assert_includes result, 'Comment.where({article_id: this.id})'
     end
 
     it "supports foreign_key option" do
@@ -55,7 +55,7 @@ describe Ruby2JS::Filter::Rails::Model do
           has_many :comments, foreign_key: 'post_id'
         end
       RUBY
-      assert_includes result, 'Comment.where({post_id: this._id})'
+      assert_includes result, 'Comment.where({post_id: this.id})'
     end
 
     it "handles dependent destroy" do

@@ -149,8 +149,8 @@ describe Ruby2JS::Filter::Rails::Routes do
       RUBY
       assert_includes result, 'article_comments: {'
       assert_includes result, 'article_comment: {'
-      assert_includes result, 'CommentsController.create(parentId, formData(event))'
-      assert_includes result, 'CommentsController.destroy(parentId, id)'
+      assert_includes result, 'await CommentsController.create'
+      assert_includes result, 'await CommentsController.destroy'
     end
   end
 
