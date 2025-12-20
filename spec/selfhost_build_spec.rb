@@ -12,7 +12,7 @@ describe Ruby2JS::Filter::SelfhostBuild do
   describe 'YAML' do
     it 'should transform YAML.load_file' do
       to_js('YAML.load_file("config.yml")').
-        must_equal 'import yaml from "js-yaml"; import fs from "fs"; ' +
+        must_equal 'import yaml from "js-yaml"; import fs from "node:fs"; ' +
           'yaml.load(fs.readFileSync("config.yml", "utf8"))'
     end
 
