@@ -4,24 +4,38 @@ module Ruby2JS
   module Filter
     module Node
       include SEXP
-      extend SEXP
 
-      IMPORT_CHILD_PROCESS = s(:import, ['child_process'],
-          s(:attr, nil, :child_process))
+      # Lazy-initialized import nodes (avoids need for extend SEXP)
+      def import_child_process
+        @import_child_process ||= s(:import, ['child_process'],
+            s(:attr, nil, :child_process))
+      end
 
-      IMPORT_FS = s(:import, ['fs'], s(:attr, nil, :fs))
+      def import_fs
+        @import_fs ||= s(:import, ['fs'], s(:attr, nil, :fs))
+      end
 
-      IMPORT_FS_PROMISES = s(:import, ['fs/promises'], s(:attr, nil, :fs))
+      def import_fs_promises
+        @import_fs_promises ||= s(:import, ['fs/promises'], s(:attr, nil, :fs))
+      end
 
       # For existsSync - no async equivalent, always use sync version
-      IMPORT_FS_SYNC = s(:import, ['fs'], s(:attr, nil, :fsSync))
+      def import_fs_sync
+        @import_fs_sync ||= s(:import, ['fs'], s(:attr, nil, :fsSync))
+      end
 
-      IMPORT_OS = s(:import, ['os'], s(:attr, nil, :os))
+      def import_os
+        @import_os ||= s(:import, ['os'], s(:attr, nil, :os))
+      end
 
-      IMPORT_PATH = s(:import, ['path'], s(:attr, nil, :path))
+      def import_path
+        @import_path ||= s(:import, ['path'], s(:attr, nil, :path))
+      end
 
-      SETUP_ARGV = s(:lvasgn, :ARGV, s(:send, s(:attr,
-          s(:attr, nil, :process), :argv), :slice, s(:int, 2)))
+      def setup_argv
+        @setup_argv ||= s(:lvasgn, :ARGV, s(:send, s(:attr,
+            s(:attr, nil, :process), :argv), :slice, s(:int, 2)))
+      end
 
       # Helper to check if async mode is enabled
       def async?
@@ -31,13 +45,13 @@ module Ruby2JS
       # Helper to generate fs calls - handles sync vs async
       def fs_call(method, *args)
         if async?
-          prepend_list << IMPORT_FS_PROMISES
+          prepend_list << import_fs_promises
           # Remove Sync suffix for async methods
           async_method = method.to_s.sub(/Sync$/, '').to_sym
           S(:send, nil, :await,
             s(:send, s(:attr, nil, :fs), async_method, *args))
         else
-          prepend_list << IMPORT_FS
+          prepend_list << import_fs
           s(:send, s(:attr, nil, :fs), method, *args)
         end
       end
@@ -45,10 +59,10 @@ module Ruby2JS
       # Special case for existsSync - no async equivalent
       def fs_exists_call(*args)
         if async?
-          prepend_list << IMPORT_FS_SYNC
+          prepend_list << import_fs_sync
           S(:send, s(:attr, nil, :fsSync), :existsSync, *args)
         else
-          prepend_list << IMPORT_FS
+          prepend_list << import_fs
           S(:send, s(:attr, nil, :fs), :existsSync, *args)
         end
       end
@@ -56,13 +70,13 @@ module Ruby2JS
       # Helper for fs.glob - async returns iterator, needs Array.fromAsync
       def fs_glob_call(*args)
         if async?
-          prepend_list << IMPORT_FS_PROMISES
+          prepend_list << import_fs_promises
           # await Array.fromAsync(fs.glob(pattern))
           S(:send, nil, :await,
             s(:send, s(:const, nil, :Array), :fromAsync,
               s(:send, s(:attr, nil, :fs), :glob, *args)))
         else
-          prepend_list << IMPORT_FS
+          prepend_list << import_fs
           s(:send, s(:attr, nil, :fs), :globSync, *args)
         end
       end
@@ -75,7 +89,7 @@ module Ruby2JS
             s(:send, s(:attr, nil, :process), :exit, *process_all(args));
 
           elsif method == :system
-            prepend_list << IMPORT_CHILD_PROCESS
+            prepend_list << import_child_process
 
             if args.length == 1
               S(:send, s(:attr, nil, :child_process), :execSync,
@@ -160,23 +174,23 @@ module Ruby2JS
 
           elsif target.children.last == :File
             if method == :absolute_path or method == :expand_path
-              prepend_list << IMPORT_PATH
+              prepend_list << import_path
               S(:send, s(:attr, nil, :path), :resolve,
                 *process_all(args.reverse))
             elsif method == :absolute_path?
-              prepend_list << IMPORT_PATH
+              prepend_list << import_path
               S(:send, s(:attr, nil, :path), :isAbsolute, *process_all(args))
             elsif method == :basename
-              prepend_list << IMPORT_PATH
+              prepend_list << import_path
               S(:send, s(:attr, nil, :path), :basename, *process_all(args))
             elsif method == :dirname
-              prepend_list << IMPORT_PATH
+              prepend_list << import_path
               S(:send, s(:attr, nil, :path), :dirname, *process_all(args))
             elsif method == :extname
-              prepend_list << IMPORT_PATH
+              prepend_list << import_path
               S(:send, s(:attr, nil, :path), :extname, *process_all(args))
             elsif method == :join
-              prepend_list << IMPORT_PATH
+              prepend_list << import_path
               S(:send, s(:attr, nil, :path), :join, *process_all(args))
             else
               super
@@ -264,13 +278,13 @@ module Ruby2JS
           elsif method == :touch
             S(:begin, *list[args.first].map {|file|
               if async?
-                prepend_list << IMPORT_FS_PROMISES
+                prepend_list << import_fs_promises
                 # For async: await fs.writeFile(file, '', {flag: 'a'})
                 S(:send, nil, :await,
                   s(:send, s(:attr, nil, :fs), :writeFile, file, s(:str, ''),
                     s(:hash, s(:pair, s(:sym, :flag), s(:str, 'a')))))
               else
-                prepend_list << IMPORT_FS
+                prepend_list << import_fs
                 S(:send, s(:attr, nil, :fs), :closeSync,
                   s(:send, s(:attr, nil, :fs), :openSync, file, s(:str, "w")))
               end
@@ -305,10 +319,10 @@ module Ruby2JS
 
             fs_call(:mkdtempSync, process(prefix))
           elsif method == :home and args.length == 0
-            prepend_list << IMPORT_OS
+            prepend_list << import_os
             S(:send!, s(:attr, nil, :os), :homedir)
           elsif method == :tmpdir and args.length == 0
-            prepend_list << IMPORT_OS
+            prepend_list << import_os
             S(:send!, s(:attr, nil, :os), :tmpdir)
           elsif [:exist?, :exists?].include? method and args.length == 1
             fs_exists_call(process(args.first))
@@ -345,7 +359,7 @@ module Ruby2JS
 
       def on_const(node)
         if node.children == [nil, :ARGV]
-          prepend_list << SETUP_ARGV
+          prepend_list << setup_argv
           super
         elsif node.children == [nil, :ENV]
           S(:attr, s(:attr, nil, :process), :env)
@@ -357,10 +371,10 @@ module Ruby2JS
           S(:attr, s(:attr, nil, :process), :stderr)
         elsif node.children.first == s(:const, nil, :File)
           if node.children.last == :SEPARATOR
-            prepend_list << IMPORT_PATH
+            prepend_list << import_path
             S(:attr, s(:attr, nil, :path), :sep)
           elsif node.children.last == :PATH_SEPARATOR
-            prepend_list << IMPORT_PATH
+            prepend_list << import_path
             S(:attr, s(:attr, nil, :path), :delimiter)
           else
             super
@@ -383,7 +397,7 @@ module Ruby2JS
       end
 
       def on_xstr(node)
-        prepend_list << IMPORT_CHILD_PROCESS
+        prepend_list << import_child_process
 
         children = node.children.dup
         command = children.shift
