@@ -5,6 +5,9 @@ module Ruby2JS
     module Erb
       include SEXP
 
+      # Browser databases - these run in browser with History API navigation
+      BROWSER_DATABASES = %w[dexie indexeddb sqljs sql.js].freeze
+
       # Track instance variables found during AST traversal
       def initialize(*args)
         # Note: super must be called first for JS class compatibility
@@ -250,7 +253,9 @@ module Ruby2JS
         end
       end
 
-      # Build a navigation link: <a href="path" onclick="return navigate(event, path)">text</a>
+      # Build a navigation link
+      # Browser target: <a href="path" onclick="return navigate(event, path)">text</a>
+      # Node target: <a href="path">text</a>
       def build_nav_link(text_node, path_node)
         # Process the path - could be a string, path helper call, or object
         path_expr = process(path_node)
@@ -262,50 +267,100 @@ module Ruby2JS
           path_expr = s(:send, nil, path_node.children[1])
         end
 
-        if text_node.type == :str && path_node.type == :str
-          # Both static - generate simple string
-          text_str = text_node.children[0]
-          path_str = path_node.children[0]
-          s(:str, "<a href=\"#{path_str}\" onclick=\"return navigate(event, '#{path_str}')\">#{text_str}</a>")
-        elsif text_node.type == :str
-          # Static text, dynamic path - single quotes around path in onclick
-          text_str = text_node.children[0]
-          s(:dstr,
-            s(:str, '<a href="'),
-            s(:begin, path_expr),
-            s(:str, "\" onclick=\"return navigate(event, '"),
-            s(:begin, path_expr),
-            s(:str, "')\" style=\"cursor: pointer\">#{text_str}</a>"))
+        if browser_target?
+          # Browser target - SPA navigation with onclick handlers
+          if text_node.type == :str && path_node.type == :str
+            # Both static - generate simple string
+            text_str = text_node.children[0]
+            path_str = path_node.children[0]
+            s(:str, "<a href=\"#{path_str}\" onclick=\"return navigate(event, '#{path_str}')\">#{text_str}</a>")
+          elsif text_node.type == :str
+            # Static text, dynamic path - single quotes around path in onclick
+            text_str = text_node.children[0]
+            s(:dstr,
+              s(:str, '<a href="'),
+              s(:begin, path_expr),
+              s(:str, "\" onclick=\"return navigate(event, '"),
+              s(:begin, path_expr),
+              s(:str, "')\" style=\"cursor: pointer\">#{text_str}</a>"))
+          else
+            # Dynamic text and/or path
+            text_expr = process(text_node)
+            s(:dstr,
+              s(:str, '<a href="'),
+              s(:begin, path_expr),
+              s(:str, "\" onclick=\"return navigate(event, '"),
+              s(:begin, path_expr),
+              s(:str, "')\" style=\"cursor: pointer\">"),
+              s(:begin, text_expr),
+              s(:str, '</a>'))
+          end
         else
-          # Dynamic text and/or path
-          text_expr = process(text_node)
-          s(:dstr,
-            s(:str, '<a href="'),
-            s(:begin, path_expr),
-            s(:str, "\" onclick=\"return navigate(event, '"),
-            s(:begin, path_expr),
-            s(:str, "')\" style=\"cursor: pointer\">"),
-            s(:begin, text_expr),
-            s(:str, '</a>'))
+          # Node target - traditional href links
+          if text_node.type == :str && path_node.type == :str
+            text_str = text_node.children[0]
+            path_str = path_node.children[0]
+            s(:str, "<a href=\"#{path_str}\">#{text_str}</a>")
+          elsif text_node.type == :str
+            text_str = text_node.children[0]
+            s(:dstr,
+              s(:str, '<a href="'),
+              s(:begin, path_expr),
+              s(:str, "\">#{text_str}</a>"))
+          else
+            text_expr = process(text_node)
+            s(:dstr,
+              s(:str, '<a href="'),
+              s(:begin, path_expr),
+              s(:str, '">'),
+              s(:begin, text_expr),
+              s(:str, '</a>'))
+          end
         end
       end
 
       # Build a delete link with confirmation
+      # Browser target: onclick handler with confirm dialog
+      # Node target: form with hidden _method=DELETE and confirm via JS or data attribute
       def build_delete_link(text_node, path_node, confirm_msg)
         path_expr = process(path_node)
         confirm_str = confirm_msg ? confirm_msg.children[0] : 'Are you sure?'
 
-        if text_node.type == :str
-          text_str = text_node.children[0]
-          # Generate link that calls deleteResource function
-          # The actual delete handler is set up by setupFormHandlers
-          s(:str, "<a href=\"#\" onclick=\"if(confirm('#{confirm_str}')) { /* TODO: wire up delete */ } return false;\">#{text_str}</a>")
+        if browser_target?
+          # Browser target - JavaScript confirm and async delete
+          if text_node.type == :str
+            text_str = text_node.children[0]
+            # Generate link that calls deleteResource function
+            # The actual delete handler is set up by setupFormHandlers
+            s(:str, "<a href=\"#\" onclick=\"if(confirm('#{confirm_str}')) { /* TODO: wire up delete */ } return false;\">#{text_str}</a>")
+          else
+            text_expr = process(text_node)
+            s(:dstr,
+              s(:str, "<a href=\"#\" onclick=\"if(confirm('#{confirm_str}')) { /* TODO: wire up delete */ } return false;\">"),
+              s(:begin, text_expr),
+              s(:str, '</a>'))
+          end
         else
-          text_expr = process(text_node)
-          s(:dstr,
-            s(:str, "<a href=\"#\" onclick=\"if(confirm('#{confirm_str}')) { /* TODO: wire up delete */ } return false;\">"),
-            s(:begin, text_expr),
-            s(:str, '</a>'))
+          # Node target - form-based delete with data-confirm attribute
+          if text_node.type == :str && path_node.type == :str
+            text_str = text_node.children[0]
+            path_str = path_node.children[0]
+            s(:str, "<form method=\"post\" action=\"#{path_str}\" style=\"display:inline\" data-confirm=\"#{confirm_str}\"><input type=\"hidden\" name=\"_method\" value=\"delete\"><button type=\"submit\">#{text_str}</button></form>")
+          elsif text_node.type == :str
+            text_str = text_node.children[0]
+            s(:dstr,
+              s(:str, '<form method="post" action="'),
+              s(:begin, path_expr),
+              s(:str, "\" style=\"display:inline\" data-confirm=\"#{confirm_str}\"><input type=\"hidden\" name=\"_method\" value=\"delete\"><button type=\"submit\">#{text_str}</button></form>"))
+          else
+            text_expr = process(text_node)
+            s(:dstr,
+              s(:str, '<form method="post" action="'),
+              s(:begin, path_expr),
+              s(:str, "\" style=\"display:inline\" data-confirm=\"#{confirm_str}\"><input type=\"hidden\" name=\"_method\" value=\"delete\"><button type=\"submit\">"),
+              s(:begin, text_expr),
+              s(:str, '</button></form>'))
+          end
         end
       end
 
@@ -480,6 +535,16 @@ module Ruby2JS
       end
 
       private
+
+      # Derive target from database option
+      # Browser databases (dexie, sqljs) need SPA navigation with onclick handlers
+      # Node databases (pg, mysql2, etc.) use traditional href links
+      def browser_target?
+        database = @options[:database]&.to_s&.downcase
+        # Default to browser if no database specified (backwards compatible)
+        return true unless database
+        BROWSER_DATABASES.include?(database)
+      end
 
       # Process form_for block into JavaScript
       # Generates a form tag and processes the block body with a form builder

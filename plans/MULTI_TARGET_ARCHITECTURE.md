@@ -375,19 +375,25 @@ See [DEXIE_SUPPORT.md](./DEXIE_SUPPORT.md).
 
 **Phase 2 Complete!** Target-specific runtime files are copied based on database adapter.
 
-### Phase 3: Filter Updates
+### Phase 3: Filter Updates ✅ COMPLETE
 
-1. Update `rails/routes` filter to derive target from database
-   - Browser (dexie/sqljs): History API routing
-   - Node (pg/mysql2/sqlite): HTTP server generation
+1. ✅ `rails/routes` filter - Already target-agnostic
+   - Imports from `../lib/rails.js` which is target-specific (copied at build time)
+   - No filter changes needed - runtime handles differences
 
-2. Update `rails/controller` filter to derive target from database
-   - Browser: DOM updates, pushState
-   - Node: HTTP responses, res.redirect
+2. ✅ `rails/controller` filter - Already target-agnostic
+   - Returns `{ redirect: path }` objects
+   - Runtime handles redirects differently per target
+   - No filter changes needed
 
-3. Update `erb` filter to derive target from database
-   - Browser: onClick handlers for navigation
-   - Node: Traditional href attributes
+3. ✅ `erb` filter updated with `database` option support
+   - Added `BROWSER_DATABASES` constant
+   - Added `browser_target?` helper method
+   - `build_nav_link`: Browser generates onclick handlers, Node generates plain hrefs
+   - `build_delete_link`: Browser uses JS confirm, Node uses form-based delete
+   - `build.rb` updated to pass database option to ERB filter
+
+**Phase 3 Complete!** ERB filter generates target-appropriate HTML based on database option.
 
 ### Phase 4: Node.js Adapters
 

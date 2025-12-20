@@ -259,7 +259,9 @@ class SelfhostBuilder
     template = File.read(src_path)
 
     ruby_src = ErbCompiler.new(template).src
-    js = Ruby2JS.convert(ruby_src, ERB_OPTIONS).to_s
+    # Pass database option for target-aware link generation
+    erb_options = ERB_OPTIONS.merge(database: @database)
+    js = Ruby2JS.convert(ruby_src, erb_options).to_s
     js = js.sub(/^function render/, 'export function render')
 
     FileUtils.mkdir_p(File.dirname(dest_path))
