@@ -67,7 +67,15 @@ module Ruby2JS
       end
 
       def on_send(node)
-        return super unless node.children[1] == :export
+        target, method, *args = node.children
+
+        # Map Ruby's __dir__ to CJS equivalent
+        # __dirname is available in Node.js CommonJS modules
+        if target.nil? && method == :__dir__ && args.empty?
+          return s(:gvar, :__dirname)
+        end
+
+        return super unless method == :export
 
         if node.children[2].type == :def
           fn = node.children[2]

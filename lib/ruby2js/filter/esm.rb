@@ -162,6 +162,12 @@ module Ruby2JS
         target, method, *args = node.children
         found_import = nil  # declare for conditional assignment below
 
+        # Map Ruby's __dir__ to ESM equivalent
+        # import.meta.dirname returns the directory path (Node 20.11+)
+        if target.nil? && method == :__dir__ && args.empty?
+          return s(:attr, s(:attr, nil, :"import.meta"), :dirname)
+        end
+
         # import.meta => s(:attr, nil, :"import.meta")
         # This bypasses jsvar escaping of the reserved word 'import'
         if method == :meta and

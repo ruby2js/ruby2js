@@ -26,6 +26,18 @@ puts __FILE__
 # => puts(__filename)
 ```
 
+## \_\_dir\_\_
+
+Ruby's `__dir__` method is converted to `__dirname`, which is available in Node.js CommonJS modules:
+
+```ruby
+__dir__
+# => __dirname
+
+puts __dir__
+# => puts(__dirname)
+```
+
 {% rendercontent "docs/note", extra_margin: true %}
 More examples of how this filter works are in the [specs file](https://github.com/ruby2js/ruby2js/blob/master/spec/cjs_spec.rb).
 {% endrendercontent %}

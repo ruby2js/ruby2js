@@ -66,6 +66,18 @@ URL.new(import.meta.url).pathname
 # => new URL(import.meta.url).pathname
 ```
 
+### \_\_dir\_\_
+
+Ruby's `__dir__` method is converted to `import.meta.dirname`, which provides the directory path of the current module (available in Node.js 20.11+):
+
+```ruby
+__dir__
+# => import.meta.dirname
+
+puts __dir__
+# => puts(import.meta.dirname)
+```
+
 ### export
 
 ```ruby

@@ -1,5 +1,6 @@
 require 'minitest/autorun'
 require 'ruby2js/filter/cjs'
+require 'ruby2js/filter/functions'
 
 describe Ruby2JS::Filter::CJS do
   
@@ -119,6 +120,16 @@ describe Ruby2JS::Filter::CJS do
 
     it "should convert __FILE__ in expressions" do
       to_js('puts __FILE__').must_equal 'puts(__filename)'
+    end
+  end
+
+  describe "__dir__" do
+    it "should convert __dir__ to __dirname" do
+      to_js('__dir__').must_equal '__dirname'
+    end
+
+    it "should convert __dir__ in expressions" do
+      to_js('puts __dir__').must_equal 'puts(__dirname)'
     end
   end
 
