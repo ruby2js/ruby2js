@@ -19,7 +19,8 @@
     "filters/"
   ],
   "scripts": {
-    "build": "mkdir -p dist filters && npm run build:prism-browser && npm run build:bundle && npm run build:spec && npm run build:filters",
+    "build": "mkdir -p dist filters lib && npm run build:prism-browser && npm run build:bundle && npm run build:spec && npm run build:filters && npm run build:erb-compiler",
+    "build:erb-compiler": "bundle exec ruby scripts/transpile_erb_compiler.rb > lib/erb_compiler.js",
     "build:prism-browser": "bundle exec ruby scripts/transpile_prism_browser.rb > prism_browser.js",
     "build:bundle": "bundle exec ruby scripts/transpile_bundle.rb > ruby2js.js",
     "build:spec": "bundle exec ruby scripts/transpile_spec.rb ../../spec/transliteration_spec.rb > dist/transliteration_spec.js",

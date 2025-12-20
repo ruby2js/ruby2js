@@ -7,6 +7,7 @@ import { join, relative, dirname as pathDirname, resolve } from 'path';
 import { exec } from 'child_process';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import { ErbCompiler } from '../../selfhost/lib/erb_compiler.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -70,15 +71,8 @@ export class SelfhostBuilder {
       Return.prototype
     ];
 
-    // Transpile the ERB compiler from Ruby source (single source of truth)
-    const erbCompilerPath = join(SelfhostBuilder.DEMO_ROOT, 'lib/erb_compiler.rb');
-    const erbCompilerSource = await readFile(erbCompilerPath, 'utf-8');
-    const erbCompilerJs = SelfhostBuilder.converter.convert(erbCompilerSource, {
-      eslevel: 2022,
-      filters: [Functions.prototype, Return.prototype]
-    }).toString();
-    // Eval the transpiled code to get the ErbCompiler class
-    SelfhostBuilder.ErbCompiler = eval(`(function() { ${erbCompilerJs}; return ErbCompiler; })()`);
+    // Use pre-transpiled ErbCompiler (transpiled during selfhost build)
+    SelfhostBuilder.ErbCompiler = ErbCompiler;
 
     console.log('Initialized selfhost with filters: rails/model,controller,routes,schema,seeds, esm, logger, functions, return');
   }
