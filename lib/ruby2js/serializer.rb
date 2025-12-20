@@ -145,6 +145,9 @@ module Ruby2JS
       @tokens.any? { |t| t.to_s == item.to_s }
     end
 
+    # Alias for JS compatibility (functions filter converts include? calls to includes)
+    alias includes include?
+
     def insert(index, *items)
       @tokens.insert(index, *items)
     end

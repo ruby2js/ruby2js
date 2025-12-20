@@ -13,7 +13,7 @@ require 'ruby2js/filter/functions'
 require 'ruby2js/filter/esm'
 require 'ruby2js/filter/return'
 require 'ruby2js/filter/erb'
-require 'ruby2js/erubi'
+require_relative '../lib/erb_compiler'
 
 DEMO_ROOT = File.expand_path('..', __dir__)
 DIST_DIR = ARGV[0] ? File.expand_path(ARGV[0]) : File.join(DEMO_ROOT, 'dist')
@@ -89,8 +89,8 @@ def transpile_erb_file(src_path, dest_path)
 
   # Convert ERB to Ruby, then to JavaScript
   # Note: Don't pass file: src_path because Prism would try to read the ERB file
-  # instead of using the Ruby source from Erubi
-  ruby_src = Ruby2JS::Erubi.new(template).src
+  # instead of using the Ruby source
+  ruby_src = ErbCompiler.new(template).src
   js = Ruby2JS.convert(ruby_src, ERB_OPTIONS).to_s
 
   # Add export keyword to make it importable

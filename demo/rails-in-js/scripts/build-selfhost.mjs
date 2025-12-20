@@ -18,6 +18,7 @@ export class SelfhostBuilder {
   static converter = null;
   static filters = [];
   static erbFilters = [];  // Separate filter chain for ERB templates
+  static ErbCompiler = null;  // Transpiled from lib/erb_compiler.rb
 
   constructor(distDir) {
     this.distDir = distDir || join(SelfhostBuilder.DEMO_ROOT, 'dist');
@@ -68,6 +69,16 @@ export class SelfhostBuilder {
       Functions.prototype,
       Return.prototype
     ];
+
+    // Transpile the ERB compiler from Ruby source (single source of truth)
+    const erbCompilerPath = join(SelfhostBuilder.DEMO_ROOT, 'lib/erb_compiler.rb');
+    const erbCompilerSource = await readFile(erbCompilerPath, 'utf-8');
+    const erbCompilerJs = SelfhostBuilder.converter.convert(erbCompilerSource, {
+      eslevel: 2022,
+      filters: [Functions.prototype, Return.prototype]
+    }).toString();
+    // Eval the transpiled code to get the ErbCompiler class
+    SelfhostBuilder.ErbCompiler = eval(`(function() { ${erbCompilerJs}; return ErbCompiler; })()`);
 
     console.log('Initialized selfhost with filters: rails/model,controller,routes,schema,seeds, esm, logger, functions, return');
   }
@@ -192,95 +203,11 @@ export class SelfhostBuilder {
     return 0;
   }
 
-  // Compile ERB template to Ruby code (like Ruby2JS::Erubi), then transpile to JavaScript
-  // This mimics the Ruby ERB compilation pipeline so we can use the erb filter
+  // Compile ERB template to Ruby code, then transpile to JavaScript
+  // Uses the transpiled ErbCompiler (from lib/erb_compiler.rb) for consistency with Ruby build
   compileERBToCode(template, viewName) {
-    // Step 1: Parse ERB and generate Ruby code exactly like Erubi does
-    // Format: _buf = ::String.new; _buf << 'literal'.freeze; _buf << ( expr ).to_s; ... _buf.to_s
-    // Key: buffer operations use semicolons, code blocks use newlines
-    let rubyCode = "_buf = ::String.new;";
-
-    let pos = 0;
-    while (pos < template.length) {
-      const erbStart = template.indexOf('<%', pos);
-
-      if (erbStart === -1) {
-        // No more ERB tags, add remaining text
-        const text = template.slice(pos);
-        if (text) {
-          rubyCode += ` _buf << ${this.emitRubyString(text)};`;
-        }
-        break;
-      }
-
-      // Find end of ERB tag first to check if this is a code block
-      const erbEnd = template.indexOf('%>', erbStart);
-      if (erbEnd === -1) {
-        throw new Error('Unclosed ERB tag');
-      }
-
-      let tag = template.slice(erbStart + 2, erbEnd);
-      const isCodeBlock = !tag.trim().startsWith('=') && !tag.trim().startsWith('-');
-
-      // Add text before ERB tag
-      if (erbStart > pos) {
-        let text = template.slice(pos, erbStart);
-        // For code blocks, strip trailing whitespace on the same line as <% %>
-        // This matches Ruby Erubi behavior where leading indent before <% %> is not included
-        if (isCodeBlock && text.includes('\n')) {
-          // Find the last newline and check if everything after is whitespace
-          const lastNewline = text.lastIndexOf('\n');
-          const afterNewline = text.slice(lastNewline + 1);
-          if (/^\s*$/.test(afterNewline)) {
-            text = text.slice(0, lastNewline + 1);
-          }
-        }
-        if (text) {
-          rubyCode += ` _buf << ${this.emitRubyString(text)};`;
-        }
-      }
-
-      // Handle -%> (trim trailing newline)
-      const trimTrailing = tag.endsWith('-');
-      if (trimTrailing) {
-        tag = tag.slice(0, -1);
-      }
-
-      tag = tag.trim();
-
-      // isCodeBlock was already computed above for whitespace stripping
-      let isOutputExpr = false;
-      if (tag.startsWith('=')) {
-        // Output expression: <%= expr %>
-        const expr = tag.slice(1).trim();
-        rubyCode += ` _buf << ( ${expr} ).to_s;`;
-        isOutputExpr = true;
-      } else if (tag.startsWith('-')) {
-        // Unescaped output: <%- expr %> (same as <%= for our purposes)
-        const expr = tag.slice(1).trim();
-        rubyCode += ` _buf << ( ${expr} ).to_s;`;
-        isOutputExpr = true;
-      } else {
-        // Code block: <% code %> - use newline, not semicolon
-        rubyCode += ` ${tag}\n`;
-      }
-
-      pos = erbEnd + 2;
-      // Trim trailing newline after code blocks (like Erubi does by default)
-      // This matches Ruby's behavior where <% %> doesn't leave extra newlines
-      if ((trimTrailing || isCodeBlock) && pos < template.length && template[pos] === '\n') {
-        pos++;
-      }
-
-      // For output expressions, if followed by a newline, add it as a separate literal
-      // This matches Ruby Erubi which splits the newline after output expressions
-      if (isOutputExpr && pos < template.length && template[pos] === '\n') {
-        rubyCode += ` _buf << ${this.emitRubyString('\n')};`;
-        pos++;
-      }
-    }
-
-    rubyCode += "\n_buf.to_s";
+    // Step 1: Use the transpiled ErbCompiler to generate Ruby code
+    const rubyCode = new SelfhostBuilder.ErbCompiler(template).src;
 
     // Step 2: Transpile Ruby code through selfhost converter with erb filter
     const result = SelfhostBuilder.converter.convert(rubyCode, {
@@ -290,22 +217,6 @@ export class SelfhostBuilder {
 
     // Step 3: Add export keyword (use multiline flag to match after imports)
     return result.toString().replace(/^function render/m, 'export function render');
-  }
-
-  // Escape string for Ruby single-quoted string literal
-  escapeRubyString(str) {
-    return str
-      .replace(/\\/g, '\\\\')
-      .replace(/'/g, "\\'");
-  }
-
-  // Emit a Ruby string literal matching Erubi's format
-  // Multi-line strings use single quotes with actual newlines (triggering template literals)
-  // Single-line strings use single quotes with .freeze
-  emitRubyString(str) {
-    // Always use single-quoted strings with proper escaping
-    // The actual newlines in the source trigger multi-line detection for template literals
-    return `'${this.escapeRubyString(str)}'.freeze`;
   }
 
   async transpileErbDirectory(srcDir, destDir) {
