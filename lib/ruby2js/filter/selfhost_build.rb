@@ -1,0 +1,134 @@
+require 'ruby2js'
+
+module Ruby2JS
+  module Filter
+    module SelfhostBuild
+      include SEXP
+
+      # Lazy-initialized imports
+      def import_yaml
+        @import_yaml ||= s(:import, ['js-yaml'], s(:attr, nil, :yaml))
+      end
+
+      def import_fs_for_yaml
+        @import_fs_for_yaml ||= s(:import, ['fs'], s(:attr, nil, :fs))
+      end
+
+      # Map filter file names to export names
+      # Some filters use uppercase (ESM, CJS), others use capitalized (Functions, Return)
+      UPPERCASE_FILTERS = %w[esm cjs].freeze
+
+      def filter_to_export_name(name)
+        if UPPERCASE_FILTERS.include?(name.downcase)
+          name.upcase
+        else
+          # Capitalize each word for names like 'active_support' → 'ActiveSupport'
+          name.split('_').map(&:capitalize).join
+        end
+      end
+
+      def on_send(node)
+        target, method, *args = node.children
+
+        # $LOAD_PATH.unshift(...) → remove entirely
+        if target&.type == :gvar && target.children == [:$LOAD_PATH]
+          return s(:begin)
+        end
+
+        # YAML.load_file(path) → yaml.load(fs.readFileSync(path, 'utf8'))
+        if target == s(:const, nil, :YAML) && method == :load_file && args.length == 1
+          prepend_list << import_yaml
+          prepend_list << import_fs_for_yaml
+          return S(:send, s(:attr, nil, :yaml), :load,
+            s(:send, s(:attr, nil, :fs), :readFileSync,
+              process(args.first), s(:str, 'utf8')))
+        end
+
+        # YAML.dump(obj) → yaml.dump(obj)
+        if target == s(:const, nil, :YAML) && method == :dump && args.length == 1
+          prepend_list << import_yaml
+          return S(:send, s(:attr, nil, :yaml), :dump, process(args.first))
+        end
+
+        # require 'yaml' or 'json' → remove (yaml handled by import above, json built-in)
+        if target.nil? && method == :require && args.length == 1 &&
+           args.first.type == :str && %w[yaml json].include?(args.first.children.first)
+          return s(:begin)
+        end
+
+        # require 'ruby2js' → import { Ruby2JS } from selfhost path
+        if target.nil? && method == :require && args.length == 1 &&
+           args.first.type == :str && args.first.children.first == 'ruby2js'
+          selfhost_path = @options[:selfhost_path] || '../selfhost/ruby2js.js'
+          return s(:import, [selfhost_path], s(:attr, nil, :Ruby2JS))
+        end
+
+        # require 'ruby2js/filter/rails' → import Rails filters
+        if target.nil? && method == :require && args.length == 1 &&
+           args.first.type == :str
+          req_path = args.first.children.first
+          if req_path.start_with?('ruby2js/filter/')
+            filter_name = req_path.sub('ruby2js/filter/', '')
+            selfhost_filters = @options[:selfhost_filters] || '../selfhost/filters'
+            # Convert filter name to export name (e.g., esm → ESM, functions → Functions)
+            export_name = filter_to_export_name(filter_name.split('/').last)
+            return s(:import, ["#{selfhost_filters}/#{filter_name}.js"],
+              s(:attr, nil, export_name.to_sym))
+          end
+        end
+
+        # require_relative → import (convert path to .js)
+        if target.nil? && method == :require_relative && args.length == 1 &&
+           args.first.type == :str
+          rel_path = args.first.children.first
+          # Convert .rb to .js, or add .js if no extension
+          js_path = if rel_path.end_with?('.rb')
+            rel_path.sub(/\.rb$/, '.js')
+          else
+            "#{rel_path}.js"
+          end
+          return s(:import, js_path)
+        end
+
+        super
+      end
+
+      def on_const(node)
+        # Ruby2JS::Filter::Rails::Model → Rails_Model (matching selfhost exports)
+        if node.children.first&.type == :const
+          parts = []
+          n = node
+          while n&.type == :const
+            parts.unshift(n.children.last)
+            n = n.children.first
+          end
+
+          # Ruby2JS::Filter::X → X (matching selfhost exports)
+          if parts[0] == :Ruby2JS && parts[1] == :Filter && parts.length >= 3
+            if parts.length == 3
+              # Ruby2JS::Filter::ESM → ESM, Ruby2JS::Filter::Functions → Functions
+              export_name = filter_to_export_name(parts[2].to_s)
+              return s(:const, nil, export_name.to_sym)
+            else
+              # Ruby2JS::Filter::Rails::Model → Rails_Model
+              filter_parts = parts[2..-1].map { |p| filter_to_export_name(p.to_s) }
+              return s(:const, nil, filter_parts.join('_').to_sym)
+            end
+          end
+        end
+
+        super
+      end
+
+      def on_gvasgn(node)
+        # $LOAD_PATH = ... → remove
+        if node.children.first == :$LOAD_PATH
+          return s(:begin)
+        end
+        super
+      end
+    end
+
+    DEFAULTS.push SelfhostBuild
+  end
+end
