@@ -15,7 +15,11 @@ usage() {
   echo "  -p, --port PORT       Use specified port (default: 3000)"
   echo "  -b, --binding HOST    Bind to HOST (default: localhost)"
   echo "  -e, --environment ENV Use environment (development/production)"
-  echo "  --runtime RUNTIME     Use runtime: node, bun, or deno (default: browser)"
+  echo "  --runtime RUNTIME     Use runtime: node, bun, or deno (for server databases)"
+  echo ""
+  echo "Database determines runtime (set in config/database.yml):"
+  echo "  dexie, sqljs         -> browser (SPA mode)"
+  echo "  better_sqlite3, pg   -> node, bun, or deno (default: node)"
   echo ""
   echo "Note: This is Ruby2JS-on-Rails, a transpiled subset of Rails patterns."
   echo "      Not all Rails commands are supported."
@@ -60,32 +64,45 @@ case "$COMMAND" in
       esac
     done
 
-    # Set environment
+    # Set environment variables for build script
     export NODE_ENV="$ENV"
+    export RAILS_ENV="$ENV"
     export PORT="$PORT"
     export HOST="$HOST"
+    [[ -n "$RUNTIME" ]] && export RUNTIME
 
-    # Start appropriate server based on runtime
-    case "$RUNTIME" in
-      node)
-        echo "Starting Node.js server on $HOST:$PORT..."
-        exec npm run dev:node
-        ;;
-      bun)
-        echo "Starting Bun server on $HOST:$PORT..."
-        exec npm run dev:bun
-        ;;
-      deno)
-        echo "Starting Deno server on $HOST:$PORT..."
-        exec npm run dev:deno
-        ;;
-      ""|browser)
+    # Build determines target from database.yml, validates runtime compatibility
+    # Then outputs TARGET=browser or TARGET=node (etc.) for us to use
+    echo "Building..."
+    BUILD_OUTPUT=$(npm run build:ruby 2>&1) || { echo "$BUILD_OUTPUT"; exit 1; }
+    echo "$BUILD_OUTPUT"
+
+    # Extract target from build output
+    TARGET=$(echo "$BUILD_OUTPUT" | grep "Target:" | sed 's/.*Target:[[:space:]]*//')
+    RUNTIME=$(echo "$BUILD_OUTPUT" | grep "Runtime:" | sed 's/.*Runtime:[[:space:]]*//' || echo "")
+
+    echo ""
+    case "$TARGET" in
+      browser)
         echo "Starting browser dev server on $HOST:$PORT..."
-        exec npm run dev
+        exec npx serve -p "$PORT"
+        ;;
+      server)
+        echo "Starting $RUNTIME server on $HOST:$PORT..."
+        case "$RUNTIME" in
+          node)
+            exec node server.mjs
+            ;;
+          bun)
+            exec bun server.mjs
+            ;;
+          deno)
+            exec deno run --allow-all server.mjs
+            ;;
+        esac
         ;;
       *)
-        echo "Unknown runtime: $RUNTIME"
-        echo "Valid options: node, bun, deno, or browser (default)"
+        echo "Error: Unknown target '$TARGET'"
         exit 1
         ;;
     esac
@@ -93,7 +110,7 @@ case "$COMMAND" in
 
   build)
     echo "Building static assets..."
-    exec npm run build
+    exec npm run build:ruby
     ;;
 
   ""|help|-h|--help)

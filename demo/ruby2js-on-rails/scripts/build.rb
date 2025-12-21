@@ -92,22 +92,33 @@ class SelfhostBuilder
     puts("=== Building Ruby2JS-on-Rails Demo ===")
     puts("")
 
-    # Copy database adapter and derive target
+    # Load database config and derive target
     puts("Database Adapter:")
     db_config = self.load_database_config()
     @database = db_config['adapter'] || db_config[:adapter] || 'sqljs'
     @target = BROWSER_DATABASES.include?(@database) ? 'browser' : 'server'
+
+    # Validate and set runtime based on database type
+    requested_runtime = ENV['RUNTIME']&.downcase
+
+    if @target == 'browser'
+      # Browser databases only work with browser target
+      if requested_runtime && requested_runtime != 'browser'
+        raise "Database '#{@database}' is browser-only. Cannot use RUNTIME=#{requested_runtime}.\n" \
+              "Browser databases: #{BROWSER_DATABASES.join(', ')}"
+      end
+      @runtime = nil  # Browser target doesn't use a JS runtime
+    else
+      # Server databases work with node, bun, or deno (default: node)
+      @runtime = requested_runtime || 'node'
+      unless SERVER_RUNTIMES.include?(@runtime)
+        raise "Unknown runtime: #{@runtime}. Valid options for server databases: #{SERVER_RUNTIMES.join(', ')}"
+      end
+    end
+
     self.copy_database_adapter(db_config)
     puts("  Target: #{@target}")
-
-    # Set runtime for server targets
-    if @target == 'server'
-      @runtime = self.load_runtime_config()
-      unless SERVER_RUNTIMES.include?(@runtime)
-        raise "Unknown runtime: #{@runtime}. Valid options: #{SERVER_RUNTIMES.join(', ')}"
-      end
-      puts("  Runtime: #{@runtime}")
-    end
+    puts("  Runtime: #{@runtime}") if @runtime
     puts("")
 
     # Copy target-specific lib files (rails.js framework)
