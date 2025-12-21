@@ -324,7 +324,6 @@ export class Application {
       // Expose helpers globally for onclick handlers
       window.navigate = navigate;
       window.submitForm = submitForm;
-      window.truncate = truncate;
 
       // Initial route
       await Router.dispatch(location.pathname || '/');

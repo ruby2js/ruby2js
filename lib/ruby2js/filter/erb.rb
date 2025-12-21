@@ -18,6 +18,7 @@ module Ruby2JS
         @erb_block_var = nil  # Track current block variable (e.g., 'f' in form_for)
         @erb_model_name = nil # Track model name for form_for (e.g., 'user')
         @erb_path_helpers = [] # Track path helper usage for imports
+        @erb_view_helpers = [] # Track view helper usage (truncate, etc.) for imports
       end
 
       # Main entry point - detect ERB/HERB output patterns and transform
@@ -28,6 +29,7 @@ module Ruby2JS
         @erb_block_var ||= nil
         @erb_model_name ||= nil
         @erb_path_helpers ||= []
+        @erb_view_helpers ||= []
 
         # Check if this looks like ERB/HERB output:
         # - First statement assigns to _erbout or _buf
@@ -80,6 +82,12 @@ module Ruby2JS
         unless @erb_path_helpers.empty?
           helpers = @erb_path_helpers.uniq.sort.map { |name| s(:const, nil, name) }
           self.prepend_list << s(:import, '../../config/paths.js', helpers)
+        end
+
+        # Add import for view helpers (truncate, etc.) from rails.js
+        unless @erb_view_helpers.empty?
+          helpers = @erb_view_helpers.uniq.sort.map { |name| s(:const, nil, name) }
+          self.prepend_list << s(:import, '../../lib/rails.js', helpers)
         end
 
         # Wrap in arrow function or regular function
@@ -366,6 +374,9 @@ module Ruby2JS
 
       # Process truncate helper
       def process_truncate(args)
+        # Track truncate usage for import
+        @erb_view_helpers << :truncate unless @erb_view_helpers.include?(:truncate)
+
         text_node = args[0]
         options_node = args[1]
 
