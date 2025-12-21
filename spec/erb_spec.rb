@@ -208,6 +208,59 @@ describe Ruby2JS::Filter::Erb do
     end
   end
 
+  describe 'target detection' do
+    def to_js_with_db(string, database:)
+      _(Ruby2JS.convert(string,
+        filters: [Ruby2JS::Filter::Erb, Ruby2JS::Filter::Functions],
+        eslevel: 2015,
+        database: database
+      ).to_s)
+    end
+
+    describe 'browser target (dexie)' do
+      it "should generate onsubmit handler for form_tag" do
+        # Format from ErbCompiler: _buf.append= form_tag ... do
+        erb_src = "_buf = ::String.new; _buf.append= form_tag articles_path do\n _buf << \"<button>Submit</button>\"; end\n_buf.to_s"
+        result = to_js_with_db(erb_src, database: 'dexie')
+        result.must_include 'onsubmit='
+        result.must_include 'routes.articles.post(event)'
+        result.wont_include 'action='
+      end
+
+      it "should generate onclick handler for link_to" do
+        erb_src = '_buf = ::String.new; _buf << ( link_to("Articles", "/articles") ).to_s; _buf.to_s'
+        result = to_js_with_db(erb_src, database: 'dexie')
+        result.must_include 'onclick='
+        result.must_include 'navigate(event'
+      end
+    end
+
+    describe 'server target (better_sqlite3)' do
+      it "should generate action URL for form_tag" do
+        erb_src = "_buf = ::String.new; _buf.append= form_tag articles_path do\n _buf << \"<button>Submit</button>\"; end\n_buf.to_s"
+        result = to_js_with_db(erb_src, database: 'better_sqlite3')
+        result.must_include 'action='
+        result.must_include 'method="post"'
+        result.wont_include 'onsubmit='
+      end
+
+      it "should generate plain href for link_to" do
+        erb_src = '_buf = ::String.new; _buf << ( link_to("Articles", "/articles") ).to_s; _buf.to_s'
+        result = to_js_with_db(erb_src, database: 'better_sqlite3')
+        result.must_include 'href='
+        result.wont_include 'onclick='
+      end
+    end
+
+    describe 'default behavior' do
+      it "should default to browser target when no database specified" do
+        erb_src = '_buf = ::String.new; _buf << ( link_to("Articles", "/articles") ).to_s; _buf.to_s'
+        result = to_js(erb_src)
+        result.must_include 'onclick='
+      end
+    end
+  end
+
   describe Ruby2JS::Filter::DEFAULTS do
     it "should include Erb" do
       _(Ruby2JS::Filter::DEFAULTS).must_include Ruby2JS::Filter::Erb
