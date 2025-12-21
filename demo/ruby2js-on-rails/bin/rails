@@ -74,7 +74,7 @@ case "$COMMAND" in
     # Build determines target from database.yml, validates runtime compatibility
     # Then outputs TARGET=browser or TARGET=node (etc.) for us to use
     echo "Building..."
-    BUILD_OUTPUT=$(npm run build:ruby 2>&1) || { echo "$BUILD_OUTPUT"; exit 1; }
+    BUILD_OUTPUT=$(npm run build 2>&1) || { echo "$BUILD_OUTPUT"; exit 1; }
     echo "$BUILD_OUTPUT"
 
     # Extract target from build output
@@ -110,7 +110,7 @@ case "$COMMAND" in
 
   build)
     echo "Building static assets..."
-    exec npm run build:ruby
+    exec npm run build
     ;;
 
   ""|help|-h|--help)
