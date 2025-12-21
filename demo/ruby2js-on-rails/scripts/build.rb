@@ -99,7 +99,8 @@ class SelfhostBuilder
     @target = BROWSER_DATABASES.include?(@database) ? 'browser' : 'server'
 
     # Validate and set runtime based on database type
-    requested_runtime = ENV['RUNTIME']&.downcase
+    requested_runtime = ENV['RUNTIME']
+    requested_runtime = requested_runtime.downcase if requested_runtime
 
     if @target == 'browser'
       # Browser databases only work with browser target
