@@ -510,6 +510,16 @@ module Ruby2JS
             return node.updated(:await!)
           end
 
+          # Check for association method chains (e.g., article.comments.find(id), article.comments.create(params))
+          # These are: lvar.accessor.method where method is :find or :create
+          if target&.type == :send && %i[find create].include?(method)
+            assoc_target, _assoc_method = target.children
+            # If the chain starts from a local variable (e.g., article.comments.find)
+            if assoc_target&.type == :lvar
+              return node.updated(:await)
+            end
+          end
+
           node
         end
 

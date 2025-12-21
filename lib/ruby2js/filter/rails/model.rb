@@ -365,12 +365,16 @@ module Ruby2JS
 
         def generate_has_many_method(assoc)
           # has_many :comments -> get comments() {
-          #   // Return cached if preloaded, otherwise fetch async
+          #   // Return a "thenable" proxy object that:
+          #   // - Has create/find methods directly accessible
+          #   // - When awaited, returns the actual collection
           #   if (this._comments) return this._comments;
-          #   let records = Comment.where({article_id: this.id});
-          #   records.create = (params) => Comment.create(Object.assign({article_id: this.id}, params));
-          #   records.find = (id) => Comment.find(id);
-          #   return records;
+          #   let _id = this.id;
+          #   return {
+          #     create: (params) => Comment.create(Object.assign({article_id: _id}, params)),
+          #     find: (id) => Comment.find(id),
+          #     then: (resolve, reject) => Comment.where({article_id: _id}).then(resolve, reject)
+          #   };
           # }
           # Also generates set comments(val) for preloading
           association_name = assoc[:name]
@@ -381,16 +385,19 @@ module Ruby2JS
           # Track model reference for import generation
           @rails_model_refs.add(class_name)
 
-          # Build the where call
+          # Capture this.id for use in closures (hash methods lose `this` binding)
+          id_capture = s(:lvasgn, :_id, s(:attr, s(:self), :id))
+
+          # Build the where call for the then handler (using captured _id)
           where_call = s(:send,
             s(:const, nil, class_name.to_sym),
             :where,
             s(:hash,
               s(:pair,
                 s(:sym, foreign_key.to_sym),
-                s(:attr, s(:self), :id))))
+                s(:lvar, :_id))))
 
-          # Build the create lambda: (params) => Model.create(Object.assign({fk: this.id}, params))
+          # Build the create lambda: (params) => Model.create(Object.assign({fk: _id}, params))
           create_lambda = s(:block,
             s(:send, nil, :lambda),
             s(:args, s(:arg, :params)),
@@ -403,7 +410,7 @@ module Ruby2JS
                 s(:hash,
                   s(:pair,
                     s(:sym, foreign_key.to_sym),
-                    s(:attr, s(:self), :id))),
+                    s(:lvar, :_id))),
                 s(:lvar, :params))))
 
           # Build the find lambda: (id) => Model.find(id)
@@ -413,10 +420,22 @@ module Ruby2JS
             s(:args, s(:arg, :id)),
             s(:send,
               s(:const, nil, class_name.to_sym),
-              :find!,
+              :find,
               s(:lvar, :id)))
 
-          # Getter: returns cache if set, otherwise fetches async
+          # Build the then handler: (resolve, reject) => Model.where({fk: _id}).then(resolve, reject)
+          then_lambda = s(:block,
+            s(:send, nil, :lambda),
+            s(:args, s(:arg, :resolve), s(:arg, :reject)),
+            s(:send, where_call, :then, s(:lvar, :resolve), s(:lvar, :reject)))
+
+          # Build the proxy object with create, find, and then methods
+          proxy_object = s(:hash,
+            s(:pair, s(:sym, :create), create_lambda),
+            s(:pair, s(:sym, :find), find_lambda),
+            s(:pair, s(:sym, :then), then_lambda))
+
+          # Getter: returns cache if set, otherwise captures id and returns thenable proxy
           getter = s(:defget, association_name,
             s(:args),
             s(:begin,
@@ -425,10 +444,8 @@ module Ruby2JS
                 s(:attr, s(:self), cache_name),
                 s(:return, s(:attr, s(:self), cache_name)),
                 nil),
-              s(:lvasgn, :records, where_call),
-              s(:send, s(:lvar, :records), :[]=, s(:str, 'create'), create_lambda),
-              s(:send, s(:lvar, :records), :[]=, s(:str, 'find'), find_lambda),
-              s(:return, s(:lvar, :records))))
+              id_capture,
+              s(:return, proxy_object)))
 
           # Setter: allows preloading with article.comments = await Comment.where(...)
           # Use method name with = suffix, class2 converter handles this as a setter
@@ -511,22 +528,22 @@ module Ruby2JS
 
           return nil if dependent_destroy.empty?
 
-          # Generate: this.comments.forEach(c => c.destroy()); super.destroy();
-          # Use :attr for property access since associations are getters
+          # Generate: async destroy() { for (let record of await this.comments) { await record.destroy() }; return super.destroy(); }
+          # Must await the association (thenable proxy) to get the collection
+          # Use for...of with await inside to properly handle async destroy calls
           destroy_calls = dependent_destroy.map do |assoc|
-            s(:send,
-              s(:attr, s(:self), assoc[:name]),
-              :each,
-              s(:block,
-                s(:send, nil, :lambda),
-                s(:args, s(:arg, :record)),
-                s(:send, s(:lvar, :record), :destroy)))
+            # for (let record of await this.comments) { await record.destroy() }
+            s(:for_of,
+              s(:lvasgn, :record),
+              s(:send, nil, :await, s(:attr, s(:self), assoc[:name])),
+              s(:send, nil, :await, s(:send, s(:lvar, :record), :destroy)))
           end
 
           # Add super.destroy() call
           destroy_calls << s(:zsuper)
 
-          s(:def, :destroy,
+          # Use :async for async instance method
+          s(:async, :destroy,
             s(:args),
             s(:autoreturn, *destroy_calls))
         end
