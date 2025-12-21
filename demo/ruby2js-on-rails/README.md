@@ -77,6 +77,75 @@ Ruby source files in `app/`, `config/`, and `db/` are transpiled to JavaScript u
 3. Save the file
 4. Browser automatically reloads with changes
 
+## Rails-like CLI
+
+For Rails users, familiar commands are available via `bin/rails`:
+
+```bash
+bin/dev                      # Start dev server (wraps npm run dev)
+bin/rails server             # Start dev server
+bin/rails server -p 4000     # Use custom port
+bin/rails server --runtime node  # Run on Node.js
+bin/rails build              # Build for production
+```
+
+## Packaging for Distribution
+
+The demo can be packaged as a standalone tarball that requires only Node.js 22+ to run (no Ruby needed):
+
+```bash
+# From the ruby2js root directory
+cd demo/selfhost
+bundle exec rake publish_demo
+```
+
+This creates `dist/ruby2js-on-rails.tar.gz` containing:
+- User app (app/, config/, db/)
+- Pre-transpiled Ruby2JS converter in `vendor/ruby2js/selfhost/`
+- Database adapters and runtime targets
+- Development server with hot reload
+
+### Testing the Published Package
+
+```bash
+# Smoke test (automated)
+bundle exec rake publish_demo:smoke
+
+# Manual test
+cd dist
+tar -xzf ruby2js-on-rails.tar.gz
+cd ruby2js-on-rails
+npm install
+npm run dev
+# Open http://localhost:3000
+```
+
+## Testing
+
+### Smoke Test
+
+Compare Ruby and selfhost transpilation to ensure identical output:
+
+```bash
+npm run test:smoke
+```
+
+This verifies:
+- Both Ruby and selfhost builds complete successfully
+- Generated JavaScript has valid syntax
+- Both builds produce identical output
+- All relative imports resolve correctly
+
+### Running from Repository
+
+When developing Ruby2JS itself:
+
+```bash
+# Run selfhost CI tests (from demo/selfhost)
+cd ../selfhost
+bundle exec rake ci
+```
+
 ## Project Structure
 
 ```
@@ -86,23 +155,27 @@ ruby2js-on-rails/
 │   ├── helpers/          # Ruby helper modules
 │   ├── models/           # Ruby ActiveRecord-style models
 │   └── views/articles/   # ERB templates
+├── bin/
+│   ├── dev               # Start dev server (wraps npm run dev)
+│   └── rails             # Rails-like CLI (server, build)
 ├── config/
 │   ├── database.yml      # Database configuration (determines target)
 │   ├── routes.rb         # Rails-style routing
 │   └── schema.rb         # Database schema
 ├── db/
 │   └── seeds.rb          # Seed data
-├── lib/
+├── vendor/ruby2js/       # Framework files
 │   ├── adapters/         # Database adapters (copied to dist/lib/active_record.mjs)
 │   │   ├── active_record_sqljs.mjs      # Browser: sql.js (SQLite WASM)
 │   │   ├── active_record_dexie.mjs      # Browser: Dexie (IndexedDB)
 │   │   ├── active_record_better_sqlite3.mjs  # Node: SQLite
 │   │   └── active_record_pg.mjs         # Node: PostgreSQL
-│   └── targets/          # Target-specific runtimes
-│       ├── browser/rails.js  # History API routing, DOM updates
-│       ├── node/rails.js     # HTTP server (http.createServer)
-│       ├── bun/rails.js      # HTTP server (Bun.serve)
-│       └── deno/rails.js     # HTTP server (Deno.serve)
+│   ├── targets/          # Target-specific runtimes
+│   │   ├── browser/rails.js  # History API routing, DOM updates
+│   │   ├── node/rails.js     # HTTP server (http.createServer)
+│   │   ├── bun/rails.js      # HTTP server (Bun.serve)
+│   │   └── deno/rails.js     # HTTP server (Deno.serve)
+│   └── erb_runtime.mjs   # ERB template runtime
 ├── dist/                 # Generated JavaScript (git-ignored)
 ├── scripts/
 │   ├── build.rb          # Ruby transpilation script
