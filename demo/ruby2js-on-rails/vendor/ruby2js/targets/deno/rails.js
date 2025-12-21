@@ -262,9 +262,9 @@ export class Application {
     await adapter.initDatabase({});
 
     // For adapters with schema migration support
-    if (this.schema && this.schema.create_tables && adapter.getDatabase) {
-      const db = adapter.getDatabase();
-      this.schema.create_tables(db);
+    // Run schema migrations - schema imports execSQL from adapter
+    if (this.schema && this.schema.create_tables) {
+      this.schema.create_tables();
     }
 
     // Run seeds if present

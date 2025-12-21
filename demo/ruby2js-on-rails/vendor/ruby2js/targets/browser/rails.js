@@ -293,8 +293,9 @@ export class Application {
     window.DB = adapter.getDatabase();
 
     // For sql.js: run schema SQL (skip for Dexie which uses defineSchema instead)
-    if (this.schema && this.schema.create_tables && !adapter.openDatabase) {
-      this.schema.create_tables(window.DB);
+    // Run schema migrations - schema imports execSQL from adapter
+    if (this.schema && this.schema.create_tables) {
+      this.schema.create_tables();
     }
 
     // Run seeds if present

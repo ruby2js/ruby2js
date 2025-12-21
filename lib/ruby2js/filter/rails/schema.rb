@@ -410,13 +410,20 @@ module Ruby2JS
           # Build method body
           method_body = statements.length == 1 ? statements.first : s(:begin, *statements)
 
+          # No db parameter - uses imported execSQL from adapter
           create_tables_method = s(:defs, s(:self), :create_tables,
-            s(:args, s(:arg, :db)),
+            s(:args),
             method_body)
 
-          # Export the module
-          process(s(:send, nil, :export,
-            s(:module, s(:const, nil, :Schema), create_tables_method)))
+          # Import execSQL from adapter and export the module
+          import_stmt = s(:send, nil, :import,
+            s(:array, s(:const, nil, :execSQL)),
+            s(:str, '../lib/active_record.mjs'))
+
+          schema_module = s(:send, nil, :export,
+            s(:module, s(:const, nil, :Schema), create_tables_method))
+
+          process(s(:begin, import_stmt, schema_module))
         end
 
         def build_create_table_statement(table)
@@ -446,8 +453,8 @@ module Ruby2JS
           sql += column_defs.map { |d| "        #{d}" }.join(",\n")
           sql += "\n      )"
 
-          # db.run(%{...})
-          s(:send, s(:lvar, :db), :run, s(:str, sql))
+          # execSQL(sql) - uses imported function from adapter
+          s(:send, nil, :execSQL, s(:str, sql))
         end
 
         def build_create_index_statement(index)
@@ -456,7 +463,8 @@ module Ruby2JS
 
           sql = "CREATE #{unique}INDEX IF NOT EXISTS #{index[:name]} ON #{index[:table]}(#{columns})"
 
-          s(:send, s(:lvar, :db), :run, s(:str, sql))
+          # execSQL(sql) - uses imported function from adapter
+          s(:send, nil, :execSQL, s(:str, sql))
         end
       end
     end
