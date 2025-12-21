@@ -1,0 +1,208 @@
+#!/usr/bin/env ruby
+# Consolidated build script for selfhost
+# Loads Ruby2JS once and transpiles all files in a single process
+# Much faster than spawning separate Ruby processes for each file
+
+require 'json'
+require 'fileutils'
+
+ROOT = File.expand_path('../../..', __dir__)
+SELFHOST = File.expand_path('..', __dir__)
+DIST = File.join(SELFHOST, 'dist')
+FILTERS_DIR = File.join(SELFHOST, 'filters')
+
+$LOAD_PATH.unshift File.join(ROOT, 'lib')
+
+require 'ruby2js'
+require 'ruby2js/filter/combiner'
+require 'ruby2js/filter/pragma'
+require 'ruby2js/filter/selfhost'
+require 'ruby2js/filter/selfhost/filter'
+require 'ruby2js/filter/polyfill'
+require 'ruby2js/filter/functions'
+require 'ruby2js/filter/return'
+require 'ruby2js/filter/esm'
+
+# Load manifest
+def manifest
+  @manifest ||= JSON.parse(File.read(File.join(SELFHOST, 'spec_manifest.json')))
+end
+
+# Common filter options for specs
+SPEC_FILTERS = [
+  Ruby2JS::Filter::Pragma,
+  Ruby2JS::Filter::Combiner,
+  Ruby2JS::Filter::Selfhost::Core,
+  Ruby2JS::Filter::Selfhost::Walker,
+  Ruby2JS::Filter::Selfhost::Spec,
+  Ruby2JS::Filter::Functions,
+  Ruby2JS::Filter::Return,
+  Ruby2JS::Filter::ESM
+]
+
+# Common filter options for filter files
+FILTER_FILTERS = [
+  Ruby2JS::Filter::Pragma,
+  Ruby2JS::Filter::Combiner,
+  Ruby2JS::Filter::Selfhost::Filter,
+  Ruby2JS::Filter::Selfhost::Core,
+  Ruby2JS::Filter::Selfhost::Converter,
+  Ruby2JS::Filter::Polyfill,
+  Ruby2JS::Filter::Functions,
+  Ruby2JS::Filter::Return,
+  Ruby2JS::Filter::ESM
+]
+
+# Map spec names to filter names
+SPEC_TO_FILTER = {
+  'camelcase_spec.rb' => 'camelCase',
+  'cjs_spec.rb' => 'cjs',
+  'rails_logger_spec.rb' => 'rails/logger',
+  'rails_model_spec.rb' => 'rails/model',
+  'rails_controller_spec.rb' => 'rails/controller',
+  'rails_routes_spec.rb' => 'rails/routes',
+  'rails_schema_spec.rb' => 'rails/schema',
+  'rails_seeds_spec.rb' => 'rails/seeds'
+}
+
+def filter_for_spec(spec_name)
+  SPEC_TO_FILTER[spec_name] || spec_name.sub('_spec.rb', '')
+end
+
+def transpile_spec(spec_file, output_path)
+  source = File.read(spec_file)
+
+  # Add skip pragmas to all requires
+  source = source.gsub(/^(require\s+['"][^'"]*['"])/) do
+    "#{$1} # Pragma: skip"
+  end
+
+  js = Ruby2JS.convert(source,
+    eslevel: 2022,
+    comparison: :identity,
+    underscored_private: true,
+    file: spec_file,
+    filters: SPEC_FILTERS
+  ).to_s
+
+  FileUtils.mkdir_p(File.dirname(output_path))
+  File.write(output_path, js)
+end
+
+def transpile_filter(filter_file, output_path)
+  source = File.read(filter_file)
+
+  js = Ruby2JS.convert(source,
+    eslevel: 2022,
+    comparison: :identity,
+    underscored_private: true,
+    nullish_to_s: true,
+    include: [:call, :keys],
+    file: filter_file,
+    filters: FILTER_FILTERS
+  ).to_s
+
+  FileUtils.mkdir_p(File.dirname(output_path))
+  File.write(output_path, js)
+end
+
+# Parse command line
+command = ARGV[0] || 'all'
+target = ARGV[1]
+
+case command
+when 'specs'
+  # Build all specs (or specific one)
+  FileUtils.mkdir_p(DIST)
+
+  specs = if target
+    [target]
+  else
+    manifest['ready'] + manifest['partial'].map { |e| e.is_a?(Hash) ? e['spec'] : e }
+  end
+
+  specs.each do |spec_name|
+    spec_path = File.join(ROOT, 'spec', spec_name)
+    output_path = File.join(DIST, spec_name.sub('.rb', '.mjs'))
+
+    if File.exist?(spec_path)
+      print "  #{spec_name}..."
+      transpile_spec(spec_path, output_path)
+      puts " done"
+    else
+      puts "  #{spec_name} (skipped - not found)"
+    end
+  end
+
+when 'filters'
+  # Build all filters (or specific one)
+  FileUtils.mkdir_p(FILTERS_DIR)
+
+  filters = if target
+    [target]
+  else
+    specs = manifest['ready'] + manifest['partial'].map { |e| e.is_a?(Hash) ? e['spec'] : e }
+    specs.map { |s| filter_for_spec(s) }
+         .uniq
+         .select { |name| File.exist?(File.join(ROOT, 'lib/ruby2js/filter', "#{name}.rb")) }
+  end
+
+  filters.each do |name|
+    src = File.join(ROOT, 'lib/ruby2js/filter', "#{name}.rb")
+    output = File.join(FILTERS_DIR, "#{name}.js")
+
+    if File.exist?(src)
+      print "  #{name}..."
+      transpile_filter(src, output)
+      puts " done"
+    else
+      puts "  #{name} (skipped - not found)"
+    end
+  end
+
+when 'all'
+  puts "Building specs..."
+  system(RbConfig.ruby, __FILE__, 'specs') || exit(1)
+
+  puts ""
+  puts "Building filters..."
+  system(RbConfig.ruby, __FILE__, 'filters') || exit(1)
+
+when 'ready'
+  # Build only ready specs
+  FileUtils.mkdir_p(DIST)
+
+  manifest['ready'].each do |spec_name|
+    spec_path = File.join(ROOT, 'spec', spec_name)
+    output_path = File.join(DIST, spec_name.sub('.rb', '.mjs'))
+
+    print "  #{spec_name}..."
+    transpile_spec(spec_path, output_path)
+    puts " done"
+  end
+
+when 'partial'
+  # Build only partial specs
+  FileUtils.mkdir_p(DIST)
+
+  manifest['partial'].each do |entry|
+    spec_name = entry.is_a?(Hash) ? entry['spec'] : entry
+    spec_path = File.join(ROOT, 'spec', spec_name)
+    output_path = File.join(DIST, spec_name.sub('.rb', '.mjs'))
+
+    print "  #{spec_name}..."
+    transpile_spec(spec_path, output_path)
+    puts " done"
+  end
+
+else
+  puts "Usage: build_all.rb [specs|filters|all|ready|partial] [target]"
+  puts ""
+  puts "Commands:"
+  puts "  specs   - Build all spec files (or specific one if target given)"
+  puts "  filters - Build all filter files (or specific one if target given)"
+  puts "  all     - Build both specs and filters"
+  puts "  ready   - Build only ready specs"
+  puts "  partial - Build only partial specs"
+  exit 1
+end

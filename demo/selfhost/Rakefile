@@ -10,7 +10,7 @@ DIST = File.join(SELFHOST, 'dist')
 
 # Helper to run bundle exec from root directory (where Gemfile is)
 def bundle_exec(cmd)
-  "cd #{ROOT} && bundle exec #{cmd}"
+  "cd #{ROOT} && BUNDLE_GEMFILE=#{ROOT}/Gemfile bundle exec #{cmd}"
 end
 
 # Load manifest
@@ -51,38 +51,6 @@ file "#{SELFHOST}/ruby2js.js" => [*bundle_deps, *runtime_deps, *namespace_deps, 
   sh bundle_exec("ruby #{SELFHOST}/scripts/transpile_bundle.rb > #{SELFHOST}/ruby2js.js")
 end
 
-# Dynamically create spec file tasks based on manifest
-def spec_output_path(spec_name)
-  "#{DIST}/#{spec_name.sub('.rb', '.mjs')}"
-end
-
-# Build tasks for ready specs
-manifest['ready'].each do |spec_name|
-  spec_path = "#{ROOT}/spec/#{spec_name}"
-  output_path = spec_output_path(spec_name)
-
-  file output_path => [DIST, spec_path, *selfhost_deps] do
-    sh bundle_exec("ruby #{SELFHOST}/scripts/transpile_spec.rb #{spec_path} > #{output_path}")
-  end
-end
-
-# Build tasks for partial specs
-manifest['partial'].each do |entry|
-  spec_name = entry.is_a?(Hash) ? entry['spec'] : entry
-  spec_path = "#{ROOT}/spec/#{spec_name}"
-  output_path = spec_output_path(spec_name)
-
-  file output_path => [DIST, spec_path, *selfhost_deps] do
-    sh bundle_exec("ruby #{SELFHOST}/scripts/transpile_spec.rb #{spec_path} > #{output_path}")
-  end
-end
-
-# Filter dependencies
-filter_deps = FileList["#{ROOT}/lib/ruby2js/filter/*.rb"]
-filters_dir = "#{SELFHOST}/filters"
-
-directory filters_dir
-
 # Map spec names to filter names (when they differ)
 SPEC_TO_FILTER = {
   'camelcase_spec.rb' => 'camelCase',
@@ -102,62 +70,41 @@ end
 
 # Get filters needed for ready + partial specs (only those with actual filter files)
 def manifest_filters
-  specs = manifest['ready'] + manifest['partial']
+  specs = manifest['ready'] + manifest['partial'].map { |e| e.is_a?(Hash) ? e['spec'] : e }
   specs.map { |s| filter_for_spec(s) }
        .uniq
        .select { |name| File.exist?("#{ROOT}/lib/ruby2js/filter/#{name}.rb") }
 end
 
-# Create build tasks for each manifest filter
-manifest_filters.each do |name|
-  src = "#{ROOT}/lib/ruby2js/filter/#{name}.rb"
-  output = "#{filters_dir}/#{name}.js"
-
-  # Handle subdirectory filters (e.g., rails/logger)
-  output_dir = File.dirname(output)
-
-  file output => [filters_dir, "#{SELFHOST}/ruby2js.js", src, *selfhost_deps] do
-    mkdir_p output_dir unless File.exist?(output_dir)
-    sh bundle_exec("ruby #{SELFHOST}/scripts/transpile_filter.rb #{src} > #{output}")
-  end
-end
-
 # Filter output files for manifest specs
+filters_dir = "#{SELFHOST}/filters"
 FILTER_TARGETS = manifest_filters.map { |name| "#{filters_dir}/#{name}.js" }
 
-desc "Build manifest filters"
-task :build_filters => FILTER_TARGETS
+desc "Build manifest filters (batch)"
+task :build_filters => ["#{SELFHOST}/ruby2js.js"] do
+  puts "Building filters..."
+  sh bundle_exec("ruby #{SELFHOST}/scripts/build_all.rb filters")
+end
 
 # Core build targets (library and prism_browser)
-CORE_TARGETS = ["#{SELFHOST}/ruby2js.js", "#{SELFHOST}/prism_browser.js", *FILTER_TARGETS]
+CORE_TARGETS = ["#{SELFHOST}/ruby2js.js", "#{SELFHOST}/prism_browser.js"]
 
-desc "Build all transpiled files (bundle, prism_browser, specs)"
-task :build => CORE_TARGETS do
-  # Build ready specs
-  manifest['ready'].each do |spec_name|
-    Rake::Task[spec_output_path(spec_name)].invoke
-  end
-
-  # Build partial specs
-  manifest['partial'].each do |entry|
-    spec_name = entry.is_a?(Hash) ? entry['spec'] : entry
-    Rake::Task[spec_output_path(spec_name)].invoke
-  end
+desc "Build all transpiled files (bundle, prism_browser, specs, filters)"
+task :build => [*CORE_TARGETS, :build_filters] do
+  puts "Building specs..."
+  sh bundle_exec("ruby #{SELFHOST}/scripts/build_all.rb specs")
 end
 
 desc "Build only ready specs"
-task :build_ready => CORE_TARGETS do
-  manifest['ready'].each do |spec_name|
-    Rake::Task[spec_output_path(spec_name)].invoke
-  end
+task :build_ready => [*CORE_TARGETS, :build_filters] do
+  puts "Building ready specs..."
+  sh bundle_exec("ruby #{SELFHOST}/scripts/build_all.rb ready")
 end
 
 desc "Build partial specs"
-task :build_partial => CORE_TARGETS do
-  manifest['partial'].each do |entry|
-    spec_name = entry.is_a?(Hash) ? entry['spec'] : entry
-    Rake::Task[spec_output_path(spec_name)].invoke
-  end
+task :build_partial => [*CORE_TARGETS, :build_filters] do
+  puts "Building partial specs..."
+  sh bundle_exec("ruby #{SELFHOST}/scripts/build_all.rb partial")
 end
 
 desc "Install npm dependencies"
