@@ -494,7 +494,6 @@ unless defined?(RUBY2JS_SELFHOST) # Pragma: skip
           def is_method?
             return false if type == :attr
             return true if type == :call
-            return true if type == :await  # await implies function call, not property access
             return true unless loc
 
             if loc.respond_to? :selector
