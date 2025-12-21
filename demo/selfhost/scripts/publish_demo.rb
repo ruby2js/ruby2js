@@ -102,6 +102,15 @@ puts "Copying runtime files..."
 end
 puts ""
 
+# 3b. Copy public directory (CSS, static assets)
+public_src = File.join(DEMO_DIR, 'public')
+if File.exist?(public_src)
+  puts "Copying public assets..."
+  FileUtils.cp_r(public_src, File.join(OUTPUT_DIR, 'public'))
+  puts "  public/"
+  puts ""
+end
+
 # 4. Copy bin directory
 puts "Copying bin scripts..."
 bin_src = File.join(DEMO_DIR, 'bin')
