@@ -252,12 +252,12 @@ task :rails_demo_npm_install do
   end
 end
 
-# Build the demo using the selfhost transpiler
+# Build the demo using Ruby2JS
 # This transpiles all Ruby files to JavaScript in dist/
-task :rails_demo_build => [:selfhost_build, :rails_demo_npm_install] do
+task :rails_demo_build => [:rails_demo_npm_install] do
   Dir.chdir(rails_demo_source) do
-    # Build using selfhost transpiler (creates dist/ with transpiled JS)
-    sh "node scripts/build.mjs"
+    # Build using Ruby gem (creates dist/ with transpiled JS)
+    sh "bundle exec ruby scripts/build.rb"
   end
 end
 
