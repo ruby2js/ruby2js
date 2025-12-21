@@ -1,16 +1,19 @@
 # Database configuration
 # Adapter is selected at build time, not runtime
 # Override with DATABASE=<adapter> environment variable
+#
+# Browser adapters:
+#   dexie        - IndexedDB wrapper (~50KB), persistent storage
+#   sqljs        - SQLite in WASM (~2.7MB), full SQL support
+#
+# Server adapters (Node.js/Bun/Deno):
+#   better_sqlite3 - Native SQLite, synchronous, fast
+#   pg             - PostgreSQL
 
 development:
   adapter: dexie
   database: ruby2js_rails_dev
 
 production:
-  adapter: dexie
-  database: ruby2js_rails
-
-# Alternative: sql.js for full SQL support (larger bundle ~2.7MB vs ~50KB)
-# development:
-#   adapter: sqljs
-#   database: ruby2js_rails_dev
+  adapter: better_sqlite3
+  database: db/production.sqlite3
