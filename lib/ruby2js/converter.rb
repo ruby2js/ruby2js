@@ -37,7 +37,7 @@ module Ruby2JS
       :=== => :'!=='
     }
 
-    GROUP_OPERATORS = [:begin, :dstr, :dsym, :and, :or, :nullish, :casgn, :if, :await]
+    GROUP_OPERATORS = [:begin, :dstr, :dsym, :and, :or, :nullish, :casgn, :if, :await, :await!]
 
     VASGN = [:cvasgn, :ivasgn, :gvasgn, :lvasgn]
 
