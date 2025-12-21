@@ -294,11 +294,11 @@ describe Ruby2JS::Filter::Rails::Schema do
           end
         end
       RUBY
-      assert_includes result, 'function create_tables(db)'
+      assert_includes result, 'function create_tables()'
       assert_includes result, 'return {create_tables}'
     end
 
-    it "uses db.run for SQL execution" do
+    it "imports execSQL from adapter and uses it for SQL execution" do
       result = to_js(<<~RUBY)
         ActiveRecord::Schema.define do
           create_table "articles" do |t|
@@ -306,7 +306,8 @@ describe Ruby2JS::Filter::Rails::Schema do
           end
         end
       RUBY
-      assert_includes result, 'db.run('
+      assert_includes result, 'import { execSQL } from "../lib/active_record.mjs"'
+      assert_includes result, 'execSQL('
     end
   end
 end

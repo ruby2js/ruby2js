@@ -36,7 +36,8 @@ describe Ruby2JS::Filter::Rails::Model do
         end
       RUBY
       assert_includes result, 'get comments()'
-      assert_includes result, 'Comment.where({article_id: this.id})'
+      # Uses _id closure variable for proper this binding in proxy methods
+      assert_includes result, 'Comment.where({article_id: _id})'
     end
 
     it "supports class_name option" do
@@ -46,7 +47,7 @@ describe Ruby2JS::Filter::Rails::Model do
         end
       RUBY
       assert_includes result, 'get reviews()'
-      assert_includes result, 'Comment.where({article_id: this.id})'
+      assert_includes result, 'Comment.where({article_id: _id})'
     end
 
     it "supports foreign_key option" do
@@ -55,7 +56,7 @@ describe Ruby2JS::Filter::Rails::Model do
           has_many :comments, foreign_key: 'post_id'
         end
       RUBY
-      assert_includes result, 'Comment.where({post_id: this.id})'
+      assert_includes result, 'Comment.where({post_id: _id})'
     end
 
     it "handles dependent destroy" do
@@ -64,10 +65,10 @@ describe Ruby2JS::Filter::Rails::Model do
           has_many :comments, dependent: :destroy
         end
       RUBY
-      assert_includes result, 'destroy()'
-      # Associations are getters, so accessed without parentheses
-      assert_includes result, 'this.comments.'
-      assert_includes result, '.destroy()'
+      assert_includes result, 'async destroy()'
+      # Uses for..of with await to iterate over association
+      assert_includes result, 'for (let record of await(this.comments))'
+      assert_includes result, 'await record.destroy()'
     end
   end
 
