@@ -34,11 +34,8 @@ export class ErbCompiler {
       // Find end of ERB tag first to check if this is a code block
       let erb_end = this.#template.indexOf("%>", erb_start);
 
-      if (erb_end == null || erb_end < 0) {
-        // Ruby's index returns nil, JS's indexOf returns -1
-        throw "Unclosed ERB tag"
-      };
-
+      // Ruby's index returns nil, JS's indexOf returns -1
+      if (erb_end == null || erb_end < 0) throw "Unclosed ERB tag";
       let tag = this.#template.slice(erb_start + 2, erb_end);
       let is_code_block = !tag.trim().startsWith("=") && !tag.trim().startsWith("-");
 
@@ -70,8 +67,15 @@ export class ErbCompiler {
       if (tag.startsWith("=")) {
         // Output expression: <%= expr %>
         let expr = tag.slice(1).trim();
-        ruby_code += ` _buf << ( ${expr} ).to_s;`;
-        is_output_expr = true
+
+        // Check if this is a block expression (ends with 'do')
+        if (expr.endsWith(" do") || expr.endsWith("\tdo")) {
+          // Block expression: use .append= pattern that ERB filter expects
+          ruby_code += ` _buf.append= ${expr}\n`
+        } else {
+          ruby_code += ` _buf << ( ${expr} ).to_s;`;
+          is_output_expr = true
+        }
       } else if (tag.startsWith("-")) {
         // Unescaped output: <%- expr %> (same as <%= for our purposes)
         let expr = tag.slice(1).trim();
