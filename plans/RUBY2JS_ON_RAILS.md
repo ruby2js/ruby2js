@@ -178,7 +178,7 @@ async function boot() {
 ruby2js/
 └── demo/
     ├── selfhost/           ← Existing selfhost demo
-    └── rails-in-js/        ← This project
+    └── ruby2js-on-rails/        ← This project
         ├── app/
         │   ├── models/
         │   ├── controllers/
@@ -623,7 +623,7 @@ The `--selfhost` flag creates a feedback loop for hardening selfhost:
 ### File Structure After Stage 2a
 
 ```
-rails-in-js/
+ruby2js-on-rails/
 ├── app/                    ← Ruby source
 ├── config/
 ├── db/
@@ -649,8 +649,8 @@ rails-in-js/
 Create a downloadable tarball that anyone can run without installing Ruby:
 
 ```bash
-curl https://ruby2js.com/demo/rails-in-js.tar.gz | tar xz
-cd rails-in-js
+curl https://ruby2js.com/demo/ruby2js-on-rails.tar.gz | tar xz
+cd ruby2js-on-rails
 npm install
 npm run dev
 ```
@@ -665,14 +665,14 @@ The tarball includes:
 
 #### Dockerfile Addition
 
-- [ ] Build rails-in-js demo during Docker build (`ruby scripts/build.rb`)
+- [ ] Build ruby2js-on-rails demo during Docker build (`ruby scripts/build.rb`)
 - [ ] Copy selfhost files into tarball (ruby2js.mjs, filters/)
 - [ ] Create tarball with correct structure
 - [ ] Place tarball in nginx output directory
 
 #### Package Restructure
 
-- [ ] Create `selfhost/` directory within rails-in-js for standalone use
+- [ ] Create `selfhost/` directory within ruby2js-on-rails for standalone use
 - [ ] Modify dev-server.mjs paths for standalone mode (detect if selfhost is local)
 - [ ] Update package.json: default `npm run dev` uses selfhost mode
 - [ ] Add `npm run dev:ruby` for Ruby-based transpilation (development)
@@ -680,7 +680,7 @@ The tarball includes:
 #### Tarball Contents
 
 ```
-rails-in-js/
+ruby2js-on-rails/
 ├── package.json          # Modified for selfhost-only mode
 ├── index.html
 ├── dev-server.mjs        # Hot reload server
@@ -1045,7 +1045,7 @@ Each stage has two types of success criteria: **selfhost hardening** (primary) a
 - [x] Ruby and selfhost produce identical output (19 files, diff verified)
 
 **Demo Functionality:**
-- [ ] Tarball downloadable from ruby2js.com/demo/rails-in-js.tar.gz
+- [ ] Tarball downloadable from ruby2js.com/demo/ruby2js-on-rails.tar.gz
 - [x] `npm install && npm run dev` works without Ruby installed (selfhost mode)
 - [x] Hot reload works with selfhost transpilation
 - [x] Full CRUD functionality works out of the box
@@ -1102,7 +1102,7 @@ Each stage has two types of success criteria: **selfhost hardening** (primary) a
 4. **Testing:** Port Rails system tests, or separate JS tests?
 5. **Demo hosting:** GitHub Pages? Standalone download?
 6. ~~**Hot reload:** Add file watching for true Rails-like development experience?~~ **Resolved:** Stage 2a includes dev server with hot reload
-7. **CI Integration:** Add rails-in-js tests to CI? (Leaning yes, decide after Stage 1)
+7. **CI Integration:** Add ruby2js-on-rails tests to CI? (Leaning yes, decide after Stage 1)
 
 ---
 

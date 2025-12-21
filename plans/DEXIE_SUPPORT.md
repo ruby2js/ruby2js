@@ -151,7 +151,7 @@ Never imported by any code that runs in the browser.
 Instead of an abstract adapter interface, maintain separate complete implementations:
 
 ```
-demo/rails-in-js/
+demo/ruby2js-on-rails/
 ├── lib/
 │   └── adapters/
 │       ├── active_record_dexie.mjs      # Complete Dexie.js implementation
@@ -299,7 +299,7 @@ db.version(1).stores({
 ## File Structure After Implementation
 
 ```
-demo/rails-in-js/
+demo/ruby2js-on-rails/
 ├── config/
 │   └── database.yml              # Adapter configuration (read at build time)
 ├── lib/

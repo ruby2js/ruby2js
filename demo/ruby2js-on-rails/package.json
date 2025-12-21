@@ -1,5 +1,5 @@
 {
-  "name": "rails-in-js",
+  "name": "ruby2js-on-rails",
   "version": "0.1.0",
   "type": "module",
   "description": "Rails-like app running in JavaScript - Ruby2JS selfhost demo",

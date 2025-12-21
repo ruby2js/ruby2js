@@ -201,7 +201,7 @@ For server-side processing, gem access may be preferable. For browser applicatio
 
 ## Context: Rails-in-JS Demo
 
-For the [Rails-in-JS demo](./RAILS_IN_JS.md) goal (blog tutorial in browser), Ruby2JS is the appropriate choice because:
+For the [Rails-in-JS demo](./RUBY2JS_ON_RAILS.md) goal (blog tutorial in browser), Ruby2JS is the appropriate choice because:
 
 1. The priority is **showcasing Ruby2JS capabilities**, not running arbitrary Ruby
 2. Bundle size matters for browser demos

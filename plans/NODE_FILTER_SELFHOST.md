@@ -121,7 +121,7 @@ Updated `selfhost_build.rb` filter to handle all export and initialization diffe
 **Transpile command:**
 ```bash
 bin/ruby2js --filter selfhost_build --filter esm --filter node --filter functions --filter return \
-  --autoexports demo/rails-in-js/scripts/build.rb > demo/rails-in-js/scripts/build.mjs
+  --autoexports demo/ruby2js-on-rails/scripts/build.rb > demo/ruby2js-on-rails/scripts/build.mjs
 ```
 
 Notes:
@@ -130,7 +130,7 @@ Notes:
 - Fixed ESM filter bug where autoexports was incorrectly skipped when imports were present (commit pending).
 
 **Completed steps:**
-1. ✅ `node demo/rails-in-js/scripts/build.mjs` produces same output as `ruby demo/rails-in-js/scripts/build.rb`
+1. ✅ `node demo/ruby2js-on-rails/scripts/build.mjs` produces same output as `ruby demo/ruby2js-on-rails/scripts/build.rb`
 2. ✅ Updated dev-server to import from `build.mjs`
 3. ✅ Smoke tests pass (7/7)
 4. ✅ Deleted `build-selfhost.mjs`
@@ -152,8 +152,8 @@ Notes:
 | `spec/selfhost_build_spec.rb` | Tests for selfhost_build filter |
 | `lib/ruby2js/filter/esm.rb` | Added `__dir__` → `import.meta.dirname` |
 | `lib/ruby2js/filter/cjs.rb` | Added `__dir__` → `__dirname` |
-| `demo/rails-in-js/scripts/build.rb` | Restructured as SelfhostBuilder class |
-| `demo/rails-in-js/scripts/build.mjs` | Generated (not yet working) |
+| `demo/ruby2js-on-rails/scripts/build.rb` | Restructured as SelfhostBuilder class |
+| `demo/ruby2js-on-rails/scripts/build.mjs` | Generated (not yet working) |
 
 ## Success Criteria
 

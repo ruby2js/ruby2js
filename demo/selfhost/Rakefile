@@ -196,25 +196,25 @@ task :test_partial => :npm_install do
   end
 end
 
-RAILS_IN_JS = File.join(File.dirname(SELFHOST), 'rails-in-js')
-BUILD_MJS = File.join(RAILS_IN_JS, 'scripts/build.mjs')
+DEMO = File.join(File.dirname(SELFHOST), 'ruby2js-on-rails')
+BUILD_MJS = File.join(DEMO, 'scripts/build.mjs')
 
-desc "Install npm dependencies for rails-in-js demo"
-task :npm_install_rails_in_js do
-  Dir.chdir(RAILS_IN_JS) do
+desc "Install npm dependencies for ruby2js-on-rails demo"
+task :npm_install_demo do
+  Dir.chdir(DEMO) do
     sh "npm install" unless File.exist?('node_modules/sql.js')
   end
 end
 
 desc "Transpile build.rb to build.mjs for selfhost builds"
-file BUILD_MJS => [File.join(RAILS_IN_JS, 'scripts/build.rb'), "#{ROOT}/lib/ruby2js/filter/selfhost_build.rb"] do
+file BUILD_MJS => [File.join(DEMO, 'scripts/build.rb'), "#{ROOT}/lib/ruby2js/filter/selfhost_build.rb"] do
   # Use stdin instead of file argument to work around autoexports + file read issue
-  sh bundle_exec("cat #{RAILS_IN_JS}/scripts/build.rb | ruby #{ROOT}/bin/ruby2js --filter selfhost_build --filter esm --filter node --filter functions --filter return --filter pragma --autoexports > #{BUILD_MJS}")
+  sh bundle_exec("cat #{DEMO}/scripts/build.rb | ruby #{ROOT}/bin/ruby2js --filter selfhost_build --filter esm --filter node --filter functions --filter return --filter pragma --autoexports > #{BUILD_MJS}")
 end
 
-desc "Run rails-in-js smoke tests (compares Ruby vs selfhost builds)"
-task :test_smoke => [:npm_install, :npm_install_rails_in_js, "#{SELFHOST}/ruby2js.js", :build_filters, BUILD_MJS] do
-  Dir.chdir(RAILS_IN_JS) do
+desc "Run ruby2js-on-rails smoke tests (compares Ruby vs selfhost builds)"
+task :test_smoke => [:npm_install, :npm_install_demo, "#{SELFHOST}/ruby2js.js", :build_filters, BUILD_MJS] do
+  Dir.chdir(DEMO) do
     sh "npm run test:smoke"
   end
 end
@@ -232,6 +232,56 @@ task :clean do
   rm_f "#{SELFHOST}/ruby2js.js"
   rm_f "#{SELFHOST}/prism_browser.js"
   rm_f BUILD_MJS
+end
+
+desc "Publish ruby2js-on-rails demo as tarball"
+task :publish_demo => [:build, :build_filters, BUILD_MJS] do
+  sh "ruby #{SELFHOST}/scripts/publish_demo.rb"
+end
+
+desc "Smoke test the published demo tarball"
+task "publish_demo:smoke" => :publish_demo do
+  require 'tmpdir'
+  tarball = "#{DIST}/ruby2js-on-rails.tar.gz"
+
+  Dir.mktmpdir('ruby2js-on-rails-smoke') do |tmpdir|
+    puts "=== Smoke Testing Published Demo ==="
+    puts ""
+    puts "Extracting to #{tmpdir}..."
+    Dir.chdir(tmpdir) do
+      sh "tar -xzf #{tarball}"
+
+      Dir.chdir('ruby2js-on-rails') do
+        puts ""
+        puts "Running npm install..."
+        sh "npm install"
+
+        puts ""
+        puts "Running npm run build..."
+        sh "npm run build"
+
+        puts ""
+        puts "Verifying dist/ output..."
+        expected_files = %w[
+          dist/lib/rails.js
+          dist/lib/active_record.mjs
+          dist/models/index.js
+          dist/controllers/articles_controller.js
+          dist/config/routes.js
+          dist/config/paths.js
+        ]
+
+        missing = expected_files.reject { |f| File.exist?(f) }
+        if missing.any?
+          raise "Missing expected files:\n  #{missing.join("\n  ")}"
+        end
+
+        puts "  All expected files present!"
+        puts ""
+        puts "=== Smoke Test Passed ==="
+      end
+    end
+  end
 end
 
 task :default => :test

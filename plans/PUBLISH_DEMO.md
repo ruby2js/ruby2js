@@ -4,26 +4,26 @@ This plan covers renaming, restructuring, and publishing the demo as a downloada
 
 ## Overview
 
-The demo currently lives in `demo/rails-in-js/`. It needs to be:
+The demo currently lives in `demo/ruby2js-on-rails/`. It needs to be:
 1. Renamed to `ruby2js-on-rails`
 2. Restructured so framework code is in `/vendor/ruby2js/`
 3. Packaged as a self-contained tarball requiring only Node.js
 
-## Phase 1: Rename rails-in-js → ruby2js-on-rails
+## Phase 1: Rename ruby2js-on-rails → ruby2js-on-rails
 
 ### 1.1 Directory rename
-- [ ] Rename `demo/rails-in-js/` to `demo/ruby2js-on-rails/`
+- [ ] Rename `demo/ruby2js-on-rails/` to `demo/ruby2js-on-rails/`
 
 ### 1.2 Update references in code
-- [ ] `demo/selfhost/Rakefile` - paths to rails-in-js
+- [ ] `demo/selfhost/Rakefile` - paths to ruby2js-on-rails
 - [ ] `demo/ruby2js-on-rails/package.json` - package name
 - [ ] `demo/ruby2js-on-rails/README.md` - all references
 - [ ] Any import paths or comments referencing the old name
 
 ### 1.3 Update references in plans/docs
-- [ ] `plans/RAILS_IN_JS.md` - rename file and update content
+- [ ] `plans/RUBY2JS_ON_RAILS.md` - rename file and update content
 - [ ] `plans/RUNTIME_TARGETS_AND_CONFIG.md` - update references
-- [ ] Any other plans referencing rails-in-js
+- [ ] Any other plans referencing ruby2js-on-rails
 
 ### 1.4 Update blog post
 - [ ] `~/git/intertwingly/src/3393.md` - update all references

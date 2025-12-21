@@ -8,7 +8,7 @@ require 'ruby2js/filter/functions'
 require 'ruby2js/filter/return'
 require 'ruby2js/filter/esm'
 
-erb_compiler_file = File.expand_path('../../rails-in-js/lib/erb_compiler.rb', __dir__)
+erb_compiler_file = File.expand_path('../../ruby2js-on-rails/lib/erb_compiler.rb', __dir__)
 source = File.read(erb_compiler_file)
 
 js = Ruby2JS.convert(source,

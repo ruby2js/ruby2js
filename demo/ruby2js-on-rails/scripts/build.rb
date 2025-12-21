@@ -262,7 +262,7 @@ class SelfhostBuilder
       raise "Unknown DATABASE adapter: #{adapter}. Valid options: #{valid}"
     end
 
-    adapter_src = File.join(DEMO_ROOT, 'lib/adapters', adapter_file)
+    adapter_src = File.join(DEMO_ROOT, 'vendor/ruby2js/adapters', adapter_file)
     adapter_dest = File.join(@dist_dir, 'lib/active_record.mjs')
     FileUtils.mkdir_p(File.dirname(adapter_dest))
 
@@ -289,7 +289,7 @@ class SelfhostBuilder
     end
 
     # Copy target-specific files (rails.js from targets/browser, node, bun, or deno)
-    target_src = File.join(DEMO_ROOT, 'lib/targets', target_dir)
+    target_src = File.join(DEMO_ROOT, 'vendor/ruby2js/targets', target_dir)
     Dir.glob(File.join(target_src, '*.js')).each do |src_path|
       dest_path = File.join(lib_dest, File.basename(src_path))
       FileUtils.cp(src_path, dest_path)
@@ -297,9 +297,9 @@ class SelfhostBuilder
       puts("    -> #{dest_path}")
     end
 
-    # Copy shared lib files (erb_runtime.mjs, etc.) - exclude old rails.js
-    lib_src = File.join(DEMO_ROOT, 'lib')
-    Dir.glob(File.join(lib_src, '*.mjs')).each do |src_path|
+    # Copy shared lib files (erb_runtime.mjs, etc.)
+    vendor_src = File.join(DEMO_ROOT, 'vendor/ruby2js')
+    Dir.glob(File.join(vendor_src, '*.mjs')).each do |src_path|
       dest_path = File.join(lib_dest, File.basename(src_path))
       FileUtils.cp(src_path, dest_path)
       puts("  Copying: #{File.basename(src_path)}")

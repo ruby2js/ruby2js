@@ -1011,7 +1011,7 @@ Schema DSL for database setup.
 
 ### Overall Success:
 
-The Rails-in-JS demo can be rewritten using **idiomatic Rails patterns** (as shown in the original RAILS_IN_JS.md plan Stage 1), and the filters transform it to working JavaScript.
+The Rails-in-JS demo can be rewritten using **idiomatic Rails patterns** (as shown in the original RUBY2JS_ON_RAILS.md plan Stage 1), and the filters transform it to working JavaScript.
 
 A Rails developer should look at the code and say "that's just Rails."
 
@@ -1055,7 +1055,7 @@ Based on Phase 1 implementation experience:
 
 ## References
 
-- [RAILS_IN_JS.md](./RAILS_IN_JS.md) - Original demo plan with idiomatic Rails examples
-- [TRANSPILATION_NOTES.md](../demo/rails-in-js/TRANSPILATION_NOTES.md) - Documented pitfalls to absorb
+- [RUBY2JS_ON_RAILS.md](./RUBY2JS_ON_RAILS.md) - Original demo plan with idiomatic Rails examples
+- [TRANSPILATION_NOTES.md](../demo/ruby2js-on-rails/TRANSPILATION_NOTES.md) - Documented pitfalls to absorb
 - [Ruby2JS Filters Documentation](https://www.ruby2js.com/docs/filters)
 - [Rails Getting Started Guide](https://guides.rubyonrails.org/getting_started.html)

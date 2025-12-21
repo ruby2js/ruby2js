@@ -199,7 +199,7 @@ async function runTests() {
   let failed = 0;
   let warnings = 0;
 
-  const tempDir = mkdtempSync(join(tmpdir(), 'rails-in-js-test-'));
+  const tempDir = mkdtempSync(join(tmpdir(), 'ruby2js-on-rails-test-'));
   const rubyDist = join(tempDir, 'ruby-dist');
   const selfhostDist = join(tempDir, 'selfhost-dist');
 
@@ -208,7 +208,7 @@ async function runTests() {
     log('1. Ruby build', BOLD);
     try {
       // Run from PROJECT_ROOT where Gemfile lives, with path to build script
-      execSync(`bundle exec ruby demo/rails-in-js/scripts/build.rb "${rubyDist}"`, {
+      execSync(`bundle exec ruby demo/ruby2js-on-rails/scripts/build.rb "${rubyDist}"`, {
         cwd: PROJECT_ROOT,
         encoding: 'utf8',
         stdio: ['pipe', 'pipe', 'pipe']

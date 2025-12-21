@@ -80,7 +80,7 @@ Ruby source files in `app/`, `config/`, and `db/` are transpiled to JavaScript u
 ## Project Structure
 
 ```
-rails-in-js/
+ruby2js-on-rails/
 ├── app/
 │   ├── controllers/      # Ruby controller classes
 │   ├── helpers/          # Ruby helper modules
@@ -124,5 +124,5 @@ The build generates sourcemaps so you can debug Ruby in the browser:
 
 ## See Also
 
-- [Rails-in-JS Plan](../../plans/RAILS_IN_JS.md) - Full project plan and roadmap
+- [Rails-in-JS Plan](../../plans/RUBY2JS_ON_RAILS.md) - Full project plan and roadmap
 - [Ruby2JS](https://www.ruby2js.com/) - The transpiler powering this demo

@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Start the development server with hot reload
+exec npm run dev "$@"

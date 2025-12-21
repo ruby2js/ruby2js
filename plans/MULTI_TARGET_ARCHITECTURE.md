@@ -275,7 +275,7 @@ See [DEXIE_SUPPORT.md](./DEXIE_SUPPORT.md) for database adapter details. The dat
 ### File Structure
 
 ```
-demo/rails-in-js/
+demo/ruby2js-on-rails/
 ├── app/                          # Ruby source (unchanged)
 │   ├── models/
 │   ├── controllers/

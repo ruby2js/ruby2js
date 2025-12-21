@@ -1,0 +1,109 @@
+#!/usr/bin/env bash
+# Ruby2JS-on-Rails command runner
+# Supports a subset of Rails commands for familiarity
+
+set -e
+
+usage() {
+  echo "Usage: bin/rails COMMAND [OPTIONS]"
+  echo ""
+  echo "Commands:"
+  echo "  server    Start the development server"
+  echo "  build     Build static assets for deployment"
+  echo ""
+  echo "Server options:"
+  echo "  -p, --port PORT       Use specified port (default: 3000)"
+  echo "  -b, --binding HOST    Bind to HOST (default: localhost)"
+  echo "  -e, --environment ENV Use environment (development/production)"
+  echo "  --runtime RUNTIME     Use runtime: node, bun, or deno (default: browser)"
+  echo ""
+  echo "Note: This is Ruby2JS-on-Rails, a transpiled subset of Rails patterns."
+  echo "      Not all Rails commands are supported."
+}
+
+# Default values
+PORT=3000
+HOST="localhost"
+ENV="development"
+RUNTIME=""
+
+# Parse command
+COMMAND="${1:-}"
+shift 2>/dev/null || true
+
+case "$COMMAND" in
+  server|s)
+    # Parse options
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        -p|--port)
+          PORT="$2"
+          shift 2
+          ;;
+        -b|--binding)
+          HOST="$2"
+          shift 2
+          ;;
+        -e|--environment)
+          ENV="$2"
+          shift 2
+          ;;
+        --runtime)
+          RUNTIME="$2"
+          shift 2
+          ;;
+        *)
+          echo "Unknown option: $1"
+          usage
+          exit 1
+          ;;
+      esac
+    done
+
+    # Set environment
+    export NODE_ENV="$ENV"
+    export PORT="$PORT"
+    export HOST="$HOST"
+
+    # Start appropriate server based on runtime
+    case "$RUNTIME" in
+      node)
+        echo "Starting Node.js server on $HOST:$PORT..."
+        exec npm run dev:node
+        ;;
+      bun)
+        echo "Starting Bun server on $HOST:$PORT..."
+        exec npm run dev:bun
+        ;;
+      deno)
+        echo "Starting Deno server on $HOST:$PORT..."
+        exec npm run dev:deno
+        ;;
+      ""|browser)
+        echo "Starting browser dev server on $HOST:$PORT..."
+        exec npm run dev
+        ;;
+      *)
+        echo "Unknown runtime: $RUNTIME"
+        echo "Valid options: node, bun, deno, or browser (default)"
+        exit 1
+        ;;
+    esac
+    ;;
+
+  build)
+    echo "Building static assets..."
+    exec npm run build
+    ;;
+
+  ""|help|-h|--help)
+    usage
+    ;;
+
+  *)
+    echo "Unknown command: $COMMAND"
+    echo ""
+    usage
+    exit 1
+    ;;
+esac
