@@ -352,7 +352,7 @@ module Ruby2JS
               # Nested resource: comment_path(@article, comment)
               parent_arg = path_args[0]
               child_arg = path_args[1]
-              parent_name = parent_arg.type == :ivar ? parent_arg.children.first.to_s.delete_prefix('@') : 'parent'
+              parent_name = parent_arg.type == :ivar ? parent_arg.children.first.to_s.sub(/^@/, '') : 'parent'
               route_name = "#{parent_name}_#{base_name}"
 
               # Build: routes.article_comment.delete(article.id, comment.id)
@@ -365,7 +365,7 @@ module Ruby2JS
             elsif path_args.length == 1
               # Single resource: article_path(@article)
               arg = path_args.first
-              model_name = arg.type == :ivar ? arg.children.first.to_s.delete_prefix('@') : nil
+              model_name = arg.type == :ivar ? arg.children.first.to_s.sub(/^@/, '') : nil
 
               if model_name
                 return s(:dstr,
@@ -591,9 +591,10 @@ module Ruby2JS
       # Browser databases (dexie, sqljs) need SPA navigation with onclick handlers
       # Node databases (pg, mysql2, etc.) use traditional href links
       def browser_target?
-        database = @options[:database]&.to_s&.downcase
+        database = @options[:database]
         # Default to browser if no database specified (backwards compatible)
         return true unless database
+        database = database.to_s.downcase
         BROWSER_DATABASES.include?(database)
       end
 
@@ -602,7 +603,7 @@ module Ruby2JS
       def process_form_for(helper_call, block_args, block_body)
         # Extract the model from form_for @model
         model_node = helper_call.children[2]
-        model_name = model_node.children.first.to_s.delete_prefix('@') if model_node&.type == :ivar
+        model_name = model_node.children.first.to_s.sub(/^@/, '') if model_node&.type == :ivar
 
         # Get the block parameter name (usually 'f')
         block_param = block_args.children.first&.children&.first
@@ -735,7 +736,7 @@ module Ruby2JS
               # Plural path with one arg = nested resource (comments_path(@article))
               # Extract parent name from the argument
               if arg.type == :ivar
-                parent_name = arg.children.first.to_s.delete_prefix('@')
+                parent_name = arg.children.first.to_s.sub(/^@/, '')
                 route_name = "#{parent_name}_#{base_name}"
               else
                 # Fallback - assume 'article' as parent for comments
@@ -748,7 +749,7 @@ module Ruby2JS
 
             if arg.type == :ivar
               # @article -> article.id (use attr for property access, not method call)
-              model_name = arg.children.first.to_s.delete_prefix('@')
+              model_name = arg.children.first.to_s.sub(/^@/, '')
               s(:dstr,
                 s(:str, "<form onsubmit=\"return routes.#{route_name}.#{http_method}(event, "),
                 s(:begin, s(:attr, s(:lvar, model_name.to_sym), :id)),

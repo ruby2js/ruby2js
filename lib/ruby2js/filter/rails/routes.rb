@@ -461,7 +461,7 @@ module Ruby2JS
             [s(:const, nil, :Seeds)])
 
           # Import layout for server targets
-          if server_target?
+          if self.server_target?()
             statements << s(:import, '../views/layouts/application.js',
               [s(:const, nil, :layout)])
           end
@@ -516,7 +516,7 @@ module Ruby2JS
             s(:pair, s(:sym, :schema), s(:const, nil, :Schema)),
             s(:pair, s(:sym, :seeds), s(:const, nil, :Seeds))
           ]
-          if server_target?
+          if self.server_target?()
             config_pairs << s(:pair, s(:sym, :layout), s(:const, nil, :layout))
           end
           statements << s(:send,
@@ -841,8 +841,9 @@ module Ruby2JS
         BROWSER_DATABASES = %w[dexie indexeddb sqljs sql.js].freeze
 
         def server_target?
-          database = @options[:database]&.to_s&.downcase
+          database = @options[:database]
           return false unless database
+          database = database.to_s.downcase
           !BROWSER_DATABASES.include?(database)
         end
       end
