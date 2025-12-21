@@ -500,14 +500,14 @@ module Ruby2JS
             # Convert Set to Array for JS compatibility (Set.include? doesn't exist in JS)
             model_refs_array = @rails_model_refs ? [*@rails_model_refs] : []
             if model_refs_array.include?(const_name) && AR_CLASS_METHODS.include?(method)
-              # Use updated(:await) to preserve send structure while adding await
-              return node.updated(:await)
+              # Use updated(:await!) to force parens (method call, not property access)
+              return node.updated(:await!)
             end
           end
 
           # Check for instance method calls on local variables (e.g., article.save)
           if target&.type == :lvar && AR_INSTANCE_METHODS.include?(method)
-            return node.updated(:await)
+            return node.updated(:await!)
           end
 
           node

@@ -155,7 +155,7 @@ module Ruby2JS
                 # Wrap with await, process children first
                 new_args = args.map { |a| wrap_ar_operations(a) }
                 new_node = node.updated(nil, [target, method, *new_args])
-                return new_node.updated(:await)
+                return new_node.updated(:await!)
               end
             end
 

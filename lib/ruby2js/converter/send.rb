@@ -14,7 +14,7 @@ module Ruby2JS
     # send! forces interpretation as a method call even with zero parameters.
     # Sendw forces parameters to be placed on separate lines.
 
-    handle :send, :sendw, :send!, :await, :attr, :call do |receiver, method, *args|
+    handle :send, :sendw, :send!, :await, :await!, :attr, :call do |receiver, method, *args|
       if \
         args.length == 1 and method == :+
       then
@@ -196,7 +196,7 @@ module Ruby2JS
         group_target ||= GROUP_OPERATORS.include? target.type # Pragma: logical
       end
 
-      put 'await ' if @ast.type == :await
+      put 'await ' if [:await, :await!].include?(@ast.type)
 
       if method == :!
         parse s(:not, receiver)
@@ -421,11 +421,11 @@ module Ruby2JS
           end
         end
 
-        # :send! and :call force method call output (with parens)
+        # :send!, :call, and :await! force method call output (with parens)
         # :await preserves is_method? from the underlying node via updated()
         # Apply private method prefix if present
         method_name = private_prefix ? "#{private_prefix}#{method}" : method
-        if not @ast.is_method? and ![:send!, :call].include?(@ast.type)
+        if not @ast.is_method? and ![:send!, :call, :await!].include?(@ast.type)
           if receiver
             (group_receiver ? group(receiver) : parse(receiver))
             put ".#{ method_name }"

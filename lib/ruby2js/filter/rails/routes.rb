@@ -706,7 +706,7 @@ module Ruby2JS
         # Generates: { let result = await controllerCall; handleFormResult(result); return false }
         def wrap_with_result_handler(controller_call)
           s(:begin,
-            s(:lvasgn, :result, controller_call.updated(:await)),
+            s(:lvasgn, :result, controller_call.updated(:await!)),
             s(:send, nil, :handleFormResult, s(:lvar, :result)),
             s(:return, s(:false)))
         end
