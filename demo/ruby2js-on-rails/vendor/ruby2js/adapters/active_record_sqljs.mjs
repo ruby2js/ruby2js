@@ -9,7 +9,10 @@ let db = null;
 // Initialize the database
 export async function initDatabase(options = {}) {
   const config = { ...DB_CONFIG, ...options };
-  const sqlJsPath = config.sqlJsPath || '/node_modules/sql.js/dist';
+  // Check for global path override (for hosted environments like ruby2js.com)
+  const sqlJsPath = (typeof window !== 'undefined' && window.SQL_WASM_PATH)
+    || config.sqlJsPath
+    || '/node_modules/sql.js/dist';
 
   const SQL = await window.initSqlJs({
     locateFile: file => `${sqlJsPath}/${file}`

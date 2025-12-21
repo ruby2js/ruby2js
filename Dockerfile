@@ -2,12 +2,18 @@
 FROM ruby:3.4-slim AS builder
 
 # Install build dependencies
+# Node.js 22+ is required for fs.glob used by the selfhost transpiler
 RUN apt-get update && apt-get install -y \
     build-essential \
     git \
     libyaml-dev \
-    nodejs \
-    npm \
+    curl \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Node.js 22 from NodeSource
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+    && apt-get install -y nodejs \
     && npm install -g yarn \
     && rm -rf /var/lib/apt/lists/*
 
@@ -31,8 +37,16 @@ COPY . .
 WORKDIR /app/docs
 RUN bundle install
 
+# Install demo dependencies for selfhost and ruby2js-on-rails
+WORKDIR /app/demo/selfhost
+RUN npm install
+
+WORKDIR /app/demo/ruby2js-on-rails
+RUN npm install
+
 # Build the demo assets and static site
 # The esbuild ruby2js plugin runs `bundle exec ruby2js`
+WORKDIR /app/docs
 ENV BRIDGETOWN_ENV=production
 RUN bundle exec rake
 RUN bundle exec rake deploy

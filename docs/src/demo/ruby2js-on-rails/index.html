@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <base href="/demo/ruby2js-on-rails/">
+  <title>Ruby2JS-on-Rails Blog</title>
+  <link rel="stylesheet" href="public/styles.css">
+  <!-- Import map for ES module dependencies -->
+  <script type="importmap">
+  {
+    "imports": {
+      "dexie": "./node_modules/dexie/dist/dexie.mjs"
+    }
+  }
+  </script>
+  <style>
+    /* Additional styles for hosted demo */
+    .demo-banner {
+      background: linear-gradient(135deg, #cc342d 0%, #8b1a1a 100%);
+      color: white;
+      padding: 0.75rem 1.5rem;
+      text-align: center;
+      font-size: 0.9rem;
+    }
+    .demo-banner a {
+      color: #ffe0e0;
+      text-decoration: underline;
+    }
+    .demo-banner a:hover {
+      color: white;
+    }
+    .download-link {
+      background: rgba(255,255,255,0.2);
+      padding: 0.25rem 0.75rem;
+      border-radius: 4px;
+      margin-left: 1rem;
+      text-decoration: none !important;
+    }
+  </style>
+</head>
+<body>
+  <div class="demo-banner">
+    This is a live demo of <strong>Ruby2JS-on-Rails</strong> - a Rails-like blog running entirely in JavaScript, transpiled from Ruby.
+    <a href="ruby2js-on-rails.tar.gz" class="download-link">Download Source</a>
+  </div>
+  <div id="loading">Loading Ruby2JS-on-Rails...<br><small>Powered by transpiled Ruby code</small></div>
+  <div id="app">
+    <nav>
+      <a onclick="navigate('/')">Home</a>
+      <a onclick="navigate('/articles')">Articles</a>
+      <a onclick="navigate('/articles/new')">New Article</a>
+      <span class="transpiled-badge">Transpiled Ruby &rarr; JS</span>
+    </nav>
+    <main id="content"></main>
+  </div>
+
+  <script src="node_modules/sql.js/dist/sql-wasm.js"></script>
+  <script type="module">
+    // Configure sql.js WASM location for hosted environment
+    window.SQL_WASM_PATH = '/demo/ruby2js-on-rails/node_modules/sql.js/dist/';
+
+    import { Application, routes } from './dist/config/routes.js';
+    window.routes = routes;
+    Application.start();
+  </script>
+</body>
+</html>
