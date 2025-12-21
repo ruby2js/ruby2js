@@ -229,9 +229,10 @@ export class Router {
     }
   }
 
-  // Create HTML response with proper headers
+  // Create HTML response with proper headers, wrapped in layout
   static htmlResponse(html) {
-    return new Response(html, {
+    const fullHtml = Application.wrapInLayout(html);
+    return new Response(fullHtml, {
       status: 200,
       headers: { 'Content-Type': 'text/html; charset=utf-8' }
     });
@@ -243,13 +244,22 @@ export class Application {
   static schema = null;
   static seeds = null;
   static activeRecordModule = null;
-  static layout = null;  // Function to wrap content in layout HTML
+  static layoutFn = null;  // Layout function loaded from views/layouts/application.js
 
   // Configure the application
   static configure(options) {
     if (options.schema) this.schema = options.schema;
     if (options.seeds) this.seeds = options.seeds;
-    if (options.layout) this.layout = options.layout;
+    if (options.layout) this.layoutFn = options.layout;
+  }
+
+  // Wrap content in HTML layout
+  static wrapInLayout(content) {
+    if (this.layoutFn) {
+      return this.layoutFn(content);
+    }
+    // Fallback if no layout loaded
+    return content;
   }
 
   // Initialize the database using the adapter

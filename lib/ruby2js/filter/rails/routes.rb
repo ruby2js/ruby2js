@@ -460,6 +460,12 @@ module Ruby2JS
           statements << s(:import, '../db/seeds.js',
             [s(:const, nil, :Seeds)])
 
+          # Import layout for server targets
+          if server_target?
+            statements << s(:import, '../views/layouts/application.js',
+              [s(:const, nil, :layout)])
+          end
+
           # Import controllers - collect all controllers from resources
           all_controllers = collect_all_controllers(@rails_resources)
           all_controllers.each do |ctrl|
@@ -506,11 +512,16 @@ module Ruby2JS
           statements << build_routes_dispatch_object
 
           # Generate Application.configure()
+          config_pairs = [
+            s(:pair, s(:sym, :schema), s(:const, nil, :Schema)),
+            s(:pair, s(:sym, :seeds), s(:const, nil, :Seeds))
+          ]
+          if server_target?
+            config_pairs << s(:pair, s(:sym, :layout), s(:const, nil, :layout))
+          end
           statements << s(:send,
             s(:const, nil, :Application), :configure,
-            s(:hash,
-              s(:pair, s(:sym, :schema), s(:const, nil, :Schema)),
-              s(:pair, s(:sym, :seeds), s(:const, nil, :Seeds))))
+            s(:hash, *config_pairs))
 
           # Export Application, routes, and path helpers
           exports = [s(:const, nil, :Application), s(:const, nil, :routes)]
@@ -824,6 +835,15 @@ module Ruby2JS
           statements << s(:export, s(:array, *exports))
 
           process(s(:begin, *statements))
+        end
+
+        # Browser-only databases (IndexedDB, WASM-based)
+        BROWSER_DATABASES = %w[dexie indexeddb sqljs sql.js].freeze
+
+        def server_target?
+          database = @options[:database]&.to_s&.downcase
+          return false unless database
+          !BROWSER_DATABASES.include?(database)
         end
       end
     end

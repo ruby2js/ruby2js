@@ -158,9 +158,10 @@ class SelfhostBuilder
     self.transpile_routes_files()
     puts("")
 
-    # Transpile views (ERB templates only)
+    # Transpile views (ERB templates and layout)
     puts("Views:")
     self.transpile_erb_directory()
+    self.transpile_layout() if @target == 'server'
     puts("")
 
     # Transpile helpers
@@ -407,6 +408,32 @@ class SelfhostBuilder
     puts("  -> dist/views/articles.js (combined ERB module)")
   end
 
+  def transpile_layout()
+    layout_path = File.join(DEMO_ROOT, 'app/views/layouts/application.html.erb')
+    return unless File.exist?(layout_path)
+
+    puts("Transpiling layout: application.html.erb")
+    template = File.read(layout_path)
+
+    # Simple transformation: replace <%= yield %> with ${content}
+    js_template = template.gsub('<%=', '${').gsub('%>', '}')
+    js_template = js_template.gsub('${yield}', '${content}').gsub('${ yield }', '${content}')
+
+    # Wrap in a template literal function
+    js = <<~JS
+      // Application layout - wraps view content
+      // Generated from app/views/layouts/application.html.erb
+      export function layout(content) {
+        return `#{js_template}`;
+      }
+    JS
+
+    dest_dir = File.join(@dist_dir, 'views/layouts')
+    FileUtils.mkdir_p(dest_dir)
+    File.write(File.join(dest_dir, 'application.js'), js)
+    puts("  -> dist/views/layouts/application.js")
+  end
+
   def transpile_directory(src_dir, dest_dir, pattern = '**/*.rb', skip: [])
     Dir.glob(File.join(src_dir, pattern)).each do |src_path|
       basename = File.basename(src_path)
@@ -461,7 +488,7 @@ class SelfhostBuilder
 
     # Generate routes.js (imports path helpers from paths.js)
     puts("Transpiling: routes.rb -> routes.js")
-    routes_options = base_options.merge(file: relative_src, paths_file: './paths.js')
+    routes_options = base_options.merge(file: relative_src, paths_file: './paths.js', database: @database)
     result = Ruby2JS.convert(source, routes_options)
     routes_js = result.to_s
 
