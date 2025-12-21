@@ -60,8 +60,14 @@ class ErbCompiler
       if tag.start_with?("=")
         # Output expression: <%= expr %>
         expr = tag[1..-1].strip
-        ruby_code += " _buf << ( #{expr} ).to_s;"
-        is_output_expr = true
+        # Check if this is a block expression (ends with 'do')
+        if expr.end_with?(" do") || expr.end_with?("\tdo")
+          # Block expression: use .append= pattern that ERB filter expects
+          ruby_code += " _buf.append= #{expr}\n"
+        else
+          ruby_code += " _buf << ( #{expr} ).to_s;"
+          is_output_expr = true
+        end
       elsif tag.start_with?("-")
         # Unescaped output: <%- expr %> (same as <%= for our purposes)
         expr = tag[1..-1].strip

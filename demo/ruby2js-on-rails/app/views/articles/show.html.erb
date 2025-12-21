@@ -10,7 +10,7 @@
 <p>
   <%= link_to "Edit", edit_article_path(@article) %> |
   <%= link_to "Back to Articles", articles_path %> |
-  <a onclick="routes.article.delete(<%= @article.id %>)" style="color: red; cursor: pointer;">Delete</a>
+  <%= link_to "Delete", article_path(@article), method: :delete, data: { confirm: "Are you sure?" } %>
 </p>
 
 <hr>
@@ -21,13 +21,13 @@
   <div class="comment">
     <p><strong><%= comment.commenter %></strong> says:</p>
     <p><%= comment.body %></p>
-    <button class="danger" onclick="routes.article_comment.delete(<%= @article.id %>, <%= comment.id %>)">Delete</button>
+    <%= link_to "Delete Comment", comment_path(@article, comment), method: :delete, data: { confirm: "Delete this comment?" } %>
   </div>
 <% end %>
 
 <h3>Add a Comment</h3>
 
-<form onsubmit="return routes.article_comments.post(event, <%= @article.id %>)">
+<%= form_tag comments_path(@article), method: :post do %>
   <p>
     <label>Your Name:</label>
     <input type="text" name="commenter" required>
@@ -37,4 +37,4 @@
     <textarea name="body" required></textarea>
   </p>
   <button type="submit">Add Comment</button>
-</form>
+<% end %>

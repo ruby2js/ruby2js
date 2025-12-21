@@ -10,7 +10,7 @@
   </div>
 <% end %>
 
-<form onsubmit="return routes.articles.post(event)">
+<%= form_tag articles_path, method: :post do %>
   <p>
     <label>Title:</label>
     <input type="text" name="title" value="<%= @article.title || '' %>" required>
@@ -20,6 +20,6 @@
     <textarea name="body" required><%= @article.body || '' %></textarea>
   </p>
   <button type="submit">Create Article</button>
-</form>
+<% end %>
 
 <p><%= link_to "Back to Articles", articles_path %></p>

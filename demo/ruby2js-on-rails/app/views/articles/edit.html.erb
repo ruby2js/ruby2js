@@ -10,7 +10,7 @@
   </div>
 <% end %>
 
-<form onsubmit="return routes.article.patch(event, <%= @article.id %>)">
+<%= form_tag article_path(@article), method: :patch do %>
   <p>
     <label>Title:</label>
     <input type="text" name="title" value="<%= @article.title %>" required>
@@ -20,7 +20,7 @@
     <textarea name="body" required><%= @article.body %></textarea>
   </p>
   <button type="submit">Update Article</button>
-</form>
+<% end %>
 
 <p>
   <%= link_to "Cancel", article_path(@article) %> |

@@ -104,9 +104,25 @@ export class Router {
   static async dispatch(req, res) {
     const parsedUrl = parseUrl(req.url, true);
     const path = parsedUrl.pathname;
-    const method = this.normalizeMethod(req);
+    let method = this.normalizeMethod(req);
+    let params = {};
+
+    // Parse request body for POST requests (may contain _method override)
+    if (req.method === 'POST') {
+      params = await this.parseBody(req);
+      // Check for _method override in body (Rails convention for PATCH/DELETE)
+      if (params._method) {
+        method = params._method.toUpperCase();
+        delete params._method;  // Remove _method from params
+      }
+    } else if (['PATCH', 'PUT', 'DELETE'].includes(method)) {
+      params = await this.parseBody(req);
+    }
 
     console.log(`Started ${method} "${path}"`);
+    if (Object.keys(params).length > 0) {
+      console.log('  Parameters:', params);
+    }
 
     const result = this.match(path, method);
 
@@ -132,13 +148,6 @@ export class Router {
 
     try {
       let html;
-      let params = {};
-
-      // Parse request body for POST/PATCH/DELETE
-      if (['POST', 'PATCH', 'DELETE'].includes(method)) {
-        params = await this.parseBody(req);
-        console.log('  Parameters:', params);
-      }
 
       // Handle different HTTP methods
       if (route.nested) {
@@ -221,12 +230,14 @@ export class Router {
           }
         } else {
           // Parse URL-encoded form data
+          // Note: + represents space in form data, must replace before decodeURIComponent
           const params = {};
           const pairs = body.split('&');
           for (const pair of pairs) {
             const [key, value] = pair.split('=');
             if (key) {
-              params[decodeURIComponent(key)] = decodeURIComponent(value || '');
+              params[decodeURIComponent(key.replace(/\+/g, ' '))] =
+                decodeURIComponent((value || '').replace(/\+/g, ' '));
             }
           }
           resolve(params);

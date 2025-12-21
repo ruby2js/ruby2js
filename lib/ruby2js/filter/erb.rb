@@ -135,6 +135,8 @@ module Ruby2JS
 
               if helper_name == :form_for
                 return process_form_for(block_send, block_args, block_body)
+              elsif helper_name == :form_tag
+                return process_form_tag(block_send, block_args, block_body)
               else
                 return process_block_helper(helper_name, block_send, block_args, block_body)
               end
@@ -336,15 +338,51 @@ module Ruby2JS
 
         if browser_target?
           # Browser target - JavaScript confirm and async delete
-          if text_node.type == :str
-            text_str = text_node.children[0]
-            # Generate link that calls deleteResource function
-            # The actual delete handler is set up by setupFormHandlers
-            s(:str, "<a href=\"#\" onclick=\"if(confirm('#{confirm_str}')) { /* TODO: wire up delete */ } return false;\">#{text_str}</a>")
+          text_str = text_node.type == :str ? text_node.children[0] : nil
+
+          # Build the delete call based on path helper
+          # article_path(@article) -> routes.article.delete(id)
+          # comment_path(@article, comment) -> routes.article_comment.delete(articleId, commentId)
+          if path_node&.type == :send && path_node.children[0].nil?
+            path_helper = path_node.children[1].to_s
+            path_args = path_node.children[2..-1]
+            base_name = path_helper.sub(/_path$/, '')
+
+            if path_args.length == 2
+              # Nested resource: comment_path(@article, comment)
+              parent_arg = path_args[0]
+              child_arg = path_args[1]
+              parent_name = parent_arg.type == :ivar ? parent_arg.children.first.to_s.delete_prefix('@') : 'parent'
+              route_name = "#{parent_name}_#{base_name}"
+
+              # Build: routes.article_comment.delete(article.id, comment.id)
+              return s(:dstr,
+                s(:str, "<a href=\"#\" onclick=\"if(confirm('#{confirm_str}')) { routes.#{route_name}.delete("),
+                s(:begin, s(:attr, s(:lvar, parent_name.to_sym), :id)),
+                s(:str, ", "),
+                s(:begin, s(:attr, process(child_arg), :id)),
+                s(:str, ") } return false;\" style=\"color: red; cursor: pointer;\">#{text_str || 'Delete'}</a>"))
+            elsif path_args.length == 1
+              # Single resource: article_path(@article)
+              arg = path_args.first
+              model_name = arg.type == :ivar ? arg.children.first.to_s.delete_prefix('@') : nil
+
+              if model_name
+                return s(:dstr,
+                  s(:str, "<a href=\"#\" onclick=\"if(confirm('#{confirm_str}')) { routes.#{base_name}.delete("),
+                  s(:begin, s(:attr, s(:lvar, model_name.to_sym), :id)),
+                  s(:str, ") } return false;\" style=\"color: red; cursor: pointer;\">#{text_str || 'Delete'}</a>"))
+              end
+            end
+          end
+
+          # Fallback
+          if text_str
+            s(:str, "<a href=\"#\" onclick=\"if(confirm('#{confirm_str}')) { /* delete */ } return false;\">#{text_str}</a>")
           else
             text_expr = process(text_node)
             s(:dstr,
-              s(:str, "<a href=\"#\" onclick=\"if(confirm('#{confirm_str}')) { /* TODO: wire up delete */ } return false;\">"),
+              s(:str, "<a href=\"#\" onclick=\"if(confirm('#{confirm_str}')) { /* delete */ } return false;\">"),
               s(:begin, text_expr),
               s(:str, '</a>'))
           end
@@ -524,6 +562,8 @@ module Ruby2JS
             # Handle form_for and similar block helpers
             if helper_name == :form_for
               return process_form_for(helper_call, block_args, block_body)
+            elsif helper_name == :form_tag
+              return process_form_tag(helper_call, block_args, block_body)
             end
 
             # Generic block helper - just process the body
@@ -603,6 +643,168 @@ module Ruby2JS
 
         # Return a begin node with all statements
         s(:begin, *statements.compact)
+      end
+
+      # Process form_tag block into JavaScript
+      # form_tag path, method: :post do ... end
+      # Browser target: <form onsubmit="return routes.articles.post(event)">
+      # Server target: <form action="/articles" method="post">
+      def process_form_tag(helper_call, block_args, block_body)
+        # Extract path and options from form_tag call
+        # form_tag(path, options) where options is a hash with :method key
+        path_node = helper_call.children[2]
+        options_node = helper_call.children[3]
+
+        # Extract HTTP method from options (default to :post)
+        http_method = :post
+        if options_node&.type == :hash
+          options_node.children.each do |pair|
+            key = pair.children[0]
+            value = pair.children[1]
+            if key.type == :sym && key.children[0] == :method
+              http_method = value.children[0] if value.type == :sym
+            end
+          end
+        end
+
+        # Track path helper for import
+        if path_node&.type == :send && path_node.children[0].nil?
+          path_helper = path_node.children[1]
+          @erb_path_helpers << path_helper unless @erb_path_helpers.include?(path_helper)
+        end
+
+        statements = []
+
+        # Generate opening form tag based on target
+        if browser_target?
+          statements << s(:op_asgn, s(:lvasgn, @erb_bufvar), :+,
+                         build_browser_form_tag(path_node, http_method))
+        else
+          statements << s(:op_asgn, s(:lvasgn, @erb_bufvar), :+,
+                         build_server_form_tag(path_node, http_method))
+        end
+
+        # Process block body
+        if block_body
+          if block_body.type == :begin
+            block_body.children.each do |child|
+              processed = process(child)
+              statements << processed if processed
+            end
+          else
+            processed = process(block_body)
+            statements << processed if processed
+          end
+        end
+
+        # Add closing form tag
+        statements << s(:op_asgn, s(:lvasgn, @erb_bufvar), :+,
+                       s(:str, "</form>\n"))
+
+        s(:begin, *statements.compact)
+      end
+
+      # Build browser form tag with onsubmit handler
+      # Returns an AST node for the form opening tag
+      def build_browser_form_tag(path_node, http_method)
+        # Determine the route name and args from the path helper
+        # articles_path -> routes.articles.post(event)
+        # article_path(@article) -> routes.article.patch(event, article.id)
+        # comments_path(@article) -> routes.article_comments.post(event, article.id)
+        if path_node&.type == :send && path_node.children[0].nil?
+          path_helper = path_node.children[1].to_s
+          path_args = path_node.children[2..-1]
+
+          # Convert path helper name to route name
+          # For nested resources: comments_path(@article) -> article_comments
+          # For regular resources: articles_path -> articles, article_path -> article
+          base_name = path_helper.sub(/_path$/, '')
+
+          # Build the onsubmit handler
+          if path_args.empty?
+            # No args: routes.articles.post(event)
+            s(:str, "<form onsubmit=\"return routes.#{base_name}.#{http_method}(event)\">\n")
+          else
+            # With args - check if this is a nested resource or single resource
+            arg = path_args.first
+
+            # Determine route name based on context
+            # comments_path(@article) -> article_comments (nested, parent is singular)
+            # article_path(@article) -> article (single resource)
+            if base_name.end_with?('s') && path_args.length == 1
+              # Plural path with one arg = nested resource (comments_path(@article))
+              # Extract parent name from the argument
+              if arg.type == :ivar
+                parent_name = arg.children.first.to_s.delete_prefix('@')
+                route_name = "#{parent_name}_#{base_name}"
+              else
+                # Fallback - assume 'article' as parent for comments
+                route_name = "article_#{base_name}"
+              end
+            else
+              # Singular path or path with resource ID
+              route_name = base_name
+            end
+
+            if arg.type == :ivar
+              # @article -> article.id (use attr for property access, not method call)
+              model_name = arg.children.first.to_s.delete_prefix('@')
+              s(:dstr,
+                s(:str, "<form onsubmit=\"return routes.#{route_name}.#{http_method}(event, "),
+                s(:begin, s(:attr, s(:lvar, model_name.to_sym), :id)),
+                s(:str, ")\">\n"))
+            else
+              # Other expression - just process it
+              s(:dstr,
+                s(:str, "<form onsubmit=\"return routes.#{route_name}.#{http_method}(event, "),
+                s(:begin, process(arg)),
+                s(:str, ")\">\n"))
+            end
+          end
+        else
+          # Fallback for non-path-helper paths
+          s(:str, "<form>\n")
+        end
+      end
+
+      # Build server form tag with action attribute
+      # Returns an AST node for the form opening tag
+      def build_server_form_tag(path_node, http_method)
+        # Process the path to get the action URL
+        path_expr = process(path_node)
+
+        # For methods other than GET/POST, use POST with hidden _method field
+        actual_method = (http_method == :get || http_method == :post) ? http_method : :post
+        needs_method_field = ![:get, :post].include?(http_method)
+
+        # Track path helper for import
+        if path_node&.type == :send && path_node.children[0].nil? && path_node.children.length == 2
+          # Ensure path helper is called as function: articles_path()
+          path_expr = s(:send, nil, path_node.children[1])
+        end
+
+        if path_node.type == :str
+          # Static path
+          path_str = path_node.children[0]
+          if needs_method_field
+            s(:str, "<form action=\"#{path_str}\" method=\"#{actual_method}\">\n<input type=\"hidden\" name=\"_method\" value=\"#{http_method}\">\n")
+          else
+            s(:str, "<form action=\"#{path_str}\" method=\"#{actual_method}\">\n")
+          end
+        else
+          # Dynamic path - use template literal
+          if needs_method_field
+            s(:dstr,
+              s(:str, '<form action="'),
+              s(:begin, path_expr),
+              s(:str, "\" method=\"#{actual_method}\">\n<input type=\"hidden\" name=\"_method\" value=\"#{http_method}\">\n"))
+          else
+            s(:dstr,
+              s(:str, '<form action="'),
+              s(:begin, path_expr),
+              s(:str, "\" method=\"#{actual_method}\">\n"))
+          end
+        end
       end
 
       # Process generic block helpers
