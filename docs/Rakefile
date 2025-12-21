@@ -286,6 +286,13 @@ end
 
 # Create downloadable tarball
 task :rails_demo_tarball => [:selfhost_build] do
+  # Generate build.mjs from build.rb (needed for the published tarball)
+  # Uses selfhost_build filter for Node.js API compatibility
+  sh "cat #{rails_demo_source}/scripts/build.rb | " \
+     "bundle exec ruby2js --filter selfhost_build --filter esm --filter node " \
+     "--filter functions --filter return --filter pragma --autoexports " \
+     "> #{rails_demo_source}/scripts/build.mjs"
+
   # Run publish script to create the tarball
   Dir.chdir(selfhost_source) do
     sh "bundle exec ruby scripts/publish_demo.rb"
