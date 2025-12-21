@@ -277,7 +277,7 @@ module Ruby2JS
           path_expr = s(:send, nil, path_node.children[1])
         end
 
-        if browser_target?
+        if self.browser_target?()
           # Browser target - SPA navigation with onclick handlers
           if text_node.type == :str && path_node.type == :str
             # Both static - generate simple string
@@ -336,7 +336,7 @@ module Ruby2JS
         path_expr = process(path_node)
         confirm_str = confirm_msg ? confirm_msg.children[0] : 'Are you sure?'
 
-        if browser_target?
+        if self.browser_target?()
           # Browser target - JavaScript confirm and async delete
           text_str = text_node.type == :str ? text_node.children[0] : nil
 
@@ -677,12 +677,12 @@ module Ruby2JS
         statements = []
 
         # Generate opening form tag based on target
-        if browser_target?
+        if self.browser_target?()
           statements << s(:op_asgn, s(:lvasgn, @erb_bufvar), :+,
-                         build_browser_form_tag(path_node, http_method))
+                         self.build_browser_form_tag(path_node, http_method))
         else
           statements << s(:op_asgn, s(:lvasgn, @erb_bufvar), :+,
-                         build_server_form_tag(path_node, http_method))
+                         self.build_server_form_tag(path_node, http_method))
         end
 
         # Process block body
