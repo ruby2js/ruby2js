@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Dev server for Rails-in-JS with hot reload
+// Dev server for Ruby2JS-on-Rails with hot reload
 // Usage: node dev-server.mjs [--ruby] [--port=3000]
 
 import { createServer } from 'http';
@@ -231,7 +231,7 @@ watcher.on('unlink', (path) => onFileChange('unlink', path));
 // Start server
 server.listen(PORT, () => {
   console.log('');
-  console.log('\x1b[1m=== Rails-in-JS Dev Server ===\x1b[0m');
+  console.log('\x1b[1m=== Ruby2JS-on-Rails Dev Server ===\x1b[0m');
   console.log('');
   console.log(`  \x1b[32m➜\x1b[0m  Local:   http://localhost:${PORT}/`);
   console.log(`  \x1b[36m➜\x1b[0m  Mode:    ${useRuby ? 'Ruby transpilation' : 'JavaScript (selfhost)'}`);

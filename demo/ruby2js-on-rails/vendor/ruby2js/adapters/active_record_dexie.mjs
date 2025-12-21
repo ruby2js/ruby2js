@@ -20,7 +20,7 @@ export function registerSchema(tableName, schema) {
 // Initialize the database
 export async function initDatabase(options = {}) {
   const config = { ...DB_CONFIG, ...options };
-  const dbName = config.database || 'rails_in_js';
+  const dbName = config.database || 'ruby2js_rails';
 
   db = new Dexie(dbName);
 

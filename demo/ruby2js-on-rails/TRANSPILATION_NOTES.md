@@ -1,6 +1,6 @@
 # Ruby2JS Transpilation Notes
 
-This document records patterns and issues discovered while building the Rails-in-JS demo, which transpiles Ruby ActiveRecord-like models to JavaScript.
+This document records patterns and issues discovered while building the Ruby2JS-on-Rails demo, which transpiles Ruby ActiveRecord-like models to JavaScript.
 
 ## Working Patterns
 

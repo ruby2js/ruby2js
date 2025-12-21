@@ -4,13 +4,13 @@
 
 development:
   adapter: dexie
-  database: rails_in_js_dev
+  database: ruby2js_rails_dev
 
 production:
   adapter: dexie
-  database: rails_in_js
+  database: ruby2js_rails
 
 # Alternative: sql.js for full SQL support (larger bundle ~2.7MB vs ~50KB)
 # development:
 #   adapter: sqljs
-#   database: rails_in_js_dev
+#   database: ruby2js_rails_dev

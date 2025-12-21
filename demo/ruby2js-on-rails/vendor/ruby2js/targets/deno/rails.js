@@ -1,4 +1,4 @@
-// Rails-in-JS Micro Framework - Deno Target
+// Ruby2JS-on-Rails Micro Framework - Deno Target
 // Provides routing, controller dispatch, and form handling for Deno.serve
 
 export class Router {

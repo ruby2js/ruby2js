@@ -1,4 +1,4 @@
-// Rails-in-JS Micro Framework - Bun Target
+// Ruby2JS-on-Rails Micro Framework - Bun Target
 // Provides routing, controller dispatch, and form handling for Bun.serve
 
 export class Router {

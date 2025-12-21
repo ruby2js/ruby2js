@@ -1,5 +1,5 @@
 #!/usr/bin/env ruby
-# Build script for Rails-in-JS demo
+# Build script for Ruby2JS-on-Rails demo
 # Transpiles Ruby models and controllers to JavaScript
 #
 # Can be run directly: ruby scripts/build.rb [dist_dir]
@@ -89,7 +89,7 @@ class SelfhostBuilder
     FileUtils.rm_rf(@dist_dir)
     FileUtils.mkdir_p(@dist_dir)
 
-    puts("=== Building Rails-in-JS Demo ===")
+    puts("=== Building Ruby2JS-on-Rails Demo ===")
     puts("")
 
     # Copy database adapter and derive target
@@ -250,7 +250,7 @@ class SelfhostBuilder
 
     # Default: sqljs
     puts("  Using default adapter: sqljs")
-    { 'adapter' => 'sqljs', 'database' => 'rails_in_js' }
+    { 'adapter' => 'sqljs', 'database' => 'ruby2js_rails' }
   end
 
   def copy_database_adapter(db_config)

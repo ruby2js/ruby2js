@@ -1,4 +1,4 @@
-// Rails-in-JS Micro Framework - Node.js Target
+// Ruby2JS-on-Rails Micro Framework - Node.js Target
 // Provides routing, controller dispatch, and form handling for HTTP servers
 
 import http from 'node:http';

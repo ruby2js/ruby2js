@@ -878,7 +878,7 @@ end
 
 ### Demo Tests
 
-The Rails-in-JS demo serves as an integration test:
+The Ruby2JS-on-Rails demo serves as an integration test:
 - Write idiomatic Rails
 - Apply filters
 - Run in browser
@@ -1011,7 +1011,7 @@ Schema DSL for database setup.
 
 ### Overall Success:
 
-The Rails-in-JS demo can be rewritten using **idiomatic Rails patterns** (as shown in the original RUBY2JS_ON_RAILS.md plan Stage 1), and the filters transform it to working JavaScript.
+The Ruby2JS-on-Rails demo can be rewritten using **idiomatic Rails patterns** (as shown in the original RUBY2JS_ON_RAILS.md plan Stage 1), and the filters transform it to working JavaScript.
 
 A Rails developer should look at the code and say "that's just Rails."
 

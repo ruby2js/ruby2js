@@ -46,16 +46,16 @@ config/database.yml                  No YAML parser
 ```yaml
 development:
   adapter: dexie
-  database: rails_in_js_dev
+  database: ruby2js_rails_dev
 
 production:
   adapter: dexie
-  database: rails_in_js
+  database: ruby2js_rails
 
 # Alternative: sql.js for full SQL support
 # development:
 #   adapter: sql_js
-#   database: rails_in_js_dev
+#   database: ruby2js_rails_dev
 ```
 
 The YAML file can include any adapter-specific options:

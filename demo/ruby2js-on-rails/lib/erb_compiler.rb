@@ -1,4 +1,4 @@
-# ERB to Ruby compiler for Rails-in-JS
+# ERB to Ruby compiler for Ruby2JS-on-Rails
 # This produces Ruby code that can be transpiled to JavaScript.
 # Both Ruby and selfhost builds use this same compiler for consistency.
 

@@ -1,4 +1,4 @@
-// Rails-in-JS Micro Framework
+// Ruby2JS-on-Rails Micro Framework
 // Provides routing, controller dispatch, and form handling
 
 export class Router {

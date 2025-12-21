@@ -2,15 +2,15 @@
 
 ## Status: ✅ COMPLETE
 
-Enable the Node filter to run in selfhost, allowing `build.rb` to be transpiled to JavaScript. This eliminates the need for a hand-maintained `build-selfhost.mjs` and enables the Rails-in-JS demo to run with zero Ruby dependency.
+Enable the Node filter to run in selfhost, allowing `build.rb` to be transpiled to JavaScript. This eliminates the need for a hand-maintained `build-selfhost.mjs` and enables the Ruby2JS-on-Rails demo to run with zero Ruby dependency.
 
 ## Goal
 
-**Transpile `build.rb` to `build.mjs`** so the Rails-in-JS demo can build and run entirely in JavaScript, with hot reload, without Ruby installed.
+**Transpile `build.rb` to `build.mjs`** so the Ruby2JS-on-Rails demo can build and run entirely in JavaScript, with hot reload, without Ruby installed.
 
 ## Why This Matters
 
-The Rails-in-JS demo currently requires two build scripts:
+The Ruby2JS-on-Rails demo currently requires two build scripts:
 - `build.rb` - Ruby version (authoritative, ~380 lines)
 - `build-selfhost.mjs` - Hand-maintained JavaScript version (~500 lines)
 

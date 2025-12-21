@@ -1,4 +1,4 @@
-# Rails-in-JS Demo
+# Ruby2JS-on-Rails Demo
 
 A Rails-like blog application running entirely in JavaScript. Ruby source files are transpiled to JavaScript via Ruby2JS, demonstrating that idiomatic Rails code can run in the browser **or** as a server on Node.js, Bun, or Deno.
 
@@ -124,5 +124,5 @@ The build generates sourcemaps so you can debug Ruby in the browser:
 
 ## See Also
 
-- [Rails-in-JS Plan](../../plans/RUBY2JS_ON_RAILS.md) - Full project plan and roadmap
+- [Ruby2JS-on-Rails Plan](../../plans/RUBY2JS_ON_RAILS.md) - Full project plan and roadmap
 - [Ruby2JS](https://www.ruby2js.com/) - The transpiler powering this demo

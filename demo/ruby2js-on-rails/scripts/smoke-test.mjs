@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Smoke test for Rails-in-JS demo builds
+// Smoke test for Ruby2JS-on-Rails demo builds
 // Compares Ruby and selfhost builds, validates JS syntax
 
 import { execSync, spawnSync } from 'child_process';
@@ -193,7 +193,7 @@ function compareDirs(dir1, dir2, label1 = 'dir1', label2 = 'dir2') {
 
 // Main test runner
 async function runTests() {
-  log('\n=== Rails-in-JS Smoke Test ===\n', BOLD);
+  log('\n=== Ruby2JS-on-Rails Smoke Test ===\n', BOLD);
 
   let passed = 0;
   let failed = 0;

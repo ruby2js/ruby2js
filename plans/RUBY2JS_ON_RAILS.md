@@ -1,4 +1,4 @@
-# Rails-in-JS: Running Rails Applications in JavaScript
+# Ruby2JS-on-Rails: Running Rails Applications in JavaScript
 
 ## Status: Stage 2b Complete
 
@@ -10,7 +10,7 @@ Run Rails applications entirely in JavaScript - either in the browser (with sql.
 
 **Harden Ruby2JS selfhost** by building a demanding real-world application that exercises the full transpilation pipeline.
 
-The Rails-in-JS demo serves as:
+The Ruby2JS-on-Rails demo serves as:
 - A concrete, testable target that keeps us honest
 - A stress test for selfhost filters (ERB, Phlex, functions, ESM)
 - A source of discovered gaps that benefit all Ruby2JS users when fixed
@@ -24,14 +24,14 @@ Demonstrate that a Rails application can be transpiled via Ruby2JS and run witho
 
 | Metric | Description |
 |--------|-------------|
-| Selfhost coverage | Filters needed for Rails-in-JS work in selfhost |
+| Selfhost coverage | Filters needed for Ruby2JS-on-Rails work in selfhost |
 | Gaps fixed | Number of Ruby2JS issues discovered and resolved |
 | Demo completeness | Blog tutorial runs in browser |
 | Community value | Improvements benefit all Ruby2JS users |
 
 ## Selfhost Hardening Strategy
 
-Building Rails-in-JS will exercise these selfhost components:
+Building Ruby2JS-on-Rails will exercise these selfhost components:
 
 | Component | Current Status | Expected Exercise |
 |-----------|----------------|-------------------|
@@ -54,7 +54,7 @@ As we build, we'll discover gaps in:
 ### Gap Resolution Workflow
 
 ```
-Build Rails-in-JS feature
+Build Ruby2JS-on-Rails feature
         ↓
 Hit selfhost gap
         ↓
@@ -99,7 +99,7 @@ Browser (sql.js + IndexedDB) or Node.js (sql.js + filesystem)
 
 ## Development vs Production Modes
 
-Like Rails and modern Node frameworks, Rails-in-JS supports two modes:
+Like Rails and modern Node frameworks, Ruby2JS-on-Rails supports two modes:
 
 ### Development Mode (Live Transpilation)
 
@@ -1118,7 +1118,7 @@ After Stage 3:
 
 ### Hotwire Integration
 
-Hotwire (Turbo + Stimulus) is a natural fit for Rails-in-JS since it's already JavaScript-based:
+Hotwire (Turbo + Stimulus) is a natural fit for Ruby2JS-on-Rails since it's already JavaScript-based:
 
 **Stimulus** - Ruby2JS already has a `stimulus` filter that transforms Ruby controller classes to Stimulus-compatible JavaScript. This should work out of the box with minimal adaptation.
 
@@ -1141,7 +1141,7 @@ Turbo.renderStreamMessage(`
 `)
 ```
 
-Stream actions (`append`, `prepend`, `replace`, `update`, `remove`, `before`, `after`) provide fine-grained control for CRUD operations. This pattern works well with Rails-in-JS since we control both the "server" (in-browser controller) and client.
+Stream actions (`append`, `prepend`, `replace`, `update`, `remove`, `before`, `after`) provide fine-grained control for CRUD operations. This pattern works well with Ruby2JS-on-Rails since we control both the "server" (in-browser controller) and client.
 
 **Implementation approach:**
 1. Import `@hotwired/turbo` from CDN or npm

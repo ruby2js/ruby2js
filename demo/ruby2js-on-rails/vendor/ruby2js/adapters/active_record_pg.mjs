@@ -34,7 +34,7 @@ export async function initDatabase(options = {}) {
   pool = new Pool({
     host: config.host || 'localhost',
     port: config.port || 5432,
-    database: config.database || 'rails_in_js',
+    database: config.database || 'ruby2js_rails',
     user: config.user || config.username,
     password: config.password,
     max: config.pool || 10,

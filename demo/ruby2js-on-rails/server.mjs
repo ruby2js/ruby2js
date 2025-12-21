@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Rails-in-JS Demo - Node.js Server Entry Point
+// Ruby2JS-on-Rails Demo - Node.js Server Entry Point
 //
 // This script starts a Node.js HTTP server using the transpiled Rails demo app.
 // It uses the built output from dist/ with the Node.js target runtime.
@@ -19,7 +19,7 @@ import { Application } from './dist/config/routes.js';
 
 const port = process.env.PORT || 3000;
 
-console.log('Starting Rails-in-JS Node.js Server...');
+console.log('Starting Ruby2JS-on-Rails Node.js Server...');
 console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
 
 // Start the application
