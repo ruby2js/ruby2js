@@ -224,7 +224,7 @@ task :selfhost_copy_filters => [selfhost_dir, :selfhost_build] do
   mkdir_p rails_dir unless File.exist?(rails_dir)
 
   # Core filters used by most combo boxes
-  %w[functions esm pragma return camelCase active_support polyfill].each do |filter|
+  %w[functions esm pragma return camelCase active_support polyfill erb].each do |filter|
     src = "#{selfhost_source}/filters/#{filter}.js"
     cp src, "#{filters_dir}/#{filter}.js" if File.exist?(src)
   end
@@ -236,12 +236,24 @@ task :selfhost_copy_filters => [selfhost_dir, :selfhost_build] do
   end
 end
 
+# Copy lib directory (erb_compiler.js, etc.)
+task :selfhost_copy_lib => [selfhost_dir, :selfhost_build] do
+  lib_dir = "#{selfhost_dir}/lib"
+  mkdir_p lib_dir unless File.exist?(lib_dir)
+
+  %w[erb_compiler.js].each do |file|
+    src = "#{selfhost_source}/lib/#{file}"
+    cp src, "#{lib_dir}/#{file}" if File.exist?(src)
+  end
+end
+
 # Note: index.html is checked into docs/src/demo/selfhost/ directly
 
 task :selfhost => [
   :selfhost_copy_prism_browser,
   :selfhost_copy_bundle,
   :selfhost_copy_filters,
+  :selfhost_copy_lib,
   :selfhost_copy_prism
 ] do
   # Ensure all files are world-readable (needed for nginx in Docker)

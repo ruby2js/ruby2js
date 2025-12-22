@@ -22,6 +22,8 @@ class SelfhostRubyController < DemoController
     @options ||= {}
     @selfhost_ready = false
     @filters_loaded = {}
+    @erb_mode = element.dataset.erb == 'true'
+    @erb_compiler = nil
 
     # parse options provided (if any)
     if element.dataset.options
@@ -79,6 +81,13 @@ class SelfhostRubyController < DemoController
       @selfhost_convert = selfhost.convert
       @selfhost_Ruby2JS = selfhost.Ruby2JS
       @selfhost_ready = true
+
+      # Load ERB compiler if in ERB mode
+      if @erb_mode
+        erb_url = "#{window.location.origin}/demo/selfhost/lib/erb_compiler.js"
+        erb_module = await import(erb_url)
+        @erb_compiler = erb_module.ErbCompiler
+      end
     rescue => e
       console.error('[SelfhostRubyController] Failed to load selfhost bundle:', e.message)
     end
@@ -155,9 +164,21 @@ class SelfhostRubyController < DemoController
     ruby = @rubyEditor.state.doc.to_s
 
     begin
+      # If in ERB mode, preprocess the template to Ruby code
+      if @erb_mode and @erb_compiler
+        compiler = @erb_compiler.new(ruby)
+        ruby = compiler.src
+      end
+
       # Load required filters
       filter_names = @options[:filters] || []
       loaded_filters = []
+
+      # Add ERB filter if in ERB mode
+      if @erb_mode
+        erb_filter = await load_filter('erb')
+        loaded_filters.push(erb_filter) if erb_filter
+      end
 
       # Use index-based iteration to get actual values, not indices
       i = 0

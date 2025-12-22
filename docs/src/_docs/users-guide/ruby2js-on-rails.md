@@ -193,7 +193,12 @@ end
 
 ERB templates become JavaScript render functions:
 
-```erb
+<div data-controller="combo" data-selfhost="true" data-erb="true" data-options='{
+  "eslevel": 2022,
+  "filters": ["functions"]
+}'></div>
+
+```ruby
 <h1><%= @article.title %></h1>
 <p><%= @article.body %></p>
 

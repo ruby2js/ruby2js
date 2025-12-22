@@ -7,7 +7,7 @@ class ComboController < DemoController
     tab = document.createElement('sl-tab')
     tab.setAttribute 'slot', 'nav'
     tab.setAttribute 'panel', 'ruby'
-    tab.textContent = 'Ruby'
+    tab.textContent = element.dataset.erb == 'true' ? 'ERB' : 'Ruby'
     tab_group.appendChild(tab)
 
     # js tab
@@ -34,6 +34,8 @@ class ComboController < DemoController
     controller_name = element.dataset.selfhost == 'true' ? 'selfhost-ruby' : 'ruby'
     div.setAttribute 'data-controller', controller_name
     div.setAttribute 'data-options', element.dataset.options
+    # Pass ERB mode flag if set
+    div.setAttribute 'data-erb', 'true' if element.dataset.erb == 'true'
     ruby_panel.appendChild(div)
     tab_group.appendChild(ruby_panel)
 
