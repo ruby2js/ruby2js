@@ -191,7 +191,9 @@ end
 
 ### ERB Templates
 
-ERB templates become JavaScript render functions:
+ERB templates become JavaScript render functions. Instance variables become
+destructured parameters, and Rails helpers like `link_to` and `truncate` are
+transformed:
 
 <div data-controller="combo" data-selfhost="true" data-erb="true" data-options='{
   "eslevel": 2022,
@@ -199,8 +201,8 @@ ERB templates become JavaScript render functions:
 }'></div>
 
 ```ruby
-<h1><%= @article.title %></h1>
-<p><%= @article.body %></p>
+<h1><%= link_to @article.title, article_path(@article) %></h1>
+<p><%= truncate(@article.body, length: 100) %></p>
 
 <h2>Comments</h2>
 <% @article.comments.each do |comment| %>
@@ -208,6 +210,9 @@ ERB templates become JavaScript render functions:
     <%= comment.body %>
   </div>
 <% end %>
+
+<%= link_to "Edit", edit_article_path(@article) %>
+<%= link_to "Delete", article_path(@article), method: :delete, data: { confirm: "Are you sure?" } %>
 ```
 
 See the [ERB filter documentation](/docs/filters/erb) for details.
