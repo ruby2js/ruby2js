@@ -83,6 +83,28 @@ module Ruby2JS
         block.push s(:return, s(:ivar, block.last.children.first))
       elsif block.last.type == :cvasgn
         block.push s(:return, s(:cvar, block.last.children.first))
+
+      elsif block.last.type == :kwbegin
+        # Unwrap kwbegin and process its contents for autoreturn
+        kwbegin = block.pop
+        inner = kwbegin.children.first
+        if inner&.type == :ensure
+          # For ensure blocks, apply autoreturn to the try body only
+          try_body = inner.children.first
+          ensure_body = inner.children.last
+          block.push kwbegin.updated(nil, [
+            inner.updated(nil, [s(:autoreturn, try_body), ensure_body])
+          ])
+        else
+          block.push kwbegin.updated(nil, [s(:autoreturn, *kwbegin.children)])
+        end
+
+      elsif block.last.type == :ensure
+        # For ensure blocks, apply autoreturn to the try body only
+        node = block.pop
+        try_body = node.children.first
+        ensure_body = node.children.last
+        block.push node.updated(nil, [s(:autoreturn, try_body), ensure_body])
       end
 
       if block.length == 1

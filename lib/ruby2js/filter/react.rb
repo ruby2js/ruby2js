@@ -153,14 +153,14 @@ module Ruby2JS
           inheritance == s(:send, s(:const, nil, :React), :Component)
 
           react = :React
-          self.prepend_list << REACT_IMPORTS[:React] if self.modules_enabled?
+          self.prepend_list << REACT_IMPORTS[:React] if self.modules_enabled?()
 
         elsif inheritance == s(:const, nil, :Preact) or
           inheritance == s(:const, s(:const, nil, :Preact), :Component) or
           inheritance == s(:send, s(:const, nil, :Preact), :Component)
 
           react = :Preact
-          self.prepend_list << REACT_IMPORTS[:Preact] if self.modules_enabled?
+          self.prepend_list << REACT_IMPORTS[:Preact] if self.modules_enabled?()
         else
           return super
         end
@@ -265,7 +265,7 @@ module Ruby2JS
 
             if hook
               react_walk(hookinit) if hookinit
-              useState = (@reactIvars[:asgn] + @reactIvars[:ref]).uniq
+              useState = [*@reactIvars[:asgn], *@reactIvars[:ref]].uniq
             end
 
             if not @reactIvars.values().flatten.empty?
@@ -287,7 +287,7 @@ module Ruby2JS
             # analyze ivar usage
             @reactIvars = {pre: [], post: [], asgn: [], ref: [], cond: []}
             react_walk(child) unless mname == :initialize
-            @reactIvars[:capture] = (@reactIvars[:pre] + @reactIvars[:post]).uniq
+            @reactIvars[:capture] = [*@reactIvars[:pre], *@reactIvars[:post]].uniq
             @reactIvars[:pre] = @reactIvars[:post] = [] if @reactClass == :hook
 
             if mname == :initialize
@@ -391,16 +391,16 @@ module Ruby2JS
 
             # retain comment
             child_comments = @comments[child]
-            unless child_comments.nil? || child_comments.empty?
+            unless child_comments&.empty?
               @comments[pairs.last] = child_comments
             end
           end
 
           if hook
-            initialize = pairs.find_index {|node| node.type == :def and node.children.first == :initialize}
+            initialize = pairs.find_index {|node| node.type == :def and node.children.first == :initialize} || -1
 
             hash = {}
-            if initialize
+            if initialize != -1
               hash = pairs.delete_at(initialize)
               hash = hash.children.last while %i(def begin send).include? hash&.type
               hash = s(:hash) unless hash&.type == :hash
@@ -413,10 +413,10 @@ module Ruby2JS
               hash[symbol.to_s[1..-1]] ||= s(:nil)
             end
 
-            hash.sort.reverse.each do |var, value|
+            hash.entries().sort.reverse.each do |var, value|
               if @react == :Preact 
                 hooker = nil
-                self.prepend_list << REACT_IMPORTS[:PreactHook] if self.modules_enabled?
+                self.prepend_list << REACT_IMPORTS[:PreactHook] if self.modules_enabled?()
               else
                 hooker = s(:const, nil, :React)
               end
@@ -426,8 +426,8 @@ module Ruby2JS
                 s(:lvasgn, setter)), s(:send, hooker, :useState, value)))
             end
 
-            render = pairs.find_index {|node| node.type == :defm and node.children.first == :render}
-            if render
+            render = pairs.find_index {|node| node.type == :defm and node.children.first == :render} || -1
+            if render != -1
               render = pairs.delete_at(render)
               pairs.push s(:autoreturn, render.children.last)
             end
@@ -480,7 +480,7 @@ module Ruby2JS
             node.children.first == s(:const, nil, :Preact) or
             node.children.first == s(:const, nil, :ReactDOM)
           then
-            if self.modules_enabled?
+            if self.modules_enabled?()
               self.prepend_list << REACT_IMPORTS[node.children.first.children.last]
             end
 
@@ -542,14 +542,14 @@ module Ruby2JS
           node.children[2..-1].each do |child|
             if child.type == :hash
               # convert _ to - in attribute names
-              pairs += child.children.map do |pair|
+              pairs.push(*child.children.map do |pair|
                 key, value = pair.children
                 if key.type == :sym
                   s(:pair, s(:str, key.children[0].to_s.gsub('_', '-')), value)
                 else
                   pair
                 end
-              end
+              end)
 
             elsif child.type == :block
               # :block arguments are inserted by on_block logic below
@@ -621,7 +621,7 @@ module Ruby2JS
             # search for the presence of a 'value' attribute
             value = pairs.find_index do |pair|
               ['value', :value].include? pair.children.first.children.first
-            end
+            end || -1
 
             event = (@react == :Preact ? :onInput : :onChange)
 
@@ -629,34 +629,34 @@ module Ruby2JS
             # search for the presence of a onInput/onChange attribute
             onChange = pairs.find_index do |pair|
               pair.children.first.children[0].to_s == event.to_s
-            end
+            end || -1
 
-            if event == :onInput and not onChange
+            if event == :onInput and onChange == -1
               # search for the presence of a 'onChange' attribute
               onChange = pairs.find_index do |pair|
                 pair.children.first.children[0].to_s == 'onChange'
-              end
+              end || -1
 
-              if onChange
+              if onChange != -1
                 pairs[onChange] = s(:pair, s(:sym, event),
                   pairs[onChange].children.last)
               end
             end
 
-            if value and pairs[value].children.last.type == :ivar and !onChange
+            if value != -1 and pairs[value].children.last.type == :ivar and onChange == -1
               pairs << s(:pair, s(:sym, event),
                 s(:block, s(:send, nil, :proc), s(:args, s(:arg, :event)),
                 s(:ivasgn, pairs[value].children.last.children.first,
                 s(:attr, s(:attr, s(:lvar, :event), :target), :value))))
             end
 
-            if not value and not onChange and tag == 'input'
+            if value == -1 and onChange == -1 and tag == 'input'
               # search for the presence of a 'checked' attribute
               checked = pairs.find_index do |pair|
                 ['checked', :checked].include? pair.children.first.children[0]
-              end
+              end || -1
 
-              if checked and pairs[checked].children.last.type == :ivar
+              if checked != -1 and pairs[checked].children.last.type == :ivar
                 pairs << s(:pair, s(:sym, event),
                   s(:block, s(:send, nil, :proc), s(:args),
                   s(:ivasgn, pairs[checked].children.last.children.first,
@@ -690,10 +690,10 @@ module Ruby2JS
           # search for the presence of a 'style' attribute
           style = pairs.find_index do |pair|
             ['style', :style].include? pair.children.first.children.first
-          end
+          end || -1
 
           # converts style strings into style hashes
-          if style and pairs[style].children[1].type == :str
+          if style != -1 and pairs[style].children[1].type == :str
             hash = []
             pairs[style].children[1].children[0].split(/;\s+/).each do |prop|
               prop.strip!
@@ -777,7 +777,7 @@ module Ruby2JS
                     arg.children[2] == s(:const, nil, "React.Fragment") and
                     arg.children[3] == s(:nil) 
                   then
-                    params += arg.children[4..-1]
+                    params.push(*arg.children[4..-1])
                   else
                     params << arg
                   end
@@ -964,8 +964,8 @@ module Ruby2JS
               end
 
               # if a hash argument is already passed, merge in id value
-              hash = children.find_index {|cnode| cnode.type == :hash}
-              if hash
+              hash = children.find_index {|cnode| cnode.type == :hash} || -1
+              if hash != -1
                 children[hash] = s(:hash, pair, *children[hash].children)
               else
                 children.unshift s(:hash, pair)
@@ -1298,30 +1298,30 @@ module Ruby2JS
 
         case node.type
         when :if, :case
-          @reactIvars[:cond] += @reactIvars[:asgn] - base
+          @reactIvars[:cond].push(*(@reactIvars[:asgn].reject { |x| base.include?(x) }))
 
         when :ivar
           if @reactIvars[:cond].include? child
-            @reactIvars[:post] << child
-            @reactIvars[:pre] << child
+            @reactIvars[:post].push(child)
+            @reactIvars[:pre].push(child)
           elsif @reactIvars[:asgn].include? child
-            @reactIvars[:post] << child
-            @reactIvars[:pre] << child if @reactIvars[:ref].include? child
+            @reactIvars[:post].push(child)
+            @reactIvars[:pre].push(child) if @reactIvars[:ref].include? child
           end
-          @reactIvars[:ref] << child
+          @reactIvars[:ref].push(child)
 
         when :ivasgn
-          @reactIvars[:asgn] << child
+          @reactIvars[:asgn].push(child)
 
         when :op_asgn, :or_asgn, :and_asgn
           if child.type == :ivasgn
             gchild = child.children.first
-            if (@reactIvars[:ref]+@reactIvars[:cond]).include? gchild
-              @reactIvars[:pre] << gchild
-              @reactIvars[:post] << gchild
+            if [*@reactIvars[:ref], *@reactIvars[:cond]].include? gchild
+              @reactIvars[:pre].push(gchild)
+              @reactIvars[:post].push(gchild)
             end
-            @reactIvars[:ref] << gchild
-            @reactIvars[:asgn] << gchild
+            @reactIvars[:ref].push(gchild)
+            @reactIvars[:asgn].push(gchild)
           end
 
         when :send
@@ -1329,7 +1329,7 @@ module Ruby2JS
             child and child.type == :self and node.children.length == 2 and
             node.children[1] == :componentWillReceiveProps
           then
-            @reactIvars[:post] += @reactIvars[:asgn]
+            @reactIvars[:post].push(*@reactIvars[:asgn])
           end
         end
       end
@@ -1387,7 +1387,7 @@ module Ruby2JS
           reactIvars = @reactIvars
           @reactIvars = {pre: [], post: [], asgn: [], ref: [], cond: []}
           react_walk(node.children.last)
-          @reactIvars[:capture] = (@reactIvars[:pre] + @reactIvars[:post]).uniq
+          @reactIvars[:capture] = [*@reactIvars[:pre], *@reactIvars[:post]].uniq
           @reactIvars[:pre] = @reactIvars[:post] = [] if @reactClass == :hook
           node = super
           block = react_process_ivars([node.children.last.dup])
