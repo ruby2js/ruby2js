@@ -37,17 +37,8 @@ module Ruby2JS
         def on_class(node)
           class_name, superclass, body = node.children
 
-          # Initialize state if needed (JS compatibility - constructor may not run in filter pipeline)
-          @rails_before_actions ||= []
-          @rails_private_methods ||= {}
-          # Always create fresh Set for each class (avoids both Opal and selfhost issues)
+          # Always create fresh Set for each class
           @rails_model_refs = Set.new
-          @rails_needs_views ||= false
-          # Model associations for preloading (model_name -> [association_names])
-          # NOTE: This must be in on_class (not just initialize) for JS compatibility
-          @rails_model_associations ||= {
-            article: [:comments]
-          }
 
           # Check if this is a controller (inherits from ApplicationController or *Controller)
           return super unless controller_class?(class_name, superclass)

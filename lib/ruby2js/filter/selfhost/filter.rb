@@ -142,6 +142,13 @@ module Ruby2JS
             return process node.updated(nil, [s(:self), method_name, *args])
           end
 
+          # Convert Ruby2JS.ast_node?(x) to ast_node(x)
+          # ast_node is imported from ruby2js.js, not a method on Ruby2JS module
+          if target&.type == :const && target.children == [nil, :Ruby2JS] &&
+             method_name == :ast_node?
+            return process s(:send, nil, :ast_node, *args)
+          end
+
           # Convert length/size/count to :attr nodes to ensure property access.
           # Without this, nodes created with s() (no location info) get is_method?=true
           # and output as method calls like body.length() instead of body.length.
@@ -315,11 +322,16 @@ module Ruby2JS
         # function that's included in the returned object.
 
         # Transform writer methods: def options=(x) → def set_options(x)
+        # Transform initialize → _filter_init (called by runtime after instantiation)
         # Note: This is a simple renaming; the preamble provides a proxy if needed
         def on_def(node)
           method_name = node.children[0]
 
-          if method_name.to_s.end_with?('=')
+          if method_name == :initialize
+            # Transform initialize to _filter_init
+            # The runtime will call this after instantiation with _parent set correctly
+            node = node.updated(nil, [:_filter_init, *node.children[1..-1]])
+          elsif method_name.to_s.end_with?('=')
             new_name = "set_#{method_name.to_s.chomp('=')}"
             node = node.updated(nil, [new_name.to_sym, *node.children[1..-1]])
           end
@@ -363,6 +375,18 @@ module Ruby2JS
             var_name = target.children[0].to_s
             new_name = var_name.sub(/^@/, '_')
             node.updated(nil, [s(:attr, s(:self), new_name.to_sym), process(value)])
+          else
+            super
+          end
+        end
+
+        # Handle @foo += value → this._foo += value
+        def on_op_asgn(node)
+          target, op, value = node.children
+          if target.type == :ivasgn
+            var_name = target.children[0].to_s
+            new_name = var_name.sub(/^@/, '_')
+            node.updated(nil, [s(:attr, s(:self), new_name.to_sym), op, process(value)])
           else
             super
           end

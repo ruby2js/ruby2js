@@ -20,7 +20,6 @@ module Ruby2JS
         @esm_autoexports_option = @esm_autoexports # preserve for require-to-import
         @esm_autoimports = options[:autoimports]
         @esm_defs = options[:defs] || {}
-        @esm_explicit_tokens = []
         @esm_top = nil
         @esm_require_recursive = options[:require_recursive]
 
@@ -133,22 +132,19 @@ module Ruby2JS
       end
 
       def on_class(node)
-        @esm_explicit_tokens ||= []
-        @esm_explicit_tokens << node.children.first.children.last
+                @esm_explicit_tokens << node.children.first.children.last
 
         super
       end
 
       def on_def(node)
-        @esm_explicit_tokens ||= []
-        @esm_explicit_tokens << node.children.first
+                @esm_explicit_tokens << node.children.first
 
         super
       end
 
       def on_lvasgn(node)
-        @esm_explicit_tokens ||= []
-        @esm_explicit_tokens << node.children.first
+                @esm_explicit_tokens << node.children.first
 
         super
       end
@@ -222,8 +218,7 @@ module Ruby2JS
             args[0].children[2].children[2].type == :str
             # import name from "file.js"
             #  => import name from "file.js"
-            @esm_explicit_tokens ||= []
-            @esm_explicit_tokens << args[0].children[1]
+                        @esm_explicit_tokens << args[0].children[1]
 
             s(:import,
               [args[0].children[2].children[2].children[0]],
@@ -241,8 +236,7 @@ module Ruby2JS
             # import Some, [ More, Stuff ], from: "file.js"
             #   => import Some, { More, Stuff } from "file.js"
             imports = []
-            @esm_explicit_tokens ||= []
-            if %i(const send str).include? args[0].type
+                        if %i(const send str).include? args[0].type
               @esm_explicit_tokens << args[0].children.last
               imports << process(args.shift)
             end
@@ -522,8 +516,7 @@ module Ruby2JS
 
       def find_autoimport(token)
         return nil unless @esm_autoimports  # truthy check handles both nil and undefined in JS
-        @esm_explicit_tokens ||= []
-        return nil if @esm_explicit_tokens.include?(token)
+                return nil if @esm_explicit_tokens.include?(token)
 
         token = camelCase(token) if respond_to?(:camelCase)
         found_key = nil  # declare for conditional assignment below

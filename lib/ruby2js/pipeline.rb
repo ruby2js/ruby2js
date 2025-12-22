@@ -92,6 +92,14 @@ module Ruby2JS
       end
       @filter_instance = filter_class.new(@comments)
 
+      # Call _filter_init if it exists (for selfhost filters where initialize → _filter_init)
+      # In Ruby, initialize is called by new, but in JS selfhost the filter chain uses
+      # prototype copying which doesn't invoke constructors. _filter_init provides
+      # the initialization logic with proper _parent chaining.
+      if defined?(globalThis) && @filter_instance.respond_to?(:_filter_init)
+        @filter_instance._filter_init(@comments)
+      end
+
       # Configure filter
       @filter_instance.options = filter_options
       @filter_instance.namespace = @namespace

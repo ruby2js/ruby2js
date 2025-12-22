@@ -35,13 +35,7 @@ module Ruby2JS
         def on_class(node)
           class_name, superclass, body = node.children
 
-          # Initialize state if needed (JS compatibility - constructor may not run in filter pipeline)
-          @rails_associations ||= []
-          @rails_validations ||= []
-          @rails_callbacks ||= {}
-          @rails_scopes ||= []
-          @rails_model_private_methods ||= {}
-          # Always create fresh Set for each class (avoids both Opal and selfhost issues)
+          # Always create fresh Set for each class
           @rails_model_refs = Set.new
 
           # Skip if already processing (prevent infinite recursion)

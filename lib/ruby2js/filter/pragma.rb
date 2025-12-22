@@ -54,8 +54,6 @@ module Ruby2JS
 
       def options=(options)
         super
-        @pragmas = {}
-        @pragma_scanned_count = 0
       end
 
       # Scan all comments for pragma patterns and build [source, line] => Set<pragma> map

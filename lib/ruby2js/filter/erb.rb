@@ -23,14 +23,6 @@ module Ruby2JS
 
       # Main entry point - detect ERB/HERB output patterns and transform
       def on_begin(node)
-        # Initialize state if needed (JS compatibility - constructor may not run in filter pipeline)
-        @erb_ivars ||= []
-        @erb_bufvar ||= nil
-        @erb_block_var ||= nil
-        @erb_model_name ||= nil
-        @erb_path_helpers ||= []
-        @erb_view_helpers ||= []
-
         # Check if this looks like ERB/HERB output:
         # - First statement assigns to _erbout or _buf
         # - Last statement returns the buffer

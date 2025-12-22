@@ -13,7 +13,8 @@
     "rails_model_spec.rb",
     "rails_seeds_spec.rb",
     "rails_schema_spec.rb",
-    "cjs_spec.rb"
+    "cjs_spec.rb",
+    "stimulus_spec.rb"
   ],
   "partial": [
     "rails_routes_spec.rb",
@@ -28,7 +29,6 @@
     "securerandom_spec.rb": "extend SEXP doesn't transpile",
     "node_spec.rb": "extend SEXP doesn't transpile",
     "react_spec.rb": "needs filters",
-    "stimulus_spec.rb": "needs filters",
     "jquery_spec.rb": "needs filters",
     "underscore_spec.rb": "needs filters",
     "active_functions_spec.rb": "needs filters",

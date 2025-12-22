@@ -53,8 +53,8 @@ module Ruby2JS
         @stim_outlets = Set.new
         stim_walk(node)
 
-        if modules_enabled?
-          prepend_list << (@options[:import_from_skypack] ?
+        if self.modules_enabled?()
+          self.prepend_list << (@options[:import_from_skypack] ?
             STIMULUS_IMPORT_SKYPACK : STIMULUS_IMPORT)
         end
 
@@ -63,64 +63,69 @@ module Ruby2JS
           nodes = nodes.first.children.dup
         end
 
-        unless @stim_classes.empty?
-          classes = nodes.find_index {|child| 
+        unless @stim_classes.size == 0
+          classes = nodes.find_index {|child|
             child.type == :send and child.children[0..1] == [s(:self), :classes=]
           }
 
-          if classes == nil
+          if classes.nil? || classes == -1
             nodes.unshift s(:send, s(:self), :classes=, s(:array, *@stim_classes))
           elsif nodes[classes].children[2].type == :array
-            @stim_classes.merge(nodes[classes].children[2].children)
+            nodes[classes].children[2].children.each {|item| @stim_classes << item} # Pragma: set
             nodes[classes] = nodes[classes].updated(nil,
               [*nodes[classes].children[0..1], s(:array, *@stim_classes)])
           end
         end
 
-        unless @stim_values.empty?
+        unless @stim_values.size == 0
           values = nodes.find_index {|child| 
             child.type == :send and child.children[0..1] == [s(:self), :values=]
           }
 
-          if values == nil
+          if values.nil? || values == -1
             nodes.unshift s(:send, s(:self), :values=, s(:hash,
-            *@stim_values.map {|name| s(:pair, name, s(:const, nil, :String))}))
+            *[*@stim_values].map {|name| s(:pair, name, s(:const, nil, :String))}))
           elsif nodes[values].children[2].type == :hash
-            stim_values = @stim_values.map {|name| 
-              [s(:sym, name.children.first.to_sym), s(:const, nil, :String)]
-            }.to_h.merge(
-              nodes[values].children[2].children.map {|pair| pair.children}.to_h
-            )
+            # Get existing pairs from the explicit values= declaration
+            existing_pairs = nodes[values].children[2].children
+            # Get keys from existing pairs for deduplication
+            existing_keys = existing_pairs.map { |pair| pair.children.first.children.first }
+            # Build pairs for inferred values, excluding those already declared
+            inferred_pairs = [*@stim_values].map { |name|
+              key = name.children.first
+              next if existing_keys.include?(key) || existing_keys.include?(key.to_sym)
+              s(:pair, s(:sym, key.to_sym), s(:const, nil, :String))
+            }.compact
 
             nodes[values] = nodes[values].updated(nil,
               [*nodes[values].children[0..1], s(:hash,
-              *stim_values.map{|name, value| s(:pair, name, value)})])
+              *inferred_pairs, *existing_pairs)])
           end
         end
 
-        unless @stim_targets.empty?
+        unless @stim_targets.size == 0
           targets = nodes.find_index {|child|
             child.type == :send and child.children[0..1] == [s(:self), :targets=]
           }
 
-          if targets == nil
+          if targets.nil? || targets == -1
             nodes.unshift s(:send, s(:self), :targets=, s(:array, *@stim_targets))
           elsif nodes[targets].children[2].type == :array
-            @stim_targets.merge(nodes[targets].children[2].children)
+            nodes[targets].children[2].children.each {|item| @stim_targets << item} # Pragma: set
             nodes[targets] = nodes[targets].updated(nil,
               [*nodes[targets].children[0..1], s(:array, *@stim_targets)])
           end
         end
 
-        unless @stim_outlets.empty?
+        unless @stim_outlets.size == 0
           outlets = nodes.find_index {|child|
             child.type == :send and child.children[0..1] == [s(:self), :outlets=]
           }
 
-          if outlets == nil
+          if outlets.nil? || outlets == -1
             nodes.unshift s(:send, s(:self), :outlets=, s(:array, *@stim_outlets))
           elsif nodes[outlets].children[2].type == :array
-            @stim_outlets.merge(nodes[outlets].children[2].children)
+            nodes[outlets].children[2].children.each {|item| @stim_outlets << item} # Pragma: set
             nodes[outlets] = nodes[outlets].updated(nil,
               [*nodes[outlets].children[0..1], s(:array, *@stim_outlets)])
           end
@@ -129,26 +134,26 @@ module Ruby2JS
         # Read-only properties use s(:self)
         readonly_props = [:element, :application]
 
-        readonly_props += @stim_targets.map do |name|
+        readonly_props.push(*[*@stim_targets].map { |name|
           name = name.children.first
           ["#{name}Target", "#{name}Targets", "has#{name[0].upcase}#{name[1..-1]}Target"]
-        end
+        })
 
-        readonly_props += @stim_classes.map do |name|
+        readonly_props.push(*[*@stim_classes].map { |name|
           name = name.children.first
           ["#{name}Class", "has#{name[0].upcase}#{name[1..-1]}Class"]
-        end
+        })
 
-        readonly_props += @stim_outlets.map do |name|
+        readonly_props.push(*[*@stim_outlets].map { |name|
           name = name.children.first
           ["#{name}Outlet", "#{name}Outlets", "has#{name[0].upcase}#{name[1..-1]}Outlet"]
-        end
+        })
 
         # Value properties are read-write, use s(:setter, s(:self)) to support assignment
-        value_props = @stim_values.map do |name|
+        value_props = [*@stim_values].map { |name|
           name = name.children.first
           ["#{name}Value", "has#{name[0].upcase}#{name[1..-1]}Value"]
-        end
+        }
 
         props = readonly_props.flatten.map {|prop| [prop.to_sym, s(:self)]}.to_h
         props.merge!(value_props.flatten.map {|prop| [prop.to_sym, s(:setter, s(:self))]}.to_h)

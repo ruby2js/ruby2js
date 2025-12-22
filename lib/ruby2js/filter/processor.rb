@@ -44,6 +44,14 @@ module Ruby2JS
         @prepend_list = []
       end
 
+      # Base _filter_init for JS selfhost filter chaining
+      # In selfhost, filter initialize → _filter_init, and super calls chain to parent
+      # This base implementation is a no-op (variables already set by initialize in Ruby,
+      # or will be set by subclass _filter_init in JS)
+      def _filter_init(*args)
+        # Base case - nothing to do
+      end
+
       # Check if object is an AST node (works with both Parser::AST::Node and Ruby2JS::Node)
       def ast_node?(obj)
         obj.respond_to?(:type) && obj.respond_to?(:children) && obj.respond_to?(:updated)

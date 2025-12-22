@@ -36,12 +36,6 @@ module Ruby2JS
           # Check for Rails.application.routes.draw
           return super unless routes_draw_block?(call)
 
-          # Initialize state if needed (JS compatibility - constructor may not run in filter pipeline)
-          @rails_resources ||= []
-          @rails_routes_list ||= []
-          @rails_path_helpers ||= []
-          @rails_route_nesting ||= []
-
           @rails_routes = true
           @rails_routes_list = []
           @rails_path_helpers = []
