@@ -109,6 +109,7 @@ async {
 
   require_relative './controllers/options_controller'
   require_relative './controllers/ruby_controller'
+  require_relative './controllers/selfhost_ruby_controller'
   require_relative './controllers/js_controller'
   require_relative './controllers/combo_controller'
   require_relative './controllers/eval_controller'
@@ -116,6 +117,7 @@ async {
   application = Stimulus::Application.start()
   application.register("options", OptionsController)
   application.register("ruby", RubyController)
+  application.register("selfhost-ruby", SelfhostRubyController)
   application.register("js", JSController)
   application.register("combo", ComboController)
   application.register("eval", EvalController)

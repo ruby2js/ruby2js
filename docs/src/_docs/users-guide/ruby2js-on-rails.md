@@ -111,7 +111,7 @@ Deploy the `dist/` directory anywhere that serves static files.
 
 Standard ActiveRecord patterns translate directly:
 
-<div data-controller="combo" data-options='{
+<div data-controller="combo" data-selfhost="true" data-options='{
   "eslevel": 2022,
   "filters": ["model", "esm", "functions"]
 }'></div>
@@ -139,7 +139,7 @@ end
 
 Controllers become JavaScript modules with async functions:
 
-<div data-controller="combo" data-options='{
+<div data-controller="combo" data-selfhost="true" data-options='{
   "eslevel": 2022,
   "filters": ["controller", "esm", "functions"]
 }'></div>
@@ -174,7 +174,7 @@ end
 
 Rails routing DSL works as expected:
 
-<div data-controller="combo" data-options='{
+<div data-controller="combo" data-selfhost="true" data-options='{
   "eslevel": 2022,
   "filters": ["routes", "esm", "functions"]
 }'></div>
@@ -328,7 +328,7 @@ This enables:
 
 Define validations once in the model:
 
-<div data-controller="combo" data-options='{
+<div data-controller="combo" data-selfhost="true" data-options='{
   "eslevel": 2022,
   "filters": ["model", "esm", "functions"]
 }'></div>

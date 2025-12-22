@@ -216,11 +216,24 @@ task :selfhost_copy_bundle => [selfhost_dir, :selfhost_build] do
   cp "#{selfhost_source}/ruby2js.js", "#{selfhost_dir}/ruby2js.js"
 end
 
-# Copy filters directory
+# Copy filters directory - all filters needed for combo boxes
 task :selfhost_copy_filters => [selfhost_dir, :selfhost_build] do
   filters_dir = "#{selfhost_dir}/filters"
+  rails_dir = "#{filters_dir}/rails"
   mkdir_p filters_dir unless File.exist?(filters_dir)
-  cp "#{selfhost_source}/filters/functions.js", "#{filters_dir}/functions.js"
+  mkdir_p rails_dir unless File.exist?(rails_dir)
+
+  # Core filters used by most combo boxes
+  %w[functions esm pragma return camelCase active_support polyfill].each do |filter|
+    src = "#{selfhost_source}/filters/#{filter}.js"
+    cp src, "#{filters_dir}/#{filter}.js" if File.exist?(src)
+  end
+
+  # Rails filters
+  %w[model controller routes schema seeds logger].each do |filter|
+    src = "#{selfhost_source}/filters/rails/#{filter}.js"
+    cp src, "#{rails_dir}/#{filter}.js" if File.exist?(src)
+  end
 end
 
 # Note: index.html is checked into docs/src/demo/selfhost/ directly

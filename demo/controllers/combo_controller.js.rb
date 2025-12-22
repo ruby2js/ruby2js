@@ -30,7 +30,9 @@ class ComboController < DemoController
     ruby_panel = document.createElement('sl-tab-panel')
     ruby_panel.setAttribute 'name', 'ruby'
     div = document.createElement('div')
-    div.setAttribute 'data-controller', 'ruby'
+    # Use selfhost controller if data-selfhost="true" is set
+    controller_name = element.dataset.selfhost == 'true' ? 'selfhost-ruby' : 'ruby'
+    div.setAttribute 'data-controller', controller_name
     div.setAttribute 'data-options', element.dataset.options
     ruby_panel.appendChild(div)
     tab_group.appendChild(ruby_panel)

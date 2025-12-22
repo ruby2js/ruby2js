@@ -25,6 +25,7 @@ class RubyController < DemoController
   async def setup()
     @ast = false
     @options ||= {}
+    @opal_ready = false
 
     # parse options provided (if any)
     if element.dataset.options
@@ -65,10 +66,29 @@ class RubyController < DemoController
     # focus on the editor without scrolling page
     @rubyEditor.focus(preventScroll: true)
 
-    # do an initial conversion as soon as Ruby2JS comes online
-    await ruby2js_ready
+    # load Opal bundle if not already loaded
+    await load_opal()
 
     convert()
+  end
+
+  # Load the Opal Ruby2JS bundle dynamically
+  async def load_opal()
+    return if defined? Ruby2JS
+
+    # Load the Opal bundle via script tag (it's not an ES module)
+    await Promise.new do |resolve, reject|
+      script = document.createElement('script')
+      script.src = "#{window.location.origin}/demo/ruby2js.js"
+      script.async = true
+      script.addEventListener(:load, resolve)
+      script.addEventListener(:error, reject)
+      document.head.appendChild(script)
+    end
+
+    # Wait for Ruby2JS to be ready
+    await ruby2js_ready
+    @opal_ready = true
   end
 
   # update editor contents from another source
@@ -87,7 +107,7 @@ class RubyController < DemoController
 
   # convert ruby to JS, sending results to target Controller
   def convert()
-    return unless targets.size > 0 and @rubyEditor and defined? Ruby2JS
+    return unless targets.size > 0 and @rubyEditor and @opal_ready
     parsed = document.getElementById('parsed')
     filtered = document.getElementById('filtered')
 

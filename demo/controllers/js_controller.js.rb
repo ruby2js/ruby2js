@@ -6,16 +6,23 @@ class JSController < DemoController
     # If data-source is specified, use that element
     source_selector = element.dataset.source
     if source_selector
-      @source = findController type: RubyController,
-        element: document.querySelector(source_selector)
+      source_element = document.querySelector(source_selector)
+      # Try RubyController first, then SelfhostRubyController
+      @source = findController(type: RubyController, element: source_element) ||
+                findController(type: SelfhostRubyController, element: source_element)
       return @source
     end
 
     # Otherwise, find the RubyController in the same parent (e.g., same combo tab group)
     parent = element.parentElement
     if parent
-      ruby_div = parent.parentElement&.querySelector('[data-controller="ruby"]')
-      @source = findController type: RubyController, element: ruby_div if ruby_div
+      # Try ruby controller first, then selfhost-ruby controller
+      ruby_div = parent.parentElement&.querySelector('[data-controller="ruby"]') ||
+                 parent.parentElement&.querySelector('[data-controller="selfhost-ruby"]')
+      if ruby_div
+        @source = findController(type: RubyController, element: ruby_div) ||
+                  findController(type: SelfhostRubyController, element: ruby_div)
+      end
     end
 
     @source
