@@ -80,6 +80,15 @@ describe Ruby2JS do
       to_js( "a, b = c" ).must_equal 'let [a, b] = c'
     end
 
+    it "should handle swap with mixed local and instance vars" do
+      to_js( "a, @b = @b, a" ).must_equal 'let a; [a, this._b] = [this._b, a]'
+      to_js( "x = 1; x, @y = @y, x" ).must_equal 'let x = 1; [x, this._y] = [this._y, x]'
+    end
+
+    it "should handle swap with setter methods" do
+      to_js( "a, self.b = self.b, nil" ).must_equal 'let a; [a, this.b] = [this.b, null]'
+    end
+
     it "should parse chained assignment statements" do
       to_js( "a = b = 1" ).must_equal 'let a, b; a = b = 1'
       to_js( "x.a = b = 1" ).must_equal 'let b; x.a = b = 1'

@@ -200,18 +200,24 @@ module Ruby2JS
           put '('; parse args; put ') => '
         end
 
-        if style == :expression
-          if expr.type == :taglit
-            parse expr
-          elsif expr.type == :hash
-            group(expr)
+        # Arrow functions are new function scopes - next should become return
+        next_token, @next_token = @next_token, :return
+        begin
+          if style == :expression
+            if expr.type == :taglit
+              parse expr
+            elsif expr.type == :hash
+              group(expr)
+            else
+              wrap('(', ')') { parse(expr) }
+            end
+          elsif body.type == :begin and body.children.length == 0
+            put "{}"
           else
-            wrap('(', ')') { parse(expr) }
+            put "{#{@nl}"; scope body, vars; put "#{@nl}}"
           end
-        elsif body.type == :begin and body.children.length == 0
-          put "{}"
-        else
-          put "{#{@nl}"; scope body, vars; put "#{@nl}}"
+        ensure
+          @next_token = next_token
         end
 
         return

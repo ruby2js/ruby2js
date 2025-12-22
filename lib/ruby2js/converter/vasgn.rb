@@ -92,6 +92,8 @@ module Ruby2JS
           subchild = child.children[1]
         end
 
+        break unless subchild
+
         if subchild.type == :send
           break unless subchild.children[1] =~ /=$/
         else

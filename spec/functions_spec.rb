@@ -1161,5 +1161,10 @@ describe Ruby2JS::Filter::Functions do
       to_js( 'fn = Proc.new { |x| x * 2 }' ).
         must_equal 'let fn = x => x * 2'
     end
+
+    it "should handle next as return inside lambda within for-of loop" do
+      to_js( 'items.each { |i| f = lambda { |x| x.any? { |y| next unless y } } }' ).
+        must_include 'x.some((y) => {if (!y) return})'
+    end
   end
 end

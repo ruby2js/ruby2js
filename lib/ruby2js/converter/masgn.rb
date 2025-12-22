@@ -127,18 +127,33 @@ module Ruby2JS
       elsif rhs.type == :array
 
         if lhs.children.length == rhs.children.length
-          block = []
-          # Mark new local vars as :masgn to tell vasgn handler not to treat as setters
-          # The marker will be cleared to true when actually processed
-          lhs.children.each do |var|
-            if var.type == :lvasgn && !@vars.key?(var.children[0])
-              @vars[var.children[0]] = :masgn
+          # For mixed local/instance vars, use destructuring with pre-declared locals
+          # This handles swaps correctly: react, @react = @react, react
+          # becomes: let react; [react, this._react] = [this._react, react]
+          newvars = lhs.children.select { |var| var.type == :lvasgn && !@vars.key?(var.children[0]) }
+
+          if newvars.length > 0
+            put "let #{newvars.map { |var| var.children.first }.join(', ')}#{@sep}"
+            newvars.each { |var| @vars[var.children.first] = true }
+          end
+
+          put '['
+          lhs.children.each_with_index do |child, index|
+            put ", " unless index == 0
+            # Handle setter methods: self.foo= becomes this.foo in destructuring
+            if child.type == :send && child.children[1].to_s.end_with?('=')
+              parse child.children[0]  # receiver (e.g., self)
+              put ".#{child.children[1].to_s.chomp('=')}"
+            else
+              parse child
             end
           end
-          lhs.children.zip rhs.children.zip do |var, val|
-            block << s(var.type, *var.children, *val)
+          put "] = ["
+          rhs.children.each_with_index do |child, index|
+            put ", " unless index == 0
+            parse child
           end
-          parse s(:begin, *block), @state
+          put ']'
         else
           raise Error.new("unmatched assignment", @ast)
         end
