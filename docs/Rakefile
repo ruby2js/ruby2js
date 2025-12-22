@@ -275,6 +275,8 @@ task :rails_demo_copy => [rails_demo_dest, :rails_demo_build] do
   sqljs_dest = "#{rails_demo_dest}/node_modules/sql.js"
   mkdir_p sqljs_dest
   cp_r "#{rails_demo_source}/node_modules/sql.js/dist", "#{sqljs_dest}/dist"
+  # Fix permissions on copied directory
+  chmod_R 0755, "#{sqljs_dest}/dist"
   puts "  node_modules/sql.js/"
 
   # Copy dexie (for import map)
@@ -308,11 +310,11 @@ end
 # Note: index.html is checked into docs/src/demo/ruby2js-on-rails/ directly
 
 task :rails_demo => [:rails_demo_copy, :rails_demo_tarball] do
-  # Ensure all files are world-readable
-  FileUtils.chmod_R(0644, Dir.glob("#{rails_demo_dest}/**/*.js"))
-  FileUtils.chmod_R(0644, Dir.glob("#{rails_demo_dest}/**/*.mjs"))
-  FileUtils.chmod_R(0644, Dir.glob("#{rails_demo_dest}/**/*.css"))
-  FileUtils.chmod_R(0644, Dir.glob("#{rails_demo_dest}/**/*.wasm"))
+  # Ensure all files are world-readable (excluding node_modules which has its own permissions)
+  Dir.glob("#{rails_demo_dest}/**/*.js").reject { |f| f.include?('/node_modules/') }.each { |f| FileUtils.chmod(0644, f) }
+  Dir.glob("#{rails_demo_dest}/**/*.mjs").reject { |f| f.include?('/node_modules/') }.each { |f| FileUtils.chmod(0644, f) }
+  Dir.glob("#{rails_demo_dest}/**/*.css").reject { |f| f.include?('/node_modules/') }.each { |f| FileUtils.chmod(0644, f) }
+  Dir.glob("#{rails_demo_dest}/**/*.wasm").reject { |f| f.include?('/node_modules/') }.each { |f| FileUtils.chmod(0644, f) }
   puts "Rails demo ready at /demo/ruby2js-on-rails/"
 end
 

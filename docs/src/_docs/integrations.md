@@ -54,8 +54,13 @@ Filters are available for [Lit](/docs/filters/lit),
 
 # Node.js
 
-A [Node](/docs/filters/node) filter is available, as well as a 
+A [Node](/docs/filters/node) filter is available, as well as a
 [register](https://www.npmjs.com/package/@ruby2js/register) module.  In most
 cases it will be the [CJS](/docs/filters/cjs) filter rather than the
 [ESM](/docs/filters/esm) filter that you will want to use.
 
+# Ruby2JS on Rails
+
+The [Rails filter](/docs/filters/rails) enables transpiling entire Rails applications to JavaScript. Models, controllers, routes, and ERB templates are converted to run in browsers or JavaScript server runtimes (Node.js, Bun, Deno).
+
+This approach is ideal for offline-first applications, static deployment, and edge computing. See the [Ruby2JS on Rails guide](/docs/users-guide/ruby2js-on-rails) for details.
