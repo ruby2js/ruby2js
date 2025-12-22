@@ -153,14 +153,14 @@ module Ruby2JS
           inheritance == s(:send, s(:const, nil, :React), :Component)
 
           react = :React
-          prepend_list << REACT_IMPORTS[:React] if modules_enabled?
+          self.prepend_list << REACT_IMPORTS[:React] if self.modules_enabled?
 
         elsif inheritance == s(:const, nil, :Preact) or
           inheritance == s(:const, s(:const, nil, :Preact), :Component) or
           inheritance == s(:send, s(:const, nil, :Preact), :Component)
 
           react = :Preact
-          prepend_list << REACT_IMPORTS[:Preact] if modules_enabled?
+          self.prepend_list << REACT_IMPORTS[:Preact] if self.modules_enabled?
         else
           return super
         end
@@ -268,7 +268,7 @@ module Ruby2JS
               useState = (@reactIvars[:asgn] + @reactIvars[:ref]).uniq
             end
 
-            if not @reactIvars.values.flatten.empty?
+            if not @reactIvars.values().flatten.empty?
               body = [s(:def, :initialize, s(:args)), *body]
             end
           end
@@ -416,7 +416,7 @@ module Ruby2JS
             hash.sort.reverse.each do |var, value|
               if @react == :Preact 
                 hooker = nil
-                prepend_list << REACT_IMPORTS[:PreactHook] if modules_enabled?
+                self.prepend_list << REACT_IMPORTS[:PreactHook] if self.modules_enabled?
               else
                 hooker = s(:const, nil, :React)
               end
@@ -480,8 +480,8 @@ module Ruby2JS
             node.children.first == s(:const, nil, :Preact) or
             node.children.first == s(:const, nil, :ReactDOM)
           then
-            if modules_enabled?
-              prepend_list << REACT_IMPORTS[node.children.first.children.last]
+            if self.modules_enabled?
+              self.prepend_list << REACT_IMPORTS[node.children.first.children.last]
             end
 
             begin

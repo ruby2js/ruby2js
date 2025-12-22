@@ -556,6 +556,11 @@ describe Ruby2JS::Filter::Functions do
         must_equal 'a.filter(item => item > 0)'
     end
 
+    it "should map .find_all to .filter" do
+      to_js( 'a.find_all {|item| item > 0}' ).
+        must_equal 'a.filter(item => item > 0)'
+    end
+
     it "should map .select! to .splice(0, .length, .filter)" do
       to_js( 'a.select! {|item| item > 0}' ).
         must_equal 'a.splice(...[0, a.length].concat(a.filter(item => item > 0)))'

@@ -36,6 +36,7 @@ If you set the `eslevel` option to `2021` or newer, the Functions filter enables
 * `.each_with_index` {{ caret }} `.forEach`
 * `.end_with?` {{ caret }} `.slice(-arg.length) == arg`
 * `.empty?` {{ caret }} `.length == 0`
+* `.find_all {}` {{ caret }} `.filter()` (alias for `.select`)
 * `.find_index` {{ caret }} `findIndex`
 * `.first` {{ caret }} `[0]`
 * `.first(n)` {{ caret }} `.slice(0, n)`
@@ -80,6 +81,7 @@ If you set the `eslevel` option to `2021` or newer, the Functions filter enables
 * `.round` {{ caret }} `Math.round()`
 * `.rstrip` {{ caret }} `.replace(/s+$/, "")`
 * `.scan` {{ caret }} `.match(//g)`
+* `.select {}` {{ caret }} `.filter()`
 * `.send` {{ caret }} dynamic method dispatch `obj.send(:foo, x)` becomes `obj.foo(x)` or `obj[method](x)`
 * `.sort_by {}` {{ caret }} `.toSorted()` (ES2023+) or `.slice().sort()` fallback
 * `.sum` {{ caret }} `.reduce((a, b) => a + b, 0)`

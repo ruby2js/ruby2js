@@ -1103,7 +1103,7 @@ module Ruby2JS
           node.updated nil, [processed_call, process(node.children[1]),
             *process_all(node.children[2..-1])]
 
-        elsif method == :select and call.children.length == 2
+        elsif [:select, :find_all].include?(method) and call.children.length == 2
           call = call.updated nil, [call.children.first, :filter]
           node.updated nil, [process(call), process(node.children[1]),
             s(:autoreturn, *process_all(node.children[2..-1]))]
