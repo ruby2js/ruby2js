@@ -40,8 +40,8 @@ module Ruby2JS
           # Initialize state if needed (JS compatibility - constructor may not run in filter pipeline)
           @rails_before_actions ||= []
           @rails_private_methods ||= {}
-          # Use explicit nil check instead of ||= to avoid Opal $ret_or_1 bug with Set.new
-          @rails_model_refs = Set.new if @rails_model_refs.nil?
+          # Always create fresh Set for each class (avoids both Opal and selfhost issues)
+          @rails_model_refs = Set.new
           @rails_needs_views ||= false
           # Model associations for preloading (model_name -> [association_names])
           # NOTE: This must be in on_class (not just initialize) for JS compatibility

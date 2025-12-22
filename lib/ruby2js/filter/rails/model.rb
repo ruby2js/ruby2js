@@ -41,8 +41,8 @@ module Ruby2JS
           @rails_callbacks ||= {}
           @rails_scopes ||= []
           @rails_model_private_methods ||= {}
-          # Use explicit nil check instead of ||= to avoid Opal $ret_or_1 bug with Set.new
-          @rails_model_refs = Set.new if @rails_model_refs.nil?
+          # Always create fresh Set for each class (avoids both Opal and selfhost issues)
+          @rails_model_refs = Set.new
 
           # Skip if already processing (prevent infinite recursion)
           return super if @rails_model_processing
