@@ -315,10 +315,19 @@ end
 task :rails_demo_tarball => [:selfhost_build] do
   # Generate build.mjs from build.rb into vendor/ruby2js/ (part of ruby2js-rails package)
   # Uses selfhost_build filter for Node.js API compatibility
+  build_mjs = "#{rails_demo_source}/vendor/ruby2js/build.mjs"
   sh "cat #{rails_demo_source}/scripts/build.rb | " \
      "bundle exec ruby2js --filter selfhost_build --filter esm --filter node " \
      "--filter functions --filter return --filter pragma --autoexports " \
-     "> #{rails_demo_source}/vendor/ruby2js/build.mjs"
+     "> #{build_mjs}"
+
+  # Convert relative paths to package imports for npm distribution
+  # Development uses relative paths (../../../selfhost/...), npm uses package imports (ruby2js/...)
+  content = File.read(build_mjs)
+  content = content.gsub('../../../selfhost/ruby2js.js', 'ruby2js')
+  content = content.gsub('../../../selfhost/filters/', 'ruby2js/filters/')
+  content = content.gsub('../../../selfhost/lib/', 'ruby2js/lib/')
+  File.write(build_mjs, content)
 
   # Run publish script to create the tarball
   Dir.chdir(selfhost_source) do
@@ -399,7 +408,8 @@ task :ruby2js_tarball => [:selfhost_build, releases_dir] do
 end
 
 # Build ruby2js-rails npm package tarball
-task :ruby2js_rails_tarball => [:ruby2js_tarball] do
+# Depends on rails_demo_tarball to ensure build.mjs has package imports (not relative paths)
+task :ruby2js_rails_tarball => [:ruby2js_tarball, :rails_demo_tarball] do
   rails_pkg_dir = "#{rails_demo_source}/vendor/ruby2js"
   Dir.chdir(rails_pkg_dir) do
     # Clean up old tarballs
