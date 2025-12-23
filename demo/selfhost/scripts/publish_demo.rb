@@ -88,11 +88,7 @@ package_json = {
   "dependencies" => {
     "ruby2js-rails" => "https://www.ruby2js.com/releases/ruby2js-rails-beta.tgz",
     "dexie" => "^4.0.10",
-    "sql.js" => "^1.11.0"
-  },
-  "optionalDependencies" => {
-    "better-sqlite3" => "^11.0.0",
-    "pg" => "^8.13.0"
+    "better-sqlite3" => "^11.0.0"
   },
   "engines" => {
     "node" => ">=22.0.0"

@@ -372,8 +372,8 @@ end
 
 # NPM package tarballs for beta distribution
 # These go to /releases/ on the website for URL-based npm install
-releases_dir = "#{dest}/releases"
-directory releases_dir => dest
+releases_dir = "#{docs}/src/releases"
+directory releases_dir
 
 # Build ruby2js npm package tarball
 task :ruby2js_tarball => [:selfhost_build, releases_dir] do
