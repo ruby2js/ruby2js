@@ -162,7 +162,7 @@ end
 desc "Run ruby2js-on-rails smoke tests (compares Ruby vs selfhost builds)"
 task :test_smoke => [:npm_install, :npm_install_demo, "#{SELFHOST}/ruby2js.js", :build_filters, BUILD_MJS] do
   Dir.chdir(DEMO) do
-    sh "npm run test:smoke"
+    sh "node scripts/smoke-test.mjs"
   end
 end
 
