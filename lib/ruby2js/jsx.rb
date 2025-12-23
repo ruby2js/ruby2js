@@ -1,5 +1,3 @@
-# TODO: This feature is deprecated.
-#
 # convert a JSX expression into wunderbar statements
 #
 # Once the syntax is converted to pure Ruby statements,

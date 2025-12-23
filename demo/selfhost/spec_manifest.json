@@ -28,12 +28,12 @@
     "comments_spec.rb",
     "react_spec.rb",
     "jest_spec.rb",
-    "node_spec.rb"
+    "node_spec.rb",
+    "jsx_spec.rb"
   ],
   "blocked": {
     "lit_spec.rb": "filter transpiles but has runtime errors",
     "active_functions_spec.rb": "filter not transpiled",
-    "jsx_spec.rb": "filter not transpiled",
     "nokogiri_spec.rb": "filter not transpiled",
     "preact_spec.rb": "uses react filter"
   }
