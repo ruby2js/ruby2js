@@ -43,7 +43,7 @@ module Ruby2JS
         @le_props = {}
         le_walk(node)
 
-        prepend_list << LITELEMENT_IMPORT if modules_enabled?
+        self.prepend_list << LITELEMENT_IMPORT if self.modules_enabled?()
 
         nodes = body.dup
         if nodes.length == 1 and nodes.first&.type == :begin

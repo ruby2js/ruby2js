@@ -16,29 +16,30 @@
     "cjs_spec.rb",
     "stimulus_spec.rb",
     "erb_spec.rb",
-    "rails_helpers_spec.rb"
+    "rails_helpers_spec.rb",
+    "rails_routes_spec.rb"
   ],
   "partial": [
-    "rails_routes_spec.rb",
     "camelcase_spec.rb",
     "tagged_templates_spec.rb",
     "polyfill_spec.rb",
     "pragma_spec.rb",
-    "comments_spec.rb"
+    "comments_spec.rb",
+    "react_spec.rb",
+    "jest_spec.rb"
   ],
   "blocked": {
     "securerandom_spec.rb": "extend SEXP doesn't transpile",
     "node_spec.rb": "extend SEXP doesn't transpile",
-    "react_spec.rb": "needs filters",
-    "jquery_spec.rb": "needs filters",
-    "underscore_spec.rb": "needs filters",
-    "active_functions_spec.rb": "needs filters",
-    "jsx_spec.rb": "needs filters",
-    "lit_spec.rb": "needs filters",
-    "matchAll_spec.rb": "needs filters",
-    "minitest_jasmine_spec.rb": "needs filters",
-    "nokogiri_spec.rb": "needs filters",
-    "preact_spec.rb": "needs filters",
-    "vue_spec.rb": "needs filters"
+    "lit_spec.rb": "filter transpiles but has runtime errors",
+    "jquery_spec.rb": "no filter",
+    "underscore_spec.rb": "no filter",
+    "active_functions_spec.rb": "filter not transpiled",
+    "jsx_spec.rb": "part of react filter",
+    "matchAll_spec.rb": "no filter",
+    "minitest_jasmine_spec.rb": "no filter",
+    "nokogiri_spec.rb": "no filter",
+    "preact_spec.rb": "uses react filter",
+    "vue_spec.rb": "no filter"
   }
 }
