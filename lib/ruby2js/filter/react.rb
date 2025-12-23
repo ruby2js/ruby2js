@@ -762,6 +762,17 @@ module Ruby2JS
               while arg.type == :send and arg.children.first != nil
                 arg = arg.children.first
               end
+
+              # Phlex-style element or plain text (when in jsx_content mode)
+              if @jsx_content
+                next true if arg.type == :send and arg.children[0] == nil and
+                  (Ruby2JS::JSX_ALL_ELEMENTS.include?(arg.children[1]) ||
+                   arg.children[1] == :plain ||
+                   arg.children[1] == :fragment ||
+                   arg.children[1] == :render ||
+                   arg.children[1] == :tag)
+              end
+
               arg.type == :send and arg.children[1] =~ /^_/
             end
 
@@ -827,6 +838,104 @@ module Ruby2JS
             s(:send, s(:gvar, :$_), :push, element)
           else
             # simple/normal case: simply return the element
+            element
+          end
+
+        # Phlex-style: plain(text) - text content
+        elsif @jsx_content and node.children[0] == nil and node.children[1] == :plain
+          if @reactApply
+            s(:send, s(:gvar, :$_), :push, process(node.children[2]))
+          else
+            process(node.children[2])
+          end
+
+        # Phlex-style: fragment - React.Fragment
+        elsif @jsx_content and node.children[0] == nil and node.children[1] == :fragment
+          if @react == :Preact
+            s(:const, nil, :"Preact.Fragment")
+          else
+            s(:const, nil, :"React.Fragment")
+          end
+
+        # Phlex-style: render Component.new(...) - React.createElement(Component, ...)
+        elsif @jsx_content and node.children[0] == nil and node.children[1] == :render and
+              node.children[2]&.type == :send and node.children[2].children[1] == :new
+          component_const = node.children[2].children[0]
+          component_args = node.children[2].children[2..-1]
+
+          hash = component_args.find { |arg| arg.type == :hash }
+          hash = hash ? process(hash) : s(:nil)
+
+          if @react == :Preact
+            element = s(:send, s(:const, nil, :Preact), :h, component_const, hash)
+          else
+            element = s(:send, s(:const, nil, :React), :createElement, component_const, hash)
+          end
+
+          if @reactApply
+            s(:send, s(:gvar, :$_), :push, element)
+          else
+            element
+          end
+
+        # Phlex-style: tag("custom-element", ...) - React.createElement("custom-element", ...)
+        elsif @jsx_content and node.children[0] == nil and node.children[1] == :tag
+          tag_name = node.children[2]
+          tag_args = node.children[3..-1] || []
+
+          hash = tag_args.find { |arg| arg.type == :hash }
+          hash = hash ? process(hash) : s(:nil)
+
+          if @react == :Preact
+            element = s(:send, s(:const, nil, :Preact), :h, tag_name, hash)
+          else
+            element = s(:send, s(:const, nil, :React), :createElement, tag_name, hash)
+          end
+
+          if @reactApply
+            s(:send, s(:gvar, :$_), :push, element)
+          else
+            element
+          end
+
+        # Phlex-style: HTML element (div, span, etc.) - React.createElement("element", ...)
+        elsif @jsx_content and node.children[0] == nil and
+              Ruby2JS::JSX_ALL_ELEMENTS.include?(node.children[1])
+          tag = node.children[1].to_s
+          args = node.children[2..-1] || []
+
+          hash = args.find { |arg| arg.type == :hash }
+          if hash
+            # process hash and convert class to className
+            pairs = hash.children.map do |pair|
+              key, value = pair.children
+              if key.type == :sym && [:class, 'class'].include?(key.children[0])
+                if @react == :Preact
+                  s(:pair, s(:sym, :class), value)
+                else
+                  s(:pair, s(:sym, :className), value)
+                end
+              else
+                pair
+              end
+            end
+            hash = process(s(:hash, *pairs))
+          else
+            hash = nil
+          end
+
+          params = [s(:str, tag)]
+          params << hash if hash
+
+          if @react == :Preact
+            element = s(:send, s(:const, nil, :Preact), :h, *params)
+          else
+            element = s(:send, s(:const, nil, :React), :createElement, *params)
+          end
+
+          if @reactApply
+            s(:send, s(:gvar, :$_), :push, element)
+          else
             element
           end
 
@@ -1090,6 +1199,112 @@ module Ruby2JS
               return process s(:block, s(:send, *send[0..1], *send[3..-1]),
                 s(:args), s(:block, s(:send, send[2], :forEach),
                 *node.children[1..-1]))
+            end
+          end
+
+        # Phlex-style block: fragment do ... end
+        elsif @jsx_content and child.children[0] == nil and child.children[1] == :fragment
+          if node.children[1].children.empty?
+            block = s(:block, s(:send, nil, :proc), s(:args),
+              *node.children[2..-1])
+            # Convert to wunderbar-style for existing processing
+            return on_send node.children.first.updated(:send,
+              [nil, :"_#{@react}.Fragment", block])
+          end
+
+        # Phlex-style block: element do ... end
+        elsif @jsx_content and child.children[0] == nil and
+              Ruby2JS::JSX_ALL_ELEMENTS.include?(child.children[1])
+          if node.children[1].children.empty?
+            tag = child.children[1].to_s
+            args = child.children[2..-1] || []
+
+            hash = args.find { |arg| arg.type == :hash }
+            if hash
+              pairs = hash.children.map do |pair|
+                key, value = pair.children
+                if key.type == :sym && [:class, 'class'].include?(key.children[0])
+                  if @react == :Preact
+                    s(:pair, s(:sym, :class), value)
+                  else
+                    s(:pair, s(:sym, :className), value)
+                  end
+                else
+                  pair
+                end
+              end
+              hash = process(s(:hash, *pairs))
+            else
+              hash = s(:nil)
+            end
+
+            # Process children in the block
+            block_children = node.children[2..-1]
+            children_ast = block_children.map { |c| process(c) }
+
+            if @react == :Preact
+              element = s(:send, s(:const, nil, :Preact), :h, s(:str, tag), hash, *children_ast)
+            else
+              element = s(:send, s(:const, nil, :React), :createElement, s(:str, tag), hash, *children_ast)
+            end
+
+            if @reactApply
+              return s(:send, s(:gvar, :$_), :push, element)
+            else
+              return element
+            end
+          end
+
+        # Phlex-style block: render Component.new do ... end
+        elsif @jsx_content and child.children[0] == nil and child.children[1] == :render and
+              child.children[2]&.type == :send and child.children[2].children[1] == :new
+          if node.children[1].children.empty?
+            component_const = child.children[2].children[0]
+            component_args = child.children[2].children[2..-1]
+
+            hash = component_args.find { |arg| arg.type == :hash }
+            hash = hash ? process(hash) : s(:nil)
+
+            # Process children in the block
+            block_children = node.children[2..-1]
+            children_ast = block_children.map { |c| process(c) }
+
+            if @react == :Preact
+              element = s(:send, s(:const, nil, :Preact), :h, component_const, hash, *children_ast)
+            else
+              element = s(:send, s(:const, nil, :React), :createElement, component_const, hash, *children_ast)
+            end
+
+            if @reactApply
+              return s(:send, s(:gvar, :$_), :push, element)
+            else
+              return element
+            end
+          end
+
+        # Phlex-style block: tag("custom-element") do ... end
+        elsif @jsx_content and child.children[0] == nil and child.children[1] == :tag
+          if node.children[1].children.empty?
+            tag_name = child.children[2]
+            tag_args = child.children[3..-1] || []
+
+            hash = tag_args.find { |arg| arg.type == :hash }
+            hash = hash ? process(hash) : s(:nil)
+
+            # Process children in the block
+            block_children = node.children[2..-1]
+            children_ast = block_children.map { |c| process(c) }
+
+            if @react == :Preact
+              element = s(:send, s(:const, nil, :Preact), :h, tag_name, hash, *children_ast)
+            else
+              element = s(:send, s(:const, nil, :React), :createElement, tag_name, hash, *children_ast)
+            end
+
+            if @reactApply
+              return s(:send, s(:gvar, :$_), :push, element)
+            else
+              return element
             end
           end
         end
@@ -1440,9 +1655,11 @@ module Ruby2JS
 
        begin
          react, @react = @react, @react || :react
+         jsx_content, @jsx_content = @jsx_content, true
          process ast
        ensure
          @react = react
+         @jsx_content = jsx_content
        end
       end
     end

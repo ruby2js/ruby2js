@@ -6,8 +6,8 @@ require 'ruby2js/filter/react'
 
 # this spec handles two very different, JSX related transformations:
 #
-# * ruby/JSX to ruby/wunderbar, which is used by both filter/react and
-#   filter/vue to produce an intermediate "pure ruby" version of
+# * ruby/JSX to ruby/phlex, which is used by both filter/react and
+#   filter/phlex to produce an intermediate "pure ruby" version of
 #   ruby intermixed with (X)HTML element syntax, which is subsequently
 #   converted to JS.
 #
@@ -16,82 +16,112 @@ require 'ruby2js/filter/react'
 
 
 describe Ruby2JS::Filter::JSX do
-  
+
   def to_js(string)
-    _(Ruby2JS.convert(string, eslevel: 2015, 
+    _(Ruby2JS.convert(string, eslevel: 2015,
       filters: [Ruby2JS::Filter::JSX, Ruby2JS::Filter::Functions]).to_s)
   end
 
   def to_rb(string)
     _(Ruby2JS.jsx2_rb(string))
   end
-  
-  describe "ruby/JSX to ruby/wunderbar" do
+
+  describe "ruby/JSX to ruby/phlex" do
     describe "tags" do
       it "should handle self enclosed elements" do
-        to_rb( '<br/>' ).must_equal '_br'
+        to_rb( '<br/>' ).must_equal 'br'
       end
 
       it "should handle attributes and text" do
         to_rb( '<a href=".">text</a>' ).must_equal(
-          ['_a(href: ".") do', '_("text")', 'end'].join("\n"))
+          ['a(href: ".") do', 'plain "text"', 'end'].join("\n"))
       end
 
       it "should handle attributes expressions" do
-        to_rb( '<img src={link}/>' ).must_equal('_img(src: link)')
+        to_rb( '<img src={link}/>' ).must_equal('img(src: link)')
       end
 
-      it "should handle nested valuess" do
+      it "should handle nested elements" do
         to_rb( '<div><br/></div>' ).must_equal(
-          ['_div do', '_br', 'end'].join("\n"))
+          ['div do', 'br', 'end'].join("\n"))
       end
 
       it "should handle fragments" do
         to_rb( '<><h1/><h2/></>' ).must_equal(
-          ['_ do', '_h1', '_h2', 'end'].join("\n"))
+          ['fragment do', 'h1', 'h2', 'end'].join("\n"))
       end
     end
 
     describe "text and strings" do
       it "should handle backslashes in attribute values" do
         # backslashes are not escape characters in HTML context
-        to_rb( '<a b="\\"/>' ).must_equal('_a(b: "\\\\")')
-        to_rb( "<a b='\\'/>" ).must_equal("_a(b: '\\\\')")
+        to_rb( '<a b="\\"/>' ).must_equal('a(b: "\\\\")')
+        to_rb( "<a b='\\'/>" ).must_equal("a(b: '\\\\')")
       end
 
       it "should handle backslashes in text" do
-        to_rb( 'a\\b' ).must_equal('_("a\\\\b")')
+        to_rb( 'a\\b' ).must_equal('plain "a\\\\b"')
       end
 
       it "should handle mixed text" do
         to_rb( 'before <p> line 1 <br/> line 2 </p> after' ).must_equal(
-          ['_("before")', '_p do', '_("line 1")', '_br',
-          '_("line 2")', 'end', '_("after")'].join("\n"))
+          ['plain "before"', 'p do', 'plain "line 1"', 'br',
+          'plain "line 2"', 'end', 'plain "after"'].join("\n"))
       end
     end
 
     describe "values" do
       it "should handle expressions in text" do
         to_rb( 'hello {name}!' ).must_equal(
-          ['_("hello ")', '_(name)', '_("!")'].join("\n"))
+          ['plain "hello "', 'plain(name)', 'plain "!"'].join("\n"))
       end
-      
+
       it "should handle strings in attribute values" do
         # backslashes are not escape characters in HTML context
-        to_rb( '<a b={"{\\"}"}/>' ).must_equal('_a(b: "{\"}")')
-        to_rb( "<a b={'{\\'}'}/>" ).must_equal("_a(b: '{\\'}')")
+        to_rb( '<a b={"{\\"}"}/>' ).must_equal('a(b: "{\"}")')
+        to_rb( "<a b={'{\\'}'}/>" ).must_equal("a(b: '{\\'}')")
       end
-      
+
       it "should handle interpolated strings" do
-        to_rb( '<a b={"d#{"e"}f"}/>' ).must_equal('_a(b: "d#{"e"}f")')
+        to_rb( '<a b={"d#{"e"}f"}/>' ).must_equal('a(b: "d#{"e"}f")')
       end
-      
+
       it "should handle elements in expressions" do
-        to_rb( '{a && <a/>}' ).must_equal('a && _a')
-        to_rb( '{a && <a href="."/>}' ).must_equal('a && _a(href: ".")')
-        to_rb( '{a>b ? <a/> : <b/>}' ).must_equal('a>b ? _a : _b')
+        to_rb( '{a && <a/>}' ).must_equal('a && a')
+        to_rb( '{a && <a href="."/>}' ).must_equal('a && a(href: ".")')
+        to_rb( '{a>b ? <a/> : <b/>}' ).must_equal('a>b ? a : b')
         to_rb( '{list.map {|item| <li>{item}</li>}}' ).
-          must_equal('list.map {|item| _li do;_(item);end}')
+          must_equal('list.map {|item| li do;plain(item);end}')
+      end
+    end
+
+    describe "components" do
+      it "should handle uppercase components" do
+        to_rb( '<Card/>' ).must_equal('render Card.new')
+      end
+
+      it "should handle components with props" do
+        to_rb( '<Button onClick={handler}/>' ).must_equal('render Button.new(onClick: handler)')
+      end
+
+      it "should handle components with children" do
+        to_rb( '<Card><p>content</p></Card>' ).must_equal(
+          ['render Card.new do', 'p do', 'plain "content"', 'end', 'end'].join("\n"))
+      end
+    end
+
+    describe "custom elements" do
+      it "should handle hyphenated element names" do
+        to_rb( '<my-widget/>' ).must_equal('tag("my-widget")')
+      end
+
+      it "should handle custom elements with attributes" do
+        to_rb( '<my-element data-id="123"/>' ).must_equal('tag("my-element", data_id: "123")')
+      end
+
+      it "should handle custom elements with children" do
+        to_rb( '<my-card><span>hi</span></my-card>' ).must_equal(
+          ['tag("my-card") do', 'span do', 'plain "hi"', 'end', 'end'].join("\n"))
       end
     end
 

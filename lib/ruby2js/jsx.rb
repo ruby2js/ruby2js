@@ -1,10 +1,29 @@
-# convert a JSX expression into wunderbar statements
+# convert a JSX expression into Phlex-style Ruby statements
 #
 # Once the syntax is converted to pure Ruby statements,
-# it can then be converted into either React or Vue
-# rendering instructions.
+# it can then be converted into either React or Phlex
+# rendering instructions via the respective filters.
 
 module Ruby2JS
+  # HTML5 void elements (self-closing)
+  JSX_VOID_ELEMENTS = %i[
+    area base br col embed hr img input link meta param source track wbr
+  ].freeze
+
+  # Standard HTML5 elements
+  JSX_HTML_ELEMENTS = %i[
+    a abbr address article aside audio b bdi bdo blockquote body button
+    canvas caption cite code colgroup data datalist dd del details dfn
+    dialog div dl dt em fieldset figcaption figure footer form h1 h2 h3
+    h4 h5 h6 head header hgroup html i iframe ins kbd label legend li
+    main map mark menu meter nav noscript object ol optgroup option
+    output p picture pre progress q rp rt ruby s samp script section
+    select slot small span strong style sub summary sup table tbody td
+    template textarea tfoot th thead time title tr u ul var video
+  ].freeze
+
+  JSX_ALL_ELEMENTS = (JSX_VOID_ELEMENTS + JSX_HTML_ELEMENTS).freeze
+
   def self.jsx2_rb(string)
     JsxParser.new(string.chars.each).parse.join("\n")
   end
@@ -16,6 +35,7 @@ module Ruby2JS
       @text = ''
       @result = []
       @element = ''
+      @element_original = ''  # Keep original name with hyphens
       @attrs = {}
       @attr_name = ''
       @value = ''
@@ -42,7 +62,7 @@ module Ruby2JS
         case @state
         when :text
           if c == '<'
-            @result << "_(\"#{@text.strip}\")" unless @text.strip.empty?
+            @result << "plain \"#{@text.strip}\"" unless @text.strip.empty?
             if @tag_stack.empty?
               @result += self.class.new(@stream).parse(:element)
               @state = :text
@@ -50,12 +70,13 @@ module Ruby2JS
             else
               @state = :element
               @element = ''
+              @element_original = ''
               @attrs = {}
             end
           elsif c == '\\'
             @text += c + c
           elsif c == '{'
-            @result << "_(\"#{@text}\")" unless @text.empty?
+            @result << "plain \"#{@text}\"" unless @text.empty?
             @result += parse_expr
             @text = ''
           else
@@ -67,12 +88,13 @@ module Ruby2JS
             if @element == ''
               @state = :close
               @element = ''
+              @element_original = ''
             else
               @state = :void
             end
           elsif c == '>'
-            @result << "_#{@element} do"
-            @tag_stack << @element
+            @result << "#{element_call(@element, @element_original)} do"
+            @tag_stack << [@element, @element_original]
             @state = :text
             @text = ''
           elsif c == ' '
@@ -81,26 +103,36 @@ module Ruby2JS
             @attrs = {}
           elsif c == '-'
             @element += '_'
+            @element_original += '-'
           elsif c =~ /^\w$/
             @element += c
+            @element_original += c
           else
             raise SyntaxError.new("invalid character in element name: #{c.inspect}")
           end
 
         when :close
           if c == '>'
-            if @element == @tag_stack.last
+            tag_info = @tag_stack.last
+            if tag_info && @element == tag_info[0]
               @tag_stack.pop
-            elsif @tag_stack.last
-              raise SyntaxError.new("missing close tag for: #{@tag_stack.last.inspect}")
+            elsif tag_info
+              raise SyntaxError.new("missing close tag for: #{tag_info[0].inspect}")
             else
               raise SyntaxError.new("close tag for element that is not open: #{@element}")
             end
 
             @result << 'end'
             return @result if @tag_stack.empty?
+
+            @state = :text
+            @text = ''
           elsif c =~ /^\w$/
             @element += c
+            @element_original += c
+          elsif c == '-' && !@element.empty?
+            @element += '_'
+            @element_original += '-'
           elsif c != ' '
             raise SyntaxError.new("invalid character in element: #{c.inspect}")
           end
@@ -108,9 +140,9 @@ module Ruby2JS
         when :void
           if c == '>'
             if @attrs.empty?
-              @result << "_#{@element}"
+              @result << element_call(@element, @element_original)
             else
-              @result << "_#{@element}(#{@attrs.map {|name, value| "#{name}: #{value}"}.join(' ')})"
+              @result << element_call(@element, @element_original, @attrs)
             end
             return @result if @tag_stack.empty?
 
@@ -123,6 +155,8 @@ module Ruby2JS
         when :attr_name
           if c =~ /^\w$/
             @attr_name += c
+          elsif c == '-'
+            @attr_name += '_'
           elsif c == '='
             @state = :attr_value
             @value = ''
@@ -133,8 +167,8 @@ module Ruby2JS
               raise SyntaxError.new("missing \"=\" after attribute #{@attr_name.inspect} " +
                 "in element #{@element.inspect}")
             elsif c == '>'
-              @result << "_#{@element}(#{@attrs.map {|name, value| "#{name}: #{value}"}.join(' ')}) do"
-              @tag_stack << @element
+              @result << "#{element_call(@element, @element_original, @attrs)} do"
+              @tag_stack << [@element, @element_original]
               @state = :text
               @text = ''
             end
@@ -184,7 +218,7 @@ module Ruby2JS
               @value += c
               @expr_nesting -= 1
             else
-              @result << (@wrap_value ? "_(#{@value})" : @value)
+              @result << (@wrap_value ? "plain(#{@value})" : @value)
               return @result
             end
           elsif c == '<'
@@ -247,17 +281,17 @@ module Ruby2JS
       end
 
       unless @tag_stack.empty?
-        raise SyntaxError.new("missing close tag for: #{@tag_stack.last.inspect}")
+        raise SyntaxError.new("missing close tag for: #{@tag_stack.last[0].inspect}")
       end
 
       case @state
       when :text
-        @result << "_(\"#{@text.strip}\")" unless @text.strip.empty?
+        @result << "plain \"#{@text.strip}\"" unless @text.strip.empty?
 
       when :element, :attr_name, :attr_value
         raise SyntaxError.new("unclosed element #{@element.inspect}")
 
-      when :dquote, :squote, :expr_dquote, :expr_dquote_backslash, 
+      when :dquote, :squote, :expr_dquote, :expr_dquote_backslash,
         :expr_squote, :expr_squote_backslash
         raise SyntaxError.new("unclosed quote")
 
@@ -286,6 +320,59 @@ module Ruby2JS
 
     def parse_element
       self.class.new(@stream).parse(:element)
+    end
+
+    # Generate the appropriate Phlex-style call for an element
+    def element_call(element, original, attrs = nil)
+      # Fragment (empty element name from <>)
+      if element == ''
+        return attrs ? "fragment(#{format_attrs(attrs)})" : "fragment"
+      end
+
+      # Check if it's a component (uppercase first letter)
+      if element[0] =~ /[A-Z]/
+        return component_call(element, attrs)
+      end
+
+      # Check if it's a custom element (has hyphen in original name)
+      if original.include?('-')
+        return custom_element_call(original, attrs)
+      end
+
+      # Standard HTML element
+      html_element_call(element, attrs)
+    end
+
+    # Generate call for a React/Phlex component
+    def component_call(name, attrs = nil)
+      if attrs && !attrs.empty?
+        "render #{name}.new(#{format_attrs(attrs)})"
+      else
+        "render #{name}.new"
+      end
+    end
+
+    # Generate call for a custom element (web component)
+    def custom_element_call(name, attrs = nil)
+      if attrs && !attrs.empty?
+        "tag(\"#{name}\", #{format_attrs(attrs)})"
+      else
+        "tag(\"#{name}\")"
+      end
+    end
+
+    # Generate call for a standard HTML element
+    def html_element_call(element, attrs = nil)
+      if attrs && !attrs.empty?
+        "#{element}(#{format_attrs(attrs)})"
+      else
+        element
+      end
+    end
+
+    # Format attributes hash as Ruby keyword arguments
+    def format_attrs(attrs)
+      attrs.map { |name, value| "#{name}: #{value}" }.join(', ')
     end
   end
 
