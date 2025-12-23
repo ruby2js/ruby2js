@@ -115,23 +115,6 @@ describe 'Ruby2JS::Filter::Hooks' do
     end
   end
 
-  describe "controlled components" do
-    it "should should automatically create onInput value functions" do
-      to_js( 'class Foo<React; def render; _input value: @x; end; end' ).
-        must_include 'onChange(event) {setX(event.target.value)}'
-    end
-
-    it "should should automatically create onInput checked functions" do
-      to_js( 'class Foo<React; def render; _input checked: @x; end; end' ).
-        must_include 'onChange() {setX(!x)}'
-    end
-
-    it "should should retain onInput functions" do
-      to_js( 'class Foo<React; def render; _input checked: @x, onInput: change; end; end' ).
-        must_include 'onInput: change'
-    end
-  end
-
   describe "props" do
     it "should add props arg to function if needed" do
       to_js( 'class Foo<React; def initialize; @x=@@y; end; end' ).

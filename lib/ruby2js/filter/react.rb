@@ -496,17 +496,7 @@ module Ruby2JS
 
         return super unless @react
 
-        if node.children[0] == nil and node.children[1] == :_
-          # text nodes
-          if @reactApply
-            # if apply is set, emit code that pushes text
-            s(:send, s(:gvar, :$_), :push, process(node.children[2]))
-          else
-            # simple/normal case: simply return the text
-            process(node.children[2])
-          end
-
-        elsif \
+        if \
           (@reactApply and node.children[1] == :createElement and
           node.children[0] == s(:const, nil, :React)) or
           (@reactApply and node.children[1] == :h and
@@ -525,320 +515,6 @@ module Ruby2JS
               *process_all(node.children[2..-1])))
           else
             node.updated(nil, [s(:const, nil, :Preact), :h, *process_all(node.children[2..-1])])
-          end
-
-        elsif !@jsx and node.children[0] == nil and node.children[1] =~ /^_\w/
-          # map method calls starting with an underscore to React calls
-          # to create an element.
-          #
-          # input:
-          #   _a 'name', href: 'link'
-          # output:
-          #  React.createElement("a", {href: "link"}, "name")
-          #
-          tag = node.children[1].to_s[1..-1]
-          pairs = []
-          text = block = nil
-          node.children[2..-1].each do |child|
-            if child.type == :hash
-              # convert _ to - in attribute names
-              pairs.push(*child.children.map do |pair|
-                key, value = pair.children
-                if key.type == :sym
-                  s(:pair, s(:str, key.children[0].to_s.gsub('_', '-')), value)
-                else
-                  pair
-                end
-              end)
-
-            elsif child.type == :block
-              # :block arguments are inserted by on_block logic below
-              block = child
-
-            elsif child.type == :splat
-              # arrays need not be expanded
-              text = child.children.first
-
-            else
-              # everything else added as text
-              text = child
-            end
-          end
-
-          # extract all class names
-          classes = pairs.find_all do |pair|
-            key = pair.children.first.children.first
-            [:class, 'class', :className, 'className'].include? key
-          end
-
-          # combine all classes into a single value (or expression)
-          if classes.length > 0
-            expr = nil
-            values = classes.map do |pair|
-              if [:sym, :str].include? pair.children.last.type
-                pair.children.last.children.first.to_s
-              else
-                expr = pair.children.last
-                ''
-              end
-            end
-            pairs -= classes
-            if expr
-              if values.length > 1
-                while expr.type == :begin and expr.children.length == 1
-                  expr = expr.children.first
-                end
-
-                if \
-                  expr.type == :if and expr.children[1] and
-                  expr.children[1].type == :str
-                then
-                  left = expr.children[1]
-                  right = expr.children[2] || s(:str, '')
-                  right = s(:or, right, s(:str, '')) unless right.type == :str
-                  expr = expr.updated(nil, [expr.children[0], left, right])
-                elsif expr.type != :str
-                  expr = s(:or, expr, s(:str, ''))
-                end
-
-                value = s(:send, s(:str, values.join(' ')), :+, expr)
-              else
-                value = expr
-              end
-            else
-              value = s(:str, values.join(' '))
-            end
-
-            if @react == :Preact
-              pairs.unshift s(:pair, s(:sym, :class), value)
-            else
-              pairs.unshift s(:pair, s(:sym, :className), value)
-            end
-          end
-
-          # support controlled form components
-          if %w(input select textarea).include? tag
-            # search for the presence of a 'value' attribute
-            value = pairs.find_index do |pair|
-              ['value', :value].include? pair.children.first.children.first
-            end || -1
-
-            event = (@react == :Preact ? :onInput : :onChange)
-
-
-            # search for the presence of a onInput/onChange attribute
-            onChange = pairs.find_index do |pair|
-              pair.children.first.children[0].to_s == event.to_s
-            end || -1
-
-            if event == :onInput and onChange == -1
-              # search for the presence of a 'onChange' attribute
-              onChange = pairs.find_index do |pair|
-                pair.children.first.children[0].to_s == 'onChange'
-              end || -1
-
-              if onChange != -1
-                pairs[onChange] = s(:pair, s(:sym, event),
-                  pairs[onChange].children.last)
-              end
-            end
-
-            if value != -1 and pairs[value].children.last.type == :ivar and onChange == -1
-              pairs << s(:pair, s(:sym, event),
-                s(:block, s(:send, nil, :proc), s(:args, s(:arg, :event)),
-                s(:ivasgn, pairs[value].children.last.children.first,
-                s(:attr, s(:attr, s(:lvar, :event), :target), :value))))
-            end
-
-            if value == -1 and onChange == -1 and tag == 'input'
-              # search for the presence of a 'checked' attribute
-              checked = pairs.find_index do |pair|
-                ['checked', :checked].include? pair.children.first.children[0]
-              end || -1
-
-              if checked != -1 and pairs[checked].children.last.type == :ivar
-                pairs << s(:pair, s(:sym, event),
-                  s(:block, s(:send, nil, :proc), s(:args),
-                  s(:ivasgn, pairs[checked].children.last.children.first,
-                  s(:send, pairs[checked].children.last, :!))))
-              end
-            end
-          end
-
-          if @react == :Preact
-            # replace selected Reactisms with native HTML
-            pairs.each_with_index do |pair, index|
-              next if pair.type == :kwsplat
-              name = pair.children.first.children.first.to_sym
-              if PreactAttrMap[name]
-                pairs[index] = pairs[index].updated(nil, 
-                  [s(:str, PreactAttrMap[name]), pairs[index].children.last])
-              end
-            end
-          else
-            # replace attribute names with case-sensitive javascript properties
-            pairs.each_with_index do |pair, index|
-              next if pair.type == :kwsplat
-              name = pair.children.first.children.first.downcase
-              if ReactAttrMap[name] and name.to_s != ReactAttrMap[name]
-                pairs[index] = pairs[index].updated(nil, 
-                  [s(:str, ReactAttrMap[name]), pairs[index].children.last])
-              end
-            end
-          end
-
-          # search for the presence of a 'style' attribute
-          style = pairs.find_index do |pair|
-            ['style', :style].include? pair.children.first.children.first
-          end || -1
-
-          # converts style strings into style hashes
-          if style != -1 and pairs[style].children[1].type == :str
-            hash = []
-            pairs[style].children[1].children[0].split(/;\s+/).each do |prop|
-              prop.strip!
-              next unless prop =~ /^([-a-z]+):\s*(.*)$/
-              name, value = $1, $2
-              name.gsub!(/-[a-z]/) {|str| str[1].upcase}
-              if value =~ /^-?\d+$/
-                hash << s(:pair, s(:str, name), s(:int, value.to_i))
-              elsif value =~ /^-?\d+$\.\d*/
-                hash << s(:pair, s(:str, name), s(:float, value.to_f))
-              else
-                hash << s(:pair, s(:str, name), s(:str, value))
-              end
-            end
-            pairs[style] = s(:pair, pairs[style].children[0], s(:hash, *hash))
-          end
-
-          # construct hash (or nil) from pairs
-          if pairs.length == 1 and pairs.first.type == :kwsplat
-            hash = pairs.first.children.first
-          else
-            hash = (pairs.length > 0 ? process(s(:hash, *pairs)) : s(:nil))
-          end
-
-          # based on case of tag name, build a HTML tag or React component
-          if tag =~ /^[A-Z]/
-            params = [s(:const, nil, tag), hash]
-          else
-            params = [s(:str, tag), hash]
-          end
-
-          # handle nested elements
-          if block
-            # enable hashes to be passed as a variable on block calls
-            params[-1] = text if text and params.last == s(:nil)
-
-            # traverse down to actual list of nested statements
-            args = block.children[2..-1]
-            if args.length == 1
-              if not args.first
-                args = []
-              elsif args.first.type == :begin
-                args = args.first.children
-              end
-            end
-
-            # check for normal case: only elements and text
-            simple = args.all? do |arg|
-              # explicit call to React.createElement
-              next true if arg.children[1] == :createElement and
-                arg.children[0] == s(:const, nil, :React)
-
-              # explicit call to Preact.h
-              next true if arg.children[1] == :h and
-                arg.children[0] == s(:const, nil, :Preact)
-
-              # explicit call to h
-              next true if arg.children[1] == :h and
-                arg.children[0] == nil
-
-              # JSX
-              next true if arg.type == :xstr
-
-              # wunderbar style call
-              arg = arg.children.first if arg.type == :block
-              while arg.type == :send and arg.children.first != nil
-                arg = arg.children.first
-              end
-
-              # Phlex-style element or plain text (when in jsx_content mode)
-              if @jsx_content
-                next true if arg.type == :send and arg.children[0] == nil and
-                  (Ruby2JS::JSX_ALL_ELEMENTS.include?(arg.children[1]) ||
-                   arg.children[1] == :plain ||
-                   arg.children[1] == :fragment ||
-                   arg.children[1] == :render ||
-                   arg.children[1] == :tag)
-              end
-
-              arg.type == :send and arg.children[1] =~ /^_/
-            end
-
-            begin
-              if simple
-                # in the normal case, process each argument
-                reactApply, @reactApply = @reactApply, false
-                args.each do |arg|
-                  arg = process(arg)
-                  if arg.type == :send and 
-                    arg.children[0] == s(:const, nil, :React) and
-                    arg.children[1] == :createElement and
-                    arg.children[2] == s(:const, nil, "React.Fragment") and
-                    arg.children[3] == s(:nil) 
-                  then
-                    params.push(*arg.children[4..-1])
-                  else
-                    params << arg
-                  end
-                end
-              else
-                reactApply, @reactApply = @reactApply, true
-
-                # collect children and apply.  Intermediate representation
-                # will look something like the following:
-                #
-                #   React.createElement(*proc {
-                #     var $_ = ['tag', hash]
-                #     $_.push(React.createElement(...))
-                #     return $_
-                #   }())
-                #
-                # Base Ruby2JS processing will convert the 'splat' to 'apply'
-                params = [s(:splat, s(:send, s(:block, s(:send, nil, :proc),
-                  s(:args, s(:shadowarg, :$_)), s(:begin,
-                  s(:lvasgn, :$_, s(:array, *params)),
-                  *args.map {|arg| process arg},
-                  s(:return, s(:lvar, :$_)))), :[]))]
-              end
-            ensure
-              @reactApply = reactApply
-            end
-
-          elsif text
-            # add text
-            params << process(text)
-          end
-
-          # trim trailing null if no text or children
-          params.pop if params.last == s(:nil)
-
-          # construct element using params
-          if @react == :Preact
-            element = node.updated(:send, [s(:const, nil, :Preact),
-              :h, *params])
-          else
-            element = node.updated(:send, [s(:const, nil, :React),
-              :createElement, *params])
-          end
-
-          if @reactApply
-            # if apply is set, emit code that pushes result
-            s(:send, s(:gvar, :$_), :push, element)
-          else
-            # simple/normal case: simply return the element
-            element
           end
 
         # Phlex-style: plain(text) - text content
@@ -939,17 +615,6 @@ module Ruby2JS
             element
           end
 
-        elsif node.children[0]==s(:send, nil, :_) and node.children[1]==:[]
-          if @reactApply
-            # if apply is set, emit code that pushes results
-            s(:send, s(:gvar, :$_), :push, *process_all(node.children[2..-1]))
-          elsif node.children.length == 3
-            process(node.children[2])
-          else
-            # simple/normal case: simply return the element
-            s(:splat, s(:array, *process_all(node.children[2..-1])))
-          end
-
         # map method calls involving i/g/c vars to straight calls
         #
         # input:
@@ -1042,53 +707,6 @@ module Ruby2JS
           end
 
           return process rewrite_tilda[node].children[0]
-
-        elsif node.children[0] and node.children[0].type == :send
-          # determine if markaby style class and id names are being used
-          child = node
-          test = child.children.first
-          while test and test.type == :send and not test.is_method?
-            child, test = test, test.children.first
-          end
-
-          if child.children[0] == nil and child.children[1] =~ /^_\w/
-            # capture the arguments provided on the current node
-            children = node.children[2..-1]
-
-            # convert method calls to id and class values
-            while node != child
-              if node.children[1] !~ /!$/
-                # convert method name to hash {className: name} pair
-                if @react == :Preact
-                  pair = s(:pair, s(:sym, :class),
-                    s(:str, node.children[1].to_s.gsub('_','-')))
-                else
-                  pair = s(:pair, s(:sym, :className),
-                    s(:str, node.children[1].to_s.gsub('_','-')))
-                end
-              else
-                # convert method name to hash {id: name} pair
-                pair = s(:pair, s(:sym, :id),
-                  s(:str, node.children[1].to_s[0..-2].gsub('_','-')))
-              end
-
-              # if a hash argument is already passed, merge in id value
-              hash = children.find_index {|cnode| cnode.type == :hash} || -1
-              if hash != -1
-                children[hash] = s(:hash, pair, *children[hash].children)
-              else
-                children.unshift s(:hash, pair)
-              end
-
-              # advance to next node
-              node = node.children.first
-            end
-
-            # collapse series of method calls into a single call
-            return process(node.updated(nil, [*node.children[0..1], *children]))
-          else
-            super
-          end
 
         elsif \
           node.children[0] and node.children[0].type == :self and
@@ -1362,48 +980,31 @@ module Ruby2JS
           child, test = test, test.children.first
         end
 
-        # wunderbar style calls
-        if child.children[0] == nil and child.children[1] == :_ and \
-          node.children[1].children.empty? and !@jsx
-
-          block = s(:block, s(:send, nil, :proc), s(:args),
-            *node.children[2..-1])
-          return on_send node.children.first.updated(:send,
-            [nil, :"_#{@react}.Fragment", block])
-
-        elsif !@jsx and child.children[0] == nil and child.children[1] =~ /^_\w/
-          if node.children[1].children.empty?
-            # append block as a standalone proc
-            block = s(:block, s(:send, nil, :proc), s(:args),
-              *node.children[2..-1])
-            return on_send node.children.first.updated(:send,
-              [*node.children.first.children, block])
-          else
-            # iterate over Enumerable arguments if there are args present
-            send = node.children.first.children
-            return super if send.length < 3
-            if node.children.length == 3 and
-              node.children.last.respond_to? :type and
-              node.children.last.type == :send
-
-              return process s(:send, *send[0..1], *send[3..-1],
-                s(:splat, s(:block, s(:send, send[2], :map),
-                node.children[1], s(:return, node.children[2]))))
-            else
-              return process s(:block, s(:send, *send[0..1], *send[3..-1]),
-                s(:args), s(:block, s(:send, send[2], :forEach),
-                *node.children[1..-1]))
-            end
-          end
-
         # Phlex-style block: fragment do ... end
-        elsif @jsx_content and child.children[0] == nil and child.children[1] == :fragment
+        if @jsx_content and child.children[0] == nil and child.children[1] == :fragment
           if node.children[1].children.empty?
-            block = s(:block, s(:send, nil, :proc), s(:args),
-              *node.children[2..-1])
-            # Convert to wunderbar-style for existing processing
-            return on_send node.children.first.updated(:send,
-              [nil, :"_#{@react}.Fragment", block])
+            # Get block body - unwrap :begin node if present
+            block_body = node.children[2..-1]
+            if block_body.length == 1 && block_body.first&.type == :begin
+              block_body = block_body.first.children
+            end
+            children_ast = block_body.map { |c| process(c) }
+
+            fragment_const = @react == :Preact ?
+              s(:const, nil, :"Preact.Fragment") :
+              s(:const, nil, :"React.Fragment")
+
+            if @react == :Preact
+              element = s(:send, s(:const, nil, :Preact), :h, fragment_const, s(:nil), *children_ast)
+            else
+              element = s(:send, s(:const, nil, :React), :createElement, fragment_const, s(:nil), *children_ast)
+            end
+
+            if @reactApply
+              return s(:send, s(:gvar, :$_), :push, element)
+            else
+              return element
+            end
           end
 
         # Phlex-style block: element do ... end
@@ -1845,7 +1446,8 @@ module Ruby2JS
        return super unless @reactClass or source.start_with? '<'
        source = Ruby2JS.jsx2_rb(source)
        ast =  Ruby2JS.parse(source).first
-       ast = s(:block, s(:send, nil, :_), s(:args), ast) if ast.type == :begin
+       # Wrap multiple top-level elements in a fragment
+       ast = s(:block, s(:send, nil, :fragment), s(:args), ast) if ast.type == :begin
 
        begin
          react, @react = @react, @react || :react

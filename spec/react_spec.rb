@@ -90,156 +90,6 @@ describe Ruby2JS::Filter::React do
     end
   end
 
-  describe "Wunderbar/JSX processing" do
-    it "should create elements for HTML tags" do
-      to_js( 'class Foo<React; def render; _a; end; end' ).
-        must_include 'return React.createElement("a")'
-    end
-
-    it "should create elements for React Components" do
-      to_js( 'class Foo<React; def render; _A; end; end' ).
-        must_include 'return React.createElement(A)'
-    end
-
-    it "should create elements with attributes and text" do
-      to_js( 'class Foo<React; def render; _a "name", href: "link"; end; end' ).
-        must_include 'return React.createElement("a", {href: "link"}, "name")'
-    end
-
-    it "should create simple nested elements" do
-      to_js( 'class Foo<React; def render; _a {_b}; end; end' ).
-        must_include ' React.createElement("a", null, React.createElement("b"))'
-    end
-
-    it "should handle options with blocks" do
-      to_js( 'class Foo<React; def render; _a options do _b; end; end; end' ).
-        must_include ' React.createElement("a", options, ' +
-          'React.createElement("b"))'
-    end
-
-    unless RUBY_VERSION =~ /^1/
-      it "should handle **options" do
-        to_js( 'class Foo<React; def render; _a **options; end; end' ).
-          must_include ' React.createElement("a", options)'
-      end
-
-      it "should handle **options with blocks" do
-        to_js('class Foo<React; def render; _a **options do _b; end; end; end').
-          must_include ' React.createElement("a", options, ' +
-            'React.createElement("b"))'
-      end
-    end
-
-    it "should create complex nested elements" do
-      result = to_js('class Foo<React; def render; _a {c="c"; _b c}; end; end')
-
-      result.must_include 'React.createElement(...(() => {'
-      result.must_include 'let $_ = ["a", null];'
-      result.must_include '$_.push(React.createElement("b", null, c));'
-      result.must_include 'return $_'
-      result.must_include '})())'
-    end
-
-    it "should treat explicit calls to React.createElement as simple" do
-      to_js( 'class Foo<React; def render; _a {React.createElement("b")}; ' +
-        'end; end' ).
-        must_include ' React.createElement("a", null, React.createElement("b"))'
-    end
-
-    it "should push results of explicit calls to React.createElement" do
-      result = to_js('class Foo<React; def render; _a {c="c"; ' +
-        'React.createElement("b", null, c)}; end; end')
-
-      result.must_include 'React.createElement(...(() => {'
-      result.must_include 'let $_ = ["a", null];'
-      result.must_include '$_.push(React.createElement("b", null, c));'
-      result.must_include 'return $_'
-      result.must_include '})())'
-    end
-
-    it "should handle call with blocks to React.createElement" do
-      result = to_js( 'class Foo<React; def render; ' +
-        'React.createElement("a") {_b}; end; end' )
-      result.must_include 'React.createElement(...(() => {'
-      result.must_include 'let $_ = ["a"];'
-      result.must_include '$_.push(React.createElement("b")'
-    end
-
-    it "should iterate" do
-      # single element each iteration
-      result = to_js('class Foo<React; def render; _ul list ' +
-        'do |i| _li i; end; end; end')
-
-      result.must_include 'React.createElement("ul", null,'
-      result.must_include 'list.map(i =>'
-      result.must_include 'React.createElement("li", null, i)'
-
-      # multiple elements each iteration
-      result = to_js('class Foo<React; def render; _dl list ' +
-        'do |i| _dt i.term; _dd i.defn; end; end; end')
-
-      result.must_include 'React.createElement(...(() => {'
-      result.must_include 'let $_ = ["dl", null];'
-      result.must_include 'list.forEach((i) =>'
-      result.must_include '$_.push(React.createElement("dt", null, i.term))'
-      result.must_include '$_.push(React.createElement("dd", null, i.defn))'
-      result.must_include 'return $_'
-      result.must_include '})())'
-    end
-
-    it "should iterate with markaby style classes/ids" do
-      # single element each iteration
-      result = to_js('class Foo<React; def render; _ul.todos list ' +
-        'do |i| _li i; end; end; end')
-
-      result.must_include 'React.createElement("ul", {className: "todos"},'
-      result.must_include 'list.map(i =>'
-      result.must_include 'React.createElement("li", null, i)'
-
-      # multiple elements each iteration
-      result = to_js('class Foo<React; def render; _dl.terms list ' +
-        'do |i| _dt i.term; _dd i.defn; end; end; end')
-
-      result.must_include 'React.createElement(...(() => {'
-      result.must_include 'let $_ = ["dl", {className: "terms"}];'
-      result.must_include 'list.forEach((i) =>'
-      result.must_include '$_.push(React.createElement("dt", null, i.term))'
-      result.must_include '$_.push(React.createElement("dd", null, i.defn))'
-      result.must_include 'return $_'
-      result.must_include '})())'
-    end
-
-    it "should handle text nodes" do
-      to_js( 'class Foo<React; def render; _a {_ @text}; end; end' ).
-        must_include 'React.createElement("a", null, text)'
-    end
-
-    it "should apply text nodes" do
-      to_js( 'class Foo<React; def render; _a {text="hi"; _ text}; end; end' ).
-        must_include 'let text = "hi"; $_.push(text);'
-    end
-
-    it "should handle arbitrary nodes" do
-      to_js( 'class Foo<React; def render; _a {_[@text]}; end; end' ).
-        must_include 'React.createElement("a", null, text)'
-    end
-
-    it "should handle lists of arbitrary nodes" do
-      to_js( 'class Foo<React; def render; _a {_[@text, @text]}; end; end' ).
-        must_include 'React.createElement("a", null, ...[text, text])'
-    end
-
-    it "should apply arbitrary nodes" do
-      to_js( 'class Foo<React; def render; _a {text="hi"; _[text]}; end; end' ).
-        must_include 'let text = "hi"; $_.push(text);'
-    end
-
-    it "should apply list of arbitrary nodes" do
-      to_js( 'class Foo<React; def render; _a {text="hi"; _[text, text]}; end; end' ).
-        must_include 'let text = "hi"; $_.push(text, text);'
-    end
-  end
-
   describe "JSX" do
     it "should wrap list" do
       to_js( 'class Foo<React; def render; %x{<p/><p/>}; end; end' ).
@@ -250,87 +100,6 @@ describe Ruby2JS::Filter::React do
     it "should handle stateless components" do
       to_js( 'Button = ->(x) { %x(<button>{x}</button>)}' ).
         must_equal 'const Button = x => (React.createElement("button", null, x))'
-    end
-  end
-
-  describe "render method" do
-    it "should wrap multiple elements with a Fragment" do
-      result = to_js( 'class Foo<React; def render; _h1 "a"; _p "b"; end; end' )
-      result.must_include 'return React.createElement(React.Fragment, null, React'
-      result.must_include 'React.createElement("h1", null, "a"),'
-      result.must_include 'React.createElement("p", null, "b"))'
-    end
-
-    it "should wrap anything that is not a method or block call with a span" do
-      result = to_js( 'class Foo<React; def render; if @a; _p "a"; else;_p "b"; end; end;end' )
-      result.must_include 'React.createElement(...(() => {'
-      result.must_include 'push(React.createElement("p", null, "a"))} else {'
-      result.must_include 'push(React.createElement("p", null, "b"))};'
-    end
-  end
-
-  describe "class attributes" do
-    it "should handle class attributes" do
-      to_js( 'class Foo<React; def render; _a class: "b"; end; end' ).
-        must_include 'React.createElement("a", {className: "b"})'
-    end
-
-    it "should handle className attributes" do
-      to_js( 'class Foo<React; def render; _a className: "b"; end; end' ).
-        must_include 'React.createElement("a", {className: "b"})'
-    end
-
-    it "should handle markaby syntax" do
-      to_js( 'class Foo<React; def render; _a.b.c href: "d"; end; end' ).
-        must_include 'React.createElement("a", {className: "b c", href: "d"})'
-    end
-
-    it "should handle mixed strings" do
-      to_js( 'class Foo<React; def render; _a.b class: "c"; end; end' ).
-        must_include 'React.createElement("a", {className: "b c"})'
-    end
-
-    it "should handle mixed strings and a value" do
-      to_js( 'class Foo<React; def render; _a.b class: c; end; end' ).
-        must_include 'React.createElement("a", {className: "b " + (c ?? "")})'
-    end
-
-    it "should handle mixed strings and a conditional value" do
-      to_js( 'class Foo<React; def render; _a.b class: ("c" if d); end; end' ).
-        must_include 'React.createElement("a", {className: "b " + (d ? "c" : "")})'
-    end
-
-    it "should handle only a value" do
-      to_js( 'class Foo<React; def render; _a class: c; end; end' ).
-        must_include 'React.createElement("a", {className: c})'
-    end
-
-    it "should handle a constant string" do
-      to_js( 'class Foo<React; def render; _a class: "x"; end; end' ).
-        must_include 'React.createElement("a", {className: "x"})'
-    end
-  end
-
-  describe "other attributes" do
-    it "should handle markaby syntax ids" do
-      to_js( 'class Foo<React; def render; _a.b! href: "c"; end; end' ).
-        must_include 'React.createElement("a", {id: "b", href: "c"})'
-    end
-
-    it "should map for attributes to htmlFor" do
-      to_js( 'class Foo<React; def render; _a for: "b"; end; end' ).
-        must_include 'React.createElement("a", {htmlFor: "b"})'
-    end
-
-    it "should map case insensitive attributes to javascript properties" do
-      to_js( 'class Foo<React; def render; _input tabindex: 1; end; end' ).
-        must_include 'React.createElement("input", {tabIndex: 1})'
-    end
-
-    it "should map style string attributes to hashes" do
-      to_js( 'class Foo<React; def render; _a ' +
-        'style: "color: blue; margin-top: 0"; end; end' ).
-        must_include '{style: {color: "blue", marginTop: 0}}'
     end
   end
 
@@ -437,15 +206,6 @@ describe Ruby2JS::Filter::React do
           'return this.setState({a: $a})'
     end
 
-    it "shouldn't produce temporary variables for inline event handlers" do
-      js = to_js( 'class F < React; def render; _input value: @draft; ' +
-        '_button "Cancel", onClick:-> {@draft = @base}; ' +
-        '_button "Save", disabled: @draft == @base; end; end' )
-      js.must_include 'setDraft(event.target.value)'
-      js.must_include 'onClick() {setDraft(base)}'
-      js.must_include '{disabled: draft == base}'
-    end
-
     it "should treat singleton method definitions as a separate scope" do
       js = to_js( 'class F < React; def m(); def x.a; @i=1; end; @i; end; end' )
       js.must_include 'setI(1)'
@@ -487,20 +247,6 @@ describe Ruby2JS::Filter::React do
     end
   end
 
-  describe 'react calls' do
-    it 'should create elements' do
-      to_js( 'ReactDOM.render _Element, document.getElementById("sidebar")' ).
-        must_include 'React.createElement(Element)'
-    end
-
-    it 'should substitute scope instance variables / props' do
-      @data = 5
-      to_js( "ReactDOM.render _Element(data: @data),
-        document.getElementById('sidebar')" ).
-        must_include 'React.createElement(Element, {data: 5})'
-    end
-  end
-
   describe "react statics" do
     it "should handle static properties" do
       to_js( 'class Foo<React; def self.one; 1; end; end' ).
@@ -535,23 +281,6 @@ describe Ruby2JS::Filter::React do
       to_js( 'class Foo<React; def componentWillReceiveProps(props);' +
         '@foo = @@foo; end; end' ).
         must_include 'componentWillReceiveProps(props) {this.setState({foo: props.foo})}'
-    end
-  end
-
-  describe "controlled components" do
-    it "should should automatically create onChange value functions" do
-      to_js( 'class Foo<React; def render; _input value: @x; end; end' ).
-        must_include 'onChange(event) {setX(event.target.value)}'
-    end
-
-    it "should should automatically create onChange checked functions" do
-      to_js( 'class Foo<React; def render; _input checked: @x; end; end' ).
-        must_include 'onChange() {setX(!x)}'
-    end
-
-    it "should should retain onChange functions" do
-      to_js( 'class Foo<React; def render; _input checked: @x, onChange: self.change; end; end' ).
-        must_include 'onChange: this.change'
     end
   end
 
