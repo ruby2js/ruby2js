@@ -22,6 +22,7 @@ require 'ruby2js/filter/functions'
 require 'ruby2js/filter/esm'
 require 'ruby2js/filter/return'
 require 'ruby2js/filter/erb'
+require 'ruby2js/filter/rails/helpers'
 require_relative '../lib/erb_compiler'
 
 class SelfhostBuilder
@@ -66,10 +67,12 @@ class SelfhostBuilder
   }.freeze
 
   # Options for ERB templates
+  # Note: Rails::Helpers must come BEFORE Erb for method overrides to work
   ERB_OPTIONS = {
     eslevel: 2022,
     include: [:class, :call],
     filters: [
+      Ruby2JS::Filter::Rails::Helpers,
       Ruby2JS::Filter::Erb,
       Ruby2JS::Filter::Functions,
       Ruby2JS::Filter::Return

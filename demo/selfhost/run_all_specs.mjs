@@ -46,6 +46,7 @@ const SPEC_TO_FILTER_MAP = {
   'rails_schema_spec.rb': 'rails/schema.js',
   'rails_logger_spec.rb': 'rails/logger.js',
   'rails_seeds_spec.rb': 'rails/seeds.js',
+  'rails_helpers_spec.rb': 'rails/helpers.js',
 };
 
 // Load transpiled filters on demand

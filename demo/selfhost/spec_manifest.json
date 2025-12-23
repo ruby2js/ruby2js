@@ -14,7 +14,9 @@
     "rails_seeds_spec.rb",
     "rails_schema_spec.rb",
     "cjs_spec.rb",
-    "stimulus_spec.rb"
+    "stimulus_spec.rb",
+    "erb_spec.rb",
+    "rails_helpers_spec.rb"
   ],
   "partial": [
     "rails_routes_spec.rb",
@@ -22,8 +24,7 @@
     "tagged_templates_spec.rb",
     "polyfill_spec.rb",
     "pragma_spec.rb",
-    "comments_spec.rb",
-    "erb_spec.rb"
+    "comments_spec.rb"
   ],
   "blocked": {
     "securerandom_spec.rb": "extend SEXP doesn't transpile",

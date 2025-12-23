@@ -346,6 +346,98 @@ export async function run() {
 }
 ```
 
+## Helpers
+
+Transforms Rails view helpers into HTML-generating JavaScript. Use with the [ERB filter](/docs/filters/erb).
+
+{% rendercontent "docs/note", type: "info" %}
+When using both filters, `rails/helpers` must come BEFORE `erb` in the filter list for method overrides to work correctly.
+{% endrendercontent %}
+
+### Form Helpers
+
+```ruby
+# With Ruby2JS::Erubi for proper block handling
+template = '<%= form_for @user do |f| %><%= f.text_field :name %><% end %>'
+src = Ruby2JS::Erubi.new(template).src
+Ruby2JS.convert(src, filters: [:"rails/helpers", :erb])
+```
+
+```javascript
+function render({ user }) {
+  let _buf = "";
+  _buf += "<form data-model=\"user\">";
+  _buf += "<input type=\"text\" name=\"user[name]\" id=\"user_name\">";
+  _buf += "</form>";
+  return _buf
+}
+```
+
+**Supported form builder methods:**
+
+| Ruby Method | HTML Output |
+|-------------|-------------|
+| `f.text_field :name` | `<input type="text" name="model[name]" id="model_name">` |
+| `f.email_field :email` | `<input type="email" ...>` |
+| `f.password_field :pass` | `<input type="password" ...>` |
+| `f.hidden_field :id` | `<input type="hidden" ...>` |
+| `f.text_area :body` | `<textarea name="model[body]" ...></textarea>` |
+| `f.check_box :active` | `<input type="checkbox" value="1" ...>` |
+| `f.radio_button :role, :admin` | `<input type="radio" value="admin" ...>` |
+| `f.label :name` | `<label for="model_name">Name</label>` |
+| `f.select :category` | `<select name="model[category]" ...></select>` |
+| `f.submit "Save"` | `<input type="submit" value="Save">` |
+| `f.button "Click"` | `<button type="submit">Click</button>` |
+
+Additional input types: `number_field`, `tel_field`, `url_field`, `search_field`, `date_field`, `time_field`, `datetime_local_field`, `month_field`, `week_field`, `color_field`, `range_field`.
+
+### Link Helper
+
+```ruby
+erb_src = '_buf = ::String.new; _buf << link_to("Articles", "/articles").to_s; _buf.to_s'
+Ruby2JS.convert(erb_src, filters: [:"rails/helpers", :erb])
+```
+
+```javascript
+function render() {
+  let _buf = "";
+  _buf += "<a href=\"/articles\" onclick=\"return navigate(event, '/articles')\">Articles</a>";
+  return _buf
+}
+```
+
+### Truncate Helper
+
+```ruby
+erb_src = '_buf = ::String.new; _buf << truncate(@body, length: 100).to_s; _buf.to_s'
+Ruby2JS.convert(erb_src, filters: [:"rails/helpers", :erb])
+```
+
+```javascript
+function render({ body }) {
+  let _buf = "";
+  _buf += truncate(body, {length: 100});
+  return _buf
+}
+```
+
+### Browser vs Server Target
+
+The helpers filter detects the target environment based on the `database` option:
+
+- **Browser databases** (dexie, indexeddb, sqljs): Generate `onclick`/`onsubmit` handlers with JavaScript navigation
+- **Server databases** (better_sqlite3, pg): Generate standard `href`/`action` attributes
+
+```ruby
+# Browser target (default)
+Ruby2JS.convert(src, filters: [:"rails/helpers", :erb], database: 'dexie')
+# => onclick="return navigate(event, '/articles')"
+
+# Server target
+Ruby2JS.convert(src, filters: [:"rails/helpers", :erb], database: 'better_sqlite3')
+# => href="/articles"
+```
+
 ## Logger
 
 Maps Rails logger calls to console methods.
@@ -417,4 +509,5 @@ Spec files for each sub-filter:
 - [rails_schema_spec.rb](https://github.com/ruby2js/ruby2js/blob/master/spec/rails_schema_spec.rb)
 - [rails_seeds_spec.rb](https://github.com/ruby2js/ruby2js/blob/master/spec/rails_seeds_spec.rb)
 - [rails_logger_spec.rb](https://github.com/ruby2js/ruby2js/blob/master/spec/rails_logger_spec.rb)
+- [rails_helpers_spec.rb](https://github.com/ruby2js/ruby2js/blob/master/spec/rails_helpers_spec.rb)
 {% endrendercontent %}

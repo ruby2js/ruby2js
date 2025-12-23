@@ -197,7 +197,7 @@ transformed:
 
 <div data-controller="combo" data-selfhost="true" data-erb="true" data-options='{
   "eslevel": 2022,
-  "filters": ["functions"]
+  "filters": ["helpers", "erb", "functions"]
 }'></div>
 
 ```ruby
@@ -290,11 +290,15 @@ Ruby2JS.convert(source,
 
 | Filter | Purpose |
 |--------|---------|
-| **rails** | Models, controllers, routes, schema |
+| **rails** | Models, controllers, routes, schema, view helpers |
 | **esm** | ES module imports/exports |
 | **functions** | Ruby → JS method mappings |
 | **erb** | ERB templates → render functions |
 | **active_support** | `blank?`, `present?`, `try`, etc. |
+
+{% rendercontent "docs/note", type: "info" %}
+The `rails` filter includes `rails/helpers` for view helpers like `link_to`, `form_for`, and `truncate`. When using both `rails` and `erb` filters, ensure `rails` comes before `erb` in the filter list for proper helper support.
+{% endrendercontent %}
 
 ## Limitations
 

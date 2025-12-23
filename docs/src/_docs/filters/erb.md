@@ -134,27 +134,27 @@ The filter performs these transformations:
 | `raw(html)` | `html` (pass-through) |
 | `str.html_safe` | `str` (pass-through) |
 
-## Using Ruby2JS::Erubi for Block Helpers
+## Using with Rails Helpers
 
-Ruby's standard ERB generates invalid syntax when block-based helpers like `form_for` are used with `<%= %>` tags. Ruby2JS provides a custom Erubi engine that handles these cases correctly:
+For Rails-style helpers like `form_for`, `form_tag`, `link_to`, and form builder methods, use the **Rails::Helpers** filter together with ERB:
 
 ```ruby
 require "ruby2js"
 require "ruby2js/erubi"
 require "ruby2js/filter/erb"
+require "ruby2js/filter/rails/helpers"
 
 template = <<~ERB
 <%= form_for @user do |f| %>
   <%= f.label :name %>
   <%= f.text_field :name %>
-  <%= f.label :email %>
-  <%= f.email_field :email %>
   <%= f.submit "Save" %>
 <% end %>
 ERB
 
 src = Ruby2JS::Erubi.new(template).src
-puts Ruby2JS.convert(src, filters: [:erb], eslevel: 2020)
+# Note: Rails::Helpers must come BEFORE Erb for method overrides to work
+puts Ruby2JS.convert(src, filters: [:"rails/helpers", :erb], eslevel: 2020)
 ```
 
 ```javascript
@@ -164,36 +164,13 @@ function render({ user }) {
   _buf += "<form data-model=\"user\">";
   _buf += "<label for=\"user_name\">Name</label>";
   _buf += "<input type=\"text\" name=\"user[name]\" id=\"user_name\">";
-  _buf += "<label for=\"user_email\">Email</label>";
-  _buf += "<input type=\"email\" name=\"user[email]\" id=\"user_email\">";
   _buf += "<input type=\"submit\" value=\"Save\">";
   _buf += "</form>";
   return _buf
 }
 ```
 
-The ERB filter with `Ruby2JS::Erubi`:
-- Detects block expressions (ending with `do |...|` or `{`)
-- Converts `form_for` to HTML `<form>` tags with `data-model` attribute
-- Converts form builder methods to HTML input elements
-
-### Supported Form Builder Methods
-
-| Ruby Method | HTML Output |
-|-------------|-------------|
-| `f.text_field :name` | `<input type="text" name="model[name]" id="model_name">` |
-| `f.email_field :email` | `<input type="email" name="model[email]" ...>` |
-| `f.password_field :pass` | `<input type="password" name="model[pass]" ...>` |
-| `f.hidden_field :id` | `<input type="hidden" name="model[id]" ...>` |
-| `f.text_area :body` | `<textarea name="model[body]" id="model_body"></textarea>` |
-| `f.check_box :active` | `<input type="checkbox" name="model[active]" value="1">` |
-| `f.radio_button :role, :admin` | `<input type="radio" name="model[role]" value="admin">` |
-| `f.label :name` | `<label for="model_name">Name</label>` |
-| `f.select :category` | `<select name="model[category]" id="model_category"></select>` |
-| `f.submit "Save"` | `<input type="submit" value="Save">` |
-| `f.button "Click"` | `<button type="submit">Click</button>` |
-
-Additional input types: `number_field`, `tel_field`, `url_field`, `search_field`, `date_field`, `time_field`, `datetime_local_field`, `month_field`, `week_field`, `color_field`, `range_field`.
+See the [Rails filter documentation](/docs/filters/rails#helpers) for the full list of supported helpers.
 
 ## Limitations
 
