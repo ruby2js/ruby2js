@@ -18,7 +18,10 @@
   },
   "dependencies": {
     "dexie": "^4.0.10",
-    "sql.js": "^1.11.0"
+    "sql.js": "^1.11.0",
+    "chokidar": "^3.5.3",
+    "js-yaml": "^4.1.0",
+    "ws": "^8.14.2"
   },
   "optionalDependencies": {
     "better-sqlite3": "^11.0.0",

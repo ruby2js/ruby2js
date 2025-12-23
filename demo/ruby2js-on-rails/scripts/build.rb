@@ -26,7 +26,13 @@ require 'ruby2js/filter/rails/helpers'
 require_relative '../lib/erb_compiler'
 
 class SelfhostBuilder
-  DEMO_ROOT = File.expand_path('..', __dir__)
+  # JS (Node.js): use process.cwd() since bin commands run from app root
+  # Ruby: resolve from scripts/ up one level to app root
+  DEMO_ROOT = if defined?(process)
+    process.cwd()
+  else
+    File.expand_path('..', __dir__)
+  end
 
   # Browser databases - these run in the browser with IndexedDB or WASM
   BROWSER_DATABASES = ['dexie', 'indexeddb', 'sqljs', 'sql.js'].freeze
@@ -313,12 +319,15 @@ class SelfhostBuilder
       puts("    -> #{dest_path}")
     end
 
-    # Copy shared lib files (erb_runtime.mjs, etc.)
+    # Copy runtime lib files (erb_runtime.mjs only - build tools stay in vendor)
     vendor_src = File.join(DEMO_ROOT, 'vendor/ruby2js')
-    Dir.glob(File.join(vendor_src, '*.mjs')).each do |src_path|
-      dest_path = File.join(lib_dest, File.basename(src_path))
+    runtime_libs = ['erb_runtime.mjs']
+    runtime_libs.each do |filename|
+      src_path = File.join(vendor_src, filename)
+      next unless File.exist?(src_path)
+      dest_path = File.join(lib_dest, filename)
       FileUtils.cp(src_path, dest_path)
-      puts("  Copying: #{File.basename(src_path)}")
+      puts("  Copying: #{filename}")
       puts("    -> #{dest_path}")
     end
   end

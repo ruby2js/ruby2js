@@ -61,8 +61,8 @@ module Ruby2JS
         # require 'ruby2js' → import * as Ruby2JS from selfhost path; await Ruby2JS.initPrism()
         if target.nil? && method == :require && args.length == 1 &&
            args.first.type == :str && args.first.children.first == 'ruby2js'
-          # Default path assumes script is in demo/*/scripts/ relative to demo/selfhost/
-          selfhost_path = @options[:selfhost_path] || '../../selfhost/ruby2js.js'
+          # Default path assumes script is in demo/*/vendor/ruby2js/ relative to demo/selfhost/
+          selfhost_path = @options[:selfhost_path] || '../../../selfhost/ruby2js.js'
           # Namespace import with async initialization for selfhost
           # Note: await is s(:send, nil, :await, expr) not s(:await, expr)
           # Path array format: [as_pair, from_pair] for "import * as X from Y"
@@ -80,7 +80,7 @@ module Ruby2JS
           req_path = args.first.children.first
           if req_path.start_with?('ruby2js/filter/')
             filter_name = req_path.sub('ruby2js/filter/', '')
-            selfhost_filters = @options[:selfhost_filters] || '../../selfhost/filters'
+            selfhost_filters = @options[:selfhost_filters] || '../../../selfhost/filters'
             # For paths like 'rails/model', export as 'Rails_Model' to match selfhost
             # For simple paths like 'functions', export as 'Functions'
             parts = filter_name.split('/')
@@ -98,7 +98,7 @@ module Ruby2JS
 
           # Special case: erb_compiler should come from selfhost (named export)
           if rel_path.include?('erb_compiler')
-            selfhost_path = @options[:selfhost_path] || '../../selfhost/ruby2js.js'
+            selfhost_path = @options[:selfhost_path] || '../../../selfhost/ruby2js.js'
             selfhost_base = File.dirname(selfhost_path)
             return s(:import, ["#{selfhost_base}/lib/erb_compiler.js"],
               s(:array, s(:const, nil, :ErbCompiler)))

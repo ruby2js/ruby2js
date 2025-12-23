@@ -144,7 +144,7 @@ task :test_partial => :npm_install do
 end
 
 DEMO = File.join(File.dirname(SELFHOST), 'ruby2js-on-rails')
-BUILD_MJS = File.join(DEMO, 'scripts/build.mjs')
+BUILD_MJS = File.join(DEMO, 'vendor/ruby2js/build.mjs')
 
 desc "Install npm dependencies for ruby2js-on-rails demo"
 task :npm_install_demo do

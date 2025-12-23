@@ -224,7 +224,7 @@ async function runTests() {
     log('\n2. Selfhost build', BOLD);
     try {
       // Import and run selfhost builder
-      const { SelfhostBuilder } = await import(join(DEMO_ROOT, 'scripts/build.mjs'));
+      const { SelfhostBuilder } = await import(join(DEMO_ROOT, 'vendor/ruby2js/build.mjs'));
       const builder = new SelfhostBuilder(selfhostDist);
       await builder.build();
       pass('Selfhost build completed');
