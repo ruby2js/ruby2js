@@ -262,6 +262,13 @@ When a partial spec passes all tests:
 
 When a selfhost test fails, follow this methodology to diagnose and fix:
 
+**Important: Never edit generated files.** In the selfhost directory, files ending in `.js` are typically generated outputs (e.g., `ruby2js.js`, `filters/phlex.js`). If a `.js` file needs fixing, make the change to the original source instead:
+- Ruby source files in `lib/ruby2js/` (for dual-compatible code changes)
+- Converter handlers in `lib/ruby2js/converter/` (for AST-to-JS conversion fixes)
+- Filters in `lib/ruby2js/filter/` (for AST transformation fixes)
+
+If a pattern is common, fixing the transpiler is preferred over changing individual source files.
+
 #### 1. Identify the Problem in Transpiled Output
 
 Look at the failing test and find the transpiled JavaScript that behaves differently from Ruby:

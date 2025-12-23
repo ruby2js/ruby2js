@@ -12,6 +12,7 @@
     "./adapters/*": "./adapters/*",
     "./targets/*": "./targets/*",
     "./erb_runtime.mjs": "./erb_runtime.mjs",
+    "./phlex_runtime.mjs": "./phlex_runtime.mjs",
     "./build.mjs": "./build.mjs",
     "./dev-server.mjs": "./dev-server.mjs",
     "./server.mjs": "./server.mjs"
@@ -20,6 +21,7 @@
     "adapters/",
     "targets/",
     "erb_runtime.mjs",
+    "phlex_runtime.mjs",
     "build.mjs",
     "dev-server.mjs",
     "server.mjs"
@@ -28,7 +30,9 @@
     "ruby2js",
     "rails",
     "activerecord",
-    "erb"
+    "erb",
+    "phlex",
+    "stimulus"
   ],
   "author": "Sam Ruby",
   "license": "MIT",

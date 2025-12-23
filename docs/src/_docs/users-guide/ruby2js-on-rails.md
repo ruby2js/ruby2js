@@ -366,6 +366,45 @@ When no `filters` key is present, the build uses default Rails filters. Specify 
 Filter order matters. When using both `rails/helpers` and `erb` filters, ensure `rails/helpers` comes before `erb` for proper helper support.
 {% endrendercontent %}
 
+### Section-Specific Configuration
+
+Different directories can use different filters. Define named sections in `ruby2js.yml`:
+
+```yaml
+# config/ruby2js.yml
+default: &default
+  eslevel: 2022
+  comparison: identity
+  autoexports: true
+  include:
+    - class
+    - call
+
+# Phlex components use the phlex filter
+components:
+  <<: *default
+  filters:
+    - phlex
+    - functions
+    - esm
+
+# Stimulus controllers use the stimulus filter
+controllers:
+  <<: *default
+  filters:
+    - stimulus
+    - camelCase
+    - functions
+    - esm
+```
+
+The build process automatically uses section-specific config:
+- Files in `app/controllers/` use the `controllers` section
+- Files in `app/components/` use the `components` section
+- Other files use `default` or environment-specific config
+
+This enables mixing Phlex views and Stimulus controllers in the same project, each transpiled with appropriate filters.
+
 ## Limitations
 
 This approach transpiles Rails *patterns*, not the full Rails framework:

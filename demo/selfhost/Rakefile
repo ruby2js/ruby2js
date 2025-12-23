@@ -162,6 +162,24 @@ file BUILD_MJS => [File.join(DEMO, 'scripts/build.rb'), "#{ROOT}/lib/ruby2js/fil
   File.write(BUILD_MJS, content)
 end
 
+desc "Force rebuild of build.mjs (development version with relative paths)"
+task :build_mjs do
+  rm_f BUILD_MJS
+  Rake::Task[BUILD_MJS].invoke
+  puts "Built: #{BUILD_MJS}"
+end
+
+desc "Build build.mjs with npm package imports (for ruby2js-rails package)"
+task "build_mjs:npm" => :build_mjs do
+  content = File.read(BUILD_MJS)
+  # Convert relative paths to npm package imports
+  content = content.gsub('../../../selfhost/ruby2js.js', 'ruby2js')
+  content = content.gsub('../../../selfhost/filters/', 'ruby2js/filters/')
+  content = content.gsub('../../../selfhost/lib/', 'ruby2js/lib/')
+  File.write(BUILD_MJS, content)
+  puts "Converted to npm package imports: #{BUILD_MJS}"
+end
+
 desc "Run ruby2js-on-rails smoke tests (compares Ruby vs selfhost builds)"
 task :test_smoke => [:npm_install, :npm_install_demo, "#{SELFHOST}/ruby2js.js", :build_filters, BUILD_MJS] do
   Dir.chdir(DEMO) do

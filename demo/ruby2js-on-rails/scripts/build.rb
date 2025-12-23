@@ -161,6 +161,20 @@ class SelfhostBuilder
     )
     puts("")
 
+    # Transpile components (Phlex views, use 'components' section from ruby2js.yml)
+    components_dir = File.join(DEMO_ROOT, 'app/components')
+    if File.exist?(components_dir)
+      puts("Components:")
+      self.copy_phlex_runtime()
+      self.transpile_directory(
+        components_dir,
+        File.join(@dist_dir, 'components'),
+        '**/*.rb',
+        section: 'components'
+      )
+      puts("")
+    end
+
     # Transpile config (skip routes.rb, handled separately)
     puts("Config:")
     self.transpile_directory(
@@ -395,6 +409,24 @@ class SelfhostBuilder
       puts("  Copying: #{filename}")
       puts("    -> #{dest_path}")
     end
+  end
+
+  def copy_phlex_runtime()
+    lib_dest = File.join(@dist_dir, 'lib')
+    FileUtils.mkdir_p(lib_dest)
+
+    # Check for npm-installed package first, fall back to development vendor directory
+    npm_package_dir = File.join(DEMO_ROOT, 'node_modules/ruby2js-rails')
+    vendor_package_dir = File.join(DEMO_ROOT, 'vendor/ruby2js')
+    package_dir = File.exist?(npm_package_dir) ? npm_package_dir : vendor_package_dir
+
+    src_path = File.join(package_dir, 'phlex_runtime.mjs')
+    return unless File.exist?(src_path)
+
+    dest_path = File.join(lib_dest, 'phlex_runtime.mjs')
+    FileUtils.cp(src_path, dest_path)
+    puts("  Copying: phlex_runtime.mjs")
+    puts("    -> #{dest_path}")
   end
 
   def transpile_file(src_path, dest_path, section = nil)
