@@ -28,7 +28,6 @@
   },
   "dependencies": {
     "dexie": "^4.0.10",
-    "ruby2js-rails": "https://www.ruby2js.com/releases/ruby2js-rails-beta.tgz",
     "sql.js": "^1.11.0"
   },
   "optionalDependencies": {

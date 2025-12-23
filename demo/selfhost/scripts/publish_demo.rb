@@ -1,6 +1,7 @@
 #!/usr/bin/env ruby
 # Publish script for Ruby2JS-on-Rails demo
-# Creates a self-contained tarball that runs with just `npm install && npm run dev`
+# Creates a tarball that depends on ruby2js-rails npm package
+# Users run: curl ... | tar xz && cd ruby2js-on-rails && npm install && npm run dev
 
 require 'fileutils'
 require 'json'
@@ -27,68 +28,47 @@ puts "Copying user app..."
   dest = File.join(OUTPUT_DIR, dir)
   if File.exist?(src)
     FileUtils.cp_r(src, dest)
-    puts "  #{dir}/ -> #{dest}"
+    puts "  #{dir}/"
   end
 end
 puts ""
 
-# 2. Assemble vendor/ruby2js/
-puts "Assembling vendor/ruby2js/..."
-vendor_dir = File.join(OUTPUT_DIR, 'vendor/ruby2js')
-FileUtils.mkdir_p(vendor_dir)
-
-# 2a. Copy adapters
-adapters_src = File.join(DEMO_DIR, 'vendor/ruby2js/adapters')
-adapters_dest = File.join(vendor_dir, 'adapters')
-FileUtils.cp_r(adapters_src, adapters_dest)
-puts "  adapters/"
-
-# 2b. Copy targets
-targets_src = File.join(DEMO_DIR, 'vendor/ruby2js/targets')
-targets_dest = File.join(vendor_dir, 'targets')
-FileUtils.cp_r(targets_src, targets_dest)
-puts "  targets/"
-
-# 2c. Copy erb_runtime.mjs
-erb_runtime_src = File.join(DEMO_DIR, 'vendor/ruby2js/erb_runtime.mjs')
-FileUtils.cp(erb_runtime_src, File.join(vendor_dir, 'erb_runtime.mjs'))
-puts "  erb_runtime.mjs"
-
-# 2d. Copy selfhost transpiler
-selfhost_dest = File.join(vendor_dir, 'selfhost')
-FileUtils.mkdir_p(selfhost_dest)
-
-# Main transpiler
-FileUtils.cp(File.join(SELFHOST_DIR, 'ruby2js.js'), File.join(selfhost_dest, 'ruby2js.js'))
-puts "  selfhost/ruby2js.js"
-
-# Prism browser support
-FileUtils.cp(File.join(SELFHOST_DIR, 'prism_browser.js'), File.join(selfhost_dest, 'prism_browser.js'))
-puts "  selfhost/prism_browser.js"
-
-# Filters
-filters_src = File.join(SELFHOST_DIR, 'filters')
-filters_dest = File.join(selfhost_dest, 'filters')
-FileUtils.cp_r(filters_src, filters_dest)
-puts "  selfhost/filters/"
-
-# Lib (erb_compiler.js)
-lib_src = File.join(SELFHOST_DIR, 'lib')
-lib_dest = File.join(selfhost_dest, 'lib')
-FileUtils.cp_r(lib_src, lib_dest)
-puts "  selfhost/lib/"
-
-# 2e. Copy and transform build.mjs
-# Update import paths from ../../selfhost/ to ../vendor/ruby2js/selfhost/
+# 2. Copy and transform build.mjs
+# Update import paths from relative to npm packages
+puts "Generating scripts/build.mjs..."
 build_mjs_src = File.join(DEMO_DIR, 'scripts/build.mjs')
 build_mjs_content = File.read(build_mjs_src)
-build_mjs_transformed = build_mjs_content.gsub(
-  %r{"\.\.\/\.\.\/selfhost\/},
-  '"../vendor/ruby2js/selfhost/'
+
+# Transform imports from relative paths to npm packages
+build_mjs_transformed = build_mjs_content
+  # ruby2js converter imports
+  .gsub(%r{"\.\.\/\.\.\/selfhost\/ruby2js\.js"}, '"ruby2js"')
+  .gsub(%r{"\.\.\/\.\.\/selfhost\/filters\/}, '"ruby2js/filters/')
+  .gsub(%r{"\.\.\/\.\.\/selfhost\/lib\/}, '"ruby2js/lib/')
+  # vendor/ruby2js paths -> RUBY2JS_RAILS_PATH (for adapters/targets/erb_runtime)
+  .gsub('SelfhostBuilder.DEMO_ROOT,\n      "vendor/ruby2js/adapters"', 'RUBY2JS_RAILS_PATH,\n      "adapters"')
+  .gsub('SelfhostBuilder.DEMO_ROOT,\n      "vendor/ruby2js/targets"', 'RUBY2JS_RAILS_PATH,\n      "targets"')
+  .gsub('SelfhostBuilder.DEMO_ROOT,\n      "vendor/ruby2js"', 'RUBY2JS_RAILS_PATH')
+
+# Add createRequire import and RUBY2JS_RAILS_PATH constant after other imports
+require_inject = <<~JS
+import { createRequire } from "node:module";
+
+// Resolve ruby2js-rails package path for adapter/target files
+const require = createRequire(import.meta.url);
+const RUBY2JS_RAILS_PATH = path.dirname(require.resolve("ruby2js-rails/erb_runtime.mjs"));
+
+JS
+
+# Insert after the last import statement
+build_mjs_transformed = build_mjs_transformed.sub(
+  /^(import \{ ErbCompiler \}.*?\n)/m,
+  "\\1\n#{require_inject}"
 )
+
 FileUtils.mkdir_p(File.join(OUTPUT_DIR, 'scripts'))
 File.write(File.join(OUTPUT_DIR, 'scripts/build.mjs'), build_mjs_transformed)
-puts "  scripts/build.mjs (paths updated)"
+puts "  scripts/build.mjs (imports from npm packages)"
 puts ""
 
 # 3. Copy runtime files
@@ -124,7 +104,7 @@ puts "  bin/dev"
 puts "  bin/rails"
 puts ""
 
-# 5. Generate package.json (runtime only)
+# 5. Generate package.json (depends on ruby2js-rails npm package)
 puts "Generating package.json..."
 package_json = {
   "name" => "ruby2js-on-rails",
@@ -143,16 +123,18 @@ package_json = {
     "start:deno" => "deno run --allow-all server.mjs"
   },
   "dependencies" => {
-    "@ruby/prism" => "^1.6.0",
+    "ruby2js-rails" => "https://www.ruby2js.com/releases/ruby2js-rails-beta.tgz",
     "dexie" => "^4.0.10",
-    "sql.js" => "^1.11.0",
-    "chokidar" => "^3.5.3",
-    "js-yaml" => "^4.1.0",
-    "ws" => "^8.14.2"
+    "sql.js" => "^1.11.0"
   },
   "optionalDependencies" => {
     "better-sqlite3" => "^11.0.0",
     "pg" => "^8.13.0"
+  },
+  "devDependencies" => {
+    "chokidar" => "^3.5.3",
+    "js-yaml" => "^4.1.0",
+    "ws" => "^8.14.2"
   },
   "engines" => {
     "node" => ">=22.0.0"

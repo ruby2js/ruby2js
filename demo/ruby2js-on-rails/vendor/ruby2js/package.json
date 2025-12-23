@@ -26,6 +26,5 @@
     "url": "https://github.com/ruby2js/ruby2js"
   },
   "dependencies": {
-    "ruby2js": "https://www.ruby2js.com/releases/ruby2js-beta.tgz"
   }
 }

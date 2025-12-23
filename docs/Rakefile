@@ -409,8 +409,14 @@ task :ruby2js_rails_tarball => [:ruby2js_tarball] do
     version = "6.0.0-beta.#{Time.now.strftime('%Y%m%d%H%M')}"
     sh "npm version #{version} --no-git-tag-version --allow-same-version"
 
+    # Add ruby2js dependency for the published package
+    sh "npm pkg set dependencies.ruby2js=https://www.ruby2js.com/releases/ruby2js-beta.tgz"
+
     # Pack
     sh "npm pack"
+
+    # Remove dependency (keep source clean for development)
+    sh "npm pkg delete dependencies.ruby2js"
 
     # Copy to releases with stable name
     tarball = Dir.glob("ruby2js-rails-*.tgz").first
