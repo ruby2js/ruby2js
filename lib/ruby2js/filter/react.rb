@@ -10,10 +10,10 @@
 #      class Foo < React::Component  -> class Foo extends React.Component
 #      class Foo < Preact::Component -> class Foo extends Preact.Component
 #
-# Element creation uses Wunderbar-style DSL:
-#   _div class: "container" do   -> React.createElement("div", {className: "container"},
-#     _p "Hello"                 ->   React.createElement("p", null, "Hello"))
-#   end
+# Element creation uses JSX syntax or pnode AST nodes:
+#   %x{ <div className="container"><p>Hello</p></div> }
+#   -> React.createElement("div", {className: "container"},
+#        React.createElement("p", null, "Hello"))
 #
 # Variable mappings:
 #   @x   -> state variable (useState hook or this.state.x)

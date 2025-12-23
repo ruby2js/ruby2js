@@ -23,10 +23,12 @@ class Counter < React
   end
 
   def render
-    _div do
-      _p "Count: #{@count}"
-      _button "Increment", onClick: -> { @count += 1 }
-    end
+    %x{
+      <div>
+        <p>Count: {count}</p>
+        <button onClick={() => setCount(count + 1)}>Increment</button>
+      </div>
+    }
   end
 end
 ```
@@ -34,7 +36,6 @@ end
 This generates a function component with `useState` hooks:
 
 - `@count = 0` becomes `const [count, setCount] = React.useState(0)`
-- `@count += 1` becomes `setCount(count + 1)`
 - `@@prop` accesses `props.prop`
 
 ## Class Components
@@ -61,14 +62,14 @@ class Timer < React::Component
   end
 
   def render
-    _p "Seconds: #{@seconds}"
+    %x{ <p>Seconds: {this.state.seconds}</p> }
   end
 end
 ```
 
-## Wunderbar Element Syntax
+## JSX Syntax
 
-Elements are created using underscore-prefixed method calls:
+Elements are created using JSX syntax with `%x{...}`:
 
 <div data-controller="combo" data-options='{
   "eslevel": 2022,
@@ -78,40 +79,39 @@ Elements are created using underscore-prefixed method calls:
 ```ruby
 class Example < React
   def render
-    _div class: "container" do
-      _h1 "Hello"
-      _p "Welcome to React"
-      _ul do
-        _li "Item 1"
-        _li "Item 2"
-      end
-    end
+    %x{
+      <div className="container">
+        <h1>Hello</h1>
+        <p>Welcome to React</p>
+        <ul>
+          <li>Item 1</li>
+          <li>Item 2</li>
+        </ul>
+      </div>
+    }
   end
 end
 ```
 
-### Element Syntax Features
+### JSX Features
 
-- `_div`, `_p`, `_span` → HTML elements
-- `_MyComponent` → React components (capitalized)
-- `class:` → becomes `className`
-- `for:` → becomes `htmlFor`
-- Markaby-style: `_div.container.active` → `<div className="container active">`
-- IDs: `_div.main!` → `<div id="main">`
+- Standard HTML elements: `<div>`, `<p>`, `<span>`, etc.
+- React components (capitalized): `<MyComponent />`
+- Custom elements: `<my-widget />`
+- Fragments: `<>...</>`
+- Expressions: `{expression}`
+- Spread attributes: `{...props}`
 
-## JSX-like Syntax
+### Attribute Names
 
-You can also use JSX-like syntax with `%x{...}`:
+JSX uses camelCase attribute names:
 
-```ruby
-def render
-  %x{
-    <div className="app">
-      <h1>Hello, {@@name}!</h1>
-    </div>
-  }
-end
-```
+| JSX | HTML |
+|-----|------|
+| `className` | `class` |
+| `htmlFor` | `for` |
+| `onClick` | `onclick` |
+| `tabIndex` | `tabindex` |
 
 ## Variable Mappings
 
@@ -122,15 +122,6 @@ end
 | `$x` | `this.refs.x` | Global variables become refs |
 | `~x` | `this.refs.x` | Tilde also accesses refs |
 | `~(expr)` | `document.querySelector(expr)` | DOM queries |
-
-## Controlled Components
-
-For form inputs with `value:` bound to state, `onChange` handlers are automatically generated:
-
-```ruby
-_input value: @name  # Auto-generates onChange to update @name
-_input checked: @active  # Auto-generates onChange to toggle @active
-```
 
 ## Preact Support
 
@@ -144,7 +135,7 @@ end
 
 Differences from React:
 - Uses `Preact.h` instead of `React.createElement`
-- Uses `onInput` instead of `onChange` for controlled components
+- Uses `onInput` instead of `onChange` for form inputs
 - Uses `class` instead of `className`
 
 {% rendercontent "docs/note", extra_margin: true %}

@@ -5,7 +5,7 @@ top_section: Filters
 category: jsx
 ---
 
-The **JSX** filter converts Wunderbar-style element calls and `React.createElement` calls into JSX syntax.
+The **JSX** filter converts `React.createElement` calls into JSX syntax for human-readable output.
 
 This filter is useful when you want human-readable JSX output, particularly for:
 - Exporting Ruby2JS code for maintenance by JavaScript developers
@@ -14,43 +14,60 @@ This filter is useful when you want human-readable JSX output, particularly for:
 
 It works in conjunction with the [React](react) filter.
 
-This is generally not necessarily if the sources are being converted for
+This is generally not necessary if the sources are being converted for
 processing in the browser or by processing in Node.js for SSR purposes.
 Instead, this filter is more likely to be useful when the code is being
 processed as a part of a one-way export of the code, with the intention of the
 result being maintained by developers.
 
-Example inputs:
+## JSX Input with %x{}
+
+You can write JSX directly in Ruby using the `%x{...}` syntax:
 
 ```ruby
 %x{ <br/> }
 
-React.createElement("p", nil, "text", 
-  React.createElement("br", nil), data)
-
-_ul @@list do |item|
-  _li item.text, key: item.id
-end
+%x{
+  <div className="container">
+    <h1>{title}</h1>
+    <p>{description}</p>
+  </div>
+}
 ```
 
-Example outputs:
+## React.createElement Conversion
+
+The filter also converts `React.createElement` calls to JSX:
+
+Example input:
+
+```ruby
+React.createElement("p", nil, "text",
+  React.createElement("br", nil), data)
+```
+
+Example output:
 
 ```jsx
-<br/>
-
 <p>text<br/>{data}</p>
-
-<ul>{this.props.list.map(
-  item => <li key={item.id}>{item.text}</li>
-)}</ul>
 ```
 
-There are cases where this conversion may be incomplete.  Examples:
+## Supported JSX Features
 
- * calls to `React.createElement` where the first argument is other
-   than a literal string.
- * wunderbar syntax involving blocks including complex control
-   statements or even simple assignments.
+- HTML elements: `<div>`, `<span>`, `<p>`, etc.
+- React components: `<Card />`, `<MyComponent />`
+- Custom elements: `<my-widget />`
+- Fragments: `<>...</>`
+- Expressions: `{variable}`, `{condition ? a : b}`
+- Spread attributes: `{...props}`
+- Children: `<div><Child /></div>`
+
+## Limitations
+
+There are cases where this conversion may be incomplete:
+
+- Calls to `React.createElement` where the first argument is other than a literal string
+- Complex control flow inside JSX expressions
 
 {% rendercontent "docs/note", extra_margin: true %}
 More examples of how this filter works are in the [specs file](https://github.com/ruby2js/ruby2js/blob/master/spec/jsx_spec.rb).

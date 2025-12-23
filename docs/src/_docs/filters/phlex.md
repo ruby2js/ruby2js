@@ -7,10 +7,6 @@ category: phlex
 
 The **Phlex** filter transforms [Phlex](https://phlex.fun/) component classes into JavaScript render functions. It converts the Phlex HTML DSL into string concatenation, making components usable as standalone JavaScript functions.
 
-{% rendercontent "docs/note", type: "warning", title: "Beta Status" %}
-This filter is in beta. It supports ERB-replacement level functionality (generating HTML strings) but does not yet support component composition (`render OtherComponent.new`). See the Limitations section for details.
-{% endrendercontent %}
-
 ## How It Works
 
 Phlex components use a Ruby DSL to build HTML:
@@ -119,6 +115,87 @@ class ProfileCard extends Phlex.HTML {
     return _phlex_out
   }
 }
+```
+
+### Component Composition
+
+Render other components using `render Component.new`:
+
+```ruby
+class Page < Phlex::HTML
+  def view_template
+    render Header.new(title: "Welcome")
+    div(class: "content") do
+      render Card.new(class: "featured") do
+        h1 { "Featured Content" }
+        p { "This is inside the card." }
+      end
+    end
+    render Footer.new
+  end
+end
+```
+
+```javascript
+// Output:
+class Page extends Phlex.HTML {
+  render() {
+    let _phlex_out = "";
+    _phlex_out += Header.render({ title: "Welcome" });
+    _phlex_out += `<div class="content">`;
+    _phlex_out += Card.render({ class: "featured" }, () => {
+      _phlex_out += "<h1>Featured Content</h1>";
+      _phlex_out += "<p>This is inside the card.</p>"
+    });
+    _phlex_out += "</div>";
+    _phlex_out += Footer.render({});
+    return _phlex_out
+  }
+}
+```
+
+### Custom Elements
+
+Use `tag("element-name")` for custom HTML elements:
+
+```ruby
+class Widget < Phlex::HTML
+  def view_template
+    tag("my-widget", class: "custom") do
+      span { "inner content" }
+    end
+    tag("custom-footer", data_year: "2024")
+  end
+end
+```
+
+```javascript
+// Output:
+class Widget extends Phlex.HTML {
+  render() {
+    let _phlex_out = "";
+    _phlex_out += `<my-widget class="custom">`;
+    _phlex_out += "<span>inner content</span>";
+    _phlex_out += "</my-widget>";
+    _phlex_out += `<custom-footer data-year="2024"></custom-footer>`;
+    return _phlex_out
+  }
+}
+```
+
+### Fragments
+
+Use `fragment` to group multiple elements without a wrapper:
+
+```ruby
+class MultiRoot < Phlex::HTML
+  def view_template
+    fragment do
+      h1 { "Title" }
+      p { "Paragraph" }
+    end
+  end
+end
 ```
 
 ### Dynamic Attributes
@@ -257,6 +334,9 @@ All HTML5 elements are supported, including:
 | `whitespace` | `" "` |
 | `comment "text"` | `"<!-- text -->"` |
 | `doctype` | `"<!DOCTYPE html>"` |
+| `render Component.new` | `Component.render({...})` |
+| `tag("name")` | `<name>...</name>` |
+| `fragment { }` | (no wrapper element) |
 
 ### Attributes
 
@@ -278,27 +358,14 @@ All HTML5 elements are supported, including:
 | `@title` | `title` (from destructured parameter) |
 | `div { ... }` | `_phlex_out += "<div>"; ...; _phlex_out += "</div>"` |
 | `input` (void) | `_phlex_out += "<input>"` (no closing tag) |
+| `render X.new(...)` | `X.render({...})` |
+| `tag("x")` | `_phlex_out += "<x>...</x>"` |
 
 ## Limitations
 
-{% rendercontent "docs/note", type: "warning", title: "Component Composition Not Yet Supported" %}
-The filter does not yet support rendering other components:
-
-```ruby
-# NOT YET SUPPORTED
-def view_template
-  render HeaderComponent.new(title: @title)
-  div { @content }
-end
-```
-
-This feature is planned for a future release as part of the Vite plugin integration. See the [SFC Framework Integration Plan](https://github.com/ruby2js/ruby2js/blob/master/plans/SFC_FRAMEWORK_INTEGRATION.md) for details on the roadmap.
-{% endrendercontent %}
-
 Current limitations:
 
-- **Component composition**: `render OtherComponent.new(...)` is not supported
-- **Slots**: Phlex slot functionality is not supported
+- **Slots**: Phlex slot functionality is not yet supported
 - **Helpers**: Custom helper methods defined in the component are not transformed
 
 ## Usage Notes
@@ -312,13 +379,3 @@ Current limitations:
 {% rendercontent "docs/note", extra_margin: true %}
 More examples of how this filter works are in the [specs file](https://github.com/ruby2js/ruby2js/blob/master/spec/phlex_spec.rb).
 {% endrendercontent %}
-
-## Roadmap
-
-The Phlex filter is part of a broader plan for single-file component (SFC) framework integration. Future work includes:
-
-- **Vite plugin** for `.phlex.rb` files
-- **Component composition** via ES module imports
-- **Integration with Vue, Svelte, and Astro**
-
-See the [SFC Framework Integration Plan](https://github.com/ruby2js/ruby2js/blob/master/plans/SFC_FRAMEWORK_INTEGRATION.md) for the full roadmap.
