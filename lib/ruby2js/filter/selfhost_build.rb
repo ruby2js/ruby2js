@@ -145,16 +145,20 @@ module Ruby2JS
       end
 
       def on_gvar(node)
-        # $0 → `file://${process.argv[1]}` for ESM main script check
+        # $0 → `file://${fs.realpathSync(process.argv[1])}` for ESM main script check
         # This works with __FILE__ → import.meta.url conversion from ESM filter
+        # Using realpathSync to resolve symlinks (npm bin commands use symlinks)
         if node.children.first == :$0
-          # Build: `file://${process.argv[1]}`
+          # Build: `file://${fs.realpathSync(process.argv[1])}`
           return s(:dstr,
             s(:str, 'file://'),
             s(:begin, s(:send,
-              s(:attr, s(:attr, nil, :process), :argv),
-              :[],
-              s(:int, 1))))
+              s(:attr, nil, :fs),
+              :realpathSync,
+              s(:send,
+                s(:attr, s(:attr, nil, :process), :argv),
+                :[],
+                s(:int, 1)))))
         end
         super
       end

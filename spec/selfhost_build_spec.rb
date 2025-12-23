@@ -38,7 +38,7 @@ describe Ruby2JS::Filter::SelfhostBuild do
 
   describe 'global variables' do
     it 'should transform $0 to file URL for ESM main check' do
-      to_js('$0').must_equal '`file://${process.argv[1]}`'
+      to_js('$0').must_equal '`file://${fs.realpathSync(process.argv[1])}`'
     end
   end
 
