@@ -644,6 +644,133 @@ describe Ruby2JS::Filter::React do
     end
   end
 
+  describe "pnode conversion" do
+    # Helper to convert an AST node directly with React filter active
+    def convert_pnode(ast)
+      # Use Pipeline which properly applies filters and sets options
+      comments = {}
+      options = {
+        filters: [Ruby2JS::Filter::React],
+        react: true
+      }
+      pipeline = Ruby2JS::Pipeline.new(ast, comments, filters: options[:filters], options: options)
+      converter = pipeline.run
+      converter.to_s
+    end
+
+    # Helper to create AST nodes - use appropriate class based on parser
+    def s(type, *children)
+      if RUBY2JS_PARSER == :prism
+        Ruby2JS::Node.new(type, children)
+      else
+        Parser::AST::Node.new(type, children)
+      end
+    end
+
+    it "should convert pnode HTML element to React.createElement" do
+      ast = s(:pnode, :div, s(:hash))
+      result = convert_pnode(ast)
+      _(result).must_include 'React.createElement("div")'
+    end
+
+    it "should convert pnode with class to className" do
+      ast = s(:pnode, :div, s(:hash, s(:pair, s(:sym, :class), s(:str, "card"))))
+      result = convert_pnode(ast)
+      _(result).must_include 'React.createElement("div"'
+      _(result).must_include 'className'
+      _(result).must_include '"card"'
+    end
+
+    it "should convert pnode with nested children" do
+      ast = s(:pnode, :div, s(:hash),
+        s(:pnode, :span, s(:hash)))
+      result = convert_pnode(ast)
+      _(result).must_include 'React.createElement("div"'
+      _(result).must_include 'React.createElement("span"'
+    end
+
+    it "should convert pnode component (uppercase) to React.createElement" do
+      ast = s(:pnode, :Card, s(:hash))
+      result = convert_pnode(ast)
+      _(result).must_include 'React.createElement(Card)'
+    end
+
+    it "should convert pnode component with props" do
+      ast = s(:pnode, :Button, s(:hash, s(:pair, s(:sym, :onClick), s(:lvar, :handler))))
+      result = convert_pnode(ast)
+      _(result).must_include 'React.createElement(Button'
+      _(result).must_include 'onClick'
+    end
+
+    it "should convert pnode custom element (string tag)" do
+      ast = s(:pnode, "my-widget", s(:hash))
+      result = convert_pnode(ast)
+      _(result).must_include 'React.createElement("my-widget"'
+    end
+
+    it "should convert pnode fragment (nil tag)" do
+      ast = s(:pnode, nil, s(:hash),
+        s(:pnode, :h1, s(:hash)),
+        s(:pnode, :p, s(:hash)))
+      result = convert_pnode(ast)
+      _(result).must_include 'React.Fragment'
+      _(result).must_include '"h1"'
+      _(result).must_include '"p"'
+    end
+
+    it "should convert pnode_text with static text" do
+      ast = s(:pnode, :p, s(:hash),
+        s(:pnode_text, s(:str, "Hello")))
+      result = convert_pnode(ast)
+      _(result).must_include 'React.createElement("p"'
+      _(result).must_include '"Hello"'
+    end
+
+    it "should convert pnode_text with dynamic content" do
+      ast = s(:pnode, :span, s(:hash),
+        s(:pnode_text, s(:lvar, :name)))
+      result = convert_pnode(ast)
+      _(result).must_include 'React.createElement("span"'
+      _(result).must_include 'name'
+    end
+
+    it "should convert for attribute to htmlFor" do
+      ast = s(:pnode, :label, s(:hash, s(:pair, s(:sym, :for), s(:str, "email"))))
+      result = convert_pnode(ast)
+      _(result).must_include 'htmlFor'
+      _(result).must_include '"email"'
+    end
+
+    it "should convert tabindex to tabIndex" do
+      ast = s(:pnode, :input, s(:hash, s(:pair, s(:sym, :tabindex), s(:int, 1))))
+      result = convert_pnode(ast)
+      _(result).must_include 'tabIndex'
+      _(result).must_include '1'
+    end
+
+    it "should convert data_foo attributes to data-foo" do
+      ast = s(:pnode, :div, s(:hash, s(:pair, s(:sym, :data_id), s(:str, "123"))))
+      result = convert_pnode(ast)
+      _(result).must_include '"data-id"'
+      _(result).must_include '"123"'
+    end
+
+    it "should handle deeply nested pnodes" do
+      ast = s(:pnode, :div, s(:hash),
+        s(:pnode, :ul, s(:hash),
+          s(:pnode, :li, s(:hash),
+            s(:pnode_text, s(:str, "Item 1"))),
+          s(:pnode, :li, s(:hash),
+            s(:pnode_text, s(:str, "Item 2")))))
+      result = convert_pnode(ast)
+      _(result).must_include 'React.createElement("div"'
+      _(result).must_include 'React.createElement("ul"'
+      _(result).must_include 'React.createElement("li"'
+      _(result).must_include '"Item 1"'
+      _(result).must_include '"Item 2"'
+    end
+  end
+
   describe Ruby2JS::Filter::DEFAULTS do
     it "should include React" do
       _(Ruby2JS::Filter::DEFAULTS).must_include Ruby2JS::Filter::React

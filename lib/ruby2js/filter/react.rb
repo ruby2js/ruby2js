@@ -1102,6 +1102,200 @@ module Ruby2JS
         end
       end
 
+      # Handle pnode (synthetic AST node for elements)
+      # Structure: s(:pnode, tag, attrs_hash, *children)
+      def on_pnode(node)
+        return super unless @react
+
+        tag, attrs, *children = node.children
+
+        process_pnode_element(tag, attrs, children)
+      end
+
+      # Handle pnode_text (text content in pnode)
+      # Structure: s(:pnode_text, content_node)
+      def on_pnode_text(node)
+        return super unless @react
+
+        content = node.children.first
+
+        if content.type == :str
+          # Static text - return as-is
+          if @reactApply
+            s(:send, s(:gvar, :$_), :push, content)
+          else
+            content
+          end
+        else
+          # Dynamic content
+          processed = process(content)
+          if @reactApply
+            s(:send, s(:gvar, :$_), :push, processed)
+          else
+            processed
+          end
+        end
+      end
+
+      private
+
+      # Process a pnode element and convert to React.createElement
+      def process_pnode_element(tag, attrs, children)
+        case tag
+        when nil
+          # Fragment
+          process_pnode_fragment(attrs, children)
+        when Symbol
+          if tag.to_s[0] =~ /[A-Z]/
+            # Component (uppercase)
+            process_pnode_component(tag, attrs, children)
+          else
+            # HTML element (lowercase)
+            process_pnode_html_element(tag, attrs, children)
+          end
+        when String
+          # Custom element
+          process_pnode_custom_element(tag, attrs, children)
+        end
+      end
+
+      def process_pnode_html_element(tag, attrs, children)
+        tag_str = tag.to_s
+
+        # Build params: [tag_string, attrs_hash, ...children]
+        params = [s(:str, tag_str)]
+        params << process_pnode_attrs(attrs)
+
+        # Process children
+        children.each do |child|
+          params << process(child)
+        end
+
+        # Trim trailing null if no children
+        params.pop if params.last == s(:nil) && children.empty?
+
+        build_react_element(params)
+      end
+
+      def process_pnode_component(tag, attrs, children)
+        # Build params: [ComponentConst, attrs_hash, ...children]
+        params = [s(:const, nil, tag)]
+        params << process_pnode_attrs(attrs)
+
+        # Process children
+        children.each do |child|
+          params << process(child)
+        end
+
+        # Trim trailing null if no children
+        params.pop if params.last == s(:nil) && children.empty?
+
+        build_react_element(params)
+      end
+
+      def process_pnode_custom_element(tag, attrs, children)
+        # Build params: [tag_string, attrs_hash, ...children]
+        params = [s(:str, tag)]
+        params << process_pnode_attrs(attrs)
+
+        # Process children
+        children.each do |child|
+          params << process(child)
+        end
+
+        # Trim trailing null if no children
+        params.pop if params.last == s(:nil) && children.empty?
+
+        build_react_element(params)
+      end
+
+      def process_pnode_fragment(attrs, children)
+        # Build params: [React.Fragment, attrs_hash, ...children]
+        fragment_const = @react == :Preact ?
+          s(:const, nil, :"Preact.Fragment") :
+          s(:const, nil, :"React.Fragment")
+
+        params = [fragment_const]
+        params << process_pnode_attrs(attrs)
+
+        # Process children
+        children.each do |child|
+          params << process(child)
+        end
+
+        # Trim trailing null if no children
+        params.pop if params.last == s(:nil) && children.empty?
+
+        build_react_element(params)
+      end
+
+      def process_pnode_attrs(attrs)
+        return s(:nil) unless attrs&.type == :hash && attrs.children.any?
+
+        # Normalize attributes: class -> className, for -> htmlFor, etc.
+        pairs = attrs.children.map do |pair|
+          next pair unless pair.type == :pair
+
+          key_node, value_node = pair.children
+          next pair unless key_node.type == :sym
+
+          key = key_node.children.first
+
+          # Attribute normalization for React
+          new_key = case key
+          when :class then :className
+          when :for then :htmlFor
+          when :tabindex then :tabIndex
+          when :readonly then :readOnly
+          when :maxlength then :maxLength
+          when :cellpadding then :cellPadding
+          when :cellspacing then :cellSpacing
+          when :colspan then :colSpan
+          when :rowspan then :rowSpan
+          when :usemap then :useMap
+          when :frameborder then :frameBorder
+          when :contenteditable then :contentEditable
+          when :autocomplete then :autoComplete
+          when :autofocus then :autoFocus
+          when :enctype then :encType
+          when :formaction then :formAction
+          when :novalidate then :noValidate
+          when :spellcheck then :spellCheck
+          else
+            # Convert data_foo to data-foo for data attributes
+            if key.to_s.start_with?('data_')
+              key.to_s.tr('_', '-').to_sym
+            else
+              key
+            end
+          end
+
+          if new_key != key
+            s(:pair, s(:sym, new_key), value_node)
+          else
+            pair
+          end
+        end
+
+        process(s(:hash, *pairs))
+      end
+
+      def build_react_element(params)
+        if @react == :Preact
+          element = s(:send, s(:const, nil, :Preact), :h, *params)
+        else
+          element = s(:send, s(:const, nil, :React), :createElement, *params)
+        end
+
+        if @reactApply
+          s(:send, s(:gvar, :$_), :push, element)
+        else
+          element
+        end
+      end
+
+      public
+
       # convert blocks to proc arguments
       def on_block(node)
         if not @react
