@@ -33,47 +33,9 @@ puts "Copying user app..."
 end
 puts ""
 
-# 2. Copy and transform build.mjs
-# Update import paths from relative to npm packages
-puts "Generating scripts/build.mjs..."
-build_mjs_src = File.join(DEMO_DIR, 'scripts/build.mjs')
-build_mjs_content = File.read(build_mjs_src)
-
-# Transform imports from relative paths to npm packages
-build_mjs_transformed = build_mjs_content
-  # ruby2js converter imports
-  .gsub(%r{"\.\.\/\.\.\/selfhost\/ruby2js\.js"}, '"ruby2js"')
-  .gsub(%r{"\.\.\/\.\.\/selfhost\/filters\/}, '"ruby2js/filters/')
-  .gsub(%r{"\.\.\/\.\.\/selfhost\/lib\/}, '"ruby2js/lib/')
-  # vendor/ruby2js paths -> RUBY2JS_RAILS_PATH (for adapters/targets/erb_runtime)
-  .gsub('SelfhostBuilder.DEMO_ROOT,\n      "vendor/ruby2js/adapters"', 'RUBY2JS_RAILS_PATH,\n      "adapters"')
-  .gsub('SelfhostBuilder.DEMO_ROOT,\n      "vendor/ruby2js/targets"', 'RUBY2JS_RAILS_PATH,\n      "targets"')
-  .gsub('SelfhostBuilder.DEMO_ROOT,\n      "vendor/ruby2js"', 'RUBY2JS_RAILS_PATH')
-
-# Add createRequire import and RUBY2JS_RAILS_PATH constant after other imports
-require_inject = <<~JS
-import { createRequire } from "node:module";
-
-// Resolve ruby2js-rails package path for adapter/target files
-const require = createRequire(import.meta.url);
-const RUBY2JS_RAILS_PATH = path.dirname(require.resolve("ruby2js-rails/erb_runtime.mjs"));
-
-JS
-
-# Insert after the last import statement
-build_mjs_transformed = build_mjs_transformed.sub(
-  /^(import \{ ErbCompiler \}.*?\n)/m,
-  "\\1\n#{require_inject}"
-)
-
-FileUtils.mkdir_p(File.join(OUTPUT_DIR, 'scripts'))
-File.write(File.join(OUTPUT_DIR, 'scripts/build.mjs'), build_mjs_transformed)
-puts "  scripts/build.mjs (imports from npm packages)"
-puts ""
-
-# 3. Copy runtime files
-puts "Copying runtime files..."
-%w[dev-server.mjs server.mjs index.html README.md favicon.ico].each do |file|
+# 2. Copy static files
+puts "Copying static files..."
+%w[index.html README.md favicon.ico].each do |file|
   src = File.join(DEMO_DIR, file)
   if File.exist?(src)
     FileUtils.cp(src, File.join(OUTPUT_DIR, file))
@@ -82,7 +44,7 @@ puts "Copying runtime files..."
 end
 puts ""
 
-# 3b. Copy public directory (CSS, static assets)
+# 3. Copy public directory (CSS, static assets)
 public_src = File.join(DEMO_DIR, 'public')
 if File.exist?(public_src)
   puts "Copying public assets..."
@@ -105,6 +67,7 @@ puts "  bin/rails"
 puts ""
 
 # 5. Generate package.json (depends on ruby2js-rails npm package)
+# All build/dev/server scripts are provided by ruby2js-rails bin commands
 puts "Generating package.json..."
 package_json = {
   "name" => "ruby2js-on-rails",
@@ -112,15 +75,15 @@ package_json = {
   "type" => "module",
   "description" => "Rails-like web app powered by Ruby2JS - write Ruby, run JavaScript",
   "scripts" => {
-    "dev" => "node dev-server.mjs",
-    "dev:node" => "DATABASE=better_sqlite3 npm run build && node server.mjs",
-    "dev:bun" => "DATABASE=better_sqlite3 RUNTIME=bun npm run build && bun server.mjs",
-    "dev:deno" => "DATABASE=better_sqlite3 RUNTIME=deno npm run build && deno run --allow-all server.mjs",
-    "build" => "node scripts/build.mjs",
+    "dev" => "ruby2js-rails-dev",
+    "dev:node" => "DATABASE=better_sqlite3 npm run build && ruby2js-rails-server",
+    "dev:bun" => "DATABASE=better_sqlite3 RUNTIME=bun npm run build && bun node_modules/ruby2js-rails/server.mjs",
+    "dev:deno" => "DATABASE=better_sqlite3 RUNTIME=deno npm run build && deno run --allow-all node_modules/ruby2js-rails/server.mjs",
+    "build" => "ruby2js-rails-build",
     "start" => "npx serve -p 3000",
-    "start:node" => "node server.mjs",
-    "start:bun" => "bun server.mjs",
-    "start:deno" => "deno run --allow-all server.mjs"
+    "start:node" => "ruby2js-rails-server",
+    "start:bun" => "bun node_modules/ruby2js-rails/server.mjs",
+    "start:deno" => "deno run --allow-all node_modules/ruby2js-rails/server.mjs"
   },
   "dependencies" => {
     "ruby2js-rails" => "https://www.ruby2js.com/releases/ruby2js-rails-beta.tgz",
@@ -130,11 +93,6 @@ package_json = {
   "optionalDependencies" => {
     "better-sqlite3" => "^11.0.0",
     "pg" => "^8.13.0"
-  },
-  "devDependencies" => {
-    "chokidar" => "^3.5.3",
-    "js-yaml" => "^4.1.0",
-    "ws" => "^8.14.2"
   },
   "engines" => {
     "node" => ">=22.0.0"

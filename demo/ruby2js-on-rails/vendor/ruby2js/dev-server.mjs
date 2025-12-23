@@ -8,12 +8,10 @@ import { join, extname } from 'path';
 import { watch } from 'chokidar';
 import { WebSocketServer } from 'ws';
 import { exec } from 'child_process';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
-import { SelfhostBuilder } from './scripts/build.mjs';
+import { SelfhostBuilder } from './build.mjs';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+// App root is current working directory (not package location)
+const APP_ROOT = process.cwd();
 
 // Parse command line arguments
 const args = process.argv.slice(2);
@@ -82,7 +80,7 @@ async function runBuild() {
 
 function runRubyBuild() {
   return new Promise((resolve, reject) => {
-    exec('ruby scripts/build.rb', { cwd: __dirname }, (error, stdout, stderr) => {
+    exec('ruby scripts/build.rb', { cwd: APP_ROOT }, (error, stdout, stderr) => {
       if (error) {
         console.error('\x1b[31m[build error]\x1b[0m', error.message);
         if (stderr) console.error(stderr);
@@ -102,7 +100,7 @@ async function runSelfhostBuild() {
   try {
     // Create builder on first use
     if (!builder) {
-      builder = new SelfhostBuilder(join(__dirname, 'dist'));
+      builder = new SelfhostBuilder(join(APP_ROOT, 'dist'), APP_ROOT);
     }
     await builder.build();
   } catch (err) {
@@ -138,7 +136,7 @@ async function serveFile(req, res) {
     return;
   }
 
-  const filePath = join(__dirname, url);
+  const filePath = join(APP_ROOT, url);
   const ext = extname(filePath);
   const contentType = MIME_TYPES[ext] || 'application/octet-stream';
 
@@ -160,7 +158,7 @@ async function serveFile(req, res) {
       // SPA fallback: if no file extension, serve index.html for client-side routing
       if (!ext || ext === '') {
         try {
-          const indexContent = await readFile(join(__dirname, 'index.html'));
+          const indexContent = await readFile(join(APP_ROOT, 'index.html'));
           res.writeHead(200, { 'Content-Type': 'text/html' });
           res.end(indexContent);
           return;
@@ -196,9 +194,9 @@ wss.on('connection', (ws) => {
 
 // File watcher
 const watchPaths = [
-  join(__dirname, 'app'),
-  join(__dirname, 'config'),
-  join(__dirname, 'db')
+  join(APP_ROOT, 'app'),
+  join(APP_ROOT, 'config'),
+  join(APP_ROOT, 'db')
 ];
 
 const watcher = watch(watchPaths, {
@@ -213,7 +211,7 @@ function onFileChange(event, path) {
   // Only watch .rb and .erb files
   if (!path.endsWith('.rb') && !path.endsWith('.erb')) return;
 
-  const relativePath = path.replace(__dirname + '/', '');
+  const relativePath = path.replace(APP_ROOT + '/', '');
   console.log(`\x1b[33m[${event}]\x1b[0m ${relativePath}`);
 
   // Debounce rapid changes

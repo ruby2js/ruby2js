@@ -4,27 +4,17 @@
   "type": "module",
   "description": "Rails-like app running in JavaScript - Ruby2JS selfhost demo",
   "scripts": {
-    "dev": "node dev-server.mjs",
-    "dev:ruby": "node dev-server.mjs --ruby",
-    "dev:selfhost": "npm run build:selfhost && npm run dev",
-    "dev:node": "npm run build:ruby && node server.mjs",
-    "dev:bun": "RUNTIME=bun npm run build:ruby && bun server.mjs",
-    "dev:deno": "RUNTIME=deno npm run build:ruby && deno run --allow-all server.mjs",
-    "build": "node scripts/build.mjs",
+    "dev": "ruby2js-rails-dev",
+    "dev:ruby": "ruby2js-rails-dev --ruby",
+    "dev:node": "DATABASE=better_sqlite3 npm run build && ruby2js-rails-server",
+    "dev:bun": "DATABASE=better_sqlite3 RUNTIME=bun npm run build && bun node_modules/ruby2js-rails/server.mjs",
+    "dev:deno": "DATABASE=better_sqlite3 RUNTIME=deno npm run build && deno run --allow-all node_modules/ruby2js-rails/server.mjs",
+    "build": "ruby2js-rails-build",
     "build:ruby": "ruby scripts/build.rb",
-    "build:selfhost": "cd ../selfhost && npm run build && rm -f ruby2js-*.tgz && npm pack && cd ../ruby2js-on-rails/vendor/ruby2js && rm -f ruby2js-rails-*.tgz && npm pkg set dependencies.ruby2js=file:../../../selfhost/ruby2js-6.0.0-beta.tgz && npm pack && npm pkg set dependencies.ruby2js=https://www.ruby2js.com/releases/ruby2js-beta.tgz && cd ../.. && npm install ./vendor/ruby2js/ruby2js-rails-*.tgz && npm pkg set dependencies.ruby2js-rails=https://www.ruby2js.com/releases/ruby2js-rails-beta.tgz",
-    "build:node": "ruby scripts/build.rb",
-    "build:bun": "RUNTIME=bun ruby scripts/build.rb",
-    "build:deno": "RUNTIME=deno ruby scripts/build.rb",
     "start": "npx serve -p 3000",
-    "start:node": "node server.mjs",
-    "start:bun": "bun server.mjs",
-    "start:deno": "deno run --allow-all server.mjs",
-    "test:sql": "node sql_prototype.mjs",
-    "test:ar": "node active_record_test.mjs",
-    "test:mvc": "node mvc_sketch.mjs",
-    "test:smoke": "node scripts/smoke-test.mjs",
-    "test": "npm run test:sql && npm run test:ar && npm run test:mvc"
+    "start:node": "ruby2js-rails-server",
+    "start:bun": "bun node_modules/ruby2js-rails/server.mjs",
+    "start:deno": "deno run --allow-all node_modules/ruby2js-rails/server.mjs"
   },
   "dependencies": {
     "dexie": "^4.0.10",
@@ -33,10 +23,5 @@
   "optionalDependencies": {
     "better-sqlite3": "^11.0.0",
     "pg": "^8.13.0"
-  },
-  "devDependencies": {
-    "chokidar": "^3.5.3",
-    "js-yaml": "^4.1.0",
-    "ws": "^8.14.2"
   }
 }
