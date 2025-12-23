@@ -55,7 +55,7 @@ describe Ruby2JS::Filter::SelfhostBuild do
   describe 'ruby2js requires' do
     it 'should transform require ruby2js with namespace import and initPrism' do
       to_js('require "ruby2js"').
-        must_equal 'import * as Ruby2JS from "../../selfhost/ruby2js.js"; await Ruby2JS.initPrism()'
+        must_equal 'import * as Ruby2JS from "../../../selfhost/ruby2js.js"; await Ruby2JS.initPrism()'
     end
 
     it 'should use custom selfhost_path option' do
@@ -65,12 +65,12 @@ describe Ruby2JS::Filter::SelfhostBuild do
 
     it 'should transform require ruby2js/filter/rails/model with named import' do
       to_js('require "ruby2js/filter/rails/model"').
-        must_equal 'import { Rails_Model } from "../../selfhost/filters/rails/model.js"'
+        must_equal 'import { Rails_Model } from "../../../selfhost/filters/rails/model.js"'
     end
 
     it 'should transform require ruby2js/filter/functions with named import' do
       to_js('require "ruby2js/filter/functions"').
-        must_equal 'import { Functions } from "../../selfhost/filters/functions.js"'
+        must_equal 'import { Functions } from "../../../selfhost/filters/functions.js"'
     end
 
     it 'should use custom selfhost_filters option with named import' do
