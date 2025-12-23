@@ -17,7 +17,8 @@
     "stimulus_spec.rb",
     "erb_spec.rb",
     "rails_helpers_spec.rb",
-    "rails_routes_spec.rb"
+    "rails_routes_spec.rb",
+    "securerandom_spec.rb"
   ],
   "partial": [
     "camelcase_spec.rb",
@@ -26,11 +27,10 @@
     "pragma_spec.rb",
     "comments_spec.rb",
     "react_spec.rb",
-    "jest_spec.rb"
+    "jest_spec.rb",
+    "node_spec.rb"
   ],
   "blocked": {
-    "securerandom_spec.rb": "extend SEXP doesn't transpile",
-    "node_spec.rb": "extend SEXP doesn't transpile",
     "lit_spec.rb": "filter transpiles but has runtime errors",
     "jquery_spec.rb": "no filter",
     "underscore_spec.rb": "no filter",
