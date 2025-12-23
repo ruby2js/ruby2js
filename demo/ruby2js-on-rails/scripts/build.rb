@@ -175,6 +175,19 @@ class SelfhostBuilder
       puts("")
     end
 
+    # Transpile Stimulus controllers (app/javascript/controllers/)
+    stimulus_dir = File.join(DEMO_ROOT, 'app/javascript/controllers')
+    if File.exist?(stimulus_dir)
+      puts("Stimulus Controllers:")
+      self.transpile_directory(
+        stimulus_dir,
+        File.join(@dist_dir, 'javascript/controllers'),
+        '**/*.rb',
+        section: 'stimulus'
+      )
+      puts("")
+    end
+
     # Transpile config (skip routes.rb, handled separately)
     puts("Config:")
     self.transpile_directory(

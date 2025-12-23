@@ -26,3 +26,20 @@ production:
 
 test:
   <<: *default
+
+# Phlex components (app/components/)
+components:
+  <<: *default
+  filters:
+    - phlex
+    - functions
+    - esm
+
+# Stimulus controllers (app/javascript/controllers/)
+stimulus:
+  <<: *default
+  filters:
+    - stimulus
+    - camelCase
+    - functions
+    - esm
