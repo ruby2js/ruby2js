@@ -440,6 +440,117 @@ describe Ruby2JS::Filter::Phlex do
     end
   end
 
+  describe 'component composition' do
+    it "should handle render Component.new without children" do
+      result = to_js(<<~RUBY)
+        class Page < Phlex::HTML
+          def view_template
+            render Header.new(title: "Welcome")
+          end
+        end
+      RUBY
+      result.must_include 'Header.render'
+      result.must_include 'title'
+    end
+
+    it "should handle render Component.new with children" do
+      result = to_js(<<~RUBY)
+        class Page < Phlex::HTML
+          def view_template
+            render Card.new(class: "featured") do
+              h1 { "Title" }
+              p { "Content" }
+            end
+          end
+        end
+      RUBY
+      result.must_include 'Card.render'
+      result.must_include '<h1>'
+      result.must_include '<p>'
+    end
+
+    it "should handle nested component composition" do
+      result = to_js(<<~RUBY)
+        class Page < Phlex::HTML
+          def view_template
+            render Layout.new do
+              render Header.new(title: "Hi")
+              render Footer.new
+            end
+          end
+        end
+      RUBY
+      result.must_include 'Layout.render'
+      result.must_include 'Header.render'
+      result.must_include 'Footer.render'
+    end
+  end
+
+  describe 'custom elements' do
+    it "should handle tag without children" do
+      result = to_js(<<~RUBY)
+        class Widget < Phlex::HTML
+          def view_template
+            tag("my-widget", class: "custom")
+          end
+        end
+      RUBY
+      result.must_include '<my-widget'
+      result.must_include '</my-widget>'
+      result.must_include 'class'
+    end
+
+    it "should handle tag with children" do
+      result = to_js(<<~RUBY)
+        class Widget < Phlex::HTML
+          def view_template
+            tag("my-card") do
+              span { "inner content" }
+            end
+          end
+        end
+      RUBY
+      result.must_include '<my-card>'
+      result.must_include '<span>'
+      result.must_include '</span>'
+      result.must_include '</my-card>'
+    end
+
+    it "should handle tag with data attributes" do
+      result = to_js(<<~RUBY)
+        class Widget < Phlex::HTML
+          def view_template
+            tag("custom-element", data_id: "123", data_action: "click")
+          end
+        end
+      RUBY
+      result.must_include '<custom-element'
+      result.must_include 'data-id'
+      result.must_include 'data-action'
+    end
+  end
+
+  describe 'fragments' do
+    it "should handle fragment with multiple children" do
+      result = to_js(<<~RUBY)
+        class MultiRoot < Phlex::HTML
+          def view_template
+            fragment do
+              h1 { "Title" }
+              p { "Paragraph" }
+            end
+          end
+        end
+      RUBY
+      result.must_include '<h1>'
+      result.must_include '</h1>'
+      result.must_include '<p>'
+      result.must_include '</p>'
+      # Fragment should not add wrapper
+      result.wont_include '<fragment>'
+    end
+  end
+
   describe Ruby2JS::Filter::DEFAULTS do
     it "should include Phlex" do
       _(Ruby2JS::Filter::DEFAULTS).must_include Ruby2JS::Filter::Phlex

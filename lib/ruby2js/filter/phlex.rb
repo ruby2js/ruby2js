@@ -163,6 +163,33 @@ module Ruby2JS
         s(:lvar, prop_name)
       end
 
+      # Handle pnode (synthetic AST node for elements)
+      # Structure: s(:pnode, tag, attrs_hash, *children)
+      def on_pnode(node)
+        return super unless @phlex_buffer
+
+        tag, attrs, *children = node.children
+
+        process_pnode_element(tag, attrs, children)
+      end
+
+      # Handle pnode_text (text content in pnode)
+      # Structure: s(:pnode_text, content_node)
+      def on_pnode_text(node)
+        return super unless @phlex_buffer
+
+        content = node.children.first
+
+        if content.type == :str
+          # Static text - add directly
+          s(:op_asgn, s(:lvasgn, @phlex_buffer), :+, content)
+        else
+          # Dynamic content - stringify
+          s(:op_asgn, s(:lvasgn, @phlex_buffer), :+,
+            s(:send, nil, :String, process(content)))
+        end
+      end
+
       # Handle element method calls
       def on_send(node)
         return super unless @phlex_buffer
@@ -178,6 +205,26 @@ module Ruby2JS
 
         if PHLEX_METHODS.include?(method)
           return process_phlex_method(method, args)
+        end
+
+        # Handle render Component.new(...) for component composition
+        if method == :render && args.first&.type == :send
+          component_call = args.first
+          if component_call.children[1] == :new
+            return process_component(component_call, nil)
+          end
+        end
+
+        # Handle tag("custom-element", ...) for custom elements
+        if method == :tag && args.first&.type == :str
+          tag_name = args.first.children.first
+          tag_args = args[1..-1]
+          return process_custom_element(tag_name, tag_args, nil)
+        end
+
+        # Handle fragment (for pnode nil tag)
+        if method == :fragment
+          return nil  # Fragment produces no output itself
         end
 
         super
@@ -196,6 +243,27 @@ module Ruby2JS
         # Handle element with block (div { ... })
         if target.nil? && ALL_ELEMENTS.include?(method)
           return process_element(method, args, block_body)
+        end
+
+        # Handle render Component.new do ... end
+        if target.nil? && method == :render && args.first&.type == :send
+          component_call = args.first
+          if component_call.children[1] == :new
+            return process_component(component_call, block_body)
+          end
+        end
+
+        # Handle tag("custom-element") do ... end
+        if target.nil? && method == :tag && args.first&.type == :str
+          tag_name = args.first.children.first
+          tag_args = args[1..-1]
+          return process_custom_element(tag_name, tag_args, block_body)
+        end
+
+        # Handle fragment do ... end
+        if target.nil? && method == :fragment
+          # Fragment just processes children without wrapper
+          return process_fragment(block_body)
         end
 
         # For loops (.each, .map, etc.), let other filters handle the conversion
@@ -482,6 +550,167 @@ module Ruby2JS
           s(:op_asgn, s(:lvasgn, @phlex_buffer), :+,
             s(:str, '<!DOCTYPE html>'))
         end
+      end
+
+      # Process a pnode (synthetic AST node for elements)
+      def process_pnode_element(tag, attrs, children)
+        statements = []
+
+        case tag
+        when nil
+          # Fragment - just process children
+          children.each do |child|
+            result = process(child)
+            statements << result if result
+          end
+        when Symbol
+          if tag.to_s[0] =~ /[A-Z]/
+            # Component (uppercase)
+            statements << process_pnode_component(tag, attrs, children)
+          else
+            # HTML element (lowercase)
+            statements.concat(process_pnode_html_element(tag, attrs, children))
+          end
+        when String
+          # Custom element
+          statements.concat(process_pnode_custom_element(tag, attrs, children))
+        end
+
+        statements.length == 1 ? statements.first : s(:begin, *statements)
+      end
+
+      def process_pnode_html_element(tag, attrs, children)
+        tag_str = tag.to_s
+        void = VOID_ELEMENTS.include?(tag)
+        statements = []
+
+        # Build open tag
+        open_tag = build_open_tag(tag_str, attrs)
+        statements << s(:op_asgn, s(:lvasgn, @phlex_buffer), :+, open_tag)
+
+        # Process children for non-void elements
+        unless void
+          children.each do |child|
+            result = process(child)
+            statements << result if result
+          end
+
+          # Close tag
+          statements << s(:op_asgn, s(:lvasgn, @phlex_buffer), :+,
+            s(:str, "</#{tag_str}>"))
+        end
+
+        statements
+      end
+
+      def process_pnode_component(tag, attrs, children)
+        component_name = tag.to_s
+
+        # Build props hash from attrs
+        props = []
+        if attrs&.type == :hash
+          attrs.children.each do |pair|
+            next unless pair.type == :pair
+            props << pair
+          end
+        end
+
+        # Build render call: ComponentName.render({ props }, () => { children })
+        props_hash = props.empty? ? s(:hash) : s(:hash, *props)
+
+        if children.empty?
+          # No children: ComponentName.render({ props })
+          s(:op_asgn, s(:lvasgn, @phlex_buffer), :+,
+            s(:send, s(:const, nil, tag), :render, process(props_hash)))
+        else
+          # With children: ComponentName.render({ props }, () => { ... })
+          child_statements = children.map { |c| process(c) }.compact
+          child_body = child_statements.length == 1 ? child_statements.first : s(:begin, *child_statements)
+
+          s(:op_asgn, s(:lvasgn, @phlex_buffer), :+,
+            s(:send, s(:const, nil, tag), :render,
+              process(props_hash),
+              s(:block, s(:send, nil, :proc), s(:args), child_body)))
+        end
+      end
+
+      def process_pnode_custom_element(tag, attrs, children)
+        statements = []
+
+        # Build open tag
+        open_tag = build_open_tag(tag, attrs)
+        statements << s(:op_asgn, s(:lvasgn, @phlex_buffer), :+, open_tag)
+
+        # Process children
+        children.each do |child|
+          result = process(child)
+          statements << result if result
+        end
+
+        # Close tag
+        statements << s(:op_asgn, s(:lvasgn, @phlex_buffer), :+,
+          s(:str, "</#{tag}>"))
+
+        statements
+      end
+
+      # Process render Component.new(...) for component composition
+      def process_component(component_call, block_body)
+        component_const = component_call.children[0]
+        component_args = component_call.children[2..-1] || []
+
+        # Extract props hash
+        props_hash = component_args.find { |a| a.respond_to?(:type) && a.type == :hash }
+        props_hash = props_hash ? process(props_hash) : s(:hash)
+
+        if block_body
+          # With children: Component.render({ props }, () => { ... })
+          child_content = process_block_content(block_body)
+          child_body = child_content.length == 1 ? child_content.first : s(:begin, *child_content)
+
+          s(:op_asgn, s(:lvasgn, @phlex_buffer), :+,
+            s(:send, component_const, :render,
+              props_hash,
+              s(:block, s(:send, nil, :proc), s(:args), child_body)))
+        else
+          # No children: Component.render({ props })
+          s(:op_asgn, s(:lvasgn, @phlex_buffer), :+,
+            s(:send, component_const, :render, props_hash))
+        end
+      end
+
+      # Process tag("custom-element", ...) for custom elements
+      def process_custom_element(tag_name, args, block_body)
+        # Extract attrs hash
+        attrs_node = args.find { |a| a.respond_to?(:type) && a.type == :hash }
+
+        statements = []
+
+        # Build open tag
+        open_tag = build_open_tag(tag_name, attrs_node)
+        statements << s(:op_asgn, s(:lvasgn, @phlex_buffer), :+, open_tag)
+
+        # Process block content if present
+        if block_body
+          content = process_block_content(block_body)
+          statements.concat(content) if content&.any?
+        end
+
+        # Close tag
+        statements << s(:op_asgn, s(:lvasgn, @phlex_buffer), :+,
+          s(:str, "</#{tag_name}>"))
+
+        statements.length == 1 ? statements.first : s(:begin, *statements)
+      end
+
+      # Process fragment do ... end
+      def process_fragment(block_body)
+        return nil unless block_body
+
+        content = process_block_content(block_body)
+        return nil if content.empty?
+
+        content.length == 1 ? content.first : s(:begin, *content)
       end
 
       def escape_html(str)
