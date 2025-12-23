@@ -284,7 +284,11 @@ class SelfhostBuilder
       raise "Unknown DATABASE adapter: #{adapter}. Valid options: #{valid}"
     end
 
-    adapter_src = File.join(DEMO_ROOT, 'vendor/ruby2js/adapters', adapter_file)
+    # Check for npm-installed package first, fall back to development vendor directory
+    npm_adapter_dir = File.join(DEMO_ROOT, 'node_modules/ruby2js-rails/adapters')
+    vendor_adapter_dir = File.join(DEMO_ROOT, 'vendor/ruby2js/adapters')
+    adapter_dir = File.exist?(npm_adapter_dir) ? npm_adapter_dir : vendor_adapter_dir
+    adapter_src = File.join(adapter_dir, adapter_file)
     adapter_dest = File.join(@dist_dir, 'lib/active_record.mjs')
     FileUtils.mkdir_p(File.dirname(adapter_dest))
 
@@ -310,8 +314,13 @@ class SelfhostBuilder
       target_dir = @runtime  # node, bun, or deno
     end
 
+    # Check for npm-installed package first, fall back to development vendor directory
+    npm_package_dir = File.join(DEMO_ROOT, 'node_modules/ruby2js-rails')
+    vendor_package_dir = File.join(DEMO_ROOT, 'vendor/ruby2js')
+    package_dir = File.exist?(npm_package_dir) ? npm_package_dir : vendor_package_dir
+
     # Copy target-specific files (rails.js from targets/browser, node, bun, or deno)
-    target_src = File.join(DEMO_ROOT, 'vendor/ruby2js/targets', target_dir)
+    target_src = File.join(package_dir, 'targets', target_dir)
     Dir.glob(File.join(target_src, '*.js')).each do |src_path|
       dest_path = File.join(lib_dest, File.basename(src_path))
       FileUtils.cp(src_path, dest_path)
@@ -320,10 +329,9 @@ class SelfhostBuilder
     end
 
     # Copy runtime lib files (erb_runtime.mjs only - build tools stay in vendor)
-    vendor_src = File.join(DEMO_ROOT, 'vendor/ruby2js')
     runtime_libs = ['erb_runtime.mjs']
     runtime_libs.each do |filename|
-      src_path = File.join(vendor_src, filename)
+      src_path = File.join(package_dir, filename)
       next unless File.exist?(src_path)
       dest_path = File.join(lib_dest, filename)
       FileUtils.cp(src_path, dest_path)
