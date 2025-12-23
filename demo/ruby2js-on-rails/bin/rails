@@ -89,15 +89,24 @@ case "$COMMAND" in
         ;;
       server)
         echo "Starting $RUNTIME server on $HOST:$PORT..."
+        # Find server.mjs: npm package or vendor directory
+        if [[ -f "node_modules/ruby2js-rails/server.mjs" ]]; then
+          SERVER_MJS="node_modules/ruby2js-rails/server.mjs"
+        elif [[ -f "vendor/ruby2js/server.mjs" ]]; then
+          SERVER_MJS="vendor/ruby2js/server.mjs"
+        else
+          echo "Error: Cannot find server.mjs"
+          exit 1
+        fi
         case "$RUNTIME" in
           node)
-            exec node server.mjs
+            exec node "$SERVER_MJS"
             ;;
           bun)
-            exec bun server.mjs
+            exec bun "$SERVER_MJS"
             ;;
           deno)
-            exec deno run --allow-all server.mjs
+            exec deno run --allow-all "$SERVER_MJS"
             ;;
         esac
         ;;
