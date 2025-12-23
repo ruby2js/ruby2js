@@ -265,6 +265,8 @@ module Ruby2JS
       def on_defineProps(node); self.process_children(node); end
       def on_hide(node); self.on_begin(node); end
       def on_xnode(node); self.process_children(node); end
+      def on_pnode(node); self.process_children(node); end
+      def on_pnode_text(node); self.process_children(node); end
       def on_export(node); self.process_children(node); end
       def on_import(node); self.process_children(node); end
       def on_taglit(node); self.on_pair(node); end

@@ -44,7 +44,7 @@ describe Ruby2JS::Filter::Phlex do
       RUBY
       result.must_include '<div>'
       result.must_include '</div>'
-      result.must_include '"content"'
+      result.must_include 'content'
     end
 
     it "should convert void elements without closing tag" do
@@ -548,6 +548,143 @@ describe Ruby2JS::Filter::Phlex do
       result.must_include '</p>'
       # Fragment should not add wrapper
       result.wont_include '<fragment>'
+    end
+  end
+
+  describe 'React integration (write once, target both)' do
+    require 'ruby2js/filter/react'
+
+    def to_react(string, eslevel: 2020)
+      _(Ruby2JS.convert(string,
+        filters: [Ruby2JS::Filter::Phlex, Ruby2JS::Filter::React],
+        eslevel: eslevel).to_s)
+    end
+
+    it "should convert single element to React.createElement" do
+      result = to_react(<<~RUBY)
+        class Card < Phlex::HTML
+          def view_template
+            div(class: "card") { "Hello" }
+          end
+        end
+      RUBY
+      result.must_include 'React.createElement'
+      result.must_include '"div"'
+      result.must_include 'className: "card"'
+      result.must_include '"Hello"'
+      result.wont_include '_phlex_out'
+    end
+
+    it "should wrap multiple elements in React.Fragment" do
+      result = to_react(<<~RUBY)
+        class Page < Phlex::HTML
+          def view_template
+            h1 { "Title" }
+            p { "Content" }
+          end
+        end
+      RUBY
+      result.must_include 'React.Fragment'
+      result.must_include 'React.createElement("h1"'
+      result.must_include 'React.createElement("p"'
+      result.wont_include '_phlex_out'
+    end
+
+    it "should handle nested elements" do
+      result = to_react(<<~RUBY)
+        class Card < Phlex::HTML
+          def view_template
+            div { span { "inner" } }
+          end
+        end
+      RUBY
+      result.must_include 'React.createElement'
+      result.must_include '"div"'
+      result.must_include '"span"'
+      result.must_include '"inner"'
+    end
+
+    it "should convert instance variables to props" do
+      result = to_react(<<~RUBY)
+        class Card < Phlex::HTML
+          def initialize(title:)
+            @title = title
+          end
+          def view_template
+            h1 { @title }
+          end
+        end
+      RUBY
+      result.must_include 'render({ title })'
+      result.must_include 'React.createElement("h1", null, title)'
+      result.wont_include '@title'
+    end
+
+    it "should handle dynamic attributes" do
+      result = to_react(<<~RUBY)
+        class Button < Phlex::HTML
+          def initialize(variant:)
+            @variant = variant
+          end
+          def view_template
+            button(class: @variant) { "Click" }
+          end
+        end
+      RUBY
+      result.must_include 'className: variant'
+    end
+
+    it "should handle component composition" do
+      result = to_react(<<~RUBY)
+        class Page < Phlex::HTML
+          def view_template
+            render Header.new(title: "Welcome")
+            div { "content" }
+          end
+        end
+      RUBY
+      result.must_include 'Header'
+      result.must_include 'React.createElement("div"'
+    end
+
+    it "should handle void elements" do
+      result = to_react(<<~RUBY)
+        class Form < Phlex::HTML
+          def view_template
+            input(type: "text")
+            br
+          end
+        end
+      RUBY
+      result.must_include 'React.createElement("input"'
+      result.must_include 'React.createElement("br"'
+    end
+
+    it "should handle custom elements" do
+      result = to_react(<<~RUBY)
+        class Widget < Phlex::HTML
+          def view_template
+            tag("my-widget", class: "custom") { "content" }
+          end
+        end
+      RUBY
+      result.must_include 'React.createElement'
+      result.must_include '"my-widget"'
+      result.must_include 'className: "custom"'
+    end
+
+    it "should return React element object (not string)" do
+      # Verify the output doesn't use string concatenation
+      result = to_react(<<~RUBY)
+        class Card < Phlex::HTML
+          def view_template
+            div { "Hello" }
+          end
+        end
+      RUBY
+      result.must_include 'return React.createElement'
+      result.wont_include '+='
+      result.wont_include '_phlex_out'
     end
   end
 

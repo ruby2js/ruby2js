@@ -25,7 +25,7 @@ describe 'pnode tests' do
       ast = s(:pnode, :div, s(:hash))
       result = convert_ast(ast)
       _(result).must_include '<div'
-      _(result).must_include '/>'
+      _(result).must_include '</div>'
     end
 
     it 'should handle element with static attributes' do
@@ -34,7 +34,7 @@ describe 'pnode tests' do
       result = convert_ast(ast)
       _(result).must_include '<div'
       _(result).must_include 'class='
-      _(result).must_include '"card"'
+      _(result).must_include 'card'
     end
 
     it 'should handle element with children' do
@@ -50,17 +50,18 @@ describe 'pnode tests' do
     it 'should handle void elements' do
       ast = s(:pnode, :br, s(:hash))
       result = convert_ast(ast)
-      _(result).must_include '<br'
-      _(result).must_include '/>'
+      _(result).must_include '<br>'
+      # Void elements don't have closing tags
+      _(result).wont_include '</br>'
     end
   end
 
   describe 'pnode components' do
-    it 'should identify uppercase tags as components' do
+    it 'should output component render call for uppercase tags' do
       ast = s(:pnode, :Card, s(:hash))
       result = convert_ast(ast)
-      _(result).must_include 'Component'
       _(result).must_include 'Card'
+      _(result).must_include '.render('
     end
 
     it 'should handle component with props' do
@@ -75,27 +76,29 @@ describe 'pnode tests' do
     it 'should handle custom elements (string tags)' do
       ast = s(:pnode, "my-widget", s(:hash))
       result = convert_ast(ast)
-      _(result).must_include 'custom'
-      _(result).must_include 'my-widget'
+      _(result).must_include '<my-widget'
+      _(result).must_include '</my-widget>'
     end
 
     it 'should handle custom element with attributes' do
       ast = s(:pnode, "my-element", s(:hash, s(:pair, s(:sym, :data_id), s(:str, "123"))))
       result = convert_ast(ast)
       _(result).must_include '<my-element'
-      _(result).must_include 'data_id'
+      _(result).must_include 'data-id'  # underscore converted to dash
+      _(result).must_include '123'
     end
   end
 
   describe 'pnode fragments' do
-    it 'should handle fragments (nil tag)' do
+    it 'should handle fragments (nil tag) by outputting children' do
       ast = s(:pnode, nil, s(:hash),
         s(:pnode, :h1, s(:hash)),
         s(:pnode, :h2, s(:hash)))
       result = convert_ast(ast)
-      _(result).must_include 'fragment'
       _(result).must_include '<h1'
       _(result).must_include '<h2'
+      # Fragment itself produces no wrapper
+      _(result).wont_include '<nil'
     end
   end
 
@@ -106,12 +109,11 @@ describe 'pnode tests' do
       _(result).must_equal 'Hello World'
     end
 
-    it 'should handle dynamic content' do
+    it 'should handle dynamic content with String wrapper' do
       ast = s(:pnode_text, s(:lvar, :name))
       result = convert_ast(ast)
-      _(result).must_include '{'
+      _(result).must_include 'String('
       _(result).must_include 'name'
-      _(result).must_include '}'
     end
 
     it 'should work within pnode' do

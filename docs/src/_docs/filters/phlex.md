@@ -5,7 +5,11 @@ top_section: Filters
 category: phlex
 ---
 
-The **Phlex** filter transforms [Phlex](https://phlex.fun/) component classes into JavaScript render functions. It converts the Phlex HTML DSL into string concatenation, making components usable as standalone JavaScript functions.
+The **Phlex** filter transforms [Phlex](https://phlex.fun/) component classes into JavaScript render functions. It converts the Phlex HTML DSL into template literal strings, making components usable as standalone JavaScript functions.
+
+{% rendercontent "docs/note" %}
+**New to component development with Ruby2JS?** See the [Building UI Components](/docs/users-guide/components) guide for an overview of approaches, trade-offs, and when to use Phlex vs React.
+{% endrendercontent %}
 
 ## How It Works
 
@@ -360,6 +364,89 @@ All HTML5 elements are supported, including:
 | `input` (void) | `_phlex_out += "<input>"` (no closing tag) |
 | `render X.new(...)` | `X.render({...})` |
 | `tag("x")` | `_phlex_out += "<x>...</x>"` |
+
+## React Integration
+
+The Phlex filter supports a **"write once, target both"** architecture. The same Phlex Ruby code can produce either Phlex JS or React JS depending on the filter chain:
+
+```ruby
+# Phlex JS output (template literals)
+Ruby2JS.convert(code, filters: [:phlex])
+
+# React JS output (React.createElement)
+Ruby2JS.convert(code, filters: [:phlex, :react])
+```
+
+### Example
+
+Given this Phlex component:
+
+```ruby
+class Card < Phlex::HTML
+  def initialize(title:)
+    @title = title
+  end
+
+  def view_template
+    div(class: "card") do
+      h1 { @title }
+    end
+  end
+end
+```
+
+**With `[:phlex]`** (Phlex JS):
+
+```javascript
+class Card extends Phlex.HTML {
+  render({ title }) {
+    let _phlex_out = "";
+    _phlex_out += `<div class="card"><h1>${String(title)}</h1></div>`;
+    return _phlex_out
+  }
+}
+```
+
+**With `[:phlex, :react]`** (React JS):
+
+```javascript
+class Card extends Phlex.HTML {
+  render({ title }) {
+    return React.createElement(
+      "div",
+      {className: "card"},
+      React.createElement("h1", null, title)
+    )
+  }
+}
+```
+
+### Multiple Elements
+
+When a component has multiple root elements, React mode automatically wraps them in a `React.Fragment`:
+
+```ruby
+class Page < Phlex::HTML
+  def view_template
+    h1 { "Title" }
+    p { "Content" }
+  end
+end
+```
+
+```javascript
+// With [:phlex, :react]
+class Page extends Phlex.HTML {
+  render() {
+    return React.createElement(
+      React.Fragment,
+      null,
+      React.createElement("h1", null, "Title"),
+      React.createElement("p", null, "Content")
+    )
+  }
+}
+```
 
 ## Limitations
 

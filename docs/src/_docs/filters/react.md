@@ -7,6 +7,10 @@ category: react
 
 The **React** filter enables you to build [React](https://react.dev/) and [Preact](https://preactjs.com/) components using Ruby syntax.
 
+{% rendercontent "docs/note" %}
+**Choosing between React and Phlex?** See the [Building UI Components](/docs/users-guide/components) guide for an overview of approaches, trade-offs, and the "write once, target both" architecture.
+{% endrendercontent %}
+
 ## Function Components (Recommended)
 
 The modern approach uses function components with hooks. Simply inherit from `React` or `Preact`:
@@ -137,6 +141,18 @@ Differences from React:
 - Uses `Preact.h` instead of `React.createElement`
 - Uses `onInput` instead of `onChange` for form inputs
 - Uses `class` instead of `className`
+
+## Phlex Integration
+
+The React filter can be combined with the [Phlex](phlex) filter for a **"write once, target both"** approach. Write components using Phlex's Ruby DSL and output either Phlex JS or React JS:
+
+```ruby
+# Same Phlex code, different outputs
+Ruby2JS.convert(code, filters: [:phlex])          # → Phlex JS (template literals)
+Ruby2JS.convert(code, filters: [:phlex, :react])  # → React JS (createElement)
+```
+
+See the [Building UI Components](/docs/users-guide/components) guide for the full picture, or [Phlex filter documentation](phlex#react-integration) for API details.
 
 {% rendercontent "docs/note", extra_margin: true %}
 More examples of how this filter works are in the

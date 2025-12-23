@@ -7,6 +7,10 @@ category: stimulus
 
 The **Stimulus** filter makes it easier to build [Stimulus](https://stimulus.hotwire.dev/) controllers.
 
+{% rendercontent "docs/note" %}
+**Stimulus + Phlex** provides a lightweight alternative to React for interactive UIs. See the [Building UI Components](/docs/users-guide/components) guide for a comparison.
+{% endrendercontent %}
+
 When a class definition is encountered that derives from
 `Stimulus::Controller`, the following transformations are applied:
 

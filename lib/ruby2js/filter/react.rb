@@ -723,8 +723,8 @@ module Ruby2JS
       # Handle pnode (synthetic AST node for elements)
       # Structure: s(:pnode, tag, attrs_hash, *children)
       def on_pnode(node)
-        return super unless @react
-
+        # pnodes come from Phlex filter - always convert when React filter is present
+        # This enables "write once, target both" - same Phlex code, different output
         tag, attrs, *children = node.children
 
         process_pnode_element(tag, attrs, children)
@@ -733,7 +733,7 @@ module Ruby2JS
       # Handle pnode_text (text content in pnode)
       # Structure: s(:pnode_text, content_node)
       def on_pnode_text(node)
-        return super unless @react
+        # pnode_text comes from Phlex filter - always handle when React filter is present
 
         content = node.children.first
 
@@ -1364,6 +1364,7 @@ module Ruby2JS
       def on_begin(node)
         node = super
         (node.children.length-2).downto(0) do |i|
+          next unless node.children[i] && node.children[i+1]  # skip nil children
           if \
             node.children[i].type == :send and
             node.children[i].children[0] and
