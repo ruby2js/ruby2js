@@ -32,14 +32,9 @@
   ],
   "blocked": {
     "lit_spec.rb": "filter transpiles but has runtime errors",
-    "jquery_spec.rb": "no filter",
-    "underscore_spec.rb": "no filter",
     "active_functions_spec.rb": "filter not transpiled",
-    "jsx_spec.rb": "part of react filter",
-    "matchAll_spec.rb": "no filter",
-    "minitest_jasmine_spec.rb": "no filter",
-    "nokogiri_spec.rb": "no filter",
-    "preact_spec.rb": "uses react filter",
-    "vue_spec.rb": "no filter"
+    "jsx_spec.rb": "filter not transpiled",
+    "nokogiri_spec.rb": "filter not transpiled",
+    "preact_spec.rb": "uses react filter"
   }
 }
