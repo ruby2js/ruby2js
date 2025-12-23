@@ -10,13 +10,15 @@
   "exports": {
     ".": "./ruby2js.js",
     "./ruby2js.js": "./ruby2js.js",
-    "./filters/*": "./filters/*"
+    "./filters/*": "./filters/*",
+    "./lib/*": "./lib/*"
   },
   "files": [
     "ruby2js.js",
     "ruby2js-cli.js",
     "prism_browser.js",
-    "filters/"
+    "filters/",
+    "lib/"
   ],
   "scripts": {
     "build": "mkdir -p dist filters lib && npm run build:prism-browser && npm run build:bundle && npm run build:spec && npm run build:filters && npm run build:erb-compiler",
@@ -33,7 +35,11 @@
     "clean": "rm -rf dist filters ruby2js.js ruby2js-cli.js prism_browser.js",
     "pack": "npm run build:prism-browser && npm run build:bundle && npm run build:filters && npm pack"
   },
-  "keywords": ["ruby", "javascript", "transpiler"],
+  "keywords": [
+    "ruby",
+    "javascript",
+    "transpiler"
+  ],
   "author": "Sam Ruby",
   "license": "MIT",
   "repository": {

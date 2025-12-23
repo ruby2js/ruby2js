@@ -6,11 +6,13 @@
   "scripts": {
     "dev": "node dev-server.mjs",
     "dev:ruby": "node dev-server.mjs --ruby",
+    "dev:selfhost": "npm run build:selfhost && npm run dev",
     "dev:node": "npm run build:ruby && node server.mjs",
     "dev:bun": "RUNTIME=bun npm run build:ruby && bun server.mjs",
     "dev:deno": "RUNTIME=deno npm run build:ruby && deno run --allow-all server.mjs",
     "build": "node scripts/build.mjs",
     "build:ruby": "ruby scripts/build.rb",
+    "build:selfhost": "cd ../selfhost && npm run build && rm -f ruby2js-*.tgz && npm pack && cd ../ruby2js-on-rails/vendor/ruby2js && rm -f ruby2js-rails-*.tgz && npm pkg set dependencies.ruby2js=file:../../../selfhost/ruby2js-6.0.0-beta.tgz && npm pack && npm pkg set dependencies.ruby2js=https://www.ruby2js.com/releases/ruby2js-beta.tgz && cd ../.. && npm install ./vendor/ruby2js/ruby2js-rails-*.tgz && npm pkg set dependencies.ruby2js-rails=https://www.ruby2js.com/releases/ruby2js-rails-beta.tgz",
     "build:node": "ruby scripts/build.rb",
     "build:bun": "RUNTIME=bun ruby scripts/build.rb",
     "build:deno": "RUNTIME=deno ruby scripts/build.rb",
@@ -26,6 +28,7 @@
   },
   "dependencies": {
     "dexie": "^4.0.10",
+    "ruby2js-rails": "https://www.ruby2js.com/releases/ruby2js-rails-beta.tgz",
     "sql.js": "^1.11.0"
   },
   "optionalDependencies": {

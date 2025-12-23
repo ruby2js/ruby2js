@@ -370,6 +370,61 @@ task :test_demo => ["#{dest}/ruby2js.js"] do
   puts "Demo smoke test passed: preset conversion works correctly"
 end
 
+# NPM package tarballs for beta distribution
+# These go to /releases/ on the website for URL-based npm install
+releases_dir = "#{dest}/releases"
+directory releases_dir => dest
+
+# Build ruby2js npm package tarball
+task :ruby2js_tarball => [:selfhost_build, releases_dir] do
+  Dir.chdir(selfhost_source) do
+    # Clean up old tarballs
+    FileUtils.rm_f Dir.glob("ruby2js-*.tgz")
+
+    # Set timestamped version for npm update detection
+    version = "6.0.0-beta.#{Time.now.strftime('%Y%m%d%H%M')}"
+    sh "npm version #{version} --no-git-tag-version --allow-same-version"
+
+    # Build and pack
+    sh "npm run pack"
+
+    # Copy to releases with stable name
+    tarball = Dir.glob("ruby2js-*.tgz").first
+    cp tarball, "#{releases_dir}/ruby2js-beta.tgz"
+    puts "  ruby2js-beta.tgz (#{(File.size("#{releases_dir}/ruby2js-beta.tgz") / 1024.0).round(1)} KB)"
+
+    # Reset version for git
+    sh "npm version 6.0.0-beta --no-git-tag-version --allow-same-version"
+  end
+end
+
+# Build ruby2js-rails npm package tarball
+task :ruby2js_rails_tarball => [:ruby2js_tarball] do
+  rails_pkg_dir = "#{rails_demo_source}/vendor/ruby2js"
+  Dir.chdir(rails_pkg_dir) do
+    # Clean up old tarballs
+    FileUtils.rm_f Dir.glob("ruby2js-rails-*.tgz")
+
+    # Set timestamped version
+    version = "6.0.0-beta.#{Time.now.strftime('%Y%m%d%H%M')}"
+    sh "npm version #{version} --no-git-tag-version --allow-same-version"
+
+    # Pack
+    sh "npm pack"
+
+    # Copy to releases with stable name
+    tarball = Dir.glob("ruby2js-rails-*.tgz").first
+    cp tarball, "#{releases_dir}/ruby2js-rails-beta.tgz"
+    puts "  ruby2js-rails-beta.tgz (#{(File.size("#{releases_dir}/ruby2js-rails-beta.tgz") / 1024.0).round(1)} KB)"
+
+    # Reset version for git
+    sh "npm version 6.0.0-beta --no-git-tag-version --allow-same-version"
+  end
+end
+
+desc "Build npm package tarballs for beta distribution"
+task :npm_packages => [:ruby2js_tarball, :ruby2js_rails_tarball]
+
 task :default => [
   "#{dest}/index.erb",
   "#{dest}/editor.js",
@@ -378,6 +433,7 @@ task :default => [
   "#{dest}/ruby2js.js",
   :selfhost,
   :rails_demo,
+  :npm_packages,
   :test_demo
 ]
 

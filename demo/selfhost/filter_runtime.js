@@ -42,12 +42,13 @@ export const ast_node = (node) => {
 // Setup: make include() a no-op (Ruby's include SEXP doesn't apply in JS)
 export const include = () => {};
 
-// Setup: Filter global for exclude/include calls and Processor base class
-export const Filter = {
-  exclude: (...methods) => {},
-  include: (...methods) => {},
-  Processor: Ruby2JS.Filter.Processor  // Base class for filter inheritance
-};
+// Setup: Add exclude/include no-ops to Ruby2JS.Filter for filter class definitions
+// (these are used by filters to declare method exclusions, which are no-ops at JS runtime)
+Ruby2JS.Filter.exclude = (...methods) => {};
+Ruby2JS.Filter.include = (...methods) => {};
+
+// Export the real Ruby2JS.Filter so imports get the live object with registered filters
+export const Filter = Ruby2JS.Filter;
 
 // Setup: DEFAULTS array for filter registration
 export const DEFAULTS = [];

@@ -36,6 +36,20 @@ bin/dev
 
 Open http://localhost:3000. The source is Ruby. The runtime is JavaScript.
 
+## Getting Updates
+
+The demo depends on `ruby2js-rails` which provides adapters, targets, and the ERB runtime. To update to the latest version:
+
+```bash
+npm update
+```
+
+This fetches the latest beta from ruby2js.com and updates your local installation.
+
+{% rendercontent "docs/note", type: "info" %}
+**Beta Distribution**: Ruby2JS 6.0 is distributed via URL-based tarballs during beta. After stable release, packages will be available on npm registry as `ruby2js` and `ruby2js-rails`.
+{% endrendercontent %}
+
 ## Project Structure
 
 A Ruby2JS on Rails project mirrors standard Rails conventions:

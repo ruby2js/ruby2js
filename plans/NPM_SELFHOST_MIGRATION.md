@@ -225,50 +225,41 @@ ruby2js-on-rails (demo app)
 
 ## Migration Tasks
 
-### Phase 1: Create ruby2js package
+### Phase 1: Create ruby2js package ✅
 
-- [ ] Create `demo/selfhost/package.json` with proper exports
-- [ ] Add CLI to package (`ruby2js-cli.js`)
-- [ ] Test `npm pack` produces correct tarball
-- [ ] Test installation from local tarball
-- [ ] Test `npm update` behavior with changing versions
+- [x] Create `demo/selfhost/package.json` with proper exports
+- [x] Add CLI to package (`ruby2js-cli.js`)
+- [x] Test `npm pack` produces correct tarball
+- [x] Test installation from local tarball
+- [x] Test `npm update` behavior with changing versions
+- [x] Fix filter registration (export Ruby2JS.Filter instead of stub)
 
-### Phase 2: Create ruby2js-rails package
+### Phase 2: Create ruby2js-rails package ✅
 
-- [ ] Create package structure for adapters/targets/erb_runtime
-- [ ] Create `package.json` with dependency on ruby2js URL
-- [ ] Test `npm pack` produces correct tarball
-- [ ] Test transitive dependency resolution
+- [x] Create package structure for adapters/targets/erb_runtime
+- [x] Create `package.json` with dependency on ruby2js URL
+- [x] Test `npm pack` produces correct tarball
+- [x] Test transitive dependency resolution
 
-### Phase 3: Update demo app
+### Phase 3: Update demo app ✅
 
-- [ ] Remove `vendor/ruby2js/selfhost/` from demo
-- [ ] Update `package.json` to depend on ruby2js-rails URL
-- [ ] Update `scripts/build.mjs` imports:
-  ```javascript
-  // Before
-  import * as Ruby2JS from "../vendor/ruby2js/selfhost/ruby2js.js";
-  import { Rails_Model } from "../vendor/ruby2js/selfhost/filters/rails/model.js";
+- [x] Update `package.json` to depend on ruby2js-rails URL
+- [x] Update `scripts/build.mjs` imports to use npm packages
+- [x] Update adapter/target paths to use RUBY2JS_RAILS_PATH
+- [x] Test full build and runtime
 
-  // After
-  import * as Ruby2JS from "ruby2js";
-  import { Rails_Model } from "ruby2js/filters/rails/model.js";
-  ```
-- [ ] Update adapter imports in build script
-- [ ] Test full build and runtime
+### Phase 4: Deploy pipeline ✅
 
-### Phase 4: Deploy pipeline
+- [x] Add `npm_packages` rake task to docs/Rakefile
+- [x] Tarballs deployed to /releases/ruby2js-beta.tgz and ruby2js-rails-beta.tgz
+- [x] Integrated into default build (runs on every deploy)
+- [ ] Test end-to-end after first deploy
 
-- [ ] Add tarball creation to GitHub Action
-- [ ] Deploy tarballs to ruby2js.com/releases/
-- [ ] Test end-to-end: curl → npm install → bin/dev
-- [ ] Test npm update gets new versions
+### Phase 5: Documentation ✅
 
-### Phase 5: Documentation
-
-- [ ] Update blog post with new installation instructions
-- [ ] Document npm update workflow
-- [ ] Note: "Beta via URL, stable via npm registry"
+- [x] Update Ruby2JS on Rails guide with "Getting Updates" section
+- [x] Document npm update workflow
+- [x] Note beta distribution model
 
 ## Size Comparison
 

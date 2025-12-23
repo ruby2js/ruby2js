@@ -42,11 +42,14 @@ The target is determined by the database adapter in `config/database.yml` or the
 | Command | Description |
 |---------|-------------|
 | `npm run dev` | Browser dev server with hot reload |
+| `npm run dev:ruby` | Dev server using Ruby transpilation |
+| `npm run dev:selfhost` | Rebuild selfhost packages and start dev server |
 | `npm run dev:node` | Build for Node.js and start server |
 | `npm run dev:bun` | Build for Bun and start server |
 | `npm run dev:deno` | Build for Deno and start server |
 | `npm run build` | One-shot browser build (selfhost transpilation) |
 | `npm run build:ruby` | One-shot browser build (Ruby transpilation) |
+| `npm run build:selfhost` | Rebuild and install local selfhost packages |
 | `npm run build:node` | Build for Node.js with SQLite |
 | `npm run build:bun` | Build for Bun with SQLite |
 | `npm run build:deno` | Build for Deno with SQLite |
@@ -89,36 +92,62 @@ bin/rails server --runtime node  # Run on Node.js
 bin/rails build              # Build for production
 ```
 
+## npm Packages
+
+This demo depends on two npm packages distributed via URL:
+
+| Package | URL | Contents |
+|---------|-----|----------|
+| `ruby2js` | ruby2js.com/releases/ruby2js-beta.tgz | Core converter, CLI, filters |
+| `ruby2js-rails` | ruby2js.com/releases/ruby2js-rails-beta.tgz | Adapters, targets, erb_runtime |
+
+To update to the latest:
+
+```bash
+npm update
+```
+
+## Developing Ruby2JS Itself
+
+When working on ruby2js core or filters (not just the demo app):
+
+### Option 1: Ruby Transpilation (Recommended)
+
+The simplest approach - uses the local gem directly:
+
+```bash
+npm run build:ruby   # Uses lib/ruby2js from the repo
+npm run dev
+```
+
+Changes to `lib/ruby2js/**/*.rb` take effect immediately on rebuild.
+
+### Option 2: Selfhost Transpilation
+
+To test the JavaScript converter with your changes:
+
+```bash
+npm run dev:selfhost   # Rebuilds selfhost, packs, installs, and starts dev server
+```
+
+This runs `build:selfhost` which handles all the packaging steps automatically.
+
 ## Packaging for Distribution
 
-The demo can be packaged as a standalone tarball that requires only Node.js 22+ to run (no Ruby needed):
+The demo tarball is built automatically during website deployment. To build manually:
 
 ```bash
-# From the ruby2js root directory
-cd demo/selfhost
-bundle exec rake publish_demo
+# From the docs directory
+cd ../../docs
+bundle exec rake rails_demo_tarball
 ```
 
-This creates `dist/ruby2js-on-rails.tar.gz` containing:
+This creates `src/demo/ruby2js-on-rails.tar.gz` containing:
 - User app (app/, config/, db/)
-- Pre-transpiled Ruby2JS converter in `vendor/ruby2js/selfhost/`
-- Database adapters and runtime targets
+- package.json with URL dependencies
 - Development server with hot reload
 
-### Testing the Published Package
-
-```bash
-# Smoke test (automated)
-bundle exec rake publish_demo:smoke
-
-# Manual test
-cd dist
-tar -xzf ruby2js-on-rails.tar.gz
-cd ruby2js-on-rails
-npm install
-npm run dev
-# Open http://localhost:3000
-```
+Users download and run with just Node.js - no Ruby needed.
 
 ## Testing
 
@@ -138,12 +167,13 @@ This verifies:
 
 ### Running from Repository
 
-When developing Ruby2JS itself:
+When developing Ruby2JS itself, see the "Developing Ruby2JS Itself" section above for local package setup.
+
+To run selfhost CI tests:
 
 ```bash
-# Run selfhost CI tests (from demo/selfhost)
 cd ../selfhost
-bundle exec rake ci
+node run_all_specs.mjs
 ```
 
 ## Project Structure
@@ -164,7 +194,8 @@ ruby2js-on-rails/
 │   └── schema.rb         # Database schema
 ├── db/
 │   └── seeds.rb          # Seed data
-├── vendor/ruby2js/       # Framework files
+├── vendor/ruby2js/       # ruby2js-rails package source (for local dev)
+│   ├── package.json      # Package definition (depends on ruby2js)
 │   ├── adapters/         # Database adapters (copied to dist/lib/active_record.mjs)
 │   │   ├── active_record_sqljs.mjs      # Browser: sql.js (SQLite WASM)
 │   │   ├── active_record_dexie.mjs      # Browser: Dexie (IndexedDB)
@@ -176,6 +207,9 @@ ruby2js-on-rails/
 │   │   ├── bun/rails.js      # HTTP server (Bun.serve)
 │   │   └── deno/rails.js     # HTTP server (Deno.serve)
 │   └── erb_runtime.mjs   # ERB template runtime
+├── node_modules/
+│   ├── ruby2js/          # Core converter (from npm URL)
+│   └── ruby2js-rails/    # Rails runtime (from npm URL)
 ├── dist/                 # Generated JavaScript (git-ignored)
 ├── scripts/
 │   ├── build.rb          # Ruby transpilation script

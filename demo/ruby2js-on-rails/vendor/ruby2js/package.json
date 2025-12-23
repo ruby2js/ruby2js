@@ -1,0 +1,31 @@
+{
+  "name": "ruby2js-rails",
+  "version": "6.0.0-beta",
+  "type": "module",
+  "description": "Rails runtime adapters and targets for Ruby2JS",
+  "exports": {
+    "./adapters/*": "./adapters/*",
+    "./targets/*": "./targets/*",
+    "./erb_runtime.mjs": "./erb_runtime.mjs"
+  },
+  "files": [
+    "adapters/",
+    "targets/",
+    "erb_runtime.mjs"
+  ],
+  "keywords": [
+    "ruby2js",
+    "rails",
+    "activerecord",
+    "erb"
+  ],
+  "author": "Sam Ruby",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ruby2js/ruby2js"
+  },
+  "dependencies": {
+    "ruby2js": "https://www.ruby2js.com/releases/ruby2js-beta.tgz"
+  }
+}
