@@ -21,6 +21,7 @@
     "securerandom_spec.rb"
   ],
   "partial": [
+    "phlex_spec.rb",
     "camelcase_spec.rb",
     "tagged_templates_spec.rb",
     "polyfill_spec.rb",
