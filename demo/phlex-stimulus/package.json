@@ -1,0 +1,15 @@
+{
+  "name": "phlex-stimulus-showcase",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Interactive UI components with Phlex views and Stimulus controllers",
+  "scripts": {
+    "build": "ruby2js-rails-build",
+    "dev": "ruby2js-rails-dev",
+    "start": "npx serve -p 3000"
+  },
+  "dependencies": {
+    "ruby2js-rails": "https://www.ruby2js.com/releases/ruby2js-rails-beta.tgz",
+    "@hotwired/stimulus": "^3.2.2"
+  }
+}

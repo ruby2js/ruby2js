@@ -151,11 +151,13 @@ class SelfhostBuilder
     self.generate_models_index()
     puts("")
 
-    # Transpile controllers
+    # Transpile controllers (use 'controllers' section from ruby2js.yml if present)
     puts("Controllers:")
     self.transpile_directory(
       File.join(DEMO_ROOT, 'app/controllers'),
-      File.join(@dist_dir, 'controllers')
+      File.join(@dist_dir, 'controllers'),
+      '**/*.rb',
+      section: 'controllers'
     )
     puts("")
 
@@ -195,7 +197,7 @@ class SelfhostBuilder
     puts("=== Build Complete ===")
   end
 
-  def load_ruby2js_config()
+  def load_ruby2js_config(section = nil)
     env = ENV['RAILS_ENV'] || ENV['NODE_ENV'] || 'development'
     config_path = File.join(DEMO_ROOT, 'config/ruby2js.yml')
 
@@ -203,6 +205,11 @@ class SelfhostBuilder
 
     # Ruby 3.4+ requires aliases: true for YAML anchors
     config = YAML.load_file(config_path, aliases: true)
+
+    # If a specific section is requested (e.g., 'controllers', 'components')
+    if section && config.key?(section)
+      return config[section]
+    end
 
     # Support environment-specific or flat config
     if config.key?(env)
@@ -214,8 +221,9 @@ class SelfhostBuilder
     end
   end
 
-  def build_options()
-    base = self.load_ruby2js_config()
+  def build_options(section = nil)
+    # Load section-specific config if section is specified, otherwise default
+    base = self.load_ruby2js_config(section)
 
     # Start with hardcoded OPTIONS as base (using spread for JS compatibility)
     options = { **OPTIONS }
@@ -260,8 +268,9 @@ class SelfhostBuilder
 
   def resolve_filters(filter_names)
     filter_names.map do |name|
-      # Already a module? Pass through
-      return name if name.is_a?(Module)
+      # Already a filter (not a string)? Pass through
+      # In Ruby, filters are Modules; in JS, they're prototype objects
+      return name unless name.is_a?(String)
 
       # Normalize: strip, downcase for lookup (but preserve camelCase key)
       normalized = name.to_s.strip
@@ -388,13 +397,13 @@ class SelfhostBuilder
     end
   end
 
-  def transpile_file(src_path, dest_path)
+  def transpile_file(src_path, dest_path, section = nil)
     puts("Transpiling: #{File.basename(src_path)}")
     source = File.read(src_path)
 
     # Use relative path for cleaner display in browser debugger
     relative_src = src_path.sub(DEMO_ROOT + '/', '')
-    options = self.build_options().merge(file: relative_src)
+    options = self.build_options(section).merge(file: relative_src)
     result = Ruby2JS.convert(source, options)
     js = result.to_s
 
@@ -502,14 +511,14 @@ class SelfhostBuilder
     puts("  -> dist/views/layouts/application.js")
   end
 
-  def transpile_directory(src_dir, dest_dir, pattern = '**/*.rb', skip: [])
+  def transpile_directory(src_dir, dest_dir, pattern = '**/*.rb', skip: [], section: nil)
     Dir.glob(File.join(src_dir, pattern)).each do |src_path|
       basename = File.basename(src_path)
       next if skip.include?(basename)
 
       relative = src_path.sub(src_dir + '/', '')
       dest_path = File.join(dest_dir, relative.sub(/\.rb$/, '.js'))
-      self.transpile_file(src_path, dest_path)
+      self.transpile_file(src_path, dest_path, section)
     end
   end
 

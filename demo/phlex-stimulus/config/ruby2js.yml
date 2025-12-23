@@ -1,0 +1,25 @@
+# Ruby2JS configuration for Phlex + Stimulus demo
+default: &default
+  eslevel: 2022
+  comparison: identity
+  autoexports: true
+  include:
+    - class
+    - call
+
+# Component-specific filters
+components:
+  <<: *default
+  filters:
+    - phlex
+    - functions
+    - esm
+
+# Controller-specific filters
+controllers:
+  <<: *default
+  filters:
+    - stimulus
+    - camelCase
+    - functions
+    - esm

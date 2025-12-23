@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Phlex + Stimulus Showcase</title>
+  <link rel="stylesheet" href="styles.css">
+  <script type="importmap">
+  {
+    "imports": {
+      "@hotwired/stimulus": "https://unpkg.com/@hotwired/stimulus@3.2.2/dist/stimulus.js"
+    }
+  }
+  </script>
+</head>
+<body>
+  <header>
+    <h1>Phlex + Stimulus Showcase</h1>
+    <p class="subtitle">Interactive UI components without React — write Ruby, run JavaScript</p>
+  </header>
+
+  <main>
+    <section class="intro">
+      <p>This demo showcases six interactive components built with:</p>
+      <ul>
+        <li><strong>Phlex</strong> — Ruby DSL for HTML views, transpiled to JavaScript</li>
+        <li><strong>Stimulus</strong> — Modest JavaScript framework for the HTML you already have</li>
+        <li><strong>Ruby2JS</strong> — Write Ruby, deploy JavaScript</li>
+      </ul>
+    </section>
+
+    <div class="components-grid">
+      <div id="counter"></div>
+      <div id="toggle"></div>
+      <div id="tabs"></div>
+      <div id="modal"></div>
+      <div id="dropdown"></div>
+      <div id="accordion"></div>
+    </div>
+  </main>
+
+  <footer>
+    <p>
+      <a href="https://github.com/ruby2js/ruby2js">Ruby2JS</a> |
+      <a href="https://phlex.fun">Phlex</a> |
+      <a href="https://stimulus.hotwired.dev">Stimulus</a>
+    </p>
+  </footer>
+
+  <script type="module" src="dist/app.js"></script>
+</body>
+</html>
