@@ -82,7 +82,7 @@ module Ruby2JS
         # Check if this should be treated as a Phlex component
         if phlex_component?(node, parent)
           @phlex_context = true
-          @phlex_ivars = Set.new
+          @phlex_ivars = []
 
           # Collect all instance variables used in the class
           collect_ivars(body)
@@ -107,8 +107,8 @@ module Ruby2JS
           @phlex_buffer = :_phlex_out
 
           # Build destructured parameters from collected ivars
-          if @phlex_ivars && !@phlex_ivars.empty?
-            kwargs = @phlex_ivars.to_a.sort.map do |ivar|
+          if @phlex_ivars && @phlex_ivars.length > 0
+            kwargs = @phlex_ivars.uniq.sort.map do |ivar|
               prop_name = ivar.to_s[1..-1].to_sym  # @title -> title
               s(:kwarg, prop_name)
             end
@@ -522,15 +522,18 @@ module Ruby2JS
           # Could be nested element with block or a loop
           send_node = node.children[0]
           if send_node.type == :send
-            target, method, *args = send_node.children
-            if target.nil? && ALL_ELEMENTS.include?(method)
+            # Use direct indexing to avoid duplicate let declarations in JS
+            block_target = send_node.children[0]
+            block_method = send_node.children[1]
+            block_args = send_node.children[2..-1]
+            if block_target.nil? && ALL_ELEMENTS.include?(block_method)
               # Nested element with block → nested pnode with children
               block_body = node.children[2]
-              attrs_node = args.find { |a| a.respond_to?(:type) && a.type == :hash }
+              attrs_node = block_args.find { |a| a.respond_to?(:type) && a.type == :hash }
               attrs = process_attrs(attrs_node)
               nested_children = extract_children(block_body)
-              [s(:pnode, method, attrs, *nested_children)]
-            elsif target.nil? && method == :fragment
+              [s(:pnode, block_method, attrs, *nested_children)]
+            elsif block_target.nil? && block_method == :fragment
               # Fragment → children only (no wrapper)
               block_body = node.children[2]
               extract_children(block_body)

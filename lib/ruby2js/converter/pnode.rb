@@ -259,7 +259,7 @@ module Ruby2JS
         end
 
         # Convert underscores to dashes (data_foo -> data-foo)
-        key = key.tr('_', '-')
+        key = key.gsub('_', '-')
 
         case value_node.type
         when :str
@@ -293,7 +293,7 @@ module Ruby2JS
         else next
         end
 
-        key = key.tr('_', '-')
+        key = key.gsub('_', '-')
 
         case value_node.type
         when :str
