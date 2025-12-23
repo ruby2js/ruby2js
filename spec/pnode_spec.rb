@@ -10,9 +10,13 @@ describe 'pnode tests' do
     converter.to_s
   end
 
-  # Helper to create AST nodes
+  # Helper to create AST nodes - use appropriate class based on parser
   def s(type, *children)
-    Ruby2JS::Node.new(type, children)
+    if RUBY2JS_PARSER == :prism
+      Ruby2JS::Node.new(type, children)
+    else
+      Parser::AST::Node.new(type, children)
+    end
   end
 
   describe 'pnode HTML elements' do
