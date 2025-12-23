@@ -62,7 +62,8 @@ SPEC_TO_FILTER = {
   'rails_controller_spec.rb' => 'rails/controller',
   'rails_routes_spec.rb' => 'rails/routes',
   'rails_schema_spec.rb' => 'rails/schema',
-  'rails_seeds_spec.rb' => 'rails/seeds'
+  'rails_seeds_spec.rb' => 'rails/seeds',
+  'rails_helpers_spec.rb' => 'rails/helpers'
 }
 
 def filter_for_spec(spec_name)
