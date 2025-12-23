@@ -281,7 +281,9 @@ module Ruby2JS
 
         if node.type == :const
           parent, name = node.children
-          if parent&.type == :const && parent.children == [nil, :Phlex]
+          # Use element-by-element comparison for JS compatibility
+          # (JS array === compares by reference, not value)
+          if parent&.type == :const && parent.children[0].nil? && parent.children[1] == :Phlex
             return [:HTML, :SVG].include?(name)
           end
         end
@@ -468,11 +470,13 @@ module Ruby2JS
         when :begin
           node.children.each do |child|
             extracted = extract_child_node(child)
-            children.concat(extracted) if extracted
+            # Use push(*array) instead of concat for JS compatibility
+            # (JS concat returns new array, Ruby concat mutates)
+            children.push(*extracted) if extracted
           end
         else
           extracted = extract_child_node(node)
-          children.concat(extracted) if extracted
+          children.push(*extracted) if extracted
         end
 
         children

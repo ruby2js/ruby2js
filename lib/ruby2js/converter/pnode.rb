@@ -4,7 +4,8 @@ module Ruby2JS
     # pnode (Phlex node) is a synthetic node representing elements in a unified format.
     #
     # Structure: s(:pnode, tag, attrs_hash, *children)
-    #   - tag is Symbol (lowercase=HTML, uppercase=Component) or String (custom element) or nil (fragment)
+    #   - tag is nil (fragment), or a string/symbol for element/component name
+    #   - Uppercase first char = Component, lowercase = HTML element
     #   - attrs_hash is s(:hash, ...) with attribute pairs
     #   - children are nested pnodes, pnode_text, or other expressions
     #
@@ -17,15 +18,13 @@ module Ruby2JS
     ].freeze
 
     handle :pnode do |tag, attrs, *children|
-      case tag
-      when nil
+      if tag.nil?
         # Fragment - just output children
         children.each_with_index do |child, index|
           put @sep if index > 0
           parse child
         end
-
-      when Symbol
+      else
         tag_str = tag.to_s
 
         if tag_str[0] =~ /[A-Z]/
@@ -49,13 +48,9 @@ module Ruby2JS
           end
           put ')'
         else
-          # HTML element - output as template literal
+          # HTML element or custom element - output as template literal
           output_pnode_element(tag_str, attrs, children)
         end
-
-      when String
-        # Custom element - output as template literal
-        output_pnode_element(tag, attrs, children)
       end
     end
 
@@ -137,11 +132,10 @@ module Ruby2JS
 
     # Output a pnode inline (for nesting within template literals)
     def output_pnode_inline(tag, attrs, children)
-      case tag
-      when nil
+      if tag.nil?
         # Fragment - just output children
         children.each { |child| output_pnode_child_inline(child) }
-      when Symbol
+      else
         tag_str = tag.to_s
         if tag_str[0] =~ /[A-Z]/
           # Component - wrap in interpolation
@@ -153,8 +147,6 @@ module Ruby2JS
         else
           output_pnode_element_inline(tag_str, attrs, children)
         end
-      when String
-        output_pnode_element_inline(tag, attrs, children)
       end
     end
 
@@ -199,10 +191,9 @@ module Ruby2JS
 
     # Output a pnode inline for static context
     def output_pnode_static_inline(tag, attrs, children)
-      case tag
-      when nil
+      if tag.nil?
         children.each { |child| output_pnode_child_static(child) }
-      when Symbol
+      else
         tag_str = tag.to_s
         if tag_str[0] =~ /[A-Z]/
           put '" + '
@@ -213,8 +204,6 @@ module Ruby2JS
         else
           output_pnode_element_static_inline(tag_str, attrs, children)
         end
-      when String
-        output_pnode_element_static_inline(tag, attrs, children)
       end
     end
 

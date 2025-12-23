@@ -125,8 +125,21 @@ export def convert(source, options = {})
   # Build pipeline options
   pipeline_options = options.merge(source: source)
 
+  # Resolve filter names to filter objects
+  # Filters can be passed as strings ('Phlex') or as filter objects directly
+  filters = (options[:filters] || []).map do |f|
+    if f.is_a?(String)
+      resolved = Ruby2JS::Filter[f]
+      unless resolved
+        raise "Filter #{f} not loaded. Load it via run_all_specs.mjs or import manually."
+      end
+      resolved
+    else
+      f
+    end
+  end
+
   # Run pipeline (handles filters if provided, converter setup, execution)
-  filters = options[:filters] || []
   pipeline = Ruby2JS::Pipeline.new(ast, comments, filters: filters, options: pipeline_options)
   result = pipeline.run
 
