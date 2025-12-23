@@ -18,7 +18,17 @@ module Ruby2JS
       # Some filters use uppercase (ESM, CJS), others use capitalized (Functions, Return)
       UPPERCASE_FILTERS = %w[esm cjs].freeze
 
+      # Filters with non-standard capitalization that must be preserved
+      SPECIAL_CASE_FILTERS = {
+        'camelcase' => 'CamelCase',
+        'camelCase' => 'CamelCase'
+      }.freeze
+
       def filter_to_export_name(name)
+        # Check for special case first
+        return SPECIAL_CASE_FILTERS[name] if SPECIAL_CASE_FILTERS.key?(name)
+        return SPECIAL_CASE_FILTERS[name.downcase] if SPECIAL_CASE_FILTERS.key?(name.downcase)
+
         if UPPERCASE_FILTERS.include?(name.downcase)
           name.upcase
         else
