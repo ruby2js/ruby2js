@@ -157,6 +157,9 @@ desc "Transpile build.rb to build.mjs for selfhost builds"
 file BUILD_MJS => [File.join(DEMO, 'scripts/build.rb'), "#{ROOT}/lib/ruby2js/filter/selfhost_build.rb"] do
   # Use stdin instead of file argument to work around autoexports + file read issue
   sh bundle_exec("cat #{DEMO}/scripts/build.rb | ruby #{ROOT}/bin/ruby2js --filter selfhost_build --filter esm --filter node --filter functions --filter return --filter pragma --autoexports > #{BUILD_MJS}")
+  # Add shebang for npm bin command execution
+  content = "#!/usr/bin/env node\n" + File.read(BUILD_MJS)
+  File.write(BUILD_MJS, content)
 end
 
 desc "Run ruby2js-on-rails smoke tests (compares Ruby vs selfhost builds)"

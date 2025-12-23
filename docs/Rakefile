@@ -321,9 +321,10 @@ task :rails_demo_tarball => [:selfhost_build] do
      "--filter functions --filter return --filter pragma --autoexports " \
      "> #{build_mjs}"
 
-  # Convert relative paths to package imports for npm distribution
+  # Add shebang and convert relative paths to package imports for npm distribution
   # Development uses relative paths (../../../selfhost/...), npm uses package imports (ruby2js/...)
   content = File.read(build_mjs)
+  content = "#!/usr/bin/env node\n" + content
   content = content.gsub('../../../selfhost/ruby2js.js', 'ruby2js')
   content = content.gsub('../../../selfhost/filters/', 'ruby2js/filters/')
   content = content.gsub('../../../selfhost/lib/', 'ruby2js/lib/')
