@@ -74,7 +74,8 @@ app/
         └── edit.html.erb
 config/
 ├── routes.rb
-└── database.yml
+├── database.yml
+└── ruby2js.yml
 db/
 ├── schema.rb
 └── seeds.rb
@@ -291,27 +292,78 @@ Ruby files appear in browser DevTools sources:
 
 The sourcemaps connect running JavaScript back to the Ruby source.
 
-## Filter Configuration
+## Transpilation Configuration
 
-Typical configuration for Rails transpilation:
+Configure transpilation options in `config/ruby2js.yml`:
 
-```ruby
-Ruby2JS.convert(source,
-  eslevel: 2022,
-  filters: [:rails, :esm, :functions, :erb, :active_support]
-)
+```yaml
+# config/ruby2js.yml
+default: &default
+  eslevel: 2022
+  include:
+    - class
+    - call
+  autoexports: true
+  comparison: identity
+
+development:
+  <<: *default
+
+production:
+  <<: *default
+  strict: true
 ```
+
+### Available Options
+
+| Option | Description |
+|--------|-------------|
+| **eslevel** | ECMAScript target (2020-2025) |
+| **include** | Method conversion opt-ins (`class`, `call`) |
+| **autoexports** | Auto-export top-level declarations |
+| **comparison** | `equality` (==) or `identity` (===) |
+| **strict** | Add "use strict" directive |
+
+### Custom Filters
+
+For applications using Phlex or Stimulus, specify filters explicitly:
+
+```yaml
+default: &default
+  eslevel: 2022
+  filters:
+    - phlex
+    - stimulus
+    - camelCase
+    - functions
+    - esm
+    - return
+```
+
+Available filter names:
 
 | Filter | Purpose |
 |--------|---------|
-| **rails** | Models, controllers, routes, schema, view helpers |
+| **functions** | Ruby → JS method mappings (`.map`, `.select` → `.filter`, etc.) |
 | **esm** | ES module imports/exports |
-| **functions** | Ruby → JS method mappings |
+| **return** | Implicit return handling |
 | **erb** | ERB templates → render functions |
-| **active_support** | `blank?`, `present?`, `try`, etc. |
+| **camelCase** | Convert snake_case to camelCase |
+| **phlex** | Phlex components → JS (template literals or React) |
+| **stimulus** | Stimulus controllers → JS classes |
+| **rails/model** | ActiveRecord models |
+| **rails/controller** | ActionController patterns |
+| **rails/routes** | Routing DSL |
+| **rails/schema** | Schema definitions |
+| **rails/seeds** | Database seeds |
+| **rails/helpers** | View helpers (`link_to`, `truncate`, etc.) |
 
 {% rendercontent "docs/note", type: "info" %}
-The `rails` filter includes `rails/helpers` for view helpers like `link_to`, `form_for`, and `truncate`. When using both `rails` and `erb` filters, ensure `rails` comes before `erb` in the filter list for proper helper support.
+When no `filters` key is present, the build uses default Rails filters. Specify filters explicitly when using Phlex, Stimulus, or other non-Rails filters.
+{% endrendercontent %}
+
+{% rendercontent "docs/note", type: "info" %}
+Filter order matters. When using both `rails/helpers` and `erb` filters, ensure `rails/helpers` comes before `erb` for proper helper support.
 {% endrendercontent %}
 
 ## Limitations
