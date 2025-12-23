@@ -38,6 +38,269 @@ Unify view component handling around Phlex as the canonical Ruby representation,
 4. **Familiar JSX** — Optional authoring syntax for those who prefer it
 5. **Idiomatic Phlex** — Full support for Phlex patterns, not a subset
 
+## Stimulus as the Reactivity Layer
+
+Phlex renders static HTML. For interactivity without React, Stimulus controllers provide a lightweight solution:
+
+```ruby
+# Phlex component with Stimulus hooks
+class Counter < Phlex::HTML
+  def view_template
+    div(data_controller: "counter") do
+      span(data_counter_target: "display") { "0" }
+      button(data_action: "click->counter#increment") { "+" }
+    end
+  end
+end
+```
+
+```ruby
+# Stimulus controller (transpiled to JS by Ruby2JS)
+class CounterController < Stimulus::Controller
+  def connect
+    @count = 0
+  end
+
+  def increment
+    @count += 1
+    displayTarget.textContent = @count.to_s
+  end
+end
+```
+
+| Concern | Handled By |
+|---------|------------|
+| Initial HTML | Phlex (server or browser) |
+| Event binding | Stimulus (data-action) |
+| State | Stimulus controller |
+| DOM updates | Stimulus targets |
+
+**Phlex + Stimulus vs React:**
+- React: state change → virtual DOM diff → patch DOM
+- Stimulus: event → controller method → direct DOM update
+
+Stimulus is lighter but requires explicit DOM manipulation. React is heavier but declarative. The choice depends on complexity needs.
+
+## Migration Scenarios
+
+### Scenario 1: Legacy React → Modern Phlex
+
+**Starting point:** Webpacker (deprecated), React/JSX components, large bundle
+
+**End goal:** Modern tooling (esbuild/vite), Phlex + Stimulus, smaller footprint
+
+#### Step 1: Categorize Components
+
+| Category | Example | Migration Target |
+|----------|---------|------------------|
+| Presentational | `<Card>`, `<Avatar>` | Phlex (trivial) |
+| Simple interaction | Toggle, dropdown | Phlex + Stimulus |
+| Form handling | Input validation | Phlex + Stimulus |
+| Complex state | Shopping cart, live search | Keep React or use Turbo |
+| Ecosystem dependent | Rich text editor, charts | Keep React wrapper |
+
+#### Step 2: Convert Presentational Components
+
+```jsx
+// Before: React
+function Card({ title, children }) {
+  return (
+    <div className="card">
+      <h2>{title}</h2>
+      {children}
+    </div>
+  );
+}
+```
+
+```ruby
+# After: Phlex
+class Card < Phlex::HTML
+  def initialize(title:)
+    @title = title
+  end
+
+  def view_template(&block)
+    div(class: "card") do
+      h2 { @title }
+      yield if block_given?
+    end
+  end
+end
+```
+
+#### Step 3: Replace React State with Stimulus
+
+```jsx
+// Before: React with useState
+function Counter() {
+  const [count, setCount] = useState(0);
+  return (
+    <div>
+      <span>{count}</span>
+      <button onClick={() => setCount(c => c + 1)}>+</button>
+    </div>
+  );
+}
+```
+
+```ruby
+# After: Phlex + Stimulus
+class Counter < Phlex::HTML
+  def view_template
+    div(data_controller: "counter") do
+      span(data_counter_target: "display") { "0" }
+      button(data_action: "click->counter#increment") { "+" }
+    end
+  end
+end
+
+class CounterController < Stimulus::Controller
+  def connect
+    @count = 0
+  end
+
+  def increment
+    @count += 1
+    displayTarget.textContent = @count.to_s
+  end
+end
+```
+
+#### Step 4: Complex State Options
+
+For components where Stimulus feels awkward:
+
+**Option A: Turbo Frames** (server-driven updates)
+```ruby
+turbo_frame_tag "cart" do
+  render CartComponent.new(items: @cart.items)
+end
+```
+
+**Option B: Keep React Island** (hybrid approach)
+```ruby
+# Phlex wrapper for React component
+div(data_react_component: "ShoppingCart", data_props: items.to_json)
+```
+
+#### Step 5: Remove Legacy Stack
+
+Once migration complete:
+- Remove Webpacker
+- Remove react, react-dom dependencies
+- Simpler build with Ruby2JS + esbuild
+
+---
+
+### Scenario 2: Phlex Prototype → React
+
+**Starting point:** Phlex components, Stimulus for interactivity, works for prototype
+
+**Discovered needs:** Complex state, frequent re-renders, React ecosystem (UI libraries), team prefers React
+
+#### Key Advantage: Same Source, Different Target
+
+The same Phlex Ruby transpiles to either target with no changes:
+
+```ruby
+# This Phlex Ruby...
+class Card < Phlex::HTML
+  def initialize(title:)
+    @title = title
+  end
+
+  def view_template
+    div(class: "card") do
+      h2 { @title }
+      yield if block_given?
+    end
+  end
+end
+```
+
+```javascript
+// ...outputs Phlex JS (string concat):
+class Card {
+  render({ title }, children) {
+    let _phlex_out = "";
+    _phlex_out += `<div class="card">`;
+    _phlex_out += `<h2>${title}</h2>`;
+    _phlex_out += children?.() || "";
+    _phlex_out += `</div>`;
+    return _phlex_out;
+  }
+}
+
+// ...OR React JS (same source!):
+function Card({ title, children }) {
+  return (
+    <div className="card">
+      <h2>{title}</h2>
+      {children}
+    </div>
+  );
+}
+```
+
+#### Step 1: Add React State Incrementally
+
+```ruby
+# Add React hooks to Phlex component
+class Counter < Phlex::HTML
+  def view_template
+    count, setCount = useState(0)
+
+    div do
+      span { count }
+      button(onclick: -> { setCount.(count + 1) }) { "+" }
+    end
+  end
+end
+```
+
+Transpiles to:
+```javascript
+function Counter() {
+  const [count, setCount] = useState(0);
+  return (
+    <div>
+      <span>{count}</span>
+      <button onClick={() => setCount(count + 1)}>+</button>
+    </div>
+  );
+}
+```
+
+#### Step 2: Replace Stimulus with React Patterns
+
+| Stimulus | React Equivalent |
+|----------|------------------|
+| `data-controller` | Component |
+| `data-target` | useRef or JSX reference |
+| `data-action` | onClick/onChange props |
+| Controller instance state | useState/useReducer |
+| connect/disconnect | useEffect cleanup |
+
+#### Step 3: Switch Build Target
+
+```ruby
+# Same Ruby source, different output
+Ruby2JS.convert(source, filters: [:phlex])  # → Phlex JS (strings)
+Ruby2JS.convert(source, filters: [:react])  # → React JS (virtual DOM)
+```
+
+---
+
+### The Ruby2JS Advantage
+
+Both migrations are **incremental and reversible** because:
+
+1. **Same source language** — Ruby throughout
+2. **Same authoring syntax** — Phlex patterns (or JSX via jsx.rb)
+3. **Build-time target selection** — Switch output with a config flag
+4. **No rewrite required** — Mechanical transformation, not manual conversion
+
 ## Breaking Change: Wunderbar Removal
 
 Wunderbar (`_div`, `_Component`) will be removed in favor of Phlex patterns. This affects:
@@ -271,14 +534,14 @@ button(onclick: handler) { "Click" }
 
 ## Implementation Phases
 
-### Phase 1: pnode Infrastructure
+### Phase 1: pnode Infrastructure (~1 day)
 
 1. [ ] Define pnode structure in converter
 2. [ ] Add pnode handler to serializer (for debugging/inspection)
 3. [ ] Add pnode_text node type
 4. [ ] Write unit tests for pnode creation and handling
 
-### Phase 2: jsx.rb Rewrite
+### Phase 2: jsx.rb Rewrite (~2 days)
 
 1. [ ] Update jsx.rb to output pnodes instead of wunderbar strings
 2. [ ] Add HTML_ELEMENTS list (import from phlex.rb)
@@ -288,7 +551,7 @@ button(onclick: handler) { "Click" }
 6. [ ] Handle spread attributes (`{...props}`)
 7. [ ] Update jsx_spec.rb tests
 
-### Phase 3: Phlex Filter Enhancement
+### Phase 3: Phlex Filter Enhancement (~2 days)
 
 1. [ ] Add `on_pnode` handler
 2. [ ] Add `on_pnode_text` handler
@@ -297,7 +560,7 @@ button(onclick: handler) { "Click" }
 5. [ ] Handle fragments
 6. [ ] Update phlex_spec.rb tests
 
-### Phase 4: React Filter Migration
+### Phase 4: React Filter Migration (~2 days)
 
 1. [ ] Add `on_pnode` handler alongside existing wunderbar support
 2. [ ] Add attribute normalization (class → className, etc.)
@@ -307,14 +570,14 @@ button(onclick: handler) { "Click" }
 6. [ ] Deprecation warnings for wunderbar patterns
 7. [ ] Update react_spec.rb tests
 
-### Phase 5: Vue Filter Migration
+### Phase 5: Vue Filter Migration (~1 day)
 
 1. [ ] Add `on_pnode` handler
 2. [ ] Attribute handling for Vue (class, style bindings)
 3. [ ] Component handling
 4. [ ] Update vue_spec.rb tests
 
-### Phase 6: Wunderbar Removal
+### Phase 6: Wunderbar Removal (~1 day)
 
 1. [ ] Remove wunderbar pattern matching from react filter
 2. [ ] Remove wunderbar pattern matching from vue filter
@@ -322,13 +585,15 @@ button(onclick: handler) { "Click" }
 4. [ ] Update demo examples
 5. [ ] Add migration guide
 
-### Phase 7: Selfhost Compatibility
+### Phase 7: Selfhost Compatibility (~2 days)
 
 1. [ ] Ensure jsx.rb transpiles to JavaScript
 2. [ ] Ensure pnode handling works in selfhost converter
 3. [ ] Update phlex.js filter for selfhost
 4. [ ] Update react.js filter for selfhost
 5. [ ] Run selfhost tests
+
+**Total: ~11 days**
 
 ## Phlex Feature Support Matrix
 
