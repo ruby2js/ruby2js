@@ -1,0 +1,200 @@
+# frozen_string_literal: true
+
+module Ruby2JS
+  module Spa
+    # Manifest DSL for configuring SPA generation
+    #
+    # Example:
+    #   Ruby2JS::Spa.configure do
+    #     name :scoring
+    #     mount_path '/offline/scores'
+    #
+    #     routes do
+    #       only controllers: [:scores], actions: [:heat, :card, :update]
+    #     end
+    #
+    #     models do
+    #       include :Heat, :Entry, :Score
+    #     end
+    #
+    #     views do
+    #       include 'scores/_table_heat.html.erb'
+    #     end
+    #
+    #     stimulus do
+    #       include 'score_controller.js'
+    #     end
+    #
+    #     sync do
+    #       endpoint '/api/spa/sync'
+    #       writable :Score
+    #     end
+    #   end
+    #
+    class Manifest
+      attr_reader :name, :mount_path
+      attr_reader :route_config, :model_config, :view_config
+      attr_reader :stimulus_config, :sync_config
+
+      def initialize
+        @route_config = RouteConfig.new
+        @model_config = ModelConfig.new
+        @view_config = ViewConfig.new
+        @stimulus_config = StimulusConfig.new
+        @sync_config = SyncConfig.new
+      end
+
+      # DSL methods
+      def name(value = nil)
+        return @name if value.nil?
+        @name = value.to_sym
+      end
+
+      def mount_path(value = nil)
+        return @mount_path if value.nil?
+        @mount_path = value
+      end
+
+      def routes(&block)
+        @route_config.instance_eval(&block) if block_given?
+        @route_config
+      end
+
+      def models(&block)
+        @model_config.instance_eval(&block) if block_given?
+        @model_config
+      end
+
+      def views(&block)
+        @view_config.instance_eval(&block) if block_given?
+        @view_config
+      end
+
+      def stimulus(&block)
+        @stimulus_config.instance_eval(&block) if block_given?
+        @stimulus_config
+      end
+
+      def sync(&block)
+        @sync_config.instance_eval(&block) if block_given?
+        @sync_config
+      end
+
+      # Validation
+      def valid?
+        errors.empty?
+      end
+
+      def errors
+        errs = []
+        errs << 'name is required' unless @name
+        errs << 'mount_path is required' unless @mount_path
+        errs
+      end
+    end
+
+    # Route filtering configuration
+    class RouteConfig
+      attr_reader :controllers, :actions, :only_routes, :except_routes
+
+      def initialize
+        @controllers = []
+        @actions = []
+        @only_routes = []
+        @except_routes = []
+      end
+
+      def only(controllers: nil, actions: nil)
+        @controllers = Array(controllers).map(&:to_sym) if controllers
+        @actions = Array(actions).map(&:to_sym) if actions
+      end
+
+      def include_route(pattern)
+        @only_routes << pattern
+      end
+
+      def exclude_route(pattern)
+        @except_routes << pattern
+      end
+
+      def matches_controller?(name)
+        return true if @controllers.empty?
+        @controllers.include?(name.to_sym)
+      end
+
+      def matches_action?(name)
+        return true if @actions.empty?
+        @actions.include?(name.to_sym)
+      end
+    end
+
+    # Model configuration
+    class ModelConfig
+      attr_reader :included_models, :excluded_models
+
+      def initialize
+        @included_models = []
+        @excluded_models = []
+      end
+
+      def include(*model_names)
+        @included_models.concat(model_names.flatten.map(&:to_sym))
+      end
+
+      def exclude(*model_names)
+        @excluded_models.concat(model_names.flatten.map(&:to_sym))
+      end
+
+      def includes?(model_name)
+        name = model_name.to_sym
+        return false if @excluded_models.include?(name)
+        return true if @included_models.empty?
+        @included_models.include?(name)
+      end
+    end
+
+    # View configuration
+    class ViewConfig
+      attr_reader :included_views
+
+      def initialize
+        @included_views = []
+      end
+
+      def include(*patterns)
+        @included_views.concat(patterns.flatten)
+      end
+    end
+
+    # Stimulus controller configuration
+    class StimulusConfig
+      attr_reader :included_controllers
+
+      def initialize
+        @included_controllers = []
+      end
+
+      def include(*controller_names)
+        @included_controllers.concat(controller_names.flatten)
+      end
+    end
+
+    # Sync configuration
+    class SyncConfig
+      attr_reader :endpoint, :writable_models
+
+      def initialize
+        @writable_models = []
+      end
+
+      def endpoint(value = nil)
+        return @endpoint if value.nil?
+        @endpoint = value
+      end
+
+      def writable(*model_names)
+        @writable_models.concat(model_names.flatten.map(&:to_sym))
+      end
+    end
+  end
+end

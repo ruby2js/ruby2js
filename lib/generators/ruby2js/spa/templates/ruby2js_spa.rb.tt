@@ -1,0 +1,51 @@
+# Ruby2JS SPA Configuration
+#
+# This file defines which parts of your Rails application should be
+# transpiled into an offline-capable Single Page Application.
+#
+# The SPA will be built to: public/spa/<%= options[:name] %>/
+# And mounted at: <%= options[:mount_path] %>/
+#
+# Build the SPA with: rails ruby2js:spa:build
+#
+# For more information, see: https://www.ruby2js.com/docs/spa
+
+require 'ruby2js/spa'
+
+Ruby2JS::Spa.configure do
+  name :<%= options[:name] %>
+  mount_path '<%= options[:mount_path] %>'
+
+  # Routes: specify which controllers and actions to include
+  # The actual routes are parsed from config/routes.rb
+  routes do
+    only controllers: [:example],
+         actions: [:index, :show, :create, :update]
+  end
+
+  # Models: specify which models to include
+  # Associations are automatically resolved - if you include a model,
+  # its associated models will be included too
+  models do
+    include :Example
+    # Additional models discovered via has_many/belongs_to are auto-included
+  end
+
+  # Views: ERB templates to transpile to JavaScript render functions
+  views do
+    # include 'examples/index.html.erb'
+    # include 'examples/show.html.erb'
+    # include 'examples/_form.html.erb'
+  end
+
+  # Stimulus: JavaScript controllers to copy (not transpiled)
+  stimulus do
+    # include 'example_controller.js'
+  end
+
+  # Sync: configuration for offline data synchronization
+  sync do
+    endpoint '/api/spa/sync'
+    # writable :Example  # Models that can be modified offline
+  end
+end
