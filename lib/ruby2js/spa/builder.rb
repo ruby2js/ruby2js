@@ -17,7 +17,7 @@ module Ruby2JS
     #
     class Builder
       attr_reader :manifest, :rails_root, :output_dir
-      attr_reader :resolved_models, :schema
+      attr_reader :resolved_models, :schema, :built_views
 
       def initialize(manifest, rails_root: nil)
         @manifest = manifest
@@ -25,6 +25,7 @@ module Ruby2JS
         @output_dir = File.join(@rails_root, 'public', 'spa', manifest.name.to_s)
         @resolved_models = {}
         @schema = {}
+        @built_views = []
       end
 
       def build
@@ -36,8 +37,10 @@ module Ruby2JS
         parse_schema
         build_models
 
-        # Stage 3-4: Views, Controllers, Routes (placeholder)
-        # build_views
+        # Stage 3: Views
+        build_views
+
+        # Stage 4: Controllers, Routes (placeholder)
         # build_controllers
         # build_routes
 
@@ -56,6 +59,7 @@ module Ruby2JS
         puts "SPA built successfully: #{output_dir}"
         puts "  Models: #{@resolved_models.keys.join(', ')}"
         puts "  Tables: #{@schema.keys.join(', ')}"
+        puts "  Views: #{@built_views.join(', ')}" if @built_views&.any?
       end
 
       private
@@ -288,8 +292,70 @@ module Ruby2JS
       # Placeholder methods for subsequent stages
 
       def build_views
-        # Stage 3: Transpile ERB templates
-        raise NotImplementedError, "View transpilation not yet implemented"
+        return if manifest.view_config.included_views.empty?
+
+        transpiler = ViewTranspiler.new(@rails_root, database: 'dexie')
+        views_dir = File.join(output_dir, 'views')
+
+        # Group views by controller for generating combined modules
+        views_by_controller = {}
+
+        manifest.view_config.included_views.each do |view_pattern|
+          # Handle glob patterns (e.g., 'articles/*.html.erb')
+          if view_pattern.include?('*')
+            glob_pattern = File.join(@rails_root, 'app', 'views', view_pattern)
+            Dir.glob(glob_pattern).each do |file_path|
+              transpile_view_file(transpiler, file_path, views_dir, views_by_controller)
+            end
+          else
+            # Direct view path (e.g., 'articles/show.html.erb' or 'articles/show')
+            view_path = view_pattern.sub(/\.html\.erb$/, '')
+            parts = view_path.split('/')
+            controller = parts[-2] || 'application'
+            action = parts[-1]
+
+            js = transpiler.transpile(controller, action)
+            if js
+              write_view_file(controller, action, js, views_dir, views_by_controller)
+            end
+          end
+        end
+
+        # Generate combined modules for each controller
+        # Write to views/{controller}.js (not inside controller subdirectory to avoid conflict with index view)
+        views_by_controller.each do |controller, actions|
+          module_js = transpiler.generate_views_module(controller, actions)
+          module_path = File.join(views_dir, "#{controller}.js")
+          File.write(module_path, module_js)
+        end
+      end
+
+      def transpile_view_file(transpiler, file_path, views_dir, views_by_controller)
+        relative = file_path.sub(File.join(@rails_root, 'app', 'views') + '/', '')
+        parts = relative.split('/')
+        controller = parts[-2] || 'application'
+        action = File.basename(parts[-1], '.html.erb')
+
+        # Skip partials for now (they start with _)
+        return if action.start_with?('_')
+
+        template = File.read(file_path)
+        js = transpiler.send(:transpile_erb, template)
+
+        write_view_file(controller, action, js, views_dir, views_by_controller)
+      end
+
+      def write_view_file(controller, action, js, views_dir, views_by_controller)
+        controller_dir = File.join(views_dir, controller)
+        FileUtils.mkdir_p(controller_dir)
+
+        file_path = File.join(controller_dir, "#{action}.js")
+        File.write(file_path, js)
+
+        views_by_controller[controller] ||= {}
+        views_by_controller[controller][action] = js
+
+        @built_views << "#{controller}/#{action}"
       end
 
       def build_controllers
