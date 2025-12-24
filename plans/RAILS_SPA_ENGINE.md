@@ -78,6 +78,25 @@ open_feedback_controller.js
 info_box_controller.js
 ```
 
+## Key Design Decision: AST-Based Manifest
+
+Rather than using YAML with string patterns that require regex matching, the manifest is a Ruby DSL. Ruby2JS already has infrastructure for parsing Ruby to AST and walking/transforming ASTs via filters. This same infrastructure processes the manifest:
+
+```
+Traditional Approach (rejected):
+  YAML manifest → regex match route strings → parse routes.rb to AST → match → transpile
+
+AST Approach (adopted):
+  Ruby manifest → parse routes.rb to AST → filter AST by criteria → transpile
+```
+
+**Benefits:**
+- One representation (AST) instead of two (YAML description + actual code)
+- Source files are the source of truth; manifest just selects what to include
+- Dependencies discovered automatically by parsing model associations
+- Validation happens at parse time, not runtime
+- Ruby DSL is familiar to Rails developers
+
 ## Architecture
 
 ### Rails Engine Structure
@@ -86,14 +105,13 @@ info_box_controller.js
 lib/ruby2js/
 ├── spa/
 │   ├── engine.rb           # Rails::Engine with generators, middleware
-│   ├── manifest.rb         # Parses config/ruby2js_spa.yml
+│   ├── manifest.rb         # Parses config/ruby2js_spa.rb (Ruby DSL)
 │   ├── builder.rb          # Orchestrates transpilation
 │   ├── middleware.rb       # Rack middleware to serve SPA
-│   ├── transpilers/
-│   │   ├── models.rb       # Transpile model subset
-│   │   ├── views.rb        # Transpile ERB templates
-│   │   ├── controllers.rb  # Transpile controller subset
-│   │   └── routes.rb       # Transpile route subset
+│   ├── filters/
+│   │   ├── route_filter.rb     # Filter routes AST by controller/action
+│   │   ├── model_filter.rb     # Filter models, resolve dependencies
+│   │   └── controller_filter.rb # Filter to actions referenced by routes
 │   └── runtime/
 │       ├── turbo_interceptor.js   # Intercept Turbo for offline
 │       ├── sync.js                # Upload/download sync logic
@@ -102,7 +120,7 @@ lib/ruby2js/
     └── spa/
         ├── install_generator.rb
         └── templates/
-            └── ruby2js_spa.yml.tt
+            └── ruby2js_spa.rb.tt
 ```
 
 ### Generated SPA Structure
@@ -121,50 +139,90 @@ public/spa/{name}/
     └── sync.js
 ```
 
-### Manifest Format
+### Manifest Format (Ruby DSL)
 
-```yaml
-# config/ruby2js_spa.yml
-name: scoring
-mount_path: /offline/scores
+```ruby
+# config/ruby2js_spa.rb
+Ruby2JS::Spa.configure do
+  name :scoring
+  mount_path '/offline/scores'
 
-# What to transpile
-routes:
-  only:
-    - "get 'heats/:id', to: 'scores#heat'"
-    - "get 'heats/:id/card', to: 'scores#card'"
-    - "patch 'scores/:id', to: 'scores#update'"
+  # Routes: parse config/routes.rb, filter by controller/action
+  # The actual route structure comes from the AST, not string matching
+  routes do
+    only controllers: [:scores],
+         actions: [:heat, :card, :table, :update]
+  end
 
-models:
-  include:
-    - Heat
-    - Entry
-    - Score
-    - Person
-    - Dance
-  # Associations outside the include list become pre-computed attributes
+  # Models: parse app/models/*.rb, auto-discover associations
+  # Dependencies are resolved by walking the AST for has_many/belongs_to
+  models do
+    include :Heat, :Entry, :Score, :Person, :Dance
+    # Age, Level, Studio, Solo discovered automatically via associations
+  end
 
-views:
-  include:
-    - scores/_table_heat.html.erb
-    - scores/_cards_heat.html.erb
-    - scores/_heat_header.html.erb
+  # Views: glob patterns for ERB templates
+  views do
+    include 'scores/_table_heat.html.erb'
+    include 'scores/_cards_heat.html.erb'
+    include 'scores/_heat_header.html.erb'
+    include 'scores/_info_box.html.erb'
+  end
 
-controllers:
-  include:
-    - ScoresController
-  # Only actions referenced by routes are transpiled
+  # Stimulus: copy existing JS controllers (not transpiled)
+  stimulus do
+    include 'score_controller.js'
+    include 'drop_controller.js'
+    include 'open_feedback_controller.js'
+    include 'info_box_controller.js'
+  end
 
-stimulus:
-  include:
-    - score_controller.js
-    - drop_controller.js
+  # Sync configuration
+  sync do
+    endpoint '/api/spa/sync'
+    writable :Score  # Models that can be modified offline
+  end
+end
+```
 
-# Sync configuration
-sync:
-  endpoint: /api/spa/sync
-  models:
-    - Score  # Models that can be modified offline
+### How AST Filtering Works
+
+**Routes:**
+```ruby
+# config/routes.rb (source)
+Rails.application.routes.draw do
+  resources :articles
+  resources :scores do
+    get :heat, on: :member
+    get :card, on: :member
+  end
+  resources :users
+end
+
+# After filtering with `only controllers: [:scores]`:
+# AST retains only the :scores resource block
+# Output includes only scores routes
+```
+
+**Models:**
+```ruby
+# Manifest says: include :Heat
+# Builder parses app/models/heat.rb:
+
+class Heat < ApplicationRecord
+  belongs_to :dance      # → Dance added to include list
+  belongs_to :entry      # → Entry added to include list
+  has_many :scores       # → Score added to include list
+end
+
+# Recursively resolves until all dependencies found
+# External associations (not in final list) become pre-computed attributes
+```
+
+**Controllers:**
+```ruby
+# After route filtering, we know actions: [:heat, :card, :update]
+# Controller AST is filtered to only those methods plus before_action chains
 ```
 
 ## Turbo Integration
@@ -262,7 +320,7 @@ Existing Stimulus controllers work unchanged because:
 
 ### Stage 1: Engine Infrastructure
 
-**Goal:** Rails Engine with generators and manifest parsing
+**Goal:** Rails Engine with generators and Ruby DSL manifest parsing
 
 #### Tasks
 
@@ -285,33 +343,56 @@ Existing Stimulus controllers work unchanged because:
 2. **Install generator**
    ```bash
    rails generate ruby2js:spa:install
-   # Creates config/ruby2js_spa.yml
+   # Creates config/ruby2js_spa.rb (Ruby DSL template)
    # Adds middleware to config/application.rb
    # Adds .gitignore entry for public/spa/
    ```
 
-3. **Manifest parser**
+3. **Manifest DSL**
    ```ruby
    # lib/ruby2js/spa/manifest.rb
    module Ruby2JS
      module Spa
        class Manifest
-         def initialize(path = 'config/ruby2js_spa.yml')
-           @config = YAML.load_file(path)
+         attr_reader :name, :mount_path, :route_filters, :model_includes,
+                     :view_patterns, :stimulus_controllers, :sync_config
+
+         def initialize(path = 'config/ruby2js_spa.rb')
+           @route_filters = {}
+           @model_includes = []
+           @view_patterns = []
+           @stimulus_controllers = []
+           @sync_config = {}
+           instance_eval(File.read(path))
          end
 
-         def routes; @config['routes']; end
-         def models; @config['models']; end
-         def views; @config['views']; end
-         def controllers; @config['controllers']; end
-         def stimulus; @config['stimulus']; end
-         def sync_config; @config['sync']; end
+         # DSL methods
+         def name(value); @name = value; end
+         def mount_path(value); @mount_path = value; end
+
+         def routes(&block)
+           RoutesDSL.new(@route_filters).instance_eval(&block)
+         end
+
+         def models(&block)
+           ModelsDSL.new(@model_includes).instance_eval(&block)
+         end
+
+         # ... similar for views, stimulus, sync
+       end
+
+       class RoutesDSL
+         def initialize(filters); @filters = filters; end
+         def only(controllers:, actions:)
+           @filters[:controllers] = controllers
+           @filters[:actions] = actions
+         end
        end
      end
    end
    ```
 
-4. **Rake task skeleton**
+4. **Rake task**
    ```ruby
    # lib/tasks/ruby2js_spa.rake
    namespace :ruby2js do
@@ -329,7 +410,7 @@ Existing Stimulus controllers work unchanged because:
 #### Deliverables
 - `rails generate ruby2js:spa:install` works
 - `rake ruby2js:spa:build` runs (outputs placeholder)
-- Manifest YAML parsed correctly
+- Ruby DSL manifest parsed correctly
 
 ### Stage 2: Model Transpilation
 
@@ -337,18 +418,45 @@ Existing Stimulus controllers work unchanged because:
 
 #### Tasks
 
-1. **Model dependency resolution**
-   - Parse `has_many`, `belongs_to` declarations
-   - Build dependency graph
-   - Warn about associations outside included models
-   - Generate pre-computed attribute stubs for external associations
+1. **AST-based dependency resolution**
+   - Parse each included model file to AST
+   - Walk AST to find `has_many`, `belongs_to`, `has_one` calls
+   - Recursively add associated models to include list
+   - Build complete dependency graph
+   - Associations to models outside final list become pre-computed attributes
+
+   ```ruby
+   # lib/ruby2js/spa/filters/model_filter.rb
+   class ModelFilter
+     def resolve_dependencies(model_names)
+       included = Set.new(model_names)
+       queue = model_names.dup
+
+       while model = queue.shift
+         ast = parse_model_file(model)
+         associations = extract_associations(ast)  # Walk AST for has_many, etc.
+
+         associations.each do |assoc|
+           unless included.include?(assoc.class_name)
+             included << assoc.class_name
+             queue << assoc.class_name
+           end
+         end
+       end
+
+       included
+     end
+   end
+   ```
 
 2. **Dexie schema generation**
-   - Extract table structure from schema.rb or model introspection
+   - Parse db/schema.rb to AST
+   - Extract table structure from `create_table` blocks
    - Generate Dexie version/stores configuration
    - Handle indexes for queried fields
 
 3. **Model class transpilation**
+   - Filter model AST to remove server-only code
    - Use existing `rails/model` filter
    - Adapt for Dexie instead of sql.js
    - Handle scopes referenced by controllers
@@ -676,15 +784,15 @@ Stages 2-4 can proceed in parallel after Stage 1.
 
 ## Open Questions
 
-1. **Manifest validation:** How strict should validation be? Warn vs error on missing dependencies?
+1. **Asset pipeline integration:** Should the build integrate with Propshaft/Sprockets, or be standalone?
 
-2. **Asset pipeline integration:** Should the build integrate with Propshaft/Sprockets, or be standalone?
+2. **Service Worker:** Should the SPA register a service worker for true offline, or rely on Turbo interception?
 
-3. **Service Worker:** Should the SPA register a service worker for true offline, or rely on Turbo interception?
+3. **Versioning:** How to handle SPA version mismatches after server deploys?
 
-4. **Versioning:** How to handle SPA version mismatches after server deploys?
+4. **Authentication:** How to handle session/auth in the offline SPA?
 
-5. **Authentication:** How to handle session/auth in the offline SPA?
+5. **AST serialization:** For debugging, should filtered ASTs be serializable back to Ruby source?
 
 ## Future Possibilities
 
