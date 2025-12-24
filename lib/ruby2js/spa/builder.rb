@@ -1,69 +1,72 @@
 # frozen_string_literal: true
 
 require 'fileutils'
+require 'json'
 require 'ruby2js/inflector'
 
 module Ruby2JS
   module Spa
     # Orchestrates the SPA build process
     #
-    # The builder:
-    # 1. Parses routes.rb and filters by manifest criteria
-    # 2. Parses model files and resolves dependencies
-    # 3. Transpiles filtered routes, models, controllers, and views
-    # 4. Copies Stimulus controllers
-    # 5. Generates runtime files (Turbo interceptor, sync, Dexie adapter)
-    # 6. Writes output to public/spa/{name}/
+    # The builder generates a standalone SPA directory with:
+    # - Ruby source files (models, controllers, views)
+    # - package.json with ruby2js-rails dependency
+    # - Config files (database.yml, ruby2js.yml, routes.rb)
+    # - index.html entry point
+    #
+    # The user then runs `npm install && npm run build` to transpile.
     #
     class Builder
       attr_reader :manifest, :rails_root, :output_dir
-      attr_reader :resolved_models, :schema, :built_views, :built_controllers
+      attr_reader :resolved_models, :copied_views, :copied_controllers
 
       def initialize(manifest, rails_root: nil)
         @manifest = manifest
         @rails_root = (rails_root || (defined?(Rails) ? Rails.root : Dir.pwd)).to_s
         @output_dir = File.join(@rails_root, 'public', 'spa', manifest.name.to_s)
         @resolved_models = {}
-        @schema = {}
-        @built_views = []
-        @built_controllers = []
+        @copied_views = []
+        @copied_controllers = []
       end
 
       def build
         validate_manifest!
         prepare_output_directory
 
-        # Stage 2: Models
+        # Resolve model dependencies
         resolve_model_dependencies
-        parse_schema
-        build_models
 
-        # Stage 3: Views
-        build_views
+        # Copy Ruby source files
+        copy_models
+        copy_views
+        copy_controllers
 
-        # Stage 4: Controllers
-        build_controllers
+        # Generate config files
+        generate_database_yml
+        generate_ruby2js_yml
+        generate_routes_rb
+        generate_schema_rb
 
-        # Routes (placeholder)
-        # build_routes
+        # Generate package.json
+        generate_package_json
 
-        # Stage 5: Copy Stimulus controllers
-        copy_stimulus_controllers
-
-        # Generate Dexie database schema
-        generate_dexie_schema
-
-        # Generate runtime files
-        # generate_runtime
-
-        # Generate index.html
+        # Generate index.html and styles
         generate_index_html
+        copy_styles
 
-        puts "SPA built successfully: #{output_dir}"
+        # Generate README
+        generate_readme
+
+        puts "SPA generated successfully: #{output_dir}"
         puts "  Models: #{@resolved_models.keys.join(', ')}"
-        puts "  Tables: #{@schema.keys.join(', ')}"
-        puts "  Views: #{@built_views.join(', ')}" if @built_views&.any?
-        puts "  Controllers: #{@built_controllers.join(', ')}" if @built_controllers&.any?
+        puts "  Views: #{@copied_views.join(', ')}" if @copied_views.any?
+        puts "  Controllers: #{@copied_controllers.join(', ')}" if @copied_controllers.any?
+        puts ""
+        puts "Next steps:"
+        puts "  cd #{output_dir}"
+        puts "  npm install"
+        puts "  npm run build"
+        puts "  npm start"
       end
 
       private
@@ -77,14 +80,15 @@ module Ruby2JS
       def prepare_output_directory
         FileUtils.rm_rf(output_dir)
         FileUtils.mkdir_p(output_dir)
-        FileUtils.mkdir_p(File.join(output_dir, 'models'))
-        FileUtils.mkdir_p(File.join(output_dir, 'views'))
-        FileUtils.mkdir_p(File.join(output_dir, 'controllers'))
-        FileUtils.mkdir_p(File.join(output_dir, 'stimulus'))
-        FileUtils.mkdir_p(File.join(output_dir, 'lib'))
+        FileUtils.mkdir_p(File.join(output_dir, 'app', 'models'))
+        FileUtils.mkdir_p(File.join(output_dir, 'app', 'views'))
+        FileUtils.mkdir_p(File.join(output_dir, 'app', 'controllers'))
+        FileUtils.mkdir_p(File.join(output_dir, 'config'))
+        FileUtils.mkdir_p(File.join(output_dir, 'db'))
+        FileUtils.mkdir_p(File.join(output_dir, 'public'))
       end
 
-      # Stage 2: Model handling
+      # Model handling
 
       def resolve_model_dependencies
         return if manifest.model_config.included_models.empty?
@@ -101,191 +105,266 @@ module Ruby2JS
         end
       end
 
-      def parse_schema
-        parser = SchemaParser.new(@rails_root)
-        parser.parse
-        @schema = parser.tables
-      end
-
-      def build_models
+      def copy_models
         return if @resolved_models.empty?
 
-        transpiler = ModelTranspiler.new(@rails_root)
-        models_dir = File.join(output_dir, 'models')
+        models_dir = File.join(output_dir, 'app', 'models')
 
-        @resolved_models.each_key do |model_name|
-          js = transpiler.transpile(model_name)
-          next unless js
-
-          file_name = "#{snake_case(model_name.to_s)}.js"
-          File.write(File.join(models_dir, file_name), js)
+        @resolved_models.each do |model_name, model_info|
+          src = model_info[:file]
+          dst = File.join(models_dir, File.basename(src))
+          FileUtils.cp(src, dst) if File.exist?(src)
         end
 
-        # Generate ApplicationRecord base class
-        generate_application_record
+        # Copy or generate ApplicationRecord
+        app_record_src = File.join(@rails_root, 'app', 'models', 'application_record.rb')
+        app_record_dst = File.join(models_dir, 'application_record.rb')
+
+        if File.exist?(app_record_src)
+          FileUtils.cp(app_record_src, app_record_dst)
+        else
+          # Generate a minimal ApplicationRecord
+          File.write(app_record_dst, <<~RUBY)
+            class ApplicationRecord < ActiveRecord::Base
+              self.abstract_class = true
+            end
+          RUBY
+        end
       end
 
-      def generate_application_record
-        # Generate a Dexie-backed ApplicationRecord base class
-        app_record = <<~JS
-          import { db } from '../lib/database.js';
+      # View handling
 
-          export class ApplicationRecord {
-            static table_name = null;
+      def copy_views
+        return if manifest.view_config.included_views.empty?
 
-            constructor(attributes = {}) {
-              this._attributes = attributes;
-              this.id = attributes.id;
+        views_src_dir = File.join(@rails_root, 'app', 'views')
+        views_dst_dir = File.join(output_dir, 'app', 'views')
 
-              // Copy attributes to instance properties
-              for (let key in attributes) {
-                if (key !== 'id') {
-                  this[key] = attributes[key];
-                }
-              }
-            }
-
-            // Class methods
-            static async all() {
-              const records = await db[this.table_name].toArray();
-              return records.map(r => new this(r));
-            }
-
-            static async find(id) {
-              const record = await db[this.table_name].get(id);
-              return record ? new this(record) : null;
-            }
-
-            static async find_by(conditions) {
-              const record = await db[this.table_name].where(conditions).first();
-              return record ? new this(record) : null;
-            }
-
-            static async where(conditions) {
-              const records = await db[this.table_name].where(conditions).toArray();
-              return records.map(r => new this(r));
-            }
-
-            static async create(attributes) {
-              const now = new Date().toISOString();
-              attributes.created_at = attributes.created_at || now;
-              attributes.updated_at = attributes.updated_at || now;
-
-              const id = await db[this.table_name].add(attributes);
-              attributes.id = id;
-              return new this(attributes);
-            }
-
-            // Instance methods
-            async save() {
-              this._attributes.updated_at = new Date().toISOString();
-
-              if (this.id) {
-                await db[this.constructor.table_name].put(this._attributes);
-              } else {
-                this._attributes.created_at = new Date().toISOString();
-                this.id = await db[this.constructor.table_name].add(this._attributes);
-                this._attributes.id = this.id;
-              }
-
-              return this;
-            }
-
-            async update(attributes) {
-              Object.assign(this._attributes, attributes);
-              Object.assign(this, attributes);
-              return this.save();
-            }
-
-            async destroy() {
-              if (this.id) {
-                await db[this.constructor.table_name].delete(this.id);
-              }
-            }
-
-            // Validation helpers (called by generated validate() methods)
-            validates_presence_of(attr) {
-              if (!this._attributes[attr] || this._attributes[attr] === '') {
-                this.errors = this.errors || {};
-                this.errors[attr] = this.errors[attr] || [];
-                this.errors[attr].push("can't be blank");
-              }
-            }
-
-            validates_length_of(attr, options) {
-              const value = this._attributes[attr] || '';
-              if (options.minimum && value.length < options.minimum) {
-                this.errors = this.errors || {};
-                this.errors[attr] = this.errors[attr] || [];
-                this.errors[attr].push(`is too short (minimum is ${options.minimum} characters)`);
-              }
-              if (options.maximum && value.length > options.maximum) {
-                this.errors = this.errors || {};
-                this.errors[attr] = this.errors[attr] || [];
-                this.errors[attr].push(`is too long (maximum is ${options.maximum} characters)`);
-              }
-            }
-
-            get valid() {
-              this.errors = {};
-              if (typeof this.validate === 'function') {
-                this.validate();
-              }
-              return Object.keys(this.errors).length === 0;
-            }
-          }
-        JS
-
-        File.write(File.join(output_dir, 'models', 'application_record.js'), app_record)
-      end
-
-      def generate_dexie_schema
-        parser = SchemaParser.new(@rails_root)
-        parser.parse
-
-        # Only include tables for resolved models (table names are pluralized snake_case)
-        table_names = @resolved_models.keys.map do |m|
-          Inflector.pluralize(snake_case(m.to_s))
+        manifest.view_config.included_views.each do |view_pattern|
+          if view_pattern.include?('*')
+            # Glob pattern
+            glob_pattern = File.join(views_src_dir, view_pattern)
+            Dir.glob(glob_pattern).each do |src_path|
+              copy_view_file(src_path, views_src_dir, views_dst_dir)
+            end
+          else
+            # Direct path
+            src_path = File.join(views_src_dir, view_pattern)
+            src_path += '.html.erb' unless src_path.end_with?('.erb')
+            copy_view_file(src_path, views_src_dir, views_dst_dir) if File.exist?(src_path)
+          end
         end
 
-        db_js = parser.to_dexie_js(
-          only_tables: table_names,
-          db_name: "#{manifest.name}_db"
-        )
-
-        File.write(File.join(output_dir, 'lib', 'database.js'), db_js)
+        # Copy layout if it exists
+        layout_src = File.join(views_src_dir, 'layouts', 'application.html.erb')
+        if File.exist?(layout_src)
+          layout_dst_dir = File.join(views_dst_dir, 'layouts')
+          FileUtils.mkdir_p(layout_dst_dir)
+          FileUtils.cp(layout_src, File.join(layout_dst_dir, 'application.html.erb'))
+        end
       end
 
-      # Stage 5: Stimulus controllers
+      def copy_view_file(src_path, views_src_dir, views_dst_dir)
+        return unless File.exist?(src_path)
 
-      def copy_stimulus_controllers
-        manifest.stimulus_config.included_controllers.each do |controller|
-          src = File.join(rails_root, 'app', 'javascript', 'controllers', controller)
-          dst = File.join(output_dir, 'stimulus', controller)
+        relative = src_path.sub(views_src_dir + '/', '')
+        dst_path = File.join(views_dst_dir, relative)
+
+        FileUtils.mkdir_p(File.dirname(dst_path))
+        FileUtils.cp(src_path, dst_path)
+
+        @copied_views << relative.sub('.html.erb', '')
+      end
+
+      # Controller handling
+
+      def copy_controllers
+        return if manifest.controller_config.included_controllers.empty?
+
+        controllers_src_dir = File.join(@rails_root, 'app', 'controllers')
+        controllers_dst_dir = File.join(output_dir, 'app', 'controllers')
+
+        manifest.controller_config.included_controllers.each_key do |controller_name|
+          src = File.join(controllers_src_dir, "#{controller_name}_controller.rb")
+          dst = File.join(controllers_dst_dir, "#{controller_name}_controller.rb")
 
           if File.exist?(src)
             FileUtils.cp(src, dst)
-          else
-            warn "Stimulus controller not found: #{src}"
+            @copied_controllers << controller_name.to_s
           end
+        end
+
+        # Copy ApplicationController
+        app_controller_src = File.join(controllers_src_dir, 'application_controller.rb')
+        app_controller_dst = File.join(controllers_dst_dir, 'application_controller.rb')
+
+        if File.exist?(app_controller_src)
+          FileUtils.cp(app_controller_src, app_controller_dst)
+        else
+          File.write(app_controller_dst, <<~RUBY)
+            class ApplicationController < ActionController::Base
+            end
+          RUBY
         end
       end
 
-      # Index HTML
+      # Config generation
+
+      def generate_database_yml
+        config = <<~YAML
+          # Database configuration for SPA
+          # Uses Dexie (IndexedDB) for browser-based offline storage
+
+          development:
+            adapter: dexie
+            database: #{manifest.name}_dev
+
+          production:
+            adapter: dexie
+            database: #{manifest.name}_prod
+        YAML
+
+        File.write(File.join(output_dir, 'config', 'database.yml'), config)
+      end
+
+      def generate_ruby2js_yml
+        config = <<~YAML
+          # Ruby2JS Transpilation Configuration
+
+          default: &default
+            eslevel: 2022
+            include:
+              - class
+              - call
+            autoexports: true
+            comparison: identity
+
+          development:
+            <<: *default
+
+          production:
+            <<: *default
+            strict: true
+        YAML
+
+        File.write(File.join(output_dir, 'config', 'ruby2js.yml'), config)
+      end
+
+      def generate_routes_rb
+        # Generate routes based on manifest controller config
+        routes = []
+        routes << "Rails.application.routes.draw do"
+
+        # Add root route if specified
+        if manifest.route_config.respond_to?(:root_path) && manifest.route_config.root_path
+          routes << "  root \"#{manifest.route_config.root_path}\""
+          routes << ""
+        end
+
+        # Generate resource routes for each controller
+        manifest.controller_config.included_controllers.each do |controller_name, config|
+          if config[:only]
+            actions = config[:only].map { |a| ":#{a}" }.join(', ')
+            routes << "  resources :#{controller_name}, only: [#{actions}]"
+          else
+            routes << "  resources :#{controller_name}"
+          end
+        end
+
+        routes << "end"
+
+        File.write(File.join(output_dir, 'config', 'routes.rb'), routes.join("\n") + "\n")
+      end
+
+      def generate_schema_rb
+        # Copy schema from source Rails app if it exists
+        schema_src = File.join(@rails_root, 'db', 'schema.rb')
+        schema_dst = File.join(output_dir, 'config', 'schema.rb')
+
+        if File.exist?(schema_src)
+          # Filter schema to only include tables for resolved models
+          schema_content = File.read(schema_src)
+          # For now, copy the full schema - filtering can be added later
+          File.write(schema_dst, schema_content)
+        else
+          # Generate minimal schema
+          tables = @resolved_models.keys.map do |model_name|
+            table_name = Inflector.pluralize(snake_case(model_name.to_s))
+            <<~RUBY
+              create_table "#{table_name}", force: :cascade do |t|
+                t.timestamps
+              end
+            RUBY
+          end
+
+          schema = <<~RUBY
+            ActiveRecord::Schema[7.0].define(version: 0) do
+              #{tables.join("\n")}
+            end
+          RUBY
+
+          File.write(schema_dst, schema)
+        end
+      end
+
+      def generate_package_json
+        package = {
+          name: manifest.name.to_s.gsub('_', '-'),
+          version: "0.1.0",
+          type: "module",
+          description: "Offline SPA generated by Ruby2JS",
+          scripts: {
+            dev: "ruby2js-rails-dev",
+            build: "ruby2js-rails-build",
+            start: "npx serve -p 3000"
+          },
+          dependencies: {
+            "ruby2js-rails": "https://www.ruby2js.com/releases/ruby2js-rails-beta.tgz",
+            "dexie": "^4.0.10"
+          },
+          engines: {
+            node: ">=22.0.0"
+          }
+        }
+
+        File.write(File.join(output_dir, 'package.json'), JSON.pretty_generate(package) + "\n")
+      end
 
       def generate_index_html
+        # Determine which controllers to set up navigation for
+        nav_links = manifest.controller_config.included_controllers.keys.map do |controller|
+          "<a onclick=\"navigate('/#{controller}')\">#{controller.to_s.capitalize}</a>"
+        end.join("\n      ")
+
         html = <<~HTML
           <!DOCTYPE html>
           <html>
           <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>#{manifest.name} - Offline SPA</title>
-            <script type="module" src="./app.js"></script>
+            <title>#{manifest.name.to_s.gsub('_', ' ').capitalize}</title>
+            <link rel="stylesheet" href="/public/styles.css">
+            <script type="importmap">
+            {
+              "imports": {
+                "dexie": "/node_modules/dexie/dist/dexie.mjs"
+              }
+            }
+            </script>
           </head>
           <body>
             <div id="loading">Loading...</div>
-            <main id="main"></main>
+            <div id="app" style="display: none;">
+              <nav>
+                #{nav_links}
+              </nav>
+              <main id="content"></main>
+            </div>
+
+            <script type="module">
+              import { Application } from '/dist/config/routes.js';
+              Application.start();
+            </script>
           </body>
           </html>
         HTML
@@ -293,102 +372,69 @@ module Ruby2JS
         File.write(File.join(output_dir, 'index.html'), html)
       end
 
-      # Placeholder methods for subsequent stages
+      def generate_readme
+        readme = <<~MD
+          # #{manifest.name.to_s.gsub('_', ' ').capitalize}
 
-      def build_views
-        return if manifest.view_config.included_views.empty?
+          Offline SPA generated by Ruby2JS.
 
-        transpiler = ViewTranspiler.new(@rails_root, database: 'dexie')
-        views_dir = File.join(output_dir, 'views')
+          ## Quick Start
 
-        # Group views by controller for generating combined modules
-        views_by_controller = {}
+          ```bash
+          npm install
+          npm run build
+          npm start
+          ```
 
-        manifest.view_config.included_views.each do |view_pattern|
-          # Handle glob patterns (e.g., 'articles/*.html.erb')
-          if view_pattern.include?('*')
-            glob_pattern = File.join(@rails_root, 'app', 'views', view_pattern)
-            Dir.glob(glob_pattern).each do |file_path|
-              transpile_view_file(transpiler, file_path, views_dir, views_by_controller)
-            end
-          else
-            # Direct view path (e.g., 'articles/show.html.erb' or 'articles/show')
-            view_path = view_pattern.sub(/\.html\.erb$/, '')
-            parts = view_path.split('/')
-            controller = parts[-2] || 'application'
-            action = parts[-1]
+          Then open http://localhost:3000
 
-            js = transpiler.transpile(controller, action)
-            if js
-              write_view_file(controller, action, js, views_dir, views_by_controller)
-            end
-          end
+          ## Development
+
+          ```bash
+          npm run dev
+          ```
+
+          This starts a development server with hot reload.
+
+          ## Structure
+
+          ```
+          app/
+            models/       # Ruby model classes
+            controllers/  # Ruby controller classes
+            views/        # ERB templates
+          config/
+            database.yml  # Database adapter (dexie for IndexedDB)
+            routes.rb     # URL routing
+            ruby2js.yml   # Transpilation options
+          dist/           # Generated JavaScript (after build)
+          ```
+
+          ## How It Works
+
+          Ruby source files are transpiled to JavaScript using ruby2js-rails.
+          The browser runs the generated JavaScript with Dexie for IndexedDB storage.
+        MD
+
+        File.write(File.join(output_dir, 'README.md'), readme)
+      end
+
+      # Copy styles if they exist
+      def copy_styles
+        styles_src = File.join(@rails_root, 'public', 'styles.css')
+        styles_dst = File.join(output_dir, 'public', 'styles.css')
+
+        if File.exist?(styles_src)
+          FileUtils.cp(styles_src, styles_dst)
+        else
+          # Generate minimal styles
+          File.write(styles_dst, <<~CSS)
+            body { font-family: system-ui, sans-serif; margin: 2rem; }
+            nav { margin-bottom: 1rem; }
+            nav a { margin-right: 1rem; cursor: pointer; color: blue; }
+            #loading { text-align: center; padding: 2rem; }
+          CSS
         end
-
-        # Generate combined modules for each controller
-        # Write to views/{controller}.js (not inside controller subdirectory to avoid conflict with index view)
-        views_by_controller.each do |controller, actions|
-          module_js = transpiler.generate_views_module(controller, actions)
-          module_path = File.join(views_dir, "#{controller}.js")
-          File.write(module_path, module_js)
-        end
-      end
-
-      def transpile_view_file(transpiler, file_path, views_dir, views_by_controller)
-        relative = file_path.sub(File.join(@rails_root, 'app', 'views') + '/', '')
-        parts = relative.split('/')
-        controller = parts[-2] || 'application'
-        action = File.basename(parts[-1], '.html.erb')
-
-        # Skip partials for now (they start with _)
-        return if action.start_with?('_')
-
-        template = File.read(file_path)
-        js = transpiler.send(:transpile_erb, template)
-
-        write_view_file(controller, action, js, views_dir, views_by_controller)
-      end
-
-      def write_view_file(controller, action, js, views_dir, views_by_controller)
-        controller_dir = File.join(views_dir, controller)
-        FileUtils.mkdir_p(controller_dir)
-
-        file_path = File.join(controller_dir, "#{action}.js")
-        File.write(file_path, js)
-
-        views_by_controller[controller] ||= {}
-        views_by_controller[controller][action] = js
-
-        @built_views << "#{controller}/#{action}"
-      end
-
-      def build_controllers
-        return if manifest.controller_config.included_controllers.empty?
-
-        transpiler = ControllerTranspiler.new(@rails_root)
-        controllers_dir = File.join(output_dir, 'controllers')
-
-        manifest.controller_config.included_controllers.each do |name, config|
-          actions = config[:only]
-          js = transpiler.transpile(name, actions: actions)
-
-          if js
-            FileUtils.mkdir_p(controllers_dir)
-            file_path = File.join(controllers_dir, "#{name}_controller.js")
-            File.write(file_path, js)
-            @built_controllers << name.to_s
-          end
-        end
-      end
-
-      def build_routes
-        # Stage 4: Filter and transpile routes
-        raise NotImplementedError, "Route transpilation not yet implemented"
-      end
-
-      def generate_runtime
-        # Stage 5-6: Generate Turbo interceptor, sync layer
-        raise NotImplementedError, "Runtime generation not yet implemented"
       end
 
       # Helpers
