@@ -2,6 +2,9 @@
 
 require_relative 'spa/manifest'
 require_relative 'spa/builder'
+require_relative 'spa/model_resolver'
+require_relative 'spa/schema_parser'
+require_relative 'spa/model_transpiler'
 
 module Ruby2JS
   module Spa
