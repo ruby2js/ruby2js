@@ -1,0 +1,1 @@
+{"version":3,"file":"config/schema.rb","sources":["../../config/schema.rb"],"names":[],"mappings":"","sourcesContent":["# Database schema - idiomatic Rails\nActiveRecord::Schema.define do\n  create_table \"posts\" do |t|\n    t.string \"title\", null: false\n    t.text \"body\"\n    t.string \"author\", default: \"Anonymous\"\n    t.timestamps\n  end\nend\n"]}

@@ -1,0 +1,16 @@
+# Database configuration for phlex-blog demo
+# Supported adapters:
+#   Browser: sqljs, dexie, indexeddb
+#   Server:  better_sqlite3, pg
+
+development:
+  adapter: sqljs
+  database: phlex_blog_dev
+
+production:
+  adapter: better_sqlite3
+  database: phlex_blog_prod
+
+test:
+  adapter: sqljs
+  database: phlex_blog_test

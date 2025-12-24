@@ -1,0 +1,1 @@
+{"version":3,"file":"app/controllers/application_controller.rb","sources":["../../app/controllers/application_controller.rb"],"names":["ApplicationController"],"mappings":"OACA,MAAMA,qBAAN;AAAA","sourcesContent":["# Application controller - base controller class\nclass ApplicationController\n  # Common controller functionality\nend\n"]}
