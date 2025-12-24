@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Phlex Components Demo</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app"></div>
+
+  <script type="module">
+    // Phlex runtime - minimal implementation for browser
+    const Phlex = {
+      HTML: class {
+        render(props = {}) {
+          // Set instance variables from props
+          for (const [key, value] of Object.entries(props)) {
+            this[key] = value;
+          }
+          // Call view_template and return the HTML string
+          return this.view_template;
+        }
+
+        get view_template() {
+          return "";
+        }
+      }
+    };
+
+    // Make Phlex globally available
+    window.Phlex = Phlex;
+
+    // Import and render the showcase
+    import('./dist/components/button.js').then(buttonModule => {
+      window.Button = buttonModule.Button;
+
+      import('./dist/components/card.js').then(cardModule => {
+        window.Card = cardModule.Card;
+        window.CardHeader = cardModule.CardHeader;
+        window.CardTitle = cardModule.CardTitle;
+        window.CardDescription = cardModule.CardDescription;
+        window.CardContent = cardModule.CardContent;
+        window.CardFooter = cardModule.CardFooter;
+
+        import('./dist/components/showcase_view.js').then(showcaseModule => {
+          const ShowcaseView = showcaseModule.ShowcaseView;
+          const view = new ShowcaseView();
+          document.getElementById('app').innerHTML = view.render();
+        });
+      });
+    });
+  </script>
+</body>
+</html>

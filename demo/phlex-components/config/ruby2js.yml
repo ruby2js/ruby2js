@@ -1,0 +1,20 @@
+# Ruby2JS Configuration for Phlex Components Demo
+
+default: &default
+  eslevel: 2022
+  comparison: identity
+  autoexports: true
+  include:
+    - class
+    - call
+  filters:
+    - phlex
+    - functions
+    - esm
+
+development:
+  <<: *default
+
+production:
+  <<: *default
+  strict: true

@@ -1,0 +1,12 @@
+{
+  "name": "phlex-components-demo",
+  "version": "1.0.0",
+  "description": "Phlex component library demo - shadcn-inspired components",
+  "type": "module",
+  "scripts": {
+    "build": "cd ../.. && bundle exec ruby demo/phlex-components/scripts/build.rb",
+    "dev": "npm run build && npx http-server -p 3002 -o"
+  },
+  "keywords": ["phlex", "ruby2js", "components"],
+  "license": "MIT"
+}
