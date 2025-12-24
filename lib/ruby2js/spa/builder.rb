@@ -17,7 +17,7 @@ module Ruby2JS
     #
     class Builder
       attr_reader :manifest, :rails_root, :output_dir
-      attr_reader :resolved_models, :schema, :built_views
+      attr_reader :resolved_models, :schema, :built_views, :built_controllers
 
       def initialize(manifest, rails_root: nil)
         @manifest = manifest
@@ -26,6 +26,7 @@ module Ruby2JS
         @resolved_models = {}
         @schema = {}
         @built_views = []
+        @built_controllers = []
       end
 
       def build
@@ -40,8 +41,10 @@ module Ruby2JS
         # Stage 3: Views
         build_views
 
-        # Stage 4: Controllers, Routes (placeholder)
-        # build_controllers
+        # Stage 4: Controllers
+        build_controllers
+
+        # Routes (placeholder)
         # build_routes
 
         # Stage 5: Copy Stimulus controllers
@@ -60,6 +63,7 @@ module Ruby2JS
         puts "  Models: #{@resolved_models.keys.join(', ')}"
         puts "  Tables: #{@schema.keys.join(', ')}"
         puts "  Views: #{@built_views.join(', ')}" if @built_views&.any?
+        puts "  Controllers: #{@built_controllers.join(', ')}" if @built_controllers&.any?
       end
 
       private
@@ -359,8 +363,22 @@ module Ruby2JS
       end
 
       def build_controllers
-        # Stage 4: Filter and transpile controllers
-        raise NotImplementedError, "Controller transpilation not yet implemented"
+        return if manifest.controller_config.included_controllers.empty?
+
+        transpiler = ControllerTranspiler.new(@rails_root)
+        controllers_dir = File.join(output_dir, 'controllers')
+
+        manifest.controller_config.included_controllers.each do |name, config|
+          actions = config[:only]
+          js = transpiler.transpile(name, actions: actions)
+
+          if js
+            FileUtils.mkdir_p(controllers_dir)
+            file_path = File.join(controllers_dir, "#{name}_controller.js")
+            File.write(file_path, js)
+            @built_controllers << name.to_s
+          end
+        end
       end
 
       def build_routes

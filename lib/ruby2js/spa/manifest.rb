@@ -34,12 +34,13 @@ module Ruby2JS
     class Manifest
       attr_reader :name, :mount_path
       attr_reader :route_config, :model_config, :view_config
-      attr_reader :stimulus_config, :sync_config
+      attr_reader :controller_config, :stimulus_config, :sync_config
 
       def initialize
         @route_config = RouteConfig.new
         @model_config = ModelConfig.new
         @view_config = ViewConfig.new
+        @controller_config = ControllerConfig.new
         @stimulus_config = StimulusConfig.new
         @sync_config = SyncConfig.new
       end
@@ -68,6 +69,11 @@ module Ruby2JS
       def views(&block)
         @view_config.instance_eval(&block) if block_given?
         @view_config
+      end
+
+      def controllers(&block)
+        @controller_config.instance_eval(&block) if block_given?
+        @controller_config
       end
 
       def stimulus(&block)
@@ -163,6 +169,39 @@ module Ruby2JS
 
       def include(*patterns)
         @included_views.concat(patterns.flatten)
+      end
+    end
+
+    # Controller configuration
+    class ControllerConfig
+      attr_reader :included_controllers
+
+      def initialize
+        @included_controllers = {}
+      end
+
+      # Include a controller with optional action filtering
+      # Usage:
+      #   include :articles                    # all actions
+      #   include :scores, only: [:heat, :card]  # specific actions
+      def include(controller_name, only: nil, except: nil)
+        name = controller_name.to_sym
+        @included_controllers[name] = {
+          only: only&.map(&:to_sym),
+          except: except&.map(&:to_sym)
+        }
+      end
+
+      # Get the list of actions to include for a controller
+      def actions_for(controller_name)
+        config = @included_controllers[controller_name.to_sym]
+        return nil unless config
+        config[:only]
+      end
+
+      # Check if a controller should be included
+      def includes?(controller_name)
+        @included_controllers.key?(controller_name.to_sym)
       end
     end
 
