@@ -76,8 +76,27 @@ module Ruby2JS
     def output_pnode_element(tag_str, attrs, children)
       void = PNODE_VOID_ELEMENTS.include?(tag_str.to_sym)
       has_dynamic = pnode_has_dynamic_attrs?(attrs) || pnode_has_dynamic_children?(children)
+      has_loops = pnode_has_loops?(children)
 
-      if has_dynamic
+      if has_loops
+        # Use IIFE to wrap loops (for loops are statements, not expressions)
+        # Use _phlex_out as the variable name since loop bodies already use it
+        put '(() => {'
+        put ' let _phlex_out = `'
+        put "<#{tag_str}"
+        output_pnode_attrs_in_template(attrs)
+        put '>`; '
+
+        unless void
+          children.each { |child| output_pnode_child_with_loops(child) }
+          put '_phlex_out += `'
+          put "</#{tag_str}>"
+          put '`; return _phlex_out; '
+        else
+          put 'return _phlex_out; '
+        end
+        put '})()'
+      elsif has_dynamic
         # Use template literal for dynamic content
         put '`'
         put "<#{tag_str}"
@@ -243,6 +262,20 @@ module Ruby2JS
       end
     end
 
+    # Check if children contain loops (recursively)
+    def pnode_has_loops?(children)
+      children.any? do |child|
+        if pnode_is_loop?(child)
+          true
+        elsif child.type == :pnode
+          _, attrs, *grandchildren = child.children
+          pnode_has_loops?(grandchildren)
+        else
+          false
+        end
+      end
+    end
+
     def output_pnode_attrs_in_template(attrs)
       return unless attrs&.type == :hash
 
@@ -340,6 +373,100 @@ module Ruby2JS
         parse value_node
       end
       put '}'
+    end
+
+    # Check if a pnode child is a loop
+    def pnode_is_loop?(child)
+      # Check for converted for loops (from functions filter)
+      return true if [:for, :for_of, :for_in, :while, :until].include?(child.type)
+
+      # Check for unconverted block loops
+      return false unless child.type == :block
+      send_node = child.children.first
+      return false unless send_node&.type == :send
+      method = send_node.children[1]
+      # Common loop methods
+      [:each, :each_with_index, :map, :select, :reject, :times].include?(method)
+    end
+
+    # Output a pnode child when there are loops (uses statements)
+    def output_pnode_child_with_loops(child)
+      case child.type
+      when :pnode_text
+        content = child.children.first
+        put '_phlex_out += '
+        if content.type == :str
+          text = content.children.first
+          put "`#{text.gsub('`', '\\`').gsub('$', '\\$')}`"
+        else
+          put 'String('
+          parse content
+          put ')'
+        end
+        put '; '
+      when :pnode
+        put '_phlex_out += '
+        tag, attrs, *grandchildren = child.children
+        output_pnode_inline_as_expression(tag, attrs, grandchildren)
+        put '; '
+      when :block, :for, :for_of, :for_in, :while, :until
+        # Loop - parse as statement (will generate for loop with _phlex_out +=)
+        parse child
+        put ' '
+      else
+        # Other expression
+        put '_phlex_out += ('
+        parse child
+        put '); '
+      end
+    end
+
+    # Output a pnode as an expression (returns string)
+    def output_pnode_inline_as_expression(tag, attrs, children)
+      if tag.nil?
+        # Fragment - concatenate children
+        put '('
+        first = true
+        children.each do |child|
+          put ' + ' unless first
+          first = false
+          output_pnode_child_as_expression(child)
+        end
+        put ')'
+      else
+        tag_str = tag.to_s
+        if tag_str[0] =~ /[A-Z]/
+          # Component
+          put tag_str
+          put '.render('
+          parse_pnode_attrs_as_object(attrs)
+          put ')'
+        else
+          output_pnode_element(tag_str, attrs, children)
+        end
+      end
+    end
+
+    def output_pnode_child_as_expression(child)
+      case child.type
+      when :pnode_text
+        content = child.children.first
+        if content.type == :str
+          text = content.children.first
+          put "`#{text.gsub('`', '\\`').gsub('$', '\\$')}`"
+        else
+          put 'String('
+          parse content
+          put ')'
+        end
+      when :pnode
+        tag, attrs, *grandchildren = child.children
+        output_pnode_inline_as_expression(tag, attrs, grandchildren)
+      else
+        put '('
+        parse child
+        put ')'
+      end
     end
   end
 end
