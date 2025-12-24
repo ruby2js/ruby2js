@@ -257,22 +257,68 @@ module Ruby2JS
 
       def phlex_component?(node, parent)
         # Direct inheritance from Phlex::HTML or Phlex::SVG
-        return true if phlex_parent?(parent)
+        return true if self.phlex_parent?(parent)
 
-        # Check for pragma: # @ruby2js phlex
-        raw_comments = @comments[:_raw] || []
-        class_line = node.loc&.line rescue nil
+        # Check for conventional Phlex directories
+        return true if self.phlex_path?
 
-        raw_comments.any? do |comment|
-          text = comment.respond_to?(:text) ? comment.text : comment.to_s
-          comment_line = (comment.loc&.line rescue nil)
+        # Check for pragma: # Pragma: phlex
+        self.has_phlex_pragma?(node)
+      end
 
-          if text.include?('@ruby2js phlex')
-            class_line.nil? || comment_line.nil? ||
-              (comment_line >= class_line - 1 && comment_line <= class_line)
-          else
-            false
+      # Check if file is in a conventional Phlex directory
+      def phlex_path?
+        file = @options[:file]
+        return false unless file
+
+        # app/components/*.rb - always Phlex
+        return true if file.start_with?('app/components/') ||
+          file.include?('/app/components/')
+
+        # app/views/*.rb - Phlex (traditional views are .html.erb)
+        return true if file.end_with?('.rb') &&
+          (file.start_with?('app/views/') || file.include?('/app/views/'))
+
+        false
+      end
+
+      # Check if a node has a Pragma: phlex comment on the same line
+      def has_phlex_pragma?(node)
+        return false unless @comments
+
+        # Use Map.get for JS compatibility (selfhost uses Map, Ruby uses Hash)
+        raw_comments = @comments.respond_to?(:get) ? @comments.get(:_raw) : @comments[:_raw]
+        raw_comments ||= []
+        return false if raw_comments.empty?
+
+        # Get the line number of the node
+        line = nil
+        if node.respond_to?(:loc) && node.loc
+          loc = node.loc
+          if loc.respond_to?(:expression) && loc.expression
+            line = loc.expression.line
+          elsif loc.respond_to?(:line)
+            line = loc.line
           end
+        end
+        return false unless line
+
+        # Check for Pragma: phlex comment on this line
+        raw_comments.any? do |comment|
+          comment_line = nil
+          if comment.respond_to?(:loc) && comment.loc
+            cloc = comment.loc
+            if cloc.respond_to?(:expression) && cloc.expression
+              comment_line = cloc.expression.line
+            elsif cloc.respond_to?(:line)
+              comment_line = cloc.line
+            end
+          end
+
+          next false unless comment_line == line
+
+          text = comment.respond_to?(:text) ? comment.text : comment.to_s
+          text.match?(/Pragma:\s*phlex/i)
         end
       end
 

@@ -1,69 +1,14 @@
 export class PostsShowView extends ApplicationView {
   #post;
 
-  constructor({ post }) {
-    this.#post = post
-  };
-
   get title() {
     return this.#post.title
   };
 
-  get view_template() {
-    return div({class: "container"}, () => {
-      render(new NavComponent);
-
-      article({class: "post-detail"}, () => {
-        header({class: "post-header"}, () => {
-          h1(() => this.#post.title);
-
-          div({class: "post-meta"}, () => {
-            span({class: "post-author"}, () => `By ${this.#post.author}`);
-
-            span(
-              {class: "post-date"},
-              () => this.format_date(this.#post.created_at)
-            )
-          })
-        });
-
-        div({class: "post-body"}, () => p(() => this.#post.body));
-
-        footer({class: "post-footer"}, () => {
-          div({class: "post-actions"}, () => {
-            a(
-              {
-                href: `/posts/${this.#post.id}/edit`,
-                onclick: `return navigate(event, '/posts/${this.#post.id}/edit')`,
-                class: "btn btn-secondary"
-              },
-
-              () => "Edit"
-            );
-
-            a(
-              {
-                href: "#",
-                onclick: `if(confirm('Delete this post?')) { routes.post.delete(${this.#post.id}) } return false;`,
-                class: "btn btn-destructive"
-              },
-
-              () => "Delete"
-            )
-          });
-
-          a(
-            {
-              href: "/posts",
-              onclick: "return navigate(event, '/posts')",
-              class: "back-link"
-            },
-
-            () => "Back to Posts"
-          )
-        })
-      })
-    })
+  render({ post }) {
+    let _phlex_out = "";
+    _phlex_out += `<div class="container">${_phlex_out += NavComponent.render({})}<article class="post-detail"><header class="post-header"><h1>${String(post.title)}</h1><div class="post-meta"><span class="post-author">${String(`By ${post.author}`)}</span><span class="post-date">${String(this.format_date(post.created_at))}</span></div></header><div class="post-body"><p>${String(post.body)}</p></div><footer class="post-footer"><div class="post-actions"><a href="${`/posts/${post.id}/edit`}" onclick="${`return navigate(event, '/posts/${post.id}/edit')`}" class="btn btn-secondary">Edit</a><a href="#" onclick="${`if(confirm('Delete this post?')) { routes.post.delete(${post.id}) } return false;`}" class="btn btn-destructive">Delete</a></div><a href="/posts" onclick="return navigate(event, '/posts')" class="back-link">Back to Posts</a></footer></article></div>`;
+    return _phlex_out
   }
 }
 //# sourceMappingURL=posts_show_view.js.map

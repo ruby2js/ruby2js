@@ -1,51 +1,13 @@
 export class PostCardComponent extends ApplicationView {
-  #post;
+  render({ post }) {
+    let _phlex_out = "";
 
-  constructor({ post }) {
-    this.#post = post
-  };
+    _phlex_out += `<article class="post-card"><header class="post-card-header"><h2 class="post-card-title"><a href="${`/posts/${post.id}`}" onclick="${`return navigate(event, '/posts/${post.id}')`}">${String(post.title)}</a></h2><div class="post-card-meta"><span class="post-author">${String(post.author)}</span><span class="post-date">${String(this.time_ago(post.created_at))}</span></div></header><div class="post-card-body"><p>${String(this.truncate(
+      post.body,
+      {length: 150}
+    ))}</p></div><footer class="post-card-footer"><a href="${`/posts/${post.id}`}" onclick="${`return navigate(event, '/posts/${post.id}')`}" class="read-more">Read more</a></footer></article>`;
 
-  get view_template() {
-    return article({class: "post-card"}, () => {
-      header({class: "post-card-header"}, () => {
-        h2({class: "post-card-title"}, () => (
-          a(
-            {
-              href: `/posts/${this.#post.id}`,
-              onclick: `return navigate(event, '/posts/${this.#post.id}')`
-            },
-
-            () => this.#post.title
-          )
-        ));
-
-        div({class: "post-card-meta"}, () => {
-          span({class: "post-author"}, () => this.#post.author);
-
-          span(
-            {class: "post-date"},
-            () => this.time_ago(this.#post.created_at)
-          )
-        })
-      });
-
-      div(
-        {class: "post-card-body"},
-        () => p(() => this.truncate(this.#post.body, {length: 150}))
-      );
-
-      footer({class: "post-card-footer"}, () => (
-        a(
-          {
-            href: `/posts/${this.#post.id}`,
-            onclick: `return navigate(event, '/posts/${this.#post.id}')`,
-            class: "read-more"
-          },
-
-          () => "Read more"
-        )
-      ))
-    })
+    return _phlex_out
   }
 }
 //# sourceMappingURL=post_card_component.js.map

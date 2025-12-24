@@ -17,6 +17,7 @@ require 'ruby2js/filter/rails/seeds'
 require 'ruby2js/filter/functions'
 require 'ruby2js/filter/esm'
 require 'ruby2js/filter/return'
+require 'ruby2js/filter/pragma'
 require 'ruby2js/filter/phlex'
 
 class PhlexBlogBuilder
@@ -59,9 +60,11 @@ class PhlexBlogBuilder
     autoexports: true,
     comparison: :identity,
     filters: [
+      Ruby2JS::Filter::Pragma,
       Ruby2JS::Filter::Phlex,
       Ruby2JS::Filter::Functions,
-      Ruby2JS::Filter::ESM
+      Ruby2JS::Filter::ESM,
+      Ruby2JS::Filter::Return
     ]
   }.freeze
 

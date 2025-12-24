@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Phlex Blog Demo</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="loading">Loading Phlex Blog...<br><small>Powered by Ruby2JS + Phlex</small></div>
+  <div id="app" style="display: none;">
+    <main id="content"></main>
+  </div>
+
+  <script src="../ruby2js-on-rails/node_modules/sql.js/dist/sql-wasm.js"></script>
+  <script type="module">
+    // Import Phlex runtime
+    import { Phlex } from './dist/lib/phlex_runtime.mjs';
+    window.Phlex = Phlex;
+
+    // Import Application and routes
+    import { Application, routes } from './dist/config/routes.js';
+    window.routes = routes;
+
+    // Start the application
+    Application.start();
+  </script>
+</body>
+</html>

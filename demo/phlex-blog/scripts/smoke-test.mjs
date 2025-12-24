@@ -112,21 +112,25 @@ async function checkSyntax(filePath) {
   }
 }
 
-async function buildWithSelfhost(srcDir, destDir, filterNames = ['phlex', 'functions', 'esm']) {
+async function buildWithSelfhost(srcDir, destDir, filterNames = ['pragma', 'phlex', 'functions', 'esm', 'return']) {
   const ruby2jsModule = await import(join(SELFHOST_ROOT, 'ruby2js.js'));
   const { convert, initPrism, Ruby2JS } = ruby2jsModule;
   await initPrism();
 
   // Import all filters that might be needed
+  await import(join(SELFHOST_ROOT, 'filters/pragma.js'));
   await import(join(SELFHOST_ROOT, 'filters/functions.js'));
   await import(join(SELFHOST_ROOT, 'filters/esm.js'));
   await import(join(SELFHOST_ROOT, 'filters/phlex.js'));
+  await import(join(SELFHOST_ROOT, 'filters/return.js'));
 
   // Build filter array based on requested filters
   const filterMap = {
+    pragma: Ruby2JS.Filter.Pragma,
     phlex: Ruby2JS.Filter.Phlex,
     functions: Ruby2JS.Filter.Functions,
-    esm: Ruby2JS.Filter.ESM
+    esm: Ruby2JS.Filter.ESM,
+    return: Ruby2JS.Filter.Return
   };
 
   const filters = filterNames.map(name => filterMap[name]).filter(Boolean);

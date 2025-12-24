@@ -7,12 +7,7 @@ export class ApplicationView extends Phlex.HTML {
   // Helper: truncate text
   truncate(text, { length=100 } = {}) {
     if (!text) return "";
-
-    if (text.length > length) {
-      `${text.slice(0, length)}...`
-    } else {
-      text
-    }
+    return text.length > length ? `${text.slice(0, length)}...` : text
   };
 
   // Helper: format time ago
@@ -21,13 +16,13 @@ export class ApplicationView extends Phlex.HTML {
     let seconds = (Date.now - time) / 1_000;
 
     if (seconds < 60) {
-      `${parseInt(seconds)}s ago`
+      return `${parseInt(seconds)}s ago`
     } else if (seconds < 3_600) {
-      `${parseInt(seconds / 60)}m ago`
+      return `${parseInt(seconds / 60)}m ago`
     } else if (seconds < 86_400) {
-      `${parseInt(seconds / 3_600)}h ago`
+      return `${parseInt(seconds / 3_600)}h ago`
     } else {
-      `${parseInt(seconds / 86_400)}d ago`
+      return `${parseInt(seconds / 86_400)}d ago`
     }
   };
 
@@ -36,7 +31,7 @@ export class ApplicationView extends Phlex.HTML {
     if (!time) return "";
     let date = new Date(time);
 
-    date.toLocaleDateString(
+    return date.toLocaleDateString(
       "en-US",
       {year: "numeric", month: "long", day: "numeric"}
     )
