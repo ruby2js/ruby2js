@@ -1,22 +1,34 @@
-# Dropdown component - demonstrates focus management and keyboard navigation
+# Dropdown component - demonstrates focus management and click-outside
 class DropdownView < Phlex::HTML
+  def initialize(label:, items:)
+    @label = label
+    @items = items  # [{label: "Item 1", value: "1"}, ...]
+  end
+
   def view_template
-    div(data_controller: "dropdown", data_action: "keydown->dropdown#handleKeydown", class: "component dropdown-demo") do
-      h3 { "Dropdown" }
-      p(class: "description") { "Menu with keyboard navigation and click-outside close" }
+    div(
+      data_controller: "dropdown",
+      data_action: "click@window->dropdown#clickOutside keydown.escape->dropdown#close",
+      class: "dropdown"
+    ) do
+      button(
+        data_action: "click->dropdown#toggle",
+        data_dropdown_target: "button",
+        class: "dropdown-button",
+        aria_haspopup: "true"
+      ) do
+        span { @label }
+        span(class: "dropdown-arrow") { "\u25BC" }
+      end
 
-      div(class: "dropdown") do
-        button(data_dropdown_target: "trigger", data_action: "click->dropdown#toggle", class: "btn btn-primary dropdown-trigger") do
-          span { "Select Option" }
-          span(class: "dropdown-arrow") { "▼" }
-        end
-
-        ul(data_dropdown_target: "menu", class: "dropdown-menu hidden") do
-          li { a(data_action: "click->dropdown#select", href: "#") { "Option 1" } }
-          li { a(data_action: "click->dropdown#select", href: "#") { "Option 2" } }
-          li { a(data_action: "click->dropdown#select", href: "#") { "Option 3" } }
-          li(class: "divider")
-          li { a(data_action: "click->dropdown#select", href: "#") { "Other..." } }
+      div(data_dropdown_target: "menu", class: "dropdown-menu hidden", role: "menu") do
+        @items.each do |item|
+          button(
+            data_action: "click->dropdown#select",
+            data_value: item[:value],
+            class: "dropdown-item",
+            role: "menuitem"
+          ) { item[:label] }
         end
       end
     end

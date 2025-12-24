@@ -1,4 +1,5 @@
-# Ruby2JS configuration for Phlex + Stimulus demo
+# Ruby2JS Configuration for Phlex + Stimulus Demo
+
 default: &default
   eslevel: 2022
   comparison: identity
@@ -7,7 +8,7 @@ default: &default
     - class
     - call
 
-# Component-specific filters
+# Phlex components (app/components/)
 components:
   <<: *default
   filters:
@@ -15,8 +16,8 @@ components:
     - functions
     - esm
 
-# Controller-specific filters
-controllers:
+# Stimulus controllers (app/javascript/controllers/)
+stimulus:
   <<: *default
   filters:
     - stimulus

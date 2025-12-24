@@ -1,17 +1,18 @@
-# Toggle component - demonstrates classList manipulation
+# Toggle component - demonstrates conditional classes with Stimulus
 class ToggleView < Phlex::HTML
+  def initialize(label: "Toggle me")
+    @label = label
+  end
+
   def view_template
-    div(data_controller: "toggle", class: "component toggle") do
-      h3 { "Toggle" }
-      p(class: "description") { "CSS class toggling with Stimulus" }
-
-      button(data_action: "click->toggle#toggle", class: "btn btn-primary") do
-        "Toggle Dark Mode"
-      end
-
-      div(data_toggle_target: "content", class: "toggle-content") do
-        p { "This panel changes appearance when toggled." }
-        p { "Click the button to switch between light and dark modes." }
+    div(data_controller: "toggle", class: "toggle") do
+      button(
+        data_action: "click->toggle#toggle",
+        data_toggle_target: "button",
+        class: "btn"
+      ) { @label }
+      div(data_toggle_target: "content", class: "toggle-content hidden") do
+        p { "This content can be toggled on and off." }
       end
     end
   end
