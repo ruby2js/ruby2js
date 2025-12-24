@@ -11,8 +11,10 @@ DIST_DIR = File.join(DEMO_ROOT, 'dist')
 $LOAD_PATH.unshift File.expand_path('../../../lib', DEMO_ROOT)
 require 'ruby2js'
 require 'ruby2js/filter/phlex'
+require 'ruby2js/filter/stimulus'
 require 'ruby2js/filter/functions'
 require 'ruby2js/filter/esm'
+require 'ruby2js/filter/camelCase'
 
 def load_config(section = nil)
   config_path = File.join(DEMO_ROOT, 'config/ruby2js.yml')
@@ -29,8 +31,10 @@ def resolve_filters(filter_names)
   filter_names.map do |name|
     case name.downcase
     when 'phlex' then Ruby2JS::Filter::Phlex
+    when 'stimulus' then Ruby2JS::Filter::Stimulus
     when 'functions' then Ruby2JS::Filter::Functions
     when 'esm' then Ruby2JS::Filter::ESM
+    when 'camelcase' then Ruby2JS::Filter::CamelCase
     else
       raise "Unknown filter: #{name}"
     end
@@ -87,7 +91,15 @@ FileUtils.mkdir_p(DIST_DIR)
 components_dir = File.join(DEMO_ROOT, 'app/components')
 if File.exist?(components_dir)
   puts "Components:"
-  transpile_directory(components_dir, File.join(DIST_DIR, 'components'), 'default')
+  transpile_directory(components_dir, File.join(DIST_DIR, 'components'), 'components')
+  puts
+end
+
+# Transpile controllers
+controllers_dir = File.join(DEMO_ROOT, 'app/controllers')
+if File.exist?(controllers_dir)
+  puts "Controllers:"
+  transpile_directory(controllers_dir, File.join(DIST_DIR, 'controllers'), 'controllers')
   puts
 end
 

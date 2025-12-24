@@ -112,18 +112,24 @@ async function checkSyntax(filePath) {
   }
 }
 
-async function buildWithSelfhost(srcDir, destDir) {
+async function buildWithSelfhost(srcDir, destDir, filterNames = ['phlex', 'functions', 'esm']) {
   const ruby2jsModule = await import(join(SELFHOST_ROOT, 'ruby2js.js'));
   const { convert, initPrism, Ruby2JS } = ruby2jsModule;
   await initPrism();
 
+  // Import all filters that might be needed
   await import(join(SELFHOST_ROOT, 'filters/functions.js'));
   await import(join(SELFHOST_ROOT, 'filters/esm.js'));
   await import(join(SELFHOST_ROOT, 'filters/phlex.js'));
 
-  const phlexFilter = Ruby2JS.Filter.Phlex;
-  const functionsFilter = Ruby2JS.Filter.Functions;
-  const esmFilter = Ruby2JS.Filter.ESM;
+  // Build filter array based on requested filters
+  const filterMap = {
+    phlex: Ruby2JS.Filter.Phlex,
+    functions: Ruby2JS.Filter.Functions,
+    esm: Ruby2JS.Filter.ESM
+  };
+
+  const filters = filterNames.map(name => filterMap[name]).filter(Boolean);
 
   const rbFiles = [];
   function findRbFiles(dir) {
@@ -148,7 +154,7 @@ async function buildWithSelfhost(srcDir, destDir) {
 
     try {
       const result = convert(source, {
-        filters: [phlexFilter, functionsFilter, esmFilter],
+        filters,
         eslevel: 2022,
         autoexports: true,
         comparison: 'identity'

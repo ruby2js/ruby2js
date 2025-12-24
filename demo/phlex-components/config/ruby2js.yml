@@ -7,8 +7,21 @@ default: &default
   include:
     - class
     - call
+
+# Phlex components
+components:
+  <<: *default
   filters:
     - phlex
+    - functions
+    - esm
+
+# Stimulus controllers
+controllers:
+  <<: *default
+  filters:
+    - stimulus
+    - camelCase
     - functions
     - esm
 
