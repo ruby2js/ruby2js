@@ -324,14 +324,19 @@ module Ruby2JS
 
       def phlex_parent?(node)
         return false unless node
+        return false unless node.type == :const
 
-        if node.type == :const
-          parent, name = node.children
-          # Use element-by-element comparison for JS compatibility
-          # (JS array === compares by reference, not value)
-          if parent&.type == :const && parent.children[0].nil? && parent.children[1] == :Phlex
-            return [:HTML, :SVG].include?(name)
-          end
+        parent, name = node.children
+
+        # Explicit: Phlex::HTML or Phlex::SVG
+        if parent&.type == :const && parent.children[0].nil? && parent.children[1] == :Phlex
+          return [:HTML, :SVG].include?(name)
+        end
+
+        # Convention: Top-level class ending in Component or View
+        if parent.nil?
+          name_str = name.to_s
+          return true if name_str.end_with?('Component') || name_str.end_with?('View')
         end
 
         false
