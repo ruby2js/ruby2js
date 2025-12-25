@@ -74,14 +74,19 @@ namespace :ruby2js do
       puts "Output:     public/spa/#{manifest.name}/"
       puts
 
-      if manifest.route_config.controllers.any?
-        puts "Routes:"
-        puts "  Controllers: #{manifest.route_config.controllers.join(', ')}"
-        puts "  Actions:     #{manifest.route_config.actions.join(', ')}" if manifest.route_config.actions.any?
-      end
-
       if manifest.model_config.included_models.any?
         puts "Models:     #{manifest.model_config.included_models.join(', ')}"
+      end
+
+      if manifest.controller_config.included_controllers.any?
+        puts "Controllers:"
+        manifest.controller_config.included_controllers.each do |name, config|
+          if config[:only]
+            puts "  - #{name} (only: #{config[:only].join(', ')})"
+          else
+            puts "  - #{name}"
+          end
+        end
       end
 
       if manifest.view_config.included_views.any?
@@ -92,12 +97,6 @@ namespace :ruby2js do
       if manifest.stimulus_config.included_controllers.any?
         puts "Stimulus:"
         manifest.stimulus_config.included_controllers.each { |c| puts "  - #{c}" }
-      end
-
-      if manifest.sync_config.endpoint
-        puts "Sync:"
-        puts "  Endpoint: #{manifest.sync_config.endpoint}"
-        puts "  Writable: #{manifest.sync_config.writable_models.join(', ')}" if manifest.sync_config.writable_models.any?
       end
     end
   end

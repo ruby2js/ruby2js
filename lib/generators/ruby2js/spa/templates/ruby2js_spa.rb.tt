@@ -4,7 +4,6 @@
 # transpiled into an offline-capable Single Page Application.
 #
 # The SPA will be built to: public/spa/<%= options[:name] %>/
-# And mounted at: <%= options[:mount_path] %>/
 #
 # Build the SPA with: rails ruby2js:spa:build
 #
@@ -16,36 +15,27 @@ Ruby2JS::Spa.configure do
   name :<%= options[:name] %>
   mount_path '<%= options[:mount_path] %>'
 
-  # Routes: specify which controllers and actions to include
-  # The actual routes are parsed from config/routes.rb
-  routes do
-    only controllers: [:example],
-         actions: [:index, :show, :create, :update]
-  end
-
   # Models: specify which models to include
   # Associations are automatically resolved - if you include a model,
-  # its associated models will be included too
+  # its associated models (has_many, belongs_to) will be included too
   models do
-    include :Example
-    # Additional models discovered via has_many/belongs_to are auto-included
+    include :Article  # Change to your model name
+  end
+
+  # Controllers: specify which controllers and actions to include
+  controllers do
+    include :articles  # Change to your controller name
+    # include :comments, only: [:create, :destroy]  # Limit to specific actions
   end
 
   # Views: ERB templates to transpile to JavaScript render functions
   views do
-    # include 'examples/index.html.erb'
-    # include 'examples/show.html.erb'
-    # include 'examples/_form.html.erb'
+    include 'articles/*.html.erb'  # Change to your views
+    # include 'comments/_form.html.erb'
   end
 
   # Stimulus: JavaScript controllers to copy (not transpiled)
-  stimulus do
-    # include 'example_controller.js'
-  end
-
-  # Sync: configuration for offline data synchronization
-  sync do
-    endpoint '/api/spa/sync'
-    # writable :Example  # Models that can be modified offline
-  end
+  # stimulus do
+  #   include 'example_controller.js'
+  # end
 end
