@@ -23,7 +23,19 @@ COPY docs/package.json docs/yarn.lock ./docs/
 WORKDIR /app/docs
 RUN yarn install
 
-# Now copy the rest of the source code
+# Copy demo package files for better layer caching
+# These npm installs happen before COPY . . so they're cached when source changes
+WORKDIR /app
+COPY demo/selfhost/package.json demo/selfhost/package-lock.json ./demo/selfhost/
+WORKDIR /app/demo/selfhost
+RUN npm install
+
+WORKDIR /app
+COPY demo/ruby2js-on-rails/package.json demo/ruby2js-on-rails/package-lock.json ./demo/ruby2js-on-rails/
+WORKDIR /app/demo/ruby2js-on-rails
+RUN npm install
+
+# Now copy the rest of the source code (node_modules dirs already populated)
 WORKDIR /app
 COPY . .
 
@@ -31,19 +43,11 @@ COPY . .
 WORKDIR /app/docs
 RUN bundle install
 
-# Install demo dependencies for selfhost and ruby2js-on-rails
-WORKDIR /app/demo/selfhost
-RUN npm install
-
-WORKDIR /app/demo/ruby2js-on-rails
-RUN npm install
-
 # Build the demo assets and static site
 # The esbuild ruby2js plugin runs `bundle exec ruby2js`
 WORKDIR /app/docs
 ENV BRIDGETOWN_ENV=production
-RUN bundle exec rake
-RUN bundle exec rake deploy
+RUN bundle exec rake && bundle exec rake deploy
 
 # Production stage - serve static files with nginx
 FROM nginx:alpine

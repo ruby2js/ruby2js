@@ -107,22 +107,11 @@ def transpile_filter(filter_file, output_path)
   File.write(output_path, js)
 end
 
-# Parse command line
-command = ARGV[0] || 'all'
-target = ARGV[1]
-
-case command
-when 'specs'
-  # Build all specs (or specific one)
+# Build specs helper (used by 'specs' and 'all' commands)
+def build_specs(spec_list)
   FileUtils.mkdir_p(DIST)
 
-  specs = if target
-    [target]
-  else
-    manifest['ready'] + manifest['partial'].map { |e| e.is_a?(Hash) ? e['spec'] : e }
-  end
-
-  specs.each do |spec_name|
+  spec_list.each do |spec_name|
     spec_path = File.join(ROOT, 'spec', spec_name)
     output_path = File.join(DIST, spec_name.sub('.rb', '.mjs'))
 
@@ -134,21 +123,13 @@ when 'specs'
       puts "  #{spec_name} (skipped - not found)"
     end
   end
+end
 
-when 'filters'
-  # Build all filters (or specific one)
+# Build filters helper (used by 'filters' and 'all' commands)
+def build_filters(filter_list)
   FileUtils.mkdir_p(FILTERS_DIR)
 
-  filters = if target
-    [target]
-  else
-    specs = manifest['ready'] + manifest['partial'].map { |e| e.is_a?(Hash) ? e['spec'] : e }
-    specs.map { |s| filter_for_spec(s) }
-         .uniq
-         .select { |name| File.exist?(File.join(ROOT, 'lib/ruby2js/filter', "#{name}.rb")) }
-  end
-
-  filters.each do |name|
+  filter_list.each do |name|
     src = File.join(ROOT, 'lib/ruby2js/filter', "#{name}.rb")
     output = File.join(FILTERS_DIR, "#{name}.js")
 
@@ -160,14 +141,50 @@ when 'filters'
       puts "  #{name} (skipped - not found)"
     end
   end
+end
+
+# Get list of specs to build
+def specs_to_build(target = nil)
+  if target
+    [target]
+  else
+    manifest['ready'] + manifest['partial'].map { |e| e.is_a?(Hash) ? e['spec'] : e }
+  end
+end
+
+# Get list of filters to build
+def filters_to_build(target = nil)
+  if target
+    [target]
+  else
+    specs = manifest['ready'] + manifest['partial'].map { |e| e.is_a?(Hash) ? e['spec'] : e }
+    specs.map { |s| filter_for_spec(s) }
+         .uniq
+         .select { |name| File.exist?(File.join(ROOT, 'lib/ruby2js/filter', "#{name}.rb")) }
+  end
+end
+
+# Parse command line
+command = ARGV[0] || 'all'
+target = ARGV[1]
+
+case command
+when 'specs'
+  # Build all specs (or specific one)
+  build_specs(specs_to_build(target))
+
+when 'filters'
+  # Build all filters (or specific one)
+  build_filters(filters_to_build(target))
 
 when 'all'
+  # Build both specs and filters in a single process (avoids Ruby startup overhead)
   puts "Building specs..."
-  system(RbConfig.ruby, __FILE__, 'specs') || exit(1)
+  build_specs(specs_to_build)
 
   puts ""
   puts "Building filters..."
-  system(RbConfig.ruby, __FILE__, 'filters') || exit(1)
+  build_filters(filters_to_build)
 
 when 'ready'
   # Build only ready specs
