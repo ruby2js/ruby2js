@@ -146,6 +146,10 @@ end
 - Phlex DSL doesn't expose all React features directly
 - Two mental models to understand
 
+{% rendercontent "docs/note" %}
+**One-way migration to JSX:** Add the [JSX filter](../filters/jsx) to produce idiomatic JSX syntax instead of `React.createElement` calls. This is useful when exporting code for JavaScript developers to maintain.
+{% endrendercontent %}
+
 ## When to Use What
 
 | Scenario | Recommended Approach |

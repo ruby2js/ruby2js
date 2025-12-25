@@ -542,17 +542,7 @@ module Ruby2JS
           hash = component_args.find { |arg| arg.type == :hash }
           hash = hash ? process(hash) : s(:nil)
 
-          if @react == :Preact
-            element = s(:send, s(:const, nil, :Preact), :h, component_const, hash)
-          else
-            element = s(:send, s(:const, nil, :React), :createElement, component_const, hash)
-          end
-
-          if @reactApply
-            s(:send, s(:gvar, :$_), :push, element)
-          else
-            element
-          end
+          build_react_element([component_const, hash])
 
         # Phlex-style: tag("custom-element", ...) - React.createElement("custom-element", ...)
         elsif @jsx_content and node.children[0] == nil and node.children[1] == :tag
@@ -562,17 +552,7 @@ module Ruby2JS
           hash = tag_args.find { |arg| arg.type == :hash }
           hash = hash ? process(hash) : s(:nil)
 
-          if @react == :Preact
-            element = s(:send, s(:const, nil, :Preact), :h, tag_name, hash)
-          else
-            element = s(:send, s(:const, nil, :React), :createElement, tag_name, hash)
-          end
-
-          if @reactApply
-            s(:send, s(:gvar, :$_), :push, element)
-          else
-            element
-          end
+          build_react_element([tag_name, hash])
 
         # Phlex-style: HTML element (div, span, etc.) - React.createElement("element", ...)
         elsif @jsx_content and node.children[0] == nil and
@@ -597,23 +577,10 @@ module Ruby2JS
             end
             hash = process(s(:hash, *pairs))
           else
-            hash = nil
+            hash = s(:nil)
           end
 
-          params = [s(:str, tag)]
-          params << hash if hash
-
-          if @react == :Preact
-            element = s(:send, s(:const, nil, :Preact), :h, *params)
-          else
-            element = s(:send, s(:const, nil, :React), :createElement, *params)
-          end
-
-          if @reactApply
-            s(:send, s(:gvar, :$_), :push, element)
-          else
-            element
-          end
+          build_react_element([s(:str, tag), hash])
 
         # map method calls involving i/g/c vars to straight calls
         #
@@ -899,10 +866,36 @@ module Ruby2JS
       end
 
       def build_react_element(params)
-        if @react == :Preact
-          element = s(:send, s(:const, nil, :Preact), :h, *params)
+        if @jsx
+          # Output xnode for JSX serialization
+          tag_node, attrs, *children = params
+
+          # Extract tag name as string
+          tag_name = case tag_node.type
+          when :str
+            tag_node.children.first
+          when :const
+            # Component or Fragment - use the constant name
+            tag_node.children.last.to_s
+          else
+            tag_node.children.first.to_s
+          end
+
+          # xnode expects: (tag_string, attrs_hash, *children)
+          # attrs should be a hash node, not nil or s(:nil)
+          if attrs.nil? || attrs.type == :nil
+            attrs = s(:hash)
+          end
+          element = s(:xnode, tag_name, attrs, *children)
         else
-          element = s(:send, s(:const, nil, :React), :createElement, *params)
+          # Trim trailing nil if no children (matches original behavior)
+          params.pop if params.last == s(:nil) && params.length == 2
+
+          if @react == :Preact
+            element = s(:send, s(:const, nil, :Preact), :h, *params)
+          else
+            element = s(:send, s(:const, nil, :React), :createElement, *params)
+          end
         end
 
         if @reactApply
@@ -994,17 +987,7 @@ module Ruby2JS
               s(:const, nil, :"Preact.Fragment") :
               s(:const, nil, :"React.Fragment")
 
-            if @react == :Preact
-              element = s(:send, s(:const, nil, :Preact), :h, fragment_const, s(:nil), *children_ast)
-            else
-              element = s(:send, s(:const, nil, :React), :createElement, fragment_const, s(:nil), *children_ast)
-            end
-
-            if @reactApply
-              return s(:send, s(:gvar, :$_), :push, element)
-            else
-              return element
-            end
+            return build_react_element([fragment_const, s(:nil), *children_ast])
           end
 
         # Phlex-style block: element do ... end
@@ -1037,17 +1020,7 @@ module Ruby2JS
             block_children = node.children[2..-1]
             children_ast = block_children.map { |c| process(c) }
 
-            if @react == :Preact
-              element = s(:send, s(:const, nil, :Preact), :h, s(:str, tag), hash, *children_ast)
-            else
-              element = s(:send, s(:const, nil, :React), :createElement, s(:str, tag), hash, *children_ast)
-            end
-
-            if @reactApply
-              return s(:send, s(:gvar, :$_), :push, element)
-            else
-              return element
-            end
+            return build_react_element([s(:str, tag), hash, *children_ast])
           end
 
         # Phlex-style block: render Component.new do ... end
@@ -1064,17 +1037,7 @@ module Ruby2JS
             block_children = node.children[2..-1]
             children_ast = block_children.map { |c| process(c) }
 
-            if @react == :Preact
-              element = s(:send, s(:const, nil, :Preact), :h, component_const, hash, *children_ast)
-            else
-              element = s(:send, s(:const, nil, :React), :createElement, component_const, hash, *children_ast)
-            end
-
-            if @reactApply
-              return s(:send, s(:gvar, :$_), :push, element)
-            else
-              return element
-            end
+            return build_react_element([component_const, hash, *children_ast])
           end
 
         # Phlex-style block: tag("custom-element") do ... end
@@ -1090,17 +1053,7 @@ module Ruby2JS
             block_children = node.children[2..-1]
             children_ast = block_children.map { |c| process(c) }
 
-            if @react == :Preact
-              element = s(:send, s(:const, nil, :Preact), :h, tag_name, hash, *children_ast)
-            else
-              element = s(:send, s(:const, nil, :React), :createElement, tag_name, hash, *children_ast)
-            end
-
-            if @reactApply
-              return s(:send, s(:gvar, :$_), :push, element)
-            else
-              return element
-            end
+            return build_react_element([tag_name, hash, *children_ast])
           end
         end
 

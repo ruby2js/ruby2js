@@ -10,9 +10,10 @@ The **JSX** filter converts `React.createElement` calls into JSX syntax for huma
 This filter is useful when you want human-readable JSX output, particularly for:
 - Exporting Ruby2JS code for maintenance by JavaScript developers
 - Generating JSX for use with build tools that expect JSX input
+- Migrating from Phlex to idiomatic React/JSX
 - Improving readability of React component output
 
-It works in conjunction with the [React](react) filter.
+It works in conjunction with the [React](react) filter and optionally the [Phlex](phlex) filter.
 
 This is generally not necessary if the sources are being converted for
 processing in the browser or by processing in Node.js for SSR purposes.
@@ -61,6 +62,37 @@ Example output:
 - Expressions: `{variable}`, `{condition ? a : b}`
 - Spread attributes: `{...props}`
 - Children: `<div><Child /></div>`
+
+## Phlex to JSX Migration
+
+When used with the [Phlex](phlex) and [React](react) filters, the JSX filter enables one-way migration from Phlex to idiomatic JSX:
+
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["phlex", "react", "jsx"]
+}'></div>
+
+```ruby
+class TaskList < Phlex::HTML
+  def initialize(title:, items:)
+    @title = title
+    @items = items
+  end
+
+  def view_template
+    div(class: "task-list") do
+      h1 { @title }
+      ul do
+        @items.each do |item|
+          li { item }
+        end
+      end
+    end
+  end
+end
+```
+
+This produces clean, maintainable JSX that JavaScript developers can work with directly.
 
 ## Limitations
 

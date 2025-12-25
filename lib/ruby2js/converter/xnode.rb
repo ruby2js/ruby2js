@@ -10,6 +10,8 @@ module Ruby2JS
       children = []
 
       args.each do |arg|
+        next if arg.nil?
+
         if arg.type == :hash
           arg.children.each do |pair|
             name = pair.children[0].children[0]
@@ -20,11 +22,11 @@ module Ruby2JS
             end
 
             if [:class, :className].include? name and attrs[name]
-              if attrs[name].type == :str and pair.children[1].type == :str
+              if attrs[name].type == :str and pair.children[1]&.type == :str
                 attrs[name] = s(:str, pair.children[1].children[0] + ' ' +
                   attrs[name].children[0])
               else
-                attrs[name] = s(:send, s(:send, attrs[name], :+, 
+                attrs[name] = s(:send, s(:send, attrs[name], :+,
                   s(:str, ' ')), :+, pair.children[1])
               end
             else
@@ -42,6 +44,7 @@ module Ruby2JS
       put nodename
 
       attrs.each do |name, value|
+        next if value.nil?
         put ' '
         put name
         put '='
@@ -58,9 +61,10 @@ module Ruby2JS
         put '/>'
       else
         put '>'
-        put @nl unless children.length == 1 and children.first.type != :xnode
+        put @nl unless children.length == 1 and children.first&.type != :xnode
 
         children.each_with_index do |child, index|
+          next if child.nil?
           put @nl unless index == 0
           if child.type == :str
             put child.children.first
@@ -78,7 +82,7 @@ module Ruby2JS
           end
         end
 
-        put @nl unless children.length == 1 and children.first.type != :xnode
+        put @nl unless children.length == 1 and children.first&.type != :xnode
 
         put '</'
         put nodename

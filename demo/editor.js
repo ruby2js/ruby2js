@@ -55,7 +55,7 @@ globalThis.CodeMirror = class {
         doc: 'content',
         extensions: [
           setup,
-          javascript(),
+          javascript({ jsx: true }),
           EditorView.editable.of(false)
         ]
       }),

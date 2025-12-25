@@ -21,3 +21,6 @@ demo/selfhost/filters/
 
 # Local config
 mise.toml
+
+# Release tarballs
+*.tgz

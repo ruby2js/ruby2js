@@ -688,6 +688,113 @@ describe Ruby2JS::Filter::Phlex do
     end
   end
 
+  describe 'JSX output (one-way migration)' do
+    require 'ruby2js/filter/react'
+    require 'ruby2js/filter/jsx'
+
+    def to_jsx(string, eslevel: 2020)
+      _(Ruby2JS.convert(string,
+        filters: [Ruby2JS::Filter::Phlex, Ruby2JS::Filter::React, Ruby2JS::Filter::JSX],
+        eslevel: eslevel).to_s)
+    end
+
+    it "should convert single element to JSX" do
+      result = to_jsx(<<~RUBY)
+        class Card < Phlex::HTML
+          def view_template
+            div(class: "card") { "Hello" }
+          end
+        end
+      RUBY
+      result.must_include '<div className="card">'
+      result.must_include 'Hello'
+      result.must_include '</div>'
+      result.wont_include 'React.createElement'
+    end
+
+    it "should handle nested elements" do
+      result = to_jsx(<<~RUBY)
+        class Card < Phlex::HTML
+          def view_template
+            div { span { "inner" } }
+          end
+        end
+      RUBY
+      result.must_include '<div>'
+      result.must_include '<span>'
+      result.must_include 'inner'
+      result.must_include '</span>'
+      result.must_include '</div>'
+    end
+
+    it "should wrap multiple elements in Fragment" do
+      result = to_jsx(<<~RUBY)
+        class Page < Phlex::HTML
+          def view_template
+            h1 { "Title" }
+            p { "Content" }
+          end
+        end
+      RUBY
+      result.must_include '<React.Fragment>'
+      result.must_include '<h1>'
+      result.must_include '<p>'
+    end
+
+    it "should handle void elements" do
+      result = to_jsx(<<~RUBY)
+        class Form < Phlex::HTML
+          def view_template
+            input(type: "text")
+            br
+          end
+        end
+      RUBY
+      result.must_include '<input type="text"/>'
+      result.must_include '<br/>'
+    end
+
+    it "should handle component rendering" do
+      result = to_jsx(<<~RUBY)
+        class Page < Phlex::HTML
+          def view_template
+            render Header.new(title: "Welcome")
+          end
+        end
+      RUBY
+      result.must_include '<Header'
+      result.must_include 'title='
+    end
+
+    it "should handle custom elements" do
+      result = to_jsx(<<~RUBY)
+        class Widget < Phlex::HTML
+          def view_template
+            tag("my-widget", class: "custom") { "content" }
+          end
+        end
+      RUBY
+      result.must_include '<my-widget'
+      result.must_include 'className="custom"'
+    end
+
+    it "should handle dynamic expressions" do
+      result = to_jsx(<<~RUBY)
+        class Card < Phlex::HTML
+          def initialize(title:)
+            @title = title
+          end
+          def view_template
+            h1 { @title }
+          end
+        end
+      RUBY
+      result.must_include '<h1>'
+      result.must_include '{title}'
+      result.must_include '</h1>'
+    end
+  end
+
   describe Ruby2JS::Filter::DEFAULTS do
     it "should include Phlex" do
       _(Ruby2JS::Filter::DEFAULTS).must_include Ruby2JS::Filter::Phlex

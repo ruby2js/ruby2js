@@ -14,7 +14,10 @@ class ComboController < DemoController
     tab = document.createElement('sl-tab')
     tab.setAttribute 'slot', 'nav'
     tab.setAttribute 'panel', 'js'
-    tab.textContent = 'JavaScript'
+    # Check if jsx filter is enabled
+    options = JSON.parse(element.dataset.options || '{}')
+    filters = options.filters || []
+    tab.textContent = filters.include?('jsx') ? 'JSX' : 'JavaScript'
     tab_group.appendChild(tab)
 
     # result tab (if there are children present)
