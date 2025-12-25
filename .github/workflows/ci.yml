@@ -14,7 +14,11 @@ jobs:
       fail-fast: false
       matrix:
         ruby: [3.2, 3.3, 3.4, 4.0]
+        include:
+          - ruby: 4.0
+            experimental: true
     runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.experimental || false }}
 
     steps:
     - uses: actions/checkout@v4
