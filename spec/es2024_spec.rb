@@ -28,10 +28,35 @@ describe "ES2024 support" do
         must_equal 'Object.groupBy(people, p => p.age > 30 ? "senior" : "junior")'
     end
 
+    it "should handle group_by with method call as key" do
+      to_js('words.group_by { |w| w.length }').
+        must_equal 'Object.groupBy(words, w => w.length)'
+    end
+
+    it "should handle group_by with arithmetic expression" do
+      to_js('items.group_by { |i| i.price / 100 }').
+        must_equal 'Object.groupBy(items, i => i.price / 100)'
+    end
+
+    it "should handle group_by with destructuring" do
+      to_js('pairs.group_by { |k, v| k }').
+        must_equal 'Object.groupBy(pairs, ([k, v]) => k)'
+    end
+
+    it "should handle group_by with destructuring and complex body" do
+      to_js('entries.group_by { |key, val| key.to_s }').
+        must_equal 'Object.groupBy(entries, ([key, val]) => key.toString())'
+    end
+
     it "should use reduce fallback without ES2024" do
       # Without ES2024, group_by uses reduce
       to_js_2023('a.group_by { |x| x.category }').
         must_equal 'a.reduce(($acc, x) => {let $key = x.category; ($acc[$key] = $acc[$key] ?? []).push(x); return $acc}, {})'
+    end
+
+    it "should use reduce fallback with destructuring without ES2024" do
+      to_js_2023('pairs.group_by { |k, v| k }').
+        must_equal 'pairs.reduce(($acc, [k, v]) => {let $key = k; ($acc[$key] = $acc[$key] ?? []).push([k, v]); return $acc}, {})'
     end
   end
 end

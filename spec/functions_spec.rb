@@ -924,14 +924,66 @@ describe Ruby2JS::Filter::Functions do
         must_equal 'a.slice().sort((x_a, x_b) => {if (x_a.name < x_b.name) {return -1} else if (x_a.name > x_b.name) {return 1} else {return 0}})'
     end
 
+    it "should handle sort_by with method call" do
+      to_js( 'words.sort_by { |w| w.length }' ).
+        must_equal 'words.slice().sort((w_a, w_b) => {if (w_a.length < w_b.length) {return -1} else if (w_a.length > w_b.length) {return 1} else {return 0}})'
+    end
+
+    it "should handle sort_by with arithmetic expression" do
+      to_js( 'items.sort_by { |i| i.price * i.quantity }' ).
+        must_equal 'items.slice().sort((i_a, i_b) => {if (i_a.price * i_a.quantity < i_b.price * i_b.quantity) {return -1} else if (i_a.price * i_a.quantity > i_b.price * i_b.quantity) {return 1} else {return 0}})'
+    end
+
     it "should handle max_by" do
       to_js( 'a.max_by { |x| x.score }' ).
         must_equal 'a.reduce((a, b) => a.score >= b.score ? a : b)'
     end
 
+    it "should handle max_by with method call" do
+      to_js( 'words.max_by { |w| w.length }' ).
+        must_equal 'words.reduce((a, b) => a.length >= b.length ? a : b)'
+    end
+
+    it "should handle max_by with arithmetic expression" do
+      to_js( 'items.max_by { |i| i.price * i.qty }' ).
+        must_equal 'items.reduce((a, b) => a.price * a.qty >= b.price * b.qty ? a : b)'
+    end
+
     it "should handle min_by" do
       to_js( 'a.min_by { |x| x.score }' ).
         must_equal 'a.reduce((a, b) => a.score <= b.score ? a : b)'
+    end
+
+    it "should handle min_by with method call" do
+      to_js( 'words.min_by { |w| w.length }' ).
+        must_equal 'words.reduce((a, b) => a.length <= b.length ? a : b)'
+    end
+
+    it "should handle min_by with arithmetic expression" do
+      to_js( 'items.min_by { |i| i.price * i.qty }' ).
+        must_equal 'items.reduce((a, b) => a.price * a.qty <= b.price * b.qty ? a : b)'
+    end
+  end
+
+  describe "group_by" do
+    it "should handle group_by with simple key" do
+      to_js_2020( 'users.group_by { |u| u.role }' ).
+        must_equal 'users.reduce(($acc, u) => {let $key = u.role; ($acc[$key] = $acc[$key] ?? []).push(u); return $acc}, {})'
+    end
+
+    it "should handle group_by with method call" do
+      to_js_2020( 'words.group_by { |w| w.length }' ).
+        must_equal 'words.reduce(($acc, w) => {let $key = w.length; ($acc[$key] = $acc[$key] ?? []).push(w); return $acc}, {})'
+    end
+
+    it "should handle group_by with ternary expression" do
+      to_js_2020( 'nums.group_by { |n| n > 0 ? "positive" : "non_positive" }' ).
+        must_equal 'nums.reduce(($acc, n) => {let $key = n > 0 ? "positive" : "non_positive"; ($acc[$key] = $acc[$key] ?? []).push(n); return $acc}, {})'
+    end
+
+    it "should handle group_by with arithmetic expression" do
+      to_js_2020( 'items.group_by { |i| i.price / 10 }' ).
+        must_equal 'items.reduce(($acc, i) => {let $key = i.price / 10; ($acc[$key] = $acc[$key] ?? []).push(i); return $acc}, {})'
     end
   end
 

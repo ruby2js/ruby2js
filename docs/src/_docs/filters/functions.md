@@ -176,6 +176,93 @@ fn = proc { |x| x * 2 }
 * `define_method` and `method_defined?` work inside class bodies (with or without explicit receiver), including inside loops like `[:a, :b].each { |m| define_method(m) { ... } }`
 * Block parameter destructuring is supported: `.map {|k, v| ...}` becomes `.map(([k, v]) => ...)`
 
+## Collection Methods: group_by, sort_by, max_by, min_by
+
+These methods provide Ruby-like collection operations with intelligent JavaScript output
+based on your ES level.
+
+### group_by
+
+Groups elements by a key extracted from each element.
+
+```ruby
+# Group users by role
+users.group_by { |u| u.role }
+# ES2024+: Object.groupBy(users, u => u.role)
+# Pre-ES2024: users.reduce(($acc, u) => {
+#   let $key = u.role;
+#   ($acc[$key] = $acc[$key] ?? []).push(u);
+#   return $acc
+# }, {})
+
+# Group with computed key
+items.group_by { |i| i.price > 100 ? "expensive" : "affordable" }
+# ES2024+: Object.groupBy(items, i => i.price > 100 ? "expensive" : "affordable")
+
+# Destructuring support for key-value pairs
+pairs.group_by { |k, v| k }
+# ES2024+: Object.groupBy(pairs, ([k, v]) => k)
+```
+
+### sort_by
+
+Sorts elements by a key, returning a new array (non-mutating).
+
+```ruby
+# Sort by property
+users.sort_by { |u| u.name }
+# ES2023+: users.toSorted((u_a, u_b) => {
+#   if (u_a.name < u_b.name) {return -1}
+#   else if (u_a.name > u_b.name) {return 1}
+#   else {return 0}
+# })
+# Pre-ES2023: users.slice().sort(...)
+
+# Sort by computed value
+items.sort_by { |i| i.price * i.quantity }
+# Compares (i.price * i.quantity) for each element
+
+# Sort by method result (with filter chaining)
+words.sort_by { |w| w.length }
+# Sorts words by their length
+```
+
+### max_by
+
+Finds the element with the maximum value for the given key.
+
+```ruby
+# Find user with highest score
+users.max_by { |u| u.score }
+# => users.reduce((a, b) => a.score >= b.score ? a : b)
+
+# Find longest word
+words.max_by { |w| w.length }
+# => words.reduce((a, b) => a.length >= b.length ? a : b)
+
+# Find item with highest total value
+items.max_by { |i| i.price * i.qty }
+# => items.reduce((a, b) => a.price * a.qty >= b.price * b.qty ? a : b)
+```
+
+### min_by
+
+Finds the element with the minimum value for the given key.
+
+```ruby
+# Find user with lowest score
+users.min_by { |u| u.score }
+# => users.reduce((a, b) => a.score <= b.score ? a : b)
+
+# Find shortest word
+words.min_by { |w| w.length }
+# => words.reduce((a, b) => a.length <= b.length ? a : b)
+
+# Find cheapest item
+items.min_by { |i| i.price }
+# => items.reduce((a, b) => a.price <= b.price ? a : b)
+```
+
 ## Methods Always Called with Parentheses
 
 Ruby allows calling methods without parentheses, but JavaScript requires them for
