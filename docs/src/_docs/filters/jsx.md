@@ -69,7 +69,7 @@ When used with the [Phlex](phlex) and [React](react) filters, the JSX filter ena
 
 <div data-controller="combo" data-options='{
   "eslevel": 2022,
-  "filters": ["phlex", "react", "jsx"]
+  "filters": ["phlex", "react", "jsx", "functions"]
 }'></div>
 
 ```ruby

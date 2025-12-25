@@ -87,6 +87,14 @@ module Ruby2JS
           # Collect all instance variables used in the class
           collect_ivars(body)
 
+          # When JSX filter is present, emit a function component instead of a class
+          if @jsx
+            result = build_function_component(node, name, body)
+            @phlex_context = false
+            @phlex_ivars = nil
+            return result
+          end
+
           result = super
           @phlex_context = false
           @phlex_ivars = nil
@@ -94,6 +102,31 @@ module Ruby2JS
         end
 
         super
+      end
+
+      # Build a function component from a Phlex class
+      def build_function_component(node, name, body)
+        # Find and process the view_template/template method
+        methods = body&.type == :begin ? body.children : [body].compact
+
+        render_method = nil
+        methods.each do |child|
+          next unless child&.type == :def
+          method_name = child.children.first
+          if [:view_template, :template].include?(method_name)
+            render_method = process(child)
+            break
+          end
+        end
+
+        return super(node) unless render_method
+
+        # Extract the render method's args and body
+        _, render_args, render_body = render_method.children
+
+        # Create a function definition with the class name
+        func_name = name.children.last
+        s(:def, func_name, render_args, render_body)
       end
 
       # Handle method definitions within Phlex context

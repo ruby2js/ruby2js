@@ -793,6 +793,22 @@ describe Ruby2JS::Filter::Phlex do
       result.must_include '{title}'
       result.must_include '</h1>'
     end
+
+    it "should output function component instead of class" do
+      result = to_jsx(<<~RUBY)
+        class Card < Phlex::HTML
+          def initialize(title:)
+            @title = title
+          end
+          def view_template
+            div { @title }
+          end
+        end
+      RUBY
+      result.must_include 'function Card('
+      result.wont_include 'class Card'
+      result.wont_include 'extends'
+    end
   end
 
   describe Ruby2JS::Filter::DEFAULTS do
