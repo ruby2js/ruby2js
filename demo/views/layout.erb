@@ -1,0 +1,11 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Ruby2JS Demo</title>
+  <base href="<%= request.path.end_with?('/') ? request.path : request.path + '/' %>">
+</head>
+<body>
+  <%= yield %>
+</body>
+</html>

@@ -77,45 +77,75 @@ file "#{root}/demo/filters.opal" => filters do
   IO.write "#{root}/demo/filters.opal", content.compact.join("\n")
 end
 
-file "#{dest}/index.erb" => [*filters, "#{root}/demo/ruby2js.rb"] do
+file "#{dest}/index.erb" => [*filters, "#{root}/demo/views/demo.erb"] do
   puts "Generating #{dest}/index.erb"
   mkdir dest unless Dir.exist? dest
 
-  begin
-    request_uri = ENV['REQUEST_URI']
-    ENV['REQUEST_URI'] = '/demo'
-    livedoc = `#{RbConfig.ruby} #{root}/demo/ruby2js.rb --live`
-  ensure
-    if request_uri
-      ENV['REQUEST_URI'] = request_uri
-    else
-      ENV.delete 'REQUEST_URI'
-    end
+  require 'erb'
 
-    body = livedoc[/<body.*?>(.*?)<\/body>/m, 1].
-      sub(/<style.*?<\/style>/m, '').
-      sub(/<script.*?<\/script>/m, '')
+  # Set up template variables for live mode (Shoelace/Bridgetown)
+  @live = true
+  @ruby = 'puts "Hello world!"'
+  @eslevel = nil
+  @ast = false
+  @preset = true
+  @filter_list = filters.map { |f| File.basename(f, '.rb') }.reject { |f| f == 'require' }.sort
+  @eslevel_list = Dir["#{root}/lib/ruby2js/es20*.rb"].map { |f| File.basename(f, '.rb').sub('es', '') }.sort
+  @option_list = {
+    'autoexports' => true,
+    'autoimports' => true,
+    'defs' => true,
+    'exclude' => true,
+    'filepath' => true,
+    'identity' => false,
+    'import_from_skypack' => false,
+    'include' => true,
+    'include-all' => false,
+    'include-only' => true,
+    'ivars' => true,
+    'nullish' => false,
+    'nullish_to_s' => false,
+    'truthy' => true,
+    'strict' => false,
+    'template_literal_tags' => true,
+    'underscored_private' => false,
+    'sourcemap' => false,
+    'ast' => false,
+    'filtered-ast' => false,
+    'show-comments' => false,
+    'filter-trace' => false
+  }
+  @selected = []
+  @options_checked = {}
+  @js_output = nil
+  @parsed_html = nil
+  @filtered_html = nil
+  @error = nil
 
-    # Add link to self-hosted demo at the bottom
-    selfhost_link = <<~HTML
-      <div style="text-align: center; margin-top: 2rem; padding: 1rem; background: #f8f9fa; border-radius: 4px;">
-        <a href="/demo/selfhost" style="color: #0d6efd;">
-          Try the Self-Hosted Preview &rarr;
-        </a>
-        <span style="color: #666; font-size: 0.85em; margin-left: 0.5rem;">
-          (experimental)
-        </span>
-      </div>
-    HTML
+  # Render the shared ERB template
+  template_path = "#{root}/demo/views/demo.erb"
+  template = ERB.new(File.read(template_path), trim_mode: '-')
+  body = template.result(binding)
 
-    erb = [
-      "---\nlayout: default\n---\n",
-      body,
-      selfhost_link
-    ].join("\n")
+  # Add link to self-hosted demo at the bottom
+  selfhost_link = <<~HTML
+    <div style="text-align: center; margin-top: 2rem; padding: 1rem; background: #f8f9fa; border-radius: 4px;">
+      <a href="/demo/selfhost" style="color: #0d6efd;">
+        Try the Self-Hosted Preview &rarr;
+      </a>
+      <span style="color: #666; font-size: 0.85em; margin-left: 0.5rem;">
+        (experimental)
+      </span>
+    </div>
+  HTML
 
-    IO.write("#{dest}/index.erb", erb)
-  end
+  erb_output = [
+    "---\nlayout: default\n---\n",
+    body,
+    selfhost_link
+  ].join("\n")
+
+  IO.write("#{dest}/index.erb", erb_output)
 end
 
 file "#{dest}/editor.js" => ["#{root}/demo/editor.js"] do

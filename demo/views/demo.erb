@@ -1,0 +1,326 @@
+<%# Shared demo template - works with both Sinatra and Bridgetown
+     @live = true for Bridgetown (Shoelace), false for Sinatra (plain HTML) -%>
+<style>
+  .js.editor { background-color: #ffffcc }
+  .ruby.editor { resize: vertical; overflow: auto; height: 200px; background-color: #ffeeee; margin-bottom: 5px; }
+  .ruby .cm-wrap { background-color: #ffeeee; height: 100% }
+  .js .cm-wrap { background-color: #ffffdd; height: 100% }
+  .ruby .cm-wrap .cm-content .cm-activeLine { background-color: #ffdddd; margin-right: 2px }
+  .js .cm-wrap .cm-content .cm-activeLine { background-color: #ffffcc; margin-right: 2px }
+
+  .unloc {background-color: yellow}
+  .loc {background-color: white}
+  .loc span.hidden, .unloc span.hidden {font-size: 0}
+  .container.narrow-container {padding: 0; margin: 0 3%; max-width: 91%}
+  .exception {background-color:#ff0; margin: 1em 0; padding: 1em; border: 4px solid red; border-radius: 1em}
+
+<% if @live %>
+  sl-menu { display: none }
+  .narrow-container pre {padding: 0 1rem}
+  .narrow-container h1.title, .narrow-container h2.title {margin: 0.5rem 0}
+<% else %>
+  svg {height: 4em; width: 4em; transition: 0.5s}
+  svg:hover {height: 8em; width: 8em}
+  textarea.ruby {background-color: #ffeeee; margin-bottom: 0.4em}
+  pre.js {background-color: #ffffcc}
+  h2 {margin-top: 0.4em}
+
+  .dropdown { position: relative; display: none; }
+  .dropdown-content { display: none; position: absolute; background-color: #f9f9f9; min-width: 180px; box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2); padding: 12px 16px; z-index: 1; }
+
+  :root{--bs-base-font-size: 16px;--bs-font-sans-serif:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans","Liberation Sans",sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol","Noto Color Emoji";--bs-font-monospace:SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
+  html{font-size:var(--bs-base-font-size)}
+  body{margin:0;font-family:var(--bs-font-sans-serif);font-size:1rem;font-weight:400;line-height:1.5;color:#212529;background-color:#fff;-webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent}
+  a{color:#0d6efd;text-decoration:underline}
+  a:hover{color:#0a58ca}
+  svg{vertical-align:middle}
+  label{display:inline-block}
+  input,select,textarea{margin:0;font-family:inherit;font-size:inherit;line-height:inherit}
+  select{text-transform:none}
+  select{word-wrap:normal}
+  [type=submit]{-webkit-appearance:button}
+  .container{width:100%;padding-right:var(--bs-gutter-x,.75rem);padding-left:var(--bs-gutter-x,.75rem);margin-right:auto;margin-left:auto}
+  .form-control{display:block;width:100%;padding:.375rem .75rem;font-size:1rem;font-weight:400;line-height:1.5;color:#212529;background-color:#fff;background-clip:padding-box;border:1px solid #ced4da;-webkit-appearance:none;-moz-appearance:none;appearance:none;border-radius:.25rem;transition:border-color .15s ease-in-out,box-shadow .15s ease-in-out}
+  .btn:focus{outline:0;box-shadow:0 0 0 .25rem rgba(13,110,253,.25)}
+  .btn-primary{color:#fff;background-color:#0d6efd;border-color:#0d6efd}
+  .btn-primary:hover{color:#fff;background-color:#0b5ed7;border-color:#0a58ca}
+  .btn-primary:focus{color:#fff;background-color:#0b5ed7;border-color:#0a58ca;box-shadow:0 0 0 .25rem rgba(49,132,253,.5)}
+  .btn-primary:active{color:#fff;background-color:#0a58ca;border-color:#0a53be}
+  .btn-primary:active:focus{box-shadow:0 0 0 .25rem rgba(49,132,253,.5)}
+  .btn-primary:disabled{color:#fff;background-color:#0d6efd;border-color:#0d6efd}
+<% end %>
+</style>
+
+<div class="container narrow-container">
+  <% if @live %>
+    <h1 class="title is-size-4">Ruby</h1>
+    <sl-dialog id="option" label="Option">
+      <sl-input></sl-input>
+      <sl-button slot="footer" type="primary">Close</sl-button>
+    </sl-dialog>
+  <% else %>
+    <a href="https://www.ruby2js.com/docs/">
+      <%= ruby2js_logo %>
+      Ruby2JS
+    </a>
+  <% end %>
+
+  <form method="post">
+    <div<%= @live ? ' data-controller="ruby"' : '' %>>
+      <textarea class="ruby form-control" name="ruby" rows="8" placeholder="Ruby source"><%= @ruby || 'puts "Hello world!"' %></textarea>
+    </div>
+
+    <div class="options"<%= @live ? ' data-controller="options"' : '' %>>
+      <input class="btn btn-primary" type="submit" value="Convert" style="display: <%= @live ? 'none' : 'inline' %>">
+
+      <% # Preset checkbox %>
+      <% if @live %>
+        <sl-checkbox id="preset" name="preset"<%= @preset ? ' checked' : '' %>>Use Preset</sl-checkbox>
+      <% else %>
+        <input type="checkbox" id="preset" name="preset"<%= @preset ? ' checked' : '' %>>
+        <label for="preset">Use Preset</label>
+      <% end %>
+
+      <label for="eslevel">ESLevel:</label>
+      <% if @live %>
+        <sl-dropdown id="eslevel" name="eslevel">
+          <sl-button slot="trigger" caret><%= @eslevel || 'default' %></sl-button>
+          <sl-menu>
+            <sl-menu-item type="checkbox"<%= (!@eslevel || @eslevel == 'default') ? ' checked' : '' %>>default</sl-menu-item>
+            <% @eslevel_list.each do |level| %>
+              <sl-menu-item type="checkbox" value="<%= level %>"<%= @eslevel == level ? ' checked' : '' %>><%= level %></sl-menu-item>
+            <% end %>
+          </sl-menu>
+        </sl-dropdown>
+      <% else %>
+        <select name="eslevel" id="eslevel">
+          <option<%= (!@eslevel || @eslevel == 'default') ? ' selected' : '' %>>default</option>
+          <% @eslevel_list.each do |level| %>
+            <option value="<%= level %>"<%= @eslevel == level ? ' selected' : '' %>><%= level %></option>
+          <% end %>
+        </select>
+      <% end %>
+
+      <% # Show AST checkbox %>
+      <% if @live %>
+        <sl-checkbox id="ast" name="ast"<%= @ast ? ' checked' : '' %>>Show AST</sl-checkbox>
+      <% else %>
+        <input type="checkbox" id="ast" name="ast"<%= @ast ? ' checked' : '' %>>
+        <label for="ast">Show AST</label>
+      <% end %>
+
+      <% # Filters dropdown %>
+      <% if @live %>
+        <sl-dropdown id="filters" close-on-select="false">
+          <sl-button slot="trigger" caret>Filters</sl-button>
+          <sl-menu>
+            <% @filter_list.each do |filter| %>
+              <sl-menu-item type="checkbox" name="<%= filter %>"<%= @selected.include?(filter) ? ' checked' : '' %>><%= filter %></sl-menu-item>
+            <% end %>
+          </sl-menu>
+        </sl-dropdown>
+      <% else %>
+        <div class="dropdown" id="filters">
+          <button class="btn" type="button">Filters</button>
+          <div class="dropdown-content">
+            <% @filter_list.each do |filter| %>
+              <div>
+                <input type="checkbox" name="<%= filter %>"<%= @selected.include?(filter) ? ' checked' : '' %>>
+                <span><%= filter %></span>
+              </div>
+            <% end %>
+          </div>
+        </div>
+      <% end %>
+
+      <% # Options dropdown %>
+      <% if @live %>
+        <sl-dropdown id="options" close-on-select="false">
+          <sl-button slot="trigger" caret>Options</sl-button>
+          <sl-menu>
+            <% @option_list.each do |option, has_args| %>
+              <% next if option == 'preset' || option == 'filter' || option.start_with?('require_') %>
+              <% show_args = option == 'truthy' ? false : has_args %>
+              <sl-menu-item type="checkbox" name="<%= option %>"<%= @options_checked[option.to_sym] ? ' checked' : '' %><%= show_args ? ' data-args="true"' : '' %>><%= option %></sl-menu-item>
+            <% end %>
+          </sl-menu>
+        </sl-dropdown>
+      <% else %>
+        <div class="dropdown" id="options">
+          <button class="btn" type="button">Options</button>
+          <div class="dropdown-content">
+            <% @option_list.each do |option, has_args| %>
+              <% next if option == 'preset' || option == 'filter' || option.start_with?('require_') %>
+              <% show_args = option == 'truthy' ? false : has_args %>
+              <div>
+                <input type="checkbox" name="<%= option %>"<%= @options_checked[option.to_sym] ? ' checked' : '' %><%= show_args ? ' data-args="true"' : '' %>>
+                <span><%= option %></span>
+              </div>
+            <% end %>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </form>
+
+  <% unless @live %>
+  <script>
+    // determine base URL and what filters and options are selected
+    let base = new URL(document.getElementsByTagName('base')[0].href).pathname;
+    let filters = new Set(window.location.pathname.slice(base.length).split('/'));
+    filters.delete('');
+    let options = {};
+    for (let match of window.location.search.matchAll(/(\w+)(=([^&]*))?/g)) {
+      options[match[1]] = match[3] && decodeURIComponent(match[3]);
+    };
+    if (options.filter) options.filter.split(',').forEach(option => filters.add(option));
+
+    function updateLocation(force = false) {
+      let location = new URL(base, window.location);
+      location.pathname += Array.from(filters).join('/');
+
+      let search = [];
+      for (let [key, value] of Object.entries(options)) {
+        search.push(value === undefined ? key : `${key}=${encodeURIComponent(value)}`);
+      };
+
+      location.search = search.length === 0 ? "" : `${search.join('&')}`;
+      if (!force && window.location.toString() == location.toString()) return;
+
+      history.replaceState({}, null, location.toString());
+
+      if (document.getElementById('js').style.display === 'none') return;
+
+      // fetch updated results
+      let ruby = document.querySelector('textarea[name=ruby]').textContent;
+      let ast = document.getElementById('ast').checked;
+      let headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      }
+
+      fetch(location,
+        {method: 'POST', headers, body: JSON.stringify({ ruby, ast })}
+      ).then(response => {
+        return response.json();
+      }).
+      then(json => {
+        document.querySelector('#js pre').textContent = json.js || json.exception;
+
+        let parsed = document.querySelector('#parsed');
+        if (json.parsed) parsed.querySelector('pre').outerHTML = json.parsed;
+        parsed.style.display = json.parsed ? "block" : "none";
+
+        let filtered = document.querySelector('#filtered');
+        if (json.filtered) filtered.querySelector('pre').outerHTML = json.filtered;
+        filtered.style.display = json.filtered ? "block" : "none";
+      }).
+      catch(console.error);
+    }
+
+    // show dropdowns (they only appear if JS is enabled)
+    let dropdowns = document.querySelectorAll('.dropdown');
+    for (let dropdown of dropdowns) {
+      dropdown.style.display = 'inline-block';
+      let content = dropdown.querySelector('.dropdown-content');
+      content.style.opacity = 0;
+      content.style.display = 'none';
+
+      // toggle dropdown
+      dropdown.querySelector('button').addEventListener('click', event => {
+        event.preventDefault();
+        content.style.transition = '0s';
+        content.style.display = 'block';
+        content.style.zIndex = 1;
+        content.style.opacity = 1 - content.style.opacity;
+      });
+
+      // make dropdown disappear when mouse moves away
+      let focus = false;
+      dropdown.addEventListener('mouseover', () => {focus = true});
+      dropdown.addEventListener('mouseout', event => {
+        if (content.style.opacity === 0) return;
+        focus = false;
+        setTimeout( () => {
+          if (!focus) {
+            content.style.transition = '0.5s';
+            content.style.opacity = 0;
+            setTimeout( () => { content.style.zIndex = -1; }, 500);
+          }
+        }, 500)
+      })
+    };
+
+    // add/remove eslevel options
+    document.getElementById('eslevel').addEventListener('change', event => {
+      let value = event.target.value;
+      if (value !== "default") options['es' + value] = undefined;
+      for (let option of event.target.querySelectorAll('option')) {
+        if (option.value === 'default' || option.value === value) continue;
+        delete options['es' + option.value];
+      };
+      updateLocation();
+    });
+
+    // add/remove filters based on checkbox
+    let dropdown = document.getElementById('filters');
+    for (let filter of dropdown.querySelectorAll('input[type=checkbox]')) {
+      filter.addEventListener('click', event => {
+        let name = event.target.name;
+        if (!filters.delete(name)) filters.add(name);
+        updateLocation();
+      });
+    }
+
+    // add/remove options based on checkbox
+    dropdown = document.getElementById('options');
+    for (let option of dropdown.querySelectorAll('input[type=checkbox]')) {
+      option.addEventListener('click', event => {
+        let name = event.target.name;
+
+        if (name in options) {
+          delete options[name];
+        } else if (option.dataset.args) {
+          options[name] = prompt(name);
+        } else {
+          options[name] = undefined;
+        };
+
+        updateLocation();
+      })
+    };
+
+    // allow update of option
+    for (let span of document.querySelectorAll('input[data-args] + span')) {
+      span.addEventListener('click', event => {
+        let name = span.previousElementSibling.name;
+        options[name] = prompt(name, decodeURIComponent(options[name] || ''));
+        span.previousElementSibling.checked = true;
+        updateLocation();
+      })
+    }
+
+    // refresh on "Show AST" change
+    document.getElementById('ast').addEventListener('click', updateLocation);
+  </script>
+  <% end %>
+
+  <% if @error %>
+    <div class="exception"><%= @error %></div>
+  <% end %>
+
+  <div id="parsed" style="display: <%= @ast && @parsed ? 'block' : 'none' %>">
+    <h2 class="title is-size-6">AST</h2>
+    <pre><%= @parsed_html %></pre>
+  </div>
+
+  <div id="filtered" style="display: <%= @ast && @filtered_html ? 'block' : 'none' %>">
+    <h2 class="title is-size-6">filtered AST</h2>
+    <pre><%= @filtered_html %></pre>
+  </div>
+
+  <div id="js"<%= @live ? ' data-controller="js"' : '' %> style="display: <%= @ruby ? 'block' : 'none' %>">
+    <h2 class="title is-size-4">JavaScript</h2>
+    <pre class="js"><%= @js_output %></pre>
+  </div>
+</div>
