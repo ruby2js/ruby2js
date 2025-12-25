@@ -17,9 +17,9 @@
   <div id="loading">Loading Ruby2JS-on-Rails...<br><small>Powered by transpiled Ruby code</small></div>
   <div id="app">
     <nav>
-      <a onclick="navigate('/')">Home</a>
-      <a onclick="navigate('/articles')">Articles</a>
-      <a onclick="navigate('/articles/new')">New Article</a>
+      <a href="/" onclick="return navigate(event, '/')">Home</a>
+      <a href="/articles" onclick="return navigate(event, '/articles')">Articles</a>
+      <a href="/articles/new" onclick="return navigate(event, '/articles/new')">New Article</a>
       <span class="transpiled-badge">Transpiled Ruby &rarr; JS</span>
     </nav>
     <main id="content"></main>
