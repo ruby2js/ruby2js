@@ -8,7 +8,7 @@ category: stateful
 ### A Stateful Component
 
 This example focuses on managing state, and making use of
-[React component lifecycle methods](https://reactjs.org/docs/react-component.html#the-component-lifecycle).
+[React component lifecycle methods](https://react.dev/reference/react/Component#adding-lifecycle-methods-to-a-class-component).
 
 While it is possible to use `this.state` to reference state and
 `this.setState` to update state within React components expressed in Ruby

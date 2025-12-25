@@ -5,7 +5,7 @@ title: React
 category: react-element
 ---
 
-This example is based on the [React site](https://reactjs.org/), but based on
+This example is based on the [React site](https://react.dev/), but based on
 Ruby2JS instead and hosted by Ruby on Rails.
 
 ## Create a Project

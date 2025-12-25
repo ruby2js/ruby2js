@@ -12,12 +12,9 @@ author: rubys
 While filters can do one-for-one transformations, they can also do much more.
 The [react](/docs/filters/react) filter will, for example, do the following:
 
- * Support three different syntaxes for HTML, one based on
-   [JSX](https://reactjs.org/docs/introducing-jsx.html), one involving
-   direct calls to
-   [React.createElement](https://reactjs.org/docs/react-api.html#createelement),
-   and finally one based on
-   [Wunderbar](https://github.com/rubys/wunderbar#readme)
+ * Support multiple syntaxes for HTML, including
+   [JSX](https://react.dev/learn/writing-markup-with-jsx) and direct calls to
+   [React.createElement](https://react.dev/reference/react/createElement).
 
  * Unifying all of the mechanisms to initialize, reference, and update state
    with assignments and references to instance variables.
@@ -26,11 +23,7 @@ The [react](/docs/filters/react) filter will, for example, do the following:
    [bind](https://developer.mozilla.org/en-us/docs/web/javascript/reference/global_objects/function/bind)
    all event handlers.
 
- * Eliminate the need to create event handlers for 
-   [controlled components](https://reactjs.org/docs/forms.html#controlled-components).
+ * Eliminate the need to create event handlers for
+   [controlled components](https://react.dev/reference/react-dom/components#form-components).
 
-
-In addition to the [documentation](/docs/filters/react), a 
-[downloadable](https://github.com/ruby2js/ruby2js/tree/master/demo/reactjs.org#readme)
-version of the demos is provided, enabling you to be up and running in
-seconds!
+See the [documentation](/docs/filters/react) for more details and live examples.

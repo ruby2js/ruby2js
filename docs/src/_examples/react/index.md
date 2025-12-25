@@ -6,23 +6,17 @@ title: React Introduction
 category: react intro
 ---
 
-The **React** filter enables you to build [React](https://reactjs.org/) components.
+The **React** filter enables you to build [React](https://react.dev/) components.
 
-The examples below are based on the examples from the
-[React](https://reactjs.org/) website.  For best results:
+The examples below are based on examples from the
+[React](https://react.dev/) website.  For best results:
 
- * Review the [React](https://reactjs.org/) website first, and refer to it as
-   you work through each example that follows.  Compare the Ruby source, the
-   JavaScript that is generated from these pages against the JavaScript source
-   and the JavaScript that results if you uncheck the _JSX?_ checkbox in the
-   top right of each corresponding example.
+ * Review the [React](https://react.dev/) website first, and refer to it as
+   you work through each example that follows.  Compare the Ruby source and the
+   JavaScript that is generated from these pages.
 
- * Change the Ruby source code in your browser , and see how the JavaScript
+ * Change the Ruby source code in your browser and see how the JavaScript
    and results change.
-
- * Download and run the
-   [demo](https://github.com/ruby2js/ruby2js/tree/master/demo/reactjs.org#readme).
-   Again, feel free to make changes and see the results live.
 
 ## Examples
 

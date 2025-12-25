@@ -9,7 +9,7 @@ category: stimulus rollup
 **This example is based on Rails Version: 7**
 {% endrendercontent %}
 
-This example is based on the [Stimulus site](https://reactjs.org/), but based on
+This example is based on the [Stimulus site](https://stimulus.hotwired.dev/), but based on
 Ruby2JS instead and hosted by Ruby on Rails.  It makes use of the new
 [jsbundling-rails](https://github.com/rails/jsbundling-rails#readme) support
 included in Rails 7.

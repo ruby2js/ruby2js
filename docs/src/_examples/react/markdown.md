@@ -73,7 +73,7 @@ There is not a whole lot new in this example:
    by the **react** filter when a `value` attribute is provided on a
    `textarea`, not when a `defaultValue` is provided.  See the React document
    for
-   [Uncontrolled Components](https://reactjs.org/docs/uncontrolled-components.html)
+   [Uncontrolled Components](https://react.dev/learn/sharing-state-between-components#controlled-and-uncontrolled-components)
    for more details.
 
  * `getRawMarkup` returns a Ruby hash/JavaScript object, and is invoked via

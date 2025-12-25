@@ -86,7 +86,7 @@ Notable:
        used in the `render` method can only return one value.  The
        **react** filter will automatically detect such cases and wrap
        the set of elements in a
-       [React.fragment](https://reactjs.org/docs/fragments.html).
+       [React.fragment](https://react.dev/reference/react/Fragment).
 
      * HTML elements (like, `h3`) are expressed in lowercase and invoking
        other React components (like `TodoList`) is expressed in uppercase.
