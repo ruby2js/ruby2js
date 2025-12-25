@@ -31,7 +31,7 @@
     "convert-source-map": "^1.8.0"
   },
   "devDependencies": {
-    "esbuild": "^0.14.39",
+    "esbuild": "^0.27.0",
     "mocha": "^10.0.0"
   }
 }
