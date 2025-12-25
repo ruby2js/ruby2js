@@ -261,13 +261,13 @@ puts Ruby2JS.convert("list.max()", preset: true, include_only: [:max])
 
 ## Import From Skypack
 
-Some filters like [ActiveFunctions](filters/active_functions) will generate
+Some filters like [Stimulus](filters/stimulus) will generate
 import statements.  If the `import_from_skypack` option is set, these import
 statements will make use of the [skypack](https://www.skypack.dev/) CDN.
 
 ```ruby
-puts Ruby2JS.convert("x.present?",
-  preset: true, filters: [:active_functions], import_from_skypack: true)
+puts Ruby2JS.convert("class MyController < Stimulus::Controller; end",
+  filters: [:stimulus], import_from_skypack: true)
 ```
 
 ## IVars

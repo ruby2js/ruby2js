@@ -157,6 +157,26 @@ module Ruby2JS
             )
           )
 
+        when :string_delete_prefix
+          # if (!String.prototype.delete_prefix) { String.prototype.delete_prefix = function(prefix) {...} }
+          define_prototype_method(:String, :delete_prefix, s(:args, s(:arg, :prefix)),
+            s(:if,
+              s(:send, s(:self), :startsWith, s(:lvar, :prefix)),
+              s(:return, s(:send, s(:self), :slice, s(:attr, s(:lvar, :prefix), :length))),
+              s(:return, s(:send, nil, :String, s(:self)))
+            )
+          )
+
+        when :string_delete_suffix
+          # if (!String.prototype.delete_suffix) { String.prototype.delete_suffix = function(suffix) {...} }
+          define_prototype_method(:String, :delete_suffix, s(:args, s(:arg, :suffix)),
+            s(:if,
+              s(:send, s(:self), :endsWith, s(:lvar, :suffix)),
+              s(:return, s(:send, s(:self), :slice, s(:int, 0), s(:send, s(:attr, s(:self), :length), :-, s(:attr, s(:lvar, :suffix), :length)))),
+              s(:return, s(:send, nil, :String, s(:self)))
+            )
+          )
+
         when :string_count
           # if (!String.prototype.count) { String.prototype.count = function(chars) {...} }
           # Counts occurrences of any character in chars string
@@ -262,6 +282,18 @@ module Ruby2JS
             if args.length <= 1
               add_polyfill(:string_chomp)
               return s(:send!, process(target), :chomp, *args.map { |a| process(a) })
+            end
+
+          when :delete_prefix
+            if args.length == 1
+              add_polyfill(:string_delete_prefix)
+              return s(:send!, process(target), :delete_prefix, process(args.first))
+            end
+
+          when :delete_suffix
+            if args.length == 1
+              add_polyfill(:string_delete_suffix)
+              return s(:send!, process(target), :delete_suffix, process(args.first))
             end
 
           when :count

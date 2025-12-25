@@ -21,14 +21,14 @@ Ruby2JS.convert(source, filters: [:active_support])
 
 #### blank?
 
-Returns `true` if the object is `null`, empty, or a blank string.
+Returns `true` if the object is `null`, empty, or a blank string. Uses optional chaining for concise output.
 
 ```ruby
 name.blank?
 ```
 
 ```javascript
-name == null || name.length === 0 || name === ""
+!name?.length
 ```
 
 #### present?
@@ -40,7 +40,7 @@ user.email.present?
 ```
 
 ```javascript
-user.email != null && user.email.length != 0 && user.email != ""
+user.email?.length > 0
 ```
 
 #### presence
@@ -52,7 +52,7 @@ name.presence || "Anonymous"
 ```
 
 ```javascript
-(name != null && name.length != 0 && name != "" ? name : null) || "Anonymous"
+(name?.length > 0 ? name : null) || "Anonymous"
 ```
 
 #### try
@@ -154,7 +154,7 @@ puts Ruby2JS.convert(src, filters: [:erb, :active_support], eslevel: 2020)
 
 These methods provide simplified JavaScript equivalents. Some edge cases may behave differently from Rails:
 
-- `blank?` checks for `null`, empty length, or empty string. It doesn't handle other "blank" values like `false` or whitespace-only strings.
+- `blank?` uses `!obj?.length` which checks for `null`/`undefined` or zero length. It doesn't handle `false` or whitespace-only strings as blank.
 - `to_sentence` uses hardcoded "and" connector (no internationalization support)
 - `truncate` doesn't support `:separator` option for word boundaries
 

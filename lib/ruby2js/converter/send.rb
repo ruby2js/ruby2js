@@ -485,6 +485,14 @@ module Ruby2JS
       end
     end
 
+    # cattr = conditional attribute access (safe navigation property access)
+    # Used by filters for optional property access: obj?.property
+    handle :cattr do |receiver, method|
+      parse receiver
+      put '?.'
+      put method.to_s
+    end
+
     # ccall = conditional call (safe navigation function invocation)
     # Ruby: foo&.call(x) -> JS: foo?.(x)
     handle :ccall do |receiver, method, *args|

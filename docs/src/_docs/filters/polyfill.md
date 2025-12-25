@@ -34,6 +34,8 @@ The Polyfill filter automatically reorders itself to run before the Functions fi
 | Ruby | JavaScript Polyfill |
 |------|---------------------|
 | `.chomp(suffix)` | Removes suffix (or `\r?\n` if no arg) from end |
+| `.delete_prefix(prefix)` | Removes prefix from start if present |
+| `.delete_suffix(suffix)` | Removes suffix from end if present |
 | `.count(chars)` | Counts occurrences of any character in `chars` |
 
 ### Object Methods

@@ -111,6 +111,42 @@ describe Ruby2JS::Filter::Polyfill do
     end
   end
 
+  describe 'String#delete_prefix' do
+    it 'should add polyfill for delete_prefix' do
+      js = to_js('str.delete_prefix("foo")')
+      _(js).must_include 'String.prototype.delete_prefix'
+      _(js).must_include 'str.delete_prefix("foo")'
+    end
+
+    it 'should use startsWith in polyfill' do
+      js = to_js('str.delete_prefix("x")')
+      _(js).must_include 'this.startsWith(prefix)'
+    end
+
+    it 'should return unchanged string when prefix not found' do
+      js = to_js('str.delete_prefix("x")')
+      _(js).must_include 'return String(this)'
+    end
+  end
+
+  describe 'String#delete_suffix' do
+    it 'should add polyfill for delete_suffix' do
+      js = to_js('str.delete_suffix("bar")')
+      _(js).must_include 'String.prototype.delete_suffix'
+      _(js).must_include 'str.delete_suffix("bar")'
+    end
+
+    it 'should use endsWith in polyfill' do
+      js = to_js('str.delete_suffix("x")')
+      _(js).must_include 'this.endsWith(suffix)'
+    end
+
+    it 'should return unchanged string when suffix not found' do
+      js = to_js('str.delete_suffix("x")')
+      _(js).must_include 'return String(this)'
+    end
+  end
+
   describe 'String#count' do
     it 'should add polyfill for count with chars' do
       js = to_js('str.count("aeiou")')

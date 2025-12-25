@@ -34,7 +34,6 @@
   ],
   "blocked": {
     "lit_spec.rb": "filter transpiles but has runtime errors",
-    "active_functions_spec.rb": "filter not transpiled",
     "nokogiri_spec.rb": "filter not transpiled",
     "preact_spec.rb": "uses react filter"
   }

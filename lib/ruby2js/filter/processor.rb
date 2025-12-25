@@ -241,6 +241,7 @@ module Ruby2JS
       def on_autoreturn(node); self.on_return(node); end
       def on_await(node); self.on_send(node); end
       def on_call(node); self.on_send(node); end
+      def on_cattr(node); self.on_csend(node); end
       def on_class_extend(node); self.on_send(node); end
       def on_class_hash(node); self.on_class(node); end
       def on_class_module(node); self.on_send(node); end
