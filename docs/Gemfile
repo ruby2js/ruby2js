@@ -18,3 +18,4 @@ end
 gem "puma", "~> 6.0"
 
 gem "bridgetown-svg-inliner", "~> 2.0"
+gem "activesupport"  # Required by bridgetown-svg-inliner

@@ -16,6 +16,7 @@ GEM
       temple (>= 0.8.2)
       thor
       tilt
+    json (2.16.0)
     minitest (5.26.2)
     nokogiri (1.18.10-aarch64-linux-gnu)
       racc (~> 1.4)
@@ -40,15 +41,13 @@ GEM
       ast (~> 2.4.1)
       racc
     racc (1.8.1)
-    rack (3.2.4)
-    rackup (2.3.1)
-      rack (>= 3)
     rake (13.3.1)
     regexp_parser (2.11.3)
     temple (0.10.4)
     thor (1.4.0)
     tilt (2.6.1)
-    webrick (1.9.2)
+    wunderbar (1.6.0)
+      json
 
 PLATFORMS
   aarch64-linux-gnu
@@ -68,11 +67,9 @@ DEPENDENCIES
   minitest
   nokogiri
   opal (~> 1.8)
-  rack
-  rackup
   rake
   ruby2js!
-  webrick
+  wunderbar
 
 BUNDLED WITH
-  4.0.3
+   4.0.3

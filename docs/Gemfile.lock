@@ -205,6 +205,7 @@ PLATFORMS
   x86_64-linux-musl
 
 DEPENDENCIES
+  activesupport
   base64
   bridgetown (~> 2.0)
   bridgetown-feed (~> 4.0)
@@ -218,4 +219,4 @@ DEPENDENCIES
   wunderbar
 
 BUNDLED WITH
-   4.0.3
+  4.0.3

@@ -1,9 +1,8 @@
 source 'https://rubygems.org'
 
 gem 'rake'
+gem 'wunderbar', '>= 0.23.0'
 gem 'rack', '>= 3.0'
-gem 'rackup'
-gem 'webrick'
 gem 'ruby2js', path: File.expand_path('..', __dir__)
 gem 'sinatra', '>= 4.0'
 gem 'nokogiri'  # includes HTML5 parsing (formerly nokogumbo)

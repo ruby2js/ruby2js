@@ -1,3 +1,5 @@
+require "active_support/core_ext/object/blank"
+
 Bridgetown.configure do |config|
   init :"bridgetown-seo-tag"
   init :"bridgetown-feed"
