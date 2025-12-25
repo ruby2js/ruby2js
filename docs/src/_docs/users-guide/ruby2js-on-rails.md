@@ -238,12 +238,14 @@ The transpiled JavaScript requires runtime implementations. The demo provides th
 
 ### Database Options
 
-| Adapter | Runtime | Storage | Use Case |
-|---------|---------|---------|----------|
-| Dexie | Browser | IndexedDB | Offline-first apps |
-| sql.js | Browser | SQLite (WASM) | SQL compatibility |
-| better-sqlite3 | Node.js | SQLite file | Server deployment |
-| pg | Node.js | PostgreSQL | Production server |
+| Adapter | Runtime | Storage | npm package |
+|---------|---------|---------|-------------|
+| dexie | Browser | IndexedDB | `dexie` |
+| sql.js | Browser | SQLite (WASM) | `sql.js` |
+| pglite | Browser | PostgreSQL (WASM) | `@electric-sql/pglite` |
+| better_sqlite3 | Node.js | SQLite file | `better-sqlite3` |
+| pg | Node.js | PostgreSQL | `pg` |
+| mysql2 | Node.js | MySQL | `mysql2` |
 
 Configure in `config/database.yml`:
 
@@ -251,9 +253,15 @@ Configure in `config/database.yml`:
 development:
   adapter: dexie
 
+# Browser with persistence
+browser_persistent:
+  adapter: pglite
+  database: my_app
+
 production:
-  adapter: better_sqlite3
-  database: db/production.sqlite3
+  adapter: pg
+  host: localhost
+  database: my_app_production
 ```
 
 ### Server Runtimes
@@ -434,7 +442,8 @@ A powerful pattern: the same Ruby source runs on both server and browser.
          │          Browser JS      Server JS
          │               │               │
          ▼               ▼               ▼
-    PostgreSQL       IndexedDB      SQLite/PG
+    PostgreSQL     IndexedDB/       SQLite/PG/
+                   PGLite/sql.js      MySQL
 ```
 
 This enables:
