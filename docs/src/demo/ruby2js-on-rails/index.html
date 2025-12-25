@@ -55,11 +55,7 @@
     <main id="content"></main>
   </div>
 
-  <script src="node_modules/sql.js/dist/sql-wasm.js"></script>
   <script type="module">
-    // Configure sql.js WASM location for hosted environment
-    window.SQL_WASM_PATH = '/demo/ruby2js-on-rails/node_modules/sql.js/dist/';
-
     import { Application, routes } from './dist/config/routes.js';
     window.routes = routes;
     Application.start();

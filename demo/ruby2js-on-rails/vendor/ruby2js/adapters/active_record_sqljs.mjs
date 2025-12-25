@@ -6,13 +6,41 @@ const DB_CONFIG = {};
 
 let db = null;
 
+// Dynamically load sql-wasm.js if not already loaded
+async function loadSqlJs(scriptPath) {
+  if (typeof window !== 'undefined' && window.initSqlJs) {
+    return; // Already loaded
+  }
+
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = scriptPath;
+    script.onload = resolve;
+    script.onerror = () => reject(new Error(`Failed to load sql.js from ${scriptPath}`));
+    document.head.appendChild(script);
+  });
+}
+
 // Initialize the database
 export async function initDatabase(options = {}) {
   const config = { ...DB_CONFIG, ...options };
-  // Check for global path override (for hosted environments like ruby2js.com)
-  const sqlJsPath = (typeof window !== 'undefined' && window.SQL_WASM_PATH)
-    || config.sqlJsPath
-    || '/node_modules/sql.js/dist';
+
+  // Determine sql.js path based on environment
+  // Priority: config option > base href detection > default path
+  let sqlJsPath = config.sqlJsPath;
+  if (!sqlJsPath) {
+    // Check for <base href> tag (used in hosted demo)
+    const baseTag = document.querySelector('base[href]');
+    if (baseTag) {
+      const baseHref = baseTag.getAttribute('href');
+      sqlJsPath = `${baseHref}node_modules/sql.js/dist`;
+    } else {
+      sqlJsPath = '/node_modules/sql.js/dist';
+    }
+  }
+
+  // Load sql-wasm.js dynamically if needed
+  await loadSqlJs(`${sqlJsPath}/sql-wasm.js`);
 
   const SQL = await window.initSqlJs({
     locateFile: file => `${sqlJsPath}/${file}`
