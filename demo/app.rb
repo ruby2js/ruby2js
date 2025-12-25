@@ -18,40 +18,11 @@ class Ruby2JSDemo < Sinatra::Base
   set :views, File.expand_path('views', __dir__)
   set :public_folder, File.expand_path('public', __dir__)
 
-  # Autoregister filters and eslevels on startup
+  # Use shared configuration from Ruby2JS::Demo
   configure do
-    set :available_filters, Dir[File.join($:.first, 'ruby2js/filter/*.rb')].map { |f|
-      File.basename(f, '.rb')
-    }.reject { |f| f == 'require' }.sort
-
-    set :available_eslevels, Dir[File.join($:.first, 'ruby2js/es20*.rb')].map { |f|
-      File.basename(f, '.rb').sub('es', '')
-    }.sort
-
-    set :available_options, {
-      'autoexports' => true,
-      'autoimports' => true,
-      'defs' => true,
-      'exclude' => true,
-      'filepath' => true,
-      'identity' => false,
-      'import_from_skypack' => false,
-      'include' => true,
-      'include-all' => false,
-      'include-only' => true,
-      'ivars' => true,
-      'nullish' => false,
-      'nullish_to_s' => false,
-      'truthy' => true,
-      'strict' => false,
-      'template_literal_tags' => true,
-      'underscored_private' => false,
-      'sourcemap' => false,
-      'ast' => false,
-      'filtered-ast' => false,
-      'show-comments' => false,
-      'filter-trace' => false
-    }
+    set :available_filters, Ruby2JS::Demo.available_filters
+    set :available_eslevels, Ruby2JS::Demo.available_eslevels
+    set :available_options, Ruby2JS::Demo.available_options
   end
 
   helpers do
@@ -185,7 +156,7 @@ class Ruby2JSDemo < Sinatra::Base
   # Main page
   get '/*' do
     @live = false
-    @ruby = params[:ruby] || 'puts "Hello world!"'
+    @ruby = params[:ruby] || Ruby2JS::Demo.default_ruby
     @eslevel = params[:eslevel]
     @ast = params[:ast] == 'on' || params[:ast] == 'true'
     @preset = params.fetch('preset', true)
@@ -254,7 +225,7 @@ class Ruby2JSDemo < Sinatra::Base
     else
       # Form submission - render HTML page with results
       @live = false
-      @ruby = params[:ruby] || 'puts "Hello world!"'
+      @ruby = params[:ruby] || Ruby2JS::Demo.default_ruby
       @eslevel = params[:eslevel]
       @ast = params[:ast] == 'on' || params[:ast] == 'true'
       @preset = params.fetch('preset', false)

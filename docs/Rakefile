@@ -82,39 +82,18 @@ file "#{dest}/index.erb" => [*filters, "#{root}/demo/views/demo.erb"] do
   mkdir dest unless Dir.exist? dest
 
   require 'erb'
+  require 'ruby2js/demo'
 
   # Set up template variables for live mode (Shoelace/Bridgetown)
+  # Uses shared configuration from Ruby2JS::Demo
   @live = true
-  @ruby = 'puts "Hello world!"'
+  @ruby = Ruby2JS::Demo.default_ruby
   @eslevel = nil
   @ast = false
   @preset = true
-  @filter_list = filters.map { |f| File.basename(f, '.rb') }.reject { |f| f == 'require' }.sort
-  @eslevel_list = Dir["#{root}/lib/ruby2js/es20*.rb"].map { |f| File.basename(f, '.rb').sub('es', '') }.sort
-  @option_list = {
-    'autoexports' => true,
-    'autoimports' => true,
-    'defs' => true,
-    'exclude' => true,
-    'filepath' => true,
-    'identity' => false,
-    'import_from_skypack' => false,
-    'include' => true,
-    'include-all' => false,
-    'include-only' => true,
-    'ivars' => true,
-    'nullish' => false,
-    'nullish_to_s' => false,
-    'truthy' => true,
-    'strict' => false,
-    'template_literal_tags' => true,
-    'underscored_private' => false,
-    'sourcemap' => false,
-    'ast' => false,
-    'filtered-ast' => false,
-    'show-comments' => false,
-    'filter-trace' => false
-  }
+  @filter_list = Ruby2JS::Demo.available_filters
+  @eslevel_list = Ruby2JS::Demo.available_eslevels
+  @option_list = Ruby2JS::Demo.available_options
   @selected = []
   @options_checked = {}
   @js_output = nil

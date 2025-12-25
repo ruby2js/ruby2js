@@ -3,6 +3,49 @@ require 'ruby2js'
 
 module Ruby2JS
   module Demo
+    # Shared configuration for demo UI (Sinatra standalone and Bridgetown docs)
+    def self.available_filters
+      @available_filters ||= Dir[File.join(File.dirname(__FILE__), 'filter/*.rb')].map { |f|
+        File.basename(f, '.rb')
+      }.reject { |f| f == 'require' }.sort
+    end
+
+    def self.available_eslevels
+      @available_eslevels ||= Dir[File.join(File.dirname(__FILE__), 'es20*.rb')].map { |f|
+        File.basename(f, '.rb').sub('es', '')
+      }.sort
+    end
+
+    def self.available_options
+      @available_options ||= {
+        'autoexports' => true,
+        'autoimports' => true,
+        'defs' => true,
+        'exclude' => true,
+        'filepath' => true,
+        'identity' => false,
+        'import_from_skypack' => false,
+        'include' => true,
+        'include-all' => false,
+        'include-only' => true,
+        'ivars' => true,
+        'nullish' => false,
+        'nullish_to_s' => false,
+        'truthy' => true,
+        'strict' => false,
+        'template_literal_tags' => true,
+        'underscored_private' => false,
+        'sourcemap' => false,
+        'ast' => false,
+        'filtered-ast' => false,
+        'show-comments' => false,
+        'filter-trace' => false
+      }
+    end
+
+    def self.default_ruby
+      'puts "Hello world!"'
+    end
     # convert {"[:foo, :Bar]" => "wee"} to {[:foo, :Bar] => "wee"}
     def self.parse_stringified_symbol_keys(mapping_hash)
       updated_mappings = {}
