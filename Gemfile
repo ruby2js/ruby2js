@@ -13,6 +13,8 @@ end
 
 group :test do
   gem 'haml'
-  gem 'wunderbar'
   gem 'erubi'
+  gem 'rack'
+  gem 'rackup'
+  gem 'webrick'
 end
