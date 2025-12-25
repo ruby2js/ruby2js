@@ -74,20 +74,21 @@ class RubyController < DemoController
 
   # Load the Opal Ruby2JS bundle dynamically
   async def load_opal()
-    return if defined? Ruby2JS
+    unless defined? Ruby2JS
+      # Load the Opal bundle via script tag (it's not an ES module)
+      await Promise.new do |resolve, reject|
+        script = document.createElement('script')
+        script.src = "#{window.location.origin}/demo/ruby2js.js"
+        script.async = true
+        script.addEventListener(:load, resolve)
+        script.addEventListener(:error, reject)
+        document.head.appendChild(script)
+      end
 
-    # Load the Opal bundle via script tag (it's not an ES module)
-    await Promise.new do |resolve, reject|
-      script = document.createElement('script')
-      script.src = "#{window.location.origin}/demo/ruby2js.js"
-      script.async = true
-      script.addEventListener(:load, resolve)
-      script.addEventListener(:error, reject)
-      document.head.appendChild(script)
+      # Wait for Ruby2JS to be ready
+      await ruby2js_ready
     end
 
-    # Wait for Ruby2JS to be ready
-    await ruby2js_ready
     @opal_ready = true
   end
 
