@@ -88,19 +88,6 @@ module Ruby2JS
       sl(node, :self)
     end
 
-    # __FILE__
-    def visit_source_file_node(node)
-      sl(node, :str, node.filepath)
-    end
-
-    # __LINE__
-    def visit_source_line_node(node)
-      sl(node, :int, node.location.start_line)
-    end
-
-    # __ENCODING__
-    def visit_source_encoding_node(node)
-      sl(node, :__ENCODING__)
-    end
+    # Note: __FILE__, __LINE__, __ENCODING__ are defined in misc.rb
   end
 end

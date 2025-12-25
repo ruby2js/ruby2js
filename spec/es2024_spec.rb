@@ -13,7 +13,7 @@ describe "ES2024 support" do
 
   describe :eslevel do
     it "should report es2024" do
-      Ruby2JS.convert('', eslevel: 2024).eslevel.must_equal 2024
+      _(Ruby2JS.convert('', eslevel: 2024).eslevel).must_equal 2024
     end
   end
 

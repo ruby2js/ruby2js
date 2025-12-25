@@ -8,6 +8,7 @@ Rake::TestTask.new do |t|
   t.libs << "spec"
   t.test_files = FileList["spec/*_spec.rb"]
   t.verbose = true
+  t.warning = false  # Disabled: intentional method redefinitions for Ruby/JS dual targeting
 end
 
 task :default => :test
