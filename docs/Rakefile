@@ -395,8 +395,8 @@ task :ruby2js_tarball => [:selfhost_build, releases_dir] do
     version = "6.0.0-beta.#{Time.now.strftime('%Y%m%d%H%M')}"
     sh "npm version #{version} --no-git-tag-version --allow-same-version"
 
-    # Build and pack
-    sh "npm run pack"
+    # Pack only (build already done by :selfhost_build dependency)
+    sh "npm run pack:only"
 
     # Copy to releases with stable name
     tarball = Dir.glob("ruby2js-*.tgz").first

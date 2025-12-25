@@ -33,7 +33,8 @@
     "test:walker": "node test_walker.mjs",
     "test:all-specs": "node run_all_specs.mjs",
     "clean": "rm -rf dist filters ruby2js.js ruby2js-cli.js prism_browser.js",
-    "pack": "npm run build:prism-browser && npm run build:bundle && npm run build:filters && npm pack"
+    "pack": "npm run build:prism-browser && npm run build:bundle && npm run build:filters && npm pack",
+    "pack:only": "npm pack"
   },
   "keywords": [
     "ruby",
