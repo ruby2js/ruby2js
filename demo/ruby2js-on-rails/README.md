@@ -37,6 +37,47 @@ The same Ruby source code can be transpiled to run on different platforms:
 
 The target is determined by the database adapter in `config/database.yml` or the `DATABASE` environment variable. The runtime can be set via the `RUNTIME` environment variable (node, bun, or deno).
 
+## Selecting a Database Adapter
+
+### Browser Adapters
+
+For browser builds, two database adapters are available:
+
+| Adapter | Size | Persistence | Use Case |
+|---------|------|-------------|----------|
+| **dexie** (default) | ~50KB | Persistent (IndexedDB) | Most browser apps |
+| **sqljs** | ~2.7MB | In-memory only | Full SQL support, testing |
+
+**Using Dexie (default):**
+```bash
+npm run dev
+# Or explicitly:
+DATABASE=dexie npm run dev
+```
+
+**Using sql.js:**
+```bash
+DATABASE=sqljs npm run dev
+```
+
+Or edit `config/database.yml`:
+```yaml
+development:
+  adapter: sqljs
+  database: ruby2js_rails_dev
+```
+
+The sql.js adapter loads the ~2.7MB WASM file dynamically when the app starts. This is loaded on-demand, so apps using Dexie don't pay this cost.
+
+### Server Adapters
+
+For server builds (Node.js, Bun, Deno):
+
+```bash
+DATABASE=better_sqlite3 npm run dev:node   # SQLite (default for server)
+DATABASE=pg npm run dev:node               # PostgreSQL
+```
+
 ## Available Commands
 
 | Command | Description |
