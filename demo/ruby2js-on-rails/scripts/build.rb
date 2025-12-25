@@ -38,7 +38,7 @@ class SelfhostBuilder
   end
 
   # Browser databases - these run in the browser with IndexedDB or WASM
-  BROWSER_DATABASES = ['dexie', 'indexeddb', 'sqljs', 'sql.js'].freeze
+  BROWSER_DATABASES = ['dexie', 'indexeddb', 'sqljs', 'sql.js', 'pglite'].freeze
 
   # Server-side JavaScript runtimes
   SERVER_RUNTIMES = ['node', 'bun', 'deno'].freeze
@@ -50,12 +50,15 @@ class SelfhostBuilder
     'sql.js' => 'active_record_sqljs.mjs',
     'dexie' => 'active_record_dexie.mjs',
     'indexeddb' => 'active_record_dexie.mjs',
+    'pglite' => 'active_record_pglite.mjs',
     # Node.js adapters
     'better_sqlite3' => 'active_record_better_sqlite3.mjs',
     'sqlite3' => 'active_record_better_sqlite3.mjs',  # Alias
     'pg' => 'active_record_pg.mjs',
     'postgres' => 'active_record_pg.mjs',
-    'postgresql' => 'active_record_pg.mjs'
+    'postgresql' => 'active_record_pg.mjs',
+    'mysql2' => 'active_record_mysql2.mjs',
+    'mysql' => 'active_record_mysql2.mjs'
   }.freeze
 
   # Common transpilation options for Ruby files
