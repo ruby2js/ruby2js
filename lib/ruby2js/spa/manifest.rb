@@ -32,7 +32,7 @@ module Ruby2JS
     #   end
     #
     class Manifest
-      attr_reader :name, :mount_path, :runtime, :database
+      attr_reader :name, :mount_path, :runtime, :database, :root_route
       attr_reader :route_config, :model_config, :view_config
       attr_reader :controller_config, :stimulus_config, :sync_config
 
@@ -47,6 +47,7 @@ module Ruby2JS
       def initialize
         @runtime = :browser
         @database = :dexie
+        @root_route = nil
         @route_config = RouteConfig.new
         @model_config = ModelConfig.new
         @view_config = ViewConfig.new
@@ -74,6 +75,11 @@ module Ruby2JS
       def database(value = nil)
         return @database if value.nil?
         @database = value.to_sym
+      end
+
+      def root(value = nil)
+        return @root_route if value.nil?
+        @root_route = value
       end
 
       # Check if this is a browser-based SPA

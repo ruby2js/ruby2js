@@ -26,7 +26,8 @@ RUN rails generate scaffold Article title:string body:text && \
     rails db:migrate
 
 # Install SPA generator and build
-# Defaults: name=blog (from Rails app), runtime=browser, database=dexie
+# Auto-detects: name=blog, scaffolds=Article, root from routes.rb
+# Defaults: runtime=browser, database=dexie
 RUN rails generate ruby2js:spa:install && \
     rails ruby2js:spa:build
 
@@ -40,10 +41,6 @@ COPY --from=builder /app/blog/public/spa/blog /spa
 
 # Install and build
 RUN npm install && npm run build
-
-# Create stub seeds.js (scaffolds don't have seeds)
-RUN mkdir -p dist/db && \
-    echo 'export class Seeds { static run() {} }' > dist/db/seeds.js
 
 EXPOSE 3000
 

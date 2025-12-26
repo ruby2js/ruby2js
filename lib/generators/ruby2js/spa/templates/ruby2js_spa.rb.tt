@@ -19,24 +19,48 @@ Ruby2JS::Spa.configure do
   # Run `rails g ruby2js:spa:install --help` for valid combinations
   runtime :<%= options[:runtime] %>
   database :<%= options[:database] %>
+<% if @root_route %>
+
+  # Root route
+  root '<%= @root_route %>'
+<% end %>
 
   # Models: specify which models to include
   # Associations are automatically resolved - if you include a model,
   # its associated models (has_many, belongs_to) will be included too
   models do
-    include :Article  # Change to your model name
+<% if @detected_scaffolds.any? -%>
+<% @detected_scaffolds.each do |scaffold| -%>
+    include :<%= scaffold %>
+<% end -%>
+<% else -%>
+    # No models detected - add your models here
+    # include :Article
+<% end -%>
   end
 
   # Controllers: specify which controllers and actions to include
   controllers do
-    include :articles  # Change to your controller name
-    # include :comments, only: [:create, :destroy]  # Limit to specific actions
+<% if @detected_scaffolds.any? -%>
+<% @detected_scaffolds.each do |scaffold| -%>
+    include :<%= scaffold.underscore.pluralize %>
+<% end -%>
+<% else -%>
+    # No controllers detected - add your controllers here
+    # include :articles
+<% end -%>
   end
 
   # Views: ERB templates to transpile to JavaScript render functions
   views do
-    include 'articles/*.html.erb'  # Change to your views
-    # include 'comments/_form.html.erb'
+<% if @detected_scaffolds.any? -%>
+<% @detected_scaffolds.each do |scaffold| -%>
+    include '<%= scaffold.underscore.pluralize %>/*.html.erb'
+<% end -%>
+<% else -%>
+    # No views detected - add your view patterns here
+    # include 'articles/*.html.erb'
+<% end -%>
   end
 
   # Stimulus: JavaScript controllers to copy (not transpiled)

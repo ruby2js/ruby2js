@@ -14,13 +14,6 @@ module Ruby2js
       class_option :name, type: :string,
         desc: "Name of the SPA (defaults to Rails app name)"
 
-      def set_default_name
-        return if options[:name]
-        # Derive from Rails app name (e.g., Blog::Application -> blog)
-        app_name = Rails.application.class.module_parent_name.underscore rescue 'app'
-        @options = options.merge(name: app_name)
-      end
-
       class_option :mount_path, type: :string, default: '/offline',
         desc: "URL path where the SPA will be mounted"
 
@@ -29,6 +22,30 @@ module Ruby2js
 
       class_option :database, type: :string, default: 'dexie',
         desc: "Database adapter: dexie, sqljs, pglite, better_sqlite3, pg, or mysql"
+
+      class_option :scaffold, type: :array, default: [],
+        desc: "Scaffold(s) to include (default: auto-detect all)"
+
+      class_option :root, type: :string,
+        desc: "Root route (default: copy from Rails routes.rb)"
+
+      def set_defaults
+        # Derive name from Rails app name if not provided
+        unless options[:name]
+          app_name = Rails.application.class.module_parent_name.underscore rescue 'app'
+          @options = options.merge(name: app_name)
+        end
+
+        # Auto-detect scaffolds if none provided
+        if options[:scaffold].empty?
+          @detected_scaffolds = detect_scaffolds
+        else
+          @detected_scaffolds = options[:scaffold].map(&:capitalize)
+        end
+
+        # Detect root route if not provided
+        @root_route = options[:root] || detect_root_route
+      end
 
       # Valid runtime/database combinations
       VALID_COMBINATIONS = {
@@ -80,8 +97,14 @@ module Ruby2js
         say ""
         say "Ruby2JS SPA installed!", :green
         say ""
+        say "Configuration:"
+        say "  Runtime:  #{options[:runtime]}"
+        say "  Database: #{options[:database]}"
+        say "  Scaffolds: #{@detected_scaffolds.any? ? @detected_scaffolds.join(', ') : '(none detected)'}"
+        say "  Root: #{@root_route || '(none)'}"
+        say ""
         say "Next steps:"
-        say "  1. Edit config/ruby2js_spa.rb to configure your SPA"
+        say "  1. Review config/ruby2js_spa.rb"
         say "  2. Run: rails ruby2js:spa:build"
         say "  3. Visit: #{options[:mount_path]}/"
         say ""
@@ -90,6 +113,43 @@ module Ruby2js
         say "  rails ruby2js:spa:clean  - Remove generated files"
         say "  rails ruby2js:spa:info   - Show configuration"
         say ""
+      end
+
+      private
+
+      # Detect models that have corresponding controllers (scaffolds)
+      def detect_scaffolds
+        models_dir = Rails.root.join('app', 'models')
+        controllers_dir = Rails.root.join('app', 'controllers')
+
+        return [] unless Dir.exist?(models_dir) && Dir.exist?(controllers_dir)
+
+        scaffolds = []
+        Dir.glob(models_dir.join('*.rb')).each do |model_file|
+          model_name = File.basename(model_file, '.rb')
+          next if model_name == 'application_record'
+
+          # Check if corresponding controller exists
+          controller_file = controllers_dir.join("#{model_name.pluralize}_controller.rb")
+          if File.exist?(controller_file)
+            scaffolds << model_name.camelize
+          end
+        end
+
+        scaffolds.sort
+      end
+
+      # Detect root route from config/routes.rb
+      def detect_root_route
+        routes_file = Rails.root.join('config', 'routes.rb')
+        return nil unless File.exist?(routes_file)
+
+        content = File.read(routes_file)
+        # Match: root "controller#action" or root 'controller#action' or root to: "controller#action"
+        if content =~ /root\s+["']([^"']+)["']/ ||
+           content =~ /root\s+to:\s*["']([^"']+)["']/
+          $1
+        end
       end
     end
   end

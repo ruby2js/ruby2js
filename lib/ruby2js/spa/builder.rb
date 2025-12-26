@@ -46,6 +46,7 @@ module Ruby2JS
         generate_ruby2js_yml
         generate_routes_rb
         generate_schema_rb
+        copy_or_generate_seeds
 
         # Generate package.json
         generate_package_json
@@ -271,8 +272,8 @@ module Ruby2JS
         routes << "Rails.application.routes.draw do"
 
         # Add root route if specified
-        if manifest.route_config.respond_to?(:root_path) && manifest.route_config.root_path
-          routes << "  root \"#{manifest.route_config.root_path}\""
+        if manifest.root_route
+          routes << "  root \"#{manifest.root_route}\""
           routes << ""
         end
 
@@ -319,6 +320,29 @@ module Ruby2JS
           RUBY
 
           File.write(schema_dst, schema)
+        end
+      end
+
+      def copy_or_generate_seeds
+        seeds_src = File.join(@rails_root, 'db', 'seeds.rb')
+        seeds_dst = File.join(output_dir, 'db', 'seeds.rb')
+
+        if File.exist?(seeds_src)
+          # Copy existing seeds file (will be transpiled by npm run build)
+          FileUtils.cp(seeds_src, seeds_dst)
+        else
+          # Generate empty Seeds module (rails/seeds filter expects module Seeds with def self.run)
+          File.write(seeds_dst, <<~RUBY)
+            # Seeds for #{manifest.name}
+            # This file is transpiled to JavaScript by the rails/seeds filter
+
+            module Seeds
+              def self.run
+                # Add your seed data here, e.g.:
+                # Article.create(title: "Hello World", body: "Welcome!")
+              end
+            end
+          RUBY
         end
       end
 
