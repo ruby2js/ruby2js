@@ -35,7 +35,7 @@ describe Ruby2JS::Filter::Rails::Schema do
   end
 
   describe "create_table" do
-    it "generates CREATE TABLE statement" do
+    it "generates createTable call" do
       result = to_js(<<~RUBY)
         ActiveRecord::Schema.define do
           create_table "articles" do |t|
@@ -43,7 +43,7 @@ describe Ruby2JS::Filter::Rails::Schema do
           end
         end
       RUBY
-      assert_includes result, 'CREATE TABLE IF NOT EXISTS articles'
+      assert_includes result, 'createTable("articles"'
     end
 
     it "adds id primary key by default" do
@@ -54,12 +54,12 @@ describe Ruby2JS::Filter::Rails::Schema do
           end
         end
       RUBY
-      assert_includes result, 'id INTEGER PRIMARY KEY AUTOINCREMENT'
+      assert_includes result, 'name: "id", type: "integer", primaryKey: true, autoIncrement: true'
     end
   end
 
   describe "column types" do
-    it "maps string to TEXT" do
+    it "uses abstract string type" do
       result = to_js(<<~RUBY)
         ActiveRecord::Schema.define do
           create_table "articles" do |t|
@@ -67,10 +67,10 @@ describe Ruby2JS::Filter::Rails::Schema do
           end
         end
       RUBY
-      assert_includes result, 'title TEXT'
+      assert_includes result, 'name: "title", type: "string"'
     end
 
-    it "maps text to TEXT" do
+    it "uses abstract text type" do
       result = to_js(<<~RUBY)
         ActiveRecord::Schema.define do
           create_table "articles" do |t|
@@ -78,10 +78,10 @@ describe Ruby2JS::Filter::Rails::Schema do
           end
         end
       RUBY
-      assert_includes result, 'body TEXT'
+      assert_includes result, 'name: "body", type: "text"'
     end
 
-    it "maps integer to INTEGER" do
+    it "uses abstract integer type" do
       result = to_js(<<~RUBY)
         ActiveRecord::Schema.define do
           create_table "articles" do |t|
@@ -89,10 +89,10 @@ describe Ruby2JS::Filter::Rails::Schema do
           end
         end
       RUBY
-      assert_includes result, 'count INTEGER'
+      assert_includes result, 'name: "count", type: "integer"'
     end
 
-    it "maps boolean to INTEGER" do
+    it "uses abstract boolean type" do
       result = to_js(<<~RUBY)
         ActiveRecord::Schema.define do
           create_table "articles" do |t|
@@ -100,10 +100,10 @@ describe Ruby2JS::Filter::Rails::Schema do
           end
         end
       RUBY
-      assert_includes result, 'published INTEGER'
+      assert_includes result, 'name: "published", type: "boolean"'
     end
 
-    it "maps datetime to TEXT" do
+    it "uses abstract datetime type" do
       result = to_js(<<~RUBY)
         ActiveRecord::Schema.define do
           create_table "articles" do |t|
@@ -111,10 +111,10 @@ describe Ruby2JS::Filter::Rails::Schema do
           end
         end
       RUBY
-      assert_includes result, 'published_at TEXT'
+      assert_includes result, 'name: "published_at", type: "datetime"'
     end
 
-    it "maps float to REAL" do
+    it "uses abstract float type" do
       result = to_js(<<~RUBY)
         ActiveRecord::Schema.define do
           create_table "articles" do |t|
@@ -122,7 +122,7 @@ describe Ruby2JS::Filter::Rails::Schema do
           end
         end
       RUBY
-      assert_includes result, 'rating REAL'
+      assert_includes result, 'name: "rating", type: "float"'
     end
   end
 
@@ -135,7 +135,7 @@ describe Ruby2JS::Filter::Rails::Schema do
           end
         end
       RUBY
-      assert_includes result, 'title TEXT NOT NULL'
+      assert_includes result, 'name: "title", type: "string", null: false'
     end
 
     it "handles default string value" do
@@ -146,7 +146,7 @@ describe Ruby2JS::Filter::Rails::Schema do
           end
         end
       RUBY
-      assert_includes result, "DEFAULT 'draft'"
+      assert_includes result, 'default: "draft"'
     end
 
     it "handles default integer value" do
@@ -157,7 +157,7 @@ describe Ruby2JS::Filter::Rails::Schema do
           end
         end
       RUBY
-      assert_includes result, 'DEFAULT 0'
+      assert_includes result, 'default: 0'
     end
 
     it "handles default boolean value" do
@@ -168,7 +168,7 @@ describe Ruby2JS::Filter::Rails::Schema do
           end
         end
       RUBY
-      assert_includes result, 'DEFAULT 0'
+      assert_includes result, 'default: false'
     end
   end
 
@@ -182,8 +182,8 @@ describe Ruby2JS::Filter::Rails::Schema do
           end
         end
       RUBY
-      assert_includes result, 'created_at TEXT'
-      assert_includes result, 'updated_at TEXT'
+      assert_includes result, 'name: "created_at", type: "datetime"'
+      assert_includes result, 'name: "updated_at", type: "datetime"'
     end
   end
 
@@ -196,10 +196,10 @@ describe Ruby2JS::Filter::Rails::Schema do
           end
         end
       RUBY
-      assert_includes result, 'article_id INTEGER'
+      assert_includes result, 'name: "article_id", type: "integer"'
     end
 
-    it "adds NOT NULL by default" do
+    it "adds null: false by default" do
       result = to_js(<<~RUBY)
         ActiveRecord::Schema.define do
           create_table "comments" do |t|
@@ -207,7 +207,7 @@ describe Ruby2JS::Filter::Rails::Schema do
           end
         end
       RUBY
-      assert_includes result, 'article_id INTEGER NOT NULL'
+      assert_includes result, 'name: "article_id", type: "integer", null: false'
     end
 
     it "adds foreign key constraint when specified" do
@@ -218,12 +218,14 @@ describe Ruby2JS::Filter::Rails::Schema do
           end
         end
       RUBY
-      assert_includes result, 'FOREIGN KEY (article_id) REFERENCES articles(id)'
+      assert_includes result, 'foreignKeys'
+      assert_includes result, 'column: "article_id"'
+      assert_includes result, 'references: "articles"'
     end
   end
 
   describe "add_index" do
-    it "creates index on single column" do
+    it "creates addIndex call on single column" do
       result = to_js(<<~RUBY)
         ActiveRecord::Schema.define do
           create_table "articles" do |t|
@@ -232,11 +234,10 @@ describe Ruby2JS::Filter::Rails::Schema do
           add_index "articles", ["title"]
         end
       RUBY
-      assert_includes result, 'CREATE INDEX IF NOT EXISTS'
-      assert_includes result, 'ON articles(title)'
+      assert_includes result, 'addIndex("articles", ["title"]'
     end
 
-    it "creates index on multiple columns" do
+    it "creates addIndex call on multiple columns" do
       result = to_js(<<~RUBY)
         ActiveRecord::Schema.define do
           create_table "articles" do |t|
@@ -246,7 +247,8 @@ describe Ruby2JS::Filter::Rails::Schema do
           add_index "articles", ["status", "created_at"]
         end
       RUBY
-      assert_includes result, 'ON articles(status, created_at)'
+      assert_includes result, 'addIndex'
+      assert_includes result, '"status", "created_at"'
     end
 
     it "creates unique index when specified" do
@@ -258,7 +260,7 @@ describe Ruby2JS::Filter::Rails::Schema do
           add_index "users", ["email"], unique: true
         end
       RUBY
-      assert_includes result, 'CREATE UNIQUE INDEX'
+      assert_includes result, 'unique: true'
     end
 
     it "uses custom index name when specified" do
@@ -298,7 +300,7 @@ describe Ruby2JS::Filter::Rails::Schema do
       assert_includes result, 'return {create_tables}'
     end
 
-    it "imports execSQL from adapter and uses it for SQL execution" do
+    it "imports createTable and addIndex from adapter" do
       result = to_js(<<~RUBY)
         ActiveRecord::Schema.define do
           create_table "articles" do |t|
@@ -306,8 +308,8 @@ describe Ruby2JS::Filter::Rails::Schema do
           end
         end
       RUBY
-      assert_includes result, 'import { execSQL } from "../lib/active_record.mjs"'
-      assert_includes result, 'execSQL('
+      assert_includes result, 'import { createTable, addIndex } from "../lib/active_record.mjs"'
+      assert_includes result, 'createTable('
     end
   end
 end
