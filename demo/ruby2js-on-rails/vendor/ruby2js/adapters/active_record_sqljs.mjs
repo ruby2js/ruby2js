@@ -58,9 +58,74 @@ export async function initDatabase(options = {}) {
   return db;
 }
 
-// Execute raw SQL (for schema creation)
+// Execute raw SQL (for schema creation) - legacy, prefer createTable/addIndex
 export function execSQL(sql) {
   return db.exec(sql);
+}
+
+// SQLite type mapping from abstract Rails types
+const SQLITE_TYPE_MAP = {
+  string: 'TEXT',
+  text: 'TEXT',
+  integer: 'INTEGER',
+  bigint: 'INTEGER',
+  float: 'REAL',
+  decimal: 'REAL',
+  boolean: 'INTEGER',
+  date: 'TEXT',
+  datetime: 'TEXT',
+  time: 'TEXT',
+  timestamp: 'TEXT',
+  binary: 'BLOB',
+  json: 'TEXT',
+  jsonb: 'TEXT'
+};
+
+// Abstract DDL interface - creates SQLite tables from abstract schema
+export function createTable(tableName, columns, options = {}) {
+  const columnDefs = columns.map(col => {
+    const sqlType = SQLITE_TYPE_MAP[col.type] || 'TEXT';
+    let def = `${col.name} ${sqlType}`;
+
+    if (col.primaryKey) {
+      def += ' PRIMARY KEY';
+      if (col.autoIncrement) def += ' AUTOINCREMENT';
+    }
+    if (col.null === false) def += ' NOT NULL';
+    if (col.default !== undefined) {
+      def += ` DEFAULT ${formatDefaultValue(col.default)}`;
+    }
+
+    return def;
+  });
+
+  // Add foreign key constraints
+  if (options.foreignKeys) {
+    for (const fk of options.foreignKeys) {
+      columnDefs.push(
+        `FOREIGN KEY (${fk.column}) REFERENCES ${fk.references}(${fk.primaryKey})`
+      );
+    }
+  }
+
+  const sql = `CREATE TABLE IF NOT EXISTS ${tableName} (${columnDefs.join(', ')})`;
+  return db.exec(sql);
+}
+
+export function addIndex(tableName, columns, options = {}) {
+  const unique = options.unique ? 'UNIQUE ' : '';
+  const indexName = options.name || `idx_${tableName}_${columns.join('_')}`;
+  const columnList = Array.isArray(columns) ? columns.join(', ') : columns;
+
+  const sql = `CREATE ${unique}INDEX IF NOT EXISTS ${indexName} ON ${tableName}(${columnList})`;
+  return db.exec(sql);
+}
+
+function formatDefaultValue(value) {
+  if (value === null) return 'NULL';
+  if (typeof value === 'string') return `'${value.replace(/'/g, "''")}'`;
+  if (typeof value === 'boolean') return value ? '1' : '0';
+  return String(value);
 }
 
 // Get the raw database instance

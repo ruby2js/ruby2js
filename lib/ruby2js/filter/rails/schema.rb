@@ -7,23 +7,8 @@ module Ruby2JS
       module Schema
         include SEXP
 
-        # SQLite type mapping
-        TYPE_MAP = {
-          string: 'TEXT',
-          text: 'TEXT',
-          integer: 'INTEGER',
-          bigint: 'INTEGER',
-          float: 'REAL',
-          decimal: 'REAL',
-          boolean: 'INTEGER',
-          date: 'TEXT',
-          datetime: 'TEXT',
-          time: 'TEXT',
-          timestamp: 'TEXT',
-          binary: 'BLOB',
-          json: 'TEXT',
-          jsonb: 'TEXT',
-        }.freeze
+        # No TYPE_MAP here - adapters handle type mapping
+        # We keep abstract Rails types: string, text, integer, boolean, datetime, etc.
 
         def initialize(*args)
           # Note: super must be called first for JS class compatibility
@@ -144,8 +129,9 @@ module Ruby2JS
           unless options[:id] == false
             columns << {
               name: 'id',
-              type: 'INTEGER',
-              constraints: ['PRIMARY KEY', 'AUTOINCREMENT']
+              type: 'integer',
+              primaryKey: true,
+              autoIncrement: true
             }
           end
 
@@ -188,8 +174,8 @@ module Ruby2JS
             # Add created_at and updated_at columns
             return {
               columns: [
-                { name: 'created_at', type: 'TEXT', constraints: [] },
-                { name: 'updated_at', type: 'TEXT', constraints: [] }
+                { name: 'created_at', type: 'datetime' },
+                { name: 'updated_at', type: 'datetime' }
               ]
             }
           when :references, :belongs_to
@@ -205,8 +191,11 @@ module Ruby2JS
           column_name = extract_string_value(args[0])
           return nil unless column_name
 
-          sql_type = TYPE_MAP[type] || 'TEXT'
-          constraints = []
+          # Keep abstract Rails type (string, text, integer, etc.)
+          column = {
+            name: column_name,
+            type: type.to_s
+          }
 
           # Process options
           args[1..-1].each do |arg|
@@ -219,25 +208,20 @@ module Ruby2JS
 
               case key.children[0]
               when :null
-                constraints << 'NOT NULL' if value.type == :false
+                column[:null] = (value.type != :false)
               when :default
-                default_value = extract_default_value(value)
-                constraints << "DEFAULT #{default_value}" if default_value
+                column[:default] = extract_default_value(value)
               when :limit
-                # For string columns, limit doesn't matter in SQLite
-              when :precision, :scale
-                # Decimal precision/scale not relevant for SQLite
+                column[:limit] = value.children[0] if value.type == :int
+              when :precision
+                column[:precision] = value.children[0] if value.type == :int
+              when :scale
+                column[:scale] = value.children[0] if value.type == :int
               end
             end
           end
 
-          {
-            column: {
-              name: column_name,
-              type: sql_type,
-              constraints: constraints
-            }
-          }
+          { column: column }
         end
 
         def process_references(args, table_name)
@@ -247,7 +231,11 @@ module Ruby2JS
           return nil unless ref_name
 
           column_name = "#{ref_name}_id"
-          constraints = ['NOT NULL']
+          column = {
+            name: column_name,
+            type: 'integer',
+            null: false
+          }
           foreign_key = nil
 
           # Process options
@@ -261,7 +249,7 @@ module Ruby2JS
 
               case key.children[0]
               when :null
-                constraints.delete('NOT NULL') if value.type == :true
+                column[:null] = true if value.type == :true
               when :foreign_key
                 if value.type == :true
                   # Infer table name from reference name
@@ -287,17 +275,13 @@ module Ruby2JS
                 end
               when :polymorphic
                 # Polymorphic associations add a type column
-                # Not fully supported in simple SQL
+                # Not fully supported yet
               end
             end
           end
 
           {
-            column: {
-              name: column_name,
-              type: 'INTEGER',
-              constraints: constraints
-            },
+            column: column,
             foreign_key: foreign_key
           }
         end
@@ -377,17 +361,18 @@ module Ruby2JS
         end
 
         def extract_default_value(node)
+          # Return abstract Ruby values, not SQL-formatted strings
           case node.type
           when :str
-            "'#{node.children[0].gsub("'", "''")}'"
+            node.children[0]
           when :int, :float
-            node.children[0].to_s
+            node.children[0]
           when :true
-            '1'
+            true
           when :false
-            '0'
+            false
           when :nil
-            'NULL'
+            nil
           else
             nil
           end
@@ -397,27 +382,26 @@ module Ruby2JS
           # Build the create_tables method body
           statements = []
 
-          # Generate CREATE TABLE statements
+          # Generate createTable calls
           @rails_tables.each do |table|
-            statements << build_create_table_statement(table)
+            statements << build_create_table_call(table)
           end
 
-          # Generate CREATE INDEX statements
+          # Generate addIndex calls
           @rails_indexes.each do |index|
-            statements << build_create_index_statement(index)
+            statements << build_add_index_call(index)
           end
 
           # Build method body
           method_body = statements.length == 1 ? statements.first : s(:begin, *statements)
 
-          # No db parameter - uses imported execSQL from adapter
           create_tables_method = s(:defs, s(:self), :create_tables,
             s(:args),
             method_body)
 
-          # Import execSQL from adapter and export the module
+          # Import createTable, addIndex from adapter
           import_stmt = s(:send, nil, :import,
-            s(:array, s(:const, nil, :execSQL)),
+            s(:array, s(:const, nil, :createTable), s(:const, nil, :addIndex)),
             s(:str, '../lib/active_record.mjs'))
 
           schema_module = s(:send, nil, :export,
@@ -426,45 +410,62 @@ module Ruby2JS
           process(s(:begin, import_stmt, schema_module))
         end
 
-        def build_create_table_statement(table)
-          # Build column definitions
-          column_defs = []
-
-          table[:columns].each do |col|
-            col_def = "#{col[:name]} #{col[:type]}"
-            col_def += " #{col[:constraints].join(' ')}" if col[:constraints]&.any?
-            column_defs << col_def
+        def build_create_table_call(table)
+          # Build column definitions as array of hashes
+          columns_ast = table[:columns].map do |col|
+            pairs = [s(:pair, s(:sym, :name), s(:str, col[:name]))]
+            pairs << s(:pair, s(:sym, :type), s(:str, col[:type]))
+            pairs << s(:pair, s(:sym, :primaryKey), s(:true)) if col[:primaryKey]
+            pairs << s(:pair, s(:sym, :autoIncrement), s(:true)) if col[:autoIncrement]
+            pairs << s(:pair, s(:sym, :null), col[:null] ? s(:true) : s(:false)) if col.key?(:null)
+            pairs << s(:pair, s(:sym, :default), value_to_ast(col[:default])) if col.key?(:default)
+            pairs << s(:pair, s(:sym, :limit), s(:int, col[:limit])) if col[:limit]
+            pairs << s(:pair, s(:sym, :precision), s(:int, col[:precision])) if col[:precision]
+            pairs << s(:pair, s(:sym, :scale), s(:int, col[:scale])) if col[:scale]
+            s(:hash, *pairs)
           end
 
-          # Add timestamps if any column had timestamps: true
-          # (handled by detecting t.timestamps in process_column)
-
-          # Check if we need to add timestamps
-          has_timestamps = @rails_tables.any? do |t|
-            t[:name] == table[:name] && t[:columns].none? { |c| c[:name] == 'created_at' }
+          # Build foreign keys array if present
+          fk_ast = table[:foreign_keys].compact.map do |fk|
+            s(:hash,
+              s(:pair, s(:sym, :column), s(:str, fk[:column])),
+              s(:pair, s(:sym, :references), s(:str, fk[:references_table])),
+              s(:pair, s(:sym, :primaryKey), s(:str, fk[:references_column])))
           end
 
-          # Add foreign key constraints
-          table[:foreign_keys].compact.each do |fk|
-            column_defs << "FOREIGN KEY (#{fk[:column]}) REFERENCES #{fk[:references_table]}(#{fk[:references_column]})"
-          end
+          # Build options hash
+          options_pairs = []
+          options_pairs << s(:pair, s(:sym, :foreignKeys), s(:array, *fk_ast)) if fk_ast.any?
 
-          sql = "CREATE TABLE IF NOT EXISTS #{table[:name]} (\n"
-          sql += column_defs.map { |d| "        #{d}" }.join(",\n")
-          sql += "\n      )"
+          args = [s(:str, table[:name]), s(:array, *columns_ast)]
+          args << s(:hash, *options_pairs) if options_pairs.any?
 
-          # execSQL(sql) - uses imported function from adapter
-          s(:send, nil, :execSQL, s(:str, sql))
+          s(:send, nil, :createTable, *args)
         end
 
-        def build_create_index_statement(index)
-          unique = index[:unique] ? 'UNIQUE ' : ''
-          columns = index[:columns].join(', ')
+        def build_add_index_call(index)
+          columns_ast = s(:array, *index[:columns].map { |c| s(:str, c) })
 
-          sql = "CREATE #{unique}INDEX IF NOT EXISTS #{index[:name]} ON #{index[:table]}(#{columns})"
+          options_pairs = []
+          options_pairs << s(:pair, s(:sym, :name), s(:str, index[:name])) if index[:name]
+          options_pairs << s(:pair, s(:sym, :unique), s(:true)) if index[:unique]
 
-          # execSQL(sql) - uses imported function from adapter
-          s(:send, nil, :execSQL, s(:str, sql))
+          args = [s(:str, index[:table]), columns_ast]
+          args << s(:hash, *options_pairs) if options_pairs.any?
+
+          s(:send, nil, :addIndex, *args)
+        end
+
+        def value_to_ast(value)
+          case value
+          when String then s(:str, value)
+          when Integer then s(:int, value)
+          when Float then s(:float, value)
+          when true then s(:true)
+          when false then s(:false)
+          when nil then s(:nil)
+          else s(:nil)
+          end
         end
       end
     end

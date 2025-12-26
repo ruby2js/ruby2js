@@ -47,10 +47,23 @@ export async function openDatabase() {
   return db;
 }
 
-// Execute raw SQL - not supported in Dexie, provided for compatibility
+// Execute raw SQL - not supported in Dexie (legacy, use createTable/addIndex)
 export function execSQL(sql) {
-  console.warn('execSQL not supported with Dexie adapter, use Dexie API directly');
+  // No-op for Dexie - schemas are registered by model classes via registerSchema()
   return [];
+}
+
+// Abstract DDL interface - Dexie schemas are registered by model classes
+// These functions are called by the transpiled schema.js but are no-ops for Dexie
+// because Dexie uses registerSchema() from model classes instead.
+export function createTable(tableName, columns, options = {}) {
+  // No-op - Dexie models self-register their schemas via registerSchema()
+  // The schema is already set up before create_tables() is called
+}
+
+export function addIndex(tableName, columns, options = {}) {
+  // No-op - Dexie indexes are defined in registerSchema()
+  // Example: registerSchema('articles', '++id, title, created_at')
 }
 
 // Get the raw database instance

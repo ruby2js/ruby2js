@@ -55,10 +55,101 @@ export async function initDatabase(options = {}) {
   return pool;
 }
 
-// Execute raw SQL (for schema creation)
+// Execute raw SQL (for schema creation) - legacy, prefer createTable/addIndex
 export async function execSQL(sql) {
   const [result] = await pool.query(sql);
   return result;
+}
+
+// MySQL type mapping from abstract Rails types
+const MYSQL_TYPE_MAP = {
+  string: 'VARCHAR(255)',
+  text: 'TEXT',
+  integer: 'INT',
+  bigint: 'BIGINT',
+  float: 'DOUBLE',
+  decimal: 'DECIMAL',
+  boolean: 'TINYINT(1)',
+  date: 'DATE',
+  datetime: 'DATETIME',
+  time: 'TIME',
+  timestamp: 'TIMESTAMP',
+  binary: 'BLOB',
+  json: 'JSON',
+  jsonb: 'JSON'
+};
+
+// Abstract DDL interface - creates MySQL tables from abstract schema
+export async function createTable(tableName, columns, options = {}) {
+  const columnDefs = columns.map(col => {
+    const sqlType = getMysqlType(col);
+    let def = `${col.name} ${sqlType}`;
+
+    if (col.primaryKey) {
+      def += ' PRIMARY KEY';
+      if (col.autoIncrement) def += ' AUTO_INCREMENT';
+    }
+    if (col.null === false) def += ' NOT NULL';
+    if (col.default !== undefined) {
+      def += ` DEFAULT ${formatDefaultValue(col.default, col.type)}`;
+    }
+
+    return def;
+  });
+
+  // Add foreign key constraints
+  if (options.foreignKeys) {
+    for (const fk of options.foreignKeys) {
+      columnDefs.push(
+        `FOREIGN KEY (${fk.column}) REFERENCES ${fk.references}(${fk.primaryKey})`
+      );
+    }
+  }
+
+  const sql = `CREATE TABLE IF NOT EXISTS ${tableName} (${columnDefs.join(', ')}) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`;
+  const [result] = await pool.query(sql);
+  return result;
+}
+
+export async function addIndex(tableName, columns, options = {}) {
+  const unique = options.unique ? 'UNIQUE ' : '';
+  const indexName = options.name || `idx_${tableName}_${columns.join('_')}`;
+  const columnList = Array.isArray(columns) ? columns.join(', ') : columns;
+
+  // MySQL doesn't support IF NOT EXISTS for CREATE INDEX, so we check first
+  const sql = `CREATE ${unique}INDEX ${indexName} ON ${tableName}(${columnList})`;
+  try {
+    const [result] = await pool.query(sql);
+    return result;
+  } catch (e) {
+    // Ignore duplicate key name error (index already exists)
+    if (e.code !== 'ER_DUP_KEYNAME') throw e;
+  }
+}
+
+function getMysqlType(col) {
+  let baseType = MYSQL_TYPE_MAP[col.type] || 'TEXT';
+
+  // Handle precision/scale for decimal
+  if (col.type === 'decimal' && (col.precision || col.scale)) {
+    const precision = col.precision || 10;
+    const scale = col.scale || 0;
+    baseType = `DECIMAL(${precision}, ${scale})`;
+  }
+
+  // Handle limit for string
+  if (col.type === 'string' && col.limit) {
+    baseType = `VARCHAR(${col.limit})`;
+  }
+
+  return baseType;
+}
+
+function formatDefaultValue(value, type) {
+  if (value === null) return 'NULL';
+  if (typeof value === 'string') return `'${value.replace(/'/g, "''")}'`;
+  if (typeof value === 'boolean') return value ? '1' : '0';
+  return String(value);
 }
 
 // Get the raw database pool

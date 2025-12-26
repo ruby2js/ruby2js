@@ -54,10 +54,97 @@ export async function initDatabase(options = {}) {
   return db;
 }
 
-// Execute raw SQL (for schema creation, migrations)
+// Execute raw SQL (for schema creation, migrations) - legacy, prefer createTable/addIndex
 export async function execSQL(sql) {
   // exec() supports multiple statements, good for migrations
   return await db.exec(sql);
+}
+
+// PostgreSQL type mapping from abstract Rails types
+const PG_TYPE_MAP = {
+  string: 'VARCHAR(255)',
+  text: 'TEXT',
+  integer: 'INTEGER',
+  bigint: 'BIGINT',
+  float: 'DOUBLE PRECISION',
+  decimal: 'DECIMAL',
+  boolean: 'BOOLEAN',
+  date: 'DATE',
+  datetime: 'TIMESTAMP',
+  time: 'TIME',
+  timestamp: 'TIMESTAMP',
+  binary: 'BYTEA',
+  json: 'JSON',
+  jsonb: 'JSONB'
+};
+
+// Abstract DDL interface - creates PostgreSQL tables from abstract schema
+export async function createTable(tableName, columns, options = {}) {
+  const columnDefs = columns.map(col => {
+    let def;
+
+    if (col.primaryKey && col.autoIncrement) {
+      // PostgreSQL uses SERIAL for auto-incrementing primary keys
+      def = `${col.name} SERIAL PRIMARY KEY`;
+    } else {
+      const sqlType = getPgType(col);
+      def = `${col.name} ${sqlType}`;
+
+      if (col.primaryKey) def += ' PRIMARY KEY';
+      if (col.null === false) def += ' NOT NULL';
+      if (col.default !== undefined) {
+        def += ` DEFAULT ${formatDefaultValue(col.default, col.type)}`;
+      }
+    }
+
+    return def;
+  });
+
+  // Add foreign key constraints
+  if (options.foreignKeys) {
+    for (const fk of options.foreignKeys) {
+      columnDefs.push(
+        `FOREIGN KEY (${fk.column}) REFERENCES ${fk.references}(${fk.primaryKey})`
+      );
+    }
+  }
+
+  const sql = `CREATE TABLE IF NOT EXISTS ${tableName} (${columnDefs.join(', ')})`;
+  return db.exec(sql);
+}
+
+export async function addIndex(tableName, columns, options = {}) {
+  const unique = options.unique ? 'UNIQUE ' : '';
+  const indexName = options.name || `idx_${tableName}_${columns.join('_')}`;
+  const columnList = Array.isArray(columns) ? columns.join(', ') : columns;
+
+  const sql = `CREATE ${unique}INDEX IF NOT EXISTS ${indexName} ON ${tableName}(${columnList})`;
+  return db.exec(sql);
+}
+
+function getPgType(col) {
+  let baseType = PG_TYPE_MAP[col.type] || 'TEXT';
+
+  // Handle precision/scale for decimal
+  if (col.type === 'decimal' && (col.precision || col.scale)) {
+    const precision = col.precision || 10;
+    const scale = col.scale || 0;
+    baseType = `DECIMAL(${precision}, ${scale})`;
+  }
+
+  // Handle limit for string
+  if (col.type === 'string' && col.limit) {
+    baseType = `VARCHAR(${col.limit})`;
+  }
+
+  return baseType;
+}
+
+function formatDefaultValue(value, type) {
+  if (value === null) return 'NULL';
+  if (typeof value === 'string') return `'${value.replace(/'/g, "''")}'`;
+  if (typeof value === 'boolean') return value ? 'TRUE' : 'FALSE';
+  return String(value);
 }
 
 // Get the raw database instance
