@@ -135,11 +135,20 @@ module Ruby2JS
       add_implicit_block = false
       contains_await = false
 
+      # Node types that create new function scopes - don't look for await inside these
+      function_boundaries = [:def, :defs, :deff, :defm, :async, :block, :lambda]
+
       walk = ->(node) do
         add_implicit_block = true if node.type == :yield || (node.type == :send && node.children[1] == "_implicitBlockYield")
-        # Detect await nodes - if body contains await, function must be async
-        contains_await = true if node.type == :await || node.type == :await!
+        # Detect await - can be :await/:await! node types OR send(nil, :await, ...) before transformation
+        if node.type == :await || node.type == :await!
+          contains_await = true
+        elsif node.type == :send && node.children[0].nil? && [:await, :await!].include?(node.children[1])
+          contains_await = true
+        end
         node.children.each do |child|
+          # Don't recurse into nested functions for await detection
+          next if ast_node?(child) && function_boundaries.include?(child.type)
           walk.call(child) if ast_node?(child)
         end
       end
