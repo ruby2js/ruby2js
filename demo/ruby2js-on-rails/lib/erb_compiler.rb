@@ -65,7 +65,7 @@ class ErbCompiler
         # Output expression: <%= expr %>
         expr = tag[1..-1].strip
         # Check if this is a block expression using Rails' BLOCK_EXPR regex
-        if BLOCK_EXPR.match?(expr)
+        if expr =~ BLOCK_EXPR
           # Block expression: use .append= pattern that ERB filter expects
           ruby_code += " _buf.append= #{expr}\n"
         else

@@ -73,7 +73,7 @@ export class ErbCompiler {
         let expr = tag.slice(1).trim();
 
         // Check if this is a block expression using Rails' BLOCK_EXPR regex
-        if (ErbCompiler.BLOCK_EXPR.match(expr)) {
+        if (ErbCompiler.BLOCK_EXPR.test(expr)) {
           // Block expression: use .append= pattern that ERB filter expects
           ruby_code += ` _buf.append= ${expr}\n`
         } else {
