@@ -1,13 +1,12 @@
 // ERB to Ruby compiler for Ruby2JS-on-Rails
 // This produces Ruby code that can be transpiled to JavaScript.
 // Both Ruby and selfhost builds use this same compiler for consistency.
-
-// Block expression regex from Rails ActionView (erubi.rb)
-// Matches: ") do |...|", " do |...|", "{ |...|", etc.
-const BLOCK_EXPR = /((\s|\))do|\{)(\s*\|[^|]*\|)?\s*$/;
-
 export class ErbCompiler {
   #template;
+
+  // Block expression regex from Rails ActionView (erubi.rb)
+  // Matches: ") do |...|", " do |...|", "{ |...|", etc.
+  static BLOCK_EXPR = /((\s|\))do|\{)(\s*\|[^|]*\|)?\s*$/;
 
   constructor(template) {
     this.#template = template
@@ -74,7 +73,7 @@ export class ErbCompiler {
         let expr = tag.slice(1).trim();
 
         // Check if this is a block expression using Rails' BLOCK_EXPR regex
-        if (BLOCK_EXPR.test(expr)) {
+        if (ErbCompiler.BLOCK_EXPR.match(expr)) {
           // Block expression: use .append= pattern that ERB filter expects
           ruby_code += ` _buf.append= ${expr}\n`
         } else {

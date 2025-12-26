@@ -37,7 +37,7 @@ module Ruby2JS
         return super if @esm_top
 
         list = [node]
-        while list.length == 1 and list.first.type == :begin
+        while list.length == 1 and list.first.respond_to?(:type) and list.first.type == :begin
           list = list.first.children.dup
         end
 
