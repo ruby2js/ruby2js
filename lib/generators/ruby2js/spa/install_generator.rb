@@ -146,8 +146,9 @@ module Ruby2js
 
         content = File.read(routes_file)
         # Match: root "controller#action" or root 'controller#action' or root to: "controller#action"
-        if content =~ /root\s+["']([^"']+)["']/ ||
-           content =~ /root\s+to:\s*["']([^"']+)["']/
+        # Anchor to start of line to avoid matching commented-out roots like "# root ..."
+        if content =~ /^\s*root\s+["']([^"']+)["']/m ||
+           content =~ /^\s*root\s+to:\s*["']([^"']+)["']/m
           $1
         end
       end
