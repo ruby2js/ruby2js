@@ -22,6 +22,9 @@ module Ruby2JS
           # Skip if already checked or if on_module is processing
           return super if @rails_seeds_checked || @rails_seeds
 
+          # Only wrap if this looks like a seeds file
+          return super unless seeds_file?
+
           # Handle nil node (comment-only input) - wrap in empty Seeds module
           if node.nil?
             @rails_seeds_checked = true
@@ -68,6 +71,13 @@ module Ruby2JS
         end
 
         private
+
+        # Check if we're processing a seeds file
+        def seeds_file?
+          file = @options[:file]
+          return false unless file
+          file.to_s.end_with?('seeds.rb') || file.to_s.include?('/seeds/')
+        end
 
         # Check if code needs to be wrapped in module Seeds
         def needs_seeds_wrapper?(node)
