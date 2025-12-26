@@ -25,6 +25,9 @@ RUN bundle add ruby2js --github ruby2js/ruby2js --require ruby2js/spa
 RUN rails generate scaffold Article title:string body:text && \
     rails db:migrate
 
+# Set root route to articles#index (common for Rails demos)
+RUN sed -i 's/# root "posts#index"/root "articles#index"/' config/routes.rb
+
 # Install SPA generator and build
 # Auto-detects: name=blog, scaffolds=Article, root from routes.rb
 # Defaults: runtime=browser, database=dexie

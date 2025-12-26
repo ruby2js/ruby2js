@@ -470,10 +470,6 @@ module Ruby2JS
 
             <script type="module">
               import { Application } from '/dist/config/routes.js';
-              // Redirect root to first resource
-              if (location.pathname === '/' && !location.hash) {
-                location.hash = '/#{manifest.controller_config.included_controllers.keys.first}';
-              }
               Application.start();
             </script>
           </body>
