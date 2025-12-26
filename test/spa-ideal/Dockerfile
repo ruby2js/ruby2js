@@ -26,7 +26,8 @@ RUN rails generate scaffold Article title:string body:text && \
     rails db:migrate
 
 # Install SPA generator and build
-RUN rails generate ruby2js:spa:install --name blog && \
+# Defaults: name=blog (from Rails app), runtime=browser, database=dexie
+RUN rails generate ruby2js:spa:install && \
     rails ruby2js:spa:build
 
 # Stage 2: Build and run with Node only (no Ruby)

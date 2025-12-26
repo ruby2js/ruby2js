@@ -11,8 +11,15 @@ module Ruby2js
 
       desc "Creates a Ruby2JS SPA configuration file and sets up the build infrastructure"
 
-      class_option :name, type: :string, default: 'app',
-        desc: "Name of the SPA (used for output directory)"
+      class_option :name, type: :string,
+        desc: "Name of the SPA (defaults to Rails app name)"
+
+      def set_default_name
+        return if options[:name]
+        # Derive from Rails app name (e.g., Blog::Application -> blog)
+        app_name = Rails.application.class.module_parent_name.underscore rescue 'app'
+        @options = options.merge(name: app_name)
+      end
 
       class_option :mount_path, type: :string, default: '/offline',
         desc: "URL path where the SPA will be mounted"
