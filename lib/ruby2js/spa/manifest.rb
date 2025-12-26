@@ -32,11 +32,21 @@ module Ruby2JS
     #   end
     #
     class Manifest
-      attr_reader :name, :mount_path
+      attr_reader :name, :mount_path, :runtime, :database
       attr_reader :route_config, :model_config, :view_config
       attr_reader :controller_config, :stimulus_config, :sync_config
 
+      # Valid runtime/database combinations
+      VALID_COMBINATIONS = {
+        browser: %i[dexie sqljs pglite],
+        node: %i[better_sqlite3 pg mysql],
+        bun: %i[better_sqlite3 pg mysql],
+        deno: %i[pg mysql]
+      }.freeze
+
       def initialize
+        @runtime = :browser
+        @database = :dexie
         @route_config = RouteConfig.new
         @model_config = ModelConfig.new
         @view_config = ViewConfig.new
@@ -54,6 +64,26 @@ module Ruby2JS
       def mount_path(value = nil)
         return @mount_path if value.nil?
         @mount_path = value
+      end
+
+      def runtime(value = nil)
+        return @runtime if value.nil?
+        @runtime = value.to_sym
+      end
+
+      def database(value = nil)
+        return @database if value.nil?
+        @database = value.to_sym
+      end
+
+      # Check if this is a browser-based SPA
+      def browser?
+        @runtime == :browser
+      end
+
+      # Check if this targets a server runtime
+      def server?
+        !browser?
       end
 
       def routes(&block)
@@ -95,6 +125,17 @@ module Ruby2JS
         errs = []
         errs << 'name is required' unless @name
         errs << 'mount_path is required' unless @mount_path
+
+        # Validate runtime/database combination
+        unless VALID_COMBINATIONS.key?(@runtime)
+          errs << "invalid runtime '#{@runtime}' (valid: #{VALID_COMBINATIONS.keys.join(', ')})"
+        else
+          valid_dbs = VALID_COMBINATIONS[@runtime]
+          unless valid_dbs.include?(@database)
+            errs << "invalid database '#{@database}' for runtime '#{@runtime}' (valid: #{valid_dbs.join(', ')})"
+          end
+        end
+
         errs
       end
     end

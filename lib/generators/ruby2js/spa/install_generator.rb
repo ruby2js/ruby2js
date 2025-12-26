@@ -17,6 +17,36 @@ module Ruby2js
       class_option :mount_path, type: :string, default: '/offline',
         desc: "URL path where the SPA will be mounted"
 
+      class_option :runtime, type: :string, default: 'browser',
+        desc: "Target runtime: browser, node, bun, or deno"
+
+      class_option :database, type: :string, default: 'dexie',
+        desc: "Database adapter: dexie, sqljs, pglite, better_sqlite3, pg, or mysql"
+
+      # Valid runtime/database combinations
+      VALID_COMBINATIONS = {
+        'browser' => %w[dexie sqljs pglite],
+        'node' => %w[better_sqlite3 pg mysql],
+        'bun' => %w[better_sqlite3 pg mysql],
+        'deno' => %w[pg mysql]
+      }.freeze
+
+      def validate_options
+        runtime = options[:runtime]
+        database = options[:database]
+
+        unless VALID_COMBINATIONS.key?(runtime)
+          say_status :error, "Invalid runtime '#{runtime}'. Valid options: #{VALID_COMBINATIONS.keys.join(', ')}", :red
+          raise ArgumentError, "Invalid runtime"
+        end
+
+        valid_dbs = VALID_COMBINATIONS[runtime]
+        unless valid_dbs.include?(database)
+          say_status :error, "Invalid database '#{database}' for runtime '#{runtime}'. Valid options: #{valid_dbs.join(', ')}", :red
+          raise ArgumentError, "Invalid database for runtime"
+        end
+      end
+
       def create_initializer
         create_file 'config/initializers/ruby2js_spa.rb', <<~RUBY
           # Load Ruby2JS SPA engine (provides rake tasks and middleware)

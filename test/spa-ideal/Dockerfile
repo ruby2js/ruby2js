@@ -10,10 +10,6 @@
 # Stage 1: Build the SPA using Rails
 FROM ruby:3.4 AS builder
 
-# Install Node.js
-RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
-    apt-get install -y nodejs
-
 WORKDIR /app
 
 # Create Rails app with scaffold
@@ -23,8 +19,7 @@ RUN gem install rails && \
 WORKDIR /app/blog
 
 # Add ruby2js gem (from rubygems once published, or github for now)
-RUN echo "gem 'ruby2js', github: 'ruby2js/ruby2js', require: ['ruby2js', 'ruby2js/spa']" >> Gemfile && \
-    bundle install
+RUN bundle add ruby2js --github ruby2js/ruby2js --require ruby2js/spa
 
 # Generate scaffold
 RUN rails generate scaffold Article title:string body:text && \

@@ -15,6 +15,11 @@ Ruby2JS::Spa.configure do
   name :<%= options[:name] %>
   mount_path '<%= options[:mount_path] %>'
 
+  # Target runtime and database
+  # Run `rails g ruby2js:spa:install --help` for valid combinations
+  runtime :<%= options[:runtime] %>
+  database :<%= options[:database] %>
+
   # Models: specify which models to include
   # Associations are automatically resolved - if you include a model,
   # its associated models (has_many, belongs_to) will be included too
