@@ -457,14 +457,22 @@ module Ruby2JS
         end
 
         def value_to_ast(value)
-          case value
-          when String then s(:str, value)
-          when Integer then s(:int, value)
-          when Float then s(:float, value)
-          when true then s(:true)
-          when false then s(:false)
-          when nil then s(:nil)
-          else s(:nil)
+          # Use is_a? checks instead of case/when for selfhost compatibility
+          # (case/when with class names doesn't work in transpiled JavaScript)
+          if value == true
+            s(:true)
+          elsif value == false
+            s(:false)
+          elsif value.nil?
+            s(:nil)
+          elsif value.is_a?(String)
+            s(:str, value)
+          elsif value.is_a?(Integer)
+            s(:int, value)
+          elsif value.is_a?(Float)
+            s(:float, value)
+          else
+            s(:nil)
           end
         end
       end
