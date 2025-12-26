@@ -70,10 +70,18 @@ module Ruby2JS
             end
           elsif not name.empty? and name =~ /^[-\w\/]+$/
             # Try to require unregistered filter by name
-            # Supports both "selfhost/walker" and "selfhost_walker" (underscores converted to slashes)
-            require_name = "ruby2js/filter/#{name.tr('_', '/')}"
+            # First try the literal name (e.g., "selfhost_build" → "ruby2js/filter/selfhost_build")
+            # Then fall back to underscore-to-slash conversion for nested filters
+            # (e.g., "rails_model" → "ruby2js/filter/rails/model")
+            require_name = "ruby2js/filter/#{name}"
             defaults_before = Ruby2JS::Filter::DEFAULTS.dup
-            require require_name
+            begin
+              require require_name
+            rescue LoadError
+              # Try converting underscores to slashes for nested filters
+              require_name = "ruby2js/filter/#{name.tr('_', '/')}"
+              require require_name
+            end
             # Add any new modules that were registered
             new_defaults = Ruby2JS::Filter::DEFAULTS - defaults_before
             if new_defaults.any?
