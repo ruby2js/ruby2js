@@ -3,6 +3,10 @@
 # Both Ruby and selfhost builds use this same compiler for consistency.
 
 class ErbCompiler
+  # Block expression regex from Rails ActionView (erubi.rb)
+  # Matches: ") do |...|", " do |...|", "{ |...|", etc.
+  BLOCK_EXPR = /((\s|\))do|\{)(\s*\|[^|]*\|)?\s*\z/
+
   def initialize(template)
     @template = template
   end
@@ -60,8 +64,8 @@ class ErbCompiler
       if tag.start_with?("=")
         # Output expression: <%= expr %>
         expr = tag[1..-1].strip
-        # Check if this is a block expression (ends with 'do')
-        if expr.end_with?(" do") || expr.end_with?("\tdo")
+        # Check if this is a block expression using Rails' BLOCK_EXPR regex
+        if BLOCK_EXPR.match?(expr)
           # Block expression: use .append= pattern that ERB filter expects
           ruby_code += " _buf.append= #{expr}\n"
         else

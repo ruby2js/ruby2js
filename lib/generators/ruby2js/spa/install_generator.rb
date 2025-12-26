@@ -17,6 +17,13 @@ module Ruby2js
       class_option :mount_path, type: :string, default: '/offline',
         desc: "URL path where the SPA will be mounted"
 
+      def create_initializer
+        create_file 'config/initializers/ruby2js_spa.rb', <<~RUBY
+          # Load Ruby2JS SPA engine (provides rake tasks and middleware)
+          require 'ruby2js/spa'
+        RUBY
+      end
+
       def create_manifest
         template 'ruby2js_spa.rb.tt', 'config/ruby2js_spa.rb'
       end

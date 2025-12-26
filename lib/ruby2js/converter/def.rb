@@ -133,9 +133,12 @@ module Ruby2JS
       end
 
       add_implicit_block = false
+      contains_await = false
 
       walk = ->(node) do
         add_implicit_block = true if node.type == :yield || (node.type == :send && node.children[1] == "_implicitBlockYield")
+        # Detect await nodes - if body contains await, function must be async
+        contains_await = true if node.type == :await || node.type == :await!
         node.children.each do |child|
           walk.call(child) if ast_node?(child)
         end
@@ -160,7 +163,8 @@ module Ruby2JS
         end
       end
 
-      put 'async ' if @ast.type == :async
+      # Add async if explicitly marked or if body contains await
+      put 'async ' if @ast.type == :async || contains_await
 
       # fat arrow support
       if \

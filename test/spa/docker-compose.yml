@@ -1,0 +1,7 @@
+services:
+  spa:
+    build:
+      context: ../..
+      dockerfile: test/spa/Dockerfile
+    ports:
+      - "3000:3000"

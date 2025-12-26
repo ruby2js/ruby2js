@@ -349,7 +349,9 @@ module Ruby2JS
             field_name = args.first
             if field_name&.type == :sym
               name = field_name.children.first.to_s
-              label_text = name.tr('_', ' ').capitalize
+              # Inline capitalize for JS compatibility (see inflector.rb)
+              label_text = name.gsub('_', ' ')
+              label_text = label_text[0].upcase + label_text[1..-1].to_s
               html = %(<label for="#{model}_#{name}">#{label_text}</label>)
               s(:str, html)
             else
