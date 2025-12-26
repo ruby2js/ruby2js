@@ -199,6 +199,12 @@
     font-size: 0.9rem;
   }
 
+  pre.js.exception {
+    background-color: #ff0;
+    border: 4px solid red;
+    border-radius: 1em;
+  }
+
   /* Options bar */
   .options {
     display: flex;
@@ -650,7 +656,7 @@
     }
 
     // Refresh on "Show AST" change
-    document.getElementById('ast').addEventListener('click', () => convert());
+    document.getElementById('ast').addEventListener('change', () => convert());
 
     // Initial conversion if there's content
     if (textarea.value.trim()) {

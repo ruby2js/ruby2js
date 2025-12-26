@@ -85,10 +85,10 @@ class Ruby2JSDemo < Sinatra::Base
       html << ast.type.to_s
       html << '<span class="hidden">,</span>' unless ast.children.empty?
 
-      if ast.children.any? { |child| child.is_a?(Parser::AST::Node) }
+      if ast.children.any? { |child| child.respond_to?(:type) && child.respond_to?(:children) }
         ast.children.each_with_index do |child, index|
           ctail = index == ast.children.length - 1 ? ')' + tail : ''
-          if child.is_a?(Parser::AST::Node)
+          if child.respond_to?(:type) && child.respond_to?(:children)
             html << walk_ast(child, "  #{indent}", ctail, last && !ctail.empty?)
           else
             html << "<div>#{indent}  #{child.inspect}"
