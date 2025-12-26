@@ -187,7 +187,7 @@ class Ruby2JSDemo < Sinatra::Base
       end
     end
 
-    erb :demo
+    erb :demo, layout: false
   end
 
   # Handle form submission and JSON API
@@ -256,7 +256,7 @@ class Ruby2JSDemo < Sinatra::Base
         end
       end
 
-      erb :demo
+      erb :demo, layout: false
     end
   end
 

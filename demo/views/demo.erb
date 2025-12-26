@@ -1,5 +1,14 @@
 <%# Shared demo template - works with both Sinatra and Bridgetown
      @live = true for Bridgetown (Shoelace), false for Sinatra (plain HTML) -%>
+<% unless @live %>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ruby2JS Demo</title>
+  <base href="/">
+<% end %>
 <style>
   .js.editor { background-color: #ffffcc }
   .ruby.editor { resize: vertical; overflow: auto; height: 200px; background-color: #ffeeee; margin-bottom: 5px; }
@@ -19,37 +28,312 @@
   .narrow-container pre {padding: 0 1rem}
   .narrow-container h1.title, .narrow-container h2.title {margin: 0.5rem 0}
 <% else %>
-  svg {height: 4em; width: 4em; transition: 0.5s}
-  svg:hover {height: 8em; width: 8em}
-  textarea.ruby {background-color: #ffeeee; margin-bottom: 0.4em}
-  pre.js {background-color: #ffffcc}
-  h2 {margin-top: 0.4em}
+  /* Base reset and fonts */
+  :root {
+    --primary-color: #c92613;
+    --primary-hover: #a51f0f;
+    --text-color: #363636;
+    --text-light: #4a4a4a;
+    --bg-light: #f5f5f5;
+    --bg-footer: #1a1a2e;
+    --border-color: #dbdbdb;
+    --link-color: #3273dc;
+  }
 
-  .dropdown { position: relative; display: none; }
-  .dropdown-content { display: none; position: absolute; background-color: #f9f9f9; min-width: 180px; box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2); padding: 12px 16px; z-index: 1; }
+  * { box-sizing: border-box; }
 
-  :root{--bs-base-font-size: 16px;--bs-font-sans-serif:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans","Liberation Sans",sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol","Noto Color Emoji";--bs-font-monospace:SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
-  html{font-size:var(--bs-base-font-size)}
-  body{margin:0;font-family:var(--bs-font-sans-serif);font-size:1rem;font-weight:400;line-height:1.5;color:#212529;background-color:#fff;-webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent}
-  a{color:#0d6efd;text-decoration:underline}
-  a:hover{color:#0a58ca}
-  svg{vertical-align:middle}
-  label{display:inline-block}
-  input,select,textarea{margin:0;font-family:inherit;font-size:inherit;line-height:inherit}
-  select{text-transform:none}
-  select{word-wrap:normal}
-  [type=submit]{-webkit-appearance:button}
-  .container{width:100%;padding-right:var(--bs-gutter-x,.75rem);padding-left:var(--bs-gutter-x,.75rem);margin-right:auto;margin-left:auto}
-  .form-control{display:block;width:100%;padding:.375rem .75rem;font-size:1rem;font-weight:400;line-height:1.5;color:#212529;background-color:#fff;background-clip:padding-box;border:1px solid #ced4da;-webkit-appearance:none;-moz-appearance:none;appearance:none;border-radius:.25rem;transition:border-color .15s ease-in-out,box-shadow .15s ease-in-out}
-  .btn:focus{outline:0;box-shadow:0 0 0 .25rem rgba(13,110,253,.25)}
-  .btn-primary{color:#fff;background-color:#0d6efd;border-color:#0d6efd}
-  .btn-primary:hover{color:#fff;background-color:#0b5ed7;border-color:#0a58ca}
-  .btn-primary:focus{color:#fff;background-color:#0b5ed7;border-color:#0a58ca;box-shadow:0 0 0 .25rem rgba(49,132,253,.5)}
-  .btn-primary:active{color:#fff;background-color:#0a58ca;border-color:#0a53be}
-  .btn-primary:active:focus{box-shadow:0 0 0 .25rem rgba(49,132,253,.5)}
-  .btn-primary:disabled{color:#fff;background-color:#0d6efd;border-color:#0d6efd}
+  html { font-size: 16px; }
+
+  body {
+    margin: 0;
+    font-family: BlinkMacSystemFont, -apple-system, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-size: 1rem;
+    font-weight: 400;
+    line-height: 1.5;
+    color: var(--text-color);
+    background-color: #fff;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  main { flex: 1; padding: 1rem 0 2rem; }
+
+  a { color: var(--link-color); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  h1, h2, h3 { color: var(--text-color); font-weight: 600; margin: 0.5em 0; }
+  h1 { font-size: 1.5rem; }
+  h2 { font-size: 1.25rem; margin-top: 1rem; }
+
+  /* Navbar */
+  .navbar {
+    background-color: var(--bg-footer);
+    padding: 0.5rem 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+  }
+
+  .navbar-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .navbar-brand a {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: white;
+    font-weight: 600;
+    font-size: 1.25rem;
+  }
+
+  .navbar-brand a:hover { text-decoration: none; opacity: 0.9; }
+
+  .navbar-brand svg {
+    height: 2.5rem;
+    width: 2.5rem;
+  }
+
+  .navbar-menu {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+  }
+
+  .navbar-menu a {
+    color: rgba(255,255,255,0.9);
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+  }
+
+  .navbar-menu a:hover {
+    background-color: rgba(255,255,255,0.1);
+    text-decoration: none;
+    color: white;
+  }
+
+  /* Footer */
+  .footer {
+    background-color: var(--bg-footer);
+    color: rgba(255,255,255,0.8);
+    padding: 2rem 1rem 1rem;
+    margin-top: auto;
+  }
+
+  .footer-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2rem;
+  }
+
+  .footer-section {
+    flex: 1;
+    min-width: 200px;
+  }
+
+  .footer-section h4 {
+    color: white;
+    margin-bottom: 1rem;
+    font-size: 1rem;
+  }
+
+  .footer-section a {
+    color: rgba(255,255,255,0.7);
+    display: block;
+    margin-bottom: 0.5rem;
+  }
+
+  .footer-section a:hover { color: white; }
+
+  .footer-bottom {
+    text-align: center;
+    margin-top: 2rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(255,255,255,0.1);
+    font-size: 0.875rem;
+    color: rgba(255,255,255,0.5);
+  }
+
+  .footer-logo {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .footer-logo svg { height: 2.5rem; width: 2.5rem; }
+
+  /* Form elements */
+  textarea.ruby {
+    background-color: #ffeeee;
+    margin-bottom: 0.5rem;
+    width: 100%;
+    padding: 0.75rem;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 0.9rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    resize: vertical;
+  }
+
+  textarea.ruby:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(201, 38, 19, 0.2);
+  }
+
+  pre.js {
+    background-color: #ffffee;
+    padding: 1rem;
+    border: 1px solid #eee;
+    border-radius: 4px;
+    overflow-x: auto;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 0.9rem;
+  }
+
+  /* Options bar */
+  .options {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    padding: 0.75rem;
+    background-color: var(--bg-light);
+    border-radius: 4px;
+  }
+
+  .options label {
+    font-size: 0.9rem;
+    color: var(--text-light);
+  }
+
+  .options input[type="checkbox"] {
+    margin-right: 0.25rem;
+    accent-color: var(--primary-color);
+  }
+
+  .options select {
+    padding: 0.375rem 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background-color: white;
+    font-size: 0.9rem;
+  }
+
+  /* Buttons */
+  .btn {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+    font-weight: 500;
+    text-align: center;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn-primary {
+    color: white;
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+  }
+
+  .btn-primary:hover {
+    background-color: var(--primary-hover);
+    border-color: var(--primary-hover);
+  }
+
+  .btn-outline {
+    color: var(--text-color);
+    background-color: white;
+    border-color: var(--border-color);
+  }
+
+  .btn-outline:hover {
+    background-color: var(--bg-light);
+  }
+
+  /* Dropdowns */
+  .dropdown {
+    position: relative;
+    display: inline-block;
+  }
+
+  .dropdown-content {
+    display: none;
+    position: absolute;
+    background-color: white;
+    min-width: 180px;
+    max-height: 300px;
+    overflow-y: auto;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    border-radius: 4px;
+    z-index: 100;
+    padding: 0.5rem 0;
+  }
+
+  .dropdown-content div {
+    padding: 0.375rem 1rem;
+    cursor: pointer;
+  }
+
+  .dropdown-content div:hover {
+    background-color: var(--bg-light);
+  }
+
+  .dropdown-content input[type="checkbox"] {
+    margin-right: 0.5rem;
+    accent-color: var(--primary-color);
+  }
+
+  .dropdown-content span {
+    font-size: 0.9rem;
+    cursor: pointer;
+  }
+
+  /* Container */
+  .container {
+    width: 100%;
+    max-width: 1200px;
+    padding: 0 1rem;
+    margin: 0 auto;
+  }
+
+  @media (max-width: 768px) {
+    .navbar { flex-direction: column; gap: 0.5rem; }
+    .navbar-menu { flex-wrap: wrap; justify-content: center; }
+    .footer-content { flex-direction: column; }
+  }
 <% end %>
 </style>
+<% unless @live %>
+</head>
+<body>
+  <nav class="navbar">
+    <div class="navbar-brand">
+      <a href="/">
+        <%= ruby2js_logo %>
+        <span>Ruby2JS</span>
+      </a>
+    </div>
+    <div class="navbar-menu">
+      <a href="https://www.ruby2js.com/docs/">Documentation</a>
+      <a href="https://www.ruby2js.com/examples/">Examples</a>
+      <a href="https://github.com/ruby2js/ruby2js" target="_blank">GitHub</a>
+    </div>
+  </nav>
+  <main>
+<% end %>
 
 <div class="container narrow-container">
   <% if @live %>
@@ -59,10 +343,7 @@
       <sl-button slot="footer" type="primary">Close</sl-button>
     </sl-dialog>
   <% else %>
-    <a href="https://www.ruby2js.com/docs/">
-      <%= ruby2js_logo %>
-      Ruby2JS
-    </a>
+    <h1>Ruby Source</h1>
   <% end %>
 
   <form method="post">
@@ -71,7 +352,7 @@
     </div>
 
     <div class="options"<%= @live ? ' data-controller="options"' : '' %>>
-      <input class="btn btn-primary" type="submit" value="Convert" style="display: <%= @live ? 'none' : 'inline' %>">
+      <input class="btn btn-primary" type="submit" value="Convert" style="display: none">
 
       <% # Preset checkbox %>
       <% if @live %>
@@ -121,11 +402,11 @@
         </sl-dropdown>
       <% else %>
         <div class="dropdown" id="filters">
-          <button class="btn" type="button">Filters</button>
+          <button class="btn btn-outline" type="button">Filters</button>
           <div class="dropdown-content">
             <% @filter_list.each do |filter| %>
               <div>
-                <input type="checkbox" name="<%= filter %>"<%= @selected.include?(filter) ? ' checked' : '' %>>
+                <input type="checkbox" id="filter-<%= filter %>" name="<%= filter %>"<%= @selected.include?(filter) ? ' checked' : '' %>>
                 <span><%= filter %></span>
               </div>
             <% end %>
@@ -147,13 +428,13 @@
         </sl-dropdown>
       <% else %>
         <div class="dropdown" id="options">
-          <button class="btn" type="button">Options</button>
+          <button class="btn btn-outline" type="button">Options</button>
           <div class="dropdown-content">
             <% @option_list.each do |option, has_args| %>
               <% next if option == 'preset' || option == 'filter' || option.start_with?('require_') %>
               <% show_args = option == 'truthy' ? false : has_args %>
               <div>
-                <input type="checkbox" name="<%= option %>"<%= @options_checked[option.to_sym] ? ' checked' : '' %><%= show_args ? ' data-args="true"' : '' %>>
+                <input type="checkbox" id="option-<%= option %>" name="<%= option %>"<%= @options_checked[option.to_sym] ? ' checked' : '' %><%= show_args ? ' data-args="true"' : '' %>>
                 <span><%= option %></span>
               </div>
             <% end %>
@@ -165,15 +446,25 @@
 
   <% unless @live %>
   <script>
-    // determine base URL and what filters and options are selected
-    let base = new URL(document.getElementsByTagName('base')[0].href).pathname;
+    // Determine base URL and what filters and options are selected
+    let base = document.querySelector('base')?.href || window.location.origin + '/';
+    base = new URL(base).pathname;
     let filters = new Set(window.location.pathname.slice(base.length).split('/'));
     filters.delete('');
     let options = {};
     for (let match of window.location.search.matchAll(/(\w+)(=([^&]*))?/g)) {
       options[match[1]] = match[3] && decodeURIComponent(match[3]);
-    };
+    }
     if (options.filter) options.filter.split(',').forEach(option => filters.add(option));
+
+    // Debounce function for live updates
+    let debounceTimer;
+    function debounce(func, delay = 300) {
+      return function(...args) {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => func.apply(this, args), delay);
+      };
+    }
 
     function updateLocation(force = false) {
       let location = new URL(base, window.location);
@@ -182,89 +473,136 @@
       let search = [];
       for (let [key, value] of Object.entries(options)) {
         search.push(value === undefined ? key : `${key}=${encodeURIComponent(value)}`);
-      };
+      }
 
       location.search = search.length === 0 ? "" : `${search.join('&')}`;
       if (!force && window.location.toString() == location.toString()) return;
 
       history.replaceState({}, null, location.toString());
+      convert();
+    }
 
-      if (document.getElementById('js').style.display === 'none') return;
-
-      // fetch updated results
-      let ruby = document.querySelector('textarea[name=ruby]').textContent;
+    function convert() {
+      // Get current ruby code and options
+      let ruby = document.querySelector('textarea[name=ruby]').value;
       let ast = document.getElementById('ast').checked;
+      let preset = document.getElementById('preset').checked;
+      let eslevel = document.getElementById('eslevel').value;
+
+      if (!ruby.trim()) {
+        document.getElementById('js').style.display = 'none';
+        return;
+      }
+
+      // Build request body with all current options
+      let body = { ruby, ast };
+      if (preset) body.preset = true;
+      if (eslevel && eslevel !== 'default') body.eslevel = eslevel;
+
+      // Add selected filters
+      Array.from(filters).forEach(f => body[f] = 'on');
+
+      // Add selected options
+      for (let [key, value] of Object.entries(options)) {
+        if (key === 'preset' || key.startsWith('es')) continue; // handled above
+        body[key] = value === undefined ? 'on' : value;
+      }
+
       let headers = {
         'Content-Type': 'application/json',
         'Accept': 'application/json'
-      }
+      };
 
-      fetch(location,
-        {method: 'POST', headers, body: JSON.stringify({ ruby, ast })}
-      ).then(response => {
-        return response.json();
-      }).
-      then(json => {
-        document.querySelector('#js pre').textContent = json.js || json.exception;
+      fetch(window.location.href, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body)
+      })
+      .then(response => response.json())
+      .then(json => {
+        let jsOutput = document.querySelector('#js pre');
+        let jsSection = document.getElementById('js');
 
-        let parsed = document.querySelector('#parsed');
-        if (json.parsed) parsed.querySelector('pre').outerHTML = json.parsed;
-        parsed.style.display = json.parsed ? "block" : "none";
+        if (json.exception) {
+          jsOutput.textContent = json.exception;
+          jsOutput.classList.add('exception');
+        } else {
+          jsOutput.textContent = json.js;
+          jsOutput.classList.remove('exception');
+        }
+        jsSection.style.display = 'block';
 
-        let filtered = document.querySelector('#filtered');
-        if (json.filtered) filtered.querySelector('pre').outerHTML = json.filtered;
-        filtered.style.display = json.filtered ? "block" : "none";
-      }).
-      catch(console.error);
+        let parsed = document.getElementById('parsed');
+        if (json.parsed) {
+          parsed.querySelector('pre').innerHTML = json.parsed.replace(/<\/?pre>/g, '');
+          parsed.style.display = 'block';
+        } else {
+          parsed.style.display = 'none';
+        }
+
+        let filtered = document.getElementById('filtered');
+        if (json.filtered) {
+          filtered.querySelector('pre').innerHTML = json.filtered.replace(/<\/?pre>/g, '');
+          filtered.style.display = 'block';
+        } else {
+          filtered.style.display = 'none';
+        }
+      })
+      .catch(err => {
+        console.error(err);
+      });
     }
 
-    // show dropdowns (they only appear if JS is enabled)
+    // Live update on textarea input
+    const textarea = document.querySelector('textarea[name=ruby]');
+    textarea.addEventListener('input', debounce(() => convert(), 400));
+
+    // Show dropdowns
     let dropdowns = document.querySelectorAll('.dropdown');
     for (let dropdown of dropdowns) {
-      dropdown.style.display = 'inline-block';
       let content = dropdown.querySelector('.dropdown-content');
-      content.style.opacity = 0;
-      content.style.display = 'none';
 
-      // toggle dropdown
+      // Toggle dropdown on button click
       dropdown.querySelector('button').addEventListener('click', event => {
         event.preventDefault();
-        content.style.transition = '0s';
-        content.style.display = 'block';
-        content.style.zIndex = 1;
-        content.style.opacity = 1 - content.style.opacity;
+        const isOpen = content.style.display === 'block';
+        // Close all other dropdowns
+        document.querySelectorAll('.dropdown-content').forEach(d => d.style.display = 'none');
+        content.style.display = isOpen ? 'none' : 'block';
       });
+    }
 
-      // make dropdown disappear when mouse moves away
-      let focus = false;
-      dropdown.addEventListener('mouseover', () => {focus = true});
-      dropdown.addEventListener('mouseout', event => {
-        if (content.style.opacity === 0) return;
-        focus = false;
-        setTimeout( () => {
-          if (!focus) {
-            content.style.transition = '0.5s';
-            content.style.opacity = 0;
-            setTimeout( () => { content.style.zIndex = -1; }, 500);
-          }
-        }, 500)
-      })
-    };
+    // Close dropdowns when clicking outside
+    document.addEventListener('click', event => {
+      if (!event.target.closest('.dropdown')) {
+        document.querySelectorAll('.dropdown-content').forEach(d => d.style.display = 'none');
+      }
+    });
 
-    // add/remove eslevel options
+    // Add/remove eslevel options
     document.getElementById('eslevel').addEventListener('change', event => {
       let value = event.target.value;
       if (value !== "default") options['es' + value] = undefined;
       for (let option of event.target.querySelectorAll('option')) {
         if (option.value === 'default' || option.value === value) continue;
         delete options['es' + option.value];
-      };
+      }
       updateLocation();
     });
 
-    // add/remove filters based on checkbox
-    let dropdown = document.getElementById('filters');
-    for (let filter of dropdown.querySelectorAll('input[type=checkbox]')) {
+    // Add/remove preset option
+    document.getElementById('preset').addEventListener('change', event => {
+      if (event.target.checked) {
+        options['preset'] = undefined;
+      } else {
+        delete options['preset'];
+      }
+      updateLocation();
+    });
+
+    // Add/remove filters based on checkbox
+    let filterDropdown = document.getElementById('filters');
+    for (let filter of filterDropdown.querySelectorAll('input[type=checkbox]')) {
       filter.addEventListener('click', event => {
         let name = event.target.name;
         if (!filters.delete(name)) filters.add(name);
@@ -272,36 +610,52 @@
       });
     }
 
-    // add/remove options based on checkbox
-    dropdown = document.getElementById('options');
-    for (let option of dropdown.querySelectorAll('input[type=checkbox]')) {
+    // Add/remove options based on checkbox
+    let optionsDropdown = document.getElementById('options');
+    for (let option of optionsDropdown.querySelectorAll('input[type=checkbox]')) {
       option.addEventListener('click', event => {
         let name = event.target.name;
 
         if (name in options) {
           delete options[name];
         } else if (option.dataset.args) {
-          options[name] = prompt(name);
+          let value = prompt(name);
+          if (value !== null) {
+            options[name] = value;
+          } else {
+            event.target.checked = false;
+            return;
+          }
         } else {
           options[name] = undefined;
-        };
+        }
 
         updateLocation();
-      })
-    };
-
-    // allow update of option
-    for (let span of document.querySelectorAll('input[data-args] + span')) {
-      span.addEventListener('click', event => {
-        let name = span.previousElementSibling.name;
-        options[name] = prompt(name, decodeURIComponent(options[name] || ''));
-        span.previousElementSibling.checked = true;
-        updateLocation();
-      })
+      });
     }
 
-    // refresh on "Show AST" change
-    document.getElementById('ast').addEventListener('click', updateLocation);
+    // Allow update of option value by clicking label
+    for (let span of document.querySelectorAll('input[data-args] + span')) {
+      span.addEventListener('click', event => {
+        let input = span.previousElementSibling;
+        let name = input.name;
+        if (input.checked) {
+          let value = prompt(name, decodeURIComponent(options[name] || ''));
+          if (value !== null) {
+            options[name] = value;
+            updateLocation();
+          }
+        }
+      });
+    }
+
+    // Refresh on "Show AST" change
+    document.getElementById('ast').addEventListener('click', () => convert());
+
+    // Initial conversion if there's content
+    if (textarea.value.trim()) {
+      convert();
+    }
   </script>
   <% end %>
 
@@ -324,3 +678,38 @@
     <pre class="js"><%= @js_output %></pre>
   </div>
 </div>
+
+<% unless @live %>
+  </main>
+  <footer class="footer">
+    <div class="footer-content">
+      <div class="footer-section">
+        <div class="footer-logo">
+          <%= ruby2js_logo %>
+          <strong style="color: white;">Ruby2JS</strong>
+        </div>
+        <p>An extensible Ruby to modern JavaScript transpiler.</p>
+        <p style="font-size: 0.8rem; margin-top: 1rem; opacity: 0.6;">
+          Source code licensed MIT
+        </p>
+      </div>
+      <div class="footer-section">
+        <h4>Documentation</h4>
+        <a href="https://www.ruby2js.com/docs/">Getting Started</a>
+        <a href="https://www.ruby2js.com/docs/filters/">Filters</a>
+        <a href="https://www.ruby2js.com/docs/options/">Options</a>
+      </div>
+      <div class="footer-section">
+        <h4>Contribute</h4>
+        <a href="https://github.com/ruby2js/ruby2js/issues">Browse Issues</a>
+        <a href="https://github.com/ruby2js/ruby2js/pulls">Pull Requests</a>
+        <a href="https://github.com/ruby2js/ruby2js/discussions">Discussions</a>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      Brought to you by Jared White and Sam Ruby
+    </div>
+  </footer>
+</body>
+</html>
+<% end %>
