@@ -51,4 +51,4 @@ RUN mkdir -p dist/db && \
 
 EXPOSE 3000
 
-CMD ["npx", "serve", "-p", "3000"]
+CMD ["npx", "serve", "-s", "-p", "3000"]

@@ -11,7 +11,7 @@
     "dev:deno": "DATABASE=better_sqlite3 RUNTIME=deno npm run build && deno run --allow-all node_modules/ruby2js-rails/server.mjs",
     "build": "ruby2js-rails-build",
     "build:ruby": "ruby scripts/build.rb",
-    "start": "npx serve -p 3000",
+    "start": "npx serve -s -p 3000",
     "start:node": "ruby2js-rails-server",
     "start:bun": "bun node_modules/ruby2js-rails/server.mjs",
     "start:deno": "deno run --allow-all node_modules/ruby2js-rails/server.mjs"
