@@ -14,6 +14,29 @@ module Ruby2JS
           super
           @rails_seeds = nil
           @rails_seeds_models = []
+          @rails_seeds_checked = false
+        end
+
+        # Process top-level to wrap bare code in module Seeds if needed
+        def process(node)
+          # Skip if already checked or if on_module is processing
+          return super if @rails_seeds_checked || @rails_seeds
+
+          # Handle nil node (comment-only input) - wrap in empty Seeds module
+          if node.nil?
+            @rails_seeds_checked = true
+            wrapped = wrap_in_seeds_module(nil)
+            return super(wrapped)
+          end
+
+          # Check if we need to wrap the code
+          if needs_seeds_wrapper?(node)
+            @rails_seeds_checked = true
+            wrapped = wrap_in_seeds_module(node)
+            return super(wrapped)
+          end
+
+          super
         end
 
         # Detect module Seeds with def self.run
@@ -45,6 +68,68 @@ module Ruby2JS
         end
 
         private
+
+        # Check if code needs to be wrapped in module Seeds
+        def needs_seeds_wrapper?(node)
+          return false unless node.respond_to?(:type)
+
+          # Get top-level statements
+          children = node.type == :begin ? node.children : [node]
+
+          # Check if there's already a module Seeds (directly or inside export)
+          has_seeds = children.any? do |child|
+            next false unless child.respond_to?(:type)
+
+            # Direct module Seeds
+            if child.type == :module &&
+               child.children[0]&.type == :const &&
+               child.children[0].children[1] == :Seeds
+              next true
+            end
+
+            # Module Seeds inside export
+            if child.type == :export
+              inner = child.children[0]
+              if inner&.type == :module &&
+                 inner.children[0]&.type == :const &&
+                 inner.children[0].children[1] == :Seeds
+                next true
+              end
+            end
+
+            false
+          end
+
+          !has_seeds
+        end
+
+        # Wrap code in module Seeds { def self.run ... end }
+        def wrap_in_seeds_module(node)
+          # Handle nil node (empty/comment-only input)
+          if node.nil?
+            run_method = s(:defs, s(:self), :run, s(:args), nil)
+            return s(:module, s(:const, nil, :Seeds), run_method)
+          end
+
+          # Get statements to wrap
+          children = node.type == :begin ? node.children : [node]
+
+          # Filter out nil children and non-executable nodes
+          executable = children.select { |c| c.respond_to?(:type) }
+
+          # Build the run method body
+          run_body = if executable.empty?
+            nil
+          elsif executable.length == 1
+            executable.first
+          else
+            s(:begin, *executable)
+          end
+
+          # Build: module Seeds; def self.run; ...; end; end
+          run_method = s(:defs, s(:self), :run, s(:args), run_body)
+          s(:module, s(:const, nil, :Seeds), run_method)
+        end
 
         def has_self_run_method?(body)
           return false unless body

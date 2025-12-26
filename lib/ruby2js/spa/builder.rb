@@ -327,19 +327,21 @@ module Ruby2JS
         seeds_src = File.join(@rails_root, 'db', 'seeds.rb')
         seeds_dst = File.join(output_dir, 'db', 'seeds.rb')
 
-        if File.exist?(seeds_src)
-          # Copy existing seeds file (will be transpiled by npm run build)
+        # Check if seeds.rb has actual Ruby code (not just comments/whitespace)
+        has_code = File.exist?(seeds_src) &&
+                   File.read(seeds_src).lines.any? { |line| line.strip !~ /\A(#.*|\s*)\z/ }
+
+        if has_code
+          # Copy existing seeds file - the rails/seeds filter will wrap bare code
+          # in module Seeds if needed during transpilation
           FileUtils.cp(seeds_src, seeds_dst)
         else
-          # Generate empty Seeds module (rails/seeds filter expects module Seeds with def self.run)
+          # Generate empty Seeds module (rails/seeds filter needs code to process)
           File.write(seeds_dst, <<~RUBY)
             # Seeds for #{manifest.name}
-            # This file is transpiled to JavaScript by the rails/seeds filter
-
             module Seeds
               def self.run
-                # Add your seed data here, e.g.:
-                # Article.create(title: "Hello World", body: "Welcome!")
+                # Add your seed data here
               end
             end
           RUBY
