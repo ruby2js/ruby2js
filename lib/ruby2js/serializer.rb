@@ -240,6 +240,7 @@ module Ruby2JS
   class Serializer
     attr_reader :timestamps
     attr_accessor :file_name
+    attr_accessor :erb_source, :erb_position_map  # For ERB->JS source maps
 
     def initialize
       @sep = '; '
@@ -255,6 +256,11 @@ module Ruby2JS
 
       @ast = nil
       @file_name = ''
+
+      # ERB source map support
+      @erb_source = nil
+      @erb_position_map = nil
+      @erb_source_buffer = nil
     end
 
     def timestamp(file)
@@ -515,6 +521,30 @@ module Ruby2JS
       @str = @lines.map(&:to_s).join(@nl)
     end
 
+    # Translate a Ruby buffer position to an ERB position using the position map.
+    # Returns the translated position, or nil if the position is not in a mapped range.
+    def translate_ruby_to_erb_position(ruby_pos)
+      return nil unless @erb_position_map
+
+      @erb_position_map.each do |ruby_start, ruby_end, erb_start, erb_end|
+        if ruby_pos >= ruby_start && ruby_pos < ruby_end
+          # Calculate offset within the range and apply to ERB position
+          offset = ruby_pos - ruby_start
+          return erb_start + offset
+        end
+      end
+
+      nil  # Position not in any mapped range
+    end
+
+    # Get or create an ERB source buffer for source map generation
+    def erb_source_buffer
+      return @erb_source_buffer if @erb_source_buffer
+      return nil unless @erb_source
+
+      @erb_source_buffer = ErbSourceBuffer.new(@erb_source, @file_name)
+    end
+
     BASE64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
 
     # https://docs.google.com/document/d/1U1RGAehQwRypUTovF1KRlpiOFze0b-_2gc6fAH0KY0k/edit
@@ -575,15 +605,43 @@ module Ruby2JS
       names = []
       @mark = nil
 
+      # If we have ERB source, use it as the source buffer for mappings
+      use_erb = @erb_source && @erb_position_map
+      erb_buffer = use_erb ? erb_source_buffer : nil
+
       @lines.each_with_index do |line, row|
         col = line.indent
         line.tokens.each do |token|
           if token.respond_to?(:loc) && token.loc && token.loc.respond_to?(:expression) && token.loc.expression
-            pos = token.loc.expression.begin_pos
+            ruby_pos = token.loc.expression.begin_pos
 
-            buffer = token.loc.expression.source_buffer
+            # Try to translate Ruby position to ERB position
+            if use_erb
+              erb_pos = translate_ruby_to_erb_position(ruby_pos)
+              if erb_pos
+                # Use ERB source buffer with translated position
+                buffer = erb_buffer
+                pos = erb_pos
+              else
+                # Position not mapped - skip this token for source mapping
+                col += token.length
+                next
+              end
+            else
+              # No ERB mapping - use original Ruby position
+              buffer = token.loc.expression.source_buffer
+              pos = ruby_pos
+            end
+
             # Use find_index with block for JS compatibility (converts to findIndex)
-            source_index = sources.find_index { |s| s == buffer }
+            # For ErbSourceBuffer, use same_source? method; for others use ==
+            source_index = sources.find_index do |s|
+              if buffer.respond_to?(:same_source?)
+                buffer.same_source?(s)
+              else
+                s == buffer
+              end
+            end
             if source_index.nil? || source_index == -1
               source_index = sources.length
               timestamp buffer.name unless defined?(globalThis) # Pragma: skip
@@ -625,6 +683,38 @@ module Ruby2JS
         names: names.map(&:to_s),
         mappings: @mappings
       }
+    end
+  end
+
+  # Source buffer for ERB templates - provides line/column lookup for source maps
+  class ErbSourceBuffer
+    attr_reader :source, :name
+
+    def initialize(source, name = nil)
+      @source = source
+      @name = name || ''
+      # Build line offset table for line_for_position
+      @line_offsets = [0]
+      source.each_char.with_index do |char, i|
+        @line_offsets << (i + 1) if char == "\n"
+      end
+    end
+
+    # For equality comparison in source map generation
+    # Use named method instead of == for JS compatibility
+    def same_source?(other)
+      other.is_a?(ErbSourceBuffer) && @source.object_id == other.source.object_id
+    end
+
+    # Return line number (1-based) for a character position
+    def line_for_position(pos)
+      @line_offsets.bsearch_index { |offset| offset > pos } || @line_offsets.length
+    end
+
+    # Return column number (0-based) for a character position
+    def column_for_position(pos)
+      line_idx = (@line_offsets.bsearch_index { |offset| offset > pos } || @line_offsets.length) - 1
+      pos - @line_offsets[line_idx]
     end
   end
 end

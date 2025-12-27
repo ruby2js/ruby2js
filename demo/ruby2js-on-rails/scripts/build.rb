@@ -499,15 +499,42 @@ class SelfhostBuilder
     puts("Transpiling ERB: #{File.basename(src_path)}")
     template = File.read(src_path)
 
-    ruby_src = ErbCompiler.new(template).src
+    # Compile ERB to Ruby and get position mapping
+    compiler = ErbCompiler.new(template)
+    ruby_src = compiler.src
+
+    # Use relative path for cleaner display in browser debugger
+    relative_src = src_path.sub(DEMO_ROOT + '/', '')
+
     # Pass database option for target-aware link generation
-    erb_options = ERB_OPTIONS.merge(database: @database)
-    js = Ruby2JS.convert(ruby_src, erb_options).to_s
+    # Also pass ERB source and position map for source map generation
+    erb_options = ERB_OPTIONS.merge(
+      database: @database,
+      file: relative_src
+    )
+    result = Ruby2JS.convert(ruby_src, erb_options)
+
+    # Set ERB source map data on the result (which is the Serializer/Converter)
+    result.erb_source = template
+    result.erb_position_map = compiler.position_map
+
+    js = result.to_s
     js = js.sub(/^function render/, 'export function render')
 
     FileUtils.mkdir_p(File.dirname(dest_path))
-    File.write(dest_path, js)
+
+    # Generate source map
+    map_path = "#{dest_path}.map"
+    sourcemap = result.sourcemap
+    sourcemap[:sourcesContent] = [template]  # Use original ERB, not Ruby
+
+    # Add sourcemap reference to JS file
+    js_with_map = "#{js}\n//# sourceMappingURL=#{File.basename(map_path)}\n"
+    File.write(dest_path, js_with_map)
+    File.write(map_path, JSON.generate(sourcemap))
+
     puts("  -> #{dest_path}")
+    puts("  -> #{map_path}")
     js
   end
 

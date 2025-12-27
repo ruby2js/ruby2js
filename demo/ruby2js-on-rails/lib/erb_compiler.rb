@@ -1,14 +1,25 @@
 # ERB to Ruby compiler for Ruby2JS-on-Rails
 # This produces Ruby code that can be transpiled to JavaScript.
 # Both Ruby and selfhost builds use this same compiler for consistency.
+#
+# Position Mapping for Source Maps:
+# The compiler tracks where each piece of Ruby code came from in the original ERB.
+# This enables source maps that point back to the .erb file, not the intermediate Ruby.
+#
+# position_map entries: [ruby_start, ruby_end, erb_start, erb_end]
+# - ruby_start/end: byte offsets in generated Ruby code
+# - erb_start/end: byte offsets in original ERB template
 
 class ErbCompiler
   # Block expression regex from Rails ActionView (erubi.rb)
   # Matches: ") do |...|", " do |...|", "{ |...|", etc.
   BLOCK_EXPR = /((\s|\))do|\{)(\s*\|[^|]*\|)?\s*\z/
 
+  attr_reader :position_map
+
   def initialize(template)
     @template = template
+    @position_map = []  # Array of [ruby_start, ruby_end, erb_start, erb_end]
   end
 
   # Compile ERB template to Ruby code
@@ -64,22 +75,45 @@ class ErbCompiler
       if tag.start_with?("=")
         # Output expression: <%= expr %>
         expr = tag[1..-1].strip
+        # Calculate ERB position: <%= is at erb_start, expr starts after "<%=" and whitespace
+        erb_expr_start = erb_start + 2 + 1 + (tag.length - 1 - expr.length)  # <%=, plus leading whitespace
+        erb_expr_end = erb_expr_start + expr.length
+
         # Check if this is a block expression using Rails' BLOCK_EXPR regex
         if expr =~ BLOCK_EXPR
           # Block expression: use .append= pattern that ERB filter expects
+          ruby_expr_start = ruby_code.length + " _buf.append= ".length
           ruby_code += " _buf.append= #{expr}\n"
+          ruby_expr_end = ruby_code.length - 1  # exclude newline
+          @position_map << [ruby_expr_start, ruby_expr_end, erb_expr_start, erb_expr_end]
         else
+          ruby_expr_start = ruby_code.length + " _buf << ( ".length
           ruby_code += " _buf << ( #{expr} ).to_s;"
+          ruby_expr_end = ruby_expr_start + expr.length
+          @position_map << [ruby_expr_start, ruby_expr_end, erb_expr_start, erb_expr_end]
           is_output_expr = true
         end
       elsif tag.start_with?("-")
         # Unescaped output: <%- expr %> (same as <%= for our purposes)
         expr = tag[1..-1].strip
+        erb_expr_start = erb_start + 2 + 1 + (tag.length - 1 - expr.length)
+        erb_expr_end = erb_expr_start + expr.length
+
+        ruby_expr_start = ruby_code.length + " _buf << ( ".length
         ruby_code += " _buf << ( #{expr} ).to_s;"
+        ruby_expr_end = ruby_expr_start + expr.length
+        @position_map << [ruby_expr_start, ruby_expr_end, erb_expr_start, erb_expr_end]
         is_output_expr = true
       else
         # Code block: <% code %> - use newline, not semicolon
-        ruby_code += " #{tag}\n"
+        code = tag.strip
+        erb_code_start = erb_start + 2 + (tag.length - tag.lstrip.length)
+        erb_code_end = erb_code_start + code.length
+
+        ruby_code_start = ruby_code.length + 1  # after space
+        ruby_code += " #{code}\n"
+        ruby_code_end = ruby_code.length - 1  # exclude newline
+        @position_map << [ruby_code_start, ruby_code_end, erb_code_start, erb_code_end]
       end
 
       pos = erb_end + 2
