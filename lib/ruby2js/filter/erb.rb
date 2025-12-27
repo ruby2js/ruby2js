@@ -11,6 +11,8 @@ module Ruby2JS
         super
         # Note: use Array instead of Set for JS compatibility (Set doesn't have push)
         @erb_ivars = []
+        @erb_locals = []      # Undefined local variables (used but not assigned)
+        @erb_lvar_assigns = [] # Local variable assignments
         @erb_bufvar = nil
       end
 
@@ -36,10 +38,12 @@ module Ruby2JS
         return super unless bufvar
         @erb_bufvar = bufvar
 
-        # Collect all instance variables used in the template
+        # Collect all instance variables and undefined locals used in the template
         # Note: use Array instead of Set for JS compatibility
         @erb_ivars = []
-        collect_ivars(node)
+        @erb_locals = []
+        @erb_lvar_assigns = []
+        collect_vars(node)
 
         # Transform the body, converting ivars to property access on 'data' param
         transformed_children = children.map { |child| process(child) }
@@ -47,16 +51,25 @@ module Ruby2JS
         # Build the function body with autoreturn for the last expression
         body = s(:autoreturn, *transformed_children)
 
-        # Create parameter for the function - destructure ivars from object
-        if @erb_ivars.empty?
+        # Create parameter for the function - destructure ivars and undefined locals
+        # Combine ivars (converted to names) and undefined locals
+        all_params = []
+
+        # Add ivars (strip @ prefix)
+        @erb_ivars.uniq.sort.each do |ivar|
+          prop_name = ivar.to_s[1..-1].to_sym  # @title -> title
+          all_params << prop_name
+        end
+
+        # Add undefined locals (used but not assigned in template)
+        undefined_locals.uniq.sort.each do |local|
+          all_params << local unless all_params.include?(local)
+        end
+
+        if all_params.empty?
           args = s(:args)
         else
-          # Create destructuring pattern: { title, content }
-          # Note: use uniq.sort for Array (was .to_a.sort for Set)
-          kwargs = @erb_ivars.uniq.sort.map do |ivar|
-            prop_name = ivar.to_s[1..-1].to_sym  # @title -> title
-            s(:kwarg, prop_name)
-          end
+          kwargs = all_params.map { |name| s(:kwarg, name) }
           args = s(:args, *kwargs)
         end
 
@@ -213,18 +226,61 @@ module Ruby2JS
 
       private
 
-      # Recursively collect all instance variables in the AST
-      def collect_ivars(node)
+      # Recursively collect all instance variables and undefined locals in the AST
+      def collect_vars(node)
         return unless ast_node?(node)
 
+        # Note: avoid case/when for JS compatibility (variable declarations in case blocks
+        # cause TDZ errors). Use if/elsif instead.
         if node.type == :ivar
-          # Note: use push instead of << for JS compatibility
+          # Instance variable: @article
           @erb_ivars.push(node.children.first)
+        elsif node.type == :lvasgn
+          # Local variable assignment: article = ...
+          name = node.children.first
+          @erb_lvar_assigns.push(name) unless @erb_lvar_assigns.include?(name)
+        elsif node.type == :lvar
+          # Local variable read: article
+          name = node.children.first
+          # Skip the buffer variable itself
+          unless name == @erb_bufvar
+            @erb_locals.push(name) unless @erb_locals.include?(name)
+          end
+        elsif node.type == :send && node.children.first.nil?
+          # Method call with no receiver: article.something or just article
+          # In ERB partials, these are often locals passed from the parent
+          name = node.children[1]
+          # Only track if it looks like a local variable (lowercase, no args beyond the method chain)
+          # Skip common Rails helpers and keywords
+          # Note: use string skip list for JS compatibility (symbols become strings in JS)
+          skip_names = %w[render link_to form_with form_for form_tag
+                          pluralize truncate content_for notice
+                          String Array Hash Integer Float]
+          name_str = name.to_s
+          if name_str =~ /\A[a-z_][a-z0-9_]*\z/ && !skip_names.include?(name_str)
+            @erb_locals.push(name) unless @erb_locals.include?(name)
+          end
+        elsif [:args, :arg, :kwarg, :blockarg].include?(node.type)
+          # Block/method arguments define local variables
+          node.children.each do |child|
+            # Note: check for string (JS) or symbol (Ruby) for dual compatibility
+            if child.respond_to?(:to_s) && !ast_node?(child)
+              @erb_lvar_assigns.push(child) unless @erb_lvar_assigns.include?(child)
+            elsif ast_node?(child) && [:arg, :kwarg, :blockarg].include?(child.type)
+              arg_name = child.children.first
+              @erb_lvar_assigns.push(arg_name) unless @erb_lvar_assigns.include?(arg_name)
+            end
+          end
         end
 
         node.children.each do |child|
-          collect_ivars(child) if ast_node?(child)
+          collect_vars(child) if ast_node?(child)
         end
+      end
+
+      # Helper to get only undefined locals (called after collect_vars completes)
+      def undefined_locals
+        @erb_locals.select { |local| !@erb_lvar_assigns.include?(local) }
       end
     end
 

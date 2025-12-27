@@ -399,6 +399,15 @@ export function truncate(text, options = {}) {
   return text.slice(0, length - omission.length) + omission;
 }
 
+// Pluralize helper (Rails view helper equivalent)
+// pluralize(1, 'error') => '1 error'
+// pluralize(2, 'error') => '2 errors'
+// pluralize(2, 'error', 'mistakes') => '2 mistakes'
+export function pluralize(count, singular, plural = null) {
+  const word = count === 1 ? singular : (plural || singular + 's');
+  return `${count} ${word}`;
+}
+
 // Extract form data from a submit event
 // Returns a params object with all form field values
 export function formData(event) {

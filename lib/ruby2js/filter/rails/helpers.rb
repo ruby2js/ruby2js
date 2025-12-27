@@ -18,6 +18,7 @@ module Ruby2JS
           @erb_model_name = nil  # Track model name for form_for (e.g., 'user')
           @erb_path_helpers = [] # Track path helper usage for imports
           @erb_view_helpers = [] # Track view helper usage (truncate, etc.) for imports
+          @erb_partials = []     # Track partial usage for imports
         end
 
         # Add imports for path helpers and view helpers
@@ -33,6 +34,20 @@ module Ruby2JS
           unless @erb_view_helpers.empty?
             helpers = @erb_view_helpers.uniq.sort.map { |name| s(:const, nil, name) }
             self.prepend_list << s(:import, '../../lib/rails.js', helpers)
+          end
+
+          # Add imports for partials
+          # render "form" -> import * as _form_module from './_form.js'
+          # Then call _form_module.render({article})
+          unless @erb_partials.empty?
+            @erb_partials.uniq.sort.each do |partial_name|
+              module_name = "_#{partial_name}_module".to_sym
+              # Path array format: [as_pair, from_pair] for "import * as X from Y"
+              self.prepend_list << s(:import,
+                [s(:pair, s(:sym, :as), s(:const, nil, module_name)),
+                 s(:pair, s(:sym, :from), s(:str, "./_#{partial_name}.js"))],
+                s(:str, '*'))
+            end
           end
         end
 
@@ -55,6 +70,11 @@ module Ruby2JS
             return process_truncate(args)
           end
 
+          # Handle pluralize helper
+          if method == :pluralize && target.nil? && args.length >= 2
+            return process_pluralize(args)
+          end
+
           # Handle notice helper (flash message)
           if method == :notice && target.nil? && args.empty?
             return process_notice
@@ -63,6 +83,12 @@ module Ruby2JS
           # Handle content_for helper
           if method == :content_for && target.nil?
             return process_content_for(args)
+          end
+
+          # Handle render partial calls
+          if method == :render && target.nil? && args.any?
+            result = process_render_partial(args)
+            return result if result
           end
 
           # Track path helper usage for imports (e.g., article_path, new_article_path)
@@ -302,6 +328,23 @@ module Ruby2JS
           s(:send, nil, :truncate, text_expr, s(:hash, s(:pair, s(:sym, :length), s(:int, length))))
         end
 
+        # Process pluralize helper
+        # pluralize(count, singular) -> pluralize(count, singular)
+        # pluralize(count, singular, plural) -> pluralize(count, singular, plural)
+        def process_pluralize(args)
+          @erb_view_helpers << :pluralize unless @erb_view_helpers.include?(:pluralize)
+
+          count_node = process(args[0])
+          singular_node = process(args[1])
+
+          if args.length >= 3
+            plural_node = process(args[2])
+            s(:send, nil, :pluralize, count_node, singular_node, plural_node)
+          else
+            s(:send, nil, :pluralize, count_node, singular_node)
+          end
+        end
+
         # Process notice helper - reads from flash and returns message
         # <%= notice %> -> flash.consumeNotice()
         def process_notice
@@ -338,6 +381,93 @@ module Ruby2JS
             else
               s(:str, '')
             end
+          end
+        end
+
+        # Process render partial calls
+        # render "form" -> _form_partial({})
+        # render "form", article: @article -> _form_partial({article})
+        # render partial: "form", locals: { article: @article } -> _form_partial({article})
+        # render @article -> _article_partial({article: @article})
+        def process_render_partial(args)
+          return nil if args.empty?
+
+          first_arg = args[0]
+          locals = {}
+
+          # Determine partial name and locals based on argument patterns
+          partial_name = nil
+
+          if first_arg.type == :str
+            # render "form" or render "form", locals: { ... }
+            partial_name = first_arg.children[0]
+
+            # Check for additional hash argument with locals
+            if args[1]&.type == :hash
+              args[1].children.each do |pair|
+                key = pair.children[0]
+                value = pair.children[1]
+                if key.type == :sym
+                  locals[key.children[0]] = value
+                end
+              end
+            end
+
+          elsif first_arg.type == :hash
+            # render partial: "form", locals: { ... }
+            first_arg.children.each do |pair|
+              key = pair.children[0]
+              value = pair.children[1]
+              next unless key.type == :sym
+
+              case key.children[0]
+              when :partial
+                partial_name = value.children[0] if value.type == :str
+              when :locals
+                if value.type == :hash
+                  value.children.each do |local_pair|
+                    local_key = local_pair.children[0]
+                    local_value = local_pair.children[1]
+                    if local_key.type == :sym
+                      locals[local_key.children[0]] = local_value
+                    end
+                  end
+                end
+              end
+            end
+
+          elsif first_arg.type == :ivar
+            # render @article -> renders _article partial with article: @article
+            ivar_name = first_arg.children[0].to_s.sub(/^@/, '')
+            partial_name = ivar_name
+            locals[ivar_name.to_sym] = first_arg
+
+          elsif first_arg.type == :lvar
+            # render article -> renders _article partial with article: article
+            var_name = first_arg.children[0].to_s
+            partial_name = var_name
+            locals[var_name.to_sym] = first_arg
+          end
+
+          return nil unless partial_name
+
+          # Track this partial for import generation
+          @erb_partials << partial_name unless @erb_partials.include?(partial_name)
+
+          # Build the partial function call: _form_module.render({article})
+          module_name = "_#{partial_name}_module".to_sym
+
+          # Build locals hash for the call
+          # Note: use keys iteration for JS compatibility (Hash#map doesn't transpile well)
+          pairs = []
+          locals.keys.each do |key|
+            pairs << s(:pair, s(:sym, key), process(locals[key]))
+          end
+
+          if pairs.empty?
+            s(:send, s(:lvar, module_name), :render, s(:hash))
+          else
+            s(:send, s(:lvar, module_name), :render, s(:hash, *pairs))
           end
         end
 
