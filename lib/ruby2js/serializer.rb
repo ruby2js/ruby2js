@@ -695,7 +695,7 @@ module Ruby2JS
       @name = name || ''
       # Build line offset table for line_for_position
       @line_offsets = [0]
-      source.each_char.with_index do |char, i|
+      source.chars.each_with_index do |char, i|
         @line_offsets << (i + 1) if char == "\n"
       end
     end
