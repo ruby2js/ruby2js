@@ -1,6 +1,23 @@
 // Ruby2JS-on-Rails Micro Framework
 // Provides routing, controller dispatch, and form handling
 
+// Flash message store - holds messages across redirects
+export const flash = {
+  _notice: null,
+
+  // Set a notice message (called after redirect with notice)
+  setNotice(message) {
+    this._notice = message;
+  },
+
+  // Get and clear the notice message (called from views via <%= notice %>)
+  consumeNotice() {
+    const message = this._notice || '';
+    this._notice = null;
+    return message;
+  }
+};
+
 export class Router {
   static routes = [];
   static controllers = {};
@@ -141,8 +158,11 @@ export class Router {
     }
   }
 
-  // Navigate to a new path
-  static async navigate(path) {
+  // Navigate to a new path, optionally with a notice message
+  static async navigate(path, notice = null) {
+    if (notice) {
+      flash.setNotice(notice);
+    }
     history.pushState({}, '', path);
     await this.dispatch(path);
   }
@@ -239,7 +259,7 @@ export class FormHandler {
   static async handleResult(result, controllerName, action, controller, id = null) {
     if (result.redirect) {
       console.log(`  Redirected to ${result.redirect}`);
-      await Router.navigate(result.redirect);
+      await Router.navigate(result.redirect, result.notice);
     } else if (result.render) {
       console.log(`  Rendering ${controllerName}/${action} (validation failed)`);
       const actionMethod = action === 'new' ? '$new' : action;
@@ -356,6 +376,9 @@ export async function submitForm(event, handler) {
     const result = await handler(event);
     if (result?.redirect) {
       console.log(`  Redirected to ${result.redirect}`);
+      if (result.notice) {
+        flash.setNotice(result.notice);
+      }
       history.pushState({}, '', result.redirect);
       await Router.dispatch(result.redirect);
     } else if (result?.render) {
@@ -390,7 +413,7 @@ export function formData(event) {
 export function handleFormResult(result, rerenderFn = null) {
   if (result?.redirect) {
     console.log(`  Redirected to ${result.redirect}`);
-    Router.navigate(result.redirect);
+    Router.navigate(result.redirect, result.notice);
   } else if (result?.render && rerenderFn) {
     console.log(`  Re-rendering form (validation failed)`);
     rerenderFn();

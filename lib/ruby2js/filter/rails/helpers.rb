@@ -55,6 +55,16 @@ module Ruby2JS
             return process_truncate(args)
           end
 
+          # Handle notice helper (flash message)
+          if method == :notice && target.nil? && args.empty?
+            return process_notice
+          end
+
+          # Handle content_for helper
+          if method == :content_for && target.nil?
+            return process_content_for(args)
+          end
+
           # Track path helper usage for imports (e.g., article_path, new_article_path)
           if target.nil? && method.to_s.end_with?('_path') && @erb_bufvar
             @erb_path_helpers << method unless @erb_path_helpers.include?(method)
@@ -290,6 +300,45 @@ module Ruby2JS
           end
 
           s(:send, nil, :truncate, text_expr, s(:hash, s(:pair, s(:sym, :length), s(:int, length))))
+        end
+
+        # Process notice helper - reads from flash and returns message
+        # <%= notice %> -> flash.consumeNotice()
+        def process_notice
+          @erb_view_helpers << :flash unless @erb_view_helpers.include?(:flash)
+          s(:send, s(:lvar, :flash), :consumeNotice)
+        end
+
+        # Process content_for helper
+        # <% content_for :title, "Articles" %> -> stores content (returns empty string)
+        # <%= content_for(:title) %> -> retrieves content
+        def process_content_for(args)
+          return s(:str, '') if args.empty?
+
+          key = args[0]
+          value = args[1]
+
+          if value
+            # Setting content: content_for :title, "Articles"
+            # For now, handle :title specially to set document.title
+            if key.type == :sym && key.children[0] == :title
+              # Set document.title and return empty string
+              s(:begin,
+                s(:send, s(:attr, nil, :document), :title=, process(value)),
+                s(:str, ''))
+            else
+              # Other keys: just return empty string (no-op for now)
+              s(:str, '')
+            end
+          else
+            # Getting content: content_for(:title)
+            # For :title, return document.title
+            if key.type == :sym && key.children[0] == :title
+              s(:attr, s(:lvar, :document), :title)
+            else
+              s(:str, '')
+            end
+          end
         end
 
         # Convert form builder method calls to HTML input elements

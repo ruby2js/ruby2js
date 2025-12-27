@@ -521,6 +521,18 @@ module Ruby2JS
           # Note: use args[0] instead of args.first for JS compatibility
           target = args[0]
 
+          # Extract notice from options hash (second argument)
+          notice_node = nil
+          if args.length > 1 && args[1]&.type == :hash
+            args[1].children.each do |pair|
+              key = pair.children[0]
+              value = pair.children[1]
+              if key.type == :sym && key.children[0] == :notice
+                notice_node = value
+              end
+            end
+          end
+
           # Note: avoid case-as-expression for JS compatibility (doesn't transpile correctly)
           path = nil
           if target.type == :ivar
@@ -548,7 +560,13 @@ module Ruby2JS
             path = transform_ivars_to_locals(target)
           end
 
-          s(:hash, s(:pair, s(:sym, :redirect), path))
+          # Build result hash with redirect and optional notice
+          pairs = [s(:pair, s(:sym, :redirect), path)]
+          if notice_node
+            pairs << s(:pair, s(:sym, :notice), notice_node)
+          end
+
+          s(:hash, *pairs)
         end
 
         def transform_render(args)
