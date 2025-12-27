@@ -41,6 +41,9 @@ prism_browser_deps = FileList["#{ROOT}/lib/ruby2js/selfhost/prism_browser.rb"]
 # Bundle dependencies (includes CLI)
 bundle_deps = FileList["#{ROOT}/lib/ruby2js/selfhost/bundle.rb", "#{ROOT}/lib/ruby2js/selfhost/cli.rb"]
 
+# ERB Compiler dependencies
+erb_compiler_deps = FileList["#{SELFHOST}/../ruby2js-on-rails/lib/erb_compiler.rb"]
+
 desc "Build prism_browser.js (in selfhost root for correct node_modules paths)"
 file "#{SELFHOST}/prism_browser.js" => [*prism_browser_deps, *selfhost_deps] do
   sh bundle_exec("ruby #{SELFHOST}/scripts/transpile_prism_browser.rb > #{SELFHOST}/prism_browser.js")
@@ -49,6 +52,12 @@ end
 desc "Build ruby2js.js (library for CLI, browser, and tests)"
 file "#{SELFHOST}/ruby2js.js" => [*bundle_deps, *runtime_deps, *namespace_deps, *walker_deps, *converter_deps, *selfhost_deps] do
   sh bundle_exec("ruby #{SELFHOST}/scripts/transpile_bundle.rb > #{SELFHOST}/ruby2js.js")
+end
+
+desc "Build erb_compiler.js (ERB to Ruby compiler)"
+file "#{SELFHOST}/lib/erb_compiler.js" => [*erb_compiler_deps] do
+  FileUtils.mkdir_p("#{SELFHOST}/lib")
+  sh bundle_exec("ruby #{SELFHOST}/scripts/transpile_erb_compiler.rb > #{SELFHOST}/lib/erb_compiler.js")
 end
 
 # Map spec names to filter names (when they differ)
@@ -181,7 +190,7 @@ task "build_mjs:npm" => :build_mjs do
 end
 
 desc "Run ruby2js-on-rails smoke tests (compares Ruby vs selfhost builds)"
-task :test_smoke => [:npm_install, :npm_install_demo, "#{SELFHOST}/ruby2js.js", :build_filters, BUILD_MJS] do
+task :test_smoke => [:npm_install, :npm_install_demo, "#{SELFHOST}/ruby2js.js", "#{SELFHOST}/lib/erb_compiler.js", :build_filters, BUILD_MJS] do
   Dir.chdir(DEMO) do
     sh "node scripts/smoke-test.mjs"
   end
@@ -197,13 +206,14 @@ desc "Clean dist directory and generated files"
 task :clean do
   rm_rf DIST
   rm_rf "#{SELFHOST}/filters"
+  rm_rf "#{SELFHOST}/lib"
   rm_f "#{SELFHOST}/ruby2js.js"
   rm_f "#{SELFHOST}/prism_browser.js"
   rm_f BUILD_MJS
 end
 
 desc "Publish ruby2js-on-rails demo as tarball"
-task :publish_demo => [:build, :build_filters, BUILD_MJS] do
+task :publish_demo => [:build, :build_filters, "#{SELFHOST}/lib/erb_compiler.js", BUILD_MJS] do
   sh "ruby #{SELFHOST}/scripts/publish_demo.rb"
 end
 
