@@ -528,6 +528,12 @@ class SelfhostBuilder
     sourcemap = result.sourcemap
     sourcemap[:sourcesContent] = [template]  # Use original ERB, not Ruby
 
+    # Compute relative path from sourcemap location back to source file
+    map_dir = File.dirname(dest_path).sub(DEMO_ROOT + '/', '')
+    depth = map_dir.split('/').length
+    source_from_map = ('../' * depth) + relative_src
+    sourcemap[:sources] = [source_from_map]
+
     # Add sourcemap reference to JS file
     js_with_map = "#{js}\n//# sourceMappingURL=#{File.basename(map_path)}\n"
     File.write(dest_path, js_with_map)
