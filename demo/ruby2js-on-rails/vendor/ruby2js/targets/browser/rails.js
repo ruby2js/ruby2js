@@ -265,10 +265,9 @@ export class FormHandler {
       console.log(`  Redirected to ${result.redirect}`);
       await Router.navigate(result.redirect, result.notice);
     } else if (result.render) {
+      // render contains the pre-rendered HTML from the view (with validation errors)
       console.log(`  Rendering ${controllerName}/${action} (validation failed)`);
-      const actionMethod = action === 'new' ? '$new' : action;
-      const html = id ? await controller[actionMethod](id) : await controller[actionMethod]();
-      document.getElementById('content').innerHTML = html;
+      document.getElementById('content').innerHTML = result.render;
     }
   }
 }

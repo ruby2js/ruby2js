@@ -667,11 +667,22 @@ module Ruby2JS
           target = args.first
 
           if target.type == :sym
-            # render :new -> ArticleViews.new_article({ ivars })
+            # render :new -> ArticleViews.$new({article})
+            # Call the view directly with the model (including validation errors)
             action = target.children[0]
-            action = :new_article if action == :new
+            model_name = @rails_controller_name.downcase.to_sym
+            view_module = "#{@rails_controller_name}Views"
+
+            # Use $new for reserved word (matches view module export)
+            view_action = action == :new ? :$new : action
+
+            # Build view call with model: ArticleViews.$new({article: article})
             s(:hash,
-              s(:pair, s(:sym, :render), s(:sym, action)))
+              s(:pair, s(:sym, :render),
+                s(:send,
+                  s(:const, nil, view_module.to_sym),
+                  view_action,
+                  s(:hash, s(:pair, s(:sym, model_name), s(:lvar, model_name))))))
           else
             # More complex render - pass through for now
             nil
