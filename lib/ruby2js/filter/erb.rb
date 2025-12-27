@@ -269,6 +269,15 @@ module Ruby2JS
           unless name == @erb_bufvar
             @erb_locals.push(name) unless @erb_locals.include?(name)
           end
+        elsif node.type == :send && node.children.first.nil?
+          # Method call with no receiver: could be a local variable reference
+          # In ERB, article.title has article as s(:send, nil, :article)
+          name = node.children[1]
+          name_str = name.to_s
+          # Only track lowercase names that look like variables (not constants or keywords)
+          if name_str =~ /\A[a-z_][a-z0-9_]*\z/
+            @erb_locals.push(name) unless @erb_locals.include?(name)
+          end
         elsif [:args, :arg, :kwarg, :blockarg].include?(node.type)
           # Block/method arguments define local variables
           node.children.each do |child|
