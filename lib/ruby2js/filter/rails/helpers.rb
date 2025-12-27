@@ -110,6 +110,8 @@ module Ruby2JS
 
             if helper_name == :form_for
               return process_form_for(block_send, block_args, block_body)
+            elsif helper_name == :form_with
+              return process_form_with(block_send, block_args, block_body)
             elsif helper_name == :form_tag
               return process_form_tag(block_send, block_args, block_body)
             else
@@ -126,6 +128,8 @@ module Ruby2JS
 
           if helper_name == :form_for
             return process_form_for(helper_call, block_args, block_body)
+          elsif helper_name == :form_with
+            return process_form_with(helper_call, block_args, block_body)
           elsif helper_name == :form_tag
             return process_form_tag(helper_call, block_args, block_body)
           end
@@ -576,6 +580,60 @@ module Ruby2JS
         def process_form_for(helper_call, block_args, block_body)
           model_node = helper_call.children[2]
           model_name = model_node.children.first.to_s.sub(/^@/, '') if model_node&.type == :ivar
+          block_param = block_args.children.first&.children&.first
+
+          old_block_var = @erb_block_var
+          old_model_name = @erb_model_name
+          @erb_block_var = block_param
+          @erb_model_name = model_name
+
+          statements = []
+          form_attrs = model_name ? " data-model=\"#{model_name}\"" : ""
+          statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+, s(:str, "<form#{form_attrs}>"))
+
+          if block_body
+            if block_body.type == :begin
+              block_body.children.each do |child|
+                processed = process(child)
+                statements << processed if processed
+              end
+            else
+              processed = process(block_body)
+              statements << processed if processed
+            end
+          end
+
+          statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+, s(:str, "</form>"))
+
+          @erb_block_var = old_block_var
+          @erb_model_name = old_model_name
+
+          s(:begin, *statements.compact)
+        end
+
+        # Process form_with block into JavaScript (Rails 5.1+ preferred form helper)
+        # form_with(model: @article) do |form| ... end
+        # form_with(url: articles_path) do |form| ... end
+        def process_form_with(helper_call, block_args, block_body)
+          # Extract model or url from keyword arguments
+          model_name = nil
+          options_node = helper_call.children[2]
+
+          if options_node&.type == :hash
+            options_node.children.each do |pair|
+              key = pair.children[0]
+              value = pair.children[1]
+              if key.type == :sym && key.children[0] == :model
+                # model: @article or model: article
+                if value.type == :ivar
+                  model_name = value.children.first.to_s.sub(/^@/, '')
+                elsif value.type == :lvar || value.type == :send
+                  model_name = value.children.first.to_s
+                end
+              end
+            end
+          end
+
           block_param = block_args.children.first&.children&.first
 
           old_block_var = @erb_block_var
