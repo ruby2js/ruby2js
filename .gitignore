@@ -14,6 +14,7 @@ demo/selfhost/ruby2js.js
 demo/selfhost/ruby2js.mjs
 demo/selfhost/prism_browser.js
 demo/selfhost/filters/
+demo/selfhost/lib/erb_compiler.js
 
 # Editor swap files
 *.swp
