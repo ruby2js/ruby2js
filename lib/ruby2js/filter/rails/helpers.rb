@@ -191,9 +191,19 @@ module Ruby2JS
 
         # Build a navigation link
         def build_nav_link(text_node, path_node)
-          # Handle model object as path: link_to "Show", @article -> article_path(@article)
+          # Handle model object as path: link_to "Show", @article or link_to "Show", article
           if path_node.type == :ivar
+            # Instance variable: @article
             model_name = path_node.children.first.to_s.sub(/^@/, '')
+            path_helper = "#{model_name}_path".to_sym
+            @erb_path_helpers << path_helper unless @erb_path_helpers.include?(path_helper)
+            # Generate /models/:id path
+            path_expr = s(:dstr,
+              s(:str, "/#{model_name}s/"),
+              s(:begin, s(:attr, s(:lvar, model_name.to_sym), :id)))
+          elsif path_node.type == :lvar
+            # Local variable: article (from a loop)
+            model_name = path_node.children.first.to_s
             path_helper = "#{model_name}_path".to_sym
             @erb_path_helpers << path_helper unless @erb_path_helpers.include?(path_helper)
             # Generate /models/:id path
