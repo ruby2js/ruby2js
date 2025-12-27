@@ -241,12 +241,16 @@ export class FormHandler {
   }
 
   // Extract form parameters
+  // Handles Rails-style nested params: article[title] -> title
   static extractParams(form) {
     const params = {};
     const inputs = form.querySelectorAll('input, textarea, select');
     inputs.forEach(input => {
       if (input.name && input.type !== 'submit') {
-        params[input.name] = input.value;
+        // Parse Rails-style nested param names: model[field] -> field
+        const match = input.name.match(/\[([^\]]+)\]$/);
+        const key = match ? match[1] : input.name;
+        params[key] = input.value;
       } else if (input.id && input.type !== 'submit') {
         // Fallback to id if no name
         params[input.id] = input.value;
