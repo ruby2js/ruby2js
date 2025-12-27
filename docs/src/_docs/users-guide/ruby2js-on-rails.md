@@ -374,6 +374,7 @@ The transpiled JavaScript requires runtime implementations. The demo provides th
 | better_sqlite3 | Node.js | SQLite file | `better-sqlite3` |
 | pg | Node.js | PostgreSQL | `pg` |
 | mysql2 | Node.js | MySQL | `mysql2` |
+| d1 | Cloudflare | SQLite (edge) | — (built-in) |
 
 Configure in `config/database.yml`:
 
@@ -386,10 +387,16 @@ browser_persistent:
   adapter: pglite
   database: my_app
 
+# Traditional server
 production:
   adapter: pg
   host: localhost
   database: my_app_production
+
+# Cloudflare Workers (edge)
+edge:
+  adapter: d1
+  binding: DB  # matches wrangler.toml
 ```
 
 ### Server Runtimes
@@ -397,13 +404,18 @@ production:
 The same transpiled code runs on multiple JavaScript runtimes:
 
 ```bash
-bin/rails server                    # Browser (default)
-bin/rails server --runtime node     # Node.js
-bin/rails server --runtime bun      # Bun
-bin/rails server --runtime deno     # Deno
+bin/rails server                         # Browser (default)
+bin/rails server --runtime node          # Node.js
+bin/rails server --runtime bun           # Bun
+bin/rails server --runtime deno          # Deno
+bin/rails server --runtime cloudflare    # Cloudflare Workers
 ```
 
 Each runtime uses its native HTTP server—no Express or framework overhead.
+
+{% rendercontent "docs/note", type: "info" %}
+**Cloudflare Workers**: When using `adapter: d1`, the build automatically selects the `cloudflare` runtime. The generated Worker uses Cloudflare's Fetch API and D1 bindings. Deploy with `wrangler deploy`.
+{% endrendercontent %}
 
 ## Developer Experience
 
@@ -562,22 +574,23 @@ The goal is enabling offline-first applications and static deployment—not repl
 A powerful pattern: the same Ruby source runs on both server and browser.
 
 ```
-                    Ruby Source
-                         │
-         ┌───────────────┼───────────────┐
-         ▼               ▼               ▼
-    Ruby Runtime    Ruby2JS →       Ruby2JS →
-         │          Browser JS      Server JS
-         │               │               │
-         ▼               ▼               ▼
-    PostgreSQL     IndexedDB/       SQLite/PG/
-                   PGLite/sql.js      MySQL
+                         Ruby Source
+                              │
+         ┌────────────┬───────┴───────┬────────────┐
+         ▼            ▼               ▼            ▼
+    Ruby Runtime  Ruby2JS →       Ruby2JS →    Ruby2JS →
+         │        Browser JS      Server JS    Edge JS
+         │            │               │            │
+         ▼            ▼               ▼            ▼
+    PostgreSQL   IndexedDB/       SQLite/      Cloudflare
+                 PGLite/sql.js    PG/MySQL        D1
 ```
 
 This enables:
 - **Single source of truth** — Validation logic in one place
 - **Progressive enhancement** — Server renders, browser enhances
 - **Offline capability** — Browser works without server
+- **Edge deployment** — Run at Cloudflare's global network
 - **Fallback** — Server handles what browser can't
 
 ## Example: Validation Sharing

@@ -832,7 +832,7 @@ module Ruby2JS
         end
 
         # Browser-only databases (IndexedDB, WASM-based)
-        BROWSER_DATABASES = %w[dexie indexeddb sqljs sql.js].freeze
+        BROWSER_DATABASES = %w[dexie indexeddb sqljs sql.js pglite].freeze
 
         def server_target?
           database = @options[:database]

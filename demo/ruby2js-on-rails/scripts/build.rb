@@ -41,7 +41,12 @@ class SelfhostBuilder
   BROWSER_DATABASES = ['dexie', 'indexeddb', 'sqljs', 'sql.js', 'pglite'].freeze
 
   # Server-side JavaScript runtimes
-  SERVER_RUNTIMES = ['node', 'bun', 'deno'].freeze
+  SERVER_RUNTIMES = ['node', 'bun', 'deno', 'cloudflare'].freeze
+
+  # Databases that require a specific runtime
+  RUNTIME_REQUIRED = {
+    'd1' => 'cloudflare'
+  }.freeze
 
   # Map DATABASE env var to adapter source file
   ADAPTER_FILES = {
@@ -58,7 +63,9 @@ class SelfhostBuilder
     'postgres' => 'active_record_pg.mjs',
     'postgresql' => 'active_record_pg.mjs',
     'mysql2' => 'active_record_mysql2.mjs',
-    'mysql' => 'active_record_mysql2.mjs'
+    'mysql' => 'active_record_mysql2.mjs',
+    # Cloudflare adapters
+    'd1' => 'active_record_d1.mjs'
   }.freeze
 
   # Common transpilation options for Ruby files
@@ -125,8 +132,18 @@ class SelfhostBuilder
       end
       @runtime = nil  # Browser target doesn't use a JS runtime
     else
-      # Server databases work with node, bun, or deno (default: node)
-      @runtime = requested_runtime || 'node'
+      # Check if database requires a specific runtime
+      required_runtime = RUNTIME_REQUIRED[@database]
+      if required_runtime
+        if requested_runtime && requested_runtime != required_runtime
+          raise "Database '#{@database}' requires RUNTIME=#{required_runtime}. Cannot use RUNTIME=#{requested_runtime}."
+        end
+        @runtime = required_runtime
+      else
+        # Server databases work with node, bun, or deno (default: node)
+        @runtime = requested_runtime || 'node'
+      end
+
       unless SERVER_RUNTIMES.include?(@runtime)
         raise "Unknown runtime: #{@runtime}. Valid options for server databases: #{SERVER_RUNTIMES.join(', ')}"
       end

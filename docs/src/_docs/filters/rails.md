@@ -456,16 +456,20 @@ function render({ body }) {
 
 The helpers filter detects the target environment based on the `database` option:
 
-- **Browser databases** (dexie, indexeddb, sqljs): Generate `onclick`/`onsubmit` handlers with JavaScript navigation
-- **Server databases** (better_sqlite3, pg): Generate standard `href`/`action` attributes
+- **Browser databases** (dexie, indexeddb, sqljs, pglite): Generate `onclick`/`onsubmit` handlers with JavaScript navigation
+- **Server databases** (better_sqlite3, pg, mysql2, d1): Generate standard `href`/`action` attributes
 
 ```ruby
 # Browser target (default)
 Ruby2JS.convert(src, filters: [:"rails/helpers", :erb], database: 'dexie')
 # => onclick="return navigate(event, '/articles')"
 
-# Server target
+# Server target (Node.js)
 Ruby2JS.convert(src, filters: [:"rails/helpers", :erb], database: 'better_sqlite3')
+# => href="/articles"
+
+# Server target (Cloudflare Workers)
+Ruby2JS.convert(src, filters: [:"rails/helpers", :erb], database: 'd1')
 # => href="/articles"
 ```
 
@@ -534,11 +538,11 @@ The transpiled JavaScript requires runtime implementations of:
 
 These are provided by the [Ruby2JS on Rails demo](https://github.com/ruby2js/ruby2js/tree/master/demo/ruby2js-on-rails) runtime, which uses:
 
-| Component | Browser | Server |
-|-----------|---------|--------|
-| Database | Dexie (IndexedDB) | better-sqlite3, pg |
-| Router | History API | HTTP server |
-| Renderer | DOM manipulation | HTML string |
+| Component | Browser | Server (Node/Bun/Deno) | Edge (Cloudflare) |
+|-----------|---------|------------------------|-------------------|
+| Database | Dexie, sql.js, PGLite | better-sqlite3, pg, mysql2 | D1 |
+| Router | History API | HTTP server | Fetch handler |
+| Renderer | DOM manipulation | HTML string | HTML string |
 
 ## Usage with Other Filters
 

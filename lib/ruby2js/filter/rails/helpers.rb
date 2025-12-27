@@ -10,7 +10,7 @@ module Ruby2JS
         # BEFORE Erb so the overrides take precedence in Ruby2JS's filter chain.
 
         # Browser databases - these run in browser with History API navigation
-        BROWSER_DATABASES = %w[dexie indexeddb sqljs sql.js].freeze
+        BROWSER_DATABASES = %w[dexie indexeddb sqljs sql.js pglite].freeze
 
         def initialize(*args)
           super
