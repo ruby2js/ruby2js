@@ -118,7 +118,8 @@ module Ruby2JS
                 base_expr = target.children[0]  # e.g., m.children
 
                 # Build element-wise comparisons
-                comparisons = rhs.children.each_with_index.map do |elem, idx|
+                comparisons = []
+                rhs.children.each_with_index do |elem, idx|
                   # Calculate actual index: range_start + idx
                   if range_start&.type == :int
                     actual_idx = s(:int, range_start.children[0] + idx)
@@ -127,7 +128,7 @@ module Ruby2JS
                   end
 
                   # base_expr[actual_idx] === elem
-                  s(:send, s(:send, base_expr, :[], actual_idx), :===, elem)
+                  comparisons << s(:send, s(:send, base_expr, :[], actual_idx), :===, elem)
                 end
 
                 # Combine with &&
