@@ -377,11 +377,11 @@ function render({ user }) {
 
 | Ruby Method | HTML Output |
 |-------------|-------------|
-| `f.text_field :name` | `<input type="text" name="model[name]" id="model_name">` |
-| `f.email_field :email` | `<input type="email" ...>` |
-| `f.password_field :pass` | `<input type="password" ...>` |
-| `f.hidden_field :id` | `<input type="hidden" ...>` |
-| `f.text_area :body` | `<textarea name="model[body]" ...></textarea>` |
+| `f.text_field :name` | `<input type="text" name="model[name]" id="model_name" value="${model.name ?? ''}">` |
+| `f.email_field :email` | `<input type="email" ... value="${model.email ?? ''}">` |
+| `f.password_field :pass` | `<input type="password" ... value="${model.pass ?? ''}">` |
+| `f.hidden_field :id` | `<input type="hidden" ... value="${model.id ?? ''}">` |
+| `f.text_area :body` | `<textarea name="model[body]" ...>${model.body ?? ''}</textarea>` |
 | `f.check_box :active` | `<input type="checkbox" value="1" ...>` |
 | `f.radio_button :role, :admin` | `<input type="radio" value="admin" ...>` |
 | `f.label :name` | `<label for="model_name">Name</label>` |
@@ -390,6 +390,10 @@ function render({ user }) {
 | `f.button "Click"` | `<button type="submit">Click</button>` |
 
 Additional input types: `number_field`, `tel_field`, `url_field`, `search_field`, `date_field`, `time_field`, `datetime_local_field`, `month_field`, `week_field`, `color_field`, `range_field`.
+
+{% rendercontent "docs/note", type: "info" %}
+Form fields automatically include the model's current value, enabling edit forms to display existing data without additional code.
+{% endrendercontent %}
 
 ### Link Helper
 
@@ -404,6 +408,33 @@ function render() {
   _buf += "<a href=\"/articles\" onclick=\"return navigate(event, '/articles')\">Articles</a>";
   return _buf
 }
+```
+
+**Link to model objects:**
+
+`link_to` accepts model objects and generates the appropriate path:
+
+```erb
+<%= link_to "Show", @article %>
+<%= link_to "Show", article %>  <%# local variable from loop %>
+```
+
+Both generate: `<a href="/articles/${article.id}" onclick="...">Show</a>`
+
+### Button Helper
+
+`button_to` generates delete buttons with confirmation dialogs:
+
+```erb
+<%= button_to "Delete", @article, method: :delete, data: { confirm: "Are you sure?" } %>
+```
+
+```javascript
+// Browser target
+_buf += `<form style="display:inline"><button type="button" onclick="if(confirm('Are you sure?')) { routes.article.delete(${article.id}) }">Delete</button></form>`;
+
+// Server target
+_buf += `<form method="post" action="/articles/${article.id}"><input type="hidden" name="_method" value="delete"><button type="submit" onclick="return confirm('Are you sure?')">Delete</button></form>`;
 ```
 
 ### Truncate Helper
@@ -437,6 +468,43 @@ Ruby2JS.convert(src, filters: [:"rails/helpers", :erb], database: 'dexie')
 Ruby2JS.convert(src, filters: [:"rails/helpers", :erb], database: 'better_sqlite3')
 # => href="/articles"
 ```
+
+### Validation Error Display
+
+When a controller action fails validation and calls `render :new` or `render :edit`, the model with its validation errors is automatically passed to the view. Standard Rails error display patterns work:
+
+```erb
+<% if @article.errors && @article.errors.length > 0 %>
+  <div class="errors">
+    <ul>
+      <% @article.errors.each do |error| %>
+        <li><%= error %></li>
+      <% end %>
+    </ul>
+  </div>
+<% end %>
+
+<%= form_for @article do |f| %>
+  <%= f.text_field :title %>
+  <%= f.text_area :body %>
+  <%= f.submit %>
+<% end %>
+```
+
+The controller remains idiomatic Rails:
+
+```ruby
+def create
+  @article = Article.new(article_params)
+  if @article.save
+    redirect_to @article
+  else
+    render :new  # Re-renders with @article.errors populated
+  end
+end
+```
+
+The transpiled controller returns the rendered view directly when validation fails, ensuring the model's error state is preserved.
 
 ## Logger
 

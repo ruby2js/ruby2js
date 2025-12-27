@@ -25,6 +25,10 @@ The transpiled output is compact, native JavaScript with direct access to browse
 
 ## Quick Start
 
+There are two ways to get started with Ruby2JS on Rails:
+
+### Option 1: Pre-built Demo
+
 No Ruby installation required. Node.js 22+ is all you need.
 
 ```bash
@@ -35,6 +39,31 @@ bin/dev
 ```
 
 Open http://localhost:3000. The source is Ruby. The runtime is JavaScript.
+
+This demo includes hand-crafted views showcasing various Rails patterns including nested resources (articles with comments), custom layouts, and helper methods.
+
+### Option 2: Rails 8 Scaffolds
+
+If you have Ruby and Rails installed, you can generate an SPA from standard Rails scaffolds:
+
+```bash
+rails new blog
+cd blog
+rails generate scaffold Article title:string body:text
+bundle add ruby2js --github ruby2js/ruby2js --require ruby2js/spa
+rails generate ruby2js:spa:install
+rails ruby2js:spa:build
+```
+
+The generated SPA is in `public/spa/blog/`. Run it with:
+
+```bash
+cd public/spa/blog
+npm install
+npm start
+```
+
+This approach lets you use familiar Rails generators and conventions, then export to a standalone JavaScript SPA.
 
 ## Getting Updates
 
@@ -227,10 +256,109 @@ transformed:
 <% end %>
 
 <%= link_to "Edit", edit_article_path(@article) %>
-<%= link_to "Delete", article_path(@article), method: :delete, data: { confirm: "Are you sure?" } %>
+<%= button_to "Delete", @article, method: :delete, data: { confirm: "Are you sure?" } %>
 ```
 
 See the [ERB filter documentation](/docs/filters/erb) for details.
+
+### Validation Errors
+
+Model validations work in the browser just like on the server. When validation fails, errors are displayed in the form:
+
+```erb
+<% if @article.errors && @article.errors.length > 0 %>
+  <div class="errors">
+    <ul>
+      <% @article.errors.each do |error| %>
+        <li><%= error %></li>
+      <% end %>
+    </ul>
+  </div>
+<% end %>
+
+<%= form_for @article do |f| %>
+  <%= f.text_field :title %>
+  <%= f.text_area :body %>
+  <%= f.submit %>
+<% end %>
+```
+
+The controller uses standard Rails patterns:
+
+```ruby
+def create
+  @article = Article.new(article_params)
+  if @article.save
+    redirect_to @article
+  else
+    render :new  # Re-renders with validation errors
+  end
+end
+```
+
+When `render :new` is called after a failed save, the view automatically receives the model with its populated `errors` array.
+
+## Rails 8 Scaffold Generator
+
+Ruby2JS includes an SPA generator that converts standard Rails scaffolds into standalone JavaScript applications.
+
+### Installation
+
+Add Ruby2JS to an existing Rails application:
+
+```bash
+bundle add ruby2js --github ruby2js/ruby2js --require ruby2js/spa
+```
+
+### Generate SPA from Scaffolds
+
+After creating scaffolds with `rails generate scaffold`, install and build the SPA:
+
+```bash
+rails generate ruby2js:spa:install
+rails ruby2js:spa:build
+```
+
+The generator:
+- Detects all scaffolded resources automatically
+- Transpiles models, controllers, and views
+- Generates a complete SPA in `public/spa/<app_name>/`
+- Configures routes and database adapter
+
+### Configuration
+
+The generator creates `config/ruby2js_spa.rb` with options:
+
+```ruby
+Ruby2JS::SPA.configure do |config|
+  config.runtime = :browser      # :browser or :node
+  config.database = :dexie       # :dexie, :sqljs, :pglite, etc.
+  config.scaffolds = %w[Article Comment]  # Auto-detected
+  config.root = "articles#index"
+end
+```
+
+### Running the SPA
+
+```bash
+cd public/spa/<app_name>
+npm install
+npm start        # Development server with hot reload
+npm run build    # Production build
+```
+
+### Supported Scaffold Features
+
+| Feature | Status |
+|---------|--------|
+| CRUD operations | ✓ |
+| `form_for` / `form_with` | ✓ |
+| Validations | ✓ |
+| Validation error display | ✓ |
+| `has_many` / `belongs_to` | ✓ |
+| Nested resources | ✓ |
+| `link_to` with models | ✓ |
+| `button_to` for delete | ✓ |
 
 ## Runtime Architecture
 
