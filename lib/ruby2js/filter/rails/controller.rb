@@ -451,6 +451,23 @@ module Ruby2JS
               else
                 return node
               end
+            elsif target&.type == :send &&
+                  target.children[0].nil? &&
+                  target.children[1] == :params &&
+                  method == :expect
+              # Rails 8 params.expect - two forms:
+              # params.expect("id") or params.expect(:id) -> id (use method parameter)
+              # params.expect({article: ["title", "body"]}) -> params (strong params)
+              arg = args.first
+              if arg&.type == :str || arg&.type == :sym
+                # params.expect("id") -> id
+                return s(:lvar, arg.children[0].to_sym)
+              elsif arg&.type == :hash
+                # params.expect({article: [...]}) -> params
+                return s(:lvar, :params)
+              else
+                return node
+              end
             elsif target.nil? && method.to_s.end_with?('_params')
               # article_params -> inline the method body (strong params)
               return transform_strong_params_call(method)
