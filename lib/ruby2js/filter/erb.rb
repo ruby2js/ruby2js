@@ -257,7 +257,9 @@ module Ruby2JS
                           pluralize truncate content_for notice raw
                           String Array Hash Integer Float]
           name_str = name.to_s
-          if name_str =~ /\A[a-z_][a-z0-9_]*\z/ && !skip_names.include?(name_str)
+          # Skip path helpers (e.g., new_article_path, articles_path)
+          # Note: use combined condition for JS compatibility (no 'next' in if/elsif)
+          if name_str =~ /\A[a-z_][a-z0-9_]*\z/ && !skip_names.include?(name_str) && !name_str.end_with?('_path')
             @erb_locals.push(name) unless @erb_locals.include?(name)
           end
         elsif [:args, :arg, :kwarg, :blockarg].include?(node.type)
