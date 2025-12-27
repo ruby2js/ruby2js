@@ -627,8 +627,11 @@ module Ruby2JS
                 # model: @article or model: article
                 if value.type == :ivar
                   model_name = value.children.first.to_s.sub(/^@/, '')
-                elsif value.type == :lvar || value.type == :send
+                elsif value.type == :lvar
                   model_name = value.children.first.to_s
+                elsif value.type == :send && value.children.first.nil?
+                  # s(:send, nil, :article) - method call as local
+                  model_name = value.children[1].to_s
                 end
               end
             end
