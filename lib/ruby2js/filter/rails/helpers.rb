@@ -75,6 +75,11 @@ module Ruby2JS
             return process_pluralize(args)
           end
 
+          # Handle dom_id helper
+          if method == :dom_id && target.nil? && args.length >= 1
+            return process_dom_id(args)
+          end
+
           # Handle notice helper (flash message)
           if method == :notice && target.nil? && args.empty?
             return process_notice
@@ -346,6 +351,22 @@ module Ruby2JS
             s(:send, nil, :pluralize, count_node, singular_node, plural_node)
           else
             s(:send, nil, :pluralize, count_node, singular_node)
+          end
+        end
+
+        # Process dom_id helper
+        # dom_id(article) -> dom_id(article)
+        # dom_id(article, :edit) -> dom_id(article, "edit")
+        def process_dom_id(args)
+          @erb_view_helpers << :dom_id unless @erb_view_helpers.include?(:dom_id)
+
+          record_node = process(args[0])
+
+          if args.length >= 2
+            prefix_node = process(args[1])
+            s(:send, nil, :dom_id, record_node, prefix_node)
+          else
+            s(:send, nil, :dom_id, record_node)
           end
         end
 

@@ -38,15 +38,27 @@ module Ruby2JS
         return super unless bufvar
         @erb_bufvar = bufvar
 
-        # Collect all instance variables and undefined locals used in the template
-        # Note: use Array instead of Set for JS compatibility
+        # Step 1: Collect instance variables BEFORE transformation
+        # (they get converted from @foo to foo by on_ivar)
         @erb_ivars = []
+        collect_ivars(node)
+
+        # Step 2: Transform the body (this triggers all filters including helpers)
+        transformed_children = children.map { |child| process(child) }
+
+        # Step 3: Let subclasses add imports via erb_prepend_imports hook
+        # (must happen before we check imported names)
+        erb_prepend_imports
+
+        # Step 4: Collect undefined locals from TRANSFORMED AST
+        # This runs after helper filters have processed their methods
         @erb_locals = []
         @erb_lvar_assigns = []
-        collect_vars(node)
+        transformed_body = s(:begin, *transformed_children)
+        collect_locals(transformed_body)
 
-        # Transform the body, converting ivars to property access on 'data' param
-        transformed_children = children.map { |child| process(child) }
+        # Step 5: Get names that were imported (these are defined, not undefined locals)
+        imported_names = collect_imported_names
 
         # Build the function body with autoreturn for the last expression
         body = s(:autoreturn, *transformed_children)
@@ -61,9 +73,11 @@ module Ruby2JS
           all_params << prop_name
         end
 
-        # Add undefined locals (used but not assigned in template)
-        undefined_locals.uniq.sort.each do |local|
-          all_params << local unless all_params.include?(local)
+        # Add undefined locals (used but not assigned and not imported)
+        undefined_locals.each do |local|
+          next if all_params.include?(local)
+          next if imported_names.include?(local)
+          all_params << local
         end
 
         if all_params.empty?
@@ -72,9 +86,6 @@ module Ruby2JS
           kwargs = all_params.map { |name| s(:kwarg, name) }
           args = s(:args, *kwargs)
         end
-
-        # Subclasses can add imports via erb_prepend_imports hook
-        erb_prepend_imports
 
         # Wrap in arrow function or regular function
         s(:def, :render, args, body)
@@ -226,16 +237,28 @@ module Ruby2JS
 
       private
 
-      # Recursively collect all instance variables and undefined locals in the AST
-      def collect_vars(node)
+      # Collect instance variables from the original AST (before transformation)
+      def collect_ivars(node)
+        return unless ast_node?(node)
+
+        if node.type == :ivar
+          @erb_ivars.push(node.children.first)
+        end
+
+        node.children.each do |child|
+          collect_ivars(child) if ast_node?(child)
+        end
+      end
+
+      # Collect local variable usage and assignments from transformed AST
+      # This runs AFTER helper filters have processed, so helper calls are already
+      # transformed and won't appear as undefined locals
+      def collect_locals(node)
         return unless ast_node?(node)
 
         # Note: avoid case/when for JS compatibility (variable declarations in case blocks
         # cause TDZ errors). Use if/elsif instead.
-        if node.type == :ivar
-          # Instance variable: @article
-          @erb_ivars.push(node.children.first)
-        elsif node.type == :lvasgn
+        if node.type == :lvasgn
           # Local variable assignment: article = ...
           name = node.children.first
           @erb_lvar_assigns.push(name) unless @erb_lvar_assigns.include?(name)
@@ -244,22 +267,6 @@ module Ruby2JS
           name = node.children.first
           # Skip the buffer variable itself
           unless name == @erb_bufvar
-            @erb_locals.push(name) unless @erb_locals.include?(name)
-          end
-        elsif node.type == :send && node.children.first.nil?
-          # Method call with no receiver: article.something or just article
-          # In ERB partials, these are often locals passed from the parent
-          name = node.children[1]
-          # Only track if it looks like a local variable (lowercase, no args beyond the method chain)
-          # Skip common Rails helpers and keywords
-          # Note: use string skip list for JS compatibility (symbols become strings in JS)
-          skip_names = %w[render link_to form_with form_for form_tag
-                          pluralize truncate content_for notice raw
-                          String Array Hash Integer Float]
-          name_str = name.to_s
-          # Skip path helpers (e.g., new_article_path, articles_path)
-          # Note: use combined condition for JS compatibility (no 'next' in if/elsif)
-          if name_str =~ /\A[a-z_][a-z0-9_]*\z/ && !skip_names.include?(name_str) && !name_str.end_with?('_path')
             @erb_locals.push(name) unless @erb_locals.include?(name)
           end
         elsif [:args, :arg, :kwarg, :blockarg].include?(node.type)
@@ -276,13 +283,42 @@ module Ruby2JS
         end
 
         node.children.each do |child|
-          collect_vars(child) if ast_node?(child)
+          collect_locals(child) if ast_node?(child)
         end
       end
 
-      # Helper to get only undefined locals (called after collect_vars completes)
+      # Extract imported names from prepend_list
+      # These are names that helper filters have imported, so they're defined
+      def collect_imported_names
+        names = []
+        return names unless respond_to?(:prepend_list) && prepend_list
+
+        prepend_list.each do |node|
+          next unless ast_node?(node) && node.type == :import
+          # Import node children: [path, names_array_or_const]
+          # names can be: s(:const, nil, :name) or array of consts
+          import_names = node.children[1]
+          if ast_node?(import_names)
+            if import_names.type == :const
+              names << import_names.children[1]
+            elsif import_names.type == :array
+              import_names.children.each do |child|
+                names << child.children[1] if ast_node?(child) && child.type == :const
+              end
+            end
+          elsif import_names.is_a?(Array)
+            import_names.each do |child|
+              names << child.children[1] if ast_node?(child) && child.type == :const
+            end
+          end
+        end
+
+        names
+      end
+
+      # Helper to get only undefined locals (used but not assigned)
       def undefined_locals
-        @erb_locals.select { |local| !@erb_lvar_assigns.include?(local) }
+        @erb_locals.select { |local| !@erb_lvar_assigns.include?(local) }.uniq.sort
       end
     end
 

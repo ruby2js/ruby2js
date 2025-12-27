@@ -408,6 +408,23 @@ export function pluralize(count, singular, plural = null) {
   return `${count} ${word}`;
 }
 
+// DOM ID helper (Rails view helper equivalent)
+// dom_id(article) => 'article_1'
+// dom_id(article, 'edit') => 'edit_article_1'
+// dom_id(new Article()) => 'new_article'
+export function dom_id(record, prefix = null) {
+  // Get model name from constructor or class name
+  const modelName = (record.constructor?.modelName || record.constructor?.name || 'record').toLowerCase();
+
+  if (record.id) {
+    // Persisted record: article_1 or edit_article_1
+    return prefix ? `${prefix}_${modelName}_${record.id}` : `${modelName}_${record.id}`;
+  } else {
+    // New record: new_article or prefix_new_article
+    return prefix ? `${prefix}_new_${modelName}` : `new_${modelName}`;
+  }
+}
+
 // Extract form data from a submit event
 // Returns a params object with all form field values
 export function formData(event) {
