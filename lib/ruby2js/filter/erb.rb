@@ -254,7 +254,7 @@ module Ruby2JS
           # Skip common Rails helpers and keywords
           # Note: use string skip list for JS compatibility (symbols become strings in JS)
           skip_names = %w[render link_to form_with form_for form_tag
-                          pluralize truncate content_for notice
+                          pluralize truncate content_for notice raw
                           String Array Hash Integer Float]
           name_str = name.to_s
           if name_str =~ /\A[a-z_][a-z0-9_]*\z/ && !skip_names.include?(name_str)
