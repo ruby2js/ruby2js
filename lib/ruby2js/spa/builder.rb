@@ -469,7 +469,8 @@ module Ruby2JS
             </div>
 
             <script type="module">
-              import { Application } from '/dist/config/routes.js';
+              import { Application, routes } from '/dist/config/routes.js';
+              window.routes = routes;
               Application.start();
             </script>
           </body>
