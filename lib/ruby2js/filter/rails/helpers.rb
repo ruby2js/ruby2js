@@ -647,18 +647,23 @@ module Ruby2JS
           statements = []
 
           # Build form tag - add onsubmit handler for browser/SPA target
-          form_attrs = ""
-          if model_name
-            if self.browser_target?
-              # Browser/SPA target - use JavaScript handler
-              handler_name = "create#{model_name.capitalize}"
-              form_attrs = " data-model=\"#{model_name}\" onsubmit=\"return #{handler_name}(event)\""
-            else
-              # Server target - standard form
-              form_attrs = " data-model=\"#{model_name}\""
-            end
+          if model_name && self.browser_target?
+            # Browser/SPA target - use routes pattern like form_tag
+            # Generate: <form onsubmit="return (model.id ? routes.model.patch(event, model.id) : routes.models.post(event))">
+            plural_name = model_name + 's'  # Simple pluralization
+            statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
+              s(:dstr,
+                s(:str, "<form data-model=\"#{model_name}\" onsubmit=\"return ("),
+                s(:begin, s(:attr, s(:lvar, model_name.to_sym), :id)),
+                s(:str, " ? routes.#{model_name}.patch(event, "),
+                s(:begin, s(:attr, s(:lvar, model_name.to_sym), :id)),
+                s(:str, ") : routes.#{plural_name}.post(event))\">")))
+          elsif model_name
+            # Server target - standard form
+            statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+, s(:str, "<form data-model=\"#{model_name}\">"))
+          else
+            statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+, s(:str, "<form>"))
           end
-          statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+, s(:str, "<form#{form_attrs}>"))
 
           if block_body
             if block_body.type == :begin
