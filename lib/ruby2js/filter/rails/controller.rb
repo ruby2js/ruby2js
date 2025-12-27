@@ -485,6 +485,23 @@ module Ruby2JS
               return wrap_with_await_if_needed(transformed)
             end
 
+          when :block
+            # Handle respond_to blocks - extract just the format.html body
+            send_node = node.children[0]
+            if send_node&.type == :send &&
+               send_node.children[0].nil? &&
+               send_node.children[1] == :respond_to
+              # This is a respond_to block - extract and simplify
+              block_body = node.children[2]
+              return transform_respond_to_block(block_body)
+            else
+              # Regular block - transform children
+              new_children = node.children.map do |c|
+                c.respond_to?(:type) ? transform_ivars_to_locals(c) : c
+              end
+              return node.updated(nil, new_children)
+            end
+
           else
             if node.children.any?
               new_children = node.children.map do |c|
@@ -494,6 +511,65 @@ module Ruby2JS
             else
               return node
             end
+          end
+        end
+
+        # Transform respond_to block body - extract format.html results
+        def transform_respond_to_block(node)
+          return node unless node.respond_to?(:type)
+
+          case node.type
+          when :if
+            # if condition; format.html {...}; else; format.html {...}; end
+            condition = transform_ivars_to_locals(node.children[0])
+            then_branch = transform_respond_to_block(node.children[1])
+            else_branch = node.children[2] ? transform_respond_to_block(node.children[2]) : nil
+
+            # Wrap the condition with await if it's a model operation
+            if condition.type == :send
+              condition = wrap_with_await_if_needed(condition)
+            end
+
+            return s(:if, condition, then_branch, else_branch)
+
+          when :begin
+            # Multiple statements - look for format.html block and return its body
+            node.children.each do |child|
+              if child.type == :block
+                block_send = child.children[0]
+                if block_send&.type == :send
+                  receiver = block_send.children[0]
+                  method = block_send.children[1]
+                  # format.html { ... } - return the block body transformed
+                  if receiver&.type == :lvar && method == :html
+                    block_body = child.children[2]
+                    return transform_ivars_to_locals(block_body)
+                  end
+                end
+              end
+            end
+            # No format.html found - transform all children
+            new_children = node.children.map { |c| transform_respond_to_block(c) }
+            return s(:begin, *new_children)
+
+          when :block
+            # Single format block - check if it's format.html
+            block_send = node.children[0]
+            if block_send&.type == :send
+              receiver = block_send.children[0]
+              method = block_send.children[1]
+              if receiver&.type == :lvar && method == :html
+                return transform_ivars_to_locals(node.children[2])
+              end
+            end
+            # Not format.html - transform normally
+            new_children = node.children.map do |c|
+              c.respond_to?(:type) ? transform_ivars_to_locals(c) : c
+            end
+            return node.updated(nil, new_children)
+
+          else
+            return transform_ivars_to_locals(node)
           end
         end
 
