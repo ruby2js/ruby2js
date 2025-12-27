@@ -298,16 +298,10 @@ module Ruby2JS
 
       # Extract imported names from prepend_list
       # These are names that helper filters have imported, so they're defined
-      # Note: wrapped in begin/rescue for JS compatibility (prepend_list may not exist)
       def collect_imported_names
         names = []
-
-        begin
-          list = prepend_list
-          return names unless list
-        rescue
-          return names
-        end
+        list = self.prepend_list
+        return names unless list
 
         list.each do |node|
           next unless ast_node?(node) && node.type == :import
