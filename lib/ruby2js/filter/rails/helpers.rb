@@ -191,11 +191,22 @@ module Ruby2JS
 
         # Build a navigation link
         def build_nav_link(text_node, path_node)
-          path_expr = process(path_node)
+          # Handle model object as path: link_to "Show", @article -> article_path(@article)
+          if path_node.type == :ivar
+            model_name = path_node.children.first.to_s.sub(/^@/, '')
+            path_helper = "#{model_name}_path".to_sym
+            @erb_path_helpers << path_helper unless @erb_path_helpers.include?(path_helper)
+            # Generate /models/:id path
+            path_expr = s(:dstr,
+              s(:str, "/#{model_name}s/"),
+              s(:begin, s(:attr, s(:lvar, model_name.to_sym), :id)))
+          else
+            path_expr = process(path_node)
 
-          # Ensure path helpers without arguments are called as functions
-          if path_node.type == :send && path_node.children[0].nil? && path_node.children.length == 2
-            path_expr = s(:send, nil, path_node.children[1])
+            # Ensure path helpers without arguments are called as functions
+            if path_node.type == :send && path_node.children[0].nil? && path_node.children.length == 2
+              path_expr = s(:send, nil, path_node.children[1])
+            end
           end
 
           if self.browser_target?()
@@ -626,8 +637,11 @@ module Ruby2JS
               input_type = method.to_s.sub(/_field$/, '')
               input_type = 'text' if input_type == 'text'
               input_type = 'datetime-local' if input_type == 'datetime_local'
-              html = %(<input type="#{input_type}" name="#{model}[#{name}]" id="#{model}_#{name}">)
-              s(:str, html)
+              # Include current value from model
+              s(:dstr,
+                s(:str, %(<input type="#{input_type}" name="#{model}[#{name}]" id="#{model}_#{name}" value=")),
+                s(:begin, s(:or, s(:attr, s(:lvar, model.to_sym), name.to_sym), s(:str, ''))),
+                s(:str, '">'))
             else
               super
             end
@@ -636,8 +650,11 @@ module Ruby2JS
             field_name = args.first
             if field_name&.type == :sym
               name = field_name.children.first.to_s
-              html = %(<textarea name="#{model}[#{name}]" id="#{model}_#{name}"></textarea>)
-              s(:str, html)
+              # Include current value from model inside textarea
+              s(:dstr,
+                s(:str, %(<textarea name="#{model}[#{name}]" id="#{model}_#{name}">)),
+                s(:begin, s(:or, s(:attr, s(:lvar, model.to_sym), name.to_sym), s(:str, ''))),
+                s(:str, '</textarea>'))
             else
               super
             end

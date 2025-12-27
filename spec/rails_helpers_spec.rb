@@ -56,8 +56,9 @@ describe Ruby2JS::Filter::Rails::Helpers do
     it "should handle various input types" do
       return skip() unless defined?(Ruby2JS::Erubi)
       result = erb_to_js('<%= form_for @user do |f| %><%= f.email_field :email %><%= f.password_field :password %><% end %>')
-      result.must_include 'type=\\"email\\"'
-      result.must_include 'type=\\"password\\"'
+      # Template literals don't need escaped quotes
+      result.must_include 'type="email"'
+      result.must_include 'type="password"'
     end
 
     it "should handle textarea" do
