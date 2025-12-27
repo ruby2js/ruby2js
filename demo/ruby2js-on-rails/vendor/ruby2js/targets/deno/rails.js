@@ -233,8 +233,8 @@ export class Router {
       console.log(`  Redirected to ${result.redirect}`);
       return Response.redirect(result.redirect, 302);
     } else if (result.render) {
-      // Validation failed, re-render form
-      return this.htmlResponse(result.html || '<h1>Validation Error</h1>');
+      // Validation failed - render contains pre-rendered HTML from the view
+      return this.htmlResponse(result.render);
     } else {
       return Response.redirect(defaultRedirect, 302);
     }

@@ -255,8 +255,9 @@ export class Router {
       res.writeHead(302, { Location: result.redirect });
       res.end();
     } else if (result.render) {
-      // Validation failed, re-render form
-      this.sendHtml(res, result.html || '<h1>Validation Error</h1>');
+      // Validation failed - render contains pre-rendered HTML from the view
+      console.log('  Re-rendering form (validation failed)');
+      this.sendHtml(res, result.render);
     } else {
       res.writeHead(302, { Location: defaultRedirect });
       res.end();
