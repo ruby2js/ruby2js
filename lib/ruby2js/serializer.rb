@@ -707,13 +707,14 @@ module Ruby2JS
     end
 
     # Return line number (1-based) for a character position
+    # Use find_index instead of bsearch_index for JS compatibility
     def line_for_position(pos)
-      @line_offsets.bsearch_index { |offset| offset > pos } || @line_offsets.length
+      @line_offsets.find_index { |offset| offset > pos } || @line_offsets.length
     end
 
     # Return column number (0-based) for a character position
     def column_for_position(pos)
-      line_idx = (@line_offsets.bsearch_index { |offset| offset > pos } || @line_offsets.length) - 1
+      line_idx = (@line_offsets.find_index { |offset| offset > pos } || @line_offsets.length) - 1
       pos - @line_offsets[line_idx]
     end
   end
