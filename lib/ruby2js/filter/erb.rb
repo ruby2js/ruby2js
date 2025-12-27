@@ -305,19 +305,38 @@ module Ruby2JS
 
         list.each do |node|
           next unless ast_node?(node) && node.type == :import
-          # Import node children: [path, names_array_or_const]
-          # names can be: s(:const, nil, :name) or array of consts
-          import_names = node.children[1]
-          if ast_node?(import_names)
-            if import_names.type == :const
-              names << import_names.children[1]
-            elsif import_names.type == :array
-              import_names.children.each do |child|
+
+          # Import node structures:
+          # 1. Named: s(:import, path, s(:const, nil, :name))
+          # 2. Named array: s(:import, path, [s(:const, nil, :name1), ...])
+          # 3. Namespace: s(:import, [s(:pair, :as, s(:const, nil, :name)), s(:pair, :from, path)], '*')
+          first_child = node.children[0]
+          second_child = node.children[1]
+
+          # Handle namespace imports: import * as name from "..."
+          # Structure: s(:import, [as_pair, from_pair], '*')
+          if first_child.is_a?(Array)
+            first_child.each do |pair|
+              next unless ast_node?(pair) && pair.type == :pair
+              key = pair.children[0]
+              value = pair.children[1]
+              if ast_node?(key) && key.type == :sym && key.children[0] == :as
+                if ast_node?(value) && value.type == :const
+                  names << value.children[1]
+                end
+              end
+            end
+          # Handle named imports: s(:import, path, names)
+          elsif ast_node?(second_child)
+            if second_child.type == :const
+              names << second_child.children[1]
+            elsif second_child.type == :array
+              second_child.children.each do |child|
                 names << child.children[1] if ast_node?(child) && child.type == :const
               end
             end
-          elsif import_names.is_a?(Array)
-            import_names.each do |child|
+          elsif second_child.is_a?(Array)
+            second_child.each do |child|
               names << child.children[1] if ast_node?(child) && child.type == :const
             end
           end
