@@ -642,7 +642,19 @@ module Ruby2JS
           @erb_model_name = model_name
 
           statements = []
-          form_attrs = model_name ? " data-model=\"#{model_name}\"" : ""
+
+          # Build form tag - add onsubmit handler for browser/SPA target
+          form_attrs = ""
+          if model_name
+            if self.browser_target?
+              # Browser/SPA target - use JavaScript handler
+              handler_name = "create#{model_name.capitalize}"
+              form_attrs = " data-model=\"#{model_name}\" onsubmit=\"return #{handler_name}(event)\""
+            else
+              # Server target - standard form
+              form_attrs = " data-model=\"#{model_name}\""
+            end
+          end
           statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+, s(:str, "<form#{form_attrs}>"))
 
           if block_body
