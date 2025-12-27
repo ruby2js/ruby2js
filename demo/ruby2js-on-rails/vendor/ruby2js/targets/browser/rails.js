@@ -443,9 +443,10 @@ export function handleFormResult(result, rerenderFn = null) {
   if (result?.redirect) {
     console.log(`  Redirected to ${result.redirect}`);
     Router.navigate(result.redirect, result.notice);
-  } else if (result?.render && rerenderFn) {
+  } else if (result?.render) {
+    // render contains pre-rendered HTML from the view (with validation errors)
     console.log(`  Re-rendering form (validation failed)`);
-    rerenderFn();
+    document.getElementById('content').innerHTML = result.render;
   }
   return false;
 }
