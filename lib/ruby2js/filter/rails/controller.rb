@@ -27,10 +27,9 @@ module Ruby2JS
           @rails_model_refs = Set.new
           @rails_needs_views = false
           # Model associations for preloading (model_name -> [association_names])
-          # TODO: Auto-detect from model files or configuration
-          @rails_model_associations = {
-            article: [:comments]
-          }
+          # Note: This is empty by default - associations are auto-detected from
+          # has_many declarations in model files when transpiled together
+          @rails_model_associations = {}
         end
 
         # Detect controller class and transform to module
