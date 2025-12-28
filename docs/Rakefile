@@ -288,10 +288,10 @@ end
 
 # Build the demo using Ruby2JS
 # This transpiles all Ruby files to JavaScript in dist/
+# Uses Ruby gem directly (faster, and smoke test validates identical output to selfhost)
 task :rails_demo_build => [:rails_demo_npm_install] do
   Dir.chdir(rails_demo_source) do
-    # Build using npm script (calls ruby2js-rails-build from package)
-    sh "npm run build"
+    sh "bundle exec ruby scripts/build.rb"
   end
 end
 

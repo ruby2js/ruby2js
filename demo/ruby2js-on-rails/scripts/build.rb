@@ -388,10 +388,17 @@ class SelfhostBuilder
       raise "Unknown DATABASE adapter: #{adapter}. Valid options: #{valid}"
     end
 
-    # Check for npm-installed package first, fall back to development vendor directory
+    # Check for npm-installed package first, then packages directory, finally vendor (legacy)
     npm_adapter_dir = File.join(DEMO_ROOT, 'node_modules/ruby2js-rails/adapters')
+    pkg_adapter_dir = File.join(DEMO_ROOT, '../../packages/ruby2js-rails/adapters')
     vendor_adapter_dir = File.join(DEMO_ROOT, 'vendor/ruby2js/adapters')
-    adapter_dir = File.exist?(npm_adapter_dir) ? npm_adapter_dir : vendor_adapter_dir
+    adapter_dir = if File.exist?(npm_adapter_dir)
+      npm_adapter_dir
+    elsif File.exist?(pkg_adapter_dir)
+      pkg_adapter_dir
+    else
+      vendor_adapter_dir
+    end
     lib_dest = File.join(@dist_dir, 'lib')
     FileUtils.mkdir_p(lib_dest)
 
@@ -425,10 +432,17 @@ class SelfhostBuilder
       target_dir = @runtime  # node, bun, or deno
     end
 
-    # Check for npm-installed package first, fall back to development vendor directory
+    # Check for npm-installed package first, then packages directory, finally vendor (legacy)
     npm_package_dir = File.join(DEMO_ROOT, 'node_modules/ruby2js-rails')
+    pkg_package_dir = File.join(DEMO_ROOT, '../../packages/ruby2js-rails')
     vendor_package_dir = File.join(DEMO_ROOT, 'vendor/ruby2js')
-    package_dir = File.exist?(npm_package_dir) ? npm_package_dir : vendor_package_dir
+    package_dir = if File.exist?(npm_package_dir)
+      npm_package_dir
+    elsif File.exist?(pkg_package_dir)
+      pkg_package_dir
+    else
+      vendor_package_dir
+    end
 
     # Copy base files (rails_base.js is needed by all targets)
     base_src = File.join(package_dir, 'rails_base.js')
@@ -473,10 +487,17 @@ class SelfhostBuilder
     lib_dest = File.join(@dist_dir, 'lib')
     FileUtils.mkdir_p(lib_dest)
 
-    # Check for npm-installed package first, fall back to development vendor directory
+    # Check for npm-installed package first, then packages directory, finally vendor (legacy)
     npm_package_dir = File.join(DEMO_ROOT, 'node_modules/ruby2js-rails')
+    pkg_package_dir = File.join(DEMO_ROOT, '../../packages/ruby2js-rails')
     vendor_package_dir = File.join(DEMO_ROOT, 'vendor/ruby2js')
-    package_dir = File.exist?(npm_package_dir) ? npm_package_dir : vendor_package_dir
+    package_dir = if File.exist?(npm_package_dir)
+      npm_package_dir
+    elsif File.exist?(pkg_package_dir)
+      pkg_package_dir
+    else
+      vendor_package_dir
+    end
 
     src_path = File.join(package_dir, 'phlex_runtime.mjs')
     return unless File.exist?(src_path)
