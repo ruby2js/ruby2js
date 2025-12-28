@@ -97,7 +97,7 @@ Changes from `== s(:const, nil, :X)` to element-by-element comparison.
 | Remove local `ast` variable, use `@ast`                     | C        | Avoids variable shadowing issues. **Keep.**                                    |
 | `receiver.children == [nil, :Class]` to element comparison  | D        | Array comparison fix. **Keep.**                                                |
 | `receiver.children == [nil, :Proc]` to element comparison   | D        | Same. **Keep.**                                                                |
-| `                                                           |          | nil # Pragma: logical`                                                         |
+| `\|\| nil # Pragma: logical`                                | B        | Pragma for explicit nil fallback. **Keep.**                                    |
 | `GROUP_OPERATORS.include? # Pragma: logical`                | B        | Pragma. **Keep.**                                                              |
 | `receiver == s(:const, nil, :Regexp)` to element comparison | D        | Array comparison fix. **Keep.**                                                |
 | `.each_char` to `.split('')`                                | C        | JS string iteration. **Could be filter.** But simple enough to keep.           |
