@@ -223,12 +223,12 @@ module Ruby2JS
           when :str
             { static: [node.children[0]], conditionals: [] }
           when :array
-            static = []
+            static_classes = []
             conditionals = []
 
             node.children.each do |child|
               if child.type == :str
-                static << child.children[0]
+                static_classes << child.children[0]
               elsif child.type == :hash
                 # Conditional classes like {"border-red": errors.any?}
                 child.children.each do |pair|
@@ -248,7 +248,7 @@ module Ruby2JS
               end
             end
 
-            { static: static, conditionals: conditionals }
+            { static: static_classes, conditionals: conditionals }
           else
             nil
           end

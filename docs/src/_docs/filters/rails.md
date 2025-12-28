@@ -373,6 +373,17 @@ function render({ user }) {
 }
 ```
 
+**Form with class attribute:**
+
+Both `form_for` and `form_with` accept a `class:` option:
+
+```erb
+<%= form_with model: @article, class: "contents space-y-4" do |form| %>
+  <%= form.text_field :title, class: "input w-full" %>
+  <%= form.submit "Save", class: "btn btn-primary" %>
+<% end %>
+```
+
 **Supported form builder methods:**
 
 | Ruby Method                    | HTML Output                                                                          |
@@ -390,6 +401,52 @@ function render({ user }) {
 | `f.button "Click"`             | `<button type="submit">Click</button>`                                               |
 
 Additional input types: `number_field`, `tel_field`, `url_field`, `search_field`, `date_field`, `time_field`, `datetime_local_field`, `month_field`, `week_field`, `color_field`, `range_field`.
+
+**HTML attributes on form fields:**
+
+Form builder methods accept standard HTML attributes:
+
+```erb
+<%= f.text_field :title, class: "input-lg", id: "article-title", placeholder: "Enter title" %>
+<%= f.text_area :body, rows: 4, class: "w-full", required: true %>
+<%= f.submit "Save", class: "btn btn-primary" %>
+<%= f.label :title, class: "font-bold" %>
+```
+
+| Attribute      | Example                              | Description           |
+| -------------- | ------------------------------------ | --------------------- |
+| `class:`       | `class: "form-control"`              | CSS classes           |
+| `id:`          | `id: "custom-id"`                    | Custom element ID     |
+| `style:`       | `style: "width: 100%"`               | Inline styles         |
+| `placeholder:` | `placeholder: "Enter value"`         | Placeholder text      |
+| `required:`    | `required: true`                     | Required field        |
+| `disabled:`    | `disabled: true`                     | Disabled field        |
+| `readonly:`    | `readonly: true`                     | Read-only field       |
+| `autofocus:`   | `autofocus: true`                    | Auto-focus on load    |
+| `rows:`        | `rows: 4`                            | Textarea rows         |
+| `cols:`        | `cols: 40`                           | Textarea columns      |
+| `min:`/`max:`  | `min: 0, max: 100`                   | Number field range    |
+| `step:`        | `step: 0.01`                         | Number field step     |
+
+**Conditional classes (Tailwind patterns):**
+
+For Tailwind CSS and similar frameworks, you can use array syntax with conditional hashes:
+
+```erb
+<%= f.text_field :title, class: ["input", "w-full", {"border-red-500": @article.errors[:title].any?}] %>
+```
+
+This generates a runtime expression that evaluates the condition:
+
+```javascript
+`<input class="${"input w-full" + (article.errors.title.any() ? " border-red-500" : "")}" ...>`
+```
+
+Multiple conditions are supported:
+
+```erb
+<%= f.text_field :email, class: ["input", {"border-red-500": has_error, "opacity-50": disabled}] %>
+```
 
 {% rendercontent "docs/note", type: "info" %}
 Form fields automatically include the model's current value, enabling edit forms to display existing data without additional code.
@@ -421,12 +478,25 @@ function render() {
 
 Both generate: `<a href="/articles/${article.id}" onclick="...">Show</a>`
 
+**Link with class attribute:**
+
+```erb
+<%= link_to "Show", @article, class: "btn btn-primary" %>
+<%= link_to "Edit", edit_article_path(@article), class: "text-blue-500 hover:underline" %>
+```
+
+Conditional classes work the same as form fields:
+
+```erb
+<%= link_to "Edit", edit_path, class: ["btn", {"opacity-50": disabled}] %>
+```
+
 ### Button Helper
 
 `button_to` generates delete buttons with confirmation dialogs:
 
 ```erb
-<%= button_to "Delete", @article, method: :delete, data: { confirm: "Are you sure?" } %>
+<%= button_to "Delete", @article, method: :delete, data: { turbo_confirm: "Are you sure?" } %>
 ```
 
 ```javascript
@@ -434,8 +504,22 @@ Both generate: `<a href="/articles/${article.id}" onclick="...">Show</a>`
 _buf += `<form style="display:inline"><button type="button" onclick="if(confirm('Are you sure?')) { routes.article.delete(${article.id}) }">Delete</button></form>`;
 
 // Server target
-_buf += `<form method="post" action="/articles/${article.id}"><input type="hidden" name="_method" value="delete"><button type="submit" onclick="return confirm('Are you sure?')">Delete</button></form>`;
+_buf += `<form method="post" action="/articles/${article.id}"><input type="hidden" name="_method" value="delete"><button type="submit" data-confirm="Are you sure?">Delete</button></form>`;
 ```
+
+**Button with class attributes:**
+
+```erb
+<%= button_to "Delete", @article, method: :delete, class: "btn-danger text-white", form_class: "inline-block" %>
+```
+
+| Option        | Description                                      |
+| ------------- | ------------------------------------------------ |
+| `class:`      | CSS classes for the button element               |
+| `form_class:` | CSS classes for the wrapping form element        |
+| `data: { turbo_confirm: "..." }` | Confirmation dialog message    |
+
+When `form_class:` is provided, the default `style="display:inline"` is omitted, allowing full control over form styling.
 
 ### Truncate Helper
 
