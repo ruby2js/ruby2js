@@ -319,8 +319,7 @@ module Ruby2JS
       def has_phlex_pragma?(node)
         return false unless @comments
 
-        # Use Map.get for JS compatibility (selfhost uses Map, Ruby uses Hash)
-        raw_comments = @comments.respond_to?(:get) ? @comments.get(:_raw) : @comments[:_raw]
+        raw_comments = @comments.get(:_raw)
         raw_comments ||= []
         return false if raw_comments.empty?
 

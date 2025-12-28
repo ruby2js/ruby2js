@@ -192,19 +192,17 @@ module Ruby2JS
         end
 
         # associate comments - MOVE (not copy) to prevent duplicates
-        if node and @comments[m]
+        m_comments = @comments.get(m)
+        if node and m_comments
           if node.is_a?(Array)
             node[0] = m.updated(node.first.type, node.first.children)
-            @comments[node.first] = @comments[m]
+            @comments.set(node.first, m_comments)
           else
             node = m.updated(node.type, node.children)
-            @comments[node] = @comments[m]
+            @comments.set(node, m_comments)
           end
           # Clear source to prevent duplicate output
-          # Use set(key, []) for Map compatibility (selfhost uses Map, not Hash)
-          # Note: Ruby Hash supports []= and delete; JS Map needs .set() and .delete()
-          # The functions filter transforms .delete to delete keyword, which doesn't work for Map
-          @comments.respond_to?(:set) ? @comments.set(m, []) : @comments.delete(m)
+          @comments.set(m, [])
         end
 
         node
@@ -269,15 +267,15 @@ module Ruby2JS
             end
 
             # MOVE (not copy) comments to prevent duplicates
-            if @comments[node]
+            node_comments = @comments.get(node)
+            if node_comments
               if replacement.is_a?(Array)
-                @comments[replacement.first] = @comments[node]
+                @comments.set(replacement.first, node_comments)
               else
-                @comments[replacement] = @comments[node]
+                @comments.set(replacement, node_comments)
               end
               # Clear source to prevent duplicate output
-              # Use set(key, []) for Map compatibility (selfhost uses Map, not Hash)
-              @comments.respond_to?(:set) ? @comments.set(node, []) : @comments.delete(node)
+              @comments.set(node, [])
             end
             replacement
           end

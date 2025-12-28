@@ -143,16 +143,9 @@ module Ruby2JS
 
       # Build new comments map: associate each comment with next node
       # Clear existing entries (but preserve _raw)
-      # Note: Can't use # Pragma: map for clear because we need to preserve _raw
-      if @comments.respond_to?(:set)
-        # JS Map: save _raw, clear, restore
-        saved_raw = @comments[:_raw] # Pragma: map
-        @comments.clear() # Pragma: map
-        @comments[:_raw] = saved_raw if saved_raw # Pragma: map
-      else
-        # Ruby Hash
-        @comments.clear
-      end
+      saved_raw = @comments.get(:_raw)
+      @comments.clear()
+      @comments.set(:_raw, saved_raw) if saved_raw
 
       trailing_comments = []
       orphan_comments = []
@@ -192,14 +185,9 @@ module Ruby2JS
 
           if target
             # Add comment to target's list
-            if @comments.respond_to?(:set)
-              existing = @comments[target] || [] # Pragma: map
-              existing.push(comment)
-              @comments[target] = existing # Pragma: map
-            else
-              @comments[target] ||= []
-              @comments[target].push(comment)
-            end
+            existing = @comments.get(target) || []
+            existing.push(comment)
+            @comments.set(target, existing)
           else
             # No target - orphan comment
             orphan_comments.push(comment)
@@ -209,23 +197,15 @@ module Ruby2JS
 
       # Store trailing and orphan comments under special keys
       if trailing_comments.length > 0
-        if @comments.respond_to?(:set)
-          @comments[:_trailing] = trailing_comments # Pragma: map
-        else
-          @comments[:_trailing] = trailing_comments
-        end
+        @comments.set(:_trailing, trailing_comments)
       end
 
       if orphan_comments.length > 0
-        if @comments.respond_to?(:set)
-          @comments[:_orphan] = orphan_comments # Pragma: map
-        else
-          @comments[:_orphan] = orphan_comments
-        end
+        @comments.set(:_orphan, orphan_comments)
       end
 
       # Re-add _raw
-      @comments[:_raw] = raw_comments # Pragma: map
+      @comments.set(:_raw, raw_comments)
     end
 
     # Recursively collect all nodes with location info
@@ -360,12 +340,7 @@ module Ruby2JS
 
       # Register empty comments for the new :begin node to prevent
       # it from inheriting comments from its first child
-      # Use Map.set() for selfhost JS, bracket notation for Ruby
-      if @comments.respond_to?(:set)
-        @comments.set(@ast, [])
-      else
-        @comments[@ast] = []
-      end
+      @comments.set(@ast, [])
     end
 
     def create_converter

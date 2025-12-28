@@ -528,11 +528,7 @@ module Ruby2JS
           result = process(begin_node)
           # Set empty comments on processed begin node to prevent first-location lookup
           # from incorrectly inheriting comments from child nodes
-          if @comments.respond_to?(:set)
-            @comments.set(result, [])
-          else
-            @comments[result] = []
-          end
+          @comments.set(result, [])
           result
         end
 

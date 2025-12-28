@@ -29,7 +29,7 @@ module Ruby2JS
             next
           end
 
-          node_comments = @comments[node]
+          node_comments = @comments.get(node)
           if node_comments && !node_comments.empty?
             (puts ''; singleton = false) if singleton
             comments(node).each {|comment| put comment}
@@ -46,7 +46,7 @@ module Ruby2JS
 
             if left.type == :prop
               if right[:get]
-                get_comments = @comments[right[:get]]
+                get_comments = @comments.get(right[:get])
                 if get_comments && !get_comments.empty?
                   (puts ''; singleton = false) if singleton
                   comments(right[:get]).each {|comment| put comment}
@@ -58,7 +58,7 @@ module Ruby2JS
               end
 
               if right[:set]
-                set_comments = @comments[right[:set]]
+                set_comments = @comments.get(right[:set])
                 if set_comments && !set_comments.empty?
                   (puts ''; singleton = false) if singleton
                   comments(right[:set]).each {|comment| put comment}
@@ -74,7 +74,8 @@ module Ruby2JS
                   pair_child = pair.children.last
                   next unless ast_node?(pair_child)
                   if %i[block def defm async].include? pair_child.type
-                    if @comments[pair_child]
+                    pair_comments = @comments.get(pair_child)
+                    if pair_comments
                       (puts ''; singleton = false) if singleton
                       comments(pair_child).each do |comment|
                         put comment

@@ -46,9 +46,12 @@ globalThis.require = function(path) {
   // Extract filter name from path like "ruby2js/filter/return"
   const match = path.match(/ruby2js\/filter\/(\w+)/);
   if (match) {
-    const filterName = match[1].charAt(0).toUpperCase() + match[1].slice(1);
-    if (!Ruby2JS.Filter[filterName]) {
-      throw new Error(`Filter ${filterName} not loaded. Load it via run_all_specs.mjs or import manually.`);
+    const requestedName = match[1].toLowerCase();
+    // Case-insensitive lookup: ESM filter registers as "ESM" not "Esm"
+    const filterNames = Object.keys(Ruby2JS.Filter);
+    const actualName = filterNames.find(n => n.toLowerCase() === requestedName);
+    if (!actualName) {
+      throw new Error(`Filter ${match[1]} not loaded. Load it via run_all_specs.mjs or import manually.`);
     }
     // Filter already loaded, nothing to do
     return;

@@ -125,7 +125,7 @@ module Ruby2JS
       scope @ast
 
       # Output orphan comments (comments after all code)
-      orphan_list = @comments.respond_to?(:get) ? @comments.get(:_orphan) : @comments[:_orphan]
+      orphan_list = @comments.get(:_orphan)
       if orphan_list
         orphan_list.each do |comment|
           text = comment.respond_to?(:text) ? comment.text : comment.to_s
@@ -329,7 +329,7 @@ module Ruby2JS
     def find_comment_entry(ast)
       # Direct lookup by object identity
       # Ruby uses Hash ([]), JS selfhost uses Map (.get())
-      comment_list = @comments.respond_to?(:get) ? @comments.get(ast) : @comments[ast]
+      comment_list = @comments.get(ast)
       return [comment_list, ast] if comment_list.is_a?(Array)
       [[], ast]
     end
@@ -345,7 +345,7 @@ module Ruby2JS
 
     # Output trailing comment for a node (on same line)
     def trailing_comment(ast)
-      trailing_list = @comments.respond_to?(:get) ? @comments.get(:_trailing) : @comments[:_trailing]
+      trailing_list = @comments.get(:_trailing)
       return unless trailing_list
 
       # Find trailing comment for this node

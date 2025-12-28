@@ -110,11 +110,7 @@ module Ruby2JS
             end
           end
           if node_comments && (node_comments.is_a?(Array) ? node_comments.any? : node_comments)
-            if @comments.respond_to?(:set)
-              @comments.set(new_node, node_comments)
-            else
-              @comments[new_node] = node_comments
-            end
+            @comments.set(new_node, node_comments)
           end
           body[i] = new_node
         elsif node.type == :asyncs and node.children.first.type == :self

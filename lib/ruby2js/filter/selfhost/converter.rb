@@ -35,7 +35,9 @@ module Ruby2JS
 
         # Methods that must be called with () in JS even when called without args in Ruby
         # Note: reverse, pop, shift, sort, dup are now handled by FORCE_PARENS in functions filter
-        ALWAYS_METHODS = %i[is_method? getOwnProps chomp].freeze
+        # clear: Map.clear() needs parens - functions filter transforms Array.clear to length=0 which
+        # doesn't apply to Maps, so we need to ensure Map.clear() keeps its parentheses
+        ALWAYS_METHODS = %i[is_method? getOwnProps chomp clear].freeze
 
         # Transform method("on_#{name}") to use cleaned name without ? or !
         # This handles the handler registration loop in Converter#initialize

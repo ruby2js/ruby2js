@@ -65,6 +65,14 @@ else
   end
 end
 
+# Add Map-compatible methods to Hash for selfhost compatibility.
+# JS Map uses .get()/.set() while Ruby Hash uses []. This lets Ruby code
+# use .get()/.set() which transpiles directly to working JS Map calls.
+class Hash # Pragma: skip
+  def get(key) = self[key]
+  def set(key, value) = self[key] = value
+end
+
 require 'ruby2js/configuration_dsl' unless RUBY_ENGINE == 'opal'
 require 'ruby2js/converter'
 require 'ruby2js/filter'

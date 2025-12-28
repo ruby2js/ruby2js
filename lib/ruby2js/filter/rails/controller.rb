@@ -59,15 +59,11 @@ module Ruby2JS
 
           # Get comments from original class node BEFORE processing
           # (processing may lose the association)
-          original_comments = @comments.respond_to?(:get) ? @comments.get(node) : @comments[node]
+          original_comments = @comments.get(node)
           original_comments = original_comments.is_a?(Array) ? original_comments.dup : []
 
           # Clear comments from original node to prevent duplication
-          if @comments.respond_to?(:set)
-            @comments.set(node, [])
-          else
-            @comments[node] = []
-          end
+          @comments.set(node, [])
 
           # Build the export module
           export_node = s(:send, nil, :export,
@@ -76,21 +72,13 @@ module Ruby2JS
 
           # Set comments on export_module so they appear after imports, before export
           if original_comments.any?
-            if @comments.respond_to?(:set)
-              @comments.set(export_module, original_comments)
-            else
-              @comments[export_module] = original_comments
-            end
+            @comments.set(export_module, original_comments)
           end
 
           result = if imports.any?
                      begin_node = s(:begin, *imports, export_module)
                      # Set empty comments on the begin node to prevent first-child-with-location
-                     if @comments.respond_to?(:set)
-                       @comments.set(begin_node, [])
-                     else
-                       @comments[begin_node] = []
-                     end
+                     @comments.set(begin_node, [])
                      begin_node
                    else
                      export_module

@@ -95,11 +95,7 @@ module Ruby2JS
       # (comments were already emitted for the export node itself)
       args.each do |arg|
         next unless arg.respond_to?(:type)
-        if @comments.respond_to?(:set)
-          @comments.set(arg, [])
-        else
-          @comments[arg] = []
-        end
+        @comments.set(arg, [])
       end
 
       node = args.first
