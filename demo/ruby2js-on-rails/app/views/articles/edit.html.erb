@@ -4,7 +4,7 @@
   <div class="errors">
     <ul>
       <% @article.errors.each do |error| %>
-        <li><%= error %></li>
+        <li><%= error.full_message %></li>
       <% end %>
     </ul>
   </div>
