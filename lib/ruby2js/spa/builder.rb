@@ -475,11 +475,6 @@ module Ruby2JS
         # Only generate index.html for browser runtime
         return unless manifest.browser?
 
-        # Determine which controllers to set up navigation for
-        nav_links = manifest.controller_config.included_controllers.keys.map do |controller|
-          "<a onclick=\"navigate('/#{controller}')\">#{controller.to_s.capitalize}</a>"
-        end.join("\n      ")
-
         # Build importmap for the chosen database
         importmap_entries = BROWSER_IMPORTMAPS[manifest.database] || {}
         importmap_json = JSON.pretty_generate({ imports: importmap_entries })
@@ -502,9 +497,6 @@ module Ruby2JS
           <body>
             <div id="loading">Loading...</div>
             <div id="app" style="display: none;">
-              <nav>
-                #{nav_links}
-              </nav>
               <main id="content" class="#{main_class_for(manifest.css)}"></main>
             </div>
 
