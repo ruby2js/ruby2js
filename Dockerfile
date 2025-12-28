@@ -1,13 +1,15 @@
 # Build stage - compile the static site
 FROM ruby:3.4-slim AS builder
 
-# Install build dependencies
+# Install build dependencies (Node 22+ required for WASI support in Prism)
 RUN apt-get update && apt-get install -y \
     build-essential \
     git \
     libyaml-dev \
-    nodejs \
-    npm \
+    curl \
+    ca-certificates \
+    && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+    && apt-get install -y nodejs \
     && npm install -g yarn \
     && rm -rf /var/lib/apt/lists/*
 
@@ -31,13 +33,25 @@ WORKDIR /app/demo/selfhost
 RUN npm install
 
 WORKDIR /app
+# Copy the full ruby2js-rails package (demo uses file: dependency which creates symlinks)
+COPY packages/ruby2js-rails/ ./packages/ruby2js-rails/
+WORKDIR /app/packages/ruby2js-rails
+RUN npm install
+
+WORKDIR /app
 COPY demo/ruby2js-on-rails/package.json demo/ruby2js-on-rails/package-lock.json ./demo/ruby2js-on-rails/
 WORKDIR /app/demo/ruby2js-on-rails
 RUN npm install
 
 # Now copy the rest of the source code (node_modules dirs already populated)
+# Remove symlink created by file: dependency - will be recreated after COPY
 WORKDIR /app
+RUN rm -rf demo/ruby2js-on-rails/node_modules/ruby2js-rails
 COPY . .
+
+# Reinstall demo dependencies to recreate symlinks and bin commands
+WORKDIR /app/demo/ruby2js-on-rails
+RUN npm install
 
 # Install docs bundle (needs full ruby2js source for path: "../")
 WORKDIR /app/docs

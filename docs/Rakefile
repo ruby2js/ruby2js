@@ -290,8 +290,8 @@ end
 # This transpiles all Ruby files to JavaScript in dist/
 task :rails_demo_build => [:rails_demo_npm_install] do
   Dir.chdir(rails_demo_source) do
-    # Build using Ruby gem (creates dist/ with transpiled JS)
-    sh "bundle exec ruby scripts/build.rb"
+    # Build using npm script (calls ruby2js-rails-build from package)
+    sh "npm run build"
   end
 end
 
@@ -321,24 +321,8 @@ task :rails_demo_copy => [rails_demo_dest, :rails_demo_build] do
 end
 
 # Create downloadable tarball
+# build.mjs now lives in packages/ruby2js-rails/ (no longer generated from build.rb)
 task :rails_demo_tarball => [:selfhost_build] do
-  # Generate build.mjs from build.rb into vendor/ruby2js/ (part of ruby2js-rails package)
-  # Uses selfhost_build filter for Node.js API compatibility
-  build_mjs = "#{rails_demo_source}/vendor/ruby2js/build.mjs"
-  sh "cat #{rails_demo_source}/scripts/build.rb | " \
-     "bundle exec ruby2js --filter selfhost_build --filter esm --filter node " \
-     "--filter functions --filter return --filter pragma --autoexports " \
-     "> #{build_mjs}"
-
-  # Add shebang and convert relative paths to package imports for npm distribution
-  # Development uses relative paths (../../../selfhost/...), npm uses package imports (ruby2js/...)
-  content = File.read(build_mjs)
-  content = "#!/usr/bin/env node\n" + content
-  content = content.gsub('../../../selfhost/ruby2js.js', 'ruby2js')
-  content = content.gsub('../../../selfhost/filters/', 'ruby2js/filters/')
-  content = content.gsub('../../../selfhost/lib/', 'ruby2js/lib/')
-  File.write(build_mjs, content)
-
   # Run publish script to create the tarball
   Dir.chdir(selfhost_source) do
     sh "bundle exec ruby scripts/publish_demo.rb"
@@ -418,9 +402,9 @@ task :ruby2js_tarball => [:selfhost_build, releases_dir] do
 end
 
 # Build ruby2js-rails npm package tarball
-# Depends on rails_demo_tarball to ensure build.mjs has package imports (not relative paths)
-task :ruby2js_rails_tarball => [:ruby2js_tarball, :rails_demo_tarball] do
-  rails_pkg_dir = "#{rails_demo_source}/vendor/ruby2js"
+# Package now lives at packages/ruby2js-rails/
+task :ruby2js_rails_tarball => [:ruby2js_tarball] do
+  rails_pkg_dir = "#{root}/packages/ruby2js-rails"
   Dir.chdir(rails_pkg_dir) do
     # Clean up old tarballs
     FileUtils.rm_f Dir.glob("ruby2js-rails-*.tgz")

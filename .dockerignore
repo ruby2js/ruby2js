@@ -11,6 +11,9 @@ docs/.bridgetown-metadata
 # Dependencies (reinstalled in container)
 docs/node_modules
 docs/vendor
+demo/selfhost/node_modules
+demo/ruby2js-on-rails/node_modules
+packages/ruby2js-rails/node_modules
 
 # Environment/secrets
 .env

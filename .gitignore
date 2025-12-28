@@ -8,8 +8,6 @@ node_modules
 # Selfhost generated outputs (regenerated via npm run build:*)
 demo/selfhost/dist/
 demo/ruby2js-on-rails/dist/
-demo/ruby2js-on-rails/dist-selfhost/
-demo/ruby2js-on-rails/scripts/build.mjs
 demo/selfhost/ruby2js.js
 demo/selfhost/ruby2js.mjs
 demo/selfhost/prism_browser.js
