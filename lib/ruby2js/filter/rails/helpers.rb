@@ -158,6 +158,7 @@ module Ruby2JS
           is_delete = false
           confirm_msg = nil
           css_class = nil
+          class_node = nil
 
           if options&.type == :hash
             options.children.each do |pair|
@@ -169,6 +170,7 @@ module Ruby2JS
                   is_delete = (value.type == :sym && value.children[0] == :delete)
                 when :class
                   css_class = extract_class_value(value)
+                  class_node = value
                 when :data
                   # Look for confirm/turbo_confirm in data hash
                   if value.type == :hash
@@ -190,45 +192,118 @@ module Ruby2JS
           if is_delete
             build_delete_link(text_node, path_node, confirm_msg, css_class)
           else
-            build_nav_link(text_node, path_node, css_class)
+            build_nav_link(text_node, path_node, css_class, class_node)
           end
         end
 
         # Extract class value from various formats:
         # - String: "foo bar"
         # - Array: ["foo", "bar", {"baz": condition}]
+        # Returns a string for static classes (for backward compatibility)
         def extract_class_value(node)
+          result = extract_class_with_conditions(node)
+          return nil unless result
+
+          # If no conditionals, return simple string
+          if result[:conditionals].empty?
+            result[:static].join(' ')
+          else
+            # Has conditionals - still return static string for simple uses
+            # (callers that need dynamic should use extract_class_with_conditions)
+            result[:static].join(' ')
+          end
+        end
+
+        # Extract class value with full conditional support
+        # Returns { static: ["class1", "class2"], conditionals: [{class: "name", condition: ast_node}] }
+        def extract_class_with_conditions(node)
+          return nil unless node
+
           case node.type
           when :str
-            node.children[0]
+            { static: [node.children[0]], conditionals: [] }
           when :array
-            # Collect static class names from array
-            # For now, skip conditional hashes (would need runtime evaluation)
-            classes = []
+            static = []
+            conditionals = []
+
             node.children.each do |child|
               if child.type == :str
-                classes << child.children[0]
+                static << child.children[0]
               elsif child.type == :hash
                 # Conditional classes like {"border-red": errors.any?}
-                # Extract class names but skip conditions (include all for now)
                 child.children.each do |pair|
                   key = pair.children[0]
-                  if key.type == :str
-                    classes << key.children[0]
-                  elsif key.type == :sym
-                    classes << key.children[0].to_s
+                  condition = pair.children[1]
+
+                  class_name = if key.type == :str
+                                 key.children[0]
+                               elsif key.type == :sym
+                                 key.children[0].to_s
+                               end
+
+                  if class_name
+                    conditionals << { class: class_name, condition: condition }
                   end
                 end
               end
             end
-            classes.join(' ')
+
+            { static: static, conditionals: conditionals }
           else
             nil
           end
         end
 
+        # Build class attribute - static string or dynamic template literal
+        # For use in contexts that support dynamic output (template literals)
+        def build_dynamic_class_attr(node)
+          return ["", nil] unless node
+
+          result = extract_class_with_conditions(node)
+          return ["", nil] unless result
+
+          if result[:conditionals].empty?
+            # Static only - return simple class attribute
+            class_str = result[:static].join(' ')
+            return [" class=\"#{class_str}\"", nil] if class_str.length > 0
+            return ["", nil]
+          end
+
+          # Has conditionals - need to generate dynamic class
+          static_part = result[:static].join(' ')
+
+          # Build AST for conditional class expression
+          # Result: `${static} ${cond1 ? 'class1' : ''} ${cond2 ? 'class2' : ''}`
+          conditional_exprs = result[:conditionals].map do |cond|
+            # (condition ? ' class-name' : '')
+            s(:if, cond[:condition],
+              s(:str, " #{cond[:class]}"),
+              s(:str, ''))
+          end
+
+          # Combine into a single expression
+          if conditional_exprs.length == 1
+            combined = conditional_exprs.first
+          else
+            # Join multiple conditionals with +
+            combined = conditional_exprs.reduce do |acc, expr|
+              s(:send, acc, :+, expr)
+            end
+          end
+
+          # Build: "static" + conditionals
+          if static_part.length > 0
+            full_expr = s(:send, s(:str, static_part), :+, combined)
+          else
+            full_expr = combined
+          end
+
+          # Return template for embedding: class="${...}"
+          [nil, full_expr]
+        end
+
         # Build a navigation link
-        def build_nav_link(text_node, path_node, css_class = nil)
+        def build_nav_link(text_node, path_node, css_class = nil, class_node = nil)
           # Handle model object as path: link_to "Show", @article or link_to "Show", article
           if path_node.type == :ivar
             # Instance variable: @article
@@ -257,7 +332,19 @@ module Ruby2JS
             end
           end
 
-          # Build class attribute string
+          # Check for conditional classes
+          has_conditionals = false
+          if class_node
+            result = extract_class_with_conditions(class_node)
+            has_conditionals = result && result[:conditionals].any?
+          end
+
+          if has_conditionals
+            # Dynamic class with conditionals - generate runtime expression
+            return build_nav_link_with_dynamic_class(text_node, path_node, path_expr, class_node)
+          end
+
+          # Build static class attribute string
           class_attr = css_class ? " class=\"#{css_class}\"" : ""
 
           if self.browser_target?()
@@ -303,6 +390,94 @@ module Ruby2JS
                 s(:str, '<a href="'),
                 s(:begin, path_expr),
                 s(:str, "\"#{class_attr}>"),
+                s(:begin, text_expr),
+                s(:str, '</a>'))
+            end
+          end
+        end
+
+        # Build a navigation link with dynamic/conditional class attribute
+        def build_nav_link_with_dynamic_class(text_node, path_node, path_expr, class_node)
+          result = extract_class_with_conditions(class_node)
+          static_part = result[:static].join(' ')
+
+          # Build conditional expressions: condition ? ' class-name' : ''
+          conditional_exprs = result[:conditionals].map do |cond|
+            s(:if, cond[:condition],
+              s(:str, " #{cond[:class]}"),
+              s(:str, ''))
+          end
+
+          # Combine conditionals
+          if conditional_exprs.length == 1
+            combined = conditional_exprs.first
+          else
+            combined = conditional_exprs.reduce do |acc, expr|
+              s(:send, acc, :+, expr)
+            end
+          end
+
+          # Build full class expression: "static" + conditionals
+          if static_part.length > 0
+            class_expr = s(:send, s(:str, static_part), :+, combined)
+          else
+            class_expr = combined
+          end
+
+          text_str = text_node.type == :str ? text_node.children[0] : nil
+          text_expr = text_str ? nil : process(text_node)
+
+          if self.browser_target?()
+            # Browser target - SPA navigation with onclick handlers
+            if text_str && path_node.type == :str
+              path_str = path_node.children[0]
+              s(:dstr,
+                s(:str, "<a href=\"#{path_str}\" class=\""),
+                s(:begin, class_expr),
+                s(:str, "\" onclick=\"return navigate(event, '#{path_str}')\">#{text_str}</a>"))
+            elsif text_str
+              s(:dstr,
+                s(:str, '<a href="'),
+                s(:begin, path_expr),
+                s(:str, '" class="'),
+                s(:begin, class_expr),
+                s(:str, "\" onclick=\"return navigate(event, '"),
+                s(:begin, path_expr),
+                s(:str, "')\">#{text_str}</a>"))
+            else
+              s(:dstr,
+                s(:str, '<a href="'),
+                s(:begin, path_expr),
+                s(:str, '" class="'),
+                s(:begin, class_expr),
+                s(:str, "\" onclick=\"return navigate(event, '"),
+                s(:begin, path_expr),
+                s(:str, "')\">"),
+                s(:begin, text_expr),
+                s(:str, '</a>'))
+            end
+          else
+            # Node target - traditional href links
+            if text_str && path_node.type == :str
+              path_str = path_node.children[0]
+              s(:dstr,
+                s(:str, "<a href=\"#{path_str}\" class=\""),
+                s(:begin, class_expr),
+                s(:str, "\">#{text_str}</a>"))
+            elsif text_str
+              s(:dstr,
+                s(:str, '<a href="'),
+                s(:begin, path_expr),
+                s(:str, '" class="'),
+                s(:begin, class_expr),
+                s(:str, "\">#{text_str}</a>"))
+            else
+              s(:dstr,
+                s(:str, '<a href="'),
+                s(:begin, path_expr),
+                s(:str, '" class="'),
+                s(:begin, class_expr),
+                s(:str, '">'),
                 s(:begin, text_expr),
                 s(:str, '</a>'))
             end
@@ -707,7 +882,7 @@ module Ruby2JS
         end
 
         # Extract options hash from form field args
-        # Returns [field_options_hash, remaining_args]
+        # Returns options hash with :class_node for dynamic class support
         def extract_field_options(args)
           options = {}
           # Options hash is typically the last argument
@@ -719,7 +894,13 @@ module Ruby2JS
                 key_name = key.children[0]
                 case key_name
                 when :class
+                  # Store both static value and node for dynamic support
                   options[:class] = extract_class_value(value)
+                  options[:class_node] = value
+                when :id
+                  options[:id] = value.children[0] if value.type == :str
+                when :style
+                  options[:style] = value.children[0] if value.type == :str
                 when :rows
                   options[:rows] = value.children[0] if value.type == :int
                 when :cols
@@ -749,10 +930,12 @@ module Ruby2JS
           options
         end
 
-        # Build HTML attributes string from options hash
+        # Build HTML attributes string from options hash (static classes only)
         def build_field_attrs(options)
           attrs = []
           attrs << "class=\"#{options[:class]}\"" if options[:class]
+          attrs << "id=\"#{options[:id]}\"" if options[:id]
+          attrs << "style=\"#{options[:style]}\"" if options[:style]
           attrs << "rows=\"#{options[:rows]}\"" if options[:rows]
           attrs << "cols=\"#{options[:cols]}\"" if options[:cols]
           attrs << "placeholder=\"#{options[:placeholder]}\"" if options[:placeholder]
@@ -767,11 +950,53 @@ module Ruby2JS
           attrs.empty? ? "" : " " + attrs.join(" ")
         end
 
+        # Check if options contain conditional classes
+        def has_conditional_classes?(options)
+          return false unless options[:class_node]
+          result = extract_class_with_conditions(options[:class_node])
+          result && result[:conditionals].any?
+        end
+
+        # Build HTML attributes for dynamic output (supports conditional classes)
+        # Returns [static_attrs_string, dynamic_class_expr_or_nil]
+        def build_field_attrs_dynamic(options)
+          # Build non-class attributes
+          attrs = []
+          attrs << "id=\"#{options[:id]}\"" if options[:id]
+          attrs << "style=\"#{options[:style]}\"" if options[:style]
+          attrs << "rows=\"#{options[:rows]}\"" if options[:rows]
+          attrs << "cols=\"#{options[:cols]}\"" if options[:cols]
+          attrs << "placeholder=\"#{options[:placeholder]}\"" if options[:placeholder]
+          attrs << "disabled" if options[:disabled]
+          attrs << "readonly" if options[:readonly]
+          attrs << "required" if options[:required]
+          attrs << "autofocus" if options[:autofocus]
+          attrs << "multiple" if options[:multiple]
+          attrs << "min=\"#{options[:min]}\"" if options[:min]
+          attrs << "max=\"#{options[:max]}\"" if options[:max]
+          attrs << "step=\"#{options[:step]}\"" if options[:step]
+
+          static_attrs = attrs.empty? ? "" : " " + attrs.join(" ")
+
+          # Handle class attribute
+          if options[:class_node]
+            static_class_attr, dynamic_class_expr = build_dynamic_class_attr(options[:class_node])
+            if dynamic_class_expr
+              # Has conditional classes - return dynamic expression
+              return [static_attrs, dynamic_class_expr]
+            elsif static_class_attr && static_class_attr.length > 0
+              # Static class only
+              return [static_class_attr + static_attrs, nil]
+            end
+          end
+
+          [static_attrs, nil]
+        end
+
         # Convert form builder method calls to HTML input elements
         def process_form_builder_method(method, args)
           model = @erb_model_name || 'model'
           options = extract_field_options(args)
-          extra_attrs = build_field_attrs(options)
 
           case method
           when :text_field, :email_field, :password_field, :hidden_field,
@@ -784,11 +1009,25 @@ module Ruby2JS
               input_type = method.to_s.sub(/_field$/, '')
               input_type = 'text' if input_type == 'text'
               input_type = 'datetime-local' if input_type == 'datetime_local'
-              # Include current value from model
-              s(:dstr,
-                s(:str, %(<input type="#{input_type}" name="#{model}[#{name}]" id="#{model}_#{name}"#{extra_attrs} value=")),
-                s(:begin, s(:or, s(:attr, s(:lvar, model.to_sym), name.to_sym), s(:str, ''))),
-                s(:str, '">'))
+
+              # Check for conditional classes
+              static_attrs, dynamic_class_expr = build_field_attrs_dynamic(options)
+
+              if dynamic_class_expr
+                # Has conditional classes - generate dynamic class attribute
+                s(:dstr,
+                  s(:str, %(<input type="#{input_type}" name="#{model}[#{name}]" id="#{model}_#{name}" class=")),
+                  s(:begin, process(dynamic_class_expr)),
+                  s(:str, %("#{static_attrs} value=")),
+                  s(:begin, s(:or, s(:attr, s(:lvar, model.to_sym), name.to_sym), s(:str, ''))),
+                  s(:str, '">'))
+              else
+                # Static classes only
+                s(:dstr,
+                  s(:str, %(<input type="#{input_type}" name="#{model}[#{name}]" id="#{model}_#{name}"#{static_attrs} value=")),
+                  s(:begin, s(:or, s(:attr, s(:lvar, model.to_sym), name.to_sym), s(:str, ''))),
+                  s(:str, '">'))
+              end
             else
               super
             end
@@ -797,11 +1036,25 @@ module Ruby2JS
             field_name = args.first
             if field_name&.type == :sym
               name = field_name.children.first.to_s
-              # Include current value from model inside textarea
-              s(:dstr,
-                s(:str, %(<textarea name="#{model}[#{name}]" id="#{model}_#{name}"#{extra_attrs}>)),
-                s(:begin, s(:or, s(:attr, s(:lvar, model.to_sym), name.to_sym), s(:str, ''))),
-                s(:str, '</textarea>'))
+
+              # Check for conditional classes
+              static_attrs, dynamic_class_expr = build_field_attrs_dynamic(options)
+
+              if dynamic_class_expr
+                # Has conditional classes - generate dynamic class attribute
+                s(:dstr,
+                  s(:str, %(<textarea name="#{model}[#{name}]" id="#{model}_#{name}" class=")),
+                  s(:begin, process(dynamic_class_expr)),
+                  s(:str, %("#{static_attrs}>)),
+                  s(:begin, s(:or, s(:attr, s(:lvar, model.to_sym), name.to_sym), s(:str, ''))),
+                  s(:str, '</textarea>'))
+              else
+                # Static classes only
+                s(:dstr,
+                  s(:str, %(<textarea name="#{model}[#{name}]" id="#{model}_#{name}"#{static_attrs}>)),
+                  s(:begin, s(:or, s(:attr, s(:lvar, model.to_sym), name.to_sym), s(:str, ''))),
+                  s(:str, '</textarea>'))
+              end
             else
               super
             end
@@ -810,6 +1063,7 @@ module Ruby2JS
             field_name = args.first
             if field_name&.type == :sym
               name = field_name.children.first.to_s
+              extra_attrs = build_field_attrs(options)
               html = %(<input type="checkbox" name="#{model}[#{name}]" id="#{model}_#{name}"#{extra_attrs} value="1">)
               s(:str, html)
             else
@@ -822,6 +1076,7 @@ module Ruby2JS
             if field_name&.type == :sym
               name = field_name.children.first.to_s
               val = value&.type == :sym ? value.children.first.to_s : value&.children&.first.to_s
+              extra_attrs = build_field_attrs(options)
               html = %(<input type="radio" name="#{model}[#{name}]" id="#{model}_#{name}_#{val}"#{extra_attrs} value="#{val}">)
               s(:str, html)
             else
@@ -835,6 +1090,7 @@ module Ruby2JS
               # Inline capitalize for JS compatibility (see inflector.rb)
               label_text = name.gsub('_', ' ')
               label_text = label_text[0].upcase + label_text[1..-1].to_s
+              extra_attrs = build_field_attrs(options)
               html = %(<label for="#{model}_#{name}"#{extra_attrs}>#{label_text}</label>)
               s(:str, html)
             else
@@ -845,6 +1101,7 @@ module Ruby2JS
             field_name = args.first
             if field_name&.type == :sym
               name = field_name.children.first.to_s
+              extra_attrs = build_field_attrs(options)
               html = %(<select name="#{model}[#{name}]" id="#{model}_#{name}"#{extra_attrs}></select>)
               s(:str, html)
             else
@@ -861,6 +1118,7 @@ module Ruby2JS
               # No label, just options - already extracted
               label = nil
             end
+            extra_attrs = build_field_attrs(options)
             if label
               html = %(<input type="submit" value="#{label}"#{extra_attrs}>)
             else
@@ -876,6 +1134,7 @@ module Ruby2JS
             elsif value&.type == :hash
               label = nil
             end
+            extra_attrs = build_field_attrs(options)
             if label
               html = %(<button type="submit"#{extra_attrs}>#{label}</button>)
             else

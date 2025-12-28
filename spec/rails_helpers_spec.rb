@@ -120,6 +120,27 @@ describe Ruby2JS::Filter::Rails::Helpers do
       result.must_include 'placeholder="Enter name"'
       result.must_include 'required'
     end
+
+    it "should include id attribute on text_field" do
+      return skip() unless defined?(Ruby2JS::Erubi)
+      result = erb_to_js('<%= form_with(model: @article) do |form| %><%= form.text_field :title, id: "article-title" %><% end %>')
+      result.must_include 'id="article-title"'
+    end
+
+    it "should include style attribute on text_field" do
+      return skip() unless defined?(Ruby2JS::Erubi)
+      result = erb_to_js('<%= form_with(model: @article) do |form| %><%= form.text_field :title, style: "width: 100%" %><% end %>')
+      result.must_include 'style="width: 100%"'
+    end
+
+    it "should handle conditional classes on form fields" do
+      return skip() unless defined?(Ruby2JS::Erubi)
+      result = erb_to_js('<%= form_with(model: @article) do |form| %><%= form.text_field :title, class: ["input", {"border-red": article.errors.any?}] %><% end %>')
+      # Conditional classes generate runtime expressions
+      result.must_include 'input'
+      result.must_include 'border-red'
+      result.must_include '?'
+    end
   end
 
   describe 'link_to helper' do
@@ -161,7 +182,10 @@ describe Ruby2JS::Filter::Rails::Helpers do
       # Tailwind pattern: class: ["base", {"conditional": condition}]
       erb_src = '_erbout = +\'\'; _erbout.<<(( link_to("Edit", "/edit", class: ["rounded-md", "px-3", {"text-red": errors}]) ).to_s); _erbout'
       result = to_js(erb_src)
-      result.must_include 'class=\"rounded-md px-3 text-red\"'
+      # Conditional classes generate runtime expressions
+      result.must_include 'rounded-md px-3'
+      result.must_include 'errors ?'
+      result.must_include 'text-red'
     end
   end
 
