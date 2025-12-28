@@ -505,7 +505,7 @@ module Ruby2JS
               <nav>
                 #{nav_links}
               </nav>
-              <main id="content"></main>
+              <main id="content" class="#{main_class_for(manifest.css)}"></main>
             </div>
 
             <script type="module">
@@ -532,6 +532,21 @@ module Ruby2JS
           '<link rel="stylesheet" href="/public/styles.css">'
         else
           '<link rel="stylesheet" href="/public/styles.css">'
+        end
+      end
+
+      def main_class_for(css)
+        case css
+        when :tailwind
+          'container mx-auto mt-28 px-5 flex'
+        when :bootstrap
+          'container mt-5'
+        when :bulma
+          'container mt-5'
+        when :pico
+          'container'
+        else
+          ''
         end
       end
 
