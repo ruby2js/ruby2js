@@ -74,6 +74,52 @@ describe Ruby2JS::Filter::Rails::Helpers do
       result.must_include 'type=\\"submit\\"'
       result.must_include 'Create Account'
     end
+
+    it "should include class attribute on form_with" do
+      return skip() unless defined?(Ruby2JS::Erubi)
+      result = erb_to_js('<%= form_with(model: @article, class: "contents") do |form| %><% end %>')
+      result.must_include 'class="contents"'
+      result.must_include '<form'
+    end
+
+    it "should include class attribute on text_field" do
+      return skip() unless defined?(Ruby2JS::Erubi)
+      result = erb_to_js('<%= form_with(model: @article) do |form| %><%= form.text_field :title, class: "input-lg" %><% end %>')
+      result.must_include 'class="input-lg"'
+      result.must_include 'type="text"'
+    end
+
+    it "should include class and rows on textarea" do
+      return skip() unless defined?(Ruby2JS::Erubi)
+      result = erb_to_js('<%= form_with(model: @article) do |form| %><%= form.textarea :body, rows: 4, class: "w-full" %><% end %>')
+      result.must_include 'class="w-full"'
+      result.must_include 'rows="4"'
+      result.must_include '<textarea'
+    end
+
+    it "should include class on submit button" do
+      return skip() unless defined?(Ruby2JS::Erubi)
+      result = erb_to_js('<%= form_with(model: @article) do |form| %><%= form.submit class: "btn btn-primary" %><% end %>')
+      # Static string output - quotes are escaped
+      result.must_include 'class=\\"btn btn-primary\\"'
+      result.must_include 'type=\\"submit\\"'
+    end
+
+    it "should include class on label" do
+      return skip() unless defined?(Ruby2JS::Erubi)
+      result = erb_to_js('<%= form_with(model: @article) do |form| %><%= form.label :title, class: "font-bold" %><% end %>')
+      # Static string output - quotes are escaped
+      result.must_include 'class=\\"font-bold\\"'
+      result.must_include '<label'
+    end
+
+    it "should handle multiple field attributes" do
+      return skip() unless defined?(Ruby2JS::Erubi)
+      result = erb_to_js('<%= form_with(model: @user) do |f| %><%= f.text_field :name, placeholder: "Enter name", required: true, class: "form-control" %><% end %>')
+      result.must_include 'class="form-control"'
+      result.must_include 'placeholder="Enter name"'
+      result.must_include 'required'
+    end
   end
 
   describe 'link_to helper' do

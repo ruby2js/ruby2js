@@ -706,9 +706,72 @@ module Ruby2JS
           end
         end
 
+        # Extract options hash from form field args
+        # Returns [field_options_hash, remaining_args]
+        def extract_field_options(args)
+          options = {}
+          # Options hash is typically the last argument
+          if args.last&.type == :hash
+            args.last.children.each do |pair|
+              key = pair.children[0]
+              value = pair.children[1]
+              if key.type == :sym
+                key_name = key.children[0]
+                case key_name
+                when :class
+                  options[:class] = extract_class_value(value)
+                when :rows
+                  options[:rows] = value.children[0] if value.type == :int
+                when :cols
+                  options[:cols] = value.children[0] if value.type == :int
+                when :placeholder
+                  options[:placeholder] = value.children[0] if value.type == :str
+                when :disabled
+                  options[:disabled] = true if value.type == :true
+                when :readonly
+                  options[:readonly] = true if value.type == :true
+                when :required
+                  options[:required] = true if value.type == :true
+                when :autofocus
+                  options[:autofocus] = true if value.type == :true
+                when :multiple
+                  options[:multiple] = true if value.type == :true
+                when :min
+                  options[:min] = value.children[0] if [:int, :str].include?(value.type)
+                when :max
+                  options[:max] = value.children[0] if [:int, :str].include?(value.type)
+                when :step
+                  options[:step] = value.children[0] if [:int, :str].include?(value.type)
+                end
+              end
+            end
+          end
+          options
+        end
+
+        # Build HTML attributes string from options hash
+        def build_field_attrs(options)
+          attrs = []
+          attrs << "class=\"#{options[:class]}\"" if options[:class]
+          attrs << "rows=\"#{options[:rows]}\"" if options[:rows]
+          attrs << "cols=\"#{options[:cols]}\"" if options[:cols]
+          attrs << "placeholder=\"#{options[:placeholder]}\"" if options[:placeholder]
+          attrs << "disabled" if options[:disabled]
+          attrs << "readonly" if options[:readonly]
+          attrs << "required" if options[:required]
+          attrs << "autofocus" if options[:autofocus]
+          attrs << "multiple" if options[:multiple]
+          attrs << "min=\"#{options[:min]}\"" if options[:min]
+          attrs << "max=\"#{options[:max]}\"" if options[:max]
+          attrs << "step=\"#{options[:step]}\"" if options[:step]
+          attrs.empty? ? "" : " " + attrs.join(" ")
+        end
+
         # Convert form builder method calls to HTML input elements
         def process_form_builder_method(method, args)
           model = @erb_model_name || 'model'
+          options = extract_field_options(args)
+          extra_attrs = build_field_attrs(options)
 
           case method
           when :text_field, :email_field, :password_field, :hidden_field,
@@ -723,7 +786,7 @@ module Ruby2JS
               input_type = 'datetime-local' if input_type == 'datetime_local'
               # Include current value from model
               s(:dstr,
-                s(:str, %(<input type="#{input_type}" name="#{model}[#{name}]" id="#{model}_#{name}" value=")),
+                s(:str, %(<input type="#{input_type}" name="#{model}[#{name}]" id="#{model}_#{name}"#{extra_attrs} value=")),
                 s(:begin, s(:or, s(:attr, s(:lvar, model.to_sym), name.to_sym), s(:str, ''))),
                 s(:str, '">'))
             else
@@ -736,7 +799,7 @@ module Ruby2JS
               name = field_name.children.first.to_s
               # Include current value from model inside textarea
               s(:dstr,
-                s(:str, %(<textarea name="#{model}[#{name}]" id="#{model}_#{name}">)),
+                s(:str, %(<textarea name="#{model}[#{name}]" id="#{model}_#{name}"#{extra_attrs}>)),
                 s(:begin, s(:or, s(:attr, s(:lvar, model.to_sym), name.to_sym), s(:str, ''))),
                 s(:str, '</textarea>'))
             else
@@ -747,7 +810,7 @@ module Ruby2JS
             field_name = args.first
             if field_name&.type == :sym
               name = field_name.children.first.to_s
-              html = %(<input type="checkbox" name="#{model}[#{name}]" id="#{model}_#{name}" value="1">)
+              html = %(<input type="checkbox" name="#{model}[#{name}]" id="#{model}_#{name}"#{extra_attrs} value="1">)
               s(:str, html)
             else
               super
@@ -759,7 +822,7 @@ module Ruby2JS
             if field_name&.type == :sym
               name = field_name.children.first.to_s
               val = value&.type == :sym ? value.children.first.to_s : value&.children&.first.to_s
-              html = %(<input type="radio" name="#{model}[#{name}]" id="#{model}_#{name}_#{val}" value="#{val}">)
+              html = %(<input type="radio" name="#{model}[#{name}]" id="#{model}_#{name}_#{val}"#{extra_attrs} value="#{val}">)
               s(:str, html)
             else
               super
@@ -772,7 +835,7 @@ module Ruby2JS
               # Inline capitalize for JS compatibility (see inflector.rb)
               label_text = name.gsub('_', ' ')
               label_text = label_text[0].upcase + label_text[1..-1].to_s
-              html = %(<label for="#{model}_#{name}">#{label_text}</label>)
+              html = %(<label for="#{model}_#{name}"#{extra_attrs}>#{label_text}</label>)
               s(:str, html)
             else
               super
@@ -782,29 +845,41 @@ module Ruby2JS
             field_name = args.first
             if field_name&.type == :sym
               name = field_name.children.first.to_s
-              html = %(<select name="#{model}[#{name}]" id="#{model}_#{name}"></select>)
+              html = %(<select name="#{model}[#{name}]" id="#{model}_#{name}"#{extra_attrs}></select>)
               s(:str, html)
             else
               super
             end
 
           when :submit
+            # submit can have: submit("Save") or submit(class: "btn")
             value = args.first
+            label = nil
             if value&.type == :str
               label = value.children.first
-              html = %(<input type="submit" value="#{label}">)
+            elsif value&.type == :hash
+              # No label, just options - already extracted
+              label = nil
+            end
+            if label
+              html = %(<input type="submit" value="#{label}"#{extra_attrs}>)
             else
-              html = %(<input type="submit">)
+              html = %(<input type="submit"#{extra_attrs}>)
             end
             s(:str, html)
 
           when :button
             value = args.first
+            label = nil
             if value&.type == :str
               label = value.children.first
-              html = %(<button type="submit">#{label}</button>)
+            elsif value&.type == :hash
+              label = nil
+            end
+            if label
+              html = %(<button type="submit"#{extra_attrs}>#{label}</button>)
             else
-              html = %(<button type="submit">Submit</button>)
+              html = %(<button type="submit"#{extra_attrs}>Submit</button>)
             end
             s(:str, html)
 
@@ -850,25 +925,31 @@ module Ruby2JS
 
         # Process form_with block into JavaScript (Rails 5.1+ preferred form helper)
         # form_with(model: @article) do |form| ... end
-        # form_with(url: articles_path) do |form| ... end
+        # form_with(url: articles_path, class: "contents") do |form| ... end
         def process_form_with(helper_call, block_args, block_body)
-          # Extract model or url from keyword arguments
+          # Extract model, url, and class from keyword arguments
           model_name = nil
+          css_class = nil
           options_node = helper_call.children[2]
 
           if options_node&.type == :hash
             options_node.children.each do |pair|
               key = pair.children[0]
               value = pair.children[1]
-              if key.type == :sym && key.children[0] == :model
-                # model: @article or model: article
-                if value.type == :ivar
-                  model_name = value.children.first.to_s.sub(/^@/, '')
-                elsif value.type == :lvar
-                  model_name = value.children.first.to_s
-                elsif value.type == :send && value.children.first.nil?
-                  # s(:send, nil, :article) - method call as local
-                  model_name = value.children[1].to_s
+              if key.type == :sym
+                case key.children[0]
+                when :model
+                  # model: @article or model: article
+                  if value.type == :ivar
+                    model_name = value.children.first.to_s.sub(/^@/, '')
+                  elsif value.type == :lvar
+                    model_name = value.children.first.to_s
+                  elsif value.type == :send && value.children.first.nil?
+                    # s(:send, nil, :article) - method call as local
+                    model_name = value.children[1].to_s
+                  end
+                when :class
+                  css_class = extract_class_value(value)
                 end
               end
             end
@@ -883,6 +964,9 @@ module Ruby2JS
 
           statements = []
 
+          # Build class attribute string
+          class_attr = css_class ? " class=\"#{css_class}\"" : ""
+
           # Build form tag - add onsubmit handler for browser/SPA target
           if model_name && self.browser_target?
             # Browser/SPA target - use routes pattern like form_tag
@@ -890,16 +974,16 @@ module Ruby2JS
             plural_name = model_name + 's'  # Simple pluralization
             statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
               s(:dstr,
-                s(:str, "<form data-model=\"#{model_name}\" onsubmit=\"return ("),
+                s(:str, "<form data-model=\"#{model_name}\"#{class_attr} onsubmit=\"return ("),
                 s(:begin, s(:attr, s(:lvar, model_name.to_sym), :id)),
                 s(:str, " ? routes.#{model_name}.patch(event, "),
                 s(:begin, s(:attr, s(:lvar, model_name.to_sym), :id)),
                 s(:str, ") : routes.#{plural_name}.post(event))\">")))
           elsif model_name
             # Server target - standard form
-            statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+, s(:str, "<form data-model=\"#{model_name}\">"))
+            statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+, s(:str, "<form data-model=\"#{model_name}\"#{class_attr}>"))
           else
-            statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+, s(:str, "<form>"))
+            statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+, s(:str, "<form#{class_attr}>"))
           end
 
           if block_body
