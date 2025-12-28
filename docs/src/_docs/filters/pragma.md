@@ -309,6 +309,36 @@ hash.each { |k, v| process(k, v) } # Pragma: entries
 **When to use:** When iterating over JavaScript objects where you need both
 keys and values, and the standard `.each` translation doesn't apply.
 
+### `extend`
+
+Extends an existing JavaScript class (monkey patching) instead of defining a
+new class.
+
+```ruby
+class String # Pragma: extend
+  def blank?
+    strip.empty?
+  end
+end
+# => String.prototype.blank = function() {return this.strip().length === 0}
+
+class Array # Pragma: extend
+  def second
+    self[1]
+  end
+end
+# => Object.defineProperty(Array.prototype, "second", {
+#      enumerable: true, configurable: true,
+#      get() {return this[1]}
+#    })
+```
+
+**When to use:** When you need to add methods to built-in JavaScript classes
+like `String`, `Array`, or `Number`, or extend classes defined elsewhere.
+
+Since the pragma is a Ruby comment, it's ignored when code runs in Ruby,
+making it ideal for dual-target development.
+
 ## Usage Notes
 
 ### Case Insensitivity

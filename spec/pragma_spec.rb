@@ -497,6 +497,34 @@ describe Ruby2JS::Filter::Pragma do
     end
   end
 
+  describe "extend pragma" do
+    it "should extend existing class with methods" do
+      to_js('class F; def m(); end; end # Pragma: extend').
+        must_equal 'F.prototype.m = function() {}'
+    end
+
+    it "should extend existing class with properties" do
+      to_js('class F; def p; 1; end; end # Pragma: extend').
+        must_equal 'Object.defineProperty(F.prototype, "p", ' +
+          '{enumerable: true, configurable: true, get() {return 1}})'
+    end
+
+    it "should extend existing class with constructors" do
+      to_js('class F; def initialize() {}; end; end # Pragma: extend').
+        must_equal '[(F = function F() {{}}).prototype] = [F.prototype]'
+    end
+
+    it "should extend built-in classes" do
+      to_js('class String; def blank?; strip.empty?; end; end # Pragma: extend').
+        must_include 'String.prototype'
+    end
+
+    it "should not extend class without pragma" do
+      to_js('class F; def m(); end; end').
+        must_include 'class F'
+    end
+  end
+
   describe "multiple pragmas on same line" do
     it "should apply both logical and method pragmas" do
       # Both pragmas should work: logical forces ||, method converts .call to ()

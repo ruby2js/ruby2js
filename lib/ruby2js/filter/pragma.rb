@@ -43,7 +43,9 @@ module Ruby2JS
         'proto' => :proto,           # .class → .constructor
         'entries' => :entries,       # Object.entries for hash iteration
         # Statement control pragmas
-        'skip' => :skip              # skip statement (require, def, defs, alias)
+        'skip' => :skip,             # skip statement (require, def, defs, alias)
+        # Class pragmas
+        'extend' => :extend          # extend existing JS class (monkey patch)
       }.freeze
 
       def initialize(*args)
@@ -241,6 +243,16 @@ module Ruby2JS
       def on_case(node)
         if pragma?(node, :skip)
           return s(:hide)
+        end
+        super
+      end
+
+      # Handle class definitions with extend pragma (monkey patching)
+      # Replaces the ++class syntax with a pragma that works in standard Ruby
+      def on_class(node)
+        if pragma?(node, :extend)
+          # Transform to :class_extend which signals this is extending an existing class
+          return process node.updated(:class_extend)
         end
         super
       end

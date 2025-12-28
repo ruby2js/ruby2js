@@ -37,17 +37,18 @@ This is the key insight: pragmas let you fine-tune JavaScript output without aff
 
 ## Quick Reference
 
-| Pragma                   | Purpose               | Example                          |
-| ------------------------ | --------------------- | -------------------------------- |
-| `skip`                   | Remove from JS output | `require 'gem' # Pragma: skip`   |
-| `array`                  | Treat as Array        | `items << x # Pragma: array`     |
-| `hash`                   | Treat as Hash         | `data.dup # Pragma: hash`        |
-| `set`                    | Treat as Set          | `s << x # Pragma: set`           |
-| `entries`                | Use Object.entries()  | `h.each {...} # Pragma: entries` |
-| `method`                 | Direct invocation     | `fn.call(x) # Pragma: method`    |
-| `logical` or `\|\|`      | Force `\|\|`          | `x \|\|= y # Pragma: logical`    |
-| `??` or `nullish`        | Force `??`            | `x \|\|= y # Pragma: ??`         |
-| `function` or `noes2015` | Traditional function  | `{ this } # Pragma: function`    |
+| Pragma                   | Purpose               | Example                           |
+| ------------------------ | --------------------- | --------------------------------- |
+| `skip`                   | Remove from JS output | `require 'gem' # Pragma: skip`    |
+| `extend`                 | Extend existing class | `class String # Pragma: extend`   |
+| `array`                  | Treat as Array        | `items << x # Pragma: array`      |
+| `hash`                   | Treat as Hash         | `data.dup # Pragma: hash`         |
+| `set`                    | Treat as Set          | `s << x # Pragma: set`            |
+| `entries`                | Use Object.entries()  | `h.each {...} # Pragma: entries`  |
+| `method`                 | Direct invocation     | `fn.call(x) # Pragma: method`     |
+| `logical` or `\|\|`      | Force `\|\|`          | `x \|\|= y # Pragma: logical`     |
+| `??` or `nullish`        | Force `??`            | `x \|\|= y # Pragma: ??`          |
+| `function` or `noes2015` | Traditional function  | `{ this } # Pragma: function`     |
 
 For complete documentation, see the [Pragma Filter](/docs/filters/pragma) reference.
 
@@ -78,6 +79,31 @@ end
 # Code that runs in both
 def process(x)
   x * 2
+end
+```
+
+### Extending Built-in Classes
+
+Add methods to JavaScript's built-in classes like `String` or `Array`:
+
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["pragma", "functions"]
+}'></div>
+
+```ruby
+# Add a blank? method to String
+class String # Pragma: extend
+  def blank?
+    strip.empty?
+  end
+end
+
+# Add a second method to Array
+class Array # Pragma: extend
+  def second
+    self[1]
+  end
 end
 ```
 
@@ -325,6 +351,7 @@ alias :kind_of? :is_a? # Pragma: skip
 | Category       | Pragmas                          | When to Use                     |
 | -------------- | -------------------------------- | ------------------------------- |
 | **Exclusion**  | `skip`                           | Ruby-only code                  |
+| **Classes**    | `extend`                         | Monkey patching built-ins       |
 | **Type hints** | `array`, `hash`, `set`, `string` | Ambiguous operations            |
 | **Iteration**  | `entries`                        | Hash `.each`, `.select`, `.map` |
 | **Functions**  | `method`, `function`             | Callables, DOM handlers         |

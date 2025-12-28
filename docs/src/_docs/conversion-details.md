@@ -112,17 +112,17 @@ The cost is that Ruby's dynamic features simply can't be supported. There's no w
 
 ### Extending Existing Classes
 
-Both Ruby and JavaScript have open classes, but Ruby unifies syntax for defining and extending classes while JavaScript does not. To extend an existing class, prepend `++`:
+Both Ruby and JavaScript have open classes, but Ruby unifies syntax for defining and extending classes while JavaScript does not. To extend an existing class, use the `extend` pragma:
 
 ```ruby
-++class String
+class String # Pragma: extend
   def blank?
     strip.empty?
   end
 end
 ```
 
-This tells Ruby2JS you're extending an existing class rather than defining a new one.
+This tells Ruby2JS you're extending an existing class rather than defining a new one. The pragma approach works in both Ruby (where the comment is ignored) and Ruby2JS, making it ideal for dual-target code.
 
 ### Suffix Stripping
 
