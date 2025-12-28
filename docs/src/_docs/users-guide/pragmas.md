@@ -37,17 +37,17 @@ This is the key insight: pragmas let you fine-tune JavaScript output without aff
 
 ## Quick Reference
 
-| Pragma | Purpose | Example |
-|--------|---------|---------|
-| `skip` | Remove from JS output | `require 'gem' # Pragma: skip` |
-| `array` | Treat as Array | `items << x # Pragma: array` |
-| `hash` | Treat as Hash | `data.dup # Pragma: hash` |
-| `set` | Treat as Set | `s << x # Pragma: set` |
-| `entries` | Use Object.entries() | `h.each {...} # Pragma: entries` |
-| `method` | Direct invocation | `fn.call(x) # Pragma: method` |
-| `logical` or `\|\|` | Force `\|\|` | `x \|\|= y # Pragma: logical` |
-| `??` or `nullish` | Force `??` | `x \|\|= y # Pragma: ??` |
-| `function` or `noes2015` | Traditional function | `{ this } # Pragma: function` |
+| Pragma                   | Purpose               | Example                          |
+| ------------------------ | --------------------- | -------------------------------- |
+| `skip`                   | Remove from JS output | `require 'gem' # Pragma: skip`   |
+| `array`                  | Treat as Array        | `items << x # Pragma: array`     |
+| `hash`                   | Treat as Hash         | `data.dup # Pragma: hash`        |
+| `set`                    | Treat as Set          | `s << x # Pragma: set`           |
+| `entries`                | Use Object.entries()  | `h.each {...} # Pragma: entries` |
+| `method`                 | Direct invocation     | `fn.call(x) # Pragma: method`    |
+| `logical` or `\|\|`      | Force `\|\|`          | `x \|\|= y # Pragma: logical`    |
+| `??` or `nullish`        | Force `??`            | `x \|\|= y # Pragma: ??`         |
+| `function` or `noes2015` | Traditional function  | `{ this } # Pragma: function`    |
 
 For complete documentation, see the [Pragma Filter](/docs/filters/pragma) reference.
 
@@ -322,13 +322,13 @@ alias :kind_of? :is_a? # Pragma: skip
 
 ## Pragma Categories
 
-| Category | Pragmas | When to Use |
-|----------|---------|-------------|
-| **Exclusion** | `skip` | Ruby-only code |
-| **Type hints** | `array`, `hash`, `set`, `string` | Ambiguous operations |
-| **Iteration** | `entries` | Hash `.each`, `.select`, `.map` |
-| **Functions** | `method`, `function` | Callables, DOM handlers |
-| **Operators** | `??`, `logical`, `guard` | OR semantics, splat safety |
+| Category       | Pragmas                          | When to Use                     |
+| -------------- | -------------------------------- | ------------------------------- |
+| **Exclusion**  | `skip`                           | Ruby-only code                  |
+| **Type hints** | `array`, `hash`, `set`, `string` | Ambiguous operations            |
+| **Iteration**  | `entries`                        | Hash `.each`, `.select`, `.map` |
+| **Functions**  | `method`, `function`             | Callables, DOM handlers         |
+| **Operators**  | `??`, `logical`, `guard`         | OR semantics, splat safety      |
 
 ## See Also
 

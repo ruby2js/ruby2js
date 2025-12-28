@@ -370,27 +370,27 @@ str.force_encoding("UTF-8")
 
 ## Summary: Safe vs Unsafe
 
-| Feature | Status | Notes |
-|---------|--------|-------|
-| Classes, methods | ✅ Safe | |
-| Blocks as lambdas | ✅ Safe | |
-| Arrays, hashes | ✅ Safe | Mind `<<`, `.dup` |
-| String interpolation | ✅ Safe | |
-| Control flow | ✅ Safe | Except `retry`, `redo` |
-| `define_method` | ✅ Safe | In class bodies |
-| `send` | ✅ Safe | Static or dynamic names |
-| `include`/`extend` | ✅ Safe | Module mixins |
-| `is_a?`, `kind_of?` | ✅ Safe | Maps to `instanceof` |
-| `instance_of?` | ✅ Safe | Exact type check |
-| `respond_to?` | ✅ Safe | Property existence |
-| `.class` | ✅ Safe | Returns constructor |
-| `superclass` | ✅ Safe | Parent class |
-| Symbols | ⚠️ Caution | Work as strings |
-| `method_missing` | ❌ Avoid | Explicit methods |
-| `eval` | ❌ Avoid | Restructure |
-| `prepend` | ❌ Avoid | MRO incompatible |
-| `retry`/`redo` | ❌ Avoid | Explicit loops |
-| `catch`/`throw` | ❌ Avoid | Break/return |
+| Feature              | Status    | Notes                   |
+| -------------------- | --------- | ----------------------- |
+| Classes, methods     | ✅ Safe    |                         |
+| Blocks as lambdas    | ✅ Safe    |                         |
+| Arrays, hashes       | ✅ Safe    | Mind `<<`, `.dup`       |
+| String interpolation | ✅ Safe    |                         |
+| Control flow         | ✅ Safe    | Except `retry`, `redo`  |
+| `define_method`      | ✅ Safe    | In class bodies         |
+| `send`               | ✅ Safe    | Static or dynamic names |
+| `include`/`extend`   | ✅ Safe    | Module mixins           |
+| `is_a?`, `kind_of?`  | ✅ Safe    | Maps to `instanceof`    |
+| `instance_of?`       | ✅ Safe    | Exact type check        |
+| `respond_to?`        | ✅ Safe    | Property existence      |
+| `.class`             | ✅ Safe    | Returns constructor     |
+| `superclass`         | ✅ Safe    | Parent class            |
+| Symbols              | ⚠️ Caution | Work as strings         |
+| `method_missing`     | ❌ Avoid   | Explicit methods        |
+| `eval`               | ❌ Avoid   | Restructure             |
+| `prepend`            | ❌ Avoid   | MRO incompatible        |
+| `retry`/`redo`       | ❌ Avoid   | Explicit loops          |
+| `catch`/`throw`      | ❌ Avoid   | Break/return            |
 
 ## See Also
 

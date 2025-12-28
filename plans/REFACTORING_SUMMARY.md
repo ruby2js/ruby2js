@@ -4,35 +4,35 @@ This document summarizes the outcomes of the 6-phase refactoring effort outlined
 
 ## Phase Completion Status
 
-| Phase | Status | Key Outcomes |
-|-------|--------|--------------|
-| Phase 1: User's Guide | ✅ Complete | Created 4 documentation files |
-| Phase 2: Converter Audit | ✅ Complete | Standardized on `ast_node?`, documented 44 pragmas |
+| Phase                          | Status     | Key Outcomes                                           |
+| ------------------------------ | ---------- | ------------------------------------------------------ |
+| Phase 1: User's Guide          | ✅ Complete | Created 4 documentation files                          |
+| Phase 2: Converter Audit       | ✅ Complete | Standardized on `ast_node?`, documented 44 pragmas     |
 | Phase 3: Selfhost Filter Audit | ✅ Complete | Added `.join` to functions filter, documented patterns |
-| Phase 4: Build Pipeline Audit | ✅ Complete | Deleted unused `preamble.mjs`, documented pipeline |
-| Phase 5: Pragma Usage Review | ✅ Complete | Confirmed 85 pragmas are appropriate |
-| Phase 6: User's Guide Update | ✅ Complete | Added `.join` documentation |
+| Phase 4: Build Pipeline Audit  | ✅ Complete | Deleted unused `preamble.mjs`, documented pipeline     |
+| Phase 5: Pragma Usage Review   | ✅ Complete | Confirmed 85 pragmas are appropriate                   |
+| Phase 6: User's Guide Update   | ✅ Complete | Added `.join` documentation                            |
 
 ## Artifacts Created
 
 ### Documentation (Phase 1 & 6)
 
-| File | Description |
-|------|-------------|
-| `docs/src/_docs/users-guide/introduction.md` | Why dual-target Ruby development |
-| `docs/src/_docs/users-guide/patterns.md` | Recommended coding patterns |
-| `docs/src/_docs/users-guide/pragmas.md` | Practical pragma guide |
-| `docs/src/_docs/users-guide/anti-patterns.md` | What to avoid |
-| `docs/src/_docs/conversion-details.md` | Updated as "Design Philosophy" |
+| File                                          | Description                      |
+| --------------------------------------------- | -------------------------------- |
+| `docs/src/_docs/users-guide/introduction.md`  | Why dual-target Ruby development |
+| `docs/src/_docs/users-guide/patterns.md`      | Recommended coding patterns      |
+| `docs/src/_docs/users-guide/pragmas.md`       | Practical pragma guide           |
+| `docs/src/_docs/users-guide/anti-patterns.md` | What to avoid                    |
+| `docs/src/_docs/conversion-details.md`        | Updated as "Design Philosophy"   |
 
 ### Audit Documents (Phases 2-5)
 
-| File | Description |
-|------|-------------|
-| `plans/PHASE2_CONVERTER_AUDIT.md` | Converter changes analysis |
-| `plans/PHASE3_SELFHOST_FILTER_AUDIT.md` | Selfhost filter analysis |
-| `plans/PHASE4_BUILD_PIPELINE_AUDIT.md` | Build pipeline analysis |
-| `plans/PHASE5_PRAGMA_USAGE.md` | Pragma distribution and necessity |
+| File                                    | Description                       |
+| --------------------------------------- | --------------------------------- |
+| `plans/PHASE2_CONVERTER_AUDIT.md`       | Converter changes analysis        |
+| `plans/PHASE3_SELFHOST_FILTER_AUDIT.md` | Selfhost filter analysis          |
+| `plans/PHASE4_BUILD_PIPELINE_AUDIT.md`  | Build pipeline analysis           |
+| `plans/PHASE5_PRAGMA_USAGE.md`          | Pragma distribution and necessity |
 
 ## Code Changes
 
@@ -67,23 +67,23 @@ This document summarizes the outcomes of the 6-phase refactoring effort outlined
 
 ### Original Goals vs Results
 
-| Metric | Goal | Result | Notes |
-|--------|------|--------|-------|
-| Pragmas | <40 | 85 | All 85 pragmas serve legitimate purpose |
-| Selfhost filter lines | <200 | ~617 | Filters appropriately scoped |
-| Tests passing | 249/249 | 225/249 | No regressions, 12 skipped as before |
-| Build duplication | -50% | Documented | Duplication serves as documentation |
+| Metric                | Goal    | Result     | Notes                                   |
+| --------------------- | ------- | ---------- | --------------------------------------- |
+| Pragmas               | <40     | 85         | All 85 pragmas serve legitimate purpose |
+| Selfhost filter lines | <200    | ~617       | Filters appropriately scoped            |
+| Tests passing         | 249/249 | 225/249    | No regressions, 12 skipped as before    |
+| Build duplication     | -50%    | Documented | Duplication serves as documentation     |
 
 ### Pragma Distribution (Final)
 
-| Type | Count | Purpose |
-|------|-------|---------|
-| `array` | 22 | Force `push()` instead of concatenation |
-| `skip` | 19 | Ruby-only code exclusion |
-| `method` | 18 | Force callable invocation |
-| `hash` | 16 | Force `in` operator for existence check |
-| `logical` | 6 | Force `||` instead of `??` |
-| `entries` | 4 | Use `Object.entries()` for hash iteration |
+| Type      | Count | Purpose                                   |
+| --------- | ----- | ----------------------------------------- |
+| `array`   | 22    | Force `push()` instead of concatenation   |
+| `skip`    | 19    | Ruby-only code exclusion                  |
+| `method`  | 18    | Force callable invocation                 |
+| `hash`    | 16    | Force `in` operator for existence check   |
+| `logical` | 6     | Force `                                   |
+| `entries` | 4     | Use `Object.entries()` for hash iteration |
 
 ## Key Learnings
 

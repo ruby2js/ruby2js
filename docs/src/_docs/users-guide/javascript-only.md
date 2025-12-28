@@ -52,13 +52,13 @@ Ruby2JS produces idiomatic JavaScript without a runtime. Combined with Ruby's cl
 
 ## Key Differences from Dual-Target
 
-| Aspect | Dual-Target | JavaScript-Only |
-|--------|-------------|-----------------|
-| Primary runtime | Both Ruby and JS | JavaScript only |
-| Ruby execution | Production use | None |
-| JS APIs | Avoided or wrapped | Used directly |
-| Ruby-only code | Minimized | Skipped liberally |
-| Pragmas | Occasional | Common |
+| Aspect          | Dual-Target        | JavaScript-Only   |
+| --------------- | ------------------ | ----------------- |
+| Primary runtime | Both Ruby and JS   | JavaScript only   |
+| Ruby execution  | Production use     | None              |
+| JS APIs         | Avoided or wrapped | Used directly     |
+| Ruby-only code  | Minimized          | Skipped liberally |
+| Pragmas         | Occasional         | Common            |
 
 ## Calling JavaScript APIs
 

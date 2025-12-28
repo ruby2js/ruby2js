@@ -19,35 +19,35 @@ The Polyfill filter automatically reorders itself to run before the Functions fi
 
 ### Array Methods
 
-| Ruby | JavaScript Polyfill |
-|------|---------------------|
-| `.first` | Property getter returning `this[0]` |
-| `.last` | Property getter returning `this.at(-1)` |
-| `.compact` | Property getter returning new array without `null`/`undefined` |
-| `.uniq` | Property getter returning `[...new Set(this)]` (duplicates removed) |
-| `.rindex { }` | Method that finds last index matching block |
-| `.insert(i, items)` | Method using `splice` to insert items |
-| `.delete_at(i)` | Method using `splice` to remove item at index |
+| Ruby                | JavaScript Polyfill                                                 |
+| ------------------- | ------------------------------------------------------------------- |
+| `.first`            | Property getter returning `this[0]`                                 |
+| `.last`             | Property getter returning `this.at(-1)`                             |
+| `.compact`          | Property getter returning new array without `null`/`undefined`      |
+| `.uniq`             | Property getter returning `[...new Set(this)]` (duplicates removed) |
+| `.rindex { }`       | Method that finds last index matching block                         |
+| `.insert(i, items)` | Method using `splice` to insert items                               |
+| `.delete_at(i)`     | Method using `splice` to remove item at index                       |
 
 ### String Methods
 
-| Ruby | JavaScript Polyfill |
-|------|---------------------|
-| `.chomp(suffix)` | Removes suffix (or `\r?\n` if no arg) from end |
-| `.delete_prefix(prefix)` | Removes prefix from start if present |
-| `.delete_suffix(suffix)` | Removes suffix from end if present |
-| `.count(chars)` | Counts occurrences of any character in `chars` |
+| Ruby                     | JavaScript Polyfill                              |
+| ------------------------ | ------------------------------------------------ |
+| `.chomp(suffix)`         | Removes suffix (or `\\r?\\n` if no arg) from end |
+| `.delete_prefix(prefix)` | Removes prefix from start if present             |
+| `.delete_suffix(suffix)` | Removes suffix from end if present               |
+| `.count(chars)`          | Counts occurrences of any character in `chars`   |
 
 ### Object Methods
 
-| Ruby | JavaScript Polyfill |
-|------|---------------------|
+| Ruby    | JavaScript Polyfill                              |
+| ------- | ------------------------------------------------ |
 | `.to_a` | Property getter returning `Object.entries(this)` |
 
 ### RegExp Methods
 
-| Ruby | JavaScript Polyfill |
-|------|---------------------|
+| Ruby                 | JavaScript Polyfill                               |
+| -------------------- | ------------------------------------------------- |
 | `Regexp.escape(str)` | `RegExp.escape(str)` with polyfill for pre-ES2025 |
 
 {% rendercontent "docs/note", title: "ES2025 Native Support" %}
@@ -113,13 +113,13 @@ hash.to_a
 
 The key difference between Polyfill and Functions:
 
-| Method | Polyfill Filter | Functions Filter |
-|--------|-----------------|------------------|
-| `arr.first` | `arr.first` (property) | `arr[0]` |
-| `arr.last` | `arr.last` (property) | `arr[arr.length - 1]` |
-| `arr.compact` | `arr.compact` (property) | `arr.filter(x => x != null)` |
-| `arr.uniq` | `arr.uniq` (property) | `[...new Set(arr)]` |
-| `str.chomp` | `str.chomp()` (method) | `str.replace(/\r?\n$/, "")` |
+| Method        | Polyfill Filter          | Functions Filter              |
+| ------------- | ------------------------ | ----------------------------- |
+| `arr.first`   | `arr.first` (property)   | `arr[0]`                      |
+| `arr.last`    | `arr.last` (property)    | `arr[arr.length - 1]`         |
+| `arr.compact` | `arr.compact` (property) | `arr.filter(x => x != null)`  |
+| `arr.uniq`    | `arr.uniq` (property)    | `[...new Set(arr)]`           |
+| `str.chomp`   | `str.chomp()` (method)   | `str.replace(/\\r?\\n$/, "")` |
 
 Choose **Polyfill** when you want Ruby-style method names preserved in the output. Choose **Functions** when you want zero-runtime-overhead inline transformations.
 

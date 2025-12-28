@@ -26,14 +26,14 @@ npm run dev:deno      # Build for Deno and start server
 
 The same Ruby source code can be transpiled to run on different platforms:
 
-| Target | Runtime | Database | Use Case |
-|--------|---------|----------|----------|
-| **Browser** | - | sql.js (SQLite WASM) | SPA with client-side storage |
-| **Browser** | - | Dexie (IndexedDB) | SPA with persistent storage |
-| **Server** | Node.js | better-sqlite3 | Development server, testing |
-| **Server** | Node.js | PostgreSQL | Production server |
-| **Server** | Bun | better-sqlite3 | Fast development server |
-| **Server** | Deno | better-sqlite3 | Secure runtime |
+| Target      | Runtime | Database             | Use Case                     |
+| ----------- | ------- | -------------------- | ---------------------------- |
+| **Browser** | -       | sql.js (SQLite WASM) | SPA with client-side storage |
+| **Browser** | -       | Dexie (IndexedDB)    | SPA with persistent storage  |
+| **Server**  | Node.js | better-sqlite3       | Development server, testing  |
+| **Server**  | Node.js | PostgreSQL           | Production server            |
+| **Server**  | Bun     | better-sqlite3       | Fast development server      |
+| **Server**  | Deno    | better-sqlite3       | Secure runtime               |
 
 The target is determined by the database adapter in `config/database.yml` or the `DATABASE` environment variable. The runtime can be set via the `RUNTIME` environment variable (node, bun, or deno).
 
@@ -43,10 +43,10 @@ The target is determined by the database adapter in `config/database.yml` or the
 
 For browser builds, two database adapters are available:
 
-| Adapter | Size | Persistence | Use Case |
-|---------|------|-------------|----------|
-| **dexie** (default) | ~50KB | Persistent (IndexedDB) | Most browser apps |
-| **sqljs** | ~2.7MB | In-memory only | Full SQL support, testing |
+| Adapter             | Size   | Persistence            | Use Case                  |
+| ------------------- | ------ | ---------------------- | ------------------------- |
+| **dexie** (default) | ~50KB  | Persistent (IndexedDB) | Most browser apps         |
+| **sqljs**           | ~2.7MB | In-memory only         | Full SQL support, testing |
 
 **Using Dexie (default):**
 ```bash
@@ -80,19 +80,19 @@ DATABASE=pg npm run dev:node               # PostgreSQL
 
 ## Available Commands
 
-| Command | Description |
-|---------|-------------|
-| `npm run dev` | Browser dev server with hot reload |
-| `npm run dev:ruby` | Dev server using Ruby transpilation |
-| `npm run dev:node` | Build for Node.js and start server |
-| `npm run dev:bun` | Build for Bun and start server |
-| `npm run dev:deno` | Build for Deno and start server |
-| `npm run build` | One-shot browser build (selfhost transpilation) |
-| `npm run build:ruby` | One-shot browser build (Ruby transpilation) |
-| `npm run start` | Serve browser build (npx serve) |
-| `npm run start:node` | Start Node.js server (after build) |
-| `npm run start:bun` | Start Bun server (after build) |
-| `npm run start:deno` | Start Deno server (after build) |
+| Command              | Description                                     |
+| -------------------- | ----------------------------------------------- |
+| `npm run dev`        | Browser dev server with hot reload              |
+| `npm run dev:ruby`   | Dev server using Ruby transpilation             |
+| `npm run dev:node`   | Build for Node.js and start server              |
+| `npm run dev:bun`    | Build for Bun and start server                  |
+| `npm run dev:deno`   | Build for Deno and start server                 |
+| `npm run build`      | One-shot browser build (selfhost transpilation) |
+| `npm run build:ruby` | One-shot browser build (Ruby transpilation)     |
+| `npm run start`      | Serve browser build (npx serve)                 |
+| `npm run start:node` | Start Node.js server (after build)              |
+| `npm run start:bun`  | Start Bun server (after build)                  |
+| `npm run start:deno` | Start Deno server (after build)                 |
 
 Both transpilation modes (Ruby and selfhost) produce **identical output**, verified by automated diff comparison.
 
@@ -131,9 +131,9 @@ bin/rails build              # Build for production
 
 This demo depends on two npm packages distributed via URL:
 
-| Package | URL | Contents |
-|---------|-----|----------|
-| `ruby2js` | ruby2js.com/releases/ruby2js-beta.tgz | Core converter, CLI, filters |
+| Package         | URL                                         | Contents                                                |
+| --------------- | ------------------------------------------- | ------------------------------------------------------- |
+| `ruby2js`       | ruby2js.com/releases/ruby2js-beta.tgz       | Core converter, CLI, filters                            |
 | `ruby2js-rails` | ruby2js.com/releases/ruby2js-rails-beta.tgz | Adapters, targets, erb_runtime, build tools, dev server |
 
 The `ruby2js-rails` package provides bin commands used by npm scripts:

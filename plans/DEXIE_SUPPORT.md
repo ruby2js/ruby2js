@@ -261,17 +261,17 @@ db.version(1).stores({
 
 **Dexie.js method mapping:**
 
-| ActiveRecord Method | Dexie.js Implementation |
-|---------------------|-------------------------|
-| `Model.all()` | `db[table].toArray()` |
-| `Model.find(id)` | `db[table].get(id)` |
-| `Model.find_by(conditions)` | `db[table].where(conditions).first()` |
-| `Model.where(conditions)` | `db[table].where(conditions).toArray()` |
-| `Model.count()` | `db[table].count()` |
-| `Model.first` | `db[table].orderBy('id').first()` |
-| `Model.last` | `db[table].orderBy('id').last()` |
-| `record.save()` | `db[table].put(attrs)` |
-| `record.destroy()` | `db[table].delete(id)` |
+| ActiveRecord Method         | Dexie.js Implementation                 |
+| --------------------------- | --------------------------------------- |
+| `Model.all()`               | `db[table].toArray()`                   |
+| `Model.find(id)`            | `db[table].get(id)`                     |
+| `Model.find_by(conditions)` | `db[table].where(conditions).first()`   |
+| `Model.where(conditions)`   | `db[table].where(conditions).toArray()` |
+| `Model.count()`             | `db[table].count()`                     |
+| `Model.first`               | `db[table].orderBy('id').first()`       |
+| `Model.last`                | `db[table].orderBy('id').last()`        |
+| `record.save()`             | `db[table].put(attrs)`                  |
+| `record.destroy()`          | `db[table].delete(id)`                  |
 
 ### Phase 3: Build Process Updates
 
@@ -316,10 +316,10 @@ demo/ruby2js-on-rails/
 
 ## Bundle Size Comparison
 
-| Backend | Runtime Size | Notes |
-|---------|--------------|-------|
-| sql.js | ~2.7MB | WASM binary |
-| Dexie.js | ~50KB | Pure JavaScript |
+| Backend  | Runtime Size | Notes           |
+| -------- | ------------ | --------------- |
+| sql.js   | ~2.7MB       | WASM binary     |
+| Dexie.js | ~50KB        | Pure JavaScript |
 
 **With Dexie.js:** ~50KB (no YAML parser in bundle!)
 **With sql.js:** ~2.7MB
@@ -333,18 +333,18 @@ Note: `js-yaml` (~50KB) is only used at build time, never shipped to browser.
 This architecture enables environment-appropriate adapters:
 
 **Browser:**
-| Adapter | Use Case | Size |
-|---------|----------|------|
-| **dexie** | Default for browser apps | ~50KB |
+| Adapter    | Use Case                           | Size   |
+| ---------- | ---------------------------------- | ------ |
+| **dexie**  | Default for browser apps           | ~50KB  |
 | **sql_js** | Full SQL needed in browser (niche) | ~2.7MB |
 
 **Node.js:**
-| Adapter | Use Case | Notes |
-|---------|----------|-------|
-| **better_sqlite3** | Development, simple apps | Native bindings, sync, fast |
-| **sqlite3** | Development, async preferred | Native bindings, async |
-| **pg** | Production PostgreSQL | Real database |
-| **mysql2** | Production MySQL | Real database |
+| Adapter            | Use Case                     | Notes                       |
+| ------------------ | ---------------------------- | --------------------------- |
+| **better_sqlite3** | Development, simple apps     | Native bindings, sync, fast |
+| **sqlite3**        | Development, async preferred | Native bindings, async      |
+| **pg**             | Production PostgreSQL        | Real database               |
+| **mysql2**         | Production MySQL             | Real database               |
 
 **The insight:** sql.js (WASM) is only needed for the niche case of "full SQL in browser." Most browser apps use Dexie.js. Node.js apps use native SQLite or production databases — no WASM overhead.
 

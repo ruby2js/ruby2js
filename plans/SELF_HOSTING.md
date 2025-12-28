@@ -37,12 +37,12 @@ JavaScript Output
 
 ## Key Components
 
-| Component | Ruby Source | Transpiled Output |
-|-----------|-------------|-------------------|
-| Walker | `lib/ruby2js/prism_walker.rb` + submodules | `dist/walker.mjs` |
-| Converter | `lib/ruby2js/converter.rb` + handlers | `dist/converter.mjs` |
-| Namespace | `lib/ruby2js/namespace.rb` | `dist/namespace.mjs` |
-| Runtime | `lib/ruby2js.rb` (associate_comments) | `shared/runtime.mjs` |
+| Component | Ruby Source                                | Transpiled Output    |
+| --------- | ------------------------------------------ | -------------------- |
+| Walker    | `lib/ruby2js/prism_walker.rb` + submodules | `dist/walker.mjs`    |
+| Converter | `lib/ruby2js/converter.rb` + handlers      | `dist/converter.mjs` |
+| Namespace | `lib/ruby2js/namespace.rb`                 | `dist/namespace.mjs` |
+| Runtime   | `lib/ruby2js.rb` (associate_comments)      | `shared/runtime.mjs` |
 
 ## Shared Code
 

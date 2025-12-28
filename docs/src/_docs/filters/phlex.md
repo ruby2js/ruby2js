@@ -331,39 +331,39 @@ All HTML5 elements are supported, including:
 
 ### Special Methods
 
-| Phlex Method | JavaScript Output |
-|-------------|-------------------|
-| `plain "text"` | `String("text")` |
-| `unsafe_raw "<html>"` | `"<html>"` (no escaping) |
-| `whitespace` | `" "` |
-| `comment "text"` | `"<!-- text -->"` |
-| `doctype` | `"<!DOCTYPE html>"` |
+| Phlex Method           | JavaScript Output         |
+| ---------------------- | ------------------------- |
+| `plain "text"`         | `String("text")`          |
+| `unsafe_raw "<html>"`  | `"<html>"` (no escaping)  |
+| `whitespace`           | `" "`                     |
+| `comment "text"`       | `"<!-- text -->"`         |
+| `doctype`              | `"<!DOCTYPE html>"`       |
 | `render Component.new` | `Component.render({...})` |
-| `tag("name")` | `<name>...</name>` |
-| `fragment { }` | (no wrapper element) |
+| `tag("name")`          | `<name>...</name>`        |
+| `fragment { }`         | (no wrapper element)      |
 
 ### Attributes
 
-| Ruby | JavaScript |
-|------|------------|
-| `div(class: "foo")` | `<div class="foo">` |
-| `div(data_controller: "x")` | `<div data-controller="x">` |
-| `input(disabled: true)` | `<input disabled>` |
-| `input(disabled: false)` | `<input>` (attribute omitted) |
-| `div(class: @var)` | `` `<div class="${var}">` `` |
+| Ruby                        | JavaScript                    |
+| --------------------------- | ----------------------------- |
+| `div(class: "foo")`         | `<div class="foo">`           |
+| `div(data_controller: "x")` | `<div data-controller="x">`   |
+| `input(disabled: true)`     | `<input disabled>`            |
+| `input(disabled: false)`    | `<input>` (attribute omitted) |
+| `div(class: @var)`          | `` `<div class="${var}">` ``  |
 
 ## Transformations
 
-| Ruby Pattern | JavaScript Output |
-|-------------|-------------------|
-| `class X < Phlex::HTML` | `class X extends Phlex.HTML` |
-| `def view_template` | `render({ ... })` |
-| `def initialize(...)` | (removed, params become render args) |
-| `@title` | `title` (from destructured parameter) |
-| `div { ... }` | `_phlex_out += "<div>"; ...; _phlex_out += "</div>"` |
-| `input` (void) | `_phlex_out += "<input>"` (no closing tag) |
-| `render X.new(...)` | `X.render({...})` |
-| `tag("x")` | `_phlex_out += "<x>...</x>"` |
+| Ruby Pattern            | JavaScript Output                                    |
+| ----------------------- | ---------------------------------------------------- |
+| `class X < Phlex::HTML` | `class X extends Phlex.HTML`                         |
+| `def view_template`     | `render({ ... })`                                    |
+| `def initialize(...)`   | (removed, params become render args)                 |
+| `@title`                | `title` (from destructured parameter)                |
+| `div { ... }`           | `_phlex_out += "<div>"; ...; _phlex_out += "</div>"` |
+| `input` (void)          | `_phlex_out += "<input>"` (no closing tag)           |
+| `render X.new(...)`     | `X.render({...})`                                    |
+| `tag("x")`              | `_phlex_out += "<x>...</x>"`                         |
 
 ## React Integration
 

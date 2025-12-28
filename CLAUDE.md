@@ -38,16 +38,16 @@ Override with environment variable: `RUBY2JS_PARSER=prism` or `RUBY2JS_PARSER=pa
 
 ### Key Components
 
-| Directory | Purpose |
-|-----------|---------|
-| `lib/ruby2js.rb` | Entry point, `Ruby2JS.convert()` method |
-| `lib/ruby2js/pipeline.rb` | Transpilable orchestration (filter chain, converter setup) |
-| `lib/ruby2js/converter.rb` | Base converter class, AST → JavaScript |
-| `lib/ruby2js/converter/` | ~60 handlers for AST node types |
-| `lib/ruby2js/filter.rb` | Filter base class and registration |
-| `lib/ruby2js/filter/` | ~23 filters (functions, esm, react, etc.) |
-| `lib/ruby2js/serializer.rb` | Output formatting |
-| `lib/ruby2js/namespace.rb` | Scope/class tracking |
+| Directory                   | Purpose                                                    |
+| --------------------------- | ---------------------------------------------------------- |
+| `lib/ruby2js.rb`            | Entry point, `Ruby2JS.convert()` method                    |
+| `lib/ruby2js/pipeline.rb`   | Transpilable orchestration (filter chain, converter setup) |
+| `lib/ruby2js/converter.rb`  | Base converter class, AST → JavaScript                     |
+| `lib/ruby2js/converter/`    | ~60 handlers for AST node types                            |
+| `lib/ruby2js/filter.rb`     | Filter base class and registration                         |
+| `lib/ruby2js/filter/`       | ~23 filters (functions, esm, react, etc.)                  |
+| `lib/ruby2js/serializer.rb` | Output formatting                                          |
+| `lib/ruby2js/namespace.rb`  | Scope/class tracking                                       |
 
 ### Converter Handlers
 
@@ -309,11 +309,11 @@ Look for the root cause. Example: `s(:send, nil, :on_block, ...)` - the `nil` re
 
 There are typically multiple ways to fix a transpilation issue:
 
-| Approach | When to Use |
-|----------|-------------|
-| **Change Ruby source** | Problem is isolated (few occurrences), fix is simple (e.g., add explicit `self.`) |
-| **Change selfhost filter** | Problem is pervasive, pattern is predictable, worth automating |
-| **Change core Ruby2JS filter** | Problem affects all users, not just selfhost |
+| Approach                       | When to Use                                                                       |
+| ------------------------------ | --------------------------------------------------------------------------------- |
+| **Change Ruby source**         | Problem is isolated (few occurrences), fix is simple (e.g., add explicit `self.`) |
+| **Change selfhost filter**     | Problem is pervasive, pattern is predictable, worth automating                    |
+| **Change core Ruby2JS filter** | Problem affects all users, not just selfhost                                      |
 
 #### 5. Assess Pervasiveness
 

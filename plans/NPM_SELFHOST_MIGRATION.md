@@ -263,11 +263,11 @@ ruby2js-on-rails (demo app)
 
 ## Size Comparison
 
-| Artifact | Before | After |
-|----------|--------|-------|
-| ruby2js-on-rails.tar.gz | ~600 KB | ~50 KB |
-| Converter (in demo) | Bundled | Fetched via npm |
-| Total download (npm install) | N/A | ~600 KB |
+| Artifact                     | Before  | After           |
+| ---------------------------- | ------- | --------------- |
+| ruby2js-on-rails.tar.gz      | ~600 KB | ~50 KB          |
+| Converter (in demo)          | Bundled | Fetched via npm |
+| Total download (npm install) | N/A     | ~600 KB         |
 
 Net transfer is similar, but:
 - Demo tarball is much smaller (faster initial download)
@@ -285,20 +285,20 @@ When ready for stable release:
 
 ## Risks & Mitigations
 
-| Risk | Impact | Mitigation |
-|------|--------|------------|
-| URL caching issues | Medium | Tested: `npm update` works correctly |
-| Transitive dep resolution | Medium | Test ruby2js-rails → ruby2js chain |
-| Build script import changes | Low | Straightforward path updates |
-| Demo breaks on deploy | Medium | Test locally before merge |
+| Risk                        | Impact | Mitigation                           |
+| --------------------------- | ------ | ------------------------------------ |
+| URL caching issues          | Medium | Tested: `npm update` works correctly |
+| Transitive dep resolution   | Medium | Test ruby2js-rails → ruby2js chain   |
+| Build script import changes | Low    | Straightforward path updates         |
+| Demo breaks on deploy       | Medium | Test locally before merge            |
 
 ## Timeline
 
-| Task | Effort |
-|------|--------|
-| Phase 1: ruby2js package | 1 day |
-| Phase 2: ruby2js-rails package | 1 day |
-| Phase 3: Update demo app | 1 day |
-| Phase 4: Deploy pipeline | 1 day |
-| Phase 5: Documentation | 1 day |
-| **Total** | **~5 days** |
+| Task                           | Effort      |
+| ------------------------------ | ----------- |
+| Phase 1: ruby2js package       | 1 day       |
+| Phase 2: ruby2js-rails package | 1 day       |
+| Phase 3: Update demo app       | 1 day       |
+| Phase 4: Deploy pipeline       | 1 day       |
+| Phase 5: Documentation         | 1 day       |
+| **Total**                      | **~5 days** |

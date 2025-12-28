@@ -14,15 +14,15 @@ The appeal of transpiling Ruby to JavaScript was straightforward: write elegant 
 
 Development was intense in the beginning—159 commits in just the final two months of 2013. The codebase grew steadily:
 
-| Year | Commits | Notes |
-|------|---------|-------|
-| 2013 | 159 | Project launch |
-| 2014 | 96 | Steady growth |
-| 2015 | 161 | React filter added |
-| 2016 | 11 | Activity slowdown |
-| 2017 | 116 | Recovery |
-| 2018 | 177 | ES2015 support finally added |
-| 2019 | 57 | Tapering off |
+| Year | Commits | Notes                        |
+| ---- | ------- | ---------------------------- |
+| 2013 | 159     | Project launch               |
+| 2014 | 96      | Steady growth                |
+| 2015 | 161     | React filter added           |
+| 2016 | 11      | Activity slowdown            |
+| 2017 | 116     | Recovery                     |
+| 2018 | 177     | ES2015 support finally added |
+| 2019 | 57      | Tapering off                 |
 
 The irony wasn't lost on anyone: ES2015 (ES6) shipped in June 2015, but Ruby2JS didn't add ES2015 class support until December 2017—over two years later. By then, JavaScript had native classes, modules, arrow functions, template literals, destructuring, and spread operators. The gap that Ruby2JS originally filled was closing.
 
@@ -48,10 +48,10 @@ Jared brought something the project desperately needed: energy, vision, and a fo
 After version 5.0.0, activity gradually slowed:
 
 | Year | Commits |
-|------|---------|
-| 2022 | 65 |
-| 2023 | 21 |
-| 2024 | 7 |
+| ---- | ------- |
+| 2022 | 65      |
+| 2023 | 21      |
+| 2024 | 7       |
 
 By May 2024, version 5.1.2 shipped—the last release before a long pause. Opal remained stuck at version 1.1.1 due to a compilation issue that was never fully resolved. Bridgetown sat at 1.3.4. The live demos on ruby2js.com stopped working.
 

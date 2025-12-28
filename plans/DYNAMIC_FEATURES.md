@@ -180,19 +180,19 @@ Foo.superclass       # => Object
 
 Update the Summary table:
 
-| Feature | Status | Notes |
-|---------|--------|-------|
-| `define_method` | ✅ Safe | In class bodies |
-| `send` | ✅ Safe | Static or dynamic names |
-| `include`/`extend` | ✅ Safe | Module mixins |
-| `is_a?`, `kind_of?` | ✅ Safe | Maps to `instanceof` |
-| `instance_of?` | ✅ Safe | Exact type check |
-| `respond_to?` | ✅ Safe | Property existence |
-| `.class` | ✅ Safe | Returns constructor |
-| `superclass` | ✅ Safe | Parent class |
-| `method_missing` | ❌ Avoid | Requires runtime proxy |
-| `eval` | ❌ Avoid | Runtime code gen |
-| `prepend` | ❌ Avoid | MRO incompatible |
+| Feature             | Status  | Notes                   |
+| ------------------- | ------- | ----------------------- |
+| `define_method`     | ✅ Safe  | In class bodies         |
+| `send`              | ✅ Safe  | Static or dynamic names |
+| `include`/`extend`  | ✅ Safe  | Module mixins           |
+| `is_a?`, `kind_of?` | ✅ Safe  | Maps to `instanceof`    |
+| `instance_of?`      | ✅ Safe  | Exact type check        |
+| `respond_to?`       | ✅ Safe  | Property existence      |
+| `.class`            | ✅ Safe  | Returns constructor     |
+| `superclass`        | ✅ Safe  | Parent class            |
+| `method_missing`    | ❌ Avoid | Requires runtime proxy  |
+| `eval`              | ❌ Avoid | Runtime code gen        |
+| `prepend`           | ❌ Avoid | MRO incompatible        |
 
 ### New Section: "Ruby's Object Model in JavaScript"
 

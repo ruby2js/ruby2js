@@ -22,26 +22,26 @@ Demonstrate that a Rails application can be transpiled via Ruby2JS and run witho
 
 ## Success Metrics
 
-| Metric | Description |
-|--------|-------------|
+| Metric            | Description                                          |
+| ----------------- | ---------------------------------------------------- |
 | Selfhost coverage | Filters needed for Ruby2JS-on-Rails work in selfhost |
-| Gaps fixed | Number of Ruby2JS issues discovered and resolved |
-| Demo completeness | Blog tutorial runs in browser |
-| Community value | Improvements benefit all Ruby2JS users |
+| Gaps fixed        | Number of Ruby2JS issues discovered and resolved     |
+| Demo completeness | Blog tutorial runs in browser                        |
+| Community value   | Improvements benefit all Ruby2JS users               |
 
 ## Selfhost Hardening Strategy
 
 Building Ruby2JS-on-Rails will exercise these selfhost components:
 
-| Component | Current Status | Expected Exercise |
-|-----------|----------------|-------------------|
-| Functions filter | ✅ Complete (212/212 tests) | Heavy - ActiveRecord patterns |
-| ERB filter | ✅ Complete (17/17 tests) | Full - all templates |
-| Phlex filter | Unknown in selfhost | Full - Stage 4 |
-| ESM filter | ✅ Complete (36/36 tests) | Heavy - module imports |
-| ActiveSupport filter | ✅ Complete (16/16 tests) | Medium - `blank?`, `present?`, etc. |
-| Core transpilation | ✅ Complete | Heavy - classes, methods, blocks |
-| Rails filters | ✅ Complete | Full - all 6 filters working |
+| Component            | Current Status             | Expected Exercise                   |
+| -------------------- | -------------------------- | ----------------------------------- |
+| Functions filter     | ✅ Complete (212/212 tests) | Heavy - ActiveRecord patterns       |
+| ERB filter           | ✅ Complete (17/17 tests)   | Full - all templates                |
+| Phlex filter         | Unknown in selfhost        | Full - Stage 4                      |
+| ESM filter           | ✅ Complete (36/36 tests)   | Heavy - module imports              |
+| ActiveSupport filter | ✅ Complete (16/16 tests)   | Medium - `blank?`, `present?`, etc. |
+| Core transpilation   | ✅ Complete                 | Heavy - classes, methods, blocks    |
+| Rails filters        | ✅ Complete                 | Full - all 6 filters working        |
 
 ### Expected Gap Discovery
 
@@ -192,15 +192,15 @@ Location within the Ruby2JS repo keeps it close to selfhost, making gap iteratio
 
 ## Timeline Summary
 
-| Stage | Description | Status |
-|-------|-------------|--------|
-| 0 | Validation (de-risk assumptions) | ✅ Complete |
-| 1 | Classic Blog (ERB) - Core Functionality | ✅ Complete |
-| 2a | Dev Server with hot reload | ✅ Complete |
-| 2b | Downloadable demo tarball | ✅ Complete |
-| 2c | Browser live transpilation | Ready (selfhost verified) |
-| 3 | Full Rails Getting Started features | Pending |
-| 4 | Phlex equivalent | Pending |
+| Stage | Description                             | Status                    |
+| ----- | --------------------------------------- | ------------------------- |
+| 0     | Validation (de-risk assumptions)        | ✅ Complete                |
+| 1     | Classic Blog (ERB) - Core Functionality | ✅ Complete                |
+| 2a    | Dev Server with hot reload              | ✅ Complete                |
+| 2b    | Downloadable demo tarball               | ✅ Complete                |
+| 2c    | Browser live transpilation              | Ready (selfhost verified) |
+| 3     | Full Rails Getting Started features     | Pending                   |
+| 4     | Phlex equivalent                        | Pending                   |
 
 ## Six-Stage Plan
 
@@ -253,12 +253,12 @@ const result = db.exec("SELECT * FROM articles");
 
 ### Stage 0 Outcome
 
-| Result | Action |
-|--------|--------|
-| All validations pass | Proceed to Stage 1 |
-| Selfhost gaps found | Fix gaps first (this is primary goal!) |
-| sql.js limitation found | Evaluate alternatives or workarounds |
-| Blocker discovered | Reassess plan |
+| Result                  | Action                                 |
+| ----------------------- | -------------------------------------- |
+| All validations pass    | Proceed to Stage 1                     |
+| Selfhost gaps found     | Fix gaps first (this is primary goal!) |
+| sql.js limitation found | Evaluate alternatives or workarounds   |
+| Blocker discovered      | Reassess plan                          |
 
 ---
 
@@ -553,10 +553,10 @@ This lets us iterate on selfhost support incrementally while maintaining a worki
 
 ### Two Ways to Run
 
-| Command | Hot Reload | Transpilation | Use Case |
-|---------|------------|---------------|----------|
-| `npm run dev` | ✅ | Ruby (shell to build.rb) | Full development |
-| `npm run dev -- --selfhost` | ✅ | JavaScript (selfhost) | Selfhost testing |
+| Command                     | Hot Reload | Transpilation            | Use Case         |
+| --------------------------- | ---------- | ------------------------ | ---------------- |
+| `npm run dev`               | ✅          | Ruby (shell to build.rb) | Full development |
+| `npm run dev -- --selfhost` | ✅          | JavaScript (selfhost)    | Selfhost testing |
 
 ### Implementation Tasks
 
@@ -770,18 +770,18 @@ Once selfhost transpilation is proven via Stage 2a, move transpilation from Node
 
 ### Additional Features
 
-| Feature | Browser | Node.js |
-|---------|---------|---------|
-| Flash messages | ✅ Object passed to views | ✅ Same |
-| Authentication | localStorage session | Cookie session |
-| Callbacks | `before_save`, `after_create`, etc. | Same |
-| Active Storage | IndexedDB blobs | Filesystem |
-| Action Text | Trix editor (npm) | Same |
-| Mailers | Console stub / EmailJS | nodemailer |
-| Background jobs | `setTimeout` / `Promise` | Same |
-| I18n | Lookup table + `t()` helper | Same |
-| Caching | Memory / localStorage | Same |
-| Concerns | Ruby2JS handles modules | Same |
+| Feature         | Browser                             | Node.js        |
+| --------------- | ----------------------------------- | -------------- |
+| Flash messages  | ✅ Object passed to views            | ✅ Same         |
+| Authentication  | localStorage session                | Cookie session |
+| Callbacks       | `before_save`, `after_create`, etc. | Same           |
+| Active Storage  | IndexedDB blobs                     | Filesystem     |
+| Action Text     | Trix editor (npm)                   | Same           |
+| Mailers         | Console stub / EmailJS              | nodemailer     |
+| Background jobs | `setTimeout` / `Promise`            | Same           |
+| I18n            | Lookup table + `t()` helper         | Same           |
+| Caching         | Memory / localStorage               | Same           |
+| Concerns        | Ruby2JS handles modules             | Same           |
 
 ### Implementation Tasks
 
@@ -935,56 +935,56 @@ Same blog functionality, demonstrating that the view layer is pluggable (ERB or 
 
 ### New JavaScript Runtime Components
 
-| Component | Lines (est.) | Stage |
-|-----------|-------------|-------|
-| ActiveRecord base | 600-800 | 1a |
-| Controller base | 200-300 | 1a |
-| Router | 150-200 | 1a |
-| ERB parser | 100-150 | 1a |
-| Sourcemap generation | 20 | 1c |
-| Dev server (hot reload) | 100 | 2 |
-| Browser reload client | 30 | 2 |
-| Build script | 100 | 2 |
-| Mode detection | 50 | 2 |
-| Flash messages | 50 | 3 |
-| Authentication | 150 | 3 |
-| Callbacks | 100 | 3 |
-| Active Storage | 200 | 3 |
-| Action Text | 100 | 3 |
-| Mailers | 150 | 3 |
-| I18n | 100 | 3 |
-| **Total** | **~2180-2480** | |
+| Component               | Lines (est.)   | Stage |
+| ----------------------- | -------------- | ----- |
+| ActiveRecord base       | 600-800        | 1a    |
+| Controller base         | 200-300        | 1a    |
+| Router                  | 150-200        | 1a    |
+| ERB parser              | 100-150        | 1a    |
+| Sourcemap generation    | 20             | 1c    |
+| Dev server (hot reload) | 100            | 2     |
+| Browser reload client   | 30             | 2     |
+| Build script            | 100            | 2     |
+| Mode detection          | 50             | 2     |
+| Flash messages          | 50             | 3     |
+| Authentication          | 150            | 3     |
+| Callbacks               | 100            | 3     |
+| Active Storage          | 200            | 3     |
+| Action Text             | 100            | 3     |
+| Mailers                 | 150            | 3     |
+| I18n                    | 100            | 3     |
+| **Total**               | **~2180-2480** |       |
 
 ### Ruby2JS Filter Work
 
-| Filter | Ruby Status | Selfhost Status |
-|--------|-------------|-----------------|
-| ERB | ✅ Complete | ✅ Complete (17 tests) |
-| Phlex | 90% | Pending transpilation |
-| Functions | ✅ Complete | ✅ Complete (212 tests) |
-| ESM | ✅ Complete | ✅ Complete (36 tests) |
-| ActiveSupport | ✅ Complete | ✅ Complete (16 tests) |
-| Return | ✅ Complete | ✅ Complete (25 tests) |
-| CJS | ✅ Complete | ✅ Complete (21 tests) |
-| Rails/Model | ✅ Complete | ✅ Complete (21 tests) |
-| Rails/Controller | ✅ Complete | ✅ Complete (19 tests) |
-| Rails/Routes | ✅ Complete | ✅ Complete |
-| Rails/Schema | ✅ Complete | ✅ Complete (25 tests) |
-| Rails/Seeds | ✅ Complete | ✅ Complete (6 tests) |
-| Rails/Logger | ✅ Complete | ✅ Complete (8 tests) |
+| Filter           | Ruby Status | Selfhost Status        |
+| ---------------- | ----------- | ---------------------- |
+| ERB              | ✅ Complete  | ✅ Complete (17 tests)  |
+| Phlex            | 90%         | Pending transpilation  |
+| Functions        | ✅ Complete  | ✅ Complete (212 tests) |
+| ESM              | ✅ Complete  | ✅ Complete (36 tests)  |
+| ActiveSupport    | ✅ Complete  | ✅ Complete (16 tests)  |
+| Return           | ✅ Complete  | ✅ Complete (25 tests)  |
+| CJS              | ✅ Complete  | ✅ Complete (21 tests)  |
+| Rails/Model      | ✅ Complete  | ✅ Complete (21 tests)  |
+| Rails/Controller | ✅ Complete  | ✅ Complete (19 tests)  |
+| Rails/Routes     | ✅ Complete  | ✅ Complete             |
+| Rails/Schema     | ✅ Complete  | ✅ Complete (25 tests)  |
+| Rails/Seeds      | ✅ Complete  | ✅ Complete (6 tests)   |
+| Rails/Logger     | ✅ Complete  | ✅ Complete (8 tests)   |
 
 ---
 
 ## Browser vs Node.js Differences
 
-| Aspect | Browser | Node.js |
-|--------|---------|---------|
-| Database | sql.js (WASM) | sql.js or better-sqlite3 |
-| File storage | IndexedDB | Filesystem |
-| Session | localStorage | Cookies |
-| Mail | Stubbed / external API | nodemailer |
-| HTTP | History API / fetch | http.createServer or Hono |
-| Entry point | `<script>` | `node app.mjs` |
+| Aspect       | Browser                | Node.js                   |
+| ------------ | ---------------------- | ------------------------- |
+| Database     | sql.js (WASM)          | sql.js or better-sqlite3  |
+| File storage | IndexedDB              | Filesystem                |
+| Session      | localStorage           | Cookies                   |
+| Mail         | Stubbed / external API | nodemailer                |
+| HTTP         | History API / fetch    | http.createServer or Hono |
+| Entry point  | `<script>`             | `node app.mjs`            |
 
 The goal is **one codebase** with runtime detection for these differences.
 

@@ -31,30 +31,30 @@ Filters loaded via dynamic import()
 ## Filter Availability
 
 ### Available in Selfhost
-| Filter | Combo Box Usage | Status |
-|--------|-----------------|--------|
-| functions | 73 uses | Ready |
-| esm | 25 uses | Ready |
-| pragma | 19 uses | Ready |
-| model | 2 uses | Ready |
-| controller | 1 use | Ready |
-| routes | 1 use | Ready |
-| camelCase | 1 use | Ready |
-| active_support | - | Ready |
-| cjs | - | Ready |
-| erb | - | Ready |
-| phlex | - | Ready |
-| polyfill | - | Ready |
-| return | - | Ready |
-| tagged_templates | - | Ready |
+| Filter           | Combo Box Usage | Status |
+| ---------------- | --------------- | ------ |
+| functions        | 73 uses         | Ready  |
+| esm              | 25 uses         | Ready  |
+| pragma           | 19 uses         | Ready  |
+| model            | 2 uses          | Ready  |
+| controller       | 1 use           | Ready  |
+| routes           | 1 use           | Ready  |
+| camelCase        | 1 use           | Ready  |
+| active_support   | -               | Ready  |
+| cjs              | -               | Ready  |
+| erb              | -               | Ready  |
+| phlex            | -               | Ready  |
+| polyfill         | -               | Ready  |
+| return           | -               | Ready  |
+| tagged_templates | -               | Ready  |
 
 ### Missing from Selfhost
-| Filter | Combo Box Usage | Blocker |
-|--------|-----------------|---------|
-| react | 9 uses | Not transpiled |
-| stimulus | 7 uses | Not transpiled |
-| lit | 2 uses | Not transpiled |
-| jest | 2 uses | Not transpiled |
+| Filter   | Combo Box Usage | Blocker        |
+| -------- | --------------- | -------------- |
+| react    | 9 uses          | Not transpiled |
+| stimulus | 7 uses          | Not transpiled |
+| lit      | 2 uses          | Not transpiled |
+| jest     | 2 uses          | Not transpiled |
 
 ## Pages by Filter Requirements
 
@@ -303,13 +303,13 @@ bundle exec ruby scripts/transpile_filter.rb \
 
 ## Size Comparison
 
-| Component | Opal | Selfhost | Savings |
-|-----------|------|----------|---------|
-| Core bundle | 5MB | 500KB | 90% |
-| functions filter | included | 75KB | - |
-| esm filter | included | 23KB | - |
-| Rails filters | included | 100KB | - |
-| **Total (typical page)** | **5MB** | **~700KB** | **86%** |
+| Component                | Opal     | Selfhost   | Savings |
+| ------------------------ | -------- | ---------- | ------- |
+| Core bundle              | 5MB      | 500KB      | 90%     |
+| functions filter         | included | 75KB       | -       |
+| esm filter               | included | 23KB       | -       |
+| Rails filters            | included | 100KB      | -       |
+| **Total (typical page)** | **5MB**  | **~700KB** | **86%** |
 
 ## Risks and Mitigations
 
@@ -335,14 +335,14 @@ bundle exec ruby scripts/transpile_filter.rb \
 
 ## Timeline Estimate
 
-| Phase | Duration | Dependencies |
-|-------|----------|--------------|
-| Phase 1: Infrastructure | 1-2 days | None |
-| Phase 2: User's Guide | 1 day | Phase 1 |
-| Phase 3: Filter Docs (partial) | 1 day | Phase 1 |
-| Phase 4: Transpile Filters | 2-3 days | None (parallel) |
-| Phase 5: Complete Migration | 1 day | Phase 4 |
-| Phase 6: Cleanup | 1 day | Phase 5 |
+| Phase                          | Duration | Dependencies    |
+| ------------------------------ | -------- | --------------- |
+| Phase 1: Infrastructure        | 1-2 days | None            |
+| Phase 2: User's Guide          | 1 day    | Phase 1         |
+| Phase 3: Filter Docs (partial) | 1 day    | Phase 1         |
+| Phase 4: Transpile Filters     | 2-3 days | None (parallel) |
+| Phase 5: Complete Migration    | 1 day    | Phase 4         |
+| Phase 6: Cleanup               | 1 day    | Phase 5         |
 
 **Total: 7-9 days** (can be reduced by parallelizing Phase 4)
 

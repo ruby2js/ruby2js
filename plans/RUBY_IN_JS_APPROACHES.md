@@ -64,16 +64,16 @@ Ruby2JS transpiles Ruby source to idiomatic JavaScript, with optional filters fo
 
 ## Comparison Matrix
 
-| Aspect | Opal | Ruby WASM | Ruby2JS |
-|--------|------|-----------|---------|
-| Bundle size | ~5MB | ~10MB+ | ~200KB |
-| Ruby compatibility | ~95% | ~100% | ~70% |
-| JS interop | Poor | Complex | Native |
-| Performance | Slow | Medium | Fast |
-| Startup time | Slow | Very slow | Fast |
-| Metaprogramming | Yes | Yes | Limited |
-| Debugging | Good | Improving | Excellent (sourcemaps) |
-| Maturity | Mature | Developing | Mature (core), Early (Rails filters) |
+| Aspect             | Opal   | Ruby WASM  | Ruby2JS                              |
+| ------------------ | ------ | ---------- | ------------------------------------ |
+| Bundle size        | ~5MB   | ~10MB+     | ~200KB                               |
+| Ruby compatibility | ~95%   | ~100%      | ~70%                                 |
+| JS interop         | Poor   | Complex    | Native                               |
+| Performance        | Slow   | Medium     | Fast                                 |
+| Startup time       | Slow   | Very slow  | Fast                                 |
+| Metaprogramming    | Yes    | Yes        | Limited                              |
+| Debugging          | Good   | Improving  | Excellent (sourcemaps)               |
+| Maturity           | Mature | Developing | Mature (core), Early (Rails filters) |
 
 ## End-User Use Cases
 
@@ -185,19 +185,19 @@ For server-side processing, gem access may be preferable. For browser applicatio
 
 ## Decision Framework
 
-| If you need... | Choose |
-|----------------|--------|
-| Run existing Ruby code unchanged | Ruby WASM |
-| Smallest possible bundle | Ruby2JS |
-| Full metaprogramming (`method_missing`, `define_method`) | Opal or Ruby WASM |
-| Native JS library interop | Ruby2JS |
-| Run Ruby gems with C extensions | Ruby WASM |
-| Fast cold start | Ruby2JS |
-| `eval` or runtime code generation | Opal or Ruby WASM |
-| Deploy to edge/serverless with size limits | Ruby2JS |
-| Team knows Ruby, not JS | Opal |
-| Gradual adoption in existing JS app | Ruby2JS |
-| Offline templates for Rails app | Ruby2JS (ERB filter) |
+| If you need...                                           | Choose               |
+| -------------------------------------------------------- | -------------------- |
+| Run existing Ruby code unchanged                         | Ruby WASM            |
+| Smallest possible bundle                                 | Ruby2JS              |
+| Full metaprogramming (`method_missing`, `define_method`) | Opal or Ruby WASM    |
+| Native JS library interop                                | Ruby2JS              |
+| Run Ruby gems with C extensions                          | Ruby WASM            |
+| Fast cold start                                          | Ruby2JS              |
+| `eval` or runtime code generation                        | Opal or Ruby WASM    |
+| Deploy to edge/serverless with size limits               | Ruby2JS              |
+| Team knows Ruby, not JS                                  | Opal                 |
+| Gradual adoption in existing JS app                      | Ruby2JS              |
+| Offline templates for Rails app                          | Ruby2JS (ERB filter) |
 
 ## Context: Ruby2JS-on-Rails Demo
 

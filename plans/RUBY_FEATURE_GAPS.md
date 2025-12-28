@@ -313,22 +313,22 @@ function wrapper(...args) {
 
 ## Priority Summary
 
-| Feature | Priority | Complexity | Status |
-|---------|----------|------------|--------|
-| Endless method return | **High** | Low | ✅ Implemented |
-| Argument forwarding (`...`) | Medium | Low | ✅ Implemented |
-| `retry` | Medium | Medium | ✅ Already implemented |
-| Multiple rescue types | Medium | Medium | ✅ Already implemented |
-| Pattern matching (basic) | Medium | High | Deferred - explicitly not implemented |
-| Ranges as values | Low | Medium | Document limitation |
-| `else` in rescue | Low | Low | ✅ Implemented |
-| Top-level `alias` | Low | Low | Skip |
-| Regex back-refs | Low | High | Skip |
-| Anonymous block forwarding | Low | Medium | Defer |
-| BEGIN/END blocks | Very Low | Medium | Skip |
-| Rational/Complex | Very Low | High | Skip |
-| Flip-flops | Very Low | High | Skip |
-| Implicit match | Very Low | Medium | Skip |
+| Feature                     | Priority | Complexity | Status                                |
+| --------------------------- | -------- | ---------- | ------------------------------------- |
+| Endless method return       | **High** | Low        | ✅ Implemented                         |
+| Argument forwarding (`...`) | Medium   | Low        | ✅ Implemented                         |
+| `retry`                     | Medium   | Medium     | ✅ Already implemented                 |
+| Multiple rescue types       | Medium   | Medium     | ✅ Already implemented                 |
+| Pattern matching (basic)    | Medium   | High       | Deferred - explicitly not implemented |
+| Ranges as values            | Low      | Medium     | Document limitation                   |
+| `else` in rescue            | Low      | Low        | ✅ Implemented                         |
+| Top-level `alias`           | Low      | Low        | Skip                                  |
+| Regex back-refs             | Low      | High       | Skip                                  |
+| Anonymous block forwarding  | Low      | Medium     | Defer                                 |
+| BEGIN/END blocks            | Very Low | Medium     | Skip                                  |
+| Rational/Complex            | Very Low | High       | Skip                                  |
+| Flip-flops                  | Very Low | High       | Skip                                  |
+| Implicit match              | Very Low | Medium     | Skip                                  |
 
 ## Implementation Stages
 
@@ -381,14 +381,14 @@ Each feature should have:
 
 The following are explicitly out of scope:
 
-| Feature | Reason |
-|---------|--------|
-| Flip-flops | Obscure, rarely used |
-| Rational/Complex literals | Requires numeric library |
-| Regex special back-refs | Would need match context tracking |
-| BEGIN/END blocks | Legacy feature, no JS equivalent |
-| Implicit regex match | Legacy Perl-ism |
-| Ranges as objects | No JS equivalent; context-specific support exists |
+| Feature                   | Reason                                            |
+| ------------------------- | ------------------------------------------------- |
+| Flip-flops                | Obscure, rarely used                              |
+| Rational/Complex literals | Requires numeric library                          |
+| Regex special back-refs   | Would need match context tracking                 |
+| BEGIN/END blocks          | Legacy feature, no JS equivalent                  |
+| Implicit regex match      | Legacy Perl-ism                                   |
+| Ranges as objects         | No JS equivalent; context-specific support exists |
 
 ## References
 

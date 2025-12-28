@@ -110,22 +110,22 @@ end
 
 JSX uses camelCase attribute names:
 
-| JSX | HTML |
-|-----|------|
-| `className` | `class` |
-| `htmlFor` | `for` |
-| `onClick` | `onclick` |
-| `tabIndex` | `tabindex` |
+| JSX         | HTML       |
+| ----------- | ---------- |
+| `className` | `class`    |
+| `htmlFor`   | `for`      |
+| `onClick`   | `onclick`  |
+| `tabIndex`  | `tabindex` |
 
 ## Variable Mappings
 
-| Ruby | JavaScript | Notes |
-|------|------------|-------|
-| `@x` | `useState` hook or `this.state.x` | Instance variables become state |
-| `@@x` | `props.x` | Class variables become props |
-| `$x` | `this.refs.x` | Global variables become refs |
-| `~x` | `this.refs.x` | Tilde also accesses refs |
-| `~(expr)` | `document.querySelector(expr)` | DOM queries |
+| Ruby      | JavaScript                        | Notes                           |
+| --------- | --------------------------------- | ------------------------------- |
+| `@x`      | `useState` hook or `this.state.x` | Instance variables become state |
+| `@@x`     | `props.x`                         | Class variables become props    |
+| `$x`      | `this.refs.x`                     | Global variables become refs    |
+| `~x`      | `this.refs.x`                     | Tilde also accesses refs        |
+| `~(expr)` | `document.querySelector(expr)`    | DOM queries                     |
 
 ## Preact Support
 

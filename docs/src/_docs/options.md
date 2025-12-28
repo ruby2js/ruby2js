@@ -336,11 +336,11 @@ x = a || b || 1          # => let x = a || b || 1
 
 Three options are available:
 
-| Option | Boolean context (`if a || b`) | Value context (`x = a || b`) |
-|--------|--------------------------------|-------------------------------|
-| `:auto` (default) | `if (a || b)` | `let x = a ?? b` |
-| `:nullish` | `if (a ?? b)` | `let x = a ?? b` |
-| `:logical` | `if (a || b)` | `let x = a || b` |
+| Option            | Boolean context (`if a |                  | b`) | Value context (`x = a |   | b`) |
+| ----------------- | ---------------------- | ---------------- | --- | --------------------- | - | --- |
+| `:auto` (default) | `if (a                 |                  | b)` | `let x = a ?? b`      |   |     |
+| `:nullish`        | `if (a ?? b)`          | `let x = a ?? b` |     |                       |   |     |
+| `:logical`        | `if (a                 |                  | b)` | `let x = a            |   | b`  |
 
 {% rendercontent "docs/note", type: "warning" %}
 **Note about `false`:** In value contexts with `:auto` or `:nullish`, `false || x` will return `false` (not `x`) because `??` doesn't treat `false` as nullish. Use `or: :logical` or `truthy: :ruby` for exact Ruby semantics with `false`.
@@ -398,11 +398,11 @@ const $T=v=>v!==false&&v!=null; const $ror=(a,b)=>$T(a)?a:b(); $ror(a, () => b)
 
 With `truthy: :ruby` enabled:
 
-| Ruby Expression | `truthy: :js` (default) | `truthy: :ruby` |
-|-----------------|-------------------------|-----------------|
-| `0 \|\| 42` | `42` (JS: 0 is falsy) | `0` (Ruby: 0 is truthy) |
+| Ruby Expression      | `truthy: :js` (default)        | `truthy: :ruby`           |
+| -------------------- | ------------------------------ | ------------------------- |
+| `0 \|\| 42`          | `42` (JS: 0 is falsy)          | `0` (Ruby: 0 is truthy)   |
 | `"" \|\| "fallback"` | `"fallback"` (JS: "" is falsy) | `""` (Ruby: "" is truthy) |
-| `0 && 42` | `0` (JS: 0 is falsy) | `42` (Ruby: 0 is truthy) |
+| `0 && 42`            | `0` (JS: 0 is falsy)           | `42` (Ruby: 0 is truthy)  |
 
 {% rendercontent "docs/note", type: "warning", title: "Performance Consideration" %}
 The `truthy: :ruby` option adds small helper functions and wraps expressions in function calls to preserve short-circuit evaluation. This has minimal performance impact but does increase code size slightly.

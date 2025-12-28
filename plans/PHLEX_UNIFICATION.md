@@ -68,12 +68,12 @@ class CounterController < Stimulus::Controller
 end
 ```
 
-| Concern | Handled By |
-|---------|------------|
-| Initial HTML | Phlex (server or browser) |
-| Event binding | Stimulus (data-action) |
-| State | Stimulus controller |
-| DOM updates | Stimulus targets |
+| Concern       | Handled By                |
+| ------------- | ------------------------- |
+| Initial HTML  | Phlex (server or browser) |
+| Event binding | Stimulus (data-action)    |
+| State         | Stimulus controller       |
+| DOM updates   | Stimulus targets          |
 
 **Phlex + Stimulus vs React:**
 - React: state change → virtual DOM diff → patch DOM
@@ -91,13 +91,13 @@ Stimulus is lighter but requires explicit DOM manipulation. React is heavier but
 
 #### Step 1: Categorize Components
 
-| Category | Example | Migration Target |
-|----------|---------|------------------|
-| Presentational | `<Card>`, `<Avatar>` | Phlex (trivial) |
-| Simple interaction | Toggle, dropdown | Phlex + Stimulus |
-| Form handling | Input validation | Phlex + Stimulus |
-| Complex state | Shopping cart, live search | Keep React or use Turbo |
-| Ecosystem dependent | Rich text editor, charts | Keep React wrapper |
+| Category            | Example                    | Migration Target        |
+| ------------------- | -------------------------- | ----------------------- |
+| Presentational      | `<Card>`, `<Avatar>`       | Phlex (trivial)         |
+| Simple interaction  | Toggle, dropdown           | Phlex + Stimulus        |
+| Form handling       | Input validation           | Phlex + Stimulus        |
+| Complex state       | Shopping cart, live search | Keep React or use Turbo |
+| Ecosystem dependent | Rich text editor, charts   | Keep React wrapper      |
 
 #### Step 2: Convert Presentational Components
 
@@ -274,13 +274,13 @@ function Counter() {
 
 #### Step 2: Replace Stimulus with React Patterns
 
-| Stimulus | React Equivalent |
-|----------|------------------|
-| `data-controller` | Component |
-| `data-target` | useRef or JSX reference |
-| `data-action` | onClick/onChange props |
-| Controller instance state | useState/useReducer |
-| connect/disconnect | useEffect cleanup |
+| Stimulus                  | React Equivalent        |
+| ------------------------- | ----------------------- |
+| `data-controller`         | Component               |
+| `data-target`             | useRef or JSX reference |
+| `data-action`             | onClick/onChange props  |
+| Controller instance state | useState/useReducer     |
+| connect/disconnect        | useEffect cleanup       |
 
 #### Step 3: Switch Build Target
 
@@ -389,26 +389,26 @@ end
 
 ### Element Mapping
 
-| JSX | Phlex Ruby | pnode |
-|-----|------------|-------|
-| `<div class="x"/>` | `div(class: "x")` | `s(:pnode, :div, s(:hash, ...))` |
-| `<br/>` | `br` | `s(:pnode, :br, s(:hash))` |
-| `<Card title="x"/>` | `render Card.new(title: "x")` | `s(:pnode, :Card, s(:hash, ...))` |
-| `<my-widget/>` | `tag("my-widget")` | `s(:pnode, "my-widget", s(:hash))` |
-| `<><h1/><h2/></>` | (fragment) | `s(:pnode, nil, s(:hash), ...)` |
-| `text content` | `plain "text content"` | `s(:pnode_text, s(:str, "..."))` |
-| `{expression}` | `plain expression` | `s(:pnode_text, s(:lvar, ...))` |
+| JSX                 | Phlex Ruby                    | pnode                              |
+| ------------------- | ----------------------------- | ---------------------------------- |
+| `<div class="x"/>`  | `div(class: "x")`             | `s(:pnode, :div, s(:hash, ...))`   |
+| `<br/>`             | `br`                          | `s(:pnode, :br, s(:hash))`         |
+| `<Card title="x"/>` | `render Card.new(title: "x")` | `s(:pnode, :Card, s(:hash, ...))`  |
+| `<my-widget/>`      | `tag("my-widget")`            | `s(:pnode, "my-widget", s(:hash))` |
+| `<><h1/><h2/></>`   | (fragment)                    | `s(:pnode, nil, s(:hash), ...)`    |
+| `text content`      | `plain "text content"`        | `s(:pnode_text, s(:str, "..."))`   |
+| `{expression}`      | `plain expression`            | `s(:pnode_text, s(:lvar, ...))`    |
 
 ### Attribute Mapping
 
-| JSX | Phlex |
-|-----|-------|
-| `class="x"` | `class: "x"` |
-| `className="x"` | `class: "x"` |
-| `htmlFor="x"` | `for: "x"` |
-| `onClick={h}` | `onclick: h` |
-| `data-id="x"` | `data_id: "x"` or `data: {id: "x"}` |
-| `{...props}` | `**props` |
+| JSX             | Phlex                               |
+| --------------- | ----------------------------------- |
+| `class="x"`     | `class: "x"`                        |
+| `className="x"` | `class: "x"`                        |
+| `htmlFor="x"`   | `for: "x"`                          |
+| `onClick={h}`   | `onclick: h`                        |
+| `data-id="x"`   | `data_id: "x"` or `data: {id: "x"}` |
+| `{...props}`    | `**props`                           |
 
 ### Children and Blocks
 
@@ -495,13 +495,13 @@ The react filter handles wunderbar patterns (`_div`, `_Component`). It must be u
 
 ### Phlex to React Mapping
 
-| Phlex Ruby | React Output |
-|------------|--------------|
-| `div(class: "x") { }` | `<div className="x"></div>` |
-| `render Card.new(title: x)` | `<Card title={x}/>` |
-| `tag("my-widget")` | `<my-widget/>` |
-| `plain text` | `{text}` |
-| `br` | `<br/>` |
+| Phlex Ruby                  | React Output                |
+| --------------------------- | --------------------------- |
+| `div(class: "x") { }`       | `<div className="x"></div>` |
+| `render Card.new(title: x)` | `<Card title={x}/>`         |
+| `tag("my-widget")`          | `<my-widget/>`              |
+| `plain text`                | `{text}`                    |
+| `br`                        | `<br/>`                     |
 
 ### Attribute Normalization
 
@@ -597,24 +597,24 @@ button(onclick: handler) { "Click" }
 
 ## Phlex Feature Support Matrix
 
-| Feature | Phlex Filter | React Filter | Notes |
-|---------|--------------|--------------|-------|
-| HTML elements | ✅ | ✅ | |
-| Void elements | ✅ | ✅ | br, img, etc. |
-| Attributes (static) | ✅ | ✅ | |
-| Attributes (dynamic) | ✅ | ✅ | |
-| Boolean attributes | ✅ | ✅ | |
-| Data attributes | ✅ | ✅ | `data_foo` or `data: {foo:}` |
-| Nested elements | ✅ | ✅ | |
-| Text content | ✅ | ✅ | `plain` |
-| Raw HTML | ✅ | ⚠️ | `unsafe_raw` (dangerouslySetInnerHTML) |
-| Components | Phase 3 | Phase 4 | `render Component.new` |
-| Custom elements | Phase 3 | Phase 4 | `tag("name")` |
-| Fragments | Phase 3 | Phase 4 | |
-| Slots | Future | N/A | Phlex-specific |
-| Conditionals | ✅ | ✅ | if/unless |
-| Loops | ✅ | ✅ | each/map |
-| Event handlers | Passthrough | ✅ | onclick, etc. |
+| Feature              | Phlex Filter | React Filter | Notes                                  |
+| -------------------- | ------------ | ------------ | -------------------------------------- |
+| HTML elements        | ✅            | ✅            |                                        |
+| Void elements        | ✅            | ✅            | br, img, etc.                          |
+| Attributes (static)  | ✅            | ✅            |                                        |
+| Attributes (dynamic) | ✅            | ✅            |                                        |
+| Boolean attributes   | ✅            | ✅            |                                        |
+| Data attributes      | ✅            | ✅            | `data_foo` or `data: {foo:}`           |
+| Nested elements      | ✅            | ✅            |                                        |
+| Text content         | ✅            | ✅            | `plain`                                |
+| Raw HTML             | ✅            | ⚠️           | `unsafe_raw` (dangerouslySetInnerHTML) |
+| Components           | Phase 3      | Phase 4      | `render Component.new`                 |
+| Custom elements      | Phase 3      | Phase 4      | `tag("name")`                          |
+| Fragments            | Phase 3      | Phase 4      |                                        |
+| Slots                | Future       | N/A          | Phlex-specific                         |
+| Conditionals         | ✅            | ✅            | if/unless                              |
+| Loops                | ✅            | ✅            | each/map                               |
+| Event handlers       | Passthrough  | ✅            | onclick, etc.                          |
 
 ## Example: Full Component
 

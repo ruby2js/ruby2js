@@ -22,14 +22,14 @@ Released June 2023. All features supported in modern browsers since July 2023.
 
 ### Relevant Features
 
-| Feature | Ruby Equivalent | Priority | Notes |
-|---------|-----------------|----------|-------|
-| `findLast()` | `reverse.find` pattern | Low | Type ambiguity limits usefulness |
-| `findLastIndex()` | `rindex` with block | Low | String/Array ambiguity |
-| `toReversed()` | `reverse` (non-mutating) | Low | Type ambiguity (Array vs String vs custom) |
-| `toSorted()` | `sort` (non-mutating) | Low | Type ambiguity |
-| `toSpliced()` | N/A | Low | No direct Ruby equivalent |
-| `with()` | N/A | Low | No direct Ruby equivalent |
+| Feature           | Ruby Equivalent          | Priority | Notes                                      |
+| ----------------- | ------------------------ | -------- | ------------------------------------------ |
+| `findLast()`      | `reverse.find` pattern   | Low      | Type ambiguity limits usefulness           |
+| `findLastIndex()` | `rindex` with block      | Low      | String/Array ambiguity                     |
+| `toReversed()`    | `reverse` (non-mutating) | Low      | Type ambiguity (Array vs String vs custom) |
+| `toSorted()`      | `sort` (non-mutating)    | Low      | Type ambiguity                             |
+| `toSpliced()`     | N/A                      | Low      | No direct Ruby equivalent                  |
+| `with()`          | N/A                      | Low      | No direct Ruby equivalent                  |
 
 ### Implementation Plan
 
@@ -74,10 +74,10 @@ Recommend: Only implement `findLast` for explicit `reverse.find` pattern where w
 
 ### Not Relevant
 
-| Feature | Reason |
-|---------|--------|
-| Symbols as WeakMap keys | Internal JS optimization, no Ruby equivalent |
-| Hashbang grammar | Ruby2JS output is modules/scripts, not executables |
+| Feature                 | Reason                                             |
+| ----------------------- | -------------------------------------------------- |
+| Symbols as WeakMap keys | Internal JS optimization, no Ruby equivalent       |
+| Hashbang grammar        | Ruby2JS output is modules/scripts, not executables |
 
 ## ECMAScript 2024 (ES15)
 
@@ -85,12 +85,12 @@ Released June 2024. Supported in Chrome 117+, Firefox 119+, Safari 17+.
 
 ### Relevant Features
 
-| Feature | Ruby Equivalent | Priority | Notes |
-|---------|-----------------|----------|-------|
-| `Object.groupBy()` | `group_by` | **Critical** | Direct 1:1 mapping |
-| `Map.groupBy()` | `group_by` (to Map) | Medium | Variant returning Map |
-| `Promise.withResolvers()` | N/A | Low | Advanced Promise pattern |
-| `isWellFormed()` / `toWellFormed()` | `valid_encoding?` | Low | Unicode validation |
+| Feature                             | Ruby Equivalent     | Priority     | Notes                    |
+| ----------------------------------- | ------------------- | ------------ | ------------------------ |
+| `Object.groupBy()`                  | `group_by`          | **Critical** | Direct 1:1 mapping       |
+| `Map.groupBy()`                     | `group_by` (to Map) | Medium       | Variant returning Map    |
+| `Promise.withResolvers()`           | N/A                 | Low          | Advanced Promise pattern |
+| `isWellFormed()` / `toWellFormed()` | `valid_encoding?`   | Low          | Unicode validation       |
 
 ### Implementation Plan
 
@@ -119,12 +119,12 @@ Currently `group_by` is only supported via the deprecated `underscore` filter. E
 
 ### Not Relevant
 
-| Feature | Reason |
-|---------|--------|
-| Resizable ArrayBuffers | Low-level API, no Ruby equivalent |
-| ArrayBuffer.transfer() | Low-level API, no Ruby equivalent |
-| RegExp /v flag | Complex regex feature, rare use case |
-| Atomics.waitAsync | SharedArrayBuffer/threading, no Ruby equivalent |
+| Feature                | Reason                                          |
+| ---------------------- | ----------------------------------------------- |
+| Resizable ArrayBuffers | Low-level API, no Ruby equivalent               |
+| ArrayBuffer.transfer() | Low-level API, no Ruby equivalent               |
+| RegExp /v flag         | Complex regex feature, rare use case            |
+| Atomics.waitAsync      | SharedArrayBuffer/threading, no Ruby equivalent |
 
 ## ECMAScript 2025 (ES16)
 
@@ -132,12 +132,12 @@ Released June 2025. Browser support varies by feature.
 
 ### Relevant Features
 
-| Feature | Ruby Equivalent | Priority | Notes |
-|---------|-----------------|----------|-------|
-| Iterator helpers | `map`, `filter`, `take`, etc. on Enumerator | Medium | Lazy iteration |
-| Set methods | Set operations | Medium | Opt-in via `Set.new(x)` wrapper |
-| `RegExp.escape()` | `Regexp.escape` | Medium | Direct mapping |
-| `Promise.try()` | N/A | Low | Advanced Promise pattern |
+| Feature           | Ruby Equivalent                             | Priority | Notes                           |
+| ----------------- | ------------------------------------------- | -------- | ------------------------------- |
+| Iterator helpers  | `map`, `filter`, `take`, etc. on Enumerator | Medium   | Lazy iteration                  |
+| Set methods       | Set operations                              | Medium   | Opt-in via `Set.new(x)` wrapper |
+| `RegExp.escape()` | `Regexp.escape`                             | Medium   | Direct mapping                  |
+| `Promise.try()`   | N/A                                         | Low      | Advanced Promise pattern        |
 
 ### Implementation Plan
 
@@ -202,12 +202,12 @@ Recommend: Document but don't implement unless demand emerges.
 
 ### Not Relevant
 
-| Feature | Reason |
-|---------|--------|
-| Import Attributes / JSON Modules | ESM feature, handled by bundlers |
-| Float16Array | Specialized numeric type, no Ruby equivalent |
-| Duplicate named capture groups | Regex edge case |
-| DurationFormat | Intl API, no direct Ruby equivalent |
+| Feature                          | Reason                                       |
+| -------------------------------- | -------------------------------------------- |
+| Import Attributes / JSON Modules | ESM feature, handled by bundlers             |
+| Float16Array                     | Specialized numeric type, no Ruby equivalent |
+| Duplicate named capture groups   | Regex edge case                              |
+| DurationFormat                   | Intl API, no direct Ruby equivalent          |
 
 ## Implementation Stages
 
@@ -251,14 +251,14 @@ Recommend: Document but don't implement unless demand emerges.
 
 ## Priority Summary
 
-| Feature | ES Version | Priority | Notes |
-|---------|------------|----------|-------|
-| `Object.groupBy()` | ES2024 | **Safe** | Unambiguous - only exists on Enumerable with block |
-| `RegExp.escape()` | ES2025 | **Safe** | Unambiguous - class method on Regexp |
-| `toReversed()` / `toSorted()` | ES2023 | Opt-in | Use `Array(x).reverse` for explicit type hint |
-| `findLast()` / `findLastIndex()` | ES2023 | Opt-in | Use `Array(x).find` pattern |
-| Set methods | ES2025 | Opt-in | Use `Set.new(x)` for explicit type hint |
-| Iterator helpers | ES2025 | Complex | Requires explicit iterator objects |
+| Feature                          | ES Version | Priority | Notes                                              |
+| -------------------------------- | ---------- | -------- | -------------------------------------------------- |
+| `Object.groupBy()`               | ES2024     | **Safe** | Unambiguous - only exists on Enumerable with block |
+| `RegExp.escape()`                | ES2025     | **Safe** | Unambiguous - class method on Regexp               |
+| `toReversed()` / `toSorted()`    | ES2023     | Opt-in   | Use `Array(x).reverse` for explicit type hint      |
+| `findLast()` / `findLastIndex()` | ES2023     | Opt-in   | Use `Array(x).find` pattern                        |
+| Set methods                      | ES2025     | Opt-in   | Use `Set.new(x)` for explicit type hint            |
+| Iterator helpers                 | ES2025     | Complex  | Requires explicit iterator objects                 |
 
 **Conclusion:**
 
@@ -289,13 +289,13 @@ Array(data).reverse.find { |x| x > 5 }
 
 ### Recognized Type Wrappers
 
-| Ruby Expression | Inferred Type | Enables |
-|-----------------|---------------|---------|
-| `Array(x)` | Array | `toReversed`, `toSorted`, `findLast`, etc. |
-| `[*x]` | Array | Same as above |
-| `x.to_a` | Array | Same as above |
-| `Set.new(x)` | Set | `intersection`, `union`, `difference`, etc. |
-| `x.to_set` | Set | Same as above |
+| Ruby Expression | Inferred Type | Enables                                     |
+| --------------- | ------------- | ------------------------------------------- |
+| `Array(x)`      | Array         | `toReversed`, `toSorted`, `findLast`, etc.  |
+| `[*x]`          | Array         | Same as above                               |
+| `x.to_a`        | Array         | Same as above                               |
+| `Set.new(x)`    | Set           | `intersection`, `union`, `difference`, etc. |
+| `x.to_set`      | Set           | Same as above                               |
 
 ### Implementation Approach
 

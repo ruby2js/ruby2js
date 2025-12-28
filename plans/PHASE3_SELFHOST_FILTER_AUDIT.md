@@ -4,12 +4,12 @@
 
 The selfhost filter suite consists of 4 files:
 
-| File | Lines | Purpose |
-|------|-------|---------|
-| `core.rb` | 18 | Entry point only, loads other modules |
-| `walker.rb` | 187 | Prism API mapping (Ruby ↔ JS) |
-| `converter.rb` | 323 | Handle pattern, respond_to?, array comparison |
-| `spec.rb` | 74 | Test spec transformations |
+| File           | Lines | Purpose                                       |
+| -------------- | ----- | --------------------------------------------- |
+| `core.rb`      | 18    | Entry point only, loads other modules         |
+| `walker.rb`    | 187   | Prism API mapping (Ruby ↔ JS)                 |
+| `converter.rb` | 323   | Handle pattern, respond_to?, array comparison |
+| `spec.rb`      | 74    | Test spec transformations                     |
 
 ## Analysis by Filter
 
@@ -188,11 +188,11 @@ elsif method == :join and args.length == 0
 
 ### Generalizable Patterns
 
-| Pattern | Current Location | Generalization Potential |
-|---------|------------------|-------------------------|
-| `.join` empty separator | converter.rb:76-79 | **High** - common Ruby/JS difference |
-| `defined?(CONST)` guard | converter.rb:21-34 | High - useful for conditional compilation |
-| Safe `respond_to?` | converter.rb:118-133 | Medium - useful when target might be primitive |
+| Pattern                 | Current Location     | Generalization Potential                       |
+| ----------------------- | -------------------- | ---------------------------------------------- |
+| `.join` empty separator | converter.rb:76-79   | **High** - common Ruby/JS difference           |
+| `defined?(CONST)` guard | converter.rb:21-34   | High - useful for conditional compilation      |
+| Safe `respond_to?`      | converter.rb:118-133 | Medium - useful when target might be primitive |
 
 ### Recommended Actions
 

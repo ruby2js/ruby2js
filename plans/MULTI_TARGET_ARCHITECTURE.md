@@ -64,14 +64,14 @@ production:
   pool: 5
 ```
 
-| Adapter | Target | Use Case |
-|---------|--------|----------|
-| `dexie` | browser | IndexedDB wrapper (~50KB) |
-| `sqljs` | browser | Full SQL support (~2.7MB WASM) |
-| `better_sqlite3` | node | Development, sync API |
-| `sqlite3` | node | Development, async API |
-| `pg` | node | Production PostgreSQL |
-| `mysql2` | node | Production MySQL |
+| Adapter          | Target  | Use Case                       |
+| ---------------- | ------- | ------------------------------ |
+| `dexie`          | browser | IndexedDB wrapper (~50KB)      |
+| `sqljs`          | browser | Full SQL support (~2.7MB WASM) |
+| `better_sqlite3` | node    | Development, sync API          |
+| `sqlite3`        | node    | Development, async API         |
+| `pg`             | node    | Production PostgreSQL          |
+| `mysql2`         | node    | Production MySQL               |
 
 ### Environment Variables
 

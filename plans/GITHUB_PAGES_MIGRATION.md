@@ -16,13 +16,13 @@ Migrate ruby2js.com hosting from Fly.io to GitHub Pages. The site is fully stati
 
 ## Benefits of Migration
 
-| Aspect | Fly.io | GitHub Pages |
-|--------|--------|--------------|
-| Cost | ~$0-5/month (auto-stop helps) | Free |
-| Complexity | Dockerfile + fly.toml | Single workflow file |
-| CDN | Single region (iad) | Global CDN |
-| SSL | Automatic | Automatic |
-| Build | Remote Docker build | GitHub Actions |
+| Aspect     | Fly.io                        | GitHub Pages         |
+| ---------- | ----------------------------- | -------------------- |
+| Cost       | ~$0-5/month (auto-stop helps) | Free                 |
+| Complexity | Dockerfile + fly.toml         | Single workflow file |
+| CDN        | Single region (iad)           | Global CDN           |
+| SSL        | Automatic                     | Automatic            |
+| Build      | Remote Docker build           | GitHub Actions       |
 
 ## Implementation Steps
 

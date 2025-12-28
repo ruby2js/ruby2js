@@ -46,15 +46,15 @@ JavaScript Output
 
 **Effort:** ~2-3 days
 
-| Task | Notes |
-|------|-------|
-| Load Prism WASM | JavaScript interop already works in Opal |
-| Load walker.mjs | Standard ES module import |
-| Bridge AST to Opal | Recursive conversion of ~30 node types |
-| Comment handling | Use existing `associateComments` from runtime.mjs |
-| Remove parser gem | Delete `patch.opal`, update requires |
-| Update build process | Add walker.mjs dependency |
-| Testing | Verify all filters work |
+| Task                 | Notes                                             |
+| -------------------- | ------------------------------------------------- |
+| Load Prism WASM      | JavaScript interop already works in Opal          |
+| Load walker.mjs      | Standard ES module import                         |
+| Bridge AST to Opal   | Recursive conversion of ~30 node types            |
+| Comment handling     | Use existing `associateComments` from runtime.mjs |
+| Remove parser gem    | Delete `patch.opal`, update requires              |
+| Update build process | Add walker.mjs dependency                         |
+| Testing              | Verify all filters work                           |
 
 ### Option 2: Opal Walker with JS Prism Bridge
 
@@ -91,15 +91,15 @@ JavaScript Output
 
 **Effort:** ~4-6 days
 
-| Task | Notes |
-|------|-------|
-| Load Prism WASM | Same as Option 1 |
-| Create PrismNodeProxy base | Wrap JS node, dispatch property access |
-| Implement node proxies | ~40 node types with their specific properties |
-| Visitor dispatch bridge | Map JS constructor names to Ruby visit methods |
-| Location proxies | Wrap location/source range objects |
-| Remove parser gem | Same as Option 1 |
-| Testing | More extensive - new proxy code |
+| Task                       | Notes                                          |
+| -------------------------- | ---------------------------------------------- |
+| Load Prism WASM            | Same as Option 1                               |
+| Create PrismNodeProxy base | Wrap JS node, dispatch property access         |
+| Implement node proxies     | ~40 node types with their specific properties  |
+| Visitor dispatch bridge    | Map JS constructor names to Ruby visit methods |
+| Location proxies           | Wrap location/source range objects             |
+| Remove parser gem          | Same as Option 1                               |
+| Testing                    | More extensive - new proxy code                |
 
 ## Recommendation: Option 1
 
@@ -121,10 +121,10 @@ Option 2 incurs proxy overhead on every property access during tree walking. The
 
 The hybrid approach showcases when to use each tool:
 
-| Tool | Strength | Used For |
-|------|----------|----------|
-| **Ruby2JS** | Direct JS interop, static conversion | Walker (interfaces with JS Prism API) |
-| **Opal** | Full Ruby semantics, no pragmas needed | Converter + Filters (complex Ruby code) |
+| Tool        | Strength                               | Used For                                |
+| ----------- | -------------------------------------- | --------------------------------------- |
+| **Ruby2JS** | Direct JS interop, static conversion   | Walker (interfaces with JS Prism API)   |
+| **Opal**    | Full Ruby semantics, no pragmas needed | Converter + Filters (complex Ruby code) |
 
 Ruby2JS excels at code that needs to interface directly with JavaScript APIs - the walker calls Prism WASM methods, accesses JS object properties, and produces JS-compatible output. This is exactly what Ruby2JS is designed for.
 

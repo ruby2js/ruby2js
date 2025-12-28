@@ -4,29 +4,29 @@
 
 ### Build Scripts
 
-| Script | Purpose | Output |
-|--------|---------|--------|
-| `transpile_walker.rb` | Transpiles `prism_walker.rb` | `dist/walker.mjs` |
+| Script                   | Purpose                              | Output               |
+| ------------------------ | ------------------------------------ | -------------------- |
+| `transpile_walker.rb`    | Transpiles `prism_walker.rb`         | `dist/walker.mjs`    |
 | `transpile_converter.rb` | Transpiles `converter.rb` + handlers | `dist/converter.mjs` |
-| `transpile_spec.rb` | Transpiles test specs | `dist/*.mjs` |
+| `transpile_spec.rb`      | Transpiles test specs                | `dist/*.mjs`         |
 
 ### Filter Configuration
 
 Each script configures filters manually. Here's the comparison:
 
-| Filter | walker | converter | spec |
-|--------|--------|-----------|------|
-| Pragma | ✓ | ✓ | ✓ |
-| Combiner | ✓ | ✓ | ✓ |
-| Require | ✓ | ✓ | ✗ |
-| Selfhost::Core | ✓ | ✓ | ✓ |
-| Selfhost::Walker | ✓ | ✓ | ✓ |
-| Selfhost::Converter | ✗ | ✓ | ✗ |
-| Selfhost::Spec | ✗ | ✗ | ✓ |
-| Polyfill | ✓ | ✓ | ✗ |
-| Functions | ✓ | ✓ | ✓ |
-| Return | ✓ | ✓ | ✓ |
-| ESM | ✓ | ✓ | ✓ |
+| Filter              | walker | converter | spec |
+| ------------------- | ------ | --------- | ---- |
+| Pragma              | ✓      | ✓         | ✓    |
+| Combiner            | ✓      | ✓         | ✓    |
+| Require             | ✓      | ✓         | ✗    |
+| Selfhost::Core      | ✓      | ✓         | ✓    |
+| Selfhost::Walker    | ✓      | ✓         | ✓    |
+| Selfhost::Converter | ✗      | ✓         | ✗    |
+| Selfhost::Spec      | ✗      | ✗         | ✓    |
+| Polyfill            | ✓      | ✓         | ✗    |
+| Functions           | ✓      | ✓         | ✓    |
+| Return              | ✓      | ✓         | ✓    |
+| ESM                 | ✓      | ✓         | ✓    |
 
 ### Shared Options
 
@@ -46,12 +46,12 @@ Converter adds:
 
 ### Runtime Files
 
-| File | Lines | Purpose |
-|------|-------|---------|
-| `ruby2js.mjs` | 492 | CLI tool - large due to AST inspection helpers |
-| `test_harness.mjs` | 356 | Test framework - duplicates classes from ruby2js.mjs |
-| `run_spec.mjs` | ~20 | Runs single spec |
-| `run_all_specs.mjs` | 238 | Spec runner orchestration |
+| File                | Lines | Purpose                                              |
+| ------------------- | ----- | ---------------------------------------------------- |
+| `ruby2js.mjs`       | 492   | CLI tool - large due to AST inspection helpers       |
+| `test_harness.mjs`  | 356   | Test framework - duplicates classes from ruby2js.mjs |
+| `run_spec.mjs`      | ~20   | Runs single spec                                     |
+| `run_all_specs.mjs` | 238   | Spec runner orchestration                            |
 
 **Note**: `preamble.mjs` was found to be unused and has been deleted.
 
@@ -165,11 +165,11 @@ The CLI file (492 lines) includes extensive AST inspection code that's only used
 
 The build pipeline works well for its purpose. The duplication is manageable:
 
-| Issue | Severity | Effort to Fix |
-|-------|----------|---------------|
-| Filter list duplication | Low | Low |
-| Runtime class duplication | Medium | Medium |
-| CLI AST helpers | Low | Low |
+| Issue                     | Severity | Effort to Fix |
+| ------------------------- | -------- | ------------- |
+| Filter list duplication   | Low      | Low           |
+| Runtime class duplication | Medium   | Medium        |
+| CLI AST helpers           | Low      | Low           |
 
 ### Recommended Actions
 
