@@ -430,6 +430,24 @@ class SelfhostBuilder
     vendor_package_dir = File.join(DEMO_ROOT, 'vendor/ruby2js')
     package_dir = File.exist?(npm_package_dir) ? npm_package_dir : vendor_package_dir
 
+    # Copy base files (rails_base.js is needed by all targets)
+    base_src = File.join(package_dir, 'rails_base.js')
+    if File.exist?(base_src)
+      FileUtils.cp(base_src, File.join(lib_dest, 'rails_base.js'))
+      puts("  Copying: rails_base.js")
+      puts("    -> #{lib_dest}/rails_base.js")
+    end
+
+    # Copy server module (needed by node, bun, deno, cloudflare targets)
+    if @target == 'server'
+      server_src = File.join(package_dir, 'rails_server.js')
+      if File.exist?(server_src)
+        FileUtils.cp(server_src, File.join(lib_dest, 'rails_server.js'))
+        puts("  Copying: rails_server.js")
+        puts("    -> #{lib_dest}/rails_server.js")
+      end
+    end
+
     # Copy target-specific files (rails.js from targets/browser, node, bun, or deno)
     target_src = File.join(package_dir, 'targets', target_dir)
     Dir.glob(File.join(target_src, '*.js')).each do |src_path|

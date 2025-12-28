@@ -1,122 +1,46 @@
 // Ruby2JS-on-Rails Micro Framework - Node.js Target
-// Provides routing, controller dispatch, and form handling for HTTP servers
+// Extends server module with Node http.createServer() startup
+// Uses Node's http module instead of Fetch API for request/response
 
 import http from 'node:http';
 import { parse as parseUrl } from 'node:url';
 import { StringDecoder } from 'node:string_decoder';
 
-export class Router {
-  static routes = [];
-  static controllers = {};
+import {
+  Router as RouterServer,
+  Application as ApplicationServer,
+  truncate,
+  pluralize,
+  dom_id,
+  navigate,
+  submitForm,
+  formData,
+  handleFormResult,
+  setupFormHandlers
+} from './rails_server.js';
 
-  // Register RESTful routes for a resource
-  static resources(name, controller, options = {}) {
-    this.controllers[name] = controller;
-    const nested = options.nested || [];
-    const only = options.only;
+// Re-export everything from server module
+export { truncate, pluralize, dom_id, navigate, submitForm, formData, handleFormResult, setupFormHandlers };
 
-    const actions = [
-      { method: 'GET', path: `/${name}`, action: 'index' },
-      { method: 'GET', path: `/${name}/new`, action: 'new' },
-      { method: 'GET', path: `/${name}/:id`, action: 'show' },
-      { method: 'GET', path: `/${name}/:id/edit`, action: 'edit' },
-      { method: 'POST', path: `/${name}`, action: 'create' },
-      { method: 'PATCH', path: `/${name}/:id`, action: 'update' },
-      { method: 'DELETE', path: `/${name}/:id`, action: 'destroy' }
-    ];
-
-    actions.forEach(route => {
-      if (only && !only.includes(route.action)) return;
-
-      // Convert path to regex pattern
-      const pattern = new RegExp('^' + route.path.replace(/:id/g, '(\\d+)') + '$');
-
-      this.routes.push({
-        method: route.method,
-        pattern,
-        controller,
-        controllerName: name,
-        action: route.action
-      });
-    });
-
-    // Handle nested resources
-    nested.forEach(nestedConfig => {
-      this.nestedResources(name, nestedConfig.name, nestedConfig.controller, nestedConfig.only);
-    });
-  }
-
-  // Register nested RESTful routes
-  static nestedResources(parentName, name, controller, only) {
-    this.controllers[name] = controller;
-
-    const actions = [
-      { method: 'GET', path: `/${parentName}/:parent_id/${name}`, action: 'index' },
-      { method: 'GET', path: `/${parentName}/:parent_id/${name}/new`, action: 'new' },
-      { method: 'GET', path: `/${parentName}/:parent_id/${name}/:id`, action: 'show' },
-      { method: 'GET', path: `/${parentName}/:parent_id/${name}/:id/edit`, action: 'edit' },
-      { method: 'POST', path: `/${parentName}/:parent_id/${name}`, action: 'create' },
-      { method: 'PATCH', path: `/${parentName}/:parent_id/${name}/:id`, action: 'update' },
-      { method: 'DELETE', path: `/${parentName}/:parent_id/${name}/:id`, action: 'destroy' }
-    ];
-
-    actions.forEach(route => {
-      if (only && !only.includes(route.action)) return;
-
-      const pattern = new RegExp('^' + route.path
-        .replace(/:parent_id/g, '(\\d+)')
-        .replace(/:id/g, '(\\d+)') + '$');
-
-      this.routes.push({
-        method: route.method,
-        pattern,
-        controller,
-        controllerName: name,
-        parentName,
-        action: route.action,
-        nested: true
-      });
-    });
-  }
-
-  // Add a simple redirect route
-  static root(path) {
-    this.routes.unshift({
-      method: 'GET',
-      pattern: /^\/$/,
-      redirect: path
-    });
-  }
-
-  // Find matching route for a path
-  static match(path, method = 'GET') {
-    for (const route of this.routes) {
-      if (route.method !== method) continue;
-      const match = path.match(route.pattern);
-      if (match) {
-        return { route, match };
-      }
-    }
-    return null;
-  }
-
+// Router with Node.js-specific dispatch (uses req/res instead of Fetch API)
+export class Router extends RouterServer {
   // Dispatch an HTTP request to the appropriate controller action
+  // Node.js version using req/res objects
   static async dispatch(req, res) {
     const parsedUrl = parseUrl(req.url, true);
     const path = parsedUrl.pathname;
-    let method = this.normalizeMethod(req);
+    let method = this.normalizeMethodNode(req, parsedUrl);
     let params = {};
 
     // Parse request body for POST requests (may contain _method override)
     if (req.method === 'POST') {
-      params = await this.parseBody(req);
-      // Check for _method override in body (Rails convention for PATCH/DELETE)
+      params = await this.parseBodyNode(req);
       if (params._method) {
         method = params._method.toUpperCase();
-        delete params._method;  // Remove _method from params
+        delete params._method;
       }
     } else if (['PATCH', 'PUT', 'DELETE'].includes(method)) {
-      params = await this.parseBody(req);
+      params = await this.parseBodyNode(req);
     }
 
     console.log(`Started ${method} "${path}"`);
@@ -149,17 +73,16 @@ export class Router {
     try {
       let html;
 
-      // Handle different HTTP methods
       if (route.nested) {
         const parentId = parseInt(match[1]);
         const id = match[2] ? parseInt(match[2]) : null;
 
         if (method === 'POST') {
           const result = await controller.create(parentId, params);
-          return this.handleResult(res, result, `/${route.parentName}/${parentId}`);
+          return this.handleResultNode(res, result, `/${route.parentName}/${parentId}`);
         } else if (method === 'PATCH') {
           const result = await controller.update(parentId, id, params);
-          return this.handleResult(res, result, `/${route.parentName}/${parentId}`);
+          return this.handleResultNode(res, result, `/${route.parentName}/${parentId}`);
         } else if (method === 'DELETE') {
           await controller.destroy(parentId, id);
           res.writeHead(302, { Location: `/${route.parentName}/${parentId}` });
@@ -173,10 +96,10 @@ export class Router {
 
         if (method === 'POST') {
           const result = await controller.create(params);
-          return this.handleResult(res, result, `/${controllerName}`);
+          return this.handleResultNode(res, result, `/${controllerName}`);
         } else if (method === 'PATCH') {
           const result = await controller.update(id, params);
-          return this.handleResult(res, result, `/${controllerName}/${id}`);
+          return this.handleResultNode(res, result, `/${controllerName}/${id}`);
         } else if (method === 'DELETE') {
           await controller.destroy(id);
           res.writeHead(302, { Location: `/${controllerName}` });
@@ -196,19 +119,17 @@ export class Router {
     }
   }
 
-  // Normalize HTTP method (handle _method override for browsers without PATCH/DELETE)
-  static normalizeMethod(req) {
+  // Normalize HTTP method for Node.js
+  static normalizeMethodNode(req, parsedUrl) {
     let method = req.method.toUpperCase();
-    // Check for _method override in query string
-    const parsedUrl = parseUrl(req.url, true);
     if (parsedUrl.query._method) {
       method = parsedUrl.query._method.toUpperCase();
     }
     return method;
   }
 
-  // Parse request body (form data or JSON)
-  static parseBody(req) {
+  // Parse request body for Node.js (using StringDecoder)
+  static parseBodyNode(req) {
     return new Promise((resolve, reject) => {
       const decoder = new StringDecoder('utf-8');
       let body = '';
@@ -230,7 +151,6 @@ export class Router {
           }
         } else {
           // Parse URL-encoded form data
-          // Note: + represents space in form data, must replace before decodeURIComponent
           const params = {};
           const pairs = body.split('&');
           for (const pair of pairs) {
@@ -248,14 +168,13 @@ export class Router {
     });
   }
 
-  // Handle controller result (redirect or render)
-  static handleResult(res, result, defaultRedirect) {
+  // Handle controller result for Node.js
+  static handleResultNode(res, result, defaultRedirect) {
     if (result.redirect) {
       console.log(`  Redirected to ${result.redirect}`);
       res.writeHead(302, { Location: result.redirect });
       res.end();
     } else if (result.render) {
-      // Validation failed - render contains pre-rendered HTML from the view
       console.log('  Re-rendering form (validation failed)');
       this.sendHtml(res, result.render);
     } else {
@@ -272,54 +191,9 @@ export class Router {
   }
 }
 
-// Application base class for Node.js
-export class Application {
-  static schema = null;
-  static seeds = null;
-  static activeRecordModule = null;
-  static layoutFn = null;  // Layout function loaded from views/layouts/application.js
-
-  // Configure the application
-  static configure(options) {
-    if (options.schema) this.schema = options.schema;
-    if (options.seeds) this.seeds = options.seeds;
-    if (options.layout) this.layoutFn = options.layout;
-  }
-
-  // Wrap content in HTML layout
-  static wrapInLayout(content) {
-    if (this.layoutFn) {
-      return this.layoutFn(content);
-    }
-    // Fallback if no layout loaded
-    return content;
-  }
-
-  // Initialize the database using the adapter
-  static async initDatabase() {
-    // Import the adapter (selected at build time)
-    const adapter = await import('./active_record.mjs');
-    this.activeRecordModule = adapter;
-
-    // Initialize database connection
-    await adapter.initDatabase({});
-
-    // Run schema migrations - schema imports execSQL from adapter
-    if (this.schema && this.schema.create_tables) {
-      this.schema.create_tables();
-    }
-
-    // Run seeds if present
-    if (this.seeds) {
-      if (this.seeds.run.constructor.name === 'AsyncFunction') {
-        await this.seeds.run();
-      } else {
-        this.seeds.run();
-      }
-    }
-  }
-
-  // Start the HTTP server
+// Application with Node.js-specific startup
+export class Application extends ApplicationServer {
+  // Start the HTTP server using http.createServer
   static async start(port = null) {
     const listenPort = port || process.env.PORT || 3000;
 
@@ -341,43 +215,4 @@ export class Application {
       process.exit(1);
     }
   }
-}
-
-// Text truncation helper (Rails view helper equivalent)
-export function truncate(text, options = {}) {
-  const length = options.length || 30;
-  const omission = options.omission || '...';
-  if (!text || text.length <= length) return text || '';
-  return text.slice(0, length - omission.length) + omission;
-}
-
-// Navigate helper - for Node.js, this just returns the path
-// Used in generated code to maintain API compatibility
-export function navigate(event, path) {
-  // In Node.js context, navigation is handled via HTTP redirects
-  // This function is here for API compatibility with browser version
-  return path;
-}
-
-// Form submission helper - for Node.js, forms are handled via HTTP
-export function submitForm(event, handler) {
-  // In Node.js context, form submission is handled via HTTP POST
-  // This function is here for API compatibility with browser version
-  return false;
-}
-
-// Extract form data - for Node.js, data comes from request body
-export function formData(event) {
-  // In Node.js context, form data is parsed in Router.parseBody
-  return {};
-}
-
-// Handle form result - for Node.js, this is handled in Router.handleResult
-export function handleFormResult(result, rerenderFn = null) {
-  return false;
-}
-
-// Setup form handlers - no-op in Node.js (forms handled via HTTP)
-export function setupFormHandlers(config) {
-  // Form handlers are handled by Router.dispatch in Node.js
 }

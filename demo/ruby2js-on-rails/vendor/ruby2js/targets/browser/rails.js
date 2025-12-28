@@ -1,16 +1,25 @@
-// Ruby2JS-on-Rails Micro Framework
-// Provides routing, controller dispatch, and form handling
+// Ruby2JS-on-Rails Micro Framework - Browser Target
+// Extends base module with DOM-based routing and form handling
+
+import {
+  RouterBase,
+  ApplicationBase,
+  truncate,
+  pluralize,
+  dom_id
+} from './rails_base.js';
+
+// Re-export base helpers
+export { truncate, pluralize, dom_id };
 
 // Flash message store - holds messages across redirects
 export const flash = {
   _notice: null,
 
-  // Set a notice message (called after redirect with notice)
   setNotice(message) {
     this._notice = message;
   },
 
-  // Get and clear the notice message (called from views via <%= notice %>)
   consumeNotice() {
     const message = this._notice || '';
     this._notice = null;
@@ -18,101 +27,8 @@ export const flash = {
   }
 };
 
-export class Router {
-  static routes = [];
-  static controllers = {};
-
-  // Register RESTful routes for a resource
-  static resources(name, controller, options = {}) {
-    this.controllers[name] = controller;
-    const nested = options.nested || [];
-    const only = options.only;
-
-    const actions = [
-      { method: 'GET', path: `/${name}`, action: 'index' },
-      { method: 'GET', path: `/${name}/new`, action: 'new' },
-      { method: 'GET', path: `/${name}/:id`, action: 'show' },
-      { method: 'GET', path: `/${name}/:id/edit`, action: 'edit' },
-      { method: 'POST', path: `/${name}`, action: 'create' },
-      { method: 'PATCH', path: `/${name}/:id`, action: 'update' },
-      { method: 'DELETE', path: `/${name}/:id`, action: 'destroy' }
-    ];
-
-    actions.forEach(route => {
-      if (only && !only.includes(route.action)) return;
-
-      // Convert path to regex pattern
-      const pattern = new RegExp('^' + route.path.replace(/:id/g, '(\\d+)') + '$');
-
-      this.routes.push({
-        method: route.method,
-        pattern,
-        controller,
-        controllerName: name,
-        action: route.action
-      });
-    });
-
-    // Handle nested resources
-    nested.forEach(nestedConfig => {
-      this.nestedResources(name, nestedConfig.name, nestedConfig.controller, nestedConfig.only);
-    });
-  }
-
-  // Register nested RESTful routes
-  static nestedResources(parentName, name, controller, only) {
-    this.controllers[name] = controller;
-
-    const actions = [
-      { method: 'GET', path: `/${parentName}/:parent_id/${name}`, action: 'index' },
-      { method: 'GET', path: `/${parentName}/:parent_id/${name}/new`, action: 'new' },
-      { method: 'GET', path: `/${parentName}/:parent_id/${name}/:id`, action: 'show' },
-      { method: 'GET', path: `/${parentName}/:parent_id/${name}/:id/edit`, action: 'edit' },
-      { method: 'POST', path: `/${parentName}/:parent_id/${name}`, action: 'create' },
-      { method: 'PATCH', path: `/${parentName}/:parent_id/${name}/:id`, action: 'update' },
-      { method: 'DELETE', path: `/${parentName}/:parent_id/${name}/:id`, action: 'destroy' }
-    ];
-
-    actions.forEach(route => {
-      if (only && !only.includes(route.action)) return;
-
-      const pattern = new RegExp('^' + route.path
-        .replace(/:parent_id/g, '(\\d+)')
-        .replace(/:id/g, '(\\d+)') + '$');
-
-      this.routes.push({
-        method: route.method,
-        pattern,
-        controller,
-        controllerName: name,
-        parentName,
-        action: route.action,
-        nested: true
-      });
-    });
-  }
-
-  // Add a simple redirect route
-  static root(path) {
-    this.routes.unshift({
-      method: 'GET',
-      pattern: /^\/$/,
-      redirect: path
-    });
-  }
-
-  // Find matching route for a path
-  static match(path, method = 'GET') {
-    for (const route of this.routes) {
-      if (route.method !== method) continue;
-      const match = path.match(route.pattern);
-      if (match) {
-        return { route, match };
-      }
-    }
-    return null;
-  }
-
+// Browser Router with DOM-based dispatch
+export class Router extends RouterBase {
   // Dispatch a path to the appropriate controller action
   static async dispatch(path) {
     console.log(`Started GET "${path}"`);
@@ -140,12 +56,10 @@ export class Router {
     try {
       let html;
       if (route.nested) {
-        // Nested resource: first capture is parent_id, second is id
         const parentId = parseInt(match[1]);
         const id = match[2] ? parseInt(match[2]) : null;
         html = id ? await controller[actionMethod](parentId, id) : await controller[actionMethod](parentId);
       } else {
-        // Regular resource: first capture is id
         const id = match[1] ? parseInt(match[1]) : null;
         html = id ? await controller[actionMethod](id) : await controller[actionMethod]();
       }
@@ -247,12 +161,10 @@ export class FormHandler {
     const inputs = form.querySelectorAll('input, textarea, select');
     inputs.forEach(input => {
       if (input.name && input.type !== 'submit') {
-        // Parse Rails-style nested param names: model[field] -> field
         const match = input.name.match(/\[([^\]]+)\]$/);
         const key = match ? match[1] : input.name;
         params[key] = input.value;
       } else if (input.id && input.type !== 'submit') {
-        // Fallback to id if no name
         params[input.id] = input.value;
       }
     });
@@ -265,24 +177,19 @@ export class FormHandler {
       console.log(`  Redirected to ${result.redirect}`);
       await Router.navigate(result.redirect, result.notice);
     } else if (result.render) {
-      // render contains the pre-rendered HTML from the view (with validation errors)
       console.log(`  Rendering ${controllerName}/${action} (validation failed)`);
       document.getElementById('content').innerHTML = result.render;
     }
   }
 }
 
-// Application base class
-export class Application {
-  static schema = null;
-  static seeds = null;
+// Browser Application
+export class Application extends ApplicationBase {
   static sqlJsPath = '/node_modules/sql.js/dist';
-  static activeRecordModule = null;
 
   // Configure the application
   static configure(options) {
-    if (options.schema) this.schema = options.schema;
-    if (options.seeds) this.seeds = options.seeds;
+    super.configure(options);
     if (options.sqlJsPath) this.sqlJsPath = options.sqlJsPath;
   }
 
@@ -292,19 +199,17 @@ export class Application {
     const adapter = await import('./active_record.mjs');
     this.activeRecordModule = adapter;
 
-    // Initialize with config (adapter reads its own config, but we can override)
+    // Initialize with config
     await adapter.initDatabase({ sqlJsPath: this.sqlJsPath });
 
     // For Dexie adapter: define schema and open database
     if (adapter.defineSchema) {
-      // Register table schemas from the schema module
       if (this.schema && this.schema.tableSchemas) {
         for (const [table, schema] of Object.entries(this.schema.tableSchemas)) {
           adapter.registerSchema(table, schema);
         }
       } else {
-        // Fallback: define schemas manually for the demo
-        // TODO: Update rails/schema filter to generate tableSchemas for Dexie
+        // Fallback for demo
         adapter.registerSchema('articles', '++id, title, created_at, updated_at');
         adapter.registerSchema('comments', '++id, article_id, created_at, updated_at');
       }
@@ -315,8 +220,7 @@ export class Application {
     // Make DB available globally for sql.js compatibility
     window.DB = adapter.getDatabase();
 
-    // For sql.js: run schema SQL (skip for Dexie which uses defineSchema instead)
-    // Run schema migrations - schema imports execSQL from adapter
+    // Run schema migrations
     if (this.schema && this.schema.create_tables) {
       this.schema.create_tables();
     }
@@ -358,8 +262,7 @@ export class Application {
   }
 }
 
-// Navigation helper - prevents default, catches errors, logs issues
-// Usage: <a href="/path" onclick="return navigate(event, '/path')">
+// Navigation helper - prevents default, catches errors
 export async function navigate(event, path) {
   event?.preventDefault?.();
   try {
@@ -372,7 +275,6 @@ export async function navigate(event, path) {
 }
 
 // Form submission helper - prevents default, catches errors
-// Usage: <form onsubmit="return submitForm(event, handler)">
 export async function submitForm(event, handler) {
   event?.preventDefault?.();
   try {
@@ -384,8 +286,6 @@ export async function submitForm(event, handler) {
       }
       history.pushState({}, '', result.redirect);
       await Router.dispatch(result.redirect);
-    } else if (result?.render) {
-      // Re-render handled by caller
     }
     return result;
   } catch (e) {
@@ -394,42 +294,7 @@ export async function submitForm(event, handler) {
   return false;
 }
 
-// Text truncation helper (Rails view helper equivalent)
-export function truncate(text, options = {}) {
-  const length = options.length || 30;
-  const omission = options.omission || '...';
-  if (!text || text.length <= length) return text || '';
-  return text.slice(0, length - omission.length) + omission;
-}
-
-// Pluralize helper (Rails view helper equivalent)
-// pluralize(1, 'error') => '1 error'
-// pluralize(2, 'error') => '2 errors'
-// pluralize(2, 'error', 'mistakes') => '2 mistakes'
-export function pluralize(count, singular, plural = null) {
-  const word = count === 1 ? singular : (plural || singular + 's');
-  return `${count} ${word}`;
-}
-
-// DOM ID helper (Rails view helper equivalent)
-// dom_id(article) => 'article_1'
-// dom_id(article, 'edit') => 'edit_article_1'
-// dom_id(new Article()) => 'new_article'
-export function dom_id(record, prefix = null) {
-  // Get model name from constructor or class name
-  const modelName = (record.constructor?.modelName || record.constructor?.name || 'record').toLowerCase();
-
-  if (record.id) {
-    // Persisted record: article_1 or edit_article_1
-    return prefix ? `${prefix}_${modelName}_${record.id}` : `${modelName}_${record.id}`;
-  } else {
-    // New record: new_article or prefix_new_article
-    return prefix ? `${prefix}_new_${modelName}` : `new_${modelName}`;
-  }
-}
-
 // Extract form data from a submit event
-// Returns a params object with all form field values
 export function formData(event) {
   event?.preventDefault?.();
   const form = event?.target;
@@ -437,26 +302,22 @@ export function formData(event) {
   return FormHandler.extractParams(form);
 }
 
-// Handle form submission result (redirect or render)
-// Call this after the controller method returns
+// Handle form submission result
 export function handleFormResult(result, rerenderFn = null) {
   if (result?.redirect) {
     console.log(`  Redirected to ${result.redirect}`);
     Router.navigate(result.redirect, result.notice);
   } else if (result?.render) {
-    // render contains pre-rendered HTML from the view (with validation errors)
     console.log(`  Re-rendering form (validation failed)`);
     document.getElementById('content').innerHTML = result.render;
   }
   return false;
 }
 
-// Convenience function to set up form handlers on window
-// handlerName is pre-computed at transpile time using Ruby's Inflector
+// Set up form handlers on window
 export function setupFormHandlers(config) {
   config.forEach(({ resource, handlerName, parent, confirmDelete }) => {
     if (parent) {
-      // Nested resource handlers
       window[`create${handlerName}`] = function(event, parentId) {
         event.preventDefault();
         try {
@@ -469,7 +330,6 @@ export function setupFormHandlers(config) {
       window[`delete${handlerName}`] = (parentId, id) =>
         FormHandler.destroyNested(resource, parent, parentId, id, confirmDelete);
     } else {
-      // Regular resource handlers
       window[`create${handlerName}`] = function(event) {
         event.preventDefault();
         try {
