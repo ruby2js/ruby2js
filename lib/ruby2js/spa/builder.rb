@@ -363,14 +363,18 @@ module Ruby2JS
       CSS_PACKAGES = {
         none: {},
         pico: { '@picocss/pico' => '^2.0.6' },
-        tailwind: { 'tailwindcss' => '^3.4.0' }
+        tailwind: { 'tailwindcss' => '^3.4.0' },
+        bootstrap: { 'bootstrap' => '^5.3.3' },
+        bulma: { 'bulma' => '^1.0.2' }
       }.freeze
 
       # CSS framework descriptions for README
       CSS_DESCRIPTIONS = {
         none: 'minimal custom styles',
         pico: 'Pico CSS (classless, semantic HTML styling)',
-        tailwind: 'Tailwind CSS (utility-first framework)'
+        tailwind: 'Tailwind CSS (utility-first framework)',
+        bootstrap: 'Bootstrap (component framework)',
+        bulma: 'Bulma (modern CSS framework)'
       }.freeze
 
       def generate_package_json
@@ -520,6 +524,10 @@ module Ruby2JS
         case css
         when :pico
           '<link rel="stylesheet" href="/node_modules/@picocss/pico/css/pico.min.css">'
+        when :bootstrap
+          '<link rel="stylesheet" href="/node_modules/bootstrap/dist/css/bootstrap.min.css">'
+        when :bulma
+          '<link rel="stylesheet" href="/node_modules/bulma/css/bulma.min.css">'
         when :tailwind
           '<link rel="stylesheet" href="/public/styles.css">'
         else
@@ -601,6 +609,10 @@ module Ruby2JS
           generate_tailwind_files
         when :pico
           generate_pico_styles
+        when :bootstrap
+          generate_bootstrap_styles
+        when :bulma
+          generate_bulma_styles
         else
           generate_default_styles
         end
@@ -627,6 +639,24 @@ module Ruby2JS
         styles_dst = File.join(output_dir, 'public', 'styles.css')
         File.write(styles_dst, <<~CSS)
           /* Custom styles (Pico CSS loaded from node_modules) */
+          #loading { text-align: center; padding: 2rem; }
+        CSS
+      end
+
+      def generate_bootstrap_styles
+        # Bootstrap CSS is loaded from node_modules, just add custom overrides
+        styles_dst = File.join(output_dir, 'public', 'styles.css')
+        File.write(styles_dst, <<~CSS)
+          /* Custom styles (Bootstrap loaded from node_modules) */
+          #loading { text-align: center; padding: 2rem; }
+        CSS
+      end
+
+      def generate_bulma_styles
+        # Bulma CSS is loaded from node_modules, just add custom overrides
+        styles_dst = File.join(output_dir, 'public', 'styles.css')
+        File.write(styles_dst, <<~CSS)
+          /* Custom styles (Bulma loaded from node_modules) */
           #loading { text-align: center; padding: 2rem; }
         CSS
       end

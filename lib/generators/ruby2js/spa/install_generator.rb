@@ -31,7 +31,7 @@ module Ruby2js
         desc: "Root route (default: copy from Rails routes.rb)"
 
       class_option :css, type: :string,
-        desc: "CSS framework: none, pico, or tailwind (default: auto-detect from Rails app)"
+        desc: "CSS framework: none, pico, tailwind, bootstrap, or bulma (default: auto-detect)"
 
       def set_defaults
         # Derive name from Rails app name if not provided
@@ -66,7 +66,7 @@ module Ruby2js
       }.freeze
 
       # Valid CSS framework options
-      VALID_CSS_OPTIONS = %w[none pico tailwind].freeze
+      VALID_CSS_OPTIONS = %w[none pico tailwind bootstrap bulma].freeze
 
       def validate_options
         runtime = options[:runtime]
@@ -159,7 +159,8 @@ module Ruby2js
               deps = (pkg['dependencies'] || {}).merge(pkg['devDependencies'] || {})
 
               return 'tailwind' if deps['tailwindcss']
-              # Bootstrap and Bulma not yet supported, fall through to none
+              return 'bootstrap' if deps['bootstrap']
+              return 'bulma' if deps['bulma']
             rescue JSON::ParserError
               # Ignore JSON parse errors
             end

@@ -45,7 +45,7 @@ module Ruby2JS
       }.freeze
 
       # Valid CSS framework options
-      VALID_CSS_OPTIONS = %i[none pico tailwind].freeze
+      VALID_CSS_OPTIONS = %i[none pico tailwind bootstrap bulma].freeze
 
       def initialize
         @runtime = :browser
