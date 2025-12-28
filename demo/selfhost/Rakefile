@@ -163,6 +163,13 @@ task :npm_install_demo do
   end
 end
 
+desc "Install npm dependencies for ruby2js-rails package"
+task :npm_install_package do
+  Dir.chdir(PACKAGE) do
+    sh "npm install" unless File.exist?('node_modules/js-yaml')
+  end
+end
+
 desc "Transpile build.rb to build.mjs for selfhost builds"
 file BUILD_MJS => [File.join(DEMO, 'scripts/build.rb'), "#{ROOT}/lib/ruby2js/filter/selfhost_build.rb"] do
   # Use stdin instead of file argument to work around autoexports + file read issue
@@ -191,7 +198,7 @@ task "build_mjs:npm" => :build_mjs do
 end
 
 desc "Run ruby2js-on-rails smoke tests (compares Ruby vs selfhost builds)"
-task :test_smoke => [:npm_install, :npm_install_demo, "#{SELFHOST}/ruby2js.js", "#{SELFHOST}/lib/erb_compiler.js", :build_filters, BUILD_MJS] do
+task :test_smoke => [:npm_install, :npm_install_demo, :npm_install_package, "#{SELFHOST}/ruby2js.js", "#{SELFHOST}/lib/erb_compiler.js", :build_filters, BUILD_MJS] do
   Dir.chdir(DEMO) do
     sh "node scripts/smoke-test.mjs"
   end
