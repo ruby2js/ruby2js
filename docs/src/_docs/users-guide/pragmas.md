@@ -95,7 +95,7 @@ Add methods to JavaScript's built-in classes like `String` or `Array`:
 # Add a blank? method to String
 class String # Pragma: extend
   def blank?
-    strip.empty?
+    self.strip.empty?
   end
 end
 

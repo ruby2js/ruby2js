@@ -117,7 +117,7 @@ Both Ruby and JavaScript have open classes, but Ruby unifies syntax for defining
 ```ruby
 class String # Pragma: extend
   def blank?
-    strip.empty?
+    self.strip.empty?
   end
 end
 ```

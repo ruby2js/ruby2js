@@ -317,10 +317,10 @@ new class.
 ```ruby
 class String # Pragma: extend
   def blank?
-    strip.empty?
+    self.strip.empty?
   end
 end
-# => String.prototype.blank = function() {return this.strip().length === 0}
+# => String.prototype.blank = function() {return this.trim().length === 0}
 
 class Array # Pragma: extend
   def second
