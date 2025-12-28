@@ -229,31 +229,25 @@ ruby2js-on-rails/
 │   └── schema.rb         # Database schema
 ├── db/
 │   └── seeds.rb          # Seed data
+├── lib/
+│   └── erb_compiler.rb   # ERB to Ruby compiler
 ├── scripts/
-│   └── build.rb          # Ruby transpilation script (for local dev)
-├── vendor/ruby2js/       # ruby2js-rails package source (for local dev)
-│   ├── package.json      # Package definition (depends on ruby2js)
-│   ├── build.mjs         # JavaScript (selfhost) transpilation script
-│   ├── dev-server.mjs    # Hot reload dev server
-│   ├── server.mjs        # Node.js server entry point
-│   ├── adapters/         # Database adapters (copied to dist/lib/active_record.mjs)
-│   │   ├── active_record_sqljs.mjs      # Browser: sql.js (SQLite WASM)
-│   │   ├── active_record_dexie.mjs      # Browser: Dexie (IndexedDB)
-│   │   ├── active_record_better_sqlite3.mjs  # Node: SQLite
-│   │   └── active_record_pg.mjs         # Node: PostgreSQL
-│   ├── targets/          # Target-specific runtimes
-│   │   ├── browser/rails.js  # History API routing, DOM updates
-│   │   ├── node/rails.js     # HTTP server (http.createServer)
-│   │   ├── bun/rails.js      # HTTP server (Bun.serve)
-│   │   └── deno/rails.js     # HTTP server (Deno.serve)
-│   └── erb_runtime.mjs   # ERB template runtime
+│   ├── build.rb          # Ruby transpilation script
+│   └── smoke-test.mjs    # Compare Ruby vs selfhost output
 ├── node_modules/
 │   ├── ruby2js/          # Core converter (from npm URL)
-│   └── ruby2js-rails/    # Rails runtime (from npm URL)
+│   └── ruby2js-rails/    # Rails runtime (symlink to ../../packages/ruby2js-rails)
 ├── dist/                 # Generated JavaScript (git-ignored)
 ├── index.html            # Browser entry point
 └── package.json
 ```
+
+The `ruby2js-rails` package (at `packages/ruby2js-rails/` in the repo) provides:
+- `adapters/` - Database adapters (sql.js, Dexie, better-sqlite3, pg)
+- `targets/` - Runtime targets (browser, node, bun, deno)
+- `build.mjs` - JavaScript (selfhost) transpilation script
+- `dev-server.mjs` - Hot reload dev server
+- `server.mjs` - Production server entry point
 
 ## Sourcemaps
 

@@ -61,6 +61,14 @@ echo "puts 'hello'" | ruby2js --preset
 - **[Framework Integrations](https://www.ruby2js.com/docs/integrations)** - Rails, Stimulus, React, Lit, and more
 - **[Live Demo](https://ruby2js.com/demo?preset=true)** - Try it in your browser (runs entirely client-side via Opal)
 
+## Demos
+
+- **[Opal Demo](https://ruby2js.com/demo?preset=true)** - Full-featured demo using Opal (~5MB)
+- **[Selfhost Demo](https://ruby2js.com/demo/selfhost/)** - Lightweight demo using transpiled Ruby2JS (~200KB + Prism WASM)
+- **[Ruby2JS-on-Rails](https://ruby2js.com/demo/ruby2js-on-rails/)** - Rails-like blog app running entirely in JavaScript
+
+The selfhost demo runs Ruby2JS transpiled to JavaScript, demonstrating that Ruby2JS can convert itself. The Ruby2JS-on-Rails demo shows a complete Rails-style MVC application with ActiveRecord, controllers, and ERB views running in the browser or on Node.js/Bun/Deno.
+
 ## Contributing
 
 ### Running Tests

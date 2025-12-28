@@ -67,38 +67,52 @@ npm test
 
 ## Key Files
 
-| File                 | Description                                                                           |
-| -------------------- | ------------------------------------------------------------------------------------- |
-| `ruby2js.js`         | Generated bundle - converter + filter runtime (regenerate via `npm run build:bundle`) |
-| `filter_runtime.js`  | Filter runtime source (appended to ruby2js.js during build)                           |
-| `prism_browser.js`   | Generated browser WASM loader (regenerate via `npm run build:prism-browser`)          |
-| `ruby2js-cli.js`     | CLI wrapper for Node.js                                                               |
-| `browser_demo.html`  | Browser demo page                                                                     |
-| `test_harness.mjs`   | Test framework for specs                                                              |
-| `run_all_specs.mjs`  | Manifest-driven spec runner for CI                                                    |
-| `spec_manifest.json` | Spec status tracking (ready/partial/blocked)                                          |
-| `filters/`           | Generated transpiled filters (regenerate via `npm run build:filters`)                 |
-| `dist/`              | Generated transpiled specs                                                            |
+| File                 | Description                                                              |
+| -------------------- | ------------------------------------------------------------------------ |
+| `ruby2js.js`         | Generated bundle - converter + filter runtime                            |
+| `ruby2js.mjs`        | CLI entry point (use with `node ruby2js.mjs`)                            |
+| `filter_runtime.js`  | Filter runtime source (appended to ruby2js.js during build)             |
+| `prism_browser.js`   | Generated browser WASM loader                                            |
+| `browser_demo.html`  | Browser demo page                                                        |
+| `test_harness.mjs`   | Test framework for specs                                                 |
+| `run_all_specs.mjs`  | Manifest-driven spec runner for CI                                       |
+| `spec_manifest.json` | Spec status tracking (ready/partial/blocked)                             |
+| `filters/`           | Generated transpiled filters                                             |
+| `lib/`               | Generated transpiled libraries (erb_compiler.js)                         |
+| `dist/`              | Generated transpiled specs                                               |
 
 ### Scripts
 
 | File                                 | Description                                               |
 | ------------------------------------ | --------------------------------------------------------- |
 | `scripts/transpile_bundle.rb`        | Transpiles Ruby2JS bundle to JS (includes filter runtime) |
-| `scripts/transpile_filter.rb`        | Transpiles filters - pure declarative, 45 lines           |
+| `scripts/transpile_filter.rb`        | Transpiles filters - pure declarative                     |
 | `scripts/transpile_spec.rb`          | Transpiles RSpec files to JS                              |
 | `scripts/transpile_prism_browser.rb` | Transpiles browser Prism loader                           |
+| `scripts/transpile_erb_compiler.rb`  | Transpiles ERB compiler for browser use                   |
+| `scripts/build_all.rb`               | Batch build for filters and specs                         |
+| `scripts/publish_demo.rb`            | Creates ruby2js-on-rails distribution tarball             |
 | `scripts/test_handlers.rb`           | Test helper for converter handlers                        |
 
-### Transpiled Output (dist/)
+### Transpiled Output
 
-| File                            | LOC   | Description                       |
-| ------------------------------- | ----- | --------------------------------- |
-| `dist/functions_filter.mjs`     | 2,040 | Transpiled Functions filter       |
-| `dist/functions_spec.mjs`       | 1,077 | Transpiled Functions filter tests |
-| `dist/transliteration_spec.mjs` | 1,391 | Transpiled transliteration tests  |
-| `dist/serializer_spec.mjs`      | 333   | Transpiled serializer tests       |
-| `dist/namespace_spec.mjs`       | 62    | Transpiled namespace tests        |
+**Filters (`filters/`)** - Transpiled from `lib/ruby2js/filter/*.rb`:
+
+| File                      | Description                    |
+| ------------------------- | ------------------------------ |
+| `filters/functions.js`    | Ruby method → JS equivalents   |
+| `filters/esm.js`          | ES module imports/exports      |
+| `filters/camelCase.js`    | snake_case → camelCase         |
+| `filters/stimulus.js`     | Stimulus controller patterns   |
+| `filters/rails/*.js`      | Rails-specific filters         |
+
+**Specs (`dist/`)** - Transpiled from `spec/*.rb`:
+
+| File                            | Description                       |
+| ------------------------------- | --------------------------------- |
+| `dist/transliteration_spec.mjs` | Transpiled transliteration tests  |
+| `dist/serializer_spec.mjs`      | Transpiled serializer tests       |
+| `dist/functions_spec.mjs`       | Transpiled Functions filter tests |
 
 ## Source Files
 
@@ -115,18 +129,42 @@ The unified bundle is transpiled from Ruby source files:
 | `lib/ruby2js/converter.rb` + handlers   | 548+  | (inlined in bundle)                |
 | `lib/ruby2js/pipeline.rb`               | 160   | (inlined in bundle)                |
 | `lib/ruby2js/filter/processor.rb`       | 333   | (in bundle, for filter base class) |
-| `lib/ruby2js/filter/functions.rb`       | 1,455 | `dist/functions_filter.mjs`        |
+| `lib/ruby2js/filter/functions.rb`       | 1,455 | `filters/functions.js`             |
 
 ## npm Scripts
 
-| Script                        | Description                             |
-| ----------------------------- | --------------------------------------- |
-| `npm test`                    | Run all tests (CLI, walker, specs)      |
-| `npm run build`               | Build bundle, prism_browser, and specs  |
-| `npm run build:bundle`        | Regenerate ruby2js.mjs from Ruby source |
-| `npm run build:prism-browser` | Regenerate prism_browser.mjs            |
-| `npm run build:spec`          | Transpile test specs                    |
-| `npm run clean`               | Remove generated files                  |
+| Script                        | Description                                        |
+| ----------------------------- | -------------------------------------------------- |
+| `npm test`                    | Run all tests (CLI, walker, specs)                 |
+| `npm run build`               | Build everything (bundle, filters, specs, lib)     |
+| `npm run build:bundle`        | Regenerate ruby2js.js from Ruby source             |
+| `npm run build:prism-browser` | Regenerate prism_browser.js                        |
+| `npm run build:filters`       | Transpile all filters to filters/                  |
+| `npm run build:erb-compiler`  | Transpile ERB compiler to lib/                     |
+| `npm run build:spec`          | Transpile test specs to dist/                      |
+| `npm run clean`               | Remove generated files                             |
+
+## Rake Tasks
+
+The Rakefile provides more comprehensive build control:
+
+```bash
+cd demo/selfhost
+
+bundle exec rake build          # Build all (bundle, filters, specs)
+bundle exec rake build_ready    # Build only ready specs
+bundle exec rake test           # Build and run all tests
+bundle exec rake ci             # CI mode (ready must pass, partial informational)
+bundle exec rake test_smoke     # Compare Ruby vs selfhost output
+bundle exec rake clean          # Remove generated files
+```
+
+For the `ruby2js-rails` npm package (at `packages/ruby2js-rails/`):
+
+```bash
+bundle exec rake build_mjs      # Generate build.mjs with dev paths
+bundle exec rake build_mjs:npm  # Generate build.mjs with npm package imports
+```
 
 ## Spec Runner Options
 
