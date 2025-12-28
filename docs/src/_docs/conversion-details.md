@@ -135,6 +135,26 @@ string.chomp!  # => string.chomp
 
 This can be useful for avoiding filter conflicts—if a filter maps `each` to `forEach`, you can use `each!` to bypass it.
 
+### JavaScript Reserved Words
+
+Some names are valid in Ruby but reserved in JavaScript (e.g., `const`, `let`, `var`, `new`, `delete`). Ruby2JS escapes these with a `$` prefix when used as variable or function names:
+
+```ruby
+const = 1
+def new; end
+# => let $const = 1
+# => function $new() {}
+```
+
+However, class methods and property names don't need escaping—ES6 allows reserved words there:
+
+```ruby
+class Foo
+  def new; end
+end
+# => class Foo { new() {} }
+```
+
 ## Further Reading
 
 - **[User's Guide](/docs/users-guide/introduction)** - How to write dual-target Ruby/JavaScript code
