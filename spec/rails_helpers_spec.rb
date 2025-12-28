@@ -119,6 +119,39 @@ describe Ruby2JS::Filter::Rails::Helpers do
     end
   end
 
+  describe 'button_to helper' do
+    it "should include class attribute on button_to" do
+      erb_src = '_erbout = +\'\'; _erbout.<<(( button_to("Delete", @article, method: :delete, class: "btn-danger text-white") ).to_s); _erbout'
+      result = to_js(erb_src)
+      # Template literal output - quotes not escaped
+      result.must_include 'class="btn-danger text-white"'
+      result.must_include '>Delete</button>'
+    end
+
+    it "should include form_class attribute on button_to" do
+      erb_src = '_erbout = +\'\'; _erbout.<<(( button_to("Delete", @article, method: :delete, form_class: "inline-block", class: "btn") ).to_s); _erbout'
+      result = to_js(erb_src)
+      # Template literal output - quotes not escaped
+      result.must_include '<form class="inline-block">'
+      result.must_include 'class="btn"'
+      result.wont_include 'style="display:inline"'
+    end
+
+    it "should handle button_to with turbo_confirm" do
+      erb_src = '_erbout = +\'\'; _erbout.<<(( button_to("Delete", @article, method: :delete, data: { turbo_confirm: "Really?" }) ).to_s); _erbout'
+      result = to_js(erb_src)
+      result.must_include "confirm('Really?')"
+    end
+
+    it "should handle button_to with path helper" do
+      erb_src = '_erbout = +\'\'; _erbout.<<(( button_to("Delete", article_path(@article), method: :delete, class: "btn-sm") ).to_s); _erbout'
+      result = to_js(erb_src)
+      # Template literal output - quotes not escaped
+      result.must_include 'class="btn-sm"'
+      result.must_include 'routes.article.delete'
+    end
+  end
+
   describe 'truncate helper' do
     it "should convert truncate with length option" do
       erb_src = '_erbout = +\'\'; _erbout.<<(( truncate(@body, length: 100) ).to_s); _erbout'

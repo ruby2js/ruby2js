@@ -388,15 +388,18 @@ module Ruby2JS
         end
 
         # Process button_to helper
-        # button_to "Destroy", @article, method: :delete
+        # button_to "Destroy", @article, method: :delete, class: "btn", form_class: "inline"
         def process_button_to(args)
           text_node = args[0]
           path_node = args[1]
           options = args[2] if args.length > 2
 
-          # Check for method: :delete option
+          # Extract options
           http_method = :post
           confirm_msg = nil
+          css_class = nil
+          form_class = nil
+
           if options&.type == :hash
             options.children.each do |pair|
               key = pair.children[0]
@@ -405,12 +408,17 @@ module Ruby2JS
                 case key.children[0]
                 when :method
                   http_method = value.children[0] if value.type == :sym
+                when :class
+                  css_class = extract_class_value(value)
+                when :form_class
+                  form_class = extract_class_value(value)
                 when :data
                   if value.type == :hash
                     value.children.each do |data_pair|
                       data_key = data_pair.children[0]
                       data_value = data_pair.children[1]
-                      if data_key.type == :sym && data_key.children[0] == :confirm
+                      if data_key.type == :sym &&
+                         [:confirm, :turbo_confirm].include?(data_key.children[0])
                         confirm_msg = data_value if data_value.type == :str
                       end
                     end
@@ -424,14 +432,19 @@ module Ruby2JS
           confirm_str = confirm_msg ? confirm_msg.children[0] : 'Are you sure?'
 
           if http_method == :delete
-            build_delete_button(text_str, path_node, confirm_str)
+            build_delete_button(text_str, path_node, confirm_str, css_class, form_class)
           else
-            build_form_button(text_str, path_node, http_method)
+            build_form_button(text_str, path_node, http_method, css_class, form_class)
           end
         end
 
         # Build a delete button (form with onclick handler for SPA)
-        def build_delete_button(text_str, path_node, confirm_str)
+        def build_delete_button(text_str, path_node, confirm_str, css_class = nil, form_class = nil)
+          # Build class attributes
+          btn_class_attr = css_class ? " class=\"#{css_class}\"" : ""
+          form_class_attr = form_class ? " class=\"#{form_class}\"" : ""
+          form_style = form_class ? "" : " style=\"display:inline\""
+
           if self.browser_target?()
             # Browser target - onclick handler
             if path_node&.type == :send && path_node.children[0].nil?
@@ -445,7 +458,7 @@ module Ruby2JS
 
                 if model_name
                   return s(:dstr,
-                    s(:str, "<form style=\"display:inline\"><button type=\"button\" onclick=\"if(confirm('#{confirm_str}')) { routes.#{base_name}.delete("),
+                    s(:str, "<form#{form_class_attr}#{form_style}><button type=\"button\"#{btn_class_attr} onclick=\"if(confirm('#{confirm_str}')) { routes.#{base_name}.delete("),
                     s(:begin, s(:attr, s(:lvar, model_name.to_sym), :id)),
                     s(:str, ") }\">#{text_str}</button></form>"))
                 end
@@ -457,7 +470,7 @@ module Ruby2JS
                 route_name = "#{parent_name}_#{base_name}"
 
                 return s(:dstr,
-                  s(:str, "<form style=\"display:inline\"><button type=\"button\" onclick=\"if(confirm('#{confirm_str}')) { routes.#{route_name}.delete("),
+                  s(:str, "<form#{form_class_attr}#{form_style}><button type=\"button\"#{btn_class_attr} onclick=\"if(confirm('#{confirm_str}')) { routes.#{route_name}.delete("),
                   s(:begin, s(:attr, s(:lvar, parent_name.to_sym), :id)),
                   s(:str, ", "),
                   s(:begin, s(:attr, process(child_arg), :id)),
@@ -469,32 +482,47 @@ module Ruby2JS
             if path_node&.type == :ivar
               model_name = path_node.children.first.to_s.sub(/^@/, '')
               return s(:dstr,
-                s(:str, "<form style=\"display:inline\"><button type=\"button\" onclick=\"if(confirm('#{confirm_str}')) { routes.#{model_name}.delete("),
+                s(:str, "<form#{form_class_attr}#{form_style}><button type=\"button\"#{btn_class_attr} onclick=\"if(confirm('#{confirm_str}')) { routes.#{model_name}.delete("),
+                s(:begin, s(:attr, s(:lvar, model_name.to_sym), :id)),
+                s(:str, ") }\">#{text_str}</button></form>"))
+            end
+
+            # Handle lvar (local variable like article from a loop)
+            if path_node&.type == :lvar
+              model_name = path_node.children.first.to_s
+              return s(:dstr,
+                s(:str, "<form#{form_class_attr}#{form_style}><button type=\"button\"#{btn_class_attr} onclick=\"if(confirm('#{confirm_str}')) { routes.#{model_name}.delete("),
                 s(:begin, s(:attr, s(:lvar, model_name.to_sym), :id)),
                 s(:str, ") }\">#{text_str}</button></form>"))
             end
 
             # Fallback
-            s(:str, "<form style=\"display:inline\"><button type=\"button\" onclick=\"if(confirm('#{confirm_str}')) { /* delete */ }\">#{text_str}</button></form>")
+            s(:str, "<form#{form_class_attr}#{form_style}><button type=\"button\"#{btn_class_attr} onclick=\"if(confirm('#{confirm_str}')) { /* delete */ }\">#{text_str}</button></form>")
           else
             # Node target - form-based delete
             path_expr = process(path_node)
             s(:dstr,
-              s(:str, '<form method="post" action="'),
+              s(:str, "<form method=\"post\" action=\""),
               s(:begin, path_expr),
-              s(:str, "\" style=\"display:inline\"><input type=\"hidden\" name=\"_method\" value=\"delete\"><button type=\"submit\" data-confirm=\"#{confirm_str}\">#{text_str}</button></form>"))
+              s(:str, "\"#{form_class_attr}#{form_style}><input type=\"hidden\" name=\"_method\" value=\"delete\"><button type=\"submit\"#{btn_class_attr} data-confirm=\"#{confirm_str}\">#{text_str}</button></form>"))
           end
         end
 
         # Build a regular form button
-        def build_form_button(text_str, path_node, http_method)
+        def build_form_button(text_str, path_node, http_method, css_class = nil, form_class = nil)
           path_expr = process(path_node)
+
+          # Build class attributes
+          btn_class_attr = css_class ? " class=\"#{css_class}\"" : ""
+          form_class_attr = form_class ? " class=\"#{form_class}\"" : ""
+          form_style = form_class ? "" : " style=\"display:inline\""
+
           s(:dstr,
             s(:str, '<form method="'),
             s(:str, http_method.to_s),
             s(:str, '" action="'),
             s(:begin, path_expr),
-            s(:str, "\" style=\"display:inline\"><button type=\"submit\">#{text_str}</button></form>"))
+            s(:str, "\"#{form_class_attr}#{form_style}><button type=\"submit\"#{btn_class_attr}>#{text_str}</button></form>"))
         end
 
         # Process truncate helper
