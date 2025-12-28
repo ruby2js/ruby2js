@@ -78,6 +78,27 @@ edge:
 
 Same Ruby source. Different adapter. Deploy anywhere JavaScript runs.
 
+## CSS Frameworks
+
+Configure in `config/ruby2js_spa.rb`:
+
+| Framework | Description |
+|-----------|-------------|
+| **none** | Minimal custom styles (default) |
+| **tailwind** | Tailwind CSS (auto-detected from Rails) |
+| **pico** | Pico CSS (classless, semantic HTML) |
+| **bootstrap** | Bootstrap 5 |
+| **bulma** | Bulma CSS |
+
+```ruby
+# config/ruby2js_spa.rb
+Ruby2JS::SPA.configure do |config|
+  config.css = :tailwind
+end
+```
+
+The SPA generator auto-detects Tailwind when using `rails new --css tailwind`. The generated HTML includes appropriate container classes for each framework.
+
 ## Development Workflow
 
 ```bash
@@ -128,6 +149,7 @@ default:
 # config/ruby2js_spa.rb
 Ruby2JS::SPA.configure do |config|
   config.database = :dexie
+  config.css = :tailwind
   config.scaffolds = %w[Article Comment]  # Auto-detected
   config.root = "articles#index"
 end
