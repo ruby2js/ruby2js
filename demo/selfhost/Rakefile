@@ -194,9 +194,11 @@ desc "Build build.mjs with npm package imports (for ruby2js-rails package)"
 task "build_mjs:npm" => :build_mjs do
   content = File.read(BUILD_MJS)
   # Convert relative paths to npm package imports
-  content = content.gsub('../../../selfhost/ruby2js.js', 'ruby2js')
-  content = content.gsub('../../../selfhost/filters/', 'ruby2js/filters/')
-  content = content.gsub('../../../selfhost/lib/', 'ruby2js/lib/')
+  # After build_mjs, paths are ../../demo/selfhost/... - convert to ruby2js package
+  content = content.gsub('../../demo/selfhost/ruby2js.js', 'ruby2js')
+  content = content.gsub('../../demo/selfhost/filters/', 'ruby2js/filters/')
+  content = content.gsub('../../demo/selfhost/lib/', 'ruby2js/lib/')
+  content = content.gsub('../../demo/ruby2js-on-rails/lib/', 'ruby2js/lib/')
   File.write(BUILD_MJS, content)
   puts "Converted to npm package imports: #{BUILD_MJS}"
 end
