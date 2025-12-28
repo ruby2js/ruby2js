@@ -519,18 +519,18 @@ See [Options](/docs/options) for configuration details.
 
 ## Summary
 
-| Pattern | Works Well | Needs Care |
-|---------|------------|------------|
-| Classes | ✓ Directly translates | |
-| Methods | ✓ Normal methods | Parens matter |
-| Modules | ✓ Namespacing | |
-| Private methods | ✓ `#` prefix (ES2022) or `_` prefix | |
-| Arrays | ✓ Most operations | `<<` needs pragma |
-| Range indexing | ✓ `[0..-2]` → `.slice()` | |
-| Hashes | ✓ Symbol keys | `.each` needs pragma |
-| Blocks | ✓ Arrow functions | Use noes2015 for `this` |
-| Strings | ✓ Interpolation | |
-| Control flow | ✓ if/unless/case | |
-| Type checks | | Avoid `is_a?` |
+| Pattern         | Works Well                          | Needs Care              |
+| --------------- | ----------------------------------- | ----------------------- |
+| Classes         | ✓ Directly translates               |                         |
+| Methods         | ✓ Normal methods                    | Parens matter           |
+| Modules         | ✓ Namespacing                       |                         |
+| Private methods | ✓ `#` prefix (ES2022) or `_` prefix |                         |
+| Arrays          | ✓ Most operations                   | `<<` needs pragma       |
+| Range indexing  | ✓ `[0..-2]` → `.slice()`            |                         |
+| Hashes          | ✓ Symbol keys                       | `.each` needs pragma    |
+| Blocks          | ✓ Arrow functions                   | Use noes2015 for `this` |
+| Strings         | ✓ Interpolation                     |                         |
+| Control flow    | ✓ if/unless/case                    |                         |
+| Type checks     |                                     | Avoid `is_a?`           |
 
 See [Anti-Patterns](/docs/users-guide/anti-patterns) for patterns to avoid, [Pragmas](/docs/users-guide/pragmas) for fine-grained control, and [JavaScript-Only](/docs/users-guide/javascript-only) for ESM, async/await, and JavaScript APIs.

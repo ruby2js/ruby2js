@@ -4,11 +4,11 @@ Three demos to prove Ruby2JS + Phlex handles real applications, not toys.
 
 ## Strategic Goals
 
-| Demo | Message | Audience |
-|------|---------|----------|
+| Demo                  | Message                       | Audience                               |
+| --------------------- | ----------------------------- | -------------------------------------- |
 | **Stimulus Showcase** | Interactive UIs without React | Developers evaluating Hotwire vs React |
-| **shadcn Components** | Build design systems | Teams building component libraries |
-| **rubymonolith Blog** | Complete apps work | Anyone asking "but does it scale?" |
+| **shadcn Components** | Build design systems          | Teams building component libraries     |
+| **rubymonolith Blog** | Complete apps work            | Anyone asking "but does it scale?"     |
 
 Together they cover the spectrum: **widget → design system → application**.
 
@@ -116,14 +116,14 @@ production:
 
 **Current status:**
 
-| Component | Self-host Status | Location |
-|-----------|------------------|----------|
-| `phlex` filter | Not yet transpiled | `lib/ruby2js/filter/phlex.rb` |
-| `stimulus` filter | Not yet transpiled | `lib/ruby2js/filter/stimulus.rb` |
-| `pnode` converter | **NOT IN BUNDLE** | `lib/ruby2js/converter/pnode.rb` |
-| `on_pnode` handler | **NOT IN BUNDLE** | `lib/ruby2js/filter/processor.rb` |
-| `functions` | Works | `demo/selfhost/filters/functions.js` |
-| `esm` | Works | `demo/selfhost/filters/esm.js` |
+| Component          | Self-host Status   | Location                             |
+| ------------------ | ------------------ | ------------------------------------ |
+| `phlex` filter     | Not yet transpiled | `lib/ruby2js/filter/phlex.rb`        |
+| `stimulus` filter  | Not yet transpiled | `lib/ruby2js/filter/stimulus.rb`     |
+| `pnode` converter  | **NOT IN BUNDLE**  | `lib/ruby2js/converter/pnode.rb`     |
+| `on_pnode` handler | **NOT IN BUNDLE**  | `lib/ruby2js/filter/processor.rb`    |
+| `functions`        | Works              | `demo/selfhost/filters/functions.js` |
+| `esm`              | Works              | `demo/selfhost/filters/esm.js`       |
 
 **Critical:** The pnode converter is required for Phlex output. Verified zero matches for "pnode" in `ruby2js.js`.
 
@@ -202,16 +202,16 @@ const filters = await loadFilters(filterNames);
 
 ### Prerequisites Checklist
 
-| ID | Task | Estimate | Blocks |
-|----|------|----------|--------|
-| P1.1 | Remove hardcoded filter restriction in build.rb | 30 min | M1 |
-| P1.2 | Add filter name → module resolution | 30 min | M1 |
-| P2.1 | Add pnode converter to selfhost bundle | 1-2 hours | M1 |
-| P2.2 | Transpile Phlex filter to JS | 1-2 hours | M1 |
-| P2.3 | Transpile Stimulus filter to JS | 1-2 hours | M1 |
-| P2.4 | Validate transpiled filters match Ruby output | 1 hour | M1 |
-| P3 | Update ruby2js-rails package | 30 min | M1 |
-| P4 | Dynamic filter loading in build.mjs | 1 hour | M1 |
+| ID   | Task                                            | Estimate  | Blocks |
+| ---- | ----------------------------------------------- | --------- | ------ |
+| P1.1 | Remove hardcoded filter restriction in build.rb | 30 min    | M1     |
+| P1.2 | Add filter name → module resolution             | 30 min    | M1     |
+| P2.1 | Add pnode converter to selfhost bundle          | 1-2 hours | M1     |
+| P2.2 | Transpile Phlex filter to JS                    | 1-2 hours | M1     |
+| P2.3 | Transpile Stimulus filter to JS                 | 1-2 hours | M1     |
+| P2.4 | Validate transpiled filters match Ruby output   | 1 hour    | M1     |
+| P3   | Update ruby2js-rails package                    | 30 min    | M1     |
+| P4   | Dynamic filter loading in build.mjs             | 1 hour    | M1     |
 
 **Total prerequisite work: 7-10 hours**
 
@@ -227,14 +227,14 @@ This is front-loaded work that must complete before M1 can begin.
 
 ### Components
 
-| Component | Phlex Patterns | Stimulus Patterns |
-|-----------|----------------|-------------------|
-| Counter | Basic div, span, button | targets, actions, state |
-| Toggle | Conditional classes | classList manipulation |
-| Tabs | Multiple children, active state | Multiple targets, data values |
-| Modal | Backdrop, nested content | show/hide, click-outside |
-| Dropdown | Positioning, menu items | Focus management, keyboard |
-| Accordion | Multiple expandable sections | Multiple instances, outlets |
+| Component | Phlex Patterns                  | Stimulus Patterns             |
+| --------- | ------------------------------- | ----------------------------- |
+| Counter   | Basic div, span, button         | targets, actions, state       |
+| Toggle    | Conditional classes             | classList manipulation        |
+| Tabs      | Multiple children, active state | Multiple targets, data values |
+| Modal     | Backdrop, nested content        | show/hide, click-outside      |
+| Dropdown  | Positioning, menu items         | Focus management, keyboard    |
+| Accordion | Multiple expandable sections    | Multiple instances, outlets   |
 
 ### Structure
 
@@ -467,15 +467,15 @@ end
 
 ### Components
 
-| Component | Patterns Demonstrated |
-|-----------|----------------------|
-| Button | Variants (primary, secondary, destructive, outline, ghost), sizes |
-| Card | Compound components (Card, CardHeader, CardTitle, CardContent, CardFooter) |
-| Input | Form integration, disabled state, placeholder |
-| Badge | Simple variants |
-| Alert | Variants, icon slot, dismissible |
-| Dialog | Portal-like behavior, Stimulus integration |
-| Tabs | Compound component, Stimulus integration |
+| Component | Patterns Demonstrated                                                      |
+| --------- | -------------------------------------------------------------------------- |
+| Button    | Variants (primary, secondary, destructive, outline, ghost), sizes          |
+| Card      | Compound components (Card, CardHeader, CardTitle, CardContent, CardFooter) |
+| Input     | Form integration, disabled state, placeholder                              |
+| Badge     | Simple variants                                                            |
+| Alert     | Variants, icon slot, dismissible                                           |
+| Dialog    | Portal-like behavior, Stimulus integration                                 |
+| Tabs      | Compound component, Stimulus integration                                   |
 
 ### Structure
 
@@ -989,12 +989,12 @@ end
 
 For all demos to run in browser (without Ruby), these filters must self-host:
 
-| Filter | Status | Notes |
-|--------|--------|-------|
-| `phlex` | Needs validation | Core of all demos |
-| `stimulus` | Needs validation | Required for interactivity |
-| `esm` | Already works | Import/export |
-| `functions` | Already works | Ruby → JS methods |
+| Filter      | Status           | Notes                      |
+| ----------- | ---------------- | -------------------------- |
+| `phlex`     | Needs validation | Core of all demos          |
+| `stimulus`  | Needs validation | Required for interactivity |
+| `esm`       | Already works    | Import/export              |
+| `functions` | Already works    | Ruby → JS methods          |
 
 ### Validation Process
 
@@ -1007,23 +1007,23 @@ For all demos to run in browser (without Ruby), these filters must self-host:
 
 ## Milestones
 
-| Milestone | Deliverable | Dependencies | Estimate |
-|-----------|-------------|--------------|----------|
-| **M0** | **Prerequisites complete** | — | **7-10 hours** |
-| M0.1 | Filter selection in ruby2js.yml works | — | 1 hour |
-| M0.2 | pnode converter added to selfhost bundle | — | 1-2 hours |
-| M0.3 | Phlex filter transpiled to JS | M0.2 | 1-2 hours |
-| M0.4 | Stimulus filter transpiled to JS | M0.1 | 1-2 hours |
-| M0.5 | Dynamic filter loading in build.mjs | M0.3, M0.4 | 1 hour |
-| M0.6 | ruby2js-rails package updated | M0.5 | 30 min |
-| **M1** | **Counter + Toggle working** | **M0** | **2-4 hours** |
-| M2 | All 6 Stimulus components | M1 | 2-3 hours |
-| M3 | Stimulus demo self-hosts | M2 | 2-6 hours |
-| **M4** | **Button + Card components** | **M3** | **1 hour** |
-| M5 | All shadcn components | M4 | 2 hours |
-| **M6** | **Blog Index + Show views** | **M5** | **2 hours** |
-| M7 | Full blog CRUD | M6 | 2-3 hours |
-| M8 | All demos published | M7 | 1-2 hours |
+| Milestone | Deliverable                              | Dependencies | Estimate       |
+| --------- | ---------------------------------------- | ------------ | -------------- |
+| **M0**    | **Prerequisites complete**               | —            | **7-10 hours** |
+| M0.1      | Filter selection in ruby2js.yml works    | —            | 1 hour         |
+| M0.2      | pnode converter added to selfhost bundle | —            | 1-2 hours      |
+| M0.3      | Phlex filter transpiled to JS            | M0.2         | 1-2 hours      |
+| M0.4      | Stimulus filter transpiled to JS         | M0.1         | 1-2 hours      |
+| M0.5      | Dynamic filter loading in build.mjs      | M0.3, M0.4   | 1 hour         |
+| M0.6      | ruby2js-rails package updated            | M0.5         | 30 min         |
+| **M1**    | **Counter + Toggle working**             | **M0**       | **2-4 hours**  |
+| M2        | All 6 Stimulus components                | M1           | 2-3 hours      |
+| M3        | Stimulus demo self-hosts                 | M2           | 2-6 hours      |
+| **M4**    | **Button + Card components**             | **M3**       | **1 hour**     |
+| M5        | All shadcn components                    | M4           | 2 hours        |
+| **M6**    | **Blog Index + Show views**              | **M5**       | **2 hours**    |
+| M7        | Full blog CRUD                           | M6           | 2-3 hours      |
+| M8        | All demos published                      | M7           | 1-2 hours      |
 
 **Total: 21-33 hours** (roughly 3-4 working days)
 

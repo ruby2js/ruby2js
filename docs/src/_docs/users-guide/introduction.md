@@ -59,13 +59,13 @@ Write Ruby code designed **exclusively** to become JavaScript. The Ruby code won
 
 ## Choosing Your Approach
 
-| Factor | Dual-Target | JavaScript-Only |
-|--------|-------------|-----------------|
-| Ruby execution | Production use | None |
-| JavaScript APIs | Wrapped or avoided | Used directly |
-| ESM imports/exports | No (use require) | Yes |
-| Pragmas needed | Occasional | Common |
-| Code complexity | Simpler patterns | Full flexibility |
+| Factor              | Dual-Target        | JavaScript-Only  |
+| ------------------- | ------------------ | ---------------- |
+| Ruby execution      | Production use     | None             |
+| JavaScript APIs     | Wrapped or avoided | Used directly    |
+| ESM imports/exports | No (use require)   | Yes              |
+| Pragmas needed      | Occasional         | Common           |
+| Code complexity     | Simpler patterns   | Full flexibility |
 
 **Not sure?** Start with dual-target patterns. They work for JavaScript-only too, and you can add JavaScript-specific features as needed.
 

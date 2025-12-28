@@ -26,16 +26,16 @@ Selfhost filters are for Ruby2JS-specific code patterns that wouldn't appear in 
 
 Patterns that could appear in any Ruby codebase belong in general filters:
 
-| Pattern | General Filter | Notes |
-|---------|---------------|-------|
-| `.freeze` removal | functions | No-op in JS |
-| `.to_sym` removal | functions | Symbols are strings in JS |
-| `.reject(&:method)` | functions | Common Ruby idiom |
-| Negative index assignment | functions | `arr[-1] = x` |
-| 2-argument slice | functions | `str[i, len]` |
-| `.empty?` | functions | Already existed |
-| Autoreturn for methods | return | Default filter |
-| Skip statements | pragma | `# Pragma: skip` |
+| Pattern                   | General Filter | Notes                     |
+| ------------------------- | -------------- | ------------------------- |
+| `.freeze` removal         | functions      | No-op in JS               |
+| `.to_sym` removal         | functions      | Symbols are strings in JS |
+| `.reject(&:method)`       | functions      | Common Ruby idiom         |
+| Negative index assignment | functions      | `arr[-1] = x`             |
+| 2-argument slice          | functions      | `str[i, len]`             |
+| `.empty?`                 | functions      | Already existed           |
+| Autoreturn for methods    | return         | Default filter            |
+| Skip statements           | pragma         | `# Pragma: skip`          |
 
 ## Current Architecture
 
@@ -58,28 +58,28 @@ lib/ruby2js/filter/
 
 ### Implementation Status
 
-| Component | Status | Lines | Purpose |
-|-----------|--------|-------|---------|
-| `pragma.rb` | Complete | ~280 | Type hints, skip statements |
-| `combiner.rb` | Complete | ~150 | Module/class merging |
-| `functions.rb` | Extended | ~800 | Ruby→JS method mapping |
-| `polyfill.rb` | Complete | ~280 | Ruby method polyfills |
-| `return.rb` | Complete | ~50 | Method autoreturn |
-| `require.rb` | Complete | ~200 | require→import |
-| `selfhost/core.rb` | Empty | ~32 | Entry point only |
-| `selfhost/walker.rb` | Complete | ~39 | Visibility removal |
-| `selfhost/spec.rb` | Complete | ~39 | _() wrapper removal |
-| `selfhost/converter.rb` | Complete | ~250 | handle :type patterns, method name conversion |
+| Component               | Status   | Lines | Purpose                                       |
+| ----------------------- | -------- | ----- | --------------------------------------------- |
+| `pragma.rb`             | Complete | ~280  | Type hints, skip statements                   |
+| `combiner.rb`           | Complete | ~150  | Module/class merging                          |
+| `functions.rb`          | Extended | ~800  | Ruby→JS method mapping                        |
+| `polyfill.rb`           | Complete | ~280  | Ruby method polyfills                         |
+| `return.rb`             | Complete | ~50   | Method autoreturn                             |
+| `require.rb`            | Complete | ~200  | require→import                                |
+| `selfhost/core.rb`      | Empty    | ~32   | Entry point only                              |
+| `selfhost/walker.rb`    | Complete | ~39   | Visibility removal                            |
+| `selfhost/spec.rb`      | Complete | ~39   | _() wrapper removal                           |
+| `selfhost/converter.rb` | Complete | ~250  | handle :type patterns, method name conversion |
 
 ### Pragmas in Source Files
 
 The walker source files (`lib/ruby2js/prism_walker.rb`, `lib/ruby2js/node.rb`) use minimal pragmas:
 
-| Pragma | Usage | Purpose |
-|--------|-------|---------|
+| Pragma           | Usage                | Purpose                           |
+| ---------------- | -------------------- | --------------------------------- |
 | `# Pragma: skip` | `require` statements | Don't transpile external requires |
-| `# Pragma: skip` | `def` statements | Skip methods not needed in JS |
-| `# Pragma: skip` | `alias` statements | Skip Ruby-only aliases |
+| `# Pragma: skip` | `def` statements     | Skip methods not needed in JS     |
+| `# Pragma: skip` | `alias` statements   | Skip Ruby-only aliases            |
 
 **Total pragmas in source: ~10-15** (not the 70-75 originally estimated)
 
@@ -197,14 +197,14 @@ Running the transpiled converter against the transliteration test suite.
 **Skipped tests (6 issues, 12 tests):**
 Tests are skipped using `skip() if defined? Function` pattern which activates in JS but not Ruby.
 
-| Issue | Tests Skipped | Root Cause | Fix Approach |
-|-------|---------------|------------|--------------|
-| Empty heredocs | 1 | Trailing newline handling differs | Compare actual output, adjust heredoc handler |
-| Redo within loop | 1 | Loop detection logic error | Debug `@state[:loop]` tracking |
-| Singleton method | 1 | Handler not producing output | Debug `on_defs` handler |
-| Class extensions | 2 | `Hash#map` - JS Objects lack `.map` | Convert to `Object.entries(...).map` |
-| Hash pattern destructuring | 1 | Missing `visit_hash_pattern_node` | Add walker method |
-| Switch/case whitespace | 6 | Missing blank line before `default:` | Fix `respace` logic for `case` |
+| Issue                      | Tests Skipped | Root Cause                           | Fix Approach                                  |
+| -------------------------- | ------------- | ------------------------------------ | --------------------------------------------- |
+| Empty heredocs             | 1             | Trailing newline handling differs    | Compare actual output, adjust heredoc handler |
+| Redo within loop           | 1             | Loop detection logic error           | Debug `@state[:loop]` tracking                |
+| Singleton method           | 1             | Handler not producing output         | Debug `on_defs` handler                       |
+| Class extensions           | 2             | `Hash#map` - JS Objects lack `.map`  | Convert to `Object.entries(...).map`          |
+| Hash pattern destructuring | 1             | Missing `visit_hash_pattern_node`    | Add walker method                             |
+| Switch/case whitespace     | 6             | Missing blank line before `default:` | Fix `respace` logic for `case`                |
 
 **Debugging tools available:**
 - `bin/ruby2js --ast` / `--filtered-ast` - Ruby-side AST inspection
@@ -369,14 +369,14 @@ end
 
 Some Ruby patterns cannot be dual-targeted:
 
-| Pattern | Why Not |
-|---------|---------|
-| `method_missing` | No JS equivalent for runtime method synthesis |
-| `define_method` at runtime | Static transpilation can't capture dynamic definitions |
-| `eval` with dynamic strings | Security and static analysis concerns |
-| File I/O | Platform-specific APIs |
-| Threading | Different concurrency models |
-| C extensions | No JS equivalent |
+| Pattern                     | Why Not                                                |
+| --------------------------- | ------------------------------------------------------ |
+| `method_missing`            | No JS equivalent for runtime method synthesis          |
+| `define_method` at runtime  | Static transpilation can't capture dynamic definitions |
+| `eval` with dynamic strings | Security and static analysis concerns                  |
+| File I/O                    | Platform-specific APIs                                 |
+| Threading                   | Different concurrency models                           |
+| C extensions                | No JS equivalent                                       |
 
 Projects wanting dual-target support should avoid these patterns in shared code.
 

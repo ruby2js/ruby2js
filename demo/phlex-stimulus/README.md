@@ -4,14 +4,14 @@ Interactive UI components built with Phlex (HTML) and Stimulus (behavior). Demon
 
 ## Components
 
-| Component | Phlex Patterns | Stimulus Patterns |
-|-----------|----------------|-------------------|
-| Counter | Basic elements, text | Targets, actions, state |
-| Toggle | Conditional classes | classList manipulation |
-| Tabs | Multiple children, active state | Multiple targets, data values |
-| Modal | Backdrop, nested content | Show/hide, click-outside |
-| Dropdown | Positioning, menu items | Focus management, keyboard |
-| Accordion | Multiple expandable sections | Multiple instances |
+| Component | Phlex Patterns                  | Stimulus Patterns             |
+| --------- | ------------------------------- | ----------------------------- |
+| Counter   | Basic elements, text            | Targets, actions, state       |
+| Toggle    | Conditional classes             | classList manipulation        |
+| Tabs      | Multiple children, active state | Multiple targets, data values |
+| Modal     | Backdrop, nested content        | Show/hide, click-outside      |
+| Dropdown  | Positioning, menu items         | Focus management, keyboard    |
+| Accordion | Multiple expandable sections    | Multiple instances            |
 
 ## Quick Start
 
@@ -62,13 +62,13 @@ app/controllers/*.rb → dist/controllers/*.js  (Stimulus filter)
 
 ## Why Phlex + Stimulus?
 
-| Concern | React | Phlex + Stimulus |
-|---------|-------|------------------|
-| Initial HTML | Virtual DOM render | Server or Phlex JS |
-| State | useState/useReducer | Controller instance |
-| Updates | Re-render → diff → patch | Direct DOM manipulation |
-| Bundle size | ~40KB+ | ~3KB (Stimulus) |
-| Mental model | Declarative | Imperative |
+| Concern      | React                    | Phlex + Stimulus        |
+| ------------ | ------------------------ | ----------------------- |
+| Initial HTML | Virtual DOM render       | Server or Phlex JS      |
+| State        | useState/useReducer      | Controller instance     |
+| Updates      | Re-render → diff → patch | Direct DOM manipulation |
+| Bundle size  | ~40KB+                   | ~3KB (Stimulus)         |
+| Mental model | Declarative              | Imperative              |
 
 **Choose Phlex + Stimulus when:**
 - Updates are infrequent or localized

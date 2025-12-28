@@ -109,12 +109,12 @@ Replace Bulma with a minimal, modern CSS framework:
 
 **Candidates:**
 
-| Framework | Size | Sass? | Notes |
-|-----------|------|-------|-------|
-| [Pico CSS](https://picocss.com/) | ~10KB | No (CSS) | Classless, semantic HTML |
-| [Simple.css](https://simplecss.org/) | ~4KB | No (CSS) | Classless, minimal |
-| [Open Props](https://open-props.style/) | ~2KB | No (CSS) | Just custom properties |
-| [Milligram](https://milligram.io/) | ~2KB | Yes | Minimal, may have same Sass issues |
+| Framework                               | Size  | Sass?    | Notes                              |
+| --------------------------------------- | ----- | -------- | ---------------------------------- |
+| [Pico CSS](https://picocss.com/)        | ~10KB | No (CSS) | Classless, semantic HTML           |
+| [Simple.css](https://simplecss.org/)    | ~4KB  | No (CSS) | Classless, minimal                 |
+| [Open Props](https://open-props.style/) | ~2KB  | No (CSS) | Just custom properties             |
+| [Milligram](https://milligram.io/)      | ~2KB  | Yes      | Minimal, may have same Sass issues |
 
 **Implementation Steps:**
 

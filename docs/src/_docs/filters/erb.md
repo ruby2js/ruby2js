@@ -124,15 +124,15 @@ function render({ title }) {
 
 The filter performs these transformations:
 
-| Ruby Pattern | JavaScript Output |
-|-------------|-------------------|
-| `_erbout = +''` | `let _erbout = ""` |
-| `_buf = ::String.new` | `let _buf = ""` |
-| `_erbout.<< "str".freeze` | `_erbout += "str"` |
-| `_erbout.<<((@var).to_s)` | `_erbout += String(var)` |
-| `@title` | `title` (from destructured parameter) |
-| `raw(html)` | `html` (pass-through) |
-| `str.html_safe` | `str` (pass-through) |
+| Ruby Pattern              | JavaScript Output                     |
+| ------------------------- | ------------------------------------- |
+| `_erbout = +''`           | `let _erbout = ""`                    |
+| `_buf = ::String.new`     | `let _buf = ""`                       |
+| `_erbout.<< "str".freeze` | `_erbout += "str"`                    |
+| `_erbout.<<((@var).to_s)` | `_erbout += String(var)`              |
+| `@title`                  | `title` (from destructured parameter) |
+| `raw(html)`               | `html` (pass-through)                 |
+| `str.html_safe`           | `str` (pass-through)                  |
 
 ## Using with Rails Helpers
 

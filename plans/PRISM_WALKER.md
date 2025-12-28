@@ -34,11 +34,11 @@ This plan outlines an incremental approach to replacing `Prism::Translation::Par
 
 **Parser Selection by Ruby Version:**
 
-| Ruby Version | Default Parser | Notes |
-|-------------|----------------|-------|
-| Ruby 3.4+   | `prism` (direct walker) | Stable Prism API, no parser gem dependency |
-| Ruby 3.3    | `translation` (Prism::Translation::Parser) | Handles Prism API differences internally |
-| Ruby < 3.3  | `parser` (whitequark) | Traditional parser gem |
+| Ruby Version | Default Parser                             | Notes                                      |
+| ------------ | ------------------------------------------ | ------------------------------------------ |
+| Ruby 3.4+    | `prism` (direct walker)                    | Stable Prism API, no parser gem dependency |
+| Ruby 3.3     | `translation` (Prism::Translation::Parser) | Handles Prism API differences internally   |
+| Ruby < 3.3   | `parser` (whitequark)                      | Traditional parser gem                     |
 
 **Usage:**
 ```bash
@@ -615,53 +615,53 @@ RUBY2JS_PARSER=prism-direct bundle exec ruby -Ilib -Ispec spec/comments_spec.rb
 
 ## Node Type Mapping Reference
 
-| Prism Node | Parser Type | Notes |
-|------------|-------------|-------|
-| `IntegerNode` | `:int` | `s(:int, node.value)` |
-| `FloatNode` | `:float` | |
-| `RationalNode` | `:rational` | |
-| `ImaginaryNode` | `:complex` | |
-| `StringNode` | `:str` | Use `node.unescaped` |
-| `SymbolNode` | `:sym` | |
-| `NilNode` | `:nil` | |
-| `TrueNode` | `:true` | |
-| `FalseNode` | `:false` | |
-| `SelfNode` | `:self` | |
-| `LocalVariableReadNode` | `:lvar` | |
-| `LocalVariableWriteNode` | `:lvasgn` | |
-| `InstanceVariableReadNode` | `:ivar` | |
-| `InstanceVariableWriteNode` | `:ivasgn` | |
-| `ClassVariableReadNode` | `:cvar` | |
-| `ClassVariableWriteNode` | `:cvasgn` | |
-| `GlobalVariableReadNode` | `:gvar` | |
-| `GlobalVariableWriteNode` | `:gvasgn` | |
-| `ConstantReadNode` | `:const` | `s(:const, nil, name)` |
-| `ConstantWriteNode` | `:casgn` | |
-| `ConstantPathNode` | `:const` | `s(:const, parent, name)` |
-| `ArrayNode` | `:array` | |
-| `HashNode` | `:hash` | |
-| `AssocNode` | `:pair` | |
-| `RangeNode` | `:irange` / `:erange` | Check `exclude_end?` |
-| `CallNode` | `:send` / `:csend` | Complex - see spec |
-| `BlockNode` | `:block` | |
-| `LambdaNode` | `:block` | With `s(:lambda)` call |
-| `DefNode` | `:def` / `:defs` | Check for receiver |
-| `ClassNode` | `:class` | |
-| `ModuleNode` | `:module` | |
-| `IfNode` | `:if` | Handles ternary too |
-| `UnlessNode` | `:if` | Negate condition |
-| `CaseNode` | `:case` | |
-| `WhileNode` | `:while` | |
-| `UntilNode` | `:until` | |
-| `ForNode` | `:for` | |
-| `BeginNode` | `:kwbegin` | |
-| `RescueNode` | `:rescue` | |
-| `EnsureNode` | `:ensure` | |
-| `AndNode` | `:and` | |
-| `OrNode` | `:or` | |
-| `InterpolatedStringNode` | `:dstr` | |
-| `RegularExpressionNode` | `:regexp` | |
-| ... | ... | ~100 more |
+| Prism Node                  | Parser Type           | Notes                     |
+| --------------------------- | --------------------- | ------------------------- |
+| `IntegerNode`               | `:int`                | `s(:int, node.value)`     |
+| `FloatNode`                 | `:float`              |                           |
+| `RationalNode`              | `:rational`           |                           |
+| `ImaginaryNode`             | `:complex`            |                           |
+| `StringNode`                | `:str`                | Use `node.unescaped`      |
+| `SymbolNode`                | `:sym`                |                           |
+| `NilNode`                   | `:nil`                |                           |
+| `TrueNode`                  | `:true`               |                           |
+| `FalseNode`                 | `:false`              |                           |
+| `SelfNode`                  | `:self`               |                           |
+| `LocalVariableReadNode`     | `:lvar`               |                           |
+| `LocalVariableWriteNode`    | `:lvasgn`             |                           |
+| `InstanceVariableReadNode`  | `:ivar`               |                           |
+| `InstanceVariableWriteNode` | `:ivasgn`             |                           |
+| `ClassVariableReadNode`     | `:cvar`               |                           |
+| `ClassVariableWriteNode`    | `:cvasgn`             |                           |
+| `GlobalVariableReadNode`    | `:gvar`               |                           |
+| `GlobalVariableWriteNode`   | `:gvasgn`             |                           |
+| `ConstantReadNode`          | `:const`              | `s(:const, nil, name)`    |
+| `ConstantWriteNode`         | `:casgn`              |                           |
+| `ConstantPathNode`          | `:const`              | `s(:const, parent, name)` |
+| `ArrayNode`                 | `:array`              |                           |
+| `HashNode`                  | `:hash`               |                           |
+| `AssocNode`                 | `:pair`               |                           |
+| `RangeNode`                 | `:irange` / `:erange` | Check `exclude_end?`      |
+| `CallNode`                  | `:send` / `:csend`    | Complex - see spec        |
+| `BlockNode`                 | `:block`              |                           |
+| `LambdaNode`                | `:block`              | With `s(:lambda)` call    |
+| `DefNode`                   | `:def` / `:defs`      | Check for receiver        |
+| `ClassNode`                 | `:class`              |                           |
+| `ModuleNode`                | `:module`             |                           |
+| `IfNode`                    | `:if`                 | Handles ternary too       |
+| `UnlessNode`                | `:if`                 | Negate condition          |
+| `CaseNode`                  | `:case`               |                           |
+| `WhileNode`                 | `:while`              |                           |
+| `UntilNode`                 | `:until`              |                           |
+| `ForNode`                   | `:for`                |                           |
+| `BeginNode`                 | `:kwbegin`            |                           |
+| `RescueNode`                | `:rescue`             |                           |
+| `EnsureNode`                | `:ensure`             |                           |
+| `AndNode`                   | `:and`                |                           |
+| `OrNode`                    | `:or`                 |                           |
+| `InterpolatedStringNode`    | `:dstr`               |                           |
+| `RegularExpressionNode`     | `:regexp`             |                           |
+| ...                         | ...                   | ~100 more                 |
 
 ## File Structure
 
@@ -687,14 +687,14 @@ lib/ruby2js/
 
 ## Total Estimated Effort
 
-| Phase | Effort |
-|-------|--------|
-| Phase 1: Minimal Walker + transliteration_spec | 3-5 days |
-| Phase 2: Selfhost Filter | 2-3 days |
-| Phase 3: JS Test Runner | 2-3 days |
-| Phase 4: Full Test Suite | 3-5 days |
-| Phase 5: Location Support | 1-2 days |
-| **Total** | **11-18 days** |
+| Phase                                          | Effort         |
+| ---------------------------------------------- | -------------- |
+| Phase 1: Minimal Walker + transliteration_spec | 3-5 days       |
+| Phase 2: Selfhost Filter                       | 2-3 days       |
+| Phase 3: JS Test Runner                        | 2-3 days       |
+| Phase 4: Full Test Suite                       | 3-5 days       |
+| Phase 5: Location Support                      | 1-2 days       |
+| **Total**                                      | **11-18 days** |
 
 ## Success Criteria
 
@@ -706,12 +706,12 @@ lib/ruby2js/
 
 ## Dependencies Eliminated
 
-| Gem | Size | Status |
-|-----|------|--------|
-| `parser` | 10.4 MB | Removed |
-| `ast` | 21 KB | Removed |
-| `racc` | 306 KB | Removed |
-| **Total savings** | **~10.7 MB** | |
+| Gem               | Size         | Status  |
+| ----------------- | ------------ | ------- |
+| `parser`          | 10.4 MB      | Removed |
+| `ast`             | 21 KB        | Removed |
+| `racc`            | 306 KB       | Removed |
+| **Total savings** | **~10.7 MB** |         |
 
 ## Semantic Differences: Prism vs Parser AST
 
@@ -721,18 +721,18 @@ The walker must handle several cases where Prism's native AST structure differs 
 
 Prism has 30+ specific operator-write node types. Parser collapses these to just 3 types:
 
-| Prism Native Nodes | Parser Type |
-|-------------------|-------------|
-| `LocalVariableOrWriteNode` | `:or_asgn` |
-| `InstanceVariableOrWriteNode` | `:or_asgn` |
-| `ClassVariableOrWriteNode` | `:or_asgn` |
-| `GlobalVariableOrWriteNode` | `:or_asgn` |
-| `ConstantOrWriteNode` | `:or_asgn` |
-| `ConstantPathOrWriteNode` | `:or_asgn` |
-| `IndexOrWriteNode` | `:or_asgn` |
-| `CallOrWriteNode` | `:or_asgn` |
-| *(same pattern for `&&=` → `:and_asgn`)* | |
-| *(same pattern for `+=`, `-=`, etc. → `:op_asgn`)* | |
+| Prism Native Nodes                                 | Parser Type |
+| -------------------------------------------------- | ----------- |
+| `LocalVariableOrWriteNode`                         | `:or_asgn`  |
+| `InstanceVariableOrWriteNode`                      | `:or_asgn`  |
+| `ClassVariableOrWriteNode`                         | `:or_asgn`  |
+| `GlobalVariableOrWriteNode`                        | `:or_asgn`  |
+| `ConstantOrWriteNode`                              | `:or_asgn`  |
+| `ConstantPathOrWriteNode`                          | `:or_asgn`  |
+| `IndexOrWriteNode`                                 | `:or_asgn`  |
+| `CallOrWriteNode`                                  | `:or_asgn`  |
+| *(same pattern for `&&=` → `:and_asgn`)*           |             |
+| *(same pattern for `+=`, `-=`, etc. → `:op_asgn`)* |             |
 
 **Child structure also differs:**
 
@@ -767,8 +767,8 @@ end
 
 ### 2. Lambda - Different Node Type
 
-| Prism | Parser |
-|-------|--------|
+| Prism        | Parser                                          |
+| ------------ | ----------------------------------------------- |
 | `LambdaNode` | `s(:block, s(:send, nil, :lambda), args, body)` |
 
 Prism has a dedicated `LambdaNode` for `-> {}` syntax. Parser wraps it as a block with a synthetic `lambda` call.
@@ -788,8 +788,8 @@ end
 foo { _1 + _2 }
 ```
 
-| Prism | Parser |
-|-------|--------|
+| Prism                                           | Parser                          |
+| ----------------------------------------------- | ------------------------------- |
 | `BlockNode` with `NumberedParametersNode` child | `:numblock` with count as child |
 
 **Prism structure:**
@@ -828,8 +828,8 @@ end
 foo rescue bar
 ```
 
-| Prism | Parser |
-|-------|--------|
+| Prism                | Parser                                     |
+| -------------------- | ------------------------------------------ |
 | `RescueModifierNode` | `:rescue` (same structure as block rescue) |
 
 **Prism structure:**
@@ -860,8 +860,8 @@ end
 {x:}  # shorthand for {x: x}
 ```
 
-| Prism | Parser |
-|-------|--------|
+| Prism                                 | Parser                                     |
+| ------------------------------------- | ------------------------------------------ |
 | `AssocNode` with `ImplicitNode` value | `s(:pair, s(:sym, :x), s(:send, nil, :x))` |
 
 **Walker implementation:**
@@ -894,9 +894,9 @@ case x; in [a, b]; end  # NOT supported
 
 ### 7. BEGIN/END Blocks
 
-| Prism | Parser |
-|-------|--------|
-| `PreExecutionNode` | `:preexe` |
+| Prism               | Parser     |
+| ------------------- | ---------- |
+| `PreExecutionNode`  | `:preexe`  |
 | `PostExecutionNode` | `:postexe` |
 
 Ruby2JS doesn't use these. Direct mapping if needed:
@@ -909,12 +909,12 @@ end
 
 ### Summary: Node Type Explosion
 
-| Category | Prism Nodes | Parser Types |
-|----------|-------------|--------------|
-| Or-assignment | 8 nodes | 1 (`:or_asgn`) |
-| And-assignment | 8 nodes | 1 (`:and_asgn`) |
-| Op-assignment | 8 nodes | 1 (`:op_asgn`) |
-| Lambda | 1 node | Uses `:block` |
+| Category        | Prism Nodes                   | Parser Types     |
+| --------------- | ----------------------------- | ---------------- |
+| Or-assignment   | 8 nodes                       | 1 (`:or_asgn`)   |
+| And-assignment  | 8 nodes                       | 1 (`:and_asgn`)  |
+| Op-assignment   | 8 nodes                       | 1 (`:op_asgn`)   |
+| Lambda          | 1 node                        | Uses `:block`    |
 | Numbered params | Uses `NumberedParametersNode` | Uses `:numblock` |
 
 The walker must implement ~24 additional visitor methods just for operator assignments, but they follow a consistent pattern.
@@ -1044,18 +1044,18 @@ Only 6 tests depend on source maps. This can be Phase 5.
 
 ### Risk Summary
 
-| Risk | Severity | Status |
-|------|----------|--------|
-| JS/Ruby API naming | Medium | Handled by selfhost filter |
-| `is_method?` | Low | ✅ **RESOLVED** - Location-based detection implemented |
-| Type checks | Low | ✅ **RESOLVED** - Duck typing with `ast_node?` |
-| Node creation | Low | ✅ **RESOLVED** - Use existing `s()` helper |
-| Comments | Medium | Offset-based matching (remaining work) |
-| Source maps | Medium | Lazy computation (remaining work) |
-| Version compat | Low | Pin versions |
-| Missing nodes | Very Low | Not used by Ruby2JS |
-| Selfhost complexity | Medium | Incremental approach |
-| No fallback | Accepted | Test early and often |
+| Risk                | Severity | Status                                                |
+| ------------------- | -------- | ----------------------------------------------------- |
+| JS/Ruby API naming  | Medium   | Handled by selfhost filter                            |
+| `is_method?`        | Low      | ✅ **RESOLVED** - Location-based detection implemented |
+| Type checks         | Low      | ✅ **RESOLVED** - Duck typing with `ast_node?`         |
+| Node creation       | Low      | ✅ **RESOLVED** - Use existing `s()` helper            |
+| Comments            | Medium   | Offset-based matching (remaining work)                |
+| Source maps         | Medium   | Lazy computation (remaining work)                     |
+| Version compat      | Low      | Pin versions                                          |
+| Missing nodes       | Very Low | Not used by Ruby2JS                                   |
+| Selfhost complexity | Medium   | Incremental approach                                  |
+| No fallback         | Accepted | Test early and often                                  |
 
 **Overall Assessment:** Core risks resolved. Remaining work is comment extraction and sourcemap support (20 failing tests). All 100+ visitor methods implemented and working.
 

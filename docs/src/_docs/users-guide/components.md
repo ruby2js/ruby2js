@@ -152,16 +152,16 @@ end
 
 ## When to Use What
 
-| Scenario | Recommended Approach |
-|----------|---------------------|
-| New React app | React with JSX |
-| Rails app, minimal JS | Phlex + Stimulus |
+| Scenario                       | Recommended Approach             |
+| ------------------------------ | -------------------------------- |
+| New React app                  | React with JSX                   |
+| Rails app, minimal JS          | Phlex + Stimulus                 |
 | Rails app, complex UI sections | Phlex → React for those sections |
-| Migrating away from React | Phlex → React now, Phlex later |
-| Maximum portability | Phlex (can target either) |
-| Need React hooks/context | React with JSX |
-| Static marketing pages | Phlex + Stimulus |
-| Interactive dashboards | React or Phlex → React |
+| Migrating away from React      | Phlex → React now, Phlex later   |
+| Maximum portability            | Phlex (can target either)        |
+| Need React hooks/context       | React with JSX                   |
+| Static marketing pages         | Phlex + Stimulus                 |
+| Interactive dashboards         | React or Phlex → React           |
 
 ## Phlex + Stimulus: A React Alternative
 
@@ -196,13 +196,13 @@ class CounterController < Stimulus::Controller
 end
 ```
 
-| Concern | React | Phlex + Stimulus |
-|---------|-------|------------------|
-| Initial HTML | Virtual DOM render | Server or Phlex JS |
-| State | useState/useReducer | Controller instance |
-| Updates | Re-render → diff → patch | Direct DOM manipulation |
-| Bundle size | ~40KB+ | ~3KB (Stimulus) |
-| Mental model | Declarative | Imperative |
+| Concern      | React                    | Phlex + Stimulus        |
+| ------------ | ------------------------ | ----------------------- |
+| Initial HTML | Virtual DOM render       | Server or Phlex JS      |
+| State        | useState/useReducer      | Controller instance     |
+| Updates      | Re-render → diff → patch | Direct DOM manipulation |
+| Bundle size  | ~40KB+                   | ~3KB (Stimulus)         |
+| Mental model | Declarative              | Imperative              |
 
 **Choose Phlex + Stimulus when:**
 - Updates are infrequent or localized

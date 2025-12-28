@@ -8,14 +8,14 @@ Generate offline-capable Single Page Applications from a subset of an existing R
 
 ### Completed ✅
 
-| Stage | Description | Commit |
-|-------|-------------|--------|
-| 1 | Engine infrastructure (generators, manifest DSL, rake tasks) | Initial |
-| 2 | Model transpilation with AST-based dependency resolution | d86afc7 |
-| 3 | View transpilation (ERB to JS render functions) | aa67a79 |
-| 4 | Controller transpilation | 2a89c8a |
-| - | Refactor: Builder generates ruby2js-rails compatible output | 8243167 |
-| - | Update generator template for current syntax | a149b9f |
+| Stage | Description                                                  | Commit  |
+| ----- | ------------------------------------------------------------ | ------- |
+| 1     | Engine infrastructure (generators, manifest DSL, rake tasks) | Initial |
+| 2     | Model transpilation with AST-based dependency resolution     | d86afc7 |
+| 3     | View transpilation (ERB to JS render functions)              | aa67a79 |
+| 4     | Controller transpilation                                     | 2a89c8a |
+| -     | Refactor: Builder generates ruby2js-rails compatible output  | 8243167 |
+| -     | Update generator template for current syntax                 | a149b9f |
 
 ### What Works Now
 
@@ -226,12 +226,12 @@ end
 
 The `ruby2js-rails` npm package may need enhancements for SPA-specific features:
 
-| Feature | Config Option | Description |
-|---------|---------------|-------------|
-| Database adapter | `config/database.yml` | Already supported |
-| Transpilation options | `config/ruby2js.yml` | Already supported |
-| Turbo interceptor | TBD | Runtime for offline navigation |
-| Sync layer | TBD | Change tracking and sync |
+| Feature               | Config Option         | Description                    |
+| --------------------- | --------------------- | ------------------------------ |
+| Database adapter      | `config/database.yml` | Already supported              |
+| Transpilation options | `config/ruby2js.yml`  | Already supported              |
+| Turbo interceptor     | TBD                   | Runtime for offline navigation |
+| Sync layer            | TBD                   | Change tracking and sync       |
 
 These would be added to `ruby2js-rails` as needed, keeping the Ruby gem lightweight.
 

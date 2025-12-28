@@ -60,17 +60,17 @@ Rails filters run **early** in the pipeline, before Functions filter. This allow
 
 Rails filters transform idioms AND avoid documented transpilation issues:
 
-| TRANSPILATION_NOTES Issue | Filter Strategy | Status |
-|---------------------------|-----------------|--------|
-| `index` → `indexOf` collision | Emit `index!` - converter drops bang, Functions ignores | ✅ Implemented |
-| `new` reserved word | Emit `new!` - converter's `jsvar` produces `$new` | ✅ Implemented |
-| `<<` operator not supported | Emit `push()` directly | Pending |
-| `valid?` gets `.bind(this)` | Emit `is_valid` internally | Pending |
-| `@attribute` shadowing | Emit `self.attribute` for parent access | Pending |
-| Hash iteration `each` | Emit `Object.keys().each` pattern | Pending |
-| `empty?` issues | Emit `.length == 0` | Pending |
-| `class << self` not supported | Emit `def self.method` pattern | N/A (filters generate this) |
-| `chomp` no JS equivalent | Emit `gsub(/x$/, '')` | Pending |
+| TRANSPILATION_NOTES Issue     | Filter Strategy                                         | Status                      |
+| ----------------------------- | ------------------------------------------------------- | --------------------------- |
+| `index` → `indexOf` collision | Emit `index!` - converter drops bang, Functions ignores | ✅ Implemented               |
+| `new` reserved word           | Emit `new!` - converter's `jsvar` produces `$new`       | ✅ Implemented               |
+| `<<` operator not supported   | Emit `push()` directly                                  | Pending                     |
+| `valid?` gets `.bind(this)`   | Emit `is_valid` internally                              | Pending                     |
+| `@attribute` shadowing        | Emit `self.attribute` for parent access                 | Pending                     |
+| Hash iteration `each`         | Emit `Object.keys().each` pattern                       | Pending                     |
+| `empty?` issues               | Emit `.length == 0`                                     | Pending                     |
+| `class << self` not supported | Emit `def self.method` pattern                          | N/A (filters generate this) |
+| `chomp` no JS equivalent      | Emit `gsub(/x$/, '')`                                   | Pending                     |
 
 Filters become an **abstraction layer** - Rails developers write natural Ruby, filters handle the translation to safe intermediate AST.
 
@@ -229,24 +229,24 @@ end
 
 #### Transformations (Implemented)
 
-| Rails Pattern | JavaScript Output | Notes |
-|---------------|-------------------|-------|
-| `class XController < ApplicationController` | `export const XController = (() => {...})()` | IIFE module pattern |
-| `def action` (instance method) | `function action()` | Exported in return object |
-| `def index` | `function index()` via `index!` | Bang avoids Functions filter |
-| `def new` | `function $new()` via `new!` | Reserved word escaped |
-| `@articles = ...` | `let articles = ...` | Collected for view params |
-| Implicit render | `return XViews.action({ivars})` | Auto-generated |
-| `render :action` | `{render: "action"}` | Hash for router |
-| `redirect_to @article` | `{redirect: \`/articles/${article.id()}\`}` | Template literal |
-| `redirect_to articles_path` | `{redirect: "/articles"}` | Static path |
-| `params[:id]` | `id` parameter | Added to function signature |
-| `article_params` call | `params` | Inlined + chain simplified |
-| `params.require(:x).permit(:a, :b)` | `params` | Permit list becomes documentation |
-| `before_action :method, only: [...]` | Inlined code | Compile-time, no runtime overhead |
-| Private methods | Removed (inlined where used) | Not exported |
-| Model references | `import { X } from "../models/x.js"` | Auto-generated |
-| View module | `import { XViews } from "../views/xs.js"` | Auto-generated |
+| Rails Pattern                               | JavaScript Output                             | Notes                             |
+| ------------------------------------------- | --------------------------------------------- | --------------------------------- |
+| `class XController < ApplicationController` | `export const XController = (() => {...})()`  | IIFE module pattern               |
+| `def action` (instance method)              | `function action()`                           | Exported in return object         |
+| `def index`                                 | `function index()` via `index!`               | Bang avoids Functions filter      |
+| `def new`                                   | `function $new()` via `new!`                  | Reserved word escaped             |
+| `@articles = ...`                           | `let articles = ...`                          | Collected for view params         |
+| Implicit render                             | `return XViews.action({ivars})`               | Auto-generated                    |
+| `render :action`                            | `{render: "action"}`                          | Hash for router                   |
+| `redirect_to @article`                      | `{redirect: \\`/articles/${article.id()}\\`}` | Template literal                  |
+| `redirect_to articles_path`                 | `{redirect: "/articles"}`                     | Static path                       |
+| `params[:id]`                               | `id` parameter                                | Added to function signature       |
+| `article_params` call                       | `params`                                      | Inlined + chain simplified        |
+| `params.require(:x).permit(:a, :b)`         | `params`                                      | Permit list becomes documentation |
+| `before_action :method, only: [...]`        | Inlined code                                  | Compile-time, no runtime overhead |
+| Private methods                             | Removed (inlined where used)                  | Not exported                      |
+| Model references                            | `import { X } from "../models/x.js"`          | Auto-generated                    |
+| View module                                 | `import { XViews } from "../views/xs.js"`     | Auto-generated                    |
 
 #### Current Limitations
 
@@ -359,24 +359,24 @@ end
 
 #### Transformations (Implemented)
 
-| Rails Pattern | JavaScript Output | Notes |
-|---------------|-------------------|-------|
-| `class X < ApplicationRecord` | `export class X extends ApplicationRecord` | Auto-generates `table_name()` |
-| `has_many :comments` | `comments() { return Comment.where({article_id: this.id()}) }` | Infers class from association name |
-| `has_many :x, class_name: 'Y'` | Uses specified class `Y` | Custom class name |
-| `has_many :x, foreign_key: 'y_id'` | Uses specified foreign key | Custom foreign key |
-| `has_many :x, dependent: :destroy` | Generates `destroy()` that cascades | Calls destroy on each associated record |
-| `has_one :profile` | `profile() { return Profile.find_by({user_id: this.id()}) }` | Uses `find_by` instead of `where` |
-| `belongs_to :author` | `author() { return Author.find(this.author_id()) }` | Infers foreign key |
-| `belongs_to :x, optional: true` | Adds nil check before `find` | Returns null if foreign key is nil |
-| `validates :x, presence: true` | `validate() { validates_presence_of("x") }` | Generates `validate` method |
-| `validates :x, length: {min: 5}` | `validates_length_of("x", {minimum: 5})` | Supports length options |
-| `validates :x, :y, presence: true` | Validates both attributes | Multiple attributes supported |
-| `before_save :method` | `before_save() { method() }` | Generates hook method |
-| `after_create :method` | `after_create() { method() }` | Any callback type supported |
-| `before_save :a, :b` | `before_save() { a(); b() }` | Multiple callbacks chained |
-| `scope :published, -> { where(...) }` | `static published() { return this.where(...) }` | Class method with query |
-| Private methods used in callbacks | Preserved in class | Only used methods kept |
+| Rails Pattern                         | JavaScript Output                                              | Notes                                   |
+| ------------------------------------- | -------------------------------------------------------------- | --------------------------------------- |
+| `class X < ApplicationRecord`         | `export class X extends ApplicationRecord`                     | Auto-generates `table_name()`           |
+| `has_many :comments`                  | `comments() { return Comment.where({article_id: this.id()}) }` | Infers class from association name      |
+| `has_many :x, class_name: 'Y'`        | Uses specified class `Y`                                       | Custom class name                       |
+| `has_many :x, foreign_key: 'y_id'`    | Uses specified foreign key                                     | Custom foreign key                      |
+| `has_many :x, dependent: :destroy`    | Generates `destroy()` that cascades                            | Calls destroy on each associated record |
+| `has_one :profile`                    | `profile() { return Profile.find_by({user_id: this.id()}) }`   | Uses `find_by` instead of `where`       |
+| `belongs_to :author`                  | `author() { return Author.find(this.author_id()) }`            | Infers foreign key                      |
+| `belongs_to :x, optional: true`       | Adds nil check before `find`                                   | Returns null if foreign key is nil      |
+| `validates :x, presence: true`        | `validate() { validates_presence_of("x") }`                    | Generates `validate` method             |
+| `validates :x, length: {min: 5}`      | `validates_length_of("x", {minimum: 5})`                       | Supports length options                 |
+| `validates :x, :y, presence: true`    | Validates both attributes                                      | Multiple attributes supported           |
+| `before_save :method`                 | `before_save() { method() }`                                   | Generates hook method                   |
+| `after_create :method`                | `after_create() { method() }`                                  | Any callback type supported             |
+| `before_save :a, :b`                  | `before_save() { a(); b() }`                                   | Multiple callbacks chained              |
+| `scope :published, -> { where(...) }` | `static published() { return this.where(...) }`                | Class method with query                 |
+| Private methods used in callbacks     | Preserved in class                                             | Only used methods kept                  |
 
 #### Current Limitations
 
@@ -465,26 +465,26 @@ end
 
 #### Transformations (Implemented)
 
-| Rails Pattern | JavaScript Output | Notes |
-|---------------|-------------------|-------|
-| `Rails.application.routes.draw do` | `export const Routes = (() => {...})()` | IIFE module pattern |
-| `root "articles#index"` | `{path: "/", controller: "ArticlesController", action: "index!"}` | Plus `root_path()` helper |
-| `resources :articles` | 7 route entries + path helpers | All RESTful routes |
-| `resources :x, only: [...]` | Subset of routes | Filters to specified actions |
-| `resources :x, except: [...]` | Routes without excluded | Excludes specified actions |
-| Nested `resources` | `/articles/:article_id/comments` | Parent param in path |
-| `get 'path', to: 'c#a'` | `{path: "/path", method: "GET", ...}` | Custom route |
-| `post`, `patch`, `put`, `delete` | Route with HTTP method | All verbs supported |
-| Path helpers | `articles_path()`, `article_path(article)` | Generated for all routes |
-| `extract_id(obj)` | `obj?.id() \|\| obj` | Helper for path params |
+| Rails Pattern                      | JavaScript Output                                                 | Notes                        |
+| ---------------------------------- | ----------------------------------------------------------------- | ---------------------------- |
+| `Rails.application.routes.draw do` | `export const Routes = (() => {...})()`                           | IIFE module pattern          |
+| `root "articles#index"`            | `{path: "/", controller: "ArticlesController", action: "index!"}` | Plus `root_path()` helper    |
+| `resources :articles`              | 7 route entries + path helpers                                    | All RESTful routes           |
+| `resources :x, only: [...]`        | Subset of routes                                                  | Filters to specified actions |
+| `resources :x, except: [...]`      | Routes without excluded                                           | Excludes specified actions   |
+| Nested `resources`                 | `/articles/:article_id/comments`                                  | Parent param in path         |
+| `get 'path', to: 'c#a'`            | `{path: "/path", method: "GET", ...}`                             | Custom route                 |
+| `post`, `patch`, `put`, `delete`   | Route with HTTP method                                            | All verbs supported          |
+| Path helpers                       | `articles_path()`, `article_path(article)`                        | Generated for all routes     |
+| `extract_id(obj)`                  | `obj?.id() \|\| obj`                                              | Helper for path params       |
 
 #### Action Name Mapping
 
-| Rails Action | JavaScript Action | Reason |
-|--------------|-------------------|--------|
-| `index` | `index!` | Avoids Functions filter collision |
-| `new` | `$new` | Reserved word escaping |
-| Others | Same name | No transformation needed |
+| Rails Action | JavaScript Action | Reason                            |
+| ------------ | ----------------- | --------------------------------- |
+| `index`      | `index!`          | Avoids Functions filter collision |
+| `new`        | `$new`            | Reserved word escaping            |
+| Others       | Same name         | No transformation needed          |
 
 #### Current Limitations
 
@@ -565,32 +565,32 @@ end
 
 #### Transformations (Implemented)
 
-| Rails Pattern | SQL Output | Notes |
-|---------------|------------|-------|
-| `ActiveRecord::Schema.define do` | `export const Schema = ...` | IIFE module pattern |
-| `ActiveRecord::Schema[7.0].define do` | Same | Versioned schema supported |
-| `create_table "x" do \|t\|` | `CREATE TABLE IF NOT EXISTS x (...)` | With auto id primary key |
-| `t.string "col"` | `col TEXT` | Maps to SQLite TEXT |
-| `t.text "col"` | `col TEXT` | Maps to SQLite TEXT |
-| `t.integer "col"` | `col INTEGER` | Maps to SQLite INTEGER |
-| `t.bigint "col"` | `col INTEGER` | Same as integer |
-| `t.boolean "col"` | `col INTEGER` | 0/1 values |
-| `t.datetime "col"` | `col TEXT` | ISO format string |
-| `t.float "col"` | `col REAL` | Maps to SQLite REAL |
-| `t.decimal "col"` | `col REAL` | Maps to SQLite REAL |
-| `t.binary "col"` | `col BLOB` | Maps to SQLite BLOB |
-| `t.json "col"` | `col TEXT` | JSON stored as text |
-| `t.timestamps` | `created_at TEXT, updated_at TEXT` | Two columns added |
-| `null: false` | `NOT NULL` | Constraint |
-| `default: "value"` | `DEFAULT 'value'` | String default |
-| `default: 0` | `DEFAULT 0` | Numeric default |
-| `default: false` | `DEFAULT 0` | Boolean default |
-| `t.references "x"` | `x_id INTEGER NOT NULL` | Foreign key column |
-| `foreign_key: true` | `FOREIGN KEY (x_id) REFERENCES xs(id)` | Auto-infers table |
-| `add_index "t", ["col"]` | `CREATE INDEX idx_t_col ON t(col)` | Single column |
-| `add_index "t", ["a", "b"]` | `CREATE INDEX ... ON t(a, b)` | Multiple columns |
-| `unique: true` | `CREATE UNIQUE INDEX` | Unique constraint |
-| `name: "custom"` | Uses custom index name | Override default |
+| Rails Pattern                         | SQL Output                             | Notes                      |
+| ------------------------------------- | -------------------------------------- | -------------------------- |
+| `ActiveRecord::Schema.define do`      | `export const Schema = ...`            | IIFE module pattern        |
+| `ActiveRecord::Schema[7.0].define do` | Same                                   | Versioned schema supported |
+| `create_table "x" do \|t\|`           | `CREATE TABLE IF NOT EXISTS x (...)`   | With auto id primary key   |
+| `t.string "col"`                      | `col TEXT`                             | Maps to SQLite TEXT        |
+| `t.text "col"`                        | `col TEXT`                             | Maps to SQLite TEXT        |
+| `t.integer "col"`                     | `col INTEGER`                          | Maps to SQLite INTEGER     |
+| `t.bigint "col"`                      | `col INTEGER`                          | Same as integer            |
+| `t.boolean "col"`                     | `col INTEGER`                          | 0/1 values                 |
+| `t.datetime "col"`                    | `col TEXT`                             | ISO format string          |
+| `t.float "col"`                       | `col REAL`                             | Maps to SQLite REAL        |
+| `t.decimal "col"`                     | `col REAL`                             | Maps to SQLite REAL        |
+| `t.binary "col"`                      | `col BLOB`                             | Maps to SQLite BLOB        |
+| `t.json "col"`                        | `col TEXT`                             | JSON stored as text        |
+| `t.timestamps`                        | `created_at TEXT, updated_at TEXT`     | Two columns added          |
+| `null: false`                         | `NOT NULL`                             | Constraint                 |
+| `default: "value"`                    | `DEFAULT 'value'`                      | String default             |
+| `default: 0`                          | `DEFAULT 0`                            | Numeric default            |
+| `default: false`                      | `DEFAULT 0`                            | Boolean default            |
+| `t.references "x"`                    | `x_id INTEGER NOT NULL`                | Foreign key column         |
+| `foreign_key: true`                   | `FOREIGN KEY (x_id) REFERENCES xs(id)` | Auto-infers table          |
+| `add_index "t", ["col"]`              | `CREATE INDEX idx_t_col ON t(col)`     | Single column              |
+| `add_index "t", ["a", "b"]`           | `CREATE INDEX ... ON t(a, b)`          | Multiple columns           |
+| `unique: true`                        | `CREATE UNIQUE INDEX`                  | Unique constraint          |
+| `name: "custom"`                      | Uses custom index name                 | Override default           |
 
 #### Current Limitations
 
@@ -621,11 +621,11 @@ The current demo supports two view approaches:
 
 With Rails filters in place, **Ruby Module views become an implementation detail**:
 
-| Layer | Developer Writes | Filter Produces |
-|-------|------------------|-----------------|
-| Controllers | Rails classes | Module with class methods |
-| Views | ERB templates | Render functions |
-| Models | ActiveRecord DSL | ApplicationRecord subclass |
+| Layer       | Developer Writes | Filter Produces            |
+| ----------- | ---------------- | -------------------------- |
+| Controllers | Rails classes    | Module with class methods  |
+| Views       | ERB templates    | Render functions           |
+| Models      | ActiveRecord DSL | ApplicationRecord subclass |
 
 The Ruby Module approach was valuable for:
 - Proving the micro-framework works
@@ -647,14 +647,14 @@ A key advantage of filters: shift complexity from runtime to compile-time. The m
 
 ### Opportunities
 
-| Currently Runtime | Compile-Time Alternative | Benefit |
-|-------------------|-------------------------|---------|
-| `get table_name()` method | Inline `"articles"` literal | Eliminate method call |
-| Manual attribute accessors | Auto-generate from schema | Less boilerplate, fewer errors |
-| `before_action` callback mechanism | Inline code at action start | No callback registration/invocation |
-| Path helpers as methods | Inline static paths as literals | Eliminate method calls |
-| Association method bodies | Generate with inlined class refs | Direct references, no lookup |
-| Validation definitions | Generate validation code directly | No DSL interpretation at runtime |
+| Currently Runtime                  | Compile-Time Alternative          | Benefit                             |
+| ---------------------------------- | --------------------------------- | ----------------------------------- |
+| `get table_name()` method          | Inline `"articles"` literal       | Eliminate method call               |
+| Manual attribute accessors         | Auto-generate from schema         | Less boilerplate, fewer errors      |
+| `before_action` callback mechanism | Inline code at action start       | No callback registration/invocation |
+| Path helpers as methods            | Inline static paths as literals   | Eliminate method calls              |
+| Association method bodies          | Generate with inlined class refs  | Direct references, no lookup        |
+| Validation definitions             | Generate validation code directly | No DSL interpretation at runtime    |
 
 ### before_action Inlining
 
@@ -794,13 +794,13 @@ Design decision: TBD based on implementation experience.
 
 Filters need to agree on naming:
 
-| Concept | Convention |
-|---------|------------|
-| Controller module | `{Resource}Controller` |
-| View module | `{Resource}Views` |
-| Model class | `{Resource}` (singular) |
-| Table name | `{resources}` (plural) |
-| Path helpers | `{resource}_path`, `{resources}_path` |
+| Concept           | Convention                            |
+| ----------------- | ------------------------------------- |
+| Controller module | `{Resource}Controller`                |
+| View module       | `{Resource}Views`                     |
+| Model class       | `{Resource}` (singular)               |
+| Table name        | `{resources}` (plural)                |
+| Path helpers      | `{resource}_path`, `{resources}_path` |
 
 ### View Discovery
 

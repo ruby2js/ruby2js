@@ -33,27 +33,27 @@ config/ruby2js.yml
 
 Based on [options.md](/docs/src/_docs/options.md), the following options are candidates for YAML configuration:
 
-| Option | Type | Description |
-|--------|------|-------------|
-| `preset` | boolean | Enable preset configuration (functions, esm, pragma, return filters + ES2022 + identity comparison) |
-| `eslevel` | integer | ECMAScript target level (2020-2025) |
-| `filters` | array | Additional filters to apply |
-| `disable_filters` | array | Filters to remove (when using preset) |
-| `autoexports` | boolean/string | Auto-export top-level declarations (true, false, or "default") |
-| `autoimports` | hash | Map constants to import sources |
-| `comparison` | string | "equality" or "identity" |
-| `include` | array | Methods to opt-in for conversion |
-| `exclude` | array | Methods to exclude from conversion |
-| `include_all` | boolean | Opt-in to all available conversions |
-| `include_only` | array | Only convert these methods |
-| `module` | string | "esm" or "cjs" |
-| `nullish_to_s` | boolean | Wrap to_s/interpolation for nil safety |
-| `or` | string | "auto", "nullish", or "logical" |
-| `truthy` | string | "ruby" or "js" |
-| `strict` | boolean | Add "use strict" directive |
-| `underscored_private` | boolean | Use `_x` instead of `#x` for private fields |
-| `width` | integer | Target output width |
-| `template_literal_tags` | array | Methods to convert to tagged templates |
+| Option                  | Type           | Description                                                                                         |
+| ----------------------- | -------------- | --------------------------------------------------------------------------------------------------- |
+| `preset`                | boolean        | Enable preset configuration (functions, esm, pragma, return filters + ES2022 + identity comparison) |
+| `eslevel`               | integer        | ECMAScript target level (2020-2025)                                                                 |
+| `filters`               | array          | Additional filters to apply                                                                         |
+| `disable_filters`       | array          | Filters to remove (when using preset)                                                               |
+| `autoexports`           | boolean/string | Auto-export top-level declarations (true, false, or "default")                                      |
+| `autoimports`           | hash           | Map constants to import sources                                                                     |
+| `comparison`            | string         | "equality" or "identity"                                                                            |
+| `include`               | array          | Methods to opt-in for conversion                                                                    |
+| `exclude`               | array          | Methods to exclude from conversion                                                                  |
+| `include_all`           | boolean        | Opt-in to all available conversions                                                                 |
+| `include_only`          | array          | Only convert these methods                                                                          |
+| `module`                | string         | "esm" or "cjs"                                                                                      |
+| `nullish_to_s`          | boolean        | Wrap to_s/interpolation for nil safety                                                              |
+| `or`                    | string         | "auto", "nullish", or "logical"                                                                     |
+| `truthy`                | string         | "ruby" or "js"                                                                                      |
+| `strict`                | boolean        | Add "use strict" directive                                                                          |
+| `underscored_private`   | boolean        | Use `_x` instead of `#x` for private fields                                                         |
+| `width`                 | integer        | Target output width                                                                                 |
+| `template_literal_tags` | array          | Methods to convert to tagged templates                                                              |
 
 ### Example Configuration
 
@@ -183,21 +183,21 @@ end
 
 The multi-target architecture derives target from database adapter:
 
-| Database Adapter | Target |
-|------------------|--------|
-| dexie, sqljs | browser |
-| pg, mysql2, better_sqlite3 | node |
+| Database Adapter           | Target  |
+| -------------------------- | ------- |
+| dexie, sqljs               | browser |
+| pg, mysql2, better_sqlite3 | node    |
 
 ### Proposed Extension
 
 Add `runtime` option for non-browser targets:
 
-| Database Adapter | Runtime | Result |
-|------------------|---------|--------|
-| dexie, sqljs | (ignored) | browser |
-| pg, mysql2, etc. | node (default) | node |
-| pg, mysql2, etc. | bun | bun |
-| pg, mysql2, etc. | deno | deno |
+| Database Adapter | Runtime        | Result  |
+| ---------------- | -------------- | ------- |
+| dexie, sqljs     | (ignored)      | browser |
+| pg, mysql2, etc. | node (default) | node    |
+| pg, mysql2, etc. | bun            | bun     |
+| pg, mysql2, etc. | deno           | deno    |
 
 ### Configuration
 
@@ -375,11 +375,11 @@ Update `docs/src/_docs/filters/node.md`:
 
 The Node filter generates code compatible with:
 
-| Runtime | Version | Notes |
-|---------|---------|-------|
-| Node.js | 16+ | Full support |
-| Bun | 1.0+ | Full support |
-| Deno | 1.36+ | Full support (2.4.0+ for `Dir.glob`) |
+| Runtime | Version | Notes                                |
+| ------- | ------- | ------------------------------------ |
+| Node.js | 16+     | Full support                         |
+| Bun     | 1.0+    | Full support                         |
+| Deno    | 1.36+   | Full support (2.4.0+ for `Dir.glob`) |
 
 All imports use the `node:` prefix (e.g., `node:fs`) which is supported
 by all three runtimes.
@@ -427,15 +427,15 @@ Requires newer runtime versions:
 
 ## Compatibility Matrix
 
-| Database | Target | Runtime | Entry Point |
-|----------|--------|---------|-------------|
-| dexie | browser | - | index.html |
-| sqljs | browser | - | index.html |
-| pg | server | node | server.js (http) |
-| pg | server | bun | server.js (Bun.serve) |
-| pg | server | deno | server.js (Deno.serve) |
-| mysql2 | server | node/bun/deno | (same as pg) |
-| better_sqlite3 | server | node/bun/deno | (same as pg) |
+| Database       | Target  | Runtime       | Entry Point            |
+| -------------- | ------- | ------------- | ---------------------- |
+| dexie          | browser | -             | index.html             |
+| sqljs          | browser | -             | index.html             |
+| pg             | server  | node          | server.js (http)       |
+| pg             | server  | bun           | server.js (Bun.serve)  |
+| pg             | server  | deno          | server.js (Deno.serve) |
+| mysql2         | server  | node/bun/deno | (same as pg)           |
+| better_sqlite3 | server  | node/bun/deno | (same as pg)           |
 
 ---
 

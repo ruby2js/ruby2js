@@ -78,27 +78,27 @@ Document patterns discovered during self-hosting:
 
 ### 2.1 Files to Audit (22 files, 371 lines changed)
 
-| File | Changes | Audit Focus |
-|------|---------|-------------|
-| class.rb | 42 lines | Hash iteration patterns |
-| class2.rb | 16 lines | Array dup, respond_to patterns |
-| def.rb | 12 lines | ast_node? checks, array dup |
-| dstr.rb | 4 lines | Empty interpolation handling |
-| for.rb | 2 lines | Range step patterns |
-| hash.rb | 11 lines | Hash literal handling |
-| if.rb | 2 lines | Condition patterns |
-| import.rb | 2 lines | Import syntax |
-| ivar.rb | 10 lines | Instance variable patterns |
-| kwbegin.rb | 43 lines | Exception handling, IIFE wrapping |
-| logical.rb | 64 lines | Nullish coalescing vs OR |
-| logical_or.rb | 58 lines | NEW FILE - needs review |
-| masgn.rb | 16 lines | Multiple assignment patterns |
-| module.rb | 8 lines | Module patterns |
-| opasgn.rb | 5 lines | Operator assignment |
-| regexp.rb | 10 lines | Rest parameter position |
-| return.rb | 8 lines | Return statement patterns |
-| send.rb | 50 lines | Method call patterns |
-| vasgn.rb | 8 lines | Variable assignment |
+| File          | Changes  | Audit Focus                       |
+| ------------- | -------- | --------------------------------- |
+| class.rb      | 42 lines | Hash iteration patterns           |
+| class2.rb     | 16 lines | Array dup, respond_to patterns    |
+| def.rb        | 12 lines | ast_node? checks, array dup       |
+| dstr.rb       | 4 lines  | Empty interpolation handling      |
+| for.rb        | 2 lines  | Range step patterns               |
+| hash.rb       | 11 lines | Hash literal handling             |
+| if.rb         | 2 lines  | Condition patterns                |
+| import.rb     | 2 lines  | Import syntax                     |
+| ivar.rb       | 10 lines | Instance variable patterns        |
+| kwbegin.rb    | 43 lines | Exception handling, IIFE wrapping |
+| logical.rb    | 64 lines | Nullish coalescing vs OR          |
+| logical_or.rb | 58 lines | NEW FILE - needs review           |
+| masgn.rb      | 16 lines | Multiple assignment patterns      |
+| module.rb     | 8 lines  | Module patterns                   |
+| opasgn.rb     | 5 lines  | Operator assignment               |
+| regexp.rb     | 10 lines | Rest parameter position           |
+| return.rb     | 8 lines  | Return statement patterns         |
+| send.rb       | 50 lines | Method call patterns              |
+| vasgn.rb      | 8 lines  | Variable assignment               |
 
 ### 2.2 Audit Questions for Each File
 1. **Can this be simplified with a pragma?** If code was added to handle JS-specific behavior, could a pragma on the Ruby source achieve the same result?
@@ -131,12 +131,12 @@ Document patterns discovered during self-hosting:
 
 ### 3.1 Files to Audit
 
-| Filter | Lines | Current Purpose |
-|--------|-------|-----------------|
-| selfhost/core.rb | 33 | Empty shell (entry point only) |
-| selfhost/walker.rb | 187 | Prism API name mapping, private/protected removal |
-| selfhost/converter.rb | 323 | handle :type pattern, method name conversion |
-| selfhost/spec.rb | 74 | _() wrapper removal, globalThis ivars |
+| Filter                | Lines | Current Purpose                                   |
+| --------------------- | ----- | ------------------------------------------------- |
+| selfhost/core.rb      | 33    | Empty shell (entry point only)                    |
+| selfhost/walker.rb    | 187   | Prism API name mapping, private/protected removal |
+| selfhost/converter.rb | 323   | handle :type pattern, method name conversion      |
+| selfhost/spec.rb      | 74    | _() wrapper removal, globalThis ivars             |
 
 ### 3.2 Audit Questions
 1. **Is this truly selfhost-specific?** Would other users benefit?
@@ -229,13 +229,13 @@ Document patterns discovered during self-hosting:
 
 ### 5.1 Current Pragma Distribution
 
-| File | Count | Pragma Types |
-|------|-------|--------------|
-| converter.rb | 10 | hash, entries, method, skip |
-| node.rb | 8 | skip (Ruby-only methods) |
-| prism_walker.rb | 5 | skip (require, respond_to?, visit) |
-| serializer.rb | 19 | skip ([], []=, <<), array |
-| converter/*.rb | ~44 | Various |
+| File            | Count | Pragma Types                       |
+| --------------- | ----- | ---------------------------------- |
+| converter.rb    | 10    | hash, entries, method, skip        |
+| node.rb         | 8     | skip (Ruby-only methods)           |
+| prism_walker.rb | 5     | skip (require, respond_to?, visit) |
+| serializer.rb   | 19    | skip ([], []=, <<), array          |
+| converter/*.rb  | ~44   | Various                            |
 
 **Total: ~86 pragmas**
 
@@ -389,33 +389,33 @@ demo/selfhost/package.json
 
 ### Current File Inventory
 
-| File | Lines | Size | Purpose |
-|------|-------|------|---------|
-| **Core Runtime** | | | |
-| ruby2js.mjs | 491 | 16KB | CLI debugging tool with AST inspection |
-| test_harness.mjs | 355 | 10KB | Test framework, polyfills, Ruby2JS.convert |
-| preamble.mjs | 16 | 600B | NotImplementedError class (unused?) |
-| prism_browser.mjs | 119 | 4KB | Browser WASI polyfill for @ruby/prism |
-| **Test Files** | | | |
-| test_walker.mjs | 270 | 7KB | Walker unit tests |
-| test_serializer.mjs | 155 | 4KB | Serializer tests |
-| debug_whitespace.mjs | 49 | 2KB | Debugging helper |
-| **Spec Infrastructure** | | | |
-| run_spec.mjs | 14 | 400B | Single spec runner |
-| run_all_specs.mjs | 237 | 8KB | Manifest-driven spec runner |
-| spec_manifest.json | 39 | 1KB | Spec readiness manifest |
-| **Build** | | | |
-| Rakefile | 145 | 4KB | Build tasks |
-| package.json | 23 | 1KB | npm configuration |
-| package-lock.json | 22 | 570B | npm lockfile |
-| **Demo** | | | |
-| browser_demo.html | 581 | 15KB | Browser demo page |
-| README.md | 302 | 10KB | Documentation |
-| **Generated (dist/)** | | | |
-| converter.mjs | ~11700 | 397KB | Transpiled converter |
-| walker.mjs | ~1800 | 64KB | Transpiled walker |
-| transliteration_spec.mjs | ~1500 | 52KB | Transpiled spec |
-| serializer_spec.mjs | ~300 | 10KB | Transpiled spec |
+| File                     | Lines  | Size  | Purpose                                    |
+| ------------------------ | ------ | ----- | ------------------------------------------ |
+| **Core Runtime**         |        |       |                                            |
+| ruby2js.mjs              | 491    | 16KB  | CLI debugging tool with AST inspection     |
+| test_harness.mjs         | 355    | 10KB  | Test framework, polyfills, Ruby2JS.convert |
+| preamble.mjs             | 16     | 600B  | NotImplementedError class (unused?)        |
+| prism_browser.mjs        | 119    | 4KB   | Browser WASI polyfill for @ruby/prism      |
+| **Test Files**           |        |       |                                            |
+| test_walker.mjs          | 270    | 7KB   | Walker unit tests                          |
+| test_serializer.mjs      | 155    | 4KB   | Serializer tests                           |
+| debug_whitespace.mjs     | 49     | 2KB   | Debugging helper                           |
+| **Spec Infrastructure**  |        |       |                                            |
+| run_spec.mjs             | 14     | 400B  | Single spec runner                         |
+| run_all_specs.mjs        | 237    | 8KB   | Manifest-driven spec runner                |
+| spec_manifest.json       | 39     | 1KB   | Spec readiness manifest                    |
+| **Build**                |        |       |                                            |
+| Rakefile                 | 145    | 4KB   | Build tasks                                |
+| package.json             | 23     | 1KB   | npm configuration                          |
+| package-lock.json        | 22     | 570B  | npm lockfile                               |
+| **Demo**                 |        |       |                                            |
+| browser_demo.html        | 581    | 15KB  | Browser demo page                          |
+| README.md                | 302    | 10KB  | Documentation                              |
+| **Generated (dist/)**    |        |       |                                            |
+| converter.mjs            | ~11700 | 397KB | Transpiled converter                       |
+| walker.mjs               | ~1800  | 64KB  | Transpiled walker                          |
+| transliteration_spec.mjs | ~1500  | 52KB  | Transpiled spec                            |
+| serializer_spec.mjs      | ~300   | 10KB  | Transpiled spec                            |
 
 ### Duplication Analysis
 
@@ -459,18 +459,18 @@ demo/selfhost/package.json
 
 ### Files That Could Be Removed
 
-| File | Recommendation | Rationale |
-|------|----------------|-----------|
-| `.spec_manifest.json.swp` | **Remove** | Editor swap file, should be in .gitignore |
-| `preamble.mjs` | **Review** | Appears unused (transpile_converter.rb generates its own preamble) |
-| `debug_whitespace.mjs` | **Consider removing** | One-off debugging script, could be recreated when needed |
+| File                      | Recommendation        | Rationale                                                          |
+| ------------------------- | --------------------- | ------------------------------------------------------------------ |
+| `.spec_manifest.json.swp` | **Remove**            | Editor swap file, should be in .gitignore                          |
+| `preamble.mjs`            | **Review**            | Appears unused (transpile_converter.rb generates its own preamble) |
+| `debug_whitespace.mjs`    | **Consider removing** | One-off debugging script, could be recreated when needed           |
 
 ### Files That Could Be Consolidated
 
-| Current | Proposed | Benefit |
-|---------|----------|---------|
-| test_harness.mjs + ruby2js.mjs | shared/runtime.mjs + test_harness.mjs + ruby2js.mjs | Single source for PrismSourceBuffer, Namespace, globals |
-| test_walker.mjs + test_serializer.mjs | Keep separate but share test utilities | Cleaner test structure |
+| Current                               | Proposed                                            | Benefit                                                 |
+| ------------------------------------- | --------------------------------------------------- | ------------------------------------------------------- |
+| test_harness.mjs + ruby2js.mjs        | shared/runtime.mjs + test_harness.mjs + ruby2js.mjs | Single source for PrismSourceBuffer, Namespace, globals |
+| test_walker.mjs + test_serializer.mjs | Keep separate but share test utilities              | Cleaner test structure                                  |
 
 ### Recommendations for Phase 4
 
@@ -530,9 +530,9 @@ demo/selfhost/package.json
 
 The ruby2js.com website (in `docs/`) includes **two live demos**:
 
-| Demo | Technology | Size | Location |
-|------|------------|------|----------|
-| Opal (main) | Opal-compiled Ruby2JS | ~24MB | `/demo` |
+| Demo        | Technology                      | Size   | Location          |
+| ----------- | ------------------------------- | ------ | ----------------- |
+| Opal (main) | Opal-compiled Ruby2JS           | ~24MB  | `/demo`           |
 | Self-Hosted | Transpiled Ruby2JS + Prism WASM | ~2.5MB | `/demo/selfhost/` |
 
 ### Future Vision
@@ -559,12 +559,12 @@ demo/selfhost/                      docs/src/demo/selfhost/
 
 The same runtime classes are now duplicated in **FOUR** places:
 
-| Class | demo/selfhost/ | docs/src/demo/selfhost/ |
-|-------|----------------|-------------------------|
-| PrismSourceBuffer | ruby2js.mjs, test_harness.mjs, test_walker.mjs | index.html (inline) |
-| PrismSourceRange | ruby2js.mjs, test_harness.mjs, test_walker.mjs | index.html (inline) |
-| Namespace | ruby2js.mjs, test_harness.mjs | index.html (inline) |
-| Polyfills | test_harness.mjs | index.html (inline) |
+| Class             | demo/selfhost/                                 | docs/src/demo/selfhost/ |
+| ----------------- | ---------------------------------------------- | ----------------------- |
+| PrismSourceBuffer | ruby2js.mjs, test_harness.mjs, test_walker.mjs | index.html (inline)     |
+| PrismSourceRange  | ruby2js.mjs, test_harness.mjs, test_walker.mjs | index.html (inline)     |
+| Namespace         | ruby2js.mjs, test_harness.mjs                  | index.html (inline)     |
+| Polyfills         | test_harness.mjs                               | index.html (inline)     |
 
 ### Implications for Phase 4
 
@@ -600,9 +600,9 @@ demo/selfhost/
 
 ### Questions Resolved
 
-| Question | Answer |
-|----------|--------|
-| Is browser_demo.html important? | **Yes** - becomes primary demo on ruby2js.com |
-| Should code be shared? | **Yes** - critical for maintainability |
-| Should polyfills be in HTML? | **No** - should be generated into dist/ files |
-| Is ruby2js.mjs needed? | **Yes** - useful debugging tool, but should share runtime |
+| Question                        | Answer                                                    |
+| ------------------------------- | --------------------------------------------------------- |
+| Is browser_demo.html important? | **Yes** - becomes primary demo on ruby2js.com             |
+| Should code be shared?          | **Yes** - critical for maintainability                    |
+| Should polyfills be in HTML?    | **No** - should be generated into dist/ files             |
+| Is ruby2js.mjs needed?          | **Yes** - useful debugging tool, but should share runtime |

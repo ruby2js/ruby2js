@@ -4,15 +4,15 @@ A shadcn-inspired component library built with Phlex. Demonstrates variant patte
 
 ## Components
 
-| Component | Patterns Demonstrated |
-|-----------|----------------------|
-| Button | Variants (primary, secondary, destructive, outline, ghost), sizes |
-| Card | Compound components (Card, CardHeader, CardTitle, CardContent, CardFooter) |
-| Input | Form integration, disabled state, placeholder |
-| Badge | Simple variants |
-| Alert | Variants, icon slot, dismissible |
-| Dialog | Modal behavior, Stimulus integration |
-| Tabs | Compound component, Stimulus integration |
+| Component | Patterns Demonstrated                                                      |
+| --------- | -------------------------------------------------------------------------- |
+| Button    | Variants (primary, secondary, destructive, outline, ghost), sizes          |
+| Card      | Compound components (Card, CardHeader, CardTitle, CardContent, CardFooter) |
+| Input     | Form integration, disabled state, placeholder                              |
+| Badge     | Simple variants                                                            |
+| Alert     | Variants, icon slot, dismissible                                           |
+| Dialog    | Modal behavior, Stimulus integration                                       |
+| Tabs      | Compound component, Stimulus integration                                   |
 
 ## Quick Start
 

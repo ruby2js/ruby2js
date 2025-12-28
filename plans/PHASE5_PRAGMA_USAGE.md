@@ -2,14 +2,14 @@
 
 ## Summary
 
-| Pragma Type | Count | Purpose |
-|-------------|-------|---------|
-| `array` | 22 | Force `arr.push(x)` instead of `arr << x` → `arr + [x]` |
-| `skip` | 19 | Exclude line/method from transpilation |
-| `method` | 18 | Force `walk.call(x)` instead of `walk(x)` |
-| `hash` | 16 | Force `prop in obj` instead of `obj[prop]` |
-| `logical` | 6 | Force `||` instead of `??` for nullish handling |
-| `entries` | 4 | Use `Object.entries()` for hash iteration |
+| Pragma Type | Count | Purpose                                                 |
+| ----------- | ----- | ------------------------------------------------------- |
+| `array`     | 22    | Force `arr.push(x)` instead of `arr << x` → `arr + [x]` |
+| `skip`      | 19    | Exclude line/method from transpilation                  |
+| `method`    | 18    | Force `walk.call(x)` instead of `walk(x)`               |
+| `hash`      | 16    | Force `prop in obj` instead of `obj[prop]`              |
+| `logical`   | 6     | Force `\|\|` instead of `??` for nullish handling       |
+| `entries`   | 4     | Use `Object.entries()` for hash iteration               |
 
 **Total**: 85 pragmas across selfhost-transpiled files
 
@@ -118,11 +118,11 @@ With pragma: `arr.push(item)` (mutates in place, correct behavior).
 
 ### Could Be Addressed
 
-| Pattern | Current Pragma | Potential Solution |
-|---------|----------------|-------------------|
-| `arr << x` in loops | `array` | Detect loop context, auto-use `.push()` |
-| `hash.include?(k)` | `hash` | Type inference (complex) |
-| `proc.call(x)` | `method` | Track proc variables (complex) |
+| Pattern             | Current Pragma | Potential Solution                      |
+| ------------------- | -------------- | --------------------------------------- |
+| `arr << x` in loops | `array`        | Detect loop context, auto-use `.push()` |
+| `hash.include?(k)`  | `hash`         | Type inference (complex)                |
+| `proc.call(x)`      | `method`       | Track proc variables (complex)          |
 
 ### Not Worth Addressing
 

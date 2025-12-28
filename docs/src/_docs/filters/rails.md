@@ -375,19 +375,19 @@ function render({ user }) {
 
 **Supported form builder methods:**
 
-| Ruby Method | HTML Output |
-|-------------|-------------|
-| `f.text_field :name` | `<input type="text" name="model[name]" id="model_name" value="${model.name ?? ''}">` |
-| `f.email_field :email` | `<input type="email" ... value="${model.email ?? ''}">` |
-| `f.password_field :pass` | `<input type="password" ... value="${model.pass ?? ''}">` |
-| `f.hidden_field :id` | `<input type="hidden" ... value="${model.id ?? ''}">` |
-| `f.text_area :body` | `<textarea name="model[body]" ...>${model.body ?? ''}</textarea>` |
-| `f.check_box :active` | `<input type="checkbox" value="1" ...>` |
-| `f.radio_button :role, :admin` | `<input type="radio" value="admin" ...>` |
-| `f.label :name` | `<label for="model_name">Name</label>` |
-| `f.select :category` | `<select name="model[category]" ...></select>` |
-| `f.submit "Save"` | `<input type="submit" value="Save">` |
-| `f.button "Click"` | `<button type="submit">Click</button>` |
+| Ruby Method                    | HTML Output                                                                          |
+| ------------------------------ | ------------------------------------------------------------------------------------ |
+| `f.text_field :name`           | `<input type="text" name="model[name]" id="model_name" value="${model.name ?? ''}">` |
+| `f.email_field :email`         | `<input type="email" ... value="${model.email ?? ''}">`                              |
+| `f.password_field :pass`       | `<input type="password" ... value="${model.pass ?? ''}">`                            |
+| `f.hidden_field :id`           | `<input type="hidden" ... value="${model.id ?? ''}">`                                |
+| `f.text_area :body`            | `<textarea name="model[body]" ...>${model.body ?? ''}</textarea>`                    |
+| `f.check_box :active`          | `<input type="checkbox" value="1" ...>`                                              |
+| `f.radio_button :role, :admin` | `<input type="radio" value="admin" ...>`                                             |
+| `f.label :name`                | `<label for="model_name">Name</label>`                                               |
+| `f.select :category`           | `<select name="model[category]" ...></select>`                                       |
+| `f.submit "Save"`              | `<input type="submit" value="Save">`                                                 |
+| `f.button "Click"`             | `<button type="submit">Click</button>`                                               |
 
 Additional input types: `number_field`, `tel_field`, `url_field`, `search_field`, `date_field`, `time_field`, `datetime_local_field`, `month_field`, `week_field`, `color_field`, `range_field`.
 
@@ -538,11 +538,11 @@ The transpiled JavaScript requires runtime implementations of:
 
 These are provided by the [Ruby2JS on Rails demo](https://github.com/ruby2js/ruby2js/tree/master/demo/ruby2js-on-rails) runtime, which uses:
 
-| Component | Browser | Server (Node/Bun/Deno) | Edge (Cloudflare) |
-|-----------|---------|------------------------|-------------------|
-| Database | Dexie, sql.js, PGLite | better-sqlite3, pg, mysql2 | D1 |
-| Router | History API | HTTP server | Fetch handler |
-| Renderer | DOM manipulation | HTML string | HTML string |
+| Component | Browser               | Server (Node/Bun/Deno)     | Edge (Cloudflare) |
+| --------- | --------------------- | -------------------------- | ----------------- |
+| Database  | Dexie, sql.js, PGLite | better-sqlite3, pg, mysql2 | D1                |
+| Router    | History API           | HTTP server                | Fetch handler     |
+| Renderer  | DOM manipulation      | HTML string                | HTML string       |
 
 ## Usage with Other Filters
 
@@ -552,13 +552,13 @@ The Rails filter works best with these companion filters:
 Ruby2JS.convert(source, filters: [:rails, :esm, :functions, :active_support])
 ```
 
-| Filter | Purpose |
-|--------|---------|
-| **esm** | ES module imports/exports |
-| **functions** | Ruby → JS method mappings (`.each` → `for...of`, etc.) |
-| **active_support** | `blank?`, `present?`, `try`, etc. |
-| **erb** | ERB templates → render functions |
-| **camelCase** | Convert snake_case identifiers |
+| Filter             | Purpose                                                |
+| ------------------ | ------------------------------------------------------ |
+| **esm**            | ES module imports/exports                              |
+| **functions**      | Ruby → JS method mappings (`.each` → `for...of`, etc.) |
+| **active_support** | `blank?`, `present?`, `try`, etc.                      |
+| **erb**            | ERB templates → render functions                       |
+| **camelCase**      | Convert snake_case identifiers                         |
 
 ## Limitations
 

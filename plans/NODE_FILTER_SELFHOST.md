@@ -25,10 +25,10 @@ With Node filter in selfhost, we can transpile `build.rb` → `build.mjs`, provi
 
 ### The Trade-off
 
-| Approach | Total Code | Maintenance Pattern |
-|----------|------------|---------------------|
+| Approach        | Total Code                                                       | Maintenance Pattern               |
+| --------------- | ---------------------------------------------------------------- | --------------------------------- |
 | Hand-maintained | `build.rb` (~380) + `build-selfhost.mjs` (~500) = **~880 lines** | Sync two implementations manually |
-| Filter | `build.rb` (~380) + `selfhost_build.rb` (~170) = **~550 lines** | Maintain transformation rules |
+| Filter          | `build.rb` (~380) + `selfhost_build.rb` (~170) = **~550 lines**  | Maintain transformation rules     |
 
 ### Filter Approach Advantages
 
@@ -58,15 +58,15 @@ The maintainability math is close, but dogfooding tips the balance decisively:
 
 ### Stage 1: Node Filter Enhancements ✅
 
-| Feature | Commit | Description |
-|---------|--------|-------------|
-| Async option | `df53ebe` | `async: true` for `fs/promises` with `await` |
-| FileUtils.mkdir_p | `df53ebe` | `fs.mkdirSync(path, {recursive: true})` |
-| FileUtils.rm_rf | `df53ebe` | `fs.rmSync(path, {recursive: true, force: true})` |
-| File.expand_path | `df53ebe` | `path.resolve()` |
-| Dir.exist? | `cc879bd` | `fs.existsSync()` |
-| Dir.glob | `cc879bd` | `fs.globSync()` (Node 22+) |
-| Remove extend SEXP | `82f4986` | Lazy initialization unblocks selfhost |
+| Feature            | Commit    | Description                                       |
+| ------------------ | --------- | ------------------------------------------------- |
+| Async option       | `df53ebe` | `async: true` for `fs/promises` with `await`      |
+| FileUtils.mkdir_p  | `df53ebe` | `fs.mkdirSync(path, {recursive: true})`           |
+| FileUtils.rm_rf    | `df53ebe` | `fs.rmSync(path, {recursive: true, force: true})` |
+| File.expand_path   | `df53ebe` | `path.resolve()`                                  |
+| Dir.exist?         | `cc879bd` | `fs.existsSync()`                                 |
+| Dir.glob           | `cc879bd` | `fs.globSync()` (Node 22+)                        |
+| Remove extend SEXP | `82f4986` | Lazy initialization unblocks selfhost             |
 
 ### Stage 2: Transpile Node Filter to Selfhost ⏭️ SKIPPED
 
@@ -76,16 +76,16 @@ Not needed. The Node filter is only required at transpilation time (Ruby), not r
 
 Created `lib/ruby2js/filter/selfhost_build.rb` to handle build-script-specific transformations:
 
-| Transformation | Ruby | JavaScript |
-|----------------|------|------------|
-| YAML.load_file | `YAML.load_file(path)` | `yaml.load(fs.readFileSync(path, 'utf8'))` |
-| YAML.dump | `YAML.dump(obj)` | `yaml.dump(obj)` |
-| $LOAD_PATH | `$LOAD_PATH.unshift(...)` | Removed |
-| require ruby2js | `require 'ruby2js'` | `import Ruby2JS from '../../selfhost/ruby2js.js'` |
-| require filters | `require 'ruby2js/filter/rails/model'` | `import Rails_Model from '../../selfhost/filters/rails/model.js'` |
-| require_relative | `require_relative '../lib/foo'` | `import '../lib/foo.js'` |
-| erb_compiler | `require_relative '../lib/erb_compiler'` | `import { ErbCompiler } from '../../selfhost/lib/erb_compiler.js'` |
-| Filter constants | `Ruby2JS::Filter::Rails::Model` | `Rails_Model` |
+| Transformation   | Ruby                                     | JavaScript                                                         |
+| ---------------- | ---------------------------------------- | ------------------------------------------------------------------ |
+| YAML.load_file   | `YAML.load_file(path)`                   | `yaml.load(fs.readFileSync(path, 'utf8'))`                         |
+| YAML.dump        | `YAML.dump(obj)`                         | `yaml.dump(obj)`                                                   |
+| $LOAD_PATH       | `$LOAD_PATH.unshift(...)`                | Removed                                                            |
+| require ruby2js  | `require 'ruby2js'`                      | `import Ruby2JS from '../../selfhost/ruby2js.js'`                  |
+| require filters  | `require 'ruby2js/filter/rails/model'`   | `import Rails_Model from '../../selfhost/filters/rails/model.js'`  |
+| require_relative | `require_relative '../lib/foo'`          | `import '../lib/foo.js'`                                           |
+| erb_compiler     | `require_relative '../lib/erb_compiler'` | `import { ErbCompiler } from '../../selfhost/lib/erb_compiler.js'` |
+| Filter constants | `Ruby2JS::Filter::Rails::Model`          | `Rails_Model`                                                      |
 
 ### Stage 4: Restructure build.rb ✅
 
@@ -101,13 +101,13 @@ Refactored `build.rb` to export a `SelfhostBuilder` class with:
 
 Updated `selfhost_build.rb` filter to handle all export and initialization differences:
 
-| Transformation | Before | After |
-|----------------|--------|-------|
-| `require 'ruby2js'` | `import Ruby2JS from ...` | `import * as Ruby2JS from ...; await Ruby2JS.initPrism()` |
-| `require 'ruby2js/filter/X'` | `import X from ...` | `import { X } from ...` |
-| `Ruby2JS::Filter::X` | `X` | `X.prototype` |
-| `$0` | `$0` (invalid JS) | `` `file://${process.argv[1]}` `` |
-| `require 'fileutils'` | `require("fileutils")` | (removed) |
+| Transformation               | Before                    | After                                                     |
+| ---------------------------- | ------------------------- | --------------------------------------------------------- |
+| `require 'ruby2js'`          | `import Ruby2JS from ...` | `import * as Ruby2JS from ...; await Ruby2JS.initPrism()` |
+| `require 'ruby2js/filter/X'` | `import X from ...`       | `import { X } from ...`                                   |
+| `Ruby2JS::Filter::X`         | `X`                       | `X.prototype`                                             |
+| `$0`                         | `$0` (invalid JS)         | `` `file://${process.argv[1]}` ``                         |
+| `require 'fileutils'`        | `require("fileutils")`    | (removed)                                                 |
 
 **Key changes to `lib/ruby2js/filter/selfhost_build.rb`:**
 - Namespace import with async init for `require 'ruby2js'`
@@ -137,23 +137,23 @@ Notes:
 
 ## Dependencies
 
-| Dependency | Status | Notes |
-|------------|--------|-------|
-| Node filter without extend SEXP | ✅ Complete | Commit `82f4986` |
-| selfhost_build filter | ✅ Complete | Handles YAML, requires, constants, exports |
-| ESM/CJS __dir__ support | ✅ Complete | `import.meta.dirname` / `__dirname` |
-| Selfhost named exports | ✅ Complete | Filter generates `{ X }` imports and `.prototype` |
+| Dependency                      | Status     | Notes                                             |
+| ------------------------------- | ---------- | ------------------------------------------------- |
+| Node filter without extend SEXP | ✅ Complete | Commit `82f4986`                                  |
+| selfhost_build filter           | ✅ Complete | Handles YAML, requires, constants, exports        |
+| ESM/CJS __dir__ support         | ✅ Complete | `import.meta.dirname` / `__dirname`               |
+| Selfhost named exports          | ✅ Complete | Filter generates `{ X }` imports and `.prototype` |
 
 ## Files Modified
 
-| File | Change |
-|------|--------|
-| `lib/ruby2js/filter/selfhost_build.rb` | New filter for build script transpilation |
-| `spec/selfhost_build_spec.rb` | Tests for selfhost_build filter |
-| `lib/ruby2js/filter/esm.rb` | Added `__dir__` → `import.meta.dirname` |
-| `lib/ruby2js/filter/cjs.rb` | Added `__dir__` → `__dirname` |
-| `demo/ruby2js-on-rails/scripts/build.rb` | Restructured as SelfhostBuilder class |
-| `demo/ruby2js-on-rails/scripts/build.mjs` | Generated (not yet working) |
+| File                                      | Change                                    |
+| ----------------------------------------- | ----------------------------------------- |
+| `lib/ruby2js/filter/selfhost_build.rb`    | New filter for build script transpilation |
+| `spec/selfhost_build_spec.rb`             | Tests for selfhost_build filter           |
+| `lib/ruby2js/filter/esm.rb`               | Added `__dir__` → `import.meta.dirname`   |
+| `lib/ruby2js/filter/cjs.rb`               | Added `__dir__` → `__dirname`             |
+| `demo/ruby2js-on-rails/scripts/build.rb`  | Restructured as SelfhostBuilder class     |
+| `demo/ruby2js-on-rails/scripts/build.mjs` | Generated (not yet working)               |
 
 ## Success Criteria
 
@@ -167,11 +167,11 @@ Notes:
 
 The `selfhost_build` filter handles all differences between Ruby and JS execution models:
 
-| Difference | Ruby Pattern | JS Output |
-|------------|--------------|-----------|
-| Module loading | `require 'ruby2js'` | `import * as Ruby2JS from ...; await Ruby2JS.initPrism()` |
-| Export style | `require 'ruby2js/filter/X'` | `import { X } from ...` (named imports) |
-| Pipeline format | `Ruby2JS::Filter::X` | `X.prototype` |
-| Main script check | `__FILE__ == $0` | `` import.meta.url == `file://${process.argv[1]}` `` |
+| Difference        | Ruby Pattern                 | JS Output                                                 |
+| ----------------- | ---------------------------- | --------------------------------------------------------- |
+| Module loading    | `require 'ruby2js'`          | `import * as Ruby2JS from ...; await Ruby2JS.initPrism()` |
+| Export style      | `require 'ruby2js/filter/X'` | `import { X } from ...` (named imports)                   |
+| Pipeline format   | `Ruby2JS::Filter::X`         | `X.prototype`                                             |
+| Main script check | `__FILE__ == $0`             | `` import.meta.url == `file://${process.argv[1]}` ``      |
 
 These transformations enable the transpiled version to be functionally equivalent to the hand-written version.

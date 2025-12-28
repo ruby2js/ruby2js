@@ -67,66 +67,66 @@ npm test
 
 ## Key Files
 
-| File | Description |
-|------|-------------|
-| `ruby2js.js` | Generated bundle - converter + filter runtime (regenerate via `npm run build:bundle`) |
-| `filter_runtime.js` | Filter runtime source (appended to ruby2js.js during build) |
-| `prism_browser.js` | Generated browser WASM loader (regenerate via `npm run build:prism-browser`) |
-| `ruby2js-cli.js` | CLI wrapper for Node.js |
-| `browser_demo.html` | Browser demo page |
-| `test_harness.mjs` | Test framework for specs |
-| `run_all_specs.mjs` | Manifest-driven spec runner for CI |
-| `spec_manifest.json` | Spec status tracking (ready/partial/blocked) |
-| `filters/` | Generated transpiled filters (regenerate via `npm run build:filters`) |
-| `dist/` | Generated transpiled specs |
+| File                 | Description                                                                           |
+| -------------------- | ------------------------------------------------------------------------------------- |
+| `ruby2js.js`         | Generated bundle - converter + filter runtime (regenerate via `npm run build:bundle`) |
+| `filter_runtime.js`  | Filter runtime source (appended to ruby2js.js during build)                           |
+| `prism_browser.js`   | Generated browser WASM loader (regenerate via `npm run build:prism-browser`)          |
+| `ruby2js-cli.js`     | CLI wrapper for Node.js                                                               |
+| `browser_demo.html`  | Browser demo page                                                                     |
+| `test_harness.mjs`   | Test framework for specs                                                              |
+| `run_all_specs.mjs`  | Manifest-driven spec runner for CI                                                    |
+| `spec_manifest.json` | Spec status tracking (ready/partial/blocked)                                          |
+| `filters/`           | Generated transpiled filters (regenerate via `npm run build:filters`)                 |
+| `dist/`              | Generated transpiled specs                                                            |
 
 ### Scripts
 
-| File | Description |
-|------|-------------|
-| `scripts/transpile_bundle.rb` | Transpiles Ruby2JS bundle to JS (includes filter runtime) |
-| `scripts/transpile_filter.rb` | Transpiles filters - pure declarative, 45 lines |
-| `scripts/transpile_spec.rb` | Transpiles RSpec files to JS |
-| `scripts/transpile_prism_browser.rb` | Transpiles browser Prism loader |
-| `scripts/test_handlers.rb` | Test helper for converter handlers |
+| File                                 | Description                                               |
+| ------------------------------------ | --------------------------------------------------------- |
+| `scripts/transpile_bundle.rb`        | Transpiles Ruby2JS bundle to JS (includes filter runtime) |
+| `scripts/transpile_filter.rb`        | Transpiles filters - pure declarative, 45 lines           |
+| `scripts/transpile_spec.rb`          | Transpiles RSpec files to JS                              |
+| `scripts/transpile_prism_browser.rb` | Transpiles browser Prism loader                           |
+| `scripts/test_handlers.rb`           | Test helper for converter handlers                        |
 
 ### Transpiled Output (dist/)
 
-| File | LOC | Description |
-|------|-----|-------------|
-| `dist/functions_filter.mjs` | 2,040 | Transpiled Functions filter |
-| `dist/functions_spec.mjs` | 1,077 | Transpiled Functions filter tests |
-| `dist/transliteration_spec.mjs` | 1,391 | Transpiled transliteration tests |
-| `dist/serializer_spec.mjs` | 333 | Transpiled serializer tests |
-| `dist/namespace_spec.mjs` | 62 | Transpiled namespace tests |
+| File                            | LOC   | Description                       |
+| ------------------------------- | ----- | --------------------------------- |
+| `dist/functions_filter.mjs`     | 2,040 | Transpiled Functions filter       |
+| `dist/functions_spec.mjs`       | 1,077 | Transpiled Functions filter tests |
+| `dist/transliteration_spec.mjs` | 1,391 | Transpiled transliteration tests  |
+| `dist/serializer_spec.mjs`      | 333   | Transpiled serializer tests       |
+| `dist/namespace_spec.mjs`       | 62    | Transpiled namespace tests        |
 
 ## Source Files
 
 The unified bundle is transpiled from Ruby source files:
 
-| Ruby Source | LOC | JavaScript Output |
-|-------------|-----|-------------------|
-| `lib/ruby2js/selfhost/bundle.rb` | 94 | `ruby2js.mjs` |
-| `lib/ruby2js/selfhost/runtime.rb` | 176 | (inlined in bundle) |
-| `lib/ruby2js/selfhost/cli.rb` | 424 | (inlined in bundle) |
-| `lib/ruby2js/selfhost/prism_browser.rb` | 117 | `prism_browser.mjs` |
-| `lib/ruby2js/namespace.rb` | 86 | (inlined in bundle) |
-| `lib/ruby2js/prism_walker.rb` | 261 | (inlined in bundle) |
-| `lib/ruby2js/converter.rb` + handlers | 548+ | (inlined in bundle) |
-| `lib/ruby2js/pipeline.rb` | 160 | (inlined in bundle) |
-| `lib/ruby2js/filter/processor.rb` | 333 | (in bundle, for filter base class) |
-| `lib/ruby2js/filter/functions.rb` | 1,455 | `dist/functions_filter.mjs` |
+| Ruby Source                             | LOC   | JavaScript Output                  |
+| --------------------------------------- | ----- | ---------------------------------- |
+| `lib/ruby2js/selfhost/bundle.rb`        | 94    | `ruby2js.mjs`                      |
+| `lib/ruby2js/selfhost/runtime.rb`       | 176   | (inlined in bundle)                |
+| `lib/ruby2js/selfhost/cli.rb`           | 424   | (inlined in bundle)                |
+| `lib/ruby2js/selfhost/prism_browser.rb` | 117   | `prism_browser.mjs`                |
+| `lib/ruby2js/namespace.rb`              | 86    | (inlined in bundle)                |
+| `lib/ruby2js/prism_walker.rb`           | 261   | (inlined in bundle)                |
+| `lib/ruby2js/converter.rb` + handlers   | 548+  | (inlined in bundle)                |
+| `lib/ruby2js/pipeline.rb`               | 160   | (inlined in bundle)                |
+| `lib/ruby2js/filter/processor.rb`       | 333   | (in bundle, for filter base class) |
+| `lib/ruby2js/filter/functions.rb`       | 1,455 | `dist/functions_filter.mjs`        |
 
 ## npm Scripts
 
-| Script | Description |
-|--------|-------------|
-| `npm test` | Run all tests (CLI, walker, specs) |
-| `npm run build` | Build bundle, prism_browser, and specs |
-| `npm run build:bundle` | Regenerate ruby2js.mjs from Ruby source |
-| `npm run build:prism-browser` | Regenerate prism_browser.mjs |
-| `npm run build:spec` | Transpile test specs |
-| `npm run clean` | Remove generated files |
+| Script                        | Description                             |
+| ----------------------------- | --------------------------------------- |
+| `npm test`                    | Run all tests (CLI, walker, specs)      |
+| `npm run build`               | Build bundle, prism_browser, and specs  |
+| `npm run build:bundle`        | Regenerate ruby2js.mjs from Ruby source |
+| `npm run build:prism-browser` | Regenerate prism_browser.mjs            |
+| `npm run build:spec`          | Transpile test specs                    |
+| `npm run clean`               | Remove generated files                  |
 
 ## Spec Runner Options
 

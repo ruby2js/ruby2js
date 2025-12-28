@@ -52,14 +52,14 @@ end
 
 ## Hooks
 
-| Ruby | Jest |
-|------|------|
-| `before { }` | `beforeEach(() => {})` |
+| Ruby                | Jest                   |
+| ------------------- | ---------------------- |
+| `before { }`        | `beforeEach(() => {})` |
 | `before(:each) { }` | `beforeEach(() => {})` |
-| `before(:all) { }` | `beforeAll(() => {})` |
-| `after { }` | `afterEach(() => {})` |
-| `after(:each) { }` | `afterEach(() => {})` |
-| `after(:all) { }` | `afterAll(() => {})` |
+| `before(:all) { }`  | `beforeAll(() => {})`  |
+| `after { }`         | `afterEach(() => {})`  |
+| `after(:each) { }`  | `afterEach(() => {})`  |
+| `after(:all) { }`   | `afterAll(() => {})`   |
 
 ## Matchers
 

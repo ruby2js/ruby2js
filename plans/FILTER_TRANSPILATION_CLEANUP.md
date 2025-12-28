@@ -24,41 +24,41 @@ puts js
 
 ### Gsubs to Eliminate
 
-| # | Pattern | Purpose | Classification |
-|---|---------|---------|----------------|
-| 1 | Remove `const Ruby2JS = {Filter: (() => {` | Fix module wrapper | Selfhost-specific |
-| 2 | Remove `return {Functions}` IIFE tail | Fix module wrapper | Selfhost-specific |
-| 3-6 | Fix empty ternary/assignment/return from `super` | Handle Ruby filter super calls | **General-use** (affects all filters) |
-| 7 | `this._options` → `_options` | Module-level options | Selfhost-specific |
-| 8 | `x === s(...)` → `nodesEqual(x, s(...))` | AST structural comparison | Selfhost-specific |
-| 9 | Fix mutating `compact` polyfill | Non-mutating compact for frozen arrays | **General-use** (polyfill filter) |
-| 10 | `Regexp.` → `RegExp.` | Ruby constant to JS | **General-use** (converter) |
-| 11 | `s("const", null, Object)` → `s("const", null, "Object")` | Quote Object constant | Selfhost-specific |
-| 12 | Spread regopt node fix | Children spread issue | Selfhost-specific |
+| #   | Pattern                                                   | Purpose                                | Classification                        |
+| --- | --------------------------------------------------------- | -------------------------------------- | ------------------------------------- |
+| 1   | Remove `const Ruby2JS = {Filter: (() => {`                | Fix module wrapper                     | Selfhost-specific                     |
+| 2   | Remove `return {Functions}` IIFE tail                     | Fix module wrapper                     | Selfhost-specific                     |
+| 3-6 | Fix empty ternary/assignment/return from `super`          | Handle Ruby filter super calls         | **General-use** (affects all filters) |
+| 7   | `this._options` → `_options`                              | Module-level options                   | Selfhost-specific                     |
+| 8   | `x === s(...)` → `nodesEqual(x, s(...))`                  | AST structural comparison              | Selfhost-specific                     |
+| 9   | Fix mutating `compact` polyfill                           | Non-mutating compact for frozen arrays | **General-use** (polyfill filter)     |
+| 10  | `Regexp.` → `RegExp.`                                     | Ruby constant to JS                    | **General-use** (converter)           |
+| 11  | `s("const", null, Object)` → `s("const", null, "Object")` | Quote Object constant                  | Selfhost-specific                     |
+| 12  | Spread regopt node fix                                    | Children spread issue                  | Selfhost-specific                     |
 
 ### Preamble Items
 
-| Item | Purpose | Classification |
-|------|---------|----------------|
-| Import statement | Load ruby2js.js | Selfhost-specific (ESM output) |
-| Parser.AST.Node alias | Bridge Ruby Parser gem API | Selfhost-specific |
-| SEXP helpers (s, S) | AST construction | Selfhost-specific |
-| `ast_node` function | Check if value is AST node | Selfhost-specific |
-| `include = () => {}` | No-op for Ruby's include | Selfhost-specific |
-| Filter.exclude/include | No-op stubs | Selfhost-specific |
-| DEFAULTS array | Filter registration | Selfhost-specific |
-| Filter infrastructure | excluded, included, process, etc. | Selfhost-specific |
-| ES level getters | es2015-es2025 property checks | Selfhost-specific |
-| `nodesEqual` function | AST structural comparison | Selfhost-specific |
+| Item                   | Purpose                           | Classification                 |
+| ---------------------- | --------------------------------- | ------------------------------ |
+| Import statement       | Load ruby2js.js                   | Selfhost-specific (ESM output) |
+| Parser.AST.Node alias  | Bridge Ruby Parser gem API        | Selfhost-specific              |
+| SEXP helpers (s, S)    | AST construction                  | Selfhost-specific              |
+| `ast_node` function    | Check if value is AST node        | Selfhost-specific              |
+| `include = () => {}`   | No-op for Ruby's include          | Selfhost-specific              |
+| Filter.exclude/include | No-op stubs                       | Selfhost-specific              |
+| DEFAULTS array         | Filter registration               | Selfhost-specific              |
+| Filter infrastructure  | excluded, included, process, etc. | Selfhost-specific              |
+| ES level getters       | es2015-es2025 property checks     | Selfhost-specific              |
+| `nodesEqual` function  | AST structural comparison         | Selfhost-specific              |
 
 ### Postamble Items
 
-| Item | Purpose | Classification |
-|------|---------|----------------|
-| DEFAULTS.push | Register filter | Selfhost-specific |
-| Ruby2JS.Filter.X assignment | Namespace registration | Selfhost-specific |
-| `_setup` function | Bind infrastructure at runtime | Selfhost-specific |
-| ES module export | ESM compatibility | Selfhost-specific |
+| Item                        | Purpose                        | Classification    |
+| --------------------------- | ------------------------------ | ----------------- |
+| DEFAULTS.push               | Register filter                | Selfhost-specific |
+| Ruby2JS.Filter.X assignment | Namespace registration         | Selfhost-specific |
+| `_setup` function           | Bind infrastructure at runtime | Selfhost-specific |
+| ES module export            | ESM compatibility              | Selfhost-specific |
 
 ## Proposed Changes
 
@@ -351,34 +351,34 @@ The transpile script is now 45 lines of pure Ruby2JS configuration - no manual s
 
 **Current test results** (2024-12-14, latest):
 
-| Category | Status | Tests |
-|----------|--------|-------|
-| Ready specs | ✅ 3/3 passing | 290 tests (transliteration, serializer, namespace) |
-| Partial specs | 8 filters tested | See matrix below |
+| Category      | Status           | Tests                                              |
+| ------------- | ---------------- | -------------------------------------------------- |
+| Ready specs   | ✅ 3/3 passing    | 290 tests (transliteration, serializer, namespace) |
+| Partial specs | 8 filters tested | See matrix below                                   |
 
 #### Filter Test Matrix
 
-| Filter | Syntax Valid | Tests Passing | Pass Rate | Notes |
-|--------|--------------|---------------|-----------|-------|
-| functions | ✓ | 190/203 | 94% | High coverage |
-| camelCase | ✓ | 17/19 | 89% | Near ready |
-| tagged_templates | ✓ | 6/7 | 86% | Near ready |
-| return | ✓ | 8/25 | 32% | Needs work |
-| esm | ✓ | 4/40 | 10% | Needs work |
-| cjs | ✓ | 1/19 | 5% | Needs work |
-| polyfill | ✓ | 0/0 | N/A | No spec tests |
-| pragma | ✓ | 0/71 | 0% | Needs work |
+| Filter           | Syntax Valid | Tests Passing | Pass Rate | Notes         |
+| ---------------- | ------------ | ------------- | --------- | ------------- |
+| functions        | ✓            | 190/203       | 94%       | High coverage |
+| camelCase        | ✓            | 17/19         | 89%       | Near ready    |
+| tagged_templates | ✓            | 6/7           | 86%       | Near ready    |
+| return           | ✓            | 8/25          | 32%       | Needs work    |
+| esm              | ✓            | 4/40          | 10%       | Needs work    |
+| cjs              | ✓            | 1/19          | 5%        | Needs work    |
+| polyfill         | ✓            | 0/0           | N/A       | No spec tests |
+| pragma           | ✓            | 0/71          | 0%        | Needs work    |
 
 #### Blocked Filters
 
 These filters have transpilation issues that need selfhost improvements:
 
-| Filter | Issue |
-|--------|-------|
+| Filter       | Issue                                |
+| ------------ | ------------------------------------ |
 | securerandom | `extend SEXP` Ruby DSL not supported |
-| node | `extend SEXP` Ruby DSL not supported |
-| combiner | Ruby2JS constant redeclaration |
-| react | Empty `let ;` statement from super |
+| node         | `extend SEXP` Ruby DSL not supported |
+| combiner     | Ruby2JS constant redeclaration       |
+| react        | Empty `let ;` statement from super   |
 
 #### Recent Progress (2024-12-14)
 
@@ -455,12 +455,12 @@ export { Functions }
 
 #### Functions Filter Failure Analysis (13 remaining)
 
-| Category | Count | Description |
-|----------|-------|-------------|
-| **Block-pass (`&:method`)** | 3 | Symbol-to-proc not expanded |
-| **Metaprogramming** | 5 | Missing class context |
-| **Class.new object literal** | 4 | Anonymous class → object literal |
-| **Runtime errors** | 1 | matchAll undefined |
+| Category                     | Count | Description                      |
+| ---------------------------- | ----- | -------------------------------- |
+| **Block-pass (`&:method`)**  | 3     | Symbol-to-proc not expanded      |
+| **Metaprogramming**          | 5     | Missing class context            |
+| **Class.new object literal** | 4     | Anonymous class → object literal |
+| **Runtime errors**           | 1     | matchAll undefined               |
 
 ## Completion Criteria
 

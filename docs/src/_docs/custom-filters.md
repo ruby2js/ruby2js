@@ -59,23 +59,23 @@ puts ast.inspect
 
 Common node types:
 
-| Node Type | Example Ruby | AST Structure |
-|-----------|--------------|---------------|
-| `:send` | `foo.bar(x)` | `s(:send, receiver, :method, args...)` |
-| `:lvar` | `x` | `s(:lvar, :x)` |
-| `:lvasgn` | `x = 1` | `s(:lvasgn, :x, value)` |
-| `:def` | `def foo; end` | `s(:def, :foo, args, body)` |
-| `:defs` | `def self.foo; end` | `s(:defs, target, :foo, args, body)` |
-| `:class` | `class Foo; end` | `s(:class, name, parent, body)` |
-| `:if` | `if x; y; end` | `s(:if, cond, then, else)` |
-| `:block` | `x { \|a\| b }` | `s(:block, call, args, body)` |
-| `:int` | `42` | `s(:int, 42)` |
-| `:str` | `"hello"` | `s(:str, "hello")` |
-| `:sym` | `:foo` | `s(:sym, :foo)` |
-| `:array` | `[1, 2]` | `s(:array, elements...)` |
-| `:hash` | `{a: 1}` | `s(:hash, pairs...)` |
-| `:ivar` | `@foo` | `s(:ivar, :@foo)` |
-| `:const` | `Foo` | `s(:const, nil, :Foo)` |
+| Node Type | Example Ruby        | AST Structure                          |
+| --------- | ------------------- | -------------------------------------- |
+| `:send`   | `foo.bar(x)`        | `s(:send, receiver, :method, args...)` |
+| `:lvar`   | `x`                 | `s(:lvar, :x)`                         |
+| `:lvasgn` | `x = 1`             | `s(:lvasgn, :x, value)`                |
+| `:def`    | `def foo; end`      | `s(:def, :foo, args, body)`            |
+| `:defs`   | `def self.foo; end` | `s(:defs, target, :foo, args, body)`   |
+| `:class`  | `class Foo; end`    | `s(:class, name, parent, body)`        |
+| `:if`     | `if x; y; end`      | `s(:if, cond, then, else)`             |
+| `:block`  | `x { \|a\| b }`     | `s(:block, call, args, body)`          |
+| `:int`    | `42`                | `s(:int, 42)`                          |
+| `:str`    | `"hello"`           | `s(:str, "hello")`                     |
+| `:sym`    | `:foo`              | `s(:sym, :foo)`                        |
+| `:array`  | `[1, 2]`            | `s(:array, elements...)`               |
+| `:hash`   | `{a: 1}`            | `s(:hash, pairs...)`                   |
+| `:ivar`   | `@foo`              | `s(:ivar, :@foo)`                      |
+| `:const`  | `Foo`               | `s(:const, nil, :Foo)`                 |
 
 ## Helper Methods
 

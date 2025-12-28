@@ -134,12 +134,12 @@ phlex-blog/
 
 The same Ruby source can target different databases:
 
-| Target | Database | Use Case |
-|--------|----------|----------|
-| Browser | sql.js (SQLite WASM) | Client-side SPA |
-| Browser | Dexie (IndexedDB) | Persistent browser storage |
-| Server | better-sqlite3 | Node.js server |
-| Server | PostgreSQL | Production server |
+| Target  | Database             | Use Case                   |
+| ------- | -------------------- | -------------------------- |
+| Browser | sql.js (SQLite WASM) | Client-side SPA            |
+| Browser | Dexie (IndexedDB)    | Persistent browser storage |
+| Server  | better-sqlite3       | Node.js server             |
+| Server  | PostgreSQL           | Production server          |
 
 Configure via `config/database.yml` or `DATABASE` environment variable.
 
