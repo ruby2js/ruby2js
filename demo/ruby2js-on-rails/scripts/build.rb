@@ -392,11 +392,18 @@ class SelfhostBuilder
     npm_adapter_dir = File.join(DEMO_ROOT, 'node_modules/ruby2js-rails/adapters')
     vendor_adapter_dir = File.join(DEMO_ROOT, 'vendor/ruby2js/adapters')
     adapter_dir = File.exist?(npm_adapter_dir) ? npm_adapter_dir : vendor_adapter_dir
-    adapter_src = File.join(adapter_dir, adapter_file)
-    adapter_dest = File.join(@dist_dir, 'lib/active_record.mjs')
-    FileUtils.mkdir_p(File.dirname(adapter_dest))
+    lib_dest = File.join(@dist_dir, 'lib')
+    FileUtils.mkdir_p(lib_dest)
+
+    # Copy base class first (all adapters depend on it)
+    base_src = File.join(adapter_dir, 'active_record_base.mjs')
+    base_dest = File.join(lib_dest, 'active_record_base.mjs')
+    FileUtils.cp(base_src, base_dest)
+    puts("  Base class: active_record_base.mjs")
 
     # Read adapter and inject config
+    adapter_src = File.join(adapter_dir, adapter_file)
+    adapter_dest = File.join(lib_dest, 'active_record.mjs')
     adapter_code = File.read(adapter_src)
     adapter_code = adapter_code.sub('const DB_CONFIG = {};', "const DB_CONFIG = #{JSON.generate(db_config)};")
     File.write(adapter_dest, adapter_code)

@@ -12,9 +12,9 @@ FROM ruby:3.4 AS builder
 
 WORKDIR /app
 
-# Create Rails app with scaffold
+# Create Rails app with scaffold and Tailwind CSS
 RUN gem install rails && \
-    rails new blog --skip-git --skip-docker
+    rails new blog --skip-git --skip-docker --css tailwind
 
 WORKDIR /app/blog
 

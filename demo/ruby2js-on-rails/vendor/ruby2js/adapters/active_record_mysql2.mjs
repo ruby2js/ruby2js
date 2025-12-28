@@ -4,6 +4,11 @@
 
 import mysql from 'mysql2/promise';
 
+import { ActiveRecordBase, attr_accessor, initTimePolyfill } from './active_record_base.mjs';
+
+// Re-export shared utilities
+export { attr_accessor };
+
 // Configuration injected at build time
 const DB_CONFIG = {};
 
@@ -46,11 +51,7 @@ export async function initDatabase(options = {}) {
   connection.release();
 
   // Time polyfill for Ruby compatibility (Node.js global)
-  globalThis.Time = {
-    now() {
-      return { toString() { return new Date().toISOString(); } };
-    }
-  };
+  initTimePolyfill(globalThis);
 
   return pool;
 }
@@ -165,66 +166,8 @@ export async function closeDatabase() {
   }
 }
 
-// Base class for ActiveRecord models
-export class ActiveRecord {
-  static table_name = null;  // Override in subclass (Ruby convention)
-  static columns = [];       // Override in subclass
-
-  // Getter to support both tableName and table_name (JS vs Ruby convention)
-  static get tableName() {
-    return this.table_name;
-  }
-
-  constructor(attributes = {}) {
-    this.id = attributes.id || null;
-    this.attributes = { ...attributes };
-    this._persisted = !!attributes.id;
-    this._changes = {};
-    this._errors = [];
-
-    // Set attribute accessors for direct property access (article.title)
-    for (const [key, value] of Object.entries(attributes)) {
-      if (key !== 'id' && !(key in this)) {
-        this[key] = value;
-      }
-    }
-  }
-
-  // --- Validation ---
-
-  get errors() {
-    return this._errors;
-  }
-
-  get isValid() {
-    this._errors = [];
-    this.validate();
-    if (this._errors.length > 0) {
-      console.warn('  Validation failed:', this._errors);
-    }
-    return this._errors.length === 0;
-  }
-
-  // Override in subclass to add validations
-  validate() {}
-
-  validates_presence_of(field) {
-    const value = this.attributes[field];
-    if (value == null || String(value).trim().length === 0) {
-      this._errors.push(`${field} can't be blank`);
-    }
-  }
-
-  validates_length_of(field, options) {
-    const value = String(this.attributes[field] || '');
-    if (options.minimum && value.length < options.minimum) {
-      this._errors.push(`${field} is too short (minimum is ${options.minimum} characters)`);
-    }
-    if (options.maximum && value.length > options.maximum) {
-      this._errors.push(`${field} is too long (maximum is ${options.maximum} characters)`);
-    }
-  }
-
+// MySQL-specific ActiveRecord implementation
+export class ActiveRecord extends ActiveRecordBase {
   // --- Class Methods (finders) ---
 
   static async all() {
@@ -261,12 +204,6 @@ export class ActiveRecord {
     return rows.map(row => new this(row));
   }
 
-  static async create(attributes) {
-    const record = new this(attributes);
-    await record.save();
-    return record;
-  }
-
   static async count() {
     const [rows] = await pool.query(`SELECT COUNT(*) as count FROM ${this.tableName}`);
     return parseInt(rows[0].count);
@@ -287,35 +224,6 @@ export class ActiveRecord {
   }
 
   // --- Instance Methods ---
-
-  get persisted() {
-    return this._persisted;
-  }
-
-  get newRecord() {
-    return !this._persisted;
-  }
-
-  async save() {
-    if (!this.isValid) return false;
-
-    if (this._persisted) {
-      return await this._update();
-    } else {
-      return await this._insert();
-    }
-  }
-
-  async update(attributes) {
-    Object.assign(this.attributes, attributes);
-    // Also update direct properties
-    for (const [key, value] of Object.entries(attributes)) {
-      if (key !== 'id') {
-        this[key] = value;
-      }
-    }
-    return await this.save();
-  }
 
   async destroy() {
     if (!this._persisted) return false;
@@ -339,18 +247,6 @@ export class ActiveRecord {
       }
     }
     return this;
-  }
-
-  // --- Association helpers ---
-
-  async hasMany(modelClass, foreignKey) {
-    return await modelClass.where({ [foreignKey]: this.id });
-  }
-
-  async belongsTo(modelClass, foreignKey) {
-    const fkValue = this.attributes[foreignKey];
-    if (!fkValue) return null;
-    return await modelClass.find(fkValue);
   }
 
   // --- Private helpers ---
@@ -417,19 +313,5 @@ export class ActiveRecord {
 
   static _resultToModels(rows) {
     return rows.map(row => new this(row));
-  }
-}
-
-// Helper to define attribute accessors
-export function attr_accessor(klass, ...attrs) {
-  for (const attr of attrs) {
-    Object.defineProperty(klass.prototype, attr, {
-      get() { return this.attributes[attr]; },
-      set(value) {
-        this.attributes[attr] = value;
-        this._changes[attr] = value;
-      },
-      enumerable: true
-    });
   }
 }
