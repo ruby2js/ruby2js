@@ -55,7 +55,7 @@ Changes from `== s(:const, nil, :X)` to element-by-element comparison.
 | --------------------------------------------- | -------- | ---------------------------------------------------------------------- |
 | `Converter::LOGICAL` instead of `LOGICAL`     | C        | Explicit module reference for JS. **Keep.**                            |
 | `Converter::INVERT_OP` instead of `INVERT_OP` | C        | Same. **Keep.**                                                        |
-| Chained `                                     |          | ` handling (left.type != :or)                                          |
+| Chained `\|\|` handling (left.type != :or)    | A        | **Bug fix for issue #264.** Prevents mixing `??` and `\|\|` in chained expressions. Benefits everyone. **Keep.** |
 | Handle nil left in `:nullish` handler         | A        | **Bug fix.** Handles `nil.to_s` with `nullish_to_s` option. **Keep.**  |
 | `Converter::OPERATORS` reference              | C        | Explicit module reference. **Keep.**                                   |
 | `:in?` node check in rewrite                  | A        | **Bug fix.** Skip `:in?` nodes in optional chaining rewrite. **Keep.** |
@@ -68,8 +68,8 @@ Changes from `== s(:const, nil, :X)` to element-by-element comparison.
 
 | Change                      | Category | Assessment                                     |
 | --------------------------- | -------- | ---------------------------------------------- |
-| New `:logical_or` handler   | B        | Created for `# Pragma: logical` and `# Pragma: |
-| New `:logical_asgn` handler | B        | Created for `                                  |
+| New `:logical_or` handler   | B        | Created for `# Pragma: logical` and `# Pragma: \|\|`. **Keep.** |
+| New `:logical_asgn` handler | B        | Created for `\|\|=` with logical pragma. **Keep.**              |
 
 **Summary:** New file implementing pragma support. Necessary and well-designed.
 

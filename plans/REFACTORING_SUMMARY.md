@@ -82,7 +82,7 @@ This document summarizes the outcomes of the 6-phase refactoring effort outlined
 | `skip`    | 19    | Ruby-only code exclusion                  |
 | `method`  | 18    | Force callable invocation                 |
 | `hash`    | 16    | Force `in` operator for existence check   |
-| `logical` | 6     | Force `                                   |
+| `logical` | 6     | Force `\|\|` instead of `??`              |
 | `entries` | 4     | Use `Object.entries()` for hash iteration |
 
 ## Key Learnings

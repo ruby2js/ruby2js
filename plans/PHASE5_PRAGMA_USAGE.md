@@ -8,7 +8,7 @@
 | `skip`      | 19    | Exclude line/method from transpilation                  |
 | `method`    | 18    | Force `walk.call(x)` instead of `walk(x)`               |
 | `hash`      | 16    | Force `prop in obj` instead of `obj[prop]`              |
-| `logical`   | 6     | Force `                                                 |
+| `logical`   | 6     | Force `\|\|` instead of `??` for nullish handling       |
 | `entries`   | 4     | Use `Object.entries()` for hash iteration               |
 
 **Total**: 85 pragmas across selfhost-transpiled files
