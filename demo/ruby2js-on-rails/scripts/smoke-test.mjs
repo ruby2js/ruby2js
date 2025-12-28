@@ -13,6 +13,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const DEMO_ROOT = join(__dirname, '..');
 const PROJECT_ROOT = join(DEMO_ROOT, '../..');  // ruby2js root where Gemfile lives
+const PACKAGE_ROOT = join(PROJECT_ROOT, 'packages/ruby2js-rails');
 
 // Parse command line options
 const showDiff = process.argv.includes('--diff') || process.argv.includes('-d');
@@ -223,8 +224,8 @@ async function runTests() {
     // Test 2: Selfhost build
     log('\n2. Selfhost build', BOLD);
     try {
-      // Import and run selfhost builder
-      const { SelfhostBuilder } = await import(join(DEMO_ROOT, 'vendor/ruby2js/build.mjs'));
+      // Import and run selfhost builder from package
+      const { SelfhostBuilder } = await import(join(PACKAGE_ROOT, 'build.mjs'));
       const builder = new SelfhostBuilder(selfhostDist);
       await builder.build();
       pass('Selfhost build completed');

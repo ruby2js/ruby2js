@@ -9,6 +9,7 @@ node_modules
 demo/selfhost/dist/
 demo/ruby2js-on-rails/dist/
 demo/selfhost/ruby2js.js
+packages/ruby2js-rails/build.mjs
 demo/selfhost/ruby2js.mjs
 demo/selfhost/prism_browser.js
 demo/selfhost/filters/
