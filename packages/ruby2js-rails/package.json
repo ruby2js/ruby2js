@@ -1,6 +1,6 @@
 {
   "name": "ruby2js-rails",
-  "version": "6.0.0-beta",
+  "version": "0.0.0-local",
   "type": "module",
   "description": "Rails runtime adapters, targets, and build tools for Ruby2JS",
   "bin": {
@@ -11,6 +11,8 @@
   "exports": {
     "./adapters/*": "./adapters/*",
     "./targets/*": "./targets/*",
+    "./rails_base.js": "./rails_base.js",
+    "./rails_server.js": "./rails_server.js",
     "./erb_runtime.mjs": "./erb_runtime.mjs",
     "./phlex_runtime.mjs": "./phlex_runtime.mjs",
     "./build.mjs": "./build.mjs",
@@ -20,6 +22,8 @@
   "files": [
     "adapters/",
     "targets/",
+    "rails_base.js",
+    "rails_server.js",
     "erb_runtime.mjs",
     "phlex_runtime.mjs",
     "build.mjs",
@@ -43,6 +47,7 @@
   "dependencies": {
     "chokidar": "^3.5.3",
     "js-yaml": "^4.1.0",
+    "ruby2js": "https://www.ruby2js.com/releases/ruby2js-beta.tgz",
     "ws": "^8.14.2"
   }
 }

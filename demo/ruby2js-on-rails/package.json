@@ -10,18 +10,15 @@
     "dev:bun": "DATABASE=better_sqlite3 RUNTIME=bun npm run build && bun node_modules/ruby2js-rails/server.mjs",
     "dev:deno": "DATABASE=better_sqlite3 RUNTIME=deno npm run build && deno run --allow-all node_modules/ruby2js-rails/server.mjs",
     "build": "ruby2js-rails-build",
-    "build:ruby": "ruby scripts/build.rb",
     "start": "npx serve -s -p 3000",
     "start:node": "ruby2js-rails-server",
     "start:bun": "bun node_modules/ruby2js-rails/server.mjs",
     "start:deno": "deno run --allow-all node_modules/ruby2js-rails/server.mjs"
   },
   "dependencies": {
+    "ruby2js-rails": "file:../../packages/ruby2js-rails",
     "dexie": "^4.0.10",
-    "sql.js": "^1.11.0",
-    "chokidar": "^3.5.3",
-    "js-yaml": "^4.1.0",
-    "ws": "^8.14.2"
+    "sql.js": "^1.11.0"
   },
   "optionalDependencies": {
     "better-sqlite3": "^11.0.0",
