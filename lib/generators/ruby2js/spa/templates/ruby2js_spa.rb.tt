@@ -19,6 +19,9 @@ Ruby2JS::Spa.configure do
   # Run `rails g ruby2js:spa:install --help` for valid combinations
   runtime :<%= options[:runtime] %>
   database :<%= options[:database] %>
+
+  # CSS framework: none, pico, or tailwind
+  css :<%= options[:css] %>
 <% if @root_route %>
 
   # Root route

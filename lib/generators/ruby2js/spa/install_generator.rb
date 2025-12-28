@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'rails/generators'
+require 'json'
 
 # Use Ruby2js (lowercase 'js') so Rails finds this as 'ruby2js:spa:install'
 # rather than 'ruby2_j_s:spa:install'
@@ -29,11 +30,20 @@ module Ruby2js
       class_option :root, type: :string,
         desc: "Root route (default: copy from Rails routes.rb)"
 
+      class_option :css, type: :string,
+        desc: "CSS framework: none, pico, or tailwind (default: auto-detect from Rails app)"
+
       def set_defaults
         # Derive name from Rails app name if not provided
         unless options[:name]
           app_name = Rails.application.class.module_parent_name.underscore rescue 'app'
           @options = options.merge(name: app_name)
+        end
+
+        # Auto-detect CSS framework if not provided
+        unless options[:css]
+          detected_css = detect_css_framework
+          @options = (@options || options).merge(css: detected_css)
         end
 
         # Auto-detect scaffolds if none provided
@@ -55,9 +65,13 @@ module Ruby2js
         'deno' => %w[pg mysql]
       }.freeze
 
+      # Valid CSS framework options
+      VALID_CSS_OPTIONS = %w[none pico tailwind].freeze
+
       def validate_options
         runtime = options[:runtime]
         database = options[:database]
+        css = options[:css]
 
         unless VALID_COMBINATIONS.key?(runtime)
           say_status :error, "Invalid runtime '#{runtime}'. Valid options: #{VALID_COMBINATIONS.keys.join(', ')}", :red
@@ -68,6 +82,11 @@ module Ruby2js
         unless valid_dbs.include?(database)
           say_status :error, "Invalid database '#{database}' for runtime '#{runtime}'. Valid options: #{valid_dbs.join(', ')}", :red
           raise ArgumentError, "Invalid database for runtime"
+        end
+
+        unless VALID_CSS_OPTIONS.include?(css)
+          say_status :error, "Invalid CSS framework '#{css}'. Valid options: #{VALID_CSS_OPTIONS.join(', ')}", :red
+          raise ArgumentError, "Invalid CSS framework"
         end
       end
 
@@ -100,6 +119,7 @@ module Ruby2js
         say "Configuration:"
         say "  Runtime:  #{options[:runtime]}"
         say "  Database: #{options[:database]}"
+        say "  CSS:      #{options[:css]}"
         say "  Scaffolds: #{@detected_scaffolds.any? ? @detected_scaffolds.join(', ') : '(none detected)'}"
         say "  Root: #{@root_route || '(none)'}"
         say ""
@@ -116,6 +136,38 @@ module Ruby2js
       end
 
       private
+
+      # Detect CSS framework from Rails app configuration
+      def detect_css_framework
+        gemfile = Rails.root.join('Gemfile')
+        return 'none' unless File.exist?(gemfile)
+
+        gemfile_content = File.read(gemfile)
+
+        # Check for tailwindcss-rails gem
+        if gemfile_content =~ /gem\s+['"]tailwindcss-rails['"]/
+          return 'tailwind'
+        end
+
+        # Check for cssbundling-rails with specific CSS frameworks
+        if gemfile_content =~ /gem\s+['"]cssbundling-rails['"]/
+          # Check package.json for the specific CSS framework
+          package_json = Rails.root.join('package.json')
+          if File.exist?(package_json)
+            begin
+              pkg = JSON.parse(File.read(package_json))
+              deps = (pkg['dependencies'] || {}).merge(pkg['devDependencies'] || {})
+
+              return 'tailwind' if deps['tailwindcss']
+              # Bootstrap and Bulma not yet supported, fall through to none
+            rescue JSON::ParserError
+              # Ignore JSON parse errors
+            end
+          end
+        end
+
+        'none'
+      end
 
       # Detect models that have corresponding controllers (scaffolds)
       def detect_scaffolds

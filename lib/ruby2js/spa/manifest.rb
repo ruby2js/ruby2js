@@ -32,7 +32,7 @@ module Ruby2JS
     #   end
     #
     class Manifest
-      attr_reader :name, :mount_path, :runtime, :database, :root_route
+      attr_reader :name, :mount_path, :runtime, :database, :css, :root_route
       attr_reader :route_config, :model_config, :view_config
       attr_reader :controller_config, :stimulus_config, :sync_config
 
@@ -44,9 +44,13 @@ module Ruby2JS
         deno: %i[pg mysql]
       }.freeze
 
+      # Valid CSS framework options
+      VALID_CSS_OPTIONS = %i[none pico tailwind].freeze
+
       def initialize
         @runtime = :browser
         @database = :dexie
+        @css = :none
         @root_route = nil
         @route_config = RouteConfig.new
         @model_config = ModelConfig.new
@@ -75,6 +79,11 @@ module Ruby2JS
       def database(value = nil)
         return @database if value.nil?
         @database = value.to_sym
+      end
+
+      def css(value = nil)
+        return @css if value.nil?
+        @css = value.to_sym
       end
 
       def root(value = nil)
@@ -140,6 +149,11 @@ module Ruby2JS
           unless valid_dbs.include?(@database)
             errs << "invalid database '#{@database}' for runtime '#{@runtime}' (valid: #{valid_dbs.join(', ')})"
           end
+        end
+
+        # Validate CSS framework
+        unless VALID_CSS_OPTIONS.include?(@css)
+          errs << "invalid css '#{@css}' (valid: #{VALID_CSS_OPTIONS.join(', ')})"
         end
 
         errs

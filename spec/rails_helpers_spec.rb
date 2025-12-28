@@ -103,6 +103,20 @@ describe Ruby2JS::Filter::Rails::Helpers do
       result.must_include '<a href="'
       result.must_include '</a>'
     end
+
+    it "should include class attribute on link_to" do
+      erb_src = '_erbout = +\'\'; _erbout.<<(( link_to("Show", "/articles", class: "btn btn-primary") ).to_s); _erbout'
+      result = to_js(erb_src)
+      result.must_include 'class=\"btn btn-primary\"'
+      result.must_include '>Show</a>'
+    end
+
+    it "should handle link_to with array class including conditionals" do
+      # Tailwind pattern: class: ["base", {"conditional": condition}]
+      erb_src = '_erbout = +\'\'; _erbout.<<(( link_to("Edit", "/edit", class: ["rounded-md", "px-3", {"text-red": errors}]) ).to_s); _erbout'
+      result = to_js(erb_src)
+      result.must_include 'class=\"rounded-md px-3 text-red\"'
+    end
   end
 
   describe 'truncate helper' do

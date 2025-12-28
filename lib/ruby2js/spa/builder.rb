@@ -61,6 +61,7 @@ module Ruby2JS
         puts "SPA generated successfully: #{output_dir}"
         puts "  Runtime: #{manifest.runtime}"
         puts "  Database: #{manifest.database}"
+        puts "  CSS: #{manifest.css}"
         puts "  Models: #{@resolved_models.keys.join(', ')}"
         puts "  Views: #{@copied_views.join(', ')}" if @copied_views.any?
         puts "  Controllers: #{@copied_controllers.join(', ')}" if @copied_controllers.any?
@@ -358,16 +359,37 @@ module Ruby2JS
         mysql: { 'mysql2' => '^3.11.0' }
       }.freeze
 
+      # CSS framework npm packages
+      CSS_PACKAGES = {
+        none: {},
+        pico: { '@picocss/pico' => '^2.0.6' },
+        tailwind: { 'tailwindcss' => '^3.4.0' }
+      }.freeze
+
+      # CSS framework descriptions for README
+      CSS_DESCRIPTIONS = {
+        none: 'minimal custom styles',
+        pico: 'Pico CSS (classless, semantic HTML styling)',
+        tailwind: 'Tailwind CSS (utility-first framework)'
+      }.freeze
+
       def generate_package_json
         runtime = manifest.runtime
         database = manifest.database
+        css = manifest.css
 
         # Base scripts - focused on the target runtime
         scripts = {
           dev: dev_script_for(runtime),
-          build: "ruby2js-rails-build",
+          build: build_script_for(css),
           start: start_script_for(runtime)
         }
+
+        # Add CSS-specific scripts for Tailwind
+        if css == :tailwind
+          scripts[:"build:css"] = "tailwindcss -i ./src/input.css -o ./public/styles.css --minify"
+          scripts[:"watch:css"] = "tailwindcss -i ./src/input.css -o ./public/styles.css --watch"
+        end
 
         # Base dependencies
         dependencies = {
@@ -377,6 +399,10 @@ module Ruby2JS
         # Add database-specific dependency
         db_deps = DATABASE_PACKAGES[database] || {}
         dependencies.merge!(db_deps)
+
+        # Add CSS-specific dependency
+        css_deps = CSS_PACKAGES[css] || {}
+        dependencies.merge!(css_deps)
 
         package = {
           name: manifest.name.to_s.gsub('_', '-'),
@@ -398,6 +424,13 @@ module Ruby2JS
         when :bun then "ruby2js-rails-dev --ruby"
         when :deno then "ruby2js-rails-dev --ruby"
         else "ruby2js-rails-dev"
+        end
+      end
+
+      def build_script_for(css)
+        case css
+        when :tailwind then "npm run build:css && ruby2js-rails-build"
+        else "ruby2js-rails-build"
         end
       end
 
@@ -447,6 +480,9 @@ module Ruby2JS
         importmap_entries = BROWSER_IMPORTMAPS[manifest.database] || {}
         importmap_json = JSON.pretty_generate({ imports: importmap_entries })
 
+        # CSS framework link
+        css_link = css_link_for(manifest.css)
+
         html = <<~HTML
           <!DOCTYPE html>
           <html>
@@ -454,7 +490,7 @@ module Ruby2JS
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>#{manifest.name.to_s.gsub('_', ' ').capitalize}</title>
-            <link rel="stylesheet" href="/public/styles.css">
+            #{css_link}
             <script type="importmap">
             #{importmap_json}
             </script>
@@ -480,6 +516,17 @@ module Ruby2JS
         File.write(File.join(output_dir, 'index.html'), html)
       end
 
+      def css_link_for(css)
+        case css
+        when :pico
+          '<link rel="stylesheet" href="/node_modules/@picocss/pico/css/pico.min.css">'
+        when :tailwind
+          '<link rel="stylesheet" href="/public/styles.css">'
+        else
+          '<link rel="stylesheet" href="/public/styles.css">'
+        end
+      end
+
       def generate_readme
         runtime_desc = case manifest.runtime
         when :browser then "runs in the browser"
@@ -490,6 +537,7 @@ module Ruby2JS
         end
 
         db_desc = DATABASE_DESCRIPTIONS[manifest.database] || manifest.database.to_s
+        css_desc = CSS_DESCRIPTIONS[manifest.css] || manifest.css.to_s
 
         readme = <<~MD
           # #{manifest.name.to_s.gsub('_', ' ').capitalize}
@@ -518,6 +566,7 @@ module Ruby2JS
 
           - **Runtime:** #{manifest.runtime}
           - **Database:** #{db_desc}
+          - **CSS:** #{css_desc}
 
           To change the target, edit `config/ruby2js_spa.rb` in your Rails app
           and regenerate with `rails ruby2js:spa:build`.
@@ -545,15 +594,25 @@ module Ruby2JS
         File.write(File.join(output_dir, 'README.md'), readme)
       end
 
-      # Copy styles if they exist
+      # Generate styles based on CSS framework
       def copy_styles
+        case manifest.css
+        when :tailwind
+          generate_tailwind_files
+        when :pico
+          generate_pico_styles
+        else
+          generate_default_styles
+        end
+      end
+
+      def generate_default_styles
         styles_src = File.join(@rails_root, 'public', 'styles.css')
         styles_dst = File.join(output_dir, 'public', 'styles.css')
 
         if File.exist?(styles_src)
           FileUtils.cp(styles_src, styles_dst)
         else
-          # Generate minimal styles
           File.write(styles_dst, <<~CSS)
             body { font-family: system-ui, sans-serif; margin: 2rem; }
             nav { margin-bottom: 1rem; }
@@ -561,6 +620,56 @@ module Ruby2JS
             #loading { text-align: center; padding: 2rem; }
           CSS
         end
+      end
+
+      def generate_pico_styles
+        # Pico CSS is loaded from node_modules, just add custom overrides
+        styles_dst = File.join(output_dir, 'public', 'styles.css')
+        File.write(styles_dst, <<~CSS)
+          /* Custom styles (Pico CSS loaded from node_modules) */
+          #loading { text-align: center; padding: 2rem; }
+        CSS
+      end
+
+      def generate_tailwind_files
+        # Create src directory for Tailwind input
+        src_dir = File.join(output_dir, 'src')
+        FileUtils.mkdir_p(src_dir)
+
+        # Generate input.css with Tailwind directives
+        File.write(File.join(src_dir, 'input.css'), <<~CSS)
+          @tailwind base;
+          @tailwind components;
+          @tailwind utilities;
+
+          /* Custom styles */
+          #loading {
+            @apply text-center p-8;
+          }
+        CSS
+
+        # Generate tailwind.config.js
+        File.write(File.join(output_dir, 'tailwind.config.js'), <<~JS)
+          /** @type {import('tailwindcss').Config} */
+          export default {
+            content: [
+              "./index.html",
+              "./app/views/**/*.erb",
+              "./dist/**/*.js"
+            ],
+            theme: {
+              extend: {},
+            },
+            plugins: [],
+          }
+        JS
+
+        # Generate placeholder styles.css (will be overwritten by Tailwind build)
+        styles_dst = File.join(output_dir, 'public', 'styles.css')
+        File.write(styles_dst, <<~CSS)
+          /* This file is generated by Tailwind CSS */
+          /* Run: npm run build:css */
+        CSS
       end
 
       # Helpers

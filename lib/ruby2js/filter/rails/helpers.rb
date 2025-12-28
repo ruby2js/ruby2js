@@ -154,9 +154,11 @@ module Ruby2JS
           path_node = args[1]
           options = args[2] if args.length > 2
 
-          # Check for method: :delete option
+          # Extract options from hash
           is_delete = false
           confirm_msg = nil
+          css_class = nil
+
           if options&.type == :hash
             options.children.each do |pair|
               key = pair.children[0]
@@ -165,13 +167,16 @@ module Ruby2JS
                 case key.children[0]
                 when :method
                   is_delete = (value.type == :sym && value.children[0] == :delete)
+                when :class
+                  css_class = extract_class_value(value)
                 when :data
-                  # Look for confirm in data hash
+                  # Look for confirm/turbo_confirm in data hash
                   if value.type == :hash
                     value.children.each do |data_pair|
                       data_key = data_pair.children[0]
                       data_value = data_pair.children[1]
-                      if data_key.type == :sym && data_key.children[0] == :confirm
+                      if data_key.type == :sym &&
+                         [:confirm, :turbo_confirm].include?(data_key.children[0])
                         confirm_msg = data_value if data_value.type == :str
                       end
                     end
@@ -183,14 +188,47 @@ module Ruby2JS
 
           # Build the HTML
           if is_delete
-            build_delete_link(text_node, path_node, confirm_msg)
+            build_delete_link(text_node, path_node, confirm_msg, css_class)
           else
-            build_nav_link(text_node, path_node)
+            build_nav_link(text_node, path_node, css_class)
+          end
+        end
+
+        # Extract class value from various formats:
+        # - String: "foo bar"
+        # - Array: ["foo", "bar", {"baz": condition}]
+        def extract_class_value(node)
+          case node.type
+          when :str
+            node.children[0]
+          when :array
+            # Collect static class names from array
+            # For now, skip conditional hashes (would need runtime evaluation)
+            classes = []
+            node.children.each do |child|
+              if child.type == :str
+                classes << child.children[0]
+              elsif child.type == :hash
+                # Conditional classes like {"border-red": errors.any?}
+                # Extract class names but skip conditions (include all for now)
+                child.children.each do |pair|
+                  key = pair.children[0]
+                  if key.type == :str
+                    classes << key.children[0]
+                  elsif key.type == :sym
+                    classes << key.children[0].to_s
+                  end
+                end
+              end
+            end
+            classes.join(' ')
+          else
+            nil
           end
         end
 
         # Build a navigation link
-        def build_nav_link(text_node, path_node)
+        def build_nav_link(text_node, path_node, css_class = nil)
           # Handle model object as path: link_to "Show", @article or link_to "Show", article
           if path_node.type == :ivar
             # Instance variable: @article
@@ -219,28 +257,31 @@ module Ruby2JS
             end
           end
 
+          # Build class attribute string
+          class_attr = css_class ? " class=\"#{css_class}\"" : ""
+
           if self.browser_target?()
             # Browser target - SPA navigation with onclick handlers
             if text_node.type == :str && path_node.type == :str
               text_str = text_node.children[0]
               path_str = path_node.children[0]
-              s(:str, "<a href=\"#{path_str}\" onclick=\"return navigate(event, '#{path_str}')\">#{text_str}</a>")
+              s(:str, "<a href=\"#{path_str}\"#{class_attr} onclick=\"return navigate(event, '#{path_str}')\">#{text_str}</a>")
             elsif text_node.type == :str
               text_str = text_node.children[0]
               s(:dstr,
                 s(:str, '<a href="'),
                 s(:begin, path_expr),
-                s(:str, "\" onclick=\"return navigate(event, '"),
+                s(:str, "\"#{class_attr} onclick=\"return navigate(event, '"),
                 s(:begin, path_expr),
-                s(:str, "')\" style=\"cursor: pointer\">#{text_str}</a>"))
+                s(:str, "')\">#{text_str}</a>"))
             else
               text_expr = process(text_node)
               s(:dstr,
                 s(:str, '<a href="'),
                 s(:begin, path_expr),
-                s(:str, "\" onclick=\"return navigate(event, '"),
+                s(:str, "\"#{class_attr} onclick=\"return navigate(event, '"),
                 s(:begin, path_expr),
-                s(:str, "')\" style=\"cursor: pointer\">"),
+                s(:str, "')\">"),
                 s(:begin, text_expr),
                 s(:str, '</a>'))
             end
@@ -249,19 +290,19 @@ module Ruby2JS
             if text_node.type == :str && path_node.type == :str
               text_str = text_node.children[0]
               path_str = path_node.children[0]
-              s(:str, "<a href=\"#{path_str}\">#{text_str}</a>")
+              s(:str, "<a href=\"#{path_str}\"#{class_attr}>#{text_str}</a>")
             elsif text_node.type == :str
               text_str = text_node.children[0]
               s(:dstr,
                 s(:str, '<a href="'),
                 s(:begin, path_expr),
-                s(:str, "\">#{text_str}</a>"))
+                s(:str, "\"#{class_attr}>#{text_str}</a>"))
             else
               text_expr = process(text_node)
               s(:dstr,
                 s(:str, '<a href="'),
                 s(:begin, path_expr),
-                s(:str, '">'),
+                s(:str, "\"#{class_attr}>"),
                 s(:begin, text_expr),
                 s(:str, '</a>'))
             end
@@ -269,9 +310,13 @@ module Ruby2JS
         end
 
         # Build a delete link with confirmation
-        def build_delete_link(text_node, path_node, confirm_msg)
+        def build_delete_link(text_node, path_node, confirm_msg, css_class = nil)
           path_expr = process(path_node)
           confirm_str = confirm_msg ? confirm_msg.children[0] : 'Are you sure?'
+
+          # Build class attribute - use provided class or default styling
+          class_attr = css_class ? " class=\"#{css_class}\"" : ""
+          style_attr = css_class ? "" : " style=\"color: red; cursor: pointer;\""
 
           if self.browser_target?()
             text_str = text_node.type == :str ? text_node.children[0] : nil
@@ -289,52 +334,53 @@ module Ruby2JS
                 route_name = "#{parent_name}_#{base_name}"
 
                 return s(:dstr,
-                  s(:str, "<a href=\"#\" onclick=\"if(confirm('#{confirm_str}')) { routes.#{route_name}.delete("),
+                  s(:str, "<a href=\"#\"#{class_attr}#{style_attr} onclick=\"if(confirm('#{confirm_str}')) { routes.#{route_name}.delete("),
                   s(:begin, s(:attr, s(:lvar, parent_name.to_sym), :id)),
                   s(:str, ", "),
                   s(:begin, s(:attr, process(child_arg), :id)),
-                  s(:str, ") } return false;\" style=\"color: red; cursor: pointer;\">#{text_str || 'Delete'}</a>"))
+                  s(:str, ") } return false;\">#{text_str || 'Delete'}</a>"))
               elsif path_args.length == 1
                 arg = path_args.first
                 model_name = arg.type == :ivar ? arg.children.first.to_s.sub(/^@/, '') : nil
 
                 if model_name
                   return s(:dstr,
-                    s(:str, "<a href=\"#\" onclick=\"if(confirm('#{confirm_str}')) { routes.#{base_name}.delete("),
+                    s(:str, "<a href=\"#\"#{class_attr}#{style_attr} onclick=\"if(confirm('#{confirm_str}')) { routes.#{base_name}.delete("),
                     s(:begin, s(:attr, s(:lvar, model_name.to_sym), :id)),
-                    s(:str, ") } return false;\" style=\"color: red; cursor: pointer;\">#{text_str || 'Delete'}</a>"))
+                    s(:str, ") } return false;\">#{text_str || 'Delete'}</a>"))
                 end
               end
             end
 
             # Fallback
             if text_str
-              s(:str, "<a href=\"#\" onclick=\"if(confirm('#{confirm_str}')) { /* delete */ } return false;\">#{text_str}</a>")
+              s(:str, "<a href=\"#\"#{class_attr} onclick=\"if(confirm('#{confirm_str}')) { /* delete */ } return false;\">#{text_str}</a>")
             else
               text_expr = process(text_node)
               s(:dstr,
-                s(:str, "<a href=\"#\" onclick=\"if(confirm('#{confirm_str}')) { /* delete */ } return false;\">"),
+                s(:str, "<a href=\"#\"#{class_attr} onclick=\"if(confirm('#{confirm_str}')) { /* delete */ } return false;\">"),
                 s(:begin, text_expr),
                 s(:str, '</a>'))
             end
           else
             # Node target - form-based delete
+            button_class = css_class ? " class=\"#{css_class}\"" : ""
             if text_node.type == :str && path_node.type == :str
               text_str = text_node.children[0]
               path_str = path_node.children[0]
-              s(:str, "<form method=\"post\" action=\"#{path_str}\" style=\"display:inline\" data-confirm=\"#{confirm_str}\"><input type=\"hidden\" name=\"_method\" value=\"delete\"><button type=\"submit\">#{text_str}</button></form>")
+              s(:str, "<form method=\"post\" action=\"#{path_str}\" style=\"display:inline\" data-confirm=\"#{confirm_str}\"><input type=\"hidden\" name=\"_method\" value=\"delete\"><button type=\"submit\"#{button_class}>#{text_str}</button></form>")
             elsif text_node.type == :str
               text_str = text_node.children[0]
               s(:dstr,
                 s(:str, '<form method="post" action="'),
                 s(:begin, path_expr),
-                s(:str, "\" style=\"display:inline\" data-confirm=\"#{confirm_str}\"><input type=\"hidden\" name=\"_method\" value=\"delete\"><button type=\"submit\">#{text_str}</button></form>"))
+                s(:str, "\" style=\"display:inline\" data-confirm=\"#{confirm_str}\"><input type=\"hidden\" name=\"_method\" value=\"delete\"><button type=\"submit\"#{button_class}>#{text_str}</button></form>"))
             else
               text_expr = process(text_node)
               s(:dstr,
                 s(:str, '<form method="post" action="'),
                 s(:begin, path_expr),
-                s(:str, "\" style=\"display:inline\" data-confirm=\"#{confirm_str}\"><input type=\"hidden\" name=\"_method\" value=\"delete\"><button type=\"submit\">"),
+                s(:str, "\" style=\"display:inline\" data-confirm=\"#{confirm_str}\"><input type=\"hidden\" name=\"_method\" value=\"delete\"><button type=\"submit\"#{button_class}>"),
                 s(:begin, text_expr),
                 s(:str, '</button></form>'))
             end
