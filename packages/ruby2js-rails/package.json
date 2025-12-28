@@ -47,7 +47,6 @@
   "dependencies": {
     "chokidar": "^3.5.3",
     "js-yaml": "^4.1.0",
-    "ruby2js": "https://www.ruby2js.com/releases/ruby2js-beta.tgz",
     "ws": "^8.14.2"
   }
 }
