@@ -291,7 +291,9 @@ class SelfhostBuilder
       </head>
       <body>
         <div id="loading">Loading...</div>
-        <main class="#{main_class}" id="content"></main>
+        <div id="app" style="display:none">
+          <main class="#{main_class}" id="content"></main>
+        </div>
         <script type="module">
           import { Application, routes } from '#{base_path}/config/routes.js';
           window.routes = routes;
