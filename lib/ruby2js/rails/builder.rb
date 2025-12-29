@@ -442,12 +442,14 @@ class SelfhostBuilder
     )
     puts("")
 
-    # Transpile db (seeds)
+    # Transpile db (schema and seeds)
     puts("Database:")
-    self.transpile_directory(
-      File.join(DEMO_ROOT, 'db'),
-      File.join(@dist_dir, 'db')
-    )
+    db_src = File.join(DEMO_ROOT, 'db')
+    db_dest = File.join(@dist_dir, 'db')
+    # Transpile schema.rb (skip seeds.rb for special handling)
+    self.transpile_directory(db_src, db_dest, '**/*.rb', skip: ['seeds.rb'])
+    # Handle seeds.rb specially - generate stub if empty/comments-only
+    self.transpile_seeds(db_src, db_dest)
     puts("")
 
     # Generate index.html for browser targets
@@ -878,6 +880,34 @@ class SelfhostBuilder
       relative = src_path.sub(src_dir + '/', '')
       dest_path = File.join(dest_dir, relative.sub(/\.rb$/, '.js'))
       self.transpile_file(src_path, dest_path, section)
+    end
+  end
+
+  # Handle seeds.rb specially - if it has only comments/whitespace, generate a stub
+  # This is shared logic with SPA builder (lib/ruby2js/spa/builder.rb)
+  def transpile_seeds(src_dir, dest_dir)
+    seeds_src = File.join(src_dir, 'seeds.rb')
+    seeds_dest = File.join(dest_dir, 'seeds.js')
+
+    # Check if seeds.rb has actual Ruby code (not just comments/whitespace)
+    has_code = File.exist?(seeds_src) &&
+               File.read(seeds_src).lines.any? { |line| line.strip !~ /\A(#.*|\s*)\z/ }
+
+    if has_code
+      # Transpile existing seeds file normally
+      self.transpile_file(seeds_src, seeds_dest)
+    else
+      # Generate empty Seeds module directly as JS (rails/seeds filter needs code to process)
+      FileUtils.mkdir_p(dest_dir)
+      File.write(seeds_dest, <<~JS)
+        // Seeds stub - original seeds.rb had no executable code
+        export const Seeds = {
+          run() {
+            // Add your seed data here
+          }
+        };
+      JS
+      puts("  -> db/seeds.js (stub)")
     end
   end
 
