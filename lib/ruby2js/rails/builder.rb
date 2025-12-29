@@ -98,27 +98,214 @@ class SelfhostBuilder
     ]
   }.freeze
 
-  # Class method to detect runtime from database.yml without building
+  # ============================================================
+  # Class methods for shared functionality
+  # These can be called by SPA builder, CLI commands, etc.
+  # ============================================================
+
+  # Load database configuration from environment or config/database.yml
+  # Returns: { 'adapter' => 'dexie', 'database' => 'myapp_dev', ... }
+  def self.load_database_config(app_root = nil, quiet: false)
+    app_root ||= DEMO_ROOT
+    env = ENV['RAILS_ENV'] || ENV['NODE_ENV'] || 'development'
+
+    # Priority 1: DATABASE environment variable
+    if ENV['DATABASE']
+      puts("  Using DATABASE=#{ENV['DATABASE']} from environment") unless quiet
+      return { 'adapter' => ENV['DATABASE'].downcase }
+    end
+
+    # Priority 2: config/database.yml
+    config_path = File.join(app_root, 'config/database.yml')
+    if File.exist?(config_path)
+      config = YAML.load_file(config_path)
+      if config && config[env] && config[env]['adapter']
+        puts("  Using config/database.yml [#{env}]") unless quiet
+        return config[env]
+      end
+    end
+
+    # Default: sqljs
+    puts("  Using default adapter: sqljs") unless quiet
+    { 'adapter' => 'sqljs', 'database' => 'ruby2js_rails' }
+  end
+
+  # Detect runtime/target from database configuration
   # Returns: { target: 'browser'|'server', runtime: nil|'node'|'bun'|'deno', database: 'adapter_name' }
-  def self.detect_runtime()
-    builder = SelfhostBuilder.new()
-    db_config = builder.load_database_config()
+  def self.detect_runtime(app_root = nil)
+    db_config = self.load_database_config(app_root, quiet: true)
     database = db_config['adapter'] || db_config[:adapter] || 'sqljs'
     target = BROWSER_DATABASES.include?(database) ? 'browser' : 'server'
 
     runtime = nil
     if target == 'server'
-      # Check for required runtime or use configured/default
       required = RUNTIME_REQUIRED[database]
-      if required
-        runtime = required
-      else
-        runtime = builder.load_runtime_config()
-      end
+      runtime = required || ENV['RUNTIME']&.downcase || 'node'
     end
 
     { target: target, runtime: runtime, database: database }
   end
+
+  # Generate package.json content for a Ruby2JS app
+  # Options:
+  #   app_name: Application name (used for package name)
+  #   adapters: Array of database adapters to include dependencies for
+  #   app_root: Application root directory (for detecting adapters if not specified)
+  # Returns: Hash suitable for JSON.generate
+  def self.generate_package_json(options = {})
+    app_name = options[:app_name] || 'ruby2js-app'
+    app_root = options[:app_root]
+
+    # Collect adapters from options or detect from database.yml
+    adapters = options[:adapters]
+    unless adapters
+      if app_root && File.exist?(File.join(app_root, 'config/database.yml'))
+        config = YAML.load_file(File.join(app_root, 'config/database.yml'))
+        adapters = config.values
+          .select { |v| v.is_a?(Hash) }
+          .map { |v| v['adapter'] }
+          .compact
+          .uniq
+      else
+        adapters = ['dexie']
+      end
+    end
+
+    deps = {
+      'ruby2js-rails' => 'https://www.ruby2js.com/releases/ruby2js-rails-beta.tgz'
+    }
+
+    optional_deps = {}
+
+    adapters.each do |adapter|
+      case adapter.to_s
+      when 'dexie', 'indexeddb'
+        deps['dexie'] = '^4.0.10'
+      when 'sqljs', 'sql.js'
+        deps['sql.js'] = '^1.11.0'
+      when 'pglite'
+        deps['@electric-sql/pglite'] = '^0.2.0'
+      when 'sqlite3', 'better_sqlite3'
+        optional_deps['better-sqlite3'] = '^11.0.0'
+      when 'pg', 'postgres', 'postgresql'
+        optional_deps['pg'] = '^8.13.0'
+      when 'mysql', 'mysql2'
+        optional_deps['mysql2'] = '^3.11.0'
+      end
+    end
+
+    server_adapters = %w[sqlite3 better_sqlite3 pg postgres postgresql mysql mysql2]
+
+    scripts = {
+      'dev' => 'ruby2js-rails-dev',
+      'dev:ruby' => 'ruby2js-rails-dev --ruby',
+      'build' => 'ruby2js-rails-build',
+      'start' => 'npx serve -s dist -p 3000'
+    }
+
+    if adapters.any? { |a| server_adapters.include?(a.to_s) }
+      scripts['start:node'] = 'ruby2js-rails-server'
+      scripts['start:bun'] = 'bun node_modules/ruby2js-rails/server.mjs'
+      scripts['start:deno'] = 'deno run --allow-all node_modules/ruby2js-rails/server.mjs'
+    end
+
+    package = {
+      'name' => app_name.to_s.gsub('_', '-'),
+      'version' => '0.1.0',
+      'type' => 'module',
+      'description' => 'Rails-like app powered by Ruby2JS',
+      'scripts' => scripts,
+      'dependencies' => deps
+    }
+
+    package['optionalDependencies'] = optional_deps unless optional_deps.empty?
+
+    package
+  end
+
+  # Database-specific importmap entries for browser builds
+  IMPORTMAP_ENTRIES = {
+    'dexie' => { 'dexie' => '/node_modules/dexie/dist/dexie.mjs' },
+    'indexeddb' => { 'dexie' => '/node_modules/dexie/dist/dexie.mjs' },
+    'sqljs' => { 'sql.js' => '/node_modules/sql.js/dist/sql-wasm.js' },
+    'sql.js' => { 'sql.js' => '/node_modules/sql.js/dist/sql-wasm.js' },
+    'pglite' => { '@electric-sql/pglite' => '/node_modules/@electric-sql/pglite/dist/index.js' }
+  }.freeze
+
+  # Generate index.html for browser builds
+  # Options:
+  #   app_name: Application name (for title)
+  #   database: Database adapter (for importmap)
+  #   css: CSS framework ('none', 'tailwind', 'pico', 'bootstrap', 'bulma')
+  #   output_path: Where to write the file (if nil, returns string)
+  # Returns: HTML string (also writes to output_path if specified)
+  def self.generate_index_html(options = {})
+    app_name = options[:app_name] || 'Ruby2JS App'
+    database = options[:database] || 'dexie'
+    css = options[:css] || 'none'
+    output_path = options[:output_path]
+
+    # Build importmap
+    importmap_entries = IMPORTMAP_ENTRIES[database] || IMPORTMAP_ENTRIES['dexie']
+    importmap = {
+      'imports' => importmap_entries
+    }
+
+    # CSS link based on framework
+    css_link = case css.to_s
+    when 'tailwind'
+      '<link href="/styles.css" rel="stylesheet">'
+    when 'pico'
+      '<link rel="stylesheet" href="/node_modules/@picocss/pico/css/pico.min.css">'
+    when 'bootstrap'
+      '<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">'
+    when 'bulma'
+      '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">'
+    else
+      '<link href="/styles.css" rel="stylesheet">'
+    end
+
+    # Main container class based on CSS framework
+    main_class = case css.to_s
+    when 'pico' then 'container'
+    when 'bootstrap' then 'container mt-4'
+    when 'bulma' then 'container mt-4'
+    when 'tailwind' then 'container mx-auto px-4 py-8'
+    else 'container'
+    end
+
+    html = <<~HTML
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>#{app_name}</title>
+        #{css_link}
+        <script type="importmap">
+        #{JSON.pretty_generate(importmap)}
+        </script>
+      </head>
+      <body>
+        <main class="#{main_class}" id="app">
+          <p>Loading...</p>
+        </main>
+        <script type="module" src="/dist/config/routes.js"></script>
+      </body>
+      </html>
+    HTML
+
+    if output_path
+      FileUtils.mkdir_p(File.dirname(output_path))
+      File.write(output_path, html)
+    end
+
+    html
+  end
+
+  # ============================================================
+  # Instance methods
+  # ============================================================
 
   def initialize(dist_dir = nil)
     @dist_dir = dist_dir || File.join(DEMO_ROOT, 'dist')
@@ -263,6 +450,13 @@ class SelfhostBuilder
     )
     puts("")
 
+    # Generate index.html for browser targets
+    if @target == 'browser'
+      puts("Static Files:")
+      self.generate_browser_index()
+      puts("")
+    end
+
     puts("=== Build Complete ===")
   end
 
@@ -377,28 +571,8 @@ class SelfhostBuilder
   end
 
   def load_database_config()
-    # Use || instead of fetch for JS compatibility
-    env = ENV['RAILS_ENV'] || ENV['NODE_ENV'] || 'development'
-
-    # Priority 1: DATABASE environment variable
-    if ENV['DATABASE']
-      puts("  Using DATABASE=#{ENV['DATABASE']} from environment")
-      return { 'adapter' => ENV['DATABASE'].downcase }
-    end
-
-    # Priority 2: config/database.yml
-    config_path = File.join(DEMO_ROOT, 'config/database.yml')
-    if File.exist?(config_path)
-      config = YAML.load_file(config_path)
-      if config && config[env] && config[env]['adapter']
-        puts("  Using config/database.yml [#{env}]")
-        return config[env]
-      end
-    end
-
-    # Default: sqljs
-    puts("  Using default adapter: sqljs")
-    { 'adapter' => 'sqljs', 'database' => 'ruby2js_rails' }
+    # Delegate to class method
+    SelfhostBuilder.load_database_config(DEMO_ROOT)
   end
 
   def copy_database_adapter(db_config)
@@ -702,6 +876,39 @@ class SelfhostBuilder
     FileUtils.mkdir_p(dest_dir)
     File.write(File.join(dest_dir, 'application_record.js'), wrapper)
     puts("  -> models/application_record.js (wrapper for ActiveRecord)")
+  end
+
+  def generate_browser_index()
+    # Detect app name from config/application.rb
+    app_name = 'Ruby2JS App'
+    app_config = File.join(DEMO_ROOT, 'config/application.rb')
+    if File.exist?(app_config)
+      content = File.read(app_config)
+      if content =~ /module\s+(\w+)/
+        app_name = $1
+      end
+    end
+
+    # Detect CSS framework from Gemfile or package.json
+    css = 'none'
+    gemfile = File.join(DEMO_ROOT, 'Gemfile')
+    if File.exist?(gemfile)
+      content = File.read(gemfile)
+      if content.include?('tailwindcss')
+        css = 'tailwind'
+      elsif content.include?('bootstrap')
+        css = 'bootstrap'
+      end
+    end
+
+    output_path = File.join(DEMO_ROOT, 'index.html')
+    SelfhostBuilder.generate_index_html(
+      app_name: app_name,
+      database: @database,
+      css: css,
+      output_path: output_path
+    )
+    puts("  -> index.html")
   end
 
   def transpile_routes_files()

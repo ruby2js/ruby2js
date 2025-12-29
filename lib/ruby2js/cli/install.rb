@@ -2,7 +2,6 @@
 
 require 'optparse'
 require 'json'
-require 'yaml'
 
 module Ruby2JS
   module CLI
@@ -12,6 +11,10 @@ module Ruby2JS
           options = parse_options(args)
 
           validate_rails_app!
+
+          # Load shared builder for package.json generation
+          require 'ruby2js/rails/builder'
+
           ensure_package_json!
           install_dependencies!
 
@@ -64,9 +67,10 @@ module Ruby2JS
           puts "Creating package.json..."
 
           app_name = detect_app_name
-          adapters = collect_adapters
-
-          package = generate_package_json(app_name, adapters)
+          package = SelfhostBuilder.generate_package_json(
+            app_name: app_name,
+            app_root: Dir.pwd
+          )
           File.write("package.json", JSON.pretty_generate(package) + "\n")
 
           puts "  Created package.json"
@@ -76,8 +80,10 @@ module Ruby2JS
           puts "Updating package.json..."
 
           existing = JSON.parse(File.read("package.json"))
-          adapters = collect_adapters
-          required = generate_package_json(existing["name"] || detect_app_name, adapters)
+          required = SelfhostBuilder.generate_package_json(
+            app_name: existing["name"] || detect_app_name,
+            app_root: Dir.pwd
+          )
 
           # Merge dependencies (add missing, don't overwrite existing)
           existing["dependencies"] ||= {}
@@ -127,75 +133,6 @@ module Ruby2JS
             end
           end
           File.basename(Dir.pwd).gsub(/[^a-z0-9_-]/i, '_').downcase
-        end
-
-        def load_database_config
-          YAML.load_file("config/database.yml", aliases: true) rescue YAML.load_file("config/database.yml")
-        rescue => e
-          warn "Warning: Could not parse config/database.yml: #{e.message}"
-          { "development" => { "adapter" => "dexie" } }
-        end
-
-        def collect_adapters
-          database_config = load_database_config
-          database_config.values
-            .select { |v| v.is_a?(Hash) }
-            .map { |v| v["adapter"] }
-            .compact
-            .uniq
-        end
-
-        def generate_package_json(app_name, adapters)
-          deps = {
-            "ruby2js-rails" => "https://www.ruby2js.com/releases/ruby2js-rails-beta.tgz"
-          }
-
-          optional_deps = {}
-
-          adapters.each do |adapter|
-            case adapter.to_s
-            when "dexie"
-              deps["dexie"] = "^4.0.10"
-            when "sqljs"
-              deps["sql.js"] = "^1.11.0"
-            when "pglite"
-              deps["@electric-sql/pglite"] = "^0.2.0"
-            when "sqlite3", "better_sqlite3"
-              optional_deps["better-sqlite3"] = "^11.0.0"
-            when "pg"
-              optional_deps["pg"] = "^8.13.0"
-            when "mysql", "mysql2"
-              optional_deps["mysql2"] = "^3.11.0"
-            end
-          end
-
-          server_adapters = %w[sqlite3 better_sqlite3 pg mysql mysql2]
-
-          scripts = {
-            "dev" => "ruby2js-rails-dev",
-            "dev:ruby" => "ruby2js-rails-dev --ruby",
-            "build" => "ruby2js-rails-build",
-            "start" => "npx serve -s dist -p 3000"
-          }
-
-          if adapters.any? { |a| server_adapters.include?(a.to_s) }
-            scripts["start:node"] = "ruby2js-rails-server"
-            scripts["start:bun"] = "bun node_modules/ruby2js-rails/server.mjs"
-            scripts["start:deno"] = "deno run --allow-all node_modules/ruby2js-rails/server.mjs"
-          end
-
-          package = {
-            "name" => app_name.to_s.gsub("_", "-"),
-            "version" => "0.1.0",
-            "type" => "module",
-            "description" => "Rails-like app powered by Ruby2JS",
-            "scripts" => scripts,
-            "dependencies" => deps
-          }
-
-          package["optionalDependencies"] = optional_deps unless optional_deps.empty?
-
-          package
         end
       end
     end
