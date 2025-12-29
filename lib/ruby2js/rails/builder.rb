@@ -98,6 +98,28 @@ class SelfhostBuilder
     ]
   }.freeze
 
+  # Class method to detect runtime from database.yml without building
+  # Returns: { target: 'browser'|'server', runtime: nil|'node'|'bun'|'deno', database: 'adapter_name' }
+  def self.detect_runtime()
+    builder = SelfhostBuilder.new()
+    db_config = builder.load_database_config()
+    database = db_config['adapter'] || db_config[:adapter] || 'sqljs'
+    target = BROWSER_DATABASES.include?(database) ? 'browser' : 'server'
+
+    runtime = nil
+    if target == 'server'
+      # Check for required runtime or use configured/default
+      required = RUNTIME_REQUIRED[database]
+      if required
+        runtime = required
+      else
+        runtime = builder.load_runtime_config()
+      end
+    end
+
+    { target: target, runtime: runtime, database: database }
+  end
+
   def initialize(dist_dir = nil)
     @dist_dir = dist_dir || File.join(DEMO_ROOT, 'dist')
     @database = nil  # Set during build from config

@@ -56,7 +56,7 @@ module Ruby2JS
 
           unless File.exist?("package.json")
             abort "Error: package.json not found.\n" \
-                  "Run 'ruby2js dev' first to set up the project."
+                  "Run 'ruby2js install' first to set up the project."
           end
         end
 
@@ -75,12 +75,21 @@ module Ruby2JS
         def start_server(options)
           ENV["PORT"] = options[:port].to_s
 
-          if options[:runtime]
-            script = "start:#{options[:runtime]}"
-            exec("npm", "run", script)
-          else
-            exec("npm", "run", "start")
+          # Auto-detect runtime from database.yml if not specified
+          runtime = options[:runtime]
+          unless runtime
+            require 'ruby2js/rails/builder'
+            config = SelfhostBuilder.detect_runtime
+            if config[:target] == 'browser'
+              # Browser databases use static file serving
+              exec("npm", "run", "start")
+              return
+            end
+            runtime = config[:runtime]
           end
+
+          script = "start:#{runtime}"
+          exec("npm", "run", script)
         end
       end
     end
