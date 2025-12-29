@@ -38,7 +38,7 @@ describe Ruby2JS::Filter::Rails::Routes do
           root 'articles#index'
         end
       RUBY
-      assert_includes result, 'import { Schema } from "./schema.js"'
+      assert_includes result, 'import { Schema } from "../db/schema.js"'
       assert_includes result, 'import { Seeds } from "../db/seeds.js"'
     end
 

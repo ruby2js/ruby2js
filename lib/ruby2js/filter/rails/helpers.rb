@@ -95,6 +95,26 @@ module Ruby2JS
             return process_content_for(args)
           end
 
+          # Handle csrf_meta_tags - stub for demo (returns empty string)
+          if method == :csrf_meta_tags && target.nil?
+            return s(:str, '')
+          end
+
+          # Handle csp_meta_tag - stub for demo (returns empty string)
+          if method == :csp_meta_tag && target.nil?
+            return s(:str, '')
+          end
+
+          # Handle stylesheet_link_tag - stub for demo
+          if method == :stylesheet_link_tag && target.nil?
+            return s(:str, '')
+          end
+
+          # Handle javascript_importmap_tags - stub for demo
+          if method == :javascript_importmap_tags && target.nil?
+            return s(:str, '')
+          end
+
           # Handle render partial calls
           if method == :render && target.nil? && args.any?
             result = process_render_partial(args)

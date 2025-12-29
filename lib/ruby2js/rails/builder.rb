@@ -830,18 +830,37 @@ class SelfhostBuilder
     return unless File.exist?(layout_path)
 
     puts("Transpiling layout: application.html.erb")
-    template = File.read(layout_path)
 
-    # Simple transformation: replace <%= yield %> with ${content}
-    js_template = template.gsub('<%=', '${').gsub('%>', '}')
-    js_template = js_template.gsub('${yield}', '${content}').gsub('${ yield }', '${content}')
+    # Detect app name from config/application.rb for title
+    app_name = 'Ruby2JS App'
+    app_config = File.join(DEMO_ROOT, 'config/application.rb')
+    if File.exist?(app_config)
+      content = File.read(app_config)
+      if content =~ /module\s+(\w+)/
+        app_name = $1
+      end
+    end
 
-    # Wrap in a template literal function
+    # Generate a minimal layout for server-side rendering
+    # Rails-specific helpers (csrf_meta_tags, etc.) don't make sense in JS context
     js = <<~JS
       // Application layout - wraps view content
       // Generated from app/views/layouts/application.html.erb
       export function layout(content) {
-        return `#{js_template}`;
+        return `<!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>#{app_name}</title>
+        <link href="/styles.css" rel="stylesheet">
+      </head>
+      <body>
+        <main class="container mx-auto px-4 py-8">
+          \${content}
+        </main>
+      </body>
+      </html>`;
       }
     JS
 
