@@ -6,6 +6,10 @@
 # Build and run:
 #   docker build -t ruby2js-blog .
 #   docker run -p 3000:3000 ruby2js-blog
+#
+# Build with specific environment:
+#   docker build --build-arg RAILS_ENV=development -t ruby2js-blog .
+#   docker build --build-arg RAILS_ENV=production -t ruby2js-blog .
 
 FROM ruby
 
@@ -23,8 +27,9 @@ RUN chmod +x create-blog && ./create-blog blog
 
 WORKDIR /app/blog
 
-# Install npm dependencies, build for production, and prepare for serving
-ENV RAILS_ENV=production
+# Install npm dependencies, build, and prepare for serving
+ARG RAILS_ENV=production
+ENV RAILS_ENV=${RAILS_ENV}
 RUN bundle exec ruby2js install
 RUN bundle exec ruby2js build
 

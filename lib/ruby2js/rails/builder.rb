@@ -953,7 +953,7 @@ class SelfhostBuilder
       end
     end
 
-    output_path = File.join(DEMO_ROOT, 'index.html')
+    output_path = File.join(@dist_dir, 'index.html')
     SelfhostBuilder.generate_index_html(
       app_name: app_name,
       database: @database,
