@@ -1,9 +1,9 @@
 #!/usr/bin/env ruby
-# Build script for Ruby2JS-on-Rails demo
+# Build script for Ruby2JS-on-Rails apps
 # Transpiles Ruby models and controllers to JavaScript
 #
-# Can be run directly: ruby scripts/build.rb [dist_dir]
-# Or transpiled to JS and imported as: import { SelfhostBuilder } from './build.mjs'
+# Can be required: require 'ruby2js/rails/builder'
+# Or transpiled to JS: import { SelfhostBuilder } from 'ruby2js-rails/build.mjs'
 
 require 'fileutils'
 require 'json'
@@ -26,15 +26,15 @@ require 'ruby2js/filter/rails/helpers'
 require 'ruby2js/filter/phlex'
 require 'ruby2js/filter/stimulus'
 require 'ruby2js/filter/camelCase'
-require_relative '../lib/erb_compiler'
+require_relative 'erb_compiler'
 
 class SelfhostBuilder
   # JS (Node.js): use process.cwd() since bin commands run from app root
-  # Ruby: resolve from scripts/ up one level to app root
+  # Ruby: use current working directory (assumes run from app root)
   DEMO_ROOT = if defined?(process)
     process.cwd()
   else
-    File.expand_path('..', __dir__)
+    Dir.pwd
   end
 
   # Browser databases - these run in the browser with IndexedDB or WASM

@@ -99,7 +99,7 @@ async function runBuild() {
 
 function runRubyBuild() {
   return new Promise((resolve, reject) => {
-    exec('ruby scripts/build.rb', { cwd: APP_ROOT }, (error, stdout, stderr) => {
+    exec("ruby -r ruby2js/rails/builder -e 'SelfhostBuilder.new.build'", { cwd: APP_ROOT }, (error, stdout, stderr) => {
       if (error) {
         console.error('\x1b[31m[build error]\x1b[0m', error.message);
         if (stderr) console.error(stderr);

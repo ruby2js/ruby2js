@@ -98,7 +98,7 @@ This package lives at `packages/ruby2js-rails/` in the Ruby2JS repository.
 
 ### Building build.mjs
 
-The `build.mjs` file is transpiled from `demo/ruby2js-on-rails/scripts/build.rb`:
+The `build.mjs` file is transpiled from `lib/ruby2js/rails/builder.rb`:
 
 ```bash
 cd demo/selfhost

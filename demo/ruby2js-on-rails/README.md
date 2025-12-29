@@ -229,10 +229,7 @@ ruby2js-on-rails/
 │   └── schema.rb         # Database schema
 ├── db/
 │   └── seeds.rb          # Seed data
-├── lib/
-│   └── erb_compiler.rb   # ERB to Ruby compiler
 ├── scripts/
-│   ├── build.rb          # Ruby transpilation script
 │   └── smoke-test.mjs    # Compare Ruby vs selfhost output
 ├── node_modules/
 │   ├── ruby2js/          # Core converter (from npm URL)

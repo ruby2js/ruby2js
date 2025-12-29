@@ -208,9 +208,9 @@ async function runTests() {
     // Test 1: Ruby build
     log('1. Ruby build', BOLD);
     try {
-      // Run from PROJECT_ROOT where Gemfile lives, with path to build script
-      execSync(`bundle exec ruby demo/ruby2js-on-rails/scripts/build.rb "${rubyDist}"`, {
-        cwd: PROJECT_ROOT,
+      // Run from demo directory, builder uses Dir.pwd as app root
+      execSync(`bundle exec ruby -r ruby2js/rails/builder -e "SelfhostBuilder.new('${rubyDist}').build"`, {
+        cwd: join(PROJECT_ROOT, 'demo/ruby2js-on-rails'),
         encoding: 'utf8',
         stdio: ['pipe', 'pipe', 'pipe']
       });

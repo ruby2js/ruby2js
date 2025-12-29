@@ -291,7 +291,7 @@ end
 # Uses Ruby gem directly (faster, and smoke test validates identical output to selfhost)
 task :rails_demo_build => [:rails_demo_npm_install] do
   Dir.chdir(rails_demo_source) do
-    sh "bundle exec ruby scripts/build.rb"
+    sh "bundle exec ruby -r ruby2js/rails/builder -e 'SelfhostBuilder.new.build'"
   end
 end
 
