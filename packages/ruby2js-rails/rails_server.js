@@ -18,6 +18,69 @@ import {
 // Re-export base helpers
 export { truncate, pluralize, dom_id, navigate, submitForm, formData, handleFormResult, setupFormHandlers };
 
+// Flash messages - cookie-based like Rails
+// Messages are set before redirect, read on next request, then cleared
+export const flash = {
+  _pending: {},   // Messages to be set in response cookie
+  _current: {},   // Messages read from request cookie
+
+  // Set a flash message (will be sent in response cookie)
+  set(key, value) {
+    this._pending[key] = value;
+  },
+
+  // Get and consume a flash message
+  get(key) {
+    const msg = this._current[key];
+    delete this._current[key];
+    return msg || '';
+  },
+
+  // Convenience methods
+  consumeNotice() { return this.get('notice'); },
+  consumeAlert() { return this.get('alert'); },
+
+  // Parse flash from request cookies
+  parseFromRequest(req) {
+    this._current = {};
+    this._pending = {};
+
+    const cookieHeader = req.headers.get('cookie') || '';
+    const cookies = cookieHeader.split(';').map(c => c.trim());
+
+    for (const cookie of cookies) {
+      if (cookie.startsWith('_flash=')) {
+        try {
+          const value = cookie.substring(7);
+          this._current = JSON.parse(decodeURIComponent(value));
+        } catch (e) {
+          // Invalid flash cookie, ignore
+        }
+        break;
+      }
+    }
+  },
+
+  // Get cookie header for response (if there are pending messages)
+  getResponseCookie() {
+    if (Object.keys(this._pending).length === 0) {
+      // Clear the flash cookie if no pending messages
+      if (Object.keys(this._current).length > 0) {
+        return '_flash=; Path=/; Max-Age=0';
+      }
+      return null;
+    }
+
+    const value = encodeURIComponent(JSON.stringify(this._pending));
+    return `_flash=${value}; Path=/; HttpOnly; SameSite=Lax`;
+  },
+
+  // Check if there are pending messages
+  hasPending() {
+    return Object.keys(this._pending).length > 0;
+  }
+};
+
 // Server Router with HTTP dispatch
 export class Router extends RouterBase {
   // Dispatch a Fetch API request to the appropriate controller action
@@ -27,6 +90,9 @@ export class Router extends RouterBase {
     const path = url.pathname;
     let method = this.normalizeMethod(req, url);
     let params = {};
+
+    // Parse flash messages from request cookie
+    flash.parseFromRequest(req);
 
     // Parse request body for POST requests (may contain _method override)
     if (req.method === 'POST') {
@@ -155,6 +221,13 @@ export class Router extends RouterBase {
   // Handle controller result (redirect or render)
   static handleResult(req, result, defaultRedirect) {
     if (result.redirect) {
+      // Set flash notice if present in result
+      if (result.notice) {
+        flash.set('notice', result.notice);
+      }
+      if (result.alert) {
+        flash.set('alert', result.alert);
+      }
       console.log(`  Redirected to ${result.redirect}`);
       return this.redirect(req, result.redirect);
     } else if (result.render) {
@@ -166,17 +239,36 @@ export class Router extends RouterBase {
     }
   }
 
-  // Create redirect response - can be overridden by subclasses
+  // Create redirect response with flash cookie
   static redirect(req, path) {
-    return Response.redirect(path, 302);
+    const headers = new Headers({ 'Location': path });
+
+    // Add flash cookie if there are pending messages
+    const flashCookie = flash.getResponseCookie();
+    if (flashCookie) {
+      headers.set('Set-Cookie', flashCookie);
+    }
+
+    return new Response(null, {
+      status: 302,
+      headers
+    });
   }
 
   // Create HTML response with proper headers, wrapped in layout
   static htmlResponse(html) {
     const fullHtml = Application.wrapInLayout(html);
+    const headers = { 'Content-Type': 'text/html; charset=utf-8' };
+
+    // Clear flash cookie after it's been consumed
+    const flashCookie = flash.getResponseCookie();
+    if (flashCookie) {
+      headers['Set-Cookie'] = flashCookie;
+    }
+
     return new Response(fullHtml, {
       status: 200,
-      headers: { 'Content-Type': 'text/html; charset=utf-8' }
+      headers
     });
   }
 }

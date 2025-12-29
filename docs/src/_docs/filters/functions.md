@@ -104,6 +104,9 @@ If you set the `eslevel` option to `2021` or newer, the Functions filter enables
 * `.to_s` {{ caret }} `.toString`
 * `.to_sym` {{ caret }} (removed - symbols are strings in JS)
 * `.to_json` {{ caret }} `JSON.stringify(obj)`
+* `JSON.generate(x)` {{ caret }} `JSON.stringify(x)`
+* `JSON.pretty_generate(x)` {{ caret }} `JSON.stringify(x, null, 2)`
+* `JSON.parse(x)` {{ caret }} `JSON.parse(x)`
 * `typeof(x)` {{ caret }} `typeof x` (JS type checking operator)
 * `.upcase` {{ caret }} `.toUpperCase`
 * `.yield_self {|n| n}` {{ caret }} `(n => n)(...)`

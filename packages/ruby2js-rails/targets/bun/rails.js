@@ -4,6 +4,7 @@
 import {
   Router as RouterServer,
   Application as ApplicationServer,
+  flash,
   truncate,
   pluralize,
   dom_id,
@@ -15,7 +16,7 @@ import {
 } from './rails_server.js';
 
 // Re-export everything from server module
-export { truncate, pluralize, dom_id, navigate, submitForm, formData, handleFormResult, setupFormHandlers };
+export { flash, truncate, pluralize, dom_id, navigate, submitForm, formData, handleFormResult, setupFormHandlers };
 
 // Router - use server implementation directly
 export class Router extends RouterServer {}

@@ -4,6 +4,7 @@
 import {
   Router as RouterServer,
   Application as ApplicationServer,
+  flash,
   truncate,
   pluralize,
   dom_id,
@@ -15,13 +16,22 @@ import {
 } from './rails_server.js';
 
 // Re-export everything from server module
-export { truncate, pluralize, dom_id, navigate, submitForm, formData, handleFormResult, setupFormHandlers };
+export { flash, truncate, pluralize, dom_id, navigate, submitForm, formData, handleFormResult, setupFormHandlers };
 
 // Router with Cloudflare-specific redirect handling
 export class Router extends RouterServer {
   // Override redirect to use full URL (Cloudflare requires absolute URLs)
   static redirect(req, path) {
-    return Response.redirect(new URL(path, req.url), 302);
+    const url = new URL(path, req.url);
+    const headers = new Headers({ 'Location': url.href });
+
+    // Add flash cookie if there are pending messages
+    const flashCookie = flash.getResponseCookie();
+    if (flashCookie) {
+      headers.set('Set-Cookie', flashCookie);
+    }
+
+    return new Response(null, { status: 302, headers });
   }
 
   // Override parseBody to handle multipart/form-data
@@ -59,13 +69,20 @@ export class Router extends RouterServer {
   // Override handleResult to use full URL for redirects
   static handleResult(req, result, defaultRedirect) {
     if (result.redirect) {
+      // Set flash notice if present in result
+      if (result.notice) {
+        flash.set('notice', result.notice);
+      }
+      if (result.alert) {
+        flash.set('alert', result.alert);
+      }
       console.log(`  Redirected to ${result.redirect}`);
-      return Response.redirect(new URL(result.redirect, req.url), 302);
+      return this.redirect(req, result.redirect);
     } else if (result.render) {
       console.log('  Re-rendering form (validation failed)');
       return this.htmlResponse(result.render);
     } else {
-      return Response.redirect(new URL(defaultRedirect, req.url), 302);
+      return this.redirect(req, defaultRedirect);
     }
   }
 }

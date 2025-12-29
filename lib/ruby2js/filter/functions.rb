@@ -592,6 +592,9 @@ module Ruby2JS
           if method == :generate or method == :dump
             # JSON.generate(x) / JSON.dump(x) => JSON.stringify(x)
             process node.updated(nil, [target, :stringify, *args])
+          elsif method == :pretty_generate
+            # JSON.pretty_generate(x) => JSON.stringify(x, null, 2)
+            process node.updated(nil, [target, :stringify, args.first, s(:nil), s(:int, 2)])
           elsif method == :parse or method == :load
             # JSON.parse(x) / JSON.load(x) => JSON.parse(x)
             super

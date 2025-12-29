@@ -91,6 +91,10 @@ describe Ruby2JS::Filter::Functions do
     it "should handle JSON.dump" do
       to_js( 'JSON.dump(obj)' ).must_equal 'JSON.stringify(obj)'
     end
+
+    it "should handle JSON.pretty_generate" do
+      to_js( 'JSON.pretty_generate(obj)' ).must_equal 'JSON.stringify(obj, null, 2)'
+    end
   end
 
   describe :irange do

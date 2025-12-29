@@ -9,6 +9,7 @@ import { StringDecoder } from 'node:string_decoder';
 import {
   Router as RouterServer,
   Application as ApplicationServer,
+  flash,
   truncate,
   pluralize,
   dom_id,
@@ -20,10 +21,31 @@ import {
 } from './rails_server.js';
 
 // Re-export everything from server module
-export { truncate, pluralize, dom_id, navigate, submitForm, formData, handleFormResult, setupFormHandlers };
+export { flash, truncate, pluralize, dom_id, navigate, submitForm, formData, handleFormResult, setupFormHandlers };
 
 // Router with Node.js-specific dispatch (uses req/res instead of Fetch API)
 export class Router extends RouterServer {
+  // Parse flash from Node.js request cookies
+  static parseFlashFromCookies(req) {
+    flash._current = {};
+    flash._pending = {};
+
+    const cookieHeader = req.headers.cookie || '';
+    const cookies = cookieHeader.split(';').map(c => c.trim());
+
+    for (const cookie of cookies) {
+      if (cookie.startsWith('_flash=')) {
+        try {
+          const value = cookie.substring(7);
+          flash._current = JSON.parse(decodeURIComponent(value));
+        } catch (e) {
+          // Invalid flash cookie, ignore
+        }
+        break;
+      }
+    }
+  }
+
   // Dispatch an HTTP request to the appropriate controller action
   // Node.js version using req/res objects
   static async dispatch(req, res) {
@@ -31,6 +53,9 @@ export class Router extends RouterServer {
     const path = parsedUrl.pathname;
     let method = this.normalizeMethodNode(req, parsedUrl);
     let params = {};
+
+    // Parse flash messages from request cookies
+    this.parseFlashFromCookies(req);
 
     // Parse request body for POST requests (may contain _method override)
     if (req.method === 'POST') {
@@ -85,8 +110,7 @@ export class Router extends RouterServer {
           return this.handleResultNode(res, result, `/${route.parentName}/${parentId}`);
         } else if (method === 'DELETE') {
           await controller.destroy(parentId, id);
-          res.writeHead(302, { Location: `/${route.parentName}/${parentId}` });
-          res.end();
+          this.redirectNode(res, `/${route.parentName}/${parentId}`);
           return;
         } else {
           html = id ? await controller[actionMethod](parentId, id) : await controller[actionMethod](parentId);
@@ -102,8 +126,7 @@ export class Router extends RouterServer {
           return this.handleResultNode(res, result, `/${controllerName}/${id}`);
         } else if (method === 'DELETE') {
           await controller.destroy(id);
-          res.writeHead(302, { Location: `/${controllerName}` });
-          res.end();
+          this.redirectNode(res, `/${controllerName}`);
           return;
         } else {
           html = id ? await controller[actionMethod](id) : await controller[actionMethod]();
@@ -171,22 +194,49 @@ export class Router extends RouterServer {
   // Handle controller result for Node.js
   static handleResultNode(res, result, defaultRedirect) {
     if (result.redirect) {
+      // Set flash notice if present in result
+      if (result.notice) {
+        flash.set('notice', result.notice);
+      }
+      if (result.alert) {
+        flash.set('alert', result.alert);
+      }
       console.log(`  Redirected to ${result.redirect}`);
-      res.writeHead(302, { Location: result.redirect });
-      res.end();
+      this.redirectNode(res, result.redirect);
     } else if (result.render) {
       console.log('  Re-rendering form (validation failed)');
       this.sendHtml(res, result.render);
     } else {
-      res.writeHead(302, { Location: defaultRedirect });
-      res.end();
+      this.redirectNode(res, defaultRedirect);
     }
+  }
+
+  // Redirect with flash cookie
+  static redirectNode(res, path) {
+    const headers = { 'Location': path };
+
+    // Add flash cookie if there are pending messages
+    const flashCookie = flash.getResponseCookie();
+    if (flashCookie) {
+      headers['Set-Cookie'] = flashCookie;
+    }
+
+    res.writeHead(302, headers);
+    res.end();
   }
 
   // Send HTML response with proper headers, wrapped in layout
   static sendHtml(res, html) {
     const fullHtml = Application.wrapInLayout(html);
-    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    const headers = { 'Content-Type': 'text/html; charset=utf-8' };
+
+    // Clear flash cookie after it's been consumed
+    const flashCookie = flash.getResponseCookie();
+    if (flashCookie) {
+      headers['Set-Cookie'] = flashCookie;
+    }
+
+    res.writeHead(200, headers);
     res.end(fullHtml);
   }
 }
