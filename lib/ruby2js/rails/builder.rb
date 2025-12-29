@@ -256,7 +256,8 @@ class SelfhostBuilder
     # CSS link based on framework
     css_link = case css.to_s
     when 'tailwind'
-      '<link href="/public/styles.css" rel="stylesheet">'
+      # tailwindcss-rails gem builds to app/assets/builds/tailwind.css
+      '<link href="/app/assets/builds/tailwind.css" rel="stylesheet">'
     when 'pico'
       '<link rel="stylesheet" href="/node_modules/@picocss/pico/css/pico.min.css">'
     when 'bootstrap'
