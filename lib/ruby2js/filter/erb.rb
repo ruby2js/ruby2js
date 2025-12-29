@@ -83,6 +83,11 @@ module Ruby2JS
         # Allow subclasses to prepend extra args (e.g., $context)
         extra = erb_render_extra_args
 
+        # Filter out params that are already provided as extra args
+        # (e.g., $context references added by helpers should not appear in kwargs)
+        extra_arg_names = extra.map { |arg| arg.children.first }
+        all_params = all_params.reject { |name| extra_arg_names.include?(name) }
+
         if all_params.empty?
           kwargs = []
         else
