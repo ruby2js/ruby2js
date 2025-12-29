@@ -296,7 +296,7 @@ module Ruby2JS
       def generate_schema_rb
         # Copy schema from source Rails app if it exists
         schema_src = File.join(@rails_root, 'db', 'schema.rb')
-        schema_dst = File.join(output_dir, 'config', 'schema.rb')
+        schema_dst = File.join(output_dir, 'db', 'schema.rb')
 
         if File.exist?(schema_src)
           # Filter schema to only include tables for resolved models

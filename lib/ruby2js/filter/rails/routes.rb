@@ -447,7 +447,7 @@ module Ruby2JS
              s(:const, nil, :handleFormResult)])
 
           # Import Schema
-          statements << s(:import, './schema.js',
+          statements << s(:import, '../db/schema.js',
             [s(:const, nil, :Schema)])
 
           # Import Seeds
