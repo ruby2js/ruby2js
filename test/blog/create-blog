@@ -1,0 +1,140 @@
+#!/usr/bin/env bash
+# Create a Ruby2JS blog demo with nested routes
+# Usage: create-blog [app-name]
+#
+# Creates a Rails app, generates Article and Comment scaffolds,
+# sets up nested routes, adds validations, and runs Ruby2JS dev server.
+
+set -e
+
+APP_NAME="${1:-blog}"
+
+echo "Creating Ruby2JS blog: $APP_NAME"
+echo ""
+
+# Create Rails app (minimal, with Tailwind for nice styling)
+rails new "$APP_NAME" --skip-git --skip-docker --css tailwind
+cd "$APP_NAME"
+
+# Generate Article scaffold
+rails generate scaffold Article title:string body:text
+
+# Generate Comment scaffold (will be nested under articles)
+rails generate scaffold Comment article:references commenter:string body:text
+
+# Run migrations
+rails db:migrate
+
+# Add ruby2js gem from GitHub
+bundle add ruby2js --github ruby2js/ruby2js
+
+# Add validations to Article model
+sed -i.bak 's/class Article < ApplicationRecord/class Article < ApplicationRecord\
+  has_many :comments, dependent: :destroy\
+\
+  validates :title, presence: true\
+  validates :body, presence: true, length: { minimum: 10 }/' app/models/article.rb
+rm -f app/models/article.rb.bak
+
+# Set up nested routes
+cat > config/routes.rb << 'ROUTES'
+Rails.application.routes.draw do
+  root "articles#index"
+
+  resources :articles do
+    resources :comments, only: [:create, :destroy]
+  end
+end
+ROUTES
+
+# Update CommentsController for nested routes
+cat > app/controllers/comments_controller.rb << 'CONTROLLER'
+class CommentsController < ApplicationController
+  before_action :set_article
+
+  def create
+    @comment = @article.comments.build(comment_params)
+    if @comment.save
+      redirect_to @article, notice: "Comment was successfully created."
+    else
+      redirect_to @article, alert: "Could not create comment."
+    end
+  end
+
+  def destroy
+    @comment = @article.comments.find(params[:id])
+    @comment.destroy
+    redirect_to @article, notice: "Comment was successfully deleted."
+  end
+
+  private
+
+  def set_article
+    @article = Article.find(params[:article_id])
+  end
+
+  def comment_params
+    params.require(:comment).permit(:commenter, :body)
+  end
+end
+CONTROLLER
+
+# Add comments section to article show view
+cat >> app/views/articles/show.html.erb << 'VIEW'
+
+<hr class="my-8">
+
+<h2 class="text-xl font-bold mb-4">Comments</h2>
+
+<div class="space-y-4 mb-8">
+  <% @article.comments.each do |comment| %>
+    <div class="p-4 bg-gray-50 rounded">
+      <p class="font-semibold"><%= comment.commenter %></p>
+      <p class="text-gray-700"><%= comment.body %></p>
+      <%= button_to "Delete", [@article, comment], method: :delete,
+          class: "text-red-600 text-sm mt-2",
+          data: { confirm: "Are you sure?" } %>
+    </div>
+  <% end %>
+</div>
+
+<h3 class="text-lg font-semibold mb-2">Add a Comment</h3>
+
+<%= form_with model: [@article, Comment.new], class: "space-y-4" do |form| %>
+  <div>
+    <%= form.label :commenter, class: "block font-medium" %>
+    <%= form.text_field :commenter, class: "block w-full border rounded p-2" %>
+  </div>
+  <div>
+    <%= form.label :body, class: "block font-medium" %>
+    <%= form.text_area :body, rows: 3, class: "block w-full border rounded p-2" %>
+  </div>
+  <%= form.submit "Add Comment", class: "bg-blue-600 text-white px-4 py-2 rounded" %>
+<% end %>
+VIEW
+
+# Configure database for Ruby2JS (dexie for browser development)
+cat > config/database.yml << DATABASE
+development:
+  adapter: dexie
+  database: ${APP_NAME}_dev
+
+production:
+  adapter: sqlite3
+  database: db/production.sqlite3
+DATABASE
+
+echo ""
+echo "Blog created: $APP_NAME/"
+echo ""
+echo "To run with Ruby2JS (transpiled to JavaScript):"
+echo "  cd $APP_NAME"
+echo "  bundle exec ruby2js dev      # Browser with IndexedDB (dexie)"
+echo "  bundle exec ruby2js server   # Node.js with SQLite"
+echo ""
+echo "To run with Rails:"
+echo "  cd $APP_NAME"
+echo "  RAILS_ENV=production bin/rails db:migrate"
+echo "  RAILS_ENV=production bin/dev"
+echo "  # or: bin/rails server -e production"
+echo ""

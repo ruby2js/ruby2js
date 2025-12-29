@@ -22,7 +22,7 @@
 $:.unshift File.absolute_path('../../lib', __FILE__)
 
 # Check for subcommands before loading the full demo
-SUBCOMMANDS = %w[dev server build].freeze
+SUBCOMMANDS = %w[dev server build install].freeze
 
 if SUBCOMMANDS.include?(ARGV.first)
   subcommand = ARGV.shift
