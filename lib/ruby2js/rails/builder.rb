@@ -273,7 +273,7 @@ class SelfhostBuilder
     when 'pico' then 'container'
     when 'bootstrap' then 'container mt-4'
     when 'bulma' then 'container mt-4'
-    when 'tailwind' then 'container mx-auto px-4 py-8'
+    when 'tailwind' then 'container mx-auto mt-28 px-5 flex'
     else '' # No classes without a CSS framework
     end
 

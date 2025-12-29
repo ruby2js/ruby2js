@@ -113,6 +113,9 @@ cat >> app/views/articles/show.html.erb << 'VIEW'
 <% end %>
 VIEW
 
+# Rebuild Tailwind CSS to include all view classes
+bin/rails tailwindcss:build
+
 # Configure database for Ruby2JS (dexie for browser development)
 cat > config/database.yml << DATABASE
 development:

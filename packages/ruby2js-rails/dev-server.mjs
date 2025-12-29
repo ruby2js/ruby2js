@@ -21,11 +21,23 @@ const PORT = portArg ? parseInt(portArg.split('=')[1]) : 3000;
 
 // Detect CSS framework
 let cssFramework = 'none';
+let tailwindType = null; // 'rails' or 'standalone'
 async function detectCssFramework() {
+  // Check for tailwindcss-rails (app/assets/tailwind/application.css)
+  try {
+    await access(join(APP_ROOT, 'app/assets/tailwind/application.css'));
+    cssFramework = 'tailwind';
+    tailwindType = 'rails';
+    console.log('\x1b[36m[css]\x1b[0m Tailwind CSS detected (tailwindcss-rails)');
+    return;
+  } catch {}
+
+  // Check for standalone Tailwind (tailwind.config.js)
   try {
     await access(join(APP_ROOT, 'tailwind.config.js'));
     cssFramework = 'tailwind';
-    console.log('\x1b[36m[css]\x1b[0m Tailwind CSS detected');
+    tailwindType = 'standalone';
+    console.log('\x1b[36m[css]\x1b[0m Tailwind CSS detected (standalone)');
     return;
   } catch {}
 
@@ -145,9 +157,14 @@ async function runCssBuild() {
   const startTime = Date.now();
   console.log('\x1b[35m[css]\x1b[0m Building Tailwind CSS...');
 
+  // Use appropriate command based on Tailwind setup
+  const buildCmd = tailwindType === 'rails'
+    ? 'npx tailwindcss -i app/assets/tailwind/application.css -o app/assets/builds/tailwind.css'
+    : 'npx tailwindcss -i ./src/input.css -o ./public/styles.css';
+
   try {
     await new Promise((resolve, reject) => {
-      exec('npx tailwindcss -i ./src/input.css -o ./public/styles.css', { cwd: APP_ROOT }, (error, stdout, stderr) => {
+      exec(buildCmd, { cwd: APP_ROOT }, (error, stdout, stderr) => {
         if (error) {
           console.error('\x1b[31m[css error]\x1b[0m', error.message);
           if (stderr) console.error(stderr);
@@ -273,7 +290,7 @@ function onFileChange(event, path) {
   const relativePath = path.replace(APP_ROOT + '/', '');
 
   // Handle CSS files
-  if (path.endsWith('.css') && !path.includes('public/')) {
+  if (path.endsWith('.css') && !path.includes('public/') && !path.includes('builds/')) {
     console.log(`\x1b[35m[${event}]\x1b[0m ${relativePath}`);
     if (cssDebounceTimer) clearTimeout(cssDebounceTimer);
     cssDebounceTimer = setTimeout(() => {
@@ -293,6 +310,10 @@ function onFileChange(event, path) {
   rubyDebounceTimer = setTimeout(() => {
     rubyDebounceTimer = null;
     runBuild();
+    // Also rebuild Tailwind CSS when views change (JIT needs to scan for new classes)
+    if (cssFramework === 'tailwind' && path.includes('/views/')) {
+      runCssBuild();
+    }
   }, 100);
 }
 
