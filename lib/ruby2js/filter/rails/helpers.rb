@@ -51,6 +51,30 @@ module Ruby2JS
           end
         end
 
+        # Override Erb filter's transform_erb_output to add context as first parameter
+        # Server-side views need context for flash, contentFor, params, etc.
+        def transform_erb_output(bufvar, children)
+          # Call parent to get the basic render function
+          result = super
+
+          # Add context as first positional parameter for server targets
+          # Browser targets also receive context for consistency
+          if result.type == :def && result.children[0] == :render
+            _, name, args, body = result.children
+
+            # Prepend context argument to the args
+            new_args = if args.children.empty?
+              s(:args, s(:arg, :context))
+            else
+              s(:args, s(:arg, :context), *args.children)
+            end
+
+            return s(:def, name, new_args, body)
+          end
+
+          result
+        end
+
         def on_send(node)
           target, method, *args = node.children
 
@@ -776,41 +800,40 @@ module Ruby2JS
         end
 
         # Process notice helper - reads from flash and returns message
-        # <%= notice %> -> flash.consumeNotice()
+        # <%= notice %> -> context.flash.consumeNotice()
         def process_notice
-          @erb_view_helpers << :flash unless @erb_view_helpers.include?(:flash)
-          s(:send, s(:lvar, :flash), :consumeNotice)
+          # Access flash through context parameter (no import needed)
+          s(:send, s(:attr, s(:lvar, :context), :flash), :consumeNotice)
         end
 
         # Process content_for helper
-        # <% content_for :title, "Articles" %> -> stores content (returns empty string)
-        # <%= content_for(:title) %> -> retrieves content
+        # <% content_for :title, "Articles" %> -> context.contentFor.title = "Articles"
+        # <%= content_for(:title) %> -> context.contentFor.title
         def process_content_for(args)
           return s(:str, '') if args.empty?
 
           key = args[0]
           value = args[1]
 
+          # Only handle symbol keys for now
+          return s(:str, '') unless key.type == :sym
+          key_name = key.children[0]
+
           if value
             # Setting content: content_for :title, "Articles"
-            # For now, handle :title specially to set document.title
-            if key.type == :sym && key.children[0] == :title
-              # Set document.title and return empty string
-              s(:begin,
-                s(:send, s(:attr, nil, :document), :title=, process(value)),
-                s(:str, ''))
-            else
-              # Other keys: just return empty string (no-op for now)
-              s(:str, '')
-            end
+            # context.contentFor.title = "Articles"; return ""
+            s(:begin,
+              s(:send,
+                s(:attr, s(:lvar, :context), :contentFor),
+                "#{key_name}=".to_sym,
+                process(value)),
+              s(:str, ''))
           else
             # Getting content: content_for(:title)
-            # For :title, return document.title
-            if key.type == :sym && key.children[0] == :title
-              s(:attr, s(:lvar, :document), :title)
-            else
-              s(:str, '')
-            end
+            # context.contentFor.title || ""
+            s(:or,
+              s(:attr, s(:attr, s(:lvar, :context), :contentFor), key_name),
+              s(:str, ''))
           end
         end
 
@@ -884,7 +907,7 @@ module Ruby2JS
           # Track this partial for import generation
           @erb_partials << partial_name unless @erb_partials.include?(partial_name)
 
-          # Build the partial function call: _form_module.render({article})
+          # Build the partial function call: _form_module.render(context, {article})
           module_name = "_#{partial_name}_module".to_sym
 
           # Build locals hash for the call
@@ -894,10 +917,11 @@ module Ruby2JS
             pairs << s(:pair, s(:sym, key), process(locals[key]))
           end
 
+          # Pass context as first argument, then locals hash
           if pairs.empty?
-            s(:send, s(:lvar, module_name), :render, s(:hash))
+            s(:send, s(:lvar, module_name), :render, s(:lvar, :context), s(:hash))
           else
-            s(:send, s(:lvar, module_name), :render, s(:hash, *pairs))
+            s(:send, s(:lvar, module_name), :render, s(:lvar, :context), s(:hash, *pairs))
           end
         end
 

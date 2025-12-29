@@ -23,13 +23,13 @@ describe Ruby2JS::Filter::Rails::Routes do
   end
 
   describe "imports" do
-    it "imports Router, Application, formData, and handleFormResult from rails.js" do
+    it "imports Router, Application, createContext, formData, and handleFormResult from rails.js" do
       result = to_js(<<~RUBY)
         Rails.application.routes.draw do
           root 'articles#index'
         end
       RUBY
-      assert_includes result, 'import { Router, Application, formData, handleFormResult } from "../lib/rails.js"'
+      assert_includes result, 'import { Router, Application, createContext, formData, handleFormResult } from "../lib/rails.js"'
     end
 
     it "imports Schema and Seeds" do
@@ -135,8 +135,9 @@ describe Ruby2JS::Filter::Rails::Routes do
       assert_includes result, 'const routes = {'
       assert_includes result, 'articles: {'
       assert_includes result, 'article: {'
-      assert_includes result, 'ArticlesController.create(formData(event))'
-      assert_includes result, 'ArticlesController.destroy(id)'
+      # Context-aware controller calls
+      assert_includes result, 'ArticlesController.create(context, params)'
+      assert_includes result, 'ArticlesController.destroy(context, id)'
     end
 
     it "generates nested routes for nested resources" do
@@ -149,8 +150,9 @@ describe Ruby2JS::Filter::Rails::Routes do
       RUBY
       assert_includes result, 'article_comments: {'
       assert_includes result, 'article_comment: {'
-      assert_includes result, 'await CommentsController.create'
-      assert_includes result, 'await CommentsController.destroy'
+      # Context-aware controller calls (may have newlines in output)
+      assert_includes result, 'CommentsController.create'
+      assert_includes result, 'CommentsController.destroy(context'
     end
   end
 

@@ -5,6 +5,7 @@
 import {
   RouterBase,
   ApplicationBase,
+  createFlash,
   truncate,
   pluralize,
   dom_id,
@@ -16,70 +17,34 @@ import {
 } from './rails_base.js';
 
 // Re-export base helpers
-export { truncate, pluralize, dom_id, navigate, submitForm, formData, handleFormResult, setupFormHandlers };
+export { createFlash, truncate, pluralize, dom_id, navigate, submitForm, formData, handleFormResult, setupFormHandlers };
 
-// Flash messages - cookie-based like Rails
-// Messages are set before redirect, read on next request, then cleared
-export const flash = {
-  _pending: {},   // Messages to be set in response cookie
-  _current: {},   // Messages read from request cookie
+// Create a fresh request context (like Rails' view context)
+// Each request gets its own context with isolated state
+// For Fetch API requests (Bun, Deno, Cloudflare, rails_server.js)
+export function createContext(req, params = {}) {
+  const url = new URL(req.url);
+  const cookieHeader = req.headers.get('cookie') || '';
 
-  // Set a flash message (will be sent in response cookie)
-  set(key, value) {
-    this._pending[key] = value;
-  },
+  return {
+    // Content for layout (like Rails content_for)
+    contentFor: {},
 
-  // Get and consume a flash message
-  get(key) {
-    const msg = this._current[key];
-    delete this._current[key];
-    return msg || '';
-  },
+    // Flash messages - parsed from request cookie
+    flash: createFlash(cookieHeader),
 
-  // Convenience methods
-  consumeNotice() { return this.get('notice'); },
-  consumeAlert() { return this.get('alert'); },
+    // Request parameters (from URL and body)
+    params: params,
 
-  // Parse flash from request cookies
-  parseFromRequest(req) {
-    this._current = {};
-    this._pending = {};
-
-    const cookieHeader = req.headers.get('cookie') || '';
-    const cookies = cookieHeader.split(';').map(c => c.trim());
-
-    for (const cookie of cookies) {
-      if (cookie.startsWith('_flash=')) {
-        try {
-          const value = cookie.substring(7);
-          this._current = JSON.parse(decodeURIComponent(value));
-        } catch (e) {
-          // Invalid flash cookie, ignore
-        }
-        break;
-      }
+    // Request info
+    request: {
+      path: url.pathname,
+      method: req.method,
+      url: req.url,
+      headers: req.headers
     }
-  },
-
-  // Get cookie header for response (if there are pending messages)
-  getResponseCookie() {
-    if (Object.keys(this._pending).length === 0) {
-      // Clear the flash cookie if no pending messages
-      if (Object.keys(this._current).length > 0) {
-        return '_flash=; Path=/; Max-Age=0';
-      }
-      return null;
-    }
-
-    const value = encodeURIComponent(JSON.stringify(this._pending));
-    return `_flash=${value}; Path=/; HttpOnly; SameSite=Lax`;
-  },
-
-  // Check if there are pending messages
-  hasPending() {
-    return Object.keys(this._pending).length > 0;
-  }
-};
+  };
+}
 
 // Server Router with HTTP dispatch
 export class Router extends RouterBase {
@@ -90,9 +55,6 @@ export class Router extends RouterBase {
     const path = url.pathname;
     let method = this.normalizeMethod(req, url);
     let params = {};
-
-    // Parse flash messages from request cookie
-    flash.parseFromRequest(req);
 
     // Parse request body for POST requests (may contain _method override)
     if (req.method === 'POST') {
@@ -105,6 +67,9 @@ export class Router extends RouterBase {
     } else if (['PATCH', 'PUT', 'DELETE'].includes(method)) {
       params = await this.parseBody(req);
     }
+
+    // Create request context with flash, params, etc.
+    const context = createContext(req, params);
 
     console.log(`Started ${method} "${path}"`);
     if (Object.keys(params).length > 0) {
@@ -124,7 +89,7 @@ export class Router extends RouterBase {
     const { route, match } = result;
 
     if (route.redirect) {
-      return this.redirect(req, route.redirect);
+      return this.redirect(context, route.redirect);
     }
 
     const { controller, controllerName, action } = route;
@@ -141,36 +106,36 @@ export class Router extends RouterBase {
         const id = match[2] ? parseInt(match[2]) : null;
 
         if (method === 'POST') {
-          const result = await controller.create(parentId, params);
-          return this.handleResult(req, result, `/${route.parentName}/${parentId}`);
+          const result = await controller.create(context, parentId, params);
+          return this.handleResult(context, result, `/${route.parentName}/${parentId}`);
         } else if (method === 'PATCH') {
-          const result = await controller.update(parentId, id, params);
-          return this.handleResult(req, result, `/${route.parentName}/${parentId}`);
+          const result = await controller.update(context, parentId, id, params);
+          return this.handleResult(context, result, `/${route.parentName}/${parentId}`);
         } else if (method === 'DELETE') {
-          await controller.destroy(parentId, id);
-          return this.redirect(req, `/${route.parentName}/${parentId}`);
+          await controller.destroy(context, parentId, id);
+          return this.redirect(context, `/${route.parentName}/${parentId}`);
         } else {
-          html = id ? await controller[actionMethod](parentId, id) : await controller[actionMethod](parentId);
+          html = id ? await controller[actionMethod](context, parentId, id) : await controller[actionMethod](context, parentId);
         }
       } else {
         const id = match[1] ? parseInt(match[1]) : null;
 
         if (method === 'POST') {
-          const result = await controller.create(params);
-          return this.handleResult(req, result, `/${controllerName}`);
+          const result = await controller.create(context, params);
+          return this.handleResult(context, result, `/${controllerName}`);
         } else if (method === 'PATCH') {
-          const result = await controller.update(id, params);
-          return this.handleResult(req, result, `/${controllerName}/${id}`);
+          const result = await controller.update(context, id, params);
+          return this.handleResult(context, result, `/${controllerName}/${id}`);
         } else if (method === 'DELETE') {
-          await controller.destroy(id);
-          return this.redirect(req, `/${controllerName}`);
+          await controller.destroy(context, id);
+          return this.redirect(context, `/${controllerName}`);
         } else {
-          html = id ? await controller[actionMethod](id) : await controller[actionMethod]();
+          html = id ? await controller[actionMethod](context, id) : await controller[actionMethod](context);
         }
       }
 
       console.log(`  Rendering ${controllerName}/${action}`);
-      return this.htmlResponse(html);
+      return this.htmlResponse(context, html);
     } catch (e) {
       console.error('  Error:', e.message || e);
       return new Response(`<h1>500 Internal Server Error</h1><pre>${e.stack}</pre>`, {
@@ -219,32 +184,32 @@ export class Router extends RouterBase {
   }
 
   // Handle controller result (redirect or render)
-  static handleResult(req, result, defaultRedirect) {
+  static handleResult(context, result, defaultRedirect) {
     if (result.redirect) {
       // Set flash notice if present in result
       if (result.notice) {
-        flash.set('notice', result.notice);
+        context.flash.set('notice', result.notice);
       }
       if (result.alert) {
-        flash.set('alert', result.alert);
+        context.flash.set('alert', result.alert);
       }
       console.log(`  Redirected to ${result.redirect}`);
-      return this.redirect(req, result.redirect);
+      return this.redirect(context, result.redirect);
     } else if (result.render) {
       // Validation failed - render contains pre-rendered HTML from the view
       console.log('  Re-rendering form (validation failed)');
-      return this.htmlResponse(result.render);
+      return this.htmlResponse(context, result.render);
     } else {
-      return this.redirect(req, defaultRedirect);
+      return this.redirect(context, defaultRedirect);
     }
   }
 
   // Create redirect response with flash cookie
-  static redirect(req, path) {
+  static redirect(context, path) {
     const headers = new Headers({ 'Location': path });
 
     // Add flash cookie if there are pending messages
-    const flashCookie = flash.getResponseCookie();
+    const flashCookie = context.flash.getResponseCookie();
     if (flashCookie) {
       headers.set('Set-Cookie', flashCookie);
     }
@@ -256,12 +221,12 @@ export class Router extends RouterBase {
   }
 
   // Create HTML response with proper headers, wrapped in layout
-  static htmlResponse(html) {
-    const fullHtml = Application.wrapInLayout(html);
+  static htmlResponse(context, html) {
+    const fullHtml = Application.wrapInLayout(context, html);
     const headers = { 'Content-Type': 'text/html; charset=utf-8' };
 
     // Clear flash cookie after it's been consumed
-    const flashCookie = flash.getResponseCookie();
+    const flashCookie = context.flash.getResponseCookie();
     if (flashCookie) {
       headers['Set-Cookie'] = flashCookie;
     }

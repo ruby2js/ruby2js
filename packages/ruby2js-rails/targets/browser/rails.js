@@ -4,34 +4,52 @@
 import {
   RouterBase,
   ApplicationBase,
+  createFlash,
   truncate,
   pluralize,
   dom_id
 } from './rails_base.js';
 
 // Re-export base helpers
-export { truncate, pluralize, dom_id };
+// Note: createContext is defined in this file with browser-specific logic
+export { createFlash, truncate, pluralize, dom_id };
 
-// Flash message store - holds messages across redirects
-export const flash = {
-  _notice: null,
+// Create a fresh request context for browser navigation
+// Each navigation gets its own context with isolated state
+export function createContext(params = {}) {
+  const cookieHeader = document.cookie || '';
 
-  setNotice(message) {
-    this._notice = message;
-  },
+  return {
+    // Content for layout (like Rails content_for)
+    contentFor: {},
 
-  consumeNotice() {
-    const message = this._notice || '';
-    this._notice = null;
-    return message;
-  }
-};
+    // Flash messages - parsed from cookie
+    flash: createFlash(cookieHeader),
+
+    // Request parameters
+    params: params,
+
+    // Request info (browser-specific)
+    request: {
+      path: location.pathname,
+      method: 'GET',
+      url: location.href,
+      headers: null  // Browser doesn't expose request headers
+    }
+  };
+}
 
 // Browser Router with DOM-based dispatch
 export class Router extends RouterBase {
   // Dispatch a path to the appropriate controller action
-  static async dispatch(path) {
+  // Context is created fresh for each navigation, or passed from form handlers
+  static async dispatch(path, context = null) {
     console.log(`Started GET "${path}"`);
+
+    // Create context if not provided (fresh navigation)
+    if (!context) {
+      context = createContext();
+    }
 
     const result = this.match(path, 'GET');
 
@@ -44,7 +62,7 @@ export class Router extends RouterBase {
     const { route, match } = result;
 
     if (route.redirect) {
-      this.navigate(route.redirect);
+      await this.navigate(route.redirect);
       return;
     }
 
@@ -58,26 +76,49 @@ export class Router extends RouterBase {
       if (route.nested) {
         const parentId = parseInt(match[1]);
         const id = match[2] ? parseInt(match[2]) : null;
-        html = id ? await controller[actionMethod](parentId, id) : await controller[actionMethod](parentId);
+        html = id ? await controller[actionMethod](context, parentId, id) : await controller[actionMethod](context, parentId);
       } else {
         const id = match[1] ? parseInt(match[1]) : null;
-        html = id ? await controller[actionMethod](id) : await controller[actionMethod]();
+        html = id ? await controller[actionMethod](context, id) : await controller[actionMethod](context);
       }
 
       console.log(`  Rendering ${controllerName}/${action}`);
-      document.getElementById('content').innerHTML = html;
+      this.renderContent(context, html);
     } catch (e) {
       console.error('  Error:', e.message || e);
       document.getElementById('content').innerHTML = '<h1>Not Found</h1>';
     }
   }
 
-  // Navigate to a new path, optionally with a notice message
-  static async navigate(path, notice = null) {
-    if (notice) {
-      flash.setNotice(notice);
+  // Render content and handle flash cookie
+  static renderContent(context, html) {
+    const fullHtml = Application.wrapInLayout(context, html);
+    document.getElementById('content').innerHTML = fullHtml;
+
+    // Clear flash cookie after rendering (consumed)
+    context.flash.writeToCookie();
+  }
+
+  // Navigate to a new path, optionally with flash messages
+  static async navigate(path, options = {}) {
+    // Create fresh context for the new navigation
+    const context = createContext();
+
+    // Set flash messages if provided
+    if (options.notice) {
+      context.flash.set('notice', options.notice);
     }
+    if (options.alert) {
+      context.flash.set('alert', options.alert);
+    }
+
+    // Write flash to cookie before navigation
+    if (context.flash.hasPending()) {
+      context.flash.writeToCookie();
+    }
+
     history.pushState({}, '', path);
+    // Create new context for dispatch (will read flash from cookie)
     await this.dispatch(path);
   }
 }
@@ -91,11 +132,14 @@ export class FormHandler {
     const form = event.target;
     const params = this.extractParams(form);
 
+    // Create context with form params
+    const context = createContext(params);
+
     console.log(`Processing ${controller.name}#create`);
     console.log('  Parameters:', params);
 
-    const result = await controller.create(params);
-    await this.handleResult(result, controllerName, 'new', controller);
+    const result = await controller.create(context, params);
+    await this.handleResult(context, result, controllerName, 'new', controller);
     return false;
   }
 
@@ -106,11 +150,14 @@ export class FormHandler {
     const form = event.target;
     const params = this.extractParams(form);
 
+    // Create context with form params
+    const context = createContext(params);
+
     console.log(`Processing ${controller.name}#update (id: ${id})`);
     console.log('  Parameters:', params);
 
-    const result = await controller.update(id, params);
-    await this.handleResult(result, controllerName, 'edit', controller, id);
+    const result = await controller.update(context, id, params);
+    await this.handleResult(context, result, controllerName, 'edit', controller, id);
     return false;
   }
 
@@ -119,9 +166,11 @@ export class FormHandler {
     if (!confirm(confirmMsg)) return;
 
     const controller = Router.controllers[controllerName];
+    const context = createContext();
+
     console.log(`Processing ${controller.name}#destroy (id: ${id})`);
 
-    await controller.destroy(id);
+    await controller.destroy(context, id);
     console.log(`  Redirected to /${controllerName}`);
     await Router.navigate(`/${controllerName}`);
   }
@@ -133,10 +182,13 @@ export class FormHandler {
     const form = event.target;
     const params = this.extractParams(form);
 
+    // Create context with form params
+    const context = createContext(params);
+
     console.log(`Processing ${controller.name}#create (${parentName}_id: ${parentId})`);
     console.log('  Parameters:', params);
 
-    await controller.create(parentId, params);
+    await controller.create(context, parentId, params);
     console.log(`  Redirected to /${parentName}/${parentId}`);
     await Router.navigate(`/${parentName}/${parentId}`);
     return false;
@@ -147,9 +199,11 @@ export class FormHandler {
     if (!confirm(confirmMsg)) return;
 
     const controller = Router.controllers[controllerName];
+    const context = createContext();
+
     console.log(`Processing ${controller.name}#destroy (${parentName}_id: ${parentId}, id: ${id})`);
 
-    await controller.destroy(parentId, id);
+    await controller.destroy(context, parentId, id);
     console.log(`  Redirected to /${parentName}/${parentId}`);
     await Router.navigate(`/${parentName}/${parentId}`);
   }
@@ -172,13 +226,22 @@ export class FormHandler {
   }
 
   // Handle controller result (redirect or render)
-  static async handleResult(result, controllerName, action, controller, id = null) {
+  static async handleResult(context, result, controllerName, action, controller, id = null) {
     if (result.redirect) {
+      // Set flash messages before redirect
+      if (result.notice) {
+        context.flash.set('notice', result.notice);
+      }
+      if (result.alert) {
+        context.flash.set('alert', result.alert);
+      }
+      context.flash.writeToCookie();
+
       console.log(`  Redirected to ${result.redirect}`);
-      await Router.navigate(result.redirect, result.notice);
+      await Router.navigate(result.redirect);
     } else if (result.render) {
       console.log(`  Rendering ${controllerName}/${action} (validation failed)`);
-      document.getElementById('content').innerHTML = result.render;
+      Router.renderContent(context, result.render);
     }
   }
 }
@@ -278,14 +341,26 @@ export async function navigate(event, path) {
 export async function submitForm(event, handler) {
   event?.preventDefault?.();
   try {
-    const result = await handler(event);
+    // Create context for form submission
+    const context = createContext(FormHandler.extractParams(event?.target));
+    const result = await handler(context, event);
+
     if (result?.redirect) {
-      console.log(`  Redirected to ${result.redirect}`);
+      // Set flash messages before redirect
       if (result.notice) {
-        flash.setNotice(result.notice);
+        context.flash.set('notice', result.notice);
       }
+      if (result.alert) {
+        context.flash.set('alert', result.alert);
+      }
+      context.flash.writeToCookie();
+
+      console.log(`  Redirected to ${result.redirect}`);
       history.pushState({}, '', result.redirect);
       await Router.dispatch(result.redirect);
+    } else if (result?.render) {
+      console.log(`  Re-rendering form (validation failed)`);
+      Router.renderContent(context, result.render);
     }
     return result;
   } catch (e) {
@@ -302,14 +377,23 @@ export function formData(event) {
   return FormHandler.extractParams(form);
 }
 
-// Handle form submission result
-export function handleFormResult(result, rerenderFn = null) {
+// Handle form submission result (context-aware)
+export function handleFormResult(context, result, rerenderFn = null) {
   if (result?.redirect) {
+    // Set flash messages before redirect
+    if (result.notice) {
+      context.flash.set('notice', result.notice);
+    }
+    if (result.alert) {
+      context.flash.set('alert', result.alert);
+    }
+    context.flash.writeToCookie();
+
     console.log(`  Redirected to ${result.redirect}`);
-    Router.navigate(result.redirect, result.notice);
+    Router.navigate(result.redirect);
   } else if (result?.render) {
     console.log(`  Re-rendering form (validation failed)`);
-    document.getElementById('content').innerHTML = result.render;
+    Router.renderContent(context, result.render);
   }
   return false;
 }

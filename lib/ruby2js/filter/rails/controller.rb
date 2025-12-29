@@ -326,9 +326,10 @@ module Ruby2JS
                         end
 
           # Build method parameters from:
+          # 0. Context (always first - contains flash, contentFor, params, request)
           # 1. Any extra params[:key] accesses (like article_id for nested resources)
           # 2. Standard RESTful params (id for show/edit/destroy, params for create/update)
-          param_args = []
+          param_args = [s(:arg, :context)]
 
           # Add extra params keys found in method body (like article_id for nested resources)
           # Exclude :id because it's handled by standard RESTful routing
@@ -655,7 +656,7 @@ module Ruby2JS
           target = args.first
 
           if target.type == :sym
-            # render :new -> ArticleViews.$new({article})
+            # render :new -> ArticleViews.$new(context, {article})
             # Call the view directly with the model (including validation errors)
             action = target.children[0]
             model_name = @rails_controller_name.downcase.to_sym
@@ -664,12 +665,13 @@ module Ruby2JS
             # Use $new for reserved word (matches view module export)
             view_action = action == :new ? :$new : action
 
-            # Build view call with model: ArticleViews.$new({article: article})
+            # Build view call with context and model: ArticleViews.$new(context, {article: article})
             s(:hash,
               s(:pair, s(:sym, :render),
                 s(:send,
                   s(:const, nil, view_module.to_sym),
                   view_action,
+                  s(:lvar, :context),
                   s(:hash, s(:pair, s(:sym, model_name), s(:lvar, model_name))))))
           else
             # More complex render - pass through for now
@@ -784,9 +786,11 @@ module Ruby2JS
             s(:pair, s(:sym, ivar), s(:lvar, ivar))
           end
 
+          # Pass context as first argument, then locals hash
           s(:send,
             s(:const, nil, view_module.to_sym),
             view_action,
+            s(:lvar, :context),
             s(:hash, *pairs))
         end
 

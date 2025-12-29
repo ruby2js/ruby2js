@@ -23,7 +23,7 @@ describe Ruby2JS::Filter::Rails::Controller do
       result = to_js(source)
       _(result).must_include 'export'
       _(result).must_include 'ArticlesController'
-      _(result).must_include 'function index()'
+      _(result).must_include 'function index(context)'
     end
 
     it "ignores non-controller classes" do
@@ -52,7 +52,7 @@ describe Ruby2JS::Filter::Rails::Controller do
       RUBY
 
       result = to_js(source)
-      _(result).must_include 'async function show(id)'
+      _(result).must_include 'async function show(context, id)'
       _(result).must_include 'let article = await Article.find(id)'
     end
 
@@ -66,7 +66,7 @@ describe Ruby2JS::Filter::Rails::Controller do
       RUBY
 
       result = to_js(source)
-      _(result).must_include 'function $new()'
+      _(result).must_include 'function $new(context)'
     end
 
     it "adds id parameter for show, edit, destroy; id and params for update" do
@@ -80,10 +80,10 @@ describe Ruby2JS::Filter::Rails::Controller do
       RUBY
 
       result = to_js(source)
-      _(result).must_include 'function show(id)'
-      _(result).must_include 'function edit(id)'
-      _(result).must_include 'function update(id, params)'
-      _(result).must_include 'function destroy(id)'
+      _(result).must_include 'function show(context, id)'
+      _(result).must_include 'function edit(context, id)'
+      _(result).must_include 'function update(context, id, params)'
+      _(result).must_include 'function destroy(context, id)'
     end
   end
 
@@ -112,7 +112,7 @@ describe Ruby2JS::Filter::Rails::Controller do
       RUBY
 
       result = to_js(source)
-      _(result).must_include 'ArticleViews.index({articles})'
+      _(result).must_include 'ArticleViews.index(context, {articles})'
     end
   end
 
@@ -146,7 +146,7 @@ describe Ruby2JS::Filter::Rails::Controller do
       RUBY
 
       result = to_js(source)
-      _(result).must_include 'function create(params)'
+      _(result).must_include 'function create(context, params)'
       _(result).must_include 'new Article(params)'
       _(result).wont_include 'article_params'
       _(result).wont_include 'require'
@@ -169,7 +169,7 @@ describe Ruby2JS::Filter::Rails::Controller do
       RUBY
 
       result = to_js(source)
-      _(result).must_include 'function update(id, params)'
+      _(result).must_include 'function update(context, id, params)'
       _(result).must_include 'Article.find(id)'
       _(result).must_include 'article.update(params)'
     end
@@ -237,7 +237,7 @@ describe Ruby2JS::Filter::Rails::Controller do
       RUBY
 
       result = to_js(source)
-      _(result).must_include 'async function show(id)'
+      _(result).must_include 'async function show(context, id)'
       _(result).must_include 'let article = await Article.find(id)'
     end
 
@@ -263,9 +263,9 @@ describe Ruby2JS::Filter::Rails::Controller do
 
       result = to_js(source)
       # index should NOT have set_article code
-      _(result).must_match(/async function index\(\).*?let articles = await Article\.all\(\)/m)
+      _(result).must_match(/async function index\(context\).*?let articles = await Article\.all\(\)/m)
       # show SHOULD have set_article code
-      _(result).must_match(/async function show\(id\).*?let article = await Article\.find\(id\)/m)
+      _(result).must_match(/async function show\(context, id\).*?let article = await Article\.find\(id\)/m)
     end
 
     it "collects ivars from before_action methods" do
@@ -286,7 +286,7 @@ describe Ruby2JS::Filter::Rails::Controller do
 
       result = to_js(source)
       # The article ivar from set_article should be passed to view
-      _(result).must_include 'ArticleViews.show({article})'
+      _(result).must_include 'ArticleViews.show(context, {article})'
     end
   end
 

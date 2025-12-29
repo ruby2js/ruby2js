@@ -438,11 +438,12 @@ module Ruby2JS
 
           statements = []
 
-          # Import Router, Application, formData, handleFormResult from rails.js
+          # Import Router, Application, createContext, formData, handleFormResult from rails.js
           # Wrap in array to get named imports: import { X, Y } from "..."
           statements << s(:import, '../lib/rails.js',
             [s(:const, nil, :Router),
              s(:const, nil, :Application),
+             s(:const, nil, :createContext),
              s(:const, nil, :formData),
              s(:const, nil, :handleFormResult)])
 
@@ -600,10 +601,11 @@ module Ruby2JS
               collection_methods = []
 
               if !resource[:only] || resource[:only].include?(:create)
-                # create(parent_id, params) - async, parent id first, then params
+                # create(context, parent_id, params) - async
                 controller_call = s(:send, controller, :create,
+                  s(:lvar, :context),
                   s(:lvar, :parentId),
-                  s(:send, nil, :formData, s(:lvar, :event)))
+                  s(:lvar, :params))
                 collection_methods << s(:pair, s(:sym, :post),
                   s(:block,
                     s(:send, nil, :async),
@@ -618,15 +620,16 @@ module Ruby2JS
               member_methods = []
 
               if !resource[:only] || resource[:only].include?(:destroy)
-                # destroy(parent_id, id) - async, parent id first, then id
+                # destroy(context, parent_id, id) - async
                 controller_call = s(:send, controller, :destroy,
+                  s(:lvar, :context),
                   s(:lvar, :parentId),
                   s(:lvar, :id))
                 member_methods << s(:pair, s(:sym, :delete),
                   s(:block,
                     s(:send, nil, :async),
                     s(:args, s(:arg, :parentId), s(:arg, :id)),
-                    wrap_with_result_handler(controller_call)))
+                    wrap_with_result_handler(controller_call, has_params: false)))
               end
 
               pairs << s(:pair, s(:sym, member_name), s(:hash, *member_methods)) if member_methods.any?
@@ -638,17 +641,19 @@ module Ruby2JS
 
               if !resource[:only] || resource[:only].include?(:index)
                 # Use :index! to bypass functions filter (which transforms .index() to .indexOf())
+                # GET handlers create context and pass it to the controller
                 collection_methods << s(:pair, s(:sym, :get),
                   s(:block,
                     s(:send, nil, :proc),
                     s(:args),
-                    s(:send, controller, :index!)))
+                    s(:send, controller, :index!, s(:send, nil, :createContext))))
               end
 
               if !resource[:only] || resource[:only].include?(:create)
-                # post: async (event) => { let result = await Controller.create(...); handleFormResult(result); return false }
+                # post: async (event) => { let params = formData(event); let context = createContext(params); let result = await Controller.create(context, params); handleFormResult(context, result); return false }
                 controller_call = s(:send, controller, :create,
-                  s(:send, nil, :formData, s(:lvar, :event)))
+                  s(:lvar, :context),
+                  s(:lvar, :params))
                 collection_methods << s(:pair, s(:sym, :post),
                   s(:block,
                     s(:send, nil, :async),
@@ -662,19 +667,20 @@ module Ruby2JS
               member_methods = []
 
               if !resource[:only] || resource[:only].include?(:show)
-                # show(id) - plain id
+                # show(context, id) - context created inline
                 member_methods << s(:pair, s(:sym, :get),
                   s(:block,
                     s(:send, nil, :proc),
                     s(:args, s(:arg, :id)),
-                    s(:send, controller, :show, s(:lvar, :id))))
+                    s(:send, controller, :show, s(:send, nil, :createContext), s(:lvar, :id))))
               end
 
               if !resource[:only] || resource[:only].include?(:update)
-                # update(id, params) - async, id first, then params
+                # update(context, id, params) - async
                 controller_call = s(:send, controller, :update,
+                  s(:lvar, :context),
                   s(:lvar, :id),
-                  s(:send, nil, :formData, s(:lvar, :event)))
+                  s(:lvar, :params))
                 update_block = s(:block,
                   s(:send, nil, :async),
                   s(:args, s(:arg, :event), s(:arg, :id)),
@@ -684,13 +690,13 @@ module Ruby2JS
               end
 
               if !resource[:only] || resource[:only].include?(:destroy)
-                # destroy(id) - async
-                controller_call = s(:send, controller, :destroy, s(:lvar, :id))
+                # destroy(context, id) - async
+                controller_call = s(:send, controller, :destroy, s(:lvar, :context), s(:lvar, :id))
                 member_methods << s(:pair, s(:sym, :delete),
                   s(:block,
                     s(:send, nil, :async),
                     s(:args, s(:arg, :id)),
-                    wrap_with_result_handler(controller_call)))
+                    wrap_with_result_handler(controller_call, has_params: false)))
               end
 
               pairs << s(:pair, s(:sym, singular.to_sym), s(:hash, *member_methods)) if member_methods.any?
@@ -704,12 +710,35 @@ module Ruby2JS
         end
 
         # Wrap a controller call with result handling (async)
-        # Generates: { let result = await controllerCall; handleFormResult(result); return false }
-        def wrap_with_result_handler(controller_call)
-          s(:begin,
-            s(:lvasgn, :result, controller_call.updated(:await!)),
-            s(:send, nil, :handleFormResult, s(:lvar, :result)),
-            s(:return, s(:false)))
+        # Generates:
+        #   let params = formData(event);
+        #   let context = createContext(params);
+        #   let result = await Controller.action(context, ...);
+        #   handleFormResult(context, result);
+        #   return false
+        def wrap_with_result_handler(controller_call, has_params: true)
+          statements = []
+
+          if has_params
+            # let params = formData(event)
+            statements << s(:lvasgn, :params, s(:send, nil, :formData, s(:lvar, :event)))
+            # let context = createContext(params)
+            statements << s(:lvasgn, :context, s(:send, nil, :createContext, s(:lvar, :params)))
+          else
+            # let context = createContext()
+            statements << s(:lvasgn, :context, s(:send, nil, :createContext))
+          end
+
+          # let result = await controller.action(context, ...)
+          statements << s(:lvasgn, :result, controller_call.updated(:await!))
+
+          # handleFormResult(context, result)
+          statements << s(:send, nil, :handleFormResult, s(:lvar, :context), s(:lvar, :result))
+
+          # return false
+          statements << s(:return, s(:false))
+
+          s(:begin, *statements)
         end
 
         # Create an async block (arrow function)

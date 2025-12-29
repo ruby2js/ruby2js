@@ -845,16 +845,18 @@ class SelfhostBuilder
 
     # Generate a minimal layout for server-side rendering
     # Rails-specific helpers (csrf_meta_tags, etc.) don't make sense in JS context
+    # Layout receives context for access to contentFor, flash, etc.
     js = <<~JS
       // Application layout - wraps view content
       // Generated from app/views/layouts/application.html.erb
-      export function layout(content) {
+      export function layout(context, content) {
+        const title = context.contentFor.title || '#{app_name}';
         return `<!DOCTYPE html>
       <html lang="en">
       <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>#{app_name}</title>
+        <title>\${title}</title>
         <link href="/styles.css" rel="stylesheet">
       </head>
       <body>

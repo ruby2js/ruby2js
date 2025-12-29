@@ -4,7 +4,8 @@
 import {
   Router as RouterServer,
   Application as ApplicationServer,
-  flash,
+  createContext,
+  createFlash,
   truncate,
   pluralize,
   dom_id,
@@ -16,17 +17,17 @@ import {
 } from './rails_server.js';
 
 // Re-export everything from server module
-export { flash, truncate, pluralize, dom_id, navigate, submitForm, formData, handleFormResult, setupFormHandlers };
+export { createContext, createFlash, truncate, pluralize, dom_id, navigate, submitForm, formData, handleFormResult, setupFormHandlers };
 
 // Router with Cloudflare-specific redirect handling
 export class Router extends RouterServer {
   // Override redirect to use full URL (Cloudflare requires absolute URLs)
-  static redirect(req, path) {
-    const url = new URL(path, req.url);
+  static redirect(context, path) {
+    const url = new URL(path, context.request.url);
     const headers = new Headers({ 'Location': url.href });
 
     // Add flash cookie if there are pending messages
-    const flashCookie = flash.getResponseCookie();
+    const flashCookie = context.flash.getResponseCookie();
     if (flashCookie) {
       headers.set('Set-Cookie', flashCookie);
     }
@@ -67,22 +68,22 @@ export class Router extends RouterServer {
   }
 
   // Override handleResult to use full URL for redirects
-  static handleResult(req, result, defaultRedirect) {
+  static handleResult(context, result, defaultRedirect) {
     if (result.redirect) {
       // Set flash notice if present in result
       if (result.notice) {
-        flash.set('notice', result.notice);
+        context.flash.set('notice', result.notice);
       }
       if (result.alert) {
-        flash.set('alert', result.alert);
+        context.flash.set('alert', result.alert);
       }
       console.log(`  Redirected to ${result.redirect}`);
-      return this.redirect(req, result.redirect);
+      return this.redirect(context, result.redirect);
     } else if (result.render) {
       console.log('  Re-rendering form (validation failed)');
-      return this.htmlResponse(result.render);
+      return this.htmlResponse(context, result.render);
     } else {
-      return this.redirect(req, defaultRedirect);
+      return this.redirect(context, defaultRedirect);
     }
   }
 }

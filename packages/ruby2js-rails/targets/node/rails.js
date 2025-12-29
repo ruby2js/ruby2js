@@ -9,7 +9,8 @@ import { StringDecoder } from 'node:string_decoder';
 import {
   Router as RouterServer,
   Application as ApplicationServer,
-  flash,
+  createContext,
+  createFlash,
   truncate,
   pluralize,
   dom_id,
@@ -21,29 +22,27 @@ import {
 } from './rails_server.js';
 
 // Re-export everything from server module
-export { flash, truncate, pluralize, dom_id, navigate, submitForm, formData, handleFormResult, setupFormHandlers };
+export { createContext, createFlash, truncate, pluralize, dom_id, navigate, submitForm, formData, handleFormResult, setupFormHandlers };
 
 // Router with Node.js-specific dispatch (uses req/res instead of Fetch API)
 export class Router extends RouterServer {
-  // Parse flash from Node.js request cookies
-  static parseFlashFromCookies(req) {
-    flash._current = {};
-    flash._pending = {};
-
+  // Create context from Node.js request (different cookie access than Fetch API)
+  static createContextNode(req, params) {
+    const parsedUrl = parseUrl(req.url, true);
+    // Node.js uses req.headers.cookie (string) vs Fetch API's req.headers.get('cookie')
     const cookieHeader = req.headers.cookie || '';
-    const cookies = cookieHeader.split(';').map(c => c.trim());
 
-    for (const cookie of cookies) {
-      if (cookie.startsWith('_flash=')) {
-        try {
-          const value = cookie.substring(7);
-          flash._current = JSON.parse(decodeURIComponent(value));
-        } catch (e) {
-          // Invalid flash cookie, ignore
-        }
-        break;
+    return {
+      contentFor: {},
+      flash: createFlash(cookieHeader),  // Use shared flash creation
+      params: params,
+      request: {
+        path: parsedUrl.pathname,
+        method: req.method,
+        url: req.url,
+        headers: req.headers
       }
-    }
+    };
   }
 
   // Dispatch an HTTP request to the appropriate controller action
@@ -53,9 +52,6 @@ export class Router extends RouterServer {
     const path = parsedUrl.pathname;
     let method = this.normalizeMethodNode(req, parsedUrl);
     let params = {};
-
-    // Parse flash messages from request cookies
-    this.parseFlashFromCookies(req);
 
     // Parse request body for POST requests (may contain _method override)
     if (req.method === 'POST') {
@@ -67,6 +63,9 @@ export class Router extends RouterServer {
     } else if (['PATCH', 'PUT', 'DELETE'].includes(method)) {
       params = await this.parseBodyNode(req);
     }
+
+    // Create request context
+    const context = this.createContextNode(req, params);
 
     console.log(`Started ${method} "${path}"`);
     if (Object.keys(params).length > 0) {
@@ -103,38 +102,38 @@ export class Router extends RouterServer {
         const id = match[2] ? parseInt(match[2]) : null;
 
         if (method === 'POST') {
-          const result = await controller.create(parentId, params);
-          return this.handleResultNode(res, result, `/${route.parentName}/${parentId}`);
+          const result = await controller.create(context, parentId, params);
+          return this.handleResultNode(context, res, result, `/${route.parentName}/${parentId}`);
         } else if (method === 'PATCH') {
-          const result = await controller.update(parentId, id, params);
-          return this.handleResultNode(res, result, `/${route.parentName}/${parentId}`);
+          const result = await controller.update(context, parentId, id, params);
+          return this.handleResultNode(context, res, result, `/${route.parentName}/${parentId}`);
         } else if (method === 'DELETE') {
-          await controller.destroy(parentId, id);
-          this.redirectNode(res, `/${route.parentName}/${parentId}`);
+          await controller.destroy(context, parentId, id);
+          this.redirectNode(context, res, `/${route.parentName}/${parentId}`);
           return;
         } else {
-          html = id ? await controller[actionMethod](parentId, id) : await controller[actionMethod](parentId);
+          html = id ? await controller[actionMethod](context, parentId, id) : await controller[actionMethod](context, parentId);
         }
       } else {
         const id = match[1] ? parseInt(match[1]) : null;
 
         if (method === 'POST') {
-          const result = await controller.create(params);
-          return this.handleResultNode(res, result, `/${controllerName}`);
+          const result = await controller.create(context, params);
+          return this.handleResultNode(context, res, result, `/${controllerName}`);
         } else if (method === 'PATCH') {
-          const result = await controller.update(id, params);
-          return this.handleResultNode(res, result, `/${controllerName}/${id}`);
+          const result = await controller.update(context, id, params);
+          return this.handleResultNode(context, res, result, `/${controllerName}/${id}`);
         } else if (method === 'DELETE') {
-          await controller.destroy(id);
-          this.redirectNode(res, `/${controllerName}`);
+          await controller.destroy(context, id);
+          this.redirectNode(context, res, `/${controllerName}`);
           return;
         } else {
-          html = id ? await controller[actionMethod](id) : await controller[actionMethod]();
+          html = id ? await controller[actionMethod](context, id) : await controller[actionMethod](context);
         }
       }
 
       console.log(`  Rendering ${controllerName}/${action}`);
-      this.sendHtml(res, html);
+      this.sendHtml(context, res, html);
     } catch (e) {
       console.error('  Error:', e.message || e);
       res.writeHead(500, { 'Content-Type': 'text/html' });
@@ -192,31 +191,31 @@ export class Router extends RouterServer {
   }
 
   // Handle controller result for Node.js
-  static handleResultNode(res, result, defaultRedirect) {
+  static handleResultNode(context, res, result, defaultRedirect) {
     if (result.redirect) {
       // Set flash notice if present in result
       if (result.notice) {
-        flash.set('notice', result.notice);
+        context.flash.set('notice', result.notice);
       }
       if (result.alert) {
-        flash.set('alert', result.alert);
+        context.flash.set('alert', result.alert);
       }
       console.log(`  Redirected to ${result.redirect}`);
-      this.redirectNode(res, result.redirect);
+      this.redirectNode(context, res, result.redirect);
     } else if (result.render) {
       console.log('  Re-rendering form (validation failed)');
-      this.sendHtml(res, result.render);
+      this.sendHtml(context, res, result.render);
     } else {
-      this.redirectNode(res, defaultRedirect);
+      this.redirectNode(context, res, defaultRedirect);
     }
   }
 
   // Redirect with flash cookie
-  static redirectNode(res, path) {
+  static redirectNode(context, res, path) {
     const headers = { 'Location': path };
 
     // Add flash cookie if there are pending messages
-    const flashCookie = flash.getResponseCookie();
+    const flashCookie = context.flash.getResponseCookie();
     if (flashCookie) {
       headers['Set-Cookie'] = flashCookie;
     }
@@ -226,12 +225,12 @@ export class Router extends RouterServer {
   }
 
   // Send HTML response with proper headers, wrapped in layout
-  static sendHtml(res, html) {
-    const fullHtml = Application.wrapInLayout(html);
+  static sendHtml(context, res, html) {
+    const fullHtml = Application.wrapInLayout(context, html);
     const headers = { 'Content-Type': 'text/html; charset=utf-8' };
 
     // Clear flash cookie after it's been consumed
-    const flashCookie = flash.getResponseCookie();
+    const flashCookie = context.flash.getResponseCookie();
     if (flashCookie) {
       headers['Set-Cookie'] = flashCookie;
     }

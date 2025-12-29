@@ -113,9 +113,10 @@ export class ApplicationBase {
   }
 
   // Wrap content in HTML layout
-  static wrapInLayout(content) {
+  // Context is passed to layout for access to flash, contentFor, etc.
+  static wrapInLayout(context, content) {
     if (this.layoutFn) {
-      return this.layoutFn(content);
+      return this.layoutFn(context, content);
     }
     return content;
   }
@@ -143,6 +144,78 @@ export class ApplicationBase {
       }
     }
   }
+}
+
+// --- Flash and Context ---
+
+// Create a flash object from a cookie header string
+// Shared by all targets - browser uses document.cookie, server uses request headers
+export function createFlash(cookieHeader = '') {
+  const flash = {
+    _pending: {},   // Messages to be set in cookie for next navigation
+    _current: {},   // Messages read from cookie (consumed on read)
+
+    // Set a flash message (will be written to cookie)
+    set(key, value) {
+      this._pending[key] = value;
+    },
+
+    // Get and consume a flash message
+    get(key) {
+      const msg = this._current[key];
+      delete this._current[key];
+      return msg || '';
+    },
+
+    // Convenience methods
+    consumeNotice() { return this.get('notice'); },
+    consumeAlert() { return this.get('alert'); },
+
+    // Get cookie string for pending messages (for Set-Cookie header or document.cookie)
+    getResponseCookie() {
+      if (Object.keys(this._pending).length === 0) {
+        // Clear the flash cookie if no pending messages but we had current ones
+        if (Object.keys(this._current).length > 0) {
+          return '_flash=; Path=/; Max-Age=0';
+        }
+        return null;
+      }
+
+      const value = encodeURIComponent(JSON.stringify(this._pending));
+      return `_flash=${value}; Path=/`;
+    },
+
+    // Check if there are pending messages
+    hasPending() {
+      return Object.keys(this._pending).length > 0;
+    },
+
+    // Write pending flash to document.cookie (browser only)
+    writeToCookie() {
+      const cookie = this.getResponseCookie();
+      if (cookie && typeof document !== 'undefined') {
+        document.cookie = cookie;
+      }
+    }
+  };
+
+  // Parse flash from cookie header
+  const cookies = cookieHeader.split(';').map(c => c.trim());
+  for (const cookie of cookies) {
+    if (cookie.startsWith('_flash=')) {
+      try {
+        const value = cookie.substring(7);
+        if (value) {
+          flash._current = JSON.parse(decodeURIComponent(value));
+        }
+      } catch (e) {
+        // Invalid flash cookie, ignore
+      }
+      break;
+    }
+  }
+
+  return flash;
 }
 
 // --- Helper Functions ---
