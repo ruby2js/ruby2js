@@ -80,14 +80,14 @@ module Ruby2JS
           all_params << local
         end
 
+        # Allow subclasses to prepend extra args (e.g., $context)
+        extra = erb_render_extra_args
+
         if all_params.empty?
           kwargs = []
         else
           kwargs = all_params.map { |name| s(:kwarg, name) }
         end
-
-        # Allow subclasses to prepend extra args (e.g., context)
-        extra = erb_render_extra_args
         if extra.empty? && kwargs.empty?
           args = s(:args)
         elsif extra.empty?

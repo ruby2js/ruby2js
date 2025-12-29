@@ -51,10 +51,11 @@ module Ruby2JS
           end
         end
 
-        # Override Erb filter's hook to add context as first parameter
-        # Views need context for flash, contentFor, params, etc.
+        # Override Erb filter's hook to add $context as first parameter
+        # Views need $context for flash, contentFor, params, etc.
+        # Using $ prefix to avoid conflicts with @context instance variables
         def erb_render_extra_args
-          [s(:arg, :context)]
+          [s(:arg, :"$context")]
         end
 
         def on_send(node)
@@ -785,7 +786,7 @@ module Ruby2JS
         # <%= notice %> -> context.flash.consumeNotice()
         def process_notice
           # Access flash through context parameter (no import needed)
-          s(:send, s(:attr, s(:lvar, :context), :flash), :consumeNotice)
+          s(:send, s(:attr, s(:lvar, :"$context"), :flash), :consumeNotice)
         end
 
         # Process content_for helper
@@ -806,7 +807,7 @@ module Ruby2JS
             # context.contentFor.title = "Articles"; return ""
             s(:begin,
               s(:send,
-                s(:attr, s(:lvar, :context), :contentFor),
+                s(:attr, s(:lvar, :"$context"), :contentFor),
                 "#{key_name}=".to_sym,
                 process(value)),
               s(:str, ''))
@@ -814,7 +815,7 @@ module Ruby2JS
             # Getting content: content_for(:title)
             # context.contentFor.title || ""
             s(:or,
-              s(:attr, s(:attr, s(:lvar, :context), :contentFor), key_name),
+              s(:attr, s(:attr, s(:lvar, :"$context"), :contentFor), key_name),
               s(:str, ''))
           end
         end
@@ -901,9 +902,9 @@ module Ruby2JS
 
           # Pass context as first argument, then locals hash
           if pairs.empty?
-            s(:send, s(:lvar, module_name), :render, s(:lvar, :context), s(:hash))
+            s(:send, s(:lvar, module_name), :render, s(:lvar, :"$context"), s(:hash))
           else
-            s(:send, s(:lvar, module_name), :render, s(:lvar, :context), s(:hash, *pairs))
+            s(:send, s(:lvar, module_name), :render, s(:lvar, :"$context"), s(:hash, *pairs))
           end
         end
 
