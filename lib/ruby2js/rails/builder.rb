@@ -200,7 +200,7 @@ class SelfhostBuilder
       'dev' => 'ruby2js-rails-dev',
       'dev:ruby' => 'ruby2js-rails-dev --ruby',
       'build' => 'ruby2js-rails-build',
-      'start' => 'npx serve -s dist -p 3000'
+      'start' => 'npx serve -s -p 3000'
     }
 
     if adapters.any? { |a| server_adapters.include?(a.to_s) }
@@ -256,7 +256,7 @@ class SelfhostBuilder
     # CSS link based on framework
     css_link = case css.to_s
     when 'tailwind'
-      '<link href="/styles.css" rel="stylesheet">'
+      '<link href="/public/styles.css" rel="stylesheet">'
     when 'pico'
       '<link rel="stylesheet" href="/node_modules/@picocss/pico/css/pico.min.css">'
     when 'bootstrap'
@@ -264,7 +264,7 @@ class SelfhostBuilder
     when 'bulma'
       '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">'
     else
-      '<link href="/styles.css" rel="stylesheet">'
+      '' # No default CSS - apps without a framework don't need a stylesheet link
     end
 
     # Main container class based on CSS framework
@@ -273,7 +273,7 @@ class SelfhostBuilder
     when 'bootstrap' then 'container mt-4'
     when 'bulma' then 'container mt-4'
     when 'tailwind' then 'container mx-auto px-4 py-8'
-    else 'container'
+    else '' # No classes without a CSS framework
     end
 
     html = <<~HTML
@@ -955,13 +955,13 @@ class SelfhostBuilder
       end
     end
 
-    output_path = File.join(@dist_dir, 'index.html')
+    output_path = File.join(DEMO_ROOT, 'index.html')
     SelfhostBuilder.generate_index_html(
       app_name: app_name,
       database: @database,
       css: css,
-      output_path: output_path,
-      base_path: ''  # Serving from dist/ directly
+      output_path: output_path
+      # Default base_path '/dist' - serving from app root
     )
     puts("  -> index.html")
   end
