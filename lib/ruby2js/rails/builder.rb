@@ -244,6 +244,8 @@ class SelfhostBuilder
     database = options[:database] || 'dexie'
     css = options[:css] || 'none'
     output_path = options[:output_path]
+    # Base path for assets - '/dist' when serving from app root, '' when serving from dist/
+    base_path = options[:base_path] || '/dist'
 
     # Build importmap
     importmap_entries = IMPORTMAP_ENTRIES[database] || IMPORTMAP_ENTRIES['dexie']
@@ -290,7 +292,7 @@ class SelfhostBuilder
         <main class="#{main_class}" id="app">
           <p>Loading...</p>
         </main>
-        <script type="module" src="/dist/config/routes.js"></script>
+        <script type="module" src="#{base_path}/config/routes.js"></script>
       </body>
       </html>
     HTML
@@ -958,7 +960,8 @@ class SelfhostBuilder
       app_name: app_name,
       database: @database,
       css: css,
-      output_path: output_path
+      output_path: output_path,
+      base_path: ''  # Serving from dist/ directly
     )
     puts("  -> index.html")
   end
