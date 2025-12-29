@@ -24,7 +24,8 @@ module Ruby2JS
         def parse_options(args)
           options = {
             port: 3000,
-            open: false
+            open: false,
+            selfhost: false
           }
 
           parser = OptionParser.new do |opts|
@@ -40,6 +41,10 @@ module Ruby2JS
 
             opts.on("-o", "--open", "Open browser automatically") do
               options[:open] = true
+            end
+
+            opts.on("--selfhost", "Use JavaScript transpiler instead of Ruby") do
+              options[:selfhost] = true
             end
 
             opts.on("-h", "--help", "Show this help message") do
@@ -90,11 +95,17 @@ module Ruby2JS
 
         def start_dev_server(options)
           cmd = ["npm", "run", "dev"]
+          extra_args = []
 
-          # Pass options through to the dev server
-          if options[:port] != 3000
+          # Default to Ruby transpilation unless --selfhost is specified
+          extra_args << "--ruby" unless options[:selfhost]
+
+          # Pass port option through to the dev server
+          extra_args << "--port=#{options[:port]}" if options[:port] != 3000
+
+          unless extra_args.empty?
             cmd << "--"
-            cmd << "--port=#{options[:port]}"
+            cmd.concat(extra_args)
           end
 
           # Open browser if requested

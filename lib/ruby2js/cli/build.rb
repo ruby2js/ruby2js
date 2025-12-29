@@ -19,7 +19,8 @@ module Ruby2JS
 
         def parse_options(args)
           options = {
-            verbose: false
+            verbose: false,
+            selfhost: false
           }
 
           parser = OptionParser.new do |opts|
@@ -31,6 +32,10 @@ module Ruby2JS
 
             opts.on("-v", "--verbose", "Show detailed build output") do
               options[:verbose] = true
+            end
+
+            opts.on("--selfhost", "Use JavaScript transpiler instead of Ruby") do
+              options[:selfhost] = true
             end
 
             opts.on("-h", "--help", "Show this help message") do
@@ -65,10 +70,18 @@ module Ruby2JS
         def build(options)
           puts "Building application..."
 
-          success = if options[:verbose]
-            system("npm run build")
+          success = if options[:selfhost]
+            # Use JavaScript transpiler via npm
+            if options[:verbose]
+              system("npm run build")
+            else
+              system("npm run build > /dev/null 2>&1")
+            end
           else
-            system("npm run build > /dev/null 2>&1")
+            # Use Ruby transpiler directly
+            require 'ruby2js/rails/builder'
+            SelfhostBuilder.new.build
+            true
           end
 
           if success
