@@ -12,9 +12,25 @@
 #     $ ruby ruby2js.rb [options] [file]
 #
 #       try --help for a list of supported options
+#
+#   Subcommands for Rails-like apps:
+#     $ ruby2js dev [options]     # Start development server
+#     $ ruby2js server [options]  # Start production server
+#     $ ruby2js build [options]   # Build for deployment
 
 # support running directly from a git clone
 $:.unshift File.absolute_path('../../lib', __FILE__)
+
+# Check for subcommands before loading the full demo
+SUBCOMMANDS = %w[dev server build].freeze
+
+if SUBCOMMANDS.include?(ARGV.first)
+  subcommand = ARGV.shift
+  require "ruby2js/cli/#{subcommand}"
+  Ruby2JS::CLI.const_get(subcommand.capitalize).run(ARGV)
+  exit
+end
+
 require 'ruby2js/demo'
 require 'json'
 
