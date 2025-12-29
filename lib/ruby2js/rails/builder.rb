@@ -320,6 +320,7 @@ class SelfhostBuilder
     @database = nil  # Set during build from config
     @target = nil    # Derived from database: 'browser' or 'server'
     @runtime = nil   # For server targets: 'node', 'bun', or 'deno'
+    @model_associations = {}  # model_name -> [association_names]
   end
 
   # Note: Using explicit () on all method calls for JS transpilation compatibility
@@ -387,6 +388,9 @@ class SelfhostBuilder
     )
     self.generate_models_index()
     puts("")
+
+    # Parse model associations for controller preloading
+    self.parse_model_associations()
 
     # Transpile controllers (use 'controllers' section from ruby2js.yml if present)
     puts("Controllers:")
@@ -510,6 +514,11 @@ class SelfhostBuilder
       else
         options[sym_key] = value
       end
+    end
+
+    # Pass model associations to controller filter for preloading
+    if section == 'controllers' && @model_associations && @model_associations.any?
+      options[:model_associations] = @model_associations
     end
 
     options
@@ -1032,6 +1041,32 @@ class SelfhostBuilder
 
     File.write(File.join(models_dir, 'index.js'), index_js)
     puts("  -> #{File.join(models_dir, 'index.js')} (re-exports)")
+  end
+
+  # Parse model files to extract has_many associations for controller preloading
+  # This allows show/edit actions to await associations before rendering views
+  def parse_model_associations()
+    models_dir = File.join(DEMO_ROOT, 'app/models')
+    return unless File.exist?(models_dir)
+
+    Dir.glob(File.join(models_dir, '*.rb')).each do |model_path|
+      basename = File.basename(model_path, '.rb')
+      next if basename == 'application_record'
+
+      source = File.read(model_path)
+      associations = []
+
+      # Simple regex to find has_many declarations
+      # Matches: has_many :comments or has_many :comments, dependent: :destroy
+      source.scan(/has_many\s+:(\w+)/) do |match|
+        associations << match[0].to_sym
+      end
+
+      if associations.any?
+        # Store associations keyed by singular model name (article -> [:comments])
+        @model_associations[basename.to_sym] = associations
+      end
+    end
   end
 end
 

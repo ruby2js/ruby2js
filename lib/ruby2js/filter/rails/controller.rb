@@ -26,10 +26,14 @@ module Ruby2JS
           @rails_private_methods = {}
           @rails_model_refs = Set.new
           @rails_needs_views = false
-          # Model associations for preloading (model_name -> [association_names])
-          # Note: This is empty by default - associations are auto-detected from
-          # has_many declarations in model files when transpiled together
-          @rails_model_associations = {}
+          # Model associations for preloading - set lazily from options in model_associations method
+          @rails_model_associations = nil
+        end
+
+        # Accessor for model associations - lazily loads from options
+        # Can be passed via options[:model_associations] from the builder
+        def model_associations
+          @rails_model_associations ||= (@options && @options[:model_associations]) || {}
         end
 
         # Detect controller class and transform to module
@@ -691,7 +695,7 @@ module Ruby2JS
           # If we have a singular model variable (e.g., :article), preload its associations
           if ivars.include?(singular_model)
             # Look up associations for this model from tracked has_many relationships
-            associations = (@rails_model_associations || {})[singular_model] || []
+            associations = model_associations[singular_model] || []
 
             associations.each do |assoc_name|
               # Generate: article.comments = await article.comments

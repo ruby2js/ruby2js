@@ -1023,6 +1023,7 @@ module Ruby2JS
         # Convert form builder method calls to HTML input elements
         def process_form_builder_method(method, args)
           model = @erb_model_name || 'model'
+          model_is_new = @erb_model_is_new  # For Model.new, don't pre-fill values
           options = extract_field_options(args)
 
           case method
@@ -1040,19 +1041,26 @@ module Ruby2JS
               # Check for conditional classes
               static_attrs, dynamic_class_expr = build_field_attrs_dynamic(options)
 
+              # For new models, use empty value; for existing, pre-fill from model
+              value_expr = if model_is_new
+                s(:str, '')
+              else
+                s(:or, s(:attr, s(:lvar, model.to_sym), name.to_sym), s(:str, ''))
+              end
+
               if dynamic_class_expr
                 # Has conditional classes - generate dynamic class attribute
                 s(:dstr,
                   s(:str, %(<input type="#{input_type}" name="#{model}[#{name}]" id="#{model}_#{name}" class=")),
                   s(:begin, process(dynamic_class_expr)),
                   s(:str, %("#{static_attrs} value=")),
-                  s(:begin, s(:or, s(:attr, s(:lvar, model.to_sym), name.to_sym), s(:str, ''))),
+                  s(:begin, value_expr),
                   s(:str, '">'))
               else
                 # Static classes only
                 s(:dstr,
                   s(:str, %(<input type="#{input_type}" name="#{model}[#{name}]" id="#{model}_#{name}"#{static_attrs} value=")),
-                  s(:begin, s(:or, s(:attr, s(:lvar, model.to_sym), name.to_sym), s(:str, ''))),
+                  s(:begin, value_expr),
                   s(:str, '">'))
               end
             else
@@ -1067,19 +1075,26 @@ module Ruby2JS
               # Check for conditional classes
               static_attrs, dynamic_class_expr = build_field_attrs_dynamic(options)
 
+              # For new models, use empty value; for existing, pre-fill from model
+              value_expr = if model_is_new
+                s(:str, '')
+              else
+                s(:or, s(:attr, s(:lvar, model.to_sym), name.to_sym), s(:str, ''))
+              end
+
               if dynamic_class_expr
                 # Has conditional classes - generate dynamic class attribute
                 s(:dstr,
                   s(:str, %(<textarea name="#{model}[#{name}]" id="#{model}_#{name}" class=")),
                   s(:begin, process(dynamic_class_expr)),
                   s(:str, %("#{static_attrs}>)),
-                  s(:begin, s(:or, s(:attr, s(:lvar, model.to_sym), name.to_sym), s(:str, ''))),
+                  s(:begin, value_expr),
                   s(:str, '</textarea>'))
               else
                 # Static classes only
                 s(:dstr,
                   s(:str, %(<textarea name="#{model}[#{name}]" id="#{model}_#{name}"#{static_attrs}>)),
-                  s(:begin, s(:or, s(:attr, s(:lvar, model.to_sym), name.to_sym), s(:str, ''))),
+                  s(:begin, value_expr),
                   s(:str, '</textarea>'))
               end
             else
@@ -1215,6 +1230,7 @@ module Ruby2JS
         def process_form_with(helper_call, block_args, block_body)
           # Extract model, url, and class from keyword arguments
           model_name = nil
+          model_is_new = false  # Track if model is Model.new (no pre-fill values)
           css_class = nil
           options_node = helper_call.children[2]
 
@@ -1225,7 +1241,7 @@ module Ruby2JS
               if key.type == :sym
                 case key.children[0]
                 when :model
-                  # model: @article or model: article
+                  # model: @article or model: article or model: [@article, Comment.new]
                   if value.type == :ivar
                     model_name = value.children.first.to_s.sub(/^@/, '')
                   elsif value.type == :lvar
@@ -1233,6 +1249,25 @@ module Ruby2JS
                   elsif value.type == :send && value.children.first.nil?
                     # s(:send, nil, :article) - method call as local
                     model_name = value.children[1].to_s
+                  elsif value.type == :send && value.children[1] == :new
+                    # model: Comment.new -> comment, and mark as new (empty values)
+                    const_node = value.children[0]
+                    if const_node&.type == :const
+                      model_name = const_node.children[1].to_s.downcase
+                      model_is_new = true
+                    end
+                  elsif value.type == :array && value.children.length >= 2
+                    # Nested resource: model: [@article, Comment.new]
+                    # Use the child model (second element) for form field naming
+                    child = value.children.last
+                    if child.type == :send && child.children[1] == :new
+                      # Comment.new -> comment, and mark as new (empty values)
+                      const_node = child.children[0]
+                      if const_node&.type == :const
+                        model_name = const_node.children[1].to_s.downcase
+                        model_is_new = true
+                      end
+                    end
                   end
                 when :class
                   css_class = extract_class_value(value)
@@ -1245,8 +1280,10 @@ module Ruby2JS
 
           old_block_var = @erb_block_var
           old_model_name = @erb_model_name
+          old_model_is_new = @erb_model_is_new
           @erb_block_var = block_param
           @erb_model_name = model_name
+          @erb_model_is_new = model_is_new
 
           statements = []
 
@@ -1255,16 +1292,23 @@ module Ruby2JS
 
           # Build form tag - add onsubmit handler for browser/SPA target
           if model_name && self.browser_target?
-            # Browser/SPA target - use routes pattern like form_tag
-            # Generate: <form onsubmit="return (model.id ? routes.model.patch(event, model.id) : routes.models.post(event))">
             plural_name = model_name + 's'  # Simple pluralization
-            statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
-              s(:dstr,
-                s(:str, "<form data-model=\"#{model_name}\"#{class_attr} onsubmit=\"return ("),
-                s(:begin, s(:attr, s(:lvar, model_name.to_sym), :id)),
-                s(:str, " ? routes.#{model_name}.patch(event, "),
-                s(:begin, s(:attr, s(:lvar, model_name.to_sym), :id)),
-                s(:str, ") : routes.#{plural_name}.post(event))\">")))
+
+            if model_is_new
+              # New model - always POST, no ID check needed
+              statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
+                s(:str, "<form data-model=\"#{model_name}\"#{class_attr} onsubmit=\"return routes.#{plural_name}.post(event)\">"))
+            else
+              # Existing model - check ID to determine POST vs PATCH
+              # Generate: <form onsubmit="return (model.id ? routes.model.patch(event, model.id) : routes.models.post(event))">
+              statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
+                s(:dstr,
+                  s(:str, "<form data-model=\"#{model_name}\"#{class_attr} onsubmit=\"return ("),
+                  s(:begin, s(:attr, s(:lvar, model_name.to_sym), :id)),
+                  s(:str, " ? routes.#{model_name}.patch(event, "),
+                  s(:begin, s(:attr, s(:lvar, model_name.to_sym), :id)),
+                  s(:str, ") : routes.#{plural_name}.post(event))\">")))
+            end
           elsif model_name
             # Server target - standard form
             statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+, s(:str, "<form data-model=\"#{model_name}\"#{class_attr}>"))
@@ -1288,6 +1332,7 @@ module Ruby2JS
 
           @erb_block_var = old_block_var
           @erb_model_name = old_model_name
+          @erb_model_is_new = old_model_is_new
 
           s(:begin, *statements.compact)
         end
