@@ -1,6 +1,6 @@
 {
   "name": "ruby2js-rails",
-  "version": "0.0.0-local",
+  "version": "6.0.0-beta",
   "type": "module",
   "description": "Rails runtime adapters, targets, and build tools for Ruby2JS",
   "bin": {

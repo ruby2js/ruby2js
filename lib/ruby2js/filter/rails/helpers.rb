@@ -51,28 +51,10 @@ module Ruby2JS
           end
         end
 
-        # Override Erb filter's transform_erb_output to add context as first parameter
-        # Server-side views need context for flash, contentFor, params, etc.
-        def transform_erb_output(bufvar, children)
-          # Call parent to get the basic render function
-          result = super
-
-          # Add context as first positional parameter for server targets
-          # Browser targets also receive context for consistency
-          if result.type == :def && result.children[0] == :render
-            _, name, args, body = result.children
-
-            # Prepend context argument to the args
-            new_args = if args.children.empty?
-              s(:args, s(:arg, :context))
-            else
-              s(:args, s(:arg, :context), *args.children)
-            end
-
-            return s(:def, name, new_args, body)
-          end
-
-          result
+        # Override Erb filter's hook to add context as first parameter
+        # Views need context for flash, contentFor, params, etc.
+        def erb_render_extra_args
+          [s(:arg, :context)]
         end
 
         def on_send(node)

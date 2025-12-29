@@ -22,7 +22,7 @@ describe Ruby2JS::Filter::Rails::Helpers do
     it "should compile simple ERB templates" do
       return skip() unless defined?(Ruby2JS::Erubi)
       result = erb_to_js('<h1><%= @title %></h1>')
-      result.must_include 'function render({ title })'
+      result.must_include 'function render(context, { title })'
       result.must_include '_buf += "<h1>"'
       result.must_include 'String(title)'
     end
@@ -30,7 +30,7 @@ describe Ruby2JS::Filter::Rails::Helpers do
     it "should handle block expressions like form_for" do
       return skip() unless defined?(Ruby2JS::Erubi)
       result = erb_to_js('<%= form_for @user do |f| %><%= f.text_field :name %><% end %>')
-      result.must_include 'function render({ user })'
+      result.must_include 'function render(context, { user })'
       # The form_for block should generate HTML form tags (escaped in JS string)
       result.must_include 'data-model'
       result.must_include '</form>'

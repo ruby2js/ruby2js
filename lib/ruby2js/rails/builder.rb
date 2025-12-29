@@ -892,8 +892,9 @@ class SelfhostBuilder
     seeds_dest = File.join(dest_dir, 'seeds.js')
 
     # Check if seeds.rb has actual Ruby code (not just comments/whitespace)
+    # Use split("\n") instead of .lines for JS compatibility (strings don't have .lines in JS)
     has_code = File.exist?(seeds_src) &&
-               File.read(seeds_src).lines.any? { |line| line.strip !~ /\A(#.*|\s*)\z/ }
+               File.read(seeds_src).split("\n").any? { |line| line.strip !~ /\A(#.*|\s*)\z/ }
 
     if has_code
       # Transpile existing seeds file normally

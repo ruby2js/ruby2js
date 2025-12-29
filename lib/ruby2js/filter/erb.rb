@@ -81,10 +81,21 @@ module Ruby2JS
         end
 
         if all_params.empty?
-          args = s(:args)
+          kwargs = []
         else
           kwargs = all_params.map { |name| s(:kwarg, name) }
+        end
+
+        # Allow subclasses to prepend extra args (e.g., context)
+        extra = erb_render_extra_args
+        if extra.empty? && kwargs.empty?
+          args = s(:args)
+        elsif extra.empty?
           args = s(:args, *kwargs)
+        elsif kwargs.empty?
+          args = s(:args, *extra)
+        else
+          args = s(:args, *extra, *kwargs)
         end
 
         # Wrap in arrow function or regular function
@@ -94,6 +105,12 @@ module Ruby2JS
       # Hook for subclasses to add imports - override in rails/helpers
       def erb_prepend_imports
         # Base implementation does nothing
+      end
+
+      # Hook for subclasses to add extra render args - override in rails/helpers
+      def erb_render_extra_args
+        # Base implementation returns no extra args
+        []
       end
 
       # Convert instance variable reads to local variable reads
