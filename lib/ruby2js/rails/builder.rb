@@ -293,7 +293,11 @@ class SelfhostBuilder
         <main class="#{main_class}" id="app">
           <p>Loading...</p>
         </main>
-        <script type="module" src="#{base_path}/config/routes.js"></script>
+        <script type="module">
+          import { Application, routes } from '#{base_path}/config/routes.js';
+          window.routes = routes;
+          Application.start();
+        </script>
       </body>
       </html>
     HTML
