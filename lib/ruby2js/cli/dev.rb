@@ -155,6 +155,12 @@ module Ruby2JS
             { "ruby2js-rails" => "https://www.ruby2js.com/releases/ruby2js-rails-beta.tgz" }
           end
 
+          # Add tailwindcss if tailwindcss-rails gem is detected
+          if File.exist?("app/assets/tailwind/application.css")
+            deps["tailwindcss"] = "^3.4.0"
+            puts "  Adding tailwindcss (tailwindcss-rails detected)"
+          end
+
           case adapter.to_s
           when "dexie"
             deps["dexie"] = "^4.0.10"

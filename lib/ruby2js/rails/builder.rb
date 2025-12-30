@@ -189,6 +189,12 @@ class SelfhostBuilder
       { 'ruby2js-rails' => 'https://www.ruby2js.com/releases/ruby2js-rails-beta.tgz' }
     end
 
+    # Add tailwindcss if tailwindcss-rails gem is detected
+    tailwind_css = app_root ? File.join(app_root, 'app/assets/tailwind/application.css') : 'app/assets/tailwind/application.css'
+    if File.exist?(tailwind_css)
+      deps['tailwindcss'] = '^3.4.0'
+    end
+
     optional_deps = {}
 
     adapters.each do |adapter|

@@ -50,3 +50,6 @@ demo/selfhost/lib/erb_compiler.js
 
 # Release tarballs
 *.tgz
+
+# Local test blog demo
+demo/blog/

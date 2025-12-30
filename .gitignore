@@ -24,3 +24,6 @@ mise.toml
 
 # Release tarballs
 *.tgz
+
+# Local test blog demo
+demo/blog/
