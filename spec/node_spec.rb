@@ -92,6 +92,18 @@ describe Ruby2JS::Filter::Node do
         must_equal 'const fs = require("node:fs"); fs.existsSync("foo")'
     end
 
+    it 'should handle File.directory?' do
+      to_js( 'File.directory?("foo")' ).
+        must_equal 'const fs = require("node:fs"); ' +
+          'fs.existsSync("foo") && fs.statSync("foo").isDirectory()'
+    end
+
+    it 'should handle File.file?' do
+      to_js( 'File.file?("bar")' ).
+        must_equal 'const fs = require("node:fs"); ' +
+          'fs.existsSync("bar") && fs.statSync("bar").isFile()'
+    end
+
     it 'should handle File.readlink' do
       to_js( 'File.readlink("foo")' ).
         must_equal 'const fs = require("node:fs"); fs.readlinkSync("foo")'
@@ -234,6 +246,11 @@ describe Ruby2JS::Filter::Node do
     it 'should handle File.join' do
       to_js( 'File.join("foo", "bar")' ).
         must_equal 'const path = require("node:path"); path.join("foo", "bar")'
+    end
+
+    it 'should handle Pathname#relative_path_from' do
+      to_js( 'Pathname.new(a).relative_path_from(Pathname.new(b))' ).
+        must_equal 'const path = require("node:path"); path.relative(b, a)'
     end
 
     it 'should handle File::PATH_SEPARATOR' do

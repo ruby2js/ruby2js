@@ -81,6 +81,12 @@ module Ruby2JS
         target, method, *args = node.children
         return super if excluded?(method) and method != :call
 
+        # require 'json' → remove (JSON is built-in in JavaScript)
+        if target.nil? && method == :require && args.length == 1 &&
+           args.first.type == :str && args.first.children.first == 'json'
+          return s(:begin)
+        end
+
         # Force certain methods to always have () in JS output
         # Without this, is_method? heuristics treat them as property access
         if target && FORCE_PARENS.include?(method) && args.empty? && !node.is_method?

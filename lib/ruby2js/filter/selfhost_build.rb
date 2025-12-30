@@ -61,10 +61,11 @@ module Ruby2JS
           return S(:send, s(:attr, nil, :yaml), :dump, process(args.first))
         end
 
-        # require 'yaml', 'json', or 'fileutils' → remove
-        # (yaml handled by import above, json built-in, fileutils replaced by node filter)
+        # require 'yaml' → remove (yaml handled by import above)
+        # Note: 'json' is handled by functions filter
+        # Note: 'fileutils', 'pathname', 'tmpdir' are handled by node filter
         if target.nil? && method == :require && args.length == 1 &&
-           args.first.type == :str && %w[yaml json fileutils].include?(args.first.children.first)
+           args.first.type == :str && args.first.children.first == 'yaml'
           return s(:begin)
         end
 

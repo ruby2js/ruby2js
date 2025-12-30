@@ -105,7 +105,7 @@ module Ruby2JS
           elsif \
             method == :require and args.length == 1 and
             args.first.type == :str and
-            %w(fileutils tmpdir).include? args.first.children.first
+            %w(fileutils pathname tmpdir).include? args.first.children.first
           then
             s(:begin)
 
@@ -128,6 +128,20 @@ module Ruby2JS
 
           elsif [:exist?, :exists?].include? method and args.length == 1
             fs_exists_call(process(args.first))
+
+          elsif method == :directory? and args.length == 1
+            # File.directory?(path) → fs.existsSync(path) && fs.statSync(path).isDirectory()
+            path_arg = process(args.first)
+            S(:and,
+              fs_exists_call(path_arg),
+              s(:send, fs_call(:statSync, path_arg), :isDirectory))
+
+          elsif method == :file? and args.length == 1
+            # File.file?(path) → fs.existsSync(path) && fs.statSync(path).isFile()
+            path_arg = process(args.first)
+            S(:and,
+              fs_exists_call(path_arg),
+              s(:send, fs_call(:statSync, path_arg), :isFile))
 
           elsif method == :readlink and args.length == 1
             fs_call(:readlinkSync, process(args.first))
@@ -333,6 +347,23 @@ module Ruby2JS
           else
             super
           end
+
+        # Pathname.new(a).relative_path_from(Pathname.new(b)) → path.relative(b, a)
+        elsif method == :relative_path_from and args.length == 1 and
+              target&.type == :send and
+              target.children[0]&.type == :const and
+              target.children[0].children == [nil, :Pathname] and
+              target.children[1] == :new and
+              args.first&.type == :send and
+              args.first.children[0]&.type == :const and
+              args.first.children[0].children == [nil, :Pathname] and
+              args.first.children[1] == :new
+        then
+          self.prepend_list << import_path
+          # path.relative(from, to) - note: args order is reversed from Ruby
+          from_path = process(args.first.children[2])
+          to_path = process(target.children[2])
+          S(:send, s(:attr, nil, :path), :relative, from_path, to_path)
 
         else
           super

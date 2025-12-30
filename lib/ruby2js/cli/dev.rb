@@ -141,9 +141,19 @@ module Ruby2JS
 
         def generate_package_json(app_name, adapter)
           # Determine dependencies based on adapter
-          deps = {
-            "ruby2js-rails" => "https://www.ruby2js.com/releases/ruby2js-rails-beta.tgz"
-          }
+          # Check for local packages directory (when running from ruby2js repo)
+          gem_root = File.expand_path("../../../..", __dir__)
+          local_package = File.join(gem_root, "packages/ruby2js-rails")
+
+          deps = if File.directory?(local_package)
+            # Compute relative path from current directory to local package
+            require 'pathname'
+            relative_path = Pathname.new(local_package).relative_path_from(Pathname.new(Dir.pwd))
+            puts "  Using local ruby2js-rails: #{relative_path}"
+            { "ruby2js-rails" => "file:#{relative_path}" }
+          else
+            { "ruby2js-rails" => "https://www.ruby2js.com/releases/ruby2js-rails-beta.tgz" }
+          end
 
           case adapter.to_s
           when "dexie"

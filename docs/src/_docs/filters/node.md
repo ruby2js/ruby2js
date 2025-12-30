@@ -30,10 +30,12 @@ The **Node** filter provides a number of convenience methods and variables which
 * `File.basename` {{ caret }} `path.basename`
 * `File.chmod` {{ caret }} `fs.chmodSync`
 * `File.chown` {{ caret }} `fs.chownSync`
+* `File.directory?` {{ caret }} `fs.existsSync(p) && fs.statSync(p).isDirectory()`
 * `File.dirname` {{ caret }} `path.dirname`
 * `File.exist?` {{ caret }} `fs.existsSync`
 * `File.expand_path` {{ caret }} `path.resolve`
 * `File.extname` {{ caret }} `path.extname`
+* `File.file?` {{ caret }} `fs.existsSync(p) && fs.statSync(p).isFile()`
 * `File.join` {{ caret }} `path.join`
 * `File.lchmod` {{ caret }} `fs.lchmodSync`
 * `File.link` {{ caret }} `fs.linkSync`
@@ -61,6 +63,7 @@ The **Node** filter provides a number of convenience methods and variables which
 * `FileUtils.rmdir` {{ caret }} `fs.rmdirSync`
 * `IO.read` {{ caret }} `fs.readFileSync`
 * `IO.write` {{ caret }} `fs.writeFileSync`
+* `Pathname#relative_path_from` {{ caret }} `path.relative(from, to)`
 * `system` {{ caret }} `child_process.execSync(..., {stdio: "inherit"})`
 
 ## Async Mode

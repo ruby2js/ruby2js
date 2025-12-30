@@ -43,13 +43,12 @@ describe Ruby2JS::Filter::SelfhostBuild do
   end
 
   describe 'require removals' do
-    it 'should remove require fileutils' do
-      to_js('require "fileutils"').must_equal ''
+    it 'should remove require yaml' do
+      to_js('require "yaml"').must_equal ''
     end
 
-    it 'should remove require json' do
-      to_js('require "json"').must_equal ''
-    end
+    # Note: require 'json' is handled by the functions filter
+    # Note: require 'fileutils', 'pathname', 'tmpdir' are handled by the node filter
   end
 
   describe 'ruby2js requires' do
