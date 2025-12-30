@@ -27,10 +27,9 @@ RUN chmod +x create-blog && ./create-blog blog
 
 WORKDIR /app/blog
 
-# Install npm dependencies, build, and prepare for serving
+# Build for serving (install already run by create-blog)
 ARG RAILS_ENV=production
 ENV RAILS_ENV=${RAILS_ENV}
-RUN bundle exec ruby2js install
 RUN bundle exec ruby2js build
 
 EXPOSE 3000

@@ -20,40 +20,16 @@ task :blog do
     content.gsub!(/gem "ruby2js".*github.*$/, 'gem "ruby2js", path: "../.."')
     File.write(gemfile, content)
 
-    # Re-run bundle install with patched Gemfile
+    # Re-run bundle install and ruby2js install with local gem
+    # Delete package.json so install regenerates it with local paths
+    rm_f File.join(BLOG_DIR, 'package.json')
+    rm_rf File.join(BLOG_DIR, 'node_modules')
+
     Dir.chdir BLOG_DIR do
       Bundler.with_unbundled_env do
         sh "bundle install"
+        sh "bundle exec ruby2js install"
       end
-    end
-
-    # Remove auto-generated package.json so dev regenerates it with local paths
-    package_json = File.join(BLOG_DIR, 'package.json')
-    rm_f package_json if File.exist?(package_json)
-
-    # Patch Tailwind CSS to use standard directives (Rails gem uses @import "tailwindcss")
-    tailwind_css = File.join(BLOG_DIR, 'app/assets/tailwind/application.css')
-    if File.exist?(tailwind_css)
-      File.write(tailwind_css, <<~CSS)
-        @tailwind base;
-        @tailwind components;
-        @tailwind utilities;
-      CSS
-
-      # Create tailwind.config.js for npm tailwindcss CLI
-      File.write(File.join(BLOG_DIR, 'tailwind.config.js'), <<~JS)
-        /** @type {import('tailwindcss').Config} */
-        module.exports = {
-          content: [
-            './app/views/**/*.{erb,html}',
-            './dist/views/**/*.html'
-          ],
-          theme: {
-            extend: {},
-          },
-          plugins: [],
-        }
-      JS
     end
 
     puts "\nCreated demo/blog with local gem. You can now:"

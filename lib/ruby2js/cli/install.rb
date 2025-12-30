@@ -16,6 +16,7 @@ module Ruby2JS
           require 'ruby2js/rails/builder'
 
           ensure_package_json!
+          setup_tailwind! if tailwind_rails_detected?
           install_dependencies!
 
           puts "Installation complete."
@@ -133,6 +134,41 @@ module Ruby2JS
             end
           end
           File.basename(Dir.pwd).gsub(/[^a-z0-9_-]/i, '_').downcase
+        end
+
+        def tailwind_rails_detected?
+          File.exist?("app/assets/tailwind/application.css")
+        end
+
+        def setup_tailwind!
+          puts "Setting up Tailwind CSS for npm..."
+
+          # Patch CSS to use standard directives (Rails gem uses @import "tailwindcss")
+          css_file = "app/assets/tailwind/application.css"
+          File.write(css_file, <<~CSS)
+            @tailwind base;
+            @tailwind components;
+            @tailwind utilities;
+          CSS
+          puts "  Patched #{css_file}"
+
+          # Create tailwind.config.js if it doesn't exist
+          unless File.exist?("tailwind.config.js")
+            File.write("tailwind.config.js", <<~JS)
+              /** @type {import('tailwindcss').Config} */
+              module.exports = {
+                content: [
+                  './app/views/**/*.{erb,html}',
+                  './dist/views/**/*.html'
+                ],
+                theme: {
+                  extend: {},
+                },
+                plugins: [],
+              }
+            JS
+            puts "  Created tailwind.config.js"
+          end
         end
       end
     end

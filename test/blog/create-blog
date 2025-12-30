@@ -127,6 +127,9 @@ production:
   database: db/production.sqlite3
 DATABASE
 
+# Run ruby2js install to set up package.json, tailwind config, and npm dependencies
+bundle exec ruby2js install
+
 echo ""
 echo "Blog created: $APP_NAME/"
 echo ""

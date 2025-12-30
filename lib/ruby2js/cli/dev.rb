@@ -1,9 +1,6 @@
 # frozen_string_literal: true
 
 require 'optparse'
-require 'json'
-require 'yaml'
-require 'fileutils'
 
 module Ruby2JS
   module CLI
@@ -13,8 +10,7 @@ module Ruby2JS
           options = parse_options(args)
 
           validate_rails_app!
-          ensure_package_json!
-          ensure_node_modules!
+          check_installation!
 
           start_dev_server(options)
         end
@@ -70,27 +66,16 @@ module Ruby2JS
           end
         end
 
-        def ensure_package_json!
-          return if File.exist?("package.json")
+        def check_installation!
+          unless File.exist?("package.json")
+            abort "Error: package.json not found.\n" \
+                  "Run 'ruby2js install' first to set up the project."
+          end
 
-          puts "Creating package.json..."
-
-          app_name = detect_app_name
-          database_config = load_database_config
-          adapter = database_config.dig("development", "adapter") || "dexie"
-
-          package = generate_package_json(app_name, adapter)
-          File.write("package.json", JSON.pretty_generate(package) + "\n")
-
-          puts "  Created package.json with #{adapter} adapter"
-        end
-
-        def ensure_node_modules!
-          return if File.directory?("node_modules")
-
-          puts "Installing npm dependencies..."
-          system("npm install") || abort("Error: npm install failed")
-          puts ""
+          unless File.directory?("node_modules")
+            abort "Error: node_modules not found.\n" \
+                  "Run 'ruby2js install' or 'npm install' first."
+          end
         end
 
         def start_dev_server(options)
@@ -117,93 +102,6 @@ module Ruby2JS
           end
 
           exec(*cmd)
-        end
-
-        def detect_app_name
-          # Try to get from Rails application name
-          if File.exist?("config/application.rb")
-            content = File.read("config/application.rb")
-            if content =~ /module\s+(\w+)/
-              return $1.gsub(/([a-z])([A-Z])/, '\1_\2').downcase
-            end
-          end
-
-          # Fall back to directory name
-          File.basename(Dir.pwd).gsub(/[^a-z0-9_-]/i, '_').downcase
-        end
-
-        def load_database_config
-          YAML.load_file("config/database.yml", aliases: true) rescue YAML.load_file("config/database.yml")
-        rescue => e
-          warn "Warning: Could not parse config/database.yml: #{e.message}"
-          { "development" => { "adapter" => "dexie" } }
-        end
-
-        def generate_package_json(app_name, adapter)
-          # Determine dependencies based on adapter
-          # Check for local packages directory (when running from ruby2js repo)
-          gem_root = File.expand_path("../../../..", __dir__)
-          local_package = File.join(gem_root, "packages/ruby2js-rails")
-
-          deps = if File.directory?(local_package)
-            # Compute relative path from current directory to local package
-            require 'pathname'
-            relative_path = Pathname.new(local_package).relative_path_from(Pathname.new(Dir.pwd))
-            puts "  Using local ruby2js-rails: #{relative_path}"
-            { "ruby2js-rails" => "file:#{relative_path}" }
-          else
-            { "ruby2js-rails" => "https://www.ruby2js.com/releases/ruby2js-rails-beta.tgz" }
-          end
-
-          # Add tailwindcss if tailwindcss-rails gem is detected
-          if File.exist?("app/assets/tailwind/application.css")
-            deps["tailwindcss"] = "^3.4.0"
-            puts "  Adding tailwindcss (tailwindcss-rails detected)"
-          end
-
-          case adapter.to_s
-          when "dexie"
-            deps["dexie"] = "^4.0.10"
-          when "sqljs"
-            deps["sql.js"] = "^1.11.0"
-          when "pglite"
-            deps["@electric-sql/pglite"] = "^0.2.0"
-          end
-
-          optional_deps = {}
-          case adapter.to_s
-          when "better_sqlite3"
-            optional_deps["better-sqlite3"] = "^11.0.0"
-          when "pg"
-            optional_deps["pg"] = "^8.13.0"
-          when "mysql", "mysql2"
-            optional_deps["mysql2"] = "^3.11.0"
-          end
-
-          package = {
-            "name" => app_name.gsub("_", "-"),
-            "version" => "0.1.0",
-            "type" => "module",
-            "description" => "Rails-like app powered by Ruby2JS",
-            "scripts" => {
-              "dev" => "ruby2js-rails-dev",
-              "dev:ruby" => "ruby2js-rails-dev --ruby",
-              "build" => "ruby2js-rails-build",
-              "start" => "npx serve -s -p 3000"
-            },
-            "dependencies" => deps
-          }
-
-          package["optionalDependencies"] = optional_deps unless optional_deps.empty?
-
-          # Add server scripts for server-side adapters
-          if %w[better_sqlite3 pg mysql mysql2].include?(adapter.to_s)
-            package["scripts"]["start:node"] = "ruby2js-rails-server"
-            package["scripts"]["start:bun"] = "bun node_modules/ruby2js-rails/server.mjs"
-            package["scripts"]["start:deno"] = "deno run --allow-all node_modules/ruby2js-rails/server.mjs"
-          end
-
-          package
         end
 
         def open_browser(url)
