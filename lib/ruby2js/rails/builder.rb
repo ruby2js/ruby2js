@@ -65,7 +65,12 @@ class SelfhostBuilder
     'mysql2' => 'active_record_mysql2.mjs',
     'mysql' => 'active_record_mysql2.mjs',
     # Cloudflare adapters
-    'd1' => 'active_record_d1.mjs'
+    'd1' => 'active_record_d1.mjs',
+    # Universal adapters (HTTP-based, work on browser/node/edge)
+    'neon' => 'active_record_neon.mjs',
+    'turso' => 'active_record_turso.mjs',
+    'libsql' => 'active_record_turso.mjs',
+    'planetscale' => 'active_record_planetscale.mjs'
   }.freeze
 
   # Common transpilation options for Ruby files
@@ -191,10 +196,16 @@ class SelfhostBuilder
         optional_deps['pg'] = '^8.13.0'
       when 'mysql', 'mysql2'
         optional_deps['mysql2'] = '^3.11.0'
+      when 'neon'
+        deps['@neondatabase/serverless'] = '^0.10.0'
+      when 'turso', 'libsql'
+        deps['@libsql/client'] = '^0.14.0'
+      when 'planetscale'
+        deps['@planetscale/database'] = '^1.19.0'
       end
     end
 
-    server_adapters = %w[sqlite3 better_sqlite3 pg postgres postgresql mysql mysql2]
+    server_adapters = %w[sqlite3 better_sqlite3 pg postgres postgresql mysql mysql2 neon turso libsql planetscale]
 
     scripts = {
       'dev' => 'ruby2js-rails-dev',
