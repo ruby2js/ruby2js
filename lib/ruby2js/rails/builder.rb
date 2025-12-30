@@ -517,7 +517,7 @@ class SelfhostBuilder
     end
 
     # Pass model associations to controller filter for preloading
-    if section == 'controllers' && @model_associations && @model_associations.any?
+    if section == 'controllers' && @model_associations && @model_associations.any?  # Pragma: hash
       options[:model_associations] = @model_associations
     end
 

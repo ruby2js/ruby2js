@@ -246,6 +246,16 @@ describe Ruby2JS::Filter::Pragma do
       to_js('obj.include?(key)').
         must_equal 'obj.include(key)'
     end
+
+    it "should convert any? to Object.keys check" do
+      to_js('obj.any? # Pragma: hash').
+        must_equal 'Object.keys(obj).length > 0'
+    end
+
+    it "should convert empty? to Object.keys check" do
+      to_js('obj.empty? # Pragma: hash').
+        must_equal 'Object.keys(obj).length === 0'
+    end
   end
 
   describe "set pragma" do

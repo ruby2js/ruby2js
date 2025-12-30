@@ -376,6 +376,24 @@ module Ruby2JS
             return process s(:send, target, :has, args.first)
           end
 
+        # .any? - Hash: Object.keys(hash).length > 0 (without block)
+        when :any?
+          if pragma?(node, :hash) && args.empty?
+            # Object.keys(target).length > 0
+            return process s(:send,
+              s(:attr, s(:send, s(:const, nil, :Object), :keys, target), :length),
+              :>, s(:int, 0))
+          end
+
+        # .empty? - Hash: Object.keys(hash).length === 0
+        when :empty?
+          if pragma?(node, :hash)
+            # Object.keys(target).length === 0
+            return process s(:send,
+              s(:attr, s(:send, s(:const, nil, :Object), :keys, target), :length),
+              :===, s(:int, 0))
+          end
+
         # .call - with method pragma, convert proc.call(args) to proc(args)
         when :call
           if pragma?(node, :method) && target
