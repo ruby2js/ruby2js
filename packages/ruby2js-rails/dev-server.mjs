@@ -203,7 +203,41 @@ function notifyClients() {
   }
 }
 
-// Static file server
+// Static file server - serves from dist/ directory
+const DIST_DIR = join(APP_ROOT, 'dist');
+
+// Hot reload WebSocket client script - injected into HTML pages
+const HOT_RELOAD_SCRIPT = `
+<script>
+(function() {
+  const ws = new WebSocket('ws://' + location.host);
+  ws.onmessage = function(event) {
+    const data = JSON.parse(event.data);
+    if (data.type === 'reload') {
+      console.log('[hot-reload] Reloading...');
+      location.reload();
+    }
+  };
+  ws.onopen = function() {
+    console.log('[hot-reload] Connected');
+  };
+  ws.onclose = function() {
+    console.log('[hot-reload] Disconnected, retrying...');
+    setTimeout(function() { location.reload(); }, 1000);
+  };
+})();
+</script>
+`;
+
+// Inject hot reload script into HTML content
+function injectHotReload(html) {
+  // Insert before </body> or at end if no </body>
+  if (html.includes('</body>')) {
+    return html.replace('</body>', HOT_RELOAD_SCRIPT + '</body>');
+  }
+  return html + HOT_RELOAD_SCRIPT;
+}
+
 async function serveFile(req, res) {
   let url = req.url.split('?')[0]; // Remove query string
 
@@ -217,7 +251,7 @@ async function serveFile(req, res) {
     return;
   }
 
-  const filePath = join(APP_ROOT, url);
+  const filePath = join(DIST_DIR, url);
   const ext = extname(filePath);
   const contentType = MIME_TYPES[ext] || 'application/octet-stream';
 
@@ -226,11 +260,16 @@ async function serveFile(req, res) {
     if (stats.isDirectory()) {
       // Try index.html in directory
       const indexPath = join(filePath, 'index.html');
-      const content = await readFile(indexPath);
+      let content = await readFile(indexPath, 'utf8');
+      content = injectHotReload(content);
       res.writeHead(200, { 'Content-Type': 'text/html' });
       res.end(content);
     } else {
-      const content = await readFile(filePath);
+      let content = await readFile(filePath);
+      // Inject hot reload for HTML files
+      if (ext === '.html') {
+        content = injectHotReload(content.toString());
+      }
       res.writeHead(200, { 'Content-Type': contentType });
       res.end(content);
     }
@@ -239,7 +278,8 @@ async function serveFile(req, res) {
       // SPA fallback: if no file extension, serve index.html for client-side routing
       if (!ext || ext === '') {
         try {
-          const indexContent = await readFile(join(APP_ROOT, 'index.html'));
+          let indexContent = await readFile(join(DIST_DIR, 'index.html'), 'utf8');
+          indexContent = injectHotReload(indexContent);
           res.writeHead(200, { 'Content-Type': 'text/html' });
           res.end(indexContent);
           return;
@@ -312,9 +352,9 @@ function onFileChange(event, path) {
 
   // Debounce rapid changes
   if (rubyDebounceTimer) clearTimeout(rubyDebounceTimer);
-  rubyDebounceTimer = setTimeout(() => {
+  rubyDebounceTimer = setTimeout(async () => {
     rubyDebounceTimer = null;
-    runBuild();
+    await runBuild();
     // Also rebuild Tailwind CSS when views change (JIT needs to scan for new classes)
     if (cssFramework === 'tailwind' && path.includes('/views/')) {
       runCssBuild();
