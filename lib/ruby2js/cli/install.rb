@@ -2,10 +2,13 @@
 
 require 'optparse'
 require 'json'
+require 'fileutils'
 
 module Ruby2JS
   module CLI
     module Install
+      DIST_DIR = 'dist'
+
       class << self
         def run(args)
           options = parse_options(args)
@@ -15,11 +18,13 @@ module Ruby2JS
           # Load shared builder for package.json generation
           require 'ruby2js/rails/builder'
 
-          ensure_package_json!
-          setup_tailwind! if tailwind_rails_detected?
+          setup_dist_directory!
+          create_package_json!
           install_dependencies!
 
           puts "Installation complete."
+          puts "  Run 'ruby2js build' to transpile your app"
+          puts "  Run 'ruby2js dev' to start the development server"
         end
 
         private
@@ -30,7 +35,7 @@ module Ruby2JS
           parser = OptionParser.new do |opts|
             opts.banner = "Usage: ruby2js install [options]"
             opts.separator ""
-            opts.separator "Set up package.json and install npm dependencies."
+            opts.separator "Set up dist/ directory with package.json and npm dependencies."
             opts.separator ""
             opts.separator "Options:"
 
@@ -56,31 +61,38 @@ module Ruby2JS
           end
         end
 
-        def ensure_package_json!
-          if File.exist?("package.json")
-            merge_package_json!
-          else
-            create_package_json!
-          end
+        def setup_dist_directory!
+          FileUtils.mkdir_p(DIST_DIR)
+          puts "Created #{DIST_DIR}/ directory"
         end
 
         def create_package_json!
-          puts "Creating package.json..."
+          package_path = File.join(DIST_DIR, 'package.json')
+
+          if File.exist?(package_path)
+            merge_package_json!(package_path)
+          else
+            write_package_json!(package_path)
+          end
+        end
+
+        def write_package_json!(package_path)
+          puts "Creating #{package_path}..."
 
           app_name = detect_app_name
           package = SelfhostBuilder.generate_package_json(
             app_name: app_name,
             app_root: Dir.pwd
           )
-          File.write("package.json", JSON.pretty_generate(package) + "\n")
+          File.write(package_path, JSON.pretty_generate(package) + "\n")
 
-          puts "  Created package.json"
+          puts "  Created #{package_path}"
         end
 
-        def merge_package_json!
-          puts "Updating package.json..."
+        def merge_package_json!(package_path)
+          puts "Updating #{package_path}..."
 
-          existing = JSON.parse(File.read("package.json"))
+          existing = JSON.parse(File.read(package_path))
           required = SelfhostBuilder.generate_package_json(
             app_name: existing["name"] || detect_app_name,
             app_root: Dir.pwd
@@ -118,12 +130,14 @@ module Ruby2JS
           # Ensure type is module
           existing["type"] ||= "module"
 
-          File.write("package.json", JSON.pretty_generate(existing) + "\n")
+          File.write(package_path, JSON.pretty_generate(existing) + "\n")
         end
 
         def install_dependencies!
-          puts "Installing npm dependencies..."
-          system("npm install") || abort("Error: npm install failed")
+          puts "Installing npm dependencies in #{DIST_DIR}/..."
+          Dir.chdir(DIST_DIR) do
+            system("npm install") || abort("Error: npm install failed")
+          end
         end
 
         def detect_app_name
@@ -134,41 +148,6 @@ module Ruby2JS
             end
           end
           File.basename(Dir.pwd).gsub(/[^a-z0-9_-]/i, '_').downcase
-        end
-
-        def tailwind_rails_detected?
-          File.exist?("app/assets/tailwind/application.css")
-        end
-
-        def setup_tailwind!
-          puts "Setting up Tailwind CSS for npm..."
-
-          # Patch CSS to use standard directives (Rails gem uses @import "tailwindcss")
-          css_file = "app/assets/tailwind/application.css"
-          File.write(css_file, <<~CSS)
-            @tailwind base;
-            @tailwind components;
-            @tailwind utilities;
-          CSS
-          puts "  Patched #{css_file}"
-
-          # Create tailwind.config.js if it doesn't exist
-          unless File.exist?("tailwind.config.js")
-            File.write("tailwind.config.js", <<~JS)
-              /** @type {import('tailwindcss').Config} */
-              module.exports = {
-                content: [
-                  './app/views/**/*.{erb,html}',
-                  './dist/views/**/*.html'
-                ],
-                theme: {
-                  extend: {},
-                },
-                plugins: [],
-              }
-            JS
-            puts "  Created tailwind.config.js"
-          end
         end
       end
     end

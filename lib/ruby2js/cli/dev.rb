@@ -5,6 +5,8 @@ require 'optparse'
 module Ruby2JS
   module CLI
     module Dev
+      DIST_DIR = 'dist'
+
       class << self
         def run(args)
           options = parse_options(args)
@@ -67,14 +69,17 @@ module Ruby2JS
         end
 
         def check_installation!
-          unless File.exist?("package.json")
-            abort "Error: package.json not found.\n" \
+          package_json = File.join(DIST_DIR, 'package.json')
+          node_modules = File.join(DIST_DIR, 'node_modules')
+
+          unless File.exist?(package_json)
+            abort "Error: #{package_json} not found.\n" \
                   "Run 'ruby2js install' first to set up the project."
           end
 
-          unless File.directory?("node_modules")
-            abort "Error: node_modules not found.\n" \
-                  "Run 'ruby2js install' or 'npm install' first."
+          unless File.directory?(node_modules)
+            abort "Error: #{node_modules} not found.\n" \
+                  "Run 'ruby2js install' first."
           end
         end
 
@@ -84,6 +89,9 @@ module Ruby2JS
 
           # Default to Ruby transpilation unless --selfhost is specified
           extra_args << "--ruby" unless options[:selfhost]
+
+          # Pass app root so dev server knows where sources are
+          extra_args << "--app-root=#{Dir.pwd}"
 
           # Pass port option through to the dev server
           extra_args << "--port=#{options[:port]}" if options[:port] != 3000
@@ -101,7 +109,10 @@ module Ruby2JS
             end
           end
 
-          exec(*cmd)
+          # Run npm from the dist directory
+          Dir.chdir(DIST_DIR) do
+            exec(*cmd)
+          end
         end
 
         def open_browser(url)

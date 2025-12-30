@@ -408,7 +408,7 @@ class SelfhostBuilder
     self.generate_application_record()
     self.transpile_directory(
       File.join(DEMO_ROOT, 'app/models'),
-      File.join(@dist_dir, 'models'),
+      File.join(@dist_dir, 'app/models'),
       '**/*.rb',
       skip: ['application_record.rb']
     )
@@ -422,7 +422,7 @@ class SelfhostBuilder
     puts("Controllers:")
     self.transpile_directory(
       File.join(DEMO_ROOT, 'app/controllers'),
-      File.join(@dist_dir, 'controllers'),
+      File.join(@dist_dir, 'app/controllers'),
       '**/*.rb',
       section: 'controllers'
     )
@@ -435,7 +435,7 @@ class SelfhostBuilder
       self.copy_phlex_runtime()
       self.transpile_directory(
         components_dir,
-        File.join(@dist_dir, 'components'),
+        File.join(@dist_dir, 'app/components'),
         '**/*.rb',
         section: 'components'
       )
@@ -448,7 +448,7 @@ class SelfhostBuilder
       puts("Stimulus Controllers:")
       self.transpile_directory(
         stimulus_dir,
-        File.join(@dist_dir, 'javascript/controllers'),
+        File.join(@dist_dir, 'app/javascript/controllers'),
         '**/*.rb',
         section: 'stimulus'
       )
@@ -476,7 +476,7 @@ class SelfhostBuilder
     puts("Helpers:")
     self.transpile_directory(
       File.join(DEMO_ROOT, 'app/helpers'),
-      File.join(@dist_dir, 'helpers')
+      File.join(@dist_dir, 'app/helpers')
     )
     puts("")
 
@@ -496,6 +496,9 @@ class SelfhostBuilder
       self.generate_browser_index()
       puts("")
     end
+
+    # Handle Tailwind CSS if present
+    self.setup_tailwind()
 
     puts("=== Build Complete ===")
   end
@@ -761,17 +764,16 @@ class SelfhostBuilder
 
     FileUtils.mkdir_p(File.dirname(dest_path))
 
-    # Generate sourcemap
+    # Copy source file alongside transpiled output for source maps
+    src_basename = File.basename(src_path)
+    copied_src_path = File.join(File.dirname(dest_path), src_basename)
+    File.write(copied_src_path, source)
+
+    # Generate sourcemap - source is in same directory
     map_path = "#{dest_path}.map"
     sourcemap = result.sourcemap
     sourcemap[:sourcesContent] = [source]
-
-    # Compute relative path from sourcemap location back to source file
-    map_dir = File.dirname(dest_path).sub(DEMO_ROOT + '/', '')
-    depth = map_dir.split('/').length
-    source_from_map = ('../' * depth) + relative_src
-
-    sourcemap[:sources] = [source_from_map]
+    sourcemap[:sources] = ["./#{src_basename}"]
 
     # Add sourcemap reference to JS file
     js_with_map = "#{js}\n//# sourceMappingURL=#{File.basename(map_path)}\n"
@@ -779,7 +781,6 @@ class SelfhostBuilder
     File.write(map_path, JSON.generate(sourcemap))
 
     puts("  -> #{dest_path}")
-    puts("  -> #{map_path}")
   end
 
   def transpile_erb_file(src_path, dest_path)
@@ -810,16 +811,16 @@ class SelfhostBuilder
 
     FileUtils.mkdir_p(File.dirname(dest_path))
 
-    # Generate source map
+    # Copy source file alongside transpiled output for source maps
+    src_basename = File.basename(src_path)
+    copied_src_path = File.join(File.dirname(dest_path), src_basename)
+    File.write(copied_src_path, template)
+
+    # Generate source map - source is in same directory
     map_path = "#{dest_path}.map"
     sourcemap = result.sourcemap
     sourcemap[:sourcesContent] = [template]  # Use original ERB, not Ruby
-
-    # Compute relative path from sourcemap location back to source file
-    map_dir = File.dirname(dest_path).sub(DEMO_ROOT + '/', '')
-    depth = map_dir.split('/').length
-    source_from_map = ('../' * depth) + relative_src
-    sourcemap[:sources] = [source_from_map]
+    sourcemap[:sources] = ["./#{src_basename}"]
 
     # Add sourcemap reference to JS file
     js_with_map = "#{js}\n//# sourceMappingURL=#{File.basename(map_path)}\n"
@@ -827,7 +828,6 @@ class SelfhostBuilder
     File.write(map_path, JSON.generate(sourcemap))
 
     puts("  -> #{dest_path}")
-    puts("  -> #{map_path}")
     js
   end
 
@@ -838,7 +838,7 @@ class SelfhostBuilder
     renders = {}
     Dir.glob(File.join(erb_dir, '**/*.html.erb')).each do |src_path|
       basename = File.basename(src_path, '.html.erb')
-      js = self.transpile_erb_file(src_path, File.join(@dist_dir, 'views/erb', "#{basename}.js"))
+      js = self.transpile_erb_file(src_path, File.join(@dist_dir, 'app/views/articles/erb', "#{basename}.js"))
       renders[basename] = js
     end
 
@@ -866,8 +866,10 @@ class SelfhostBuilder
       };
     JS
 
-    File.write(File.join(@dist_dir, 'views/articles.js'), erb_views_js)
-    puts("  -> dist/views/articles.js (combined ERB module)")
+    views_dir = File.join(@dist_dir, 'app/views/articles')
+    FileUtils.mkdir_p(views_dir)
+    File.write(File.join(views_dir, 'articles.js'), erb_views_js)
+    puts("  -> app/views/articles/articles.js (combined ERB module)")
   end
 
   def transpile_layout()
@@ -911,10 +913,10 @@ class SelfhostBuilder
       }
     JS
 
-    dest_dir = File.join(@dist_dir, 'views/layouts')
+    dest_dir = File.join(@dist_dir, 'app/views/layouts')
     FileUtils.mkdir_p(dest_dir)
     File.write(File.join(dest_dir, 'application.js'), js)
-    puts("  -> dist/views/layouts/application.js")
+    puts("  -> app/views/layouts/application.js")
   end
 
   def transpile_directory(src_dir, dest_dir, pattern = '**/*.rb', skip: [], section: nil)
@@ -961,16 +963,16 @@ class SelfhostBuilder
     wrapper = <<~JS
       // ApplicationRecord - wraps ActiveRecord from adapter
       // This file is generated by the build script
-      import { ActiveRecord } from '../lib/active_record.mjs';
+      import { ActiveRecord } from '../../lib/active_record.mjs';
 
       export class ApplicationRecord extends ActiveRecord {
         // Subclasses (Article, Comment) extend this and add their own validations
       }
     JS
-    dest_dir = File.join(@dist_dir, 'models')
+    dest_dir = File.join(@dist_dir, 'app/models')
     FileUtils.mkdir_p(dest_dir)
     File.write(File.join(dest_dir, 'application_record.js'), wrapper)
-    puts("  -> models/application_record.js (wrapper for ActiveRecord)")
+    puts("  -> app/models/application_record.js (wrapper for ActiveRecord)")
   end
 
   def generate_browser_index()
@@ -996,15 +998,69 @@ class SelfhostBuilder
       end
     end
 
-    output_path = File.join(DEMO_ROOT, 'index.html')
+    # Write index.html to dist/ - self-contained, served from dist root
+    output_path = File.join(@dist_dir, 'index.html')
     SelfhostBuilder.generate_index_html(
       app_name: app_name,
       database: @database,
       css: css,
-      output_path: output_path
-      # Default base_path '/dist' - serving from app root
+      output_path: output_path,
+      base_path: ''  # Serving from dist/ root, not /dist
     )
-    puts("  -> index.html")
+    puts("  -> dist/index.html")
+  end
+
+  def setup_tailwind()
+    # Check for tailwindcss-rails gem source file
+    tailwind_src = File.join(DEMO_ROOT, 'app/assets/tailwind/application.css')
+    return unless File.exist?(tailwind_src)
+
+    puts("Tailwind CSS:")
+
+    # Create destination directory
+    tailwind_dest_dir = File.join(@dist_dir, 'app/assets/tailwind')
+    FileUtils.mkdir_p(tailwind_dest_dir)
+
+    # Read the tailwindcss-rails source and convert to npm-compatible format
+    source = File.read(tailwind_src)
+
+    # Convert @import "tailwindcss" to npm @tailwind directives
+    npm_css = source.gsub(/@import\s+["']tailwindcss["'];?/, <<~CSS.strip)
+      @tailwind base;
+      @tailwind components;
+      @tailwind utilities;
+    CSS
+
+    # Write the converted CSS to dist
+    dest_path = File.join(tailwind_dest_dir, 'application.css')
+    File.write(dest_path, npm_css)
+    puts("  -> app/assets/tailwind/application.css")
+
+    # Create tailwind.config.js if not present
+    config_path = File.join(@dist_dir, 'tailwind.config.js')
+    unless File.exist?(config_path)
+      # Generate config that watches dist/ for class names
+      config = <<~JS
+        /** @type {import('tailwindcss').Config} */
+        export default {
+          content: [
+            './app/**/*.{js,html,erb}',
+            './index.html'
+          ],
+          theme: {
+            extend: {},
+          },
+          plugins: [],
+        }
+      JS
+      File.write(config_path, config)
+      puts("  -> tailwind.config.js")
+    end
+
+    # Create output directory for built CSS
+    builds_dir = File.join(@dist_dir, 'app/assets/builds')
+    FileUtils.mkdir_p(builds_dir)
+    puts("  (Run 'npx tailwindcss -i app/assets/tailwind/application.css -o app/assets/builds/tailwind.css' in dist/ to build)")
   end
 
   def transpile_routes_files()
@@ -1051,7 +1107,7 @@ class SelfhostBuilder
   end
 
   def generate_models_index()
-    models_dir = File.join(@dist_dir, 'models')
+    models_dir = File.join(@dist_dir, 'app/models')
     model_files = Dir.glob(File.join(models_dir, '*.js'))
       .map { |f| File.basename(f, '.js') }
       .reject { |name| name == 'application_record' || name == 'index' }
@@ -1066,7 +1122,7 @@ class SelfhostBuilder
     end.join("\n") + "\n"
 
     File.write(File.join(models_dir, 'index.js'), index_js)
-    puts("  -> #{File.join(models_dir, 'index.js')} (re-exports)")
+    puts("  -> app/models/index.js (re-exports)")
   end
 
   # Parse model files to extract has_many associations for controller preloading

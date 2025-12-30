@@ -5,12 +5,14 @@ require 'optparse'
 module Ruby2JS
   module CLI
     module Build
+      DIST_DIR = 'dist'
+
       class << self
         def run(args)
           options = parse_options(args)
 
           validate_rails_app!
-          ensure_dependencies!
+          check_installation!
 
           build(options)
         end
@@ -53,17 +55,20 @@ module Ruby2JS
             abort "Error: Not a Rails-like application directory.\n" \
                   "Run this command from your Rails application root."
           end
-
-          unless File.exist?("package.json")
-            abort "Error: package.json not found.\n" \
-                  "Run 'ruby2js dev' first to set up the project."
-          end
         end
 
-        def ensure_dependencies!
-          unless File.directory?("node_modules")
-            puts "Installing npm dependencies..."
-            system("npm install") || abort("Error: npm install failed")
+        def check_installation!
+          package_json = File.join(DIST_DIR, 'package.json')
+          node_modules = File.join(DIST_DIR, 'node_modules')
+
+          unless File.exist?(package_json)
+            abort "Error: #{package_json} not found.\n" \
+                  "Run 'ruby2js install' first to set up the project."
+          end
+
+          unless File.directory?(node_modules)
+            abort "Error: #{node_modules} not found.\n" \
+                  "Run 'ruby2js install' first."
           end
         end
 
@@ -71,11 +76,13 @@ module Ruby2JS
           puts "Building application..."
 
           success = if options[:selfhost]
-            # Use JavaScript transpiler via npm
-            if options[:verbose]
-              system("npm run build")
-            else
-              system("npm run build > /dev/null 2>&1")
+            # Use JavaScript transpiler via npm (run from dist/)
+            Dir.chdir(DIST_DIR) do
+              if options[:verbose]
+                system("npm run build")
+              else
+                system("npm run build > /dev/null 2>&1")
+              end
             end
           else
             # Use Ruby transpiler directly

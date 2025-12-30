@@ -21,9 +21,8 @@ task :blog do
     File.write(gemfile, content)
 
     # Re-run bundle install and ruby2js install with local gem
-    # Delete package.json so install regenerates it with local paths
-    rm_f File.join(BLOG_DIR, 'package.json')
-    rm_rf File.join(BLOG_DIR, 'node_modules')
+    # Delete dist/ so install regenerates it with local paths
+    rm_rf File.join(BLOG_DIR, 'dist')
 
     Dir.chdir BLOG_DIR do
       Bundler.with_unbundled_env do
