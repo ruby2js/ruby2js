@@ -173,7 +173,8 @@ end
 desc "Transpile builder.rb to build.mjs for selfhost builds"
 file BUILD_MJS => ["#{ROOT}/lib/ruby2js/rails/builder.rb", "#{ROOT}/lib/ruby2js/filter/selfhost_build.rb"] do
   # Use stdin instead of file argument to work around autoexports + file read issue
-  sh bundle_exec("cat #{ROOT}/lib/ruby2js/rails/builder.rb | ruby #{ROOT}/bin/ruby2js --filter selfhost_build --filter esm --filter node --filter functions --filter return --filter pragma --autoexports > #{BUILD_MJS}")
+  # Note: node filter must run before esm so require removals happen before esm transforms require→import
+  sh bundle_exec("cat #{ROOT}/lib/ruby2js/rails/builder.rb | ruby #{ROOT}/bin/ruby2js --filter selfhost_build --filter node --filter esm --filter functions --filter return --filter pragma --autoexports > #{BUILD_MJS}")
   # Add shebang and fix relative paths for new location (packages/ruby2js-rails/)
   # Source is now lib/ruby2js/rails/builder.rb, output is packages/ruby2js-rails/build.mjs
   content = "#!/usr/bin/env node\n" + File.read(BUILD_MJS)
