@@ -423,6 +423,34 @@ module Ruby2JS
             S(:send, process(target), :match, gpattern)
           end
 
+        elsif method == :scan and args.length == 2 and args[1].type == :block
+          # str.scan(/pattern/) { |match| ... } with capturing groups
+          # Convert to: for (let $_ of str.matchAll(/pattern/g)) { let match = $_.slice(1); ... }
+          arg = args.first
+          callback = args[1]
+
+          if arg.type == :regexp
+            gpattern = arg.updated(:regexp, [*arg.children[0...-1],
+              s(:regopt, :g, *arg.children.last.children)])
+          else
+            gpattern = s(:send, s(:const, nil, :RegExp), :new, process(arg), s(:str, 'g'))
+          end
+
+          # Extract block args and body
+          block_args = callback.children[1]
+          block_body = callback.children[2]
+
+          # Build: for (let $_ of str.matchAll(/pattern/g)) { let match = $_.slice(1); body }
+          match_var = :"$_"
+          block_arg_name = block_args.children.first&.children&.first || :match
+
+          s(:for_of,
+            s(:lvasgn, match_var),
+            s(:send, process(target), :matchAll, gpattern),
+            s(:begin,
+              s(:lvasgn, block_arg_name, s(:send, s(:lvar, match_var), :slice, s(:int, 1))),
+              process(block_body)))
+
         elsif method == :gsub and args.length == 2
           before, after = args
           if before.type == :regexp

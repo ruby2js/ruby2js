@@ -177,6 +177,15 @@ describe Ruby2JS::Filter::Functions do
           's => s.slice(1))'
     end
 
+    it 'should handle scan with block' do
+      to_js( 'str.scan(/(\w+)/) { |m| puts m }' ).
+        must_equal 'for (let $_ of str.matchAll(/(\w+)/g)) ' +
+          '{let m = $_.slice(1); console.log(m)}'
+      to_js( 'str.scan(/has_many\s+:(\w+)/) { |match| results << match[0] }' ).
+        must_equal 'for (let $_ of str.matchAll(/has_many\s+:(\w+)/g)) ' +
+          '{let match = $_.slice(1); results.push(match[0])}'
+    end
+
     it 'should handle sort!' do
       to_js( 'str.sort! {|a, b| a - b}' ).
         must_equal 'str.sort((a, b) => a - b)'
