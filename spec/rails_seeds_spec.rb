@@ -44,7 +44,7 @@ describe Ruby2JS::Filter::Rails::Seeds do
           end
         end
       RUBY
-      assert_includes result, 'import { Article } from "../models/index.js"'
+      assert_includes result, 'import { Article } from "../app/models/index.js"'
     end
 
     it "imports multiple models" do
@@ -60,7 +60,7 @@ describe Ruby2JS::Filter::Rails::Seeds do
       assert_includes result, 'Article'
       assert_includes result, 'Comment'
       assert_includes result, 'User'
-      assert_includes result, '../models/index.js'
+      assert_includes result, '../app/models/index.js'
     end
 
     it "does not import Seeds itself" do

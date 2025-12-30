@@ -184,7 +184,7 @@ module Ruby2JS
           # Generate import for models if any were found
           if @rails_seeds_models.any?
             model_consts = @rails_seeds_models.map { |m| s(:const, nil, m.to_sym) }
-            statements << s(:import, '../models/index.js', model_consts)
+            statements << s(:import, '../app/models/index.js', model_consts)
           end
 
           # Transform the module to make run async and wrap AR operations with await

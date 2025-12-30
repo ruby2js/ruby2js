@@ -457,14 +457,14 @@ module Ruby2JS
 
           # Import layout for server targets
           if self.server_target?()
-            statements << s(:import, '../views/layouts/application.js',
+            statements << s(:import, '../app/views/layouts/application.js',
               [s(:const, nil, :layout)])
           end
 
           # Import controllers - collect all controllers from resources
           all_controllers = collect_all_controllers(@rails_resources)
           all_controllers.each do |ctrl|
-            statements << s(:import, "../controllers/#{ctrl[:controller_file]}.js",
+            statements << s(:import, "../app/controllers/#{ctrl[:controller_file]}.js",
               [s(:const, nil, ctrl[:controller_name].to_sym)])
           end
 

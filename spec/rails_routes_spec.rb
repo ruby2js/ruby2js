@@ -48,7 +48,7 @@ describe Ruby2JS::Filter::Rails::Routes do
           resources :articles
         end
       RUBY
-      assert_includes result, 'import { ArticlesController } from "../controllers/articles_controller.js"'
+      assert_includes result, 'import { ArticlesController } from "../app/controllers/articles_controller.js"'
     end
   end
 
