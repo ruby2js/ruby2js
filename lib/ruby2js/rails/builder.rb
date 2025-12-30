@@ -847,11 +847,13 @@ class SelfhostBuilder
     renders = {}
     Dir.glob(File.join(erb_dir, '**/*.html.erb')).each do |src_path|
       basename = File.basename(src_path, '.html.erb')
-      js = self.transpile_erb_file(src_path, File.join(@dist_dir, 'app/views/articles/erb', "#{basename}.js"))
+      # Output individual view files to app/views/articles/
+      js = self.transpile_erb_file(src_path, File.join(@dist_dir, 'app/views/articles', "#{basename}.js"))
       renders[basename] = js
     end
 
     # Create a combined module that exports all render functions
+    # This goes in app/views/articles.js (not inside articles/ to avoid conflicts)
     erb_views_js = <<~JS
       // Article views - auto-generated from .html.erb templates
       // Each exported function is a render function that takes { article } or { articles }
@@ -861,7 +863,8 @@ class SelfhostBuilder
     render_exports = []
     Dir.glob(File.join(erb_dir, '*.html.erb')).sort.each do |erb_path|
       name = File.basename(erb_path, '.html.erb')
-      erb_views_js += "import { render as #{name}_render } from './erb/#{name}.js';\n"
+      # Import from ./articles/ subdirectory
+      erb_views_js += "import { render as #{name}_render } from './articles/#{name}.js';\n"
       render_exports << "#{name}: #{name}_render"
     end
 
@@ -875,10 +878,11 @@ class SelfhostBuilder
       };
     JS
 
-    views_dir = File.join(@dist_dir, 'app/views/articles')
+    # Write combined module to app/views/articles.js
+    views_dir = File.join(@dist_dir, 'app/views')
     FileUtils.mkdir_p(views_dir)
     File.write(File.join(views_dir, 'articles.js'), erb_views_js)
-    puts("  -> app/views/articles/articles.js (combined ERB module)")
+    puts("  -> app/views/articles.js (combined ERB module)")
   end
 
   def transpile_layout()

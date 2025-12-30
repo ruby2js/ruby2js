@@ -830,7 +830,7 @@ module Ruby2JS
             view_module = "#{@rails_controller_name}Views"
             imports << s(:send, nil, :import,
               s(:array, s(:const, nil, view_module.to_sym)),
-              s(:str, "../views/#{@rails_controller_plural}/#{@rails_controller_plural}.js"))
+              s(:str, "../views/#{@rails_controller_plural}.js"))
           end
 
           imports
