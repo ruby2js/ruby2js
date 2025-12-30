@@ -180,10 +180,11 @@ class SelfhostBuilder
     # Check for local packages directory (when running from ruby2js repo)
     gem_root = File.expand_path("../../..", __dir__)
     local_package = File.join(gem_root, "packages/ruby2js-rails")
-    base_dir = app_root || Dir.pwd
+    # Path is relative to dist/ directory where package.json lives
+    dist_dir = File.join(app_root || Dir.pwd, 'dist')
 
     deps = if File.directory?(local_package)
-      relative_path = Pathname.new(local_package).relative_path_from(Pathname.new(base_dir))
+      relative_path = Pathname.new(local_package).relative_path_from(Pathname.new(dist_dir))
       { 'ruby2js-rails' => "file:#{relative_path}" }
     else
       { 'ruby2js-rails' => 'https://www.ruby2js.com/releases/ruby2js-rails-beta.tgz' }
@@ -351,9 +352,17 @@ class SelfhostBuilder
 
   # Note: Using explicit () on all method calls for JS transpilation compatibility
   def build()
-    # Clean and create dist directory
-    FileUtils.rm_rf(@dist_dir)
-    FileUtils.mkdir_p(@dist_dir)
+    # Clean dist directory but preserve package.json, package-lock.json, and node_modules
+    # These are managed by ruby2js install and shouldn't be removed during builds
+    if File.directory?(@dist_dir)
+      Dir.glob(File.join(@dist_dir, '*')).each do |path|
+        basename = File.basename(path)
+        next if ['package.json', 'package-lock.json', 'node_modules'].include?(basename)
+        FileUtils.rm_rf(path)
+      end
+    else
+      FileUtils.mkdir_p(@dist_dir)
+    end
 
     puts("=== Building Ruby2JS-on-Rails Demo ===")
     puts("")

@@ -8,16 +8,17 @@ import { join, extname } from 'path';
 import { watch } from 'chokidar';
 import { WebSocketServer } from 'ws';
 import { exec } from 'child_process';
-import { SelfhostBuilder } from './build.mjs';
-
-// App root is current working directory (not package location)
-const APP_ROOT = process.cwd();
+// SelfhostBuilder is dynamically imported only when needed (not with --ruby flag)
 
 // Parse command line arguments
 const args = process.argv.slice(2);
 const useRuby = args.includes('--ruby');
 const portArg = args.find(a => a.startsWith('--port='));
 const PORT = portArg ? parseInt(portArg.split('=')[1]) : 3000;
+const appRootArg = args.find(a => a.startsWith('--app-root='));
+
+// App root - use --app-root if provided, otherwise current working directory
+const APP_ROOT = appRootArg ? appRootArg.split('=')[1] : process.cwd();
 
 // Detect CSS framework
 let cssFramework = 'none';
@@ -129,8 +130,10 @@ function runRubyBuild() {
 
 async function runSelfhostBuild() {
   try {
-    // Create builder on first use
+    // Dynamically import SelfhostBuilder only when needed
+    // This avoids loading selfhost dependencies when using --ruby flag
     if (!builder) {
+      const { SelfhostBuilder } = await import('./build.mjs');
       builder = new SelfhostBuilder(join(APP_ROOT, 'dist'), APP_ROOT);
     }
     await builder.build();
@@ -158,13 +161,15 @@ async function runCssBuild() {
   console.log('\x1b[35m[css]\x1b[0m Building Tailwind CSS...');
 
   // Use appropriate command based on Tailwind setup
+  // Run from dist/ directory where tailwindcss is installed
+  const distDir = join(APP_ROOT, 'dist');
   const buildCmd = tailwindType === 'rails'
     ? 'npx tailwindcss -i app/assets/tailwind/application.css -o app/assets/builds/tailwind.css'
     : 'npx tailwindcss -i ./src/input.css -o ./public/styles.css';
 
   try {
     await new Promise((resolve, reject) => {
-      exec(buildCmd, { cwd: APP_ROOT }, (error, stdout, stderr) => {
+      exec(buildCmd, { cwd: distDir }, (error, stdout, stderr) => {
         if (error) {
           console.error('\x1b[31m[css error]\x1b[0m', error.message);
           if (stderr) console.error(stderr);
