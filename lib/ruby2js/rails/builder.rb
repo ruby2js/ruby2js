@@ -160,7 +160,8 @@ class SelfhostBuilder
     # Priority 2: config/database.yml
     config_path = File.join(app_root, 'config/database.yml')
     if File.exist?(config_path)
-      config = YAML.load_file(config_path)
+      # Ruby 3.4+/4.0+ requires aliases: true for YAML anchors used by Rails
+      config = YAML.load_file(config_path, aliases: true)
       if config && config[env] && config[env]['adapter']
         puts("  Using config/database.yml [#{env}]") unless quiet
         return config[env]
@@ -213,7 +214,8 @@ class SelfhostBuilder
     adapters = options[:adapters]
     unless adapters
       if app_root && File.exist?(File.join(app_root, 'config/database.yml'))
-        config = YAML.load_file(File.join(app_root, 'config/database.yml'))
+        # Ruby 3.4+/4.0+ requires aliases: true for YAML anchors used by Rails
+        config = YAML.load_file(File.join(app_root, 'config/database.yml'), aliases: true)
         adapters = config.values
           .select { |v| v.is_a?(Hash) }
           .map { |v| v['adapter'] }
