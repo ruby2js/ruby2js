@@ -61,7 +61,7 @@ SPEC_TO_FILTER = {
   'rails_model_spec.rb' => 'rails/model',
   'rails_controller_spec.rb' => 'rails/controller',
   'rails_routes_spec.rb' => 'rails/routes',
-  'rails_schema_spec.rb' => 'rails/schema',
+  'rails_migration_spec.rb' => 'rails/migration',
   'rails_seeds_spec.rb' => 'rails/seeds',
   'rails_helpers_spec.rb' => 'rails/helpers'
 }
