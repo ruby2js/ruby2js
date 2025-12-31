@@ -158,8 +158,8 @@ article3 = Article.create!(
 puts "Created #{Article.count} articles and #{Comment.count} comments"
 SEEDS
 
-# Run ruby2js install to set up package.json, tailwind config, and npm dependencies
-bundle exec ruby2js install
+# Run ruby2js:install generator to set up dist/, package.json, and npm dependencies
+bin/rails generate ruby2js:install
 
 echo ""
 echo "Blog created: $APP_NAME/"

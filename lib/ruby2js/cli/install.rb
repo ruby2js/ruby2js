@@ -26,6 +26,8 @@ module Ruby2JS
           puts "Installation complete."
           puts "  Run 'bin/juntos build' to transpile your app"
           puts "  Run 'bin/juntos dev' to start the development server"
+          puts ""
+          puts "Note: You can also use 'rails generate ruby2js:install' for Rails integration."
         end
 
         private
