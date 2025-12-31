@@ -111,7 +111,9 @@ module Ruby2JS
           unless options[:skip_build]
             puts "Building for #{target}..."
             require 'ruby2js/rails/builder'
-            SelfhostBuilder.new(nil, target: target).build
+            builder_opts = { target: target }
+            builder_opts[:database] = options[:database] if options[:database]
+            SelfhostBuilder.new(nil, **builder_opts).build
           end
 
           # Generate platform config
