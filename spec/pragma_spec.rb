@@ -794,6 +794,65 @@ describe Ruby2JS::Filter::Pragma do
           must_equal 'let items = []; items.add("x")'
       end
     end
+
+    describe "Sorbet T.let support" do
+      it "should strip T.let and use type for disambiguation" do
+        to_js('x = T.let([], Array); x << "a"').
+          must_equal 'let x = []; x.push("a")'
+      end
+
+      it "should handle T.let with Set type" do
+        to_js('x = T.let(Set.new, Set); x << "a"').
+          must_equal 'let x = new Set; x.add("a")'
+      end
+
+      it "should handle T.let with Hash type" do
+        to_js('x = T.let({}, Hash); x.empty?').
+          must_equal 'let x = {}; Object.keys(x).length === 0'
+      end
+
+      it "should handle T::Array generic" do
+        to_js('x = T.let([], T::Array[String]); x << "a"').
+          must_equal 'let x = []; x.push("a")'
+      end
+
+      it "should handle T::Hash generic" do
+        to_js('x = T.let({}, T::Hash[Symbol, String]); x.empty?').
+          must_equal 'let x = {}; Object.keys(x).length === 0'
+      end
+
+      it "should handle T::Set generic" do
+        to_js('x = T.let(Set.new, T::Set[String]); x << "a"').
+          must_equal 'let x = new Set; x.add("a")'
+      end
+
+      it "should work with instance variables" do
+        code = <<~RUBY
+          class Foo
+            def initialize
+              @items = T.let([], Array)
+            end
+            def add(x)
+              @items << x
+            end
+          end
+        RUBY
+        js = to_js(code)
+        js.must_include 'this._items = []'
+        js.must_include 'this._items.push(x)'
+      end
+
+      it "should pass through unrecognized T.let types" do
+        # If we don't recognize the type, just strip T.let wrapper
+        to_js('x = T.let(foo, SomeUnknownType)').
+          must_equal 'let x = T.let(foo, SomeUnknownType)'
+      end
+
+      it "should strip require 'sorbet-runtime'" do
+        to_js("require 'sorbet-runtime'; x = T.let([], Array); x << 'a'").
+          must_equal "let x = []; x.push(\"a\")"
+      end
+    end
   end
 
   describe "pragma filter reorder" do

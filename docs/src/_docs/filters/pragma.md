@@ -298,6 +298,16 @@ Types are inferred from:
 - `Hash.new` → hash
 - `String.new` → string
 
+**Sorbet T.let annotations:**
+- `T.let(value, Array)` → array
+- `T.let(value, Hash)` → hash
+- `T.let(value, Set)` → set
+- `T.let(value, Map)` → map
+- `T.let(value, String)` → string
+- `T.let(value, T::Array[X])` → array
+- `T.let(value, T::Hash[K, V])` → hash
+- `T.let(value, T::Set[X])` → set
+
 ### Examples
 
 ```ruby
@@ -316,6 +326,37 @@ config = {}
 config.empty?
 # => let config = {}; Object.keys(config).length === 0
 ```
+
+### Sorbet T.let
+
+Ruby2JS recognizes [Sorbet](https://sorbet.org/)'s `T.let` type annotations.
+The `T.let` wrapper is stripped from the output, and the type is used for
+disambiguation:
+
+```ruby
+# Sorbet annotation - T.let is stripped, type is used
+items = T.let([], Array)
+items << "hello"
+# => let items = []; items.push("hello")
+
+# Works with generic types too
+cache = T.let({}, T::Hash[Symbol, String])
+cache.empty?
+# => let cache = {}; Object.keys(cache).length === 0
+
+# Set types work correctly
+visited = T.let(Set.new, T::Set[String])
+visited << "page1"
+# => let visited = new Set; visited.add("page1")
+```
+
+This allows you to write Ruby code that is both type-checked by Sorbet and
+correctly transpiled by Ruby2JS. The type annotations are used at compile
+time for disambiguation and removed from the JavaScript output.
+
+**Note:** `require 'sorbet-runtime'` is automatically stripped from the output
+since Sorbet is Ruby-only. This enables writing dual-target code that works
+in both Ruby and JavaScript environments.
 
 ### Instance Variables
 

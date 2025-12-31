@@ -96,10 +96,70 @@ module Ruby2JS
         nil
       end
 
+      # Check if node is a T.let(value, Type) call
+      # Returns [value_node, type_symbol] if it is, nil otherwise
+      def extract_t_let(node)
+        return nil unless node&.type == :send
+        receiver, method, *args = node.children
+
+        # Check for T.let pattern: receiver is T constant, method is :let, 2 args
+        return nil unless method == :let && args.length == 2
+        return nil unless receiver&.type == :const && receiver.children == [nil, :T]
+
+        value_node = args[0]
+        type_node = args[1]
+        type_sym = sorbet_type_to_symbol(type_node)
+
+        type_sym ? [value_node, type_sym] : nil
+      end
+
+      # Convert Sorbet type annotation to internal type symbol
+      def sorbet_type_to_symbol(node)
+        return nil unless node
+
+        case node.type
+        when :const
+          # Simple type: Array, Hash, Set, String, Integer, etc.
+          case node.children.last
+          when :Array then :array
+          when :Hash then :hash
+          when :Set then :set
+          when :Map then :map
+          when :String then :string
+          end
+
+        when :send
+          # Generic type: T::Array[X], T::Hash[K,V], T::Set[X]
+          receiver, method, *_args = node.children
+          if method == :[] && receiver&.type == :const
+            # Check for T::Array, T::Hash, T::Set pattern
+            parent = receiver.children[0]
+            type_name = receiver.children[1]
+            if parent&.type == :const && parent.children == [nil, :T]
+              case type_name
+              when :Array then :array
+              when :Hash then :hash
+              when :Set then :set
+              end
+            end
+          end
+        end
+      end
+
       # Track variable types from assignments
       def on_lvasgn(node)
         name, value = node.children
         if value
+          # Check for T.let first
+          t_let = extract_t_let(value)
+          if t_let
+            actual_value, type_sym = t_let
+            @var_types[name] = type_sym
+            # Replace T.let(value, Type) with just value
+            return process node.updated(nil, [name, actual_value])
+          end
+
+          # Fall back to inference from value
           inferred = infer_type(value)
           @var_types[name] = inferred if inferred
         end
@@ -110,6 +170,16 @@ module Ruby2JS
       def on_ivasgn(node)
         name, value = node.children
         if value
+          # Check for T.let first
+          t_let = extract_t_let(value)
+          if t_let
+            actual_value, type_sym = t_let
+            @var_types[name] = type_sym
+            # Replace T.let(value, Type) with just value
+            return process node.updated(nil, [name, actual_value])
+          end
+
+          # Fall back to inference from value
           inferred = infer_type(value)
           @var_types[name] = inferred if inferred
         end
@@ -405,6 +475,12 @@ module Ruby2JS
         if target.nil? && [:require, :require_relative].include?(method)
           if pragma?(node, :skip)
             return s(:hide)
+          end
+
+          # require 'sorbet-runtime' → remove (Sorbet is Ruby-only)
+          if args.length == 1 && args.first.type == :str &&
+             args.first.children.first == 'sorbet-runtime'
+            return s(:begin)
           end
         end
 
