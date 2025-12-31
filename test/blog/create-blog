@@ -28,6 +28,9 @@ rails db:prepare
 # Add ruby2js gem from GitHub
 bundle add ruby2js --github ruby2js/ruby2js
 
+# Ensure git checkout is complete (handles Bundler version upgrade)
+bundle install
+
 # Add validations to Article model
 sed -i.bak 's/class Article < ApplicationRecord/class Article < ApplicationRecord\
   has_many :comments, dependent: :destroy\
