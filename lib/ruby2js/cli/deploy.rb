@@ -133,6 +133,7 @@ module Ruby2JS
         def generate_vercel_config(options)
           vercel_json = {
             "version" => 2,
+            "buildCommand" => "npm run migrate",
             "builds" => [
               { "src" => "api/**/*.js", "use" => "@vercel/node" }
             ],
@@ -143,7 +144,7 @@ module Ruby2JS
           }
 
           File.write(File.join(DIST_DIR, 'vercel.json'), JSON.pretty_generate(vercel_json))
-          puts "  Generated vercel.json"
+          puts "  Generated vercel.json (with migrations)"
 
           # Generate API handler
           api_dir = File.join(DIST_DIR, 'api')

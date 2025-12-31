@@ -6,7 +6,8 @@
   "bin": {
     "ruby2js-rails-dev": "./dev-server.mjs",
     "ruby2js-rails-server": "./server.mjs",
-    "ruby2js-rails-build": "./build.mjs"
+    "ruby2js-rails-build": "./build.mjs",
+    "ruby2js-rails-migrate": "./migrate.mjs"
   },
   "exports": {
     "./adapters/*": "./adapters/*",
@@ -17,7 +18,8 @@
     "./phlex_runtime.mjs": "./phlex_runtime.mjs",
     "./build.mjs": "./build.mjs",
     "./dev-server.mjs": "./dev-server.mjs",
-    "./server.mjs": "./server.mjs"
+    "./server.mjs": "./server.mjs",
+    "./migrate.mjs": "./migrate.mjs"
   },
   "files": [
     "adapters/",
@@ -28,7 +30,8 @@
     "phlex_runtime.mjs",
     "build.mjs",
     "dev-server.mjs",
-    "server.mjs"
+    "server.mjs",
+    "migrate.mjs"
   ],
   "keywords": [
     "ruby2js",

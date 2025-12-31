@@ -276,6 +276,7 @@ class SelfhostBuilder
       'dev' => 'ruby2js-rails-dev',
       'dev:ruby' => 'ruby2js-rails-dev --ruby',
       'build' => 'ruby2js-rails-build',
+      'migrate' => 'ruby2js-rails-migrate',
       'start' => 'npx serve -s -p 3000'
     }
 
