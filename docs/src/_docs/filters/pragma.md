@@ -170,6 +170,10 @@ require 'my_module'  # No pragma, will be processed normally
 Some Ruby methods have different JavaScript equivalents depending on the
 receiver type. These pragmas let you specify the intended type.
 
+**Note:** Ruby2JS also supports [automatic type inference](#type-inference)
+from literals and constructor calls. Use these pragmas when the type cannot
+be inferred or when you need to override the inferred type.
+
 ### `array`
 
 Specifies that the receiver is an Array.
@@ -268,6 +272,112 @@ str.dup # Pragma: string
 ```
 
 **Note:** Strings in JavaScript are immutable, so `.dup` is a no-op.
+
+## Type Inference
+
+Ruby2JS can automatically infer variable types from literals and constructor
+calls, reducing the need for explicit pragma annotations. When a variable is
+assigned a value with a recognizable type, subsequent operations on that
+variable will use the appropriate JavaScript equivalent.
+
+### Inferred Types
+
+Types are inferred from:
+
+**Literals:**
+- `[]` → array
+- `{}` → hash
+- `""` or `''` → string
+- Integer/float literals → number
+- Regular expressions → regexp
+
+**Constructor calls:**
+- `Set.new` → set
+- `Map.new` → map
+- `Array.new` → array
+- `Hash.new` → hash
+- `String.new` → string
+
+### Examples
+
+```ruby
+# Type inferred from literal - no pragma needed
+items = []
+items << "hello"
+# => let items = []; items.push("hello")
+
+# Type inferred from constructor
+cache = Map.new
+cache[:key] = value
+# => let cache = new Map(); cache.set("key", value)
+
+# Hash operations work automatically
+config = {}
+config.empty?
+# => let config = {}; Object.keys(config).length === 0
+```
+
+### Instance Variables
+
+Type inference also works with instance variables:
+
+```ruby
+class Counter
+  def initialize
+    @items = []
+  end
+
+  def add(item)
+    @items << item  # Uses push() automatically
+  end
+end
+```
+
+### Pragma Override
+
+Explicit pragmas always take precedence over inferred types. This allows you
+to override the inference when needed:
+
+```ruby
+items = []           # Inferred as array
+items << x           # Uses push()
+
+items << y # Pragma: set  # Pragma overrides - uses add()
+```
+
+### Scope Boundaries
+
+Type information is scoped to methods and classes. Types inferred in one
+method do not affect other methods:
+
+```ruby
+def method_a
+  items = []        # Array in this scope
+  items << "a"      # push()
+end
+
+def method_b
+  items = Set.new   # Set in this scope
+  items << "b"      # add()
+end
+```
+
+### When to Use Pragmas
+
+You still need pragmas when:
+
+1. **No assignment visible:** The variable comes from a parameter or external source
+2. **Type changes:** A variable is reassigned to a different type
+3. **Override needed:** You want different behavior than the inferred type
+
+```ruby
+def process(data)   # data type unknown
+  data << item # Pragma: array  # Pragma needed
+end
+
+items = get_items() # Return type unknown
+items << x # Pragma: set        # Pragma needed
+```
 
 ## Behavior Pragmas
 

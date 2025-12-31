@@ -561,6 +561,241 @@ describe Ruby2JS::Filter::Pragma do
     end
   end
 
+  describe "type inference" do
+    def to_js_with_functions(string, options={})
+      require 'ruby2js/filter/functions'
+      _(Ruby2JS.convert(string, options.merge(
+        eslevel: options[:eslevel] || 2021,
+        filters: [Ruby2JS::Filter::Pragma, Ruby2JS::Filter::Functions]
+      )).to_s)
+    end
+
+    describe "from literals" do
+      it "should infer array type from []" do
+        to_js('items = []; items << "x"').
+          must_equal 'let items = []; items.push("x")'
+      end
+
+      it "should infer hash type from {}" do
+        to_js('h = {}; h.empty?').
+          must_equal 'let h = {}; Object.keys(h).length === 0'
+      end
+
+      it "should infer string type from string literal" do
+        to_js('s = "hello"; s << " world"').
+          must_equal 'let s = "hello"; s += " world"'
+      end
+    end
+
+    describe "from constructor calls" do
+      it "should infer set type from Set.new" do
+        to_js('s = Set.new; s << "x"').
+          must_equal 'let s = new Set; s.add("x")'
+      end
+
+      it "should infer map type from Map.new" do
+        to_js('m = Map.new; m[:key] = "val"').
+          must_equal 'let m = new Map; m.set("key", "val")'
+      end
+
+      it "should infer array type from Array.new" do
+        to_js('a = Array.new; a << 1').
+          must_equal 'let a = new Array; a.push(1)'
+      end
+
+      it "should infer hash type from Hash.new" do
+        to_js('h = Hash.new; h.any?').
+          must_equal 'let h = new Hash; Object.keys(h).length > 0'
+      end
+    end
+
+    describe "instance variables" do
+      it "should track types for instance variables" do
+        to_js('@items = []; @items << "x"').
+          must_equal 'this._items = []; this._items.push("x")'
+      end
+
+      it "should track set type for instance variables" do
+        to_js('@s = Set.new; @s << "x"').
+          must_equal 'this._s = new Set; this._s.add("x")'
+      end
+    end
+
+    describe "disambiguation" do
+      it "should disambiguate << for array vs set" do
+        code = <<~RUBY
+          arr = []
+          arr << 1
+          s = Set.new
+          s << 2
+        RUBY
+        js = to_js(code)
+        js.must_include 'arr.push(1)'
+        js.must_include 's.add(2)'
+      end
+
+      it "should disambiguate .dup for array vs hash" do
+        code = <<~RUBY
+          arr = [1, 2]
+          a2 = arr.dup
+          h = {a: 1}
+          h2 = h.dup
+        RUBY
+        js = to_js(code)
+        js.must_include 'arr.slice()'
+        js.must_include '{...h}'
+      end
+
+      it "should disambiguate .include? for set vs hash" do
+        code = <<~RUBY
+          s = Set.new
+          s.include?("x")
+          h = {}
+          h.include?("y")
+        RUBY
+        js = to_js(code)
+        js.must_include 's.has("x")'
+        js.must_include '"y" in h'
+      end
+
+      it "should disambiguate .delete for set" do
+        to_js_with_functions('s = Set.new; s.delete("x")').
+          must_equal 'let s = new Set; s.delete("x")'
+      end
+
+      it "should disambiguate .clear for set" do
+        to_js_with_functions('s = Set.new; s.clear').
+          must_equal 'let s = new Set; s.clear()'
+      end
+
+      it "should disambiguate [] and []= for map" do
+        code = <<~RUBY
+          m = Map.new
+          m[:key] = "val"
+          x = m[:key]
+        RUBY
+        js = to_js(code)
+        js.must_include 'm.set("key", "val")'
+        js.must_include 'm.get("key")'
+      end
+
+      it "should disambiguate .key? for map" do
+        to_js('m = Map.new; m.key?(:k)').
+          must_equal 'let m = new Map; m.has("k")'
+      end
+
+      it "should disambiguate .any? and .empty? for hash" do
+        code = <<~RUBY
+          h = {}
+          h.any?
+          h.empty?
+        RUBY
+        js = to_js(code)
+        js.must_include 'Object.keys(h).length > 0'
+        js.must_include 'Object.keys(h).length === 0'
+      end
+    end
+
+    describe "scope management" do
+      it "should not leak types across method definitions" do
+        code = <<~RUBY
+          def foo
+            items = Set.new
+            items << "a"
+          end
+          def bar
+            items << "b"
+          end
+        RUBY
+        js = to_js(code)
+        js.must_include 'items.add("a")'  # foo knows it's a Set
+        js.must_include 'items.push("b")' # bar doesn't know, defaults to push
+      end
+
+      it "should not leak types across class definitions" do
+        code = <<~RUBY
+          class A
+            def foo
+              @items = Set.new
+            end
+          end
+          class B
+            def bar
+              @items << "x"
+            end
+          end
+        RUBY
+        js = to_js(code)
+        js.must_include 'this._items = new Set'
+        js.must_include 'this._items.push("x")' # B doesn't know type
+      end
+
+      it "should preserve types within same method" do
+        code = <<~RUBY
+          def foo
+            items = []
+            if true
+              items << 1
+            end
+            items << 2
+          end
+        RUBY
+        js = to_js(code)
+        js.must_include 'items.push(1)'
+        js.must_include 'items.push(2)'
+      end
+
+      it "should allow type reassignment within method" do
+        code = <<~RUBY
+          def foo
+            x = []
+            x << 1
+            x = Set.new
+            x << 2
+          end
+        RUBY
+        js = to_js(code)
+        js.must_include 'x.push(1)'
+        js.must_include 'x.add(2)'
+      end
+    end
+
+    describe "shadowarg handling" do
+      it "should preserve outer type when variable is shadowed" do
+        code = <<~RUBY
+          x = []
+          [1].each do |i; x|
+            x = Set.new
+            x << i
+          end
+          x << 2
+        RUBY
+        js = to_js(code)
+        js.must_include 'x.add(i)'  # inner x is Set
+        js.must_include 'x.push(2)' # outer x is still Array
+      end
+
+      it "should handle shadowarg for variable not previously defined" do
+        code = <<~RUBY
+          [1].each do |i; x|
+            x = Set.new
+            x << i
+          end
+        RUBY
+        js = to_js(code)
+        js.must_include 'x.add(i)'
+      end
+    end
+
+    describe "pragma override" do
+      it "should allow pragma to override inferred type" do
+        # Even though items is inferred as array, pragma forces set behavior
+        to_js('items = []; items << "x" # Pragma: set').
+          must_equal 'let items = []; items.add("x")'
+      end
+    end
+  end
+
   describe "pragma filter reorder" do
     it "should position pragma first in filter list" do
       require 'ruby2js/filter/require'

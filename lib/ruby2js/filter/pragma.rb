@@ -48,14 +48,93 @@ module Ruby2JS
         'extend' => :extend          # extend existing JS class (monkey patch)
       }.freeze
 
+      # Mapping from AST node types to inferred types
+      TYPE_INFERENCE = {
+        array: :array,
+        hash: :hash,
+        str: :string,
+        dstr: :string,   # interpolated string
+        xstr: :string,   # backtick string
+        int: :number,
+        float: :number,
+        regexp: :regexp,
+      }.freeze
+
       def initialize(*args)
         super
         @pragmas = {}
         @pragma_scanned_count = 0
+        @var_types = {}        # Track inferred variable types
+        @var_types_stack = []  # Stack for scope management
       end
 
       def options=(options)
         super
+      end
+
+      # Infer type from an AST node (literal or constructor call)
+      def infer_type(node)
+        return nil unless node.respond_to?(:type)
+
+        # Direct literal types
+        return TYPE_INFERENCE[node.type] if TYPE_INFERENCE.key?(node.type)
+
+        # Constructor calls: Set.new, Map.new, Array.new, Hash.new, String.new
+        if node.type == :send
+          receiver, method, *_args = node.children
+          if method == :new && receiver&.type == :const
+            case receiver.children.last
+            when :Set then return :set
+            when :Map then return :map
+            when :Array then return :array
+            when :Hash then return :hash
+            when :String then return :string
+            end
+          end
+        end
+
+        nil
+      end
+
+      # Track variable types from assignments
+      def on_lvasgn(node)
+        name, value = node.children
+        if value
+          inferred = infer_type(value)
+          @var_types[name] = inferred if inferred
+        end
+        super
+      end
+
+      # Track instance variable types from assignments
+      def on_ivasgn(node)
+        name, value = node.children
+        if value
+          inferred = infer_type(value)
+          @var_types[name] = inferred if inferred
+        end
+        super
+      end
+
+      # Get the inferred type for a variable reference
+      def var_type(node)
+        return nil unless node
+        case node.type
+        when :lvar, :ivar
+          @var_types[node.children.first]
+        else
+          nil
+        end
+      end
+
+      # Scope management: push/pop @var_types at scope boundaries
+      def push_var_types_scope
+        @var_types_stack.push @var_types
+        @var_types = {}
+      end
+
+      def pop_var_types_scope
+        @var_types = @var_types_stack.pop || {}
       end
 
       # Scan all comments for pragma patterns and build [source, line] => Set<pragma> map
@@ -182,12 +261,18 @@ module Ruby2JS
           return s(:hide)
         end
 
-        if node.children[0].nil? && pragma?(node, :function)
-          # Convert anonymous def to deff (forces function syntax)
-          # Don't re-process - just update type and process children
-          node.updated(:deff, process_all(node.children))
-        else
-          super
+        # New scope for local variable types
+        push_var_types_scope
+        begin
+          if node.children[0].nil? && pragma?(node, :function)
+            # Convert anonymous def to deff (forces function syntax)
+            # Don't re-process - just update type and process children
+            node.updated(:deff, process_all(node.children))
+          else
+            super
+          end
+        ensure
+          pop_var_types_scope
         end
       end
 
@@ -196,7 +281,14 @@ module Ruby2JS
         if pragma?(node, :skip)
           return s(:hide)
         end
-        super
+
+        # New scope for local variable types
+        push_var_types_scope
+        begin
+          super
+        ensure
+          pop_var_types_scope
+        end
       end
 
       # Handle alias with skip pragma
@@ -254,7 +346,24 @@ module Ruby2JS
           # Transform to :class_extend which signals this is extending an existing class
           return process node.updated(:class_extend)
         end
-        super
+
+        # New scope for local variable types
+        push_var_types_scope
+        begin
+          super
+        ensure
+          pop_var_types_scope
+        end
+      end
+
+      # Handle module definitions - new scope for variable types
+      def on_module(node)
+        push_var_types_scope
+        begin
+          super
+        ensure
+          pop_var_types_scope
+        end
       end
 
       # Handle array splat with guard pragma -> ensure array even if null
@@ -304,36 +413,56 @@ module Ruby2JS
 
         # .dup - Array: .slice(), Hash: {...obj}, String: str (no-op in JS)
         when :dup
-          if pragma?(node, :array)
+          # Check pragma first, then fall back to inferred type
+          type = if pragma?(node, :array) then :array
+                 elsif pragma?(node, :hash) then :hash
+                 elsif pragma?(node, :string) then :string
+                 else var_type(target)
+                 end
+
+          if type == :array
             # target.slice() - creates shallow copy of array
             return process s(:send, target, :slice)
-          elsif pragma?(node, :hash)
+          elsif type == :hash
             # {...target}
             return process s(:hash, s(:kwsplat, target))
-          elsif pragma?(node, :string)
+          elsif type == :string
             # No-op for strings in JS (they're immutable)
             return process target
           end
 
         # << - Array: push, Set: add, String: +=
         when :<<
-          if pragma?(node, :array) && args.length == 1
+          # Check pragma first, then fall back to inferred type
+          type = if pragma?(node, :array) then :array
+                 elsif pragma?(node, :set) then :set
+                 elsif pragma?(node, :string) then :string
+                 else var_type(target)
+                 end
+
+          if type == :array && args.length == 1
             # target.push(arg)
             return process s(:send, target, :push, args.first)
-          elsif pragma?(node, :set) && args.length == 1
+          elsif type == :set && args.length == 1
             # target.add(arg)
             return process s(:send, target, :add, args.first)
-          elsif pragma?(node, :string) && args.length == 1
+          elsif type == :string && args.length == 1
             # target += arg (returns new string)
             return process s(:op_asgn, target, :+, args.first)
           end
 
         # .include? - Array: includes(), String: includes(), Set: has(), Hash: 'key' in obj
         when :include?
-          if pragma?(node, :hash) && args.length == 1
+          # Check pragma first, then fall back to inferred type
+          type = if pragma?(node, :hash) then :hash
+                 elsif pragma?(node, :set) then :set
+                 else var_type(target)
+                 end
+
+          if type == :hash && args.length == 1
             # arg in target (uses :in? synthetic type)
             return process s(:in?, args.first, target)
-          elsif pragma?(node, :set) && args.length == 1
+          elsif type == :set && args.length == 1
             # target.has(arg) - Set membership check
             return process s(:send, target, :has, args.first)
           end
@@ -341,44 +470,84 @@ module Ruby2JS
 
         # .delete - Set/Map: delete (keep as method), Hash: delete keyword
         when :delete
-          if (pragma?(node, :set) || pragma?(node, :map)) && args.length == 1
-            # Transform to (:call (:attr target :delete) nil arg) which produces target.delete(arg)
-            # This structure isn't recognized by functions filter, so it won't be converted to delete keyword
-            return process s(:call, s(:attr, target, :delete), nil, *args)
+          # Only apply if this is a real :send node, not from :attr or :call processing
+          if node.type == :send
+            # Check pragma first, then fall back to inferred type
+            type = if pragma?(node, :set) then :set
+                   elsif pragma?(node, :map) then :map
+                   else var_type(target)
+                   end
+
+            if (type == :set || type == :map) && args.length == 1
+              # Transform to (:call (:attr target :delete) nil arg) which produces target.delete(arg)
+              # This structure isn't recognized by functions filter, so it won't be converted to delete keyword
+              # Don't re-process to avoid infinite loop - just return the transformed node
+              return s(:call, s(:attr, process(target), :delete), nil, *args.map { |a| process(a) })
+            end
           end
 
         # .clear - Set/Map: clear (keep as method), Array: length = 0
         when :clear
-          if (pragma?(node, :set) || pragma?(node, :map)) && args.length == 0
-            # Transform to (:call (:attr target :clear) nil) which produces target.clear()
-            # This structure isn't recognized by functions filter, so it won't be converted to length = 0
-            return process s(:call, s(:attr, target, :clear), nil)
+          # Only apply if this is a real :send node, not from :attr or :call processing
+          if node.type == :send
+            # Check pragma first, then fall back to inferred type
+            type = if pragma?(node, :set) then :set
+                   elsif pragma?(node, :map) then :map
+                   else var_type(target)
+                   end
+
+            if (type == :set || type == :map) && args.length == 0
+              # Transform to (:call (:attr target :clear) nil) which produces target.clear()
+              # This structure isn't recognized by functions filter, so it won't be converted to length = 0
+              # Don't re-process to avoid infinite loop - just return the transformed node
+              return s(:call, s(:attr, process(target), :clear), nil)
+            end
           end
 
         # [] - Map: get (keep as method call), Hash/Array: bracket access
         when :[]
-          if pragma?(node, :map) && args.length == 1
+          # Check pragma first, then fall back to inferred type
+          type = if pragma?(node, :map) then :map
+                 else var_type(target)
+                 end
+
+          if type == :map && args.length == 1
             # target.get(key)
             return process s(:send, target, :get, args.first)
           end
 
         # []= - Map: set (keep as method call), Hash/Array: bracket assignment
         when :[]=
-          if pragma?(node, :map) && args.length == 2
+          # Check pragma first, then fall back to inferred type
+          type = if pragma?(node, :map) then :map
+                 else var_type(target)
+                 end
+
+          if type == :map && args.length == 2
             # target.set(key, value)
             return process s(:send, target, :set, *args)
           end
 
         # .key? - Map: has, Hash: 'key' in obj
         when :key?
-          if pragma?(node, :map) && args.length == 1
+          # Check pragma first, then fall back to inferred type
+          type = if pragma?(node, :map) then :map
+                 else var_type(target)
+                 end
+
+          if type == :map && args.length == 1
             # target.has(key)
             return process s(:send, target, :has, args.first)
           end
 
         # .any? - Hash: Object.keys(hash).length > 0 (without block)
         when :any?
-          if pragma?(node, :hash) && args.empty?
+          # Check pragma first, then fall back to inferred type
+          type = if pragma?(node, :hash) then :hash
+                 else var_type(target)
+                 end
+
+          if type == :hash && args.empty?
             # Object.keys(target).length > 0
             return process s(:send,
               s(:attr, s(:send, s(:const, nil, :Object), :keys, target), :length),
@@ -387,7 +556,12 @@ module Ruby2JS
 
         # .empty? - Hash: Object.keys(hash).length === 0
         when :empty?
-          if pragma?(node, :hash)
+          # Check pragma first, then fall back to inferred type
+          type = if pragma?(node, :hash) then :hash
+                 else var_type(target)
+                 end
+
+          if type == :hash
             # Object.keys(target).length === 0
             return process s(:send,
               s(:attr, s(:send, s(:const, nil, :Object), :keys, target), :length),
@@ -424,16 +598,33 @@ module Ruby2JS
       # hash.each { |k,v| } -> Object.entries(hash).forEach(([k,v]) => {})
       # hash.map { |k,v| } -> Object.entries(hash).map(([k,v]) => {})
       # hash.select { |k,v| } -> Object.fromEntries(Object.entries(hash).filter(([k,v]) => {}))
+      #
+      # Also handles shadowargs - block-local variables that shadow outer scope
+      # These create JS-scoped let declarations, so we preserve outer types
       def on_block(node)
         call, args, body = node.children
 
-        if pragma?(node, :function)
-          # Transform to use :deff which forces function syntax
-          function = node.updated(:deff, [nil, args, body])
-          return process s(call.type, *call.children, function)
+        # Check for shadowargs (block-local variables that shadow outer scope)
+        shadowargs = args.children.select { |arg| arg.type == :shadowarg }
+        saved_types = {}
+
+        if shadowargs.any?
+          # Save and clear types for shadowed variables
+          shadowargs.each do |arg|
+            name = arg.children.first
+            saved_types[name] = @var_types[name] if @var_types.key?(name)
+            @var_types.delete(name)
+          end
         end
 
-        if pragma?(node, :entries) && call.type == :send
+        begin
+          if pragma?(node, :function)
+            # Transform to use :deff which forces function syntax
+            function = node.updated(:deff, [nil, args, body])
+            return process s(call.type, *call.children, function)
+          end
+
+          if pragma?(node, :entries) && call.type == :send
           target, method = call.children[0], call.children[1]
 
           if [:each, :each_pair].include?(method) && target
@@ -503,6 +694,19 @@ module Ruby2JS
         end
 
         super
+        ensure
+          # Restore types for shadowed variables
+          if shadowargs.any?
+            shadowargs.each do |arg|
+              name = arg.children.first
+              if saved_types.key?(name)
+                @var_types[name] = saved_types[name]
+              else
+                @var_types.delete(name)
+              end
+            end
+          end
+        end
       end
     end
 
