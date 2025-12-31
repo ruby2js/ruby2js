@@ -12,7 +12,7 @@ require 'ruby2js'
 require 'ruby2js/filter/rails/model'
 require 'ruby2js/filter/rails/controller'
 require 'ruby2js/filter/rails/routes'
-require 'ruby2js/filter/rails/schema'
+require 'ruby2js/filter/rails/migration'
 require 'ruby2js/filter/rails/seeds'
 require 'ruby2js/filter/functions'
 require 'ruby2js/filter/esm'
@@ -45,7 +45,7 @@ class PhlexBlogBuilder
       Ruby2JS::Filter::Rails::Model,
       Ruby2JS::Filter::Rails::Controller,
       Ruby2JS::Filter::Rails::Routes,
-      Ruby2JS::Filter::Rails::Schema,
+      Ruby2JS::Filter::Rails::Migration,
       Ruby2JS::Filter::Rails::Seeds,
       Ruby2JS::Filter::Functions,
       Ruby2JS::Filter::ESM,

@@ -1237,13 +1237,13 @@ class SelfhostBuilder
 
       import { Application, Router } from '../lib/rails.js';
       import '../config/routes.js';
-      import { Schema } from '../db/schema.js';
+      import { migrations } from '../db/migrate/index.js';
       import { Seeds } from '../db/seeds.js';
       import { layout } from '../app/views/layouts/application.js';
 
       // Configure application
       Application.configure({
-        schema: Schema,
+        migrations: migrations,
         seeds: Seeds,
         layout: layout
       });
