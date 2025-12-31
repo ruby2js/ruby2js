@@ -165,6 +165,18 @@ export function getDatabase() {
   return db;
 }
 
+// Query interface for rails_base.js migration system
+export async function query(sql, params = []) {
+  const result = await db.query(sql, params);
+  return result.rows;
+}
+
+// Execute interface for rails_base.js migration system
+export async function execute(sql, params = []) {
+  const result = await db.query(sql, params);
+  return { changes: result.affectedRows || 0 };
+}
+
 // Close the database connection
 export async function closeDatabase() {
   if (db) {

@@ -149,6 +149,25 @@ export function getDatabase() {
   return client;
 }
 
+// Query interface for rails_base.js migration system
+export async function query(sql, params = []) {
+  const result = await client.execute({ sql, args: params });
+  return result.rows.map(row => {
+    // Convert row to plain object
+    const obj = {};
+    for (const [key, value] of Object.entries(row)) {
+      obj[key] = value;
+    }
+    return obj;
+  });
+}
+
+// Execute interface for rails_base.js migration system
+export async function execute(sql, params = []) {
+  const result = await client.execute({ sql, args: params });
+  return { changes: result.rowsAffected || 0 };
+}
+
 // Close the connection
 export async function closeDatabase() {
   if (client) {

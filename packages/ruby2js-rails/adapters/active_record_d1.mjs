@@ -125,6 +125,20 @@ export function getDatabase() {
   return db;
 }
 
+// Query interface for rails_base.js migration system
+export async function query(sql, params = []) {
+  const stmt = db.prepare(sql);
+  const result = params.length > 0 ? await stmt.bind(...params).all() : await stmt.all();
+  return result.results;
+}
+
+// Execute interface for rails_base.js migration system
+export async function execute(sql, params = []) {
+  const stmt = db.prepare(sql);
+  const result = params.length > 0 ? await stmt.bind(...params).run() : await stmt.run();
+  return { changes: result.meta?.changes || 0 };
+}
+
 // D1-specific ActiveRecord implementation
 export class ActiveRecord extends ActiveRecordBase {
   // --- Class Methods (finders) ---

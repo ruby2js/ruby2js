@@ -85,6 +85,46 @@ export function getDatabase() {
   return db;
 }
 
+// Query interface for rails_base.js migration system
+// For Dexie, we simulate SQL queries for schema_migrations table
+export async function query(sql, params = []) {
+  // Only handle schema_migrations queries
+  if (sql.includes('schema_migrations')) {
+    try {
+      const table = db.table('schema_migrations');
+      const results = await table.toArray();
+      return results;
+    } catch (e) {
+      // Table doesn't exist yet
+      throw e;
+    }
+  }
+  return [];
+}
+
+// Execute interface for rails_base.js migration system
+// For Dexie, we simulate SQL executes for schema_migrations table
+export async function execute(sql, params = []) {
+  if (sql.includes('CREATE TABLE') && sql.includes('schema_migrations')) {
+    // Dexie handles schema via version stores, but we need a runtime table
+    // Add schema_migrations to the schema if not present
+    if (!tableSchemas['schema_migrations']) {
+      tableSchemas['schema_migrations'] = 'version';
+    }
+    return { changes: 0 };
+  }
+  if (sql.includes('INSERT INTO schema_migrations')) {
+    const version = params[0];
+    try {
+      await db.table('schema_migrations').add({ version });
+    } catch (e) {
+      // May fail if table not ready, ignore
+    }
+    return { changes: 1 };
+  }
+  return { changes: 0 };
+}
+
 // Dexie-specific ActiveRecord implementation
 export class ActiveRecord extends ActiveRecordBase {
   // Get the Dexie table for this model

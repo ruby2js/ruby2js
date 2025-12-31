@@ -149,6 +149,18 @@ export function getDatabase() {
   return sql;
 }
 
+// Query interface for rails_base.js migration system
+export async function query(sqlString, params = []) {
+  const rows = await sql(sqlString, params);
+  return rows;
+}
+
+// Execute interface for rails_base.js migration system
+export async function execute(sqlString, params = []) {
+  await sql(sqlString, params);
+  return { changes: 0 }; // Neon doesn't return rowCount easily
+}
+
 // Close the connection (no-op for HTTP-based Neon)
 export async function closeDatabase() {
   sql = null;

@@ -171,6 +171,18 @@ export function getDatabase() {
   return pool;
 }
 
+// Query interface for rails_base.js migration system
+export async function query(sql, params = []) {
+  const result = await pool.query(sql, params);
+  return result.rows;
+}
+
+// Execute interface for rails_base.js migration system
+export async function execute(sql, params = []) {
+  const result = await pool.query(sql, params);
+  return { changes: result.rowCount || 0 };
+}
+
 // Close the connection pool (for graceful shutdown)
 export async function closeDatabase() {
   if (pool) {

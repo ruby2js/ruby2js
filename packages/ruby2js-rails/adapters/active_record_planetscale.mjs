@@ -158,6 +158,18 @@ export function getDatabase() {
   return connection;
 }
 
+// Query interface for rails_base.js migration system
+export async function query(sql, params = []) {
+  const result = await connection.execute(sql, params);
+  return result.rows;
+}
+
+// Execute interface for rails_base.js migration system
+export async function execute(sql, params = []) {
+  const result = await connection.execute(sql, params);
+  return { changes: result.rowsAffected || 0 };
+}
+
 // Close the connection (no-op for HTTP-based PlanetScale)
 export async function closeDatabase() {
   connection = null;

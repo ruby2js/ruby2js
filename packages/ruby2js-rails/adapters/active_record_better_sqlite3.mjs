@@ -125,6 +125,18 @@ export function getDatabase() {
   return db;
 }
 
+// Query interface for rails_base.js migration system
+export async function query(sql, params = []) {
+  const stmt = db.prepare(sql);
+  return stmt.all(...params);
+}
+
+// Execute interface for rails_base.js migration system
+export async function execute(sql, params = []) {
+  const stmt = db.prepare(sql);
+  return stmt.run(...params);
+}
+
 // better-sqlite3-specific ActiveRecord implementation
 export class ActiveRecord extends ActiveRecordBase {
   // --- Class Methods (finders) ---
