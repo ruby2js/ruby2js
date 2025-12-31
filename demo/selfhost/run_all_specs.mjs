@@ -34,20 +34,22 @@ async function ensurePrismInitialized() {
   }
 }
 
-// Map spec names to filter file names (when they differ)
-const SPEC_TO_FILTER_MAP = {
-  'camelcase_spec.rb': 'camelCase.js',
-  'cjs_spec.rb': 'cjs.js',
-  'tagged_templates_spec.rb': 'tagged_templates.js',
-  // Rails filters are in a subdirectory
-  'rails_model_spec.rb': 'rails/model.js',
-  'rails_controller_spec.rb': 'rails/controller.js',
-  'rails_routes_spec.rb': 'rails/routes.js',
-  'rails_schema_spec.rb': 'rails/schema.js',
-  'rails_logger_spec.rb': 'rails/logger.js',
-  'rails_seeds_spec.rb': 'rails/seeds.js',
-  'rails_helpers_spec.rb': 'rails/helpers.js',
+// Exceptions to the naming convention (spec name => filter file)
+// Convention: X_spec.rb => X.js, rails_X_spec.rb => rails/X.js
+const FILTER_NAME_EXCEPTIONS = {
+  'camelcase_spec.rb': 'camelCase.js'
 };
+
+// Derive filter file path from spec name
+function filterFileForSpec(specName) {
+  if (FILTER_NAME_EXCEPTIONS[specName]) {
+    return FILTER_NAME_EXCEPTIONS[specName];
+  }
+  let base = specName.replace('_spec.rb', '');
+  // rails_X => rails/X
+  base = base.replace(/^rails_/, 'rails/');
+  return `${base}.js`;
+}
 
 // Load transpiled filters on demand
 const loadedFilters = new Set();
@@ -56,8 +58,7 @@ const loadedFilters = new Set();
 async function loadReadyFilters() {
   const readySpecs = manifest.ready || [];
   for (const specName of readySpecs) {
-    const baseName = specName.replace('_spec.rb', '');
-    const filterFile = SPEC_TO_FILTER_MAP[specName] || `${baseName}.js`;
+    const filterFile = filterFileForSpec(specName);
     if (loadedFilters.has(filterFile)) continue;
     try {
       await import(`./filters/${filterFile}?t=${Date.now()}`);
@@ -69,10 +70,10 @@ async function loadReadyFilters() {
 }
 
 async function loadFilterForSpec(specName) {
-  // Derive filter name from spec name: functions_spec.rb -> functions.js
-  const baseName = specName.replace('_spec.rb', '');
-  const filterFile = SPEC_TO_FILTER_MAP[specName] || `${baseName}.js`;
+  const filterFile = filterFileForSpec(specName);
   const filterPath = `./filters/${filterFile}`;
+  // Extract base name for filter lookup (e.g., 'rails/model.js' -> 'rails/model')
+  const baseName = filterFile.replace('.js', '');
 
   // Normalize name for comparison (remove underscores, lowercase)
   const normalize = s => s.toLowerCase().replace(/_/g, '');

@@ -53,21 +53,18 @@ FILTER_FILTERS = [
   Ruby2JS::Filter::ESM
 ]
 
-# Map spec names to filter names
-SPEC_TO_FILTER = {
-  'camelcase_spec.rb' => 'camelCase',
-  'cjs_spec.rb' => 'cjs',
-  'rails_logger_spec.rb' => 'rails/logger',
-  'rails_model_spec.rb' => 'rails/model',
-  'rails_controller_spec.rb' => 'rails/controller',
-  'rails_routes_spec.rb' => 'rails/routes',
-  'rails_migration_spec.rb' => 'rails/migration',
-  'rails_seeds_spec.rb' => 'rails/seeds',
-  'rails_helpers_spec.rb' => 'rails/helpers'
-}
+# Exceptions to the naming convention (spec name => filter name)
+# Convention: X_spec.rb => X, rails_X_spec.rb => rails/X
+FILTER_NAME_EXCEPTIONS = {
+  'camelcase_spec.rb' => 'camelCase'
+}.freeze
 
 def filter_for_spec(spec_name)
-  SPEC_TO_FILTER[spec_name] || spec_name.sub('_spec.rb', '')
+  return FILTER_NAME_EXCEPTIONS[spec_name] if FILTER_NAME_EXCEPTIONS[spec_name]
+
+  base = spec_name.sub('_spec.rb', '')
+  # rails_X => rails/X
+  base.sub(/^rails_/, 'rails/')
 end
 
 def transpile_spec(spec_file, output_path)
