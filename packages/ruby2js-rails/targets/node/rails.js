@@ -5,10 +5,13 @@
 import http from 'node:http';
 import { parse as parseUrl } from 'node:url';
 import { StringDecoder } from 'node:string_decoder';
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 
 import {
   Router as RouterServer,
   Application as ApplicationServer,
+  MIME_TYPES,
   createContext,
   createFlash,
   truncate,
@@ -26,6 +29,40 @@ export { createContext, createFlash, truncate, pluralize, dom_id, navigate, subm
 
 // Router with Node.js-specific dispatch (uses req/res instead of Fetch API)
 export class Router extends RouterServer {
+  // Try to serve a static file, returns true if served
+  // Node.js uses req/res objects, so we need a separate implementation
+  static async serveStatic(req, res) {
+    const parsedUrl = parseUrl(req.url, true);
+    const path = parsedUrl.pathname;
+
+    // Security: prevent directory traversal
+    if (path.includes('..')) {
+      return false;
+    }
+
+    // Only serve files with extensions (not routes like /articles/1)
+    const lastDot = path.lastIndexOf('.');
+    if (lastDot === -1) {
+      return false;
+    }
+
+    const ext = path.slice(lastDot);
+    const contentType = MIME_TYPES[ext];
+    if (!contentType) {
+      return false;
+    }
+
+    try {
+      const content = await readFile(join(process.cwd(), path));
+      res.writeHead(200, { 'Content-Type': contentType });
+      res.end(content);
+      return true;
+    } catch (err) {
+      // File not found, let routing handle it
+      return false;
+    }
+  }
+
   // Create context from Node.js request (different cookie access than Fetch API)
   static createContextNode(req, params) {
     const parsedUrl = parseUrl(req.url, true);
@@ -48,6 +85,11 @@ export class Router extends RouterServer {
   // Dispatch an HTTP request to the appropriate controller action
   // Node.js version using req/res objects
   static async dispatch(req, res) {
+    // Try static files first (CSS, JS, images, etc.)
+    if (await this.serveStatic(req, res)) {
+      return;
+    }
+
     const parsedUrl = parseUrl(req.url, true);
     const path = parsedUrl.pathname;
     let method = this.normalizeMethodNode(req, parsedUrl);

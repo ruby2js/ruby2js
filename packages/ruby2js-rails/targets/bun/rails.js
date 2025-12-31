@@ -1,6 +1,8 @@
 // Ruby2JS-on-Rails Micro Framework - Bun Target
 // Extends server module with Bun.serve() startup
 
+import { join } from 'path';
+
 import {
   Router as RouterServer,
   Application as ApplicationServer,
@@ -19,8 +21,26 @@ import {
 // Re-export everything from server module
 export { createContext, createFlash, truncate, pluralize, dom_id, navigate, submitForm, formData, handleFormResult, setupFormHandlers };
 
-// Router - use server implementation directly
-export class Router extends RouterServer {}
+// Router with Bun-specific static file serving
+export class Router extends RouterServer {
+  // Override dispatch to serve static files first
+  static async dispatch(req) {
+    const fileInfo = this.getStaticFileInfo(req);
+    if (fileInfo) {
+      try {
+        const file = Bun.file(join(process.cwd(), fileInfo.path));
+        if (await file.exists()) {
+          return new Response(file, {
+            headers: { 'Content-Type': fileInfo.contentType }
+          });
+        }
+      } catch (err) {
+        // File not found, fall through to routing
+      }
+    }
+    return super.dispatch(req);
+  }
+}
 
 // Application with Bun-specific startup
 export class Application extends ApplicationServer {

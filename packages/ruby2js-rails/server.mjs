@@ -18,8 +18,8 @@
 import { join } from 'path';
 import { pathToFileURL } from 'url';
 
-// Import Application from the app's dist directory (cwd-relative)
-const routesPath = join(process.cwd(), 'dist/config/routes.js');
+// Import Application from the current directory (npm scripts run from dist/)
+const routesPath = join(process.cwd(), 'config/routes.js');
 const { Application } = await import(pathToFileURL(routesPath).href);
 
 const port = process.env.PORT || 3000;

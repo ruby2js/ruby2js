@@ -84,6 +84,8 @@ module Ruby2JS
 
         def start_server(options)
           ENV["PORT"] = options[:port].to_s
+          # Pass RAILS_ENV through to NODE_ENV for Node.js (RAILS_ENV takes precedence)
+          ENV["NODE_ENV"] = ENV["RAILS_ENV"] if ENV["RAILS_ENV"]
 
           # Auto-detect runtime from database.yml if not specified
           runtime = options[:runtime]

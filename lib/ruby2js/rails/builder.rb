@@ -901,6 +901,13 @@ class SelfhostBuilder
       end
     end
 
+    # Detect CSS framework for correct stylesheet link
+    css_link = ''
+    tailwind_src = File.join(DEMO_ROOT, 'app/assets/tailwind/application.css')
+    if File.exist?(tailwind_src)
+      css_link = '<link href="/app/assets/builds/tailwind.css" rel="stylesheet">'
+    end
+
     # Generate a minimal layout for server-side rendering
     # Rails-specific helpers (csrf_meta_tags, etc.) don't make sense in JS context
     # Layout receives context for access to contentFor, flash, etc.
@@ -915,7 +922,7 @@ class SelfhostBuilder
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>\${title}</title>
-        <link href="/styles.css" rel="stylesheet">
+        #{css_link}
       </head>
       <body>
         <main class="container mx-auto px-4 py-8">
@@ -1073,7 +1080,21 @@ class SelfhostBuilder
     # Create output directory for built CSS
     builds_dir = File.join(@dist_dir, 'app/assets/builds')
     FileUtils.mkdir_p(builds_dir)
-    puts("  (Run 'npx tailwindcss -i app/assets/tailwind/application.css -o app/assets/builds/tailwind.css' in dist/ to build)")
+
+    # Run Tailwind CSS build (only if tailwindcss is installed)
+    tailwind_bin = File.join(@dist_dir, 'node_modules/.bin/tailwindcss')
+    if File.exist?(tailwind_bin)
+      puts("  Building CSS...")
+      Dir.chdir(@dist_dir) do
+        system('npx', 'tailwindcss',
+               '-i', 'app/assets/tailwind/application.css',
+               '-o', 'app/assets/builds/tailwind.css',
+               '--minify')
+      end
+      puts("  -> app/assets/builds/tailwind.css")
+    else
+      puts("  (Run 'npm install' in dist/, then 'npx tailwindcss -i app/assets/tailwind/application.css -o app/assets/builds/tailwind.css')")
+    end
   end
 
   def transpile_routes_files()

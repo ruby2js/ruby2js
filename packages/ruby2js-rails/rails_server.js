@@ -19,6 +19,25 @@ import {
 // Re-export base helpers
 export { createFlash, truncate, pluralize, dom_id, navigate, submitForm, formData, handleFormResult, setupFormHandlers };
 
+// MIME types for static file serving (shared across all server targets)
+export const MIME_TYPES = {
+  '.html': 'text/html',
+  '.js': 'text/javascript',
+  '.mjs': 'text/javascript',
+  '.css': 'text/css',
+  '.json': 'application/json',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+  '.ttf': 'font/ttf',
+  '.map': 'application/json'
+};
+
 // Create a fresh request context (like Rails' view context)
 // Each request gets its own context with isolated state
 // For Fetch API requests (Bun, Deno, Cloudflare, rails_server.js)
@@ -48,6 +67,32 @@ export function createContext(req, params = {}) {
 
 // Server Router with HTTP dispatch
 export class Router extends RouterBase {
+  // Check if request is for a static file. Returns { path, contentType } or null.
+  // Used by runtime-specific targets to serve static files.
+  static getStaticFileInfo(req) {
+    const url = new URL(req.url);
+    const path = url.pathname;
+
+    // Security: prevent directory traversal
+    if (path.includes('..')) {
+      return null;
+    }
+
+    // Only serve files with extensions (not routes like /articles/1)
+    const lastDot = path.lastIndexOf('.');
+    if (lastDot === -1) {
+      return null;
+    }
+
+    const ext = path.slice(lastDot);
+    const contentType = MIME_TYPES[ext];
+    if (!contentType) {
+      return null;
+    }
+
+    return { path, contentType };
+  }
+
   // Dispatch a Fetch API request to the appropriate controller action
   // Returns a Response object
   static async dispatch(req) {

@@ -1,6 +1,8 @@
 // Ruby2JS-on-Rails Micro Framework - Deno Target
 // Extends server module with Deno.serve() startup
 
+import { join } from 'node:path';
+
 import {
   Router as RouterServer,
   Application as ApplicationServer,
@@ -19,8 +21,24 @@ import {
 // Re-export everything from server module
 export { createContext, createFlash, truncate, pluralize, dom_id, navigate, submitForm, formData, handleFormResult, setupFormHandlers };
 
-// Router - use server implementation directly
-export class Router extends RouterServer {}
+// Router with Deno-specific static file serving
+export class Router extends RouterServer {
+  // Override dispatch to serve static files first
+  static async dispatch(req) {
+    const fileInfo = this.getStaticFileInfo(req);
+    if (fileInfo) {
+      try {
+        const content = await Deno.readFile(join(Deno.cwd(), fileInfo.path));
+        return new Response(content, {
+          headers: { 'Content-Type': fileInfo.contentType }
+        });
+      } catch (err) {
+        // File not found, fall through to routing
+      }
+    }
+    return super.dispatch(req);
+  }
+}
 
 // Application with Deno-specific startup
 export class Application extends ApplicationServer {
