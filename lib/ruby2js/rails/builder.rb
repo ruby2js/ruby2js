@@ -537,7 +537,7 @@ class SelfhostBuilder
     # Transpile views (ERB templates and layout)
     puts("Views:")
     self.transpile_erb_directory()
-    self.transpile_layout() if @target == 'server'
+    self.transpile_layout() if @target != 'browser'
     puts("")
 
     # Transpile helpers
@@ -808,7 +808,7 @@ class SelfhostBuilder
     end
 
     # Copy server module (needed by node, bun, deno, cloudflare targets)
-    if @target == 'server'
+    if @target != 'browser'
       server_src = File.join(package_dir, 'rails_server.js')
       if File.exist?(server_src)
         FileUtils.cp(server_src, File.join(lib_dest, 'rails_server.js'))
