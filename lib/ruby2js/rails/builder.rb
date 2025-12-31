@@ -654,14 +654,29 @@ class SelfhostBuilder
 
     # Check for npm-installed package first, then packages directory, finally vendor (legacy)
     npm_adapter_dir = File.join(DEMO_ROOT, 'node_modules/ruby2js-rails/adapters')
+    npm_dist_dir = File.join(DEMO_ROOT, 'node_modules/ruby2js-rails/dist/lib')
     pkg_adapter_dir = File.join(DEMO_ROOT, '../../packages/ruby2js-rails/adapters')
     vendor_adapter_dir = File.join(DEMO_ROOT, 'vendor/ruby2js/adapters')
     adapter_dir = if File.exist?(npm_adapter_dir)
       npm_adapter_dir
+    elsif File.exist?(npm_dist_dir)
+      npm_dist_dir
     elsif File.exist?(pkg_adapter_dir)
       pkg_adapter_dir
-    else
+    elsif File.exist?(vendor_adapter_dir)
       vendor_adapter_dir
+    else
+      raise <<~ERROR
+        Could not find ruby2js-rails adapters directory.
+        Looked in:
+          - #{npm_adapter_dir}
+          - #{npm_dist_dir}
+          - #{pkg_adapter_dir}
+          - #{vendor_adapter_dir}
+
+        Try running: npm install ruby2js-rails
+        Or ensure the ruby2js-rails package is properly installed.
+      ERROR
     end
     lib_dest = File.join(@dist_dir, 'lib')
     FileUtils.mkdir_p(lib_dest)
