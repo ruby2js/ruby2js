@@ -108,18 +108,12 @@ export class Application extends ApplicationServer {
       url: process.env.DATABASE_URL,
     });
 
-    // Run schema migrations
-    if (this.schema && this.schema.create_tables) {
-      await this.schema.create_tables();
-    }
+    // Run migrations
+    await this.runMigrations();
 
-    // Run seeds if present (typically only in development)
-    if (this.seeds && process.env.RUN_SEEDS) {
-      if (this.seeds.run.constructor.name === 'AsyncFunction') {
-        await this.seeds.run();
-      } else {
-        this.seeds.run();
-      }
+    // Run seeds if present (seeds check internally if data already exists)
+    if (this.seeds) {
+      await this.seeds.run();
     }
 
     this._initialized = true;

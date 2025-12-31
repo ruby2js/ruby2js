@@ -132,19 +132,71 @@ export class ApplicationBase {
     // Initialize database connection
     await adapter.initDatabase(options);
 
-    // Run schema migrations
-    if (this.schema && this.schema.create_tables) {
-      this.schema.create_tables();
+    // Run migrations and check if this is a fresh database
+    const { wasFresh } = await this.runMigrations();
+
+    // Run seeds only on fresh database (seeds also guard themselves)
+    if (this.seeds && wasFresh) {
+      await this.seeds.run();
+    }
+  }
+
+  // Run pending migrations and track them in schema_migrations
+  // For SQL-based databases, check schema_migrations table
+  // Returns { ran: number, wasFresh: boolean }
+  static async runMigrations() {
+    // Fall back to schema if no migrations (legacy support)
+    if (!this.migrations || this.migrations.length === 0) {
+      if (this.schema && this.schema.create_tables) {
+        await this.schema.create_tables();
+      }
+      return { ran: 0, wasFresh: true };
     }
 
-    // Run seeds if present
-    if (this.seeds) {
-      if (this.seeds.run.constructor.name === 'AsyncFunction') {
-        await this.seeds.run();
-      } else {
-        this.seeds.run();
+    const adapter = this.activeRecordModule;
+    if (!adapter) return { ran: 0, wasFresh: true };
+
+    // Get already-run migrations from schema_migrations table
+    let appliedVersions = new Set();
+    try {
+      const applied = await adapter.query('SELECT version FROM schema_migrations');
+      appliedVersions = new Set(applied.map(r => r.version));
+    } catch (e) {
+      // Table might not exist on first run - create it
+      try {
+        await adapter.execute('CREATE TABLE IF NOT EXISTS schema_migrations (version TEXT PRIMARY KEY)');
+      } catch (createErr) {
+        console.log('First database initialization');
       }
     }
+
+    // Track if database was fresh (no prior migrations)
+    const wasFresh = appliedVersions.size === 0;
+
+    // Run pending migrations in order
+    let ran = 0;
+    for (const migration of this.migrations) {
+      if (appliedVersions.has(migration.version)) {
+        continue;
+      }
+
+      console.log(`Running migration ${migration.version}...`);
+      try {
+        await migration.up();
+        // Record that this migration ran
+        await adapter.execute('INSERT INTO schema_migrations (version) VALUES (?)', [migration.version]);
+        ran++;
+      } catch (e) {
+        console.error(`Migration ${migration.version} failed:`, e);
+        throw e;
+      }
+    }
+
+    if (ran > 0) {
+      console.log(`Ran ${ran} migration(s)`);
+    }
+
+    return { ran, wasFresh };
   }
 }
 

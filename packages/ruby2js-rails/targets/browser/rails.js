@@ -292,28 +292,24 @@ export class Application extends ApplicationBase {
     // Make DB available globally for sql.js compatibility
     window.DB = adapter.getDatabase();
 
-    // Run migrations
-    const migrationsRun = await this.runMigrations(adapter);
+    // Run migrations and check if this is a fresh database
+    const { wasFresh } = await this.runMigrations(adapter);
 
-    // Run seeds if present and migrations were run (fresh database)
-    if (this.seeds && migrationsRun > 0) {
-      console.log('Fresh database, running seeds...');
-      if (this.seeds.run.constructor.name === 'AsyncFunction') {
-        await this.seeds.run();
-      } else {
-        this.seeds.run();
-      }
+    // Run seeds only on fresh database (seeds also guard themselves)
+    if (this.seeds && wasFresh) {
+      await this.seeds.run();
     }
   }
 
   // Run pending migrations and track them in schema_migrations
+  // Returns { ran: number, wasFresh: boolean }
   static async runMigrations(adapter) {
     if (!this.migrations || this.migrations.length === 0) {
       // Fall back to schema if no migrations
       if (this.schema && this.schema.create_tables) {
         this.schema.create_tables();
       }
-      return 0;
+      return { ran: 0, wasFresh: true };
     }
 
     // Get already-run migrations
@@ -328,6 +324,9 @@ export class Application extends ApplicationBase {
       // Table might not exist or be empty on first run
       console.log('First database initialization');
     }
+
+    // Track if database was fresh (no prior migrations)
+    const wasFresh = appliedVersions.size === 0;
 
     // Run pending migrations in order
     let ran = 0;
@@ -352,7 +351,7 @@ export class Application extends ApplicationBase {
       console.log(`Ran ${ran} migration(s)`);
     }
 
-    return ran;
+    return { ran, wasFresh };
   }
 
   // Start the application

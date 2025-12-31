@@ -22,8 +22,8 @@ rails generate scaffold Article title:string body:text
 # Generate Comment scaffold (will be nested under articles)
 rails generate scaffold Comment article:references commenter:string body:text
 
-# Run migrations
-rails db:migrate
+# Prepare database (migrate + seed)
+rails db:prepare
 
 # Add ruby2js gem from GitHub
 bundle add ruby2js --github ruby2js/ruby2js
@@ -130,6 +130,8 @@ DATABASE
 # Create seeds with sample articles and comments
 cat > db/seeds.rb << 'SEEDS'
 # Sample articles and comments for the blog demo
+# Seeds are idempotent - only run if database is empty
+return if Article.count > 0
 
 article1 = Article.create!(
   title: "Getting Started with Rails",
@@ -177,7 +179,6 @@ echo "  bundle exec ruby2js server   # Node.js with SQLite"
 echo ""
 echo "To run with Rails:"
 echo "  cd $APP_NAME"
-echo "  RAILS_ENV=production bin/rails db:migrate"
-echo "  RAILS_ENV=production bin/dev"
-echo "  # or: bin/rails server -e production"
+echo "  RAILS_ENV=production bin/rails db:prepare"
+echo "  bin/rails server -e production"
 echo ""
