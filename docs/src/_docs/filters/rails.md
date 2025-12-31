@@ -6,7 +6,7 @@ category: rails
 next_page_order: 26
 ---
 
-The **Rails** filter transforms idiomatic Rails code into JavaScript, enabling Rails applications to run in browsers and JavaScript runtimes. It handles models, controllers, routes, database schema, seeds, and logging.
+The **Rails** filter transforms idiomatic Rails code into JavaScript, enabling Rails applications to run in browsers and JavaScript runtimes. It handles models, controllers, routes, migrations, seeds, and logging.
 
 {% rendercontent "docs/note", title: "Meta-Filter" %}
 The `rails` filter loads all Rails sub-filters together. For most use cases, this is what you want:
@@ -27,7 +27,7 @@ app/models/article.rb     →  dist/models/article.js
 app/controllers/...       →  dist/controllers/...
 app/views/...html.erb     →  dist/views/...js
 config/routes.rb          →  dist/routes.js
-db/schema.rb              →  dist/schema.js
+db/migrate/*.rb           →  dist/db/migrate/*.js
 ```
 
 See the [Ruby2JS on Rails](https://intertwingly.net/blog/2025/12/21/Ruby2JS-on-Rails.html) blog post for a complete walkthrough.
@@ -276,57 +276,65 @@ export const Routes = {
 
 **Supported options:** `:only`, `:except`, `:path`, `:as`
 
-## Schema
+## Migration
 
-Transforms `db/schema.rb` to JavaScript for IndexedDB or SQLite setup.
+Transforms Rails migration files (`db/migrate/*.rb`) to JavaScript modules. Each migration becomes a module with an async `up()` function that creates or modifies database tables.
 
 ```ruby
-ActiveRecord::Schema.define(version: 2024_01_15_000000) do
-  create_table "articles", force: :cascade do |t|
-    t.string "title", null: false
-    t.text "body"
-    t.string "status", default: "draft"
-    t.timestamps
-  end
+# db/migrate/20241231120000_create_articles.rb
+class CreateArticles < ActiveRecord::Migration[7.1]
+  def change
+    create_table :articles do |t|
+      t.string :title, null: false
+      t.text :body
+      t.string :status, default: "draft"
+      t.timestamps
+    end
 
-  create_table "comments", force: :cascade do |t|
-    t.references "article", null: false, foreign_key: true
-    t.text "body"
-    t.timestamps
+    add_index :articles, :status
   end
 end
 ```
 
 ```javascript
-export const Schema = {
-  version: 2024_01_15_000000,
+import { createTable, addIndex } from "../../lib/active_record.mjs";
 
-  tables: {
-    articles: {
-      columns: {
-        id: {type: "integer", primaryKey: true, autoIncrement: true},
-        title: {type: "string", null: false},
-        body: {type: "text"},
-        status: {type: "string", default: "draft"},
-        created_at: {type: "datetime"},
-        updated_at: {type: "datetime"}
-      }
-    },
+export const migration = {
+  up: async () => {
+    await createTable("articles", [
+      {name: "id", type: "integer", primaryKey: true, autoIncrement: true},
+      {name: "title", type: "string", null: false},
+      {name: "body", type: "text"},
+      {name: "status", type: "string", default: "draft"},
+      {name: "created_at", type: "datetime"},
+      {name: "updated_at", type: "datetime"}
+    ]);
+    await addIndex("articles", ["status"])
+  },
 
-    comments: {
-      columns: {
-        id: {type: "integer", primaryKey: true, autoIncrement: true},
-        article_id: {type: "integer", null: false, references: "articles"},
-        body: {type: "text"},
-        created_at: {type: "datetime"},
-        updated_at: {type: "datetime"}
-      }
-    }
+  tableSchemas: {
+    articles: "++id, title, body, status, created_at, updated_at"
   }
 };
 ```
 
-**Supported column types:** `string`, `text`, `integer`, `float`, `decimal`, `boolean`, `date`, `datetime`, `time`, `binary`, `references`
+**Migration Features:**
+
+- **Version tracking** — Migrations are tracked in a `schema_migrations` table, ensuring each migration runs only once
+- **Dexie support** — The `tableSchemas` property provides IndexedDB schema strings for Dexie adapter
+- **DDL functions** — Uses abstract DDL functions (`createTable`, `addIndex`, `addColumn`, `removeColumn`, `dropTable`) that are implemented by each database adapter
+
+**Supported migration methods:**
+
+| Ruby Method                      | JavaScript Function                |
+| -------------------------------- | ---------------------------------- |
+| `create_table :name`             | `createTable("name", columns)`     |
+| `add_index :table, :column`      | `addIndex("table", ["column"])`    |
+| `add_column :table, :col, :type` | `addColumn("table", "col", type)`  |
+| `remove_column :table, :col`     | `removeColumn("table", "col")`     |
+| `drop_table :name`               | `dropTable("name")`                |
+
+**Supported column types:** `string`, `text`, `integer`, `bigint`, `float`, `decimal`, `boolean`, `date`, `datetime`, `time`, `timestamp`, `binary`, `json`, `jsonb`, `references`
 
 ## Seeds
 
@@ -662,7 +670,7 @@ Spec files for each sub-filter:
 - [rails_model_spec.rb](https://github.com/ruby2js/ruby2js/blob/master/spec/rails_model_spec.rb)
 - [rails_controller_spec.rb](https://github.com/ruby2js/ruby2js/blob/master/spec/rails_controller_spec.rb)
 - [rails_routes_spec.rb](https://github.com/ruby2js/ruby2js/blob/master/spec/rails_routes_spec.rb)
-- [rails_schema_spec.rb](https://github.com/ruby2js/ruby2js/blob/master/spec/rails_schema_spec.rb)
+- [rails_migration_spec.rb](https://github.com/ruby2js/ruby2js/blob/master/spec/rails_migration_spec.rb)
 - [rails_seeds_spec.rb](https://github.com/ruby2js/ruby2js/blob/master/spec/rails_seeds_spec.rb)
 - [rails_logger_spec.rb](https://github.com/ruby2js/ruby2js/blob/master/spec/rails_logger_spec.rb)
 - [rails_helpers_spec.rb](https://github.com/ruby2js/ruby2js/blob/master/spec/rails_helpers_spec.rb)

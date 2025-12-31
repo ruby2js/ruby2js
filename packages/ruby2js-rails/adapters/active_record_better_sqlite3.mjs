@@ -95,6 +95,24 @@ export function addIndex(tableName, columns, options = {}) {
   return db.exec(sql);
 }
 
+export function addColumn(tableName, columnName, columnType) {
+  const sqlType = SQLITE_TYPE_MAP[columnType] || 'TEXT';
+  const sql = `ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${sqlType}`;
+  return db.exec(sql);
+}
+
+export function removeColumn(tableName, columnName) {
+  // SQLite doesn't support DROP COLUMN directly in older versions
+  // For SQLite 3.35.0+ (2021-03-12), this works:
+  const sql = `ALTER TABLE ${tableName} DROP COLUMN ${columnName}`;
+  return db.exec(sql);
+}
+
+export function dropTable(tableName) {
+  const sql = `DROP TABLE IF EXISTS ${tableName}`;
+  return db.exec(sql);
+}
+
 function formatDefaultValue(value) {
   if (value === null) return 'NULL';
   if (typeof value === 'string') return `'${value.replace(/'/g, "''")}'`;

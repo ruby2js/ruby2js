@@ -128,6 +128,25 @@ export async function addIndex(tableName, columns, options = {}) {
   }
 }
 
+export async function addColumn(tableName, columnName, columnType) {
+  const sqlType = MYSQL_TYPE_MAP[columnType] || 'TEXT';
+  const sql = `ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${sqlType}`;
+  const [result] = await pool.query(sql);
+  return result;
+}
+
+export async function removeColumn(tableName, columnName) {
+  const sql = `ALTER TABLE ${tableName} DROP COLUMN ${columnName}`;
+  const [result] = await pool.query(sql);
+  return result;
+}
+
+export async function dropTable(tableName) {
+  const sql = `DROP TABLE IF EXISTS ${tableName}`;
+  const [result] = await pool.query(sql);
+  return result;
+}
+
 function getMysqlType(col) {
   let baseType = MYSQL_TYPE_MAP[col.type] || 'TEXT';
 

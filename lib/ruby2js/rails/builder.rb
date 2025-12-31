@@ -17,8 +17,8 @@ require 'ruby2js'
 require 'ruby2js/filter/rails/model'
 require 'ruby2js/filter/rails/controller'
 require 'ruby2js/filter/rails/routes'
-require 'ruby2js/filter/rails/schema'
 require 'ruby2js/filter/rails/seeds'
+require 'ruby2js/filter/rails/migration'
 require 'ruby2js/filter/functions'
 require 'ruby2js/filter/esm'
 require 'ruby2js/filter/return'
@@ -107,7 +107,6 @@ class SelfhostBuilder
       Ruby2JS::Filter::Rails::Model,
       Ruby2JS::Filter::Rails::Controller,
       Ruby2JS::Filter::Rails::Routes,
-      Ruby2JS::Filter::Rails::Schema,
       Ruby2JS::Filter::Rails::Seeds,
       Ruby2JS::Filter::Functions,
       Ruby2JS::Filter::ESM,
@@ -124,6 +123,18 @@ class SelfhostBuilder
       Ruby2JS::Filter::Rails::Helpers,
       Ruby2JS::Filter::Erb,
       Ruby2JS::Filter::Functions,
+      Ruby2JS::Filter::Return
+    ]
+  }.freeze
+
+  # Options for database migrations
+  MIGRATION_OPTIONS = {
+    eslevel: 2022,
+    include: [:class, :call],
+    filters: [
+      Ruby2JS::Filter::Rails::Migration,
+      Ruby2JS::Filter::Functions,
+      Ruby2JS::Filter::ESM,
       Ruby2JS::Filter::Return
     ]
   }.freeze
@@ -518,12 +529,12 @@ class SelfhostBuilder
     )
     puts("")
 
-    # Transpile db (schema and seeds)
+    # Transpile db (migrations and seeds)
     puts("Database:")
     db_src = File.join(DEMO_ROOT, 'db')
     db_dest = File.join(@dist_dir, 'db')
-    # Transpile schema.rb (skip seeds.rb for special handling)
-    self.transpile_directory(db_src, db_dest, '**/*.rb', skip: ['seeds.rb'])
+    # Transpile migrations (skip schema.rb and seeds.rb)
+    self.transpile_migrations(db_src, db_dest)
     # Handle seeds.rb specially - generate stub if empty/comments-only
     self.transpile_seeds(db_src, db_dest)
     puts("")
@@ -632,9 +643,9 @@ class SelfhostBuilder
     'rails/model' => Ruby2JS::Filter::Rails::Model,
     'rails/controller' => Ruby2JS::Filter::Rails::Controller,
     'rails/routes' => Ruby2JS::Filter::Rails::Routes,
-    'rails/schema' => Ruby2JS::Filter::Rails::Schema,
     'rails/seeds' => Ruby2JS::Filter::Rails::Seeds,
-    'rails/helpers' => Ruby2JS::Filter::Rails::Helpers
+    'rails/helpers' => Ruby2JS::Filter::Rails::Helpers,
+    'rails/migration' => Ruby2JS::Filter::Rails::Migration
   }.freeze
 
   def resolve_filters(filter_names)
@@ -1044,6 +1055,87 @@ class SelfhostBuilder
       JS
       puts("  -> db/seeds.js (stub)")
     end
+  end
+
+  # Transpile database migrations to JavaScript
+  # Each migration becomes a module with an async up() function
+  # Also generates an index file that exports all migrations with their versions
+  def transpile_migrations(src_dir, dest_dir)
+    migrate_src = File.join(src_dir, 'migrate')
+    migrate_dest = File.join(dest_dir, 'migrate')
+
+    return unless File.exist?(migrate_src)
+
+    migrations = []
+
+    Dir.glob(File.join(migrate_src, '*.rb')).sort.each do |src_path|
+      basename = File.basename(src_path, '.rb')
+      dest_path = File.join(migrate_dest, "#{basename}.js")
+
+      # Extract version from filename (e.g., 20241231120000_create_articles.rb)
+      version = basename.split('_').first
+
+      self.transpile_migration_file(src_path, dest_path)
+
+      migrations << { version: version, filename: basename }
+    end
+
+    # Generate migrations index file
+    if migrations.any?
+      self.generate_migrations_index(migrate_dest, migrations)
+    end
+  end
+
+  def transpile_migration_file(src_path, dest_path)
+    puts("Transpiling migration: #{File.basename(src_path)}")
+    source = File.read(src_path)
+
+    relative_src = src_path.sub(DEMO_ROOT + '/', '')
+    options = MIGRATION_OPTIONS.merge(file: relative_src)
+    result = Ruby2JS.convert(source, options)
+    js = result.to_s
+
+    FileUtils.mkdir_p(File.dirname(dest_path))
+
+    # Copy source file alongside transpiled output for source maps
+    src_basename = File.basename(src_path)
+    copied_src_path = File.join(File.dirname(dest_path), src_basename)
+    File.write(copied_src_path, source)
+
+    # Generate sourcemap
+    map_path = "#{dest_path}.map"
+    sourcemap = result.sourcemap
+    sourcemap[:sourcesContent] = [source]
+    sourcemap[:sources] = ["./#{src_basename}"]
+
+    # Add sourcemap reference to JS file
+    js_with_map = "#{js}\n//# sourceMappingURL=#{File.basename(map_path)}\n"
+    File.write(dest_path, js_with_map)
+    File.write(map_path, JSON.generate(sourcemap))
+
+    puts("  -> #{dest_path}")
+  end
+
+  def generate_migrations_index(migrate_dest, migrations)
+    index_js = <<~JS
+      // Database migrations index - auto-generated
+      // Each migration exports { migration: { up: async () => {...} } }
+
+    JS
+
+    # Import each migration
+    migrations.each do |m|
+      index_js += "import { migration as m#{m[:version]} } from './#{m[:filename]}.js';\n"
+    end
+
+    index_js += "\n// All migrations in order\nexport const migrations = [\n"
+    migrations.each do |m|
+      index_js += "  { version: '#{m[:version]}', ...m#{m[:version]} },\n"
+    end
+    index_js += "];\n"
+
+    File.write(File.join(migrate_dest, 'index.js'), index_js)
+    puts("  -> db/migrate/index.js (#{migrations.length} migrations)")
   end
 
   def generate_application_record()

@@ -119,6 +119,22 @@ export async function addIndex(tableName, columns, options = {}) {
   return db.exec(sql);
 }
 
+export async function addColumn(tableName, columnName, columnType) {
+  const sqlType = PG_TYPE_MAP[columnType] || 'TEXT';
+  const sql = `ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${sqlType}`;
+  return db.exec(sql);
+}
+
+export async function removeColumn(tableName, columnName) {
+  const sql = `ALTER TABLE ${tableName} DROP COLUMN ${columnName}`;
+  return db.exec(sql);
+}
+
+export async function dropTable(tableName) {
+  const sql = `DROP TABLE IF EXISTS ${tableName}`;
+  return db.exec(sql);
+}
+
 function getPgType(col) {
   let baseType = PG_TYPE_MAP[col.type] || 'TEXT';
 

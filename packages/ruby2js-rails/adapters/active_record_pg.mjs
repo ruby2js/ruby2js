@@ -125,6 +125,22 @@ export async function addIndex(tableName, columns, options = {}) {
   return pool.query(sql);
 }
 
+export async function addColumn(tableName, columnName, columnType) {
+  const sqlType = PG_TYPE_MAP[columnType] || 'TEXT';
+  const sql = `ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${sqlType}`;
+  return pool.query(sql);
+}
+
+export async function removeColumn(tableName, columnName) {
+  const sql = `ALTER TABLE ${tableName} DROP COLUMN ${columnName}`;
+  return pool.query(sql);
+}
+
+export async function dropTable(tableName) {
+  const sql = `DROP TABLE IF EXISTS ${tableName}`;
+  return pool.query(sql);
+}
+
 function getPgType(col) {
   let baseType = PG_TYPE_MAP[col.type] || 'TEXT';
 

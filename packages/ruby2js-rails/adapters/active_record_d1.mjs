@@ -97,6 +97,22 @@ export async function addIndex(tableName, columns, options = {}) {
   return await db.exec(sql);
 }
 
+export async function addColumn(tableName, columnName, columnType) {
+  const sqlType = SQLITE_TYPE_MAP[columnType] || 'TEXT';
+  const sql = `ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${sqlType}`;
+  return await db.exec(sql);
+}
+
+export async function removeColumn(tableName, columnName) {
+  const sql = `ALTER TABLE ${tableName} DROP COLUMN ${columnName}`;
+  return await db.exec(sql);
+}
+
+export async function dropTable(tableName) {
+  const sql = `DROP TABLE IF EXISTS ${tableName}`;
+  return await db.exec(sql);
+}
+
 function formatDefaultValue(value) {
   if (value === null) return 'NULL';
   if (typeof value === 'string') return `'${value.replace(/'/g, "''")}'`;

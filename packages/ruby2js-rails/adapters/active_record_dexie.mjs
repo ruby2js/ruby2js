@@ -66,6 +66,20 @@ export function addIndex(tableName, columns, options = {}) {
   // Example: registerSchema('articles', '++id, title, created_at')
 }
 
+export function addColumn(tableName, columnName, columnType) {
+  // No-op - Dexie schema changes require version upgrades
+  // For browser apps, columns are added via registerSchema() before db.open()
+}
+
+export function removeColumn(tableName, columnName) {
+  // No-op - Dexie schema changes require version upgrades
+}
+
+export function dropTable(tableName) {
+  // No-op - Dexie schema changes require version upgrades
+  // To drop a table, set it to null in the next version: db.version(2).stores({ tableName: null })
+}
+
 // Get the raw database instance
 export function getDatabase() {
   return db;

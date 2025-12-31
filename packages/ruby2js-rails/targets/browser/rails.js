@@ -267,14 +267,23 @@ export class Application extends ApplicationBase {
 
     // For Dexie adapter: define schema and open database
     if (adapter.defineSchema) {
+      // Always register schema_migrations table for tracking
+      adapter.registerSchema('schema_migrations', '&version');
+
       if (this.schema && this.schema.tableSchemas) {
         for (const [table, schema] of Object.entries(this.schema.tableSchemas)) {
           adapter.registerSchema(table, schema);
         }
-      } else {
-        // Fallback for demo
-        adapter.registerSchema('articles', '++id, title, created_at, updated_at');
-        adapter.registerSchema('comments', '++id, article_id, created_at, updated_at');
+      } else if (this.migrations) {
+        // Collect table schemas from all migrations
+        // Each migration may have a tableSchemas property with Dexie schema strings
+        for (const migration of this.migrations) {
+          if (migration.tableSchemas) {
+            for (const [table, schema] of Object.entries(migration.tableSchemas)) {
+              adapter.registerSchema(table, schema);
+            }
+          }
+        }
       }
       adapter.defineSchema(1);
       await adapter.openDatabase();
@@ -283,19 +292,67 @@ export class Application extends ApplicationBase {
     // Make DB available globally for sql.js compatibility
     window.DB = adapter.getDatabase();
 
-    // Run schema migrations
-    if (this.schema && this.schema.create_tables) {
-      this.schema.create_tables();
-    }
+    // Run migrations
+    const migrationsRun = await this.runMigrations(adapter);
 
-    // Run seeds if present
-    if (this.seeds) {
+    // Run seeds if present and migrations were run (fresh database)
+    if (this.seeds && migrationsRun > 0) {
+      console.log('Fresh database, running seeds...');
       if (this.seeds.run.constructor.name === 'AsyncFunction') {
         await this.seeds.run();
       } else {
         this.seeds.run();
       }
     }
+  }
+
+  // Run pending migrations and track them in schema_migrations
+  static async runMigrations(adapter) {
+    if (!this.migrations || this.migrations.length === 0) {
+      // Fall back to schema if no migrations
+      if (this.schema && this.schema.create_tables) {
+        this.schema.create_tables();
+      }
+      return 0;
+    }
+
+    // Get already-run migrations
+    const db = adapter.getDatabase();
+    let appliedVersions = new Set();
+
+    try {
+      // Check if schema_migrations table has data
+      const applied = await db.table('schema_migrations').toArray();
+      appliedVersions = new Set(applied.map(r => r.version));
+    } catch (e) {
+      // Table might not exist or be empty on first run
+      console.log('First database initialization');
+    }
+
+    // Run pending migrations in order
+    let ran = 0;
+    for (const migration of this.migrations) {
+      if (appliedVersions.has(migration.version)) {
+        continue;
+      }
+
+      console.log(`Running migration ${migration.version}...`);
+      try {
+        await migration.up();
+        // Record that this migration ran
+        await db.table('schema_migrations').add({ version: migration.version });
+        ran++;
+      } catch (e) {
+        console.error(`Migration ${migration.version} failed:`, e);
+        throw e;
+      }
+    }
+
+    if (ran > 0) {
+      console.log(`Ran ${ran} migration(s)`);
+    }
+
+    return ran;
   }
 
   // Start the application

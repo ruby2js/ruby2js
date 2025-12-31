@@ -4,78 +4,86 @@ require 'ruby2js/inflector'
 module Ruby2JS
   module Filter
     module Rails
-      module Schema
+      module Migration
         include SEXP
 
-        # No TYPE_MAP here - adapters handle type mapping
-        # We keep abstract Rails types: string, text, integer, boolean, datetime, etc.
-
         def initialize(*args)
-          # Note: super must be called first for JS class compatibility
           super
-          @rails_schema = nil
-          @rails_tables = []
-          @rails_indexes = []
+          @rails_migration = nil
+          @migration_statements = []
         end
 
-        # Detect ActiveRecord::Schema.define block
-        def on_block(node)
-          call, args, body = node.children
+        # Detect class CreateXxx < ActiveRecord::Migration[x.x]
+        def on_class(node)
+          name, parent, *body = node.children
 
-          # Check for ActiveRecord::Schema.define or ActiveRecord::Schema[version].define
-          return super unless schema_define_block?(call)
+          # Check for ActiveRecord::Migration inheritance
+          return super unless migration_class?(parent)
 
-          @rails_schema = true
-          @rails_tables = []
-          @rails_indexes = []
+          @rails_migration = name.children[1].to_s
+          @migration_statements = []
 
-          # Process the schema DSL
-          process_schema_body(body)
+          # Process class body to find change/up method
+          process_migration_body(body.first)
 
-          # Build the Schema module
-          result = build_schema_module
+          result = build_migration_module
 
-          @rails_schema = nil
-          @rails_tables = []
-          @rails_indexes = []
+          @rails_migration = nil
+          @migration_statements = []
 
           result
         end
 
         private
 
-        def schema_define_block?(node)
-          return false unless node&.type == :send
+        def migration_class?(node)
+          return false unless node
 
-          target, method = node.children[0..1]
-          return false unless method == :define
-
-          # Check for ActiveRecord::Schema or ActiveRecord::Schema[version]
-          if target&.type == :const
-            # ActiveRecord::Schema.define
-            # Note: compare children individually for JS compatibility (=== compares references, not values)
-            children = target.children
-            return children.length == 2 &&
-                   children[0]&.type == :const &&
-                   children[0].children[0].nil? &&
-                   children[0].children[1] == :ActiveRecord &&
-                   children[1] == :Schema
-          elsif target&.type == :send && target.children[1] == :[]
-            # ActiveRecord::Schema[7.0].define
-            schema_const = target.children[0]
-            return false unless schema_const&.type == :const
-            children = schema_const.children
-            return children.length == 2 &&
-                   children[0]&.type == :const &&
-                   children[0].children[0].nil? &&
-                   children[0].children[1] == :ActiveRecord &&
-                   children[1] == :Schema
+          # ActiveRecord::Migration[7.0] or ActiveRecord::Migration
+          if node.type == :send && node.children[1] == :[]
+            # ActiveRecord::Migration[version]
+            const = node.children[0]
+            return migration_const?(const)
+          elsif node.type == :const
+            return migration_const?(node)
           end
 
           false
         end
 
-        def process_schema_body(body)
+        def migration_const?(node)
+          return false unless node&.type == :const
+          children = node.children
+          return false unless children.length == 2
+
+          parent = children[0]
+          name = children[1]
+
+          parent&.type == :const &&
+            parent.children[0].nil? &&
+            parent.children[1] == :ActiveRecord &&
+            name == :Migration
+        end
+
+        def process_migration_body(body)
+          return unless body
+
+          children = body.type == :begin ? body.children : [body]
+
+          children.each do |child|
+            next unless child
+
+            # Look for def change or def up
+            if child.type == :def
+              method_name = child.children[0]
+              if method_name == :change || method_name == :up
+                process_migration_method(child.children[2])
+              end
+            end
+          end
+        end
+
+        def process_migration_method(body)
           return unless body
 
           children = body.type == :begin ? body.children : [body]
@@ -85,14 +93,14 @@ module Ruby2JS
 
             case child.type
             when :block
-              process_schema_block(child)
+              process_migration_block(child)
             when :send
-              process_schema_send(child)
+              process_migration_send(child)
             end
           end
         end
 
-        def process_schema_block(node)
+        def process_migration_block(node)
           call, block_args, body = node.children
           return unless call.type == :send
 
@@ -105,13 +113,19 @@ module Ruby2JS
           end
         end
 
-        def process_schema_send(node)
+        def process_migration_send(node)
           target, method, *args = node.children
           return unless target.nil?
 
           case method
           when :add_index
             process_add_index(args)
+          when :add_column
+            process_add_column(args)
+          when :remove_column
+            process_remove_column(args)
+          when :drop_table
+            process_drop_table(args)
           end
         end
 
@@ -144,20 +158,16 @@ module Ruby2JS
 
               result = process_column(child, table_name)
               if result
-                # Handle single column
                 columns << result[:column] if result[:column]
-                # Handle multiple columns (timestamps)
-                # Note: use push(*arr) for JS compatibility (JS concat returns new array, doesn't modify in place)
                 columns.push(*result[:columns]) if result[:columns]
-                # Handle foreign keys
                 foreign_keys << result[:foreign_key] if result[:foreign_key]
               end
             end
           end
 
-          # Note: use push instead of << for JS compatibility (autoreturn + << = bitwise shift)
-          @rails_tables.push({
-            name: table_name,
+          @migration_statements.push({
+            type: :create_table,
+            table: table_name,
             columns: columns,
             foreign_keys: foreign_keys
           })
@@ -171,11 +181,10 @@ module Ruby2JS
 
           case method
           when :timestamps
-            # Add created_at and updated_at columns
             return {
               columns: [
-                { name: 'created_at', type: 'datetime' },
-                { name: 'updated_at', type: 'datetime' }
+                { name: 'created_at', type: 'datetime', null: false },
+                { name: 'updated_at', type: 'datetime', null: false }
               ]
             }
           when :references, :belongs_to
@@ -191,7 +200,6 @@ module Ruby2JS
           column_name = extract_string_value(args[0])
           return nil unless column_name
 
-          # Keep abstract Rails type (string, text, integer, etc.)
           column = {
             name: column_name,
             type: type.to_s
@@ -238,7 +246,6 @@ module Ruby2JS
           }
           foreign_key = nil
 
-          # Process options
           args[1..-1].each do |arg|
             next unless arg.type == :hash
 
@@ -252,30 +259,13 @@ module Ruby2JS
                 column[:null] = true if value.type == :true
               when :foreign_key
                 if value.type == :true
-                  # Infer table name from reference name
                   ref_table = Ruby2JS::Inflector.pluralize(ref_name)
                   foreign_key = {
                     column: column_name,
                     references_table: ref_table,
                     references_column: 'id'
                   }
-                elsif value.type == :hash
-                  # foreign_key: { to_table: "authors" }
-                  value.children.each do |fk_pair|
-                    fk_key = fk_pair.children[0]
-                    fk_value = fk_pair.children[1]
-                    if fk_key.type == :sym && fk_key.children[0] == :to_table
-                      foreign_key = {
-                        column: column_name,
-                        references_table: extract_string_value(fk_value),
-                        references_column: 'id'
-                      }
-                    end
-                  end
                 end
-              when :polymorphic
-                # Polymorphic associations add a type column
-                # Not fully supported yet
               end
             end
           end
@@ -318,14 +308,55 @@ module Ruby2JS
             end
           end
 
-          index_name = options[:name] || "idx_#{table_name}_#{columns.join('_')}"
-
-          # Note: use push instead of << for JS compatibility (autoreturn + << = bitwise shift)
-          @rails_indexes.push({
+          @migration_statements.push({
+            type: :add_index,
             table: table_name,
             columns: columns,
-            name: index_name,
-            unique: options[:unique]
+            options: options
+          })
+        end
+
+        def process_add_column(args)
+          return if args.length < 3
+
+          table_name = extract_string_value(args[0])
+          column_name = extract_string_value(args[1])
+          column_type = extract_string_value(args[2])
+
+          return unless table_name && column_name && column_type
+
+          @migration_statements.push({
+            type: :add_column,
+            table: table_name,
+            column: column_name,
+            column_type: column_type
+          })
+        end
+
+        def process_remove_column(args)
+          return if args.length < 2
+
+          table_name = extract_string_value(args[0])
+          column_name = extract_string_value(args[1])
+
+          return unless table_name && column_name
+
+          @migration_statements.push({
+            type: :remove_column,
+            table: table_name,
+            column: column_name
+          })
+        end
+
+        def process_drop_table(args)
+          return if args.empty?
+
+          table_name = extract_string_value(args[0])
+          return unless table_name
+
+          @migration_statements.push({
+            type: :drop_table,
+            table: table_name
           })
         end
 
@@ -343,8 +374,6 @@ module Ruby2JS
               case key.children[0]
               when :id
                 options[:id] = value.type != :false
-              when :primary_key
-                options[:primary_key] = extract_string_value(value)
               end
             end
           end
@@ -361,104 +390,148 @@ module Ruby2JS
         end
 
         def extract_default_value(node)
-          # Return abstract Ruby values, not SQL-formatted strings
           case node.type
-          when :str
-            node.children[0]
-          when :int, :float
-            node.children[0]
-          when :true
-            true
-          when :false
-            false
-          when :nil
-            nil
-          else
-            nil
+          when :str then node.children[0]
+          when :int, :float then node.children[0]
+          when :true then true
+          when :false then false
+          when :nil then nil
+          else nil
           end
         end
 
-        def build_schema_module
-          # Build the create_tables method body
-          statements = []
-
-          # Generate createTable calls
-          @rails_tables.each do |table|
-            statements << build_create_table_call(table)
+        def build_migration_module
+          # Build the up function body
+          statements = @migration_statements.map do |stmt|
+            build_statement_call(stmt)
           end
 
-          # Generate addIndex calls
-          @rails_indexes.each do |index|
-            statements << build_add_index_call(index)
-          end
-
-          # Build method body
           method_body = statements.length == 1 ? statements.first : s(:begin, *statements)
 
-          create_tables_method = s(:defs, s(:self), :create_tables,
-            s(:args),
-            method_body)
+          # Export migration object with version and up function
+          up_method = s(:pair, s(:sym, :up),
+            s(:block,
+              s(:send, nil, :async),
+              s(:args),
+              method_body))
 
-          # Import createTable, addIndex from adapter
+          # Build tableSchemas for Dexie (e.g., { articles: '++id, title, created_at' })
+          table_schemas_pairs = @migration_statements
+            .select { |stmt| stmt[:type] == :create_table }
+            .map do |stmt|
+              # Build Dexie schema string: '++id, column1, column2, ...'
+              schema_parts = stmt[:columns].map do |col|
+                if col[:primaryKey] && col[:autoIncrement]
+                  "++#{col[:name]}"
+                elsif col[:primaryKey]
+                  "&#{col[:name]}"
+                else
+                  col[:name]
+                end
+              end
+              s(:pair, s(:sym, stmt[:table].to_sym), s(:str, schema_parts.join(', ')))
+            end
+
+          migration_parts = [up_method]
+          if table_schemas_pairs.any?
+            migration_parts << s(:pair, s(:sym, :tableSchemas), s(:hash, *table_schemas_pairs))
+          end
+
+          migration_obj = s(:hash, *migration_parts)
+
+          export_stmt = s(:send, nil, :export,
+            s(:casgn, nil, :migration, migration_obj))
+
+          # Import createTable, addIndex, addColumn, etc. from adapter
           import_stmt = s(:send, nil, :import,
-            s(:array, s(:const, nil, :createTable), s(:const, nil, :addIndex)),
-            s(:str, '../lib/active_record.mjs'))
+            s(:array,
+              s(:const, nil, :createTable),
+              s(:const, nil, :addIndex),
+              s(:const, nil, :addColumn),
+              s(:const, nil, :removeColumn),
+              s(:const, nil, :dropTable)),
+            s(:str, '../../lib/active_record.mjs'))
 
-          schema_module = s(:send, nil, :export,
-            s(:module, s(:const, nil, :Schema), create_tables_method))
-
-          process(s(:begin, import_stmt, schema_module))
+          process(s(:begin, import_stmt, export_stmt))
         end
 
-        def build_create_table_call(table)
-          # Build column definitions as array of hashes
-          columns_ast = table[:columns].map do |col|
+        def build_statement_call(stmt)
+          case stmt[:type]
+          when :create_table
+            build_create_table_call(stmt)
+          when :add_index
+            build_add_index_call(stmt)
+          when :add_column
+            build_add_column_call(stmt)
+          when :remove_column
+            build_remove_column_call(stmt)
+          when :drop_table
+            build_drop_table_call(stmt)
+          end
+        end
+
+        def build_create_table_call(stmt)
+          columns_ast = stmt[:columns].map do |col|
             pairs = [s(:pair, s(:sym, :name), s(:str, col[:name]))]
             pairs << s(:pair, s(:sym, :type), s(:str, col[:type]))
             pairs << s(:pair, s(:sym, :primaryKey), s(:true)) if col[:primaryKey]
             pairs << s(:pair, s(:sym, :autoIncrement), s(:true)) if col[:autoIncrement]
             pairs << s(:pair, s(:sym, :null), col[:null] ? s(:true) : s(:false)) if col.key?(:null)
             pairs << s(:pair, s(:sym, :default), value_to_ast(col[:default])) if col.key?(:default)
-            pairs << s(:pair, s(:sym, :limit), s(:int, col[:limit])) if col[:limit]
-            pairs << s(:pair, s(:sym, :precision), s(:int, col[:precision])) if col[:precision]
-            pairs << s(:pair, s(:sym, :scale), s(:int, col[:scale])) if col[:scale]
             s(:hash, *pairs)
           end
 
-          # Build foreign keys array if present
-          fk_ast = table[:foreign_keys].compact.map do |fk|
+          fk_ast = stmt[:foreign_keys].compact.map do |fk|
             s(:hash,
               s(:pair, s(:sym, :column), s(:str, fk[:column])),
               s(:pair, s(:sym, :references), s(:str, fk[:references_table])),
               s(:pair, s(:sym, :primaryKey), s(:str, fk[:references_column])))
           end
 
-          # Build options hash
           options_pairs = []
           options_pairs << s(:pair, s(:sym, :foreignKeys), s(:array, *fk_ast)) if fk_ast.any?
 
-          args = [s(:str, table[:name]), s(:array, *columns_ast)]
+          args = [s(:str, stmt[:table]), s(:array, *columns_ast)]
           args << s(:hash, *options_pairs) if options_pairs.any?
 
-          s(:send, nil, :createTable, *args)
+          s(:send, nil, :await, s(:send, nil, :createTable, *args))
         end
 
-        def build_add_index_call(index)
-          columns_ast = s(:array, *index[:columns].map { |c| s(:str, c) })
+        def build_add_index_call(stmt)
+          columns_ast = s(:array, *stmt[:columns].map { |c| s(:str, c) })
 
           options_pairs = []
-          options_pairs << s(:pair, s(:sym, :name), s(:str, index[:name])) if index[:name]
-          options_pairs << s(:pair, s(:sym, :unique), s(:true)) if index[:unique]
+          options_pairs << s(:pair, s(:sym, :name), s(:str, stmt[:options][:name])) if stmt[:options][:name]
+          options_pairs << s(:pair, s(:sym, :unique), s(:true)) if stmt[:options][:unique]
 
-          args = [s(:str, index[:table]), columns_ast]
+          args = [s(:str, stmt[:table]), columns_ast]
           args << s(:hash, *options_pairs) if options_pairs.any?
 
-          s(:send, nil, :addIndex, *args)
+          s(:send, nil, :await, s(:send, nil, :addIndex, *args))
+        end
+
+        def build_add_column_call(stmt)
+          s(:send, nil, :await,
+            s(:send, nil, :addColumn,
+              s(:str, stmt[:table]),
+              s(:str, stmt[:column]),
+              s(:str, stmt[:column_type])))
+        end
+
+        def build_remove_column_call(stmt)
+          s(:send, nil, :await,
+            s(:send, nil, :removeColumn,
+              s(:str, stmt[:table]),
+              s(:str, stmt[:column])))
+        end
+
+        def build_drop_table_call(stmt)
+          s(:send, nil, :await,
+            s(:send, nil, :dropTable,
+              s(:str, stmt[:table])))
         end
 
         def value_to_ast(value)
-          # Use is_a? checks instead of case/when for selfhost compatibility
-          # (case/when with class names doesn't work in transpiled JavaScript)
           if value == true
             s(:true)
           elsif value == false
@@ -478,6 +551,6 @@ module Ruby2JS
       end
     end
 
-    DEFAULTS.push Rails::Schema
+    DEFAULTS.push Rails::Migration
   end
 end

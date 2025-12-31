@@ -102,6 +102,7 @@ export class RouterBase {
 export class ApplicationBase {
   static schema = null;
   static seeds = null;
+  static migrations = null;
   static activeRecordModule = null;
   static layoutFn = null;
 
@@ -109,6 +110,7 @@ export class ApplicationBase {
   static configure(options) {
     if (options.schema) this.schema = options.schema;
     if (options.seeds) this.seeds = options.seeds;
+    if (options.migrations) this.migrations = options.migrations;
     if (options.layout) this.layoutFn = options.layout;
   }
 

@@ -447,9 +447,9 @@ module Ruby2JS
              s(:const, nil, :formData),
              s(:const, nil, :handleFormResult)])
 
-          # Import Schema
-          statements << s(:import, '../db/schema.js',
-            [s(:const, nil, :Schema)])
+          # Import migrations (for migrations-based approach)
+          statements << s(:import, '../db/migrate/index.js',
+            [s(:const, nil, :migrations)])
 
           # Import Seeds
           statements << s(:import, '../db/seeds.js',
@@ -508,7 +508,7 @@ module Ruby2JS
 
           # Generate Application.configure()
           config_pairs = [
-            s(:pair, s(:sym, :schema), s(:const, nil, :Schema)),
+            s(:pair, s(:sym, :migrations), s(:const, nil, :migrations)),
             s(:pair, s(:sym, :seeds), s(:const, nil, :Seeds))
           ]
           if self.server_target?()

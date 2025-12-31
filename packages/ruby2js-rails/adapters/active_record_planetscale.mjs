@@ -112,6 +112,22 @@ export async function addIndex(tableName, columns, options = {}) {
   }
 }
 
+export async function addColumn(tableName, columnName, columnType) {
+  const sqlType = MYSQL_TYPE_MAP[columnType] || 'TEXT';
+  const sql = `ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${sqlType}`;
+  return await connection.execute(sql);
+}
+
+export async function removeColumn(tableName, columnName) {
+  const sql = `ALTER TABLE ${tableName} DROP COLUMN ${columnName}`;
+  return await connection.execute(sql);
+}
+
+export async function dropTable(tableName) {
+  const sql = `DROP TABLE IF EXISTS ${tableName}`;
+  return await connection.execute(sql);
+}
+
 function getMysqlType(col) {
   let baseType = MYSQL_TYPE_MAP[col.type] || 'TEXT';
 

@@ -122,6 +122,23 @@ export function addIndex(tableName, columns, options = {}) {
   return db.exec(sql);
 }
 
+export function addColumn(tableName, columnName, columnType) {
+  const sqlType = SQLITE_TYPE_MAP[columnType] || 'TEXT';
+  const sql = `ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${sqlType}`;
+  return db.exec(sql);
+}
+
+export function removeColumn(tableName, columnName) {
+  // sql.js uses SQLite which supports DROP COLUMN in 3.35.0+
+  const sql = `ALTER TABLE ${tableName} DROP COLUMN ${columnName}`;
+  return db.exec(sql);
+}
+
+export function dropTable(tableName) {
+  const sql = `DROP TABLE IF EXISTS ${tableName}`;
+  return db.exec(sql);
+}
+
 function formatDefaultValue(value) {
   if (value === null) return 'NULL';
   if (typeof value === 'string') return `'${value.replace(/'/g, "''")}'`;
