@@ -162,15 +162,16 @@ class SelfhostBuilder
 
   # Detect runtime/target from database configuration
   # Returns: { target: 'browser'|'server', runtime: nil|'node'|'bun'|'deno', database: 'adapter_name' }
+  # Priority: database.yml target > inferred from adapter
   def self.detect_runtime(app_root = nil)
     db_config = self.load_database_config(app_root, quiet: true)
     database = db_config['adapter'] || db_config[:adapter] || 'sqljs'
-    target = BROWSER_DATABASES.include?(database) ? 'browser' : 'server'
+    target = db_config['target'] || db_config[:target] || (BROWSER_DATABASES.include?(database) ? 'browser' : 'server')
 
     runtime = nil
-    if target == 'server'
+    if target != 'browser'
       required = RUNTIME_REQUIRED[database]
-      runtime = required || ENV['RUNTIME']&.downcase || 'node'
+      runtime = required || ENV['RUNTIME']&.downcase || target
     end
 
     { target: target, runtime: runtime, database: database }
@@ -392,10 +393,11 @@ class SelfhostBuilder
     puts("")
 
     # Load database config and derive target (unless explicitly set)
+    # Priority: CLI option > database.yml target > inferred from adapter
     puts("Database Adapter:")
     db_config = self.load_database_config()
     @database = db_config['adapter'] || db_config[:adapter] || 'sqljs'
-    @target ||= BROWSER_DATABASES.include?(@database) ? 'browser' : 'server'
+    @target ||= db_config['target'] || db_config[:target] || (BROWSER_DATABASES.include?(@database) ? 'browser' : 'server')
 
     # Validate and set runtime based on database type
     requested_runtime = ENV['RUNTIME']
