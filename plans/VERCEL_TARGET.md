@@ -137,13 +137,13 @@ The `test/blog` demo (articles + comments with validations and nested routes) re
 The runtime architecture already supports Vercel:
 
 ```
-rails_base.js          → Shared: RouterBase, ApplicationBase, helpers
-    ↓
-rails_server.js        → Shared: Fetch API dispatch (Request/Response)
-    ↓
-targets/cloudflare/    → Worker fetch handler (~60 lines)
-targets/vercel-edge/   → Edge Function handler (NEW)
-targets/vercel-node/   → Serverless Function handler (NEW)
+packages/ruby2js-rails/
+├── rails_base.js          → Shared: RouterBase, ApplicationBase, helpers
+├── rails_server.js        → Shared: Fetch API dispatch (Request/Response)
+└── targets/
+    ├── cloudflare/        → Worker fetch handler
+    ├── vercel-edge/       → Edge Function handler ✅
+    └── vercel-node/       → Serverless Function handler ✅
 ```
 
 The key insight: `rails_server.js` uses the Fetch API (Request/Response), which Vercel Edge Functions use natively.
@@ -490,15 +490,15 @@ end
 
 ## Implementation Phases
 
-### Phase 1: Target Files
-- [ ] Create `targets/vercel-edge/rails.js`
-- [ ] Create `targets/vercel-node/rails.js`
-- [ ] Test with existing `rails_server.js` dispatch
+### Phase 1: Target Files ✅
+- [x] Create `targets/vercel-edge/rails.js`
+- [x] Create `targets/vercel-node/rails.js`
+- [x] Test with existing `rails_server.js` dispatch
 
-### Phase 2: Build Integration
-- [ ] Add `vercel-edge` and `vercel-node` to valid targets
-- [ ] Generate `vercel.json` configuration
-- [ ] Generate API entry point
+### Phase 2: Build Integration ✅
+- [x] Add `vercel-edge` and `vercel-node` to valid targets
+- [x] Generate `vercel.json` configuration
+- [x] Generate API entry point
 
 ### Phase 3: Documentation
 - [ ] Deployment guide for Vercel
