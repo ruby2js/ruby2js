@@ -703,7 +703,31 @@ module Ruby2JS
             s(:str, "<form#{form_class_attr}#{form_style}><button type=\"button\"#{btn_class_attr} onclick=\"if(confirm('#{confirm_str}')) { /* delete */ }\">#{text_str}</button></form>")
           else
             # Node target - form-based delete
-            path_expr = process(path_node)
+            # Convert model object to path helper call
+            if path_node&.type == :lvar
+              model_name = path_node.children.first.to_s
+              path_helper = "#{model_name}_path".to_sym
+              @erb_path_helpers << path_helper unless @erb_path_helpers.include?(path_helper)
+              path_expr = s(:send, nil, path_helper, path_node)
+            elsif path_node&.type == :ivar
+              model_name = path_node.children.first.to_s.sub(/^@/, '')
+              path_helper = "#{model_name}_path".to_sym
+              @erb_path_helpers << path_helper unless @erb_path_helpers.include?(path_helper)
+              # In ERB context, ivars are passed as locals
+              path_expr = s(:send, nil, path_helper, s(:lvar, model_name.to_sym))
+            elsif path_node&.type == :array && path_node.children.length == 2
+              # Nested resource: [@article, comment] -> comment_path(article, comment)
+              parent, child = path_node.children
+              child_name = child.type == :ivar ? child.children.first.to_s.sub(/^@/, '') : child.children.first.to_s
+              path_helper = "#{child_name}_path".to_sym
+              @erb_path_helpers << path_helper unless @erb_path_helpers.include?(path_helper)
+              # Convert ivars to lvars for ERB context
+              parent_arg = parent.type == :ivar ? s(:lvar, parent.children.first.to_s.sub(/^@/, '').to_sym) : parent
+              child_arg = child.type == :ivar ? s(:lvar, child.children.first.to_s.sub(/^@/, '').to_sym) : child
+              path_expr = s(:send, nil, path_helper, parent_arg, child_arg)
+            else
+              path_expr = process(path_node)
+            end
             s(:dstr,
               s(:str, "<form method=\"post\" action=\""),
               s(:begin, path_expr),
