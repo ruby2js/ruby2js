@@ -22,7 +22,8 @@ module Ruby2JS
         def parse_options(args)
           options = {
             verbose: false,
-            selfhost: false
+            selfhost: false,
+            target: nil
           }
 
           parser = OptionParser.new do |opts|
@@ -31,6 +32,10 @@ module Ruby2JS
             opts.separator "Build a Rails-like app for deployment."
             opts.separator ""
             opts.separator "Options:"
+
+            opts.on("-t", "--target TARGET", "Build target: browser or node") do |target|
+              options[:target] = target
+            end
 
             opts.on("-v", "--verbose", "Show detailed build output") do
               options[:verbose] = true
@@ -87,7 +92,7 @@ module Ruby2JS
           else
             # Use Ruby transpiler directly
             require 'ruby2js/rails/builder'
-            SelfhostBuilder.new.build
+            SelfhostBuilder.new(nil, target: options[:target]).build
             true
           end
 

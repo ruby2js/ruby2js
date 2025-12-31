@@ -52,6 +52,27 @@ class SelfhostBuilder
     'd1' => 'cloudflare'
   }.freeze
 
+  # Valid target environments for each database adapter
+  VALID_TARGETS = {
+    'dexie' => ['browser'],
+    'indexeddb' => ['browser'],
+    'sqljs' => ['browser'],
+    'sql.js' => ['browser'],
+    'pglite' => ['browser', 'node'],
+    'better_sqlite3' => ['node', 'bun'],
+    'sqlite3' => ['node', 'bun'],
+    'pg' => ['node', 'bun', 'deno'],
+    'postgres' => ['node', 'bun', 'deno'],
+    'postgresql' => ['node', 'bun', 'deno'],
+    'mysql2' => ['node', 'bun'],
+    'mysql' => ['node', 'bun'],
+    'd1' => ['cloudflare'],
+    'neon' => ['browser', 'node', 'bun', 'deno', 'cloudflare', 'vercel-edge', 'vercel-node'],
+    'turso' => ['browser', 'node', 'bun', 'deno', 'cloudflare', 'vercel-edge', 'vercel-node'],
+    'libsql' => ['browser', 'node', 'bun', 'deno', 'cloudflare', 'vercel-edge', 'vercel-node'],
+    'planetscale' => ['browser', 'node', 'bun', 'deno', 'cloudflare', 'vercel-edge', 'vercel-node']
+  }.freeze
+
   # Map DATABASE env var to adapter source file
   ADAPTER_FILES = {
     # Browser adapters
@@ -345,10 +366,10 @@ class SelfhostBuilder
   # Instance methods
   # ============================================================
 
-  def initialize(dist_dir = nil)
+  def initialize(dist_dir = nil, target: nil)
     @dist_dir = dist_dir || File.join(DEMO_ROOT, 'dist')
     @database = nil  # Set during build from config
-    @target = nil    # Derived from database: 'browser' or 'server'
+    @target = target # Can be set explicitly or derived from database
     @runtime = nil   # For server targets: 'node', 'bun', or 'deno'
     @model_associations = {}  # model_name -> [association_names]
   end
@@ -370,11 +391,11 @@ class SelfhostBuilder
     puts("=== Building Ruby2JS-on-Rails Demo ===")
     puts("")
 
-    # Load database config and derive target
+    # Load database config and derive target (unless explicitly set)
     puts("Database Adapter:")
     db_config = self.load_database_config()
     @database = db_config['adapter'] || db_config[:adapter] || 'sqljs'
-    @target = BROWSER_DATABASES.include?(@database) ? 'browser' : 'server'
+    @target ||= BROWSER_DATABASES.include?(@database) ? 'browser' : 'server'
 
     # Validate and set runtime based on database type
     requested_runtime = ENV['RUNTIME']
@@ -404,6 +425,9 @@ class SelfhostBuilder
         raise "Unknown runtime: #{@runtime}. Valid options for server databases: #{SERVER_RUNTIMES.join(', ')}"
       end
     end
+
+    # Validate database/target combination
+    self.validate_target!()
 
     self.copy_database_adapter(db_config)
     puts("  Target: #{@target}")
@@ -521,6 +545,20 @@ class SelfhostBuilder
     self.setup_tailwind()
 
     puts("=== Build Complete ===")
+  end
+
+  def validate_target!()
+    # Determine the effective target for validation
+    # For browser target, use 'browser'; for server targets, use the runtime
+    effective_target = @target == 'browser' ? 'browser' : @runtime
+
+    valid_targets = VALID_TARGETS[@database]
+    return unless valid_targets  # Unknown database, skip validation
+
+    unless valid_targets.include?(effective_target)
+      raise "Database '#{@database}' does not support target '#{effective_target}'.\n" \
+            "Valid targets for #{@database}: #{valid_targets.join(', ')}"
+    end
   end
 
   def load_ruby2js_config(section = nil)
@@ -829,10 +867,11 @@ class SelfhostBuilder
     # Use relative path for cleaner display in browser debugger
     relative_src = src_path.sub(DEMO_ROOT + '/', '')
 
-    # Pass database option for target-aware link generation
+    # Pass database and target options for target-aware link generation
     # Also pass ERB source and position map for source map generation
     erb_options = ERB_OPTIONS.merge(
       database: @database,
+      target: @target,
       file: relative_src
     )
     result = Ruby2JS.convert(ruby_src, erb_options)

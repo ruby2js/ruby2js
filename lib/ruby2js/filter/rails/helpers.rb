@@ -334,23 +334,26 @@ module Ruby2JS
         def build_nav_link(text_node, path_node, css_class = nil, class_node = nil)
           # Handle model object as path: link_to "Show", @article or link_to "Show", article
           if path_node.type == :ivar
-            # Instance variable: @article
+            # Instance variable: @article -> article_path(article)
             model_name = path_node.children.first.to_s.sub(/^@/, '')
             path_helper = "#{model_name}_path".to_sym
             @erb_path_helpers << path_helper unless @erb_path_helpers.include?(path_helper)
-            # Generate /models/:id path
-            path_expr = s(:dstr,
-              s(:str, "/#{model_name}s/"),
-              s(:begin, s(:attr, s(:lvar, model_name.to_sym), :id)))
+            path_expr = s(:send, nil, path_helper, s(:lvar, model_name.to_sym))
           elsif path_node.type == :lvar
-            # Local variable: article (from a loop)
+            # Local variable: article -> article_path(article)
             model_name = path_node.children.first.to_s
             path_helper = "#{model_name}_path".to_sym
             @erb_path_helpers << path_helper unless @erb_path_helpers.include?(path_helper)
-            # Generate /models/:id path
-            path_expr = s(:dstr,
-              s(:str, "/#{model_name}s/"),
-              s(:begin, s(:attr, s(:lvar, model_name.to_sym), :id)))
+            path_expr = s(:send, nil, path_helper, path_node)
+          elsif path_node.type == :array && path_node.children.length == 2
+            # Nested resource: [@article, comment] -> comment_path(article, comment)
+            parent, child = path_node.children
+            child_name = child.type == :ivar ? child.children.first.to_s.sub(/^@/, '') : child.children.first.to_s
+            path_helper = "#{child_name}_path".to_sym
+            @erb_path_helpers << path_helper unless @erb_path_helpers.include?(path_helper)
+            parent_arg = parent.type == :ivar ? s(:lvar, parent.children.first.to_s.sub(/^@/, '').to_sym) : parent
+            child_arg = child.type == :ivar ? s(:lvar, child.children.first.to_s.sub(/^@/, '').to_sym) : child
+            path_expr = s(:send, nil, path_helper, parent_arg, child_arg)
           else
             path_expr = process(path_node)
 
@@ -514,7 +517,31 @@ module Ruby2JS
 
         # Build a delete link with confirmation
         def build_delete_link(text_node, path_node, confirm_msg, css_class = nil)
-          path_expr = process(path_node)
+          # Handle model object as path: link_to "Delete", @article, method: :delete
+          if path_node.type == :ivar
+            # Instance variable: @article -> article_path(article)
+            model_name = path_node.children.first.to_s.sub(/^@/, '')
+            path_helper = "#{model_name}_path".to_sym
+            @erb_path_helpers << path_helper unless @erb_path_helpers.include?(path_helper)
+            path_expr = s(:send, nil, path_helper, s(:lvar, model_name.to_sym))
+          elsif path_node.type == :lvar
+            # Local variable: article -> article_path(article)
+            model_name = path_node.children.first.to_s
+            path_helper = "#{model_name}_path".to_sym
+            @erb_path_helpers << path_helper unless @erb_path_helpers.include?(path_helper)
+            path_expr = s(:send, nil, path_helper, path_node)
+          elsif path_node.type == :array && path_node.children.length == 2
+            # Nested resource: [@article, comment] -> comment_path(article, comment)
+            parent, child = path_node.children
+            child_name = child.type == :ivar ? child.children.first.to_s.sub(/^@/, '') : child.children.first.to_s
+            path_helper = "#{child_name}_path".to_sym
+            @erb_path_helpers << path_helper unless @erb_path_helpers.include?(path_helper)
+            parent_arg = parent.type == :ivar ? s(:lvar, parent.children.first.to_s.sub(/^@/, '').to_sym) : parent
+            child_arg = child.type == :ivar ? s(:lvar, child.children.first.to_s.sub(/^@/, '').to_sym) : child
+            path_expr = s(:send, nil, path_helper, parent_arg, child_arg)
+          else
+            path_expr = process(path_node)
+          end
           confirm_str = confirm_msg ? confirm_msg.children[0] : 'Are you sure?'
 
           # Build class attribute - use provided class or default styling
@@ -1510,8 +1537,16 @@ module Ruby2JS
 
         private
 
-        # Derive target from database option
+        # Check if targeting browser (vs server-side rendering)
+        # Explicit :target option takes precedence over database inference
         def browser_target?
+          # Check for explicit target option first
+          target = @options[:target]
+          if target
+            return target.to_s.downcase == 'browser'
+          end
+
+          # Fall back to inferring from database
           database = @options[:database]
           return true unless database
           database = database.to_s.downcase

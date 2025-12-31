@@ -287,6 +287,39 @@ describe Ruby2JS::Filter::Rails::Helpers do
         result.must_include 'onclick='
       end
     end
+
+    describe 'explicit target option' do
+      def to_js_with_target(string, database:, target:)
+        _(Ruby2JS.convert(string,
+          filters: [Ruby2JS::Filter::Rails::Helpers, Ruby2JS::Filter::Erb, Ruby2JS::Filter::Functions],
+          eslevel: 2015,
+          database: database,
+          target: target
+        ).to_s)
+      end
+
+      it "should respect explicit target: 'browser' even with server database" do
+        erb_src = '_buf = ::String.new; _buf << ( link_to("Articles", "/articles") ).to_s; _buf.to_s'
+        result = to_js_with_target(erb_src, database: 'better_sqlite3', target: 'browser')
+        result.must_include 'onclick='
+        result.must_include 'navigate(event'
+      end
+
+      it "should respect explicit target: 'node' even with browser database" do
+        erb_src = '_buf = ::String.new; _buf << ( link_to("Articles", "/articles") ).to_s; _buf.to_s'
+        result = to_js_with_target(erb_src, database: 'dexie', target: 'node')
+        result.must_include 'href='
+        result.wont_include 'onclick='
+      end
+
+      it "should generate server-style form_tag with explicit target: 'node'" do
+        erb_src = "_buf = ::String.new; _buf.append= form_tag articles_path do\n _buf << \"<button>Submit</button>\"; end\n_buf.to_s"
+        result = to_js_with_target(erb_src, database: 'dexie', target: 'node')
+        result.must_include 'action='
+        result.must_include 'method="post"'
+        result.wont_include 'onsubmit='
+      end
+    end
   end
 
   describe Ruby2JS::Filter::DEFAULTS do
