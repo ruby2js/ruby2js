@@ -116,17 +116,6 @@ VIEW
 # Rebuild Tailwind CSS to include all view classes
 bin/rails tailwindcss:build
 
-# Configure database for Ruby2JS (dexie for browser development)
-cat > config/database.yml << DATABASE
-development:
-  adapter: dexie
-  database: ${APP_NAME}_dev
-
-production:
-  adapter: sqlite3
-  database: db/production.sqlite3
-DATABASE
-
 # Create seeds with sample articles and comments
 cat > db/seeds.rb << 'SEEDS'
 # Sample articles and comments for the blog demo
@@ -172,10 +161,11 @@ bundle exec ruby2js install
 echo ""
 echo "Blog created: $APP_NAME/"
 echo ""
-echo "To run with Ruby2JS (transpiled to JavaScript):"
+echo "To run with Juntos (transpiled to JavaScript):"
 echo "  cd $APP_NAME"
-echo "  bundle exec ruby2js dev      # Browser with IndexedDB (dexie)"
-echo "  bundle exec ruby2js server   # Node.js with SQLite"
+echo "  bin/juntos dev -d dexie      # Browser with IndexedDB"
+echo "  bin/juntos dev -d sqljs      # Browser with sql.js (SQLite in WASM)"
+echo "  bin/juntos server -d sqlite  # Node.js with SQLite"
 echo ""
 echo "To run with Rails:"
 echo "  cd $APP_NAME"

@@ -21,10 +21,11 @@ module Ruby2JS
           setup_dist_directory!
           create_package_json!
           install_dependencies!
+          create_binstub!
 
           puts "Installation complete."
-          puts "  Run 'ruby2js build' to transpile your app"
-          puts "  Run 'ruby2js dev' to start the development server"
+          puts "  Run 'bin/juntos build' to transpile your app"
+          puts "  Run 'bin/juntos dev' to start the development server"
         end
 
         private
@@ -148,6 +149,35 @@ module Ruby2JS
             end
           end
           File.basename(Dir.pwd).gsub(/[^a-z0-9_-]/i, '_').downcase
+        end
+
+        def create_binstub!
+          binstub_path = "bin/juntos"
+
+          # Don't overwrite existing binstub
+          if File.exist?(binstub_path)
+            puts "  bin/juntos already exists, skipping"
+            return
+          end
+
+          FileUtils.mkdir_p("bin")
+
+          binstub_content = <<~RUBY
+            #!/usr/bin/env ruby
+            # frozen_string_literal: true
+
+            # Juntos - Rails patterns, JavaScript runtimes
+            # This binstub delegates to the ruby2js gem's Juntos CLI
+
+            require "bundler/setup"
+            require "ruby2js/cli/juntos"
+
+            Ruby2JS::CLI::Juntos.run(ARGV)
+          RUBY
+
+          File.write(binstub_path, binstub_content)
+          File.chmod(0755, binstub_path)
+          puts "  Created bin/juntos"
         end
       end
     end

@@ -12,13 +12,14 @@ Gem::Specification.new do |s|
   s.authors = ["Sam Ruby".freeze, "Jared White".freeze]
   s.description = "    The base package maps Ruby syntax to JavaScript semantics.\n    Filters may be provided to add Ruby-specific or framework specific\n    behavior.\n".freeze
   s.email = "rubys@intertwingly.net".freeze
-  s.files = %w(ruby2js.gemspec README.md bin/ruby2js demo/ruby2js.rb) + Dir.glob("{lib}/**/*")
+  s.files = %w(ruby2js.gemspec README.md bin/ruby2js bin/juntos demo/ruby2js.rb) + Dir.glob("{lib}/**/*")
   s.homepage = "http://github.com/rubys/ruby2js".freeze
   s.licenses = ["MIT".freeze]
   s.required_ruby_version = Gem::Requirement.new(">= 2.7".freeze)
   s.summary = "Minimal yet extensible Ruby to JavaScript conversion.".freeze
 
   s.executables << 'ruby2js'
+  s.executables << 'juntos'
 
   s.add_dependency('parser')
   s.add_dependency('regexp_parser', '~> 2.9')

@@ -1,0 +1,11 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Juntos - Rails patterns, JavaScript runtimes
+# Global executable for the ruby2js gem
+
+$LOAD_PATH.unshift File.expand_path('../lib', __dir__)
+
+require 'ruby2js/cli/juntos'
+
+Ruby2JS::CLI::Juntos.run(ARGV)

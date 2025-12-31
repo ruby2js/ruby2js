@@ -84,6 +84,7 @@ class SelfhostBuilder
     # Node.js adapters
     'better_sqlite3' => 'active_record_better_sqlite3.mjs',
     'sqlite3' => 'active_record_better_sqlite3.mjs',  # Alias
+    'sqlite' => 'active_record_better_sqlite3.mjs',   # Alias
     'pg' => 'active_record_pg.mjs',
     'postgres' => 'active_record_pg.mjs',
     'postgresql' => 'active_record_pg.mjs',
@@ -173,16 +174,26 @@ class SelfhostBuilder
 
   # Detect runtime/target from database configuration
   # Returns: { target: 'browser'|'server', runtime: nil|'node'|'bun'|'deno', database: 'adapter_name' }
-  # Priority: database.yml target > inferred from adapter
+  # Priority: JUNTOS_* env vars > database.yml target > inferred from adapter
   def self.detect_runtime(app_root = nil)
-    db_config = self.load_database_config(app_root, quiet: true)
-    database = db_config['adapter'] || db_config[:adapter] || 'sqljs'
-    target = db_config['target'] || db_config[:target] || (BROWSER_DATABASES.include?(database) ? 'browser' : 'server')
+    # Check for CLI overrides first
+    database = ENV['JUNTOS_DATABASE']
+    target = ENV['JUNTOS_TARGET']
+
+    # Fall back to database.yml
+    unless database
+      db_config = self.load_database_config(app_root, quiet: true)
+      database = db_config['adapter'] || db_config[:adapter] || 'sqljs'
+      target ||= db_config['target'] || db_config[:target]
+    end
+
+    # Infer target from database if not specified
+    target ||= (BROWSER_DATABASES.include?(database) ? 'browser' : 'server')
 
     runtime = nil
     if target != 'browser'
       required = RUNTIME_REQUIRED[database]
-      runtime = required || ENV['RUNTIME']&.downcase || target
+      runtime = required || ENV['RUNTIME']&.downcase || 'node'
     end
 
     { target: target, runtime: runtime, database: database }
@@ -378,9 +389,10 @@ class SelfhostBuilder
   # Instance methods
   # ============================================================
 
-  def initialize(dist_dir = nil, target: nil)
+  def initialize(dist_dir = nil, target: nil, database: nil)
     @dist_dir = dist_dir || File.join(DEMO_ROOT, 'dist')
-    @database = nil  # Set during build from config
+    @database_override = database  # CLI override for database adapter
+    @database = nil  # Set during build from config or override
     @target = target # Can be set explicitly or derived from database
     @runtime = nil   # For server targets: 'node', 'bun', or 'deno'
     @model_associations = {}  # model_name -> [association_names]
@@ -406,9 +418,14 @@ class SelfhostBuilder
     # Load database config and derive target (unless explicitly set)
     # Priority: CLI option > database.yml target > inferred from adapter
     puts("Database Adapter:")
-    db_config = self.load_database_config()
-    @database = db_config['adapter'] || db_config[:adapter] || 'sqljs'
-    @target ||= db_config['target'] || db_config[:target] || (BROWSER_DATABASES.include?(@database) ? 'browser' : 'server')
+    if @database_override
+      puts("  CLI override: #{@database_override}")
+      @database = @database_override
+    else
+      db_config = self.load_database_config()
+      @database = db_config['adapter'] || db_config[:adapter] || 'sqljs'
+    end
+    @target ||= (BROWSER_DATABASES.include?(@database) ? 'browser' : 'server')
 
     # Validate and set runtime based on database type
     requested_runtime = ENV['RUNTIME']
@@ -442,7 +459,7 @@ class SelfhostBuilder
     # Validate database/target combination
     self.validate_target!()
 
-    self.copy_database_adapter(db_config)
+    self.copy_database_adapter()
     puts("  Target: #{@target}")
     puts("  Runtime: #{@runtime}") if @runtime
     puts("")
@@ -694,13 +711,12 @@ class SelfhostBuilder
     SelfhostBuilder.load_database_config(DEMO_ROOT)
   end
 
-  def copy_database_adapter(db_config)
-    adapter = db_config['adapter'] || db_config[:adapter] || 'sqljs'
-    adapter_file = ADAPTER_FILES[adapter]
+  def copy_database_adapter()
+    adapter_file = ADAPTER_FILES[@database]
 
     unless adapter_file
       valid = ADAPTER_FILES.keys.join(', ')
-      raise "Unknown DATABASE adapter: #{adapter}. Valid options: #{valid}"
+      raise "Unknown DATABASE adapter: #{@database}. Valid options: #{valid}"
     end
 
     # Check for npm-installed package first (in dist/), then packages directory, finally vendor (legacy)
@@ -738,6 +754,13 @@ class SelfhostBuilder
     FileUtils.cp(base_src, base_dest)
     puts("  Base class: active_record_base.mjs")
 
+    # Get database config for injection (load from file or use minimal config for override)
+    db_config = if @database_override
+      { 'adapter' => @database, 'database' => "#{File.basename(DEMO_ROOT)}_dev" }
+    else
+      self.load_database_config()
+    end
+
     # Read adapter and inject config
     adapter_src = File.join(adapter_dir, adapter_file)
     adapter_dest = File.join(lib_dest, 'active_record.mjs')
@@ -745,7 +768,7 @@ class SelfhostBuilder
     adapter_code = adapter_code.sub('const DB_CONFIG = {};', "const DB_CONFIG = #{JSON.generate(db_config)};")
     File.write(adapter_dest, adapter_code)
 
-    puts("  Adapter: #{adapter} -> lib/active_record.mjs")
+    puts("  Adapter: #{@database} -> lib/active_record.mjs")
     if db_config['database'] || db_config[:database]
       puts("  Database: #{db_config['database'] || db_config[:database]}")
     end

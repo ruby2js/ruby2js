@@ -23,7 +23,8 @@ module Ruby2JS
           options = {
             verbose: false,
             selfhost: false,
-            target: nil
+            target: ENV['JUNTOS_TARGET'],
+            database: ENV['JUNTOS_DATABASE']
           }
 
           parser = OptionParser.new do |opts|
@@ -33,8 +34,12 @@ module Ruby2JS
             opts.separator ""
             opts.separator "Options:"
 
-            opts.on("-t", "--target TARGET", "Build target: browser or node") do |target|
+            opts.on("-t", "--target TARGET", "Build target: browser, node, vercel, cloudflare") do |target|
               options[:target] = target
+            end
+
+            opts.on("-d", "--database ADAPTER", "Database adapter (overrides database.yml)") do |db|
+              options[:database] = db
             end
 
             opts.on("-v", "--verbose", "Show detailed build output") do
@@ -92,7 +97,9 @@ module Ruby2JS
           else
             # Use Ruby transpiler directly
             require 'ruby2js/rails/builder'
-            SelfhostBuilder.new(nil, target: options[:target]).build
+            builder_opts = { target: options[:target] }
+            builder_opts[:database] = options[:database] if options[:database]
+            SelfhostBuilder.new(nil, **builder_opts).build
             true
           end
 
