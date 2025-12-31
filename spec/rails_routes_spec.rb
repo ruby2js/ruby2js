@@ -32,13 +32,13 @@ describe Ruby2JS::Filter::Rails::Routes do
       assert_includes result, 'import { Router, Application, createContext, formData, handleFormResult } from "../lib/rails.js"'
     end
 
-    it "imports Schema and Seeds" do
+    it "imports migrations and Seeds" do
       result = to_js(<<~RUBY)
         Rails.application.routes.draw do
           root 'articles#index'
         end
       RUBY
-      assert_includes result, 'import { Schema } from "../db/schema.js"'
+      assert_includes result, 'import { migrations } from "../db/migrate/index.js"'
       assert_includes result, 'import { Seeds } from "../db/seeds.js"'
     end
 
@@ -157,13 +157,13 @@ describe Ruby2JS::Filter::Rails::Routes do
   end
 
   describe "Application.configure" do
-    it "configures Application with schema and seeds" do
+    it "configures Application with migrations and seeds" do
       result = to_js(<<~RUBY)
         Rails.application.routes.draw do
           root 'home#index'
         end
       RUBY
-      assert_includes result, 'Application.configure({schema: Schema, seeds: Seeds})'
+      assert_includes result, 'Application.configure({migrations: migrations, seeds: Seeds})'
     end
   end
 

@@ -12,7 +12,7 @@
     "esm_spec.rb",
     "rails_model_spec.rb",
     "rails_seeds_spec.rb",
-    "rails_schema_spec.rb",
+    "rails_migration_spec.rb",
     "cjs_spec.rb",
     "stimulus_spec.rb",
     "erb_spec.rb",
