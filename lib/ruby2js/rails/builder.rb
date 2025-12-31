@@ -652,9 +652,9 @@ class SelfhostBuilder
       raise "Unknown DATABASE adapter: #{adapter}. Valid options: #{valid}"
     end
 
-    # Check for npm-installed package first, then packages directory, finally vendor (legacy)
-    npm_adapter_dir = File.join(DEMO_ROOT, 'node_modules/ruby2js-rails/adapters')
-    npm_dist_dir = File.join(DEMO_ROOT, 'node_modules/ruby2js-rails/dist/lib')
+    # Check for npm-installed package first (in dist/), then packages directory, finally vendor (legacy)
+    npm_adapter_dir = File.join(@dist_dir, 'node_modules/ruby2js-rails/adapters')
+    npm_dist_dir = File.join(@dist_dir, 'node_modules/ruby2js-rails/dist/lib')
     pkg_adapter_dir = File.join(DEMO_ROOT, '../../packages/ruby2js-rails/adapters')
     vendor_adapter_dir = File.join(DEMO_ROOT, 'vendor/ruby2js/adapters')
     adapter_dir = if File.exist?(npm_adapter_dir)
@@ -711,8 +711,8 @@ class SelfhostBuilder
       target_dir = @runtime  # node, bun, or deno
     end
 
-    # Check for npm-installed package first, then packages directory, finally vendor (legacy)
-    npm_package_dir = File.join(DEMO_ROOT, 'node_modules/ruby2js-rails')
+    # Check for npm-installed package first (in dist/), then packages directory, finally vendor (legacy)
+    npm_package_dir = File.join(@dist_dir, 'node_modules/ruby2js-rails')
     pkg_package_dir = File.join(DEMO_ROOT, '../../packages/ruby2js-rails')
     vendor_package_dir = File.join(DEMO_ROOT, 'vendor/ruby2js')
     package_dir = if File.exist?(npm_package_dir)
@@ -766,8 +766,8 @@ class SelfhostBuilder
     lib_dest = File.join(@dist_dir, 'lib')
     FileUtils.mkdir_p(lib_dest)
 
-    # Check for npm-installed package first, then packages directory, finally vendor (legacy)
-    npm_package_dir = File.join(DEMO_ROOT, 'node_modules/ruby2js-rails')
+    # Check for npm-installed package first (in dist/), then packages directory, finally vendor (legacy)
+    npm_package_dir = File.join(@dist_dir, 'node_modules/ruby2js-rails')
     pkg_package_dir = File.join(DEMO_ROOT, '../../packages/ruby2js-rails')
     vendor_package_dir = File.join(DEMO_ROOT, 'vendor/ruby2js')
     package_dir = if File.exist?(npm_package_dir)
