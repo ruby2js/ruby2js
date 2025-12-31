@@ -141,7 +141,16 @@ module Ruby2JS
       end
 
       put (type==:and ? ' && ' : (use_nullish ? ' ?? ' : ' || '))
-      put '(' if rgroup; parse right; put ')' if rgroup
+
+      # Same for right child - force || if we're using || and right contains :or
+      # This handles cases like: a ||= b || c where we expand to a = a || (b || c)
+      if type == :or && !use_nullish && right.type == :or
+        saved_or, @or = @or, :logical
+        put '(' if rgroup; parse right; put ')' if rgroup
+        @or = saved_or
+      else
+        put '(' if rgroup; parse right; put ')' if rgroup
+      end
     end
 
     # (nullish

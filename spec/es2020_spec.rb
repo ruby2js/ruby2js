@@ -72,6 +72,14 @@ describe "ES2020 support" do
         to_js( 'x = a || b || c' ).must_equal 'let x = a || b || c'
         to_js( 'x = a || b || c || d' ).must_equal 'let x = a || b || c || d'
       end
+
+      it "should use || consistently when ||= expands with inner ||" do
+        # When ||= expands to x = x || y and y contains ||, must use || throughout
+        # to avoid mixing || and ?? which is a JavaScript syntax error
+        to_js( 'x ||= a || b' ).must_equal 'x = x || a || b'
+        to_js( 'target ||= config["key"] || config[:key]' ).
+          must_equal 'target = target || config.key || config.key'
+      end
     end
 
     describe "or: :nullish" do
