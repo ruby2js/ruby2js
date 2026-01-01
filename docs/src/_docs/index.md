@@ -86,4 +86,5 @@ Conversions can be explored interactively using the
 - **[Options](/docs/options)** - Learn about the "preset" configuration or build your own
 - **[User's Guide](/docs/users-guide/introduction)** - Best practices for writing dual-target Ruby/JavaScript code
 - **[Filters](/docs/filters/functions)** - Available transformations for your code
-- **[Ruby2JS on Rails](/docs/users-guide/ruby2js-on-rails)** - Transpile Rails applications to JavaScript
+- **[Juntos](/docs/juntos/)** - Rails-compatible framework for browsers, servers, and edge
+- **[Ruby2JS on Rails](/docs/users-guide/ruby2js-on-rails)** - Quick start guide for Rails apps

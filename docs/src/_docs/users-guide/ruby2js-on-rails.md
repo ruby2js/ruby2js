@@ -10,6 +10,10 @@ next_page_order: 10
 
 Transpile Rails applications to JavaScript. Same models, controllers, views, and routes—running in browsers, on servers, or at the edge.
 
+{% rendercontent "docs/note", title: "Full Documentation" %}
+This page provides a quick start. For complete documentation including CLI reference, architecture details, and deployment guides, see the **[Juntos documentation](/docs/juntos/)**.
+{% endrendercontent %}
+
 {% toc %}
 
 ## Quick Start
