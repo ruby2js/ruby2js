@@ -319,6 +319,28 @@ describe Ruby2JS::Filter::Rails::Helpers do
         result.must_include 'method="post"'
         result.wont_include 'onsubmit='
       end
+
+      it "should generate server-style form_with with action and method for existing model" do
+        erb_src = "_buf = ::String.new; _buf.append= form_with model: @article do |form|\n _buf << \"<button>Submit</button>\"; end\n_buf.to_s"
+        result = to_js_with_target(erb_src, database: 'dexie', target: 'node')
+        result.must_include 'action='
+        result.must_include 'article_path'
+        result.must_include 'articles_path'
+        result.must_include 'method="post"'
+        result.must_include '_method'
+        result.must_include 'patch'
+        result.wont_include 'onsubmit='
+      end
+
+      it "should generate server-style form_with with action for new model" do
+        erb_src = "_buf = ::String.new; _buf.append= form_with model: Comment.new do |form|\n _buf << \"<button>Submit</button>\"; end\n_buf.to_s"
+        result = to_js_with_target(erb_src, database: 'dexie', target: 'node')
+        result.must_include 'action='
+        result.must_include 'comments_path'
+        result.must_include 'method="post"'
+        result.wont_include '_method'
+        result.wont_include 'onsubmit='
+      end
     end
   end
 

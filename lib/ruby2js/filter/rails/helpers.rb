@@ -1362,8 +1362,39 @@ module Ruby2JS
                   s(:str, ") : routes.#{plural_name}.post(event))\">")))
             end
           elsif model_name
-            # Server target - standard form
-            statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+, s(:str, "<form data-model=\"#{model_name}\"#{class_attr}>"))
+            # Server target - form with action and method using path helpers
+            plural_name = model_name + 's'  # Simple pluralization
+            singular_path = :"#{model_name}_path"   # :article_path
+            plural_path = :"#{plural_name}_path"    # :articles_path
+            model_var = s(:lvar, model_name.to_sym)
+
+            if model_is_new
+              # New model - POST to collection path
+              # <form action="<%= articles_path() %>" method="post">
+              statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
+                s(:dstr,
+                  s(:str, "<form data-model=\"#{model_name}\"#{class_attr} action=\""),
+                  s(:begin, s(:send, nil, plural_path)),
+                  s(:str, "\" method=\"post\">")))
+            else
+              # Existing model - check ID to determine POST vs PATCH
+              # <form action="<%= article.id ? article_path(article) : articles_path() %>" method="post">
+              statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
+                s(:dstr,
+                  s(:str, "<form data-model=\"#{model_name}\"#{class_attr} action=\""),
+                  s(:begin,
+                    s(:if, s(:send, model_var, :id),
+                      s(:send, nil, singular_path, model_var),
+                      s(:send, nil, plural_path))),
+                  s(:str, "\" method=\"post\">")))
+
+              # Add hidden _method field for existing records (PATCH)
+              # <% if article.id %><input type="hidden" name="_method" value="patch"><% end %>
+              statements << s(:if, s(:send, model_var, :id),
+                s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
+                  s(:str, '<input type="hidden" name="_method" value="patch">')),
+                nil)
+            end
           else
             statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+, s(:str, "<form#{class_attr}>"))
           end
