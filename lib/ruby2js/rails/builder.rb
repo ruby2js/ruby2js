@@ -174,10 +174,11 @@ class SelfhostBuilder
     app_root ||= DEMO_ROOT
     env = ENV['RAILS_ENV'] || ENV['NODE_ENV'] || 'development'
 
-    # Priority 1: DATABASE environment variable
-    if ENV['DATABASE']
-      puts("  Using DATABASE=#{ENV['DATABASE']} from environment") unless quiet
-      return { 'adapter' => ENV['DATABASE'].downcase }
+    # Priority 1: JUNTOS_DATABASE or DATABASE environment variable
+    db_env = ENV['JUNTOS_DATABASE'] || ENV['DATABASE']
+    if db_env
+      puts("  Using #{ENV['JUNTOS_DATABASE'] ? 'JUNTOS_DATABASE' : 'DATABASE'}=#{db_env} from environment") unless quiet
+      return { 'adapter' => db_env.downcase }
     end
 
     # Priority 2: config/database.yml
@@ -453,7 +454,7 @@ class SelfhostBuilder
       db_config = self.load_database_config()
       @database = db_config['adapter'] || db_config[:adapter] || 'sqljs'
     end
-    @target ||= DEFAULT_TARGETS[@database] || 'node'
+    @target ||= ENV['JUNTOS_TARGET'] || DEFAULT_TARGETS[@database] || 'node'
 
     # Set runtime based on target
     if @target == 'browser'
