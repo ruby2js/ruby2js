@@ -87,6 +87,20 @@ export class Router extends RouterServer {
       return this.redirect(context, defaultRedirect);
     }
   }
+
+  // Override htmlResponse to use the correct Application class
+  // (Parent class references its own Application which doesn't have layoutFn set)
+  static htmlResponse(context, html) {
+    const fullHtml = Application.wrapInLayout(context, html);
+    const headers = { 'Content-Type': 'text/html; charset=utf-8' };
+
+    const flashCookie = context.flash.getResponseCookie();
+    if (flashCookie) {
+      headers['Set-Cookie'] = flashCookie;
+    }
+
+    return new Response(fullHtml, { status: 200, headers });
+  }
 }
 
 // Application with Vercel Serverless Function pattern
@@ -120,14 +134,14 @@ export class Application extends ApplicationServer {
   }
 
   // Create the Serverless Function handler
-  // Vercel's Node.js runtime supports Web API Request/Response
+  // Vercel's Edge runtime provides native Web API Request/Response support
   // Usage in api/[[...path]].js:
   //   import { Application, Router } from '../lib/rails.js';
   //   export default Application.handler();
-  //   export const config = { runtime: 'nodejs' };
+  //   export const config = { runtime: 'edge' };
   static handler() {
     const app = this;
-    return async function(request, context) {
+    return async function(request) {
       try {
         // Initialize database on first request
         await app.initDatabase();

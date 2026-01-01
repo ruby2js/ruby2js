@@ -38,12 +38,32 @@ export const MIME_TYPES = {
   '.map': 'application/json'
 };
 
+// Parse URL from request - handles both full URLs and path-only (Vercel Node.js)
+function parseRequestUrl(req) {
+  if (req.url.startsWith('http')) {
+    return new URL(req.url);
+  }
+  // Handle both Fetch API Headers (.get) and Node.js headers (plain object)
+  const host = typeof req.headers.get === 'function'
+    ? req.headers.get('host')
+    : req.headers.host || req.headers['host'];
+  return new URL(req.url, `https://${host || 'localhost'}`);
+}
+
+// Get header value - works with both Fetch API and Node.js request objects
+function getHeader(req, name) {
+  if (typeof req.headers.get === 'function') {
+    return req.headers.get(name);
+  }
+  return req.headers[name.toLowerCase()];
+}
+
 // Create a fresh request context (like Rails' view context)
 // Each request gets its own context with isolated state
 // For Fetch API requests (Bun, Deno, Cloudflare, rails_server.js)
 export function createContext(req, params = {}) {
-  const url = new URL(req.url);
-  const cookieHeader = req.headers.get('cookie') || '';
+  const url = parseRequestUrl(req);
+  const cookieHeader = getHeader(req, 'cookie') || '';
 
   return {
     // Content for layout (like Rails content_for)
@@ -59,7 +79,7 @@ export function createContext(req, params = {}) {
     request: {
       path: url.pathname,
       method: req.method,
-      url: req.url,
+      url: url.href,  // Full URL for redirect base
       headers: req.headers
     }
   };
@@ -70,7 +90,7 @@ export class Router extends RouterBase {
   // Check if request is for a static file. Returns { path, contentType } or null.
   // Used by runtime-specific targets to serve static files.
   static getStaticFileInfo(req) {
-    const url = new URL(req.url);
+    const url = parseRequestUrl(req);
     const path = url.pathname;
 
     // Security: prevent directory traversal
@@ -96,8 +116,12 @@ export class Router extends RouterBase {
   // Dispatch a Fetch API request to the appropriate controller action
   // Returns a Response object
   static async dispatch(req) {
-    const url = new URL(req.url);
-    const path = url.pathname;
+    const url = parseRequestUrl(req);
+    // Normalize path: remove trailing slash (except for root)
+    let path = url.pathname;
+    if (path.length > 1 && path.endsWith('/')) {
+      path = path.slice(0, -1);
+    }
     let method = this.normalizeMethod(req, url);
     let params = {};
 

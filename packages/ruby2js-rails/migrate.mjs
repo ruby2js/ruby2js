@@ -80,7 +80,7 @@ async function main() {
         console.log(`Running migration ${migration.version}...`);
         try {
           await migration.up();
-          await adapter.execute('INSERT INTO schema_migrations (version) VALUES (?)', [migration.version]);
+          await adapter.insert('schema_migrations', { version: migration.version });
           ran++;
           console.log(`  ✓ Completed`);
         } catch (e) {

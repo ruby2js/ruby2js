@@ -177,6 +177,15 @@ export async function execute(sql, params = []) {
   return { changes: result.affectedRows || 0 };
 }
 
+// Insert a row - PostgreSQL uses $1, $2, ... placeholders
+export async function insert(tableName, data) {
+  const keys = Object.keys(data);
+  const values = Object.values(data);
+  const placeholders = keys.map((_, i) => `$${i + 1}`);
+  const sql = `INSERT INTO ${tableName} (${keys.join(', ')}) VALUES (${placeholders.join(', ')})`;
+  await db.query(sql, values);
+}
+
 // Close the database connection
 export async function closeDatabase() {
   if (db) {

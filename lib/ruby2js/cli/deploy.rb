@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'optparse'
+require 'fileutils'
 
 module Ruby2JS
   module CLI
@@ -181,9 +182,10 @@ module Ruby2JS
 
         def generate_vercel_config(options)
           # Vercel config for serverless deployment
-          # Migrations run locally before deploy, so no buildCommand needed
+          # App is pre-built locally, so skip Vercel's build step
           vercel_json = {
             "version" => 2,
+            "buildCommand" => "",
             "routes" => [
               { "src" => "/app/assets/(.*)", "dest" => "/app/assets/$1" },
               { "src" => "/(.*)", "dest" => "/api/[[...path]]" }
@@ -232,6 +234,14 @@ module Ruby2JS
           puts "\nVerifying deployment..."
 
           Dir.chdir(DIST_DIR) do
+            # Clear caches when forcing
+            if options[:force]
+              puts "  Clearing npm cache..."
+              system("npm cache clean --force --silent")
+              FileUtils.rm_rf("node_modules")
+              FileUtils.rm_f("package-lock.json")
+            end
+
             # Install dependencies
             puts "  Installing dependencies..."
             unless system("npm install --silent")

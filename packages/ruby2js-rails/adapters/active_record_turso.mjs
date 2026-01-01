@@ -168,6 +168,15 @@ export async function execute(sql, params = []) {
   return { changes: result.rowsAffected || 0 };
 }
 
+// Insert a row - libSQL uses ? placeholders
+export async function insert(tableName, data) {
+  const keys = Object.keys(data);
+  const values = Object.values(data);
+  const placeholders = keys.map(() => '?');
+  const sql = `INSERT INTO ${tableName} (${keys.join(', ')}) VALUES (${placeholders.join(', ')})`;
+  await client.execute({ sql, args: values });
+}
+
 // Close the connection
 export async function closeDatabase() {
   if (client) {

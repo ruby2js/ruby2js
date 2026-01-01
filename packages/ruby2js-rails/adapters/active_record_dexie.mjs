@@ -113,16 +113,12 @@ export async function execute(sql, params = []) {
     }
     return { changes: 0 };
   }
-  if (sql.includes('INSERT INTO schema_migrations')) {
-    const version = params[0];
-    try {
-      await db.table('schema_migrations').add({ version });
-    } catch (e) {
-      // May fail if table not ready, ignore
-    }
-    return { changes: 1 };
-  }
   return { changes: 0 };
+}
+
+// Insert a row - Dexie native API
+export async function insert(tableName, data) {
+  await db.table(tableName).add(data);
 }
 
 // Dexie-specific ActiveRecord implementation

@@ -170,6 +170,15 @@ export async function execute(sql, params = []) {
   return { changes: result.rowsAffected || 0 };
 }
 
+// Insert a row - MySQL uses ? placeholders
+export async function insert(tableName, data) {
+  const keys = Object.keys(data);
+  const values = Object.values(data);
+  const placeholders = keys.map(() => '?');
+  const sql = `INSERT INTO ${tableName} (${keys.join(', ')}) VALUES (${placeholders.join(', ')})`;
+  await connection.execute(sql, values);
+}
+
 // Close the connection (no-op for HTTP-based PlanetScale)
 export async function closeDatabase() {
   connection = null;

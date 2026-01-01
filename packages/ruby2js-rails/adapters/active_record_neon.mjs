@@ -162,6 +162,15 @@ export async function execute(sqlString, params = []) {
   return { changes: 0 }; // Neon doesn't return rowCount easily
 }
 
+// Insert a row - adapter handles SQL dialect
+export async function insert(tableName, data) {
+  const keys = Object.keys(data);
+  const values = Object.values(data);
+  const placeholders = keys.map((_, i) => `$${i + 1}`);
+  const sqlString = `INSERT INTO ${tableName} (${keys.join(', ')}) VALUES (${placeholders.join(', ')})`;
+  await sql(sqlString, values);
+}
+
 // Close the connection (no-op for HTTP-based Neon)
 export async function closeDatabase() {
   sql = null;

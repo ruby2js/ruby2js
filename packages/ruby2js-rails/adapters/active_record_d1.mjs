@@ -139,6 +139,16 @@ export async function execute(sql, params = []) {
   return { changes: result.meta?.changes || 0 };
 }
 
+// Insert a row - D1 uses ? placeholders
+export async function insert(tableName, data) {
+  const keys = Object.keys(data);
+  const values = Object.values(data);
+  const placeholders = keys.map(() => '?');
+  const sql = `INSERT INTO ${tableName} (${keys.join(', ')}) VALUES (${placeholders.join(', ')})`;
+  const stmt = db.prepare(sql);
+  await stmt.bind(...values).run();
+}
+
 // D1-specific ActiveRecord implementation
 export class ActiveRecord extends ActiveRecordBase {
   // --- Class Methods (finders) ---

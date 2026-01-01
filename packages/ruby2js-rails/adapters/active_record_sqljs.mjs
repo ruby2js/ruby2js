@@ -169,6 +169,15 @@ export async function execute(sql, params = []) {
   return { changes: db.getRowsModified() };
 }
 
+// Insert a row - SQLite uses ? placeholders
+export async function insert(tableName, data) {
+  const keys = Object.keys(data);
+  const values = Object.values(data);
+  const placeholders = keys.map(() => '?');
+  const sql = `INSERT INTO ${tableName} (${keys.join(', ')}) VALUES (${placeholders.join(', ')})`;
+  db.run(sql, values);
+}
+
 // sql.js-specific ActiveRecord implementation
 export class ActiveRecord extends ActiveRecordBase {
   // --- Class Methods (finders) ---

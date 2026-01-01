@@ -453,13 +453,20 @@ class SelfhostBuilder
         @runtime = required_runtime
       else
         # Server databases work with node, bun, deno, or platform-specific runtimes
-        # When target is a platform (vercel, cloudflare), default to that platform's runtime
-        if requested_runtime
-          @runtime = requested_runtime
-        elsif @target == 'vercel'
+        # Target can directly specify runtime (vercel-edge, vercel-node, cloudflare)
+        # or be a platform name (vercel → vercel-edge, cloudflare → cloudflare)
+        if @target == 'vercel' || @target == 'vercel-edge'
+          # Edge runtime provides native Web API Request/Response support
+          @runtime = 'vercel-edge'
+          @target = 'vercel'  # Normalize target name
+        elsif @target == 'vercel-node'
+          # Node.js runtime (has issues with Response handling, not recommended)
           @runtime = 'vercel-node'
+          @target = 'vercel'  # Normalize target name
         elsif @target == 'cloudflare'
           @runtime = 'cloudflare'
+        elsif requested_runtime
+          @runtime = requested_runtime
         else
           @runtime = 'node'
         end
@@ -733,17 +740,18 @@ class SelfhostBuilder
       raise "Unknown DATABASE adapter: #{@database}. Valid options: #{valid}"
     end
 
-    # Check for npm-installed package first (in dist/), then packages directory, finally vendor (legacy)
+    # Check for local packages first (development), then npm-installed, finally vendor (legacy)
+    # Prefer local source over npm when available so local changes are immediately reflected
     npm_adapter_dir = File.join(@dist_dir, 'node_modules/ruby2js-rails/adapters')
     npm_dist_dir = File.join(@dist_dir, 'node_modules/ruby2js-rails/dist/lib')
     pkg_adapter_dir = File.join(DEMO_ROOT, '../../packages/ruby2js-rails/adapters')
     vendor_adapter_dir = File.join(DEMO_ROOT, 'vendor/ruby2js/adapters')
-    adapter_dir = if File.exist?(npm_adapter_dir)
+    adapter_dir = if File.exist?(pkg_adapter_dir)
+      pkg_adapter_dir
+    elsif File.exist?(npm_adapter_dir)
       npm_adapter_dir
     elsif File.exist?(npm_dist_dir)
       npm_dist_dir
-    elsif File.exist?(pkg_adapter_dir)
-      pkg_adapter_dir
     elsif File.exist?(vendor_adapter_dir)
       vendor_adapter_dir
     else

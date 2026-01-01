@@ -189,6 +189,15 @@ export async function execute(sql, params = []) {
   return { changes: result.affectedRows || 0 };
 }
 
+// Insert a row - MySQL uses ? placeholders
+export async function insert(tableName, data) {
+  const keys = Object.keys(data);
+  const values = Object.values(data);
+  const placeholders = keys.map(() => '?');
+  const sql = `INSERT INTO ${tableName} (${keys.join(', ')}) VALUES (${placeholders.join(', ')})`;
+  await pool.query(sql, values);
+}
+
 // Close the connection pool (for graceful shutdown)
 export async function closeDatabase() {
   if (pool) {

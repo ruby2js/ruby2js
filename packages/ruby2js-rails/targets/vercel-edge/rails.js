@@ -86,6 +86,20 @@ export class Router extends RouterServer {
       return this.redirect(context, defaultRedirect);
     }
   }
+
+  // Override htmlResponse to use the correct Application class
+  // (Parent class references its own Application which doesn't have layoutFn set)
+  static htmlResponse(context, html) {
+    const fullHtml = Application.wrapInLayout(context, html);
+    const headers = { 'Content-Type': 'text/html; charset=utf-8' };
+
+    const flashCookie = context.flash.getResponseCookie();
+    if (flashCookie) {
+      headers['Set-Cookie'] = flashCookie;
+    }
+
+    return new Response(fullHtml, { status: 200, headers });
+  }
 }
 
 // Application with Vercel Edge Function pattern
