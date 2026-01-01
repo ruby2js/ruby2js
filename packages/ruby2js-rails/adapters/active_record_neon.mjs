@@ -91,7 +91,8 @@ export async function createTable(tableName, columns, options = {}) {
   }
 
   const ddl = `CREATE TABLE IF NOT EXISTS ${tableName} (${columnDefs.join(', ')})`;
-  return sql(ddl);
+  // Pass empty array as params - neon requires this for non-parameterized queries
+  return sql(ddl, []);
 }
 
 export async function addIndex(tableName, columns, options = {}) {
@@ -100,23 +101,23 @@ export async function addIndex(tableName, columns, options = {}) {
   const columnList = Array.isArray(columns) ? columns.join(', ') : columns;
 
   const ddl = `CREATE ${unique}INDEX IF NOT EXISTS ${indexName} ON ${tableName}(${columnList})`;
-  return sql(ddl);
+  return sql(ddl, []);
 }
 
 export async function addColumn(tableName, columnName, columnType) {
   const sqlType = PG_TYPE_MAP[columnType] || 'TEXT';
   const ddl = `ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${sqlType}`;
-  return sql(ddl);
+  return sql(ddl, []);
 }
 
 export async function removeColumn(tableName, columnName) {
   const ddl = `ALTER TABLE ${tableName} DROP COLUMN ${columnName}`;
-  return sql(ddl);
+  return sql(ddl, []);
 }
 
 export async function dropTable(tableName) {
   const ddl = `DROP TABLE IF EXISTS ${tableName}`;
-  return sql(ddl);
+  return sql(ddl, []);
 }
 
 function getPgType(col) {
