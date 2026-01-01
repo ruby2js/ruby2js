@@ -420,8 +420,26 @@ module Ruby2JS
             s(:args, s(:arg, :resolve), s(:arg, :reject)),
             s(:send, where_call, :then, s(:lvar, :resolve), s(:lvar, :reject)))
 
-          # Build the proxy object with create, find, and then methods
+          # Build the build lambda: (params) => new Model(Object.assign({fk: _id}, params))
+          # This creates a new instance with the foreign key set but does NOT save it
+          build_lambda = s(:block,
+            s(:send, nil, :lambda),
+            s(:args, s(:arg, :params)),
+            s(:send,
+              s(:const, nil, class_name.to_sym),
+              :new,
+              s(:send,
+                s(:const, nil, :Object),
+                :assign,
+                s(:hash,
+                  s(:pair,
+                    s(:sym, foreign_key.to_sym),
+                    s(:lvar, :_id))),
+                s(:lvar, :params))))
+
+          # Build the proxy object with build, create, find, and then methods
           proxy_object = s(:hash,
+            s(:pair, s(:sym, :build), build_lambda),
             s(:pair, s(:sym, :create), create_lambda),
             s(:pair, s(:sym, :find), find_lambda),
             s(:pair, s(:sym, :then), then_lambda))

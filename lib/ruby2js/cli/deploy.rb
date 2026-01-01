@@ -94,6 +94,11 @@ module Ruby2JS
         end
 
         def validate_target!(options)
+          # Infer target from database if not specified
+          unless options[:target]
+            options[:target] = infer_target_from_database(options[:database])
+          end
+
           unless options[:target]
             abort "Error: Deploy target required.\n" \
                   "Use -t/--target to specify: #{TARGETS.keys.join(', ')}\n\n" \
@@ -112,6 +117,14 @@ module Ruby2JS
                     "Valid databases: #{valid_dbs.join(', ')}"
             end
           end
+        end
+
+        def infer_target_from_database(database)
+          return nil unless database
+          require 'ruby2js/rails/builder'
+          target = SelfhostBuilder::DEFAULT_TARGETS[database]
+          # Only return deploy-able targets (vercel, cloudflare)
+          target if %w[vercel cloudflare].include?(target)
         end
 
         def deploy(options)
@@ -181,7 +194,7 @@ module Ruby2JS
             "version" => 2,
             "buildCommand" => "",
             "routes" => [
-              { "src" => "/app/assets/(.*)", "dest" => "/app/assets/$1" },
+              { "src" => "/assets/(.*)", "dest" => "/public/assets/$1" },
               { "src" => "/(.*)", "dest" => "/api/[[...path]]" }
             ]
           }
@@ -198,21 +211,43 @@ module Ruby2JS
         def generate_cloudflare_config(options)
           app_name = File.basename(Dir.pwd).downcase.gsub(/[^a-z0-9-]/, '-')
 
+          # Read D1_DATABASE_ID from .env.local or environment
+          d1_database_id = ENV['D1_DATABASE_ID']
+          unless d1_database_id
+            env_local = '.env.local'
+            if File.exist?(env_local)
+              File.readlines(env_local).each do |line|
+                if line =~ /^D1_DATABASE_ID=(.+)$/
+                  d1_database_id = $1.strip
+                  break
+                end
+              end
+            end
+          end
+
+          unless d1_database_id
+            abort "Error: D1_DATABASE_ID not found.\n" \
+                  "Set it in .env.local or as an environment variable.\n\n" \
+                  "Create with: wrangler d1 create #{app_name}"
+          end
+
           wrangler_toml = <<~TOML
             name = "#{app_name}"
             main = "src/index.js"
             compatibility_date = "#{Date.today}"
             compatibility_flags = ["nodejs_compat"]
+            workers_dev = true
+            preview_urls = true
 
             # D1 database binding
             [[d1_databases]]
             binding = "DB"
-            database_name = "#{app_name}_production"
-            database_id = "${D1_DATABASE_ID}"
+            database_name = "#{app_name}"
+            database_id = "#{d1_database_id}"
 
-            # Static assets
+            # Static assets (Rails convention: public/)
             [assets]
-            directory = "./app/assets"
+            directory = "./public"
           TOML
 
           File.write(File.join(DIST_DIR, 'wrangler.toml'), wrangler_toml)
@@ -263,6 +298,17 @@ module Ruby2JS
             puts "  Installing dependencies..."
             unless system("npm install --silent")
               abort "Error: npm install failed. Check package.json for issues."
+            end
+
+            # Build Tailwind CSS if source exists
+            tailwind_src = "app/assets/tailwind/application.css"
+            if File.exist?(tailwind_src)
+              puts "  Building Tailwind CSS..."
+              FileUtils.mkdir_p("public/assets")
+              system("npx", "tailwindcss",
+                     "-i", tailwind_src,
+                     "-o", "public/assets/tailwind.css",
+                     "--minify")
             end
 
             # Determine entry point based on target

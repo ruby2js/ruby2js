@@ -70,6 +70,38 @@ describe Ruby2JS::Filter::Rails::Model do
       assert_includes result, 'for (let record of await(this.comments))'
       assert_includes result, 'await record.destroy()'
     end
+
+    it "generates build method for association proxy" do
+      result = to_js(<<~RUBY)
+        class Article < ApplicationRecord
+          has_many :comments
+        end
+      RUBY
+      # build creates a new instance with foreign key set but does NOT save
+      assert_includes result, 'build(params)'
+      assert_includes result, 'new Comment(Object.assign({article_id: _id}, params))'
+    end
+
+    it "generates create method for association proxy" do
+      result = to_js(<<~RUBY)
+        class Article < ApplicationRecord
+          has_many :comments
+        end
+      RUBY
+      # create saves the new instance
+      assert_includes result, 'create(params)'
+      assert_includes result, 'Comment.create(Object.assign({article_id: _id}, params))'
+    end
+
+    it "generates find method for association proxy" do
+      result = to_js(<<~RUBY)
+        class Article < ApplicationRecord
+          has_many :comments
+        end
+      RUBY
+      assert_includes result, 'find(id)'
+      assert_includes result, 'Comment.find(id)'
+    end
   end
 
   describe "belongs_to" do

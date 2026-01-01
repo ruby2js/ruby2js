@@ -358,8 +358,8 @@ class SelfhostBuilder
     # CSS link based on framework
     css_link = case css.to_s
     when 'tailwind'
-      # tailwindcss-rails gem builds to app/assets/builds/tailwind.css
-      '<link href="/app/assets/builds/tailwind.css" rel="stylesheet">'
+      # Rails convention: public/assets/
+      '<link href="/assets/tailwind.css" rel="stylesheet">'
     when 'pico'
       '<link rel="stylesheet" href="/node_modules/@picocss/pico/css/pico.min.css">'
     when 'bootstrap'
@@ -785,6 +785,27 @@ class SelfhostBuilder
     end
   end
 
+  # Find the ruby2js-rails package directory, preferring local packages when in dev
+  def find_package_dir
+    npm_package_dir = File.join(@dist_dir, 'node_modules/ruby2js-rails')
+    pkg_package_dir = File.join(DEMO_ROOT, '../../packages/ruby2js-rails')
+    vendor_package_dir = File.join(DEMO_ROOT, 'vendor/ruby2js')
+
+    # When running from within ruby2js repo, prefer packages directory over stale npm module
+    if File.exist?(pkg_package_dir) && File.exist?(npm_package_dir)
+      puts "  Removing stale npm module (using local packages instead)"
+      FileUtils.rm_rf(npm_package_dir)
+    end
+
+    if File.exist?(npm_package_dir)
+      npm_package_dir
+    elsif File.exist?(pkg_package_dir)
+      pkg_package_dir
+    else
+      vendor_package_dir
+    end
+  end
+
   def copy_lib_files()
     lib_dest = File.join(@dist_dir, 'lib')
     FileUtils.mkdir_p(lib_dest)
@@ -796,17 +817,7 @@ class SelfhostBuilder
       target_dir = @runtime  # node, bun, or deno
     end
 
-    # Check for npm-installed package first (in dist/), then packages directory, finally vendor (legacy)
-    npm_package_dir = File.join(@dist_dir, 'node_modules/ruby2js-rails')
-    pkg_package_dir = File.join(DEMO_ROOT, '../../packages/ruby2js-rails')
-    vendor_package_dir = File.join(DEMO_ROOT, 'vendor/ruby2js')
-    package_dir = if File.exist?(npm_package_dir)
-      npm_package_dir
-    elsif File.exist?(pkg_package_dir)
-      pkg_package_dir
-    else
-      vendor_package_dir
-    end
+    package_dir = find_package_dir
 
     # Copy base files (rails_base.js is needed by all targets)
     base_src = File.join(package_dir, 'rails_base.js')
@@ -851,18 +862,7 @@ class SelfhostBuilder
     lib_dest = File.join(@dist_dir, 'lib')
     FileUtils.mkdir_p(lib_dest)
 
-    # Check for npm-installed package first (in dist/), then packages directory, finally vendor (legacy)
-    npm_package_dir = File.join(@dist_dir, 'node_modules/ruby2js-rails')
-    pkg_package_dir = File.join(DEMO_ROOT, '../../packages/ruby2js-rails')
-    vendor_package_dir = File.join(DEMO_ROOT, 'vendor/ruby2js')
-    package_dir = if File.exist?(npm_package_dir)
-      npm_package_dir
-    elsif File.exist?(pkg_package_dir)
-      pkg_package_dir
-    else
-      vendor_package_dir
-    end
-
+    package_dir = find_package_dir
     src_path = File.join(package_dir, 'phlex_runtime.mjs')
     return unless File.exist?(src_path)
 
@@ -1017,7 +1017,7 @@ class SelfhostBuilder
     css_link = ''
     tailwind_src = File.join(DEMO_ROOT, 'app/assets/tailwind/application.css')
     if File.exist?(tailwind_src)
-      css_link = '<link href="/app/assets/builds/tailwind.css" rel="stylesheet">'
+      css_link = '<link href="/assets/tailwind.css" rel="stylesheet">'
     end
 
     # Generate a minimal layout for server-side rendering
@@ -1232,8 +1232,8 @@ class SelfhostBuilder
       'buildCommand' => 'npm run build',
       'outputDirectory' => 'dist',
       'routes' => [
-        # Serve static assets directly
-        { 'src' => '/app/assets/(.*)', 'dest' => '/app/assets/$1' },
+        # Serve static assets from public/ (Rails convention)
+        { 'src' => '/assets/(.*)', 'dest' => '/public/assets/$1' },
         # All other routes go to the catch-all API handler
         { 'src' => '/(.*)', 'dest' => '/api/[[...path]]' }
       ]
@@ -1314,9 +1314,9 @@ class SelfhostBuilder
       database_name = "#{app_name}_production"
       database_id = "${D1_DATABASE_ID}"
 
-      # Static assets
+      # Static assets (Rails convention: public/)
       [assets]
-      directory = "./app/assets"
+      directory = "./public"
     TOML
 
     config_path = File.join(@dist_dir, 'wrangler.toml')
@@ -1361,7 +1361,7 @@ class SelfhostBuilder
 
     puts("Tailwind CSS:")
 
-    # Create destination directory
+    # Create source directory (for Tailwind input)
     tailwind_dest_dir = File.join(@dist_dir, 'app/assets/tailwind')
     FileUtils.mkdir_p(tailwind_dest_dir)
 
@@ -1375,7 +1375,7 @@ class SelfhostBuilder
       @tailwind utilities;
     CSS
 
-    # Write the converted CSS to dist
+    # Write the converted CSS to dist (source for Tailwind build)
     dest_path = File.join(tailwind_dest_dir, 'application.css')
     File.write(dest_path, npm_css)
     puts("  -> app/assets/tailwind/application.css")
@@ -1401,9 +1401,9 @@ class SelfhostBuilder
       puts("  -> tailwind.config.js")
     end
 
-    # Create output directory for built CSS
-    builds_dir = File.join(@dist_dir, 'app/assets/builds')
-    FileUtils.mkdir_p(builds_dir)
+    # Create output directory for built CSS (Rails convention: public/assets/)
+    assets_dir = File.join(@dist_dir, 'public/assets')
+    FileUtils.mkdir_p(assets_dir)
 
     # Run Tailwind CSS build (only if tailwindcss is installed)
     tailwind_bin = File.join(@dist_dir, 'node_modules/.bin/tailwindcss')
@@ -1412,12 +1412,12 @@ class SelfhostBuilder
       Dir.chdir(@dist_dir) do
         system('npx', 'tailwindcss',
                '-i', 'app/assets/tailwind/application.css',
-               '-o', 'app/assets/builds/tailwind.css',
+               '-o', 'public/assets/tailwind.css',
                '--minify')
       end
-      puts("  -> app/assets/builds/tailwind.css")
+      puts("  -> public/assets/tailwind.css")
     else
-      puts("  (Run 'npm install' in dist/, then 'npx tailwindcss -i app/assets/tailwind/application.css -o app/assets/builds/tailwind.css')")
+      puts("  (Run 'npm install' in dist/, then 'npx tailwindcss -i app/assets/tailwind/application.css -o public/assets/tailwind.css')")
     end
   end
 

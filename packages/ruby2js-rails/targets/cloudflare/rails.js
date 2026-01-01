@@ -4,6 +4,7 @@
 import {
   Router as RouterServer,
   Application as ApplicationServer,
+  extractNestedKey,
   createContext,
   createFlash,
   truncate,
@@ -46,7 +47,7 @@ export class Router extends RouterServer {
         const formData = await req.formData();
         const params = {};
         for (const [key, value] of formData.entries()) {
-          params[key] = value;
+          params[extractNestedKey(key)] = value;
         }
         return params;
       } else if (contentType.includes('multipart/form-data')) {
@@ -55,7 +56,7 @@ export class Router extends RouterServer {
         for (const [key, value] of formData.entries()) {
           // Skip file uploads for now, just get string values
           if (typeof value === 'string') {
-            params[key] = value;
+            params[extractNestedKey(key)] = value;
           }
         }
         return params;

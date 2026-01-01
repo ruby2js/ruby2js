@@ -12,6 +12,7 @@ import {
   Router as RouterServer,
   Application as ApplicationServer,
   MIME_TYPES,
+  extractNestedKey,
   createContext,
   createFlash,
   truncate,
@@ -220,7 +221,8 @@ export class Router extends RouterServer {
           for (const pair of pairs) {
             const [key, value] = pair.split('=');
             if (key) {
-              params[decodeURIComponent(key.replace(/\+/g, ' '))] =
+              const decodedKey = decodeURIComponent(key.replace(/\+/g, ' '));
+              params[extractNestedKey(decodedKey)] =
                 decodeURIComponent((value || '').replace(/\+/g, ' '));
             }
           }

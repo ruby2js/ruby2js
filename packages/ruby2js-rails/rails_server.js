@@ -58,6 +58,13 @@ function getHeader(req, name) {
   return req.headers[name.toLowerCase()];
 }
 
+// Extract nested Rails-style param key: article[title] -> title
+// Exported for use by target-specific parseBody implementations
+export function extractNestedKey(key) {
+  const match = key.match(/\[([^\]]+)\]$/);
+  return match ? match[1] : key;
+}
+
 // Create a fresh request context (like Rails' view context)
 // Each request gets its own context with isolated state
 // For Fetch API requests (Bun, Deno, Cloudflare, rails_server.js)
@@ -244,7 +251,8 @@ export class Router extends RouterBase {
       for (const pair of pairs) {
         const [key, value] = pair.split('=');
         if (key) {
-          params[decodeURIComponent(key.replace(/\+/g, ' '))] =
+          const decodedKey = decodeURIComponent(key.replace(/\+/g, ' '));
+          params[extractNestedKey(decodedKey)] =
             decodeURIComponent((value || '').replace(/\+/g, ' '));
         }
       }

@@ -82,6 +82,7 @@ describe Ruby2JS::Filter::Rails::Helpers do
       result.must_include '<form'
     end
 
+
     it "should include class attribute on text_field" do
       return skip() unless defined?(Ruby2JS::Erubi)
       result = erb_to_js('<%= form_with(model: @article) do |form| %><%= form.text_field :title, class: "input-lg" %><% end %>')
@@ -332,6 +333,26 @@ describe Ruby2JS::Filter::Rails::Helpers do
         result.wont_include 'onsubmit='
       end
 
+      it "should use property access for model.id not function call" do
+        erb_src = "_buf = ::String.new; _buf.append= form_with model: @article do |form|\n _buf << \"<button>Submit</button>\"; end\n_buf.to_s"
+        result = to_js_with_target(erb_src, database: 'dexie', target: 'node')
+        # article.id should be property access, not function call
+        result.must_include 'article.id'
+        result.wont_include 'article.id()'
+      end
+
+      it "should import path helpers for form_with model rather than passing as parameters" do
+        erb_src = "_buf = ::String.new; _buf.append= form_with model: @article do |form|\n _buf << \"<button>Submit</button>\"; end\n_buf.to_s"
+        result = to_js_with_target(erb_src, database: 'dexie', target: 'node')
+        # Path helpers should be imported, not function parameters
+        result.must_include 'import { article_path, articles_path } from'
+        # The render function should only have article as parameter
+        result.must_include 'function render($context, { article })'
+        # Should NOT have path helpers as function parameters
+        result.wont_include '{ article, article_path'
+        result.wont_include '{ article, articles_path'
+      end
+
       it "should generate server-style form_with with action for new model" do
         erb_src = "_buf = ::String.new; _buf.append= form_with model: Comment.new do |form|\n _buf << \"<button>Submit</button>\"; end\n_buf.to_s"
         result = to_js_with_target(erb_src, database: 'dexie', target: 'node')
@@ -340,6 +361,16 @@ describe Ruby2JS::Filter::Rails::Helpers do
         result.must_include 'method="post"'
         result.wont_include '_method'
         result.wont_include 'onsubmit='
+      end
+
+      it "should generate nested resource form_with with parent model in path" do
+        erb_src = "_buf = ::String.new; _buf.append= form_with model: [@article, Comment.new] do |form|\n _buf << \"<button>Submit</button>\"; end\n_buf.to_s"
+        result = to_js_with_target(erb_src, database: 'dexie', target: 'node')
+        result.must_include 'action='
+        # Should pass parent model to path helper: comments_path(article)
+        result.must_include 'comments_path(article)'
+        result.must_include 'method="post"'
+        result.wont_include 'comments_path()'
       end
     end
   end

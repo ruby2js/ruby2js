@@ -1282,6 +1282,7 @@ module Ruby2JS
         def process_form_with(helper_call, block_args, block_body)
           # Extract model, url, and class from keyword arguments
           model_name = nil
+          parent_model_name = nil  # Track parent for nested resources
           model_is_new = false  # Track if model is Model.new (no pre-fill values)
           css_class = nil
           options_node = helper_call.children[2]
@@ -1310,6 +1311,13 @@ module Ruby2JS
                     end
                   elsif value.type == :array && value.children.length >= 2
                     # Nested resource: model: [@article, Comment.new]
+                    # Extract parent model (first element) for path generation
+                    parent = value.children.first
+                    if parent.type == :ivar
+                      parent_model_name = parent.children.first.to_s.sub(/^@/, '')
+                    elsif parent.type == :lvar
+                      parent_model_name = parent.children.first.to_s
+                    end
                     # Use the child model (second element) for form field naming
                     child = value.children.last
                     if child.type == :send && child.children[1] == :new
@@ -1368,14 +1376,29 @@ module Ruby2JS
             plural_path = :"#{plural_name}_path"    # :articles_path
             model_var = s(:lvar, model_name.to_sym)
 
+            # Track path helpers for import
+            @erb_path_helpers << singular_path unless @erb_path_helpers.include?(singular_path)
+            @erb_path_helpers << plural_path unless @erb_path_helpers.include?(plural_path)
+
             if model_is_new
               # New model - POST to collection path
               # <form action="<%= articles_path() %>" method="post">
-              statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
-                s(:dstr,
-                  s(:str, "<form data-model=\"#{model_name}\"#{class_attr} action=\""),
-                  s(:begin, s(:send, nil, plural_path)),
-                  s(:str, "\" method=\"post\">")))
+              # For nested resources: <form action="<%= comments_path(article) %>" method="post">
+              if parent_model_name
+                # Nested resource - pass parent model to path helper
+                parent_var = s(:lvar, parent_model_name.to_sym)
+                statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
+                  s(:dstr,
+                    s(:str, "<form data-model=\"#{model_name}\"#{class_attr} action=\""),
+                    s(:begin, s(:send, nil, plural_path, parent_var)),
+                    s(:str, "\" method=\"post\">")))
+              else
+                statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
+                  s(:dstr,
+                    s(:str, "<form data-model=\"#{model_name}\"#{class_attr} action=\""),
+                    s(:begin, s(:send, nil, plural_path)),
+                    s(:str, "\" method=\"post\">")))
+              end
             else
               # Existing model - check ID to determine POST vs PATCH
               # <form action="<%= article.id ? article_path(article) : articles_path() %>" method="post">
@@ -1383,14 +1406,14 @@ module Ruby2JS
                 s(:dstr,
                   s(:str, "<form data-model=\"#{model_name}\"#{class_attr} action=\""),
                   s(:begin,
-                    s(:if, s(:send, model_var, :id),
+                    s(:if, s(:attr, model_var, :id),
                       s(:send, nil, singular_path, model_var),
                       s(:send, nil, plural_path))),
                   s(:str, "\" method=\"post\">")))
 
               # Add hidden _method field for existing records (PATCH)
               # <% if article.id %><input type="hidden" name="_method" value="patch"><% end %>
-              statements << s(:if, s(:send, model_var, :id),
+              statements << s(:if, s(:attr, model_var, :id),
                 s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
                   s(:str, '<input type="hidden" name="_method" value="patch">')),
                 nil)
