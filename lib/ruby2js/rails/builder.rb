@@ -227,12 +227,14 @@ class SelfhostBuilder
     end
 
     # Check for local packages directory (when running from ruby2js repo)
+    # For deploy targets, always use tarball URL since deployed code can't access local files
     gem_root = File.expand_path("../../..", __dir__)
     local_package = File.join(gem_root, "packages/ruby2js-rails")
     # Path is relative to dist/ directory where package.json lives
     dist_dir = File.join(app_root || Dir.pwd, 'dist')
 
-    deps = if File.directory?(local_package)
+    use_local = File.directory?(local_package) && !options[:for_deploy]
+    deps = if use_local
       relative_path = Pathname.new(local_package).relative_path_from(Pathname.new(dist_dir))
       { 'ruby2js-rails' => "file:#{relative_path}" }
     else
@@ -450,8 +452,17 @@ class SelfhostBuilder
         end
         @runtime = required_runtime
       else
-        # Server databases work with node, bun, or deno (default: node)
-        @runtime = requested_runtime || 'node'
+        # Server databases work with node, bun, deno, or platform-specific runtimes
+        # When target is a platform (vercel, cloudflare), default to that platform's runtime
+        if requested_runtime
+          @runtime = requested_runtime
+        elsif @target == 'vercel'
+          @runtime = 'vercel-node'
+        elsif @target == 'cloudflare'
+          @runtime = 'cloudflare'
+        else
+          @runtime = 'node'
+        end
       end
 
       unless SERVER_RUNTIMES.include?(@runtime)
