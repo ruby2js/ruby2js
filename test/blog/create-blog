@@ -22,8 +22,8 @@ rails generate scaffold Article title:string body:text
 # Generate Comment scaffold (will be nested under articles)
 rails generate scaffold Comment article:references commenter:string body:text
 
-# Prepare database (migrate + seed)
-rails db:prepare
+# Create database (migration and seeding done separately)
+rails db:create
 
 # Add ruby2js gem from GitHub
 bundle add ruby2js --github ruby2js/ruby2js

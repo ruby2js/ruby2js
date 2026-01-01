@@ -40,6 +40,9 @@ ENV JUNTOS_TARGET=${TARGET}
 # Build with specified database and target
 RUN bin/juntos build -d ${DATABASE} -t ${TARGET}
 
+# Run migrations (creates tables in database)
+RUN bin/juntos migrate -d ${DATABASE} -t ${TARGET}
+
 EXPOSE 3000
 
 # Run server with specified database
