@@ -1343,7 +1343,7 @@ module Ruby2JS
           class_attr = css_class ? " class=\"#{css_class}\"" : ""
 
           # Build form tag - add onsubmit handler for browser/SPA target
-          if model_name && self.browser_target?
+          if model_name && self.browser_target?()
             plural_name = model_name + 's'  # Simple pluralization
 
             if model_is_new
