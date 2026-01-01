@@ -13,20 +13,53 @@ Juntos currently supports the core Rails patterns: models, controllers, views, r
 
 ## Planned
 
-### Action Mailer
+### Vite Integration
 
-Transform Rails mailer syntax into email service API calls:
+A [Vite](https://vitejs.dev/) plugin ecosystem that makes Ruby a first-class frontend language:
 
-```ruby
-# What you write
-UserMailer.welcome(@user).deliver_later
+```javascript
+// vite.config.js
+import { defineConfig } from 'vite';
+import { rails } from 'vite-plugin-ruby2js';
 
-# Browser target: queue for server sync
-# Node target: Resend/SendGrid API call
-# Edge target: Resend/SendGrid API call
+export default defineConfig({
+  plugins: [rails()]
+});
 ```
 
-Email services under consideration: [Resend](https://resend.com/), [SendGrid](https://sendgrid.com/), [Postmark](https://postmarkapp.com/).
+**Benefits over current dev server:**
+
+| Feature | Current | With Vite |
+|---------|---------|-----------|
+| Hot reload | Full page refresh | HMR — state preserved |
+| Rebuild speed | Full project | Module-level |
+| CSS handling | Separate Tailwind CLI | Built-in PostCSS |
+| Production | No optimization | Tree shaking, code splitting |
+
+Hot Module Replacement means editing a view re-renders without losing your current article, form inputs, or scroll position.
+
+**Beyond Juntos:** The same plugin architecture supports Ruby inside [Vue](https://vuejs.org/), [Svelte](https://svelte.dev/), and [Astro](https://astro.build/) components. Write a Juntos backend with Vue or Svelte for interactive parts—all in Ruby. Phlex components become portable across frameworks via ES module imports.
+
+### Hotwire (Turbo + Stimulus)
+
+[Hotwire](https://hotwired.dev/) integration for the Rails-native approach to interactivity:
+
+**Stimulus** — Ruby2JS already has a working [`stimulus` filter](/docs/filters/stimulus) that transforms Ruby controller classes:
+
+```ruby
+class SearchController < Stimulus::Controller
+  def search
+    results_target.innerHTML = fetch_results(query_target.value)
+  end
+end
+```
+
+**Turbo** — Import `@hotwired/turbo` to get:
+- Turbo Drive for fetch-based navigation (no full page reloads)
+- Turbo Frames for partial page updates
+- Turbo Streams for real-time DOM manipulation
+
+Since Turbo and Stimulus are JavaScript libraries, integration is straightforward — just import and use.
 
 ### Active Storage
 
@@ -60,9 +93,9 @@ end
 # Edge: Not supported (platform limitation)
 ```
 
-### Background Jobs
+### Active Job
 
-Active Job-style interface for async processing:
+Async processing with the Rails Active Job interface:
 
 ```ruby
 # What you write
@@ -74,6 +107,10 @@ ProcessOrderJob.perform_later(@order)
 ```
 
 ## Under Consideration
+
+### Action Mailer
+
+Transform Rails mailer syntax into email service API calls ([Resend](https://resend.com/), [SendGrid](https://sendgrid.com/), [Postmark](https://postmarkapp.com/)).
 
 ### Stimulus Reflex / Hotwire
 
