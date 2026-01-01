@@ -38,9 +38,6 @@ class SelfhostBuilder
     Dir.pwd
   end
 
-  # Browser databases - these run in the browser with IndexedDB or WASM
-  BROWSER_DATABASES = ['dexie', 'indexeddb', 'sqljs', 'sql.js', 'pglite'].freeze
-
   # Server-side JavaScript runtimes
   SERVER_RUNTIMES = ['node', 'bun', 'deno', 'cloudflare', 'vercel-edge', 'vercel-node'].freeze
 
@@ -71,6 +68,32 @@ class SelfhostBuilder
     'turso' => ['browser', 'node', 'bun', 'deno', 'cloudflare', 'vercel-edge', 'vercel-node'],
     'libsql' => ['browser', 'node', 'bun', 'deno', 'cloudflare', 'vercel-edge', 'vercel-node'],
     'planetscale' => ['browser', 'node', 'bun', 'deno', 'cloudflare', 'vercel-edge', 'vercel-node']
+  }.freeze
+
+  # Default target for each database adapter (used when target not specified)
+  DEFAULT_TARGETS = {
+    # Browser-only databases
+    'dexie' => 'browser',
+    'indexeddb' => 'browser',
+    'sqljs' => 'browser',
+    'sql.js' => 'browser',
+    'pglite' => 'browser',
+    # TCP-based server databases
+    'better_sqlite3' => 'node',
+    'sqlite3' => 'node',
+    'sqlite' => 'node',
+    'pg' => 'node',
+    'postgres' => 'node',
+    'postgresql' => 'node',
+    'mysql2' => 'node',
+    'mysql' => 'node',
+    # Platform-specific databases
+    'd1' => 'cloudflare',
+    # HTTP-based edge databases
+    'neon' => 'vercel',
+    'turso' => 'vercel',
+    'libsql' => 'vercel',
+    'planetscale' => 'vercel'
   }.freeze
 
   # Map DATABASE env var to adapter source file
@@ -189,12 +212,12 @@ class SelfhostBuilder
     end
 
     # Infer target from database if not specified
-    target ||= (BROWSER_DATABASES.include?(database) ? 'browser' : 'server')
+    target ||= DEFAULT_TARGETS[database] || 'node'
 
     runtime = nil
     if target != 'browser'
       required = RUNTIME_REQUIRED[database]
-      runtime = required || ENV['RUNTIME']&.downcase || 'node'
+      runtime = required || target
     end
 
     { target: target, runtime: runtime, database: database }
@@ -430,50 +453,30 @@ class SelfhostBuilder
       db_config = self.load_database_config()
       @database = db_config['adapter'] || db_config[:adapter] || 'sqljs'
     end
-    @target ||= (BROWSER_DATABASES.include?(@database) ? 'browser' : 'server')
+    @target ||= DEFAULT_TARGETS[@database] || 'node'
 
-    # Validate and set runtime based on database type
-    requested_runtime = ENV['RUNTIME']
-    requested_runtime = requested_runtime.downcase if requested_runtime
-
+    # Set runtime based on target
     if @target == 'browser'
-      # Browser databases only work with browser target
-      if requested_runtime && requested_runtime != 'browser'
-        raise "Database '#{@database}' is browser-only. Cannot use RUNTIME=#{requested_runtime}.\n" \
-              "Browser databases: #{BROWSER_DATABASES.join(', ')}"
-      end
       @runtime = nil  # Browser target doesn't use a JS runtime
     else
       # Check if database requires a specific runtime
       required_runtime = RUNTIME_REQUIRED[@database]
       if required_runtime
-        if requested_runtime && requested_runtime != required_runtime
-          raise "Database '#{@database}' requires RUNTIME=#{required_runtime}. Cannot use RUNTIME=#{requested_runtime}."
-        end
         @runtime = required_runtime
+      elsif @target == 'vercel' || @target == 'vercel-edge'
+        @runtime = 'vercel-edge'
+        @target = 'vercel'  # Normalize target name
+      elsif @target == 'vercel-node'
+        @runtime = 'vercel-node'
+        @target = 'vercel'  # Normalize target name
+      elsif @target == 'cloudflare'
+        @runtime = 'cloudflare'
       else
-        # Server databases work with node, bun, deno, or platform-specific runtimes
-        # Target can directly specify runtime (vercel-edge, vercel-node, cloudflare)
-        # or be a platform name (vercel → vercel-edge, cloudflare → cloudflare)
-        if @target == 'vercel' || @target == 'vercel-edge'
-          # Edge runtime provides native Web API Request/Response support
-          @runtime = 'vercel-edge'
-          @target = 'vercel'  # Normalize target name
-        elsif @target == 'vercel-node'
-          # Node.js runtime (has issues with Response handling, not recommended)
-          @runtime = 'vercel-node'
-          @target = 'vercel'  # Normalize target name
-        elsif @target == 'cloudflare'
-          @runtime = 'cloudflare'
-        elsif requested_runtime
-          @runtime = requested_runtime
-        else
-          @runtime = 'node'
-        end
+        @runtime = @target  # node, bun, deno
       end
 
       unless SERVER_RUNTIMES.include?(@runtime)
-        raise "Unknown runtime: #{@runtime}. Valid options for server databases: #{SERVER_RUNTIMES.join(', ')}"
+        raise "Unknown runtime: #{@runtime}. Valid options: #{SERVER_RUNTIMES.join(', ')}"
       end
     end
 
@@ -703,28 +706,6 @@ class SelfhostBuilder
       end
       filter
     end
-  end
-
-  def load_runtime_config()
-    # Priority 1: RUNTIME environment variable
-    if ENV['RUNTIME']
-      return ENV['RUNTIME'].downcase
-    end
-
-    # Priority 2: database.yml runtime key
-    db_config = self.load_database_config()
-    if db_config['runtime']
-      return db_config['runtime'].downcase
-    end
-
-    # Priority 3: ruby2js.yml runtime key
-    r2js_config = self.load_ruby2js_config()
-    if r2js_config['runtime']
-      return r2js_config['runtime'].downcase
-    end
-
-    # Default: node
-    'node'
   end
 
   def load_database_config()
