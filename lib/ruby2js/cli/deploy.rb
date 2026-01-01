@@ -33,7 +33,6 @@ module Ruby2JS
             database: ENV['JUNTOS_DATABASE'],
             verbose: false,
             skip_build: false,
-            skip_migrate: false,
             force: false
           }
 
@@ -54,10 +53,6 @@ module Ruby2JS
 
             opts.on("--skip-build", "Skip the build step (use existing dist/)") do
               options[:skip_build] = true
-            end
-
-            opts.on("--skip-migrate", "Skip running migrations") do
-              options[:skip_migrate] = true
             end
 
             opts.on("-f", "--force", "Force deploy (clears remote build cache)") do
@@ -135,11 +130,6 @@ module Ruby2JS
 
           # Verify deployment before proceeding
           verify_deployment(target, options)
-
-          # Run migrations locally (better error output, faster)
-          unless options[:skip_migrate]
-            run_migrations_locally(options)
-          end
 
           # Run platform deploy
           run_platform_deploy(target, options)
@@ -282,29 +272,6 @@ module Ruby2JS
             File.delete(lock_path) if File.exist?(lock_path)
 
             puts "  ✓ Verification passed"
-          end
-        end
-
-        def run_migrations_locally(options)
-          puts "\nRunning migrations..."
-
-          Dir.chdir(DIST_DIR) do
-            # Load environment variables from .env.local if present
-            env_file = ".env.local"
-            if File.exist?(env_file)
-              File.readlines(env_file).each do |line|
-                next if line.start_with?('#') || line.strip.empty?
-                if line =~ /^([^=]+)=["']?([^"'\n]*)["']?$/
-                  ENV[$1] = $2
-                end
-              end
-            end
-
-            # Run the migrate script
-            unless system("node", "node_modules/ruby2js-rails/migrate.mjs")
-              abort "\nError: Migration failed.\n" \
-                    "Fix the errors above before deploying."
-            end
           end
         end
 

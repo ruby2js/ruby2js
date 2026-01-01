@@ -6,7 +6,7 @@ require 'yaml'
 module Ruby2JS
   module CLI
     module Juntos
-      SUBCOMMANDS = %w[dev server build deploy install].freeze
+      SUBCOMMANDS = %w[dev server build deploy install up migrate].freeze
 
       class << self
         def run(args)
@@ -101,10 +101,12 @@ module Ruby2JS
             Usage: juntos [options] <command> [command-options]
 
             Commands:
+              up        Build and run locally (node, bun, deno, browser)
               dev       Start development server with hot reload
-              server    Start production server
+              server    Start production server (requires prior build)
               build     Build for deployment
-              deploy    Build and deploy to platform
+              deploy    Build and deploy to serverless platform
+              migrate   Run database migrations
               install   Set up project for Juntos
 
             Common Options:
@@ -113,10 +115,10 @@ module Ruby2JS
               -t, --target TARGET      Deploy target (browser, node, vercel, cloudflare)
 
             Examples:
-              juntos dev                         # Start dev server (uses database.yml)
-              juntos dev -d dexie                # Dev with IndexedDB in browser
-              juntos server -d sqlite            # Production server with SQLite
-              juntos deploy -t vercel -d turso   # Deploy to Vercel with Turso DB
+              juntos up                              # Build and run (uses database.yml)
+              juntos up -t node -d better_sqlite3    # Build and run with Node + SQLite
+              juntos dev                             # Start dev server with hot reload
+              juntos deploy -t vercel -d neon        # Deploy to Vercel with Neon DB
 
             Run 'juntos <command> --help' for command-specific options.
           HELP

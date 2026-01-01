@@ -124,6 +124,7 @@ export class ApplicationBase {
   }
 
   // Initialize the database using the adapter
+  // Note: Migrations are NOT run automatically - use 'juntos migrate' before starting
   static async initDatabase(options = {}) {
     // Import the adapter (selected at build time)
     const adapter = await import('./active_record.mjs');
@@ -131,14 +132,6 @@ export class ApplicationBase {
 
     // Initialize database connection
     await adapter.initDatabase(options);
-
-    // Run migrations and check if this is a fresh database
-    const { wasFresh } = await this.runMigrations();
-
-    // Run seeds only on fresh database (seeds also guard themselves)
-    if (this.seeds && wasFresh) {
-      await this.seeds.run();
-    }
   }
 
   // Run pending migrations and track them in schema_migrations

@@ -108,6 +108,7 @@ export class Application extends ApplicationServer {
 
   // Initialize the database using the adapter
   // Uses environment variables (Vercel convention)
+  // Note: Migrations are NOT run automatically - use 'juntos migrate' before deploying
   static async initDatabase() {
     if (this._initialized) return;
 
@@ -120,14 +121,6 @@ export class Application extends ApplicationServer {
     await adapter.initDatabase({
       url: process.env.DATABASE_URL,
     });
-
-    // Run migrations
-    await this.runMigrations();
-
-    // Run seeds if present (seeds check internally if data already exists)
-    if (this.seeds) {
-      await this.seeds.run();
-    }
 
     this._initialized = true;
   }

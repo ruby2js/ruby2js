@@ -108,6 +108,7 @@ export class Application extends ApplicationServer {
 
   // Initialize the database using the adapter
   // env contains the D1 binding (e.g., env.DB)
+  // Note: Migrations are NOT run automatically - use 'juntos migrate' before deploying
   static async initDatabase(env) {
     if (this._initialized) return;
 
@@ -117,14 +118,6 @@ export class Application extends ApplicationServer {
 
     // Initialize database connection with D1 binding
     await adapter.initDatabase({ binding: env.DB });
-
-    // Run migrations
-    await this.runMigrations();
-
-    // Run seeds if present (seeds check internally if data already exists)
-    if (this.seeds) {
-      await this.seeds.run();
-    }
 
     this._initialized = true;
   }
