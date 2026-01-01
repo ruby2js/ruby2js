@@ -42,6 +42,10 @@ module Ruby2JS
               options[:database] = db
             end
 
+            opts.on("-e", "--environment ENV", "Rails environment (default: development)") do |env|
+              ENV['RAILS_ENV'] = env
+            end
+
             opts.on("-v", "--verbose", "Show detailed build output") do
               options[:verbose] = true
             end

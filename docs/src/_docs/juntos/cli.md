@@ -24,6 +24,7 @@ bin/juntos dev [options]
 | Option | Description |
 |--------|-------------|
 | `-d, --database ADAPTER` | Database adapter (dexie, sqljs, pglite) |
+| `-e, --environment ENV` | Rails environment (default: development) |
 | `-p, --port PORT` | Server port (default: 3000) |
 | `-v, --verbose` | Show detailed output |
 | `-h, --help` | Show help |
@@ -35,6 +36,7 @@ bin/juntos dev                    # Default: dexie adapter
 bin/juntos dev -d sqljs           # SQLite in WebAssembly
 bin/juntos dev -d pglite          # PostgreSQL in WebAssembly
 bin/juntos dev -p 8080            # Custom port
+bin/juntos dev -e test            # Use test environment from database.yml
 ```
 
 **What it does:**
@@ -58,6 +60,7 @@ bin/juntos up [options]
 |--------|-------------|
 | `-t, --target TARGET` | Runtime target (node, bun, deno) |
 | `-d, --database ADAPTER` | Database adapter |
+| `-e, --environment ENV` | Rails environment (default: development) |
 | `-p, --port PORT` | Server port (default: 3000) |
 | `-v, --verbose` | Show detailed output |
 | `-h, --help` | Show help |
@@ -67,7 +70,7 @@ bin/juntos up [options]
 ```bash
 bin/juntos up -d sqlite           # Node.js with SQLite
 bin/juntos up -t bun -d postgres  # Bun with PostgreSQL
-bin/juntos up -t deno -d postgres # Deno with PostgreSQL
+bin/juntos up -e production       # Use production environment
 ```
 
 **What it does:**
@@ -90,6 +93,7 @@ bin/juntos build [options]
 |--------|-------------|
 | `-t, --target TARGET` | Target (browser, node, bun, deno, vercel, cloudflare) |
 | `-d, --database ADAPTER` | Database adapter |
+| `-e, --environment ENV` | Rails environment (default: development) |
 | `-v, --verbose` | Show detailed output |
 | `-h, --help` | Show help |
 
@@ -97,7 +101,7 @@ bin/juntos build [options]
 
 ```bash
 bin/juntos build -d dexie                # Browser build
-bin/juntos build -t node -d sqlite       # Node.js build
+bin/juntos build -e production           # Build for production environment
 bin/juntos build -t vercel -d neon       # Vercel Edge build
 bin/juntos build -t cloudflare -d d1     # Cloudflare Workers build
 ```
@@ -128,6 +132,7 @@ bin/juntos migrate [options]
 |--------|-------------|
 | `-t, --target TARGET` | Target platform |
 | `-d, --database ADAPTER` | Database adapter |
+| `-e, --environment ENV` | Rails environment (default: development) |
 | `-v, --verbose` | Show detailed output |
 | `-h, --help` | Show help |
 
@@ -135,8 +140,8 @@ bin/juntos migrate [options]
 
 ```bash
 bin/juntos migrate -d sqlite              # Local SQLite
-bin/juntos migrate -t vercel -d neon      # Neon (reads .env.local)
-bin/juntos migrate -t cloudflare -d d1    # D1 via Wrangler
+bin/juntos migrate -e production          # Migrate production database
+bin/juntos migrate -d d1                  # D1 via Wrangler
 ```
 
 **Environment:**
@@ -163,6 +168,7 @@ bin/juntos deploy [options]
 |--------|-------------|
 | `-t, --target TARGET` | Deploy target (vercel, cloudflare) |
 | `-d, --database ADAPTER` | Database adapter |
+| `-e, --environment ENV` | Rails environment (default: production) |
 | `--skip-build` | Use existing dist/ |
 | `-f, --force` | Clear remote build cache |
 | `-v, --verbose` | Show detailed output |
@@ -171,10 +177,10 @@ bin/juntos deploy [options]
 **Examples:**
 
 ```bash
-bin/juntos deploy -t vercel -d neon           # Vercel with Neon
-bin/juntos deploy -t vercel -d turso          # Vercel with Turso
-bin/juntos deploy -t cloudflare -d d1         # Cloudflare with D1
-bin/juntos deploy -t vercel -d neon --force   # Clear cache and deploy
+bin/juntos deploy -e production       # Deploy production (adapter from database.yml)
+bin/juntos deploy -d neon             # Vercel with Neon (target inferred)
+bin/juntos deploy -d d1               # Cloudflare with D1 (target inferred)
+bin/juntos deploy -d neon --force     # Clear cache and deploy
 ```
 
 **What it does:**

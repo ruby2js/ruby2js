@@ -52,6 +52,10 @@ module Ruby2JS
               options[:port] = port
             end
 
+            opts.on("-e", "--environment ENV", "Rails environment (default: development)") do |env|
+              ENV['RAILS_ENV'] = env
+            end
+
             opts.on("-v", "--verbose", "Show detailed output") do
               options[:verbose] = true
             end

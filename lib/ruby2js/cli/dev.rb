@@ -37,6 +37,10 @@ module Ruby2JS
               options[:port] = port
             end
 
+            opts.on("-e", "--environment ENV", "Rails environment (default: development)") do |env|
+              ENV['RAILS_ENV'] = env
+            end
+
             opts.on("-o", "--open", "Open browser automatically") do
               options[:open] = true
             end

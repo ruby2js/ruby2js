@@ -51,6 +51,10 @@ module Ruby2JS
               options[:database] = db
             end
 
+            opts.on("-e", "--environment ENV", "Rails environment (default: production)") do |env|
+              ENV['RAILS_ENV'] = env
+            end
+
             opts.on("--skip-build", "Skip the build step (use existing dist/)") do
               options[:skip_build] = true
             end
