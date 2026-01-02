@@ -224,6 +224,99 @@ describe Ruby2JS::Filter::Pragma do
         must_equal 'arr.push(item)'
     end
 
+    it "should convert += to push with spread" do
+      to_js('arr += [1, 2] # Pragma: array').
+        must_equal 'arr.push(...[1, 2])'
+    end
+
+    it "should convert += to push with inferred type" do
+      to_js('arr = []; arr += [1, 2]').
+        must_equal 'let arr = []; arr.push(...[1, 2])'
+    end
+
+    it "should convert + to spread concat with pragma" do
+      to_js('x = a + b # Pragma: array').
+        must_equal 'let x = [...a, ...b]'
+    end
+
+    it "should convert + to spread concat with inferred type" do
+      to_js('a = [1]; x = a + [2, 3]').
+        must_equal 'let a = [1]; let x = [...a, ...[2, 3]]'
+    end
+
+    it "should convert - to filter for difference with pragma" do
+      to_js('x = a - b # Pragma: array').
+        must_equal 'let x = a.filter(x => !b.includes(x))'
+    end
+
+    it "should convert - to filter for difference with inferred type" do
+      to_js('a = [1, 2, 3]; x = a - [2]').
+        must_equal 'let a = [1, 2, 3]; let x = a.filter(x => ![2].includes(x))'
+    end
+
+    it "should convert -= to filter assignment" do
+      # Note: adds 'let' since arr wasn't declared before
+      to_js('arr -= [1, 2] # Pragma: array').
+        must_equal 'let arr = arr.filter(x => (![1, 2].includes(x)))'
+    end
+
+    it "should convert -= with inferred type" do
+      to_js('arr = [1, 2, 3]; arr -= [2]').
+        must_equal 'let arr = [1, 2, 3]; arr = arr.filter(x => ![2].includes(x))'
+    end
+
+    it "should convert & to filter for intersection with pragma" do
+      to_js('x = a & b # Pragma: array').
+        must_equal 'let x = a.filter(x => b.includes(x))'
+    end
+
+    it "should convert & to filter for intersection with inferred type" do
+      to_js('a = [1, 2, 3]; x = a & [2, 3, 4]').
+        must_equal 'let a = [1, 2, 3]; let x = a.filter(x => ([2, 3, 4].includes(x)))'
+    end
+
+    it "should convert &= to filter assignment" do
+      # Note: adds 'let' since arr wasn't declared before
+      to_js('arr &= [1, 2] # Pragma: array').
+        must_equal 'let arr = arr.filter(x => ([1, 2].includes(x)))'
+    end
+
+    it "should convert &= with inferred type" do
+      to_js('arr = [1, 2, 3]; arr &= [2, 3]').
+        must_equal 'let arr = [1, 2, 3]; arr = arr.filter(x => ([2, 3].includes(x)))'
+    end
+
+    it "should convert | to Set spread for union with pragma" do
+      to_js('x = a | b # Pragma: array').
+        must_equal 'let x = [...new Set([...a, ...b])]'
+    end
+
+    it "should convert | to Set spread for union with inferred type" do
+      to_js('a = [1, 2]; x = a | [2, 3]').
+        must_equal 'let a = [1, 2]; let x = [...new Set([...a, ...[2, 3]])]'
+    end
+
+    it "should convert |= to Set spread assignment" do
+      # Note: adds 'let' since arr wasn't declared before
+      to_js('arr |= [1, 2] # Pragma: array').
+        must_equal 'let arr = [...new Set([...arr, ...[1, 2]])]'
+    end
+
+    it "should convert |= with inferred type" do
+      to_js('arr = [1, 2]; arr |= [2, 3]').
+        must_equal 'let arr = [1, 2]; arr = [...new Set([...arr, ...[2, 3]])]'
+    end
+
+    it "should not affect + without array type" do
+      to_js('x = a + b').
+        must_equal 'let x = a + b'
+    end
+
+    it "should not affect - without array type" do
+      to_js('x = a - b').
+        must_equal 'let x = a - b'
+    end
+
     it "should not affect dup without pragma" do
       to_js('x = arr.dup').
         must_equal 'let x = arr.dup'

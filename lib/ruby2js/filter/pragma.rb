@@ -197,6 +197,64 @@ module Ruby2JS
         end
       end
 
+      # Handle array compound assignments that differ between Ruby and JS
+      # Transform: arr += [1, 2] => arr.push(...[1, 2])
+      # Transform: arr -= [1, 2] => arr = arr.filter(x => ![1, 2].includes(x))
+      # Transform: arr &= [1, 2] => arr = arr.filter(x => [1, 2].includes(x))
+      # Transform: arr |= [1, 2] => arr = [...new Set([...arr, ...[1, 2]])]
+      def on_op_asgn(node)
+        target, op, value = node.children
+
+        if [:lvasgn, :ivasgn].include?(target.type)
+          var_name = target.children.first
+          inferred_type = @var_types[var_name]
+
+          if inferred_type == :array || pragma?(node, :array)
+            var_node = target.type == :lvasgn ? s(:lvar, var_name) : s(:ivar, var_name)
+
+            case op
+            when :+
+              # arr += [1, 2] => arr.push(...[1, 2])
+              return process s(:send, var_node, :push, s(:splat, value))
+
+            when :-
+              # arr -= [1, 2] => arr = arr.filter(x => ![1, 2].includes(x))
+              x_arg = s(:arg, :x)
+              x_lvar = s(:lvar, :x)
+              includes_call = s(:send, value, :includes, x_lvar)
+              negated = s(:send, includes_call, :!)
+              filter_block = s(:block,
+                s(:send, var_node, :filter),
+                s(:args, x_arg),
+                negated
+              )
+              return process s(target.type, var_name, filter_block)
+
+            when :&
+              # arr &= [1, 2] => arr = arr.filter(x => [1, 2].includes(x))
+              x_arg = s(:arg, :x)
+              x_lvar = s(:lvar, :x)
+              includes_call = s(:send, value, :includes, x_lvar)
+              filter_block = s(:block,
+                s(:send, var_node, :filter),
+                s(:args, x_arg),
+                includes_call
+              )
+              return process s(target.type, var_name, filter_block)
+
+            when :|
+              # arr |= [1, 2] => arr = [...new Set([...arr, ...[1, 2]])]
+              spread_both = s(:array, s(:splat, var_node), s(:splat, value))
+              set_new = s(:send, s(:const, nil, :Set), :new, spread_both)
+              union_result = s(:array, s(:splat, set_new))
+              return process s(target.type, var_name, union_result)
+            end
+          end
+        end
+
+        super
+      end
+
       # Scope management: push/pop @var_types at scope boundaries
       def push_var_types_scope
         @var_types_stack.push @var_types
@@ -642,6 +700,68 @@ module Ruby2JS
             return process s(:send,
               s(:attr, s(:send, s(:const, nil, :Object), :keys, target), :length),
               :===, s(:int, 0))
+          end
+
+        # Array binary operators that differ between Ruby and JS
+        # a + b → [...a, ...b]  (concat - JS + does string concat on arrays)
+        when :+
+          type = if pragma?(node, :array) then :array
+                 else var_type(target)
+                 end
+
+          if type == :array && target && args.length == 1
+            # [...a, ...b]
+            return process s(:array, s(:splat, target), s(:splat, args.first))
+          end
+
+        # a - b → a.filter(x => !b.includes(x))  (difference - JS - gives NaN)
+        when :-
+          type = if pragma?(node, :array) then :array
+                 else var_type(target)
+                 end
+
+          if type == :array && target && args.length == 1
+            # Generate: target.filter(x => !args.first.includes(x))
+            x_arg = s(:arg, :x)
+            x_lvar = s(:lvar, :x)
+            includes_call = s(:send, args.first, :includes, x_lvar)
+            negated = s(:send, includes_call, :!)
+            return process s(:block,
+              s(:send, target, :filter),
+              s(:args, x_arg),
+              negated
+            )
+          end
+
+        # a & b → a.filter(x => b.includes(x))  (intersection - JS & is bitwise)
+        when :&
+          type = if pragma?(node, :array) then :array
+                 else var_type(target)
+                 end
+
+          if type == :array && target && args.length == 1
+            # Generate: target.filter(x => args.first.includes(x))
+            x_arg = s(:arg, :x)
+            x_lvar = s(:lvar, :x)
+            includes_call = s(:send, args.first, :includes, x_lvar)
+            return process s(:block,
+              s(:send, target, :filter),
+              s(:args, x_arg),
+              includes_call
+            )
+          end
+
+        # a | b → [...new Set([...a, ...b])]  (union - JS | is bitwise)
+        when :|
+          type = if pragma?(node, :array) then :array
+                 else var_type(target)
+                 end
+
+          if type == :array && target && args.length == 1
+            # Generate: [...new Set([...a, ...b])]
+            spread_both = s(:array, s(:splat, target), s(:splat, args.first))
+            set_new = s(:send, s(:const, nil, :Set), :new, spread_both)
+            return process s(:array, s(:splat, set_new))
           end
 
         # .call - with method pragma, convert proc.call(args) to proc(args)

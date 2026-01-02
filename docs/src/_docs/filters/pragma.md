@@ -184,6 +184,34 @@ arr.dup # Pragma: array
 
 arr << item # Pragma: array
 # => arr.push(item)
+
+arr += [1, 2] # Pragma: array
+# => arr.push(...[1, 2])
+
+# Binary operators (Ruby array operations → JS equivalents)
+x = a + b # Pragma: array
+# => let x = [...a, ...b]  (concatenation)
+
+x = a - b # Pragma: array
+# => let x = a.filter(x => !b.includes(x))  (difference)
+
+x = a & b # Pragma: array
+# => let x = a.filter(x => b.includes(x))  (intersection)
+
+x = a | b # Pragma: array
+# => let x = [...new Set([...a, ...b])]  (union)
+```
+
+**Note:** All array operators work with type inference:
+
+```ruby
+arr = []
+arr += [1, 2]  # No pragma needed - type inferred from []
+# => let arr = []; arr.push(...[1, 2])
+
+a = [1, 2, 3]
+x = a - [2]    # Type inferred from [1, 2, 3]
+# => let a = [1, 2, 3]; let x = a.filter(x => ![2].includes(x))
 ```
 
 **When to use:** When Ruby2JS can't infer the type and you need array-specific
