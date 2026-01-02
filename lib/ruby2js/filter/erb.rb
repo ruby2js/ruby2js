@@ -9,10 +9,9 @@ module Ruby2JS
       def initialize(*args)
         # Note: super must be called first for JS class compatibility
         super
-        # Note: use Array instead of Set for JS compatibility (Set doesn't have push)
-        @erb_ivars = []
-        @erb_locals = []      # Undefined local variables (used but not assigned)
-        @erb_lvar_assigns = [] # Local variable assignments
+        @erb_ivars = Set.new
+        @erb_locals = Set.new      # Undefined local variables (used but not assigned)
+        @erb_lvar_assigns = Set.new # Local variable assignments
         @erb_bufvar = nil
       end
 
@@ -40,7 +39,7 @@ module Ruby2JS
 
         # Step 1: Collect instance variables BEFORE transformation
         # (they get converted from @foo to foo by on_ivar)
-        @erb_ivars = []
+        @erb_ivars = Set.new
         collect_ivars(node)
 
         # Step 2: Transform the body (this triggers all filters including helpers)
@@ -52,8 +51,8 @@ module Ruby2JS
 
         # Step 4: Collect undefined locals from TRANSFORMED AST
         # This runs after helper filters have processed their methods
-        @erb_locals = []
-        @erb_lvar_assigns = []
+        @erb_locals = Set.new
+        @erb_lvar_assigns = Set.new
         transformed_body = s(:begin, *transformed_children)
         collect_locals(transformed_body)
 
@@ -68,7 +67,7 @@ module Ruby2JS
         all_params = []
 
         # Add ivars (strip @ prefix)
-        @erb_ivars.uniq.sort.each do |ivar|
+        [*@erb_ivars].sort.each do |ivar|
           prop_name = ivar.to_s[1..-1].to_sym  # @title -> title
           all_params << prop_name
         end
@@ -264,7 +263,7 @@ module Ruby2JS
         return unless ast_node?(node)
 
         if node.type == :ivar
-          @erb_ivars.push(node.children.first)
+          @erb_ivars << node.children.first
         end
 
         node.children.each do |child|
@@ -283,13 +282,13 @@ module Ruby2JS
         if node.type == :lvasgn
           # Local variable assignment: article = ...
           name = node.children.first
-          @erb_lvar_assigns.push(name) unless @erb_lvar_assigns.include?(name)
+          @erb_lvar_assigns << name
         elsif node.type == :lvar
           # Local variable read: article
           name = node.children.first
           # Skip the buffer variable itself
           unless name == @erb_bufvar
-            @erb_locals.push(name) unless @erb_locals.include?(name)
+            @erb_locals << name
           end
         elsif node.type == :send && node.children.first.nil?
           # Method call with no receiver: could be a local variable reference
@@ -298,17 +297,17 @@ module Ruby2JS
           name_str = name.to_s
           # Only track lowercase names that look like variables (not constants or keywords)
           if name_str =~ /\A[a-z_][a-z0-9_]*\z/
-            @erb_locals.push(name) unless @erb_locals.include?(name)
+            @erb_locals << name
           end
         elsif [:args, :arg, :kwarg, :blockarg].include?(node.type)
           # Block/method arguments define local variables
           node.children.each do |child|
             # Note: check for string (JS) or symbol (Ruby) for dual compatibility
             if child.respond_to?(:to_s) && !ast_node?(child)
-              @erb_lvar_assigns.push(child) unless @erb_lvar_assigns.include?(child)
+              @erb_lvar_assigns << child
             elsif ast_node?(child) && [:arg, :kwarg, :blockarg].include?(child.type)
               arg_name = child.children.first
-              @erb_lvar_assigns.push(arg_name) unless @erb_lvar_assigns.include?(arg_name)
+              @erb_lvar_assigns << arg_name
             end
           end
         end
@@ -369,7 +368,7 @@ module Ruby2JS
 
       # Helper to get only undefined locals (used but not assigned)
       def undefined_locals
-        @erb_locals.select { |local| !@erb_lvar_assigns.include?(local) }.uniq.sort
+        @erb_locals.select { |local| !@erb_lvar_assigns.include?(local) }.sort
       end
     end
 
