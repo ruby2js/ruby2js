@@ -731,19 +731,25 @@ module Ruby2JS
               :>, s(:int, 0))
           end
 
-        # .empty? - Hash: Object.keys(hash).length === 0
+        # .empty? - Hash: Object.keys(hash).length === 0, Set/Map: size === 0
         when :empty?
           # Check pragma first, then fall back to inferred type
           type = if pragma?(node, :hash) then :hash
+                 elsif pragma?(node, :set) then :set
+                 elsif pragma?(node, :map) then :map
                  else var_type(target)
                  end
 
-          if type == :hash
+          if type == :hash && args.empty?
             # Object.keys(target).length === 0
             return process s(:send,
               s(:attr, s(:send, s(:const, nil, :Object), :keys, target), :length),
               :===, s(:int, 0))
+          elsif (type == :set || type == :map) && args.empty?
+            # target.size === 0 (JS Sets/Maps use .size not .length)
+            return process s(:send, s(:attr, target, :size), :==, s(:int, 0))
           end
+          # Note: array and string use .length which functions filter handles
 
         # Array binary operators that differ between Ruby and JS
         # a + b → [...a, ...b]  (concat - JS + does string concat on arrays)

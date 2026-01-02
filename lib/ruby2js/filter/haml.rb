@@ -86,7 +86,8 @@ module Ruby2JS
         if @haml_ivars.empty?
           args = s(:args)
         else
-          kwargs = @haml_ivars.to_a.sort.map do |ivar|
+          # Use splat to array for JS Set compatibility (Set#to_a doesn't exist in JS)
+          kwargs = [*@haml_ivars].sort.map do |ivar|
             prop_name = ivar.to_s[1..-1].to_sym
             s(:kwarg, prop_name)
           end

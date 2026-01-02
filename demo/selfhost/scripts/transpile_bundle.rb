@@ -35,7 +35,7 @@ js = Ruby2JS.convert(source,
   comparison: :identity,
   underscored_private: true,
   nullish_to_s: true,
-  include: [:call],
+  include: [:call, :values],
   require_recursive: true,
   file: bundle_file,
   filters: [

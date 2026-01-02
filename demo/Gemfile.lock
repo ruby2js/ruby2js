@@ -1,5 +1,5 @@
 PATH
-  remote: /Users/rubys/git/ruby2js
+  remote: .
   specs:
     ruby2js (5.1.2)
       parser
@@ -10,11 +10,15 @@ GEM
   specs:
     ast (2.4.3)
     base64 (0.3.0)
+    erubi (1.13.1)
     execjs (2.10.0)
-    logger (1.7.0)
-    mustermann (3.0.4)
-      ruby2_keywords (~> 0.0.1)
-    nio4r (2.7.5)
+    haml (7.0.2)
+      temple (>= 0.8.2)
+      thor
+      tilt
+    json (2.18.0)
+    minitest (6.0.1)
+      prism (~> 1.5)
     nokogiri (1.18.10-aarch64-linux-gnu)
       racc (~> 1.4)
     nokogiri (1.18.10-aarch64-linux-musl)
@@ -37,30 +41,15 @@ GEM
     parser (3.3.10.0)
       ast (~> 2.4.1)
       racc
-    puma (7.1.0)
-      nio4r (~> 2.0)
+    prism (1.7.0)
     racc (1.8.1)
-    rack (3.2.4)
-    rack-protection (4.2.1)
-      base64 (>= 0.1.0)
-      logger (>= 1.6.0)
-      rack (>= 3.0.0, < 4)
-    rack-session (2.1.1)
-      base64 (>= 0.1.0)
-      rack (>= 3.0.0)
-    rackup (2.3.1)
-      rack (>= 3)
     rake (13.3.1)
     regexp_parser (2.11.3)
-    ruby2_keywords (0.0.5)
-    sinatra (4.2.1)
-      logger (>= 1.6.0)
-      mustermann (~> 3.0)
-      rack (>= 3.0.0, < 4)
-      rack-protection (= 4.2.1)
-      rack-session (>= 2.0.0, < 3)
-      tilt (~> 2.0)
+    temple (0.10.4)
+    thor (1.4.0)
     tilt (2.6.1)
+    wunderbar (1.6.0)
+      json
 
 PLATFORMS
   aarch64-linux-gnu
@@ -73,24 +62,25 @@ PLATFORMS
   x86_64-linux-musl
 
 DEPENDENCIES
+  base64
+  erubi
   execjs
+  haml
+  minitest
   nokogiri
-  opal (~> 1.0)
-  puma
-  rack (>= 3.0)
-  rackup
+  opal (~> 1.8)
   rake
-  regexp_parser
   ruby2js!
-  sinatra (>= 4.0)
+  wunderbar
 
 CHECKSUMS
   ast (2.4.3) sha256=954615157c1d6a382bc27d690d973195e79db7f55e9765ac7c481c60bdb4d383
   base64 (0.3.0) sha256=27337aeabad6ffae05c265c450490628ef3ebd4b67be58257393227588f5a97b
+  erubi (1.13.1)
   execjs (2.10.0) sha256=6bcb8be8f0052ff9d370b65d1c080f2406656e150452a0abdb185a133048450d
-  logger (1.7.0)
-  mustermann (3.0.4)
-  nio4r (2.7.5)
+  haml (7.0.2)
+  json (2.18.0)
+  minitest (6.0.1)
   nokogiri (1.18.10-aarch64-linux-gnu) sha256=7fb87235d729c74a2be635376d82b1d459230cc17c50300f8e4fcaabc6195344
   nokogiri (1.18.10-aarch64-linux-musl) sha256=7e74e58314297cc8a8f1b533f7212d1999dbe2639a9ee6d97b483ea2acc18944
   nokogiri (1.18.10-arm-linux-gnu) sha256=51f4f25ab5d5ba1012d6b16aad96b840a10b067b93f35af6a55a2c104a7ee322
@@ -101,18 +91,15 @@ CHECKSUMS
   nokogiri (1.18.10-x86_64-linux-musl) sha256=0651fccf8c2ebbc2475c8b1dfd7ccac3a0a6d09f8a41b72db8c21808cb483385
   opal (1.8.2) sha256=cedde4e1691d7cdaaf0aadac99fbf1fdb5bb90fe2dcc60e968f984601bd5d4e3
   parser (3.3.10.0) sha256=ce3587fa5cc55a88c4ba5b2b37621b3329aadf5728f9eafa36bbd121462aabd6
-  puma (7.1.0)
+  prism (1.7.0)
   racc (1.8.1) sha256=4a7f6929691dbec8b5209a0b373bc2614882b55fc5d2e447a21aaa691303d62f
-  rack (3.2.4)
-  rack-protection (4.2.1)
-  rack-session (2.1.1)
-  rackup (2.3.1)
   rake (13.3.1) sha256=8c9e89d09f66a26a01264e7e3480ec0607f0c497a861ef16063604b1b08eb19c
   regexp_parser (2.11.3) sha256=ca13f381a173b7a93450e53459075c9b76a10433caadcb2f1180f2c741fc55a4
-  ruby2_keywords (0.0.5)
   ruby2js (5.1.2)
-  sinatra (4.2.1)
+  temple (0.10.4)
+  thor (1.4.0)
   tilt (2.6.1) sha256=35a99bba2adf7c1e362f5b48f9b581cce4edfba98117e34696dde6d308d84770
+  wunderbar (1.6.0)
 
 BUNDLED WITH
   4.0.3

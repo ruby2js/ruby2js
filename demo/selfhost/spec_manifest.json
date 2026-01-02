@@ -23,7 +23,8 @@
     "jest_spec.rb",
     "camelcase_spec.rb",
     "tagged_templates_spec.rb",
-    "nokogiri_spec.rb"
+    "nokogiri_spec.rb",
+    "haml_spec.rb"
   ],
   "partial": [
     "phlex_spec.rb",
@@ -33,7 +34,6 @@
     "node_spec.rb",
     "jsx_spec.rb",
     "lit_spec.rb",
-    "haml_spec.rb",
     "combiner_spec.rb",
     "require_spec.rb",
     "action_cable_spec.rb",

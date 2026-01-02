@@ -761,6 +761,16 @@ describe Ruby2JS::Filter::Pragma do
           must_equal 'let s = new Set; s.clear()'
       end
 
+      it "should disambiguate .empty? for set (uses .size not .length)" do
+        to_js_with_functions('s = Set.new; s.empty?').
+          must_equal 'let s = new Set; s.size == 0'
+      end
+
+      it "should disambiguate .empty? for map (uses .size not .length)" do
+        to_js_with_functions('m = Map.new; m.empty?').
+          must_equal 'let m = new Map; m.size == 0'
+      end
+
       it "should disambiguate [] and []= for map" do
         code = <<~RUBY
           m = Map.new
