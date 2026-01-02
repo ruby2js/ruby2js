@@ -275,6 +275,17 @@ async function serveFile(req, res) {
     }
   } catch (err) {
     if (err.code === 'ENOENT') {
+      // Try public/ subdirectory (Rails convention for static assets)
+      const publicPath = join(DIST_DIR, 'public', url);
+      try {
+        const content = await readFile(publicPath);
+        res.writeHead(200, { 'Content-Type': contentType });
+        res.end(content);
+        return;
+      } catch {
+        // Fall through to other fallbacks
+      }
+
       // SPA fallback: if no file extension, serve index.html for client-side routing
       if (!ext || ext === '') {
         try {

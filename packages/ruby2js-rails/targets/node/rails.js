@@ -59,8 +59,16 @@ export class Router extends RouterServer {
       res.end(content);
       return true;
     } catch (err) {
-      // File not found, let routing handle it
-      return false;
+      // Try public/ subdirectory (Rails convention for static assets)
+      try {
+        const content = await readFile(join(process.cwd(), 'public', path));
+        res.writeHead(200, { 'Content-Type': contentType });
+        res.end(content);
+        return true;
+      } catch {
+        // File not found, let routing handle it
+        return false;
+      }
     }
   }
 
