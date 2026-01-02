@@ -555,7 +555,12 @@ module Ruby2JS
           end
 
         elsif method == :respond_to? and args.length == 1
-          process S(:in?, args.first, target)
+          if node.type == :csend
+            # x&.respond_to?(:foo) => x != null && "foo" in x
+            process S(:and, S(:send, target, :!=, s(:nil)), S(:in?, args.first, target))
+          else
+            process S(:in?, args.first, target)
+          end
 
         elsif method == :send and args.length >= 1
           # target.send(:method, arg1, arg2) => target.method(arg1, arg2)

@@ -86,6 +86,7 @@ require 'ruby2js/pipeline'
 # Use Function.new when you need dynamic `this` (e.g., for method composition, event handlers).
 Function = Proc unless defined?(Function)
 
+
 module Ruby2JS
   class SyntaxError < RuntimeError
     attr_reader :diagnostic

@@ -91,7 +91,14 @@ end
 
 # PrismComment wrapper - provides interface expected by converter
 export class PrismComment
+  @@next_object_id = 1
+
   def initialize(prismComment, source, sourceBuffer)
+    unless defined? self.object_id
+      self.object_id = @@next_object_id
+      @@next_object_id += 1
+    end
+
     start = prismComment.location.startOffset
     end_ = start + prismComment.location.length
     @text = source[start...end_]

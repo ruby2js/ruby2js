@@ -84,14 +84,26 @@ module Ruby2JS
 
         # Constructor calls: Set.new, Map.new, Array.new, Hash.new, String.new
         if node.type == :send
-          receiver, method, *_args = node.children
+          receiver, method, *args = node.children
           if method == :new && receiver&.type == :const
             case receiver.children.last
             when :Set then return :set
-            when :Map then return :map
+            when :Map, :$Hash then return :map
             when :Array then return :array
-            when :Hash then return :hash
+            # Hash.new with args becomes $Hash (Map-like), plain Hash.new stays :hash
+            when :Hash then return args.any? ? :map : :hash
             when :String then return :string
+            end
+          end
+        end
+
+        # Hash.new { block } - treat as :map (will become $Hash)
+        if node.type == :block
+          call = node.children.first
+          if call.type == :send
+            receiver, method = call.children
+            if method == :new && receiver&.type == :const && receiver.children.last == :Hash
+              return :map
             end
           end
         end

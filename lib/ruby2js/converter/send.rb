@@ -313,7 +313,12 @@ module Ruby2JS
         (group_receiver ? group(receiver) : parse(receiver))
 
         if @comparison == :identity and [:==, :!=].include? method
-          put " #{ method }= "
+          # Don't convert == null or != null (idiomatic JS nullish check)
+          if target&.type == :nil || receiver&.type == :nil
+            put " #{ method } "
+          else
+            put " #{ method }= "
+          end
         else
           put " #{ method } "
         end
@@ -567,12 +572,15 @@ module Ruby2JS
         if finish.type == :int
           # output cleaner code if we know the value already
           length = finish.children.first + (node.type == :irange ? 1 : 0)
+          return put "[...Array(#{length}).keys()]"
         else
-          # If this is variable we need to fix indexing by 1 in js
-          length = "#{finish.children.last}" + (node.type == :irange ? "+1" : "")
+          # If this is variable/expression we need to parse it properly
+          put "[...Array("
+          parse finish
+          put(node.type == :irange ? "+1" : "")
+          put ").keys()]"
+          return
         end
-
-        return put "[...Array(#{length}).keys()]"
       else
         # Use .compact because the first argument is nil with variables
         # This way the first value is always set

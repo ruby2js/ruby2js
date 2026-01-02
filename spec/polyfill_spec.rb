@@ -194,6 +194,42 @@ describe Ruby2JS::Filter::Polyfill do
     end
   end
 
+  describe 'Hash.new with default value' do
+    it 'should add $Hash polyfill for Hash.new(default)' do
+      js = to_js('h = Hash.new(0)')
+      _(js).must_include 'class $Hash extends Map'
+      _(js).must_include 'new $Hash(0)'
+    end
+
+    it 'should add $Hash polyfill for Hash.new with block' do
+      js = to_js('h = Hash.new { |hash, key| hash[key] = [] }')
+      _(js).must_include 'class $Hash extends Map'
+      _(js).must_include 'new $Hash('
+    end
+
+    it 'should support get with default value' do
+      js = to_js('h = Hash.new(0)')
+      _(js).must_include 'get(k)'
+      _(js).must_include '__d'  # default value stored as __d
+    end
+  end
+
+  describe 'Array#bsearch_index' do
+    it 'should add polyfill for bsearch_index' do
+      js = to_js('arr.bsearch_index { |x| x >= 5 }')
+      _(js).must_include 'Array.prototype.bsearch_index'
+      _(js).must_include 'arr.bsearch_index'
+    end
+
+    it 'should implement binary search correctly' do
+      js = to_js('arr.bsearch_index { |x| x >= 5 }')
+      # Binary search should have lo, hi, mid
+      _(js).must_include 'let lo = 0'
+      _(js).must_include 'let hi = this.length'
+      _(js).must_include 'Math.floor((lo + hi) / 2)'
+    end
+  end
+
   describe 'multiple polyfills' do
     it 'should add multiple polyfills when needed' do
       js = to_js('arr.first; arr.last; str.chomp')

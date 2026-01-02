@@ -19,15 +19,16 @@ The Polyfill filter automatically reorders itself to run before the Functions fi
 
 ### Array Methods
 
-| Ruby                | JavaScript Polyfill                                                 |
-| ------------------- | ------------------------------------------------------------------- |
-| `.first`            | Property getter returning `this[0]`                                 |
-| `.last`             | Property getter returning `this.at(-1)`                             |
-| `.compact`          | Property getter returning new array without `null`/`undefined`      |
-| `.uniq`             | Property getter returning `[...new Set(this)]` (duplicates removed) |
-| `.rindex { }`       | Method that finds last index matching block                         |
-| `.insert(i, items)` | Method using `splice` to insert items                               |
-| `.delete_at(i)`     | Method using `splice` to remove item at index                       |
+| Ruby                  | JavaScript Polyfill                                                 |
+| --------------------- | ------------------------------------------------------------------- |
+| `.first`              | Property getter returning `this[0]`                                 |
+| `.last`               | Property getter returning `this.at(-1)`                             |
+| `.compact`            | Property getter returning new array without `null`/`undefined`      |
+| `.uniq`               | Property getter returning `[...new Set(this)]` (duplicates removed) |
+| `.rindex { }`         | Method that finds last index matching block                         |
+| `.insert(i, items)`   | Method using `splice` to insert items                               |
+| `.delete_at(i)`       | Method using `splice` to remove item at index                       |
+| `.bsearch_index { }`  | Binary search returning index of first match                        |
 
 ### String Methods
 
@@ -43,6 +44,25 @@ The Polyfill filter automatically reorders itself to run before the Functions fi
 | Ruby    | JavaScript Polyfill                              |
 | ------- | ------------------------------------------------ |
 | `.to_a` | Property getter returning `Object.entries(this)` |
+
+### Hash Methods
+
+| Ruby                           | JavaScript Polyfill                                          |
+| ------------------------------ | ------------------------------------------------------------ |
+| `Hash.new(default)`            | `$Hash` class extending `Map` with default value             |
+| `Hash.new { \|h, k\| block }`  | `$Hash` class extending `Map` with default block             |
+
+The `$Hash` class provides Ruby's `Hash.new` behavior where accessing missing keys returns a default value or calls a block. This is useful for auto-vivifying hashes:
+
+```ruby
+# Counter with default 0
+counts = Hash.new(0)
+counts[:a] += 1
+
+# Nested hash auto-vivification
+nested = Hash.new { |h, k| h[k] = [] }
+nested[:users] << "Alice"
+```
 
 ### RegExp Methods
 

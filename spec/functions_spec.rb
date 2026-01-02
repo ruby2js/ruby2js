@@ -431,6 +431,11 @@ describe Ruby2JS::Filter::Functions do
         must_equal '"foo" in a && a.foo'
     end
 
+    it "should handle respond_to? with safe navigation" do
+      # &.respond_to? should include null check
+      to_js_2020( 'a&.respond_to?(:foo)' ).must_equal 'a != null && "foo" in a'
+    end
+
     it "should handle has_key?/key?/member?" do
       to_js( 'h.has_key?(:foo)' ).must_equal '"foo" in h'
       to_js( 'h.key?(:foo)' ).must_equal '"foo" in h'

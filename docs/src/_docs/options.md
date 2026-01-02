@@ -141,6 +141,34 @@ identity_comparison
 
 ```ruby
 puts Ruby2JS.convert('a == b', comparison: :identity)
+# => a === b
+
+puts Ruby2JS.convert('a != b', comparison: :identity)
+# => a !== b
+```
+
+### Null Check Exception
+
+When using identity comparison, `== nil` and `!= nil` comparisons are intentionally **not** converted to strict equality. This preserves the idiomatic JavaScript pattern where `x == null` catches both `null` and `undefined`:
+
+```ruby
+puts Ruby2JS.convert('a == nil', comparison: :identity)
+# => a == null (NOT a === null)
+
+puts Ruby2JS.convert('a != nil', comparison: :identity)
+# => a != null (NOT a !== null)
+```
+
+This exception exists because:
+- In JavaScript, `x == null` is equivalent to `x === null || x === undefined`
+- This is a common and idiomatic pattern for null checks
+- Using strict equality (`===`) would only catch `null`, missing `undefined` values
+
+If you need strict null-only comparison, use Ruby's triple equals explicitly:
+
+```ruby
+puts Ruby2JS.convert('a === nil', comparison: :identity)
+# => a === null
 ```
 
 ## Defs

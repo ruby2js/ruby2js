@@ -54,7 +54,7 @@ module Ruby2JS
       apply_filters if @filters && !@filters.empty?
       # Always reassociate comments (for trailing/orphan comment handling)
       # even when no filters are applied
-      reassociate_comments unless @filters && !@filters.empty?
+      reassociate_comments if !@filters || @filters.empty?
       create_converter
       configure_converter
       execute_converter
@@ -126,72 +126,111 @@ module Ruby2JS
       raw_comments = @comments[:_raw] # Pragma: map
       return unless raw_comments && raw_comments.length > 0
 
-      # Comment association strategy:
-      # 1. Collect all nodes with location from filtered AST
-      # 2. Sort by source position
-      # 3. For each comment:
-      #    - If on same line as a node that ends before it: trailing comment
-      #    - Else if there's a next node: associate with next node
-      #    - Else: orphan comment (output at end)
+      # Comment association strategy (optimized O(n+m) approach):
+      # 1. Index comments by line number for O(1) trailing comment lookup
+      # 2. Sort comments by end position for efficient preceding comment matching
+      # 3. For each node, find trailing comments on its line
+      # 4. For remaining comments, binary search for target node
 
       # Collect nodes with location info
       nodes = []
       collect_located_nodes(@ast, nodes)
 
-      # Sort by start position (use assignment for JS compatibility)
-      nodes = nodes.sort_by { |n| node_start_pos(n) }
+      # Pre-compute node location data once (avoids repeated bsearch_index calls)
+      # Store in parallel arrays using index as key (works in both Ruby and JS)
+      node_lines = []
+      node_starts = []
+      node_ends = []
+      node_sources = []
+      nodes.each_with_index do |n, i|
+        node_lines[i] = node_line_number(n)
+        node_starts[i] = node_start_pos(n)
+        node_ends[i] = node_end_pos(n)
+        node_sources[i] = node_source_name(n)
+      end
 
-      # Build new comments map: associate each comment with next node
-      # Clear existing entries (but preserve _raw)
+      # Sort nodes by start position, keeping parallel arrays in sync
+      num_nodes = nodes.length
+      indices = (0...num_nodes).to_a
+      indices = indices.sort_by { |i| node_starts[i] || 0 }
+      nodes = indices.map { |i| nodes[i] }
+      node_lines = indices.map { |i| node_lines[i] }
+      node_starts = indices.map { |i| node_starts[i] }
+      node_ends = indices.map { |i| node_ends[i] }
+      node_sources = indices.map { |i| node_sources[i] }
+
+      # Index comments by line number for O(1) lookup (integer keys are fast)
+      comments_by_line = {}
+      raw_comments.each do |comment|
+        line = comment_line_number(comment)
+        next unless line
+        comments_by_line[line] ||= []
+        comments_by_line[line].push(comment)
+      end
+
+      # Build new comments map
       saved_raw = @comments.get(:_raw)
       @comments.clear()
       @comments.set(:_raw, saved_raw) if saved_raw
 
       trailing_comments = []
-      orphan_comments = []
+      matched_comments = {} # Track which comments became trailing (by object_id or index)
 
-      raw_comments.each do |comment|
-        comment_line = comment_line_number(comment)
-        comment_end = comment_end_pos(comment)
-        next unless comment_end && comment_line
+      # Pass 1: Find trailing comments by iterating nodes (flipped loop)
+      # For each node, check if any comments on its line are trailing
+      nodes.each_with_index do |node, i|
+        line = node_lines[i]
+        next unless line
+        same_line = comments_by_line[line]
+        next unless same_line
 
-        # Check if this is a trailing comment (same line as a node that ends before it)
-        # Find the node with the largest end_pos (outermost/statement-level) to avoid
-        # matching child nodes like `self` instead of the full `self['id'] = @_id`
-        comment_start = comment_start_pos(comment)
-        comment_source = comment_source_name(comment)
-        same_line_node = nil
-        best_end = -1
-        nodes.each do |n|
-          node_line = node_line_number(n)
-          node_end = node_end_pos(n)
-          next unless node_line && node_end && node_line == comment_line
-          next unless comment_start.nil? || node_end <= comment_start
-          # Ensure comment and node are from the same source file (when multi-file)
-          node_source = node_source_name(n)
+        node_end = node_ends[i]
+        node_source = node_sources[i]
+        next unless node_end
+
+        same_line.each do |comment|
+          comment_start = comment_start_pos(comment)
+          comment_source = comment_source_name(comment)
+
+          # Skip if comment starts before node ends
+          next if comment_start && node_end > comment_start
+          # Skip if different source files
           next if comment_source && node_source && comment_source != node_source
-          if node_end > best_end
-            best_end = node_end
-            same_line_node = n
+
+          # This comment is on the same line and after the node
+          # Track the best (outermost) node for this comment
+          comment_id = comment.object_id
+          existing = matched_comments[comment_id]
+          if existing.nil? || node_end > existing[:end_pos]
+            matched_comments[comment_id] = { node: node, end_pos: node_end, comment: comment }
           end
         end
+      end
 
-        if same_line_node
-          # Trailing comment - store separately with node reference
-          trailing_comments.push([same_line_node, comment])
+      # Collect trailing comments from matched
+      matched_comments.values().each do |match|
+        trailing_comments.push([match[:node], match[:comment]])
+      end
+
+      # Pass 2: Associate non-trailing comments with following nodes
+      orphan_comments = []
+      raw_comments.each do |comment|
+        # Skip if already matched as trailing
+        next if matched_comments.key?(comment.object_id)
+
+        comment_end = comment_end_pos(comment)
+        next unless comment_end
+
+        # Binary search for first node that starts at or after comment ends
+        target_idx = node_starts.bsearch_index { |start| start && start >= comment_end }
+
+        if !target_idx.nil?
+          target = nodes[target_idx]
+          existing = @comments.get(target) || []
+          existing.push(comment)
+          @comments.set(target, existing)
         else
-          # Find first node that starts at or after comment ends
-          target = nodes.find { |n| node_start_pos(n) >= comment_end }
-
-          if target
-            # Add comment to target's list
-            existing = @comments.get(target) || []
-            existing.push(comment)
-            @comments.set(target, existing)
-          else
-            # No target - orphan comment
-            orphan_comments.push(comment)
-          end
+          orphan_comments.push(comment)
         end
       end
 

@@ -139,6 +139,32 @@ module Ruby2JS
             )
           )
 
+        when :array_bsearch_index
+          # if (!Array.prototype.bsearch_index) { Array.prototype.bsearch_index = function(fn) {...} }
+          # Binary search returning index of first element where fn returns true
+          define_prototype_method(:Array, :bsearch_index, s(:args, s(:arg, :fn)),
+            s(:begin,
+              s(:lvasgn, :lo, s(:int, 0)),
+              s(:lvasgn, :hi, s(:attr, s(:self), :length)),
+              s(:while, s(:send, s(:lvar, :lo), :<, s(:lvar, :hi)),
+                s(:begin,
+                  s(:lvasgn, :mid, s(:send, s(:const, nil, :Math), :floor,
+                    s(:send, s(:send, s(:lvar, :lo), :+, s(:lvar, :hi)), :/, s(:int, 2)))),
+                  s(:if,
+                    s(:send!, s(:lvar, :fn), nil, s(:send, s(:self), :[], s(:lvar, :mid))),
+                    s(:lvasgn, :hi, s(:lvar, :mid)),
+                    s(:lvasgn, :lo, s(:send, s(:lvar, :mid), :+, s(:int, 1)))
+                  )
+                )
+              ),
+              s(:if,
+                s(:send, s(:lvar, :lo), :<, s(:attr, s(:self), :length)),
+                s(:return, s(:lvar, :lo)),
+                s(:return, s(:nil))
+              )
+            )
+          )
+
         when :string_chomp
           # if (!String.prototype.chomp) { String.prototype.chomp = function(suffix) {...} }
           define_prototype_method(:String, :chomp, s(:args, s(:arg, :suffix)),
@@ -216,6 +242,55 @@ module Ruby2JS
               )
             ),
             nil
+          )
+
+        when :hash_with_default
+          # class $Hash extends Map {
+          #   constructor(d, b) { super(); this._d = d; this._b = b; }
+          #   get(k) {
+          #     const v = super.get(k);
+          #     if (v !== undefined || this.has(k)) return v;
+          #     if (this._b) return this._b(this, k);
+          #     return this._d;
+          #   }
+          # }
+          s(:class,
+            s(:const, nil, :$Hash),
+            s(:const, nil, :Map),
+            s(:begin,
+              # constructor(d, b) { super(); this._d = d; this._b = b; }
+              s(:def, :initialize, s(:args, s(:arg, :d), s(:arg, :b)),
+                s(:begin,
+                  s(:super),
+                  s(:ivasgn, :@_d, s(:lvar, :d)),
+                  s(:ivasgn, :@_b, s(:lvar, :b))
+                )
+              ),
+              # get(k) { ... }
+              s(:def, :get, s(:args, s(:arg, :k)),
+                s(:begin,
+                  # const v = super.get(k);  (super(k) in a get() method becomes super.get(k))
+                  s(:lvasgn, :v, s(:super, s(:lvar, :k))),
+                  # if (v !== undefined || this.has(k)) return v;
+                  s(:if,
+                    s(:or,
+                      s(:send, s(:lvar, :v), :"!==", s(:lvar, :undefined)),
+                      s(:send, s(:self), :has, s(:lvar, :k))
+                    ),
+                    s(:return, s(:lvar, :v)),
+                    nil
+                  ),
+                  # if (this._b) return this._b(this, k);
+                  s(:if,
+                    s(:ivar, :@_b),
+                    s(:return, s(:send, s(:ivar, :@_b), :call, s(:self), s(:lvar, :k))),
+                    nil
+                  ),
+                  # return this._d;
+                  s(:return, s(:ivar, :@_d))
+                )
+              )
+            )
           )
         end
       end
@@ -316,6 +391,18 @@ module Ruby2JS
               add_polyfill(:regexp_escape) unless es2025
               return s(:send, s(:const, nil, :RegExp), :escape, process(args.first))
             end
+
+          when :new
+            # Hash.new(default) => new $Hash(default)
+            # Hash.new => {} (plain object)
+            if target == s(:const, nil, :Hash)
+              if args.length == 1
+                add_polyfill(:hash_with_default)
+                return s(:send, s(:const, nil, :$Hash), :new, process(args.first))
+              elsif args.empty?
+                return s(:hash)
+              end
+            end
           end
         end
 
@@ -341,12 +428,13 @@ module Ruby2JS
         super
       end
 
-      # Handle rindex with block
+      # Handle rindex with block and Hash.new with block
       def on_block(node)
         call = node.children.first
 
         if call.type == :send
-          target, method = call.children
+          target, method, *args = call.children
+
           if target && method == :rindex
             add_polyfill(:array_rindex)
             # Process the block but keep as :send! to prevent further transformation
@@ -355,6 +443,32 @@ module Ruby2JS
               process(node.children[1]),
               process(node.children[2])
             ])
+          end
+
+          if target && method == :bsearch_index
+            add_polyfill(:array_bsearch_index)
+            # Process the block but keep as :send! to prevent further transformation
+            return node.updated(nil, [
+              s(:send!, process(target), :bsearch_index),
+              process(node.children[1]),
+              process(node.children[2])
+            ])
+          end
+
+          # Hash.new { |h, k| ... } => new $Hash(undefined, (h, k) => ...)
+          if target == s(:const, nil, :Hash) && method == :new
+            add_polyfill(:hash_with_default)
+            block_args = node.children[1]
+            block_body = node.children[2]
+            # Create arrow function from block
+            arrow_fn = s(:block,
+              s(:send, nil, :lambda),
+              process(block_args),
+              process(block_body)
+            )
+            # Pass default value (from args) or undefined, plus the block
+            default_val = args.empty? ? s(:lvar, :undefined) : process(args.first)
+            return s(:send, s(:const, nil, :$Hash), :new, default_val, arrow_fn)
           end
         end
 
