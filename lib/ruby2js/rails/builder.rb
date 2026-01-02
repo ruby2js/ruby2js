@@ -478,8 +478,7 @@ class SelfhostBuilder
         basename = File.basename(path)
         next if ['package.json', 'package-lock.json', 'node_modules'].include?(basename)
         # Preserve SQLite database files (including WAL mode files)
-        next if basename.end_with?('.sqlite3', '.db', '-shm', '-wal') ||
-                basename =~ /^[a-z_]+_(dev|development|test|production)$/
+        next if basename.end_with?('.sqlite3', '.db', '-shm', '-wal')
         FileUtils.rm_rf(path)
       end
     else
@@ -827,6 +826,14 @@ class SelfhostBuilder
       { 'adapter' => @database, 'database' => "#{File.basename(DEMO_ROOT)}_dev" }
     else
       self.load_database_config()
+    end
+
+    # Ensure SQLite databases have .sqlite3 extension for reliable preservation during rebuilds
+    db_name = db_config['database'] || db_config[:database]
+    if db_name && ['sqlite', 'better_sqlite3'].include?(@database)
+      unless db_name.end_with?('.sqlite3', '.db') || db_name == ':memory:'
+        db_config['database'] = "#{db_name}.sqlite3"
+      end
     end
 
     # Read adapter and inject config
