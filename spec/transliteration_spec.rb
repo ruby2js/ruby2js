@@ -1086,6 +1086,33 @@ describe Ruby2JS do
     end
   end
 
+  describe 'double negation' do
+    it "should preserve !!x for boolean coercion" do
+      to_js( '!!x' ).must_equal '!!x'
+    end
+
+    it "should simplify double negation of comparisons" do
+      to_js( '!!(a == b)' ).must_equal 'a == b'
+      to_js( '!!(a != b)' ).must_equal 'a != b'
+      to_js( '!!(a < b)' ).must_equal 'a < b'
+      to_js( '!!(a <= b)' ).must_equal 'a <= b'
+      to_js( '!!(a > b)' ).must_equal 'a > b'
+      to_js( '!!(a >= b)' ).must_equal 'a >= b'
+    end
+
+    it "should simplify triple negation to single negation" do
+      to_js( '!!!x' ).must_equal '!x'
+    end
+
+    it "should simplify quadruple negation to double negation" do
+      to_js( '!!!!x' ).must_equal '!!x'
+    end
+
+    it "should handle not not as double negation" do
+      to_js( 'not not x' ).must_equal '!!x'
+    end
+  end
+
   describe 'attribute access' do
     it "should support attribute reference" do
       to_js('x=a.b').must_equal 'let x = a.b'

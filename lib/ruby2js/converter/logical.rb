@@ -190,6 +190,25 @@ module Ruby2JS
       if expr.type == :send and Converter::INVERT_OP[expr.children[1]]
         parse(s(:send, expr.children[0], Converter::INVERT_OP[expr.children[1]],
           expr.children[2]))
+      elsif expr.type == :send and expr.children[1] == :!
+        # Double negation: not(!inner)
+        inner = expr.children[0]
+        # Unwrap :begin nodes (from parentheses)
+        inner = inner.children.first if inner&.type == :begin && inner.children.length == 1
+        if inner&.type == :send and Converter::INVERT_OP[inner.children[1]]
+          # not(!(comparison)) → comparison (double negation cancels)
+          parse inner
+        elsif inner&.type == :send and inner.children[1] == :!
+          # Triple+ negation: not(!(!x)) → not(x)
+          # Recursively handle by parsing the inner negation as :not
+          parse s(:not, inner.children[0])
+        else
+          # Preserve !!x for boolean coercion
+          group = Converter::LOGICAL.include?(expr.type) &&
+            operator_index(:not) < operator_index(expr.type)
+          group = true if expr and %i[begin in?].include? expr.type
+          put '!'; put '(' if group; parse expr; put ')' if group
+        end
       elsif expr.type == :defined?
         parse s(:undefined?, *expr.children)
       elsif expr.type == :or
