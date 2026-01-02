@@ -28,6 +28,9 @@ js = Ruby2JS.convert(source,
 # Remove incorrect require-based imports that ESM filter generates
 js = js.gsub(/^import ["']ruby2js.*["'];\n/, '')
 
+# Fix autoimport to use named import (ruby2js.js uses named exports, not default)
+js = js.gsub(/^import Ruby2JS from/, 'import { Ruby2JS } from')
+
 # Extract just the MigrationSQL class from the nested module structure
 # Input:  export const Ruby2JS = {Rails: {MigrationSQL: class {...}}}
 # Output: export class MigrationSQL {...}
