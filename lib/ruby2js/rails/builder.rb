@@ -326,6 +326,47 @@ class SelfhostBuilder
     package
   end
 
+  # Map database adapters to their required npm dependencies
+  ADAPTER_DEPENDENCIES = {
+    'dexie' => { 'dexie' => '^4.0.10' },
+    'indexeddb' => { 'dexie' => '^4.0.10' },
+    'sqljs' => { 'sql.js' => '^1.11.0' },
+    'sql.js' => { 'sql.js' => '^1.11.0' },
+    'pglite' => { '@electric-sql/pglite' => '^0.2.0' },
+    'neon' => { '@neondatabase/serverless' => '^0.10.0' },
+    'turso' => { '@libsql/client' => '^0.14.0' },
+    'libsql' => { '@libsql/client' => '^0.14.0' },
+    'planetscale' => { '@planetscale/database' => '^1.19.0' }
+  }.freeze
+
+  # Ensure package.json has required dependencies for the selected adapter
+  # Updates the file if dependencies are missing and returns true if npm install is needed
+  def ensure_adapter_dependencies()
+    package_path = File.join(@dist_dir, 'package.json')
+    return false unless File.exist?(package_path)
+
+    required = ADAPTER_DEPENDENCIES[@database]
+    return false unless required
+
+    package = JSON.parse(File.read(package_path))
+    deps = package['dependencies'] || {}
+
+    missing = required.reject { |name, _version| deps.key?(name) }
+    return false if missing.empty?
+
+    # Add missing dependencies
+    missing.each do |name, version|
+      deps[name] = version
+      puts("  Adding dependency: #{name}@#{version}")
+    end
+
+    package['dependencies'] = deps
+    File.write(package_path, JSON.pretty_generate(package) + "\n")
+    puts("  Updated package.json")
+
+    true  # npm install needed
+  end
+
   # Database-specific importmap entries for browser builds
   IMPORTMAP_ENTRIES = {
     'dexie' => { 'dexie' => '/node_modules/dexie/dist/dexie.mjs' },
@@ -484,6 +525,9 @@ class SelfhostBuilder
     # Validate database/target combination
     self.validate_target!()
 
+    # Ensure package.json has required dependencies for this adapter
+    @needs_npm_install = self.ensure_adapter_dependencies()
+
     self.copy_database_adapter()
     puts("  Target: #{@target}")
     puts("  Runtime: #{@runtime}") if @runtime
@@ -606,6 +650,14 @@ class SelfhostBuilder
 
     # Handle Tailwind CSS if present
     self.setup_tailwind()
+
+    if @needs_npm_install
+      puts("Installing dependencies...")
+      Dir.chdir(@dist_dir) do
+        system('npm', 'install', '--silent')
+      end
+      puts("")
+    end
 
     puts("=== Build Complete ===")
   end
