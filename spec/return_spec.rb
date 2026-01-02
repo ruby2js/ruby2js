@@ -108,6 +108,11 @@ describe Ruby2JS::Filter::Return do
       to_js( 'lambda {|x| case false; when true; a; when false; b; end}' ).
         must_equal '(x) => {switch (false) {case true: return a; case false: return b}}'
     end
+
+    it "should handle case statements with ternary in when clause" do
+      to_js( 'lambda {|x| case x; when :a; foo ? bar : nil; else nil; end}' ).
+        must_include 'return foo ? bar : null'
+    end
   end
 
   describe 'Class.new' do

@@ -73,6 +73,10 @@ module Ruby2JS
               # Multi-statement when body - apply autoreturn to the begin block
               gchildren[-1] = s(:autoreturn, gchildren.last)
               children[i] = children[i].updated(nil, gchildren)
+            elsif !gchildren.empty? and gchildren.last.type == :if
+              # Ternary or if expression in when body - apply autoreturn
+              gchildren[-1] = s(:autoreturn, gchildren.last)
+              children[i] = children[i].updated(nil, gchildren)
             end
           elsif EXPRESSIONS.include? children[i].type
             children[i] = children[i].updated(:return, [children[i]])
