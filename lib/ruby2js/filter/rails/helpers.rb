@@ -1353,21 +1353,48 @@ module Ruby2JS
           # Build form tag - add onsubmit handler for browser/SPA target
           if model_name && self.browser_target?()
             plural_name = model_name + 's'  # Simple pluralization
+            # For nested resources (e.g., [@article, Comment.new]), use parent_child route name
+            route_name = parent_model_name ? "#{parent_model_name}_#{plural_name}" : plural_name
 
             if model_is_new
               # New model - always POST, no ID check needed
-              statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
-                s(:str, "<form data-model=\"#{model_name}\"#{class_attr} onsubmit=\"return routes.#{plural_name}.post(event)\">"))
+              if parent_model_name
+                # Nested resource: routes.article_comments.post(event, article.id)
+                statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
+                  s(:dstr,
+                    s(:str, "<form data-model=\"#{model_name}\"#{class_attr} onsubmit=\"return routes.#{route_name}.post(event, "),
+                    s(:begin, s(:attr, s(:lvar, parent_model_name.to_sym), :id)),
+                    s(:str, ")\">")))
+              else
+                statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
+                  s(:str, "<form data-model=\"#{model_name}\"#{class_attr} onsubmit=\"return routes.#{route_name}.post(event)\">"))
+              end
             else
               # Existing model - check ID to determine POST vs PATCH
-              # Generate: <form onsubmit="return (model.id ? routes.model.patch(event, model.id) : routes.models.post(event))">
-              statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
-                s(:dstr,
-                  s(:str, "<form data-model=\"#{model_name}\"#{class_attr} onsubmit=\"return ("),
-                  s(:begin, s(:attr, s(:lvar, model_name.to_sym), :id)),
-                  s(:str, " ? routes.#{model_name}.patch(event, "),
-                  s(:begin, s(:attr, s(:lvar, model_name.to_sym), :id)),
-                  s(:str, ") : routes.#{plural_name}.post(event))\">")))
+              singular_route = parent_model_name ? "#{parent_model_name}_#{model_name}" : model_name
+              if parent_model_name
+                # Nested resource: routes.article_comment.patch(event, article.id, comment.id)
+                statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
+                  s(:dstr,
+                    s(:str, "<form data-model=\"#{model_name}\"#{class_attr} onsubmit=\"return ("),
+                    s(:begin, s(:attr, s(:lvar, model_name.to_sym), :id)),
+                    s(:str, " ? routes.#{singular_route}.patch(event, "),
+                    s(:begin, s(:attr, s(:lvar, parent_model_name.to_sym), :id)),
+                    s(:str, ", "),
+                    s(:begin, s(:attr, s(:lvar, model_name.to_sym), :id)),
+                    s(:str, ") : routes.#{route_name}.post(event, "),
+                    s(:begin, s(:attr, s(:lvar, parent_model_name.to_sym), :id)),
+                    s(:str, "))\">")))
+              else
+                # Generate: <form onsubmit="return (model.id ? routes.model.patch(event, model.id) : routes.models.post(event))">
+                statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
+                  s(:dstr,
+                    s(:str, "<form data-model=\"#{model_name}\"#{class_attr} onsubmit=\"return ("),
+                    s(:begin, s(:attr, s(:lvar, model_name.to_sym), :id)),
+                    s(:str, " ? routes.#{model_name}.patch(event, "),
+                    s(:begin, s(:attr, s(:lvar, model_name.to_sym), :id)),
+                    s(:str, ") : routes.#{route_name}.post(event))\">")))
+              end
             end
           elsif model_name
             # Server target - form with action and method using path helpers

@@ -372,6 +372,16 @@ describe Ruby2JS::Filter::Rails::Helpers do
         result.must_include 'method="post"'
         result.wont_include 'comments_path()'
       end
+
+      it "should generate browser-style nested resource form_with with article_comments route" do
+        erb_src = "_buf = ::String.new; _buf.append= form_with model: [@article, Comment.new] do |form|\n _buf << \"<button>Submit</button>\"; end\n_buf.to_s"
+        result = to_js_with_target(erb_src, database: 'dexie', target: 'browser')
+        # Should use nested route: routes.article_comments.post(event, article.id)
+        result.must_include 'onsubmit='
+        result.must_include 'routes.article_comments.post(event'
+        result.must_include 'article.id'
+        result.wont_include 'routes.comments.post'
+      end
     end
   end
 
