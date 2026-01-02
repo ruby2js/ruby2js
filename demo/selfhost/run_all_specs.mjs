@@ -40,6 +40,11 @@ const FILTER_NAME_EXCEPTIONS = {
   'camelcase_spec.rb': 'camelCase.js'
 };
 
+// Additional filter dependencies (spec name => additional filter files to load)
+const FILTER_DEPENDENCIES = {
+  'camelcase_spec.rb': ['lit.js']
+};
+
 // Derive filter file path from spec name
 function filterFileForSpec(specName) {
   if (FILTER_NAME_EXCEPTIONS[specName]) {
@@ -70,6 +75,19 @@ async function loadReadyFilters() {
 }
 
 async function loadFilterForSpec(specName) {
+  // Load any additional filter dependencies first
+  const deps = FILTER_DEPENDENCIES[specName] || [];
+  for (const dep of deps) {
+    if (!loadedFilters.has(dep)) {
+      try {
+        await import(`./filters/${dep}?t=${Date.now()}`);
+        loadedFilters.add(dep);
+      } catch (e) {
+        // Dependency not available, continue anyway
+      }
+    }
+  }
+
   const filterFile = filterFileForSpec(specName);
   const filterPath = `./filters/${filterFile}`;
   // Extract base name for filter lookup (e.g., 'rails/model.js' -> 'rails/model')

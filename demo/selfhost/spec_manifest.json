@@ -19,21 +19,21 @@
     "rails_helpers_spec.rb",
     "rails_routes_spec.rb",
     "securerandom_spec.rb",
-    "comments_spec.rb"
+    "comments_spec.rb",
+    "jest_spec.rb",
+    "camelcase_spec.rb",
+    "tagged_templates_spec.rb"
   ],
   "partial": [
     "phlex_spec.rb",
-    "camelcase_spec.rb",
-    "tagged_templates_spec.rb",
     "polyfill_spec.rb",
     "pragma_spec.rb",
     "react_spec.rb",
-    "jest_spec.rb",
     "node_spec.rb",
-    "jsx_spec.rb"
+    "jsx_spec.rb",
+    "lit_spec.rb"
   ],
   "blocked": {
-    "lit_spec.rb": "filter transpiles but has runtime errors",
     "nokogiri_spec.rb": "filter not transpiled",
     "preact_spec.rb": "uses react filter"
   }

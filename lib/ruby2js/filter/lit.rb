@@ -16,12 +16,12 @@ module Ruby2JS
       end
 
       def on_ivar(node)
-        return super unless @le_props&.include?(node.children.first)
+        return super unless @le_props&.include?(node.children.first) # Pragma: hash
         process s(:attr, s(:self), node.children.first.to_s[1..-1])
       end
 
       def on_ivasgn(node)
-        return super unless @le_props&.include?(node.children.first)
+        return super unless @le_props&.include?(node.children.first) # Pragma: hash
         return super unless node.children.length > 1
 
         process s(:send, s(:self), node.children.first.to_s[1..-1]+'=',
@@ -31,7 +31,7 @@ module Ruby2JS
       def on_op_asgn(node)
         return super unless node.children.first.type == :ivasgn
         var = node.children.first.children.first
-        return super unless @le_props&.include?(var)
+        return super unless @le_props&.include?(var) # Pragma: hash
         super node.updated(nil, [s(:attr, s(:attr, nil, :this),
           var.to_s[1..-1]), *node.children[1..-1]])
       end
@@ -57,27 +57,29 @@ module Ruby2JS
             (child.type == :send and child.children[0..1] == [s(:self), :properties=])
           }
 
-          if values == nil
+          if values == nil || values < 0
+            props_pairs = @le_props.map {|name, type| # Pragma: entries
+              s(:pair, s(:sym, name.to_s[1..-1]),
+              s(:hash, s(:pair, s(:sym, :type), s(:const, nil, type || :String))))
+            }
             if es2022
-              nodes.unshift process(s(:casgn, nil, :properties, 
-                s(:hash, *@le_props.map {|name, type| s(:pair, s(:sym, name.to_s[1..-1]), 
-                s(:hash, s(:pair, s(:sym, :type), s(:const, nil, type || :String))))})))
+              nodes.unshift process(s(:casgn, nil, :properties, s(:hash, *props_pairs)))
             else
-              nodes.unshift process(s(:defp, s(:self), :properties, s(:args), s(:return, 
-                s(:hash, *@le_props.map {|name, type| s(:pair, s(:sym, name.to_s[1..-1]), 
-                s(:hash, s(:pair, s(:sym, :type), s(:const, nil, type || :String))))}))))
+              nodes.unshift process(s(:defp, s(:self), :properties, s(:args), s(:return,
+                s(:hash, *props_pairs))))
             end
           elsif nodes[values].children.last.type == :hash
-            le_props = @le_props.map {|name, type| 
-              [s(:sym, name.to_s[1..-1].to_sym), 
+            le_props_array = @le_props.map {|name, type| # Pragma: entries
+              [s(:sym, name.to_s[1..-1].to_sym),
               s(:hash, s(:pair, s(:sym, :type), s(:const, nil, type || :String)))]
-            }.to_h.merge(
+            }
+            le_props = le_props_array.to_h.merge(
               nodes[values].children.last.children.map {|pair| pair.children}.to_h
             )
 
+            le_props_final = le_props.map{|name, value| s(:pair, name, value)} # Pragma: entries
             nodes[values] = nodes[values].updated(nil,
-              [*nodes[values].children[0..-2], s(:hash,
-              *le_props.map{|name, value| s(:pair, name, value)})])
+              [*nodes[values].children[0..-2], s(:hash, *le_props_final)])
           end
         end
 
@@ -85,7 +87,7 @@ module Ruby2JS
         customElement = nodes.find_index {|child| 
           child&.type == :send and (child.children[0..1] == [nil, :customElement] || child.children[0..1] == [nil, :custom_element])
         }
-        if customElement and nodes[customElement].children.length == 3
+        if customElement != nil and customElement >= 0 and nodes[customElement].children.length == 3
           nodes[customElement] = nodes[customElement].updated(nil,
             [s(:attr, nil, :customElements), :define,
             nodes[customElement].children.last, class_name])
@@ -95,7 +97,7 @@ module Ruby2JS
         render = nodes.find_index {|child| 
           child&.type == :def and child.children.first == :render
         }
-        if render and %i[str dstr begin if block].include?(nodes[render].children[2]&.type)
+        if render != nil and render >= 0 and %i[str dstr begin if block].include?(nodes[render].children[2]&.type)
           nodes[render] = nodes[render].updated(:deff,
             [*nodes[render].children[0..1],
             s(:autoreturn, html_wrap(nodes[render].children[2]))])
@@ -107,7 +109,7 @@ module Ruby2JS
           (child&.type == :defs and child.children[0..1] == [s(:self), :styles]) or
           (child&.type == :send and child.children[0..1] == [s(:self), :styles=])
         }
-        if styles and %i[str dstr].include?(nodes[styles].children.last&.type)
+        if styles != nil and styles >= 0 and %i[str dstr].include?(nodes[styles].children.last&.type)
           string = nodes[styles].children.last
           string = s(:dstr, string) if string.type == :str
           children = string.children.dup
@@ -137,7 +139,7 @@ module Ruby2JS
         initialize = nodes.find_index {|child| 
           child&.type == :def and child.children.first == :initialize
         }
-        if initialize and nodes[initialize].children.length == 3
+        if initialize != nil and initialize >= 0 and nodes[initialize].children.length == 3
           statements = nodes[initialize].children[2..-1]
 
           if statements.length == 1 and statements.first.type == :begin
@@ -162,7 +164,8 @@ module Ruby2JS
         }
 
         # local props
-        props.merge! @le_props.keys.map {|prop| [prop.to_sym, s(:self)]}.to_h
+        local_props = @le_props.keys().map {|prop| [prop.to_sym, s(:self)]}.to_h
+        props.merge! local_props
 
         nodes.unshift s(:defineProps, props)
 
@@ -240,9 +243,9 @@ module Ruby2JS
             @le_props[child.children.first] ||= nil
           elsif child.type == :ivasgn || child.type == :op_asgn
             prop = child.children.first
-            unless prop.is_a? Symbol
+            if prop.respond_to?(:type)
               prop = prop.children.first if prop.type == :ivasgn
-              next unless prop.is_a? Symbol
+              next if prop.respond_to?(:type)
             end
 
             next if prop.to_s.start_with?("@_")

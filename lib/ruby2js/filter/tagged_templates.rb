@@ -23,7 +23,7 @@ module Ruby2JS
           elsif strnode.type == :dstr
             # for literal strings, chomp a newline off the end
             if strnode.children.last.type == :str && strnode.children.last.children[0].end_with?("\n")
-             children = [*strnode.children.take(strnode.children.length - 1), s(:str, strnode.children.last.children[0].chomp)]
+             children = [*strnode.children[0..-2], s(:str, strnode.children.last.children[0].chomp)]
              strnode = s(:dstr, *children)
             end
           else
