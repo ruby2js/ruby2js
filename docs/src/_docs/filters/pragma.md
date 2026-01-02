@@ -388,19 +388,49 @@ in both Ruby and JavaScript environments.
 
 ### Instance Variables
 
-Type inference also works with instance variables:
+Type inference works with instance variables, and types set in `initialize` are
+tracked across all methods in the class:
 
 ```ruby
 class Counter
   def initialize
     @items = []
+    @visited = Set.new
   end
 
   def add(item)
-    @items << item  # Uses push() automatically
+    @items << item     # Uses push() - type known from initialize
+    @visited << item   # Uses add() - type known from initialize
+  end
+
+  def unvisited
+    # Set.select auto-converts to [...set].filter()
+    @items.select { |x| !@visited.include?(x) }
   end
 end
 ```
+
+Output:
+```javascript
+class Counter {
+  constructor() {
+    this._items = [];
+    this._visited = new Set
+  }
+
+  add(item) {
+    this._items.push(item);
+    this._visited.add(item)
+  }
+
+  get unvisited() {
+    return this._items.filter(x => !this._visited.has(x))
+  }
+}
+```
+
+**Note:** Instance variable types are only tracked when assigned in `initialize`.
+Types assigned in other methods are not propagated class-wide.
 
 ### Pragma Override
 
@@ -416,8 +446,8 @@ items << y # Pragma: set  # Pragma overrides - uses add()
 
 ### Scope Boundaries
 
-Type information is scoped to methods and classes. Types inferred in one
-method do not affect other methods:
+**Local variables** are scoped to their method. Types inferred in one method
+do not affect other methods:
 
 ```ruby
 def method_a
@@ -430,6 +460,10 @@ def method_b
   items << "b"      # add()
 end
 ```
+
+**Instance variables** assigned in `initialize` are tracked class-wide (see
+[Instance Variables](#instance-variables) above). Instance variables assigned
+in other methods are only tracked within that method.
 
 ### When to Use Pragmas
 
