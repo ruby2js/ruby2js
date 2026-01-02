@@ -190,6 +190,51 @@ bin/juntos deploy -d neon --force     # Clear cache and deploy
 3. Verifies the build loads correctly
 4. Runs the platform CLI (vercel or wrangler)
 
+## Static Hosting
+
+Browser builds (`dexie`, `sqljs`, `pglite`) produce static files in `dist/` that can be hosted anywhere. No server runtime required—the app runs entirely in the browser.
+
+### Quick Start
+
+```bash
+bin/juntos build -d dexie
+cd dist && npx serve -s
+```
+
+### Production Hosting
+
+For traditional web servers, configure SPA fallback routing so client-side routes like `/articles/1` serve `index.html` instead of 404:
+
+**nginx:**
+
+```nginx
+server {
+    listen 80;
+    root /path/to/dist;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
+```
+
+**Apache (.htaccess in dist/):**
+
+```apache
+RewriteEngine On
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.html [L]
+```
+
+**Static Hosts:**
+
+- **GitHub Pages:** Push `dist/` contents to gh-pages branch, add a 404.html that's a copy of index.html
+- **Netlify:** Add `_redirects` file: `/* /index.html 200`
+- **Vercel:** Add `vercel.json`: `{"rewrites": [{"source": "/(.*)", "destination": "/index.html"}]}`
+- **Cloudflare Pages:** Automatically handles SPA routing
+
 ## Database Adapters
 
 | Adapter | Targets | Storage |
