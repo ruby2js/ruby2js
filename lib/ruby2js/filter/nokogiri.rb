@@ -29,7 +29,7 @@ module Ruby2JS
           [:HTML, :HTML5].include? method and
           target == s(:const, nil, :Nokogiri)
         then
-          prepend_list << IMPORT_JSDOM
+          self.prepend_list << IMPORT_JSDOM
           S(:attr, s(:attr, s(:send, s(:const, nil, :JSDOM), :new,
             *process_all(args)), :window), :document)
 
@@ -39,7 +39,7 @@ module Ruby2JS
           target.children.first == s(:const, nil, :Nokogiri) and
           [:HTML, :HTML5].include? target.children.last
         then
-          prepend_list << IMPORT_JSDOM
+          self.prepend_list << IMPORT_JSDOM
           S(:attr, s(:attr, s(:send, s(:const, nil, :JSDOM), :new,
             *process_all(args)), :window), :document)
 
@@ -120,20 +120,20 @@ module Ruby2JS
             init = []
             args[1..-1].each do |arg|
               if arg.type == :hash
-                init += arg.children.map do |pair|
-                  s(:send, s(:gvar, :$_), :setAttribute,
+                arg.children.each do |pair|
+                  init << s(:send, s(:lvar, :$_), :setAttribute,
                     *process_all(pair.children))
                 end
               elsif arg.type == :str
-                init << s(:send, s(:gvar, :$_), :textContent=, process(arg))
+                init << s(:send, s(:lvar, :$_), :textContent=, process(arg))
               else
                 return super
               end
             end
 
             S(:send, s(:block, s(:send, nil, :proc), s(:args),
-              s(:begin, s(:gvasgn, :$_, create), *init,
-              s(:return, s(:gvar, :$_)))), :[])
+              s(:begin, s(:lvasgn, :$_, create), *init,
+              s(:return, s(:lvar, :$_)))), :[])
           else
             super
           end

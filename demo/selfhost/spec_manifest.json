@@ -22,7 +22,8 @@
     "comments_spec.rb",
     "jest_spec.rb",
     "camelcase_spec.rb",
-    "tagged_templates_spec.rb"
+    "tagged_templates_spec.rb",
+    "nokogiri_spec.rb"
   ],
   "partial": [
     "phlex_spec.rb",
@@ -38,7 +39,6 @@
     "action_cable_spec.rb",
     "alpine_spec.rb",
     "turbo_spec.rb",
-    "nokogiri_spec.rb",
     "preact_spec.rb"
   ],
   "blocked": {
