@@ -593,24 +593,25 @@ module Ruby2JS
                 s(:str, '</a>'))
             end
           else
-            # Node target - form-based delete
+            # Node target - form-based delete with onclick confirm (works without Turbo)
             button_class = css_class ? " class=\"#{css_class}\"" : ""
+            onclick_confirm = " onclick=\"return confirm('#{confirm_str}')\""
             if text_node.type == :str && path_node.type == :str
               text_str = text_node.children[0]
               path_str = path_node.children[0]
-              s(:str, "<form method=\"post\" action=\"#{path_str}\" style=\"display:inline\" data-confirm=\"#{confirm_str}\"><input type=\"hidden\" name=\"_method\" value=\"delete\"><button type=\"submit\"#{button_class}>#{text_str}</button></form>")
+              s(:str, "<form method=\"post\" action=\"#{path_str}\" style=\"display:inline\"><input type=\"hidden\" name=\"_method\" value=\"delete\"><button type=\"submit\"#{button_class}#{onclick_confirm}>#{text_str}</button></form>")
             elsif text_node.type == :str
               text_str = text_node.children[0]
               s(:dstr,
                 s(:str, '<form method="post" action="'),
                 s(:begin, path_expr),
-                s(:str, "\" style=\"display:inline\" data-confirm=\"#{confirm_str}\"><input type=\"hidden\" name=\"_method\" value=\"delete\"><button type=\"submit\"#{button_class}>#{text_str}</button></form>"))
+                s(:str, "\" style=\"display:inline\"><input type=\"hidden\" name=\"_method\" value=\"delete\"><button type=\"submit\"#{button_class}#{onclick_confirm}>#{text_str}</button></form>"))
             else
               text_expr = process(text_node)
               s(:dstr,
                 s(:str, '<form method="post" action="'),
                 s(:begin, path_expr),
-                s(:str, "\" style=\"display:inline\" data-confirm=\"#{confirm_str}\"><input type=\"hidden\" name=\"_method\" value=\"delete\"><button type=\"submit\"#{button_class}>"),
+                s(:str, "\" style=\"display:inline\"><input type=\"hidden\" name=\"_method\" value=\"delete\"><button type=\"submit\"#{button_class}#{onclick_confirm}>"),
                 s(:begin, text_expr),
                 s(:str, '</button></form>'))
             end
@@ -787,10 +788,11 @@ module Ruby2JS
             else
               path_expr = process(path_node)
             end
+            onclick_confirm = " onclick=\"return confirm('#{confirm_str}')\""
             s(:dstr,
               s(:str, "<form method=\"post\" action=\""),
               s(:begin, path_expr),
-              s(:str, "\"#{form_class_attr}#{form_style}><input type=\"hidden\" name=\"_method\" value=\"delete\"><button type=\"submit\"#{btn_class_attr} data-confirm=\"#{confirm_str}\">#{text_str}</button></form>"))
+              s(:str, "\"#{form_class_attr}#{form_style}><input type=\"hidden\" name=\"_method\" value=\"delete\"><button type=\"submit\"#{btn_class_attr}#{onclick_confirm}>#{text_str}</button></form>"))
           end
         end
 
