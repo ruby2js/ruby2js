@@ -96,13 +96,45 @@ module Ruby2JS
               end
             end
 
-            # Run the migrate script
-            unless system("node", "node_modules/ruby2js-rails/migrate.mjs")
-              abort "\nError: Migration failed."
+            # D1 requires wrangler to run migrations
+            if options[:database] == 'd1'
+              run_d1_migrations(options)
+            else
+              # Run the migrate script
+              unless system("node", "node_modules/ruby2js-rails/migrate.mjs")
+                abort "\nError: Migration failed."
+              end
             end
           end
 
           puts "Migrations completed."
+        end
+
+        def run_d1_migrations(options)
+          # Get database name from wrangler.toml
+          db_name = nil
+          if File.exist?('wrangler.toml')
+            File.read('wrangler.toml').each_line do |line|
+              if line =~ /database_name\s*=\s*"([^"]+)"/
+                db_name = $1
+                break
+              end
+            end
+          end
+
+          db_name ||= 'blog'  # fallback
+
+          # Check if wrangler is available
+          unless system('npx', 'wrangler', '--version', out: File::NULL, err: File::NULL)
+            abort "\nError: wrangler not found. Install with: npm install -D wrangler"
+          end
+
+          # Use wrangler to run migrations via the d1_migrate.mjs script
+          puts "Using wrangler to run D1 migrations (local)..."
+          unless system('npx', 'wrangler', 'd1', 'execute', db_name, '--local',
+                        '--file', 'db/migrations.sql')
+            abort "\nError: D1 migration failed. Make sure db/migrations.sql exists."
+          end
         end
       end
     end

@@ -28,6 +28,7 @@ require 'ruby2js/filter/phlex'
 require 'ruby2js/filter/stimulus'
 require 'ruby2js/filter/camelCase'
 require_relative 'erb_compiler'
+require_relative 'migration_sql'
 
 class SelfhostBuilder
   # JS (Node.js): use process.cwd() since bin commands run from app root
@@ -662,6 +663,12 @@ class SelfhostBuilder
       puts("")
     end
 
+    # Copy .env.local if present (for database credentials, API keys, etc.)
+    env_local = File.join(DEMO_ROOT, '.env.local')
+    if File.exist?(env_local)
+      FileUtils.cp(env_local, File.join(@dist_dir, '.env.local'))
+    end
+
     puts("=== Build Complete ===")
   end
 
@@ -1181,6 +1188,23 @@ class SelfhostBuilder
     # Generate migrations index file
     if migrations.any?
       self.generate_migrations_index(migrate_dest, migrations)
+    end
+
+    # For D1, also generate a migrations.sql file that wrangler can execute
+    if @database == 'd1'
+      self.generate_migrations_sql(migrate_src, dest_dir)
+    end
+  end
+
+  # Generate SQL migrations file for D1/wrangler
+  def generate_migrations_sql(migrate_src, db_dest)
+    result = Ruby2JS::Rails::MigrationSQL.generate_all(migrate_src)
+
+    if result[:sql] && !result[:sql].empty?
+      FileUtils.mkdir_p(db_dest)
+      sql_path = File.join(db_dest, 'migrations.sql')
+      File.write(sql_path, result[:sql])
+      puts("  -> db/migrations.sql (#{result[:migrations].length} migrations)")
     end
   end
 
