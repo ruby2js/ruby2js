@@ -72,11 +72,10 @@ server {
     root /usr/share/nginx/html;
     index index.html;
 
-    # Include default MIME types and add extras for ES modules and WebAssembly
+    # Include default MIME types and add .mjs for ES modules
     include /etc/nginx/mime.types;
     types {
         application/javascript mjs;
-        application/wasm wasm;
     }
 
     # Enable gzip compression
