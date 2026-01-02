@@ -31,10 +31,16 @@
     "react_spec.rb",
     "node_spec.rb",
     "jsx_spec.rb",
-    "lit_spec.rb"
+    "lit_spec.rb",
+    "haml_spec.rb",
+    "combiner_spec.rb",
+    "require_spec.rb",
+    "action_cable_spec.rb",
+    "alpine_spec.rb",
+    "turbo_spec.rb",
+    "nokogiri_spec.rb",
+    "preact_spec.rb"
   ],
   "blocked": {
-    "nokogiri_spec.rb": "filter not transpiled",
-    "preact_spec.rb": "uses react filter"
   }
 }
