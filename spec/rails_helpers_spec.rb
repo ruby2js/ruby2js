@@ -382,6 +382,17 @@ describe Ruby2JS::Filter::Rails::Helpers do
         result.must_include 'article.id'
         result.wont_include 'routes.comments.post'
       end
+
+      it "should generate browser-style nested resource button_to delete with article_comment route" do
+        erb_src = '_buf = ::String.new; _buf << ( button_to "Delete", [@article, comment], method: :delete ).to_s; _buf.to_s'
+        result = to_js_with_target(erb_src, database: 'dexie', target: 'browser')
+        # Should use nested route: routes.article_comment.delete(article.id, comment.id)
+        result.must_include 'onclick='
+        result.must_include 'routes.article_comment.delete('
+        result.must_include 'article.id'
+        result.must_include 'comment.id'
+        result.wont_include '/* delete */'
+      end
     end
   end
 

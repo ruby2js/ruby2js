@@ -726,6 +726,38 @@ module Ruby2JS
                 s(:str, ") }\">#{text_str}</button></form>"))
             end
 
+            # Handle array (nested resource like [@article, comment])
+            if path_node&.type == :array && path_node.children.length == 2
+              parent_node = path_node.children[0]
+              child_node = path_node.children[1]
+
+              # Extract parent name
+              parent_name = case parent_node.type
+                when :ivar then parent_node.children.first.to_s.sub(/^@/, '')
+                when :lvar then parent_node.children.first.to_s
+                when :send then parent_node.children[0].nil? ? parent_node.children[1].to_s : nil
+                else nil
+              end
+
+              # Extract child name for route
+              child_name = case child_node.type
+                when :ivar then child_node.children.first.to_s.sub(/^@/, '')
+                when :lvar then child_node.children.first.to_s
+                when :send then child_node.children[0].nil? ? child_node.children[1].to_s : nil
+                else nil
+              end
+
+              if parent_name && child_name
+                route_name = "#{parent_name}_#{child_name}"
+                return s(:dstr,
+                  s(:str, "<form#{form_class_attr}#{form_style}><button type=\"button\"#{btn_class_attr} onclick=\"if(confirm('#{confirm_str}')) { routes.#{route_name}.delete("),
+                  s(:begin, s(:attr, s(:lvar, parent_name.to_sym), :id)),
+                  s(:str, ", "),
+                  s(:begin, s(:attr, s(:lvar, child_name.to_sym), :id)),
+                  s(:str, ") }\">#{text_str}</button></form>"))
+              end
+            end
+
             # Fallback
             s(:str, "<form#{form_class_attr}#{form_style}><button type=\"button\"#{btn_class_attr} onclick=\"if(confirm('#{confirm_str}')) { /* delete */ }\">#{text_str}</button></form>")
           else
