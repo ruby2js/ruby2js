@@ -823,6 +823,37 @@ describe Ruby2JS::Filter::Pragma do
         js.must_include 'this._items.push("x")' # B doesn't know type
       end
 
+      it "should track ivar types from initialize across methods" do
+        code = <<~RUBY
+          class Foo
+            def initialize
+              @items = Set.new
+            end
+            def add(x)
+              @items << x
+            end
+          end
+        RUBY
+        js = to_js(code)
+        js.must_include 'this._items = new Set'
+        js.must_include 'this._items.add(x)' # knows it's a Set from initialize
+      end
+
+      it "should convert Set.select to array spread with filter" do
+        code = <<~RUBY
+          class Foo
+            def initialize
+              @items = Set.new
+            end
+            def filtered
+              @items.select { |x| x > 0 }
+            end
+          end
+        RUBY
+        js = to_js(code)
+        js.must_include '[...this._items].filter(x => x > 0)'
+      end
+
       it "should preserve types within same method" do
         code = <<~RUBY
           def foo

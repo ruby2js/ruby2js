@@ -64,8 +64,11 @@ module Ruby2JS
         super
         @pragmas = {}
         @pragma_scanned_count = 0
-        @var_types = {}        # Track inferred variable types
+        @var_types = {}        # Track inferred variable types (method-scoped)
         @var_types_stack = []  # Stack for scope management
+        @ivar_types = {}       # Track instance variable types (class-scoped)
+        @ivar_types_stack = [] # Stack for class scope management
+        @in_initialize = false # Track if we're in an initialize method
       end
 
       def options=(options)
@@ -175,13 +178,19 @@ module Ruby2JS
           if t_let
             actual_value, type_sym = t_let
             @var_types[name] = type_sym
+            # Also store in class-scoped ivar_types if in initialize
+            @ivar_types[name] = type_sym if @in_initialize
             # Replace T.let(value, Type) with just value
             return process node.updated(nil, [name, actual_value])
           end
 
           # Fall back to inference from value
           inferred = infer_type(value)
-          @var_types[name] = inferred if inferred
+          if inferred
+            @var_types[name] = inferred
+            # Also store in class-scoped ivar_types if in initialize
+            @ivar_types[name] = inferred if @in_initialize
+          end
         end
         super
       end
@@ -190,8 +199,12 @@ module Ruby2JS
       def var_type(node)
         return nil unless node
         case node.type
-        when :lvar, :ivar
+        when :lvar
           @var_types[node.children.first]
+        when :ivar
+          # Check method-scoped first, then class-scoped
+          name = node.children.first
+          @var_types[name] || @ivar_types[name]
         else
           nil
         end
@@ -263,6 +276,16 @@ module Ruby2JS
 
       def pop_var_types_scope
         @var_types = @var_types_stack.pop || {}
+      end
+
+      # Scope management for class-scoped instance variable types
+      def push_ivar_types_scope
+        @ivar_types_stack.push @ivar_types
+        @ivar_types = {}
+      end
+
+      def pop_ivar_types_scope
+        @ivar_types = @ivar_types_stack.pop || {}
       end
 
       # Scan all comments for pragma patterns and build [source, line] => Set<pragma> map
@@ -389,6 +412,11 @@ module Ruby2JS
           return s(:hide)
         end
 
+        # Track if we're in initialize (for class-scoped ivar type tracking)
+        method_name = node.children[0]
+        was_in_initialize = @in_initialize
+        @in_initialize = (method_name == :initialize)
+
         # New scope for local variable types
         push_var_types_scope
         begin
@@ -401,6 +429,7 @@ module Ruby2JS
           end
         ensure
           pop_var_types_scope
+          @in_initialize = was_in_initialize
         end
       end
 
@@ -475,11 +504,13 @@ module Ruby2JS
           return process node.updated(:class_extend)
         end
 
-        # New scope for local variable types
+        # New scope for local variable types and class-scoped ivar types
         push_var_types_scope
+        push_ivar_types_scope
         begin
           super
         ensure
+          pop_ivar_types_scope
           pop_var_types_scope
         end
       end
@@ -886,6 +917,25 @@ module Ruby2JS
 
             return s(:send,
               s(:const, nil, :Object), :fromEntries, processed_filter)
+          end
+        end
+
+        # Handle Set.select - JS Sets don't have filter(), so convert to array first
+        # set.select { |x| expr } → [...set].filter(x => expr)
+        if call.type == :send
+          target, method = call.children[0], call.children[1]
+          if method == :select && target
+            type = pragma?(node, :set) ? :set : var_type(target)
+            if type == :set
+              # Wrap set in array spread: [...set]
+              spread_array = s(:array, s(:splat, target))
+              # Create filter block on the spread array
+              return process node.updated(nil, [
+                s(:send, spread_array, :filter),
+                args,
+                body
+              ])
+            end
           end
         end
 
