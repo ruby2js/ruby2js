@@ -71,7 +71,7 @@ module Ruby2JS
           if classes.nil? || classes == -1
             nodes.unshift s(:send, s(:self), :classes=, s(:array, *@stim_classes))
           elsif nodes[classes].children[2].type == :array
-            nodes[classes].children[2].children.each {|item| @stim_classes << item} # Pragma: set
+            nodes[classes].children[2].children.each {|item| @stim_classes << item}
             nodes[classes] = nodes[classes].updated(nil,
               [*nodes[classes].children[0..1], s(:array, *@stim_classes)])
           end
@@ -111,7 +111,7 @@ module Ruby2JS
           if targets.nil? || targets == -1
             nodes.unshift s(:send, s(:self), :targets=, s(:array, *@stim_targets))
           elsif nodes[targets].children[2].type == :array
-            nodes[targets].children[2].children.each {|item| @stim_targets << item} # Pragma: set
+            nodes[targets].children[2].children.each {|item| @stim_targets << item}
             nodes[targets] = nodes[targets].updated(nil,
               [*nodes[targets].children[0..1], s(:array, *@stim_targets)])
           end
@@ -125,7 +125,7 @@ module Ruby2JS
           if outlets.nil? || outlets == -1
             nodes.unshift s(:send, s(:self), :outlets=, s(:array, *@stim_outlets))
           elsif nodes[outlets].children[2].type == :array
-            nodes[outlets].children[2].children.each {|item| @stim_outlets << item} # Pragma: set
+            nodes[outlets].children[2].children.each {|item| @stim_outlets << item}
             nodes[outlets] = nodes[outlets].updated(nil,
               [*nodes[outlets].children[0..1], s(:array, *@stim_outlets)])
           end

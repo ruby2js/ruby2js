@@ -101,7 +101,7 @@ module Ruby2JS
                 args_node.children.each do |arg|
                   case arg.type
                   when :arg, :optarg, :restarg, :kwarg, :kwoptarg, :kwrestarg
-                    constructor_args << arg.children.first if arg.children.first # Pragma: set
+                    constructor_args << arg.children.first if arg.children.first
                   end
                 end
               end
@@ -110,7 +110,7 @@ module Ruby2JS
               base_node = s(:setter, s(:self))
               # Wrap private setters so send.rb can apply the prefix
               if method_visibility == :private
-                private_methods << prop # Pragma: set
+                private_methods << prop
                 prefix = (es2022 and !underscored_private) ? '#' : '_'
                 base_node = s(:private_method, prefix, base_node)
               end
@@ -124,7 +124,7 @@ module Ruby2JS
 
               # Wrap private methods so send.rb can apply the prefix
               if method_visibility == :private
-                private_methods << prop # Pragma: set
+                private_methods << prop
                 prefix = (es2022 and !underscored_private) ? '#' : '_'
                 base_node = s(:private_method, prefix, base_node)
               end
@@ -142,7 +142,7 @@ module Ruby2JS
 
               # Wrap private async methods
               if method_visibility == :private
-                private_methods << prop # Pragma: set
+                private_methods << prop
                 prefix = (es2022 and !underscored_private) ? '#' : '_'
                 base_node = s(:private_method, prefix, base_node)
               end
@@ -163,10 +163,10 @@ module Ruby2JS
 
           # find ivars and cvars
           walk = proc do |ast|
-            ivars << ast.children.first if ast.type === :ivar # Pragma: set
-            ivars << ast.children.first if ast.type === :ivasgn # Pragma: set
-            cvars << ast.children.first if ast.type === :cvar # Pragma: set
-            cvars << ast.children.first if ast.type === :cvasgn # Pragma: set
+            ivars << ast.children.first if ast.type === :ivar
+            ivars << ast.children.first if ast.type === :ivasgn
+            cvars << ast.children.first if ast.type === :cvar
+            cvars << ast.children.first if ast.type === :cvasgn
 
             ast.children.each do |child|
               walk.call(child) if ast_node?(child)
@@ -175,15 +175,15 @@ module Ruby2JS
             if ast.type == :send and ast.children.first == nil
               if ast.children[1] == :attr_accessor
                 ast.children[2..-1].each_with_index do |child_sym, index2|
-                  ivars << :"@#{child_sym.children.first}" # Pragma: set
+                  ivars << :"@#{child_sym.children.first}"
                 end
               elsif ast.children[1] == :attr_reader
                 ast.children[2..-1].each_with_index do |child_sym, index2|
-                  ivars << :"@#{child_sym.children.first}" # Pragma: set
+                  ivars << :"@#{child_sym.children.first}"
                 end
               elsif ast.children[1] == :attr_writer
                 ast.children[2..-1].each_with_index do |child_sym, index2|
-                  ivars << :"@#{child_sym.children.first}" # Pragma: set
+                  ivars << :"@#{child_sym.children.first}"
                 end
               end
             end
@@ -198,7 +198,7 @@ module Ruby2JS
           # emit additional class declarations
           unless cvars.empty?
             body.each do |m|
-              cvars.delete m.children.first if m.type == :cvasgn # Pragma: set
+              cvars.delete m.children.first if m.type == :cvasgn
             end
           end
           [*cvars].sort.each do |cvar|
@@ -211,7 +211,7 @@ module Ruby2JS
           # Only hoist ivasgn to class field if RHS doesn't reference constructor args
           references_args = lambda do |node|
             next false unless ast_node?(node)
-            next true if node.type == :lvar && constructor_args.include?(node.children.first) # Pragma: set
+            next true if node.type == :lvar && constructor_args.include?(node.children.first)
             node.children.any? { |child| references_args.call(child) }
           end
 
@@ -226,7 +226,7 @@ module Ruby2JS
             put ' = '
             parse statement.children.last
 
-            ivars.delete statement.children.first # Pragma: set
+            ivars.delete statement.children.first
           end
 
           # emit additional instance declarations
