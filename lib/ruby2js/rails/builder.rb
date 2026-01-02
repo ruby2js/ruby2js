@@ -472,10 +472,14 @@ class SelfhostBuilder
   def build()
     # Clean dist directory but preserve package.json, package-lock.json, and node_modules
     # These are managed by ruby2js install and shouldn't be removed during builds
+    # Also preserve database files (SQLite, etc.)
     if File.directory?(@dist_dir)
       Dir.glob(File.join(@dist_dir, '*')).each do |path|
         basename = File.basename(path)
         next if ['package.json', 'package-lock.json', 'node_modules'].include?(basename)
+        # Preserve SQLite database files (including WAL mode files)
+        next if basename.end_with?('.sqlite3', '.db', '-shm', '-wal') ||
+                basename =~ /^[a-z_]+_(dev|development|test|production)$/
         FileUtils.rm_rf(path)
       end
     else
