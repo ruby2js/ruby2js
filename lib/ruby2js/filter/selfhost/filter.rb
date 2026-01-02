@@ -39,7 +39,7 @@ module Ruby2JS
         # TODO: Revisit this - it's specific to selfhost transpilation. A more general
         # solution might be to have s() preserve some location metadata or to have
         # is_method? check the source_map option to know when we're doing selfhost.
-        ALWAYS_PROPERTIES = %i[length size count].freeze
+        ALWAYS_PROPERTIES = %i[length size count children].freeze
 
         # Track if we're inside a filter module (Ruby2JS::Filter::X)
         def initialize(*args)
