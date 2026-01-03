@@ -107,9 +107,21 @@ Next.js is React-based with a fundamentally different paradigm. App Router, Serv
 
 Hono is more Sinatra than Rails—lightweight routing without opinions about models, views, or structure. You'd be starting from scratch on everything Rails provides for free.
 
+## Demos
+
+Two demo applications show Juntos in action:
+
+| Demo | What You Learn | Create With |
+|------|---------------|-------------|
+| **[Blog](/docs/juntos/getting-started)** | CRUD operations, multi-platform deployment | `curl .../create-blog \| bash` |
+| **[Chat](/docs/juntos/hotwire#chat-demo)** | Real-time broadcasting, Stimulus controllers | `curl .../create-chat \| bash` |
+
+Both demos run on browser (IndexedDB), Node.js (SQLite), and Cloudflare (D1) from the same code.
+
 ## Next Steps
 
 - **[Getting Started](/docs/juntos/getting-started)** — Build a blog app in 10 minutes
+- **[Hotwire](/docs/juntos/hotwire)** — Real-time features and Stimulus controllers
 - **[CLI Reference](/docs/juntos/cli)** — The `juntos` commands
 - **[Architecture](/docs/juntos/architecture)** — What gets generated and how it works
 - **[Deployment](/docs/juntos/deploying/browser)** — Deploy to any target

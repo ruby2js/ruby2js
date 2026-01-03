@@ -2,6 +2,60 @@
 
 A unified Vite plugin that makes Ruby a first-class frontend language, targeting Rails-style apps, Vue, Svelte, Astro, and Phlex components.
 
+## Blog Post Series Context
+
+This is **Post 3** in a four-part series demonstrating Ruby2JS/Juntos capabilities:
+
+| Post | Plan | Theme | Key Proof |
+|------|------|-------|-----------|
+| 1 | — | Patterns | Rails conventions transpile to JS |
+| 2 | [HOTWIRE_TURBO.md](./HOTWIRE_TURBO.md) | Frameworks | Ruby becomes valid Stimulus/Turbo JS |
+| **3** | **VITE_RUBY2JS.md** | **Tooling** | **Ruby as first-class frontend language** |
+| 4 | [PHLEX_UNIFICATION.md](./PHLEX_UNIFICATION.md) | Portability | Same Ruby → Phlex JS or React |
+
+**Builds on Post 2:** Stimulus controllers already work. Now we add HMR—edit a Ruby controller, see instant updates.
+
+**This post proves:** Ruby integrates with modern frontend tooling (Vite) like any other language—HMR, source maps, tree shaking.
+
+**Teaser for next post:** "HMR works for Stimulus. What about React components?"
+
+---
+
+## Next Iteration Scope (Post 3)
+
+### In Scope
+
+| Component | Description | Status |
+|-----------|-------------|--------|
+| Core Vite plugin | Basic `.rb` file transformation | To build |
+| Rails preset | Juntos/Rails apps with HMR | To build |
+| Source maps | Ruby visible in DevTools | To build |
+| Error handling | Ruby line numbers in errors | To build |
+| Production builds | Tree shaking, code splitting | To build |
+
+### Demo
+
+Use the existing **chat app** from Post 2. Add Vite configuration, show:
+1. Edit `chat_controller.rb` → instant update without page refresh
+2. Source maps show Ruby in browser DevTools
+3. Production build is optimized
+
+### Out of Scope (Future Iterations)
+
+| Component | Description | Why Deferred |
+|-----------|-------------|--------------|
+| React preset | Phlex → React output | Depends on [PHLEX_UNIFICATION.md](./PHLEX_UNIFICATION.md) |
+| Next.js preset | RSC directives + React | Depends on React preset + [VERCEL_TARGET.md](./VERCEL_TARGET.md) |
+| Vue preset | Ruby in Vue SFCs | Framework complexity, uncertain audience |
+| Svelte preset | Ruby in Svelte components | Needs `reactive {}` DSL |
+| Astro preset | Ruby in Astro frontmatter | Lower priority |
+| Phlex preset | Phlex components as ES modules | Depends on Phlex filter maturity |
+| Advanced HMR | Controller/model-level updates | Core HMR first |
+
+React/Next.js presets are Post 4 scope. Other presets remain future iterations.
+
+---
+
 ## Vision
 
 Today: "Ruby2JS lets you write Ruby instead of JavaScript"

@@ -2,6 +2,29 @@
 
 Add Vercel as a deployment target for Ruby2JS on Rails, enabling Rails-style applications to run as serverless functions on Vercel's platform.
 
+## Blog Post Series Context
+
+This plan spans multiple posts in the series:
+
+| Post | Plan | What This Plan Contributes |
+|------|------|---------------------------|
+| 1-2 | — | Vercel Edge deployment (already working) |
+| 3 | [VITE_RUBY2JS.md](./VITE_RUBY2JS.md) | — |
+| 4 | [PHLEX_UNIFICATION.md](./PHLEX_UNIFICATION.md) | — |
+| **5** | **This plan (RSC section)** | **`use_server`/`use_client` for Next.js** |
+
+**Post 5 theme:** "Rails paradigm, Next.js deployment"
+
+**Builds on Post 4:** Phlex→React output works. Now add React Server Components to target Next.js fully.
+
+**This post proves:** Ruby + Rails conventions can power a Next.js application—same productivity, different runtime.
+
+**Key sections for Post 5:**
+- [React Server Components](#react-server-components-nextjs) — `use_server`/`use_client` directives
+- [Caching Filter](#caching-filter) — Edge caching patterns
+
+---
+
 ## Prerequisites
 
 This plan depends on [UNIVERSAL_DATABASES.md](./UNIVERSAL_DATABASES.md) — Vercel requires HTTP-based databases (Neon, Turso, PlanetScale) since Edge Functions cannot use TCP connections.

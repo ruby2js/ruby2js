@@ -2,6 +2,27 @@
 
 Unify view component handling around Phlex as the canonical Ruby representation, with bidirectional support for React interop and browser-side rendering.
 
+## Blog Post Series Context
+
+This is **Post 4** in a four-part series demonstrating Ruby2JS/Juntos capabilities:
+
+| Post | Plan | Theme | Key Proof |
+|------|------|-------|-----------|
+| 1 | — | Patterns | Rails conventions transpile to JS |
+| 2 | [HOTWIRE_TURBO.md](./HOTWIRE_TURBO.md) | Frameworks | Ruby becomes valid Stimulus/Turbo JS |
+| 3 | [VITE_RUBY2JS.md](./VITE_RUBY2JS.md) | Tooling | Ruby as first-class frontend language |
+| **4** | **PHLEX_UNIFICATION.md** | **Portability** | **Same Ruby → Phlex JS or React** |
+
+**Builds on Post 3:** Vite serves Ruby files with HMR. Now the same Phlex component outputs to either Phlex JS (lightweight) or React (ecosystem).
+
+**This post proves:** "Write once, target both"—choose your runtime without rewriting components.
+
+**Dependencies:**
+- [VITE_RUBY2JS.md](./VITE_RUBY2JS.md) — React preset uses Vite plugin infrastructure
+- [VERCEL_TARGET.md](./VERCEL_TARGET.md) — `use_server`/`use_client` for RSC support
+
+---
+
 ## Vision
 
 ```

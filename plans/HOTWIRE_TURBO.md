@@ -2,6 +2,116 @@
 
 This plan covers full Hotwire Turbo support for Juntos, enabling real-time updates across browser windows. Real-time broadcasting works on Browser (BroadcastChannel), Node/Bun/Deno (WebSocket), and Cloudflare (Durable Objects). Vercel lacks native WebSocket support and will have broadcasting stubbed out.
 
+## Blog Post Series Context
+
+This is **Post 2** in a four-part series demonstrating Ruby2JS/Juntos capabilities:
+
+| Post | Plan | Theme | Key Proof |
+|------|------|-------|-----------|
+| 1 | — | Patterns | Rails conventions transpile to JS |
+| **2** | **HOTWIRE_TURBO.md** | **Frameworks** | **Ruby becomes valid Stimulus/Turbo JS** |
+| 3 | [VITE_RUBY2JS.md](./VITE_RUBY2JS.md) | Tooling | Ruby as first-class frontend language |
+| 4 | [PHLEX_UNIFICATION.md](./PHLEX_UNIFICATION.md) | Portability | Same Ruby → Phlex JS or React |
+
+**This post proves:** Ruby transpiles to valid framework code that Stimulus accepts—not just "Rails-like" patterns, but actual JavaScript that tools recognize.
+
+**Teaser for next post:** "If Ruby works for Stimulus, why stop there?"
+
+## Current Status (January 2026)
+
+### Completed
+
+| Phase | Component | Status | Notes |
+|-------|-----------|--------|-------|
+| 1 | Turbo Drive | ✅ Complete | Navigation via Turbo, no custom handlers |
+| 2 | Turbo Frames | ✅ Complete | `turbo_frame_tag` helper works |
+| 3a | Turbo Stream Helpers | ✅ Complete | All 7 actions implemented |
+| 3b | Server Format Negotiation | ✅ Complete | `respond_to` with Accept header checking |
+| 4 | Model Broadcasting | ✅ Complete | All broadcast_*_to methods |
+| 5 | turbo_stream_from | ✅ Complete | View subscriptions work |
+| 6 | Stimulus Controllers | ✅ Complete | Ruby transpilation + JS copy |
+
+### Platform Support
+
+| Platform | Turbo Drive | Turbo Streams | Broadcasting | Status |
+|----------|-------------|---------------|--------------|--------|
+| Browser | ✅ | ✅ | ✅ BroadcastChannel | **Tested** |
+| Node.js | ✅ | ✅ | ✅ WebSocket (`ws`) | **Tested** |
+| Bun | ✅ | ✅ | ✅ Native WebSocket | Untested |
+| Deno | ✅ | ✅ | ✅ Native WebSocket | Untested |
+| Cloudflare | ✅ | ✅ | ⚠️ Durable Objects | **Needs fixes** |
+| Vercel | ✅ | ✅ | ❌ Stubbed | By design |
+
+### What Works Now
+
+- **Blog demo**: Browser (dexie) and Node (sqlite) targets tested and working
+- **Chat demo**: Created with `test/chat/create-chat`, Turbo Streams broadcasting functional
+- **Stimulus controllers**: Ruby controllers transpile correctly, auto-scroll example works
+- **422 status for validation errors**: All targets return proper status for Turbo Drive
+
+### Remaining Work: Cloudflare Durable Objects
+
+The Cloudflare target has all the code but the deployment configuration is incomplete:
+
+| Component | Location | Status | Issue |
+|-----------|----------|--------|-------|
+| D1 adapter | `packages/ruby2js-rails/adapters/active_record_d1.mjs` | ✅ Complete | — |
+| Cloudflare target | `packages/ruby2js-rails/targets/cloudflare/rails.js` | ✅ Complete | — |
+| TurboBroadcaster DO | Lines 170-290 in cloudflare target | ✅ Complete | — |
+| wrangler.toml (builder) | `lib/ruby2js/rails/builder.rb:1485` | ⚠️ Incomplete | Missing DO binding |
+| wrangler.toml (deploy) | `lib/ruby2js/cli/deploy.rb:234` | ⚠️ Incomplete | Missing DO binding |
+| Entry point (builder) | `lib/ruby2js/rails/builder.rb:1509` | ⚠️ Incomplete | Missing DO export |
+| Entry point (deploy) | `lib/ruby2js/cli/deploy.rb:260` | ⚠️ Incomplete | Missing DO export |
+| CLI migrate -d d1 | `lib/ruby2js/cli/migrate.rb` | ✅ Complete | Uses wrangler d1 execute |
+| CLI deploy -t cloudflare | `lib/ruby2js/cli/deploy.rb` | ✅ Complete | Runs wrangler deploy |
+
+### Fixes Required
+
+**1. Add Durable Objects to wrangler.toml generation** (two locations):
+
+```toml
+# Add after [[d1_databases]] section:
+[[durable_objects.bindings]]
+name = "TURBO_BROADCASTER"
+class_name = "TurboBroadcaster"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["TurboBroadcaster"]
+```
+
+**2. Export TurboBroadcaster from entry point** (two locations):
+
+```javascript
+import { Application, Router, TurboBroadcaster } from '../lib/rails.js';
+// ... existing code ...
+export default Application.worker();
+export { TurboBroadcaster };  // ADD THIS LINE
+```
+
+### Files to Modify
+
+1. `lib/ruby2js/rails/builder.rb`
+   - Line ~1485: `generate_cloudflare_config()` - add DO binding to wrangler.toml
+   - Line ~1509: `generate_cloudflare_entry_point()` - add TurboBroadcaster export
+
+2. `lib/ruby2js/cli/deploy.rb`
+   - Line ~234: `generate_cloudflare_config()` - add DO binding to wrangler.toml
+   - Line ~260: worker entry point generation - add TurboBroadcaster export
+
+### Testing Plan
+
+After fixes:
+1. Create chat demo: `curl ... | bash -s chat`
+2. `cd chat`
+3. Create D1 database: `wrangler d1 create chat`
+4. Add D1_DATABASE_ID to `.env.local`
+5. Migrate: `bin/juntos migrate -d d1`
+6. Deploy: `bin/juntos deploy -d d1` (builds automatically)
+7. Test real-time: Open two browser windows, send messages
+
+---
+
 ## Architecture Overview
 
 ```
@@ -430,18 +540,19 @@ end
 
 ## Estimated Effort
 
-| Phase | Complexity | Effort |
-|-------|------------|--------|
-| Phase 1: Turbo Drive | Medium | 2 days |
-| Phase 2: Turbo Frames | Low | 1 day |
-| Phase 3a: Turbo Stream Helpers | Low | 0.5 days |
-| Phase 3b: Server Format Negotiation | Medium | 1 day |
-| Phase 4: Model Broadcasting | Medium | 2 days |
-| Phase 5: turbo_stream_from | Low | 1 day |
-| Phase 6: Stimulus refinements | Low | 0.5 days |
-| **Total** | | **8-9 days** |
+| Phase | Complexity | Effort | Status |
+|-------|------------|--------|--------|
+| Phase 1: Turbo Drive | Medium | 2 days | ✅ Complete |
+| Phase 2: Turbo Frames | Low | 1 day | ✅ Complete |
+| Phase 3a: Turbo Stream Helpers | Low | 0.5 days | ✅ Complete |
+| Phase 3b: Server Format Negotiation | Medium | 1 day | ✅ Complete |
+| Phase 4: Model Broadcasting | Medium | 2 days | ✅ Complete |
+| Phase 5: turbo_stream_from | Low | 1 day | ✅ Complete |
+| Phase 6: Stimulus refinements | Low | 0.5 days | ✅ Complete |
+| **Cloudflare DO fixes** | Low | 0.5 days | ⏳ Remaining |
+| **Total** | | **8-9 days** | ~95% done |
 
-Risk is substantially reduced by:
+Risk was substantially reduced by:
 - Simple custom WebSocket protocol (not Action Cable compatible)
 - In-memory pub/sub only (no Redis)
 - Cloudflare Durable Objects provide native WebSocket (no custom server needed)
@@ -451,13 +562,16 @@ Risk is substantially reduced by:
 
 ## Success Criteria
 
-At completion:
-- ✅ Two browser windows open to same article
-- ✅ Add comment in window A → appears immediately in window B
-- ✅ Works on browser (BroadcastChannel), Node/Bun/Deno (WebSocket), Cloudflare (Durable Objects)
-- ✅ Vercel works for everything except real-time (stubbed)
-- ✅ Stimulus controllers (both .js and .rb) fully supported
-- ✅ No backwards compatibility concerns (replacing current navigation entirely)
+| Criterion | Status | Notes |
+|-----------|--------|-------|
+| Two browser windows open to same article | ✅ Achieved | Tested on browser + Node |
+| Add comment in window A → appears in B | ✅ Achieved | Chat demo working |
+| Browser (BroadcastChannel) | ✅ Achieved | Tested with dexie |
+| Node/Bun/Deno (WebSocket) | ✅ Achieved | Node tested, Bun/Deno untested |
+| Cloudflare (Durable Objects) | ⏳ Pending | Code complete, config fixes needed |
+| Vercel (stubbed) | ✅ Achieved | By design, no WebSocket |
+| Stimulus controllers (.js and .rb) | ✅ Achieved | Both copy and transpile work |
+| No backwards compatibility concerns | ✅ Achieved | Turbo replaces custom navigation |
 
 ---
 
@@ -470,6 +584,37 @@ These items are explicitly out of scope for this implementation:
 - **Two-way WebSocket communication** - Server→client only; client→server uses HTTP
 - **Cross-process pub/sub** - In-memory is sufficient; Redis/etc can be added later
 - **Horizontal scaling** - Single-process model matches TurboCable approach
+
+## Blog Post Context
+
+This work is part of a trilogy of blog posts introducing Juntos:
+
+| Post | Title | Theme | Status |
+|------|-------|-------|--------|
+| 1 | Rails to the Edge and Beyond | Same CRUD, five runtimes | ✅ Published 2026-01-02 |
+| 2 | Hotwire on the Edge | Real-time + Stimulus | 📝 Draft, target 2026-01-05 |
+| 3 | (Vite integration) | Ruby as frontend language | 📋 Planned |
+
+**Post 2 narrative arc:**
+- Post 1 proved Rails patterns work in JavaScript (CRUD)
+- Post 2 proves Ruby can do frontend JavaScript (Stimulus controllers)
+- This sets up Post 3: "if Ruby works for Stimulus, why not Vue/Svelte/Astro?"
+
+**Post 2 key claims to verify:**
+1. Chat demo with `broadcast_append_to`/`broadcast_remove_to` works
+2. Stimulus controllers in Ruby transpile to valid Stimulus JS
+3. `turbo_stream_from` establishes WebSocket subscriptions
+4. Cloudflare with D1 and Durable Objects provides real-time at the edge
+
+**Before publishing Post 2:**
+- [ ] Fix Cloudflare Durable Objects configuration (wrangler.toml + entry point)
+- [ ] Test chat demo on Cloudflare deployment
+- [ ] Update blog post with tested Cloudflare instructions
+- [ ] Add hint about Post 3 (Vite/Vue/Svelte) at the end
+
+See also: `plans/VITE_RUBY2JS.md` for Post 3 planning.
+
+---
 
 ## References
 

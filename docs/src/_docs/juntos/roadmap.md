@@ -110,9 +110,9 @@ ProcessOrderJob.perform_later(@order)
 
 Transform Rails mailer syntax into email service API calls ([Resend](https://resend.com/), [SendGrid](https://sendgrid.com/), [Postmark](https://postmarkapp.com/)).
 
-### Stimulus Reflex / Hotwire
+### StimulusReflex
 
-Server-side DOM updates over WebSocket. Depends on Action Cable.
+[StimulusReflex](https://docs.stimulusreflex.com/) enables server-side DOM updates over WebSocket—reactive UIs without writing JavaScript. Depends on Action Cable.
 
 ### Active Record Encryption
 
