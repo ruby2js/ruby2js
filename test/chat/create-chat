@@ -1,0 +1,244 @@
+#!/usr/bin/env bash
+# Create a Ruby2JS chat demo with Turbo Streams
+# Usage: create-chat [app-name]
+#
+# Creates a Rails app with a simple chat room demonstrating
+# real-time Turbo Streams broadcasting.
+
+set -e
+
+APP_NAME="${1:-chat}"
+
+echo "Creating Ruby2JS chat: $APP_NAME"
+echo ""
+
+# Create Rails app (minimal, with Tailwind for nice styling)
+rails new "$APP_NAME" --skip-git --skip-docker --css tailwind
+cd "$APP_NAME"
+
+# Generate Message scaffold
+rails generate scaffold Message username:string body:text
+
+# Create database
+rails db:create
+
+# Add ruby2js gem from GitHub
+bundle add ruby2js --github ruby2js/ruby2js
+
+# Ensure git checkout is complete
+bundle install
+
+# Update Message model with broadcasting
+cat > app/models/message.rb << 'MODEL'
+class Message < ApplicationRecord
+  validates :username, presence: true
+  validates :body, presence: true
+
+  # Broadcast new messages to all chat room subscribers
+  after_create_commit do
+    broadcast_append_to "chat_room",
+      target: "messages",
+      partial: "messages/message",
+      locals: { message: self }
+  end
+
+  # Broadcast removal when message is deleted
+  after_destroy_commit do
+    broadcast_remove_to "chat_room",
+      target: "message_#{id}"
+  end
+end
+MODEL
+
+# Set up routes - simple single room chat
+cat > config/routes.rb << 'ROUTES'
+Rails.application.routes.draw do
+  root "messages#index"
+  resources :messages, only: [:index, :create, :destroy]
+end
+ROUTES
+
+# Update MessagesController for chat
+cat > app/controllers/messages_controller.rb << 'CONTROLLER'
+class MessagesController < ApplicationController
+  def index
+    @messages = Message.order(created_at: :asc)
+    @message = Message.new
+  end
+
+  def create
+    @message = Message.new(message_params)
+    if @message.save
+      # Turbo Stream handles the response - just acknowledge
+      respond_to do |format|
+        format.turbo_stream
+        format.html { redirect_to messages_path }
+      end
+    else
+      redirect_to messages_path, alert: "Could not send message."
+    end
+  end
+
+  def destroy
+    @message = Message.find(params[:id])
+    @message.destroy
+    respond_to do |format|
+      format.turbo_stream
+      format.html { redirect_to messages_path }
+    end
+  end
+
+  private
+
+  def message_params
+    params.require(:message).permit(:username, :body)
+  end
+end
+CONTROLLER
+
+# Create chat room view
+cat > app/views/messages/index.html.erb << 'VIEW'
+<div class="max-w-2xl mx-auto p-4">
+  <h1 class="text-2xl font-bold mb-6">Chat Room</h1>
+
+  <%# Subscribe to real-time updates %>
+  <%= turbo_stream_from "chat_room" %>
+
+  <%# Messages container - broadcasts append here %>
+  <%# Stimulus controller handles auto-scroll when new messages arrive %>
+  <div id="messages"
+       class="space-y-4 mb-8 h-96 overflow-y-auto border rounded p-4 bg-gray-50"
+       data-controller="chat"
+       data-action="turbo:before-stream-render@document->chat#scrollAfterRender">
+    <%= render @messages %>
+  </div>
+
+  <%# New message form %>
+  <%= form_with model: @message, class: "space-y-4" do |form| %>
+    <div class="flex gap-4">
+      <div class="w-1/4">
+        <%= form.text_field :username,
+            placeholder: "Your name",
+            value: cookies[:chat_username],
+            class: "w-full border rounded p-2" %>
+      </div>
+      <div class="flex-1">
+        <%= form.text_field :body,
+            placeholder: "Type a message...",
+            autofocus: true,
+            class: "w-full border rounded p-2" %>
+      </div>
+      <%= form.submit "Send",
+          class: "bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700" %>
+    </div>
+  <% end %>
+</div>
+VIEW
+
+# Create message partial
+cat > app/views/messages/_message.html.erb << 'PARTIAL'
+<div id="<%= dom_id(message) %>" class="p-3 bg-white rounded shadow-sm">
+  <div class="flex justify-between items-start">
+    <div>
+      <span class="font-semibold text-blue-600"><%= message.username %></span>
+      <span class="text-gray-400 text-sm ml-2"><%= message.created_at.strftime("%H:%M") %></span>
+    </div>
+    <%= button_to "×", message_path(message), method: :delete,
+        class: "text-gray-400 hover:text-red-600 text-xl leading-none",
+        data: { turbo_confirm: "Delete this message?" } %>
+  </div>
+  <p class="text-gray-700 mt-1"><%= message.body %></p>
+</div>
+PARTIAL
+
+# Create Turbo Stream response for create
+mkdir -p app/views/messages
+cat > app/views/messages/create.turbo_stream.erb << 'TURBO'
+<%# Clear the form after sending %>
+<%= turbo_stream.replace "new_message" do %>
+  <%= form_with model: Message.new, class: "space-y-4" do |form| %>
+    <div class="flex gap-4">
+      <div class="w-1/4">
+        <%= form.text_field :username,
+            placeholder: "Your name",
+            value: cookies[:chat_username],
+            class: "w-full border rounded p-2" %>
+      </div>
+      <div class="flex-1">
+        <%= form.text_field :body,
+            placeholder: "Type a message...",
+            autofocus: true,
+            class: "w-full border rounded p-2" %>
+      </div>
+      <%= form.submit "Send",
+          class: "bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700" %>
+    </div>
+  <% end %>
+<% end %>
+TURBO
+
+# Create Turbo Stream response for destroy (empty - broadcast handles it)
+cat > app/views/messages/destroy.turbo_stream.erb << 'TURBO'
+<%# Broadcast handles the removal - nothing needed here %>
+TURBO
+
+# Rebuild Tailwind CSS
+bin/rails tailwindcss:build
+
+# Create seeds with sample messages
+cat > db/seeds.rb << 'SEEDS'
+# Sample messages for the chat demo
+return if Message.count > 0
+
+Message.create!(username: "Alice", body: "Hey everyone! Welcome to the chat room.")
+Message.create!(username: "Bob", body: "Hi Alice! This is pretty cool.")
+Message.create!(username: "Carol", body: "Love how messages appear in real-time!")
+Message.create!(username: "Alice", body: "Yeah, Turbo Streams makes it so easy.")
+
+puts "Created #{Message.count} sample messages"
+SEEDS
+
+# Run ruby2js:install generator
+bin/rails generate ruby2js:install
+
+# Create Stimulus controller for auto-scroll (in Ruby for transpilation)
+mkdir -p app/javascript/controllers
+cat > app/javascript/controllers/chat_controller.rb << 'CONTROLLER'
+class ChatController < Stimulus::Controller
+  # Auto-scroll to bottom when controller connects
+  def connect()
+    scroll_to_bottom()
+  end
+
+  # Called before Turbo Stream renders - schedule scroll after render
+  def scrollAfterRender(event)
+    # Only scroll if this stream targets our messages container
+    target = event.target.getAttribute("target")
+    return unless target == "messages"
+
+    # Use requestAnimationFrame to scroll after DOM update
+    requestAnimationFrame { scroll_to_bottom() }
+  end
+
+  def scroll_to_bottom()
+    element.scrollTop = element.scrollHeight
+  end
+end
+CONTROLLER
+
+echo ""
+echo "Chat created: $APP_NAME/"
+echo ""
+echo "To run with Juntos (transpiled to JavaScript):"
+echo "  cd $APP_NAME"
+echo "  bin/juntos dev -d dexie      # Browser with IndexedDB"
+echo "  bin/juntos dev -d sqljs      # Browser with sql.js (SQLite in WASM)"
+echo "  bin/juntos server -d sqlite  # Node.js with SQLite"
+echo ""
+echo "To run with Rails:"
+echo "  cd $APP_NAME"
+echo "  RAILS_ENV=production bin/rails db:prepare"
+echo "  bin/rails server -e production"
+echo ""
+echo "Open multiple browser tabs to see real-time messaging!"
+echo ""

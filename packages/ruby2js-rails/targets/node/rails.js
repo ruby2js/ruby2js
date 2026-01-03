@@ -22,11 +22,15 @@ import {
   submitForm,
   formData,
   handleFormResult,
-  setupFormHandlers
+  setupFormHandlers,
+  TurboBroadcast
 } from './rails_server.js';
 
 // Re-export everything from server module
 export { createContext, createFlash, truncate, pluralize, dom_id, navigate, submitForm, formData, handleFormResult, setupFormHandlers };
+
+// Re-export TurboBroadcast and alias as BroadcastChannel for model compatibility
+export { TurboBroadcast, TurboBroadcast as BroadcastChannel };
 
 // Router with Node.js-specific dispatch (uses req/res instead of Fetch API)
 export class Router extends RouterServer {
@@ -294,7 +298,10 @@ export class Router extends RouterServer {
 
 // Application with Node.js-specific startup
 export class Application extends ApplicationServer {
+  static wsServer = null;
+
   // Start the HTTP server using http.createServer
+  // Includes WebSocket support for Turbo Streams broadcasting
   static async start(port = null) {
     const listenPort = port || process.env.PORT || 3000;
 
@@ -306,14 +313,67 @@ export class Application extends ApplicationServer {
         await Router.dispatch(req, res);
       });
 
+      // Set up WebSocket server for Turbo Streams
+      await this.setupWebSocket(server);
+
       server.listen(listenPort, () => {
         console.log(`Server running at http://localhost:${listenPort}/`);
+        if (this.wsServer) {
+          console.log(`WebSocket available at ws://localhost:${listenPort}/cable`);
+        }
       });
 
       return server;
     } catch (e) {
       console.error('Failed to start server:', e);
       process.exit(1);
+    }
+  }
+
+  // Set up WebSocket server for Turbo Streams broadcasting
+  static async setupWebSocket(server) {
+    try {
+      // Dynamically import ws package (optional dependency)
+      const { WebSocketServer } = await import('ws');
+
+      this.wsServer = new WebSocketServer({ noServer: true });
+
+      // Handle WebSocket connections
+      this.wsServer.on('connection', (ws, req) => {
+        console.log('WebSocket connected');
+
+        ws.on('message', (data) => {
+          TurboBroadcast.handleMessage(ws, data.toString());
+        });
+
+        ws.on('close', () => {
+          TurboBroadcast.cleanup(ws);
+          console.log('WebSocket disconnected');
+        });
+
+        ws.on('error', (err) => {
+          console.error('WebSocket error:', err);
+          TurboBroadcast.cleanup(ws);
+        });
+      });
+
+      // Handle upgrade requests for /cable path
+      server.on('upgrade', (req, socket, head) => {
+        const url = parseUrl(req.url, true);
+
+        if (url.pathname === '/cable') {
+          this.wsServer.handleUpgrade(req, socket, head, (ws) => {
+            this.wsServer.emit('connection', ws, req);
+          });
+        } else {
+          socket.destroy();
+        }
+      });
+
+      console.log('WebSocket server initialized');
+    } catch (e) {
+      // ws package not installed - WebSocket disabled
+      console.log('WebSocket disabled (ws package not installed)');
     }
   }
 }

@@ -1,5 +1,6 @@
 // Ruby2JS-on-Rails Micro Framework - Cloudflare Workers Target
 // Extends server module with Worker fetch handler pattern
+// Includes Durable Objects support for Turbo Streams broadcasting
 
 import {
   Router as RouterServer,
@@ -125,15 +126,31 @@ export class Application extends ApplicationServer {
 
   // Create the Worker fetch handler
   // Usage in worker entry point:
-  //   import { Application, Router } from './lib/rails.js';
+  //   import { Application, Router, TurboBroadcaster } from './lib/rails.js';
   //   export default Application.worker();
+  //   export { TurboBroadcaster };
   static worker() {
     const app = this;
     return {
       async fetch(request, env, ctx) {
         try {
+          // Store env for broadcasting
+          app.env = env;
+
           // Initialize database on first request
           await app.initDatabase(env);
+
+          const url = new URL(request.url);
+
+          // Handle WebSocket connections via Durable Object
+          if (url.pathname === '/cable') {
+            if (env.TURBO_BROADCASTER) {
+              const id = env.TURBO_BROADCASTER.idFromName('global');
+              const broadcaster = env.TURBO_BROADCASTER.get(id);
+              return broadcaster.fetch(request);
+            }
+            return new Response('Durable Object not configured', { status: 503 });
+          }
 
           // Dispatch the request
           return await Router.dispatch(request);
@@ -148,3 +165,158 @@ export class Application extends ApplicationServer {
     };
   }
 }
+
+// Durable Object for Turbo Streams broadcasting
+// Manages WebSocket connections with hibernation support
+// Add to wrangler.toml:
+//   [durable_objects]
+//   bindings = [{ name = "TURBO_BROADCASTER", class_name = "TurboBroadcaster" }]
+export class TurboBroadcaster {
+  constructor(state, env) {
+    this.state = state;
+    this.env = env;
+    // Map of channel -> Set of WebSocket connections
+    this.channels = new Map();
+  }
+
+  async fetch(request) {
+    const url = new URL(request.url);
+
+    // Handle WebSocket upgrade
+    if (request.headers.get('Upgrade') === 'websocket') {
+      const pair = new WebSocketPair();
+      const [client, server] = Object.values(pair);
+
+      // Accept the WebSocket with hibernation
+      this.state.acceptWebSocket(server);
+
+      return new Response(null, { status: 101, webSocket: client });
+    }
+
+    // Handle broadcast POST from model callbacks
+    if (request.method === 'POST' && url.pathname === '/broadcast') {
+      const { stream, html } = await request.json();
+      this.broadcastToChannel(stream, html);
+      return new Response('ok');
+    }
+
+    return new Response('Not found', { status: 404 });
+  }
+
+  // WebSocket message handler (with hibernation support)
+  async webSocketMessage(ws, message) {
+    try {
+      const msg = JSON.parse(message);
+
+      switch (msg.type) {
+        case 'subscribe':
+          this.subscribe(ws, msg.stream);
+          break;
+        case 'unsubscribe':
+          this.unsubscribe(ws, msg.stream);
+          break;
+        case 'ping':
+          ws.send(JSON.stringify({ type: 'pong' }));
+          break;
+      }
+    } catch (e) {
+      console.error('WebSocket message error:', e);
+    }
+  }
+
+  // WebSocket close handler
+  async webSocketClose(ws, code, reason, wasClean) {
+    this.cleanup(ws);
+  }
+
+  // WebSocket error handler
+  async webSocketError(ws, error) {
+    console.error('WebSocket error:', error);
+    this.cleanup(ws);
+  }
+
+  subscribe(ws, channel) {
+    if (!this.channels.has(channel)) {
+      this.channels.set(channel, new Set());
+    }
+    this.channels.get(channel).add(ws);
+
+    // Store subscription in WebSocket attachment for cleanup
+    const attachment = ws.deserializeAttachment() || { channels: [] };
+    if (!attachment.channels.includes(channel)) {
+      attachment.channels.push(channel);
+      ws.serializeAttachment(attachment);
+    }
+  }
+
+  unsubscribe(ws, channel) {
+    const subscribers = this.channels.get(channel);
+    if (subscribers) {
+      subscribers.delete(ws);
+      if (subscribers.size === 0) {
+        this.channels.delete(channel);
+      }
+    }
+  }
+
+  cleanup(ws) {
+    const attachment = ws.deserializeAttachment();
+    if (attachment && attachment.channels) {
+      for (const channel of attachment.channels) {
+        this.unsubscribe(ws, channel);
+      }
+    }
+  }
+
+  broadcastToChannel(channel, html) {
+    const subscribers = this.channels.get(channel);
+    if (!subscribers || subscribers.size === 0) {
+      return;
+    }
+
+    const message = JSON.stringify({
+      type: 'message',
+      stream: channel,
+      html: html
+    });
+
+    for (const ws of subscribers) {
+      try {
+        ws.send(message);
+      } catch (e) {
+        this.cleanup(ws);
+      }
+    }
+  }
+}
+
+// TurboBroadcast for Cloudflare - broadcasts via Durable Object
+// Models call: BroadcastChannel.broadcast("channel", html)
+export class TurboBroadcast {
+  static env = null;
+
+  static async broadcast(channel, html) {
+    // Get env from Application
+    const env = Application.env;
+    if (!env || !env.TURBO_BROADCASTER) {
+      console.warn('TurboBroadcast: Durable Object not configured');
+      return;
+    }
+
+    try {
+      const id = env.TURBO_BROADCASTER.idFromName('global');
+      const broadcaster = env.TURBO_BROADCASTER.get(id);
+
+      await broadcaster.fetch(new Request('https://internal/broadcast', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stream: channel, html })
+      }));
+    } catch (e) {
+      console.error('TurboBroadcast error:', e);
+    }
+  }
+}
+
+// Export BroadcastChannel as alias for model broadcast methods
+export { TurboBroadcast as BroadcastChannel };

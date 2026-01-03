@@ -362,14 +362,125 @@ export class Application extends ApplicationBase {
       document.getElementById('loading').style.display = 'none';
       document.getElementById('app').style.display = 'block';
 
-      // Handle browser back/forward
+      // Handle browser back/forward via Turbo
       window.addEventListener('popstate', async () => {
         await Router.dispatch(location.pathname);
       });
 
-      // Expose helpers globally for onclick handlers
-      window.navigate = navigate;
-      window.submitForm = submitForm;
+      // Intercept Turbo navigation for client-side routing
+      // Turbo handles link clicks, we handle the actual rendering
+      document.addEventListener('turbo:before-visit', async (event) => {
+        // Prevent Turbo from making a fetch request
+        event.preventDefault();
+
+        // Extract the URL from the event
+        const url = new URL(event.detail.url);
+        const path = url.pathname;
+
+        // Use our Router to handle the navigation
+        history.pushState({}, '', path);
+        await Router.dispatch(path);
+      });
+
+      // Intercept ALL Turbo fetch requests for client-side handling
+      // This is the only cancelable event for form submissions
+      document.addEventListener('turbo:before-fetch-request', async (event) => {
+        const fetchOptions = event.detail.fetchOptions;
+        let method = fetchOptions.method?.toUpperCase() || 'GET';
+        const url = new URL(event.detail.url);
+
+        // Only intercept same-origin requests
+        if (url.origin !== location.origin) {
+          return; // Let Turbo handle external URLs
+        }
+
+        // Check for Rails _method override (e.g., DELETE via POST form)
+        const body = fetchOptions.body;
+        if (body instanceof URLSearchParams) {
+          const override = body.get('_method');
+          if (override) method = override.toUpperCase();
+        } else if (body instanceof FormData) {
+          const override = body.get('_method');
+          if (override) method = override.toUpperCase();
+        }
+
+        const path = url.pathname;
+        const result = Router.match(path, method);
+
+        if (!result) {
+          return; // No matching route, let Turbo handle it
+        }
+
+        // Prevent Turbo from making a fetch request
+        event.preventDefault();
+
+        const { route, match } = result;
+        const context = createContext();
+
+        if (method === 'DELETE') {
+          if (route.nested) {
+            // Nested resource: /articles/:article_id/comments/:id
+            const parentId = parseInt(match[1]);
+            const id = match[2] ? parseInt(match[2]) : null;
+            await route.controller.destroy(context, parentId, id);
+            // Navigate back to parent show page
+            const parentPath = '/' + route.parentName + '/' + parentId;
+            history.pushState({}, '', parentPath);
+            await Router.dispatch(parentPath);
+          } else {
+            const id = match[1] ? parseInt(match[1]) : null;
+            await route.controller.destroy(context, id);
+            // Navigate back to index after delete
+            const indexPath = '/' + route.controllerName;
+            history.pushState({}, '', indexPath);
+            await Router.dispatch(indexPath);
+          }
+        } else if (method === 'POST' || method === 'PATCH' || method === 'PUT') {
+          // Extract form params from the fetch body (body already defined above)
+          let params = {};
+
+          if (body instanceof FormData) {
+            for (const [key, value] of body.entries()) {
+              // Handle Rails-style nested params: article[title] -> title
+              const keyMatch = key.match(/\[([^\]]+)\]$/);
+              const paramKey = keyMatch ? keyMatch[1] : key;
+              if (paramKey !== '_method') {
+                params[paramKey] = value;
+              }
+            }
+          } else if (body instanceof URLSearchParams) {
+            for (const [key, value] of body.entries()) {
+              const keyMatch = key.match(/\[([^\]]+)\]$/);
+              const paramKey = keyMatch ? keyMatch[1] : key;
+              if (paramKey !== '_method') {
+                params[paramKey] = value;
+              }
+            }
+          } else if (typeof body === 'string') {
+            // URL-encoded string: article[title]=foo&article[body]=bar
+            const searchParams = new URLSearchParams(body);
+            for (const [key, value] of searchParams.entries()) {
+              const keyMatch = key.match(/\[([^\]]+)\]$/);
+              const paramKey = keyMatch ? keyMatch[1] : key;
+              if (paramKey !== '_method') {
+                params[paramKey] = value;
+              }
+            }
+          }
+          context.params = params;
+          console.log('  Parameters:', params);
+
+          const controllerAction = route.controller[route.action];
+          if (controllerAction) {
+            // Pass id for update actions (from route match, not key match)
+            const id = match[1] ? parseInt(match[1]) : null;
+            const response = id
+              ? await controllerAction.call(route.controller, context, id, params)
+              : await controllerAction.call(route.controller, context, params);
+            await FormHandler.handleResult(context, response, route.controllerName, route.action, route.controller, id);
+          }
+        }
+      });
 
       // Initial route
       await Router.dispatch(location.pathname || '/');
@@ -493,3 +604,60 @@ export function setupFormHandlers(config) {
     }
   });
 }
+
+// Turbo Streams Broadcasting via BroadcastChannel API
+// Used for real-time updates between browser windows/tabs
+export class TurboBroadcast {
+  // Cache of BroadcastChannel instances by name
+  static channels = new Map();
+
+  // Get or create a BroadcastChannel for the given name
+  static getChannel(name) {
+    if (!this.channels.has(name)) {
+      const channel = new globalThis.BroadcastChannel(name);
+      this.channels.set(name, channel);
+    }
+    return this.channels.get(name);
+  }
+
+  // Broadcast a turbo-stream message to all subscribers
+  // Called by model broadcast_*_to methods
+  static broadcast(channelName, html) {
+    const channel = this.getChannel(channelName);
+    channel.postMessage(html);
+    // Also apply locally via Turbo
+    if (typeof Turbo !== 'undefined' && Turbo.renderStreamMessage) {
+      Turbo.renderStreamMessage(html);
+    }
+  }
+
+  // Subscribe to turbo-stream messages on a channel
+  // Used by turbo_stream_from helper in views
+  static subscribe(channelName, callback) {
+    const channel = this.getChannel(channelName);
+    channel.onmessage = (event) => {
+      // Render the turbo-stream via Turbo
+      if (typeof Turbo !== 'undefined' && Turbo.renderStreamMessage) {
+        Turbo.renderStreamMessage(event.data);
+      }
+      // Also call custom callback if provided
+      if (callback) {
+        callback(event.data);
+      }
+    };
+    return channel;
+  }
+
+  // Unsubscribe and close a channel
+  static unsubscribe(channelName) {
+    const channel = this.channels.get(channelName);
+    if (channel) {
+      channel.close();
+      this.channels.delete(channelName);
+    }
+  }
+}
+
+// Export BroadcastChannel as alias for model broadcast methods
+// Models call: BroadcastChannel.broadcast("channel", html)
+export { TurboBroadcast as BroadcastChannel };

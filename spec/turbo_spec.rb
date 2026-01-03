@@ -55,6 +55,137 @@ describe Ruby2JS::Filter::Turbo do
     end
   end
 
+  describe "turbo_frame_tag" do
+    it "should generate turbo-frame with string id" do
+      result = to_js('turbo_frame_tag "comments"')
+      result.must_include 'turbo-frame'
+      result.must_include 'id=\\"comments\\"'
+    end
+
+    it "should generate turbo-frame with symbol id" do
+      result = to_js('turbo_frame_tag :comments')
+      result.must_include 'turbo-frame'
+      result.must_include 'id=\\"comments\\"'
+    end
+
+    it "should generate turbo-frame with src attribute" do
+      result = to_js('turbo_frame_tag "edit", src: "/articles/1/edit"')
+      result.must_include 'id=\\"edit\\"'
+      result.must_include 'src=\\"/articles/1/edit\\"'
+    end
+
+    it "should generate turbo-frame with loading attribute" do
+      result = to_js('turbo_frame_tag "comments", loading: :lazy')
+      result.must_include 'id=\\"comments\\"'
+      result.must_include 'loading=\\"lazy\\"'
+    end
+
+    it "should generate turbo-frame with target attribute" do
+      result = to_js('turbo_frame_tag "nav", target: :_top')
+      result.must_include 'id=\\"nav\\"'
+      result.must_include 'target=\\"_top\\"'
+    end
+
+    it "should generate turbo-frame with multiple attributes" do
+      result = to_js('turbo_frame_tag "edit", src: "/edit", loading: :lazy, target: :_top')
+      result.must_include 'id=\\"edit\\"'
+      result.must_include 'src=\\"/edit\\"'
+      result.must_include 'loading=\\"lazy\\"'
+      result.must_include 'target=\\"_top\\"'
+    end
+
+    it "should generate turbo-frame with block content" do
+      result = to_js('turbo_frame_tag "comments" do; "content"; end')
+      result.must_include '<turbo-frame'
+      result.must_include '</turbo-frame>'
+      result.must_include 'content'
+    end
+  end
+
+  describe "turbo_stream actions" do
+    it "should generate turbo-stream replace" do
+      result = to_js('turbo_stream.replace "list"')
+      result.must_include 'turbo-stream'
+      result.must_include 'action=\\"replace\\"'
+      result.must_include 'target=\\"list\\"'
+    end
+
+    it "should generate turbo-stream append" do
+      result = to_js('turbo_stream.append "items"')
+      result.must_include 'action=\\"append\\"'
+      result.must_include 'target=\\"items\\"'
+    end
+
+    it "should generate turbo-stream prepend" do
+      result = to_js('turbo_stream.prepend "items"')
+      result.must_include 'action=\\"prepend\\"'
+      result.must_include 'target=\\"items\\"'
+    end
+
+    it "should generate turbo-stream update" do
+      result = to_js('turbo_stream.update "content"')
+      result.must_include 'action=\\"update\\"'
+      result.must_include 'target=\\"content\\"'
+    end
+
+    it "should generate turbo-stream remove" do
+      result = to_js('turbo_stream.remove "item_1"')
+      result.must_include 'action=\\"remove\\"'
+      result.must_include 'target=\\"item_1\\"'
+      # remove doesn't need template
+      result.wont_include '<template>'
+    end
+
+    it "should generate turbo-stream before" do
+      result = to_js('turbo_stream.before "item_2"')
+      result.must_include 'action=\\"before\\"'
+      result.must_include 'target=\\"item_2\\"'
+    end
+
+    it "should generate turbo-stream after" do
+      result = to_js('turbo_stream.after "item_1"')
+      result.must_include 'action=\\"after\\"'
+      result.must_include 'target=\\"item_1\\"'
+    end
+
+    it "should generate turbo-stream with html content" do
+      result = to_js('turbo_stream.replace "list", html: "<li>New item</li>"')
+      # Template literal uses unescaped quotes
+      result.must_include 'action="replace"'
+      result.must_include '<template>'
+      result.must_include '</template>'
+      result.must_include '<li>New item</li>'
+    end
+
+    it "should handle symbol target" do
+      result = to_js('turbo_stream.replace :comments')
+      result.must_include 'target=\\"comments\\"'
+    end
+  end
+
+  describe "turbo_stream_from" do
+    it "should subscribe with static channel name" do
+      result = to_js('turbo_stream_from "comments"')
+      result.must_include 'TurboBroadcast.subscribe("comments")'
+    end
+
+    it "should subscribe with dynamic channel name" do
+      result = to_js('turbo_stream_from "article_#{article_id}_comments"')
+      result.must_include 'TurboBroadcast.subscribe(`article_${'
+      result.must_include '_comments`)'
+    end
+
+    it "should subscribe with symbol channel name" do
+      result = to_js('turbo_stream_from :notifications')
+      result.must_include 'TurboBroadcast.subscribe("notifications")'
+    end
+
+    it "should handle variable channel name" do
+      result = to_js('turbo_stream_from channel_name')
+      result.must_include 'TurboBroadcast.subscribe(channel_name)'
+    end
+  end
+
   describe Ruby2JS::Filter::DEFAULTS do
     it "should include Turbo" do
       _(Ruby2JS::Filter::DEFAULTS).must_include Ruby2JS::Filter::Turbo

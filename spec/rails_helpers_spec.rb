@@ -145,22 +145,22 @@ describe Ruby2JS::Filter::Rails::Helpers do
   end
 
   describe 'link_to helper' do
-    it "should convert static link_to to anchor with navigate" do
+    it "should convert static link_to to anchor (Turbo handles navigation)" do
       erb_src = '_erbout = +\'\'; _erbout.<<(( link_to("Articles", "/articles") ).to_s); _erbout'
       result = to_js(erb_src)
       # Output is a JS string with escaped quotes
       result.must_include '<a href=\"/articles\"'
-      result.must_include 'onclick=\"return navigate(event'
+      result.wont_include 'onclick='  # Turbo handles navigation, no onclick needed
       result.must_include '>Articles</a>'
     end
 
-    it "should convert link_to with path helper to anchor with navigate" do
+    it "should convert link_to with path helper to anchor (Turbo handles navigation)" do
       erb_src = '_erbout = +\'\'; _erbout.<<(( link_to("View", article_path(article)) ).to_s); _erbout'
       result = to_js(erb_src)
       # Template literal output - quotes not escaped
       result.must_include '<a href="'
       result.must_include 'article_path(article)'
-      result.must_include 'navigate(event'
+      result.wont_include 'onclick='  # Turbo handles navigation, no onclick needed
       result.must_include '>View</a>'
     end
 
@@ -203,23 +203,28 @@ describe Ruby2JS::Filter::Rails::Helpers do
       erb_src = '_erbout = +\'\'; _erbout.<<(( button_to("Delete", @article, method: :delete, form_class: "inline-block", class: "btn") ).to_s); _erbout'
       result = to_js(erb_src)
       # Template literal output - quotes not escaped
-      result.must_include '<form class="inline-block">'
-      result.must_include 'class="btn"'
+      result.must_include 'class="inline-block"'  # form_class on the form element
+      result.must_include 'class="btn"'  # class on the button element
       result.wont_include 'style="display:inline"'
     end
 
-    it "should handle button_to with turbo_confirm" do
+    it "should handle button_to with turbo_confirm (uses data attribute)" do
       erb_src = '_erbout = +\'\'; _erbout.<<(( button_to("Delete", @article, method: :delete, data: { turbo_confirm: "Really?" }) ).to_s); _erbout'
       result = to_js(erb_src)
-      result.must_include "confirm('Really?')"
+      # Turbo handles confirmation via data attribute, not onclick confirm()
+      result.must_include 'data-turbo-confirm="Really?"'
+      result.wont_include "confirm("
     end
 
-    it "should handle button_to with path helper" do
+    it "should handle button_to with path helper (uses Turbo form)" do
       erb_src = '_erbout = +\'\'; _erbout.<<(( button_to("Delete", article_path(@article), method: :delete, class: "btn-sm") ).to_s); _erbout'
       result = to_js(erb_src)
       # Template literal output - quotes not escaped
       result.must_include 'class="btn-sm"'
-      result.must_include 'routes.article.delete'
+      # Now uses Turbo-compatible forms instead of onclick routes
+      result.must_include 'method="post"'
+      result.must_include '_method" value="delete"'
+      result.must_include 'article_path(article)'
     end
   end
 
@@ -246,21 +251,25 @@ describe Ruby2JS::Filter::Rails::Helpers do
       ).to_s)
     end
 
+    # With Turbo integration, both browser and server targets generate the same HTML
+    # (standard forms and links without onclick/onsubmit handlers).
+    # Turbo intercepts navigation and form submissions automatically.
+
     describe 'browser target (dexie)' do
-      it "should generate onsubmit handler for form_tag" do
+      it "should generate standard form_tag (Turbo handles submission)" do
         # Format from ErbCompiler: _buf.append= form_tag ... do
         erb_src = "_buf = ::String.new; _buf.append= form_tag articles_path do\n _buf << \"<button>Submit</button>\"; end\n_buf.to_s"
         result = to_js_with_db(erb_src, database: 'dexie')
-        result.must_include 'onsubmit='
-        result.must_include 'routes.articles.post(event)'
-        result.wont_include 'action='
+        result.must_include 'action='
+        result.must_include 'method="post"'
+        result.wont_include 'onsubmit='  # Turbo handles submission
       end
 
-      it "should generate onclick handler for link_to" do
+      it "should generate standard link_to (Turbo handles navigation)" do
         erb_src = '_buf = ::String.new; _buf << ( link_to("Articles", "/articles") ).to_s; _buf.to_s'
         result = to_js_with_db(erb_src, database: 'dexie')
-        result.must_include 'onclick='
-        result.must_include 'navigate(event'
+        result.must_include 'href='
+        result.wont_include 'onclick='  # Turbo handles navigation
       end
     end
 
@@ -282,10 +291,11 @@ describe Ruby2JS::Filter::Rails::Helpers do
     end
 
     describe 'default behavior' do
-      it "should default to browser target when no database specified" do
+      it "should generate standard links (Turbo handles navigation)" do
         erb_src = '_buf = ::String.new; _buf << ( link_to("Articles", "/articles") ).to_s; _buf.to_s'
         result = to_js(erb_src)
-        result.must_include 'onclick='
+        result.must_include 'href='
+        result.wont_include 'onclick='  # Turbo handles navigation
       end
     end
 
@@ -299,21 +309,21 @@ describe Ruby2JS::Filter::Rails::Helpers do
         ).to_s)
       end
 
-      it "should respect explicit target: 'browser' even with server database" do
+      it "should generate standard link (Turbo handles navigation regardless of target)" do
         erb_src = '_buf = ::String.new; _buf << ( link_to("Articles", "/articles") ).to_s; _buf.to_s'
         result = to_js_with_target(erb_src, database: 'better_sqlite3', target: 'browser')
-        result.must_include 'onclick='
-        result.must_include 'navigate(event'
+        result.must_include 'href='
+        result.wont_include 'onclick='  # Turbo handles navigation
       end
 
-      it "should respect explicit target: 'node' even with browser database" do
+      it "should generate standard link for node target" do
         erb_src = '_buf = ::String.new; _buf << ( link_to("Articles", "/articles") ).to_s; _buf.to_s'
         result = to_js_with_target(erb_src, database: 'dexie', target: 'node')
         result.must_include 'href='
         result.wont_include 'onclick='
       end
 
-      it "should generate server-style form_tag with explicit target: 'node'" do
+      it "should generate standard form_tag for node target" do
         erb_src = "_buf = ::String.new; _buf.append= form_tag articles_path do\n _buf << \"<button>Submit</button>\"; end\n_buf.to_s"
         result = to_js_with_target(erb_src, database: 'dexie', target: 'node')
         result.must_include 'action='
@@ -373,25 +383,24 @@ describe Ruby2JS::Filter::Rails::Helpers do
         result.wont_include 'comments_path()'
       end
 
-      it "should generate browser-style nested resource form_with with article_comments route" do
+      it "should generate standard nested resource form_with (Turbo handles submission)" do
         erb_src = "_buf = ::String.new; _buf.append= form_with model: [@article, Comment.new] do |form|\n _buf << \"<button>Submit</button>\"; end\n_buf.to_s"
         result = to_js_with_target(erb_src, database: 'dexie', target: 'browser')
-        # Should use nested route: routes.article_comments.post(event, article.id)
-        result.must_include 'onsubmit='
-        result.must_include 'routes.article_comments.post(event'
-        result.must_include 'article.id'
-        result.wont_include 'routes.comments.post'
+        # Should generate standard form with action
+        result.must_include 'action='
+        result.must_include 'comments_path(article)'
+        result.must_include 'method="post"'
+        result.wont_include 'onsubmit='  # Turbo handles submission
       end
 
-      it "should generate browser-style nested resource button_to delete with article_comment route" do
+      it "should generate standard nested resource button_to delete (Turbo handles submission)" do
         erb_src = '_buf = ::String.new; _buf << ( button_to "Delete", [@article, comment], method: :delete ).to_s; _buf.to_s'
         result = to_js_with_target(erb_src, database: 'dexie', target: 'browser')
-        # Should use nested route: routes.article_comment.delete(article.id, comment.id)
-        result.must_include 'onclick='
-        result.must_include 'routes.article_comment.delete('
-        result.must_include 'article.id'
-        result.must_include 'comment.id'
-        result.wont_include '/* delete */'
+        # Should generate Turbo-compatible form with data attributes
+        result.must_include 'method="post"'
+        result.must_include '_method" value="delete"'
+        result.must_include 'data-turbo-confirm='
+        result.wont_include 'onclick='  # Turbo handles submission
       end
     end
   end

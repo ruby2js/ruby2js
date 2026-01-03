@@ -506,7 +506,8 @@ module Ruby2JS
           end
         end
 
-        # Transform respond_to block body - extract format.html results
+        # Transform respond_to block body - handles format.html and format.turbo_stream
+        # When both are present, generates Accept header check for content negotiation
         def transform_respond_to_block(node)
           return node unless node.respond_to?(:type)
 
@@ -525,36 +526,52 @@ module Ruby2JS
             return s(:if, condition, then_branch, else_branch)
 
           when :begin
-            # Multiple statements - look for format.html block and return its body
+            # Multiple statements - collect format.html and format.turbo_stream blocks
+            html_block = nil
+            turbo_stream_block = nil
+
             node.children.each do |child|
               if child.type == :block
                 block_send = child.children[0]
                 if block_send&.type == :send
                   receiver = block_send.children[0]
                   method = block_send.children[1]
-                  # format.html { ... } - return the block body transformed
-                  if receiver&.type == :lvar && method == :html
-                    block_body = child.children[2]
-                    return transform_ivars_to_locals(block_body)
+                  if receiver&.type == :lvar
+                    if method == :html
+                      html_block = child.children[2]
+                    elsif method == :turbo_stream
+                      turbo_stream_block = child.children[2]
+                    end
                   end
                 end
               end
             end
-            # No format.html found - transform all children
+
+            # If both formats present, generate Accept header conditional
+            if html_block && turbo_stream_block
+              return generate_format_conditional(html_block, turbo_stream_block)
+            elsif html_block
+              return transform_ivars_to_locals(html_block)
+            elsif turbo_stream_block
+              # Only turbo_stream - return it directly
+              return transform_ivars_to_locals(turbo_stream_block)
+            end
+
+            # No format blocks found - transform all children
             new_children = node.children.map { |c| transform_respond_to_block(c) }
             return s(:begin, *new_children)
 
           when :block
-            # Single format block - check if it's format.html
+            # Single format block - check if it's format.html or format.turbo_stream
             block_send = node.children[0]
             if block_send&.type == :send
               receiver = block_send.children[0]
               method = block_send.children[1]
-              if receiver&.type == :lvar && method == :html
+              if receiver&.type == :lvar && (method == :html || method == :turbo_stream)
                 return transform_ivars_to_locals(node.children[2])
               end
             end
-            # Not format.html - transform normally
+            # Not a format block - transform normally
             new_children = node.children.map do |c|
               c.respond_to?(:type) ? transform_ivars_to_locals(c) : c
             end
@@ -563,6 +580,34 @@ module Ruby2JS
           else
             return transform_ivars_to_locals(node)
           end
+        end
+
+        # Generate conditional for Turbo Stream content negotiation
+        # Checks Accept header for 'text/vnd.turbo-stream.html'
+        def generate_format_conditional(html_block, turbo_stream_block)
+          # Build: const accept = context.request.headers.accept || '';
+          #        if (accept.includes('text/vnd.turbo-stream.html')) { ... } else { ... }
+          # Use :attr for property access instead of :send for method calls
+          accept_var = s(:lvasgn, :accept,
+            s(:or,
+              s(:attr,
+                s(:attr,
+                  s(:attr, s(:lvar, :context), :request),
+                  :headers),
+                :accept),
+              s(:str, '')))
+
+          condition = s(:send,
+            s(:lvar, :accept),
+            :includes,
+            s(:str, 'text/vnd.turbo-stream.html'))
+
+          turbo_branch = transform_ivars_to_locals(turbo_stream_block)
+          html_branch = transform_ivars_to_locals(html_block)
+
+          s(:begin,
+            accept_var,
+            s(:if, condition, turbo_branch, html_branch))
         end
 
         # Wrap ActiveRecord operations with await for async database support

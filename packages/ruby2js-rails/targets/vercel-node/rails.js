@@ -1,6 +1,7 @@
 // Ruby2JS-on-Rails Micro Framework - Vercel Serverless Functions Target (Node.js)
 // Extends server module with Vercel Serverless Function handler pattern
 // Supports TCP-based databases (pg, mysql2, better-sqlite3) in addition to HTTP-based ones
+// Note: Turbo Streams broadcasting is stubbed (Vercel doesn't support persistent WebSockets)
 
 import {
   Router as RouterServer,
@@ -20,6 +21,27 @@ import {
 
 // Re-export everything from server module
 export { createContext, createFlash, truncate, pluralize, dom_id, navigate, submitForm, formData, handleFormResult, setupFormHandlers };
+
+// Stubbed TurboBroadcast for Vercel - no persistent WebSocket support
+// Broadcasts are silently ignored since Vercel Serverless Functions don't support WebSockets
+// Consider using Vercel Edge Functions with external pub/sub (e.g., Pusher, Ably) for real-time features
+export class TurboBroadcast {
+  static broadcast(channel, html) {
+    // No-op: Vercel Serverless Functions don't support persistent WebSocket connections
+    console.log(`TurboBroadcast (stubbed): would broadcast to ${channel}`);
+  }
+
+  static subscribe(channel) {
+    console.log(`TurboBroadcast (stubbed): would subscribe to ${channel}`);
+  }
+
+  static unsubscribe(channel) {
+    console.log(`TurboBroadcast (stubbed): would unsubscribe from ${channel}`);
+  }
+}
+
+// Export BroadcastChannel as alias for model broadcast methods
+export { TurboBroadcast as BroadcastChannel };
 
 // Router with Vercel-specific redirect handling
 export class Router extends RouterServer {
