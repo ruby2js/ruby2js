@@ -28,6 +28,17 @@ module Ruby2JS
       include SEXP
       extend SEXP
 
+      # Turbo Stream actions
+      TURBO_STREAM_ACTIONS = Set.new(%i[
+        append
+        prepend
+        replace
+        update
+        remove
+        before
+        after
+      ])
+
       TURBO_STREAM_PROPS = Set.new(%i[
         action
         target
@@ -98,6 +109,13 @@ module Ruby2JS
           return process_turbo_frame_tag(args, nil)
         end
 
+        # turbo_stream.replace, turbo_stream.append, etc.
+        if target&.type == :send && target.children == [nil, :turbo_stream]
+          if TURBO_STREAM_ACTIONS.include?(method)
+            return process_turbo_stream_action(method, args)
+          end
+        end
+
         return super unless @turbo_stream_action
 
         # Convert unqualified Turbo stream properties to this.*
@@ -109,6 +127,81 @@ module Ruby2JS
       end
 
       private
+
+      # Process turbo_stream action helpers
+      # turbo_stream.replace "target", html: content
+      # turbo_stream.append "target", partial: "items/item", locals: { item: @item }
+      # turbo_stream.remove "target"
+      def process_turbo_stream_action(action, args)
+        # First arg is the target (string or symbol)
+        target_node = args[0]
+        target_value = case target_node&.type
+          when :str then target_node.children[0]
+          when :sym then target_node.children[0].to_s
+          else nil  # Dynamic target
+        end
+
+        # For remove action, no content needed
+        if action == :remove
+          if target_value
+            return s(:str, "<turbo-stream action=\"remove\" target=\"#{target_value}\"></turbo-stream>")
+          else
+            # Dynamic target - use template literal
+            return s(:dstr,
+              s(:str, '<turbo-stream action="remove" target="'),
+              s(:begin, process(target_node)),
+              s(:str, '"></turbo-stream>'))
+          end
+        end
+
+        # Get content from options hash
+        content_node = nil
+        if args[1]&.type == :hash
+          args[1].children.each do |pair|
+            key_node, value_node = pair.children
+            key = key_node.children[0].to_s
+            if key == 'html' || key == 'content'
+              content_node = value_node
+              break
+            end
+            # For partial/locals, we'd need to render - for now just use the value
+            if key == 'partial'
+              content_node = value_node
+              break
+            end
+          end
+        end
+
+        # Build the turbo-stream element
+        if target_value && content_node.nil?
+          # Static target, no content (empty template)
+          s(:str, "<turbo-stream action=\"#{action}\" target=\"#{target_value}\"><template></template></turbo-stream>")
+        elsif target_value && content_node
+          # Static target, with content
+          processed_content = process(content_node)
+          s(:dstr,
+            s(:str, "<turbo-stream action=\"#{action}\" target=\"#{target_value}\"><template>"),
+            s(:begin, processed_content),
+            s(:str, '</template></turbo-stream>'))
+        else
+          # Dynamic target
+          processed_target = process(target_node)
+          if content_node
+            processed_content = process(content_node)
+            s(:dstr,
+              s(:str, "<turbo-stream action=\"#{action}\" target=\""),
+              s(:begin, processed_target),
+              s(:str, '"><template>'),
+              s(:begin, processed_content),
+              s(:str, '</template></turbo-stream>'))
+          else
+            s(:dstr,
+              s(:str, "<turbo-stream action=\"#{action}\" target=\""),
+              s(:begin, processed_target),
+              s(:str, '"><template></template></turbo-stream>'))
+          end
+        end
+      end
 
       # Process turbo_frame_tag helper
       # turbo_frame_tag "id" do ... end

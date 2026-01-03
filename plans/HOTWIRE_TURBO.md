@@ -130,9 +130,18 @@ end
 ```
 
 **Files to modify**:
-- `lib/ruby2js/filter/rails/controller.rb` - Add `respond_to` format.turbo_stream handling
-- `lib/ruby2js/filter/turbo.rb` - Add stream action helpers
-- Server runtime - Check Accept header for `text/vnd.turbo-stream.html`
+- `lib/ruby2js/filter/turbo.rb` - Add stream action helpers ✅ (done)
+- `lib/ruby2js/filter/rails/controller.rb` - Add `respond_to` format.turbo_stream handling (server targets)
+- Server runtime - Check Accept header for `text/vnd.turbo-stream.html` (server targets)
+
+**Server-side format negotiation** (for Node/Cloudflare/etc, not browser):
+The controller filter currently extracts only `format.html` bodies. For full Turbo Stream support on server targets:
+1. Transform `respond_to` blocks to check `request.headers.accept` at runtime
+2. If Accept includes `text/vnd.turbo-stream.html`, execute `format.turbo_stream` block
+3. Otherwise execute `format.html` block
+4. Set appropriate `Content-Type` header in response
+
+This is not needed for browser SPAs (we intercept all requests client-side).
 
 **Multiple streams**:
 ```ruby
@@ -362,8 +371,11 @@ Phase 1: Turbo Drive ───────────────────�
 Phase 2: Turbo Frames                                          │
    │ (Partial page updates)                                    │ Can demo
    ▼                                                           │ at each
-Phase 3: Turbo Streams                                         │ phase
-   │ (format.turbo_stream in controllers)                      │
+Phase 3a: Turbo Stream Helpers                                 │ phase
+   │ (turbo_stream.replace/append/etc)                         │
+   ▼                                                           │
+Phase 3b: Server Format Negotiation                            │
+   │ (respond_to with format.turbo_stream for server targets)  │
    ▼                                                           │
 Phase 4: Model Broadcasting ────────────────────────────────────┘
    │ (broadcast_replace_to)
@@ -422,7 +434,8 @@ end
 |-------|------------|--------|
 | Phase 1: Turbo Drive | Medium | 2 days |
 | Phase 2: Turbo Frames | Low | 1 day |
-| Phase 3: Turbo Streams | Medium | 2 days |
+| Phase 3a: Turbo Stream Helpers | Low | 0.5 days |
+| Phase 3b: Server Format Negotiation | Medium | 1 day |
 | Phase 4: Model Broadcasting | Medium | 2 days |
 | Phase 5: turbo_stream_from | Low | 1 day |
 | Phase 6: Stimulus refinements | Low | 0.5 days |
