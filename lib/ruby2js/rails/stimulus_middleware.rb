@@ -32,8 +32,8 @@ module Ruby2JS
       def initialize(app, options = {})
         @app = app
         @controllers_path = options[:controllers_path]
-        # Use stimulus + esm filters with autoexports for Rails-compatible output
-        @filters = options[:filters] || [:stimulus, :esm]
+        # Use stimulus + functions + esm filters with autoexports for Rails-compatible output
+        @filters = options[:filters] || [:stimulus, :functions, :esm]
         @options = { autoexports: :default }.merge(options.except(:filters, :controllers_path))
         @checked = false
       end

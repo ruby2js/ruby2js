@@ -545,3 +545,8 @@ module Ruby2JS
     [nil, nil]
   end
 end
+
+# Auto-load Rails integration when Rails is present
+if defined?(Rails::Railtie)
+  require 'ruby2js/rails'
+end

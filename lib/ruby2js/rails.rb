@@ -14,13 +14,15 @@ class Ruby2JSRailtie < Rails::Railtie
     end
   end
 
-  # Transpile Ruby Stimulus controllers at boot time so importmap discovers them
-  # This runs before importmap processes pin_all_from
+  # Transpile Ruby Stimulus controllers at boot time in development
+  # so importmap discovers them. Production uses rake task via assets:precompile.
   initializer "ruby2js.transpile_controllers", before: :set_load_path do |app|
+    next unless ::Rails.env.development?
+
     controllers_path = ::Rails.root.join("app/javascript/controllers")
     next unless controllers_path.exist?
 
-    filters = [:stimulus, :esm]
+    filters = [:stimulus, :functions, :esm]
     options = { autoexports: :default }
 
     Dir[controllers_path.join("*_controller.rb")].each do |rb_path|
@@ -44,13 +46,17 @@ class Ruby2JSRailtie < Rails::Railtie
     # Only use middleware in development for hot reload
     next unless ::Rails.env.development?
 
-    enabled = app.config.respond_to?(:ruby2js) &&
-              app.config.ruby2js.respond_to?(:stimulus_middleware) ?
-              app.config.ruby2js.stimulus_middleware : true
+    # Default to enabled unless explicitly set to false
+    enabled = if app.config.respond_to?(:ruby2js) && app.config.ruby2js.key?(:stimulus_middleware)
+      app.config.ruby2js.stimulus_middleware
+    else
+      true
+    end
 
     if enabled
       require_relative 'rails/stimulus_middleware'
-      app.middleware.use Ruby2JS::Rails::StimulusMiddleware
+      # Insert before ActionDispatch::Static so we transpile before assets are served
+      app.middleware.insert_before ActionDispatch::Static, Ruby2JS::Rails::StimulusMiddleware
     end
   end
 
