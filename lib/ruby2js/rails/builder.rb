@@ -591,15 +591,16 @@ class SelfhostBuilder
       puts("")
     end
 
-    # Transpile Stimulus controllers (app/javascript/controllers/)
+    # Handle Stimulus controllers (app/javascript/controllers/)
+    # - Copy .js files directly (no transpilation)
+    # - Transpile .rb files with stimulus filter
+    # - Generate controllers/index.js to register all controllers
     stimulus_dir = File.join(DEMO_ROOT, 'app/javascript/controllers')
     if File.exist?(stimulus_dir)
       puts("Stimulus Controllers:")
-      self.transpile_directory(
+      self.process_stimulus_controllers(
         stimulus_dir,
-        File.join(@dist_dir, 'app/javascript/controllers'),
-        '**/*.rb',
-        section: 'stimulus'
+        File.join(@dist_dir, 'app/javascript/controllers')
       )
       puts("")
     end
@@ -1145,6 +1146,83 @@ class SelfhostBuilder
       dest_path = File.join(dest_dir, relative.sub(/\.rb$/, '.js'))
       self.transpile_file(src_path, dest_path, section)
     end
+  end
+
+  # Process Stimulus controllers:
+  # - Copy .js files directly (no transpilation needed)
+  # - Transpile .rb files with stimulus filter
+  # - Generate index.js that registers all controllers with Stimulus
+  def process_stimulus_controllers(src_dir, dest_dir)
+    FileUtils.mkdir_p(dest_dir)
+
+    controllers = []
+
+    # Process all controller files
+    Dir.glob(File.join(src_dir, '**/*_controller.{js,rb}')).each do |src_path|
+      basename = File.basename(src_path)
+      relative = src_path.sub(src_dir + '/', '')
+
+      # Skip index files and application_controller
+      next if basename == 'index.js' || basename == 'application_controller.js'
+
+      if src_path.end_with?('.js')
+        # Copy .js files directly
+        dest_path = File.join(dest_dir, relative)
+        FileUtils.mkdir_p(File.dirname(dest_path))
+        FileUtils.cp(src_path, dest_path)
+        puts("  #{relative} (copied)")
+        controllers << relative
+      elsif src_path.end_with?('.rb')
+        # Transpile .rb files
+        dest_relative = relative.sub(/\.rb$/, '.js')
+        dest_path = File.join(dest_dir, dest_relative)
+        self.transpile_file(src_path, dest_path, 'stimulus')
+        controllers << dest_relative
+      end
+    end
+
+    # Generate index.js that registers all controllers
+    if controllers.any?
+      self.generate_stimulus_index(dest_dir, controllers)
+    end
+  end
+
+  # Generate controllers/index.js that imports and registers all Stimulus controllers
+  def generate_stimulus_index(dest_dir, controller_files)
+    imports = []
+    registrations = []
+
+    controller_files.sort.each do |file|
+      # Extract controller name from filename
+      # hello_controller.js -> HelloController, "hello"
+      # live_scores_controller.js -> LiveScoresController, "live-scores"
+      basename = File.basename(file, '.js')
+      name_part = basename.sub(/_controller$/, '')
+
+      # Convert to class name (hello_world -> HelloWorld)
+      class_name = name_part.split('_').map(&:capitalize).join('') + 'Controller'
+
+      # Convert to Stimulus identifier (hello_world -> hello-world)
+      identifier = name_part.gsub('_', '-')
+
+      imports << "import #{class_name} from \"./#{file}\";"
+      registrations << "application.register(\"#{identifier}\", #{class_name});"
+    end
+
+    index_content = <<~JS
+      import { Application } from "@hotwired/stimulus";
+
+      #{imports.join("\n")}
+
+      const application = Application.start();
+
+      #{registrations.join("\n")}
+
+      export { application };
+    JS
+
+    File.write(File.join(dest_dir, 'index.js'), index_content)
+    puts("  -> index.js (#{controller_files.length} controllers)")
   end
 
   # Handle seeds.rb specially - if it has only comments/whitespace, generate a stub
