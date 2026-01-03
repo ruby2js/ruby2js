@@ -163,6 +163,29 @@ describe Ruby2JS::Filter::Turbo do
     end
   end
 
+  describe "turbo_stream_from" do
+    it "should subscribe with static channel name" do
+      result = to_js('turbo_stream_from "comments"')
+      result.must_include 'TurboBroadcast.subscribe("comments")'
+    end
+
+    it "should subscribe with dynamic channel name" do
+      result = to_js('turbo_stream_from "article_#{article_id}_comments"')
+      result.must_include 'TurboBroadcast.subscribe(`article_${'
+      result.must_include '_comments`)'
+    end
+
+    it "should subscribe with symbol channel name" do
+      result = to_js('turbo_stream_from :notifications')
+      result.must_include 'TurboBroadcast.subscribe("notifications")'
+    end
+
+    it "should handle variable channel name" do
+      result = to_js('turbo_stream_from channel_name')
+      result.must_include 'TurboBroadcast.subscribe(channel_name)'
+    end
+  end
+
   describe Ruby2JS::Filter::DEFAULTS do
     it "should include Turbo" do
       _(Ruby2JS::Filter::DEFAULTS).must_include Ruby2JS::Filter::Turbo

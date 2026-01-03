@@ -18,6 +18,12 @@
 # To HTML:
 #   <turbo-frame id="comments">...</turbo-frame>
 #
+# And turbo_stream_from for subscribing to broadcast channels:
+#   turbo_stream_from "article_#{@article.id}_comments"
+#
+# To JavaScript:
+#   TurboBroadcast.subscribe(`article_${this.article.id}_comments`)
+#
 # Works with @hotwired/turbo.
 
 require 'ruby2js'
@@ -107,6 +113,11 @@ module Ruby2JS
         # turbo_frame_tag "id", src: "/path" (without block)
         if target.nil? && method == :turbo_frame_tag
           return process_turbo_frame_tag(args, nil)
+        end
+
+        # turbo_stream_from "channel_name" - subscribe to broadcast channel
+        if target.nil? && method == :turbo_stream_from
+          return process_turbo_stream_from(args)
         end
 
         # turbo_stream.replace, turbo_stream.append, etc.
@@ -201,6 +212,24 @@ module Ruby2JS
               s(:str, '"><template></template></turbo-stream>'))
           end
         end
+      end
+
+      # Process turbo_stream_from helper
+      # turbo_stream_from "channel_name"
+      # turbo_stream_from "article_#{@article.id}_comments"
+      #
+      # Generates a call to TurboBroadcast.subscribe() which sets up
+      # a BroadcastChannel listener that renders incoming turbo-stream messages.
+      def process_turbo_stream_from(args)
+        return super if args.empty?
+
+        channel_node = args[0]
+
+        # Generate: TurboBroadcast.subscribe("channel_name")
+        s(:send,
+          s(:const, nil, :TurboBroadcast),
+          :subscribe,
+          process(channel_node))
       end
 
       # Process turbo_frame_tag helper
