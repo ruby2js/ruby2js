@@ -547,6 +547,9 @@ module Ruby2JS
 end
 
 # Auto-load Rails integration when Rails is present
-if defined?(Rails::Railtie)
-  require 'ruby2js/rails'
+unless RUBY_ENGINE == 'opal'
+  if defined?(Rails::Railtie)
+    require 'ruby2js/rails'
+  end
 end
+

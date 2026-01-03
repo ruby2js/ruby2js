@@ -61,6 +61,9 @@ end
 def Ruby2JS.options(hash)
   hash = default_options.merge(Hash.new(hash || {}))
 
+  # Apply eslevel default if not specified (matches Ruby gem behavior)
+  hash[:eslevel] ||= Ruby2JS.eslevel_default
+
   hash[:filters] ||= []
   hash[:filters] = hash[:filters].split(/,\s*/) if hash[:filters].is_a? String
   hash[:filters] = hash[:filters].map {|name| Ruby2JS::Filter.registered_filters[name]}
