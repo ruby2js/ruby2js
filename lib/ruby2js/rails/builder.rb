@@ -408,10 +408,10 @@ class SelfhostBuilder
     }
 
     # CSS link based on framework
+    # This method is only used for browser targets, which serve from dist/ root
     css_link = case css.to_s
     when 'tailwind'
-      # Rails convention: public/assets/
-      '<link href="/assets/tailwind.css" rel="stylesheet">'
+      '<link href="/public/assets/tailwind.css" rel="stylesheet">'
     when 'pico'
       '<link rel="stylesheet" href="/node_modules/@picocss/pico/css/pico.min.css">'
     when 'bootstrap'
