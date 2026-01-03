@@ -11,6 +11,25 @@ Juntos currently supports the core Rails patterns: models, controllers, views, r
 
 {% toc %}
 
+## Recently Implemented
+
+### Hotwire (Turbo + Stimulus)
+
+[Hotwire](https://hotwired.dev/) integration is now available. See the [Hotwire documentation](/docs/juntos/hotwire) for details.
+
+**What's included:**
+
+- **Turbo Streams Broadcasting** — Real-time DOM updates via WebSocket
+  - `broadcast_append_to`, `broadcast_prepend_to`, `broadcast_replace_to`, `broadcast_remove_to`
+  - WebSocket support on Node.js, Bun, Deno, and Cloudflare (Durable Objects)
+  - Browser-side `BroadcastChannel` for same-origin tabs
+
+- **View Helpers** — `turbo_stream_from`, `turbo_frame_tag`
+
+- **Stimulus Controllers** — Write controllers in Ruby, transpile to JavaScript
+  - Rails middleware serves `.rb` controllers as `.js` on-the-fly
+  - Juntos builder generates `controllers/index.js` manifest
+
 ## Planned
 
 ### Vite Integration
@@ -39,27 +58,6 @@ export default defineConfig({
 Hot Module Replacement means editing a view re-renders without losing your current article, form inputs, or scroll position.
 
 **Beyond Juntos:** The same plugin architecture supports Ruby inside [Vue](https://vuejs.org/), [Svelte](https://svelte.dev/), and [Astro](https://astro.build/) components. Write a Juntos backend with Vue or Svelte for interactive parts—all in Ruby. Phlex components become portable across frameworks via ES module imports.
-
-### Hotwire (Turbo + Stimulus)
-
-[Hotwire](https://hotwired.dev/) integration for the Rails-native approach to interactivity:
-
-**Stimulus** — Ruby2JS already has a working [`stimulus` filter](/docs/filters/stimulus) that transforms Ruby controller classes:
-
-```ruby
-class SearchController < Stimulus::Controller
-  def search
-    results_target.innerHTML = fetch_results(query_target.value)
-  end
-end
-```
-
-**Turbo** — Import `@hotwired/turbo` to get:
-- Turbo Drive for fetch-based navigation (no full page reloads)
-- Turbo Frames for partial page updates
-- Turbo Streams for real-time DOM manipulation
-
-Since Turbo and Stimulus are JavaScript libraries, integration is straightforward — just import and use.
 
 ### Active Storage
 

@@ -65,6 +65,14 @@ Not DRY like Rails, but not magic either. The generated code is readable, debugg
 
 Other frameworks are Rails-*inspired*. Juntos aims for Rails patterns exactly. Rails developers feel at home. Rails documentation mostly applies. The mental model transfers.
 
+### Hotwire Ready
+
+Full [Hotwire](https://hotwired.dev/) support for the Rails-native approach to interactivity:
+
+- **Turbo Streams** — Real-time broadcasting with `broadcast_append_to`, `broadcast_remove_to`
+- **Stimulus** — Write controllers in Ruby, transpile to JavaScript
+- **WebSockets** — Built-in support on Node.js, Bun, Deno, and Cloudflare
+
 ### Multi-Target
 
 Write once, deploy anywhere JavaScript runs. No other framework offers the same code running in browsers with IndexedDB, on Node.js with PostgreSQL, and on edge functions with serverless databases.

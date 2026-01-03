@@ -35,6 +35,10 @@ dist/
 │   │   │   └── *.html.erb          # Source (for sourcemaps)
 │   │   └── layouts/
 │   │       └── application.js      # Layout wrapper
+│   ├── javascript/
+│   │   └── controllers/            # Stimulus controllers
+│   │       ├── index.js            # Auto-generated manifest
+│   │       └── *_controller.js     # Transpiled from .rb
 │   └── helpers/
 ├── config/
 │   ├── routes.js                   # Route definitions + dispatch
@@ -100,6 +104,30 @@ No Ruby required. The generated code is idiomatic JavaScript—ES2022 classes, a
 - Routing: Worker receives all requests
 - Database: D1 binding, Turso
 - Rendering: Returns `Response` objects
+
+## WebSocket Support
+
+Turbo Streams broadcasting uses WebSockets for real-time updates. Support varies by target:
+
+| Target | WebSocket Implementation |
+|--------|-------------------------|
+| Browser | `BroadcastChannel` (same-origin tabs) |
+| Node.js | `ws` package |
+| Bun | Native `Bun.serve` WebSocket |
+| Deno | Native `Deno.upgradeWebSocket` |
+| Cloudflare | Durable Objects with hibernation |
+| Vercel | Not supported (platform limitation) |
+
+WebSocket connections use the `/cable` endpoint:
+
+```javascript
+// Client subscribes to a channel
+const ws = new WebSocket('ws://localhost:3000/cable');
+ws.send(JSON.stringify({ command: 'subscribe', channel: 'chat_room' }));
+
+// Server broadcasts to subscribers
+TurboBroadcast.broadcast('chat_room', '<turbo-stream action="append">...</turbo-stream>');
+```
 
 ## The Runtime
 
