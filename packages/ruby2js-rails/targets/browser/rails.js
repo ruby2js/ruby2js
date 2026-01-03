@@ -604,3 +604,60 @@ export function setupFormHandlers(config) {
     }
   });
 }
+
+// Turbo Streams Broadcasting via BroadcastChannel API
+// Used for real-time updates between browser windows/tabs
+export class TurboBroadcast {
+  // Cache of BroadcastChannel instances by name
+  static channels = new Map();
+
+  // Get or create a BroadcastChannel for the given name
+  static getChannel(name) {
+    if (!this.channels.has(name)) {
+      const channel = new globalThis.BroadcastChannel(name);
+      this.channels.set(name, channel);
+    }
+    return this.channels.get(name);
+  }
+
+  // Broadcast a turbo-stream message to all subscribers
+  // Called by model broadcast_*_to methods
+  static broadcast(channelName, html) {
+    const channel = this.getChannel(channelName);
+    channel.postMessage(html);
+    // Also apply locally via Turbo
+    if (typeof Turbo !== 'undefined' && Turbo.renderStreamMessage) {
+      Turbo.renderStreamMessage(html);
+    }
+  }
+
+  // Subscribe to turbo-stream messages on a channel
+  // Used by turbo_stream_from helper in views
+  static subscribe(channelName, callback) {
+    const channel = this.getChannel(channelName);
+    channel.onmessage = (event) => {
+      // Render the turbo-stream via Turbo
+      if (typeof Turbo !== 'undefined' && Turbo.renderStreamMessage) {
+        Turbo.renderStreamMessage(event.data);
+      }
+      // Also call custom callback if provided
+      if (callback) {
+        callback(event.data);
+      }
+    };
+    return channel;
+  }
+
+  // Unsubscribe and close a channel
+  static unsubscribe(channelName) {
+    const channel = this.channels.get(channelName);
+    if (channel) {
+      channel.close();
+      this.channels.delete(channelName);
+    }
+  }
+}
+
+// Export BroadcastChannel as alias for model broadcast methods
+// Models call: BroadcastChannel.broadcast("channel", html)
+export { TurboBroadcast as BroadcastChannel };

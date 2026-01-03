@@ -262,4 +262,117 @@ describe Ruby2JS::Filter::Rails::Model do
       assert_includes result, 'export class Article'
     end
   end
+
+  describe "broadcast methods" do
+    it "transforms broadcast_append_to" do
+      result = to_js(<<~RUBY)
+        class Comment < ApplicationRecord
+          after_create_commit do
+            broadcast_append_to "comments", target: "comments"
+          end
+        end
+      RUBY
+      assert_includes result, 'BroadcastChannel.broadcast'
+      assert_includes result, '"comments"'
+      assert_includes result, '<turbo-stream action="append" target="comments">'
+    end
+
+    it "transforms broadcast_replace_to" do
+      result = to_js(<<~RUBY)
+        class Article < ApplicationRecord
+          after_update_commit do
+            broadcast_replace_to "articles", target: "article_1"
+          end
+        end
+      RUBY
+      assert_includes result, 'BroadcastChannel.broadcast'
+      assert_includes result, '"articles"'
+      assert_includes result, '<turbo-stream action="replace" target="article_1">'
+    end
+
+    it "transforms broadcast_remove_to" do
+      result = to_js(<<~RUBY)
+        class Comment < ApplicationRecord
+          after_destroy_commit do
+            broadcast_remove_to "comments", target: "comment_1"
+          end
+        end
+      RUBY
+      assert_includes result, 'BroadcastChannel.broadcast'
+      assert_includes result, 'action=\\"remove\\"'
+      assert_includes result, 'target=\\"comment_1\\"'
+      # remove doesn't need template
+      refute_includes result, '<template>'
+    end
+
+    it "transforms broadcast_prepend_to" do
+      result = to_js(<<~RUBY)
+        class Comment < ApplicationRecord
+          after_create_commit do
+            broadcast_prepend_to "comments", target: "comments"
+          end
+        end
+      RUBY
+      assert_includes result, 'action="prepend"'
+    end
+
+    it "transforms broadcast_update_to" do
+      result = to_js(<<~RUBY)
+        class Article < ApplicationRecord
+          after_save_commit do
+            broadcast_update_to "articles", target: "article_content"
+          end
+        end
+      RUBY
+      assert_includes result, 'action="update"'
+    end
+
+    it "transforms broadcast_*_later_to with setTimeout" do
+      result = to_js(<<~RUBY)
+        class Comment < ApplicationRecord
+          after_create_commit do
+            broadcast_append_later_to "comments", target: "comments"
+          end
+        end
+      RUBY
+      assert_includes result, 'setTimeout'
+      assert_includes result, 'BroadcastChannel.broadcast'
+    end
+
+    it "handles dynamic channel names" do
+      result = to_js(<<~RUBY)
+        class Comment < ApplicationRecord
+          after_create_commit do
+            broadcast_append_to "article_\#{article_id}_comments", target: "comments"
+          end
+        end
+      RUBY
+      # Dynamic channel via template literal
+      assert_includes result, '`article_${'
+    end
+
+    it "handles symbol target" do
+      result = to_js(<<~RUBY)
+        class Comment < ApplicationRecord
+          after_create_commit do
+            broadcast_append_to "comments", target: :comments
+          end
+        end
+      RUBY
+      assert_includes result, 'target="comments"'
+    end
+
+    it "generates toTurboStreamHTML call for content" do
+      result = to_js(<<~RUBY)
+        class Comment < ApplicationRecord
+          after_create_commit do
+            broadcast_append_to "comments", target: "comments"
+          end
+        end
+      RUBY
+      # Non-remove actions use toTurboStreamHTML for content
+      assert_includes result, 'this.toTurboStreamHTML'
+      assert_includes result, '<template>'
+    end
+  end
 end

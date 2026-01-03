@@ -14,7 +14,35 @@ module Ruby2JS
           before_create after_create
           before_update after_update
           before_destroy after_destroy
+          after_commit
+          after_create_commit after_update_commit after_destroy_commit after_save_commit
         ].freeze
+
+        # Turbo broadcast methods
+        BROADCAST_METHODS = %i[
+          broadcast_replace_to broadcast_replace_later_to
+          broadcast_append_to broadcast_append_later_to
+          broadcast_prepend_to broadcast_prepend_later_to
+          broadcast_update_to broadcast_update_later_to
+          broadcast_remove_to broadcast_remove_later_to
+          broadcast_before_to broadcast_after_to
+        ].freeze
+
+        # Map broadcast methods to their turbo-stream actions
+        BROADCAST_TO_ACTION = {
+          broadcast_replace_to: :replace,
+          broadcast_replace_later_to: :replace,
+          broadcast_append_to: :append,
+          broadcast_append_later_to: :append,
+          broadcast_prepend_to: :prepend,
+          broadcast_prepend_later_to: :prepend,
+          broadcast_update_to: :update,
+          broadcast_update_later_to: :update,
+          broadcast_remove_to: :remove,
+          broadcast_remove_later_to: :remove,
+          broadcast_before_to: :before,
+          broadcast_after_to: :after
+        }.freeze
 
         def initialize(*args)
           # Note: super must come first for JS compatibility (derived class constructor rule)
@@ -94,7 +122,129 @@ module Ruby2JS
           result
         end
 
+        # Handle broadcast_*_to method calls inside model callbacks
+        def on_send(node)
+          target, method, *args = node.children
+
+          # Only handle broadcast methods when processing a model
+          return super unless @rails_model
+
+          # Only handle unqualified (implicit self) calls
+          return super unless target.nil?
+
+          # Check if this is a broadcast method
+          return super unless BROADCAST_METHODS.include?(method)
+
+          process_broadcast_call(method, args)
+        end
+
         private
+
+        # Process broadcast_*_to method calls
+        # Example: broadcast_append_to "article_#{article_id}_comments", partial: "...", target: "comments"
+        # Generates: BroadcastChannel.broadcast("channel", `<turbo-stream ...>...</turbo-stream>`)
+        def process_broadcast_call(method, args)
+          return super if args.empty?
+
+          # First argument is the channel name
+          channel_node = args[0]
+
+          # Get the action from the method name
+          action = BROADCAST_TO_ACTION[method]
+          return super unless action
+
+          # Extract options from remaining arguments
+          target_node = nil
+          partial_node = nil
+          locals_node = nil
+
+          args[1..-1].each do |arg|
+            next unless arg.type == :hash
+            arg.children.each do |pair|
+              key_node, value_node = pair.children
+              key = key_node.children[0].to_s
+              case key
+              when 'target' then target_node = value_node
+              when 'partial' then partial_node = value_node
+              when 'locals' then locals_node = value_node
+              end
+            end
+          end
+
+          # For remove action, we only need target
+          # For other actions, we need content from partial
+          stream_html = build_broadcast_stream_html(action, channel_node, target_node, partial_node, locals_node)
+
+          # Check if this is a _later method (deferred execution)
+          is_later = method.to_s.include?('_later')
+
+          # Build the broadcast call
+          broadcast_call = s(:send,
+            s(:const, nil, :BroadcastChannel),
+            :broadcast,
+            process(channel_node),
+            stream_html)
+
+          if is_later
+            # Wrap in setTimeout for _later methods
+            s(:send, nil, :setTimeout,
+              s(:block,
+                s(:send, nil, :proc),
+                s(:args),
+                broadcast_call),
+              s(:int, 0))
+          else
+            broadcast_call
+          end
+        end
+
+        # Build the turbo-stream HTML for broadcasting
+        def build_broadcast_stream_html(action, channel_node, target_node, partial_node, locals_node)
+          # For remove action, no template content needed
+          if action == :remove
+            # If target is static
+            if target_node&.type == :str
+              target_val = target_node.children[0]
+              return s(:str, "<turbo-stream action=\"remove\" target=\"#{target_val}\"></turbo-stream>")
+            elsif target_node&.type == :sym
+              target_val = target_node.children[0].to_s
+              return s(:str, "<turbo-stream action=\"remove\" target=\"#{target_val}\"></turbo-stream>")
+            else
+              # Dynamic target - use template literal
+              return s(:dstr,
+                s(:str, '<turbo-stream action="remove" target="'),
+                s(:begin, process(target_node)),
+                s(:str, '"></turbo-stream>'))
+            end
+          end
+
+          # For other actions, we need to render content
+          # Build: `<turbo-stream action="..." target="..."><template>${this.toTurboStreamHTML()}</template></turbo-stream>`
+
+          # Handle target
+          target_expr = nil
+          if target_node&.type == :str
+            target_expr = target_node.children[0]
+          elsif target_node&.type == :sym
+            target_expr = target_node.children[0].to_s
+          end
+
+          if target_expr
+            # Static target
+            s(:dstr,
+              s(:str, "<turbo-stream action=\"#{action}\" target=\"#{target_expr}\"><template>"),
+              s(:begin, s(:send, s(:self), :toTurboStreamHTML)),
+              s(:str, '</template></turbo-stream>'))
+          else
+            # Dynamic target
+            s(:dstr,
+              s(:str, "<turbo-stream action=\"#{action}\" target=\""),
+              s(:begin, process(target_node)),
+              s(:str, '"><template>'),
+              s(:begin, s(:send, s(:self), :toTurboStreamHTML)),
+              s(:str, '</template></turbo-stream>'))
+          end
+        end
 
         def model_class?(class_name, superclass)
           return false unless class_name&.type == :const
