@@ -104,8 +104,9 @@ export class Router extends RouterServer {
       console.log(`  Redirected to ${result.redirect}`);
       return this.redirect(context, result.redirect);
     } else if (result.render) {
+      // Return 422 Unprocessable Entity so Turbo Drive renders the response
       console.log('  Re-rendering form (validation failed)');
-      return this.htmlResponse(context, result.render);
+      return this.htmlResponse(context, result.render, 422);
     } else {
       return this.redirect(context, defaultRedirect);
     }
@@ -113,7 +114,7 @@ export class Router extends RouterServer {
 
   // Override htmlResponse to use the correct Application class
   // (Parent class references its own Application which doesn't have layoutFn set)
-  static htmlResponse(context, html) {
+  static htmlResponse(context, html, status = 200) {
     const fullHtml = Application.wrapInLayout(context, html);
     const headers = { 'Content-Type': 'text/html; charset=utf-8' };
 
@@ -122,7 +123,7 @@ export class Router extends RouterServer {
       headers['Set-Cookie'] = flashCookie;
     }
 
-    return new Response(fullHtml, { status: 200, headers });
+    return new Response(fullHtml, { status, headers });
   }
 }
 

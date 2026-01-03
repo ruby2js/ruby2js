@@ -274,8 +274,9 @@ export class Router extends RouterBase {
       return this.redirect(context, result.redirect);
     } else if (result.render) {
       // Validation failed - render contains pre-rendered HTML from the view
+      // Return 422 Unprocessable Entity so Turbo Drive renders the response
       console.log('  Re-rendering form (validation failed)');
-      return this.htmlResponse(context, result.render);
+      return this.htmlResponse(context, result.render, 422);
     } else {
       return this.redirect(context, defaultRedirect);
     }
@@ -298,7 +299,7 @@ export class Router extends RouterBase {
   }
 
   // Create HTML response with proper headers, wrapped in layout
-  static htmlResponse(context, html) {
+  static htmlResponse(context, html, status = 200) {
     const fullHtml = Application.wrapInLayout(context, html);
     const headers = { 'Content-Type': 'text/html; charset=utf-8' };
 
@@ -309,7 +310,7 @@ export class Router extends RouterBase {
     }
 
     return new Response(fullHtml, {
-      status: 200,
+      status,
       headers
     });
   }
