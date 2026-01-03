@@ -322,3 +322,117 @@ export class Application extends ApplicationBase {
     throw new Error('Application.start() must be implemented by runtime-specific target');
   }
 }
+
+// Turbo Streams Broadcasting for server targets
+// Manages WebSocket connections and channel subscriptions
+// Platform-specific targets provide the WebSocket server, this handles the protocol
+export class TurboBroadcast {
+  // Map of channel name -> Set of WebSocket connections
+  static channels = new Map();
+
+  // Map of WebSocket -> Set of channel names (for cleanup on disconnect)
+  static subscriptions = new Map();
+
+  // Subscribe a WebSocket to a channel
+  static subscribe(ws, channel) {
+    // Add to channel's subscriber set
+    if (!this.channels.has(channel)) {
+      this.channels.set(channel, new Set());
+    }
+    this.channels.get(channel).add(ws);
+
+    // Track subscription for this WebSocket
+    if (!this.subscriptions.has(ws)) {
+      this.subscriptions.set(ws, new Set());
+    }
+    this.subscriptions.get(ws).add(channel);
+
+    console.log(`  Subscribed to channel: ${channel}`);
+  }
+
+  // Unsubscribe a WebSocket from a channel
+  static unsubscribe(ws, channel) {
+    const subscribers = this.channels.get(channel);
+    if (subscribers) {
+      subscribers.delete(ws);
+      if (subscribers.size === 0) {
+        this.channels.delete(channel);
+      }
+    }
+
+    const wsChannels = this.subscriptions.get(ws);
+    if (wsChannels) {
+      wsChannels.delete(channel);
+    }
+
+    console.log(`  Unsubscribed from channel: ${channel}`);
+  }
+
+  // Clean up all subscriptions for a WebSocket (on disconnect)
+  static cleanup(ws) {
+    const wsChannels = this.subscriptions.get(ws);
+    if (wsChannels) {
+      for (const channel of wsChannels) {
+        const subscribers = this.channels.get(channel);
+        if (subscribers) {
+          subscribers.delete(ws);
+          if (subscribers.size === 0) {
+            this.channels.delete(channel);
+          }
+        }
+      }
+      this.subscriptions.delete(ws);
+    }
+  }
+
+  // Broadcast a turbo-stream message to all subscribers of a channel
+  // Called by model broadcast_*_to methods
+  static broadcast(channel, html) {
+    const subscribers = this.channels.get(channel);
+    if (!subscribers || subscribers.size === 0) {
+      return;
+    }
+
+    const message = JSON.stringify({
+      type: 'message',
+      stream: channel,
+      html: html
+    });
+
+    console.log(`  Broadcasting to ${channel} (${subscribers.size} subscribers)`);
+
+    for (const ws of subscribers) {
+      try {
+        ws.send(message);
+      } catch (e) {
+        // Connection may have closed, clean up
+        this.cleanup(ws);
+      }
+    }
+  }
+
+  // Handle incoming WebSocket message (subscribe/unsubscribe protocol)
+  static handleMessage(ws, data) {
+    try {
+      const msg = typeof data === 'string' ? JSON.parse(data) : data;
+
+      switch (msg.type) {
+        case 'subscribe':
+          this.subscribe(ws, msg.stream);
+          break;
+        case 'unsubscribe':
+          this.unsubscribe(ws, msg.stream);
+          break;
+        case 'ping':
+          ws.send(JSON.stringify({ type: 'pong' }));
+          break;
+      }
+    } catch (e) {
+      console.error('TurboBroadcast message error:', e);
+    }
+  }
+}
+
+// Export BroadcastChannel as alias for model broadcast methods (server-side)
+// Models call: BroadcastChannel.broadcast("channel", html)
+export { TurboBroadcast as BroadcastChannel };

@@ -333,4 +333,44 @@ describe Ruby2JS::Filter::Rails::Controller do
       _(result).must_include 'return {redirect:'
     end
   end
+
+  describe 'respond_to with turbo_stream' do
+    it "generates Accept header check when both html and turbo_stream present" do
+      source = <<~RUBY
+        class ArticlesController < ApplicationController
+          def create
+            @article = Article.new(params)
+            if @article.save
+              respond_to do |format|
+                format.html { redirect_to @article }
+                format.turbo_stream { turbo_stream.append "articles", @article }
+              end
+            end
+          end
+        end
+      RUBY
+
+      result = to_js(source)
+      # Should check Accept header
+      _(result).must_include 'context.request.headers.accept'
+      _(result).must_include 'text/vnd.turbo-stream.html'
+    end
+
+    it "handles html-only respond_to without turbo check" do
+      source = <<~RUBY
+        class ArticlesController < ApplicationController
+          def create
+            @article = Article.new(params)
+            respond_to do |format|
+              format.html { redirect_to @article }
+            end
+          end
+        end
+      RUBY
+
+      result = to_js(source)
+      # Should NOT have turbo-stream check when only html format
+      _(result).wont_include 'text/vnd.turbo-stream.html'
+    end
+  end
 end
