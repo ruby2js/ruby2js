@@ -5,6 +5,7 @@
 # - Rake tasks for Ruby2JS operations
 
 require 'rails'
+require 'ruby2js'
 
 class Ruby2JSRailtie < Rails::Railtie
   rake_tasks do
@@ -13,10 +14,36 @@ class Ruby2JSRailtie < Rails::Railtie
     end
   end
 
-  # Auto-register Stimulus middleware in development
+  # Transpile Ruby Stimulus controllers at boot time so importmap discovers them
+  # This runs before importmap processes pin_all_from
+  initializer "ruby2js.transpile_controllers", before: :set_load_path do |app|
+    controllers_path = ::Rails.root.join("app/javascript/controllers")
+    next unless controllers_path.exist?
+
+    filters = [:stimulus, :esm]
+    options = { autoexports: :default }
+
+    Dir[controllers_path.join("*_controller.rb")].each do |rb_path|
+      js_path = rb_path.sub(/\.rb$/, '.js')
+
+      if !File.exist?(js_path) || File.mtime(rb_path) > File.mtime(js_path)
+        begin
+          js = Ruby2JS.convert(File.read(rb_path), filters: filters, **options)
+          File.write(js_path, js.to_s)
+          puts "Ruby2JS: Transpiled #{File.basename(rb_path)} -> #{File.basename(js_path)}"
+        rescue => e
+          warn "Ruby2JS: Failed to transpile #{rb_path}: #{e.message}"
+        end
+      end
+    end
+  end
+
+  # Auto-register Stimulus middleware for development (hot reload)
   # Can be disabled with: config.ruby2js.stimulus_middleware = false
   initializer "ruby2js.stimulus_middleware" do |app|
-    # Check if middleware is explicitly disabled
+    # Only use middleware in development for hot reload
+    next unless ::Rails.env.development?
+
     enabled = app.config.respond_to?(:ruby2js) &&
               app.config.ruby2js.respond_to?(:stimulus_middleware) ?
               app.config.ruby2js.stimulus_middleware : true

@@ -7,15 +7,14 @@ module Ruby2JS
       include SEXP
       extend  SEXP
 
+      # Named import: import { Controller } from "@hotwired/stimulus"
       STIMULUS_IMPORT = s(:import,
-        [s(:pair, s(:sym, :as), s(:const, nil, :Stimulus)),
-          s(:pair, s(:sym, :from), s(:str, "@hotwired/stimulus"))],
-          s(:str, '*'))
+        ["@hotwired/stimulus"],
+        [s(:attr, nil, :Controller)])
 
       STIMULUS_IMPORT_SKYPACK = s(:import,
-        [s(:pair, s(:sym, :as), s(:const, nil, :Stimulus)),
-          s(:pair, s(:sym, :from), s(:str, "https://cdn.skypack.dev/@hotwired/stimulus"))],
-          s(:str, '*'))
+        ["https://cdn.skypack.dev/@hotwired/stimulus"],
+        [s(:attr, nil, :Controller)])
 
       def initialize(*args)
         super
@@ -39,9 +38,10 @@ module Ruby2JS
           inheritance == s(:send, s(:const, nil, :Stimulus), :Controller) or
           @stim_subclasses.include? @namespace.resolve(inheritance)
 
-        if inheritance == s(:const, nil, :Stimulus)
+        # Always extend Controller directly (named import style)
+        unless inheritance == s(:const, nil, :Controller)
           node = node.updated(nil, [node.children.first,
-            s(:const, s(:const, nil, :Stimulus), :Controller),
+            s(:const, nil, :Controller),
             *node.children[2..-1]])
         end
 

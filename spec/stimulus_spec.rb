@@ -22,17 +22,17 @@ describe Ruby2JS::Filter::Stimulus do
   describe "class aliases" do
     it "handles ruby scope syntax" do
       to_js( 'class Foo<Stimulus::Controller; end' ).
-        must_equal 'class Foo extends Stimulus.Controller {}'
+        must_equal 'class Foo extends Controller {}'
     end
 
     it "handles JS scope syntax" do
       to_js( 'class Foo<Stimulus.Controller; end' ).
-        must_equal 'class Foo extends Stimulus.Controller {}'
+        must_equal 'class Foo extends Controller {}'
     end
 
     it "handles shorthand" do
       to_js( 'class Foo<Stimulus; end' ).
-        must_equal 'class Foo extends Stimulus.Controller {}'
+        must_equal 'class Foo extends Controller {}'
     end
   end
 
@@ -150,14 +150,14 @@ describe Ruby2JS::Filter::Stimulus do
   describe "modules" do
     it "imports from Stimulus" do
       to_js_esm( 'class Foo<Stimulus::Controller; end' ).
-        must_equal 'import * as Stimulus from "@hotwired/stimulus"; ' +
-          'class Foo extends Stimulus.Controller {}'
+        must_equal 'import { Controller } from "@hotwired/stimulus"; ' +
+          'class Foo extends Controller {}'
     end
 
     it "imports from skypack" do
       to_js_skypack( 'class Foo<Stimulus::Controller; end' ).
-        must_equal 'import * as Stimulus from "https://cdn.skypack.dev/@hotwired/stimulus"; ' +
-          'class Foo extends Stimulus.Controller {}'
+        must_equal 'import { Controller } from "https://cdn.skypack.dev/@hotwired/stimulus"; ' +
+          'class Foo extends Controller {}'
     end
   end
 

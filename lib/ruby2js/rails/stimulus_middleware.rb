@@ -4,11 +4,12 @@ require 'ruby2js'
 
 module Ruby2JS
   module Rails
-    # Rack middleware that serves Ruby Stimulus controllers as JavaScript.
+    # Rack middleware that transpiles Ruby Stimulus controllers to JavaScript.
     #
-    # This middleware intercepts requests for Stimulus controller JS files and:
-    # 1. Transpiles corresponding .rb files to JavaScript on-the-fly
-    # 2. Generates a controllers/index.js manifest that registers all controllers
+    # This middleware runs early in the request cycle and ensures all Ruby
+    # controller files are transpiled to JavaScript before Propshaft serves them.
+    # The generated .js files are placed alongside the .rb files so Propshaft
+    # discovers and serves them with proper fingerprinting.
     #
     # Usage in Rails:
     #   # config/application.rb or config/environments/development.rb
@@ -22,37 +23,27 @@ module Ruby2JS
     #     end
     #   end
     #
+    # The middleware will generate chat_controller.js alongside the .rb file.
+    # Add it to your controllers/index.js:
+    #   import ChatController from "./chat_controller"
+    #   application.register("chat", ChatController)
+    #
     class StimulusMiddleware
       def initialize(app, options = {})
         @app = app
         @controllers_path = options[:controllers_path]
-        @filters = options[:filters] || [:stimulus]
+        # Use stimulus + esm filters with autoexports for Rails-compatible output
+        @filters = options[:filters] || [:stimulus, :esm]
+        @options = { autoexports: :default }.merge(options.except(:filters, :controllers_path))
+        @checked = false
       end
 
       def call(env)
-        path = env['PATH_INFO']
-
-        # Match controllers/index.js - generate manifest
-        if path =~ %r{/controllers/index\.js$}
-          if controllers_path.exist?
-            return [200, js_headers, [generate_manifest]]
-          end
-        end
-
-        # Match *_controller.js - transpile from .rb if exists
-        if path =~ %r{/controllers/(.+_controller)\.js$}
-          controller_name = $1
-          rb_path = controllers_path.join("#{controller_name}.rb")
-
-          if rb_path.exist?
-            begin
-              js = Ruby2JS.convert(rb_path.read, filters: @filters)
-              return [200, js_headers, [js.to_s]]
-            rescue => e
-              error_js = "console.error(#{e.message.to_json});"
-              return [500, js_headers, [error_js]]
-            end
-          end
+        # Ensure Ruby controllers are transpiled to JS files
+        # In development, check on every request; in production, check once
+        if !@checked || ::Rails.env.development?
+          ensure_controllers_transpiled
+          @checked = true
         end
 
         @app.call(env)
@@ -60,57 +51,37 @@ module Ruby2JS
 
       private
 
+      def ensure_controllers_transpiled
+        return unless controllers_path.exist?
+
+        # Transpile any .rb controllers that are newer than their .js counterparts
+        Dir[controllers_path.join("*_controller.rb")].each do |rb_path|
+          js_path = rb_path.sub(/\.rb$/, '.js')
+
+          if !File.exist?(js_path) || File.mtime(rb_path) > File.mtime(js_path)
+            transpile_controller(rb_path, js_path)
+          end
+        end
+      end
+
+      def transpile_controller(rb_path, js_path)
+        js = Ruby2JS.convert(File.read(rb_path), filters: @filters, **@options)
+        File.write(js_path, js.to_s)
+        log(:info, "Ruby2JS: Transpiled #{File.basename(rb_path)} -> #{File.basename(js_path)}")
+      rescue => e
+        log(:error, "Ruby2JS: Failed to transpile #{rb_path}: #{e.message}")
+      end
+
+      def log(level, message)
+        if defined?(::Rails) && ::Rails.respond_to?(:logger) && ::Rails.logger
+          ::Rails.logger.send(level, message)
+        elsif level == :error
+          warn message
+        end
+      end
+
       def controllers_path
         @controllers_path ||= ::Rails.root.join("app/javascript/controllers")
-      end
-
-      def js_headers
-        { 'Content-Type' => 'application/javascript; charset=utf-8' }
-      end
-
-      def generate_manifest
-        controllers = discover_controllers
-
-        imports = controllers.map do |identifier, filename, class_name|
-          "import #{class_name} from \"./#{filename}.js\""
-        end
-
-        registrations = controllers.map do |identifier, filename, class_name|
-          "application.register(\"#{identifier}\", #{class_name})"
-        end
-
-        <<~JS
-          import { application } from "./application"
-
-          #{imports.join("\n")}
-
-          #{registrations.join("\n")}
-        JS
-      end
-
-      def discover_controllers
-        controllers = []
-
-        # Find all .rb controller files
-        Dir[controllers_path.join("*_controller.rb")].each do |path|
-          filename = File.basename(path, ".rb")           # chat_controller
-          identifier = filename.sub(/_controller$/, "")   # chat
-          class_name = filename.split('_').map(&:capitalize).join + ""  # ChatController
-          controllers << [identifier, filename, class_name]
-        end
-
-        # Also include .js controllers (that don't have .rb equivalents)
-        Dir[controllers_path.join("*_controller.js")].each do |path|
-          filename = File.basename(path, ".js")
-          # Skip if we already have a .rb version
-          next if controllers_path.join("#{filename}.rb").exist?
-
-          identifier = filename.sub(/_controller$/, "")
-          class_name = filename.split('_').map(&:capitalize).join
-          controllers << [identifier, filename, class_name]
-        end
-
-        controllers.sort_by(&:first)
       end
     end
   end
