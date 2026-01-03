@@ -287,17 +287,6 @@ See also [Exclude](#exclude), [Include](#include), and
 puts Ruby2JS.convert("list.max()", preset: true, include_only: [:max])
 ```
 
-## Import From Skypack
-
-Some filters like [Stimulus](filters/stimulus) will generate
-import statements.  If the `import_from_skypack` option is set, these import
-statements will make use of the [skypack](https://www.skypack.dev/) CDN.
-
-```ruby
-puts Ruby2JS.convert("class MyController < Stimulus::Controller; end",
-  filters: [:stimulus], import_from_skypack: true)
-```
-
 ## IVars
 
 Instance Variables (ivars) allow you to supply data to the script.  A common
@@ -551,7 +540,6 @@ An example of all of the supported options:
   "include": ["class"],
   "include_all": true,
   "include_only": ["max"],
-  "import_from_skypack": true,
   "ivars": {"@x": 1, "@name": "value"},
   "module": "esm",
   "nullish_to_s": true,

@@ -12,10 +12,6 @@ module Ruby2JS
         ["@hotwired/stimulus"],
         [s(:attr, nil, :Controller)])
 
-      STIMULUS_IMPORT_SKYPACK = s(:import,
-        ["https://cdn.skypack.dev/@hotwired/stimulus"],
-        [s(:attr, nil, :Controller)])
-
       def initialize(*args)
         super
         @stim_scope = []
@@ -54,8 +50,7 @@ module Ruby2JS
         stim_walk(node)
 
         if self.modules_enabled?()
-          self.prepend_list << (@options[:import_from_skypack] ?
-            STIMULUS_IMPORT_SKYPACK : STIMULUS_IMPORT)
+          self.prepend_list << STIMULUS_IMPORT
         end
 
         nodes = body

@@ -24,7 +24,6 @@ Usage: ruby2js [options] [file]
     -f, --filter NAME,...            process using NAME filter(s)
         --filepath [PATH]            supply a path if stdin is related to a source file
         --identity                   triple equal comparison operators
-        --import_from_skypack        use Skypack for internal functions import statements
         --include METHOD,...         have filters process METHOD(s)
         --include-all                have filters include all methods
         --include-only METHOD,...    have filters only process METHOD(s)

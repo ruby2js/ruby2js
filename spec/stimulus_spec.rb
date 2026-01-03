@@ -14,11 +14,6 @@ describe Ruby2JS::Filter::Stimulus do
       filters: [Ruby2JS::Filter::Stimulus, Ruby2JS::Filter::ESM]).to_s)
   end
   
-  def to_js_skypack(string)
-    _(Ruby2JS.convert(string, eslevel: 2022, import_from_skypack: true,
-      filters: [Ruby2JS::Filter::Stimulus, Ruby2JS::Filter::ESM]).to_s)
-  end
-  
   describe "class aliases" do
     it "handles ruby scope syntax" do
       to_js( 'class Foo<Stimulus::Controller; end' ).
@@ -151,12 +146,6 @@ describe Ruby2JS::Filter::Stimulus do
     it "imports from Stimulus" do
       to_js_esm( 'class Foo<Stimulus::Controller; end' ).
         must_equal 'import { Controller } from "@hotwired/stimulus"; ' +
-          'class Foo extends Controller {}'
-    end
-
-    it "imports from skypack" do
-      to_js_skypack( 'class Foo<Stimulus::Controller; end' ).
-        must_equal 'import { Controller } from "https://cdn.skypack.dev/@hotwired/stimulus"; ' +
           'class Foo extends Controller {}'
     end
   end

@@ -24,7 +24,6 @@ module Ruby2JS
         'exclude' => true,
         'filepath' => true,
         'identity' => false,
-        'import_from_skypack' => false,
         'include' => true,
         'include-all' => false,
         'include-only' => true,

@@ -32,7 +32,6 @@ An example of all supported options:
   include: ["class"],
   include_all: true,
   include_only: ["max"],
-  import_from_skypack: true,
   or: "nullish",
   require_recurse: true,
   strict: true,

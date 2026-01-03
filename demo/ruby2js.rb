@@ -93,10 +93,6 @@ end
 
 opts.on('--identity', "triple equal comparison operators") { options[:comparison] = :identity }
 
-opts.on('--import_from_skypack', "use Skypack for internal functions import statements") do
-  options[:import_from_skypack] = true
-end
-
 opts.on('--include METHOD,...', "have filters process METHOD(s)", Array) { |methods|
   options[:include] ||= []; options[:include].push(*methods.map(&:to_sym))
 }
