@@ -266,6 +266,9 @@ class SelfhostBuilder
       { 'ruby2js-rails' => 'https://www.ruby2js.com/releases/ruby2js-rails-beta.tgz' }
     end
 
+    # Hotwire Turbo for all browser builds
+    deps['@hotwired/turbo'] = '^8.0.0'
+
     # Add tailwindcss if tailwindcss-rails gem is detected
     tailwind_css = app_root ? File.join(app_root, 'app/assets/tailwind/application.css') : 'app/assets/tailwind/application.css'
     if File.exist?(tailwind_css)
@@ -368,6 +371,11 @@ class SelfhostBuilder
     true  # npm install needed
   end
 
+  # Common importmap entries for all browser builds
+  COMMON_IMPORTMAP_ENTRIES = {
+    '@hotwired/turbo' => '/node_modules/@hotwired/turbo/dist/turbo.es2017-esm.js'
+  }.freeze
+
   # Database-specific importmap entries for browser builds
   IMPORTMAP_ENTRIES = {
     'dexie' => { 'dexie' => '/node_modules/dexie/dist/dexie.mjs' },
@@ -392,8 +400,9 @@ class SelfhostBuilder
     # Base path for assets - '/dist' when serving from app root, '' when serving from dist/
     base_path = options[:base_path] || '/dist'
 
-    # Build importmap
-    importmap_entries = IMPORTMAP_ENTRIES[database] || IMPORTMAP_ENTRIES['dexie']
+    # Build importmap - merge common entries with database-specific entries
+    db_entries = IMPORTMAP_ENTRIES[database] || IMPORTMAP_ENTRIES['dexie']
+    importmap_entries = COMMON_IMPORTMAP_ENTRIES.merge(db_entries)
     importmap = {
       'imports' => importmap_entries
     }
@@ -440,8 +449,9 @@ class SelfhostBuilder
           <main class="#{main_class}" id="content"></main>
         </div>
         <script type="module">
-          import { Application, routes } from '#{base_path}/config/routes.js';
-          window.routes = routes;
+          import * as Turbo from '@hotwired/turbo';
+          import { Application } from '#{base_path}/config/routes.js';
+          window.Turbo = Turbo;
           Application.start();
         </script>
       </body>
@@ -1106,6 +1116,10 @@ class SelfhostBuilder
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>\${title}</title>
         #{css_link}
+        <script type="module">
+          import * as Turbo from '/node_modules/@hotwired/turbo/dist/turbo.es2017-esm.js';
+          window.Turbo = Turbo;
+        </script>
       </head>
       <body>
         <main class="container mx-auto px-4 py-8">

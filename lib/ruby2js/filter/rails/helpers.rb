@@ -176,7 +176,7 @@ module Ruby2JS
           process_block_helper(helper_name, helper_call, block_args, block_body)
         end
 
-        # Process link_to helper into anchor tag with navigate
+        # Process link_to helper into anchor tag (Turbo handles navigation)
         def process_link_to(args)
           text_node = args[0]
           path_node = args[1]
@@ -378,52 +378,25 @@ module Ruby2JS
           # Build static class attribute string
           class_attr = css_class ? " class=\"#{css_class}\"" : ""
 
-          if self.browser_target?()
-            # Browser target - SPA navigation with onclick handlers
-            if text_node.type == :str && path_node.type == :str
-              text_str = text_node.children[0]
-              path_str = path_node.children[0]
-              s(:str, "<a href=\"#{path_str}\"#{class_attr} onclick=\"return navigate(event, '#{path_str}')\">#{text_str}</a>")
-            elsif text_node.type == :str
-              text_str = text_node.children[0]
-              s(:dstr,
-                s(:str, '<a href="'),
-                s(:begin, path_expr),
-                s(:str, "\"#{class_attr} onclick=\"return navigate(event, '"),
-                s(:begin, path_expr),
-                s(:str, "')\">#{text_str}</a>"))
-            else
-              text_expr = process(text_node)
-              s(:dstr,
-                s(:str, '<a href="'),
-                s(:begin, path_expr),
-                s(:str, "\"#{class_attr} onclick=\"return navigate(event, '"),
-                s(:begin, path_expr),
-                s(:str, "')\">"),
-                s(:begin, text_expr),
-                s(:str, '</a>'))
-            end
+          # Generate standard href links - Turbo Drive intercepts clicks automatically
+          if text_node.type == :str && path_node.type == :str
+            text_str = text_node.children[0]
+            path_str = path_node.children[0]
+            s(:str, "<a href=\"#{path_str}\"#{class_attr}>#{text_str}</a>")
+          elsif text_node.type == :str
+            text_str = text_node.children[0]
+            s(:dstr,
+              s(:str, '<a href="'),
+              s(:begin, path_expr),
+              s(:str, "\"#{class_attr}>#{text_str}</a>"))
           else
-            # Node target - traditional href links
-            if text_node.type == :str && path_node.type == :str
-              text_str = text_node.children[0]
-              path_str = path_node.children[0]
-              s(:str, "<a href=\"#{path_str}\"#{class_attr}>#{text_str}</a>")
-            elsif text_node.type == :str
-              text_str = text_node.children[0]
-              s(:dstr,
-                s(:str, '<a href="'),
-                s(:begin, path_expr),
-                s(:str, "\"#{class_attr}>#{text_str}</a>"))
-            else
-              text_expr = process(text_node)
-              s(:dstr,
-                s(:str, '<a href="'),
-                s(:begin, path_expr),
-                s(:str, "\"#{class_attr}>"),
-                s(:begin, text_expr),
-                s(:str, '</a>'))
-            end
+            text_expr = process(text_node)
+            s(:dstr,
+              s(:str, '<a href="'),
+              s(:begin, path_expr),
+              s(:str, "\"#{class_attr}>"),
+              s(:begin, text_expr),
+              s(:str, '</a>'))
           end
         end
 
@@ -458,64 +431,34 @@ module Ruby2JS
           text_str = text_node.type == :str ? text_node.children[0] : nil
           text_expr = text_str ? nil : process(text_node)
 
-          if self.browser_target?()
-            # Browser target - SPA navigation with onclick handlers
-            if text_str && path_node.type == :str
-              path_str = path_node.children[0]
-              s(:dstr,
-                s(:str, "<a href=\"#{path_str}\" class=\""),
-                s(:begin, class_expr),
-                s(:str, "\" onclick=\"return navigate(event, '#{path_str}')\">#{text_str}</a>"))
-            elsif text_str
-              s(:dstr,
-                s(:str, '<a href="'),
-                s(:begin, path_expr),
-                s(:str, '" class="'),
-                s(:begin, class_expr),
-                s(:str, "\" onclick=\"return navigate(event, '"),
-                s(:begin, path_expr),
-                s(:str, "')\">#{text_str}</a>"))
-            else
-              s(:dstr,
-                s(:str, '<a href="'),
-                s(:begin, path_expr),
-                s(:str, '" class="'),
-                s(:begin, class_expr),
-                s(:str, "\" onclick=\"return navigate(event, '"),
-                s(:begin, path_expr),
-                s(:str, "')\">"),
-                s(:begin, text_expr),
-                s(:str, '</a>'))
-            end
+          # Generate standard href links - Turbo Drive intercepts clicks automatically
+          if text_str && path_node.type == :str
+            path_str = path_node.children[0]
+            s(:dstr,
+              s(:str, "<a href=\"#{path_str}\" class=\""),
+              s(:begin, class_expr),
+              s(:str, "\">#{text_str}</a>"))
+          elsif text_str
+            s(:dstr,
+              s(:str, '<a href="'),
+              s(:begin, path_expr),
+              s(:str, '" class="'),
+              s(:begin, class_expr),
+              s(:str, "\">#{text_str}</a>"))
           else
-            # Node target - traditional href links
-            if text_str && path_node.type == :str
-              path_str = path_node.children[0]
-              s(:dstr,
-                s(:str, "<a href=\"#{path_str}\" class=\""),
-                s(:begin, class_expr),
-                s(:str, "\">#{text_str}</a>"))
-            elsif text_str
-              s(:dstr,
-                s(:str, '<a href="'),
-                s(:begin, path_expr),
-                s(:str, '" class="'),
-                s(:begin, class_expr),
-                s(:str, "\">#{text_str}</a>"))
-            else
-              s(:dstr,
-                s(:str, '<a href="'),
-                s(:begin, path_expr),
-                s(:str, '" class="'),
-                s(:begin, class_expr),
-                s(:str, '">'),
-                s(:begin, text_expr),
-                s(:str, '</a>'))
-            end
+            s(:dstr,
+              s(:str, '<a href="'),
+              s(:begin, path_expr),
+              s(:str, '" class="'),
+              s(:begin, class_expr),
+              s(:str, '">'),
+              s(:begin, text_expr),
+              s(:str, '</a>'))
           end
         end
 
-        # Build a delete link with confirmation
+        # Build a delete link with confirmation using Turbo data attributes
+        # Turbo intercepts the link click and sends DELETE request automatically
         def build_delete_link(text_node, path_node, confirm_msg, css_class = nil)
           # Handle model object as path: link_to "Delete", @article, method: :delete
           if path_node.type == :ivar
@@ -544,77 +487,31 @@ module Ruby2JS
           end
           confirm_str = confirm_msg ? confirm_msg.children[0] : 'Are you sure?'
 
-          # Build class attribute - use provided class or default styling
+          # Build class attribute
           class_attr = css_class ? " class=\"#{css_class}\"" : ""
-          style_attr = css_class ? "" : " style=\"color: red; cursor: pointer;\""
 
-          if self.browser_target?()
-            text_str = text_node.type == :str ? text_node.children[0] : nil
+          # Build Turbo data attributes for delete method and confirmation
+          turbo_attrs = " data-turbo-method=\"delete\" data-turbo-confirm=\"#{confirm_str}\""
 
-            if path_node&.type == :send && path_node.children[0].nil?
-              path_helper = path_node.children[1].to_s
-              path_args = path_node.children[2..-1]
-              base_name = path_helper.sub(/_path$/, '')
+          text_str = text_node.type == :str ? text_node.children[0] : nil
 
-              if path_args.length == 2
-                # Nested resource: comment_path(@article, comment)
-                parent_arg = path_args[0]
-                child_arg = path_args[1]
-                parent_name = parent_arg.type == :ivar ? parent_arg.children.first.to_s.sub(/^@/, '') : 'parent'
-                route_name = "#{parent_name}_#{base_name}"
-
-                return s(:dstr,
-                  s(:str, "<a href=\"#\"#{class_attr}#{style_attr} onclick=\"if(confirm('#{confirm_str}')) { routes.#{route_name}.delete("),
-                  s(:begin, s(:attr, s(:lvar, parent_name.to_sym), :id)),
-                  s(:str, ", "),
-                  s(:begin, s(:attr, process(child_arg), :id)),
-                  s(:str, ") } return false;\">#{text_str || 'Delete'}</a>"))
-              elsif path_args.length == 1
-                arg = path_args.first
-                model_name = arg.type == :ivar ? arg.children.first.to_s.sub(/^@/, '') : nil
-
-                if model_name
-                  return s(:dstr,
-                    s(:str, "<a href=\"#\"#{class_attr}#{style_attr} onclick=\"if(confirm('#{confirm_str}')) { routes.#{base_name}.delete("),
-                    s(:begin, s(:attr, s(:lvar, model_name.to_sym), :id)),
-                    s(:str, ") } return false;\">#{text_str || 'Delete'}</a>"))
-                end
-              end
-            end
-
-            # Fallback
-            if text_str
-              s(:str, "<a href=\"#\"#{class_attr} onclick=\"if(confirm('#{confirm_str}')) { /* delete */ } return false;\">#{text_str}</a>")
-            else
-              text_expr = process(text_node)
-              s(:dstr,
-                s(:str, "<a href=\"#\"#{class_attr} onclick=\"if(confirm('#{confirm_str}')) { /* delete */ } return false;\">"),
-                s(:begin, text_expr),
-                s(:str, '</a>'))
-            end
+          # Generate link with Turbo data attributes - Turbo handles the DELETE request
+          if text_str && path_node.type == :str
+            path_str = path_node.children[0]
+            s(:str, "<a href=\"#{path_str}\"#{class_attr}#{turbo_attrs}>#{text_str}</a>")
+          elsif text_str
+            s(:dstr,
+              s(:str, '<a href="'),
+              s(:begin, path_expr),
+              s(:str, "\"#{class_attr}#{turbo_attrs}>#{text_str}</a>"))
           else
-            # Node target - form-based delete with onclick confirm (works without Turbo)
-            button_class = css_class ? " class=\"#{css_class}\"" : ""
-            onclick_confirm = " onclick=\"return confirm('#{confirm_str}')\""
-            if text_node.type == :str && path_node.type == :str
-              text_str = text_node.children[0]
-              path_str = path_node.children[0]
-              s(:str, "<form method=\"post\" action=\"#{path_str}\" style=\"display:inline\"><input type=\"hidden\" name=\"_method\" value=\"delete\"><button type=\"submit\"#{button_class}#{onclick_confirm}>#{text_str}</button></form>")
-            elsif text_node.type == :str
-              text_str = text_node.children[0]
-              s(:dstr,
-                s(:str, '<form method="post" action="'),
-                s(:begin, path_expr),
-                s(:str, "\" style=\"display:inline\"><input type=\"hidden\" name=\"_method\" value=\"delete\"><button type=\"submit\"#{button_class}#{onclick_confirm}>#{text_str}</button></form>"))
-            else
-              text_expr = process(text_node)
-              s(:dstr,
-                s(:str, '<form method="post" action="'),
-                s(:begin, path_expr),
-                s(:str, "\" style=\"display:inline\"><input type=\"hidden\" name=\"_method\" value=\"delete\"><button type=\"submit\"#{button_class}#{onclick_confirm}>"),
-                s(:begin, text_expr),
-                s(:str, '</button></form>'))
-            end
+            text_expr = process(text_node)
+            s(:dstr,
+              s(:str, '<a href="'),
+              s(:begin, path_expr),
+              s(:str, "\"#{class_attr}#{turbo_attrs}>"),
+              s(:begin, text_expr),
+              s(:str, '</a>'))
           end
         end
 
@@ -669,131 +566,48 @@ module Ruby2JS
           end
         end
 
-        # Build a delete button (form with onclick handler for SPA)
+        # Build a delete button using Turbo-compatible form
+        # Turbo intercepts the form submission and handles the DELETE request
         def build_delete_button(text_str, path_node, confirm_str, css_class = nil, form_class = nil)
           # Build class attributes
           btn_class_attr = css_class ? " class=\"#{css_class}\"" : ""
           form_class_attr = form_class ? " class=\"#{form_class}\"" : ""
           form_style = form_class ? "" : " style=\"display:inline\""
 
-          if self.browser_target?()
-            # Browser target - onclick handler
-            if path_node&.type == :send && path_node.children[0].nil?
-              path_helper = path_node.children[1].to_s
-              path_args = path_node.children[2..-1]
-              base_name = path_helper.sub(/_path$/, '')
-
-              if path_args.length == 1
-                arg = path_args.first
-                model_name = arg.type == :ivar ? arg.children.first.to_s.sub(/^@/, '') : nil
-
-                if model_name
-                  return s(:dstr,
-                    s(:str, "<form#{form_class_attr}#{form_style}><button type=\"button\"#{btn_class_attr} onclick=\"if(confirm('#{confirm_str}')) { routes.#{base_name}.delete("),
-                    s(:begin, s(:attr, s(:lvar, model_name.to_sym), :id)),
-                    s(:str, ") }\">#{text_str}</button></form>"))
-                end
-              elsif path_args.length == 2
-                # Nested resource
-                parent_arg = path_args[0]
-                child_arg = path_args[1]
-                parent_name = parent_arg.type == :ivar ? parent_arg.children.first.to_s.sub(/^@/, '') : 'parent'
-                route_name = "#{parent_name}_#{base_name}"
-
-                return s(:dstr,
-                  s(:str, "<form#{form_class_attr}#{form_style}><button type=\"button\"#{btn_class_attr} onclick=\"if(confirm('#{confirm_str}')) { routes.#{route_name}.delete("),
-                  s(:begin, s(:attr, s(:lvar, parent_name.to_sym), :id)),
-                  s(:str, ", "),
-                  s(:begin, s(:attr, process(child_arg), :id)),
-                  s(:str, ") }\">#{text_str}</button></form>"))
-              end
-            end
-
-            # Handle @model directly (not path helper)
-            if path_node&.type == :ivar
-              model_name = path_node.children.first.to_s.sub(/^@/, '')
-              return s(:dstr,
-                s(:str, "<form#{form_class_attr}#{form_style}><button type=\"button\"#{btn_class_attr} onclick=\"if(confirm('#{confirm_str}')) { routes.#{model_name}.delete("),
-                s(:begin, s(:attr, s(:lvar, model_name.to_sym), :id)),
-                s(:str, ") }\">#{text_str}</button></form>"))
-            end
-
-            # Handle lvar (local variable like article from a loop)
-            if path_node&.type == :lvar
-              model_name = path_node.children.first.to_s
-              return s(:dstr,
-                s(:str, "<form#{form_class_attr}#{form_style}><button type=\"button\"#{btn_class_attr} onclick=\"if(confirm('#{confirm_str}')) { routes.#{model_name}.delete("),
-                s(:begin, s(:attr, s(:lvar, model_name.to_sym), :id)),
-                s(:str, ") }\">#{text_str}</button></form>"))
-            end
-
-            # Handle array (nested resource like [@article, comment])
-            if path_node&.type == :array && path_node.children.length == 2
-              parent_node = path_node.children[0]
-              child_node = path_node.children[1]
-
-              # Extract parent name
-              parent_name = case parent_node.type
-                when :ivar then parent_node.children.first.to_s.sub(/^@/, '')
-                when :lvar then parent_node.children.first.to_s
-                when :send then parent_node.children[0].nil? ? parent_node.children[1].to_s : nil
-                else nil
-              end
-
-              # Extract child name for route
-              child_name = case child_node.type
-                when :ivar then child_node.children.first.to_s.sub(/^@/, '')
-                when :lvar then child_node.children.first.to_s
-                when :send then child_node.children[0].nil? ? child_node.children[1].to_s : nil
-                else nil
-              end
-
-              if parent_name && child_name
-                route_name = "#{parent_name}_#{child_name}"
-                return s(:dstr,
-                  s(:str, "<form#{form_class_attr}#{form_style}><button type=\"button\"#{btn_class_attr} onclick=\"if(confirm('#{confirm_str}')) { routes.#{route_name}.delete("),
-                  s(:begin, s(:attr, s(:lvar, parent_name.to_sym), :id)),
-                  s(:str, ", "),
-                  s(:begin, s(:attr, s(:lvar, child_name.to_sym), :id)),
-                  s(:str, ") }\">#{text_str}</button></form>"))
-              end
-            end
-
-            # Fallback
-            s(:str, "<form#{form_class_attr}#{form_style}><button type=\"button\"#{btn_class_attr} onclick=\"if(confirm('#{confirm_str}')) { /* delete */ }\">#{text_str}</button></form>")
+          # Convert model object to path helper call
+          if path_node&.type == :lvar
+            model_name = path_node.children.first.to_s
+            path_helper = "#{model_name}_path".to_sym
+            @erb_path_helpers << path_helper unless @erb_path_helpers.include?(path_helper)
+            path_expr = s(:send, nil, path_helper, path_node)
+          elsif path_node&.type == :ivar
+            model_name = path_node.children.first.to_s.sub(/^@/, '')
+            path_helper = "#{model_name}_path".to_sym
+            @erb_path_helpers << path_helper unless @erb_path_helpers.include?(path_helper)
+            # In ERB context, ivars are passed as locals
+            path_expr = s(:send, nil, path_helper, s(:lvar, model_name.to_sym))
+          elsif path_node&.type == :array && path_node.children.length == 2
+            # Nested resource: [@article, comment] -> comment_path(article, comment)
+            parent, child = path_node.children
+            child_name = child.type == :ivar ? child.children.first.to_s.sub(/^@/, '') : child.children.first.to_s
+            path_helper = "#{child_name}_path".to_sym
+            @erb_path_helpers << path_helper unless @erb_path_helpers.include?(path_helper)
+            # Convert ivars to lvars for ERB context
+            parent_arg = parent.type == :ivar ? s(:lvar, parent.children.first.to_s.sub(/^@/, '').to_sym) : parent
+            child_arg = child.type == :ivar ? s(:lvar, child.children.first.to_s.sub(/^@/, '').to_sym) : child
+            path_expr = s(:send, nil, path_helper, parent_arg, child_arg)
           else
-            # Node target - form-based delete
-            # Convert model object to path helper call
-            if path_node&.type == :lvar
-              model_name = path_node.children.first.to_s
-              path_helper = "#{model_name}_path".to_sym
-              @erb_path_helpers << path_helper unless @erb_path_helpers.include?(path_helper)
-              path_expr = s(:send, nil, path_helper, path_node)
-            elsif path_node&.type == :ivar
-              model_name = path_node.children.first.to_s.sub(/^@/, '')
-              path_helper = "#{model_name}_path".to_sym
-              @erb_path_helpers << path_helper unless @erb_path_helpers.include?(path_helper)
-              # In ERB context, ivars are passed as locals
-              path_expr = s(:send, nil, path_helper, s(:lvar, model_name.to_sym))
-            elsif path_node&.type == :array && path_node.children.length == 2
-              # Nested resource: [@article, comment] -> comment_path(article, comment)
-              parent, child = path_node.children
-              child_name = child.type == :ivar ? child.children.first.to_s.sub(/^@/, '') : child.children.first.to_s
-              path_helper = "#{child_name}_path".to_sym
-              @erb_path_helpers << path_helper unless @erb_path_helpers.include?(path_helper)
-              # Convert ivars to lvars for ERB context
-              parent_arg = parent.type == :ivar ? s(:lvar, parent.children.first.to_s.sub(/^@/, '').to_sym) : parent
-              child_arg = child.type == :ivar ? s(:lvar, child.children.first.to_s.sub(/^@/, '').to_sym) : child
-              path_expr = s(:send, nil, path_helper, parent_arg, child_arg)
-            else
-              path_expr = process(path_node)
-            end
-            onclick_confirm = " onclick=\"return confirm('#{confirm_str}')\""
-            s(:dstr,
-              s(:str, "<form method=\"post\" action=\""),
-              s(:begin, path_expr),
-              s(:str, "\"#{form_class_attr}#{form_style}><input type=\"hidden\" name=\"_method\" value=\"delete\"><button type=\"submit\"#{btn_class_attr}#{onclick_confirm}>#{text_str}</button></form>"))
+            path_expr = process(path_node)
           end
+
+          # Use data-turbo-confirm for confirmation dialog
+          turbo_confirm = " data-turbo-confirm=\"#{confirm_str}\""
+
+          # Generate form with action and method - Turbo handles the submission
+          s(:dstr,
+            s(:str, "<form method=\"post\" action=\""),
+            s(:begin, path_expr),
+            s(:str, "\"#{form_class_attr}#{form_style}#{turbo_confirm}><input type=\"hidden\" name=\"_method\" value=\"delete\"><button type=\"submit\"#{btn_class_attr}>#{text_str}</button></form>"))
         end
 
         # Build a regular form button
@@ -1384,54 +1198,9 @@ module Ruby2JS
           # Build class attribute string
           class_attr = css_class ? " class=\"#{css_class}\"" : ""
 
-          # Build form tag - add onsubmit handler for browser/SPA target
-          if model_name && self.browser_target?()
-            plural_name = model_name + 's'  # Simple pluralization
-            # For nested resources (e.g., [@article, Comment.new]), use parent_child route name
-            route_name = parent_model_name ? "#{parent_model_name}_#{plural_name}" : plural_name
-
-            if model_is_new
-              # New model - always POST, no ID check needed
-              if parent_model_name
-                # Nested resource: routes.article_comments.post(event, article.id)
-                statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
-                  s(:dstr,
-                    s(:str, "<form data-model=\"#{model_name}\"#{class_attr} onsubmit=\"return routes.#{route_name}.post(event, "),
-                    s(:begin, s(:attr, s(:lvar, parent_model_name.to_sym), :id)),
-                    s(:str, ")\">")))
-              else
-                statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
-                  s(:str, "<form data-model=\"#{model_name}\"#{class_attr} onsubmit=\"return routes.#{route_name}.post(event)\">"))
-              end
-            else
-              # Existing model - check ID to determine POST vs PATCH
-              singular_route = parent_model_name ? "#{parent_model_name}_#{model_name}" : model_name
-              if parent_model_name
-                # Nested resource: routes.article_comment.patch(event, article.id, comment.id)
-                statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
-                  s(:dstr,
-                    s(:str, "<form data-model=\"#{model_name}\"#{class_attr} onsubmit=\"return ("),
-                    s(:begin, s(:attr, s(:lvar, model_name.to_sym), :id)),
-                    s(:str, " ? routes.#{singular_route}.patch(event, "),
-                    s(:begin, s(:attr, s(:lvar, parent_model_name.to_sym), :id)),
-                    s(:str, ", "),
-                    s(:begin, s(:attr, s(:lvar, model_name.to_sym), :id)),
-                    s(:str, ") : routes.#{route_name}.post(event, "),
-                    s(:begin, s(:attr, s(:lvar, parent_model_name.to_sym), :id)),
-                    s(:str, "))\">")))
-              else
-                # Generate: <form onsubmit="return (model.id ? routes.model.patch(event, model.id) : routes.models.post(event))">
-                statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
-                  s(:dstr,
-                    s(:str, "<form data-model=\"#{model_name}\"#{class_attr} onsubmit=\"return ("),
-                    s(:begin, s(:attr, s(:lvar, model_name.to_sym), :id)),
-                    s(:str, " ? routes.#{model_name}.patch(event, "),
-                    s(:begin, s(:attr, s(:lvar, model_name.to_sym), :id)),
-                    s(:str, ") : routes.#{route_name}.post(event))\">")))
-              end
-            end
-          elsif model_name
-            # Server target - form with action and method using path helpers
+          # Build form tag with action and method - Turbo intercepts form submissions automatically
+          if model_name
+            # Form with action and method using path helpers
             plural_name = model_name + 's'  # Simple pluralization
             singular_path = :"#{model_name}_path"   # :article_path
             plural_path = :"#{plural_name}_path"    # :articles_path
@@ -1527,11 +1296,8 @@ module Ruby2JS
 
           statements = []
 
-          if self.browser_target?()
-            statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+, build_browser_form_tag(path_node, http_method))
-          else
-            statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+, build_server_form_tag(path_node, http_method))
-          end
+          # Generate standard form with action/method - Turbo intercepts submissions automatically
+          statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+, build_server_form_tag(path_node, http_method))
 
           if block_body
             if block_body.type == :begin
@@ -1550,48 +1316,7 @@ module Ruby2JS
           s(:begin, *statements.compact)
         end
 
-        # Build browser form tag with onsubmit handler
-        def build_browser_form_tag(path_node, http_method)
-          if path_node&.type == :send && path_node.children[0].nil?
-            path_helper = path_node.children[1].to_s
-            path_args = path_node.children[2..-1]
-            base_name = path_helper.sub(/_path$/, '')
-
-            if path_args.empty?
-              s(:str, "<form onsubmit=\"return routes.#{base_name}.#{http_method}(event)\">\n")
-            else
-              arg = path_args.first
-
-              if base_name.end_with?('s') && path_args.length == 1
-                if arg.type == :ivar
-                  parent_name = arg.children.first.to_s.sub(/^@/, '')
-                  route_name = "#{parent_name}_#{base_name}"
-                else
-                  route_name = "article_#{base_name}"
-                end
-              else
-                route_name = base_name
-              end
-
-              if arg.type == :ivar
-                model_name = arg.children.first.to_s.sub(/^@/, '')
-                s(:dstr,
-                  s(:str, "<form onsubmit=\"return routes.#{route_name}.#{http_method}(event, "),
-                  s(:begin, s(:attr, s(:lvar, model_name.to_sym), :id)),
-                  s(:str, ")\">\n"))
-              else
-                s(:dstr,
-                  s(:str, "<form onsubmit=\"return routes.#{route_name}.#{http_method}(event, "),
-                  s(:begin, process(arg)),
-                  s(:str, ")\">\n"))
-              end
-            end
-          else
-            s(:str, "<form>\n")
-          end
-        end
-
-        # Build server form tag with action attribute
+        # Build form tag with action attribute - Turbo intercepts submissions automatically
         def build_server_form_tag(path_node, http_method)
           path_expr = process(path_node)
           actual_method = (http_method == :get || http_method == :post) ? http_method : :post
