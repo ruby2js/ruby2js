@@ -30,12 +30,16 @@ module Ruby2JS
       def on_class(node)
         cname, inheritance, *body = node.children
         return super unless inheritance == s(:const, nil, :Stimulus) or
+          inheritance == s(:const, nil, :Controller) or
           inheritance == s(:const, s(:const, nil, :Stimulus), :Controller) or
           inheritance == s(:send, s(:const, nil, :Stimulus), :Controller) or
           @stim_subclasses.include? @namespace.resolve(inheritance)
 
-        # Always extend Controller directly (named import style)
-        unless inheritance == s(:const, nil, :Controller)
+        # Normalize Stimulus/Stimulus::Controller/Stimulus.Controller to just Controller
+        # But preserve inheritance from known subclasses (e.g., DemoController)
+        if inheritance == s(:const, nil, :Stimulus) or
+           inheritance == s(:const, s(:const, nil, :Stimulus), :Controller) or
+           inheritance == s(:send, s(:const, nil, :Stimulus), :Controller)
           node = node.updated(nil, [node.children.first,
             s(:const, nil, :Controller),
             *node.children[2..-1]])
