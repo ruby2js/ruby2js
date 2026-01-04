@@ -246,45 +246,9 @@ The `TurboBroadcaster` class handles:
 - Broadcasting to subscribers
 - Hibernation for cost efficiency
 
-## Chat Demo
+## Demo
 
-A complete chat room demo showcases real-time Turbo Streams broadcasting:
-
-```bash
-# Create the app
-curl -sL https://raw.githubusercontent.com/ruby2js/ruby2js/master/test/chat/create-chat | bash -s chat
-cd chat
-```
-
-Run in the browser with IndexedDB:
-
-```bash
-bin/juntos dev -d dexie
-```
-
-Run on Node.js with SQLite:
-
-```bash
-bin/juntos migrate -d sqlite
-bin/juntos server -d sqlite
-```
-
-Deploy to Cloudflare with D1:
-
-```bash
-wrangler d1 create chat
-echo "D1_DATABASE_ID=your-id-here" >> .env.local
-bin/juntos migrate -d d1
-bin/juntos deploy -d d1
-```
-
-Open multiple browser tabs, send messages, and watch them appear everywhere.
-
-The demo showcases:
-- Turbo Streams broadcasting (`broadcast_append_to`, `broadcast_remove_to`)
-- Stimulus controller for auto-scroll (written in Ruby)
-- `turbo_stream_from` subscription
-- `respond_to` with format negotiation
+See the [Chat Demo](/docs/juntos/demos/chat) for a complete example of Turbo Streams broadcasting, Stimulus controllers in Ruby, and real-time features across platforms.
 
 ## Limitations
 

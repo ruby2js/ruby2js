@@ -111,17 +111,18 @@ Hono is more Sinatra than Rails—lightweight routing without opinions about mod
 
 Two demo applications show Juntos in action:
 
-| Demo | What You Learn | Create With |
-|------|---------------|-------------|
-| **[Blog](/docs/juntos/getting-started)** | CRUD operations, multi-platform deployment | `curl .../create-blog \| bash` |
-| **[Chat](/docs/juntos/hotwire#chat-demo)** | Real-time broadcasting, Stimulus controllers | `curl .../create-chat \| bash` |
+| Demo | What You Learn |
+|------|---------------|
+| **[Blog](/docs/juntos/demos/blog)** | CRUD operations, associations, validations, multi-platform deployment |
+| **[Chat](/docs/juntos/demos/chat)** | Real-time Turbo Streams, Stimulus controllers in Ruby, WebSocket broadcasting |
 
-Both demos run on browser (IndexedDB), Node.js (SQLite), and Cloudflare (D1) from the same code.
+Both demos run on browser (IndexedDB), Node.js (SQLite), and Cloudflare (D1) from the same code. See [Demo Applications](/docs/juntos/demos/) for the full list and walkthroughs.
 
 ## Next Steps
 
-- **[Getting Started](/docs/juntos/getting-started)** — Build a blog app in 10 minutes
+- **[Getting Started](/docs/juntos/getting-started)** — Install and run your first app
+- **[Demo Applications](/docs/juntos/demos/)** — Hands-on examples
 - **[Hotwire](/docs/juntos/hotwire)** — Real-time features and Stimulus controllers
 - **[CLI Reference](/docs/juntos/cli)** — The `juntos` commands
 - **[Architecture](/docs/juntos/architecture)** — What gets generated and how it works
-- **[Deployment](/docs/juntos/deploying/browser)** — Deploy to any target
+- **[Deployment](/docs/juntos/deploying/)** — Deploy to any target
