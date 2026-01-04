@@ -252,6 +252,7 @@ export class ActiveRecord extends ActiveRecordBase {
     db.run(`DELETE FROM ${this.constructor.tableName} WHERE id = ?`, [this.id]);
     this._persisted = false;
     console.log(`  ${this.constructor.name} Destroy (id: ${this.id})`);
+    await this._runCallbacks('after_destroy_commit');
     return true;
   }
 

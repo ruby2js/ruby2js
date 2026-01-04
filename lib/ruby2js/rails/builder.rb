@@ -1035,48 +1035,73 @@ class SelfhostBuilder
   end
 
   def transpile_erb_directory()
-    erb_dir = File.join(DEMO_ROOT, 'app/views/articles')
-    return unless Dir.exist?(erb_dir)
+    views_root = File.join(DEMO_ROOT, 'app/views')
+    return unless Dir.exist?(views_root)
 
-    renders = {}
-    Dir.glob(File.join(erb_dir, '**/*.html.erb')).each do |src_path|
-      basename = File.basename(src_path, '.html.erb')
-      # Output individual view files to app/views/articles/
-      js = self.transpile_erb_file(src_path, File.join(@dist_dir, 'app/views/articles', "#{basename}.js"))
-      renders[basename] = js
+    # Find all resource directories (exclude layouts, pwa, and partials)
+    excluded_dirs = %w[layouts pwa]
+    resource_dirs = Dir.children(views_root).select do |name|
+      path = File.join(views_root, name)
+      File.directory?(path) && !excluded_dirs.include?(name) && !name.start_with?('_')
     end
 
-    # Create a combined module that exports all render functions
-    # This goes in app/views/articles.js (not inside articles/ to avoid conflicts)
+    return if resource_dirs.empty?
+
+    views_dist_dir = File.join(@dist_dir, 'app/views')
+    FileUtils.mkdir_p(views_dist_dir)
+
+    resource_dirs.each do |resource|
+      transpile_resource_views(resource, views_root, views_dist_dir)
+    end
+  end
+
+  def transpile_resource_views(resource, views_root, views_dist_dir)
+    erb_dir = File.join(views_root, resource)
+    erb_files = Dir.glob(File.join(erb_dir, '*.html.erb'))
+    return if erb_files.empty?
+
+    # Create resource subdirectory in dist
+    resource_dist_dir = File.join(views_dist_dir, resource)
+    FileUtils.mkdir_p(resource_dist_dir)
+
+    # Transpile each ERB file
+    erb_files.each do |src_path|
+      basename = File.basename(src_path, '.html.erb')
+      self.transpile_erb_file(src_path, File.join(resource_dist_dir, "#{basename}.js"))
+    end
+
+    # Create combined module that exports all render functions
+    # Convert resource name to class-like name (messages -> Message, articles -> Article)
+    class_name = resource.chomp('s').split('_').map(&:capitalize).join
+    views_class = "#{class_name}Views"
+
     erb_views_js = <<~JS
-      // Article views - auto-generated from .html.erb templates
-      // Each exported function is a render function that takes { article } or { articles }
+      // #{class_name} views - auto-generated from .html.erb templates
+      // Each exported function is a render function that takes { #{resource.chomp('s')} } or { #{resource} }
 
     JS
 
     render_exports = []
-    Dir.glob(File.join(erb_dir, '*.html.erb')).sort.each do |erb_path|
+    has_new = false
+    erb_files.sort.each do |erb_path|
       name = File.basename(erb_path, '.html.erb')
-      # Import from ./articles/ subdirectory
-      erb_views_js += "import { render as #{name}_render } from './articles/#{name}.js';\n"
+      has_new = true if name == 'new'
+      # Import from ./#{resource}/ subdirectory
+      erb_views_js += "import { render as #{name}_render } from './#{resource}/#{name}.js';\n"
       render_exports << "#{name}: #{name}_render"
     end
 
     erb_views_js += <<~JS
 
-      // Export ArticleViews - method names match controller action names
-      export const ArticleViews = {
-        #{render_exports.join(",\n  ")},
-        // $new alias for 'new' (JS reserved word handling)
-        $new: new_render
+      // Export #{views_class} - method names match controller action names
+      export const #{views_class} = {
+        #{render_exports.join(",\n  ")}#{has_new ? ",\n  // $new alias for 'new' (JS reserved word handling)\n  $new: new_render" : ''}
       };
     JS
 
-    # Write combined module to app/views/articles.js
-    views_dir = File.join(@dist_dir, 'app/views')
-    FileUtils.mkdir_p(views_dir)
-    File.write(File.join(views_dir, 'articles.js'), erb_views_js)
-    puts("  -> app/views/articles.js (combined ERB module)")
+    # Write combined module to app/views/#{resource}.js
+    File.write(File.join(views_dist_dir, "#{resource}.js"), erb_views_js)
+    puts("  -> app/views/#{resource}.js (combined ERB module)")
   end
 
   def transpile_layout()

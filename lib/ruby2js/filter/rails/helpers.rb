@@ -1,4 +1,5 @@
 require 'ruby2js'
+require 'ruby2js/inflector'
 
 module Ruby2JS
   module Filter
@@ -132,6 +133,12 @@ module Ruby2JS
           # Track path helper usage for imports (e.g., article_path, new_article_path)
           if target.nil? && method.to_s.end_with?('_path') && @erb_bufvar
             @erb_path_helpers << method unless @erb_path_helpers.include?(method)
+          end
+
+          # Handle turbo_stream_from helper - subscribes to broadcast channel
+          # turbo_stream_from "chat_room" -> TurboBroadcast.subscribe("chat_room")
+          if target.nil? && method == :turbo_stream_from && args.length >= 1
+            return process_turbo_stream_from(args)
           end
 
           super
@@ -666,6 +673,21 @@ module Ruby2JS
           end
         end
 
+        # Process turbo_stream_from helper - subscribes to broadcast channel
+        # turbo_stream_from "chat_room" -> TurboBroadcast.subscribe("chat_room") || ""
+        # Returns empty string since subscription is a side effect
+        def process_turbo_stream_from(args)
+          @erb_view_helpers << :TurboBroadcast unless @erb_view_helpers.include?(:TurboBroadcast)
+
+          channel_node = process(args[0])
+
+          # subscribe returns the channel object, so use || "" to return empty string
+          # TurboBroadcast.subscribe("...") || ""
+          s(:or,
+            s(:send, s(:const, nil, :TurboBroadcast), :subscribe, channel_node),
+            s(:str, ''))
+        end
+
         # Process dom_id helper
         # dom_id(article) -> dom_id(article)
         # dom_id(article, :edit) -> dom_id(article, "edit")
@@ -774,15 +796,25 @@ module Ruby2JS
 
           elsif first_arg.type == :ivar
             # render @article -> renders _article partial with article: @article
+            # render @messages -> renders _message partial for each item (collection)
             ivar_name = first_arg.children[0].to_s.sub(/^@/, '')
-            partial_name = ivar_name
-            locals[ivar_name.to_sym] = first_arg
+            partial_name = singularize_partial_name(ivar_name)
+            is_collection = (partial_name != ivar_name)
+            collection_var = first_arg
+            singular_name = partial_name.to_sym
+            locals[singular_name] = s(:lvar, singular_name) if is_collection
+            locals[ivar_name.to_sym] = first_arg unless is_collection
 
           elsif first_arg.type == :lvar
             # render article -> renders _article partial with article: article
+            # render messages -> renders _message partial for each item (collection)
             var_name = first_arg.children[0].to_s
-            partial_name = var_name
-            locals[var_name.to_sym] = first_arg
+            partial_name = singularize_partial_name(var_name)
+            is_collection = (partial_name != var_name)
+            collection_var = first_arg
+            singular_name = partial_name.to_sym
+            locals[singular_name] = s(:lvar, singular_name) if is_collection
+            locals[var_name.to_sym] = first_arg unless is_collection
           end
 
           return nil unless partial_name
@@ -794,18 +826,38 @@ module Ruby2JS
           module_name = "_#{partial_name}_module".to_sym
 
           # Build locals hash for the call
-          # Note: use keys iteration for JS compatibility (Hash#map doesn't transpile well)
           pairs = []
           locals.keys.each do |key|
             pairs << s(:pair, s(:sym, key), process(locals[key]))
           end
 
-          # Pass context as first argument, then locals hash
-          if pairs.empty?
-            s(:send, s(:lvar, module_name), :render, s(:lvar, :"$context"), s(:hash))
+          render_call = s(:send, s(:lvar, module_name), :render,
+            s(:lvar, :"$context"),
+            pairs.empty? ? s(:hash) : s(:hash, *pairs))
+
+          # For collections, wrap in map().join('')
+          # messages.map(message => _message_module.render($context, {message})).join('')
+          if is_collection
+            s(:send,
+              s(:send,
+                process(collection_var),
+                :map,
+                s(:block,
+                  s(:send, nil, :lambda),
+                  s(:args, s(:arg, singular_name)),
+                  render_call)),
+              :join,
+              s(:str, ''))
           else
-            s(:send, s(:lvar, module_name), :render, s(:lvar, :"$context"), s(:hash, *pairs))
+            render_call
           end
+        end
+
+        # Singularize a variable name for partial lookup (Rails collection rendering convention)
+        # render @messages -> _message partial, render @articles -> _article partial
+        # But render @article stays as _article, render @status stays as _status
+        def singularize_partial_name(name)
+          Ruby2JS::Inflector.singularize(name)
         end
 
         # Extract options hash from form field args

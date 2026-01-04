@@ -21,8 +21,17 @@ export class ActiveRecordBase {
     return this.table_name;
   }
 
+  // Getter/setter for id property access
+  get id() {
+    return this._id;
+  }
+
+  set id(value) {
+    this._id = value;
+  }
+
   constructor(attributes = {}) {
-    this.id = attributes.id || null;
+    this._id = attributes.id || null;
     this.attributes = { ...attributes };
     this._persisted = !!attributes.id;
     this._changes = {};
@@ -166,9 +175,23 @@ export class ActiveRecordBase {
     if (!this.isValid) return false;
 
     if (this._persisted) {
-      return await this._update();
+      const result = await this._update();
+      if (result) await this._runCallbacks('after_update_commit');
+      return result;
     } else {
-      return await this._insert();
+      const result = await this._insert();
+      if (result) await this._runCallbacks('after_create_commit');
+      return result;
+    }
+  }
+
+  // Run callbacks registered on the class, passing this instance as parameter
+  async _runCallbacks(type) {
+    const callbacks = this.constructor[`_${type}_callbacks`];
+    if (!callbacks) return;
+    for (const callback of callbacks) {
+      // Pass instance as first argument (arrow functions don't bind 'this')
+      await callback(this);
     }
   }
 
@@ -191,10 +214,45 @@ export class ActiveRecordBase {
     return record;
   }
 
+  // --- Callback registration ---
+  static after_create_commit(callback) {
+    if (!this._after_create_commit_callbacks) this._after_create_commit_callbacks = [];
+    this._after_create_commit_callbacks.push(callback);
+  }
+
+  static after_update_commit(callback) {
+    if (!this._after_update_commit_callbacks) this._after_update_commit_callbacks = [];
+    this._after_update_commit_callbacks.push(callback);
+  }
+
+  static after_destroy_commit(callback) {
+    if (!this._after_destroy_commit_callbacks) this._after_destroy_commit_callbacks = [];
+    this._after_destroy_commit_callbacks.push(callback);
+  }
+
   // --- Association helpers ---
 
   async hasMany(modelClass, foreignKey) {
     return await modelClass.where({ [foreignKey]: this.id });
+  }
+
+  // --- Turbo Stream helpers ---
+
+  // Generate HTML for Turbo Stream broadcasts
+  // Override in model for custom rendering
+  toHTML() {
+    const domId = `${this.constructor.tableName.replace(/_/g, '-').slice(0, -1)}_${this.id}`;
+    const attrs = Object.entries(this.attributes)
+      .filter(([k]) => !['id', 'created_at', 'updated_at'].includes(k))
+      .map(([k, v]) => `<span class="${k}">${v ?? ''}</span>`)
+      .join(' ');
+    return `<div id="${domId}">${attrs}</div>`;
+  }
+
+  // Generate dom_id compatible ID
+  domId() {
+    const modelName = this.constructor.tableName.replace(/_/g, '-').slice(0, -1);
+    return `${modelName}_${this.id}`;
   }
 
   async belongsTo(modelClass, foreignKey) {

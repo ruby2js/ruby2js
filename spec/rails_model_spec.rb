@@ -362,7 +362,7 @@ describe Ruby2JS::Filter::Rails::Model do
       assert_includes result, 'target="comments"'
     end
 
-    it "generates toTurboStreamHTML call for content" do
+    it "generates toHTML call for content" do
       result = to_js(<<~RUBY)
         class Comment < ApplicationRecord
           after_create_commit do
@@ -370,8 +370,8 @@ describe Ruby2JS::Filter::Rails::Model do
           end
         end
       RUBY
-      # Non-remove actions use toTurboStreamHTML for content
-      assert_includes result, 'this.toTurboStreamHTML'
+      # Non-remove actions use record.toHTML() for content
+      assert_includes result, 'record.toHTML()'
       assert_includes result, '<template>'
     end
   end

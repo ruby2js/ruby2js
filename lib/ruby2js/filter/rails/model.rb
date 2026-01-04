@@ -57,6 +57,8 @@ module Ruby2JS
           @rails_scopes = []
           @rails_model_private_methods = {}
           @rails_model_refs = Set.new
+          @in_callback_block = false  # Track when processing callback body
+          @uses_broadcast = false  # Track if model uses broadcast methods
         end
 
         # Detect model class and transform
@@ -102,6 +104,15 @@ module Ruby2JS
               s(:str, "./#{model_file}.js")))
           end
 
+          # Check if model uses broadcast methods (for BroadcastChannel import)
+          uses_broadcast = body_uses_broadcasts?(body)
+          if uses_broadcast
+            broadcast_import = s(:send, nil, :import,
+              s(:array, s(:const, nil, :BroadcastChannel)),
+              s(:str, "../../lib/rails.js"))
+            model_import_nodes.push(broadcast_import)
+          end
+
           begin_node = s(:begin, import_node, *model_import_nodes, exported_class)
           result = process(begin_node)
           # Set empty comments on processed begin node to prevent first-location lookup
@@ -122,6 +133,36 @@ module Ruby2JS
           result
         end
 
+        # Handle callback blocks (after_create_commit do ... end)
+        # Transform to accept record parameter: (record) => { ... }
+        def on_block(node)
+          send_node, args_node, body = node.children
+          return super unless send_node&.type == :send
+
+          target, method = send_node.children
+          return super unless target.nil?
+          return super unless CALLBACKS.include?(method)
+          return super unless @rails_model
+
+          # Transform the callback body to use 'record' parameter
+          # Replace: self -> record, id -> record.id, etc.
+          transformed_body = transform_callback_body(body)
+
+          # Set flag so broadcast methods know to use 'record' instead of 'this'
+          @in_callback_block = true
+          processed_body = process(transformed_body)
+          @in_callback_block = false
+
+          # Generate: ClassName.callback_method((record) => { ... })
+          s(:send,
+            s(:const, nil, @rails_model_name.to_sym),
+            method,
+            s(:block,
+              s(:send, nil, :proc),
+              s(:args, s(:arg, :record)),
+              processed_body))
+        end
+
         # Handle broadcast_*_to method calls inside model callbacks
         def on_send(node)
           target, method, *args = node.children
@@ -140,11 +181,87 @@ module Ruby2JS
 
         private
 
+        # Transform callback body to use 'record' parameter instead of self/id
+        def transform_callback_body(node)
+          return node unless node.respond_to?(:type)
+
+          case node.type
+          when :self
+            # self -> record
+            s(:lvar, :record)
+
+          when :send
+            target, method, *args = node.children
+
+            if target.nil?
+              # Bare method call - could be a record attribute/method
+              # id, article_id, created_at, etc. -> record.id, record.article_id, etc.
+              if instance_method?(method)
+                # Use :attr for property access (no parentheses in JS)
+                s(:attr,
+                  s(:lvar, :record),
+                  method)
+              else
+                # Keep other bare calls (like broadcast_append_to)
+                node.updated(nil, [target, method, *args.map { |arg| transform_callback_body(arg) }])
+              end
+            elsif target&.type == :self
+              # self.foo -> record.foo (property access)
+              s(:attr,
+                s(:lvar, :record),
+                method)
+            else
+              # Recurse into target and args
+              node.updated(nil, [
+                transform_callback_body(target),
+                method,
+                *args.map { |arg| transform_callback_body(arg) }
+              ])
+            end
+
+          when :lvar, :ivar
+            # Keep local/instance variables as-is
+            node
+
+          else
+            # Recurse into children
+            return node.updated(nil, node.children.map { |child| transform_callback_body(child) }) if node.children.any?
+            node
+          end
+        end
+
+        # Check if a method name looks like an instance method (attribute accessor)
+        def instance_method?(method)
+          method_str = method.to_s
+          # Common ActiveRecord attribute accessors
+          return true if method_str == 'id'
+          return true if method_str.end_with?('_id')  # foreign keys
+          return true if method_str.end_with?('_at')  # timestamps
+          return true if %w[created_at updated_at].include?(method_str)
+          false
+        end
+
+        # Check if the class body contains any broadcast method calls
+        def body_uses_broadcasts?(node)
+          return false unless node.respond_to?(:type)
+
+          if node.type == :send
+            method = node.children[1]
+            return true if BROADCAST_METHODS.include?(method)
+          end
+
+          # Recurse into children
+          node.children.any? { |child| body_uses_broadcasts?(child) }
+        end
+
         # Process broadcast_*_to method calls
         # Example: broadcast_append_to "article_#{article_id}_comments", partial: "...", target: "comments"
         # Generates: BroadcastChannel.broadcast("channel", `<turbo-stream ...>...</turbo-stream>`)
         def process_broadcast_call(method, args)
           return super if args.empty?
+
+          # Mark that this model uses broadcasting (for import generation)
+          @uses_broadcast = true
 
           # First argument is the channel name
           channel_node = args[0]
@@ -200,6 +317,9 @@ module Ruby2JS
 
         # Build the turbo-stream HTML for broadcasting
         def build_broadcast_stream_html(action, channel_node, target_node, partial_node, locals_node)
+          # Use 'record' in callbacks, 'this' otherwise
+          receiver = @in_callback_block ? s(:lvar, :record) : s(:self)
+
           # For remove action, no template content needed
           if action == :remove
             # If target is static
@@ -219,7 +339,7 @@ module Ruby2JS
           end
 
           # For other actions, we need to render content
-          # Build: `<turbo-stream action="..." target="..."><template>${this.toTurboStreamHTML()}</template></turbo-stream>`
+          # Build: `<turbo-stream action="..." target="..."><template>${record.toHTML()}</template></turbo-stream>`
 
           # Handle target
           target_expr = nil
@@ -233,7 +353,7 @@ module Ruby2JS
             # Static target
             s(:dstr,
               s(:str, "<turbo-stream action=\"#{action}\" target=\"#{target_expr}\"><template>"),
-              s(:begin, s(:send, s(:self), :toTurboStreamHTML)),
+              s(:begin, s(:send, receiver, :toHTML)),
               s(:str, '</template></turbo-stream>'))
           else
             # Dynamic target
@@ -241,7 +361,7 @@ module Ruby2JS
               s(:str, "<turbo-stream action=\"#{action}\" target=\""),
               s(:begin, process(target_node)),
               s(:str, '"><template>'),
-              s(:begin, s(:send, s(:self), :toTurboStreamHTML)),
+              s(:begin, s(:send, receiver, :toHTML)),
               s(:str, '</template></turbo-stream>'))
           end
         end

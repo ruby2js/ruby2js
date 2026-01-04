@@ -251,6 +251,7 @@ export class ActiveRecord extends ActiveRecordBase {
     );
     this._persisted = false;
     console.log(`  ${this.constructor.name} Destroy (id: ${this.id})`);
+    await this._runCallbacks('after_destroy_commit');
     return true;
   }
 

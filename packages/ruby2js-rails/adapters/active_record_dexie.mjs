@@ -157,6 +157,26 @@ export class ActiveRecord extends ActiveRecordBase {
     return await this.table.count();
   }
 
+  // Order records by column - returns array of models
+  // Usage: Message.order({created_at: 'asc'}) or Message.order('created_at')
+  static async order(options) {
+    let column, direction;
+    if (typeof options === 'string') {
+      column = options;
+      direction = 'asc';
+    } else {
+      column = Object.keys(options)[0];
+      direction = options[column];
+    }
+
+    let collection = this.table.orderBy(column);
+    if (direction === 'desc' || direction === ':desc') {
+      collection = collection.reverse();
+    }
+    const rows = await collection.toArray();
+    return rows.map(row => new this(row));
+  }
+
   static async first() {
     const row = await this.table.orderBy('id').first();
     return row ? new this(row) : null;
@@ -174,6 +194,7 @@ export class ActiveRecord extends ActiveRecordBase {
     await this.constructor.table.delete(this.id);
     this._persisted = false;
     console.log(`  ${this.constructor.name} Destroy (id: ${this.id})`);
+    await this._runCallbacks('after_destroy_commit');
     return true;
   }
 

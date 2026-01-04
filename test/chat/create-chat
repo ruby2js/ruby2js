@@ -19,6 +19,13 @@ cd "$APP_NAME"
 # Generate Message scaffold
 rails generate scaffold Message username:string body:text
 
+# Remove unused scaffolded views (chat only needs index, create, destroy)
+rm -f app/views/messages/show.html.erb \
+      app/views/messages/edit.html.erb \
+      app/views/messages/new.html.erb \
+      app/views/messages/_form.html.erb \
+      app/views/messages/*.json.jbuilder
+
 # Create database
 rails db:create
 

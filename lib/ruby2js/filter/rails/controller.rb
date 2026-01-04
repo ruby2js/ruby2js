@@ -11,7 +11,7 @@ module Ruby2JS
         RESTFUL_ACTIONS = %i[index show new create edit update destroy].freeze
 
         # ActiveRecord class methods that should be awaited
-        AR_CLASS_METHODS = %i[all find find_by where first last count create create!].freeze
+        AR_CLASS_METHODS = %i[all find find_by where first last count create create! order].freeze
 
         # ActiveRecord instance methods that should be awaited
         AR_INSTANCE_METHODS = %i[save save! update update! destroy destroy! reload].freeze

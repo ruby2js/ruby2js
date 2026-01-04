@@ -633,6 +633,7 @@ export class TurboBroadcast {
 
   // Subscribe to turbo-stream messages on a channel
   // Used by turbo_stream_from helper in views
+  // Returns empty string for ERB interpolation compatibility
   static subscribe(channelName, callback) {
     const channel = this.getChannel(channelName);
     channel.onmessage = (event) => {
@@ -645,7 +646,7 @@ export class TurboBroadcast {
         callback(event.data);
       }
     };
-    return channel;
+    return '';
   }
 
   // Unsubscribe and close a channel
@@ -661,3 +662,11 @@ export class TurboBroadcast {
 // Export BroadcastChannel as alias for model broadcast methods
 // Models call: BroadcastChannel.broadcast("channel", html)
 export { TurboBroadcast as BroadcastChannel };
+
+// Helper function for views to subscribe to turbo streams
+// Usage in ERB: <%= turbo_stream_from "chat_room" %>
+export function turbo_stream_from(channelName) {
+  TurboBroadcast.subscribe(channelName);
+  // Return empty string - subscription is a side effect
+  return '';
+}
