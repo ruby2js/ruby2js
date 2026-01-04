@@ -263,6 +263,21 @@ export class ActiveRecord extends ActiveRecordBase {
     return rows.length > 0 ? new this(rows[0]) : null;
   }
 
+  // Order records by column - returns array of models
+  // Usage: Message.order({created_at: 'asc'}) or Message.order('created_at')
+  static async order(options) {
+    let column, direction;
+    if (typeof options === 'string') {
+      column = options;
+      direction = 'ASC';
+    } else {
+      column = Object.keys(options)[0];
+      direction = (options[column] === 'desc' || options[column] === ':desc') ? 'DESC' : 'ASC';
+    }
+    const [rows] = await pool.query(`SELECT * FROM ${this.tableName} ORDER BY ${column} ${direction}`);
+    return rows.map(row => new this(row));
+  }
+
   // --- Instance Methods ---
 
   async destroy() {

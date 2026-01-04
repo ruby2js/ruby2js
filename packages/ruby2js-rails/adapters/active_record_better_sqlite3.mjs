@@ -186,6 +186,22 @@ export class ActiveRecord extends ActiveRecordBase {
     return result.count;
   }
 
+  // Order records by column - returns array of models
+  // Usage: Message.order({created_at: 'asc'}) or Message.order('created_at')
+  static async order(options) {
+    let column, direction;
+    if (typeof options === 'string') {
+      column = options;
+      direction = 'ASC';
+    } else {
+      column = Object.keys(options)[0];
+      direction = (options[column] === 'desc' || options[column] === ':desc') ? 'DESC' : 'ASC';
+    }
+    const stmt = db.prepare(`SELECT * FROM ${this.tableName} ORDER BY ${column} ${direction}`);
+    const rows = stmt.all();
+    return rows.map(row => new this(row));
+  }
+
   static async first() {
     const stmt = db.prepare(`SELECT * FROM ${this.tableName} ORDER BY id ASC LIMIT 1`);
     const row = stmt.get();
