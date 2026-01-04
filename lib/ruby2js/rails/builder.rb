@@ -1041,8 +1041,8 @@ class SelfhostBuilder
     # Find all resource directories (exclude layouts, pwa, and partials)
     excluded_dirs = %w[layouts pwa]
     resource_dirs = Dir.children(views_root).select do |name|
-      path = File.join(views_root, name)
-      File.directory?(path) && !excluded_dirs.include?(name) && !name.start_with?('_')
+      dir_path = File.join(views_root, name)
+      File.directory?(dir_path) && !excluded_dirs.include?(name) && !name.start_with?('_')
     end
 
     return if resource_dirs.empty?
