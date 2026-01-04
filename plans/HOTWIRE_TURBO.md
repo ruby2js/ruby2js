@@ -46,7 +46,11 @@ This is **Post 2** in a four-part series demonstrating Ruby2JS/Juntos capabiliti
 
 - **Blog demo**: Browser (dexie) and Node (sqlite) targets tested and working
 - **Chat demo**: Created with `test/chat/create-chat`, Turbo Streams broadcasting functional
-- **Stimulus controllers**: Ruby controllers transpile correctly, auto-scroll example works
+- **Stimulus controllers**: Ruby controllers transpile correctly (fixed 2026-01-04)
+  - Builder now uses dedicated STIMULUS_OPTIONS with Stimulus filter
+  - Uses `autoexports: :default` for Rails-convention `export default class`
+  - `@hotwired/stimulus` added to browser importmap
+  - Controllers imported via `/app/javascript/controllers/index.js`
 - **422 status for validation errors**: All targets return proper status for Turbo Drive
 
 ### Remaining Work: Cloudflare Durable Objects

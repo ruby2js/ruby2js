@@ -139,6 +139,21 @@ class SelfhostBuilder
     ]
   }.freeze
 
+  # Options for Stimulus controllers
+  # Uses Stimulus filter instead of Rails::Controller for proper ES class output
+  # autoexports: :default produces 'export default class' (Rails convention)
+  STIMULUS_OPTIONS = {
+    eslevel: 2022,
+    include: [:class, :call],
+    autoexports: :default,
+    filters: [
+      Ruby2JS::Filter::Stimulus,
+      Ruby2JS::Filter::Functions,
+      Ruby2JS::Filter::ESM,
+      Ruby2JS::Filter::Return
+    ]
+  }.freeze
+
   # Options for ERB templates
   # Note: Rails::Helpers must come BEFORE Erb for method overrides to work
   ERB_OPTIONS = {
@@ -373,7 +388,8 @@ class SelfhostBuilder
 
   # Common importmap entries for all browser builds
   COMMON_IMPORTMAP_ENTRIES = {
-    '@hotwired/turbo' => '/node_modules/@hotwired/turbo/dist/turbo.es2017-esm.js'
+    '@hotwired/turbo' => '/node_modules/@hotwired/turbo/dist/turbo.es2017-esm.js',
+    '@hotwired/stimulus' => '/node_modules/@hotwired/stimulus/dist/stimulus.js'
   }.freeze
 
   # Database-specific importmap entries for browser builds
@@ -451,6 +467,7 @@ class SelfhostBuilder
         <script type="module">
           import * as Turbo from '@hotwired/turbo';
           import { Application } from '#{base_path}/config/routes.js';
+          import '#{base_path}/app/javascript/controllers/index.js';
           window.Turbo = Turbo;
           Application.start();
         </script>
@@ -725,8 +742,16 @@ class SelfhostBuilder
     # Load section-specific config if section is specified, otherwise default
     base = self.load_ruby2js_config(section)
 
-    # Start with hardcoded OPTIONS as base (using spread for JS compatibility)
-    options = { **OPTIONS }
+    # Use section-specific options as base
+    base_options = case section
+    when 'stimulus'
+      STIMULUS_OPTIONS
+    else
+      OPTIONS
+    end
+
+    # Start with hardcoded options as base (using spread for JS compatibility)
+    options = { **base_options }
 
     # Merge YAML config values (string keys converted to symbols)
     base.each do |key, value| # Pragma: entries
