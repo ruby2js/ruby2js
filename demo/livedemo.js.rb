@@ -1,6 +1,7 @@
-import [Controller, Application], "@hotwired/stimulus"
+import [Application], "@hotwired/stimulus"
 
 # Create Stimulus namespace object for compatibility with Opal
+# Controller is imported by the stimulus filter
 Stimulus = { Controller: Controller, Application: Application }
 
 async {
@@ -18,7 +19,7 @@ async {
   # codemirror_ready and ruby2js_ready methods can be used to wait for these
   # scripts to load before proceeding.
   #
-  class DemoController < Controller
+  class DemoController < Stimulus::Controller
     attr_reader :source, :targets
 
     # subclasses are expected to override this method
