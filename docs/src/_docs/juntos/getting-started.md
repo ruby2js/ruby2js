@@ -112,6 +112,13 @@ If transpilation fails, check:
 
 ### Models
 
+**Try it** — edit the Ruby to see how models transpile:
+
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["model", "esm", "functions"]
+}'></div>
+
 ```ruby
 class Article < ApplicationRecord
   has_many :comments, dependent: :destroy
@@ -126,6 +133,13 @@ end
 Associations, validations, and callbacks transpile directly.
 
 ### Controllers
+
+**Try it** — controllers transpile with the same patterns:
+
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["controller", "esm", "functions"]
+}'></div>
 
 ```ruby
 class ArticlesController < ApplicationController

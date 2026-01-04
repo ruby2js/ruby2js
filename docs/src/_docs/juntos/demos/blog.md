@@ -115,10 +115,14 @@ bin/juntos deploy -t cloudflare -d d1
 
 ## The Code
 
-The code is idiomatic Rails:
+The code is idiomatic Rails. **Try it** — edit the Ruby to see how models transpile:
+
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["model", "esm", "functions"]
+}'></div>
 
 ```ruby
-# app/models/article.rb
 class Article < ApplicationRecord
   has_many :comments, dependent: :destroy
   validates :title, presence: true
@@ -126,8 +130,14 @@ class Article < ApplicationRecord
 end
 ```
 
+**Try it** — controllers also transpile directly:
+
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["controller", "esm", "functions"]
+}'></div>
+
 ```ruby
-# app/controllers/articles_controller.rb
 class ArticlesController < ApplicationController
   before_action :set_article, only: %i[show edit update destroy]
 
@@ -138,7 +148,20 @@ class ArticlesController < ApplicationController
   def show
   end
 
-  # ... standard scaffold code
+  def create
+    @article = Article.new(article_params)
+    if @article.save
+      redirect_to @article
+    else
+      render :new, status: :unprocessable_entity
+    end
+  end
+
+  private
+
+  def set_article
+    @article = Article.find(params[:id])
+  end
 end
 ```
 

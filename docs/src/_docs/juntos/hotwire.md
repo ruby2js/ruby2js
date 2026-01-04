@@ -139,8 +139,14 @@ if (context.request.headers.accept?.includes('text/vnd.turbo-stream.html')) {
 
 Write Stimulus controllers in Ruby:
 
+**Try it** — edit the Ruby code to see how it transpiles:
+
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["stimulus", "esm", "functions"]
+}'></div>
+
 ```ruby
-# app/javascript/controllers/chat_controller.rb
 class ChatController < Stimulus::Controller
   def connect()
     scroll_to_bottom()
@@ -155,25 +161,6 @@ class ChatController < Stimulus::Controller
     # Handle form submission
   end
 end
-```
-
-**Transpiles to:**
-
-```javascript
-class ChatController extends Stimulus.Controller {
-  connect() {
-    this.scroll_to_bottom()
-  }
-
-  scroll_to_bottom() {
-    this.element.scrollTop = this.element.scrollHeight
-  }
-
-  send_message(event) {
-    event.preventDefault()
-    // Handle form submission
-  }
-}
 ```
 
 ### Rails Integration

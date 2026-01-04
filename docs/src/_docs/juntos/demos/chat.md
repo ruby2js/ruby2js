@@ -112,8 +112,14 @@ The `turbo_stream_from` helper establishes the WebSocket subscription. New messa
 
 ### Stimulus Controller in Ruby
 
+**Try it** — edit the Ruby code to see how it transpiles:
+
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["stimulus", "esm", "functions"]
+}'></div>
+
 ```ruby
-# app/javascript/controllers/chat_controller.rb
 class ChatController < Stimulus::Controller
   def connect()
     scroll_to_bottom()
@@ -129,29 +135,6 @@ class ChatController < Stimulus::Controller
     element.scrollTop = element.scrollHeight
   end
 end
-```
-
-This Ruby code transpiles to standard Stimulus JavaScript:
-
-```javascript
-// Generated: app/javascript/controllers/chat_controller.js
-import { Controller } from "@hotwired/stimulus"
-
-export default class ChatController extends Controller {
-  connect() {
-    this.scroll_to_bottom()
-  }
-
-  scrollAfterRender(event) {
-    let target = event.target.getAttribute("target");
-    if (target != "messages") return;
-    setTimeout(() => this.scroll_to_bottom(), 50)
-  }
-
-  scroll_to_bottom() {
-    this.element.scrollTop = this.element.scrollHeight
-  }
-}
 ```
 
 The controller auto-scrolls the chat when new messages arrive.
