@@ -7,24 +7,37 @@ category: juntos-deploying
 
 # Deploying Juntos Applications
 
-Juntos applications can deploy to any JavaScript runtime. Choose based on your needs.
+Juntos unlocks platforms Rails can't reach—and works everywhere JavaScript runs.
 
 {% toc %}
 
-## Deployment Targets
+## Sweet Spots
+
+These targets require transpilation. Rails can't run here; Juntos can:
 
 | Target | Best For | Database Options |
 |--------|----------|------------------|
-| **[Browser](/docs/juntos/deploying/browser)** | Offline-first, demos, local-first | Dexie, sql.js, PGlite |
-| **[Node.js](/docs/juntos/deploying/node)** | Traditional hosting, VPS, containers | SQLite, PostgreSQL, MySQL |
-| **[Vercel](/docs/juntos/deploying/vercel)** | Serverless, global edge, auto-scaling | Neon, Turso, PlanetScale |
-| **[Cloudflare](/docs/juntos/deploying/cloudflare)** | Edge computing, D1, maximum distribution | D1, Turso |
+| **[Browser](/docs/juntos/deploying/browser)** | Offline-first, local-first, demos | Dexie, sql.js, PGlite |
+| **[Vercel Edge](/docs/juntos/deploying/vercel)** | Global edge, auto-scaling | Neon, Turso, PlanetScale |
+| **[Cloudflare Workers](/docs/juntos/deploying/cloudflare)** | Edge computing, maximum distribution | D1, Turso |
+
+## Also Works
+
+For traditional hosting, Juntos works but Rails does too. Reasons to choose Juntos on Node.js:
+
+- **npm ecosystem** — access to JavaScript libraries not available in Ruby
+- **Event-driven model** — JavaScript's async I/O may suit some workloads better than Ruby's Global VM Lock (GVL)
+- **Unified codebase** — one codebase across browser, edge, and server
+
+| Target | Best For | Database Options |
+|--------|----------|------------------|
+| **[Node.js](/docs/juntos/deploying/node)** | VPS, containers, traditional hosting | SQLite, PostgreSQL, MySQL |
 
 ## Quick Comparison
 
 | Aspect | Browser | Node.js | Vercel | Cloudflare |
 |--------|---------|---------|--------|------------|
-| Infrastructure | None (static) | Server/container | Serverless | Serverless |
+| Infrastructure | None (static) | Server/container | On-demand | On-demand |
 | Scaling | N/A | Manual | Automatic | Automatic |
 | Cold starts | None | N/A | ~50-250ms | ~5-50ms |
 | Database | Client-side | TCP/file | HTTP APIs | D1 binding |
@@ -33,24 +46,22 @@ Juntos applications can deploy to any JavaScript runtime. Choose based on your n
 ## Choosing a Target
 
 **Choose Browser if:**
-- Your app works offline
+- Your app works offline or local-first
 - Data stays on the user's device
 - You want zero infrastructure
+- *Rails can't do this*
+
+**Choose Vercel or Cloudflare if:**
+- You want global edge distribution
+- You need auto-scaling and pay-per-request
+- You want fast cold starts (~5-50ms)
+- *Rails can't do this*
 
 **Choose Node.js if:**
-- You need traditional server capabilities
-- You're self-hosting or using containers
-- You need TCP database connections
-
-**Choose Vercel if:**
-- You want serverless with PostgreSQL/MySQL
-- You need Git-based deployments
-- You're already in the Vercel ecosystem
-
-**Choose Cloudflare if:**
-- You want SQLite simplicity at scale
-- You need maximum global distribution
-- You're already using Cloudflare
+- You need npm packages not available in Ruby
+- Your workload benefits from JavaScript's event-driven async model
+- You want one codebase across browser, edge, and server
+- *Rails works here too—but Juntos has advantages*
 
 ## Default Target Inference
 

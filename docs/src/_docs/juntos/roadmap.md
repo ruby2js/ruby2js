@@ -76,7 +76,7 @@ Transform attachment APIs into cloud storage operations:
 
 ### Action Cable
 
-WebSocket support for real-time features:
+Full Action Cable abstraction for custom channels:
 
 ```ruby
 # What you write
@@ -88,8 +88,11 @@ end
 
 # Node/Bun/Deno: Native WebSocket server
 # Browser: WebSocket client
-# Edge: Not supported (platform limitation)
+# Cloudflare: Durable Objects
+# Vercel: Not supported (platform limitation)
 ```
+
+**Note:** Basic real-time features already work via [Turbo Streams broadcasting](/docs/juntos/hotwire)—`broadcast_append_to`, `broadcast_remove_to`, etc. Action Cable would add support for custom channels beyond Turbo Streams.
 
 ### Active Job
 

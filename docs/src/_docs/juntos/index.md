@@ -7,22 +7,26 @@ category: juntos
 
 # Juntos
 
-Juntos is a set of Ruby2JS filters that implement a Rails-compatible framework for JavaScript runtimes. Write Rails—models, controllers, views, routes—and deploy to browsers, Node.js, or serverless edge platforms.
+Juntos is a set of Ruby2JS filters that implement a Rails-compatible framework for JavaScript runtimes. Write Rails—models, controllers, views, routes—and deploy to browsers, Node.js, or edge platforms.
 
 {% toc %}
 
 ## The Vision
 
-Rails is the fastest way to go from idea to working application. Serverless is the future of deployment. Until now, you had to choose.
+Rails is the fastest way to go from idea to working application. But traditional hosting means paying for capacity whether you use it or not. V8 Isolates—lightweight JavaScript environments that spin up on demand—offer a different model: deploy once, run globally, scale automatically, pay only for what you use.
 
-Juntos bridges this gap. The same Rails code runs:
+The catch? V8 runs JavaScript, not Ruby.
 
-- **In browsers** with IndexedDB or SQLite/WASM
-- **On Node.js** with SQLite, PostgreSQL, or MySQL
-- **On Vercel Edge** with Neon, Turso, or PlanetScale
-- **On Cloudflare Workers** with D1
+Juntos bridges this gap by transpiling Rails to JavaScript. This unlocks platforms Rails can't reach:
 
-Same models, controllers, and views. Different runtimes, same conventions. No lock-in—switch platforms without rewriting your application.
+- **V8 Isolates** (Cloudflare Workers, Vercel Edge, Deno Deploy) — Rails can't run here; Juntos can
+- **Browsers** (IndexedDB, SQLite/WASM) — offline-first apps, local-first data, zero infrastructure
+
+And works everywhere JavaScript runs:
+
+- **Node.js, Bun, Deno** with SQLite, PostgreSQL, or MySQL
+
+Same models, controllers, and views. The sweet spot is where transpilation is necessary—V8 Isolates and browsers—but one codebase runs everywhere.
 
 ## How It Works
 
@@ -75,7 +79,7 @@ Full [Hotwire](https://hotwired.dev/) support for the Rails-native approach to i
 
 ### Multi-Target
 
-Write once, deploy anywhere JavaScript runs. No other framework offers the same code running in browsers with IndexedDB, on Node.js with PostgreSQL, and on edge functions with serverless databases.
+Write once, deploy anywhere JavaScript runs. The same code runs in browsers with IndexedDB, on Node.js with PostgreSQL, and on V8 Isolates with edge databases.
 
 ### Transparency
 
