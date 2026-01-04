@@ -105,7 +105,7 @@ module Ruby2JS
               dev       Start development server with hot reload
               server    Start production server (requires prior build)
               build     Build for deployment
-              deploy    Build and deploy to serverless platform
+              deploy    Build and deploy (Vercel, Cloudflare)
               migrate   Run database migrations
               install   Set up project for Juntos
 
