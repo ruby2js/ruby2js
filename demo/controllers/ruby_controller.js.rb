@@ -72,22 +72,35 @@ class RubyController < DemoController
     convert()
   end
 
-  # Load the Opal Ruby2JS bundle dynamically
+  # Load the Opal Ruby2JS bundle dynamically (singleton pattern to prevent double-loading)
   async def load_opal()
-    unless defined? Ruby2JS
-      # Load the Opal bundle via script tag (it's not an ES module)
-      await Promise.new do |resolve, reject|
-        script = document.createElement('script')
-        script.src = "#{window.location.origin}/demo/ruby2js.js"
-        script.async = true
-        script.addEventListener(:load, resolve)
-        script.addEventListener(:error, reject)
-        document.head.appendChild(script)
-      end
-
-      # Wait for Ruby2JS to be ready
-      await ruby2js_ready
+    # If already loaded, we're done
+    if defined? Ruby2JS
+      @opal_ready = true
+      return
     end
+
+    # If already loading, wait for the existing load to complete
+    if @@opal_loading_promise
+      await @@opal_loading_promise
+      @opal_ready = true
+      return
+    end
+
+    # Start loading - store promise so other instances can await it
+    @@opal_loading_promise = Promise.new do |resolve, reject|
+      script = document.createElement('script')
+      script.src = "#{window.location.origin}/demo/ruby2js.js"
+      script.async = true
+      script.addEventListener(:load, resolve)
+      script.addEventListener(:error, reject)
+      document.head.appendChild(script)
+    end
+
+    await @@opal_loading_promise
+
+    # Wait for Ruby2JS to be ready
+    await ruby2js_ready
 
     @opal_ready = true
   end
