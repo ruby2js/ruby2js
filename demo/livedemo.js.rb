@@ -1,8 +1,13 @@
+import [Controller, Application], "@hotwired/stimulus"
+
+# Create Stimulus namespace object for compatibility with Opal
+Stimulus = { Controller: Controller, Application: Application }
+
 async {
 
   # This superclass is intended for Stimulus controllers that not only
   # connect to Stimulus, but pair with each other.  Subclasses of
-  # DemoController don't define connect methods, instead they define 
+  # DemoController don't define connect methods, instead they define
   # setup methods.  Subclasses that initiate pairing define source methods.
   # Subclasses that expect to be targets define pair methods.  A
   # findController method is defined to help find sources.
@@ -13,7 +18,7 @@ async {
   # codemirror_ready and ruby2js_ready methods can be used to wait for these
   # scripts to load before proceeding.
   #
-  class DemoController < Stimulus::Controller
+  class DemoController < Controller
     attr_reader :source, :targets
 
     # subclasses are expected to override this method
@@ -114,7 +119,7 @@ async {
   require_relative './controllers/combo_controller'
   require_relative './controllers/eval_controller'
 
-  application = Stimulus::Application.start()
+  application = Application.start()
   application.register("options", OptionsController)
   application.register("ruby", RubyController)
   application.register("selfhost-ruby", SelfhostRubyController)
