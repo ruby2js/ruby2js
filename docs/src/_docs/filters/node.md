@@ -15,6 +15,7 @@ The **Node** filter provides a number of convenience methods and variables which
 * `` `command` `` {{ caret }} `child_process.execSync("command", {encoding: "utf8"})`
 * `ARGV` {{ caret }} `process.argv.slice(2)`
 * `Dir.chdir` {{ caret }} `process.chdir`
+* `Dir.children` {{ caret }} `fs.readdirSync`
 * `Dir.entries` {{ caret }} `fs.readdirSync`
 * `Dir.exist?` {{ caret }} `fs.existsSync`
 * `Dir.glob` {{ caret }} `fs.globSync` *(Node 22+)*
@@ -81,6 +82,7 @@ In async mode:
 * `FileUtils.mkdir_p("foo")` {{ caret }} `await fs.mkdir("foo", {recursive: true})`
 * `FileUtils.rm_rf("foo")` {{ caret }} `await fs.rm("foo", {recursive: true, force: true})`
 * `FileUtils.cp("src", "dest")` {{ caret }} `await fs.copyFile("src", "dest")`
+* `Dir.children("foo")` {{ caret }} `await fs.readdir("foo")`
 * `Dir.entries("foo")` {{ caret }} `await fs.readdir("foo")`
 * `Dir.glob("**/*.rb")` {{ caret }} `await Array.fromAsync(fs.glob("**/*.rb"))` *(Node 22+)*
 

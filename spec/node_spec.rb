@@ -194,6 +194,11 @@ describe Ruby2JS::Filter::Node do
         must_equal 'const fs = require("node:fs"); fs.readdirSync("foo")'
     end
 
+    it 'should handle Dir.children' do
+      to_js( 'Dir.children("foo")' ).
+        must_equal 'const fs = require("node:fs"); fs.readdirSync("foo")'
+    end
+
     it 'should handle Dir.mktmpdir' do
       to_js( 'Dir.mktmpdir' ).
         must_equal 'const fs = require("node:fs"); fs.mkdtempSync("d")'
@@ -379,6 +384,11 @@ describe Ruby2JS::Filter::Node do
 
     it 'should use fs/promises for Dir.entries' do
       to_js_async( 'Dir.entries("foo")' ).
+        must_equal 'import fs from "node:fs/promises"; await fs.readdir("foo")'
+    end
+
+    it 'should use fs/promises for Dir.children' do
+      to_js_async( 'Dir.children("foo")' ).
         must_equal 'import fs from "node:fs/promises"; await fs.readdir("foo")'
     end
 

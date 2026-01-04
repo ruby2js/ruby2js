@@ -317,7 +317,9 @@ module Ruby2JS
             S(:send, s(:attr, nil, :process), :chdir, *process_all(args))
           elsif method == :pwd and args.length == 0
             S(:send!, s(:attr, nil, :process), :cwd)
-          elsif method == :entries
+          elsif method == :entries or method == :children
+            # Note: Node.js readdirSync already excludes '.' and '..'
+            # so both Ruby's Dir.entries and Dir.children map to readdirSync
             fs_call(:readdirSync, *process_all(args))
           elsif method == :mkdir and args.length == 1
             fs_call(:mkdirSync, process(args.first))
