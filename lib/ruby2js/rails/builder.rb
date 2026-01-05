@@ -281,8 +281,9 @@ class SelfhostBuilder
       { 'ruby2js-rails' => 'https://www.ruby2js.com/releases/ruby2js-rails-beta.tgz' }
     end
 
-    # Hotwire Turbo for all browser builds
+    # Hotwire Turbo and Stimulus for all browser builds
     deps['@hotwired/turbo'] = '^8.0.0'
+    deps['@hotwired/stimulus'] = '^3.2.0'
 
     # Add tailwindcss if tailwindcss-rails gem is detected
     tailwind_css = app_root ? File.join(app_root, 'app/assets/tailwind/application.css') : 'app/assets/tailwind/application.css'
