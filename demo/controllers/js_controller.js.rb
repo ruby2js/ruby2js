@@ -1,5 +1,7 @@
 # control the JS (read-only) editor.
 class JSController < DemoController
+  attr_reader :source
+
   def source
     return @source if @source
 

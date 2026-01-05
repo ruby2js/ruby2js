@@ -1,4 +1,6 @@
 class EvalController < DemoController
+  attr_reader :source
+
   SCRIPTS = {
     LitElement: "/demo/litelement.js",
     Preact: "https://cdn.jsdelivr.net/npm/preact/dist/preact.min.js",
@@ -8,8 +10,8 @@ class EvalController < DemoController
   }
 
   def source
-    @source ||= findController type: RubyController,
-      element: document.querySelector(element.dataset.source)
+    return @source ||= findController(type: RubyController,
+      element: document.querySelector(element.dataset.source))
   end
 
   def setup()

@@ -1,9 +1,11 @@
 # Control the Ruby editor using selfhost Ruby2JS
 # This controller uses the selfhost bundle instead of Opal
 class SelfhostRubyController < DemoController
+  attr_reader :source
+
   def source
-    @source ||= findController type: OptionsController,
-      element: document.querySelector(element.dataset.source)
+    return @source ||= findController(type: OptionsController,
+      element: document.querySelector(element.dataset.source))
   end
 
   attr_reader :options
