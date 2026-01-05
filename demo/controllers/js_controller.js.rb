@@ -29,7 +29,7 @@ class JSController < DemoController
   end
 
   async def setup()
-    await codemirror_ready
+    await codemirror_ready()
 
     # create another editor below the output
     @outputDiv = document.createElement('div')

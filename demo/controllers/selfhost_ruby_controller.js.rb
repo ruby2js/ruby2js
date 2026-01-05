@@ -34,7 +34,7 @@ class SelfhostRubyController < DemoController
       end
     end
 
-    await codemirror_ready
+    await codemirror_ready()
 
     # create an editor
     editorDiv = document.createElement('div')

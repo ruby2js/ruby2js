@@ -36,7 +36,7 @@ class RubyController < DemoController
       end
     end
 
-    await codemirror_ready
+    await codemirror_ready()
 
     # create an editor
     editorDiv = document.createElement('div')
@@ -100,7 +100,7 @@ class RubyController < DemoController
     await @@opal_loading_promise
 
     # Wait for Ruby2JS to be ready
-    await ruby2js_ready
+    await ruby2js_ready()
 
     @opal_ready = true
   end
