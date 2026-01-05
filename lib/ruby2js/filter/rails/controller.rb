@@ -676,10 +676,10 @@ module Ruby2JS
             # redirect_to articles_path -> "/articles"
             if target.children[0].nil? && target.children[1].to_s.end_with?('_path')
               path_helper = target.children[1].to_s
-              if path_helper == 'articles_path'
-                path = s(:str, '/articles')
-              elsif path_helper =~ /^(\w+)_path$/
-                path = s(:str, "/#{$1}s")
+              if path_helper =~ /^(\w+)_path$/
+                # Path helper name already contains the pluralized resource name
+                # e.g., messages_path -> /messages, articles_path -> /articles
+                path = s(:str, "/#{$1}")
               else
                 path = s(:str, '/')
               end
