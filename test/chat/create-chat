@@ -115,8 +115,7 @@ cat > app/views/messages/index.html.erb << 'VIEW'
   <%# Stimulus controller handles auto-scroll when new messages arrive %>
   <div id="messages"
        class="space-y-4 mb-8 h-96 overflow-y-auto border rounded p-4 bg-gray-50"
-       data-controller="chat"
-       data-action="turbo:before-stream-render@document->chat#scrollAfterRender">
+       data-controller="chat">
     <%= render @messages %>
   </div>
 
@@ -144,7 +143,7 @@ VIEW
 
 # Create message partial
 cat > app/views/messages/_message.html.erb << 'PARTIAL'
-<div id="<%= dom_id(message) %>" class="p-3 bg-white rounded shadow-sm">
+<div id="<%= dom_id(message) %>" class="p-3 bg-white rounded shadow-sm" data-chat-target="message">
   <div class="flex justify-between items-start">
     <div>
       <span class="font-semibold text-blue-600"><%= message.username %></span>
@@ -212,23 +211,20 @@ bin/rails generate ruby2js:install
 mkdir -p app/javascript/controllers
 cat > app/javascript/controllers/chat_controller.rb << 'CONTROLLER'
 class ChatController < Stimulus::Controller
+  self.targets = ["message"]
+
   # Auto-scroll to bottom when controller connects
-  def connect()
-    scroll_to_bottom()
+  def connect
+    scroll_to_bottom
   end
 
-  # Called before Turbo Stream renders - schedule scroll after render
-  def scrollAfterRender(event)
-    # Only scroll if this stream targets our messages container
-    target = event.target.getAttribute("target")
-    return unless target == "messages"
-
-    # Use requestAnimationFrame to scroll after DOM update
-    requestAnimationFrame { scroll_to_bottom() }
+  # Called automatically by Stimulus when a new message target is added to the DOM
+  def messageTargetConnected(element)
+    scroll_to_bottom
   end
 
-  def scroll_to_bottom()
-    element.scrollTop = element.scrollHeight
+  def scroll_to_bottom
+    self.element.scrollTop = self.element.scrollHeight
   end
 end
 CONTROLLER

@@ -97,8 +97,7 @@ The `after_create_commit` callback broadcasts new messages to all subscribers. T
 <%# app/views/messages/index.html.erb %>
 <%= turbo_stream_from "chat_room" %>
 
-<div id="messages" data-controller="chat"
-     data-action="turbo:before-stream-render@document->chat#scrollAfterRender">
+<div id="messages" data-controller="chat">
   <%= render @messages %>
 </div>
 
@@ -111,6 +110,18 @@ The `after_create_commit` callback broadcasts new messages to all subscribers. T
 
 The `turbo_stream_from` helper establishes the WebSocket subscription. New messages append to `#messages` automatically.
 
+### Message Partial
+
+```erb
+<%# app/views/messages/_message.html.erb %>
+<div id="<%= dom_id(message) %>" data-chat-target="message">
+  <span><%= message.username %></span>
+  <span><%= message.body %></span>
+</div>
+```
+
+The `data-chat-target="message"` attribute tells Stimulus to track this element. When new messages are appended, Stimulus calls `messageTargetConnected`.
+
 ### Stimulus Controller in Ruby
 
 **Try it** — edit the Ruby code to see how it transpiles:
@@ -122,28 +133,28 @@ The `turbo_stream_from` helper establishes the WebSocket subscription. New messa
 
 ```ruby
 class ChatController < Stimulus::Controller
-  def connect()
-    scroll_to_bottom()
+  self.targets = ["message"]
+
+  def connect
+    scroll_to_bottom
   end
 
-  def scrollAfterRender(event)
-    target = event.target.getAttribute("target")
-    return unless target == "messages"
-    setTimeout(50) { scroll_to_bottom() }
+  def messageTargetConnected(element)
+    scroll_to_bottom
   end
 
-  def scroll_to_bottom()
-    element.scrollTop = element.scrollHeight
+  def scroll_to_bottom
+    self.element.scrollTop = self.element.scrollHeight
   end
 end
 ```
 
-The controller auto-scrolls the chat when new messages arrive.
+The controller auto-scrolls the chat when new messages arrive. The `messageTargetConnected` callback is called by Stimulus whenever a new element with `data-chat-target="message"` is added to the DOM—this is the idiomatic Stimulus pattern for reacting to dynamic content.
 
 **Key transpilations:**
-- `return unless` becomes `if (...) return`
-- Block `{ scroll_to_bottom() }` becomes arrow function
-- Implicit `element` becomes `this.element`
+- `self.targets = [...]` becomes `static targets = [...]`
+- `messageTargetConnected` stays as-is (Stimulus convention)
+- `self.element` becomes `this.element`
 
 ## WebSocket Implementation by Platform
 
@@ -190,9 +201,10 @@ The Durable Object uses hibernation for cost efficiency—connections stay open 
 ### Stimulus in Ruby
 
 - `Stimulus::Controller` base class
-- `connect()` lifecycle method
-- Event handlers with `event` parameter
-- Direct JavaScript object access (`element`, `setTimeout`)
+- `self.targets` for target definitions
+- `connect` lifecycle method
+- `targetConnected` callbacks for dynamic content
+- Direct JavaScript object access (`self.element`)
 
 ### Format Negotiation
 
