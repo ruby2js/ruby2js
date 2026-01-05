@@ -93,7 +93,11 @@ export class Router extends RouterServer {
 
   // Override handleResult to use full URL for redirects
   static handleResult(context, result, defaultRedirect) {
-    if (result.redirect) {
+    if (result.turbo_stream) {
+      // Turbo Stream response - return with proper content type
+      console.log('  Rendering turbo_stream response');
+      return this.turboStreamResponse(context, result.turbo_stream);
+    } else if (result.redirect) {
       // Set flash notice if present in result
       if (result.notice) {
         context.flash.set('notice', result.notice);
@@ -110,6 +114,18 @@ export class Router extends RouterServer {
     } else {
       return this.redirect(context, defaultRedirect);
     }
+  }
+
+  // Create Turbo Stream response with proper content type
+  static turboStreamResponse(context, html) {
+    const headers = { 'Content-Type': 'text/vnd.turbo-stream.html; charset=utf-8' };
+
+    const flashCookie = context.flash.getResponseCookie();
+    if (flashCookie) {
+      headers['Set-Cookie'] = flashCookie;
+    }
+
+    return new Response(html, { status: 200, headers });
   }
 
   // Override htmlResponse to use the correct Application class
