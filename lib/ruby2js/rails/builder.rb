@@ -1202,6 +1202,7 @@ class SelfhostBuilder
         #{css_link}
         <script type="module">
           import * as Turbo from '/node_modules/@hotwired/turbo/dist/turbo.es2017-esm.js';
+          import '/app/javascript/controllers/index.js';
           window.Turbo = Turbo;
         </script>
       </head>
