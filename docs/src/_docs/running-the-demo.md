@@ -1,5 +1,5 @@
 ---
-order: 31
+order: 510
 title: Running the Demo
 top_section: Behind the Scenes
 category: demo

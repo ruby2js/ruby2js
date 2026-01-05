@@ -1,5 +1,6 @@
 ---
-order: 7
+order: 140
+title: CLI
 top_section: Introduction
 category: CLI
 ---

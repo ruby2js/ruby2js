@@ -1,5 +1,5 @@
 ---
-order: 52
+order: 610
 title: CLI Reference
 top_section: Juntos
 category: juntos

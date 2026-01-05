@@ -1,5 +1,5 @@
 ---
-order: 9.6
+order: 250
 title: Building UI Components
 top_section: User's Guide
 category: users-guide-components

@@ -1,9 +1,8 @@
 ---
-order: 9.1
+order: 210
 title: Patterns
 top_section: User's Guide
 category: users-guide-patterns
-next_page_order: 9.2
 ---
 
 # Patterns

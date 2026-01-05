@@ -1,5 +1,5 @@
 ---
-order: 57
+order: 640
 title: Cloudflare Deployment
 top_section: Juntos
 category: juntos-deploying

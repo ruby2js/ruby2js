@@ -1,9 +1,8 @@
 ---
-order: 9
+order: 200
 title: Introduction
 top_section: User's Guide
 category: users-guide-intro
-next_page_order: 9.1
 ---
 
 # Writing Ruby for JavaScript

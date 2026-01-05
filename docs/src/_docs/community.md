@@ -1,6 +1,6 @@
 ---
-order: 8
-next_page_order: 10
+order: 150
+title: Community
 top_section: Introduction
 category: community
 ---

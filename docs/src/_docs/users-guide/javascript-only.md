@@ -1,9 +1,8 @@
 ---
-order: 9.4
+order: 240
 title: JavaScript-Only Development
 top_section: User's Guide
 category: users-guide-js-only
-next_page_order: 10
 ---
 
 # JavaScript-Only Development

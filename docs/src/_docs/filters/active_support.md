@@ -1,5 +1,5 @@
 ---
-order: 10
+order: 300
 title: ActiveSupport
 top_section: Filters
 category: active_support

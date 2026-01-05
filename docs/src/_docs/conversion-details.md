@@ -1,5 +1,5 @@
 ---
-order: 30
+order: 500
 title: Design Philosophy
 top_section: Behind the Scenes
 category: conversion-details

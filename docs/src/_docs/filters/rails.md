@@ -1,9 +1,8 @@
 ---
-order: 25.5
+order: 380
 title: Rails
 top_section: Filters
 category: rails
-next_page_order: 26
 ---
 
 The **Rails** filter transforms idiomatic Rails code into JavaScript, enabling Rails applications to run in browsers and JavaScript runtimes. It handles models, controllers, routes, migrations, seeds, and logging.

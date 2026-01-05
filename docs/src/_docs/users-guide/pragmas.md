@@ -1,9 +1,8 @@
 ---
-order: 9.2
+order: 220
 title: Pragmas in Practice
 top_section: User's Guide
 category: users-guide-pragmas
-next_page_order: 9.3
 ---
 
 # Pragmas in Practice

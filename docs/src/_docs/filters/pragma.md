@@ -1,9 +1,8 @@
 ---
-order: 25
+order: 375
 title: Pragma
 top_section: Filters
 category: pragma
-next_page_order: 25.5
 ---
 
 The **Pragma** filter provides line-level control over JavaScript output through

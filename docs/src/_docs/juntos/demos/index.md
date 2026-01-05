@@ -1,5 +1,5 @@
 ---
-order: 60
+order: 650
 title: Demo Applications
 top_section: Juntos
 category: juntos-demos
