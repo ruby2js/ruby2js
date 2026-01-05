@@ -225,9 +225,17 @@ export class FormHandler {
     return params;
   }
 
-  // Handle controller result (redirect or render)
+  // Handle controller result (redirect, render, or turbo_stream)
   static async handleResult(context, result, controllerName, action, controller, id = null) {
-    if (result.redirect) {
+    if (result.turbo_stream) {
+      // Turbo Stream response - apply partial page update via Turbo
+      console.log(`  Rendering turbo_stream response`);
+      if (typeof Turbo !== 'undefined' && Turbo.renderStreamMessage) {
+        Turbo.renderStreamMessage(result.turbo_stream);
+      } else {
+        console.warn('Turbo.renderStreamMessage not available');
+      }
+    } else if (result.redirect) {
       // Set flash messages before redirect
       if (result.notice) {
         context.flash.set('notice', result.notice);
@@ -417,23 +425,37 @@ export class Application extends ApplicationBase {
         const { route, match } = result;
         const context = createContext();
 
+        // Set Accept header to indicate Turbo Stream support for form submissions
+        // This allows controllers to check for turbo_stream format
+        if (typeof Turbo !== 'undefined' && (method === 'POST' || method === 'PATCH' || method === 'PUT' || method === 'DELETE')) {
+          context.request.headers = { accept: 'text/vnd.turbo-stream.html, text/html, application/xhtml+xml' };
+        }
+
         if (method === 'DELETE') {
           if (route.nested) {
             // Nested resource: /articles/:article_id/comments/:id
             const parentId = parseInt(match[1]);
             const id = match[2] ? parseInt(match[2]) : null;
-            await route.controller.destroy(context, parentId, id);
-            // Navigate back to parent show page
-            const parentPath = '/' + route.parentName + '/' + parentId;
-            history.pushState({}, '', parentPath);
-            await Router.dispatch(parentPath);
+            const response = await route.controller.destroy(context, parentId, id);
+            // Handle turbo_stream response or navigate back
+            if (response?.turbo_stream) {
+              await FormHandler.handleResult(context, response, route.controllerName, 'destroy', route.controller, id);
+            } else {
+              const parentPath = '/' + route.parentName + '/' + parentId;
+              history.pushState({}, '', parentPath);
+              await Router.dispatch(parentPath);
+            }
           } else {
             const id = match[1] ? parseInt(match[1]) : null;
-            await route.controller.destroy(context, id);
-            // Navigate back to index after delete
-            const indexPath = '/' + route.controllerName;
-            history.pushState({}, '', indexPath);
-            await Router.dispatch(indexPath);
+            const response = await route.controller.destroy(context, id);
+            // Handle turbo_stream response or navigate back
+            if (response?.turbo_stream) {
+              await FormHandler.handleResult(context, response, route.controllerName, 'destroy', route.controller, id);
+            } else {
+              const indexPath = '/' + route.controllerName;
+              history.pushState({}, '', indexPath);
+              await Router.dispatch(indexPath);
+            }
           }
         } else if (method === 'POST' || method === 'PATCH' || method === 'PUT') {
           // Extract form params from the fetch body (body already defined above)
@@ -512,7 +534,13 @@ export async function submitForm(event, handler) {
     const context = createContext(FormHandler.extractParams(event?.target));
     const result = await handler(context, event);
 
-    if (result?.redirect) {
+    if (result?.turbo_stream) {
+      // Turbo Stream response - apply partial page update via Turbo
+      console.log(`  Rendering turbo_stream response`);
+      if (typeof Turbo !== 'undefined' && Turbo.renderStreamMessage) {
+        Turbo.renderStreamMessage(result.turbo_stream);
+      }
+    } else if (result?.redirect) {
       // Set flash messages before redirect
       if (result.notice) {
         context.flash.set('notice', result.notice);
@@ -546,7 +574,13 @@ export function formData(event) {
 
 // Handle form submission result (context-aware)
 export function handleFormResult(context, result, rerenderFn = null) {
-  if (result?.redirect) {
+  if (result?.turbo_stream) {
+    // Turbo Stream response - apply partial page update via Turbo
+    console.log(`  Rendering turbo_stream response`);
+    if (typeof Turbo !== 'undefined' && Turbo.renderStreamMessage) {
+      Turbo.renderStreamMessage(result.turbo_stream);
+    }
+  } else if (result?.redirect) {
     // Set flash messages before redirect
     if (result.notice) {
       context.flash.set('notice', result.notice);

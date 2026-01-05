@@ -151,7 +151,18 @@ module Ruby2JS
           block_body = block_node.children[2]
 
           if block_send&.type == :send
+            receiver = block_send.children[0]
             helper_name = block_send.children[1]
+
+            # Handle turbo_stream.replace, turbo_stream.append, etc.
+            # turbo_stream can be either a local variable (lvar) or a method call (send nil :turbo_stream)
+            is_turbo_stream = (receiver&.type == :lvar && receiver.children[0] == :turbo_stream) ||
+                              (receiver&.type == :send && receiver.children[0].nil? && receiver.children[1] == :turbo_stream)
+            if is_turbo_stream
+              action = helper_name.to_s  # :replace, :append, :prepend, :remove, :update
+              target_arg = block_send.children[2]
+              return process_turbo_stream_action(action, target_arg, block_body)
+            end
 
             if helper_name == :form_for
               return process_form_for(block_send, block_args, block_body)
@@ -686,6 +697,108 @@ module Ruby2JS
           s(:or,
             s(:send, s(:const, nil, :TurboBroadcast), :subscribe, channel_node),
             s(:str, ''))
+        end
+
+        # Process turbo_stream.replace, turbo_stream.append, etc.
+        # turbo_stream.replace "target" do ... end
+        # -> <turbo-stream action="replace" target="..."><template>...</template></turbo-stream>
+        def process_turbo_stream_action(action, target_arg, block_body)
+          # Get target as string
+          target_str = if target_arg&.type == :str
+            target_arg.children[0]
+          else
+            nil
+          end
+
+          statements = []
+
+          # Add opening turbo-stream tag to buffer
+          if target_str
+            statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
+              s(:str, "<turbo-stream action=\"#{action}\" target=\"#{target_str}\"><template>"))
+          else
+            # Dynamic target
+            target_expr = process(target_arg)
+            statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
+              s(:dstr,
+                s(:str, "<turbo-stream action=\"#{action}\" target=\""),
+                s(:begin, target_expr),
+                s(:str, "\"><template>")))
+          end
+
+          # Process block body (adds to buffer via form_with etc.)
+          if block_body
+            if block_body.type == :begin
+              block_body.children.each do |child|
+                processed = process(child)
+                statements << processed if processed
+              end
+            else
+              processed = process(block_body)
+              statements << processed if processed
+            end
+          end
+
+          # Add closing turbo-stream tag to buffer
+          statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
+            s(:str, "</template></turbo-stream>"))
+
+          # Return a begin node containing all statements
+          if statements.length == 1
+            statements.first
+          else
+            s(:begin, *statements)
+          end
+        end
+
+        # Process ERB block content into a string expression
+        def process_erb_content(node)
+          return s(:str, '') unless node
+
+          case node.type
+          when :str
+            node
+          when :begin
+            # Multiple statements - process each and concatenate
+            parts = node.children.map { |child| process_erb_content(child) }
+            combine_string_parts(parts)
+          when :send
+            # Check for buffer operations
+            target, method, *args = node.children
+            if target&.type == :lvar && method == :append=
+              # _buf.append= expr -> process expr
+              process(args.first)
+            else
+              process(node)
+            end
+          else
+            process(node)
+          end
+        end
+
+        # Combine multiple string parts into a single string or dstr
+        def combine_string_parts(parts)
+          return s(:str, '') if parts.empty?
+          return parts.first if parts.length == 1
+
+          # Check if all parts are static strings
+          if parts.all? { |p| p.type == :str }
+            combined = parts.map { |p| p.children[0] }.join
+            return s(:str, combined)
+          end
+
+          # Build dstr with all parts
+          dstr_children = []
+          parts.each do |part|
+            if part.type == :str
+              dstr_children << part
+            elsif part.type == :dstr
+              dstr_children.concat(part.children)
+            else
+              dstr_children << s(:begin, part)
+            end
+          end
+          s(:dstr, *dstr_children)
         end
 
         # Process dom_id helper

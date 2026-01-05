@@ -1078,6 +1078,7 @@ class SelfhostBuilder
 
     resource_dirs.each do |resource|
       transpile_resource_views(resource, views_root, views_dist_dir)
+      transpile_turbo_stream_views(resource, views_root, views_dist_dir)
     end
   end
 
@@ -1128,6 +1129,53 @@ class SelfhostBuilder
     # Write combined module to app/views/#{resource}.js
     File.write(File.join(views_dist_dir, "#{resource}.js"), erb_views_js)
     puts("  -> app/views/#{resource}.js (combined ERB module)")
+  end
+
+  def transpile_turbo_stream_views(resource, views_root, views_dist_dir)
+    erb_dir = File.join(views_root, resource)
+    erb_files = Dir.glob(File.join(erb_dir, '*.turbo_stream.erb'))
+    return if erb_files.empty?
+
+    # Create resource subdirectory in dist for turbo stream templates
+    resource_dist_dir = File.join(views_dist_dir, resource)
+    FileUtils.mkdir_p(resource_dist_dir)
+
+    # Transpile each turbo stream ERB file
+    erb_files.each do |src_path|
+      basename = File.basename(src_path, '.turbo_stream.erb')
+      self.transpile_erb_file(src_path, File.join(resource_dist_dir, "#{basename}_turbo_stream.js"))
+    end
+
+    # Create combined module that exports all turbo stream functions
+    # Convert resource name to class-like name (messages -> Message, articles -> Article)
+    class_name = resource.chomp('s').split('_').map(&:capitalize).join
+    turbo_class = "#{class_name}TurboStreams"
+
+    turbo_js = <<~JS
+      // #{class_name} turbo stream templates - auto-generated from .turbo_stream.erb templates
+      // Each exported function returns Turbo Stream HTML for partial page updates
+
+    JS
+
+    render_exports = []
+    erb_files.sort.each do |erb_path|
+      name = File.basename(erb_path, '.turbo_stream.erb')
+      # Import from ./#{resource}/ subdirectory
+      turbo_js += "import { render as #{name}_render } from './#{resource}/#{name}_turbo_stream.js';\n"
+      render_exports << "#{name}: #{name}_render"
+    end
+
+    turbo_js += <<~JS
+
+      // Export #{turbo_class} - method names match controller action names
+      export const #{turbo_class} = {
+        #{render_exports.join(",\n  ")}
+      };
+    JS
+
+    # Write combined module to app/views/#{resource}_turbo_streams.js
+    File.write(File.join(views_dist_dir, "#{resource}_turbo_streams.js"), turbo_js)
+    puts("  -> app/views/#{resource}_turbo_streams.js (turbo stream templates)")
   end
 
   def transpile_layout()

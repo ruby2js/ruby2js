@@ -26,6 +26,8 @@ module Ruby2JS
           @rails_private_methods = {}
           @rails_model_refs = Set.new
           @rails_needs_views = false
+          @rails_needs_turbo_stream_views = false
+          @rails_current_action = nil
           # Model associations for preloading - set lazily from options in model_associations method
           @rails_model_associations = nil
         end
@@ -94,6 +96,8 @@ module Ruby2JS
           @rails_before_actions = []
           @rails_private_methods = {}
           @rails_model_refs = Set.new
+          @rails_needs_views = false
+          @rails_needs_turbo_stream_views = false
 
           result
         end
@@ -230,6 +234,7 @@ module Ruby2JS
 
         def transform_action_method(node)
           method_name = node.children[0]
+          @rails_current_action = method_name
           args = node.children[1]
           body = node.children[2]
 
@@ -359,7 +364,9 @@ module Ruby2JS
           output_args = s(:args, *param_args)
 
           # Create async class method (asyncs with self for async/await support)
-          s(:asyncs, s(:self), output_name, output_args, final_body)
+          result = s(:asyncs, s(:self), output_name, output_args, final_body)
+          @rails_current_action = nil
+          result
         end
 
         def collect_instance_variables(node)
@@ -529,6 +536,7 @@ module Ruby2JS
             # Multiple statements - collect format.html and format.turbo_stream blocks
             html_block = nil
             turbo_stream_block = nil
+            turbo_stream_template = false  # format.turbo_stream without block
 
             node.children.each do |child|
               if child.type == :block
@@ -544,7 +552,21 @@ module Ruby2JS
                     end
                   end
                 end
+              elsif child.type == :send
+                # format.turbo_stream without block - render template
+                receiver = child.children[0]
+                method = child.children[1]
+                if receiver&.type == :lvar && method == :turbo_stream
+                  turbo_stream_template = true
+                end
               end
+            end
+
+            # If turbo_stream template render is needed (no block), generate template call
+            if turbo_stream_template && html_block
+              return generate_format_conditional_with_template(html_block)
+            elsif turbo_stream_template
+              return generate_turbo_stream_template_render
             end
 
             # If both formats present, generate Accept header conditional
@@ -608,6 +630,53 @@ module Ruby2JS
           s(:begin,
             accept_var,
             s(:if, condition, turbo_branch, html_branch))
+        end
+
+        # Generate format conditional when format.turbo_stream is a template render (no block)
+        # Checks Accept header and returns turbo_stream response or html response
+        # Uses ternary to ensure proper return behavior (bare hash literals in if/else
+        # are misinterpreted as labeled blocks in JS)
+        def generate_format_conditional_with_template(html_block)
+          @rails_needs_turbo_stream_views = true
+
+          # Build: (context.request.headers.accept || '').includes('text/vnd.turbo-stream.html')
+          #        ? { turbo_stream: ... } : html_response
+          accept_check = s(:send,
+            s(:begin,
+              s(:or,
+                s(:attr,
+                  s(:attr,
+                    s(:attr, s(:lvar, :context), :request),
+                    :headers),
+                  :accept),
+                s(:str, ''))),
+            :includes,
+            s(:str, 'text/vnd.turbo-stream.html'))
+
+          turbo_branch = generate_turbo_stream_template_render
+          html_branch = transform_ivars_to_locals(html_block)
+
+          # Use ternary for proper expression context
+          s(:if, accept_check, turbo_branch, html_branch)
+        end
+
+        # Generate turbo_stream template render call
+        # Returns: { turbo_stream: MessageTurboStreams.create(context, {message}) }
+        def generate_turbo_stream_template_render
+          @rails_needs_turbo_stream_views = true
+
+          model_name = @rails_controller_name.downcase.to_sym
+          view_module = "#{@rails_controller_name}TurboStreams"
+          action = @rails_current_action
+
+          # Build view call: MessageTurboStreams.create(context, {message: message})
+          s(:hash,
+            s(:pair, s(:sym, :turbo_stream),
+              s(:send,
+                s(:const, nil, view_module.to_sym),
+                action,
+                s(:lvar, :context),
+                s(:hash, s(:pair, s(:sym, model_name), s(:lvar, model_name))))))
         end
 
         # Wrap ActiveRecord operations with await for async database support
@@ -876,6 +945,14 @@ module Ruby2JS
             imports << s(:send, nil, :import,
               s(:array, s(:const, nil, view_module.to_sym)),
               s(:str, "../views/#{@rails_controller_plural}.js"))
+          end
+
+          # Import turbo stream views if needed
+          if @rails_needs_turbo_stream_views
+            turbo_module = "#{@rails_controller_name}TurboStreams"
+            imports << s(:send, nil, :import,
+              s(:array, s(:const, nil, turbo_module.to_sym)),
+              s(:str, "../views/#{@rails_controller_plural}_turbo_streams.js"))
           end
 
           imports
