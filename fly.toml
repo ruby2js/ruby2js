@@ -4,7 +4,7 @@
 #
 
 app = 'ruby2js'
-primary_region = 'iad'
+primary_region = 'dfw'
 
 [build]
 
