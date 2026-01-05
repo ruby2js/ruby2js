@@ -111,6 +111,24 @@ module Ruby2JS
               s(:array, s(:const, nil, :BroadcastChannel)),
               s(:str, "../../lib/rails.js"))
             model_import_nodes.push(broadcast_import)
+
+            # Collect and import broadcast partials
+            # For now, only supports one partial per model (imported as 'render')
+            partials = collect_broadcast_partials(body)
+            if partials.length > 0
+              partial_path = partials.first
+              # Build path: messages/message -> ../views/messages/_message.js
+              parts = partial_path.split('/')
+              partial_file = "_#{parts.last}.js"
+              partial_dir = parts[0..-2].join('/')
+              import_path = "../views/#{partial_dir}/#{partial_file}"
+
+              # Import { render } from "..."
+              partial_import = s(:send, nil, :import,
+                s(:array, s(:const, nil, :render)),
+                s(:str, import_path))
+              model_import_nodes.push(partial_import)
+            end
           end
 
           begin_node = s(:begin, import_node, *model_import_nodes, exported_class)
@@ -254,6 +272,31 @@ module Ruby2JS
           node.children.any? { |child| body_uses_broadcasts?(child) }
         end
 
+        # Collect all broadcast partial paths from the class body (pre-pass)
+        def collect_broadcast_partials(node, partials = [])
+          return partials unless node.respond_to?(:type)
+
+          if node.type == :send
+            method = node.children[1]
+            if BROADCAST_METHODS.include?(method)
+              args = node.children[2..-1]
+              args.each do |arg|
+                next unless arg.type == :hash
+                arg.children.each do |pair|
+                  key_node, value_node = pair.children
+                  if key_node.children[0].to_s == 'partial' && value_node.type == :str
+                    partials << value_node.children[0]
+                  end
+                end
+              end
+            end
+          end
+
+          # Recurse into children
+          node.children.each { |child| collect_broadcast_partials(child, partials) }
+          partials.uniq
+        end
+
         # Process broadcast_*_to method calls
         # Example: broadcast_append_to "article_#{article_id}_comments", partial: "...", target: "comments"
         # Generates: BroadcastChannel.broadcast("channel", `<turbo-stream ...>...</turbo-stream>`)
@@ -339,7 +382,25 @@ module Ruby2JS
           end
 
           # For other actions, we need to render content
-          # Build: `<turbo-stream action="..." target="..."><template>${record.toHTML()}</template></turbo-stream>`
+          # If partial is specified, use the compiled partial render function
+          # Otherwise fall back to record.toHTML
+
+          content_expr = if partial_node&.type == :str
+            # Extract partial path: "messages/message" -> render function call
+            partial_path = partial_node.children[0]
+            # Track this partial and get its index for function name
+            @broadcast_partials ||= []
+            partial_index = @broadcast_partials.index(partial_path)
+            if partial_index.nil?
+              partial_index = @broadcast_partials.length
+              @broadcast_partials << partial_path
+            end
+            render_call = build_partial_render_call(partial_index, locals_node, receiver)
+            render_call
+          else
+            # No partial specified, use toHTML
+            s(:send, receiver, :toHTML)
+          end
 
           # Handle target
           target_expr = nil
@@ -353,7 +414,7 @@ module Ruby2JS
             # Static target
             s(:dstr,
               s(:str, "<turbo-stream action=\"#{action}\" target=\"#{target_expr}\"><template>"),
-              s(:begin, s(:send, receiver, :toHTML)),
+              s(:begin, content_expr),
               s(:str, '</template></turbo-stream>'))
           else
             # Dynamic target
@@ -361,9 +422,34 @@ module Ruby2JS
               s(:str, "<turbo-stream action=\"#{action}\" target=\""),
               s(:begin, process(target_node)),
               s(:str, '"><template>'),
-              s(:begin, s(:send, receiver, :toHTML)),
+              s(:begin, content_expr),
               s(:str, '</template></turbo-stream>'))
           end
+        end
+
+        # Build a call to the partial's render function
+        def build_partial_render_call(partial_index, locals_node, receiver)
+          # Build locals object from locals_node
+          # locals: { message: self } -> { message: record }
+          locals_hash = if locals_node&.type == :hash
+            pairs = locals_node.children.map do |pair|
+              key_node, value_node = pair.children
+              # Transform the value (self -> record in callbacks)
+              transformed_value = if value_node.type == :self
+                receiver
+              else
+                process(value_node)
+              end
+              s(:pair, key_node, transformed_value)
+            end
+            s(:hash, *pairs)
+          else
+            # No locals specified, pass empty object
+            s(:hash)
+          end
+
+          # Build: render({}, locals)
+          s(:send, nil, :render, s(:hash), locals_hash)
         end
 
         def model_class?(class_name, superclass)
