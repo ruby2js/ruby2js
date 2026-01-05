@@ -19,7 +19,7 @@ When a class definition is encountered that derives from
 
  * `initialize` methods are **not** mapped to constructors.
 
- * **All methods are generated as JavaScript methods**, not getters. This ensures proper `this.methodName()` call semantics when methods call each other within the controller.
+ * **All methods are generated as JavaScript methods**, not getters. This ensures proper `this.methodName()` call semantics when methods call each other within the controller. Exception: methods that override an `attr_reader` or `attr_accessor` remain getters to preserve property accessor semantics.
 
  * Unqualified references to `application` and `element` are prefixed with
    `this.`.  As will each of the identifiers mentioned in the next three

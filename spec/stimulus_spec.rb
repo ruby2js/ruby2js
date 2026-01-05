@@ -153,7 +153,7 @@ describe Ruby2JS::Filter::Stimulus do
   describe "method definitions" do
     it "should generate methods not getters for all defs" do
       result = to_js('class Foo<Stimulus; def connect; end; def greet; end; end')
-      # Both should be methods with parentheses, not getters
+      # All defs should be methods, not getters
       result.must_include 'connect()'
       result.must_include 'greet()'
       result.wont_include 'get connect'
@@ -166,10 +166,12 @@ describe Ruby2JS::Filter::Stimulus do
       result.must_include 'this.scroll_to_bottom()'
     end
 
-    it "should handle methods calling other methods" do
-      result = to_js('class Foo<Stimulus; def a; b; c; end; def b; end; def c; end; end')
-      result.must_include 'this.b()'
-      result.must_include 'this.c()'
+    it "should keep attr_reader overrides as getters" do
+      result = to_js('class Foo<Stimulus; attr_reader :source; def source; @source ||= default; end; end')
+      # Methods overriding attr_reader should stay as getters (not methods)
+      result.must_include 'get source()'
+      # Should not have a non-getter method definition
+      result.wont_match(/[^t] source\(\)/)  # matches " source()" but not "get source()"
     end
   end
 

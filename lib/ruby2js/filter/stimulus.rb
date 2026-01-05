@@ -163,9 +163,20 @@ module Ruby2JS
 
         nodes.pop unless nodes.last
 
-        # Convert all def nodes to defm to ensure they're methods, not getters
+        # Collect attr_reader/attr_accessor names - these are intentionally property accessors
+        attr_reader_names = Set.new
+        nodes.each do |n|
+          if n.type == :send && %i[attr_reader attr_accessor].include?(n.children[1])
+            n.children[2..].each do |arg|
+              attr_reader_names.add(arg.children.first) if arg.type == :sym
+            end
+          end
+        end
+
+        # Convert def nodes to defm to ensure they're methods, not getters.
+        # Exception: methods overriding attr_reader/attr_accessor stay as getters.
         nodes = nodes.map do |n|
-          if n.type == :def
+          if n.type == :def && !attr_reader_names.include?(n.children.first)
             n.updated(:defm, n.children)
           else
             n
