@@ -3,6 +3,7 @@ order: 62
 title: Chat Demo
 top_section: Juntos
 category: juntos-demos
+hide_in_toc: true
 ---
 
 # Chat Demo

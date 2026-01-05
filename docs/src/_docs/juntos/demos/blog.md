@@ -3,6 +3,7 @@ order: 61
 title: Blog Demo
 top_section: Juntos
 category: juntos-demos
+hide_in_toc: true
 ---
 
 # Blog Demo
