@@ -105,22 +105,21 @@ CONTROLLER
 
 # Create chat room view
 cat > app/views/messages/index.html.erb << 'VIEW'
-<div class="max-w-2xl mx-auto p-4">
+<div class="max-w-2xl mx-auto p-4" data-controller="chat">
   <h1 class="text-2xl font-bold mb-6">Chat Room</h1>
 
   <%# Subscribe to real-time updates %>
   <%= turbo_stream_from "chat_room" %>
 
   <%# Messages container - broadcasts append here %>
-  <%# Stimulus controller handles auto-scroll when new messages arrive %>
   <div id="messages"
-       class="space-y-4 mb-8 h-96 overflow-y-auto border rounded p-4 bg-gray-50"
-       data-controller="chat">
+       class="space-y-4 mb-8 h-96 overflow-y-auto border rounded p-4 bg-gray-50">
     <%= render @messages %>
   </div>
 
-  <%# New message form %>
-  <%= form_with model: @message, class: "space-y-4" do |form| %>
+  <%# New message form - clears input after successful submission %>
+  <%= form_with model: @message, class: "space-y-4",
+      data: { action: "turbo:submit-end->chat#clearInput" } do |form| %>
     <div class="flex gap-4">
       <div class="w-1/4">
         <%= form.text_field :username,
@@ -132,7 +131,8 @@ cat > app/views/messages/index.html.erb << 'VIEW'
         <%= form.text_field :body,
             placeholder: "Type a message...",
             autofocus: true,
-            class: "w-full border rounded p-2" %>
+            class: "w-full border rounded p-2",
+            data: { chat_target: "body" } %>
       </div>
       <%= form.submit "Send",
           class: "bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700" %>
@@ -207,23 +207,29 @@ SEEDS
 # Run ruby2js:install generator
 bin/rails generate ruby2js:install
 
-# Create Stimulus controller for auto-scroll (in Ruby for transpilation)
+# Create Stimulus controller for auto-scroll and form clearing (in Ruby for transpilation)
 mkdir -p app/javascript/controllers
 cat > app/javascript/controllers/chat_controller.rb << 'CONTROLLER'
 class ChatController < Stimulus::Controller
-  self.targets = ["message"]
+  self.targets = ["message", "body"]
 
   # Auto-scroll to bottom when controller connects
-  def connect()
-    scroll_to_bottom()
+  def connect
+    scroll_to_bottom
   end
 
   # Called automatically by Stimulus when a new message target is added to the DOM
   def messageTargetConnected(element)
-    scroll_to_bottom()
+    scroll_to_bottom
   end
 
-  def scroll_to_bottom()
+  # Clear the message input after form submission
+  def clearInput
+    bodyTarget.value = ""
+    bodyTarget.focus()
+  end
+
+  def scroll_to_bottom
     self.element.scrollTop = self.element.scrollHeight
   end
 end

@@ -95,20 +95,24 @@ The `after_create_commit` callback broadcasts new messages to all subscribers. T
 
 ```erb
 <%# app/views/messages/index.html.erb %>
-<%= turbo_stream_from "chat_room" %>
+<div data-controller="chat">
+  <%= turbo_stream_from "chat_room" %>
 
-<div id="messages" data-controller="chat">
-  <%= render @messages %>
+  <div id="messages">
+    <%= render @messages %>
+  </div>
+
+  <%= form_with model: Message.new,
+      data: { action: "turbo:submit-end->chat#clearInput" } do |f| %>
+    <%= f.text_field :username, placeholder: "Name" %>
+    <%= f.text_field :body, placeholder: "Message",
+        data: { chat_target: "body" } %>
+    <%= f.submit "Send" %>
+  <% end %>
 </div>
-
-<%= form_with model: Message.new do |f| %>
-  <%= f.text_field :username, placeholder: "Name" %>
-  <%= f.text_field :body, placeholder: "Message" %>
-  <%= f.submit "Send" %>
-<% end %>
 ```
 
-The `turbo_stream_from` helper establishes the WebSocket subscription. New messages append to `#messages` automatically.
+The `turbo_stream_from` helper establishes the WebSocket subscription. New messages append to `#messages` automatically. The `turbo:submit-end` action clears the input field after each message is sent.
 
 ### Message Partial
 
@@ -133,27 +137,33 @@ The `data-chat-target="message"` attribute tells Stimulus to track this element.
 
 ```ruby
 class ChatController < Stimulus::Controller
-  self.targets = ["message"]
+  self.targets = ["message", "body"]
 
-  def connect()
-    scroll_to_bottom()
+  def connect
+    scroll_to_bottom
   end
 
   def messageTargetConnected(element)
-    scroll_to_bottom()
+    scroll_to_bottom
   end
 
-  def scroll_to_bottom()
+  def clearInput
+    bodyTarget.value = ""
+    bodyTarget.focus()
+  end
+
+  def scroll_to_bottom
     self.element.scrollTop = self.element.scrollHeight
   end
 end
 ```
 
-The controller auto-scrolls the chat when new messages arrive. The `messageTargetConnected` callback is called by Stimulus whenever a new element with `data-chat-target="message"` is added to the DOM—this is the idiomatic Stimulus pattern for reacting to dynamic content.
+The controller auto-scrolls the chat when new messages arrive and clears the input after each message is sent. The `messageTargetConnected` callback is called by Stimulus whenever a new element with `data-chat-target="message"` is added to the DOM—this is the idiomatic Stimulus pattern for reacting to dynamic content.
 
 **Key transpilations:**
 - `self.targets = [...]` becomes `static targets = [...]`
 - `messageTargetConnected` stays as-is (Stimulus convention)
+- `bodyTarget` becomes `this.bodyTarget` (Stimulus target accessor)
 - `self.element` becomes `this.element`
 
 ## WebSocket Implementation by Platform
