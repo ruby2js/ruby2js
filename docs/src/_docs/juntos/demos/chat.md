@@ -135,15 +135,15 @@ The `data-chat-target="message"` attribute tells Stimulus to track this element.
 class ChatController < Stimulus::Controller
   self.targets = ["message"]
 
-  def connect
-    scroll_to_bottom
+  def connect()
+    scroll_to_bottom()
   end
 
   def messageTargetConnected(element)
-    scroll_to_bottom
+    scroll_to_bottom()
   end
 
-  def scroll_to_bottom
+  def scroll_to_bottom()
     self.element.scrollTop = self.element.scrollHeight
   end
 end

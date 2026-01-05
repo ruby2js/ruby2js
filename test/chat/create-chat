@@ -214,16 +214,16 @@ class ChatController < Stimulus::Controller
   self.targets = ["message"]
 
   # Auto-scroll to bottom when controller connects
-  def connect
-    scroll_to_bottom
+  def connect()
+    scroll_to_bottom()
   end
 
   # Called automatically by Stimulus when a new message target is added to the DOM
   def messageTargetConnected(element)
-    scroll_to_bottom
+    scroll_to_bottom()
   end
 
-  def scroll_to_bottom
+  def scroll_to_bottom()
     self.element.scrollTop = self.element.scrollHeight
   end
 end
