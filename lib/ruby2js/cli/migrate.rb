@@ -129,9 +129,9 @@ module Ruby2JS
             abort "\nError: wrangler not found. Install with: npm install -D wrangler"
           end
 
-          # Use wrangler to run migrations via the d1_migrate.mjs script
-          puts "Using wrangler to run D1 migrations (local)..."
-          unless system('npx', 'wrangler', 'd1', 'execute', db_name, '--local',
+          # Use wrangler to run migrations on remote D1
+          puts "Running D1 migrations on remote database..."
+          unless system('npx', 'wrangler', 'd1', 'execute', db_name, '--remote',
                         '--file', 'db/migrations.sql')
             abort "\nError: D1 migration failed. Make sure db/migrations.sql exists."
           end
