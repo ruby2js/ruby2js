@@ -1200,8 +1200,16 @@ class SelfhostBuilder
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>\${title}</title>
         #{css_link}
+        <script type="importmap">
+        {
+          "imports": {
+            "@hotwired/turbo": "/node_modules/@hotwired/turbo/dist/turbo.es2017-esm.js",
+            "@hotwired/stimulus": "/node_modules/@hotwired/stimulus/dist/stimulus.js"
+          }
+        }
+        </script>
         <script type="module">
-          import * as Turbo from '/node_modules/@hotwired/turbo/dist/turbo.es2017-esm.js';
+          import * as Turbo from '@hotwired/turbo';
           import '/app/javascript/controllers/index.js';
           window.Turbo = Turbo;
         </script>
