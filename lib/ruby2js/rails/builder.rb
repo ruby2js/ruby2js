@@ -1185,6 +1185,17 @@ class SelfhostBuilder
       css_link = '<link href="/assets/tailwind.css" rel="stylesheet">'
     end
 
+    # Use CDN URLs for edge targets (Cloudflare, Vercel) since they don't have node_modules
+    # Local server targets (Node, Bun, Deno) can serve from node_modules directly
+    edge_targets = %w[cloudflare vercel-edge vercel-node]
+    if edge_targets.include?(@target.to_s) || edge_targets.include?(@runtime.to_s)
+      turbo_url = 'https://cdn.jsdelivr.net/npm/@hotwired/turbo@8/dist/turbo.es2017-esm.js'
+      stimulus_url = 'https://cdn.jsdelivr.net/npm/@hotwired/stimulus@3/dist/stimulus.js'
+    else
+      turbo_url = '/node_modules/@hotwired/turbo/dist/turbo.es2017-esm.js'
+      stimulus_url = '/node_modules/@hotwired/stimulus/dist/stimulus.js'
+    end
+
     # Generate a minimal layout for server-side rendering
     # Rails-specific helpers (csrf_meta_tags, etc.) don't make sense in JS context
     # Layout receives context for access to contentFor, flash, etc.
@@ -1203,8 +1214,8 @@ class SelfhostBuilder
         <script type="importmap">
         {
           "imports": {
-            "@hotwired/turbo": "/node_modules/@hotwired/turbo/dist/turbo.es2017-esm.js",
-            "@hotwired/stimulus": "/node_modules/@hotwired/stimulus/dist/stimulus.js"
+            "@hotwired/turbo": "#{turbo_url}",
+            "@hotwired/stimulus": "#{stimulus_url}"
           }
         }
         </script>
