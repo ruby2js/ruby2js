@@ -1281,8 +1281,9 @@ class SelfhostBuilder
     end
 
     # Generate index.js that registers all controllers
+    # Use uniq because both .js and .rb versions may exist (e.g., chat_controller.js and chat_controller.rb)
     if controllers.any?
-      self.generate_stimulus_index(dest_dir, controllers)
+      self.generate_stimulus_index(dest_dir, controllers.uniq)
     end
   end
 

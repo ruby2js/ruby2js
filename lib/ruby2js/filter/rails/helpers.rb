@@ -1015,6 +1015,26 @@ module Ruby2JS
                   options[:max] = value.children[0] if [:int, :str].include?(value.type)
                 when :step
                   options[:step] = value.children[0] if [:int, :str].include?(value.type)
+                when :data
+                  # Handle data: { key: value } -> data-key="value"
+                  if value.type == :hash
+                    options[:data] ||= {}
+                    value.children.each do |data_pair|
+                      data_key = data_pair.children[0]
+                      data_value = data_pair.children[1]
+                      if data_key.type == :sym
+                        # Convert underscores to dashes: chat_target -> chat-target
+                        attr_name = data_key.children[0].to_s.gsub('_', '-')
+                        if data_value.type == :str
+                          options[:data][attr_name] = data_value.children[0]
+                        elsif data_value.type == :true
+                          options[:data][attr_name] = "true"
+                        elsif data_value.type == :false
+                          options[:data][attr_name] = "false"
+                        end
+                      end
+                    end
+                  end
                 end
               end
             end
@@ -1039,6 +1059,12 @@ module Ruby2JS
           attrs << "min=\"#{options[:min]}\"" if options[:min]
           attrs << "max=\"#{options[:max]}\"" if options[:max]
           attrs << "step=\"#{options[:step]}\"" if options[:step]
+          # Add data-* attributes
+          if options[:data]
+            options[:data].each do |key, value|
+              attrs << "data-#{key}=\"#{value}\""
+            end
+          end
           attrs.empty? ? "" : " " + attrs.join(" ")
         end
 
@@ -1067,6 +1093,12 @@ module Ruby2JS
           attrs << "min=\"#{options[:min]}\"" if options[:min]
           attrs << "max=\"#{options[:max]}\"" if options[:max]
           attrs << "step=\"#{options[:step]}\"" if options[:step]
+          # Add data-* attributes
+          if options[:data]
+            options[:data].each do |key, value|
+              attrs << "data-#{key}=\"#{value}\""
+            end
+          end
 
           static_attrs = attrs.empty? ? "" : " " + attrs.join(" ")
 
@@ -1293,11 +1325,12 @@ module Ruby2JS
         # form_with(model: @article) do |form| ... end
         # form_with(url: articles_path, class: "contents") do |form| ... end
         def process_form_with(helper_call, block_args, block_body)
-          # Extract model, url, and class from keyword arguments
+          # Extract model, url, class, and data from keyword arguments
           model_name = nil
           parent_model_name = nil  # Track parent for nested resources
           model_is_new = false  # Track if model is Model.new (no pre-fill values)
           css_class = nil
+          data_attrs = {}  # Track data-* attributes for form tag
           options_node = helper_call.children[2]
 
           if options_node&.type == :hash
@@ -1344,6 +1377,25 @@ module Ruby2JS
                   end
                 when :class
                   css_class = extract_class_value(value)
+                when :data
+                  # Handle data: { key: value } -> data-key="value"
+                  if value.type == :hash
+                    value.children.each do |data_pair|
+                      data_key = data_pair.children[0]
+                      data_value = data_pair.children[1]
+                      if data_key.type == :sym
+                        # Convert underscores to dashes: turbo_confirm -> turbo-confirm
+                        attr_name = data_key.children[0].to_s.gsub('_', '-')
+                        if data_value.type == :str
+                          data_attrs[attr_name] = data_value.children[0]
+                        elsif data_value.type == :true
+                          data_attrs[attr_name] = "true"
+                        elsif data_value.type == :false
+                          data_attrs[attr_name] = "false"
+                        end
+                      end
+                    end
+                  end
                 end
               end
             end
@@ -1362,6 +1414,9 @@ module Ruby2JS
 
           # Build class attribute string
           class_attr = css_class ? " class=\"#{css_class}\"" : ""
+
+          # Build data attributes string
+          data_attr = data_attrs.map { |k, v| " data-#{k}=\"#{v}\"" }.join
 
           # Build form tag with action and method - Turbo intercepts form submissions automatically
           if model_name
@@ -1384,13 +1439,13 @@ module Ruby2JS
                 parent_var = s(:lvar, parent_model_name.to_sym)
                 statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
                   s(:dstr,
-                    s(:str, "<form data-model=\"#{model_name}\"#{class_attr} action=\""),
+                    s(:str, "<form data-model=\"#{model_name}\"#{class_attr}#{data_attr} action=\""),
                     s(:begin, s(:send, nil, plural_path, parent_var)),
                     s(:str, "\" method=\"post\">")))
               else
                 statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
                   s(:dstr,
-                    s(:str, "<form data-model=\"#{model_name}\"#{class_attr} action=\""),
+                    s(:str, "<form data-model=\"#{model_name}\"#{class_attr}#{data_attr} action=\""),
                     s(:begin, s(:send, nil, plural_path)),
                     s(:str, "\" method=\"post\">")))
               end
@@ -1399,7 +1454,7 @@ module Ruby2JS
               # <form action="<%= article.id ? article_path(article) : articles_path() %>" method="post">
               statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
                 s(:dstr,
-                  s(:str, "<form data-model=\"#{model_name}\"#{class_attr} action=\""),
+                  s(:str, "<form data-model=\"#{model_name}\"#{class_attr}#{data_attr} action=\""),
                   s(:begin,
                     s(:if, s(:attr, model_var, :id),
                       s(:send, nil, singular_path, model_var),
@@ -1414,7 +1469,7 @@ module Ruby2JS
                 nil)
             end
           else
-            statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+, s(:str, "<form#{class_attr}>"))
+            statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+, s(:str, "<form#{class_attr}#{data_attr}>"))
           end
 
           if block_body

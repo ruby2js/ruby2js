@@ -422,6 +422,9 @@ export class Application extends ApplicationBase {
         // Prevent Turbo from making a fetch request
         event.preventDefault();
 
+        // Capture the form element to dispatch turbo:submit-end later
+        const formElement = event.target;
+
         const { route, match } = result;
         const context = createContext();
 
@@ -501,6 +504,15 @@ export class Application extends ApplicationBase {
               : await controllerAction.call(route.controller, context, params);
             await FormHandler.handleResult(context, response, route.controllerName, route.action, route.controller, id);
           }
+        }
+
+        // Dispatch turbo:submit-end to maintain compatibility with Stimulus actions
+        // that depend on Turbo's form submission lifecycle events
+        if (formElement) {
+          formElement.dispatchEvent(new CustomEvent('turbo:submit-end', {
+            bubbles: true,
+            detail: { success: true }
+          }));
         }
       });
 

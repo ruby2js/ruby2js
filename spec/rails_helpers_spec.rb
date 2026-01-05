@@ -142,6 +142,48 @@ describe Ruby2JS::Filter::Rails::Helpers do
       result.must_include 'border-red'
       result.must_include '?'
     end
+
+    it "should include data attributes on text_field" do
+      return skip() unless defined?(Ruby2JS::Erubi)
+      result = erb_to_js('<%= form_with(model: @message) do |form| %><%= form.text_field :body, data: { chat_target: "body" } %><% end %>')
+      result.must_include 'data-chat-target="body"'
+    end
+
+    it "should convert underscores to dashes in data attribute names" do
+      return skip() unless defined?(Ruby2JS::Erubi)
+      result = erb_to_js('<%= form_with(model: @user) do |form| %><%= form.text_field :name, data: { controller_name: "user", action_type: "submit" } %><% end %>')
+      result.must_include 'data-controller-name="user"'
+      result.must_include 'data-action-type="submit"'
+    end
+
+    it "should handle data attributes with boolean values" do
+      return skip() unless defined?(Ruby2JS::Erubi)
+      result = erb_to_js('<%= form_with(model: @user) do |form| %><%= form.text_field :name, data: { turbo: true, disabled: false } %><% end %>')
+      result.must_include 'data-turbo="true"'
+      result.must_include 'data-disabled="false"'
+    end
+
+    it "should handle data attributes alongside other options" do
+      return skip() unless defined?(Ruby2JS::Erubi)
+      result = erb_to_js('<%= form_with(model: @user) do |form| %><%= form.text_field :name, class: "input", placeholder: "Name", data: { target: "form.input" } %><% end %>')
+      result.must_include 'class="input"'
+      result.must_include 'placeholder="Name"'
+      result.must_include 'data-target="form.input"'
+    end
+
+    it "should include data attributes on form_with tag" do
+      return skip() unless defined?(Ruby2JS::Erubi)
+      result = erb_to_js('<%= form_with(model: @message, class: "space-y-4", data: { action: "turbo:submit-end->chat#clearInput" }) do |form| %><% end %>')
+      result.must_include 'data-action="turbo:submit-end->chat#clearInput"'
+      result.must_include 'class="space-y-4"'
+    end
+
+    it "should handle multiple data attributes on form_with tag" do
+      return skip() unless defined?(Ruby2JS::Erubi)
+      result = erb_to_js('<%= form_with(model: @article, data: { controller: "form", turbo_frame: "modal" }) do |form| %><% end %>')
+      result.must_include 'data-controller="form"'
+      result.must_include 'data-turbo-frame="modal"'
+    end
   end
 
   describe 'link_to helper' do
