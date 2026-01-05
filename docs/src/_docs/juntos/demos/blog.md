@@ -2,11 +2,9 @@
 order: 655
 title: Blog Demo
 top_section: Juntos
-category: juntos-demos
+category: juntos/demos
 hide_in_toc: true
 ---
-
-# Blog Demo
 
 A classic Rails blog with articles and comments. The same code runs on Rails, in browsers with IndexedDB, on Node.js with SQLite, and on edge platforms.
 

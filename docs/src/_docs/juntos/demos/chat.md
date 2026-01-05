@@ -2,11 +2,9 @@
 order: 660
 title: Chat Demo
 top_section: Juntos
-category: juntos-demos
+category: juntos/demos
 hide_in_toc: true
 ---
-
-# Chat Demo
 
 A real-time chat room demonstrating Hotwire patterns—Turbo Streams broadcasting and Stimulus controllers written in Ruby.
 
