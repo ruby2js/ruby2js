@@ -137,28 +137,17 @@ The `data-chat-target="message"` attribute tells Stimulus to track this element.
 
 ```ruby
 class ChatController < Stimulus::Controller
-  self.targets = %w(message body)
+  self.targets = %w(body)
 
-  # Auto-scroll to bottom when controller connects
-  def connect
-    scroll_to_bottom
-  end
-
-  # Auto-scroll to bottom when a new message is added
+  # Auto-scroll to show the new message
   def messageTargetConnected(element)
-    scroll_to_bottom
+    element.scrollIntoView()
   end
 
   # Clear the message input after form submission
   def clearInput
     bodyTarget.value = ""
     bodyTarget.focus()
-  end
-
-  # scrollHeight is the total height of content (including overflow).
-  # Setting scrollTop to scrollHeight scrolls to the very bottom.
-  def scroll_to_bottom
-    self.element.scrollTop = self.element.scrollHeight
   end
 end
 ```
