@@ -150,6 +150,29 @@ describe Ruby2JS::Filter::Stimulus do
     end
   end
 
+  describe "method definitions" do
+    it "should generate methods not getters for all defs" do
+      result = to_js('class Foo<Stimulus; def connect; end; def greet; end; end')
+      # Both should be methods with parentheses, not getters
+      result.must_include 'connect()'
+      result.must_include 'greet()'
+      result.wont_include 'get connect'
+      result.wont_include 'get greet'
+    end
+
+    it "should call class methods with this. and parentheses" do
+      result = to_js('class Foo<Stimulus; def greet; scroll_to_bottom; end; def scroll_to_bottom; end; end')
+      # Internal method call should have this. prefix and parentheses
+      result.must_include 'this.scroll_to_bottom()'
+    end
+
+    it "should handle methods calling other methods" do
+      result = to_js('class Foo<Stimulus; def a; b; c; end; def b; end; def c; end; end')
+      result.must_include 'this.b()'
+      result.must_include 'this.c()'
+    end
+  end
+
   describe Ruby2JS::Filter::DEFAULTS do
     it "should include Stimulus" do
       _(Ruby2JS::Filter::DEFAULTS).must_include Ruby2JS::Filter::Stimulus

@@ -7,9 +7,6 @@ module Ruby2JS
       module Controller
         include SEXP
 
-        # Standard RESTful action names
-        RESTFUL_ACTIONS = %i[index show new create edit update destroy].freeze
-
         # ActiveRecord class methods that should be awaited
         AR_CLASS_METHODS = %i[all find find_by where first last count create create! order].freeze
 

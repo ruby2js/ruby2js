@@ -19,7 +19,9 @@ When a class definition is encountered that derives from
 
  * `initialize` methods are **not** mapped to constructors.
 
- * Unqualified references to `application` and `element` are prefixed with 
+ * **All methods are generated as JavaScript methods**, not getters. This ensures proper `this.methodName()` call semantics when methods call each other within the controller.
+
+ * Unqualified references to `application` and `element` are prefixed with
    `this.`.  As will each of the identifiers mentioned in the next three
    bullets.
 

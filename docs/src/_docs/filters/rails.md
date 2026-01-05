@@ -117,10 +117,13 @@ end
 
 ```javascript
 export class Article extends ApplicationRecord {
-  static _callbacks = {
-    before_save: ["normalize_title"],
-    after_create: ["notify_subscribers"]
-  };
+  before_save() {
+    this.normalize_title()
+  }
+
+  after_create() {
+    this.notify_subscribers()
+  }
 
   normalize_title() {
     this.title = title.trim().titleize()
@@ -129,6 +132,15 @@ export class Article extends ApplicationRecord {
 ```
 
 **Supported callbacks:** `before_validation`, `after_validation`, `before_save`, `after_save`, `before_create`, `after_create`, `before_update`, `after_update`, `before_destroy`, `after_destroy`
+
+{% rendercontent "docs/note", type: "info", title: "Method vs Getter Handling" %}
+The model filter intelligently determines whether a `def` should become a JavaScript method (with parentheses) or a getter:
+
+- **Methods**: `validate`, callback invokers (`before_save`, `after_create`, etc.), and callback implementation methods are always generated as methods since they're called by the framework
+- **Getters**: Simple property accessors without arguments default to getters
+
+This ensures proper `this.methodName()` call semantics for lifecycle methods while keeping property access clean for simple accessors.
+{% endrendercontent %}
 
 ### Scopes
 

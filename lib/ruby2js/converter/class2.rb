@@ -91,7 +91,7 @@ module Ruby2JS
             end
           end
 
-          if m.type == :def
+          if %i[def defm deff].include?(m.type)
             prop = m.children.first
             if prop == :initialize and !@rbstack.last[:initialize]
               constructor = m.children[2..-1]
@@ -120,7 +120,7 @@ module Ruby2JS
               # to match how send.rb looks up methods:
               # - For regular methods (no ?/!), send.rb looks up by symbol
               # - For ?/! methods, send.rb strips suffix and looks up by string
-              base_node = m.is_method? ? s(:autobind, s(:self)) : s(:self)
+              base_node = (m.is_method? || %i[defm deff].include?(m.type)) ? s(:autobind, s(:self)) : s(:self)
 
               # Wrap private methods so send.rb can apply the prefix
               if method_visibility == :private

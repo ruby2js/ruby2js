@@ -244,7 +244,7 @@ describe Ruby2JS::Filter::Rails::Model do
   end
 
   describe "instance methods" do
-    it "preserves public instance methods" do
+    it "preserves public instance methods as getters by default" do
       result = to_js(<<~RUBY)
         class Article < ApplicationRecord
           def full_title
@@ -252,7 +252,60 @@ describe Ruby2JS::Filter::Rails::Model do
           end
         end
       RUBY
-      assert_includes result, 'full_title()'
+      # Simple property accessors should be getters
+      assert_includes result, 'get full_title()'
+    end
+  end
+
+  describe "getter vs method handling" do
+    it "generates validate as a method not a getter" do
+      result = to_js(<<~RUBY)
+        class Article < ApplicationRecord
+          validates :title, presence: true
+        end
+      RUBY
+      # validate() is called by the framework, should be a method
+      assert_includes result, 'validate()'
+      refute_includes result, 'get validate'
+    end
+
+    it "generates callback invokers as methods" do
+      result = to_js(<<~RUBY)
+        class Article < ApplicationRecord
+          before_save :normalize_title
+        end
+      RUBY
+      # before_save() is called by the framework, should be a method
+      assert_includes result, 'before_save()'
+      refute_includes result, 'get before_save'
+    end
+
+    it "generates callback implementation methods as methods" do
+      result = to_js(<<~RUBY)
+        class Article < ApplicationRecord
+          before_save :normalize_title
+
+          private
+
+          def normalize_title
+            self.title = title.strip
+          end
+        end
+      RUBY
+      # normalize_title is called by before_save, should be a method
+      assert_includes result, 'normalize_title()'
+      refute_includes result, 'get normalize_title'
+    end
+
+    it "calls callback methods with parentheses" do
+      result = to_js(<<~RUBY)
+        class Article < ApplicationRecord
+          before_save :step_a, :step_b
+        end
+      RUBY
+      # Callback method calls should have parentheses
+      assert_includes result, 'this.step_a()'
+      assert_includes result, 'this.step_b()'
     end
   end
 

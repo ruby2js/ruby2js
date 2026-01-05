@@ -163,6 +163,15 @@ module Ruby2JS
 
         nodes.pop unless nodes.last
 
+        # Convert all def nodes to defm to ensure they're methods, not getters
+        nodes = nodes.map do |n|
+          if n.type == :def
+            n.updated(:defm, n.children)
+          else
+            n
+          end
+        end
+
         node.updated(nil, [*node.children[0..1], s(:begin, *process_all(nodes))])
       end
 

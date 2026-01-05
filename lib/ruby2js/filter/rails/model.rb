@@ -691,8 +691,9 @@ module Ruby2JS
             # Check if used in callbacks
             used_in_callbacks = all_callback_methods.include?(name)
             if used_in_callbacks
-              # Transform and include the method
-              transformed << process(node)
+              # Convert to :defm since callback methods are called by framework
+              method_node = node.updated(:defm, node.children)
+              transformed << process(method_node)
             end
           end
 
@@ -985,20 +986,23 @@ module Ruby2JS
 
           return nil if validation_calls.empty?
 
-          s(:def, :validate,
+          # Use :defm to ensure validate is a method (called by framework)
+          s(:defm, :validate,
             s(:args),
             s(:begin, *validation_calls))
         end
 
         def generate_callback_method(callback_type, methods)
           # Generate callback method that calls all registered methods
+          # Use :send! with s(:self) receiver for this.method_name() with parens
           calls = methods.map do |method_name|
-            s(:send, nil, method_name)
+            s(:send!, s(:self), method_name)
           end
 
           body = calls.length == 1 ? calls.first : s(:begin, *calls)
 
-          s(:def, callback_type,
+          # Use :defm to ensure callback invoker is a method (called by framework)
+          s(:defm, callback_type,
             s(:args),
             body)
         end
