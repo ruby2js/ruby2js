@@ -90,7 +90,7 @@ async {
 
     # wait for ruby2js.js to load and Ruby2JS to be defined.
     def ruby2js_ready
-      Promise.new do |resolve, reject|
+      return Promise.new do |resolve, reject|
         if defined? Ruby2JS
           resolve()
         else
@@ -101,7 +101,7 @@ async {
 
     # wait for codemirror.js to load and CodeMirror to be defined.
     def codemirror_ready
-      Promise.new do |resolve, reject|
+      return Promise.new do |resolve, reject|
         if defined? CodeMirror
           resolve()
         else
