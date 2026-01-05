@@ -285,7 +285,7 @@ module Ruby2JS
 
               [[migrations]]
               tag = "v1"
-              new_classes = ["TurboBroadcaster"]
+              new_sqlite_classes = ["TurboBroadcaster"]
             TOML
           end
 
