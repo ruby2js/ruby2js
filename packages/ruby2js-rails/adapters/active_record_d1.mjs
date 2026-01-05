@@ -237,13 +237,6 @@ export class ActiveRecord extends ActiveRecordBase {
   // --- Private helpers ---
 
   async _insert() {
-    const now = new Date().toISOString();
-    this.attributes.created_at = now;
-    this.attributes.updated_at = now;
-    // Also set direct properties for accessor access
-    this.created_at = now;
-    this.updated_at = now;
-
     const cols = [];
     const placeholders = [];
     const values = [];
@@ -269,11 +262,6 @@ export class ActiveRecord extends ActiveRecordBase {
   }
 
   async _update() {
-    const now = new Date().toISOString();
-    this.attributes.updated_at = now;
-    // Also set direct property for accessor access
-    this.updated_at = now;
-
     const sets = [];
     const values = [];
 

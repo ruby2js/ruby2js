@@ -174,11 +174,18 @@ export class ActiveRecordBase {
   async save() {
     if (!this.isValid) return false;
 
+    // Set timestamps centrally - adapters don't need to handle this
+    const now = new Date().toISOString();
+    this.attributes.updated_at = now;
+    this.updated_at = now;
+
     if (this._persisted) {
       const result = await this._update();
       if (result) await this._runCallbacks('after_update_commit');
       return result;
     } else {
+      this.attributes.created_at = now;
+      this.created_at = now;
       const result = await this._insert();
       if (result) await this._runCallbacks('after_create_commit');
       return result;
