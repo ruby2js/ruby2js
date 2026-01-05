@@ -30,7 +30,7 @@ This creates a Rails app with:
 
 ```bash
 bin/rails db:prepare
-bin/rails server
+bin/dev
 ```
 
 Open http://localhost:3000 in multiple browser tabs. Send messages. Watch them appear everywhere.
