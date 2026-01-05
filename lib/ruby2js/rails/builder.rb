@@ -308,6 +308,7 @@ class SelfhostBuilder
     'sql.js' => { 'sql.js' => '^1.11.0' },
     'pglite' => { '@electric-sql/pglite' => '^0.2.0' },
     # Node-only adapters (native modules - use optionalDependencies)
+    'sqlite' => { 'better-sqlite3' => '^11.0.0' },
     'sqlite3' => { 'better-sqlite3' => '^11.0.0' },
     'better_sqlite3' => { 'better-sqlite3' => '^11.0.0' },
     'pg' => { 'pg' => '^8.13.0' },
@@ -323,7 +324,7 @@ class SelfhostBuilder
   }.freeze
 
   # Adapters that require native compilation (should be optionalDependencies)
-  NATIVE_ADAPTERS = %w[sqlite3 better_sqlite3 pg postgres postgresql mysql mysql2].freeze
+  NATIVE_ADAPTERS = %w[sqlite sqlite3 better_sqlite3 pg postgres postgresql mysql mysql2].freeze
 
   # Ensure package.json has required dependencies for the selected adapter and target
   # Updates the file if dependencies are missing and returns true if npm install is needed
