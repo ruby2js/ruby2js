@@ -260,9 +260,13 @@ export class Router extends RouterBase {
     }
   }
 
-  // Handle controller result (redirect or render)
+  // Handle controller result (redirect, render, or turbo_stream)
   static handleResult(context, result, defaultRedirect) {
-    if (result.redirect) {
+    if (result.turbo_stream) {
+      // Turbo Stream response - return with proper content type
+      console.log('  Rendering turbo_stream response');
+      return this.turboStreamResponse(context, result.turbo_stream);
+    } else if (result.redirect) {
       // Set flash notice if present in result
       if (result.notice) {
         context.flash.set('notice', result.notice);
@@ -280,6 +284,22 @@ export class Router extends RouterBase {
     } else {
       return this.redirect(context, defaultRedirect);
     }
+  }
+
+  // Create Turbo Stream response with proper content type
+  static turboStreamResponse(context, html) {
+    const headers = { 'Content-Type': 'text/vnd.turbo-stream.html; charset=utf-8' };
+
+    // Clear flash cookie after it's been consumed
+    const flashCookie = context.flash.getResponseCookie();
+    if (flashCookie) {
+      headers['Set-Cookie'] = flashCookie;
+    }
+
+    return new Response(html, {
+      status: 200,
+      headers
+    });
   }
 
   // Create redirect response with flash cookie
@@ -335,6 +355,7 @@ export class TurboBroadcast {
   static subscriptions = new Map();
 
   // Subscribe a WebSocket to a channel
+  // Called by handleMessage when client sends subscribe message
   static subscribe(ws, channel) {
     // Add to channel's subscriber set
     if (!this.channels.has(channel)) {

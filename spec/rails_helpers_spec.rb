@@ -444,6 +444,43 @@ describe Ruby2JS::Filter::Rails::Helpers do
         result.must_include 'data-turbo-confirm='
         result.wont_include 'onclick='  # Turbo handles submission
       end
+
+      it "should use TurboBroadcast.subscribe for browser target with turbo_stream_from" do
+        erb_src = '_buf = ::String.new; _buf << ( turbo_stream_from "chat_room" ).to_s; _buf.to_s'
+        result = to_js_with_target(erb_src, database: 'dexie', target: 'browser')
+        result.must_include 'TurboBroadcast.subscribe("chat_room")'
+        result.wont_include '<script'
+      end
+
+      it "should generate inline WebSocket script for server target with turbo_stream_from" do
+        erb_src = '_buf = ::String.new; _buf << ( turbo_stream_from "chat_room" ).to_s; _buf.to_s'
+        result = to_js_with_target(erb_src, database: 'sqlite3', target: 'node')
+        # Output is a JS string, so quotes are escaped
+        result.must_include '<script type=\\"module\\">'
+        result.must_include 'WebSocket'
+        result.must_include '/cable'
+        result.must_include 'subscribe'
+        result.must_include 'chat_room'
+        result.wont_include 'TurboBroadcast.subscribe'
+      end
+
+      it "should handle dynamic channel names for server target with turbo_stream_from" do
+        erb_src = '_buf = ::String.new; _buf << ( turbo_stream_from "room_#{room_id}" ).to_s; _buf.to_s'
+        result = to_js_with_target(erb_src, database: 'sqlite3', target: 'node')
+        # Dynamic channel uses template literal
+        result.must_include '<script type='
+        result.must_include 'room_'
+        result.must_include '${room_id}'
+        result.must_include 'WebSocket'
+      end
+
+      it "should generate WebSocket script for Cloudflare target with turbo_stream_from" do
+        erb_src = '_buf = ::String.new; _buf << ( turbo_stream_from "notifications" ).to_s; _buf.to_s'
+        result = to_js_with_target(erb_src, database: 'd1', target: 'cloudflare')
+        # Cloudflare Workers use Durable Objects for WebSockets, handled differently
+        result.must_include '<script type=\\"module\\">'
+        result.must_include 'WebSocket'
+      end
     end
   end
 

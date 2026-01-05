@@ -685,18 +685,62 @@ module Ruby2JS
         end
 
         # Process turbo_stream_from helper - subscribes to broadcast channel
-        # turbo_stream_from "chat_room" -> TurboBroadcast.subscribe("chat_room") || ""
-        # Returns empty string since subscription is a side effect
+        # For browser targets: TurboBroadcast.subscribe("chat_room") || ""
+        # For server targets: inline <script> with WebSocket subscription
         def process_turbo_stream_from(args)
-          @erb_view_helpers << :TurboBroadcast unless @erb_view_helpers.include?(:TurboBroadcast)
-
           channel_node = process(args[0])
 
-          # subscribe returns the channel object, so use || "" to return empty string
-          # TurboBroadcast.subscribe("...") || ""
-          s(:or,
-            s(:send, s(:const, nil, :TurboBroadcast), :subscribe, channel_node),
-            s(:str, ''))
+          if browser_target?
+            # Browser: Use BroadcastChannel API via TurboBroadcast
+            @erb_view_helpers << :TurboBroadcast unless @erb_view_helpers.include?(:TurboBroadcast)
+
+            # subscribe returns the channel object, so use || "" to return empty string
+            s(:or,
+              s(:send, s(:const, nil, :TurboBroadcast), :subscribe, channel_node),
+              s(:str, ''))
+          else
+            # Server targets: Generate inline WebSocket subscription script
+            # This script runs in the browser after SSR, connecting to the server's WebSocket
+            build_turbo_stream_websocket_script(channel_node)
+          end
+        end
+
+        # Build inline WebSocket subscription script for server-side rendering
+        # Generates a template literal with the channel name interpolated
+        def build_turbo_stream_websocket_script(channel_node)
+          # The script that will run in the browser
+          script_prefix = '<script type="module">
+(function() {
+  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+  const ws = new WebSocket(protocol + "//" + window.location.host + "/cable");
+  ws.onopen = () => {
+    ws.send(JSON.stringify({ type: "subscribe", stream: "'
+          script_suffix = '" }));
+  };
+  ws.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+    if (data.type === "message" && data.html) {
+      if (typeof Turbo !== "undefined") {
+        Turbo.renderStreamMessage(data.html);
+      }
+    }
+  };
+  ws.onerror = (err) => console.error("WebSocket error:", err);
+})();
+</script>'
+
+          # If channel is a simple string, we can build a simple dstr
+          # If channel is already processed (could be dstr), embed it
+          if channel_node.type == :str
+            # Simple string channel - just concatenate
+            s(:str, script_prefix + channel_node.children[0] + script_suffix)
+          else
+            # Dynamic channel - build template literal
+            s(:dstr,
+              s(:str, script_prefix),
+              channel_node,
+              s(:str, script_suffix))
+          end
         end
 
         # Process turbo_stream.replace, turbo_stream.append, etc.

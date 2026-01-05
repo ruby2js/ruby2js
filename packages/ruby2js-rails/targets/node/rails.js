@@ -248,7 +248,11 @@ export class Router extends RouterServer {
 
   // Handle controller result for Node.js
   static handleResultNode(context, res, result, defaultRedirect) {
-    if (result.redirect) {
+    if (result.turbo_stream) {
+      // Turbo Stream response - return with proper content type
+      console.log('  Rendering turbo_stream response');
+      this.sendTurboStream(context, res, result.turbo_stream);
+    } else if (result.redirect) {
       // Set flash notice if present in result
       if (result.notice) {
         context.flash.set('notice', result.notice);
@@ -265,6 +269,20 @@ export class Router extends RouterServer {
     } else {
       this.redirectNode(context, res, defaultRedirect);
     }
+  }
+
+  // Send Turbo Stream response with proper content type
+  static sendTurboStream(context, res, html) {
+    const headers = { 'Content-Type': 'text/vnd.turbo-stream.html; charset=utf-8' };
+
+    // Clear flash cookie after it's been consumed
+    const flashCookie = context.flash.getResponseCookie();
+    if (flashCookie) {
+      headers['Set-Cookie'] = flashCookie;
+    }
+
+    res.writeHead(200, headers);
+    res.end(html);
   }
 
   // Redirect with flash cookie

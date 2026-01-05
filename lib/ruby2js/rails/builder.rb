@@ -243,28 +243,12 @@ class SelfhostBuilder
   # Generate package.json content for a Ruby2JS app
   # Options:
   #   app_name: Application name (used for package name)
-  #   adapters: Array of database adapters to include dependencies for
-  #   app_root: Application root directory (for detecting adapters if not specified)
+  #   app_root: Application root directory
   # Returns: Hash suitable for JSON.generate
+  # Note: Database and target-specific dependencies are added at build time
   def self.generate_package_json(options = {})
     app_name = options[:app_name] || 'ruby2js-app'
     app_root = options[:app_root]
-
-    # Collect adapters from options or detect from database.yml
-    adapters = options[:adapters]
-    unless adapters
-      if app_root && File.exist?(File.join(app_root, 'config/database.yml'))
-        # Ruby 3.4+/4.0+ requires aliases: true for YAML anchors used by Rails
-        config = YAML.load_file(File.join(app_root, 'config/database.yml'), aliases: true)
-        adapters = config.values
-          .select { |v| v.is_a?(Hash) }
-          .map { |v| v['adapter'] }
-          .compact
-          .uniq
-      else
-        adapters = ['dexie']
-      end
-    end
 
     # Check for local packages directory (when running from ruby2js repo)
     # For deploy targets, always use tarball URL since deployed code can't access local files
@@ -281,7 +265,7 @@ class SelfhostBuilder
       { 'ruby2js-rails' => 'https://www.ruby2js.com/releases/ruby2js-rails-beta.tgz' }
     end
 
-    # Hotwire Turbo and Stimulus for all browser builds
+    # Hotwire Turbo and Stimulus - used by all targets
     deps['@hotwired/turbo'] = '^8.0.0'
     deps['@hotwired/stimulus'] = '^3.2.0'
 
@@ -291,48 +275,20 @@ class SelfhostBuilder
       deps['tailwindcss'] = '^3.4.0'
     end
 
-    optional_deps = {}
-
-    adapters.each do |adapter|
-      case adapter.to_s
-      when 'dexie', 'indexeddb'
-        deps['dexie'] = '^4.0.10'
-      when 'sqljs', 'sql.js'
-        deps['sql.js'] = '^1.11.0'
-      when 'pglite'
-        deps['@electric-sql/pglite'] = '^0.2.0'
-      when 'sqlite3', 'better_sqlite3'
-        optional_deps['better-sqlite3'] = '^11.0.0'
-      when 'pg', 'postgres', 'postgresql'
-        optional_deps['pg'] = '^8.13.0'
-      when 'mysql', 'mysql2'
-        optional_deps['mysql2'] = '^3.11.0'
-      when 'neon'
-        deps['@neondatabase/serverless'] = '^0.10.0'
-      when 'turso', 'libsql'
-        deps['@libsql/client'] = '^0.14.0'
-      when 'planetscale'
-        deps['@planetscale/database'] = '^1.19.0'
-      end
-    end
-
-    server_adapters = %w[sqlite3 better_sqlite3 pg postgres postgresql mysql mysql2 neon turso libsql planetscale]
-
+    # Base scripts - server scripts added at build time based on target
     scripts = {
       'dev' => 'ruby2js-rails-dev',
       'dev:ruby' => 'ruby2js-rails-dev --ruby',
       'build' => 'ruby2js-rails-build',
       'migrate' => 'ruby2js-rails-migrate',
-      'start' => 'npx serve -s -p 3000'
+      'start' => 'npx serve -s -p 3000',
+      # Server scripts included by default - they just won't work without deps
+      'start:node' => 'ruby2js-rails-server',
+      'start:bun' => 'bun node_modules/ruby2js-rails/server.mjs',
+      'start:deno' => 'deno run --allow-all node_modules/ruby2js-rails/server.mjs'
     }
 
-    if adapters.any? { |a| server_adapters.include?(a.to_s) }
-      scripts['start:node'] = 'ruby2js-rails-server'
-      scripts['start:bun'] = 'bun node_modules/ruby2js-rails/server.mjs'
-      scripts['start:deno'] = 'deno run --allow-all node_modules/ruby2js-rails/server.mjs'
-    end
-
-    package = {
+    {
       'name' => app_name.to_s.gsub('_', '-'),
       'version' => '0.1.0',
       'type' => 'module',
@@ -340,47 +296,74 @@ class SelfhostBuilder
       'scripts' => scripts,
       'dependencies' => deps
     }
-
-    package['optionalDependencies'] = optional_deps unless optional_deps.empty?
-
-    package
   end
 
   # Map database adapters to their required npm dependencies
+  # Each entry specifies: { package_name => version }
   ADAPTER_DEPENDENCIES = {
+    # Browser-only adapters
     'dexie' => { 'dexie' => '^4.0.10' },
     'indexeddb' => { 'dexie' => '^4.0.10' },
     'sqljs' => { 'sql.js' => '^1.11.0' },
     'sql.js' => { 'sql.js' => '^1.11.0' },
     'pglite' => { '@electric-sql/pglite' => '^0.2.0' },
+    # Node-only adapters (native modules - use optionalDependencies)
+    'sqlite3' => { 'better-sqlite3' => '^11.0.0' },
+    'better_sqlite3' => { 'better-sqlite3' => '^11.0.0' },
+    'pg' => { 'pg' => '^8.13.0' },
+    'postgres' => { 'pg' => '^8.13.0' },
+    'postgresql' => { 'pg' => '^8.13.0' },
+    'mysql' => { 'mysql2' => '^3.11.0' },
+    'mysql2' => { 'mysql2' => '^3.11.0' },
+    # Universal adapters (work on browser, node, and edge)
     'neon' => { '@neondatabase/serverless' => '^0.10.0' },
     'turso' => { '@libsql/client' => '^0.14.0' },
     'libsql' => { '@libsql/client' => '^0.14.0' },
     'planetscale' => { '@planetscale/database' => '^1.19.0' }
   }.freeze
 
-  # Ensure package.json has required dependencies for the selected adapter
+  # Adapters that require native compilation (should be optionalDependencies)
+  NATIVE_ADAPTERS = %w[sqlite3 better_sqlite3 pg postgres postgresql mysql mysql2].freeze
+
+  # Ensure package.json has required dependencies for the selected adapter and target
   # Updates the file if dependencies are missing and returns true if npm install is needed
   def ensure_adapter_dependencies()
     package_path = File.join(@dist_dir, 'package.json')
     return false unless File.exist?(package_path)
 
-    required = ADAPTER_DEPENDENCIES[@database]
-    return false unless required
-
     package = JSON.parse(File.read(package_path))
     deps = package['dependencies'] || {}
+    optional_deps = package['optionalDependencies'] || {}
+    updated = false
 
-    missing = required.reject { |name, _version| deps.key?(name) }
-    return false if missing.empty?
+    # Add adapter-specific dependencies
+    required = ADAPTER_DEPENDENCIES[@database]
+    if required
+      # Native adapters go to optionalDependencies (may fail to compile on some platforms)
+      is_native = NATIVE_ADAPTERS.include?(@database)
+      target_deps = is_native ? optional_deps : deps
+      dep_type = is_native ? 'optional dependency' : 'dependency'
 
-    # Add missing dependencies
-    missing.each do |name, version|
-      deps[name] = version
-      puts("  Adding dependency: #{name}@#{version}")
+      missing = required.reject { |name, _version| target_deps.key?(name) || deps.key?(name) }
+      missing.each do |name, version|
+        target_deps[name] = version
+        puts("  Adding #{dep_type}: #{name}@#{version}")
+        updated = true
+      end
     end
 
+    # Add ws for Node/Bun/Deno targets (WebSocket support for real-time features)
+    node_targets = %w[node bun deno]
+    if node_targets.include?(@target.to_s) && !optional_deps.key?('ws')
+      optional_deps['ws'] = '^8.18.0'
+      puts("  Adding optional dependency: ws@^8.18.0")
+      updated = true
+    end
+
+    return false unless updated
+
     package['dependencies'] = deps
+    package['optionalDependencies'] = optional_deps unless optional_deps.empty?
     File.write(package_path, JSON.pretty_generate(package) + "\n")
     puts("  Updated package.json")
 
