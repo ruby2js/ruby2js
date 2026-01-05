@@ -1460,7 +1460,9 @@ module Ruby2JS
           class_attr = css_class ? " class=\"#{css_class}\"" : ""
 
           # Build data attributes string
-          data_attr = data_attrs.map { |k, v| " data-#{k}=\"#{v}\"" }.join
+          # Use each_pair for selfhost compatibility (transpiles to Object.entries().forEach)
+          data_attr = ""
+          data_attrs.each_pair { |k, v| data_attr += " data-#{k}=\"#{v}\"" }
 
           # Build form tag with action and method - Turbo intercepts form submissions automatically
           if model_name
