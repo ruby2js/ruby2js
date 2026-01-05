@@ -690,7 +690,7 @@ module Ruby2JS
         def process_turbo_stream_from(args)
           channel_node = process(args[0])
 
-          if browser_target?
+          if browser_target?()
             # Browser: Use BroadcastChannel API via TurboBroadcast
             @erb_view_helpers << :TurboBroadcast unless @erb_view_helpers.include?(:TurboBroadcast)
 
