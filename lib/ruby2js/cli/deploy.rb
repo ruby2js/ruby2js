@@ -31,6 +31,7 @@ module Ruby2JS
           options = {
             target: ENV['JUNTOS_TARGET'],
             database: ENV['JUNTOS_DATABASE'],
+            environment: ENV['RAILS_ENV'] || 'production',
             verbose: false,
             skip_build: false,
             force: false
@@ -52,7 +53,7 @@ module Ruby2JS
             end
 
             opts.on("-e", "--environment ENV", "Rails environment (default: production)") do |env|
-              ENV['RAILS_ENV'] = env
+              options[:environment] = env
             end
 
             opts.on("--skip-build", "Skip the build step (use existing dist/)") do
@@ -130,9 +131,12 @@ module Ruby2JS
         def deploy(options)
           target = options[:target]
 
+          # Set RAILS_ENV for child processes
+          ENV['RAILS_ENV'] = options[:environment]
+
           # Build first unless skipped
           unless options[:skip_build]
-            puts "Building for #{target}..."
+            puts "Building for #{target} (#{options[:environment]})..."
             require 'ruby2js/rails/builder'
             builder_opts = { target: target }
             builder_opts[:database] = options[:database] if options[:database]
@@ -232,25 +236,33 @@ module Ruby2JS
 
         def generate_cloudflare_config(options)
           app_name = File.basename(Dir.pwd).downcase.gsub(/[^a-z0-9-]/, '-')
+          env = options[:environment] || 'production'
 
-          # Read D1_DATABASE_ID from .env.local or environment
-          d1_database_id = ENV['D1_DATABASE_ID']
+          # Read D1_DATABASE_ID from environment or .env.local
+          # Check per-environment var first (D1_DATABASE_ID_PRODUCTION), then fallback to D1_DATABASE_ID
+          env_var = env == 'development' ? 'D1_DATABASE_ID' : "D1_DATABASE_ID_#{env.upcase}"
+          d1_database_id = ENV[env_var] || ENV['D1_DATABASE_ID']
+
           unless d1_database_id
             env_local = '.env.local'
             if File.exist?(env_local)
               File.readlines(env_local).each do |line|
-                if line =~ /^D1_DATABASE_ID=(.+)$/
+                # Try per-environment var first
+                if line =~ /^#{Regexp.escape(env_var)}=(.+)$/
                   d1_database_id = $1.strip
                   break
+                # Fallback to D1_DATABASE_ID
+                elsif line =~ /^D1_DATABASE_ID=(.+)$/ && !d1_database_id
+                  d1_database_id = $1.strip
                 end
               end
             end
           end
 
           unless d1_database_id
-            abort "Error: D1_DATABASE_ID not found.\n" \
+            abort "Error: #{env_var} not found.\n" \
                   "Set it in .env.local or as an environment variable.\n\n" \
-                  "Create with: wrangler d1 create #{app_name}"
+                  "Create with: juntos db:create -d d1 -e #{env}"
           end
 
           uses_broadcasting = uses_turbo_broadcasting?
