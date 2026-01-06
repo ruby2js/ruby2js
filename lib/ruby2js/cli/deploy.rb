@@ -237,6 +237,7 @@ module Ruby2JS
         def generate_cloudflare_config(options)
           app_name = File.basename(Dir.pwd).downcase.gsub(/[^a-z0-9-]/, '-')
           env = options[:environment] || 'production'
+          db_name = "#{app_name}_#{env}".downcase.gsub(/[^a-z0-9_]/, '_')
 
           # Read D1_DATABASE_ID from environment or .env.local
           # Check per-environment var first (D1_DATABASE_ID_PRODUCTION), then fallback to D1_DATABASE_ID
@@ -278,7 +279,7 @@ module Ruby2JS
             # D1 database binding
             [[d1_databases]]
             binding = "DB"
-            database_name = "#{app_name}"
+            database_name = "#{db_name}"
             database_id = "#{d1_database_id}"
 
             # Static assets (Rails convention: public/)

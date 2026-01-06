@@ -411,7 +411,8 @@ module Ruby2JS
         # ============================================
 
         def run_turso_create(options)
-          app_name = get_app_name
+          db_name = options[:db_name]
+          env = options[:environment] || 'development'
 
           unless turso_cli_available?
             puts "Turso CLI not found. Install it first:"
@@ -420,21 +421,25 @@ module Ruby2JS
             return
           end
 
-          puts "Creating Turso database '#{app_name}'..."
+          puts "Creating Turso database '#{db_name}' for #{env}..."
 
-          output = `turso db create #{app_name} 2>&1`
+          output = `turso db create #{db_name} 2>&1`
           if $?.success?
-            puts "Created Turso database: #{app_name}"
+            puts "Created Turso database: #{db_name}"
             puts "\nTo get your connection URL, run:"
-            puts "  turso db show #{app_name} --url"
-            puts "  turso db tokens create #{app_name}"
+            puts "  turso db show #{db_name} --url"
+            puts "  turso db tokens create #{db_name}"
+            puts "\nAdd these to .env.local:"
+            puts "  TURSO_DATABASE_URL=libsql://#{db_name}-<org>.turso.io"
+            puts "  TURSO_AUTH_TOKEN=<token>"
           else
             abort "Error: Failed to create database.\n#{output}"
           end
         end
 
         def run_turso_drop(options)
-          app_name = get_app_name
+          db_name = options[:db_name]
+          env = options[:environment] || 'development'
 
           unless turso_cli_available?
             puts "Turso CLI not found. Delete the database at:"
@@ -442,10 +447,10 @@ module Ruby2JS
             return
           end
 
-          puts "Deleting Turso database '#{app_name}'..."
+          puts "Deleting Turso database '#{db_name}' (#{env})..."
 
           # Let turso prompt for confirmation - this is destructive
-          unless system('turso', 'db', 'destroy', app_name)
+          unless system('turso', 'db', 'destroy', db_name)
             abort "\nError: Failed to delete database."
           end
 
@@ -571,13 +576,20 @@ module Ruby2JS
           return nil unless File.exist?(env_file)
 
           var_name = d1_env_var(env)
+          fallback_id = nil
+
           File.readlines(env_file).each do |line|
+            # Try per-environment var first
             if line =~ /^#{Regexp.escape(var_name)}=(.+)$/
               return $1.strip.gsub(/["']/, '')
+            # Track D1_DATABASE_ID as fallback for backwards compatibility
+            elsif line =~ /^D1_DATABASE_ID=(.+)$/
+              fallback_id = $1.strip.gsub(/["']/, '')
             end
           end
 
-          nil
+          # Fall back to D1_DATABASE_ID if per-environment var not found
+          fallback_id
         end
 
         def save_database_id(database_id, env = 'development')
@@ -620,7 +632,8 @@ module Ruby2JS
           return unless content.include?('${D1_DATABASE_ID}')
 
           var_name = d1_env_var(env)
-          d1_id = ENV[var_name]
+          # Try per-environment var first, fall back to D1_DATABASE_ID for backwards compatibility
+          d1_id = ENV[var_name] || ENV['D1_DATABASE_ID']
           unless d1_id
             abort "Error: #{var_name} not set.\n" \
                   "Run 'juntos db:create -e #{env}' first or set it in .env.local"
@@ -628,11 +641,6 @@ module Ruby2JS
 
           updated = content.gsub('${D1_DATABASE_ID}', d1_id)
           File.write('wrangler.toml', updated)
-        end
-
-        # Used by Turso which doesn't have per-environment databases yet
-        def get_app_name
-          File.basename(Dir.pwd).downcase.gsub(/[^a-z0-9-]/, '-')
         end
 
         def database_fresh?(db_name)
