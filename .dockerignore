@@ -46,10 +46,11 @@ demo/selfhost/ruby2js.js
 demo/selfhost/ruby2js.mjs
 demo/selfhost/prism_browser.js
 demo/selfhost/filters/
-demo/selfhost/lib/erb_compiler.js
+demo/selfhost/lib/
 
 # Release tarballs
 *.tgz
 
 # Local test blog demo
 demo/blog/
+demo/chat/

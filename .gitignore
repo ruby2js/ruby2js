@@ -13,7 +13,7 @@ packages/ruby2js-rails/build.mjs
 demo/selfhost/ruby2js.mjs
 demo/selfhost/prism_browser.js
 demo/selfhost/filters/
-demo/selfhost/lib/erb_compiler.js
+demo/selfhost/lib/
 
 # Editor swap files
 *.swp
@@ -27,3 +27,4 @@ mise.toml
 
 # Local test blog demo
 demo/blog/
+demo/chat/
