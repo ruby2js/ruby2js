@@ -82,6 +82,67 @@ Override with `-t`:
 bin/juntos up -t node -d neon   # Force Node.js with Neon
 ```
 
+## Hybrid Development
+
+You don't need to hit remote databases during development. Use the familiar `config/database.yml` pattern—a local database for development, a cloud database for production.
+
+### Recommended Pairings
+
+| Deploy Target | Prod Database | Dev Adapter | Dev Target | Notes |
+|---------------|---------------|-------------|------------|-------|
+| Cloudflare Workers | d1 | sqlite | node | Same SQL dialect |
+| Vercel Edge | neon | pglite | browser | No server needed |
+| Vercel Edge | turso | sqlite | node | Same SQL dialect |
+| Deno Deploy | neon | pg | deno | Requires local PostgreSQL |
+
+### Example Configuration
+
+```yaml
+# config/database.yml
+development:
+  adapter: sqlite
+  database: db/development.sqlite3
+
+production:
+  adapter: d1
+  database: myapp_production
+```
+
+```bash
+# Development: instant feedback, no cloud round-trips
+bin/juntos up -d sqlite
+
+# Production: deploy to Cloudflare with D1
+bin/juntos deploy -d d1
+```
+
+The SQL dialect matches between SQLite and D1, so your migrations and queries work in both environments.
+
+### Offline-First Browser Apps
+
+The browser target enables offline-first applications that sync with a Rails backend:
+
+1. **Browser app** — runs entirely client-side with IndexedDB (Dexie)
+2. **Rails API** — traditional server for sync and shared data
+3. **Sync on reconnect** — browser app treats Rails as an API when connectivity returns
+
+This pattern works well for:
+- Mobile apps in spotty connectivity
+- Field data collection
+- Event scoring/judging systems
+- Any scenario where the app must work without internet
+
+```yaml
+# Same models power both apps
+development:
+  adapter: dexie      # Browser app
+  database: myapp_dev
+
+production:
+  adapter: pg         # Rails API backend
+  url: <%= ENV['DATABASE_URL'] %>
+```
+
 ## Database Setup Guides
 
 For detailed setup instructions, see the [Database Overview](/docs/juntos/databases):
