@@ -294,7 +294,7 @@ export class TurboBroadcaster {
     const message = JSON.stringify({
       type: 'message',
       stream: channel,
-      html: html
+      message: html
     });
 
     for (const ws of subscribers) {

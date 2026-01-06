@@ -719,9 +719,9 @@ module Ruby2JS
   };
   ws.onmessage = (event) => {
     const data = JSON.parse(event.data);
-    if (data.type === "message" && data.html) {
+    if (data.type === "message" && data.message) {
       if (typeof Turbo !== "undefined") {
-        Turbo.renderStreamMessage(data.html);
+        Turbo.renderStreamMessage(data.message);
       }
     }
   };

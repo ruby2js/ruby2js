@@ -433,7 +433,7 @@ export class TurboBroadcast {
     const message = JSON.stringify({
       type: 'message',
       stream: channel,
-      html: html
+      message: html
     });
 
     console.log(`  Broadcasting to ${channel} (${subscribers.size} subscribers)`);
