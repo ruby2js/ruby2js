@@ -19,6 +19,7 @@ These targets require transpilation. Rails can't run here; Juntos can:
 |--------|----------|------------------|
 | **[Browser](/docs/juntos/deploying/browser)** | Offline-first, local-first, demos | Dexie, sql.js, PGlite |
 | **[Vercel Edge](/docs/juntos/deploying/vercel)** | Global edge, auto-scaling | [Neon](/docs/juntos/databases/neon), [Turso](/docs/juntos/databases/turso), [PlanetScale](/docs/juntos/databases/planetscale), [Supabase](/docs/juntos/databases/supabase) |
+| **[Deno Deploy](/docs/juntos/deploying/deno-deploy)** | Edge, Deno/TypeScript native | [Neon](/docs/juntos/databases/neon), [Turso](/docs/juntos/databases/turso), [PlanetScale](/docs/juntos/databases/planetscale), [Supabase](/docs/juntos/databases/supabase) |
 | **[Cloudflare Workers](/docs/juntos/deploying/cloudflare)** | Edge computing, maximum distribution | D1, Turso |
 
 ## Also Works
@@ -37,13 +38,13 @@ For traditional hosting, Juntos works but Rails does too. Reasons to choose Junt
 
 ## Quick Comparison
 
-| Aspect | Browser | Node.js | Vercel | Cloudflare |
-|--------|---------|---------|--------|------------|
-| Infrastructure | None (static) | Server/container | On-demand | On-demand |
-| Scaling | N/A | Manual | Automatic | Automatic |
-| Cold starts | None | N/A | ~50-250ms | ~5-50ms |
-| Database | Client-side | TCP/file | HTTP APIs | D1 binding |
-| Cost model | Hosting only | Server time | Per-request | Per-request |
+| Aspect | Browser | Node.js | Vercel | Deno Deploy | Cloudflare |
+|--------|---------|---------|--------|-------------|------------|
+| Infrastructure | None (static) | Server/container | On-demand | On-demand | On-demand |
+| Scaling | N/A | Manual | Automatic | Automatic | Automatic |
+| Cold starts | None | N/A | ~50-250ms | ~5-50ms | ~5-50ms |
+| Database | Client-side | TCP/file | HTTP APIs | HTTP APIs | D1 binding |
+| Cost model | Hosting only | Server time | Per-request | Per-request | Per-request |
 
 ## Choosing a Target
 
@@ -53,7 +54,7 @@ For traditional hosting, Juntos works but Rails does too. Reasons to choose Junt
 - You want zero infrastructure
 - *Rails can't do this*
 
-**Choose Vercel or Cloudflare if:**
+**Choose Vercel, Deno Deploy, or Cloudflare if:**
 - You want global edge distribution
 - You need auto-scaling and pay-per-request
 - You want fast cold starts (~5-50ms)
