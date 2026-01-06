@@ -149,15 +149,6 @@ module Ruby2JS
                         '--file', 'db/migrations.sql')
             abort "\nError: D1 migration failed. Make sure db/migrations.sql exists."
           end
-
-          # Run seeds if seeds.sql exists
-          if File.exist?('db/seeds.sql')
-            puts "Running D1 seeds on remote database..."
-            unless system('npx', 'wrangler', 'd1', 'execute', db_name, '--remote',
-                          '--file', 'db/seeds.sql')
-              abort "\nError: D1 seeds failed."
-            end
-          end
         end
       end
     end

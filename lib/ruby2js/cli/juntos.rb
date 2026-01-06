@@ -6,7 +6,7 @@ require 'yaml'
 module Ruby2JS
   module CLI
     module Juntos
-      SUBCOMMANDS = %w[dev server build deploy install up migrate].freeze
+      SUBCOMMANDS = %w[dev server build deploy install up migrate db].freeze
 
       class << self
         def run(args)
@@ -107,6 +107,7 @@ module Ruby2JS
               build     Build for deployment
               deploy    Build and deploy (Vercel, Cloudflare)
               migrate   Run database migrations
+              db        D1 database commands (create, migrate, seed, prepare, drop)
               install   Set up project for Juntos
 
             Common Options:
@@ -119,6 +120,7 @@ module Ruby2JS
               juntos up -t node -d better_sqlite3    # Build and run with Node + SQLite
               juntos dev                             # Start dev server with hot reload
               juntos deploy -t vercel -d neon        # Deploy to Vercel with Neon DB
+              juntos db prepare                      # Create, migrate, and seed D1 database
 
             Run 'juntos <command> --help' for command-specific options.
           HELP

@@ -19,10 +19,6 @@ module Ruby2JS
         return { sql: '', inserts: 0 } unless ast
 
         inserts = []
-        guard_model = nil
-
-        # Extract guard condition (e.g., "return if Message.count > 0")
-        guard_model = extract_guard(ast)
 
         # Extract create statements
         extract_creates(ast, inserts)
@@ -33,70 +29,12 @@ module Ruby2JS
         sql_parts << "-- Ruby2JS Generated Seeds"
         sql_parts << "-- Generated at: #{Time.now.utc}"
         sql_parts << ""
-        sql_parts << "-- Seed tracking table (like schema_migrations)"
-        sql_parts << "CREATE TABLE IF NOT EXISTS _seeds_applied (id INTEGER PRIMARY KEY);"
-        sql_parts << ""
 
         inserts.each do |insert|
           sql_parts << generate_insert_sql(insert)
         end
 
-        sql_parts << ""
-        sql_parts << "-- Mark seeds as applied"
-        sql_parts << "INSERT INTO _seeds_applied (id) VALUES (1) ON CONFLICT DO NOTHING;"
-
         { sql: sql_parts.join("\n"), inserts: inserts.length }
-      end
-
-      # Extract the guard model from "return if Model.count > 0"
-      def self.extract_guard(node)
-        return nil unless node
-
-        case node.type
-        when :if
-          # Check for: return if Model.count > 0
-          cond, then_body, else_body = node.children
-          if then_body.nil? && else_body&.type == :return
-            # This is "return if <cond>" format
-            return extract_count_model(cond)
-          elsif then_body&.type == :return && else_body.nil?
-            return extract_count_model(cond)
-          end
-        when :begin
-          # Check each statement
-          node.children.each do |child|
-            result = extract_guard(child)
-            return result if result
-          end
-        end
-
-        nil
-      end
-
-      # Extract model name from "Model.count > 0" or "Model.count.positive?"
-      def self.extract_count_model(node)
-        return nil unless node
-
-        case node.type
-        when :send
-          target, method, *args = node.children
-
-          # Model.count > 0
-          if method == :> && args.first&.type == :int && args.first.children.first == 0
-            if target&.type == :send && target.children[1] == :count
-              model_node = target.children[0]
-              return model_node.children[1].to_s if model_node&.type == :const
-            end
-          end
-
-          # Model.count.positive?
-          if method == :positive? && target&.type == :send && target.children[1] == :count
-            model_node = target.children[0]
-            return model_node.children[1].to_s if model_node&.type == :const
-          end
-        end
-
-        nil
       end
 
       # Extract all Model.create/create! calls from the AST
@@ -161,7 +99,6 @@ module Ruby2JS
       end
 
       # Generate SQL INSERT statement
-      # Uses WHERE NOT EXISTS on _seeds_applied to skip if seeds already ran
       def self.generate_insert_sql(insert)
         table = insert[:table]
         attrs = insert[:attributes].dup
@@ -173,10 +110,7 @@ module Ruby2JS
         columns = attrs.keys
         values = attrs.values.map { |v| sql_value(v) }
 
-        # Check _seeds_applied table, not the data table
-        "INSERT INTO #{table} (#{columns.join(', ')}) " \
-          "SELECT #{values.join(', ')} " \
-          "WHERE NOT EXISTS (SELECT 1 FROM _seeds_applied);"
+        "INSERT INTO #{table} (#{columns.join(', ')}) VALUES (#{values.join(', ')});"
       end
 
       def self.sql_value(value)
