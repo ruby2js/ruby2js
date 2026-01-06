@@ -123,6 +123,14 @@ module Ruby2JS
               s(:array, s(:const, nil, :MigrationSQL)))
           end
 
+          # Special case: seed_sql should come from selfhost (named export)
+          if rel_path.include?('seed_sql')
+            selfhost_path = @options[:selfhost_path] || '../../../selfhost/ruby2js.js'
+            selfhost_base = File.dirname(selfhost_path)
+            return s(:import, ["#{selfhost_base}/lib/seed_sql.js"],
+              s(:array, s(:const, nil, :SeedSQL)))
+          end
+
           # Convert .rb to .js, or add .js if no extension
           js_path = if rel_path.end_with?('.rb')
             rel_path.sub(/\.rb$/, '.js')

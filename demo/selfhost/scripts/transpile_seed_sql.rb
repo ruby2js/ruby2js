@@ -1,0 +1,40 @@
+#!/usr/bin/env ruby
+# Transpile SeedSQL from Ruby to JavaScript for selfhost use
+
+$LOAD_PATH.unshift File.expand_path('../../../lib', __dir__)
+
+require 'ruby2js'
+require 'ruby2js/filter/functions'
+require 'ruby2js/filter/return'
+require 'ruby2js/filter/esm'
+
+seed_sql_file = File.expand_path('../../../lib/ruby2js/rails/seed_sql.rb', __dir__)
+source = File.read(seed_sql_file)
+
+js = Ruby2JS.convert(source,
+  eslevel: 2022,
+  autoexports: true,
+  autoimports: {
+    Inflector: '../ruby2js.js',
+    Ruby2JS: '../ruby2js.js'
+  },
+  filters: [
+    Ruby2JS::Filter::Functions,
+    Ruby2JS::Filter::Return,
+    Ruby2JS::Filter::ESM
+  ]
+).to_s
+
+# Remove incorrect require-based imports that ESM filter generates
+js = js.gsub(/^import ["']ruby2js.*["'];\n/, '')
+
+# Fix autoimport to use named import (ruby2js.js uses named exports, not default)
+js = js.gsub(/^import Ruby2JS from/, 'import { Ruby2JS } from')
+
+# Extract just the SeedSQL class from the nested module structure
+# Input:  export const Ruby2JS = {Rails: {SeedSQL: class {...}}}
+# Output: export class SeedSQL {...}
+js = js.sub(/^export const Ruby2JS = \{Rails: \{SeedSQL: class \{/, 'export class SeedSQL {')
+js = js.sub(/\}\}\}\s*$/, '}')
+
+puts js

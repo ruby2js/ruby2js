@@ -44,6 +44,7 @@ bundle_deps = FileList["#{ROOT}/lib/ruby2js/selfhost/bundle.rb", "#{ROOT}/lib/ru
 # ERB Compiler dependencies
 erb_compiler_deps = FileList["#{ROOT}/lib/ruby2js/rails/erb_compiler.rb"]
 migration_sql_deps = FileList["#{ROOT}/lib/ruby2js/rails/migration_sql.rb"]
+seed_sql_deps = FileList["#{ROOT}/lib/ruby2js/rails/seed_sql.rb"]
 
 desc "Build prism_browser.js (in selfhost root for correct node_modules paths)"
 file "#{SELFHOST}/prism_browser.js" => [*prism_browser_deps, *selfhost_deps] do
@@ -65,6 +66,12 @@ desc "Build migration_sql.js (SQL generator for D1 migrations)"
 file "#{SELFHOST}/lib/migration_sql.js" => [*migration_sql_deps] do
   FileUtils.mkdir_p("#{SELFHOST}/lib")
   sh bundle_exec("ruby #{SELFHOST}/scripts/transpile_migration_sql.rb > #{SELFHOST}/lib/migration_sql.js")
+end
+
+desc "Build seed_sql.js (SQL generator for D1 seeds)"
+file "#{SELFHOST}/lib/seed_sql.js" => [*seed_sql_deps] do
+  FileUtils.mkdir_p("#{SELFHOST}/lib")
+  sh bundle_exec("ruby #{SELFHOST}/scripts/transpile_seed_sql.rb > #{SELFHOST}/lib/seed_sql.js")
 end
 
 # Map spec names to filter names (when they differ)
@@ -211,7 +218,7 @@ task "build_mjs:npm" => :build_mjs do
 end
 
 desc "Run ruby2js-on-rails smoke tests (compares Ruby vs selfhost builds)"
-task :test_smoke => [:npm_install, :npm_install_demo, :npm_install_package, "#{SELFHOST}/ruby2js.js", "#{SELFHOST}/lib/erb_compiler.js", "#{SELFHOST}/lib/migration_sql.js", :build_filters, BUILD_MJS] do
+task :test_smoke => [:npm_install, :npm_install_demo, :npm_install_package, "#{SELFHOST}/ruby2js.js", "#{SELFHOST}/lib/erb_compiler.js", "#{SELFHOST}/lib/migration_sql.js", "#{SELFHOST}/lib/seed_sql.js", :build_filters, BUILD_MJS] do
   Dir.chdir(DEMO) do
     sh "node scripts/smoke-test.mjs"
   end
@@ -234,7 +241,7 @@ task :clean do
 end
 
 desc "Publish ruby2js-on-rails demo as tarball"
-task :publish_demo => [:build, :build_filters, "#{SELFHOST}/lib/erb_compiler.js", "#{SELFHOST}/lib/migration_sql.js", BUILD_MJS] do
+task :publish_demo => [:build, :build_filters, "#{SELFHOST}/lib/erb_compiler.js", "#{SELFHOST}/lib/migration_sql.js", "#{SELFHOST}/lib/seed_sql.js", BUILD_MJS] do
   sh "ruby #{SELFHOST}/scripts/publish_demo.rb"
 end
 
