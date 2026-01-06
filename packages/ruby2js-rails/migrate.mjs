@@ -14,10 +14,42 @@
 //   TURSO_URL, TURSO_TOKEN - For Turso adapter
 //   NEON_DATABASE_URL - For Neon adapter
 //   PLANETSCALE_URL - For PlanetScale adapter
+//   JUNTOS_MIGRATE_VIA_PG - Use direct Postgres connection for migrations (for Supabase)
 
 import { pathToFileURL } from 'url';
 import path from 'path';
 import fs from 'fs';
+
+// Direct Postgres adapter for migrations (used by Supabase)
+// Supabase's PostgREST doesn't support DDL, so we use pg directly for schema changes
+async function createPgMigrationAdapter() {
+  const pg = await import('pg');
+  const client = new pg.default.Client(process.env.DATABASE_URL);
+  await client.connect();
+
+  return {
+    query: async (sql, params = []) => {
+      const result = await client.query(sql, params);
+      return result.rows;
+    },
+    execute: async (sql, params = []) => {
+      await client.query(sql, params);
+      return { changes: 0 };
+    },
+    insert: async (table, data) => {
+      const keys = Object.keys(data);
+      const values = Object.values(data);
+      const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
+      await client.query(
+        `INSERT INTO ${table} (${keys.join(', ')}) VALUES (${placeholders})`,
+        values
+      );
+    },
+    closeDatabase: async () => {
+      await client.end();
+    }
+  };
+}
 
 async function main() {
   const args = process.argv.slice(2);
@@ -48,13 +80,34 @@ async function main() {
     const routesPath = pathToFileURL(path.join(appRoot, 'config/routes.js')).href;
     const { Application } = await import(routesPath);
 
-    // Import the active_record adapter
-    const adapterPath = pathToFileURL(path.join(appRoot, 'lib/active_record.mjs')).href;
-    const adapter = await import(adapterPath);
+    // Choose adapter based on mode:
+    // - JUNTOS_MIGRATE_VIA_PG: Use direct Postgres for migrations (Supabase)
+    // - Otherwise: Use the app's configured adapter
+    const usePgForMigrations = process.env.JUNTOS_MIGRATE_VIA_PG === '1';
 
-    // Initialize the database connection
-    console.log('Initializing database connection...');
-    await adapter.initDatabase();
+    let adapter;
+    let migrationAdapter;
+
+    if (usePgForMigrations) {
+      console.log('Using direct Postgres connection for migrations...');
+      migrationAdapter = await createPgMigrationAdapter();
+
+      // For seeds, still use the app's adapter (Supabase PostgREST)
+      if (!migrateOnly) {
+        const adapterPath = pathToFileURL(path.join(appRoot, 'lib/active_record.mjs')).href;
+        adapter = await import(adapterPath);
+        await adapter.initDatabase();
+      }
+    } else {
+      // Import the active_record adapter
+      const adapterPath = pathToFileURL(path.join(appRoot, 'lib/active_record.mjs')).href;
+      adapter = await import(adapterPath);
+      migrationAdapter = adapter;
+
+      // Initialize the database connection
+      console.log('Initializing database connection...');
+      await adapter.initDatabase();
+    }
 
     // Run migrations and track if database was fresh
     let wasFresh = true;
@@ -66,14 +119,14 @@ async function main() {
         // Get already-run migrations
         let appliedVersions = new Set();
         try {
-          const applied = await adapter.query('SELECT version FROM schema_migrations');
+          const applied = await migrationAdapter.query('SELECT version FROM schema_migrations');
           appliedVersions = new Set(applied.map(r => r.version));
           wasFresh = appliedVersions.size === 0;
           console.log(`Already applied: ${appliedVersions.size} migration(s)`);
         } catch (e) {
           // Table doesn't exist - create it (fresh database)
           console.log('Creating schema_migrations table...');
-          await adapter.execute('CREATE TABLE IF NOT EXISTS schema_migrations (version TEXT PRIMARY KEY)');
+          await migrationAdapter.execute('CREATE TABLE IF NOT EXISTS schema_migrations (version TEXT PRIMARY KEY)');
           wasFresh = true;
         }
 
@@ -86,8 +139,8 @@ async function main() {
 
           console.log(`Running migration ${migration.version}...`);
           try {
-            await migration.up();
-            await adapter.insert('schema_migrations', { version: migration.version });
+            await migration.up(migrationAdapter);
+            await migrationAdapter.insert('schema_migrations', { version: migration.version });
             ran++;
             console.log(`  ✓ Completed`);
           } catch (e) {
@@ -130,8 +183,11 @@ async function main() {
       }
     }
 
-    // Close database connection
-    if (adapter.closeDatabase) {
+    // Close database connections
+    if (migrationAdapter && migrationAdapter.closeDatabase) {
+      await migrationAdapter.closeDatabase();
+    }
+    if (adapter && adapter !== migrationAdapter && adapter.closeDatabase) {
       await adapter.closeDatabase();
     }
 

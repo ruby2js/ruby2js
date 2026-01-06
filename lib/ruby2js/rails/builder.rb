@@ -69,7 +69,8 @@ class SelfhostBuilder
     'neon' => ['browser', 'node', 'bun', 'deno', 'cloudflare', 'vercel-edge', 'vercel-node'],
     'turso' => ['browser', 'node', 'bun', 'deno', 'cloudflare', 'vercel-edge', 'vercel-node'],
     'libsql' => ['browser', 'node', 'bun', 'deno', 'cloudflare', 'vercel-edge', 'vercel-node'],
-    'planetscale' => ['browser', 'node', 'bun', 'deno', 'cloudflare', 'vercel-edge', 'vercel-node']
+    'planetscale' => ['browser', 'node', 'bun', 'deno', 'cloudflare', 'vercel-edge', 'vercel-node'],
+    'supabase' => ['browser', 'node', 'bun', 'deno', 'cloudflare', 'vercel-edge', 'vercel-node']
   }.freeze
 
   # Default target for each database adapter (used when target not specified)
@@ -95,7 +96,8 @@ class SelfhostBuilder
     'neon' => 'vercel',
     'turso' => 'vercel',
     'libsql' => 'vercel',
-    'planetscale' => 'vercel'
+    'planetscale' => 'vercel',
+    'supabase' => 'vercel'
   }.freeze
 
   # Map DATABASE env var to adapter source file
@@ -121,7 +123,8 @@ class SelfhostBuilder
     'neon' => 'active_record_neon.mjs',
     'turso' => 'active_record_turso.mjs',
     'libsql' => 'active_record_turso.mjs',
-    'planetscale' => 'active_record_planetscale.mjs'
+    'planetscale' => 'active_record_planetscale.mjs',
+    'supabase' => 'active_record_supabase.mjs'
   }.freeze
 
   # Common transpilation options for Ruby files
@@ -321,7 +324,8 @@ class SelfhostBuilder
     'neon' => { '@neondatabase/serverless' => '^0.10.0' },
     'turso' => { '@libsql/client' => '^0.14.0' },
     'libsql' => { '@libsql/client' => '^0.14.0' },
-    'planetscale' => { '@planetscale/database' => '^1.19.0' }
+    'planetscale' => { '@planetscale/database' => '^1.19.0' },
+    'supabase' => { '@supabase/supabase-js' => '^2.47.0', 'pg' => '^8.13.0' }
   }.freeze
 
   # Adapters that require native compilation (should be optionalDependencies)

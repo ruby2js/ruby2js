@@ -17,6 +17,10 @@ module Ruby2JS
       # Databases that require wrangler CLI
       WRANGLER_DATABASES = %w[d1].freeze
 
+      # Databases that use direct Postgres connection for migrations
+      # (PostgREST doesn't support DDL, so we use DATABASE_URL for schema changes)
+      POSTGRES_MIGRATION_DATABASES = %w[supabase].freeze
+
       class << self
         def run(args)
           subcommand = args.shift
@@ -192,6 +196,16 @@ module Ruby2JS
             puts "PlanetScale databases are managed via the PlanetScale console or CLI."
             puts "Visit: https://app.planetscale.com/"
             puts "Or use: pscale database create <name>"
+          when 'supabase'
+            puts "Supabase databases are managed via the Supabase dashboard."
+            puts "Visit: https://supabase.com/dashboard"
+            puts ""
+            puts "After creating your project, add these to .env.local:"
+            puts "  SUPABASE_URL=https://<project-ref>.supabase.co"
+            puts "  SUPABASE_ANON_KEY=<anon-key>"
+            puts "  DATABASE_URL=postgresql://postgres:<password>@db.<project-ref>.supabase.co:5432/postgres"
+            puts ""
+            puts "Find these values in: Project Settings → API and Project Settings → Database"
           else
             puts "Database creation for '#{db || 'unknown'}' is not supported via CLI."
             puts "Please create your database using your database provider's tools."
@@ -207,6 +221,8 @@ module Ruby2JS
 
           if d1?(options)
             run_d1_migrate(options)
+          elsif supabase?(options)
+            run_supabase_migrate(options)
           else
             run_node_migrate(options)
           end
@@ -251,6 +267,8 @@ module Ruby2JS
 
           if d1?(options)
             run_d1_prepare(options)
+          elsif supabase?(options)
+            run_supabase_prepare(options)
           else
             run_node_prepare(options)
           end
@@ -285,6 +303,10 @@ module Ruby2JS
             puts "PlanetScale databases are managed via the PlanetScale console or CLI."
             puts "Visit: https://app.planetscale.com/"
             puts "Or use: pscale database delete <name>"
+          when 'supabase'
+            puts "Supabase databases are managed via the Supabase dashboard."
+            puts "Visit: https://supabase.com/dashboard"
+            puts "Go to Project Settings → General → Delete Project"
           else
             puts "Database deletion for '#{db || 'unknown'}' is not supported via CLI."
             puts "Please delete your database using your database provider's tools."
@@ -523,6 +545,104 @@ module Ruby2JS
         end
 
         # ============================================
+        # Supabase implementations
+        # ============================================
+        # Supabase uses PostgREST for CRUD (via @supabase/supabase-js)
+        # but requires direct Postgres connection for DDL (migrations)
+
+        def run_supabase_migrate(options)
+          validate_supabase_env!
+
+          Dir.chdir(DIST_DIR) do
+            load_env_local
+
+            puts "Running Supabase migrations via direct Postgres connection..."
+            # Use pg adapter with DATABASE_URL for migrations
+            # The migrate.mjs script will use DATABASE_URL when JUNTOS_DATABASE=supabase
+            unless system({ 'JUNTOS_MIGRATE_VIA_PG' => '1' },
+                          'node', 'node_modules/ruby2js-rails/migrate.mjs', '--migrate-only')
+              abort "\nError: Migration failed."
+            end
+          end
+        end
+
+        def run_supabase_prepare(options)
+          validate_supabase_env!
+
+          Dir.chdir(DIST_DIR) do
+            load_env_local
+
+            is_fresh = supabase_database_fresh?
+
+            puts "Running Supabase migrations via direct Postgres connection..."
+            unless system({ 'JUNTOS_MIGRATE_VIA_PG' => '1' },
+                          'node', 'node_modules/ruby2js-rails/migrate.mjs', '--migrate-only')
+              abort "\nError: Migration failed."
+            end
+
+            if is_fresh
+              puts "Running seeds via Supabase PostgREST..."
+              unless system('node', 'node_modules/ruby2js-rails/migrate.mjs', '--seed-only')
+                abort "\nError: Seeding failed."
+              end
+            else
+              puts "Skipping seeds (existing database)"
+            end
+          end
+        end
+
+        def validate_supabase_env!
+          load_env_local
+          unless ENV['DATABASE_URL']
+            abort <<~ERROR
+              Error: DATABASE_URL not set.
+
+              Supabase requires a direct Postgres connection for migrations.
+              Add to .env.local:
+                DATABASE_URL=postgresql://postgres:<password>@db.<project-ref>.supabase.co:5432/postgres
+
+              Find this in: Supabase Dashboard → Project Settings → Database → Connection string
+            ERROR
+          end
+
+          unless ENV['SUPABASE_URL'] && ENV['SUPABASE_ANON_KEY']
+            warn <<~WARNING
+              Warning: SUPABASE_URL or SUPABASE_ANON_KEY not set.
+              Seeds and runtime operations require these for PostgREST access.
+              Add to .env.local:
+                SUPABASE_URL=https://<project-ref>.supabase.co
+                SUPABASE_ANON_KEY=<anon-key>
+            WARNING
+          end
+        end
+
+        def supabase_database_fresh?
+          # Check if schema_migrations table exists via DATABASE_URL
+          require 'uri'
+          db_url = ENV['DATABASE_URL']
+          return true unless db_url
+
+          # Use node to check - simpler than adding pg gem dependency
+          check_script = <<~JS
+            import pg from 'pg';
+            const client = new pg.Client(process.env.DATABASE_URL);
+            await client.connect();
+            const result = await client.query(
+              "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'schema_migrations')"
+            );
+            console.log(result.rows[0].exists ? 'exists' : 'fresh');
+            await client.end();
+          JS
+
+          Dir.chdir(DIST_DIR) do
+            output = `node -e "#{check_script.gsub('"', '\\"').gsub("\n", ' ')}" 2>/dev/null`
+            !output.include?('exists')
+          end
+        rescue
+          true  # Assume fresh if we can't check
+        end
+
+        # ============================================
         # SQLite implementations
         # ============================================
 
@@ -603,6 +723,10 @@ module Ruby2JS
 
         def d1?(options)
           options[:database] == 'd1'
+        end
+
+        def supabase?(options)
+          options[:database] == 'supabase'
         end
 
         def browser_database?(options)
