@@ -3,6 +3,7 @@
 require 'optparse'
 require 'fileutils'
 require 'json'
+require 'yaml'
 
 module Ruby2JS
   module CLI
@@ -36,6 +37,9 @@ module Ruby2JS
           options = parse_options(args)
           validate_rails_app!
 
+          # Load database config from database.yml (CLI options override)
+          load_database_config!(options)
+
           send("run_#{subcommand}", options)
         end
 
@@ -45,18 +49,23 @@ module Ruby2JS
           options = {
             database: ENV['JUNTOS_DATABASE'],
             target: ENV['JUNTOS_TARGET'],
+            environment: ENV['RAILS_ENV'] || ENV['NODE_ENV'],
             verbose: false
           }
 
           parser = OptionParser.new do |opts|
             opts.banner = "Usage: juntos db <command> [options]"
 
-            opts.on("-d", "--database ADAPTER", "Database adapter") do |db|
+            opts.on("-d", "--database ADAPTER", "Database adapter (overrides database.yml)") do |db|
               options[:database] = db
             end
 
             opts.on("-t", "--target TARGET", "Target runtime") do |target|
               options[:target] = target
+            end
+
+            opts.on("-e", "--environment ENV", "Rails environment (default: development)") do |env|
+              options[:environment] = env
             end
 
             opts.on("-v", "--verbose", "Show detailed output") do
@@ -71,6 +80,40 @@ module Ruby2JS
 
           parser.parse!(args)
           options
+        end
+
+        # Load database configuration from config/database.yml
+        # Priority: CLI options > environment variables > database.yml > defaults
+        def load_database_config!(options)
+          env = options[:environment] || 'development'
+          ENV['RAILS_ENV'] = env  # Set for child processes
+
+          # If CLI provided database, use it (already set in options)
+          if options[:database]
+            # Derive database name from environment if not in config
+            options[:db_name] ||= "#{File.basename(Dir.pwd)}_#{env}".downcase.gsub(/[^a-z0-9_]/, '_')
+            return
+          end
+
+          # Try to load from config/database.yml
+          config_path = 'config/database.yml'
+          if File.exist?(config_path)
+            begin
+              config = YAML.load_file(config_path, aliases: true)
+              if config && config[env]
+                env_config = config[env]
+                options[:database] ||= env_config['adapter']
+                options[:db_name] ||= env_config['database']
+                options[:target] ||= env_config['target']
+              end
+            rescue => e
+              warn "Warning: Could not parse #{config_path}: #{e.message}"
+            end
+          end
+
+          # Defaults
+          options[:database] ||= 'sqlite'
+          options[:db_name] ||= "#{File.basename(Dir.pwd)}_#{env}".downcase.gsub(/[^a-z0-9_]/, '_')
         end
 
         def validate_rails_app!
@@ -96,17 +139,22 @@ module Ruby2JS
 
             Options:
               -d, --database ADAPTER   Database adapter (d1, sqlite, neon, turso, etc.)
+              -e, --environment ENV    Rails environment (development, production, etc.)
               -t, --target TARGET      Target runtime (cloudflare, vercel, node, etc.)
               -v, --verbose            Show detailed output
               -h, --help               Show this help message
 
             Examples:
-              juntos db:migrate                    # Run migrations
+              juntos db:migrate                    # Run migrations (uses database.yml)
               juntos db:seed                       # Run seeds
               juntos db:prepare                    # Migrate + seed if fresh
-              juntos db:prepare -d d1              # D1: create + migrate + seed
-              juntos db:create -d d1               # Create D1 database
-              juntos db:drop -d d1                 # Delete D1 database
+              juntos db:prepare -e production      # Prepare production database
+              juntos db:create                     # Create database (D1, Turso)
+              juntos db:drop                       # Delete database
+
+            Configuration:
+              Database settings are read from config/database.yml based on RAILS_ENV.
+              Use -d to override the adapter, -e to set the environment.
 
             Note: Browser databases (dexie) auto-migrate at runtime.
           HELP
@@ -181,11 +229,13 @@ module Ruby2JS
         def run_prepare(options)
           validate_not_browser!(options, 'prepare')
 
+          env = options[:environment] || 'development'
+
           # D1: also handles create if needed
           if d1?(options)
-            database_id = get_database_id
+            database_id = get_database_id(env)
             unless database_id
-              puts "No D1_DATABASE_ID found. Creating database..."
+              puts "No #{d1_env_var(env)} found. Creating database..."
               run_create(options)
             end
           end
@@ -239,22 +289,24 @@ module Ruby2JS
         # ============================================
 
         def run_d1_create(options)
-          app_name = get_app_name
-          puts "Creating D1 database '#{app_name}'..."
+          db_name = options[:db_name]
+          env = options[:environment] || 'development'
+          puts "Creating D1 database '#{db_name}' for #{env}..."
 
           check_wrangler!
 
-          output = `npx wrangler d1 create #{app_name} 2>&1`
+          output = `npx wrangler d1 create #{db_name} 2>&1`
           puts output if options[:verbose]
 
-          if output =~ /database_id\s*[=:]\s*["']?([a-f0-9-]+)["']?/i
+          # Match JSON format: "database_id": "xxx" or TOML format: database_id = "xxx"
+          if output =~ /"?database_id"?\s*[=:]\s*"?([a-f0-9-]+)"?/i
             database_id = $1
-            save_database_id(database_id)
-            puts "Created D1 database: #{app_name}"
+            save_database_id(database_id, env)
+            puts "Created D1 database: #{db_name}"
             puts "Database ID: #{database_id}"
-            puts "Saved to .env.local"
+            puts "Saved to .env.local (#{d1_env_var(env)})"
           elsif output.include?('already exists')
-            puts "Database '#{app_name}' already exists."
+            puts "Database '#{db_name}' already exists."
             puts "Use 'juntos db:drop' first if you want to recreate it."
           else
             abort "Error: Failed to create database.\n#{output}"
@@ -262,33 +314,38 @@ module Ruby2JS
         end
 
         def run_d1_drop(options)
-          database_id = get_database_id
+          db_name = options[:db_name]
+          env = options[:environment] || 'development'
+          database_id = get_database_id(env)
+
           unless database_id
-            abort "Error: No D1_DATABASE_ID found in .env.local"
+            abort "Error: No #{d1_env_var(env)} found in .env.local"
           end
 
-          app_name = get_app_name
           check_wrangler!
 
-          puts "Deleting D1 database '#{app_name}' (#{database_id})..."
+          puts "Deleting D1 database '#{db_name}' (#{database_id})..."
 
-          unless system('npx', 'wrangler', 'd1', 'delete', database_id, '--yes')
+          # Let wrangler prompt for confirmation - this is destructive
+          unless system('npx', 'wrangler', 'd1', 'delete', db_name)
             abort "\nError: Failed to delete database."
           end
 
-          remove_database_id
+          remove_database_id(env)
           puts "Database deleted and removed from .env.local"
         end
 
         def run_d1_migrate(options)
+          db_name = options[:db_name]
+          env = options[:environment] || 'development'
+
           Dir.chdir(DIST_DIR) do
             load_env_local
-            setup_wrangler_toml
+            setup_wrangler_toml(env)
 
-            db_name = get_db_name_from_wrangler
             check_wrangler!
 
-            puts "Running D1 migrations..."
+            puts "Running D1 migrations on '#{db_name}'..."
             unless system('npx', 'wrangler', 'd1', 'execute', db_name, '--remote',
                           '--file', 'db/migrations.sql')
               abort "\nError: Migration failed."
@@ -297,19 +354,21 @@ module Ruby2JS
         end
 
         def run_d1_seed(options)
+          db_name = options[:db_name]
+          env = options[:environment] || 'development'
+
           Dir.chdir(DIST_DIR) do
             load_env_local
-            setup_wrangler_toml
+            setup_wrangler_toml(env)
 
             unless File.exist?('db/seeds.sql')
               puts "No seeds.sql found - nothing to seed."
               return
             end
 
-            db_name = get_db_name_from_wrangler
             check_wrangler!
 
-            puts "Running D1 seeds..."
+            puts "Running D1 seeds on '#{db_name}'..."
             unless system('npx', 'wrangler', 'd1', 'execute', db_name, '--remote',
                           '--file', 'db/seeds.sql')
               abort "\nError: Seeding failed."
@@ -318,11 +377,13 @@ module Ruby2JS
         end
 
         def run_d1_prepare(options)
+          db_name = options[:db_name]
+          env = options[:environment] || 'development'
+
           Dir.chdir(DIST_DIR) do
             load_env_local
-            setup_wrangler_toml
+            setup_wrangler_toml(env)
 
-            db_name = get_db_name_from_wrangler
             check_wrangler!
 
             is_fresh = database_fresh?(db_name)
@@ -383,7 +444,8 @@ module Ruby2JS
 
           puts "Deleting Turso database '#{app_name}'..."
 
-          unless system('turso', 'db', 'destroy', app_name, '--yes')
+          # Let turso prompt for confirmation - this is destructive
+          unless system('turso', 'db', 'destroy', app_name)
             abort "\nError: Failed to delete database."
           end
 
@@ -498,16 +560,19 @@ module Ruby2JS
           end
         end
 
-        def get_app_name
-          File.basename(Dir.pwd).downcase.gsub(/[^a-z0-9-]/, '-')
+        # Environment variable name for D1 database ID
+        # development uses D1_DATABASE_ID, others use D1_DATABASE_ID_PRODUCTION, etc.
+        def d1_env_var(env = 'development')
+          env == 'development' ? 'D1_DATABASE_ID' : "D1_DATABASE_ID_#{env.upcase}"
         end
 
-        def get_database_id
+        def get_database_id(env = 'development')
           env_file = '.env.local'
           return nil unless File.exist?(env_file)
 
+          var_name = d1_env_var(env)
           File.readlines(env_file).each do |line|
-            if line =~ /^D1_DATABASE_ID=(.+)$/
+            if line =~ /^#{Regexp.escape(var_name)}=(.+)$/
               return $1.strip.gsub(/["']/, '')
             end
           end
@@ -515,22 +580,24 @@ module Ruby2JS
           nil
         end
 
-        def save_database_id(database_id)
+        def save_database_id(database_id, env = 'development')
           env_file = '.env.local'
           lines = File.exist?(env_file) ? File.readlines(env_file) : []
 
-          lines.reject! { |line| line.start_with?('D1_DATABASE_ID=') }
-          lines << "D1_DATABASE_ID=#{database_id}\n"
+          var_name = d1_env_var(env)
+          lines.reject! { |line| line.start_with?("#{var_name}=") }
+          lines << "#{var_name}=#{database_id}\n"
 
           File.write(env_file, lines.join)
         end
 
-        def remove_database_id
+        def remove_database_id(env = 'development')
           env_file = '.env.local'
           return unless File.exist?(env_file)
 
+          var_name = d1_env_var(env)
           lines = File.readlines(env_file)
-          lines.reject! { |line| line.start_with?('D1_DATABASE_ID=') }
+          lines.reject! { |line| line.start_with?("#{var_name}=") }
           File.write(env_file, lines.join)
         end
 
@@ -546,32 +613,26 @@ module Ruby2JS
           end
         end
 
-        def setup_wrangler_toml
+        def setup_wrangler_toml(env = 'development')
           return unless File.exist?('wrangler.toml')
 
           content = File.read('wrangler.toml')
           return unless content.include?('${D1_DATABASE_ID}')
 
-          d1_id = ENV['D1_DATABASE_ID']
+          var_name = d1_env_var(env)
+          d1_id = ENV[var_name]
           unless d1_id
-            abort "Error: D1_DATABASE_ID not set.\n" \
-                  "Run 'juntos db:create' first or set it in .env.local"
+            abort "Error: #{var_name} not set.\n" \
+                  "Run 'juntos db:create -e #{env}' first or set it in .env.local"
           end
 
           updated = content.gsub('${D1_DATABASE_ID}', d1_id)
           File.write('wrangler.toml', updated)
         end
 
-        def get_db_name_from_wrangler
-          return get_app_name unless File.exist?('wrangler.toml')
-
-          File.read('wrangler.toml').each_line do |line|
-            if line =~ /database_name\s*=\s*"([^"]+)"/
-              return $1
-            end
-          end
-
-          get_app_name
+        # Used by Turso which doesn't have per-environment databases yet
+        def get_app_name
+          File.basename(Dir.pwd).downcase.gsub(/[^a-z0-9-]/, '-')
         end
 
         def database_fresh?(db_name)
