@@ -29,6 +29,7 @@ require 'ruby2js/filter/stimulus'
 require 'ruby2js/filter/camelCase'
 require_relative 'erb_compiler'
 require_relative 'migration_sql'
+require_relative 'seed_sql'
 
 class SelfhostBuilder
   # JS (Node.js): use process.cwd() since bin commands run from app root
@@ -1350,6 +1351,11 @@ class SelfhostBuilder
     if has_code
       # Transpile existing seeds file normally
       self.transpile_file(seeds_src, seeds_dest)
+
+      # For D1, also generate a seeds.sql file that wrangler can execute
+      if @database == 'd1'
+        generate_seeds_sql(seeds_src, dest_dir)
+      end
     else
       # Generate empty Seeds module directly as JS (rails/seeds filter needs code to process)
       FileUtils.mkdir_p(dest_dir)
@@ -1362,6 +1368,18 @@ class SelfhostBuilder
         };
       JS
       puts("  -> db/seeds.js (stub)")
+    end
+  end
+
+  # Generate SQL seeds file for D1/wrangler
+  def generate_seeds_sql(seeds_src, db_dest)
+    result = Ruby2JS::Rails::SeedSQL.generate(seeds_src)
+
+    if result[:sql] && !result[:sql].empty?
+      FileUtils.mkdir_p(db_dest)
+      sql_path = File.join(db_dest, 'seeds.sql')
+      File.write(sql_path, result[:sql])
+      puts("  -> db/seeds.sql (#{result[:inserts]} inserts)")
     end
   end
 
