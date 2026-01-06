@@ -91,8 +91,8 @@ module Ruby2JS
               migrate   Run database migrations
               seed      Run database seeds
               prepare   Migrate, and seed if fresh database
-              create    Create database (D1 only)
-              drop      Delete database (D1 only)
+              create    Create database (D1, Turso)
+              drop      Delete database (D1, Turso, SQLite)
 
             Options:
               -d, --database ADAPTER   Database adapter (d1, sqlite, neon, turso, etc.)
@@ -113,30 +113,33 @@ module Ruby2JS
         end
 
         # ============================================
-        # db create - Create database (D1 only)
+        # db create - Create database
         # ============================================
         def run_create(options)
-          validate_d1!(options, 'create')
+          db = options[:database]
 
-          app_name = get_app_name
-          puts "Creating D1 database '#{app_name}'..."
-
-          check_wrangler!
-
-          output = `npx wrangler d1 create #{app_name} 2>&1`
-          puts output if options[:verbose]
-
-          if output =~ /database_id\s*[=:]\s*["']?([a-f0-9-]+)["']?/i
-            database_id = $1
-            save_database_id(database_id)
-            puts "Created D1 database: #{app_name}"
-            puts "Database ID: #{database_id}"
-            puts "Saved to .env.local"
-          elsif output.include?('already exists')
-            puts "Database '#{app_name}' already exists."
-            puts "Use 'juntos db:drop' first if you want to recreate it."
+          case db
+          when 'd1'
+            run_d1_create(options)
+          when 'turso'
+            run_turso_create(options)
+          when 'better_sqlite3', 'sqlite', 'sql.js'
+            puts "SQLite databases are created automatically by db:migrate."
+            puts "Run 'juntos db:migrate' to create and initialize the database."
+          when 'dexie'
+            puts "Dexie (IndexedDB) databases are created automatically in the browser."
+            puts "No CLI action needed."
+          when 'neon'
+            puts "Neon databases are managed via the Neon console or CLI."
+            puts "Visit: https://console.neon.tech/"
+            puts "Or install the Neon CLI: npm install -g neonctl"
+          when 'planetscale'
+            puts "PlanetScale databases are managed via the PlanetScale console or CLI."
+            puts "Visit: https://app.planetscale.com/"
+            puts "Or use: pscale database create <name>"
           else
-            abort "Error: Failed to create database.\n#{output}"
+            puts "Database creation for '#{db || 'unknown'}' is not supported via CLI."
+            puts "Please create your database using your database provider's tools."
           end
         end
 
@@ -199,11 +202,66 @@ module Ruby2JS
         end
 
         # ============================================
-        # db drop - Delete database (D1 only)
+        # db drop - Delete database
         # ============================================
         def run_drop(options)
-          validate_d1!(options, 'drop')
+          db = options[:database]
 
+          case db
+          when 'd1'
+            run_d1_drop(options)
+          when 'turso'
+            run_turso_drop(options)
+          when 'better_sqlite3', 'sqlite'
+            run_sqlite_drop(options)
+          when 'sql.js'
+            puts "sql.js uses in-memory databases that don't persist."
+            puts "No action needed."
+          when 'dexie'
+            puts "Dexie (IndexedDB) databases are managed by the browser."
+            puts "Use browser DevTools > Application > IndexedDB to delete."
+          when 'neon'
+            puts "Neon databases are managed via the Neon console or CLI."
+            puts "Visit: https://console.neon.tech/"
+            puts "Or use: neonctl databases delete <name>"
+          when 'planetscale'
+            puts "PlanetScale databases are managed via the PlanetScale console or CLI."
+            puts "Visit: https://app.planetscale.com/"
+            puts "Or use: pscale database delete <name>"
+          else
+            puts "Database deletion for '#{db || 'unknown'}' is not supported via CLI."
+            puts "Please delete your database using your database provider's tools."
+          end
+        end
+
+        # ============================================
+        # D1-specific implementations
+        # ============================================
+
+        def run_d1_create(options)
+          app_name = get_app_name
+          puts "Creating D1 database '#{app_name}'..."
+
+          check_wrangler!
+
+          output = `npx wrangler d1 create #{app_name} 2>&1`
+          puts output if options[:verbose]
+
+          if output =~ /database_id\s*[=:]\s*["']?([a-f0-9-]+)["']?/i
+            database_id = $1
+            save_database_id(database_id)
+            puts "Created D1 database: #{app_name}"
+            puts "Database ID: #{database_id}"
+            puts "Saved to .env.local"
+          elsif output.include?('already exists')
+            puts "Database '#{app_name}' already exists."
+            puts "Use 'juntos db:drop' first if you want to recreate it."
+          else
+            abort "Error: Failed to create database.\n#{output}"
+          end
+        end
+
+        def run_d1_drop(options)
           database_id = get_database_id
           unless database_id
             abort "Error: No D1_DATABASE_ID found in .env.local"
@@ -221,10 +279,6 @@ module Ruby2JS
           remove_database_id
           puts "Database deleted and removed from .env.local"
         end
-
-        # ============================================
-        # D1-specific implementations
-        # ============================================
 
         def run_d1_migrate(options)
           Dir.chdir(DIST_DIR) do
@@ -292,6 +346,93 @@ module Ruby2JS
         end
 
         # ============================================
+        # Turso implementations
+        # ============================================
+
+        def run_turso_create(options)
+          app_name = get_app_name
+
+          unless turso_cli_available?
+            puts "Turso CLI not found. Install it first:"
+            puts "  curl -sSfL https://get.tur.so/install.sh | bash"
+            puts "\nOr create the database at: https://turso.tech/app"
+            return
+          end
+
+          puts "Creating Turso database '#{app_name}'..."
+
+          output = `turso db create #{app_name} 2>&1`
+          if $?.success?
+            puts "Created Turso database: #{app_name}"
+            puts "\nTo get your connection URL, run:"
+            puts "  turso db show #{app_name} --url"
+            puts "  turso db tokens create #{app_name}"
+          else
+            abort "Error: Failed to create database.\n#{output}"
+          end
+        end
+
+        def run_turso_drop(options)
+          app_name = get_app_name
+
+          unless turso_cli_available?
+            puts "Turso CLI not found. Delete the database at:"
+            puts "  https://turso.tech/app"
+            return
+          end
+
+          puts "Deleting Turso database '#{app_name}'..."
+
+          unless system('turso', 'db', 'destroy', app_name, '--yes')
+            abort "\nError: Failed to delete database."
+          end
+
+          puts "Database deleted."
+        end
+
+        def turso_cli_available?
+          system('turso', '--version', out: File::NULL, err: File::NULL)
+        end
+
+        # ============================================
+        # SQLite implementations
+        # ============================================
+
+        def run_sqlite_drop(options)
+          # Find the database file
+          db_file = find_sqlite_database
+
+          unless db_file
+            puts "No SQLite database file found."
+            puts "Looked for: db/*.sqlite3, db/*.db, *.sqlite3, *.db"
+            return
+          end
+
+          puts "Deleting SQLite database: #{db_file}"
+          File.delete(db_file)
+          puts "Database deleted."
+        end
+
+        def find_sqlite_database
+          # Common SQLite database locations
+          patterns = [
+            'db/development.sqlite3',
+            'db/production.sqlite3',
+            'db/*.sqlite3',
+            'db/*.db',
+            '*.sqlite3',
+            '*.db'
+          ]
+
+          patterns.each do |pattern|
+            matches = Dir.glob(pattern)
+            return matches.first if matches.any?
+          end
+
+          nil
+        end
+
+        # ============================================
         # Node.js implementations (SQLite, Postgres, etc.)
         # ============================================
 
@@ -338,13 +479,6 @@ module Ruby2JS
 
         def browser_database?(options)
           BROWSER_DATABASES.include?(options[:database])
-        end
-
-        def validate_d1!(options, command)
-          unless d1?(options)
-            abort "Error: 'db:#{command}' only works with D1 databases.\n" \
-                  "Use: juntos db:#{command} -d d1"
-          end
         end
 
         def validate_not_browser!(options, command)
