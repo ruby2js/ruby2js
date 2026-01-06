@@ -72,6 +72,21 @@ export function createContext(req, params = {}) {
   const url = parseRequestUrl(req);
   const cookieHeader = getHeader(req, 'cookie') || '';
 
+  // Convert headers to plain object for property access (controllers use headers.accept, not headers.get('accept'))
+  // This works with both Fetch API Headers and Node.js plain object headers
+  const headers = {};
+  if (typeof req.headers.get === 'function') {
+    // Fetch API Headers - extract common headers
+    headers.accept = req.headers.get('accept') || '';
+    headers.contentType = req.headers.get('content-type') || '';
+    headers.cookie = req.headers.get('cookie') || '';
+  } else {
+    // Plain object (Node.js style)
+    headers.accept = req.headers.accept || req.headers['accept'] || '';
+    headers.contentType = req.headers['content-type'] || '';
+    headers.cookie = req.headers.cookie || '';
+  }
+
   return {
     // Content for layout (like Rails content_for)
     contentFor: {},
@@ -87,7 +102,7 @@ export function createContext(req, params = {}) {
       path: url.pathname,
       method: req.method,
       url: url.href,  // Full URL for redirect base
-      headers: req.headers
+      headers: headers
     }
   };
 }

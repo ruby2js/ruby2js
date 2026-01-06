@@ -600,10 +600,17 @@ class SelfhostBuilder
     stimulus_dir = File.join(DEMO_ROOT, 'app/javascript/controllers')
     if File.exist?(stimulus_dir)
       puts("Stimulus Controllers:")
-      self.process_stimulus_controllers(
-        stimulus_dir,
-        File.join(@dist_dir, 'app/javascript/controllers')
-      )
+      controllers_dest = File.join(@dist_dir, 'app/javascript/controllers')
+      self.process_stimulus_controllers(stimulus_dir, controllers_dest)
+
+      # For edge targets (Cloudflare, Vercel), also copy to public/ for static serving
+      edge_targets = %w[cloudflare vercel-edge vercel-node]
+      if edge_targets.include?(@target.to_s) || edge_targets.include?(@runtime.to_s)
+        public_controllers = File.join(@dist_dir, 'public/app/javascript/controllers')
+        FileUtils.mkdir_p(public_controllers)
+        FileUtils.cp_r(Dir.glob("#{controllers_dest}/*.js"), public_controllers)
+        puts("  -> public/app/javascript/controllers/ (for static serving)")
+      end
       puts("")
     end
 

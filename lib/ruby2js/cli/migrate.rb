@@ -113,8 +113,10 @@ module Ruby2JS
         def run_d1_migrations(options)
           # Get database name from wrangler.toml
           db_name = nil
+          wrangler_content = nil
           if File.exist?('wrangler.toml')
-            File.read('wrangler.toml').each_line do |line|
+            wrangler_content = File.read('wrangler.toml')
+            wrangler_content.each_line do |line|
               if line =~ /database_name\s*=\s*"([^"]+)"/
                 db_name = $1
                 break
@@ -123,6 +125,18 @@ module Ruby2JS
           end
 
           db_name ||= 'blog'  # fallback
+
+          # Substitute D1_DATABASE_ID placeholder if present
+          if wrangler_content&.include?('${D1_DATABASE_ID}')
+            d1_id = ENV['D1_DATABASE_ID']
+            unless d1_id
+              abort "\nError: D1_DATABASE_ID not set.\n" \
+                    "Set it in .env.local or as an environment variable."
+            end
+            updated_content = wrangler_content.gsub('${D1_DATABASE_ID}', d1_id)
+            File.write('wrangler.toml', updated_content)
+            puts "  Configured database_id: #{d1_id}"
+          end
 
           # Check if wrangler is available
           unless system('npx', 'wrangler', '--version', out: File::NULL, err: File::NULL)
