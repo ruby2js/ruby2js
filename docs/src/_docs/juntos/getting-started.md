@@ -65,7 +65,7 @@ Runs in your browser with IndexedDB storage. Features:
 ### Server Mode (Node.js)
 
 ```bash
-bin/juntos migrate -d sqlite
+bin/juntos db:prepare -d sqlite
 bin/juntos up -d sqlite
 ```
 

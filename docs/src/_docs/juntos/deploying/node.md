@@ -46,12 +46,12 @@ bin/juntos up -d sqlite
 
 This builds the app and starts a server on port 3000.
 
-## Migrations
+## Database Setup
 
-Run migrations before starting the server:
+Prepare the database before starting the server:
 
 ```bash
-bin/juntos migrate -d sqlite
+bin/juntos db:prepare -d sqlite
 bin/juntos up -d sqlite
 ```
 
@@ -61,9 +61,11 @@ For remote databases:
 # Set connection string in .env.local
 echo "DATABASE_URL=postgres://user:pass@host/db" >> .env.local
 
-bin/juntos migrate -d pg
+bin/juntos db:prepare -d pg
 bin/juntos up -d pg
 ```
+
+The `db:prepare` command runs migrations and seeds if the database is fresh.
 
 ## Production Build
 

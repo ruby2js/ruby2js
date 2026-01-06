@@ -30,18 +30,7 @@ Cloudflare Workers deployment runs your application on Cloudflare's edge network
    wrangler login
    ```
 
-2. **Create D1 database**
-   ```bash
-   wrangler d1 create myapp_production
-   ```
-
-   Note the database ID from the output.
-
-3. **Local environment**
-   ```bash
-   # .env.local
-   D1_DATABASE_ID=xxxx-xxxx-xxxx-xxxx
-   ```
+That's it! The `db:prepare` command handles D1 database creation automatically.
 
 ## Database Options
 
@@ -55,11 +44,11 @@ D1 is the primary choice for Cloudflare deployments.
 ## Deployment
 
 ```bash
-# Run migrations first
-bin/juntos migrate -t cloudflare -d d1
+# Prepare database (creates if needed, migrates, seeds if fresh)
+bin/juntos db:prepare -d d1
 
 # Deploy
-bin/juntos deploy -t cloudflare -d d1
+bin/juntos deploy -d d1
 ```
 
 The deploy command:
@@ -119,16 +108,19 @@ Application.configure({
 export default Application.worker();
 ```
 
-## Migrations
+## Database Commands
 
-D1 migrations run via Wrangler:
+D1 database management uses Wrangler under the hood:
 
 ```bash
-# The migrate command uses wrangler d1 execute
-bin/juntos migrate -t cloudflare -d d1
+bin/juntos db:create -d d1     # Create D1 database
+bin/juntos db:migrate -d d1    # Run migrations only
+bin/juntos db:seed -d d1       # Run seeds only
+bin/juntos db:prepare -d d1    # All of the above (smart)
+bin/juntos db:drop -d d1       # Delete database
 ```
 
-This executes each pending migration against your D1 database.
+The `db:prepare` command is the most common—it creates the database if needed, runs migrations, and seeds only if the database is fresh.
 
 ## Environment Variables
 
@@ -190,7 +182,7 @@ For Tailwind CSS, ensure the built CSS is in `app/assets/builds/`.
 Migrations haven't run:
 
 ```bash
-bin/juntos migrate -t cloudflare -d d1
+bin/juntos db:migrate -d d1
 ```
 
 ### "Binding not found: DB"

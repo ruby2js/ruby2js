@@ -53,7 +53,7 @@ bin/juntos dev -d dexie
 Full server with SQLite:
 
 ```bash
-bin/juntos migrate -d sqlite
+bin/juntos db:prepare -d sqlite
 bin/juntos up -d sqlite
 ```
 
@@ -62,11 +62,11 @@ bin/juntos up -d sqlite
 Cloudflare Workers with D1:
 
 ```bash
-wrangler d1 create myapp
-echo "D1_DATABASE_ID=your-id" >> .env.local
-bin/juntos migrate -d d1
+bin/juntos db:prepare -d d1
 bin/juntos deploy -d d1
 ```
+
+The `db:prepare` command creates the D1 database (if needed), runs migrations, and seeds if fresh.
 
 ## What Each Demo Teaches
 

@@ -46,8 +46,8 @@ Same chat interface, running entirely in your browser. The browser target uses `
 ## Run on Node.js
 
 ```bash
-bin/juntos migrate -d sqlite
-bin/juntos server -d sqlite
+bin/juntos db:prepare -d sqlite
+bin/juntos up -d sqlite
 ```
 
 Open multiple browser tabs. Messages broadcast via WebSocket to all connected clients.
@@ -55,11 +55,11 @@ Open multiple browser tabs. Messages broadcast via WebSocket to all connected cl
 ## Deploy to Cloudflare
 
 ```bash
-wrangler d1 create chat
-echo "D1_DATABASE_ID=your-id-here" >> .env.local
-bin/juntos migrate -d d1
+bin/juntos db:prepare -d d1
 bin/juntos deploy -d d1
 ```
+
+The `db:prepare` command creates the D1 database (if needed), runs migrations, and seeds if fresh.
 
 Your model's `broadcast_append_to` calls route through Durable Objects. Subscribers on different edge instances receive the update. Real-time, globally distributed.
 

@@ -67,13 +67,13 @@ Article Update {id: 1, title: "Updated", updated_at: "..."}
 ## Run on Node.js
 
 ```bash
-bin/juntos migrate -d sqlite
+bin/juntos db:prepare -d sqlite
 bin/juntos up -d sqlite
 ```
 
 Open http://localhost:3000. Same blog—but now Node.js serves requests, and [better-sqlite3](https://github.com/WiseLibs/better-sqlite3) provides the database.
 
-The `migrate` command runs pending database migrations. The `up` command builds and starts the server.
+The `db:prepare` command runs migrations and seeds if the database is fresh. The `up` command builds and starts the server.
 
 Other runtimes work too:
 
@@ -85,8 +85,8 @@ bin/juntos up -t deno -d postgres  # Deno with PostgreSQL
 ## Deploy to Vercel
 
 ```bash
-bin/juntos migrate -t vercel -d neon
-bin/juntos deploy -t vercel -d neon
+bin/juntos db:prepare -d neon
+bin/juntos deploy -d neon
 ```
 
 **Prerequisites:**
@@ -97,20 +97,20 @@ bin/juntos deploy -t vercel -d neon
 4. Connect database — add `DATABASE_URL` as a Vercel environment variable
 5. Local environment — copy credentials to `.env.local` for migrations
 
-Like Rails, migrations run separately from deployment. The `migrate` command applies migrations to your production database. The `deploy` command builds and deploys.
+Like Rails, migrations run separately from deployment. The `db:prepare` command applies migrations and seeds if fresh. The `deploy` command builds and deploys.
 
 ## Deploy to Cloudflare
 
 ```bash
-bin/juntos migrate -t cloudflare -d d1
-bin/juntos deploy -t cloudflare -d d1
+bin/juntos db:prepare -d d1
+bin/juntos deploy -d d1
 ```
 
 **Prerequisites:**
 
 1. [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/) — `npm i -g wrangler` and `wrangler login`
-2. [Create a D1 database](https://developers.cloudflare.com/d1/get-started/) — `wrangler d1 create blog_production`
-3. Local environment — add `D1_DATABASE_ID` to `.env.local`
+
+The `db:prepare` command creates the D1 database (if `D1_DATABASE_ID` is not set), runs migrations, and seeds if fresh. The database ID is saved to `.env.local` automatically.
 
 ## The Code
 

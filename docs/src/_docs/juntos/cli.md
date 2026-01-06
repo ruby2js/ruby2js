@@ -118,33 +118,101 @@ Creates the `dist/` directory containing:
 - `api/` or `src/` — Entry point (serverless targets)
 - `package.json` — Dependencies
 
-## juntos migrate
+## juntos db
 
-Run database migrations against a target.
+Database management commands. Supports Rails-style colon syntax (`db:migrate`) or space syntax (`db migrate`).
 
 ```bash
-bin/juntos migrate [options]
+bin/juntos db <command> [options]
+bin/juntos db:command [options]
 ```
+
+**Commands:**
+
+| Command | Description |
+|---------|-------------|
+| `migrate` | Run database migrations |
+| `seed` | Run database seeds |
+| `prepare` | Migrate + seed if fresh database |
+| `create` | Create database (D1, Turso) |
+| `drop` | Delete database (D1, Turso, SQLite) |
 
 **Options:**
 
 | Option | Description |
 |--------|-------------|
-| `-t, --target TARGET` | Target platform |
 | `-d, --database ADAPTER` | Database adapter |
-| `-e, --environment ENV` | Rails environment (default: development) |
+| `-t, --target TARGET` | Target runtime |
 | `-v, --verbose` | Show detailed output |
 | `-h, --help` | Show help |
 
-**Examples:**
+### db:migrate
+
+Run database migrations.
 
 ```bash
-bin/juntos migrate -d sqlite              # Local SQLite
-bin/juntos migrate -e production          # Migrate production database
-bin/juntos migrate -d d1                  # D1 via Wrangler
+bin/juntos db:migrate -d sqlite           # Local SQLite
+bin/juntos db:migrate -d d1               # D1 via Wrangler
+bin/juntos db:migrate -d neon             # Neon PostgreSQL
 ```
 
-**Environment:**
+### db:seed
+
+Run database seeds (always runs, unlike `prepare`).
+
+```bash
+bin/juntos db:seed -d sqlite              # Seed local SQLite
+bin/juntos db:seed -d d1                  # Seed D1 database
+```
+
+### db:prepare
+
+Smart setup: migrate + seed only if database is fresh (no existing tables).
+
+```bash
+bin/juntos db:prepare -d sqlite           # SQLite: migrate + seed if fresh
+bin/juntos db:prepare -d d1               # D1: create + migrate + seed if fresh
+bin/juntos db:prepare -d neon             # Neon: migrate + seed if fresh
+```
+
+For D1, `db:prepare` also creates the database if `D1_DATABASE_ID` is not set.
+
+### db:create
+
+Create a new database. Support varies by adapter:
+
+```bash
+bin/juntos db:create -d d1                # Create D1 database via Wrangler
+bin/juntos db:create -d turso             # Create Turso database via CLI
+```
+
+| Adapter | Support |
+|---------|---------|
+| D1 | Creates via Wrangler, saves ID to `.env.local` |
+| Turso | Creates via `turso` CLI |
+| SQLite | Created automatically by `db:migrate` |
+| Neon, PlanetScale | Use their web console or CLI |
+| Dexie | Created automatically in browser |
+
+### db:drop
+
+Delete a database. Support varies by adapter:
+
+```bash
+bin/juntos db:drop -d d1                  # Delete D1 database
+bin/juntos db:drop -d turso               # Delete Turso database
+bin/juntos db:drop -d sqlite              # Delete SQLite file
+```
+
+| Adapter | Support |
+|---------|---------|
+| D1 | Deletes via Wrangler |
+| Turso | Deletes via `turso` CLI |
+| SQLite | Deletes the `.sqlite3` file |
+| Neon, PlanetScale | Use their web console or CLI |
+| Dexie | Use browser DevTools |
+
+### Environment Variables
 
 For remote databases, credentials are read from `.env.local`:
 
@@ -152,6 +220,8 @@ For remote databases, credentials are read from `.env.local`:
 # .env.local
 DATABASE_URL=postgres://user:pass@host/db   # Neon, Turso, PlanetScale
 D1_DATABASE_ID=xxxx-xxxx-xxxx               # Cloudflare D1
+TURSO_URL=libsql://db-name.turso.io         # Turso
+TURSO_TOKEN=your-token                       # Turso auth token
 ```
 
 ## juntos deploy

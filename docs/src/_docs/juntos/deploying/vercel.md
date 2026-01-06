@@ -58,11 +58,11 @@ All use HTTP protocols that work in edge environments (no TCP sockets).
 ## Deployment
 
 ```bash
-# Run migrations first
-bin/juntos migrate -t vercel -d neon
+# Prepare database (migrate, seed if fresh)
+bin/juntos db:prepare -d neon
 
 # Deploy
-bin/juntos deploy -t vercel -d neon
+bin/juntos deploy -d neon
 ```
 
 The deploy command:
