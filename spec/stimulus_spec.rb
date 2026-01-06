@@ -65,6 +65,13 @@ describe Ruby2JS::Filter::Stimulus do
       to_js( 'class Foo<Stimulus; def bar(); hasXTarget; end; end' ).
         must_include 'static targets = ["x"]; bar() {this.hasXTarget}'
     end
+
+    it "should deduplicate targets from explicit declaration and usage" do
+      result = to_js( 'class Foo<Stimulus; self.targets = %w(body); def bar(); bodyTarget.value = ""; bodyTarget.focus(); end; end' )
+      # Target should appear only once, not tripled
+      result.must_include 'static targets = ["body"]'
+      result.wont_include '["body", "body"'
+    end
   end
 
   describe "values" do

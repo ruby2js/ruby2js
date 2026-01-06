@@ -68,22 +68,22 @@ module Ruby2JS
           }
 
           if classes.nil? || classes == -1
-            nodes.unshift s(:send, s(:self), :classes=, s(:array, *@stim_classes))
+            nodes.unshift s(:send, s(:self), :classes=, s(:array, *[*@stim_classes].map { |c| s(:str, c) }))
           elsif nodes[classes].children[2].type == :array
-            nodes[classes].children[2].children.each {|item| @stim_classes << item}
+            nodes[classes].children[2].children.each {|item| @stim_classes << item.children.first}
             nodes[classes] = nodes[classes].updated(nil,
-              [*nodes[classes].children[0..1], s(:array, *@stim_classes)])
+              [*nodes[classes].children[0..1], s(:array, *[*@stim_classes].map { |c| s(:str, c) })])
           end
         end
 
         unless @stim_values.size == 0
-          values = nodes.find_index {|child| 
+          values = nodes.find_index {|child|
             child.type == :send and child.children[0..1] == [s(:self), :values=]
           }
 
           if values.nil? || values == -1
             nodes.unshift s(:send, s(:self), :values=, s(:hash,
-            *[*@stim_values].map {|name| s(:pair, name, s(:const, nil, :String))}))
+            *[*@stim_values].map {|name| s(:pair, s(:str, name), s(:const, nil, :String))}))
           elsif nodes[values].children[2].type == :hash
             # Get existing pairs from the explicit values= declaration
             existing_pairs = nodes[values].children[2].children
@@ -91,9 +91,8 @@ module Ruby2JS
             existing_keys = existing_pairs.map { |pair| pair.children.first.children.first }
             # Build pairs for inferred values, excluding those already declared
             inferred_pairs = [*@stim_values].map { |name|
-              key = name.children.first
-              next if existing_keys.include?(key) || existing_keys.include?(key.to_sym)
-              s(:pair, s(:sym, key.to_sym), s(:const, nil, :String))
+              next if existing_keys.include?(name) || existing_keys.include?(name.to_sym)
+              s(:pair, s(:sym, name.to_sym), s(:const, nil, :String))
             }.compact
 
             nodes[values] = nodes[values].updated(nil,
@@ -108,11 +107,11 @@ module Ruby2JS
           }
 
           if targets.nil? || targets == -1
-            nodes.unshift s(:send, s(:self), :targets=, s(:array, *@stim_targets))
+            nodes.unshift s(:send, s(:self), :targets=, s(:array, *[*@stim_targets].map { |t| s(:str, t) }))
           elsif nodes[targets].children[2].type == :array
-            nodes[targets].children[2].children.each {|item| @stim_targets << item}
+            nodes[targets].children[2].children.each {|item| @stim_targets << item.children.first}
             nodes[targets] = nodes[targets].updated(nil,
-              [*nodes[targets].children[0..1], s(:array, *@stim_targets)])
+              [*nodes[targets].children[0..1], s(:array, *[*@stim_targets].map { |t| s(:str, t) })])
           end
         end
 
@@ -122,11 +121,11 @@ module Ruby2JS
           }
 
           if outlets.nil? || outlets == -1
-            nodes.unshift s(:send, s(:self), :outlets=, s(:array, *@stim_outlets))
+            nodes.unshift s(:send, s(:self), :outlets=, s(:array, *[*@stim_outlets].map { |o| s(:str, o) }))
           elsif nodes[outlets].children[2].type == :array
-            nodes[outlets].children[2].children.each {|item| @stim_outlets << item}
+            nodes[outlets].children[2].children.each {|item| @stim_outlets << item.children.first}
             nodes[outlets] = nodes[outlets].updated(nil,
-              [*nodes[outlets].children[0..1], s(:array, *@stim_outlets)])
+              [*nodes[outlets].children[0..1], s(:array, *[*@stim_outlets].map { |o| s(:str, o) })])
           end
         end
 
@@ -134,23 +133,19 @@ module Ruby2JS
         readonly_props = [:element, :application]
 
         readonly_props.push(*[*@stim_targets].map { |name|
-          name = name.children.first
           ["#{name}Target", "#{name}Targets", "has#{name[0].upcase}#{name[1..-1]}Target"]
         })
 
         readonly_props.push(*[*@stim_classes].map { |name|
-          name = name.children.first
           ["#{name}Class", "has#{name[0].upcase}#{name[1..-1]}Class"]
         })
 
         readonly_props.push(*[*@stim_outlets].map { |name|
-          name = name.children.first
           ["#{name}Outlet", "#{name}Outlets", "has#{name[0].upcase}#{name[1..-1]}Outlet"]
         })
 
         # Value properties are read-write, use s(:setter, s(:self)) to support assignment
         value_props = [*@stim_values].map { |name|
-          name = name.children.first
           ["#{name}Value", "has#{name[0].upcase}#{name[1..-1]}Value"]
         }
 
@@ -196,38 +191,38 @@ module Ruby2JS
             [nil, s(:self), s(:send, nil, :this)].include? child.children[0]
 
             if child.children[1] =~ /^has([A-Z]\w*)(Target|Value|Class|Outlet)$/
-              name = s(:str, $1[0].downcase + $1[1..-1])
+              name = $1[0].downcase + $1[1..-1]
               @stim_targets.add name if $2 == 'Target'
               @stim_values.add name if $2 == 'Value'
               @stim_classes.add name if $2 == 'Class'
               @stim_outlets.add name if $2 == 'Outlet'
             elsif child.children[1] =~ /^(\w+)Targets?$/
-              @stim_targets.add s(:str, $1)
+              @stim_targets.add $1
             elsif child.children[1] =~ /^(\w+)Value=?$/
-              @stim_values.add s(:str, $1)
+              @stim_values.add $1
             elsif child.children[1] =~ /^(\w+)Class$/
-              @stim_classes.add s(:str, $1)
+              @stim_classes.add $1
             elsif child.children[1] =~ /^(\w+)Outlets?$/
-              @stim_outlets.add s(:str, $1)
+              @stim_outlets.add $1
             end
 
           elsif child.type == :send and child.children.length == 3 and
             [s(:self), s(:send, nil, :this)].include? child.children[0]
 
             if child.children[1] =~ /^(\w+)Value=$/
-              @stim_values.add s(:str, $1)
+              @stim_values.add $1
             end
 
           elsif child.type == :lvasgn
             if child.children[0] =~ /^(\w+)Value$/
-              @stim_values.add s(:str, $1)
+              @stim_values.add $1
             end
 
           elsif child.type == :def
             if child.children[0] =~ /^(\w+)ValueChanged$/
-              @stim_values.add s(:str, $1)
+              @stim_values.add $1
             elsif child.children[0] =~ /^(\w+)Outlet(Connected|Disconnected)$/
-              @stim_outlets.add s(:str, $1)
+              @stim_outlets.add $1
             end
           end
 

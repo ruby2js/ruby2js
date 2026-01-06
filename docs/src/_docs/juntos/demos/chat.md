@@ -156,8 +156,6 @@ The `data-chat-target="message"` attribute tells Stimulus to track this element.
 
 ```ruby
 class ChatController < Stimulus::Controller
-  self.targets = %w(body)
-
   # Auto-scroll to show the new message
   def messageTargetConnected(element)
     element.scrollIntoView()
@@ -174,7 +172,7 @@ end
 The controller auto-scrolls the chat when new messages arrive and clears the input after each message is sent. The `messageTargetConnected` callback is called by Stimulus whenever a new element with `data-chat-target="message"` is added to the DOM—this is the idiomatic Stimulus pattern for reacting to dynamic content.
 
 **Key transpilations:**
-- `self.targets = [...]` becomes `static targets = [...]`
+- `bodyTarget` usage auto-generates `static targets = ["body"]`
 - `messageTargetConnected` stays as-is (Stimulus convention)
 - `bodyTarget` becomes `this.bodyTarget` (Stimulus target accessor)
 - `self.element` becomes `this.element`
