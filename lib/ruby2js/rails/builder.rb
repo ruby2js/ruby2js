@@ -1632,6 +1632,8 @@ class SelfhostBuilder
   def generate_cloudflare_config()
     # Generate wrangler.toml for Cloudflare Workers deployment
     app_name = File.basename(DEMO_ROOT).downcase.gsub(/[^a-z0-9-]/, '-')
+    rails_env = ENV['RAILS_ENV'] || 'production'
+    db_name = "#{app_name}_#{rails_env}".downcase.gsub(/[^a-z0-9_]/, '_')
 
     wrangler_toml = <<~TOML
       name = "#{app_name}"
@@ -1642,7 +1644,7 @@ class SelfhostBuilder
       # D1 database binding
       [[d1_databases]]
       binding = "DB"
-      database_name = "#{app_name}_production"
+      database_name = "#{db_name}"
       database_id = "${D1_DATABASE_ID}"
 
       # Static assets (Rails convention: public/)
