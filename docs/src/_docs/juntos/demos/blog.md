@@ -110,7 +110,7 @@ bin/juntos deploy -d d1
 
 1. [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/) — `npm i -g wrangler` and `wrangler login`
 
-The `db:prepare` command creates the D1 database (if `D1_DATABASE_ID` is not set), runs migrations, and seeds if fresh. The database ID is saved to `.env.local` automatically.
+The `db:prepare` command creates the D1 database (if not already set up), runs migrations, and seeds if fresh. The database ID is saved to `.env.local` automatically as `D1_DATABASE_ID` (for development) or `D1_DATABASE_ID_PRODUCTION` (for production).
 
 ## The Code
 

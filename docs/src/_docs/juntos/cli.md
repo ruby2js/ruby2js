@@ -134,6 +134,7 @@ bin/juntos db:command [options]
 | `migrate` | Run database migrations |
 | `seed` | Run database seeds |
 | `prepare` | Migrate + seed if fresh database |
+| `reset` | Drop, create, migrate, and seed |
 | `create` | Create database (D1, Turso) |
 | `drop` | Delete database (D1, Turso, SQLite) |
 
@@ -141,7 +142,8 @@ bin/juntos db:command [options]
 
 | Option | Description |
 |--------|-------------|
-| `-d, --database ADAPTER` | Database adapter |
+| `-d, --database ADAPTER` | Database adapter (overrides database.yml) |
+| `-e, --environment ENV` | Rails environment (default: development) |
 | `-t, --target TARGET` | Target runtime |
 | `-v, --verbose` | Show detailed output |
 | `-h, --help` | Show help |
@@ -170,12 +172,25 @@ bin/juntos db:seed -d d1                  # Seed D1 database
 Smart setup: migrate + seed only if database is fresh (no existing tables).
 
 ```bash
+bin/juntos db:prepare                     # Uses database.yml settings
 bin/juntos db:prepare -d sqlite           # SQLite: migrate + seed if fresh
 bin/juntos db:prepare -d d1               # D1: create + migrate + seed if fresh
-bin/juntos db:prepare -d neon             # Neon: migrate + seed if fresh
+bin/juntos db:prepare -e production       # Prepare production database
 ```
 
-For D1, `db:prepare` also creates the database if `D1_DATABASE_ID` is not set.
+For D1, `db:prepare` also creates the database if `D1_DATABASE_ID` (or `D1_DATABASE_ID_PRODUCTION` for production) is not set.
+
+### db:reset
+
+Complete database reset: drop, create, migrate, and seed. Useful for development when you want a fresh start.
+
+```bash
+bin/juntos db:reset                       # Reset development database
+bin/juntos db:reset -d d1                 # Reset D1 database
+bin/juntos db:reset -e staging            # Reset staging database
+```
+
+**Warning:** This is destructive. D1 and Turso will prompt for confirmation before dropping.
 
 ### db:create
 
@@ -219,10 +234,14 @@ For remote databases, credentials are read from `.env.local`:
 ```bash
 # .env.local
 DATABASE_URL=postgres://user:pass@host/db   # Neon, Turso, PlanetScale
-D1_DATABASE_ID=xxxx-xxxx-xxxx               # Cloudflare D1
+D1_DATABASE_ID=xxxx-xxxx-xxxx               # Cloudflare D1 (development)
+D1_DATABASE_ID_PRODUCTION=yyyy-yyyy-yyyy    # Cloudflare D1 (production)
+D1_DATABASE_ID_STAGING=zzzz-zzzz-zzzz       # Cloudflare D1 (staging)
 TURSO_URL=libsql://db-name.turso.io         # Turso
 TURSO_TOKEN=your-token                       # Turso auth token
 ```
+
+D1 database IDs are environment-specific. `juntos db:create -e production` saves to `D1_DATABASE_ID_PRODUCTION`, while development uses `D1_DATABASE_ID`. Commands fall back to `D1_DATABASE_ID` if the per-environment variable is not set.
 
 ## juntos deploy
 
@@ -352,4 +371,88 @@ production:
 | `JUNTOS_TARGET` | Override target |
 | `JUNTOS_DATABASE` | Override database adapter |
 | `DATABASE_URL` | Database connection string |
-| `D1_DATABASE_ID` | Cloudflare D1 database ID |
+| `D1_DATABASE_ID` | Cloudflare D1 database ID (development) |
+| `D1_DATABASE_ID_PRODUCTION` | Cloudflare D1 database ID (production) |
+
+## juntos info
+
+Show current Juntos configuration.
+
+```bash
+bin/juntos info [options]
+```
+
+**Options:**
+
+| Option | Description |
+|--------|-------------|
+| `-v, --verbose` | Show detailed information (dependencies, D1 config) |
+| `-h, --help` | Show help |
+
+**Example output:**
+
+```
+Juntos Configuration
+========================================
+
+Environment:
+  RAILS_ENV:        development (default)
+  JUNTOS_DATABASE:  (not set)
+  JUNTOS_TARGET:    (not set)
+
+Database Configuration:
+  config/database.yml (development):
+    adapter:  d1
+    database: myapp_development
+
+Project:
+  Directory: myapp
+  Rails app: Yes
+  ruby2js:   In Gemfile
+  dist/:     Built
+  Target:    Cloudflare (wrangler.toml present)
+```
+
+Use `--verbose` to also see D1 database IDs and installed dependencies.
+
+## juntos doctor
+
+Check environment and prerequisites for Juntos.
+
+```bash
+bin/juntos doctor
+```
+
+**What it checks:**
+
+| Check | Requirement |
+|-------|-------------|
+| Ruby | 3.0+ required, 3.2+ recommended |
+| Node.js | 18+ required, 22+ recommended |
+| npm | Must be installed |
+| Rails app | `app/` and `config/` directories |
+| database.yml | Valid configuration |
+| .env.local | D1 database ID (if using D1) |
+| wrangler | Available (if using Cloudflare) |
+| dist/ | Build status |
+
+**Example output:**
+
+```
+Juntos Doctor
+========================================
+
+Checking Ruby... OK (3.4.0)
+Checking Node.js... OK (v22.0.0)
+Checking npm... OK (10.0.0)
+Checking Rails app structure... OK
+Checking config/database.yml... OK (d1)
+Checking .env.local... OK (D1 configured)
+Checking wrangler CLI... OK
+Checking dist/ directory... OK (built)
+
+========================================
+All checks passed! Your environment is ready.
+```
+
+Issues are reported with actionable suggestions for how to fix them.

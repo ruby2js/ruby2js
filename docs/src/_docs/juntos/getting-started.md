@@ -94,6 +94,44 @@ Builds and deploys to serverless platforms.
 | `neon` | Vercel | Serverless PostgreSQL |
 | `d1` | Cloudflare | Edge SQLite |
 
+## Development to Production Workflow
+
+Configure different databases per environment in `config/database.yml`:
+
+```yaml
+development:
+  adapter: sqlite
+  database: db/development.sqlite3
+
+production:
+  adapter: d1
+  database: myapp_production
+```
+
+Then use environment flags:
+
+```bash
+# Local development (uses sqlite from database.yml)
+bin/juntos up
+
+# Prepare production database (creates D1, runs migrations)
+bin/juntos db:prepare -e production
+
+# Deploy to production (uses d1 from database.yml)
+bin/juntos deploy -e production
+```
+
+The `-e` flag (or `RAILS_ENV` environment variable) selects which `database.yml` section to use. Commands read from `database.yml` by default; `-d` overrides the adapter if you need to.
+
+**Common patterns:**
+
+| Development | Production | Use Case |
+|-------------|------------|----------|
+| `sqlite` | `d1` | Cloudflare Workers |
+| `sqlite` | `neon` | Vercel Edge |
+| `dexie` | `dexie` | Browser-only (static hosting) |
+| `sqlite` | `pg` | Traditional Node.js server |
+
 ## Using with an Existing App
 
 Any Rails app can run with Juntos:

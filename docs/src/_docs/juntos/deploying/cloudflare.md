@@ -124,11 +124,15 @@ The `db:prepare` command is the most common—it creates the database if needed,
 
 ## Environment Variables
 
-Set the database ID in Wrangler or Cloudflare Dashboard:
+Database IDs are stored in `.env.local` and are environment-specific:
 
 | Variable | Description |
 |----------|-------------|
-| `D1_DATABASE_ID` | Your D1 database ID |
+| `D1_DATABASE_ID` | D1 database ID (development) |
+| `D1_DATABASE_ID_PRODUCTION` | D1 database ID (production) |
+| `D1_DATABASE_ID_STAGING` | D1 database ID (staging) |
+
+When you run `juntos db:create -e production`, the ID is saved to `D1_DATABASE_ID_PRODUCTION`. Commands fall back to `D1_DATABASE_ID` if the per-environment variable is not set.
 
 For secrets:
 
