@@ -50,7 +50,8 @@ module Ruby2JS
             database: ENV['JUNTOS_DATABASE'],
             target: ENV['JUNTOS_TARGET'],
             environment: ENV['RAILS_ENV'] || ENV['NODE_ENV'],
-            verbose: false
+            verbose: false,
+            yes: false
           }
 
           parser = OptionParser.new do |opts|
@@ -66,6 +67,10 @@ module Ruby2JS
 
             opts.on("-e", "--environment ENV", "Rails environment (default: development)") do |env|
               options[:environment] = env
+            end
+
+            opts.on("-y", "--yes", "Skip confirmation prompts (migrate, seed)") do
+              options[:yes] = true
             end
 
             opts.on("-v", "--verbose", "Show detailed output") do
@@ -142,6 +147,7 @@ module Ruby2JS
               -d, --database ADAPTER   Database adapter (d1, sqlite, neon, turso, etc.)
               -e, --environment ENV    Rails environment (development, production, etc.)
               -t, --target TARGET      Target runtime (cloudflare, vercel, node, etc.)
+              -y, --yes                Skip confirmation prompts (migrate, seed)
               -v, --verbose            Show detailed output
               -h, --help               Show this help message
 
@@ -395,9 +401,11 @@ module Ruby2JS
 
             check_wrangler!
 
+            cmd = ['npx', 'wrangler', 'd1', 'execute', db_name, '--remote', '--file', 'db/migrations.sql']
+            cmd << '--yes' if options[:yes]
+
             puts "Running D1 migrations on '#{db_name}'..."
-            unless system('npx', 'wrangler', 'd1', 'execute', db_name, '--remote',
-                          '--file', 'db/migrations.sql')
+            unless system(*cmd)
               abort "\nError: Migration failed."
             end
           end
@@ -418,9 +426,11 @@ module Ruby2JS
 
             check_wrangler!
 
+            cmd = ['npx', 'wrangler', 'd1', 'execute', db_name, '--remote', '--file', 'db/seeds.sql']
+            cmd << '--yes' if options[:yes]
+
             puts "Running D1 seeds on '#{db_name}'..."
-            unless system('npx', 'wrangler', 'd1', 'execute', db_name, '--remote',
-                          '--file', 'db/seeds.sql')
+            unless system(*cmd)
               abort "\nError: Seeding failed."
             end
           end
@@ -438,16 +448,17 @@ module Ruby2JS
 
             is_fresh = database_fresh?(db_name)
 
+            # Always skip prompts for prepare - database unavailability is expected
             puts "Running D1 migrations..."
             unless system('npx', 'wrangler', 'd1', 'execute', db_name, '--remote',
-                          '--file', 'db/migrations.sql')
+                          '--file', 'db/migrations.sql', '--yes')
               abort "\nError: Migration failed."
             end
 
             if is_fresh && File.exist?('db/seeds.sql')
               puts "Running D1 seeds (fresh database)..."
               unless system('npx', 'wrangler', 'd1', 'execute', db_name, '--remote',
-                            '--file', 'db/seeds.sql')
+                            '--file', 'db/seeds.sql', '--yes')
                 abort "\nError: Seeding failed."
               end
             elsif !is_fresh
