@@ -2,10 +2,9 @@
 order: 635
 title: Vercel Deployment
 top_section: Juntos
-category: juntos-deploying
+category: juntos/deploying
+hide_in_toc: true
 ---
-
-# Deploying to Vercel
 
 Run your Rails app on Vercel's Edge Network with serverless databases.
 
@@ -52,8 +51,11 @@ Vercel deployment runs your application as serverless functions with global dist
 | `neon` | Neon | HTTP | PostgreSQL compatibility |
 | `turso` | Turso | HTTP | SQLite, edge replication |
 | `planetscale` | PlanetScale | HTTP | MySQL, branching workflow |
+| `supabase` | Supabase | HTTP | Full backend, real-time included |
 
 All use HTTP protocols that work in edge environments (no TCP sockets).
+
+See [Database Overview](/docs/juntos/databases) for detailed setup guides.
 
 ## Deployment
 
@@ -183,10 +185,89 @@ Edge functions have a 30-second limit. For long operations:
 - Stream responses
 - Break into smaller operations
 
+## Real-Time Features
+
+Vercel serverless functions can't maintain WebSocket connections. For Turbo Streams broadcasting (real-time updates), Juntos provides two solutions:
+
+### Option 1: Supabase Database + Realtime
+
+If you're using Supabase as your database, Juntos automatically uses Supabase Realtime:
+
+```bash
+bin/juntos deploy -d supabase
+```
+
+**Environment variables:**
+```bash
+SUPABASE_URL=https://xxx.supabase.co
+SUPABASE_ANON_KEY=eyJ...
+DATABASE_URL=postgres://...  # For migrations
+```
+
+Broadcasts use Supabase's channel system. No additional setup required.
+
+### Option 2: Any Database + Pusher
+
+For Neon, Turso, or PlanetScale, use [Pusher](https://pusher.com) (Vercel's recommended real-time service):
+
+```bash
+bin/juntos deploy -d neon
+```
+
+**Environment variables:**
+```bash
+DATABASE_URL=postgres://...
+
+# Pusher credentials
+PUSHER_APP_ID=123456
+PUSHER_KEY=abc123
+PUSHER_SECRET=xyz789
+PUSHER_CLUSTER=us2
+
+# Client-side (prefixed for Next.js convention)
+NEXT_PUBLIC_PUSHER_KEY=abc123
+NEXT_PUBLIC_PUSHER_CLUSTER=us2
+```
+
+### How It Works
+
+Your model code stays the same:
+
+```ruby
+class Message < ApplicationRecord
+  after_create_commit do
+    broadcast_append_to "chat_room",
+      target: "messages",
+      partial: "messages/message"
+  end
+end
+```
+
+Juntos routes broadcasts through the configured adapter:
+- **Supabase** → `supabase.channel().send()`
+- **Pusher** → `pusher.trigger()`
+
+Clients subscribe the same way:
+
+```erb
+<%= turbo_stream_from "chat_room" %>
+```
+
+The adapter handles subscription and message delivery.
+
+### Pusher Free Tier
+
+Pusher's free tier includes:
+- 200,000 messages/day
+- 100 concurrent connections
+- Unlimited channels
+
+Sufficient for development and small apps.
+
 ## Limitations
 
 - **No filesystem writes** — Use object storage (Vercel Blob, S3)
-- **No WebSockets** — Use Pusher, Ably, or similar
+- **No native WebSockets** — Use Pusher, Supabase Realtime, or Ably
 - **30-second timeout** — Long operations need different architecture
 - **Cold starts** — First request after idle may be slower
 

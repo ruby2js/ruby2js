@@ -2,10 +2,9 @@
 order: 640
 title: Cloudflare Deployment
 top_section: Juntos
-category: juntos-deploying
+category: juntos/deploying
+hide_in_toc: true
 ---
-
-# Deploying to Cloudflare Workers
 
 Run your Rails app on Cloudflare's global network with D1 database.
 

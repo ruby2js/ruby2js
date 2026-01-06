@@ -18,12 +18,12 @@ These targets require transpilation. Rails can't run here; Juntos can:
 | Target | Best For | Database Options |
 |--------|----------|------------------|
 | **[Browser](/docs/juntos/deploying/browser)** | Offline-first, local-first, demos | Dexie, sql.js, PGlite |
-| **[Vercel Edge](/docs/juntos/deploying/vercel)** | Global edge, auto-scaling | Neon, Turso, PlanetScale |
+| **[Vercel Edge](/docs/juntos/deploying/vercel)** | Global edge, auto-scaling | [Neon](/docs/juntos/databases/neon), [Turso](/docs/juntos/databases/turso), [PlanetScale](/docs/juntos/databases/planetscale), [Supabase](/docs/juntos/databases/supabase) |
 | **[Cloudflare Workers](/docs/juntos/deploying/cloudflare)** | Edge computing, maximum distribution | D1, Turso |
 
 ## Also Works
 
-For traditional hosting, Juntos works but Rails does too. Reasons to choose Juntos on Node.js:
+For traditional hosting, Juntos works but Rails does too. Reasons to choose Juntos on a server runtime:
 
 - **npm ecosystem** — access to JavaScript libraries not available in Ruby
 - **Event-driven model** — JavaScript's async I/O may suit some workloads better than Ruby's Global VM Lock (GVL)
@@ -31,7 +31,9 @@ For traditional hosting, Juntos works but Rails does too. Reasons to choose Junt
 
 | Target | Best For | Database Options |
 |--------|----------|------------------|
-| **[Node.js](/docs/juntos/deploying/node)** | VPS, containers, traditional hosting | SQLite, PostgreSQL, MySQL |
+| **[Node.js](/docs/juntos/deploying/node)** | VPS, containers, widest compatibility | SQLite, PostgreSQL, MySQL |
+| **[Bun](/docs/juntos/deploying/node)** | Fast startup, native SQLite | SQLite, PostgreSQL, MySQL |
+| **[Deno](/docs/juntos/deploying/node)** | Secure by default, TypeScript | SQLite, PostgreSQL, MySQL |
 
 ## Quick Comparison
 
@@ -57,7 +59,7 @@ For traditional hosting, Juntos works but Rails does too. Reasons to choose Junt
 - You want fast cold starts (~5-50ms)
 - *Rails can't do this*
 
-**Choose Node.js if:**
+**Choose Node.js, Bun, or Deno if:**
 - You need npm packages not available in Ruby
 - Your workload benefits from JavaScript's event-driven async model
 - You want one codebase across browser, edge, and server
@@ -79,3 +81,12 @@ Override with `-t`:
 ```bash
 bin/juntos up -t node -d neon   # Force Node.js with Neon
 ```
+
+## Database Setup Guides
+
+For detailed setup instructions, see the [Database Overview](/docs/juntos/databases):
+
+- [Neon](/docs/juntos/databases/neon) — Serverless PostgreSQL
+- [Turso](/docs/juntos/databases/turso) — SQLite at the edge
+- [PlanetScale](/docs/juntos/databases/planetscale) — Serverless MySQL
+- [Supabase](/docs/juntos/databases/supabase) — Full backend platform

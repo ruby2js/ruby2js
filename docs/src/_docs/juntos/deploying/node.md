@@ -1,11 +1,10 @@
 ---
 order: 630
-title: Node.js Deployment
+title: Server Runtimes
 top_section: Juntos
-category: juntos-deploying
+category: juntos/deploying
+hide_in_toc: true
 ---
-
-# Deploying to Node.js
 
 Run your Rails app on Node.js, Bun, or Deno with traditional server databases.
 

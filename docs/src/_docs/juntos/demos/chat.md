@@ -52,6 +52,53 @@ bin/juntos up -d sqlite
 
 Open multiple browser tabs. Messages broadcast via WebSocket to all connected clients.
 
+## Deploy to Vercel
+
+For Vercel deployment, you need a universal database and a real-time service. Juntos supports two approaches:
+
+### Option 1: Supabase (Database + Real-time)
+
+Supabase provides both PostgreSQL and real-time in one service:
+
+```bash
+bin/juntos db:prepare -d supabase
+bin/juntos deploy -d supabase
+```
+
+Juntos automatically uses Supabase Realtime for Turbo Streams broadcasting.
+
+**Setup:**
+1. Create a [Supabase](https://supabase.com) project
+2. Add environment variables to Vercel:
+   - `SUPABASE_URL` — Project URL
+   - `SUPABASE_ANON_KEY` — Anonymous key
+   - `DATABASE_URL` — Direct Postgres connection (for migrations)
+
+### Option 2: Any Database + Pusher
+
+For other databases (Neon, Turso, PlanetScale), use Pusher for real-time:
+
+```bash
+bin/juntos db:prepare -d neon
+bin/juntos deploy -d neon
+```
+
+Juntos detects Vercel + non-Supabase database and configures Pusher automatically.
+
+**Setup:**
+1. Create database ([Neon](https://neon.tech), [Turso](https://turso.tech), or [PlanetScale](https://planetscale.com))
+2. Create a [Pusher](https://pusher.com) app (free tier: 200K messages/day)
+3. Add environment variables to Vercel:
+   - `DATABASE_URL` (or database-specific vars)
+   - `PUSHER_APP_ID`, `PUSHER_KEY`, `PUSHER_SECRET`, `PUSHER_CLUSTER`
+
+### Why Two Options?
+
+Vercel's serverless functions can't maintain WebSocket connections. Both solutions use HTTP-based approaches:
+
+- **Supabase Realtime** — Built into Supabase, uses their WebSocket infrastructure
+- **Pusher** — Third-party service (Vercel's recommended approach for real-time)
+
 ## Deploy to Cloudflare
 
 ```bash
@@ -186,6 +233,7 @@ The controller auto-scrolls the chat when new messages arrive and clears the inp
 | **Node.js** | `ws` package | All connected clients |
 | **Bun** | Native WebSocket | All connected clients |
 | **Deno** | Native WebSocket | All connected clients |
+| **Vercel** | Pusher or Supabase Realtime | All connected clients |
 | **Cloudflare** | Durable Objects | Global edge distribution |
 
 ### Browser Limitations
@@ -267,4 +315,6 @@ The Hotwire patterns scale from this simple demo to complex real-time applicatio
 
 - Read [Hotwire](/docs/juntos/hotwire) for the full reference
 - Try the [Blog Demo](/docs/juntos/demos/blog) for CRUD patterns
-- See [Cloudflare Deployment](/docs/juntos/deploying/cloudflare) for edge details
+- See [Database Overview](/docs/juntos/databases) for database setup guides
+- See [Vercel Deployment](/docs/juntos/deploying/vercel) for edge deployment
+- See [Cloudflare Deployment](/docs/juntos/deploying/cloudflare) for Durable Objects

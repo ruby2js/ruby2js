@@ -2,10 +2,9 @@
 order: 625
 title: Browser Deployment
 top_section: Juntos
-category: juntos-deploying
+category: juntos/deploying
+hide_in_toc: true
 ---
-
-# Deploying to Browsers
 
 Run your Rails app entirely in the browser with client-side storage.
 
