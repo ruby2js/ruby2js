@@ -6,7 +6,7 @@ require 'yaml'
 module Ruby2JS
   module CLI
     module Juntos
-      SUBCOMMANDS = %w[dev server build deploy install up migrate db].freeze
+      SUBCOMMANDS = %w[dev server build deploy install up db].freeze
 
       class << self
         def run(args)
@@ -18,6 +18,13 @@ module Ruby2JS
           unless subcommand
             show_help
             exit 1
+          end
+
+          # Support Rails-style colon syntax: db:prepare -> db prepare
+          if subcommand.include?(':')
+            parts = subcommand.split(':', 2)
+            subcommand = parts[0]
+            remaining.unshift(parts[1])
           end
 
           unless SUBCOMMANDS.include?(subcommand)
@@ -106,8 +113,7 @@ module Ruby2JS
               server    Start production server (requires prior build)
               build     Build for deployment
               deploy    Build and deploy (Vercel, Cloudflare)
-              migrate   Run database migrations
-              db        D1 database commands (create, migrate, seed, prepare, drop)
+              db        Database commands (create, migrate, seed, prepare, drop)
               install   Set up project for Juntos
 
             Common Options:
