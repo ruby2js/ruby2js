@@ -9,7 +9,7 @@ module Ruby2JS
   module CLI
     module Db
       DIST_DIR = 'dist'
-      SUBCOMMANDS = %w[create migrate seed prepare drop].freeze
+      SUBCOMMANDS = %w[create migrate seed prepare drop reset].freeze
 
       # Databases that run in the browser (no CLI migration possible)
       BROWSER_DATABASES = %w[dexie].freeze
@@ -134,6 +134,7 @@ module Ruby2JS
               migrate   Run database migrations
               seed      Run database seeds
               prepare   Migrate, and seed if fresh database
+              reset     Drop, create, migrate, and seed
               create    Create database (D1, Turso)
               drop      Delete database (D1, Turso, SQLite)
 
@@ -282,6 +283,55 @@ module Ruby2JS
             puts "Database deletion for '#{db || 'unknown'}' is not supported via CLI."
             puts "Please delete your database using your database provider's tools."
           end
+        end
+
+        # ============================================
+        # db reset - Drop, create, migrate, seed
+        # ============================================
+        def run_reset(options)
+          validate_not_browser!(options, 'reset')
+
+          db = options[:database]
+          env = options[:environment] || 'development'
+
+          puts "Resetting #{db} database for #{env}..."
+          puts
+
+          # Step 1: Drop (may prompt for confirmation)
+          puts "Step 1/4: Dropping database..."
+          run_drop(options)
+          puts
+
+          # Step 2: Create (for databases that need explicit creation)
+          if %w[d1 turso].include?(db)
+            puts "Step 2/4: Creating database..."
+            run_create(options)
+            puts
+          else
+            puts "Step 2/4: Skipping create (#{db} creates automatically)"
+            puts
+          end
+
+          # Step 3: Migrate
+          puts "Step 3/4: Running migrations..."
+          build_app(options)
+          if d1?(options)
+            run_d1_migrate(options)
+          else
+            run_node_migrate(options)
+          end
+          puts
+
+          # Step 4: Seed
+          puts "Step 4/4: Running seeds..."
+          if d1?(options)
+            run_d1_seed(options)
+          else
+            run_node_seed(options)
+          end
+
+          puts
+          puts "Database reset complete."
         end
 
         # ============================================

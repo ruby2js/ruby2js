@@ -6,7 +6,7 @@ require 'yaml'
 module Ruby2JS
   module CLI
     module Juntos
-      SUBCOMMANDS = %w[dev server build deploy install up db].freeze
+      SUBCOMMANDS = %w[dev server build deploy install up db info doctor].freeze
 
       class << self
         def run(args)
@@ -113,7 +113,9 @@ module Ruby2JS
               server    Start production server (requires prior build)
               build     Build for deployment
               deploy    Build and deploy (Vercel, Cloudflare)
-              db        Database commands (create, migrate, seed, prepare, drop)
+              db        Database commands (create, migrate, seed, prepare, drop, reset)
+              info      Show current configuration
+              doctor    Check environment and prerequisites
               install   Set up project for Juntos
 
             Common Options:
