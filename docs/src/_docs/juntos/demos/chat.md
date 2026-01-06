@@ -67,6 +67,13 @@ Your model's `broadcast_append_to` calls route through Durable Objects. Subscrib
 
 ### Message Model
 
+**Try it** — edit the Ruby to see how the model transpiles:
+
+<div data-controller="combo" data-selfhost="true" data-options='{
+  "eslevel": 2022,
+  "filters": ["model", "esm", "functions"]
+}'></div>
+
 ```ruby
 # app/models/message.rb
 class Message < ApplicationRecord
@@ -91,7 +98,14 @@ The `after_create_commit` callback broadcasts new messages to all subscribers. T
 
 ### View Subscription
 
-```erb
+**Try it** — edit the ERB to see how views transpile:
+
+<div data-controller="combo" data-selfhost="true" data-erb="true" data-options='{
+  "eslevel": 2022,
+  "filters": ["rails/helpers", "erb", "esm", "functions"]
+}'></div>
+
+```ruby
 <%# app/views/messages/index.html.erb %>
 <div data-controller="chat">
   <%= turbo_stream_from "chat_room" %>
@@ -114,7 +128,14 @@ The `turbo_stream_from` helper establishes the WebSocket subscription. New messa
 
 ### Message Partial
 
-```erb
+**Try it** — partials transpile the same way:
+
+<div data-controller="combo" data-selfhost="true" data-erb="true" data-options='{
+  "eslevel": 2022,
+  "filters": ["rails/helpers", "erb", "esm", "functions"]
+}'></div>
+
+```ruby
 <%# app/views/messages/_message.html.erb %>
 <div id="<%= dom_id(message) %>" data-chat-target="message">
   <span><%= message.username %></span>
@@ -128,7 +149,7 @@ The `data-chat-target="message"` attribute tells Stimulus to track this element.
 
 **Try it** — edit the Ruby code to see how it transpiles:
 
-<div data-controller="combo" data-options='{
+<div data-controller="combo" data-selfhost="true" data-options='{
   "eslevel": 2022,
   "filters": ["stimulus", "esm", "functions"]
 }'></div>
@@ -209,6 +230,13 @@ The Durable Object uses hibernation for cost efficiency—connections stay open 
 - Direct JavaScript object access (`self.element`)
 
 ### Format Negotiation
+
+**Try it** — see how `respond_to` transpiles:
+
+<div data-controller="combo" data-selfhost="true" data-options='{
+  "eslevel": 2022,
+  "filters": ["controller", "esm", "functions"]
+}'></div>
 
 ```ruby
 # app/controllers/messages_controller.rb
