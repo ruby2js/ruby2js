@@ -127,6 +127,20 @@ class SelfhostBuilder
     'supabase' => 'active_record_supabase.mjs'
   }.freeze
 
+  # Map broadcast adapter to source file
+  # Used for real-time Turbo Streams when native WebSockets aren't available
+  BROADCAST_ADAPTER_FILES = {
+    'supabase' => 'broadcast_supabase.mjs',
+    'pusher' => 'broadcast_pusher.mjs'
+    # 'websocket' is the default (built into rails.js targets), no separate file needed
+  }.freeze
+
+  # Map broadcast adapters to their required npm dependencies
+  BROADCAST_ADAPTER_DEPENDENCIES = {
+    'supabase' => { '@supabase/supabase-js' => '^2.47.0' },
+    'pusher' => { 'pusher' => '^5.2.0', 'pusher-js' => '^8.4.0' }
+  }.freeze
+
   # Common transpilation options for Ruby files
   OPTIONS = {
     eslevel: 2022,
@@ -358,9 +372,31 @@ class SelfhostBuilder
       end
     end
 
+    # Add broadcast adapter dependencies (Supabase Realtime, Pusher, etc.)
+    # Note: @broadcast may not be set yet during initial build, so we auto-detect
+    broadcast = @broadcast
+    unless broadcast
+      if @database == 'supabase'
+        broadcast = 'supabase'
+      elsif VERCEL_RUNTIMES.include?(@target.to_s)
+        broadcast = 'pusher'
+      end
+    end
+
+    broadcast_deps = BROADCAST_ADAPTER_DEPENDENCIES[broadcast]
+    if broadcast_deps
+      missing = broadcast_deps.reject { |name, _version| deps.key?(name) }
+      missing.each do |name, version|
+        deps[name] = version
+        puts("  Adding broadcast dependency: #{name}@#{version}")
+        updated = true
+      end
+    end
+
     # Add ws for Node/Bun/Deno targets (WebSocket support for real-time features)
+    # Skip if using external broadcast adapter (Supabase, Pusher handle their own connections)
     node_targets = %w[node bun deno]
-    if node_targets.include?(@target.to_s) && !optional_deps.key?('ws')
+    if node_targets.include?(@target.to_s) && !broadcast && !optional_deps.key?('ws')
       optional_deps['ws'] = '^8.18.0'
       puts("  Adding optional dependency: ws@^8.18.0")
       updated = true
@@ -477,12 +513,13 @@ class SelfhostBuilder
   # Instance methods
   # ============================================================
 
-  def initialize(dist_dir = nil, target: nil, database: nil)
+  def initialize(dist_dir = nil, target: nil, database: nil, broadcast: nil)
     @dist_dir = dist_dir || File.join(DEMO_ROOT, 'dist')
     @database_override = database  # CLI override for database adapter
     @database = nil  # Set during build from config or override
     @target = target # Can be set explicitly or derived from database
     @runtime = nil   # For server targets: 'node', 'bun', or 'deno'
+    @broadcast = broadcast  # Broadcast adapter: 'supabase', 'pusher', or nil (use native WebSocket)
     @model_associations = {}  # model_name -> [association_names]
   end
 
@@ -550,8 +587,10 @@ class SelfhostBuilder
     @needs_npm_install = self.ensure_adapter_dependencies()
 
     self.copy_database_adapter()
+    self.setup_broadcast_adapter()
     puts("  Target: #{@target}")
     puts("  Runtime: #{@runtime}") if @runtime
+    puts("  Broadcast: #{@broadcast || 'native WebSocket'}") if @broadcast || VERCEL_RUNTIMES.include?(@runtime)
     puts("")
 
     # Copy target-specific lib files (rails.js framework)
@@ -886,6 +925,60 @@ class SelfhostBuilder
     puts("  Adapter: #{@database} -> lib/active_record.mjs")
     if db_config['database'] || db_config[:database]
       puts("  Database: #{db_config['database'] || db_config[:database]}")
+    end
+  end
+
+  # Set up broadcast adapter for real-time Turbo Streams
+  # Auto-detects based on database and target if not explicitly set
+  def setup_broadcast_adapter()
+    # Auto-detect broadcast adapter if not explicitly set
+    unless @broadcast
+      if @database == 'supabase'
+        # Supabase Realtime for Supabase database users
+        @broadcast = 'supabase'
+      elsif VERCEL_RUNTIMES.include?(@runtime)
+        # Pusher for Vercel (no native WebSocket support)
+        @broadcast = 'pusher'
+      end
+      # Otherwise, use native WebSocket (built into rails.js targets)
+    end
+
+    # Copy broadcast adapter if using an external service
+    adapter_file = BROADCAST_ADAPTER_FILES[@broadcast]
+    return unless adapter_file
+
+    adapter_dir = self.find_adapter_dir()
+    lib_dest = File.join(@dist_dir, 'lib')
+    FileUtils.mkdir_p(lib_dest)
+
+    adapter_src = File.join(adapter_dir, adapter_file)
+    adapter_dest = File.join(lib_dest, 'broadcast.mjs')
+
+    if File.exist?(adapter_src)
+      FileUtils.cp(adapter_src, adapter_dest)
+      puts("  Broadcast: #{@broadcast} -> lib/broadcast.mjs")
+    else
+      puts("  Warning: Broadcast adapter not found: #{adapter_src}")
+    end
+  end
+
+  # Find the adapters directory
+  def find_adapter_dir()
+    npm_adapter_dir = File.join(@dist_dir, 'node_modules/ruby2js-rails/adapters')
+    npm_dist_dir = File.join(@dist_dir, 'node_modules/ruby2js-rails/dist/lib')
+    pkg_adapter_dir = File.join(DEMO_ROOT, '../../packages/ruby2js-rails/adapters')
+    vendor_adapter_dir = File.join(DEMO_ROOT, 'vendor/ruby2js/adapters')
+
+    if File.exist?(pkg_adapter_dir)
+      pkg_adapter_dir
+    elsif File.exist?(npm_adapter_dir)
+      npm_adapter_dir
+    elsif File.exist?(npm_dist_dir)
+      npm_dist_dir
+    elsif File.exist?(vendor_adapter_dir)
+      vendor_adapter_dir
+    else
+      nil
     end
   end
 
