@@ -99,11 +99,43 @@ Vercel's serverless functions can't maintain WebSocket connections. Both solutio
 - **Supabase Realtime** — Built into Supabase, uses their WebSocket infrastructure
 - **Pusher** — Third-party service (Vercel's recommended approach for real-time)
 
+## Deploy to Fly.io
+
+Fly.io is ideal for the chat demo—it has **native WebSocket support**, so Turbo Streams broadcasting works without Pusher or other external services:
+
+```bash
+juntos db:create -d mpg
+# Start proxy in separate terminal: fly mpg proxy chatapp_production
+juntos db:prepare -d mpg
+juntos deploy -t fly -d mpg
+```
+
+**Setup:**
+1. Install [Fly CLI](https://fly.io/docs/flyctl/install/) and run `fly auth login`
+2. The `db:create` command creates your app, database, and connects them automatically
+
+No Pusher configuration needed. Messages broadcast via WebSocket to all connected clients, just like Rails with Action Cable.
+
+## Deploy to Deno Deploy
+
+```bash
+juntos db:prepare -d neon
+juntos deploy -t deno-deploy -d neon
+```
+
+Like Vercel, Deno Deploy requires Pusher for real-time (or Supabase Realtime if using Supabase).
+
+**Setup:**
+1. Install [deployctl](https://docs.deno.com/deploy/manual/deployctl)
+2. Create a [Neon](https://neon.tech) database
+3. Create a [Pusher](https://pusher.com) app
+4. Set environment variables in Deno Deploy dashboard
+
 ## Deploy to Cloudflare
 
 ```bash
-bin/juntos db:prepare -d d1
-bin/juntos deploy -d d1
+juntos db:prepare -d d1
+juntos deploy -d d1
 ```
 
 The `db:prepare` command creates the D1 database (if needed), runs migrations, and seeds if fresh.
@@ -233,7 +265,9 @@ The controller auto-scrolls the chat when new messages arrive and clears the inp
 | **Node.js** | `ws` package | All connected clients |
 | **Bun** | Native WebSocket | All connected clients |
 | **Deno** | Native WebSocket | All connected clients |
+| **Fly.io** | Native WebSocket | All connected clients |
 | **Vercel** | Pusher or Supabase Realtime | All connected clients |
+| **Deno Deploy** | Pusher or Supabase Realtime | All connected clients |
 | **Cloudflare** | Durable Objects | Global edge distribution |
 
 ### Browser Limitations
@@ -316,5 +350,7 @@ The Hotwire patterns scale from this simple demo to complex real-time applicatio
 - Read [Hotwire](/docs/juntos/hotwire) for the full reference
 - Try the [Blog Demo](/docs/juntos/demos/blog) for CRUD patterns
 - See [Database Overview](/docs/juntos/databases) for database setup guides
+- See [Fly.io Deployment](/docs/juntos/deploying/fly) for native WebSocket support
 - See [Vercel Deployment](/docs/juntos/deploying/vercel) for edge deployment
+- See [Deno Deploy](/docs/juntos/deploying/deno-deploy) for Deno-native edge
 - See [Cloudflare Deployment](/docs/juntos/deploying/cloudflare) for Durable Objects

@@ -564,29 +564,59 @@ module Ruby2JS
 
         def run_mpg_create(options)
           db_name = options[:db_name]
+          app_name = File.basename(Dir.pwd).downcase.gsub(/[^a-z0-9-]/, '-')
           env = options[:environment] || 'development'
 
           unless fly_cli_available?
             puts "Fly CLI not found. Install it first:"
             puts "  curl -L https://fly.io/install.sh | sh"
-            puts "\nOr create the database at: https://fly.io/dashboard"
             return
           end
 
-          puts "Creating Fly MPG database '#{db_name}' for #{env}..."
+          # Step 1: Ensure fly app exists
+          puts "Checking Fly app '#{app_name}'..."
+          app_exists = system("fly apps list 2>/dev/null | grep -q '^#{app_name}'")
 
-          output = `fly mpg create --name #{db_name} 2>&1`
-          if $?.success?
-            puts "Created MPG database: #{db_name}"
-            puts output if options[:verbose]
-            puts "\nNext steps:"
-            puts "  1. Attach to your app: fly mpg attach #{db_name} --app <your-app>"
-            puts "  2. This sets DATABASE_URL automatically"
-            puts "\nFor local development, use proxy:"
-            puts "  fly mpg proxy #{db_name}"
+          unless app_exists
+            puts "Creating Fly app '#{app_name}'..."
+            unless system('fly', 'apps', 'create', app_name, '--machines')
+              abort "Error: Failed to create Fly app."
+            end
           else
-            abort "Error: Failed to create database.\n#{output}"
+            puts "  App '#{app_name}' already exists"
           end
+
+          # Step 2: Create MPG database
+          puts "Creating MPG database '#{db_name}'..."
+          db_output = `fly mpg create --name #{db_name} 2>&1`
+
+          if $?.success?
+            puts "  Created database: #{db_name}"
+          elsif db_output.include?('already exists')
+            puts "  Database '#{db_name}' already exists"
+          else
+            abort "Error: Failed to create database.\n#{db_output}"
+          end
+
+          # Step 3: Attach database to app (sets DATABASE_URL secret)
+          puts "Attaching database to app..."
+          attach_output = `fly mpg attach #{db_name} --app #{app_name} 2>&1`
+
+          if $?.success?
+            puts "  Attached #{db_name} to #{app_name}"
+            puts "  DATABASE_URL is now set on the app"
+          elsif attach_output.include?('already attached')
+            puts "  Database already attached to app"
+          else
+            # Attachment might fail if already attached differently, warn but continue
+            puts "  Warning: #{attach_output.strip}"
+          end
+
+          # Step 4: Get connection string for local development
+          puts "\nFor local development, start a proxy:"
+          puts "  fly mpg proxy #{db_name}"
+          puts "\nThen set in .env.local:"
+          puts "  DATABASE_URL=postgres://postgres:postgres@localhost:5432/#{db_name}"
         end
 
         def run_mpg_drop(options)
@@ -662,17 +692,23 @@ module Ruby2JS
         def validate_mpg_env!
           load_env_local
           unless ENV['DATABASE_URL']
+            db_name = "#{File.basename(Dir.pwd)}_#{ENV['RAILS_ENV'] || 'development'}".downcase.gsub(/[^a-z0-9_]/, '_')
             abort <<~ERROR
               Error: DATABASE_URL not set.
 
-              For Fly.io MPG:
-                1. Create database: fly mpg create --name <db-name>
-                2. Attach to app: fly mpg attach <db-name> --app <app-name>
-                   This sets DATABASE_URL automatically.
+              For migrations against your Fly MPG database:
 
-              For local development:
-                Run: fly mpg proxy <db-name>
-                Then add to .env.local: DATABASE_URL=postgres://postgres:postgres@localhost:5432/<db-name>
+                1. Start proxy (in a separate terminal):
+                   fly mpg proxy #{db_name}
+
+                2. Set DATABASE_URL in .env.local:
+                   DATABASE_URL=postgres://postgres:postgres@localhost:5432/#{db_name}
+
+                3. Run migrations:
+                   juntos db:migrate -d mpg
+
+              If you haven't created the database yet:
+                juntos db:create -d mpg
             ERROR
           end
         end

@@ -45,39 +45,35 @@ Fly.io's Managed Postgres (MPG) provides a fully CLI-driven workflow. No dashboa
 
 ### Create Database
 
-```bash
-# Create a Postgres cluster
-fly mpg create --name myapp-db
-
-# This outputs connection details automatically
-```
-
-### Attach to App
+One command creates the Fly app, database, and connects them:
 
 ```bash
-# First, create your Fly app (if not already done)
-cd dist
-fly launch --no-deploy
-
-# Attach database to app (sets DATABASE_URL automatically)
-fly mpg attach myapp-db --app myapp
+juntos db:create -d mpg
 ```
 
-The `attach` command automatically sets the `DATABASE_URL` secret on your app.
+This automatically:
+1. Creates a Fly app (named after your directory)
+2. Creates an MPG Postgres database
+3. Attaches the database to your app (sets `DATABASE_URL`)
+
+### Run Migrations
+
+For migrations, you need a local connection to your remote database:
+
+```bash
+# Terminal 1: Start the database proxy
+fly mpg proxy myapp_production
+
+# Terminal 2: Set DATABASE_URL and run migrations
+# Add to .env.local:
+#   DATABASE_URL=postgres://postgres:postgres@localhost:5432/myapp_production
+
+juntos db:prepare -d mpg
+```
 
 ### Local Development
 
-Use the proxy command to connect to your remote database locally:
-
-```bash
-# Start proxy (runs in foreground)
-fly mpg proxy myapp-db
-
-# In another terminal, run migrations
-DATABASE_URL=postgres://postgres:postgres@localhost:5432/myapp juntos db:migrate
-```
-
-Or use a local SQLite/Postgres for development:
+Use a local SQLite for development to avoid cloud round-trips:
 
 ```yaml
 # config/database.yml
@@ -87,16 +83,24 @@ development:
 
 production:
   adapter: mpg
-  # DATABASE_URL is set automatically by fly mpg attach
+  # DATABASE_URL is set automatically on Fly.io
 ```
 
 ## Deployment
 
+The complete workflow uses only `juntos` commands:
+
 ```bash
-# Prepare database (migrate, seed if fresh)
+# 1. Create app + database (one-time setup)
+juntos db:create -d mpg
+
+# 2. Start proxy for migrations (in separate terminal)
+fly mpg proxy myapp_production
+
+# 3. Run migrations
 juntos db:prepare -d mpg
 
-# Deploy
+# 4. Deploy
 juntos deploy -t fly -d mpg
 ```
 
@@ -106,19 +110,6 @@ The deploy command:
 2. Generates `fly.toml` and `Dockerfile`
 3. Verifies the build loads correctly
 4. Runs `fly deploy`
-
-## Manual Deployment
-
-If you prefer manual control:
-
-```bash
-# Build only
-juntos build -t fly -d mpg
-
-# Deploy with fly CLI
-cd dist
-fly deploy
-```
 
 ## Generated Files
 
@@ -216,11 +207,13 @@ juntos db:reset -d mpg
 
 ## Local Development
 
-Run your app locally with the Fly proxy:
+For local development, we recommend using SQLite (see [Hybrid Development](/docs/juntos/deploying/#hybrid-development)).
+
+If you need to test against your production database:
 
 ```bash
 # Terminal 1: Start database proxy
-fly mpg proxy myapp-db
+fly mpg proxy myapp_production
 
 # Terminal 2: Run your app
 cd dist
