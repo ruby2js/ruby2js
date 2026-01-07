@@ -359,7 +359,13 @@ Remaining:
 
 ## References
 
+**Upstream (this depends on):**
+- [AREL_QUERY_BUILDER.md](AREL_QUERY_BUILDER.md) - Query building and associations (foundational)
+
+**Downstream (depends on this):**
 - [Calendar Demo Plan](CALENDAR_DEMO.md) - First validation (new app + Electron/Capacitor)
+
+**External:**
 - [Ruby2JS on Rails Demo](../demo/ruby2js-on-rails/) - Proves transpilation approach
 - [ruby2js-rails npm package](https://www.ruby2js.com/releases/ruby2js-rails-beta.tgz) - Build infrastructure
 - [RUBY2JS_SHARED_LOGIC.md](https://github.com/rubys/showcase/blob/main/plans/RUBY2JS_SHARED_LOGIC.md) - Showcase requirements

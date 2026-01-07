@@ -2,13 +2,24 @@
 
 A third demo application showcasing offline-first capabilities across browser, Electron (desktop), and Capacitor (mobile) targets, with a Rails server acting as sync coordinator.
 
-## Relationship to SPA Engine
+## Relationship to Other Plans
 
-This demo **validates** the [Rails SPA Engine](RAILS_SPA_ENGINE.md), which provides the core tooling:
+This demo sits at the top of the dependency chain:
+
+```
+AREL_QUERY_BUILDER (foundational - query building, associations)
+        ↓
+RAILS_SPA_ENGINE (tooling - manifest, builder, middleware)
+        ↓
+CALENDAR_DEMO (this plan - first validation)
+        ↓
+Showcase Scoring (production validation)
+```
 
 | Plan | Purpose |
 |------|---------|
-| **RAILS_SPA_ENGINE.md** | The tooling (manifest DSL, builder, middleware, sync layer) |
+| **[AREL_QUERY_BUILDER.md](AREL_QUERY_BUILDER.md)** | Query building, associations, includes() |
+| **[RAILS_SPA_ENGINE.md](RAILS_SPA_ENGINE.md)** | The tooling (manifest DSL, builder, middleware, sync layer) |
 | **CALENDAR_DEMO.md** | First validation: new demo app built from scratch |
 | Showcase scoring | Second validation: production app (existing Rails subset) |
 

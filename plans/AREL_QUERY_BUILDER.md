@@ -2,6 +2,32 @@
 
 Add deferred query building to Juntos ActiveRecord, enabling Rails-like method chaining with lazy evaluation.
 
+## Dependency Role
+
+This plan is **foundational** for offline-first applications:
+
+```
+AREL_QUERY_BUILDER (this plan)
+        ↓
+RAILS_SPA_ENGINE (tooling that uses queries)
+        ↓
+CALENDAR_DEMO (first validation)
+        ↓
+Showcase Scoring (production validation)
+```
+
+Both Calendar and Showcase require ActiveRecord-style queries against Dexie:
+
+```ruby
+# Calendar needs
+Event.where(user_id: 1).includes(:user).modified_since(timestamp)
+
+# Showcase needs
+Heat.where(number: 42).includes(:dance, entry: [:lead, :follow])
+```
+
+Without this working, the "same models everywhere" vision can't be realized.
+
 ## Context
 
 The current Juntos ActiveRecord implementation executes queries immediately:
@@ -703,7 +729,238 @@ async pluck(...columns) {
 }
 ```
 
-### Phase 4: Scopes
+### Phase 4: Associations
+
+**Goal:** Define and load related models, enabling `includes()` for eager loading.
+
+This phase is **critical** for Calendar and Showcase demos where queries span multiple tables.
+
+**Features:**
+- `belongs_to` / `has_many` / `has_many :through` declarations
+- `includes(...associations)` — eager loading
+- Nested includes: `includes(entry: [:lead, :follow])`
+- Association accessors: `heat.dance`, `entry.lead`
+
+**Model Declarations:**
+
+```javascript
+// Model with associations
+class Heat extends ActiveRecord {
+  static associations = {
+    dance: { type: 'belongs_to', model: 'Dance', foreignKey: 'dance_id' },
+    entry: { type: 'belongs_to', model: 'Entry', foreignKey: 'entry_id' },
+    scores: { type: 'has_many', model: 'Score', foreignKey: 'heat_id' }
+  };
+}
+
+class Entry extends ActiveRecord {
+  static associations = {
+    lead: { type: 'belongs_to', model: 'Person', foreignKey: 'lead_id' },
+    follow: { type: 'belongs_to', model: 'Person', foreignKey: 'follow_id' },
+    instructor: { type: 'belongs_to', model: 'Person', foreignKey: 'instructor_id' }
+  };
+}
+
+class Event extends ActiveRecord {
+  static associations = {
+    user: { type: 'belongs_to', model: 'User', foreignKey: 'user_id' },
+    meeting_requests: { type: 'has_many', model: 'MeetingRequest', foreignKey: 'event_id' }
+  };
+}
+```
+
+**Relation Enhancement:**
+
+```javascript
+class Relation {
+  includes(...associations) {
+    const rel = this._clone();
+    rel._includes = rel._includes || [];
+    rel._includes.push(...associations);
+    return rel;
+  }
+}
+```
+
+**SQL Adapter Implementation:**
+
+For SQL adapters, use separate queries (not JOINs) to load associations:
+
+```javascript
+static async _executeRelation(rel) {
+  // 1. Execute main query
+  const rows = await this._executeMainQuery(rel);
+  const records = rows.map(row => new this(row));
+
+  // 2. Load included associations
+  if (rel._includes && rel._includes.length > 0) {
+    await this._loadAssociations(records, rel._includes);
+  }
+
+  return records;
+}
+
+static async _loadAssociations(records, includes) {
+  for (const include of includes) {
+    if (typeof include === 'string') {
+      // Simple include: 'dance'
+      await this._loadAssociation(records, include);
+    } else if (typeof include === 'object') {
+      // Nested include: { entry: ['lead', 'follow'] }
+      for (const [assocName, nested] of Object.entries(include)) {
+        await this._loadAssociation(records, assocName);
+        // Recursively load nested associations
+        const assocRecords = records.map(r => r[assocName]).filter(Boolean);
+        const assocModel = this._getAssociationModel(assocName);
+        await assocModel._loadAssociations(assocRecords, nested);
+      }
+    }
+  }
+}
+
+static async _loadAssociation(records, assocName) {
+  const assoc = this.associations[assocName];
+  if (!assoc) return;
+
+  const AssocModel = this._resolveModel(assoc.model);
+
+  if (assoc.type === 'belongs_to') {
+    // Collect foreign key values
+    const fkValues = [...new Set(records.map(r => r[assoc.foreignKey]).filter(Boolean))];
+    if (fkValues.length === 0) return;
+
+    // Single query for all related records
+    const related = await AssocModel.where({ id: fkValues });
+    const relatedById = Object.fromEntries(related.map(r => [r.id, r]));
+
+    // Attach to parent records
+    for (const record of records) {
+      record[assocName] = relatedById[record[assoc.foreignKey]] || null;
+    }
+  } else if (assoc.type === 'has_many') {
+    // Collect primary key values
+    const pkValues = records.map(r => r.id);
+
+    // Single query for all related records
+    const related = await AssocModel.where({ [assoc.foreignKey]: pkValues });
+
+    // Group by foreign key
+    const relatedByFk = {};
+    for (const r of related) {
+      const fk = r[assoc.foreignKey];
+      if (!relatedByFk[fk]) relatedByFk[fk] = [];
+      relatedByFk[fk].push(r);
+    }
+
+    // Attach to parent records
+    for (const record of records) {
+      record[assocName] = relatedByFk[record.id] || [];
+    }
+  }
+}
+```
+
+**Dexie Adapter Implementation:**
+
+Same pattern, but using Dexie's `where().anyOf()` for batch loading:
+
+```javascript
+static async _loadAssociation(records, assocName) {
+  const assoc = this.associations[assocName];
+  if (!assoc) return;
+
+  const AssocModel = this._resolveModel(assoc.model);
+
+  if (assoc.type === 'belongs_to') {
+    const fkValues = [...new Set(records.map(r => r[assoc.foreignKey]).filter(Boolean))];
+    if (fkValues.length === 0) return;
+
+    // Dexie batch lookup
+    const related = await AssocModel.table.where('id').anyOf(fkValues).toArray();
+    const relatedById = Object.fromEntries(related.map(r => [r.id, new AssocModel(r)]));
+
+    for (const record of records) {
+      record[assocName] = relatedById[record[assoc.foreignKey]] || null;
+    }
+  } else if (assoc.type === 'has_many') {
+    const pkValues = records.map(r => r.id);
+
+    // Dexie batch lookup on foreign key (requires index)
+    const related = await AssocModel.table.where(assoc.foreignKey).anyOf(pkValues).toArray();
+
+    const relatedByFk = {};
+    for (const r of related) {
+      const fk = r[assoc.foreignKey];
+      if (!relatedByFk[fk]) relatedByFk[fk] = [];
+      relatedByFk[fk].push(new AssocModel(r));
+    }
+
+    for (const record of records) {
+      record[assocName] = relatedByFk[record.id] || [];
+    }
+  }
+}
+```
+
+**N+1 Prevention:**
+
+The key insight is that `includes()` triggers batch loading, not per-record queries:
+
+```javascript
+// BAD: N+1 queries (without includes)
+const heats = await Heat.where({number: 42});
+for (const heat of heats) {
+  console.log(heat.dance);  // Separate query for each heat!
+}
+
+// GOOD: 2 queries total (with includes)
+const heats = await Heat.where({number: 42}).includes('dance');
+for (const heat of heats) {
+  console.log(heat.dance);  // Already loaded
+}
+```
+
+**Dexie Index Requirements:**
+
+For efficient `has_many` loading, foreign keys need indexes:
+
+```javascript
+// Dexie schema must include foreign key indexes
+const db = new Dexie('calendar');
+db.version(1).stores({
+  events: '++id, user_id',           // user_id indexed for has_many
+  meeting_requests: '++id, event_id', // event_id indexed for has_many
+  scores: '++id, heat_id, judge_id'   // heat_id indexed for has_many
+});
+```
+
+**Testing:**
+
+```javascript
+describe('Associations', () => {
+  it('loads belongs_to association', async () => {
+    const heats = await Heat.where({number: 1}).includes('dance');
+    expect(heats[0].dance).toBeInstanceOf(Dance);
+    expect(heats[0].dance.name).toBeDefined();
+  });
+
+  it('loads nested associations', async () => {
+    const heats = await Heat.where({number: 1}).includes({ entry: ['lead', 'follow'] });
+    expect(heats[0].entry).toBeInstanceOf(Entry);
+    expect(heats[0].entry.lead).toBeInstanceOf(Person);
+    expect(heats[0].entry.follow).toBeInstanceOf(Person);
+  });
+
+  it('prevents N+1 queries', async () => {
+    const queryCount = trackQueries();
+    const heats = await Heat.limit(100).includes('dance', 'entry');
+    // Should be 3 queries: heats, dances, entries (not 201)
+    expect(queryCount()).toBe(3);
+  });
+});
+```
+
+### Phase 5: Scopes
 
 **Goal:** Named, reusable query fragments.
 
@@ -754,7 +1011,7 @@ static all() {
 }
 ```
 
-### Phase 5: Batching
+### Phase 6: Batching
 
 **Goal:** Memory-efficient iteration over large datasets.
 
@@ -803,7 +1060,7 @@ async find_in_batches(callback, { batch_size = 1000 } = {}) {
 }
 ```
 
-### Phase 6: Aggregations (Optional)
+### Phase 7: Aggregations (Optional)
 
 **Goal:** SQL aggregation without loading records.
 
@@ -901,11 +1158,14 @@ for (const adapter of adapters) {
 
 1. **Phase 0 complete:** SQL adapters refactored to use inheritance hierarchy
 2. **Phase 1 complete:** Basic chaining works across all adapters
-3. **API compatibility:** `await User.where(...).order(...).limit(...)` works
-4. **No regressions:** Existing immediate-execution code still works
-5. **Code reduction:** SQL adapter code reduced from ~1800 to ~500 lines
-6. **Performance:** No significant overhead for simple queries
-7. **Documentation:** Examples in Juntos docs show chaining patterns
+3. **Phase 4 complete:** Associations with includes() work across all adapters
+4. **API compatibility:** `await User.where(...).order(...).limit(...)` works
+5. **Association loading:** `await Heat.includes(:dance, entry: [:lead, :follow])` works
+6. **No regressions:** Existing immediate-execution code still works
+7. **Code reduction:** SQL adapter code reduced from ~1800 to ~500 lines
+8. **Performance:** No significant overhead for simple queries
+9. **N+1 prevention:** includes() batch-loads associations efficiently
+10. **Documentation:** Examples in Juntos docs show chaining and association patterns
 
 ## What We Skip (The Other 80%)
 
@@ -925,6 +1185,11 @@ If any of these become necessary, the Relation architecture supports adding them
 
 ## Related Plans
 
+**Downstream (depends on this):**
+- [RAILS_SPA_ENGINE.md](./RAILS_SPA_ENGINE.md) — SPA generation tooling (uses query builder)
+- [CALENDAR_DEMO.md](./CALENDAR_DEMO.md) — First validation of offline-first queries
+
+**Parallel (same layer):**
 - [DEXIE_SUPPORT.md](./DEXIE_SUPPORT.md) — Multiple adapter architecture
 - [UNIVERSAL_DATABASES.md](./UNIVERSAL_DATABASES.md) — HTTP-based adapters
 - [MULTI_TARGET_ARCHITECTURE.md](./MULTI_TARGET_ARCHITECTURE.md) — Target environments
