@@ -993,6 +993,41 @@ class SelfhostBuilder
     FileUtils.cp(base_src, base_dest)
     puts("  Base class: active_record_base.mjs")
 
+    # Copy SQL base class (shared by all SQL adapters)
+    sql_src = File.join(adapter_dir, 'active_record_sql.mjs')
+    if File.exist?(sql_src)
+      sql_dest = File.join(lib_dest, 'active_record_sql.mjs')
+      FileUtils.cp(sql_src, sql_dest)
+      puts("  SQL base class: active_record_sql.mjs")
+    end
+
+    # Copy dialect files (SQLite or PostgreSQL)
+    dialects_src = File.join(adapter_dir, 'dialects')
+    if File.directory?(dialects_src)
+      dialects_dest = File.join(lib_dest, 'dialects')
+      FileUtils.mkdir_p(dialects_dest)
+
+      # Determine which dialect to copy based on adapter
+      # Note: dexie, mysql2, planetscale, supabase not yet refactored to use dialects
+      sqlite_adapters = %w[sqljs sql.js better_sqlite3 sqlite3 sqlite turso libsql d1]
+      postgres_adapters = %w[pg postgres postgresql pglite neon mpg]
+
+      if sqlite_adapters.include?(@database)
+        dialect_src = File.join(dialects_src, 'sqlite.mjs')
+        if File.exist?(dialect_src)
+          FileUtils.cp(dialect_src, File.join(dialects_dest, 'sqlite.mjs'))
+          puts("  Dialect: dialects/sqlite.mjs")
+        end
+      elsif postgres_adapters.include?(@database)
+        dialect_src = File.join(dialects_src, 'postgres.mjs')
+        if File.exist?(dialect_src)
+          FileUtils.cp(dialect_src, File.join(dialects_dest, 'postgres.mjs'))
+          puts("  Dialect: dialects/postgres.mjs")
+        end
+      end
+      # MySQL adapters would go here when refactored
+    end
+
     # Get database config for injection (load from file or use minimal config for override)
     db_config = if @database_override
       { 'adapter' => @database, 'database' => "#{File.basename(DEMO_ROOT)}_dev" }

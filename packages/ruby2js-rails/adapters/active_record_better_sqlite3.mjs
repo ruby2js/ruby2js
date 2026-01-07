@@ -4,7 +4,8 @@
 
 import Database from 'better-sqlite3';
 
-import { ActiveRecordBase, attr_accessor, initTimePolyfill } from './active_record_base.mjs';
+import { SQLiteDialect, SQLITE_TYPE_MAP } from './dialects/sqlite.mjs';
+import { attr_accessor, initTimePolyfill } from './active_record_base.mjs';
 
 // Re-export shared utilities
 export { attr_accessor };
@@ -36,24 +37,6 @@ export async function initDatabase(options = {}) {
 export function execSQL(sql) {
   return db.exec(sql);
 }
-
-// SQLite type mapping from abstract Rails types
-const SQLITE_TYPE_MAP = {
-  string: 'TEXT',
-  text: 'TEXT',
-  integer: 'INTEGER',
-  bigint: 'INTEGER',
-  float: 'REAL',
-  decimal: 'REAL',
-  boolean: 'INTEGER',
-  date: 'TEXT',
-  datetime: 'TEXT',
-  time: 'TEXT',
-  timestamp: 'TEXT',
-  binary: 'BLOB',
-  json: 'TEXT',
-  jsonb: 'TEXT'
-};
 
 // Abstract DDL interface - creates SQLite tables from abstract schema
 export function createTable(tableName, columns, options = {}) {
@@ -148,156 +131,27 @@ export async function insert(tableName, data) {
 }
 
 // better-sqlite3-specific ActiveRecord implementation
-export class ActiveRecord extends ActiveRecordBase {
-  // --- Class Methods (finders) ---
-
-  static async all() {
-    const stmt = db.prepare(`SELECT * FROM ${this.tableName}`);
-    const rows = stmt.all();
-    return rows.map(row => new this(row));
-  }
-
-  static async find(id) {
-    const stmt = db.prepare(`SELECT * FROM ${this.tableName} WHERE id = ?`);
-    const row = stmt.get(id);
-    if (!row) {
-      throw new Error(`${this.name} not found with id=${id}`);
-    }
-    return new this(row);
-  }
-
-  static async findBy(conditions) {
-    const { where, values } = this._buildWhere(conditions);
-    const stmt = db.prepare(`SELECT * FROM ${this.tableName} WHERE ${where} LIMIT 1`);
-    const row = stmt.get(...values);
-    return row ? new this(row) : null;
-  }
-
-  static async where(conditions) {
-    const { where, values } = this._buildWhere(conditions);
-    const stmt = db.prepare(`SELECT * FROM ${this.tableName} WHERE ${where}`);
-    const rows = stmt.all(...values);
-    return rows.map(row => new this(row));
-  }
-
-  static async count() {
-    const stmt = db.prepare(`SELECT COUNT(*) as count FROM ${this.tableName}`);
-    const result = stmt.get();
-    return result.count;
-  }
-
-  // Order records by column - returns array of models
-  // Usage: Message.order({created_at: 'asc'}) or Message.order('created_at')
-  static async order(options) {
-    let column, direction;
-    if (typeof options === 'string') {
-      column = options;
-      direction = 'ASC';
+// Extends SQLiteDialect which provides all finder/mutation methods
+// Only needs to implement driver-specific execution
+export class ActiveRecord extends SQLiteDialect {
+  // Execute SQL and return raw result
+  static async _execute(sql, params = []) {
+    const stmt = db.prepare(sql);
+    // For SELECT queries, use all(); for others, use run()
+    if (sql.trim().toUpperCase().startsWith('SELECT')) {
+      return { rows: stmt.all(...params), type: 'select' };
     } else {
-      column = Object.keys(options)[0];
-      direction = (options[column] === 'desc' || options[column] === ':desc') ? 'DESC' : 'ASC';
+      return { info: stmt.run(...params), type: 'run' };
     }
-    const stmt = db.prepare(`SELECT * FROM ${this.tableName} ORDER BY ${column} ${direction}`);
-    const rows = stmt.all();
-    return rows.map(row => new this(row));
   }
 
-  static async first() {
-    const stmt = db.prepare(`SELECT * FROM ${this.tableName} ORDER BY id ASC LIMIT 1`);
-    const row = stmt.get();
-    return row ? new this(row) : null;
+  // Extract rows array from result
+  static _getRows(result) {
+    return result.rows || [];
   }
 
-  static async last() {
-    const stmt = db.prepare(`SELECT * FROM ${this.tableName} ORDER BY id DESC LIMIT 1`);
-    const row = stmt.get();
-    return row ? new this(row) : null;
-  }
-
-  // --- Instance Methods ---
-
-  async destroy() {
-    if (!this._persisted) return false;
-    const stmt = db.prepare(`DELETE FROM ${this.constructor.tableName} WHERE id = ?`);
-    stmt.run(this.id);
-    this._persisted = false;
-    console.log(`  ${this.constructor.name} Destroy (id: ${this.id})`);
-    await this._runCallbacks('after_destroy_commit');
-    return true;
-  }
-
-  async reload() {
-    if (!this.id) return this;
-    const fresh = await this.constructor.find(this.id);
-    this.attributes = fresh.attributes;
-    // Also update direct properties
-    for (const [key, value] of Object.entries(this.attributes)) {
-      if (key !== 'id') {
-        this[key] = value;
-      }
-    }
-    return this;
-  }
-
-  // --- Private helpers ---
-
-  _insert() {
-    const cols = [];
-    const placeholders = [];
-    const values = [];
-
-    for (const [key, value] of Object.entries(this.attributes)) {
-      if (key === 'id') continue;
-      cols.push(key);
-      placeholders.push('?');
-      values.push(value);
-    }
-
-    const sql = `INSERT INTO ${this.constructor.tableName} (${cols.join(', ')}) VALUES (${placeholders.join(', ')})`;
-    console.debug(`  ${this.constructor.name} Create  ${sql}`, values);
-
-    const stmt = db.prepare(sql);
-    const result = stmt.run(...values);
-
-    this.id = result.lastInsertRowid;
-    this.attributes.id = this.id;
-    this._persisted = true;
-    console.log(`  ${this.constructor.name} Create (id: ${this.id})`);
-    return true;
-  }
-
-  _update() {
-    const sets = [];
-    const values = [];
-
-    for (const [key, value] of Object.entries(this.attributes)) {
-      if (key === 'id') continue;
-      sets.push(`${key} = ?`);
-      values.push(value);
-    }
-    values.push(this.id);
-
-    const sql = `UPDATE ${this.constructor.tableName} SET ${sets.join(', ')} WHERE id = ?`;
-    console.debug(`  ${this.constructor.name} Update  ${sql}`, values);
-
-    const stmt = db.prepare(sql);
-    stmt.run(...values);
-
-    console.log(`  ${this.constructor.name} Update (id: ${this.id})`);
-    return true;
-  }
-
-  static _buildWhere(conditions) {
-    const clauses = [];
-    const values = [];
-    for (const [key, value] of Object.entries(conditions)) {
-      clauses.push(`${key} = ?`);
-      values.push(value);
-    }
-    return { where: clauses.join(' AND '), values };
-  }
-
-  static _resultToModels(rows) {
-    return rows.map(row => new this(row));
+  // Get last insert ID from result
+  static _getLastInsertId(result) {
+    return result.info?.lastInsertRowid;
   }
 }

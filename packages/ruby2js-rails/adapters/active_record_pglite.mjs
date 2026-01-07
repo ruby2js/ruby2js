@@ -2,7 +2,8 @@
 // This file is copied to dist/lib/active_record.mjs at build time
 // PGLite provides PostgreSQL compatibility in the browser with optional IndexedDB persistence
 
-import { ActiveRecordBase, attr_accessor, initTimePolyfill } from './active_record_base.mjs';
+import { PostgresDialect, PG_TYPE_MAP } from './dialects/postgres.mjs';
+import { attr_accessor, initTimePolyfill } from './active_record_base.mjs';
 
 // Re-export shared utilities
 export { attr_accessor };
@@ -57,24 +58,6 @@ export async function execSQL(sql) {
   return await db.exec(sql);
 }
 
-// PostgreSQL type mapping from abstract Rails types
-const PG_TYPE_MAP = {
-  string: 'VARCHAR(255)',
-  text: 'TEXT',
-  integer: 'INTEGER',
-  bigint: 'BIGINT',
-  float: 'DOUBLE PRECISION',
-  decimal: 'DECIMAL',
-  boolean: 'BOOLEAN',
-  date: 'DATE',
-  datetime: 'TIMESTAMP',
-  time: 'TIME',
-  timestamp: 'TIMESTAMP',
-  binary: 'BYTEA',
-  json: 'JSON',
-  jsonb: 'JSONB'
-};
-
 // Abstract DDL interface - creates PostgreSQL tables from abstract schema
 export async function createTable(tableName, columns, options = {}) {
   const columnDefs = columns.map(col => {
@@ -84,7 +67,7 @@ export async function createTable(tableName, columns, options = {}) {
       // PostgreSQL uses SERIAL for auto-incrementing primary keys
       def = `${col.name} SERIAL PRIMARY KEY`;
     } else {
-      const sqlType = getPgType(col);
+      const sqlType = getSqlType(col);
       def = `${col.name} ${sqlType}`;
 
       if (col.primaryKey) def += ' PRIMARY KEY';
@@ -135,7 +118,7 @@ export async function dropTable(tableName) {
   return db.exec(sql);
 }
 
-function getPgType(col) {
+function getSqlType(col) {
   let baseType = PG_TYPE_MAP[col.type] || 'TEXT';
 
   // Handle precision/scale for decimal
@@ -195,164 +178,21 @@ export async function closeDatabase() {
 }
 
 // PGLite-specific ActiveRecord implementation
-export class ActiveRecord extends ActiveRecordBase {
-  // --- Class Methods (finders) ---
-
-  static async all() {
-    const result = await db.query(`SELECT * FROM ${this.tableName}`);
-    return result.rows.map(row => new this(row));
+// Extends PostgresDialect which provides all finder/mutation methods
+// Only needs to implement driver-specific execution
+export class ActiveRecord extends PostgresDialect {
+  // Execute SQL and return raw result
+  static async _execute(sql, params = []) {
+    return await db.query(sql, params);
   }
 
-  static async find(id) {
-    const result = await db.query(
-      `SELECT * FROM ${this.tableName} WHERE id = $1`,
-      [id]
-    );
-    if (result.rows.length === 0) {
-      throw new Error(`${this.name} not found with id=${id}`);
-    }
-    return new this(result.rows[0]);
+  // Extract rows array from result
+  static _getRows(result) {
+    return result.rows || [];
   }
 
-  static async findBy(conditions) {
-    const { where, values } = this._buildWhere(conditions);
-    const result = await db.query(
-      `SELECT * FROM ${this.tableName} WHERE ${where} LIMIT 1`,
-      values
-    );
-    return result.rows.length > 0 ? new this(result.rows[0]) : null;
-  }
-
-  static async where(conditions) {
-    const { where, values } = this._buildWhere(conditions);
-    const result = await db.query(
-      `SELECT * FROM ${this.tableName} WHERE ${where}`,
-      values
-    );
-    return result.rows.map(row => new this(row));
-  }
-
-  static async count() {
-    const result = await db.query(`SELECT COUNT(*) as count FROM ${this.tableName}`);
-    return parseInt(result.rows[0].count);
-  }
-
-  static async first() {
-    const result = await db.query(
-      `SELECT * FROM ${this.tableName} ORDER BY id ASC LIMIT 1`
-    );
-    return result.rows.length > 0 ? new this(result.rows[0]) : null;
-  }
-
-  static async last() {
-    const result = await db.query(
-      `SELECT * FROM ${this.tableName} ORDER BY id DESC LIMIT 1`
-    );
-    return result.rows.length > 0 ? new this(result.rows[0]) : null;
-  }
-
-  // Order records by column - returns array of models
-  // Usage: Message.order({created_at: 'asc'}) or Message.order('created_at')
-  static async order(options) {
-    let column, direction;
-    if (typeof options === 'string') {
-      column = options;
-      direction = 'ASC';
-    } else {
-      column = Object.keys(options)[0];
-      direction = (options[column] === 'desc' || options[column] === ':desc') ? 'DESC' : 'ASC';
-    }
-    const result = await db.query(`SELECT * FROM ${this.tableName} ORDER BY ${column} ${direction}`);
-    return result.rows.map(row => new this(row));
-  }
-
-  // --- Instance Methods ---
-
-  async destroy() {
-    if (!this._persisted) return false;
-    await db.query(
-      `DELETE FROM ${this.constructor.tableName} WHERE id = $1`,
-      [this.id]
-    );
-    this._persisted = false;
-    console.log(`  ${this.constructor.name} Destroy (id: ${this.id})`);
-    await this._runCallbacks('after_destroy_commit');
-    return true;
-  }
-
-  async reload() {
-    if (!this.id) return this;
-    const fresh = await this.constructor.find(this.id);
-    this.attributes = fresh.attributes;
-    // Also update direct properties
-    for (const [key, value] of Object.entries(this.attributes)) {
-      if (key !== 'id') {
-        this[key] = value;
-      }
-    }
-    return this;
-  }
-
-  // --- Private helpers ---
-
-  async _insert() {
-    const cols = [];
-    const placeholders = [];
-    const values = [];
-    let paramIndex = 1;
-
-    for (const [key, value] of Object.entries(this.attributes)) {
-      if (key === 'id') continue;
-      cols.push(key);
-      placeholders.push(`$${paramIndex++}`);
-      values.push(value);
-    }
-
-    const sql = `INSERT INTO ${this.constructor.tableName} (${cols.join(', ')}) VALUES (${placeholders.join(', ')}) RETURNING id`;
-    console.debug(`  ${this.constructor.name} Create  ${sql}`, values);
-
-    const result = await db.query(sql, values);
-
-    this.id = result.rows[0].id;
-    this.attributes.id = this.id;
-    this._persisted = true;
-    console.log(`  ${this.constructor.name} Create (id: ${this.id})`);
-    return true;
-  }
-
-  async _update() {
-    const sets = [];
-    const values = [];
-    let paramIndex = 1;
-
-    for (const [key, value] of Object.entries(this.attributes)) {
-      if (key === 'id') continue;
-      sets.push(`${key} = $${paramIndex++}`);
-      values.push(value);
-    }
-    values.push(this.id);
-
-    const sql = `UPDATE ${this.constructor.tableName} SET ${sets.join(', ')} WHERE id = $${paramIndex}`;
-    console.debug(`  ${this.constructor.name} Update  ${sql}`, values);
-
-    await db.query(sql, values);
-
-    console.log(`  ${this.constructor.name} Update (id: ${this.id})`);
-    return true;
-  }
-
-  static _buildWhere(conditions) {
-    const clauses = [];
-    const values = [];
-    let paramIndex = 1;
-    for (const [key, value] of Object.entries(conditions)) {
-      clauses.push(`${key} = $${paramIndex++}`);
-      values.push(value);
-    }
-    return { where: clauses.join(' AND '), values };
-  }
-
-  static _resultToModels(rows) {
-    return rows.map(row => new this(row));
+  // Get last insert ID from result (PostgreSQL uses RETURNING id)
+  static _getLastInsertId(result) {
+    return result.rows?.[0]?.id;
   }
 }

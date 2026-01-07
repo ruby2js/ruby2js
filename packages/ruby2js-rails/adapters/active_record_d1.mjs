@@ -2,7 +2,8 @@
 // This file is copied to dist/lib/active_record.mjs at build time
 // D1 is Cloudflare's serverless SQLite database, accessed via Worker bindings
 
-import { ActiveRecordBase, attr_accessor, initTimePolyfill } from './active_record_base.mjs';
+import { SQLiteDialect, SQLITE_TYPE_MAP } from './dialects/sqlite.mjs';
+import { attr_accessor, initTimePolyfill } from './active_record_base.mjs';
 
 // Re-export shared utilities
 export { attr_accessor };
@@ -38,24 +39,6 @@ export async function execSQL(sql) {
   // D1's exec() supports multiple statements
   return await db.exec(sql);
 }
-
-// SQLite type mapping from abstract Rails types
-const SQLITE_TYPE_MAP = {
-  string: 'TEXT',
-  text: 'TEXT',
-  integer: 'INTEGER',
-  bigint: 'INTEGER',
-  float: 'REAL',
-  decimal: 'REAL',
-  boolean: 'INTEGER',
-  date: 'TEXT',
-  datetime: 'TEXT',
-  time: 'TEXT',
-  timestamp: 'TEXT',
-  binary: 'BLOB',
-  json: 'TEXT',
-  jsonb: 'TEXT'
-};
 
 // Abstract DDL interface - creates SQLite tables from abstract schema
 export async function createTable(tableName, columns, options = {}) {
@@ -150,149 +133,32 @@ export async function insert(tableName, data) {
 }
 
 // D1-specific ActiveRecord implementation
-export class ActiveRecord extends ActiveRecordBase {
-  // --- Class Methods (finders) ---
+// Extends SQLiteDialect which provides all finder/mutation methods
+// Only needs to implement driver-specific execution
+export class ActiveRecord extends SQLiteDialect {
+  // Execute SQL and return raw result
+  // D1 uses prepare/bind pattern
+  static async _execute(sql, params = []) {
+    const stmt = db.prepare(sql);
+    const bound = params.length > 0 ? stmt.bind(...params) : stmt;
 
-  static async all() {
-    const result = await db.prepare(`SELECT * FROM ${this.tableName}`).all();
-    return result.results.map(row => new this(row));
-  }
-
-  static async find(id) {
-    const result = await db.prepare(`SELECT * FROM ${this.tableName} WHERE id = ?`).bind(id).first();
-    if (!result) {
-      throw new Error(`${this.name} not found with id=${id}`);
-    }
-    return new this(result);
-  }
-
-  static async findBy(conditions) {
-    const { where, values } = this._buildWhere(conditions);
-    const stmt = db.prepare(`SELECT * FROM ${this.tableName} WHERE ${where} LIMIT 1`);
-    const result = await stmt.bind(...values).first();
-    return result ? new this(result) : null;
-  }
-
-  static async where(conditions) {
-    const { where, values } = this._buildWhere(conditions);
-    const stmt = db.prepare(`SELECT * FROM ${this.tableName} WHERE ${where}`);
-    const result = await stmt.bind(...values).all();
-    return result.results.map(row => new this(row));
-  }
-
-  static async count() {
-    const result = await db.prepare(`SELECT COUNT(*) as count FROM ${this.tableName}`).first();
-    return result.count;
-  }
-
-  static async first() {
-    const result = await db.prepare(`SELECT * FROM ${this.tableName} ORDER BY id ASC LIMIT 1`).first();
-    return result ? new this(result) : null;
-  }
-
-  static async last() {
-    const result = await db.prepare(`SELECT * FROM ${this.tableName} ORDER BY id DESC LIMIT 1`).first();
-    return result ? new this(result) : null;
-  }
-
-  // Order records by column - returns array of models
-  // Usage: Message.order({created_at: 'asc'}) or Message.order('created_at')
-  static async order(options) {
-    let column, direction;
-    if (typeof options === 'string') {
-      column = options;
-      direction = 'ASC';
+    // For SELECT queries, use all(); for others, use run()
+    if (sql.trim().toUpperCase().startsWith('SELECT')) {
+      const result = await bound.all();
+      return { rows: result.results, type: 'select' };
     } else {
-      column = Object.keys(options)[0];
-      direction = (options[column] === 'desc' || options[column] === ':desc') ? 'DESC' : 'ASC';
+      const result = await bound.run();
+      return { meta: result.meta, type: 'run' };
     }
-    const result = await db.prepare(`SELECT * FROM ${this.tableName} ORDER BY ${column} ${direction}`).all();
-    return result.results.map(row => new this(row));
   }
 
-  // --- Instance Methods ---
-
-  async destroy() {
-    if (!this._persisted) return false;
-    await db.prepare(`DELETE FROM ${this.constructor.tableName} WHERE id = ?`).bind(this.id).run();
-    this._persisted = false;
-    console.log(`  ${this.constructor.name} Destroy (id: ${this.id})`);
-    await this._runCallbacks('after_destroy_commit');
-    return true;
+  // Extract rows array from result
+  static _getRows(result) {
+    return result.rows || [];
   }
 
-  async reload() {
-    if (!this.id) return this;
-    const fresh = await this.constructor.find(this.id);
-    this.attributes = fresh.attributes;
-    // Also update direct properties
-    for (const [key, value] of Object.entries(this.attributes)) {
-      if (key !== 'id') {
-        this[key] = value;
-      }
-    }
-    return this;
-  }
-
-  // --- Private helpers ---
-
-  async _insert() {
-    const cols = [];
-    const placeholders = [];
-    const values = [];
-
-    for (const [key, value] of Object.entries(this.attributes)) {
-      if (key === 'id') continue;
-      cols.push(key);
-      placeholders.push('?');
-      values.push(value);
-    }
-
-    const sql = `INSERT INTO ${this.constructor.tableName} (${cols.join(', ')}) VALUES (${placeholders.join(', ')}) RETURNING id`;
-    console.debug(`  ${this.constructor.name} Create  ${sql}`, values);
-
-    const stmt = db.prepare(sql);
-    const result = await stmt.bind(...values).first();
-
-    this.id = result.id;
-    this.attributes.id = this.id;
-    this._persisted = true;
-    console.log(`  ${this.constructor.name} Create (id: ${this.id})`);
-    return true;
-  }
-
-  async _update() {
-    const sets = [];
-    const values = [];
-
-    for (const [key, value] of Object.entries(this.attributes)) {
-      if (key === 'id') continue;
-      sets.push(`${key} = ?`);
-      values.push(value);
-    }
-    values.push(this.id);
-
-    const sql = `UPDATE ${this.constructor.tableName} SET ${sets.join(', ')} WHERE id = ?`;
-    console.debug(`  ${this.constructor.name} Update  ${sql}`, values);
-
-    const stmt = db.prepare(sql);
-    await stmt.bind(...values).run();
-
-    console.log(`  ${this.constructor.name} Update (id: ${this.id})`);
-    return true;
-  }
-
-  static _buildWhere(conditions) {
-    const clauses = [];
-    const values = [];
-    for (const [key, value] of Object.entries(conditions)) {
-      clauses.push(`${key} = ?`);
-      values.push(value);
-    }
-    return { where: clauses.join(' AND '), values };
-  }
-
-  static _resultToModels(rows) {
-    return rows.map(row => new this(row));
+  // Get last insert ID from result
+  static _getLastInsertId(result) {
+    return result.meta?.last_row_id;
   }
 }

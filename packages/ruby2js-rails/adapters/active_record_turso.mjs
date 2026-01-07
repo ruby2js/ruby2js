@@ -4,7 +4,8 @@
 
 import { createClient } from '@libsql/client';
 
-import { ActiveRecordBase, attr_accessor, initTimePolyfill } from './active_record_base.mjs';
+import { SQLiteDialect, SQLITE_TYPE_MAP } from './dialects/sqlite.mjs';
+import { attr_accessor, initTimePolyfill } from './active_record_base.mjs';
 
 // Re-export shared utilities
 export { attr_accessor };
@@ -62,24 +63,6 @@ export async function execSQL(sql) {
     }
   }
 }
-
-// SQLite type mapping from abstract Rails types
-const SQLITE_TYPE_MAP = {
-  string: 'TEXT',
-  text: 'TEXT',
-  integer: 'INTEGER',
-  bigint: 'INTEGER',
-  float: 'REAL',
-  decimal: 'REAL',
-  boolean: 'INTEGER',
-  date: 'TEXT',
-  datetime: 'TEXT',
-  time: 'TEXT',
-  timestamp: 'TEXT',
-  binary: 'BLOB',
-  json: 'TEXT',
-  jsonb: 'TEXT'
-};
 
 // Abstract DDL interface - creates SQLite tables from abstract schema
 export async function createTable(tableName, columns, options = {}) {
@@ -152,14 +135,7 @@ export function getDatabase() {
 // Query interface for rails_base.js migration system
 export async function query(sql, params = []) {
   const result = await client.execute({ sql, args: params });
-  return result.rows.map(row => {
-    // Convert row to plain object
-    const obj = {};
-    for (const [key, value] of Object.entries(row)) {
-      obj[key] = value;
-    }
-    return obj;
-  });
+  return result.rows.map(row => ({ ...row }));
 }
 
 // Execute interface for rails_base.js migration system
@@ -186,169 +162,22 @@ export async function closeDatabase() {
 }
 
 // Turso-specific ActiveRecord implementation
-export class ActiveRecord extends ActiveRecordBase {
-  // --- Class Methods (finders) ---
-
-  static async all() {
-    const result = await client.execute(`SELECT * FROM ${this.tableName}`);
-    return result.rows.map(row => new this(this._rowToObject(row)));
+// Extends SQLiteDialect which provides all finder/mutation methods
+// Only needs to implement driver-specific execution
+export class ActiveRecord extends SQLiteDialect {
+  // Execute SQL and return raw result
+  static async _execute(sql, params = []) {
+    return await client.execute({ sql, args: params });
   }
 
-  static async find(id) {
-    const result = await client.execute({
-      sql: `SELECT * FROM ${this.tableName} WHERE id = ?`,
-      args: [id]
-    });
-    if (result.rows.length === 0) {
-      throw new Error(`${this.name} not found with id=${id}`);
-    }
-    return new this(this._rowToObject(result.rows[0]));
+  // Extract rows array from result, converting to plain objects
+  static _getRows(result) {
+    return (result.rows || []).map(row => ({ ...row }));
   }
 
-  static async findBy(conditions) {
-    const { where, values } = this._buildWhere(conditions);
-    const result = await client.execute({
-      sql: `SELECT * FROM ${this.tableName} WHERE ${where} LIMIT 1`,
-      args: values
-    });
-    return result.rows.length > 0 ? new this(this._rowToObject(result.rows[0])) : null;
-  }
-
-  static async where(conditions) {
-    const { where, values } = this._buildWhere(conditions);
-    const result = await client.execute({
-      sql: `SELECT * FROM ${this.tableName} WHERE ${where}`,
-      args: values
-    });
-    return result.rows.map(row => new this(this._rowToObject(row)));
-  }
-
-  static async count() {
-    const result = await client.execute(`SELECT COUNT(*) as count FROM ${this.tableName}`);
-    return Number(result.rows[0].count);
-  }
-
-  static async first() {
-    const result = await client.execute(`SELECT * FROM ${this.tableName} ORDER BY id ASC LIMIT 1`);
-    return result.rows.length > 0 ? new this(this._rowToObject(result.rows[0])) : null;
-  }
-
-  static async last() {
-    const result = await client.execute(`SELECT * FROM ${this.tableName} ORDER BY id DESC LIMIT 1`);
-    return result.rows.length > 0 ? new this(this._rowToObject(result.rows[0])) : null;
-  }
-
-  // Order records by column - returns array of models
-  // Usage: Message.order({created_at: 'asc'}) or Message.order('created_at')
-  static async order(options) {
-    let column, direction;
-    if (typeof options === 'string') {
-      column = options;
-      direction = 'ASC';
-    } else {
-      column = Object.keys(options)[0];
-      direction = (options[column] === 'desc' || options[column] === ':desc') ? 'DESC' : 'ASC';
-    }
-    const result = await client.execute(`SELECT * FROM ${this.tableName} ORDER BY ${column} ${direction}`);
-    return result.rows.map(row => new this(this._rowToObject(row)));
-  }
-
-  // --- Instance Methods ---
-
-  async destroy() {
-    if (!this._persisted) return false;
-    await client.execute({
-      sql: `DELETE FROM ${this.constructor.tableName} WHERE id = ?`,
-      args: [this.id]
-    });
-    this._persisted = false;
-    console.log(`  ${this.constructor.name} Destroy (id: ${this.id})`);
-    await this._runCallbacks('after_destroy_commit');
-    return true;
-  }
-
-  async reload() {
-    if (!this.id) return this;
-    const fresh = await this.constructor.find(this.id);
-    this.attributes = fresh.attributes;
-    // Also update direct properties
-    for (const [key, value] of Object.entries(this.attributes)) {
-      if (key !== 'id') {
-        this[key] = value;
-      }
-    }
-    return this;
-  }
-
-  // --- Private helpers ---
-
-  async _insert() {
-    const cols = [];
-    const placeholders = [];
-    const values = [];
-
-    for (const [key, value] of Object.entries(this.attributes)) {
-      if (key === 'id') continue;
-      cols.push(key);
-      placeholders.push('?');
-      values.push(value);
-    }
-
-    const sql = `INSERT INTO ${this.constructor.tableName} (${cols.join(', ')}) VALUES (${placeholders.join(', ')}) RETURNING id`;
-    console.debug(`  ${this.constructor.name} Create  ${sql}`, values);
-
-    const result = await client.execute({ sql, args: values });
-
+  // Get last insert ID from result
+  static _getLastInsertId(result) {
     // libSQL returns lastInsertRowid for inserts
-    this.id = result.rows[0]?.id ?? Number(result.lastInsertRowid);
-    this.attributes.id = this.id;
-    this._persisted = true;
-    console.log(`  ${this.constructor.name} Create (id: ${this.id})`);
-    return true;
-  }
-
-  async _update() {
-    const sets = [];
-    const values = [];
-
-    for (const [key, value] of Object.entries(this.attributes)) {
-      if (key === 'id') continue;
-      sets.push(`${key} = ?`);
-      values.push(value);
-    }
-    values.push(this.id);
-
-    const sql = `UPDATE ${this.constructor.tableName} SET ${sets.join(', ')} WHERE id = ?`;
-    console.debug(`  ${this.constructor.name} Update  ${sql}`, values);
-
-    await client.execute({ sql, args: values });
-
-    console.log(`  ${this.constructor.name} Update (id: ${this.id})`);
-    return true;
-  }
-
-  // Convert libSQL row (array-like with column names) to plain object
-  static _rowToObject(row) {
-    // libSQL rows are already object-like, but may need normalization
-    if (Array.isArray(row)) {
-      // Shouldn't happen with default config, but handle it
-      return row;
-    }
-    // Row is already an object with column names as keys
-    return { ...row };
-  }
-
-  static _buildWhere(conditions) {
-    const clauses = [];
-    const values = [];
-    for (const [key, value] of Object.entries(conditions)) {
-      clauses.push(`${key} = ?`);
-      values.push(value);
-    }
-    return { where: clauses.join(' AND '), values };
-  }
-
-  static _resultToModels(rows) {
-    return rows.map(row => new this(this._rowToObject(row)));
+    return result.rows?.[0]?.id ?? Number(result.lastInsertRowid);
   }
 }

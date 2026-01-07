@@ -623,9 +623,118 @@ export class ActiveRecord extends SQLiteDialect {
 
 **Files Modified:**
 
-- New: `active_record_sql.mjs`, `dialects/sqlite.mjs`, `dialects/postgres.mjs`, `dialects/mysql.mjs`
-- Modified: All `active_record_*.mjs` adapters (simplified to extend dialect)
-- Unchanged: `active_record_base.mjs`, `active_record_dexie.mjs`
+- New: `active_record_sql.mjs`, `dialects/sqlite.mjs`, `dialects/postgres.mjs`
+- Modified: SQLite adapters (better-sqlite3, turso, d1, sqljs), PostgreSQL adapters (pg, neon, pglite)
+- Unchanged: `active_record_base.mjs`
+
+**Intentionally Standalone Adapters:**
+
+| Adapter | Reason |
+|---------|--------|
+| **dexie** | Non-SQL (IndexedDB) — uses Collection API, not SQL queries |
+| **supabase** | Non-SQL (PostgREST API) — uses `.from().select().eq()`, not raw SQL |
+
+These adapters implement the same ActiveRecord interface but have fundamentally different query mechanisms that don't fit the SQL inheritance hierarchy.
+
+---
+
+### Phase 0.5: MySQL Dialect
+
+**Goal:** Extend the SQL inheritance hierarchy to MySQL-compatible databases.
+
+**Adapters to refactor:**
+- `mysql2` — Standard MySQL driver for Node.js
+- `planetscale` — MySQL-compatible serverless database
+
+**New File:** `dialects/mysql.mjs`
+
+```javascript
+// dialects/mysql.mjs
+import { ActiveRecordSQL } from '../active_record_sql.mjs';
+
+export const MYSQL_TYPE_MAP = {
+  string: 'VARCHAR(255)',
+  text: 'TEXT',
+  integer: 'INT',
+  bigint: 'BIGINT',
+  float: 'DOUBLE',
+  decimal: 'DECIMAL',
+  boolean: 'TINYINT(1)',
+  date: 'DATE',
+  datetime: 'DATETIME',
+  time: 'TIME',
+  timestamp: 'TIMESTAMP',
+  binary: 'BLOB',
+  json: 'JSON',
+  jsonb: 'JSON'
+};
+
+export class MySQLDialect extends ActiveRecordSQL {
+  // MySQL uses ? placeholders (like SQLite)
+  static get useNumberedParams() { return false; }
+
+  // MySQL doesn't support RETURNING, uses insertId
+  static get returningId() { return false; }
+
+  static get typeMap() { return MYSQL_TYPE_MAP; }
+
+  // MySQL accepts native booleans but stores as TINYINT(1)
+  static _formatValue(val) {
+    if (typeof val === 'boolean') return val ? 1 : 0;
+    return val;
+  }
+
+  static formatDefaultValue(value) {
+    if (value === null) return 'NULL';
+    if (typeof value === 'string') return `'${value.replace(/'/g, "''")}'`;
+    if (typeof value === 'boolean') return value ? '1' : '0';
+    return String(value);
+  }
+}
+```
+
+**Thin Adapter Example (mysql2):**
+
+```javascript
+// active_record_mysql2.mjs
+import mysql from 'mysql2/promise';
+import { MySQLDialect } from './dialects/mysql.mjs';
+import { attr_accessor, initTimePolyfill } from './active_record_base.mjs';
+
+export { attr_accessor };
+
+let pool = null;
+
+// ... initDatabase, DDL functions ...
+
+export class ActiveRecord extends MySQLDialect {
+  static async _execute(sql, params = []) {
+    const [rows, fields] = await pool.execute(sql, params);
+    return { rows, fields };
+  }
+
+  static _getRows(result) {
+    return result.rows || [];
+  }
+
+  static _getLastInsertId(result) {
+    return result.rows?.insertId;
+  }
+}
+```
+
+**Testing:**
+
+MySQL adapters require a MySQL server for testing. Options:
+1. Local MySQL/MariaDB installation
+2. Docker: `docker run -d -p 3306:3306 -e MYSQL_ROOT_PASSWORD=test mysql:8`
+3. PlanetScale dev branch (free tier)
+
+**Files Modified:**
+
+- New: `dialects/mysql.mjs`
+- Modified: `active_record_mysql2.mjs`, `active_record_planetscale.mjs`
+- Updated: `lib/ruby2js/rails/builder.rb` (copy mysql dialect)
 
 ---
 
