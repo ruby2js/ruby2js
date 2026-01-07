@@ -41,9 +41,9 @@ jobs:
         bundler-cache: true
 
     - name: Set up Node
-      uses: actions/setup-node@v3
+      uses: actions/setup-node@v4
       with:
-        node-version: '18'
+        node-version: '24'
         cache: 'yarn'
         cache-dependency-path: 'packages/**/yarn.lock'
 
@@ -66,7 +66,7 @@ jobs:
     - name: Set up Node
       uses: actions/setup-node@v4
       with:
-        node-version: '22'  # Required for fs.globSync
+        node-version: '24'
 
     - name: Run selfhost CI tests
       run: bundle exec rake -f demo/selfhost/Rakefile ci
