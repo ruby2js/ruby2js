@@ -589,3 +589,70 @@ export default config;
 - Recurring events
 - Time zone handling
 - Attachments (files, images)
+
+## Follow-On: Showcase Scoring Interface
+
+The Calendar demo validates offline-first patterns with a purpose-built demo app. The next step is applying these patterns to a production application: the offline scoring interface in [Showcase](https://github.com/rubys/showcase), a ballroom dance competition management system.
+
+### Current Architecture
+
+The existing scoring interface is a JavaScript SPA with:
+- `heat_app_controller.js` - Stimulus controller for SPA navigation
+- `heat_hydrator.js` - Joins normalized JSON (resolves IDs to objects)
+- `heat_data_manager.js` - Fetch, cache, offline queue via IndexedDB
+- `dirty_scores_queue.js` - Pending score queue for offline mode
+- Web Components for heat display and scoring
+
+### Target Architecture
+
+Replace the JavaScript SPA with Juntos-transpiled Ruby:
+
+```
+Server (Rails + SQLite)          Browser (Juntos + Dexie)
+┌─────────────────────┐          ┌─────────────────────┐
+│  Heat.where(...)    │  ──sync→ │  Heat.where(...)    │
+│  Score.create(...)  │  ←sync── │  Score.create(...)  │
+│                     │          │                     │
+│  Same Ruby models   │          │  Same Ruby models   │
+│  SQLite database    │          │  Dexie/IndexedDB    │
+└─────────────────────┘          └─────────────────────┘
+```
+
+**Key insight:** No hydration layer. The browser runs the same ActiveRecord-style queries against Dexie that Rails runs against SQLite.
+
+### Models Required (Subset of Showcase)
+
+| Model | Purpose | Writes? |
+|-------|---------|---------|
+| Event | Competition config | No |
+| Judge | Judge assignment | No |
+| Heat | Heat display data | No |
+| Person | Participant names | No |
+| Entry | Lead/follow pairs | No |
+| Dance | Dance names | No |
+| Score | **Judge scores** | **Yes** |
+| Solo/Formation | Solo displays | No |
+
+Most models are read-only on the client. Only `Score` needs create/update.
+
+### Sync Strategy
+
+1. **Pull:** Fetch heats/people/entries modified since last sync → import to Dexie
+2. **Offline:** Query Dexie, render views, queue score changes
+3. **Push:** When online, POST pending scores to Rails API
+4. **Conflict:** Last-write-wins (acceptable for scoring use case)
+
+### Why This Validates Juntos
+
+- **Real production app** with actual users (judges at competitions)
+- **Complex associations** (Heat → Entry → Lead/Follow → Studio)
+- **Offline-critical** (venues often have poor connectivity)
+- **Same codebase** proving the "Rails everywhere" vision
+
+### Dependencies
+
+Requires Calendar demo completion:
+- ActiveRecord query interface against Dexie
+- Associations (belongs_to, has_many, has_many through)
+- Sync infrastructure (delta sync, pending queue)
+- Browser target with IndexedDB storage
