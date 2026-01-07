@@ -41,6 +41,10 @@ namespace :packages do
       sh "cp ../ruby2js/ruby2js.js #{npm_root}/@ruby2js/ruby2js/ruby2js.js"
       sh 'yarn test'
     end
+
+    Dir.chdir 'packages/ruby2js-rails' do
+      sh 'npm test'
+    end
   end
 end
 

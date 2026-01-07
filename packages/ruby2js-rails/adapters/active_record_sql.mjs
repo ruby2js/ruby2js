@@ -147,7 +147,10 @@ export class ActiveRecordSQL extends ActiveRecordBase {
           }
         }
       }
-      sql += ` WHERE ${whereParts.join(' AND ')}`;
+      // Only add WHERE if we have actual conditions
+      if (whereParts.length > 0) {
+        sql += ` WHERE ${whereParts.join(' AND ')}`;
+      }
     }
 
     // ORDER BY (skip for count queries)

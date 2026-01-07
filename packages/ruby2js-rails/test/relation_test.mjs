@@ -1,0 +1,634 @@
+// Tests for Relation class and SQL building
+//
+// Run with: node --test packages/ruby2js-rails/test/relation_test.mjs
+
+import { describe, it, beforeEach } from 'node:test';
+import assert from 'node:assert/strict';
+
+import { Relation } from '../adapters/relation.mjs';
+import { ActiveRecordSQL } from '../adapters/active_record_sql.mjs';
+
+// --- Mock Model Classes ---
+
+// Mock model using ? placeholders (SQLite/MySQL style)
+class MockModel extends ActiveRecordSQL {
+  static tableName = 'users';
+  static get useNumberedParams() { return false; }
+
+  static _executedQueries = [];
+
+  static async _execute(sql, params) {
+    this._executedQueries.push({ sql, params });
+    return { rows: [] };
+  }
+
+  static _getRows(result) {
+    return result.rows;
+  }
+
+  static _getLastInsertId(result) {
+    return 1;
+  }
+
+  static resetQueries() {
+    this._executedQueries = [];
+  }
+}
+
+// Mock model using $1, $2 placeholders (Postgres style)
+class MockPostgresModel extends ActiveRecordSQL {
+  static tableName = 'posts';
+  static get useNumberedParams() { return true; }
+
+  static _executedQueries = [];
+
+  static async _execute(sql, params) {
+    this._executedQueries.push({ sql, params });
+    return { rows: [] };
+  }
+
+  static _getRows(result) {
+    return result.rows;
+  }
+
+  static _getLastInsertId(result) {
+    return 1;
+  }
+
+  static resetQueries() {
+    this._executedQueries = [];
+  }
+}
+
+// --- Relation Class Tests ---
+
+describe('Relation', () => {
+  describe('constructor', () => {
+    it('initializes with empty state', () => {
+      const rel = new Relation(MockModel);
+      assert.equal(rel.model, MockModel);
+      assert.deepEqual(rel._conditions, []);
+      assert.deepEqual(rel._orConditions, []);
+      assert.equal(rel._order, null);
+      assert.equal(rel._limit, null);
+      assert.equal(rel._offset, null);
+      assert.equal(rel._select, null);
+      assert.equal(rel._distinct, false);
+    });
+  });
+
+  describe('chainable methods', () => {
+    it('where() adds conditions and returns new Relation', () => {
+      const rel1 = new Relation(MockModel);
+      const rel2 = rel1.where({ active: true });
+
+      // Original unchanged
+      assert.deepEqual(rel1._conditions, []);
+      // New has condition
+      assert.deepEqual(rel2._conditions, [{ active: true }]);
+      // Different instances
+      assert.notEqual(rel1, rel2);
+    });
+
+    it('where() chains multiple conditions', () => {
+      const rel = new Relation(MockModel)
+        .where({ active: true })
+        .where({ role: 'admin' });
+
+      assert.deepEqual(rel._conditions, [
+        { active: true },
+        { role: 'admin' }
+      ]);
+    });
+
+    it('order() sets ordering and returns new Relation', () => {
+      const rel1 = new Relation(MockModel);
+      const rel2 = rel1.order('name');
+
+      assert.equal(rel1._order, null);
+      assert.equal(rel2._order, 'name');
+      assert.notEqual(rel1, rel2);
+    });
+
+    it('order() accepts object with direction', () => {
+      const rel = new Relation(MockModel).order({ created_at: 'desc' });
+      assert.deepEqual(rel._order, { created_at: 'desc' });
+    });
+
+    it('limit() sets limit and returns new Relation', () => {
+      const rel1 = new Relation(MockModel);
+      const rel2 = rel1.limit(10);
+
+      assert.equal(rel1._limit, null);
+      assert.equal(rel2._limit, 10);
+      assert.notEqual(rel1, rel2);
+    });
+
+    it('offset() sets offset and returns new Relation', () => {
+      const rel1 = new Relation(MockModel);
+      const rel2 = rel1.offset(20);
+
+      assert.equal(rel1._offset, null);
+      assert.equal(rel2._offset, 20);
+      assert.notEqual(rel1, rel2);
+    });
+
+    it('chains all methods together', () => {
+      const rel = new Relation(MockModel)
+        .where({ active: true })
+        .where({ role: 'admin' })
+        .order({ name: 'asc' })
+        .limit(10)
+        .offset(5);
+
+      assert.deepEqual(rel._conditions, [{ active: true }, { role: 'admin' }]);
+      assert.deepEqual(rel._order, { name: 'asc' });
+      assert.equal(rel._limit, 10);
+      assert.equal(rel._offset, 5);
+    });
+  });
+
+  describe('_clone()', () => {
+    it('creates independent copy', () => {
+      const rel1 = new Relation(MockModel)
+        .where({ active: true })
+        .order('name')
+        .limit(5);
+
+      const rel2 = rel1._clone();
+
+      // Same values
+      assert.deepEqual(rel1._conditions, rel2._conditions);
+      assert.equal(rel1._order, rel2._order);
+      assert.equal(rel1._limit, rel2._limit);
+
+      // But independent arrays
+      rel2._conditions.push({ extra: true });
+      assert.equal(rel1._conditions.length, 1);
+      assert.equal(rel2._conditions.length, 2);
+    });
+  });
+
+  describe('_reverseOrder()', () => {
+    it('reverses string order to desc', () => {
+      const rel = new Relation(MockModel);
+      const reversed = rel._reverseOrder('name');
+      assert.deepEqual(reversed, { name: 'desc' });
+    });
+
+    it('reverses desc to asc', () => {
+      const rel = new Relation(MockModel);
+      const reversed = rel._reverseOrder({ created_at: 'desc' });
+      assert.deepEqual(reversed, { created_at: 'asc' });
+    });
+
+    it('reverses asc to desc', () => {
+      const rel = new Relation(MockModel);
+      const reversed = rel._reverseOrder({ updated_at: 'asc' });
+      assert.deepEqual(reversed, { updated_at: 'desc' });
+    });
+  });
+
+  describe('thenable interface', () => {
+    beforeEach(() => {
+      MockModel.resetQueries();
+    });
+
+    it('has then() method', () => {
+      const rel = new Relation(MockModel);
+      assert.equal(typeof rel.then, 'function');
+    });
+
+    it('await triggers toArray()', async () => {
+      const results = await new Relation(MockModel).where({ active: true });
+      assert.ok(Array.isArray(results));
+      assert.equal(MockModel._executedQueries.length, 1);
+    });
+  });
+
+  describe('async iterator', () => {
+    beforeEach(() => {
+      MockModel.resetQueries();
+    });
+
+    it('supports for-await-of', async () => {
+      const rel = new Relation(MockModel);
+      const items = [];
+      for await (const item of rel) {
+        items.push(item);
+      }
+      assert.ok(Array.isArray(items));
+    });
+  });
+});
+
+// --- SQL Building Tests ---
+
+describe('ActiveRecordSQL._buildRelationSQL', () => {
+  describe('basic queries', () => {
+    it('builds SELECT * for empty relation', () => {
+      const rel = new Relation(MockModel);
+      const { sql, values } = MockModel._buildRelationSQL(rel);
+
+      assert.equal(sql, 'SELECT * FROM users');
+      assert.deepEqual(values, []);
+    });
+
+    it('builds COUNT(*) when count option is true', () => {
+      const rel = new Relation(MockModel);
+      const { sql, values } = MockModel._buildRelationSQL(rel, { count: true });
+
+      assert.equal(sql, 'SELECT COUNT(*) as count FROM users');
+      assert.deepEqual(values, []);
+    });
+  });
+
+  describe('WHERE clause', () => {
+    it('builds simple equality condition', () => {
+      const rel = new Relation(MockModel).where({ active: true });
+      const { sql, values } = MockModel._buildRelationSQL(rel);
+
+      assert.equal(sql, 'SELECT * FROM users WHERE active = ?');
+      assert.deepEqual(values, [true]);
+    });
+
+    it('builds multiple conditions with AND', () => {
+      const rel = new Relation(MockModel)
+        .where({ active: true })
+        .where({ role: 'admin' });
+      const { sql, values } = MockModel._buildRelationSQL(rel);
+
+      assert.equal(sql, 'SELECT * FROM users WHERE active = ? AND role = ?');
+      assert.deepEqual(values, [true, 'admin']);
+    });
+
+    it('builds IN clause for array values', () => {
+      const rel = new Relation(MockModel).where({ id: [1, 2, 3] });
+      const { sql, values } = MockModel._buildRelationSQL(rel);
+
+      assert.equal(sql, 'SELECT * FROM users WHERE id IN (?, ?, ?)');
+      assert.deepEqual(values, [1, 2, 3]);
+    });
+
+    it('builds IS NULL for null values', () => {
+      const rel = new Relation(MockModel).where({ deleted_at: null });
+      const { sql, values } = MockModel._buildRelationSQL(rel);
+
+      assert.equal(sql, 'SELECT * FROM users WHERE deleted_at IS NULL');
+      assert.deepEqual(values, []);
+    });
+
+    it('combines multiple condition types', () => {
+      const rel = new Relation(MockModel)
+        .where({ active: true, role: ['admin', 'moderator'] })
+        .where({ deleted_at: null });
+      const { sql, values } = MockModel._buildRelationSQL(rel);
+
+      assert.equal(sql, 'SELECT * FROM users WHERE active = ? AND role IN (?, ?) AND deleted_at IS NULL');
+      assert.deepEqual(values, [true, 'admin', 'moderator']);
+    });
+  });
+
+  describe('ORDER BY clause', () => {
+    it('builds ORDER BY with string column (ASC)', () => {
+      const rel = new Relation(MockModel).order('name');
+      const { sql } = MockModel._buildRelationSQL(rel);
+
+      assert.equal(sql, 'SELECT * FROM users ORDER BY name ASC');
+    });
+
+    it('builds ORDER BY with object (desc)', () => {
+      const rel = new Relation(MockModel).order({ created_at: 'desc' });
+      const { sql } = MockModel._buildRelationSQL(rel);
+
+      assert.equal(sql, 'SELECT * FROM users ORDER BY created_at DESC');
+    });
+
+    it('builds ORDER BY with :desc symbol style', () => {
+      const rel = new Relation(MockModel).order({ name: ':desc' });
+      const { sql } = MockModel._buildRelationSQL(rel);
+
+      assert.equal(sql, 'SELECT * FROM users ORDER BY name DESC');
+    });
+
+    it('skips ORDER BY for count queries', () => {
+      const rel = new Relation(MockModel).order('name');
+      const { sql } = MockModel._buildRelationSQL(rel, { count: true });
+
+      assert.equal(sql, 'SELECT COUNT(*) as count FROM users');
+    });
+  });
+
+  describe('LIMIT and OFFSET', () => {
+    it('builds LIMIT clause', () => {
+      const rel = new Relation(MockModel).limit(10);
+      const { sql } = MockModel._buildRelationSQL(rel);
+
+      assert.equal(sql, 'SELECT * FROM users LIMIT 10');
+    });
+
+    it('builds OFFSET clause', () => {
+      const rel = new Relation(MockModel).offset(20);
+      const { sql } = MockModel._buildRelationSQL(rel);
+
+      assert.equal(sql, 'SELECT * FROM users OFFSET 20');
+    });
+
+    it('builds LIMIT and OFFSET together', () => {
+      const rel = new Relation(MockModel).limit(10).offset(20);
+      const { sql } = MockModel._buildRelationSQL(rel);
+
+      assert.equal(sql, 'SELECT * FROM users LIMIT 10 OFFSET 20');
+    });
+
+    it('skips LIMIT and OFFSET for count queries', () => {
+      const rel = new Relation(MockModel).limit(10).offset(20);
+      const { sql } = MockModel._buildRelationSQL(rel, { count: true });
+
+      assert.equal(sql, 'SELECT COUNT(*) as count FROM users');
+    });
+  });
+
+  describe('complete queries', () => {
+    it('builds complex query with all clauses', () => {
+      const rel = new Relation(MockModel)
+        .where({ active: true })
+        .where({ role: 'admin' })
+        .order({ created_at: 'desc' })
+        .limit(10)
+        .offset(5);
+      const { sql, values } = MockModel._buildRelationSQL(rel);
+
+      assert.equal(sql,
+        'SELECT * FROM users WHERE active = ? AND role = ? ORDER BY created_at DESC LIMIT 10 OFFSET 5'
+      );
+      assert.deepEqual(values, [true, 'admin']);
+    });
+  });
+});
+
+describe('PostgreSQL numbered parameters', () => {
+  it('uses $1, $2 style placeholders', () => {
+    const rel = new Relation(MockPostgresModel)
+      .where({ active: true })
+      .where({ role: 'admin' });
+    const { sql, values } = MockPostgresModel._buildRelationSQL(rel);
+
+    assert.equal(sql, 'SELECT * FROM posts WHERE active = $1 AND role = $2');
+    assert.deepEqual(values, [true, 'admin']);
+  });
+
+  it('numbers IN clause placeholders correctly', () => {
+    const rel = new Relation(MockPostgresModel)
+      .where({ status: 'active' })
+      .where({ id: [1, 2, 3] });
+    const { sql, values } = MockPostgresModel._buildRelationSQL(rel);
+
+    assert.equal(sql, 'SELECT * FROM posts WHERE status = $1 AND id IN ($2, $3, $4)');
+    assert.deepEqual(values, ['active', 1, 2, 3]);
+  });
+});
+
+// --- ActiveRecord Static Method Tests ---
+
+describe('ActiveRecordSQL static methods', () => {
+  beforeEach(() => {
+    MockModel.resetQueries();
+  });
+
+  describe('all()', () => {
+    it('returns a Relation', () => {
+      const rel = MockModel.all();
+      assert.ok(rel instanceof Relation);
+      assert.equal(rel.model, MockModel);
+    });
+  });
+
+  describe('where()', () => {
+    it('returns a Relation with conditions', () => {
+      const rel = MockModel.where({ active: true });
+      assert.ok(rel instanceof Relation);
+      assert.deepEqual(rel._conditions, [{ active: true }]);
+    });
+  });
+
+  describe('order()', () => {
+    it('returns a Relation with ordering', () => {
+      const rel = MockModel.order('name');
+      assert.ok(rel instanceof Relation);
+      assert.equal(rel._order, 'name');
+    });
+  });
+
+  describe('limit()', () => {
+    it('returns a Relation with limit', () => {
+      const rel = MockModel.limit(5);
+      assert.ok(rel instanceof Relation);
+      assert.equal(rel._limit, 5);
+    });
+  });
+
+  describe('offset()', () => {
+    it('returns a Relation with offset', () => {
+      const rel = MockModel.offset(10);
+      assert.ok(rel instanceof Relation);
+      assert.equal(rel._offset, 10);
+    });
+  });
+
+  describe('chaining from static methods', () => {
+    it('chains where().order().limit()', async () => {
+      await MockModel.where({ active: true }).order('name').limit(5);
+
+      assert.equal(MockModel._executedQueries.length, 1);
+      const { sql, params } = MockModel._executedQueries[0];
+      assert.equal(sql, 'SELECT * FROM users WHERE active = ? ORDER BY name ASC LIMIT 5');
+      assert.deepEqual(params, [true]);
+    });
+  });
+});
+
+// --- Terminal Method Tests ---
+
+describe('Terminal methods', () => {
+  // Create a model with test data
+  class MockModelWithData extends ActiveRecordSQL {
+    static tableName = 'items';
+    static get useNumberedParams() { return false; }
+
+    static _testData = [
+      { id: 1, name: 'First' },
+      { id: 2, name: 'Second' },
+      { id: 3, name: 'Third' }
+    ];
+
+    static async _execute(sql, params) {
+      // Simple simulation - return all data or filtered
+      if (sql.includes('COUNT')) {
+        return { rows: [{ count: this._testData.length }], type: 'count' };
+      }
+      return { rows: this._testData, type: 'select' };
+    }
+
+    static _getRows(result) {
+      return result.rows;
+    }
+
+    static _getLastInsertId(result) {
+      return 1;
+    }
+
+    constructor(attrs) {
+      super(attrs);
+      Object.assign(this, attrs);
+    }
+  }
+
+  describe('first()', () => {
+    it('returns first record', async () => {
+      const item = await new Relation(MockModelWithData).first();
+      assert.equal(item.id, 1);
+      assert.equal(item.name, 'First');
+    });
+
+    it('returns null for empty result', async () => {
+      class EmptyModel extends MockModelWithData {
+        static _testData = [];
+      }
+      const item = await new Relation(EmptyModel).first();
+      assert.equal(item, null);
+    });
+  });
+
+  describe('last()', () => {
+    it('returns last record (uses reversed order)', async () => {
+      const item = await new Relation(MockModelWithData).last();
+      // Note: with mock data this returns first since we don't actually reorder
+      assert.ok(item !== null);
+    });
+  });
+
+  describe('count()', () => {
+    it('returns count of records', async () => {
+      const count = await new Relation(MockModelWithData).count();
+      assert.equal(count, 3);
+    });
+  });
+
+  describe('toArray()', () => {
+    it('returns array of model instances', async () => {
+      const items = await new Relation(MockModelWithData).toArray();
+      assert.equal(items.length, 3);
+      assert.ok(items[0] instanceof MockModelWithData);
+    });
+  });
+
+  describe('find() within relation', () => {
+    it('finds by id within scoped relation', async () => {
+      const item = await new Relation(MockModelWithData).find(1);
+      assert.equal(item.id, 1);
+    });
+
+    it('throws when not found', async () => {
+      class EmptyModel extends MockModelWithData {
+        static name = 'EmptyModel';
+        static _testData = [];
+      }
+      await assert.rejects(
+        async () => await new Relation(EmptyModel).find(999),
+        /EmptyModel not found with id=999/
+      );
+    });
+  });
+
+  describe('findBy() within relation', () => {
+    it('finds by conditions', async () => {
+      const item = await new Relation(MockModelWithData).findBy({ name: 'First' });
+      assert.ok(item !== null);
+    });
+
+    it('returns null when not found', async () => {
+      class EmptyModel extends MockModelWithData {
+        static _testData = [];
+      }
+      const item = await new Relation(EmptyModel).findBy({ name: 'Nonexistent' });
+      assert.equal(item, null);
+    });
+  });
+});
+
+// --- Edge Cases ---
+
+describe('Edge cases', () => {
+  describe('empty conditions', () => {
+    it('handles empty where object', () => {
+      const rel = new Relation(MockModel).where({});
+      const { sql, values } = MockModel._buildRelationSQL(rel);
+
+      // Empty condition object shouldn't add WHERE clause
+      assert.equal(sql, 'SELECT * FROM users');
+      assert.deepEqual(values, []);
+    });
+  });
+
+  describe('zero values', () => {
+    it('handles limit(0)', () => {
+      const rel = new Relation(MockModel).limit(0);
+      const { sql } = MockModel._buildRelationSQL(rel);
+
+      assert.equal(sql, 'SELECT * FROM users LIMIT 0');
+    });
+
+    it('handles offset(0)', () => {
+      const rel = new Relation(MockModel).offset(0);
+      const { sql } = MockModel._buildRelationSQL(rel);
+
+      assert.equal(sql, 'SELECT * FROM users OFFSET 0');
+    });
+  });
+
+  describe('empty IN clause', () => {
+    it('handles empty array in where', () => {
+      const rel = new Relation(MockModel).where({ id: [] });
+      const { sql, values } = MockModel._buildRelationSQL(rel);
+
+      // Empty IN clause
+      assert.equal(sql, 'SELECT * FROM users WHERE id IN ()');
+      assert.deepEqual(values, []);
+    });
+  });
+
+  describe('special values', () => {
+    it('handles numeric string values', () => {
+      const rel = new Relation(MockModel).where({ code: '123' });
+      const { sql, values } = MockModel._buildRelationSQL(rel);
+
+      assert.equal(sql, 'SELECT * FROM users WHERE code = ?');
+      assert.deepEqual(values, ['123']);
+    });
+
+    it('handles zero as value', () => {
+      const rel = new Relation(MockModel).where({ count: 0 });
+      const { sql, values } = MockModel._buildRelationSQL(rel);
+
+      assert.equal(sql, 'SELECT * FROM users WHERE count = ?');
+      assert.deepEqual(values, [0]);
+    });
+
+    it('handles false as value', () => {
+      const rel = new Relation(MockModel).where({ active: false });
+      const { sql, values } = MockModel._buildRelationSQL(rel);
+
+      assert.equal(sql, 'SELECT * FROM users WHERE active = ?');
+      assert.deepEqual(values, [false]);
+    });
+
+    it('handles empty string as value', () => {
+      const rel = new Relation(MockModel).where({ name: '' });
+      const { sql, values } = MockModel._buildRelationSQL(rel);
+
+      assert.equal(sql, 'SELECT * FROM users WHERE name = ?');
+      assert.deepEqual(values, ['']);
+    });
+  });
+});

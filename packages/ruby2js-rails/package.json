@@ -2,6 +2,9 @@
   "name": "ruby2js-rails",
   "version": "6.0.0-beta",
   "type": "module",
+  "scripts": {
+    "test": "node --test 'test/**/*.mjs'"
+  },
   "description": "Rails runtime adapters, targets, and build tools for Ruby2JS",
   "bin": {
     "ruby2js-rails-dev": "./dev-server.mjs",
