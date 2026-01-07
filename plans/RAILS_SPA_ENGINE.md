@@ -4,6 +4,17 @@
 
 Generate offline-capable Single Page Applications from a subset of an existing Rails application. The SPA runs entirely client-side with IndexedDB storage, syncing with the server when online.
 
+## Validation Plan
+
+This plan defines the **tooling**. Two applications validate it:
+
+| Validation | Application | Purpose |
+|------------|-------------|---------|
+| First | [Calendar Demo](CALENDAR_DEMO.md) | New app built from scratch, proves the concept |
+| Second | [Showcase Scoring](#target-use-case-showcase-scoring) | Production app, proves real-world viability |
+
+The Calendar demo also extends SPA Engine with Electron and Capacitor targets for desktop/mobile.
+
 ## Current Progress
 
 ### Completed ✅
@@ -232,12 +243,30 @@ The `ruby2js-rails` npm package may need enhancements for SPA-specific features:
 | Transpilation options | `config/ruby2js.yml`  | Already supported              |
 | Turbo interceptor     | TBD                   | Runtime for offline navigation |
 | Sync layer            | TBD                   | Change tracking and sync       |
+| Middleware transpile  | TBD                   | Rack → Fetch API for edge deployment |
 
 These would be added to `ruby2js-rails` as needed, keeping the Ruby gem lightweight.
 
+### Middleware Transpilation (Edge Deployment)
+
+For deploying the server to Cloudflare Workers, Rack middleware needs to transpile to Fetch API handlers:
+
+| Rack Pattern | Fetch API Equivalent |
+|--------------|---------------------|
+| `def call(env)` | `async fetch(request, env)` |
+| `env['PATH_INFO']` | `new URL(request.url).pathname` |
+| `env['REQUEST_METHOD']` | `request.method` |
+| `env['rack.input'].read` | `await request.text()` |
+| `@app.call(env)` | `await this.app.fetch(request, env)` |
+| `[200, headers, [body]]` | `new Response(body, { status: 200, headers })` |
+
+This enables the "Ruby runtime optional" story - same sync API code runs on Rails or Cloudflare.
+
 ## Target Use Case: Showcase Scoring
 
-The showcase application's offline scoring requirements define the minimum viable scope:
+**Second validation** after [Calendar Demo](CALENDAR_DEMO.md).
+
+The [Showcase](https://github.com/rubys/showcase) application's offline scoring interface provides a production validation. Unlike Calendar (built from scratch), this extracts an SPA from an **existing** Rails application with real users (judges at ballroom dance competitions).
 
 ### Routes Needed
 ```ruby
@@ -247,9 +276,35 @@ patch 'scores/:id', to: 'scores#update'
 ```
 
 ### Models Needed
-```ruby
-Heat, Entry, Score, Person, Dance, Age, Level, Studio
+
+| Model | Purpose | Writes? |
+|-------|---------|---------|
+| Event | Competition config | No |
+| Judge | Judge assignment | No |
+| Heat | Heat display data | No |
+| Person | Participant names | No |
+| Entry | Lead/follow pairs | No |
+| Dance | Dance names | No |
+| Score | **Judge scores** | **Yes** |
+| Solo/Formation | Solo displays | No |
+| Age, Level, Studio | Reference data | No |
+
+Most models are read-only on the client. Only `Score` needs create/update.
+
+### Architecture
+
 ```
+Server (Rails + SQLite)          Browser (SPA Engine + Dexie)
+┌─────────────────────┐          ┌─────────────────────┐
+│  Heat.where(...)    │  ──sync→ │  Heat.where(...)    │
+│  Score.create(...)  │  ←sync── │  Score.create(...)  │
+│                     │          │                     │
+│  Same Ruby models   │          │  Same Ruby models   │
+│  SQLite database    │          │  Dexie/IndexedDB    │
+└─────────────────────┘          └─────────────────────┘
+```
+
+**Key insight:** No hydration layer. The browser runs the same ActiveRecord-style queries against Dexie that Rails runs against SQLite. This replaces the existing JavaScript SPA (`heat_hydrator.js`, `heat_data_manager.js`, etc.) with transpiled Ruby.
 
 ### Success Criteria
 
@@ -281,8 +336,15 @@ Remaining:
       ▼
   Stage 7 (Sync Layer)
       │
-      ▼
-  Stage 8 (Documentation)
+      ├──────────────────────────────┐
+      ▼                              ▼
+  Stage 8 (Documentation)    📱 Calendar Demo validates
+      │                         (+ Electron/Capacitor)
+      │                              │
+      ▼                              ▼
+  ════════════════════════════════════════
+             Showcase Scoring
+        (production validation)
 ```
 
 ## Open Questions
@@ -297,6 +359,7 @@ Remaining:
 
 ## References
 
+- [Calendar Demo Plan](CALENDAR_DEMO.md) - First validation (new app + Electron/Capacitor)
 - [Ruby2JS on Rails Demo](../demo/ruby2js-on-rails/) - Proves transpilation approach
 - [ruby2js-rails npm package](https://www.ruby2js.com/releases/ruby2js-rails-beta.tgz) - Build infrastructure
 - [RUBY2JS_SHARED_LOGIC.md](https://github.com/rubys/showcase/blob/main/plans/RUBY2JS_SHARED_LOGIC.md) - Showcase requirements

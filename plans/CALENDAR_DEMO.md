@@ -2,6 +2,18 @@
 
 A third demo application showcasing offline-first capabilities across browser, Electron (desktop), and Capacitor (mobile) targets, with a Rails server acting as sync coordinator.
 
+## Relationship to SPA Engine
+
+This demo **validates** the [Rails SPA Engine](RAILS_SPA_ENGINE.md), which provides the core tooling:
+
+| Plan | Purpose |
+|------|---------|
+| **RAILS_SPA_ENGINE.md** | The tooling (manifest DSL, builder, middleware, sync layer) |
+| **CALENDAR_DEMO.md** | First validation: new demo app built from scratch |
+| Showcase scoring | Second validation: production app (existing Rails subset) |
+
+The Calendar demo is a Rails app that **uses** the SPA Engine to generate offline-capable browser/Electron/Capacitor apps. Implementation details for middleware (Stage 5), Turbo interceptor (Stage 6), and sync layer (Stage 7) are in the SPA Engine plan.
+
 ## Overview
 
 | Demo | Pattern | What It Shows |
@@ -12,11 +24,15 @@ A third demo application showcasing offline-first capabilities across browser, E
 
 ### The Story
 
-> Write a Rails app. Run it as a web app, a desktop app, or a mobile app. Works offline. Syncs when online. Same codebase.
+> Write a Rails app. Deploy it anywhere - traditional server, edge, browser, desktop, or mobile. Works offline. Syncs when online. Same codebase. Ruby runtime optional.
 
 This is something Rails genuinely can't do on its own.
 
 ## Architecture
+
+Two server options - same offline clients:
+
+### Option A: Rails Server (Traditional)
 
 ```
 ┌──────────────────────────────────────────────────────┐
@@ -30,7 +46,32 @@ This is something Rails genuinely can't do on its own.
 │  • Primary web app (server-rendered Rails)          │
 │  • Serves offline-capable browser app via middleware │
 │  • Sync API endpoints for all offline clients       │
-│  • Single codebase, single deployment               │
+│  • Requires Ruby runtime                            │
+└──────────────────────────────────────────────────────┘
+              ▲                ▲                ▲
+              │ sync           │ sync           │ sync
+        ┌─────┴─────┐    ┌─────┴─────┐    ┌─────┴─────┐
+        │  Browser  │    │ Electron  │    │ Capacitor │
+        │ (offline) │    │ (desktop) │    │ (mobile)  │
+        │ IndexedDB │    │  SQLite   │    │ IndexedDB │
+        └───────────┘    └───────────┘    └───────────┘
+```
+
+### Option B: Edge Server (Serverless)
+
+```
+┌──────────────────────────────────────────────────────┐
+│              Cloudflare Workers (Transpiled)          │
+│  ┌─────────────────────────────────────────────────┐ │
+│  │  Middleware (transpiled Rack → Fetch API)       │ │
+│  │  ├── /offline → Static assets (KV/R2)          │ │
+│  │  └── /* → Transpiled controllers               │ │
+│  └─────────────────────────────────────────────────┘ │
+│                                                      │
+│  • Same codebase, transpiled to JavaScript          │
+│  • D1 database (SQLite-compatible)                  │
+│  • Sync API endpoints (same code, different runtime)│
+│  • No Ruby runtime needed anywhere                  │
 └──────────────────────────────────────────────────────┘
               ▲                ▲                ▲
               │ sync           │ sync           │ sync
@@ -43,10 +84,11 @@ This is something Rails genuinely can't do on its own.
 
 ### Key Points
 
-1. **Rails app is primary** - Normal server-rendered Rails for full experience
-2. **Middleware serves offline app** - Same app, transpiled, served from `/offline`
-3. **Sync API** - Rails provides REST endpoints for sync operations
+1. **Same codebase** - Write once, deploy to Rails OR edge
+2. **Middleware transpiles** - Rack middleware → Fetch API handlers
+3. **Sync API everywhere** - Same sync controller on Rails or Cloudflare
 4. **Same models everywhere** - `Event`, `MeetingRequest` work on all platforms
+5. **Ruby optional** - Edge deployment needs no Ruby runtime
 
 ## Data Model
 
@@ -412,13 +454,17 @@ export default config;
 
 ## Implementation Plan
 
-### Phase 1: Core Demo (Rails + Browser)
+The Calendar demo builds on the [SPA Engine](RAILS_SPA_ENGINE.md) infrastructure. Phases are sequenced to validate SPA Engine stages as they're completed.
 
-**Goal:** Working calendar with offline browser support via middleware.
+### Phase 1: Rails App + SPA Engine Integration
+
+**Goal:** Working calendar that uses SPA Engine to generate offline browser app.
+
+**Depends on:** SPA Engine Stages 1-4 (complete), Stage 5 (Rack Middleware)
 
 1. **Create Rails app structure**
    - [ ] Generate models (User, Event, MeetingRequest)
-   - [ ] Create migrations
+   - [ ] Create migrations with sync fields (client_id, synced_at, deleted_at)
    - [ ] Add validations and associations
    - [ ] Seed data (demo users)
 
@@ -428,23 +474,70 @@ export default config;
    - [ ] Meeting request workflow
    - [ ] User switching (for demo purposes)
 
-3. **Add Sync API**
+3. **Add SPA Engine manifest**
+   - [ ] `rails generate ruby2js:spa:install --name calendar`
+   - [ ] Configure models, controllers, views in manifest
+   - [ ] `rails ruby2js:spa:build` generates browser app
+
+4. **Add Sync API** (server-side only)
    - [ ] GET /api/sync endpoint
    - [ ] POST /api/sync endpoint
    - [ ] Authentication (simple token for demo)
 
-4. **Add Rack Middleware**
-   - [ ] Create OfflineMiddleware
-   - [ ] Configure in application.rb
-   - [ ] Build task integration
-
-5. **Browser offline app**
-   - [ ] Build with Juntos browser target
-   - [ ] Add SyncService
-   - [ ] Add Service Worker
+5. **Validate SPA Engine Stage 5**
+   - [ ] Rack middleware serves SPA at `/offline`
    - [ ] Test offline functionality
 
-### Phase 2: Electron Target
+**Depends on:** SPA Engine Stage 6 (Turbo Interceptor), Stage 7 (Sync Layer)
+
+6. **Validate SPA Engine Stages 6-7**
+   - [ ] Turbo interceptor handles offline navigation
+   - [ ] Sync layer pushes/pulls changes
+   - [ ] Conflict resolution works
+
+### Phase 2: Edge Server Option
+
+**Goal:** Deploy the server to Cloudflare Workers - no Ruby runtime needed anywhere.
+
+This transforms the architecture from "Rails server + offline clients" to "Edge server + offline clients" where everything is transpiled JavaScript.
+
+```
+┌─────────────────┐         ┌─────────────────┐
+│  Rails Server   │         │  Edge Server    │
+│  (Ruby)         │   OR    │  (Transpiled)   │
+│  SQLite/Postgres│         │  D1 database    │
+└────────┬────────┘         └────────┬────────┘
+         │ sync                      │ sync
+    ┌────┴────┐                 ┌────┴────┐
+    ▼         ▼                 ▼         ▼
+ Browser   Desktop           Browser   Desktop
+ (Dexie)   (SQLite)          (Dexie)   (SQLite)
+```
+
+**Story upgrade:** "Write a Rails app. Deploy everywhere. No Ruby server needed."
+
+1. **Middleware transpilation**
+   - [ ] Rack `call(env)` → Fetch API `fetch(request, env)`
+   - [ ] Rack env hash → Request/URL properties
+   - [ ] Rack response tuple → Response object
+   - [ ] Middleware chaining (`@app.call`)
+
+2. **Sync API on edge**
+   - [ ] Same sync controller, transpiled
+   - [ ] D1 as server database
+   - [ ] Authentication (edge-compatible)
+
+3. **Build integration**
+   - [ ] `juntos deploy -t cloudflare` includes sync API
+   - [ ] Generates worker with middleware + routes + sync
+   - [ ] D1 migrations from schema.rb
+
+4. **Validate full serverless story**
+   - [ ] No Ruby runtime anywhere
+   - [ ] Same models on edge (D1) and client (Dexie)
+   - [ ] Sync works between edge and offline clients
+
+### Phase 3: Electron Target
 
 **Goal:** Same app as desktop application (developer use).
 
@@ -541,16 +634,24 @@ export default config;
    ```
    Same app, runs on your own iPhone/iPad/Android (no App Store needed)
 
+5. **Deploy server to edge (no Ruby needed)**
+   ```bash
+   juntos deploy -t cloudflare -d d1
+   ```
+   Same sync API, running on Cloudflare Workers with D1 database.
+   No Ruby runtime anywhere - everything is transpiled JavaScript.
+
 ### Key Demonstrations
 
-| Feature | Server | Browser | Electron | Capacitor |
-|---------|--------|---------|----------|-----------|
-| View calendar | ✅ | ✅ | ✅ | ✅ |
-| Create events | ✅ | ✅ offline | ✅ offline | ✅ offline |
-| See others' events | ✅ | ✅ cached | ✅ cached | ✅ cached |
-| Meeting requests | ✅ | ✅ queued | ✅ queued | ✅ queued |
-| Works offline | N/A | ✅ | ✅ | ✅ |
-| Syncs when online | N/A | ✅ | ✅ | ✅ |
+| Feature | Rails Server | Edge Server | Browser | Electron | Capacitor |
+|---------|--------------|-------------|---------|----------|-----------|
+| View calendar | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Create events | ✅ | ✅ | ✅ offline | ✅ offline | ✅ offline |
+| See others' events | ✅ | ✅ | ✅ cached | ✅ cached | ✅ cached |
+| Meeting requests | ✅ | ✅ | ✅ queued | ✅ queued | ✅ queued |
+| Works offline | N/A | N/A | ✅ | ✅ | ✅ |
+| Syncs when online | N/A | N/A | ✅ | ✅ | ✅ |
+| Ruby runtime | Required | **None** | None | None | None |
 
 ## Open Questions
 
@@ -592,23 +693,16 @@ export default config;
 
 ## Follow-On: Showcase Scoring Interface
 
-The Calendar demo validates offline-first patterns with a purpose-built demo app. The next step is applying these patterns to a production application: the offline scoring interface in [Showcase](https://github.com/rubys/showcase), a ballroom dance competition management system.
+After Calendar validates the SPA Engine with a new demo app, the next step is validating with a **production application**: the offline scoring interface in [Showcase](https://github.com/rubys/showcase).
 
-### Current Architecture
-
-The existing scoring interface is a JavaScript SPA with:
-- `heat_app_controller.js` - Stimulus controller for SPA navigation
-- `heat_hydrator.js` - Joins normalized JSON (resolves IDs to objects)
-- `heat_data_manager.js` - Fetch, cache, offline queue via IndexedDB
-- `dirty_scores_queue.js` - Pending score queue for offline mode
-- Web Components for heat display and scoring
+See [RAILS_SPA_ENGINE.md](RAILS_SPA_ENGINE.md#target-use-case-showcase-scoring) for detailed requirements.
 
 ### Target Architecture
 
-Replace the JavaScript SPA with Juntos-transpiled Ruby:
+Replace the existing JavaScript SPA with SPA Engine-generated Ruby:
 
 ```
-Server (Rails + SQLite)          Browser (Juntos + Dexie)
+Server (Rails + SQLite)          Browser (SPA Engine + Dexie)
 ┌─────────────────────┐          ┌─────────────────────┐
 │  Heat.where(...)    │  ──sync→ │  Heat.where(...)    │
 │  Score.create(...)  │  ←sync── │  Score.create(...)  │
@@ -620,39 +714,9 @@ Server (Rails + SQLite)          Browser (Juntos + Dexie)
 
 **Key insight:** No hydration layer. The browser runs the same ActiveRecord-style queries against Dexie that Rails runs against SQLite.
 
-### Models Required (Subset of Showcase)
-
-| Model | Purpose | Writes? |
-|-------|---------|---------|
-| Event | Competition config | No |
-| Judge | Judge assignment | No |
-| Heat | Heat display data | No |
-| Person | Participant names | No |
-| Entry | Lead/follow pairs | No |
-| Dance | Dance names | No |
-| Score | **Judge scores** | **Yes** |
-| Solo/Formation | Solo displays | No |
-
-Most models are read-only on the client. Only `Score` needs create/update.
-
-### Sync Strategy
-
-1. **Pull:** Fetch heats/people/entries modified since last sync → import to Dexie
-2. **Offline:** Query Dexie, render views, queue score changes
-3. **Push:** When online, POST pending scores to Rails API
-4. **Conflict:** Last-write-wins (acceptable for scoring use case)
-
-### Why This Validates Juntos
+### Why This Matters
 
 - **Real production app** with actual users (judges at competitions)
 - **Complex associations** (Heat → Entry → Lead/Follow → Studio)
 - **Offline-critical** (venues often have poor connectivity)
 - **Same codebase** proving the "Rails everywhere" vision
-
-### Dependencies
-
-Requires Calendar demo completion:
-- ActiveRecord query interface against Dexie
-- Associations (belongs_to, has_many, has_many through)
-- Sync infrastructure (delta sync, pending queue)
-- Browser target with IndexedDB storage
