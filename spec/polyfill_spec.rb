@@ -177,13 +177,16 @@ describe Ruby2JS::Filter::Polyfill do
   describe 'Regexp.escape' do
     it 'should add polyfill for pre-ES2025' do
       js = to_js('Regexp.escape(str)', eslevel: 2024)
-      _(js).must_include 'if (!RegExp.escape)'
+      # Always define polyfill (no guard) to ensure Ruby-compatible behavior
+      # Native ES2025 RegExp.escape escapes more characters than Ruby's Regexp.escape
+      _(js).must_include 'RegExp.escape = function'
       _(js).must_include 'RegExp.escape(str)'
     end
 
     it 'should not add polyfill for ES2025' do
       js = to_js('Regexp.escape(str)', eslevel: 2025)
-      _(js).wont_include 'if (!RegExp.escape)'
+      # For ES2025+, use native RegExp.escape without polyfill
+      _(js).wont_include 'RegExp.escape = function'
       _(js).must_include 'RegExp.escape(str)'
     end
 

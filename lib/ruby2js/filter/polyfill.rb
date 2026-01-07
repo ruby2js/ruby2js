@@ -228,20 +228,17 @@ module Ruby2JS
           )
 
         when :regexp_escape
-          # if (!RegExp.escape) { RegExp.escape = function(str) { return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') } }
-          s(:if,
-            s(:send, s(:attr, s(:const, nil, :RegExp), :escape), :!),
-            s(:send, s(:const, nil, :RegExp), :[]=, s(:str, 'escape'),
-              s(:deff, nil, s(:args, s(:arg, :str)),
-                s(:return,
-                  s(:send, s(:lvar, :str), :replace,
-                    s(:regexp, s(:str, '[.*+?^${}()|[\\]\\\\]'), s(:regopt, :g)),
-                    s(:str, '\\$&')
-                  )
+          # RegExp.escape = function(str) { return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') }
+          # Always define to ensure Ruby-compatible behavior (native ES2025 escapes more chars)
+          s(:send, s(:const, nil, :RegExp), :[]=, s(:str, 'escape'),
+            s(:deff, nil, s(:args, s(:arg, :str)),
+              s(:return,
+                s(:send, s(:lvar, :str), :replace,
+                  s(:regexp, s(:str, '[.*+?^${}()|[\\]\\\\]'), s(:regopt, :g)),
+                  s(:str, '\\$&')
                 )
               )
-            ),
-            nil
+            )
           )
 
         when :hash_with_default
