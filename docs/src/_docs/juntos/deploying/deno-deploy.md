@@ -203,18 +203,18 @@ Deno is secure by default. The entry point needs:
 - `--allow-env` — Read environment variables
 - `--allow-read` — Read local files
 
-## Comparison with Vercel
+## Comparison with Vercel Edge
 
 | Aspect | Deno Deploy | Vercel Edge |
 |--------|-------------|-------------|
-| Runtime | Deno | V8 Isolates |
+| Runtime | Deno (V8-based) | V8 Isolates |
 | Language | TypeScript/JavaScript | JavaScript |
 | Cold starts | ~5-50ms | ~50-250ms |
 | Database | HTTP APIs | HTTP APIs |
 | WebSockets | Via Pusher/Supabase | Via Pusher/Supabase |
 | CLI | deployctl | vercel |
 
-Both are excellent choices for edge deployment. Choose based on your preference for Deno vs Node.js ecosystem.
+Both use V8 Isolates for fast cold starts and global distribution. Choose Deno Deploy if you prefer the Deno ecosystem (built-in TypeScript, URL imports, secure-by-default permissions).
 
 ## Limitations
 
