@@ -364,6 +364,82 @@ production:
   target: vercel
 ```
 
+### config/ruby2js.yml
+
+Configure Ruby2JS transpilation options. Supports environment-specific and section-specific settings.
+
+```yaml
+# Base configuration inherited by all environments
+default: &default
+  eslevel: 2022
+  include:
+    - class
+    - call
+  autoexports: true
+  comparison: identity
+
+# Environment-specific overrides
+development:
+  <<: *default
+
+production:
+  <<: *default
+  strict: true
+
+# Section-specific configuration
+components:
+  <<: *default
+  filters:
+    - phlex
+    - functions
+    - esm
+```
+
+**Supported sections:**
+
+| Section | Directory | Purpose |
+|---------|-----------|---------|
+| `controllers` | `app/controllers/` | Rails controllers |
+| `components` | `app/components/` | Phlex view components |
+| `stimulus` | `app/javascript/controllers/` | Stimulus controllers |
+
+Section config overrides the environment config for files in that directory.
+
+**Using preset mode:**
+
+```yaml
+# Preset enables: functions, esm, pragma, return + ES2022 + identity comparison
+preset: true
+
+# Add extra filters on top of preset
+filters:
+  - camelCase
+
+# Remove specific filters from preset
+disable_filters:
+  - return
+```
+
+**Available options:**
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `preset` | boolean | Enable preset configuration |
+| `eslevel` | integer | ECMAScript target (2020-2025) |
+| `filters` | array | Filters to apply |
+| `disable_filters` | array | Filters to remove from preset |
+| `autoexports` | boolean/string | Auto-export declarations (true, false, "default") |
+| `comparison` | string | "equality" or "identity" |
+| `include` | array | Methods to opt-in for conversion |
+| `exclude` | array | Methods to exclude |
+| `strict` | boolean | Add "use strict" directive |
+
+**Available filters:**
+
+`functions`, `esm`, `cjs`, `return`, `erb`, `pragma`, `camelCase`, `tagged_templates`, `phlex`, `stimulus`, `active_support`, `securerandom`, `nokogiri`, `haml`, `jest`, `rails/model`, `rails/controller`, `rails/routes`, `rails/seeds`, `rails/helpers`, `rails/migration`
+
+See [Ruby2JS Options](/docs/options) for the full list of transpilation options.
+
 ### Environment Variables
 
 | Variable | Description |

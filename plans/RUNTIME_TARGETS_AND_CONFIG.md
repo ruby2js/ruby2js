@@ -31,29 +31,59 @@ config/ruby2js.yml
 
 ### Configuration Options
 
-Based on [options.md](/docs/src/_docs/options.md), the following options are candidates for YAML configuration:
+Based on [options.md](/docs/src/_docs/options.md), the following options are supported in YAML configuration:
 
-| Option                  | Type           | Description                                                                                         |
-| ----------------------- | -------------- | --------------------------------------------------------------------------------------------------- |
-| `preset`                | boolean        | Enable preset configuration (functions, esm, pragma, return filters + ES2022 + identity comparison) |
-| `eslevel`               | integer        | ECMAScript target level (2020-2025)                                                                 |
-| `filters`               | array          | Additional filters to apply                                                                         |
-| `disable_filters`       | array          | Filters to remove (when using preset)                                                               |
-| `autoexports`           | boolean/string | Auto-export top-level declarations (true, false, or "default")                                      |
-| `autoimports`           | hash           | Map constants to import sources                                                                     |
-| `comparison`            | string         | "equality" or "identity"                                                                            |
-| `include`               | array          | Methods to opt-in for conversion                                                                    |
-| `exclude`               | array          | Methods to exclude from conversion                                                                  |
-| `include_all`           | boolean        | Opt-in to all available conversions                                                                 |
-| `include_only`          | array          | Only convert these methods                                                                          |
-| `module`                | string         | "esm" or "cjs"                                                                                      |
-| `nullish_to_s`          | boolean        | Wrap to_s/interpolation for nil safety                                                              |
-| `or`                    | string         | "auto", "nullish", or "logical"                                                                     |
-| `truthy`                | string         | "ruby" or "js"                                                                                      |
-| `strict`                | boolean        | Add "use strict" directive                                                                          |
-| `underscored_private`   | boolean        | Use `_x` instead of `#x` for private fields                                                         |
-| `width`                 | integer        | Target output width                                                                                 |
-| `template_literal_tags` | array          | Methods to convert to tagged templates                                                              |
+| Option                  | Type           | Status | Description                                                                                         |
+| ----------------------- | -------------- | ------ | --------------------------------------------------------------------------------------------------- |
+| `preset`                | boolean        | ✅     | Enable preset configuration (functions, esm, pragma, return filters + ES2022 + identity comparison) |
+| `eslevel`               | integer        | ✅     | ECMAScript target level (2020-2025)                                                                 |
+| `filters`               | array          | ✅     | Additional filters to apply (selfhost-ready filters only)                                           |
+| `disable_filters`       | array          | ✅     | Filters to remove (when using preset)                                                               |
+| `autoexports`           | boolean/string | ✅     | Auto-export top-level declarations (true, false, or "default")                                      |
+| `autoimports`           | hash           | ✅     | Map constants to import sources                                                                     |
+| `comparison`            | string         | ✅     | "equality" or "identity"                                                                            |
+| `include`               | array          | ✅     | Methods to opt-in for conversion                                                                    |
+| `exclude`               | array          | ✅     | Methods to exclude from conversion                                                                  |
+| `include_all`           | boolean        | ✅     | Opt-in to all available conversions                                                                 |
+| `include_only`          | array          | ✅     | Only convert these methods                                                                          |
+| `module`                | string         | ✅     | "esm" or "cjs"                                                                                      |
+| `nullish_to_s`          | boolean        | ✅     | Wrap to_s/interpolation for nil safety                                                              |
+| `or`                    | string         | ✅     | "auto", "nullish", or "logical"                                                                     |
+| `truthy`                | string         | ✅     | "ruby" or "js"                                                                                      |
+| `strict`                | boolean        | ✅     | Add "use strict" directive                                                                          |
+| `underscored_private`   | boolean        | ✅     | Use `_x` instead of `#x` for private fields                                                         |
+| `width`                 | integer        | ✅     | Target output width                                                                                 |
+| `template_literal_tags` | array          | ✅     | Methods to convert to tagged templates                                                              |
+
+### Available Filters in FILTER_MAP
+
+Filters available for use in `filters:` configuration (selfhost-ready):
+
+| Filter             | Module                           |
+| ------------------ | -------------------------------- |
+| `functions`        | Ruby2JS::Filter::Functions       |
+| `esm`              | Ruby2JS::Filter::ESM             |
+| `cjs`              | Ruby2JS::Filter::CJS             |
+| `return`           | Ruby2JS::Filter::Return          |
+| `erb`              | Ruby2JS::Filter::Erb             |
+| `pragma`           | Ruby2JS::Filter::Pragma          |
+| `camelCase`        | Ruby2JS::Filter::CamelCase       |
+| `tagged_templates` | Ruby2JS::Filter::TaggedTemplates |
+| `phlex`            | Ruby2JS::Filter::Phlex           |
+| `stimulus`         | Ruby2JS::Filter::Stimulus        |
+| `active_support`   | Ruby2JS::Filter::ActiveSupport   |
+| `securerandom`     | Ruby2JS::Filter::SecureRandom    |
+| `nokogiri`         | Ruby2JS::Filter::Nokogiri        |
+| `haml`             | Ruby2JS::Filter::Haml            |
+| `jest`             | Ruby2JS::Filter::Jest            |
+| `rails/model`      | Ruby2JS::Filter::Rails::Model    |
+| `rails/controller` | Ruby2JS::Filter::Rails::Controller |
+| `rails/routes`     | Ruby2JS::Filter::Rails::Routes   |
+| `rails/seeds`      | Ruby2JS::Filter::Rails::Seeds    |
+| `rails/helpers`    | Ruby2JS::Filter::Rails::Helpers  |
+| `rails/migration`  | Ruby2JS::Filter::Rails::Migration |
+
+**Pending selfhost readiness:** react, node, jsx, lit, alpine, turbo, action_cable
 
 ### Example Configuration
 
@@ -401,7 +431,11 @@ Requires newer runtime versions:
 1. ✅ Created `config/ruby2js.yml` with environment-specific configuration
 2. ✅ Updated `build.rb` to load and merge YAML config via `load_ruby2js_config()`
 3. ✅ Added `build_options()` method to merge YAML with hardcoded OPTIONS
-4. ⏸️ Formal tests for configuration loading (deferred - verified via smoke tests)
+4. ✅ Implemented `preset: true` option for standard configuration (functions, esm, pragma, return + ES2022 + identity)
+5. ✅ Implemented `disable_filters` option to remove filters from preset/base
+6. ✅ Expanded `FILTER_MAP` with selfhost-ready filters (cjs, active_support, securerandom, jest, tagged_templates, nokogiri, haml)
+7. ⏸️ Formal tests for configuration loading (deferred - verified via smoke tests)
+8. ⏸️ Additional filters (react, node, jsx, lit, alpine, turbo, action_cable) blocked pending selfhost readiness
 
 ### Phase 2: Node Filter Updates ✅ COMPLETE
 

@@ -19,14 +19,24 @@ require 'ruby2js/filter/rails/controller'
 require 'ruby2js/filter/rails/routes'
 require 'ruby2js/filter/rails/seeds'
 require 'ruby2js/filter/rails/migration'
+# Core filters used by hardcoded OPTIONS (always loaded)
 require 'ruby2js/filter/functions'
 require 'ruby2js/filter/esm'
 require 'ruby2js/filter/return'
 require 'ruby2js/filter/erb'
+require 'ruby2js/filter/pragma'
 require 'ruby2js/filter/rails/helpers'
 require 'ruby2js/filter/phlex'
 require 'ruby2js/filter/stimulus'
 require 'ruby2js/filter/camelCase'
+# Additional filters marked "ready" in selfhost manifest
+require 'ruby2js/filter/cjs'
+require 'ruby2js/filter/active_support'
+require 'ruby2js/filter/securerandom'
+require 'ruby2js/filter/jest'
+require 'ruby2js/filter/tagged_templates'
+require 'ruby2js/filter/nokogiri'
+require 'ruby2js/filter/haml'
 require_relative 'erb_compiler'
 require_relative 'migration_sql'
 require_relative 'seed_sql'
@@ -808,26 +818,51 @@ class SelfhostBuilder
     # Load section-specific config if section is specified, otherwise default
     base = self.load_ruby2js_config(section)
 
-    # Use section-specific options as base
-    base_options = case section
-    when 'stimulus'
-      STIMULUS_OPTIONS
+    # Check if preset mode is enabled
+    use_preset = base['preset'] || base[:preset]
+
+    # Use section-specific options as base, or preset if enabled
+    base_options = if use_preset
+      PRESET_OPTIONS
     else
-      OPTIONS
+      case section
+      when 'stimulus'
+        STIMULUS_OPTIONS
+      else
+        OPTIONS
+      end
     end
 
     # Start with hardcoded options as base (using spread for JS compatibility)
     options = { **base_options }
 
+    # Track filters to disable (processed after all options are merged)
+    disable_filters = nil
+
     # Merge YAML config values (string keys converted to symbols)
     base.each do |key, value| # Pragma: entries
       sym_key = key.to_s.to_sym
+
+      # Skip preset key (already handled above)
+      next if sym_key == :preset
+
+      # Handle disable_filters separately (applied after filters are set)
+      if sym_key == :disable_filters && value.is_a?(Array)
+        disable_filters = self.resolve_filters(value)
+        next
+      end
+
       # Convert filter names to module references
       if sym_key == :filters && value.is_a?(Array)
         options[sym_key] = self.resolve_filters(value)
       else
         options[sym_key] = value
       end
+    end
+
+    # Apply disable_filters: remove specified filters from the list
+    if disable_filters && options[:filters]
+      options[:filters] = options[:filters].reject { |f| disable_filters.include?(f) }
     end
 
     # Pass model associations to controller filter for preloading
@@ -839,19 +874,32 @@ class SelfhostBuilder
   end
 
   # Map filter names (strings) to Ruby2JS filter modules
-  # Supports both short names ('phlex') and full paths ('rails/helpers')
+  # Only includes filters required above (selfhost-ready filters)
+  # Users needing other filters should require them before using builder
   FILTER_MAP = {
     # Core filters
     'functions' => Ruby2JS::Filter::Functions,
     'esm' => Ruby2JS::Filter::ESM,
+    'cjs' => Ruby2JS::Filter::CJS,
     'return' => Ruby2JS::Filter::Return,
     'erb' => Ruby2JS::Filter::Erb,
+    'pragma' => Ruby2JS::Filter::Pragma,
     'camelcase' => Ruby2JS::Filter::CamelCase,
     'camelCase' => Ruby2JS::Filter::CamelCase,
+    'tagged_templates' => Ruby2JS::Filter::TaggedTemplates,
 
     # Framework filters
     'phlex' => Ruby2JS::Filter::Phlex,
     'stimulus' => Ruby2JS::Filter::Stimulus,
+
+    # Ruby stdlib filters (selfhost-ready)
+    'active_support' => Ruby2JS::Filter::ActiveSupport,
+    'securerandom' => Ruby2JS::Filter::SecureRandom,
+    'nokogiri' => Ruby2JS::Filter::Nokogiri,
+    'haml' => Ruby2JS::Filter::Haml,
+
+    # Utility filters
+    'jest' => Ruby2JS::Filter::Jest,
 
     # Rails sub-filters
     'rails/model' => Ruby2JS::Filter::Rails::Model,
@@ -862,13 +910,28 @@ class SelfhostBuilder
     'rails/migration' => Ruby2JS::Filter::Rails::Migration
   }.freeze
 
+  # Preset configuration: standard set of filters and options for typical apps
+  # Enable with `preset: true` in config/ruby2js.yml
+  PRESET_FILTERS = [
+    Ruby2JS::Filter::Functions,
+    Ruby2JS::Filter::ESM,
+    Ruby2JS::Filter::Pragma,
+    Ruby2JS::Filter::Return
+  ].freeze
+
+  PRESET_OPTIONS = {
+    eslevel: 2022,
+    comparison: :identity,
+    filters: PRESET_FILTERS
+  }.freeze
+
   def resolve_filters(filter_names)
     filter_names.map do |name|
       # Already a filter (not a string)? Pass through
       # In Ruby, filters are Modules; in JS, they're prototype objects
       return name unless name.is_a?(String)
 
-      # Normalize: strip, downcase for lookup (but preserve camelCase key)
+      # Normalize: strip for lookup (preserve case for camelCase)
       normalized = name.to_s.strip
       lookup_key = FILTER_MAP.key?(normalized) ? normalized : normalized.downcase
 

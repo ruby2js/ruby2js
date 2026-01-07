@@ -19,9 +19,17 @@ module Ruby2JS
       UPPERCASE_FILTERS = %w[esm cjs].freeze
 
       # Filters with non-standard capitalization that must be preserved
+      # Includes both file name form (snake_case) and constant name form (CamelCase)
       SPECIAL_CASE_FILTERS = {
         'camelcase' => 'CamelCase',
-        'camelCase' => 'CamelCase'
+        'camelCase' => 'CamelCase',
+        'CamelCase' => 'CamelCase',
+        'securerandom' => 'SecureRandom',
+        'SecureRandom' => 'SecureRandom',
+        'tagged_templates' => 'TaggedTemplates',
+        'TaggedTemplates' => 'TaggedTemplates',
+        'active_support' => 'ActiveSupport',
+        'ActiveSupport' => 'ActiveSupport'
       }.freeze
 
       def filter_to_export_name(name)
