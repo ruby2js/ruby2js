@@ -731,3 +731,30 @@ Server (Rails + SQLite)          Browser (SPA Engine + Dexie)
 - **Complex associations** (Heat → Entry → Lead/Follow → Studio)
 - **Offline-critical** (venues often have poor connectivity)
 - **Same codebase** proving the "Rails everywhere" vision
+
+## Future Demos
+
+Once Calendar proves the offline-first patterns, additional demos could showcase different domains:
+
+### Offline Kanban (Inspired by Fizzy)
+
+An offline-capable task/issue tracker demonstrating:
+- **Board/Column/Card** model with drag-and-drop
+- **Personal workflow** - edit your tasks offline, sync when online
+- **Conflict resolution** - last-write-wins for card movements
+- **Append-only comments** - easy merge strategy
+
+**Use cases:**
+- Field workers updating task status
+- Construction sites with poor connectivity
+- Mobile-first teams
+- Personal kanban that syncs across devices
+
+**Scope:** ~500-1000 LOC, 5-6 models (Board, Column, Card, Tag, User)
+
+**Why it's different from Calendar:**
+- More complex drag-and-drop interactions
+- Card state machine (triage → column → closed)
+- Demonstrates sync patterns for ordered lists
+
+**Inspired by [Fizzy](https://github.com/basecamp/fizzy)** (37signals' kanban app) but purpose-built for offline-first rather than real-time collaboration.
