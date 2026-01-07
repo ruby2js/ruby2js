@@ -3,6 +3,7 @@
 // This file contains SQL-specific ActiveRecord functionality shared across
 // SQLite, PostgreSQL, and MySQL adapters:
 // - Finder methods (all, find, findBy, where, first, last, order, count)
+// - Relation execution (_executeRelation, _executeCount)
 // - Mutation methods (_insert, _update, destroy, reload)
 // - SQL building helpers (_buildWhere, _param)
 //
@@ -13,6 +14,7 @@
 // - static _getLastInsertId(result) - get auto-generated ID after insert
 
 import { ActiveRecordBase } from './active_record_base.mjs';
+import { Relation } from './relation.mjs';
 
 export class ActiveRecordSQL extends ActiveRecordBase {
   // --- Dialect hooks (override in dialect subclass) ---
@@ -37,12 +39,34 @@ export class ActiveRecordSQL extends ActiveRecordBase {
     throw new Error('Subclass must implement _getLastInsertId(result)');
   }
 
-  // --- Class Methods (finders) ---
+  // --- Class Methods (chainable - return Relation) ---
 
-  static async all() {
-    const result = await this._execute(`SELECT * FROM ${this.tableName}`);
-    return this._getRows(result).map(row => new this(row));
+  // Returns a Relation that can be chained or awaited
+  static all() {
+    return new Relation(this);
   }
+
+  // Returns a Relation with conditions
+  static where(conditions) {
+    return new Relation(this).where(conditions);
+  }
+
+  // Returns a Relation with ordering
+  static order(options) {
+    return new Relation(this).order(options);
+  }
+
+  // Returns a Relation with limit
+  static limit(n) {
+    return new Relation(this).limit(n);
+  }
+
+  // Returns a Relation with offset
+  static offset(n) {
+    return new Relation(this).offset(n);
+  }
+
+  // --- Class Methods (terminal - execute immediately) ---
 
   static async find(id) {
     const sql = `SELECT * FROM ${this.tableName} WHERE id = ${this._param(1)}`;
@@ -64,53 +88,95 @@ export class ActiveRecordSQL extends ActiveRecordBase {
     return rows.length > 0 ? new this(rows[0]) : null;
   }
 
-  static async where(conditions) {
-    const { sql: whereSql, values } = this._buildWhere(conditions);
-    const result = await this._execute(
-      `SELECT * FROM ${this.tableName} WHERE ${whereSql}`,
-      values
-    );
-    return this._getRows(result).map(row => new this(row));
-  }
-
-  static async count() {
-    const result = await this._execute(
-      `SELECT COUNT(*) as count FROM ${this.tableName}`
-    );
-    return parseInt(this._getRows(result)[0].count);
-  }
-
+  // Convenience methods that delegate to Relation
   static async first() {
-    const result = await this._execute(
-      `SELECT * FROM ${this.tableName} ORDER BY id ASC LIMIT 1`
-    );
-    const rows = this._getRows(result);
-    return rows.length > 0 ? new this(rows[0]) : null;
+    return new Relation(this).first();
   }
 
   static async last() {
-    const result = await this._execute(
-      `SELECT * FROM ${this.tableName} ORDER BY id DESC LIMIT 1`
-    );
-    const rows = this._getRows(result);
-    return rows.length > 0 ? new this(rows[0]) : null;
+    return new Relation(this).last();
   }
 
-  // Order records by column - returns array of models
-  // Usage: Message.order({created_at: 'asc'}) or Message.order('created_at')
-  static async order(options) {
-    let column, direction;
-    if (typeof options === 'string') {
-      column = options;
-      direction = 'ASC';
-    } else {
-      column = Object.keys(options)[0];
-      direction = (options[column] === 'desc' || options[column] === ':desc') ? 'DESC' : 'ASC';
-    }
-    const result = await this._execute(
-      `SELECT * FROM ${this.tableName} ORDER BY ${column} ${direction}`
-    );
+  static async count() {
+    return new Relation(this).count();
+  }
+
+  // --- Relation Execution (called by Relation class) ---
+
+  // Execute a Relation and return model instances
+  static async _executeRelation(rel) {
+    const { sql, values } = this._buildRelationSQL(rel);
+    const result = await this._execute(sql, values);
     return this._getRows(result).map(row => new this(row));
+  }
+
+  // Execute a COUNT query for a Relation
+  static async _executeCount(rel) {
+    const { sql, values } = this._buildRelationSQL(rel, { count: true });
+    const result = await this._execute(sql, values);
+    return parseInt(this._getRows(result)[0].count);
+  }
+
+  // Build SQL from a Relation object
+  static _buildRelationSQL(rel, options = {}) {
+    const values = [];
+    let paramIndex = 1;
+
+    // SELECT clause
+    let sql = options.count
+      ? `SELECT COUNT(*) as count FROM ${this.tableName}`
+      : `SELECT * FROM ${this.tableName}`;
+
+    // WHERE clause
+    if (rel._conditions.length > 0) {
+      const whereParts = [];
+      for (const cond of rel._conditions) {
+        for (const [key, value] of Object.entries(cond)) {
+          if (Array.isArray(value)) {
+            // IN clause: where({id: [1, 2, 3]})
+            const placeholders = value.map(() => this._param(paramIndex++)).join(', ');
+            whereParts.push(`${key} IN (${placeholders})`);
+            values.push(...value.map(v => this._formatValue(v)));
+          } else if (value === null) {
+            // IS NULL
+            whereParts.push(`${key} IS NULL`);
+          } else {
+            // Simple equality
+            whereParts.push(`${key} = ${this._param(paramIndex++)}`);
+            values.push(this._formatValue(value));
+          }
+        }
+      }
+      sql += ` WHERE ${whereParts.join(' AND ')}`;
+    }
+
+    // ORDER BY (skip for count queries)
+    if (!options.count && rel._order) {
+      const [col, dir] = this._parseOrder(rel._order);
+      sql += ` ORDER BY ${col} ${dir}`;
+    }
+
+    // LIMIT (skip for count queries)
+    if (!options.count && rel._limit != null) {
+      sql += ` LIMIT ${rel._limit}`;
+    }
+
+    // OFFSET (skip for count queries)
+    if (!options.count && rel._offset != null) {
+      sql += ` OFFSET ${rel._offset}`;
+    }
+
+    return { sql, values };
+  }
+
+  // Parse order option into [column, direction]
+  static _parseOrder(order) {
+    if (typeof order === 'string') {
+      return [order, 'ASC'];
+    }
+    const col = Object.keys(order)[0];
+    const dir = (order[col] === 'desc' || order[col] === ':desc') ? 'DESC' : 'ASC';
+    return [col, dir];
   }
 
   // --- Instance Methods ---
@@ -199,7 +265,7 @@ export class ActiveRecordSQL extends ActiveRecordBase {
     return this.useNumberedParams ? `$${n}` : '?';
   }
 
-  // Build WHERE clause from conditions object
+  // Build WHERE clause from conditions object (for findBy)
   static _buildWhere(conditions) {
     const clauses = [];
     const values = [];

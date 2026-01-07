@@ -308,6 +308,15 @@ The Relation API is identical across adapters, but Dexie has constraints:
 
 These differences are hidden from the developer. Performance may vary.
 
+## Cleanup: Remove Obsolete Prototype
+
+Before implementation, remove `demo/ruby2js-on-rails/` which contains an outdated standalone ActiveRecord prototype. This code has been superseded by the adapter system in `packages/ruby2js-rails/adapters/`.
+
+**Files to remove:**
+- `demo/ruby2js-on-rails/` — entire directory
+
+**Rationale:** The prototype has a standalone `active_record.mjs` that doesn't use the modern adapter inheritance hierarchy. Keeping it risks confusion and divergent implementations. The blog and chat demos under `demo/` demonstrate the current approach.
+
 ## Phased Implementation
 
 ### Phase 0: Adapter Refactoring (Prerequisite)
@@ -614,12 +623,9 @@ export class ActiveRecord extends SQLiteDialect {
 | Bug fix propagation | 6 places | 1 place |
 | Adding new adapter | Copy 300 lines | Implement 3 methods |
 
-**Testing:**
+**Testing:** No new tests required.
 
-1. Refactor one adapter at a time (start with better-sqlite3)
-2. Run existing tests after each refactor
-3. Add inheritance-specific tests for dialect behavior
-4. Verify all adapters produce identical results for same queries
+The existing demo applications (`demo/blog/`, `demo/chat/`) serve as integration tests. Run them after each adapter refactor to verify functionality. This refactoring changes internal structure, not external behavior, so existing code coverage is sufficient.
 
 **Files Modified:**
 
@@ -723,12 +729,9 @@ export class ActiveRecord extends MySQLDialect {
 }
 ```
 
-**Testing:**
+**Testing:** No new tests required.
 
-MySQL adapters require a MySQL server for testing. Options:
-1. Local MySQL/MariaDB installation
-2. Docker: `docker run -d -p 3306:3306 -e MYSQL_ROOT_PASSWORD=test mysql:8`
-3. PlanetScale dev branch (free tier)
+MySQL adapters can be tested manually via demos. The adapter refactoring doesn't change external behavior. Docker setup for integration testing: `docker run -d -p 3306:3306 -e MYSQL_ROOT_PASSWORD=test mysql:8`
 
 **Files Modified:**
 
@@ -753,6 +756,15 @@ MySQL adapters require a MySQL server for testing. Options:
 **Files:**
 - New: `packages/ruby2js-rails/adapters/relation.mjs`
 - Modified: All `active_record_*.mjs` adapters
+
+**Testing:** Tests required in `packages/ruby2js-rails/test/`.
+
+This phase introduces new functionality with significant complexity. Tests should cover:
+- Method chaining (`where().order().limit()`)
+- Deferred execution (Relation is thenable)
+- Terminal methods (`first()`, `last()`, `count()`, `toArray()`)
+- SQL building (`_buildRelationSQL()` produces correct SQL)
+- Edge cases (empty results, null conditions, IN clauses)
 
 **Estimated size:** ~150 lines for Relation, ~50 lines per adapter
 
@@ -790,6 +802,14 @@ or(otherRelation) {
   return rel;
 }
 ```
+
+**Testing:** Tests required in `packages/ruby2js-rails/test/`.
+
+New query patterns need verification:
+- IN clause: `where({id: [1, 2, 3]})` generates correct SQL
+- NULL handling: `where({deleted_at: null})` produces `IS NULL`
+- NOT conditions: `not({role: 'guest'})` negates correctly
+- OR composition: `where({admin: true}).or(...)` combines properly
 
 ### Phase 3: Query Refinement
 
@@ -837,6 +857,14 @@ async pluck(...columns) {
     : rows.map(r => columns.map(c => r[c]));
 }
 ```
+
+**Testing:** Tests required in `packages/ruby2js-rails/test/`.
+
+New functionality needs verification:
+- `select()` limits columns returned
+- `distinct()` produces unique results
+- `exists()` returns boolean correctly (edge cases: empty table, matching/non-matching)
+- `pluck()` returns values (single column as flat array, multiple as nested arrays)
 
 ### Phase 4: Associations
 
@@ -1043,7 +1071,16 @@ db.version(1).stores({
 });
 ```
 
-**Testing:**
+**Testing:** Tests required in `packages/ruby2js-rails/test/`.
+
+Complex feature requires comprehensive tests:
+- `belongs_to` associations load correctly
+- `has_many` associations load correctly
+- Nested associations: `includes({ entry: ['lead', 'follow'] })`
+- N+1 prevention: batch loading verifies query count
+- Edge cases: missing associations, null foreign keys
+
+Example test structure:
 
 ```javascript
 describe('Associations', () => {
@@ -1120,6 +1157,10 @@ static all() {
 }
 ```
 
+**Testing:** No new tests required.
+
+Scopes are simply methods that return Relations. Phase 1 tests cover Relation functionality. Default scope behavior can be verified through existing integration tests in demos.
+
 ### Phase 6: Batching
 
 **Goal:** Memory-efficient iteration over large datasets.
@@ -1169,6 +1210,15 @@ async find_in_batches(callback, { batch_size = 1000 } = {}) {
 }
 ```
 
+**Testing:** Tests required in `packages/ruby2js-rails/test/`.
+
+Batching has subtle edge cases:
+- Empty dataset (zero iterations)
+- Dataset smaller than batch size (single iteration)
+- Dataset exactly divisible by batch size (boundary condition)
+- `find_each` vs `find_in_batches` callback signatures
+- Error handling mid-batch
+
 ### Phase 7: Aggregations (Optional)
 
 **Goal:** SQL aggregation without loading records.
@@ -1185,6 +1235,13 @@ await Order.where({status: 'completed'}).sum('total')
 await Product.average('price')
 await User.group('role').count()
 ```
+
+**Testing:** Tests if implemented.
+
+This phase is optional. If implemented, tests should cover:
+- `sum()`, `average()`, `minimum()`, `maximum()` with various data types
+- `group()` with aggregations
+- Aggregations combined with `where()` conditions
 
 **Note:** This phase is optional. Many apps don't need aggregations in JavaScript — they use database views or reporting tools. Implement only if there's clear demand.
 
@@ -1228,7 +1285,32 @@ The key is that `await` on a Relation calls its `then()` method, which executes 
 
 ## Testing Strategy
 
-### Unit Tests
+### Test Location
+
+All Relation and adapter tests go in `packages/ruby2js-rails/test/`. This directory should contain:
+
+```
+packages/ruby2js-rails/test/
+├── relation_test.mjs           # Core Relation class tests
+├── active_record_sql_test.mjs  # SQL building and execution tests
+└── fixtures/                   # Test data setup
+```
+
+### Testing by Phase
+
+| Phase | Tests Required | Rationale |
+|-------|---------------|-----------|
+| 0 (Adapter Refactoring) | No | Internal refactoring; demos provide integration coverage |
+| 0.5 (MySQL Dialect) | No | Internal refactoring; demos provide integration coverage |
+| 1 (Core Relation) | **Yes** | New functionality with significant complexity |
+| 2 (Enhanced Conditions) | **Yes** | New query patterns |
+| 3 (Query Refinement) | **Yes** | New functionality (select, distinct, exists, pluck) |
+| 4 (Associations) | **Yes** | Complex feature with N+1 prevention |
+| 5 (Scopes) | No | Just methods returning Relations; Phase 1 covers this |
+| 6 (Batching) | **Yes** | Edge cases around batch boundaries |
+| 7 (Aggregations) | If implemented | Optional phase |
+
+### Unit Tests (Phase 1+)
 
 ```javascript
 describe('Relation', () => {
@@ -1251,17 +1333,9 @@ describe('Relation', () => {
 
 ### Integration Tests
 
-Test each adapter with the same query patterns:
+Existing demos (`demo/blog/`, `demo/chat/`) serve as integration tests. Run them after significant changes to verify end-to-end functionality.
 
-```javascript
-const adapters = ['better_sqlite3', 'dexie', 'pg', 'neon', 'turso'];
-
-for (const adapter of adapters) {
-  describe(`Relation with ${adapter}`, () => {
-    // Same tests for each adapter
-  });
-}
-```
+For adapter-specific testing, create minimal test cases that exercise each adapter's unique behavior (e.g., placeholder syntax, boolean formatting).
 
 ## Success Criteria
 

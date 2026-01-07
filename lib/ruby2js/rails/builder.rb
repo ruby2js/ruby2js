@@ -1001,6 +1001,14 @@ class SelfhostBuilder
       puts("  SQL base class: active_record_sql.mjs")
     end
 
+    # Copy Relation class (deferred query building)
+    relation_src = File.join(adapter_dir, 'relation.mjs')
+    if File.exist?(relation_src)
+      relation_dest = File.join(lib_dest, 'relation.mjs')
+      FileUtils.cp(relation_src, relation_dest)
+      puts("  Relation class: relation.mjs")
+    end
+
     # Copy dialect files (SQLite, PostgreSQL, or MySQL)
     dialects_src = File.join(adapter_dir, 'dialects')
     if File.directory?(dialects_src)
