@@ -17,6 +17,9 @@ module Ruby2JS
       # Databases that require wrangler CLI
       WRANGLER_DATABASES = %w[d1].freeze
 
+      # Databases that require Fly.io CLI
+      FLY_DATABASES = %w[mpg].freeze
+
       # Databases that use direct Postgres connection for migrations
       # (PostgREST doesn't support DDL, so we use DATABASE_URL for schema changes)
       POSTGRES_MIGRATION_DATABASES = %w[supabase].freeze
@@ -144,8 +147,8 @@ module Ruby2JS
               seed      Run database seeds
               prepare   Migrate, and seed if fresh database
               reset     Drop, create, migrate, and seed
-              create    Create database (D1, Turso)
-              drop      Delete database (D1, Turso, SQLite)
+              create    Create database (D1, Turso, MPG)
+              drop      Delete database (D1, Turso, MPG, SQLite)
 
             Options:
               -d, --database ADAPTER   Database adapter (d1, sqlite, neon, turso, etc.)
@@ -182,6 +185,8 @@ module Ruby2JS
             run_d1_create(options)
           when 'turso'
             run_turso_create(options)
+          when 'mpg'
+            run_mpg_create(options)
           when 'better_sqlite3', 'sqlite', 'sql.js'
             puts "SQLite databases are created automatically by db:migrate."
             puts "Run 'juntos db:migrate' to create and initialize the database."
@@ -223,6 +228,8 @@ module Ruby2JS
             run_d1_migrate(options)
           elsif supabase?(options)
             run_supabase_migrate(options)
+          elsif mpg?(options)
+            run_mpg_migrate(options)
           else
             run_node_migrate(options)
           end
@@ -239,6 +246,8 @@ module Ruby2JS
 
           if d1?(options)
             run_d1_seed(options)
+          elsif mpg?(options)
+            run_mpg_seed(options)
           else
             run_node_seed(options)
           end
@@ -269,6 +278,8 @@ module Ruby2JS
             run_d1_prepare(options)
           elsif supabase?(options)
             run_supabase_prepare(options)
+          elsif mpg?(options)
+            run_mpg_prepare(options)
           else
             run_node_prepare(options)
           end
@@ -287,6 +298,8 @@ module Ruby2JS
             run_d1_drop(options)
           when 'turso'
             run_turso_drop(options)
+          when 'mpg'
+            run_mpg_drop(options)
           when 'better_sqlite3', 'sqlite'
             run_sqlite_drop(options)
           when 'sql.js'
@@ -331,7 +344,7 @@ module Ruby2JS
           puts
 
           # Step 2: Create (for databases that need explicit creation)
-          if %w[d1 turso].include?(db)
+          if %w[d1 turso mpg].include?(db)
             puts "Step 2/4: Creating database..."
             run_create(options)
             puts
@@ -545,6 +558,155 @@ module Ruby2JS
         end
 
         # ============================================
+        # Fly.io MPG (Managed Postgres) implementations
+        # ============================================
+        # MPG provides managed Postgres on Fly.io with CLI-driven workflows
+
+        def run_mpg_create(options)
+          db_name = options[:db_name]
+          env = options[:environment] || 'development'
+
+          unless fly_cli_available?
+            puts "Fly CLI not found. Install it first:"
+            puts "  curl -L https://fly.io/install.sh | sh"
+            puts "\nOr create the database at: https://fly.io/dashboard"
+            return
+          end
+
+          puts "Creating Fly MPG database '#{db_name}' for #{env}..."
+
+          output = `fly mpg create --name #{db_name} 2>&1`
+          if $?.success?
+            puts "Created MPG database: #{db_name}"
+            puts output if options[:verbose]
+            puts "\nNext steps:"
+            puts "  1. Attach to your app: fly mpg attach #{db_name} --app <your-app>"
+            puts "  2. This sets DATABASE_URL automatically"
+            puts "\nFor local development, use proxy:"
+            puts "  fly mpg proxy #{db_name}"
+          else
+            abort "Error: Failed to create database.\n#{output}"
+          end
+        end
+
+        def run_mpg_drop(options)
+          db_name = options[:db_name]
+          env = options[:environment] || 'development'
+
+          unless fly_cli_available?
+            puts "Fly CLI not found. Delete the database at:"
+            puts "  https://fly.io/dashboard"
+            return
+          end
+
+          puts "Deleting MPG database '#{db_name}' (#{env})..."
+
+          # Let fly prompt for confirmation - this is destructive
+          unless system('fly', 'mpg', 'destroy', db_name)
+            abort "\nError: Failed to delete database."
+          end
+
+          puts "Database deleted."
+        end
+
+        def run_mpg_migrate(options)
+          validate_mpg_env!
+
+          Dir.chdir(DIST_DIR) do
+            load_env_local
+
+            puts "Running MPG migrations via DATABASE_URL..."
+            unless system('node', 'node_modules/ruby2js-rails/migrate.mjs', '--migrate-only')
+              abort "\nError: Migration failed."
+            end
+          end
+        end
+
+        def run_mpg_seed(options)
+          validate_mpg_env!
+
+          Dir.chdir(DIST_DIR) do
+            load_env_local
+
+            puts "Running MPG seeds..."
+            unless system('node', 'node_modules/ruby2js-rails/migrate.mjs', '--seed-only')
+              abort "\nError: Seeding failed."
+            end
+          end
+        end
+
+        def run_mpg_prepare(options)
+          validate_mpg_env!
+
+          Dir.chdir(DIST_DIR) do
+            load_env_local
+
+            is_fresh = mpg_database_fresh?
+
+            puts "Running MPG migrations..."
+            unless system('node', 'node_modules/ruby2js-rails/migrate.mjs', '--migrate-only')
+              abort "\nError: Migration failed."
+            end
+
+            if is_fresh
+              puts "Running MPG seeds (fresh database)..."
+              unless system('node', 'node_modules/ruby2js-rails/migrate.mjs', '--seed-only')
+                abort "\nError: Seeding failed."
+              end
+            else
+              puts "Skipping seeds (existing database)"
+            end
+          end
+        end
+
+        def validate_mpg_env!
+          load_env_local
+          unless ENV['DATABASE_URL']
+            abort <<~ERROR
+              Error: DATABASE_URL not set.
+
+              For Fly.io MPG:
+                1. Create database: fly mpg create --name <db-name>
+                2. Attach to app: fly mpg attach <db-name> --app <app-name>
+                   This sets DATABASE_URL automatically.
+
+              For local development:
+                Run: fly mpg proxy <db-name>
+                Then add to .env.local: DATABASE_URL=postgres://postgres:postgres@localhost:5432/<db-name>
+            ERROR
+          end
+        end
+
+        def mpg_database_fresh?
+          # Check if schema_migrations table exists via DATABASE_URL
+          db_url = ENV['DATABASE_URL']
+          return true unless db_url
+
+          # Use node to check
+          check_script = <<~JS
+            import pg from 'pg';
+            const client = new pg.Client(process.env.DATABASE_URL);
+            await client.connect();
+            const result = await client.query(
+              "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'schema_migrations')"
+            );
+            console.log(result.rows[0].exists ? 'exists' : 'fresh');
+            await client.end();
+          JS
+
+          Dir.chdir(DIST_DIR) do
+            output = `node -e "#{check_script.gsub('"', '\\"').gsub("\n", ' ')}" 2>/dev/null`
+            !output.include?('exists')
+          end
+        rescue
+          true  # Assume fresh if we can't check
+        end
+
+        def fly_cli_available?
+          system('fly', 'version', out: File::NULL, err: File::NULL)
+        end
+
+        # ============================================
         # Supabase implementations
         # ============================================
         # Supabase uses PostgREST for CRUD (via @supabase/supabase-js)
@@ -727,6 +889,10 @@ module Ruby2JS
 
         def supabase?(options)
           options[:database] == 'supabase'
+        end
+
+        def mpg?(options)
+          options[:database] == 'mpg'
         end
 
         def browser_database?(options)

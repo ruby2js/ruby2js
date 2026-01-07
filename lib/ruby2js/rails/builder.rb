@@ -41,7 +41,7 @@ class SelfhostBuilder
   end
 
   # Server-side JavaScript runtimes
-  SERVER_RUNTIMES = ['node', 'bun', 'deno', 'cloudflare', 'vercel-edge', 'vercel-node', 'deno-deploy'].freeze
+  SERVER_RUNTIMES = ['node', 'bun', 'deno', 'cloudflare', 'vercel-edge', 'vercel-node', 'deno-deploy', 'fly'].freeze
 
   # Vercel deployment targets
   VERCEL_RUNTIMES = ['vercel-edge', 'vercel-node'].freeze
@@ -49,9 +49,13 @@ class SelfhostBuilder
   # Deno Deploy target
   DENO_DEPLOY_RUNTIMES = ['deno-deploy'].freeze
 
+  # Fly.io target
+  FLY_RUNTIMES = ['fly'].freeze
+
   # Databases that require a specific runtime
   RUNTIME_REQUIRED = {
-    'd1' => 'cloudflare'
+    'd1' => 'cloudflare',
+    'mpg' => 'fly'
   }.freeze
 
   # Valid target environments for each database adapter
@@ -69,6 +73,7 @@ class SelfhostBuilder
     'mysql2' => ['node', 'bun'],
     'mysql' => ['node', 'bun'],
     'd1' => ['cloudflare'],
+    'mpg' => ['fly'],
     'neon' => ['browser', 'node', 'bun', 'deno', 'cloudflare', 'vercel-edge', 'vercel-node', 'deno-deploy'],
     'turso' => ['browser', 'node', 'bun', 'deno', 'cloudflare', 'vercel-edge', 'vercel-node', 'deno-deploy'],
     'libsql' => ['browser', 'node', 'bun', 'deno', 'cloudflare', 'vercel-edge', 'vercel-node', 'deno-deploy'],
@@ -95,6 +100,7 @@ class SelfhostBuilder
     'mysql' => 'node',
     # Platform-specific databases
     'd1' => 'cloudflare',
+    'mpg' => 'fly',
     # HTTP-based edge databases
     'neon' => 'vercel',
     'turso' => 'vercel',
@@ -122,6 +128,8 @@ class SelfhostBuilder
     'mysql' => 'active_record_mysql2.mjs',
     # Cloudflare adapters
     'd1' => 'active_record_d1.mjs',
+    # Fly.io adapters
+    'mpg' => 'active_record_pg.mjs',  # MPG is Managed Postgres
     # Universal adapters (HTTP-based, work on browser/node/edge)
     'neon' => 'active_record_neon.mjs',
     'turso' => 'active_record_turso.mjs',
@@ -337,6 +345,8 @@ class SelfhostBuilder
     'postgresql' => { 'pg' => '^8.13.0' },
     'mysql' => { 'mysql2' => '^3.11.0' },
     'mysql2' => { 'mysql2' => '^3.11.0' },
+    # Fly.io adapters
+    'mpg' => { 'pg' => '^8.13.0' },  # MPG is Managed Postgres
     # Universal adapters (work on browser, node, and edge)
     'neon' => { '@neondatabase/serverless' => '^0.10.0' },
     'turso' => { '@libsql/client' => '^0.14.0' },
@@ -346,7 +356,7 @@ class SelfhostBuilder
   }.freeze
 
   # Adapters that require native compilation (should be optionalDependencies)
-  NATIVE_ADAPTERS = %w[sqlite sqlite3 better_sqlite3 pg postgres postgresql mysql mysql2].freeze
+  NATIVE_ADAPTERS = %w[sqlite sqlite3 better_sqlite3 pg postgres postgresql mysql mysql2 mpg].freeze
 
   # Ensure package.json has required dependencies for the selected adapter and target
   # Updates the file if dependencies are missing and returns true if npm install is needed
@@ -729,6 +739,13 @@ class SelfhostBuilder
       puts("")
     end
 
+    # Generate Fly.io deployment files
+    if FLY_RUNTIMES.include?(@runtime)
+      puts("Fly.io:")
+      self.generate_fly_config()
+      puts("")
+    end
+
     # Handle Tailwind CSS if present
     self.setup_tailwind()
 
@@ -1023,6 +1040,8 @@ class SelfhostBuilder
     # Determine source directory: browser or runtime-specific server target
     if @target == 'browser'
       target_dir = 'browser'
+    elsif FLY_RUNTIMES.include?(@runtime)
+      target_dir = 'node'  # Fly.io runs Node.js in containers
     else
       target_dir = @runtime  # node, bun, or deno
     end
@@ -1741,6 +1760,81 @@ class SelfhostBuilder
 
     File.write(File.join(@dist_dir, 'main.ts'), entry)
     puts("  -> main.ts")
+  end
+
+  def generate_fly_config()
+    app_name = File.basename(DEMO_ROOT).downcase.gsub(/[^a-z0-9-]/, '-')
+
+    # Generate fly.toml
+    fly_toml = <<~TOML
+      app = '#{app_name}'
+      primary_region = 'ord'
+
+      [build]
+
+      [http_service]
+        internal_port = 3000
+        force_https = true
+        auto_stop_machines = 'stop'
+        auto_start_machines = true
+        min_machines_running = 0
+        processes = ['app']
+
+      [[vm]]
+        memory = '1gb'
+        cpu_kind = 'shared'
+        cpus = 1
+    TOML
+
+    File.write(File.join(@dist_dir, 'fly.toml'), fly_toml)
+    puts("  -> fly.toml")
+
+    # Generate Dockerfile for Node.js
+    dockerfile = <<~DOCKERFILE
+      # syntax = docker/dockerfile:1
+
+      # Adjust NODE_VERSION as desired
+      ARG NODE_VERSION=22
+      FROM node:${NODE_VERSION}-slim AS base
+
+      LABEL fly_launch_runtime="Node.js"
+
+      # Node.js app lives here
+      WORKDIR /app
+
+      # Set production environment
+      ENV NODE_ENV="production"
+
+      # Install packages needed to build node modules
+      RUN apt-get update -qq && \\
+          apt-get install --no-install-recommends -y build-essential pkg-config python-is-python3
+
+      # Install node modules
+      COPY package*.json ./
+      RUN npm ci --include=dev
+
+      # Copy application code
+      COPY . .
+
+      # Start the server
+      EXPOSE 3000
+      CMD [ "npm", "run", "start:node" ]
+    DOCKERFILE
+
+    File.write(File.join(@dist_dir, 'Dockerfile'), dockerfile)
+    puts("  -> Dockerfile")
+
+    # Generate .dockerignore
+    dockerignore = <<~IGNORE
+      node_modules
+      .git
+      .env
+      .env.local
+      *.log
+    IGNORE
+
+    File.write(File.join(@dist_dir, '.dockerignore'), dockerignore)
+    puts("  -> .dockerignore")
   end
 
   def uses_turbo_broadcasting?

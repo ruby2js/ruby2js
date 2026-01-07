@@ -32,19 +32,21 @@ For traditional hosting, Juntos works but Rails does too. Reasons to choose Junt
 
 | Target | Best For | Database Options |
 |--------|----------|------------------|
+| **[Fly.io](/docs/juntos/deploying/fly)** | CLI-driven workflow, managed Postgres, native WebSockets | MPG (Managed Postgres) |
 | **[Node.js](/docs/juntos/deploying/node)** | VPS, containers, widest compatibility | SQLite, PostgreSQL, MySQL |
 | **[Bun](/docs/juntos/deploying/node)** | Fast startup, native SQLite | SQLite, PostgreSQL, MySQL |
 | **[Deno](/docs/juntos/deploying/node)** | Secure by default, TypeScript | SQLite, PostgreSQL, MySQL |
 
 ## Quick Comparison
 
-| Aspect | Browser | Node.js | Vercel | Deno Deploy | Cloudflare |
-|--------|---------|---------|--------|-------------|------------|
-| Infrastructure | None (static) | Server/container | On-demand | On-demand | On-demand |
-| Scaling | N/A | Manual | Automatic | Automatic | Automatic |
-| Cold starts | None | N/A | ~50-250ms | ~5-50ms | ~5-50ms |
-| Database | Client-side | TCP/file | HTTP APIs | HTTP APIs | D1 binding |
-| Cost model | Hosting only | Server time | Per-request | Per-request | Per-request |
+| Aspect | Browser | Node.js | Fly.io | Vercel | Deno Deploy | Cloudflare |
+|--------|---------|---------|--------|--------|-------------|------------|
+| Infrastructure | None (static) | Server/container | Container | On-demand | On-demand | On-demand |
+| Scaling | N/A | Manual | Automatic | Automatic | Automatic | Automatic |
+| Cold starts | None | N/A | ~200-500ms | ~50-250ms | ~5-50ms | ~5-50ms |
+| Database | Client-side | TCP/file | MPG (Postgres) | HTTP APIs | HTTP APIs | D1 binding |
+| WebSockets | N/A | Native | Native | Via Pusher | Via Pusher | Durable Objects |
+| Cost model | Hosting only | Server time | Machine time | Per-request | Per-request | Per-request |
 
 ## Choosing a Target
 
@@ -59,6 +61,12 @@ For traditional hosting, Juntos works but Rails does too. Reasons to choose Junt
 - You need auto-scaling and pay-per-request
 - You want fast cold starts (~5-50ms)
 - *Rails can't do this*
+
+**Choose Fly.io if:**
+- You need native WebSocket support (Turbo Streams without Pusher)
+- You want CLI-driven workflow (no dashboard copying)
+- You want managed Postgres with automatic failover
+- *Rails works here too—but Juntos + MPG provides a streamlined CLI workflow*
 
 **Choose Node.js, Bun, or Deno if:**
 - You need npm packages not available in Ruby
@@ -75,6 +83,7 @@ bin/juntos up -d dexie      # → browser
 bin/juntos up -d sqlite     # → node
 bin/juntos up -d neon       # → vercel
 bin/juntos up -d d1         # → cloudflare
+bin/juntos up -d mpg        # → fly
 ```
 
 Override with `-t`:
@@ -95,6 +104,7 @@ You don't need to hit remote databases during development. Use the familiar `con
 | Vercel Edge | neon | pglite | browser | No server needed |
 | Vercel Edge | turso | sqlite | node | Same SQL dialect |
 | Deno Deploy | neon | pg | deno | Requires local PostgreSQL |
+| Fly.io | mpg | sqlite | node | Local SQLite, prod Postgres |
 
 ### Example Configuration
 
