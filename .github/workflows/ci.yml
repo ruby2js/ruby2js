@@ -73,10 +73,6 @@ jobs:
 
   demo-test:
     runs-on: ubuntu-latest
-    # Allow failure until these known issues are fixed:
-    # - ActionController not imported in transpiled controllers
-    # - Nested route parameters (article_id) missing in selfhost build
-    continue-on-error: true
 
     steps:
     - uses: actions/checkout@v4
