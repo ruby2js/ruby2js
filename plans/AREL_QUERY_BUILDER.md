@@ -308,14 +308,26 @@ The Relation API is identical across adapters, but Dexie has constraints:
 
 These differences are hidden from the developer. Performance may vary.
 
-## Cleanup: Remove Obsolete Prototype
+## Progress
 
-Before implementation, remove `demo/ruby2js-on-rails/` which contains an outdated standalone ActiveRecord prototype. This code has been superseded by the adapter system in `packages/ruby2js-rails/adapters/`.
+| Phase | Status | Notes |
+|-------|--------|-------|
+| Cleanup | ✅ Done | `demo/ruby2js-on-rails/` removed |
+| Phase 0 | ✅ Done | `active_record_sql.mjs`, dialects, all SQL adapters refactored |
+| Phase 0.5 | ✅ Done | `dialects/mysql.mjs` created |
+| Phase 1 | ✅ Done | `relation.mjs` with 56 passing tests |
+| Phase 2 | 🔲 TODO | Enhanced conditions (`not()`, `or()`) |
+| Phase 3 | 🔲 TODO | Query refinement (`select()`, `distinct()`, `exists()`, `pluck()`) |
+| Phase 4 | 🔲 TODO | Associations with `includes()` - **critical for Calendar/Showcase** |
+| Phase 5 | 🔲 TODO | Scopes (documentation pattern) |
+| Phase 6 | 🔲 TODO | Batching (`find_each`, `find_in_batches`) |
+| Phase 7 | ⏸️ Optional | Aggregations |
 
-**Files to remove:**
-- `demo/ruby2js-on-rails/` — entire directory
+## ~~Cleanup: Remove Obsolete Prototype~~ ✅ Done
 
-**Rationale:** The prototype has a standalone `active_record.mjs` that doesn't use the modern adapter inheritance hierarchy. Keeping it risks confusion and divergent implementations. The blog and chat demos under `demo/` demonstrate the current approach.
+~~Before implementation, remove `demo/ruby2js-on-rails/` which contains an outdated standalone ActiveRecord prototype.~~
+
+Removed in earlier session. The blog and chat demos under `demo/` now use smoke tests to validate Ruby vs selfhost transpilation.
 
 ## Phased Implementation
 
