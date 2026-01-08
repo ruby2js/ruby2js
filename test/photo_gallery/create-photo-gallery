@@ -1,0 +1,265 @@
+#!/usr/bin/env bash
+# Create a Ruby2JS photo gallery demo with camera integration
+# Usage: create-photo-gallery [app-name]
+#
+# Creates a Rails app with a Photo model, camera controller,
+# and browser camera integration via getUserMedia().
+
+set -e
+
+APP_NAME="${1:-photo_gallery}"
+
+echo "Creating Ruby2JS photo gallery: $APP_NAME"
+echo ""
+
+# Create Rails app (minimal, with Tailwind for nice styling)
+rails new "$APP_NAME" --skip-git --skip-docker --css tailwind
+cd "$APP_NAME"
+
+# Generate Photo model (no scaffold - we'll create custom views)
+rails generate model Photo client_id:string image_data:text caption:string taken_at:datetime
+
+# Create database
+rails db:create
+
+# Add ruby2js gem from GitHub
+bundle add ruby2js --github ruby2js/ruby2js
+
+# Ensure git checkout is complete (handles Bundler version upgrade)
+bundle install
+
+# Update Photo model with validations and callbacks
+cat > app/models/photo.rb << 'MODEL'
+class Photo < ApplicationRecord
+  validates :image_data, presence: true
+  validates :taken_at, presence: true
+
+  before_create do
+    self.client_id ||= SecureRandom.uuid
+    self.taken_at ||= Time.current
+  end
+end
+MODEL
+
+# Create PhotosController
+mkdir -p app/controllers
+cat > app/controllers/photos_controller.rb << 'CONTROLLER'
+class PhotosController < ApplicationController
+  def index
+    @photos = Photo.order(taken_at: :desc)
+  end
+
+  def create
+    @photo = Photo.new(photo_params)
+    @photo.taken_at = Time.current
+
+    if @photo.save
+      respond_to do |format|
+        format.turbo_stream
+        format.html { redirect_to photos_path }
+      end
+    else
+      redirect_to photos_path, alert: "Could not save photo."
+    end
+  end
+
+  private
+
+  def photo_params
+    params.require(:photo).permit(:image_data, :caption)
+  end
+end
+CONTROLLER
+
+# Set up routes
+cat > config/routes.rb << 'ROUTES'
+Rails.application.routes.draw do
+  root "photos#index"
+  resources :photos, only: [:index, :create]
+end
+ROUTES
+
+# Create views directory
+mkdir -p app/views/photos
+
+# Create index view with camera UI
+cat > app/views/photos/index.html.erb << 'VIEW'
+<div class="container mx-auto px-4 py-8" data-controller="camera">
+  <h1 class="text-3xl font-bold mb-8">Photo Gallery</h1>
+
+  <!-- Camera controls -->
+  <div class="mb-8 p-6 bg-gray-100 rounded-lg">
+    <div class="flex gap-4 mb-4">
+      <button data-action="click->camera#takePhoto"
+              class="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition">
+        Take Photo
+      </button>
+      <button data-action="click->camera#chooseFromGallery"
+              class="bg-gray-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-gray-700 transition">
+        Choose from Gallery
+      </button>
+    </div>
+
+    <!-- Video preview for browser camera -->
+    <video data-camera-target="video"
+           class="hidden w-full max-w-md rounded-lg mb-4"
+           autoplay playsinline></video>
+
+    <!-- Capture button (shown when video is active) -->
+    <button data-camera-target="captureBtn"
+            data-action="click->camera#capture"
+            class="hidden bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition mb-4">
+      Capture
+    </button>
+
+    <!-- New photo form -->
+    <%= form_with model: Photo.new,
+                  data: { camera_target: "form", action: "turbo:submit-end->camera#reset" },
+                  class: "hidden" do |f| %>
+      <%= f.hidden_field :image_data, data: { camera_target: "imageData" } %>
+
+      <!-- Image preview after capture -->
+      <img data-camera-target="preview" class="w-full max-w-md rounded-lg mb-4" />
+
+      <div class="flex gap-4 items-end">
+        <%= f.text_field :caption,
+            placeholder: "Add a caption...",
+            data: { camera_target: "captionInput" },
+            class: "flex-1 border rounded-lg p-3" %>
+
+        <%= f.submit "Save Photo",
+            class: "bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition cursor-pointer" %>
+      </div>
+    <% end %>
+  </div>
+
+  <!-- Gallery grid -->
+  <div id="photos" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <%= render @photos %>
+  </div>
+
+  <% if @photos.empty? %>
+    <p class="text-gray-500 text-center py-12">No photos yet. Take one to get started!</p>
+  <% end %>
+</div>
+VIEW
+
+# Create photo partial
+cat > app/views/photos/_photo.html.erb << 'PARTIAL'
+<div id="<%= dom_id(photo) %>" class="bg-white rounded-lg shadow-md overflow-hidden">
+  <img src="data:image/jpeg;base64,<%= photo.image_data %>"
+       class="w-full h-48 object-cover"
+       alt="<%= photo.caption.presence || 'Photo' %>" />
+  <div class="p-4">
+    <% if photo.caption.present? %>
+      <p class="text-gray-800 mb-2"><%= photo.caption %></p>
+    <% end %>
+    <time class="text-gray-500 text-sm"><%= photo.taken_at.strftime("%b %d, %Y at %I:%M %p") %></time>
+  </div>
+</div>
+PARTIAL
+
+# Create turbo stream response for create
+cat > app/views/photos/create.turbo_stream.erb << 'TURBO'
+<%= turbo_stream.prepend "photos", @photo %>
+TURBO
+
+# Create Stimulus camera controller (Ruby)
+mkdir -p app/javascript/controllers
+cat > app/javascript/controllers/camera_controller.rb << 'STIMULUS'
+class CameraController < Stimulus::Controller
+  def takePhoto
+    # Start video stream from webcam
+    stream = await navigator.mediaDevices.getUserMedia(video: { facingMode: "user" })
+    videoTarget.srcObject = stream
+    videoTarget.classList.remove("hidden")
+    captureBtnTarget.classList.remove("hidden")
+    formTarget.classList.add("hidden")
+  end
+
+  def capture
+    # Capture frame from video to canvas
+    canvas = document.createElement("canvas")
+    canvas.width = videoTarget.videoWidth
+    canvas.height = videoTarget.videoHeight
+    canvas.getContext("2d").drawImage(videoTarget, 0, 0)
+
+    # Stop video stream
+    videoTarget.srcObject.getTracks().each { |track| track.stop() }
+    videoTarget.classList.add("hidden")
+    captureBtnTarget.classList.add("hidden")
+
+    # Get base64 image data (without data URL prefix)
+    dataUrl = canvas.toDataURL("image/jpeg", 0.8)
+    base64 = dataUrl.sub("data:image/jpeg;base64,", "")
+
+    # Show preview and form
+    handlePhoto(base64)
+  end
+
+  def chooseFromGallery
+    input = document.createElement("input")
+    input.type = "file"
+    input.accept = "image/*"
+    input.onchange = -> { handleFileSelect(input) }
+    input.click()
+  end
+
+  def handleFileSelect(input)
+    file = input.files[0]
+    return unless file
+
+    reader = FileReader.new
+    reader.onload = -> {
+      base64 = reader.result.sub(/^data:image\/\w+;base64,/, "")
+      handlePhoto(base64)
+    }
+    reader.readAsDataURL(file)
+  end
+
+  def handlePhoto(base64)
+    imageDataTarget.value = base64
+    previewTarget.src = "data:image/jpeg;base64,#{base64}"
+    formTarget.classList.remove("hidden")
+    captionInputTarget.focus()
+  end
+
+  def reset
+    # Reset form after successful save
+    imageDataTarget.value = ""
+    previewTarget.src = ""
+    captionInputTarget.value = ""
+    formTarget.classList.add("hidden")
+  end
+end
+STIMULUS
+
+# Rebuild Tailwind CSS to include all view classes
+bin/rails tailwindcss:build
+
+# Create seeds with sample photos (placeholder - real photos come from camera)
+cat > db/seeds.rb << 'SEEDS'
+# Photo gallery seeds
+# In a real app, photos come from the camera
+# This just ensures the database is ready
+puts "Photo gallery ready - take some photos!"
+SEEDS
+
+# Run ruby2js:install generator to set up dist/, package.json, and npm dependencies
+bin/rails generate ruby2js:install
+
+echo ""
+echo "Photo gallery created: $APP_NAME/"
+echo ""
+echo "To run with Juntos (transpiled to JavaScript):"
+echo "  cd $APP_NAME"
+echo "  bin/juntos dev -d dexie      # Browser with IndexedDB"
+echo ""
+echo "Camera will request permission to access your webcam."
+echo "Click 'Take Photo' to start, then 'Capture' to snap a picture."
+echo ""
+echo "To run with Rails:"
+echo "  cd $APP_NAME"
+echo "  bin/rails db:prepare"
+echo "  bin/rails server"
+echo ""
