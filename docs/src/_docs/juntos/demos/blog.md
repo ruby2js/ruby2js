@@ -201,7 +201,7 @@ Nothing special. Nothing modified for transpilation. Standard Rails conventions 
 
 - **Migrations** — In browsers, migrations run automatically on startup
 - **Database** — IndexedDB in browsers, SQLite/PostgreSQL on servers
-- **No ActiveRecord queries** — Use `where`, `find`, `all`—no raw SQL
+- **ActiveRecord queries** — Use `where`, `find`, `all`, chainable queries, and basic raw SQL conditions
 
 ## What Doesn't Work
 

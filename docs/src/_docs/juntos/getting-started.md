@@ -241,7 +241,7 @@ Nested routes and path helpers work as expected.
 
 - **Action Mailer** — browsers can't send SMTP
 - **Runtime metaprogramming** — no `method_missing` or `define_method`
-- **Complex SQL** — basic queries only, no raw SQL
+- **Complex SQL** — supports basic raw SQL conditions like `where('updated_at > ?', timestamp)`, but complex joins and subqueries are not supported
 - **Native gems** — gems requiring C extensions
 - **File uploads** — no filesystem in browsers (use external storage)
 

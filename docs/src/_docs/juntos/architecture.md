@@ -52,8 +52,13 @@ dist/
 ├── lib/
 │   ├── rails.js                    # Framework runtime (target-specific)
 │   ├── rails_base.js               # Shared base classes
-│   ├── active_record.mjs           # Database adapter
-│   └── erb_runtime.mjs             # ERB helper functions
+│   ├── active_record.mjs           # Database adapter (selected at build time)
+│   ├── erb_runtime.mjs             # ERB helper functions
+│   └── dialects/                   # SQL dialect (SQLite, PostgreSQL, or MySQL)
+│       └── sqlite.mjs              # Example: SQLite dialect for Turso/D1
+├── node_modules/
+│   └── ruby2js-rails/              # Shared runtime modules
+│       └── adapters/               # ActiveRecord base classes, query builder
 ├── index.html                      # Entry point (browser targets)
 ├── api/[[...path]].js              # Entry point (Vercel)
 ├── src/index.js                    # Entry point (Cloudflare)
@@ -203,17 +208,37 @@ The adapter is selected at build time based on the database configuration:
 All adapters implement the same interface:
 
 ```javascript
-// Static methods
-Model.all()
-Model.find(id)
-Model.where(conditions)
-Model.create(attributes)
+// Finders
+Model.all()                              // All records
+Model.find(id)                           // Find by ID (throws if not found)
+Model.findBy({ status: 'active' })       // Find first matching (returns null)
+Model.where({ status: 'active' })        // Find all matching
+Model.first()                            // First record by ID
+Model.last()                             // Last record by ID
+Model.count()                            // Count records
+
+// Chainable query builder (returns Relation)
+Model.where({ published: true })
+     .order({ created_at: 'desc' })
+     .limit(10)
+     .offset(20)
+
+// Raw SQL conditions (SQL adapters)
+Model.where('created_at > ?', timestamp)
+Model.where('status = ? AND priority > ?', 'active', 5)
+
+// Eager loading associations
+Article.includes('comments').find(id)    // Preloads article.comments
+Article.includes('comments', 'author')   // Multiple associations
 
 // Instance methods
-record.save()
-record.update(attributes)
-record.destroy()
+record.save()                            // Insert or update
+record.update({ title: 'New' })          // Update attributes
+record.destroy()                         // Delete record
+record.reload()                          // Refresh from database
 ```
+
+**Note:** Raw SQL conditions work on all SQL adapters. For Dexie (IndexedDB), simple conditions like `>`, `<`, `>=`, `<=`, `=` are translated to Dexie's query API; complex conditions fall back to JavaScript filtering.
 
 ## Sourcemaps
 
@@ -230,7 +255,7 @@ The original `.rb` files are copied alongside for debugger access. In browser De
 ## The Build Process
 
 1. **Load configuration** — Read `config/database.yml`, determine target
-2. **Copy runtime** — Copy target-specific `rails.js` and adapter
+2. **Copy runtime** — Copy target-specific `rails.js` and database adapter
 3. **Transpile models** — Apply rails/model filter
 4. **Transpile controllers** — Apply rails/controller filter
 5. **Transpile views** — Compile ERB to Ruby, apply rails/helpers filter
@@ -239,12 +264,14 @@ The original `.rb` files are copied alongside for debugger access. In browser De
 8. **Generate entry point** — Create index.html or serverless handler
 9. **Setup Tailwind** — If detected, configure and build CSS
 
+**Note:** Shared modules (ActiveRecord base classes, query builder, inflector) are imported from the `ruby2js-rails` npm package rather than copied to `dist/`. This keeps builds smaller and provides a single source of truth for the runtime code.
+
 ## Continuing in JavaScript
 
 After building, you can take `dist/` and develop purely in JavaScript:
 
 1. The generated code follows standard patterns
-2. No Ruby2JS dependencies at runtime
+2. No Ruby required at runtime—it's pure JavaScript (the `ruby2js-rails` npm package provides the runtime)
 3. Add npm packages directly to `dist/package.json`
 4. Modify transpiled files as needed
 
