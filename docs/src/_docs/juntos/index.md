@@ -48,20 +48,20 @@ Becomes:
 // dist/app/models/article.js
 export class Article extends ApplicationRecord {
   static _associations = {
-    comments: { type: 'hasMany', dependent: 'destroy' }
+    comments: { type: 'hasMany', dependent: 'destroy', foreignKey: 'article_id' }
   };
 
   static _validations = {
     title: [{ presence: true }]
   };
 
-  async comments() {
-    return await Comment.where({ article_id: this.id });
+  get comments() {
+    return new CollectionProxy(this, this.constructor._associations.comments, Comment);
   }
 }
 ```
 
-Not DRY like Rails, but not magic either. The generated code is readable, debuggable, and yours to keep.
+Not DRY like Rails, but not magic either. The generated code is readable, debuggable, and yours to keep. The `CollectionProxy` wraps associations with Rails-like behavior—synchronous `.size` when eagerly loaded, chainable queries like `.where()` and `.order()`, and methods like `.build()` that pre-set the foreign key.
 
 ## Why Juntos?
 

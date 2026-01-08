@@ -58,7 +58,7 @@ dist/
 │       └── sqlite.mjs              # Example: SQLite dialect for Turso/D1
 ├── node_modules/
 │   └── ruby2js-rails/              # Shared runtime modules
-│       └── adapters/               # ActiveRecord base classes, query builder
+│       └── adapters/               # ActiveRecord base classes, query builder, CollectionProxy
 ├── index.html                      # Entry point (browser targets)
 ├── api/[[...path]].js              # Entry point (Vercel)
 ├── src/index.js                    # Entry point (Cloudflare)
@@ -185,12 +185,12 @@ Models extend `ApplicationRecord` which wraps the database adapter:
 ```javascript
 class Article extends ApplicationRecord {
   static _tableName = 'articles';
-  static _associations = { comments: { type: 'hasMany' } };
+  static _associations = { comments: { type: 'hasMany', foreignKey: 'article_id' } };
   static _validations = { title: [{ presence: true }] };
 
-  // Generated association method
-  async comments() {
-    return await Comment.where({ article_id: this.id });
+  // Generated association method returns CollectionProxy
+  get comments() {
+    return new CollectionProxy(this, this.constructor._associations.comments, Comment);
   }
 }
 ```
@@ -230,6 +230,11 @@ Model.where('status = ? AND priority > ?', 'active', 5)
 // Eager loading associations
 Article.includes('comments').find(id)    // Preloads article.comments
 Article.includes('comments', 'author')   // Multiple associations
+
+// CollectionProxy (for has_many associations)
+article.comments.size                    // Synchronous when eagerly loaded
+article.comments.build({ body: '...' }) // Pre-sets article_id automatically
+article.comments.where({ approved: true }) // Returns chainable Relation
 
 // Instance methods
 record.save()                            // Insert or update
