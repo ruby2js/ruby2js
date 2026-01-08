@@ -55,9 +55,9 @@ sed -i.bak 's/@articles = Article.all/@articles = Article.includes(:comments).al
 rm -f app/controllers/articles_controller.rb.bak
 
 # Add comment count to article partial (demonstrates eager loading benefit)
-# Note: uses .length instead of .size until CollectionProxy is implemented (see plans/COLLECTION_PROXY.md)
+# Uses .size which is provided by CollectionProxy
 sed -i.bak 's|<%= article.title %>|<%= article.title %>\
-    <span class="text-gray-500 text-sm ml-2">(<%= pluralize(article.comments.length, "comment") %>)</span>|' app/views/articles/_article.html.erb
+    <span class="text-gray-500 text-sm ml-2">(<%= pluralize(article.comments.size, "comment") %>)</span>|' app/views/articles/_article.html.erb
 rm -f app/views/articles/_article.html.erb.bak
 
 # Update CommentsController for nested routes

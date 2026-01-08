@@ -6,10 +6,11 @@ import { createClient } from '@supabase/supabase-js';
 
 import { ActiveRecordBase, attr_accessor, initTimePolyfill } from 'ruby2js-rails/adapters/active_record_base.mjs';
 import { Relation } from 'ruby2js-rails/adapters/relation.mjs';
+import { CollectionProxy } from 'ruby2js-rails/adapters/collection_proxy.mjs';
 import { singularize } from 'ruby2js-rails/adapters/inflector.mjs';
 
 // Re-export shared utilities
-export { attr_accessor };
+export { attr_accessor, CollectionProxy };
 
 // Model registry for association resolution (populated by Application.registerModels)
 export const modelRegistry = {};
@@ -499,10 +500,19 @@ export class ActiveRecord extends ActiveRecordBase {
   // Load has_many association
   static async _loadHasMany(records, assocName, assoc, AssocModel) {
     const pkValues = records.map(r => r.id).filter(v => v != null);
-    if (pkValues.length === 0) return;
 
     // Determine foreign key (e.g., article_id for Article has_many comments)
     const foreignKey = assoc.foreignKey || `${singularize(this.name).toLowerCase()}_id`;
+
+    if (pkValues.length === 0) {
+      // No parent records, still set empty CollectionProxy
+      for (const record of records) {
+        const proxy = new CollectionProxy(record, { name: assocName, type: 'has_many', foreignKey }, AssocModel);
+        proxy.load([]);
+        record[`_${assocName}`] = proxy;
+      }
+      return;
+    }
 
     // Fetch all related records in one query using Supabase
     const { data: related, error } = await supabase
@@ -522,9 +532,12 @@ export class ActiveRecord extends ActiveRecordBase {
       relatedByFk.get(fk).push(new AssocModel(r));
     }
 
-    // Attach to parent records
+    // Attach to parent records as CollectionProxy
     for (const record of records) {
-      record[`_${assocName}`] = relatedByFk.get(record.id) || [];
+      const related = relatedByFk.get(record.id) || [];
+      const proxy = new CollectionProxy(record, { name: assocName, type: 'has_many', foreignKey }, AssocModel);
+      proxy.load(related);
+      record[`_${assocName}`] = proxy;
     }
   }
 

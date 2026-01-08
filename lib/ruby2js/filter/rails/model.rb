@@ -91,8 +91,16 @@ module Ruby2JS
           # Generate import for superclass (ApplicationRecord or ActiveRecord::Base)
           superclass_name = superclass.children.last.to_s
           superclass_file = superclass_name.gsub(/([A-Z])/, '_\1').downcase.sub(/^_/, '')
+
+          # Check if model has has_many associations (need CollectionProxy)
+          has_has_many = @rails_associations.any? { |a| a[:type] == :has_many }
+
+          # Build import list: always include superclass, add CollectionProxy if needed
+          import_list = [s(:const, nil, superclass_name.to_sym)]
+          import_list.push(s(:const, nil, :CollectionProxy)) if has_has_many
+
           import_node = s(:send, nil, :import,
-            s(:array, s(:const, nil, superclass_name.to_sym)),
+            s(:array, *import_list),
             s(:str, "./#{superclass_file}.js"))
 
           # Generate imports for associated models
@@ -742,16 +750,9 @@ module Ruby2JS
 
         def generate_has_many_method(assoc)
           # has_many :comments -> get comments() {
-          #   // Return a "thenable" proxy object that:
-          #   // - Has create/find methods directly accessible
-          #   // - When awaited, returns the actual collection
+          #   // Return CollectionProxy - either cached or new
           #   if (this._comments) return this._comments;
-          #   let _id = this.id;
-          #   return {
-          #     create: (params) => Comment.create(Object.assign({article_id: _id}, params)),
-          #     find: (id) => Comment.find(id),
-          #     then: (resolve, reject) => Comment.where({article_id: _id}).then(resolve, reject)
-          #   };
+          #   return new CollectionProxy(this, { name: 'comments', type: 'has_many', foreignKey: 'article_id' }, Comment);
           # }
           # Also generates set comments(val) for preloading
           association_name = assoc[:name]
@@ -762,75 +763,21 @@ module Ruby2JS
           # Track model reference for import generation
           @rails_model_refs.add(class_name)
 
-          # Capture this.id for use in closures (hash methods lose `this` binding)
-          id_capture = s(:lvasgn, :_id, s(:attr, s(:self), :id))
+          # Build association metadata object: { name: 'comments', type: 'has_many', foreignKey: 'article_id' }
+          assoc_metadata = s(:hash,
+            s(:pair, s(:sym, :name), s(:str, association_name.to_s)),
+            s(:pair, s(:sym, :type), s(:str, 'has_many')),
+            s(:pair, s(:sym, :foreignKey), s(:str, foreign_key)))
 
-          # Build the where call for the then handler (using captured _id)
-          where_call = s(:send,
-            s(:const, nil, class_name.to_sym),
-            :where,
-            s(:hash,
-              s(:pair,
-                s(:sym, foreign_key.to_sym),
-                s(:lvar, :_id))))
+          # Build: new CollectionProxy(this, metadata, Comment)
+          collection_proxy = s(:send,
+            s(:const, nil, :CollectionProxy),
+            :new,
+            s(:self),
+            assoc_metadata,
+            s(:const, nil, class_name.to_sym))
 
-          # Build the create lambda: (params) => Model.create(Object.assign({fk: _id}, params))
-          create_lambda = s(:block,
-            s(:send, nil, :lambda),
-            s(:args, s(:arg, :params)),
-            s(:send,
-              s(:const, nil, class_name.to_sym),
-              :create,
-              s(:send,
-                s(:const, nil, :Object),
-                :assign,
-                s(:hash,
-                  s(:pair,
-                    s(:sym, foreign_key.to_sym),
-                    s(:lvar, :_id))),
-                s(:lvar, :params))))
-
-          # Build the find lambda: (id) => Model.find(id)
-          # This overrides Array.prototype.find to provide Rails-like find-by-id behavior
-          find_lambda = s(:block,
-            s(:send, nil, :lambda),
-            s(:args, s(:arg, :id)),
-            s(:send,
-              s(:const, nil, class_name.to_sym),
-              :find,
-              s(:lvar, :id)))
-
-          # Build the then handler: (resolve, reject) => Model.where({fk: _id}).then(resolve, reject)
-          then_lambda = s(:block,
-            s(:send, nil, :lambda),
-            s(:args, s(:arg, :resolve), s(:arg, :reject)),
-            s(:send, where_call, :then, s(:lvar, :resolve), s(:lvar, :reject)))
-
-          # Build the build lambda: (params) => new Model(Object.assign({fk: _id}, params))
-          # This creates a new instance with the foreign key set but does NOT save it
-          build_lambda = s(:block,
-            s(:send, nil, :lambda),
-            s(:args, s(:arg, :params)),
-            s(:send,
-              s(:const, nil, class_name.to_sym),
-              :new,
-              s(:send,
-                s(:const, nil, :Object),
-                :assign,
-                s(:hash,
-                  s(:pair,
-                    s(:sym, foreign_key.to_sym),
-                    s(:lvar, :_id))),
-                s(:lvar, :params))))
-
-          # Build the proxy object with build, create, find, and then methods
-          proxy_object = s(:hash,
-            s(:pair, s(:sym, :build), build_lambda),
-            s(:pair, s(:sym, :create), create_lambda),
-            s(:pair, s(:sym, :find), find_lambda),
-            s(:pair, s(:sym, :then), then_lambda))
-
-          # Getter: returns cache if set, otherwise captures id and returns thenable proxy
+          # Getter: returns cache if set, otherwise creates new CollectionProxy
           getter = s(:defget, association_name,
             s(:args),
             s(:begin,
@@ -839,8 +786,7 @@ module Ruby2JS
                 s(:attr, s(:self), cache_name),
                 s(:return, s(:attr, s(:self), cache_name)),
                 nil),
-              id_capture,
-              s(:return, proxy_object)))
+              s(:return, collection_proxy)))
 
           # Setter: allows preloading with article.comments = await Comment.where(...)
           # Use method name with = suffix, class2 converter handles this as a setter

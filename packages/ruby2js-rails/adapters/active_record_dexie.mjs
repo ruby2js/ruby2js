@@ -6,9 +6,10 @@ import Dexie from 'dexie';
 import { ActiveRecordBase, attr_accessor, initTimePolyfill } from 'ruby2js-rails/adapters/active_record_base.mjs';
 import { parseCondition, applyToDexie, toFilterFunction, canParse } from 'ruby2js-rails/adapters/sql_parser.mjs';
 import { Relation } from 'ruby2js-rails/adapters/relation.mjs';
+import { CollectionProxy } from 'ruby2js-rails/adapters/collection_proxy.mjs';
 
 // Re-export shared utilities
-export { attr_accessor };
+export { attr_accessor, CollectionProxy };
 
 // Model registry for association resolution (populated by Application.registerModels)
 export const modelRegistry = {};
@@ -336,9 +337,13 @@ export class ActiveRecord extends ActiveRecordBase {
       relatedByFk.get(fk).push(new AssocModel(r));
     }
 
-    // Attach to parent records (sets _comments so getter returns cached value)
+    // Attach to parent records as CollectionProxy (sets _comments so getter returns cached value)
     for (const record of records) {
-      record[`_${assocName}`] = relatedByFk.get(record.id) || [];
+      const related = relatedByFk.get(record.id) || [];
+      const foreignKey = assoc.foreignKey || `${this._singularize(this.name).toLowerCase()}_id`;
+      const proxy = new CollectionProxy(record, { name: assocName, type: 'has_many', foreignKey }, AssocModel);
+      proxy.load(related);
+      record[`_${assocName}`] = proxy;
     }
   }
 

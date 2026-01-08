@@ -4,10 +4,10 @@
 
 import { PostgresDialect, PG_TYPE_MAP } from './dialects/postgres.mjs';
 import { attr_accessor, initTimePolyfill } from 'ruby2js-rails/adapters/active_record_base.mjs';
-import { modelRegistry } from 'ruby2js-rails/adapters/active_record_sql.mjs';
+import { modelRegistry, CollectionProxy } from 'ruby2js-rails/adapters/active_record_sql.mjs';
 
 // Re-export shared utilities
-export { attr_accessor, modelRegistry };
+export { attr_accessor, modelRegistry, CollectionProxy };
 
 // Configuration injected at build time
 const DB_CONFIG = {};

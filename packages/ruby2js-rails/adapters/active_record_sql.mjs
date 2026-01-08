@@ -15,10 +15,14 @@
 
 import { ActiveRecordBase } from 'ruby2js-rails/adapters/active_record_base.mjs';
 import { Relation } from 'ruby2js-rails/adapters/relation.mjs';
+import { CollectionProxy } from 'ruby2js-rails/adapters/collection_proxy.mjs';
 import { singularize } from 'ruby2js-rails/adapters/inflector.mjs';
 
 // Model registry for association resolution (populated by Application.registerModels)
 export const modelRegistry = {};
+
+// Re-export CollectionProxy for use by models
+export { CollectionProxy };
 
 export class ActiveRecordSQL extends ActiveRecordBase {
   // --- Dialect hooks (override in dialect subclass) ---
@@ -301,15 +305,18 @@ export class ActiveRecordSQL extends ActiveRecordBase {
     // Collect primary key values
     const pkValues = records.map(r => r.id).filter(v => v != null);
 
+    // Foreign key on the associated model
+    const foreignKey = assoc.foreignKey || `${singularize(this.name).toLowerCase()}_id`;
+
     if (pkValues.length === 0) {
+      // No parent records, still set empty CollectionProxy
       for (const record of records) {
-        record[assocName] = [];
+        const proxy = new CollectionProxy(record, { name: assocName, type: 'has_many', foreignKey }, AssocModel);
+        proxy.load([]);
+        record[`_${assocName}`] = proxy;
       }
       return;
     }
-
-    // Foreign key on the associated model
-    const foreignKey = assoc.foreignKey || `${singularize(this.name).toLowerCase()}_id`;
 
     // Single query for all related records
     const related = await AssocModel.where({ [foreignKey]: pkValues });
@@ -324,9 +331,12 @@ export class ActiveRecordSQL extends ActiveRecordBase {
       relatedByFk.get(fk).push(r);
     }
 
-    // Attach to parent records
+    // Attach to parent records as CollectionProxy
     for (const record of records) {
-      record[assocName] = relatedByFk.get(record.id) || [];
+      const related = relatedByFk.get(record.id) || [];
+      const proxy = new CollectionProxy(record, { name: assocName, type: 'has_many', foreignKey }, AssocModel);
+      proxy.load(related);
+      record[`_${assocName}`] = proxy;
     }
   }
 

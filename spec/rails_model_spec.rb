@@ -29,15 +29,28 @@ describe Ruby2JS::Filter::Rails::Model do
   end
 
   describe "has_many" do
-    it "generates association getter" do
+    it "generates association getter with CollectionProxy" do
       result = to_js(<<~RUBY)
         class Article < ApplicationRecord
           has_many :comments
         end
       RUBY
       assert_includes result, 'get comments()'
-      # Uses _id closure variable for proper this binding in proxy methods
-      assert_includes result, 'Comment.where({article_id: _id})'
+      # Returns CollectionProxy with association metadata
+      assert_includes result, 'new CollectionProxy(this'
+      assert_includes result, 'name: "comments"'
+      assert_includes result, 'type: "has_many"'
+      assert_includes result, 'foreignKey: "article_id"'
+      assert_includes result, ', Comment)'
+    end
+
+    it "imports CollectionProxy for has_many associations" do
+      result = to_js(<<~RUBY)
+        class Article < ApplicationRecord
+          has_many :comments
+        end
+      RUBY
+      assert_includes result, 'import { ApplicationRecord, CollectionProxy }'
     end
 
     it "supports class_name option" do
@@ -47,7 +60,8 @@ describe Ruby2JS::Filter::Rails::Model do
         end
       RUBY
       assert_includes result, 'get reviews()'
-      assert_includes result, 'Comment.where({article_id: _id})'
+      assert_includes result, 'name: "reviews"'
+      assert_includes result, ', Comment)'
     end
 
     it "supports foreign_key option" do
@@ -56,7 +70,7 @@ describe Ruby2JS::Filter::Rails::Model do
           has_many :comments, foreign_key: 'post_id'
         end
       RUBY
-      assert_includes result, 'Comment.where({post_id: _id})'
+      assert_includes result, 'foreignKey: "post_id"'
     end
 
     it "handles dependent destroy" do
@@ -71,36 +85,24 @@ describe Ruby2JS::Filter::Rails::Model do
       assert_includes result, 'await record.destroy()'
     end
 
-    it "generates build method for association proxy" do
+    it "caches CollectionProxy in getter" do
       result = to_js(<<~RUBY)
         class Article < ApplicationRecord
           has_many :comments
         end
       RUBY
-      # build creates a new instance with foreign key set but does NOT save
-      assert_includes result, 'build(params)'
-      assert_includes result, 'new Comment(Object.assign({article_id: _id}, params))'
+      # Returns cached proxy if available
+      assert_includes result, 'if (this._comments) return this._comments'
     end
 
-    it "generates create method for association proxy" do
+    it "generates setter for preloading" do
       result = to_js(<<~RUBY)
         class Article < ApplicationRecord
           has_many :comments
         end
       RUBY
-      # create saves the new instance
-      assert_includes result, 'create(params)'
-      assert_includes result, 'Comment.create(Object.assign({article_id: _id}, params))'
-    end
-
-    it "generates find method for association proxy" do
-      result = to_js(<<~RUBY)
-        class Article < ApplicationRecord
-          has_many :comments
-        end
-      RUBY
-      assert_includes result, 'find(id)'
-      assert_includes result, 'Comment.find(id)'
+      assert_includes result, 'set comments(value)'
+      assert_includes result, 'this._comments = value'
     end
   end
 
