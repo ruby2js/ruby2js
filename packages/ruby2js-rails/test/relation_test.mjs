@@ -6,7 +6,7 @@ import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { Relation } from '../adapters/relation.mjs';
-import { ActiveRecordSQL } from '../adapters/active_record_sql.mjs';
+import { ActiveRecordSQL, modelRegistry } from '../adapters/active_record_sql.mjs';
 import { singularize, pluralize } from '../adapters/inflector.mjs';
 
 // --- Mock Model Classes ---
@@ -1278,10 +1278,10 @@ describe('Association loading', () => {
   // Register models before tests
   beforeEach(() => {
     queryLog = [];
-    ActiveRecordSQL.registerModel(Author);
-    ActiveRecordSQL.registerModel(Post);
-    ActiveRecordSQL.registerModel(Comment);
-    ActiveRecordSQL.registerModel(Profile);
+    modelRegistry['Author'] = Author;
+    modelRegistry['Post'] = Post;
+    modelRegistry['Comment'] = Comment;
+    modelRegistry['Profile'] = Profile;
   });
 
   describe('belongs_to', () => {
@@ -1591,7 +1591,7 @@ describe('Model registry', () => {
       static tableName = 'tests';
     }
 
-    ActiveRecordSQL.registerModel(TestModel);
+    modelRegistry['TestModel'] = TestModel;
 
     const resolved = ActiveRecordSQL._resolveModel('TestModel');
     assert.equal(resolved, TestModel);
