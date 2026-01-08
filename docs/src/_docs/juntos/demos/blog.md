@@ -173,6 +173,7 @@ Nothing special. Nothing modified for transpilation. Standard Rails conventions 
 - `has_many` and `belongs_to` associations
 - `dependent: :destroy` for cascading deletes
 - `validates` with `presence` and `length`
+- `includes(:comments)` for eager loading (prevents N+1 queries)
 
 ### Controller Layer
 

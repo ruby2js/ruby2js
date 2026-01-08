@@ -50,6 +50,15 @@ Rails.application.routes.draw do
 end
 ROUTES
 
+# Update ArticlesController to use eager loading
+sed -i.bak 's/@articles = Article.all/@articles = Article.includes(:comments).all/' app/controllers/articles_controller.rb
+rm -f app/controllers/articles_controller.rb.bak
+
+# Add comment count to article partial (demonstrates eager loading benefit)
+sed -i.bak 's|<%= article.title %>|<%= article.title %>\
+    <span class="text-gray-500 text-sm ml-2">(<%= pluralize(article.comments.size, "comment") %>)</span>|' app/views/articles/_article.html.erb
+rm -f app/views/articles/_article.html.erb.bak
+
 # Update CommentsController for nested routes
 cat > app/controllers/comments_controller.rb << 'CONTROLLER'
 class CommentsController < ApplicationController
