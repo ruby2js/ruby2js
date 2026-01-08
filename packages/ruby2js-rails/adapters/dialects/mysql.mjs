@@ -9,7 +9,7 @@
 //
 // Used by: mysql2, PlanetScale
 
-import { ActiveRecordSQL } from '../active_record_sql.mjs';
+import { ActiveRecordSQL } from 'ruby2js-rails/adapters/active_record_sql.mjs';
 
 // MySQL type mapping from abstract Rails types
 export const MYSQL_TYPE_MAP = {

@@ -8,7 +8,7 @@
 //
 // Used by: pg (node-postgres), Neon, PGlite
 
-import { ActiveRecordSQL } from '../active_record_sql.mjs';
+import { ActiveRecordSQL } from 'ruby2js-rails/adapters/active_record_sql.mjs';
 
 // PostgreSQL type mapping from abstract Rails types
 export const PG_TYPE_MAP = {

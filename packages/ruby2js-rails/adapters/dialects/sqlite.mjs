@@ -9,7 +9,7 @@
 //
 // Used by: better-sqlite3, Turso, D1, sql.js
 
-import { ActiveRecordSQL } from '../active_record_sql.mjs';
+import { ActiveRecordSQL } from 'ruby2js-rails/adapters/active_record_sql.mjs';
 
 // SQLite type mapping from abstract Rails types
 export const SQLITE_TYPE_MAP = {

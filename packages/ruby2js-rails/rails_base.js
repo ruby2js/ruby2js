@@ -1,7 +1,7 @@
 // Ruby2JS-on-Rails Micro Framework - Base Module
 // Shared routing and helper functionality for all targets
 
-import { pluralize as inflectPlural } from './adapters/inflector.mjs';
+import { pluralize as inflectPlural } from 'ruby2js-rails/adapters/inflector.mjs';
 
 // Base Router class with route registration and matching
 export class RouterBase {
