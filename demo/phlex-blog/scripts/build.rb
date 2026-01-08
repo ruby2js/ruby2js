@@ -185,8 +185,8 @@ class PhlexBlogBuilder
       raise "Unknown DATABASE adapter: #{adapter}"
     end
 
-    vendor_adapter_dir = File.join(DEMO_ROOT, '../ruby2js-on-rails/vendor/ruby2js/adapters')
-    adapter_src = File.join(vendor_adapter_dir, adapter_file)
+    package_dir = File.join(DEMO_ROOT, '../../packages/ruby2js-rails')
+    adapter_src = File.join(package_dir, 'adapters', adapter_file)
     adapter_dest = File.join(@dist_dir, 'lib/active_record.mjs')
     FileUtils.mkdir_p(File.dirname(adapter_dest))
 
@@ -202,9 +202,9 @@ class PhlexBlogBuilder
     FileUtils.mkdir_p(lib_dest)
 
     target_dir = @target == 'browser' ? 'browser' : 'node'
-    vendor_package_dir = File.join(DEMO_ROOT, '../ruby2js-on-rails/vendor/ruby2js')
+    package_dir = File.join(DEMO_ROOT, '../../packages/ruby2js-rails')
 
-    target_src = File.join(vendor_package_dir, 'targets', target_dir)
+    target_src = File.join(package_dir, 'targets', target_dir)
     Dir.glob(File.join(target_src, '*.js')).each do |src_path|
       dest_path = File.join(lib_dest, File.basename(src_path))
       FileUtils.cp(src_path, dest_path)
@@ -216,8 +216,8 @@ class PhlexBlogBuilder
     lib_dest = File.join(@dist_dir, 'lib')
     FileUtils.mkdir_p(lib_dest)
 
-    vendor_package_dir = File.join(DEMO_ROOT, '../ruby2js-on-rails/vendor/ruby2js')
-    src_path = File.join(vendor_package_dir, 'phlex_runtime.mjs')
+    package_dir = File.join(DEMO_ROOT, '../../packages/ruby2js-rails')
+    src_path = File.join(package_dir, 'phlex_runtime.mjs')
     return unless File.exist?(src_path)
 
     dest_path = File.join(lib_dest, 'phlex_runtime.mjs')

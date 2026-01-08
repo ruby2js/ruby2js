@@ -70,3 +70,36 @@ jobs:
 
     - name: Run selfhost CI tests
       run: bundle exec rake -f demo/selfhost/Rakefile ci
+
+  demo-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: 3.3
+        bundler-cache: true
+
+    - name: Set up Node
+      uses: actions/setup-node@v4
+      with:
+        node-version: '24'
+
+    - name: Install Rails
+      run: gem install rails
+
+    - name: Build selfhost converter
+      run: bundle exec rake -f demo/selfhost/Rakefile build
+
+    - name: Generate and test blog demo
+      run: |
+        test/blog/create-blog demo/blog
+        node test/smoke-test.mjs demo/blog
+
+    - name: Generate and test chat demo
+      run: |
+        test/chat/create-chat demo/chat
+        node test/smoke-test.mjs demo/chat

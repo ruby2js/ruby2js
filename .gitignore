@@ -7,7 +7,6 @@ node_modules
 
 # Selfhost generated outputs (regenerated via npm run build:*)
 demo/selfhost/dist/
-demo/ruby2js-on-rails/dist/
 demo/selfhost/ruby2js.js
 packages/ruby2js-rails/build.mjs
 demo/selfhost/ruby2js.mjs

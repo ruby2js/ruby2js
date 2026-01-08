@@ -1,22 +1,41 @@
 #!/usr/bin/env node
-// Smoke test for Ruby2JS-on-Rails demo builds
+// Smoke test for Ruby2JS demo builds
 // Compares Ruby and selfhost builds, validates JS syntax
+//
+// Usage: node test/smoke-test.mjs <demo-directory>
+//        node test/smoke-test.mjs demo/blog --diff
 
-import { execSync, spawnSync } from 'child_process';
+import { execSync } from 'child_process';
 import { readFileSync, readdirSync, statSync, existsSync, mkdtempSync, rmSync } from 'fs';
-import { join, relative } from 'path';
+import { join, relative, dirname } from 'path';
 import { tmpdir } from 'os';
 import { fileURLToPath } from 'url';
-import { dirname } from 'path';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const DEMO_ROOT = join(__dirname, '..');
-const PROJECT_ROOT = join(DEMO_ROOT, '../..');  // ruby2js root where Gemfile lives
+const PROJECT_ROOT = join(__dirname, '..');
 const PACKAGE_ROOT = join(PROJECT_ROOT, 'packages/ruby2js-rails');
 
-// Parse command line options
-const showDiff = process.argv.includes('--diff') || process.argv.includes('-d');
+// Parse command line
+const args = process.argv.slice(2);
+const showDiff = args.includes('--diff') || args.includes('-d');
+const demoDir = args.find(arg => !arg.startsWith('-'));
+
+if (!demoDir) {
+  console.error('Usage: node test/smoke-test.mjs <demo-directory> [--diff]');
+  console.error('');
+  console.error('Example:');
+  console.error('  node test/smoke-test.mjs demo/blog');
+  console.error('  node test/smoke-test.mjs demo/chat --diff');
+  process.exit(1);
+}
+
+const DEMO_ROOT = join(PROJECT_ROOT, demoDir);
+
+if (!existsSync(DEMO_ROOT)) {
+  console.error(`Demo directory not found: ${DEMO_ROOT}`);
+  process.exit(1);
+}
 
 // ANSI colors
 const GREEN = '\x1b[32m';
@@ -32,7 +51,6 @@ function log(msg, color = '') {
 
 function pass(msg) { log(`  ✓ ${msg}`, GREEN); }
 function fail(msg) { log(`  ✗ ${msg}`, RED); }
-function warn(msg) { log(`  ⚠ ${msg}`, YELLOW); }
 function info(msg) { log(`  ${msg}`, CYAN); }
 
 // Simple unified diff output
@@ -55,7 +73,7 @@ function showUnifiedDiff(content1, content2, label1, label2, filename) {
     }
   }
 
-  if (firstDiff === -1) return; // No diff (shouldn't happen)
+  if (firstDiff === -1) return;
 
   // Show context around differences
   const contextLines = 3;
@@ -69,14 +87,11 @@ function showUnifiedDiff(content1, content2, label1, label2, filename) {
     const line2 = lines2[i];
 
     if (line1 === line2) {
-      // Context line (same in both)
       console.log(` ${line1 ?? ''}`);
     } else {
-      // Show removed line (from file1)
       if (line1 !== undefined) {
         console.log(`${RED}-${line1}${RESET}`);
       }
-      // Show added line (from file2)
       if (line2 !== undefined) {
         console.log(`${GREEN}+${line2}${RESET}`);
       }
@@ -110,7 +125,6 @@ async function checkSyntax(filePath) {
     await import(dataUrl);
     return { valid: true, error: null };
   } catch (err) {
-    // Extract just the first line of error message
     const match = err.message.match(/^(.+?)(?:\n|$)/);
     const shortErr = match ? match[1] : err.message;
     // Ignore module resolution errors (imports that don't exist in data URL context)
@@ -124,7 +138,6 @@ async function checkSyntax(filePath) {
 // Check for common JS syntax issues
 function checkCommonIssues(filePath, content) {
   const issues = [];
-  const lines = content.split('\n');
 
   // Check for 'export import' (invalid syntax)
   if (/export\s+import\s/.test(content)) {
@@ -194,13 +207,13 @@ function compareDirs(dir1, dir2, label1 = 'dir1', label2 = 'dir2') {
 
 // Main test runner
 async function runTests() {
-  log('\n=== Ruby2JS-on-Rails Smoke Test ===\n', BOLD);
+  const demoName = demoDir.split('/').pop();
+  log(`\n=== Smoke Test: ${demoName} ===\n`, BOLD);
 
   let passed = 0;
   let failed = 0;
-  let warnings = 0;
 
-  const tempDir = mkdtempSync(join(tmpdir(), 'ruby2js-on-rails-test-'));
+  const tempDir = mkdtempSync(join(tmpdir(), `ruby2js-${demoName}-test-`));
   const rubyDist = join(tempDir, 'ruby-dist');
   const selfhostDist = join(tempDir, 'selfhost-dist');
 
@@ -208,9 +221,8 @@ async function runTests() {
     // Test 1: Ruby build
     log('1. Ruby build', BOLD);
     try {
-      // Run from demo directory, builder uses Dir.pwd as app root
       execSync(`bundle exec ruby -r ruby2js/rails/builder -e "SelfhostBuilder.new('${rubyDist}').build"`, {
-        cwd: join(PROJECT_ROOT, 'demo/ruby2js-on-rails'),
+        cwd: DEMO_ROOT,
         encoding: 'utf8',
         stdio: ['pipe', 'pipe', 'pipe']
       });
@@ -224,9 +236,9 @@ async function runTests() {
     // Test 2: Selfhost build
     log('\n2. Selfhost build', BOLD);
     try {
-      // Import and run selfhost builder from package
       const { SelfhostBuilder } = await import(join(PACKAGE_ROOT, 'build.mjs'));
       const builder = new SelfhostBuilder(selfhostDist);
+      builder.appRoot = DEMO_ROOT;
       await builder.build();
       pass('Selfhost build completed');
       passed++;
@@ -340,7 +352,6 @@ async function runTests() {
         const importPath = match[1];
         if (importPath.startsWith('.')) {
           const resolved = join(dirname(file), importPath);
-          // Try with and without .js extension
           const exists = existsSync(resolved) ||
                         existsSync(resolved + '.js') ||
                         existsSync(resolved + '.mjs');
@@ -373,7 +384,6 @@ async function runTests() {
   log('\n=== Summary ===', BOLD);
   log(`  Passed:   ${passed}`, GREEN);
   if (failed > 0) log(`  Failed:   ${failed}`, RED);
-  if (warnings > 0) log(`  Warnings: ${warnings}`, YELLOW);
   log('');
 
   process.exit(failed > 0 ? 1 : 0);

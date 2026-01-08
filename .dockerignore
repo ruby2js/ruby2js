@@ -12,7 +12,6 @@ docs/.bridgetown-metadata
 docs/node_modules
 docs/vendor
 demo/selfhost/node_modules
-demo/ruby2js-on-rails/node_modules
 packages/ruby2js-rails/node_modules
 
 # Environment/secrets
@@ -40,8 +39,6 @@ plans/
 
 # Selfhost generated outputs (regenerated via npm run build:*)
 demo/selfhost/dist/
-demo/ruby2js-on-rails/dist/
-demo/ruby2js-on-rails/scripts/build.mjs
 demo/selfhost/ruby2js.js
 demo/selfhost/ruby2js.mjs
 demo/selfhost/prism_browser.js
