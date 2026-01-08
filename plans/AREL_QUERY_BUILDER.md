@@ -79,6 +79,7 @@ class Relation {
   constructor(modelClass) {
     this.model = modelClass;
     this._conditions = [];
+    this._notConditions = [];
     this._orConditions = [];
     this._order = null;
     this._limit = null;
@@ -144,6 +145,7 @@ class Relation {
   _clone() {
     const rel = new Relation(this.model);
     rel._conditions = [...this._conditions];
+    rel._notConditions = [...this._notConditions];
     rel._orConditions = [...this._orConditions];
     rel._order = this._order;
     rel._limit = this._limit;
@@ -316,7 +318,7 @@ These differences are hidden from the developer. Performance may vary.
 | Phase 0 | ✅ Done | `active_record_sql.mjs`, dialects, all SQL adapters refactored |
 | Phase 0.5 | ✅ Done | `dialects/mysql.mjs` created |
 | Phase 1 | ✅ Done | `relation.mjs` with 56 passing tests |
-| Phase 2 | 🔲 TODO | Enhanced conditions (`not()`, `or()`) |
+| Phase 2 | ✅ Done | `not()` and `or()` methods, 72 passing tests |
 | Phase 3 | 🔲 TODO | Query refinement (`select()`, `distinct()`, `exists()`, `pluck()`) |
 | Phase 4 | 🔲 TODO | Associations with `includes()` - **critical for Calendar/Showcase** |
 | Phase 5 | 🔲 TODO | Scopes (documentation pattern) |
