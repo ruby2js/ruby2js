@@ -103,6 +103,9 @@ end
 filters_dir = "#{SELFHOST}/filters"
 FILTER_TARGETS = manifest_filters.map { |name| "#{filters_dir}/#{name}.js" }
 
+desc "Build lib files (erb_compiler, migration_sql, seed_sql)"
+task :build_lib => ["#{SELFHOST}/lib/erb_compiler.js", "#{SELFHOST}/lib/migration_sql.js", "#{SELFHOST}/lib/seed_sql.js"]
+
 desc "Build manifest filters (batch)"
 task :build_filters => ["#{SELFHOST}/ruby2js.js"] do
   puts "Building filters..."

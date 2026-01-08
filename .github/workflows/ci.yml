@@ -92,11 +92,7 @@ jobs:
       run: gem install rails
 
     - name: Build selfhost converter, lib files, and build.mjs
-      run: |
-        bundle exec rake -f demo/selfhost/Rakefile build build_mjs
-        bundle exec rake -f demo/selfhost/Rakefile "demo/selfhost/lib/erb_compiler.js"
-        bundle exec rake -f demo/selfhost/Rakefile "demo/selfhost/lib/migration_sql.js"
-        bundle exec rake -f demo/selfhost/Rakefile "demo/selfhost/lib/seed_sql.js"
+      run: bundle exec rake -f demo/selfhost/Rakefile build build_lib build_mjs
 
     - name: Install npm dependencies for ruby2js-rails package
       run: cd packages/ruby2js-rails && npm install
