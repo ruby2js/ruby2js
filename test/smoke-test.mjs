@@ -219,9 +219,11 @@ async function runTests() {
 
   try {
     // Test 1: Ruby build
+    // Note: Run from demo directory to get correct DEMO_ROOT, but use project root's Gemfile
+    // The demo's Gemfile uses ruby2js from GitHub, but we want to test local changes
     log('1. Ruby build', BOLD);
     try {
-      execSync(`bundle exec ruby -r ruby2js/rails/builder -e "SelfhostBuilder.new('${rubyDist}').build"`, {
+      execSync(`BUNDLE_GEMFILE="${PROJECT_ROOT}/Gemfile" bundle exec ruby -r ruby2js/rails/builder -e "SelfhostBuilder.new('${rubyDist}').build"`, {
         cwd: DEMO_ROOT,
         encoding: 'utf8',
         stdio: ['pipe', 'pipe', 'pipe']
@@ -236,14 +238,24 @@ async function runTests() {
     // Test 2: Selfhost build
     log('\n2. Selfhost build', BOLD);
     try {
-      const { SelfhostBuilder } = await import(join(PACKAGE_ROOT, 'build.mjs'));
-      const builder = new SelfhostBuilder(selfhostDist);
-      builder.appRoot = DEMO_ROOT;
-      await builder.build();
-      pass('Selfhost build completed');
-      passed++;
+      // Change to demo directory so DEMO_ROOT (process.cwd()) is correct
+      // The JS builder uses process.cwd() to find app files and ../../packages/
+      const originalCwd = process.cwd();
+      process.chdir(DEMO_ROOT);
+      try {
+        const { SelfhostBuilder } = await import(join(PACKAGE_ROOT, 'build.mjs'));
+        const builder = new SelfhostBuilder(selfhostDist);
+        await builder.build();
+        pass('Selfhost build completed');
+        passed++;
+      } finally {
+        process.chdir(originalCwd);
+      }
     } catch (e) {
-      fail(`Selfhost build failed: ${e.message}`);
+      fail(`Selfhost build failed: ${e.message || e}`);
+      if (e.stack) {
+        console.error(e.stack);
+      }
       failed++;
     }
 

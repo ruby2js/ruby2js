@@ -684,14 +684,10 @@ class SelfhostBuilder
       puts("")
     end
 
-    # Transpile config (skip routes.rb, handled separately)
+    # Transpile config - only routes.rb is relevant for Juntos
+    # Skip all Rails-specific config files (boot, application, environment, puma, etc.)
+    # Skip subdirectories (environments/, initializers/) which are Rails-only
     puts("Config:")
-    self.transpile_directory(
-      File.join(DEMO_ROOT, 'config'),
-      File.join(@dist_dir, 'config'),
-      '**/*.rb',
-      skip: ['routes.rb']
-    )
     self.transpile_routes_files()
     puts("")
 
@@ -701,13 +697,8 @@ class SelfhostBuilder
     self.transpile_layout() if @target != 'browser'
     puts("")
 
-    # Transpile helpers
-    puts("Helpers:")
-    self.transpile_directory(
-      File.join(DEMO_ROOT, 'app/helpers'),
-      File.join(@dist_dir, 'app/helpers')
-    )
-    puts("")
+    # Note: Rails view helpers (app/helpers/) are not transpiled
+    # They don't have Juntos equivalents - use JS helper functions instead
 
     # Transpile db (migrations and seeds)
     puts("Database:")

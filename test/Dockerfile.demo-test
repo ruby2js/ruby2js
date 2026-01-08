@@ -1,0 +1,64 @@
+# Dockerfile for demo-test CI job
+# Usage:
+#   docker build -f test/Dockerfile.demo-test -t ruby2js-demo-test .
+#   docker run --rm ruby2js-demo-test
+
+FROM ruby:3.3-slim
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    bash \
+    build-essential \
+    git \
+    curl \
+    sqlite3 \
+    libsqlite3-dev \
+    libyaml-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Node.js 24
+RUN curl -fsSL https://deb.nodesource.com/setup_24.x | bash - \
+    && apt-get install -y nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Rails globally
+RUN gem install rails --no-document
+
+# Set working directory
+WORKDIR /app
+
+# Copy Gemfile and gemspec first for better caching
+COPY Gemfile Gemfile.lock ruby2js.gemspec ./
+COPY lib/ruby2js/version.rb lib/ruby2js/
+RUN bundle install
+
+# Copy package files for npm install caching
+COPY demo/selfhost/package.json demo/selfhost/package-lock.json demo/selfhost/
+COPY packages/ruby2js-rails/package.json packages/ruby2js-rails/package-lock.json packages/ruby2js-rails/
+
+# Install npm dependencies
+RUN cd demo/selfhost && npm install
+RUN cd packages/ruby2js-rails && npm install
+
+# Copy the rest of the codebase
+COPY . .
+
+# Build selfhost converter, lib files, and build.mjs
+RUN bundle exec rake -f demo/selfhost/Rakefile build build_lib build_mjs
+
+# Run the tests
+CMD ["bash", "-c", "\
+    echo '=== Generating blog demo ===' && \
+    test/blog/create-blog demo/blog && \
+    echo '' && \
+    echo '=== Running blog smoke test ===' && \
+    node test/smoke-test.mjs demo/blog && \
+    echo '' && \
+    echo '=== Generating chat demo ===' && \
+    test/chat/create-chat demo/chat && \
+    echo '' && \
+    echo '=== Running chat smoke test ===' && \
+    node test/smoke-test.mjs demo/chat && \
+    echo '' && \
+    echo '=== All tests passed! ===' \
+"]

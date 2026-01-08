@@ -36,15 +36,8 @@ COPY packages/ruby2js-rails/ ./packages/ruby2js-rails/
 WORKDIR /app/packages/ruby2js-rails
 RUN npm install
 
-WORKDIR /app
-COPY demo/ruby2js-on-rails/package.json demo/ruby2js-on-rails/package-lock.json ./demo/ruby2js-on-rails/
-WORKDIR /app/demo/ruby2js-on-rails
-RUN npm install
-
 # Now copy the rest of the source code (node_modules dirs already populated)
-# Remove symlink created by file: dependency before COPY to avoid conflict
 WORKDIR /app
-RUN rm -rf demo/ruby2js-on-rails/node_modules/ruby2js-rails
 COPY . .
 
 # Install docs bundle (needs full ruby2js source for path: "../")

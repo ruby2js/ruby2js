@@ -30,9 +30,8 @@ packages/ruby2js-rails/node_modules
 yarn-error.log
 yarn-debug.log*
 
-# Test artifacts
+# Test artifacts - exclude spec but keep test scripts
 spec/
-test/
 
 # Plans/docs not needed for build
 plans/
