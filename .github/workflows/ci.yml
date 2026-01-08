@@ -91,8 +91,8 @@ jobs:
     - name: Install Rails
       run: gem install rails
 
-    - name: Build selfhost converter
-      run: bundle exec rake -f demo/selfhost/Rakefile build
+    - name: Build selfhost converter and build.mjs
+      run: bundle exec rake -f demo/selfhost/Rakefile build build_mjs
 
     - name: Generate and test blog demo
       run: |
