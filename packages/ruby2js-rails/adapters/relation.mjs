@@ -12,6 +12,7 @@ export class Relation {
   constructor(modelClass) {
     this.model = modelClass;
     this._conditions = [];
+    this._notConditions = [];
     this._orConditions = [];
     this._order = null;
     this._limit = null;
@@ -43,6 +44,27 @@ export class Relation {
   offset(n) {
     const rel = this._clone();
     rel._offset = n;
+    return rel;
+  }
+
+  // Negation: where.not({role: 'guest'}) or User.not({deleted: true})
+  not(conditions) {
+    const rel = this._clone();
+    rel._notConditions.push(conditions);
+    return rel;
+  }
+
+  // OR composition: User.where({admin: true}).or(User.where({moderator: true}))
+  // Can also accept conditions directly: User.where({admin: true}).or({moderator: true})
+  or(conditionsOrRelation) {
+    const rel = this._clone();
+    if (conditionsOrRelation instanceof Relation) {
+      // Merge conditions from the other relation
+      rel._orConditions.push(conditionsOrRelation._conditions);
+    } else {
+      // Treat as simple conditions
+      rel._orConditions.push([conditionsOrRelation]);
+    }
     return rel;
   }
 
@@ -106,6 +128,7 @@ export class Relation {
   _clone() {
     const rel = new Relation(this.model);
     rel._conditions = [...this._conditions];
+    rel._notConditions = [...this._notConditions];
     rel._orConditions = [...this._orConditions];
     rel._order = this._order;
     rel._limit = this._limit;

@@ -120,36 +120,75 @@ export class ActiveRecordSQL extends ActiveRecordBase {
   // Build SQL from a Relation object
   static _buildRelationSQL(rel, options = {}) {
     const values = [];
-    let paramIndex = 1;
+    let paramIndex = { value: 1 }; // Use object so _buildConditionSQL can mutate it
 
     // SELECT clause
     let sql = options.count
       ? `SELECT COUNT(*) as count FROM ${this.tableName}`
       : `SELECT * FROM ${this.tableName}`;
 
-    // WHERE clause
+    // Collect all WHERE clause parts
+    const allWhereParts = [];
+
+    // Build AND conditions (from where())
     if (rel._conditions.length > 0) {
-      const whereParts = [];
-      for (const cond of rel._conditions) {
-        for (const [key, value] of Object.entries(cond)) {
-          if (Array.isArray(value)) {
-            // IN clause: where({id: [1, 2, 3]})
-            const placeholders = value.map(() => this._param(paramIndex++)).join(', ');
-            whereParts.push(`${key} IN (${placeholders})`);
-            values.push(...value.map(v => this._formatValue(v)));
-          } else if (value === null) {
-            // IS NULL
-            whereParts.push(`${key} IS NULL`);
-          } else {
-            // Simple equality
-            whereParts.push(`${key} = ${this._param(paramIndex++)}`);
-            values.push(this._formatValue(value));
-          }
+      const { parts, vals } = this._buildConditionsSQL(rel._conditions, paramIndex);
+      if (parts.length > 0) {
+        allWhereParts.push(parts.join(' AND '));
+        values.push(...vals);
+      }
+    }
+
+    // Build NOT conditions (from not())
+    if (rel._notConditions && rel._notConditions.length > 0) {
+      const { parts, vals } = this._buildConditionsSQL(rel._notConditions, paramIndex);
+      if (parts.length > 0) {
+        // Wrap each NOT condition and negate it
+        allWhereParts.push(`NOT (${parts.join(' AND ')})`);
+        values.push(...vals);
+      }
+    }
+
+    // Build OR conditions (from or())
+    if (rel._orConditions && rel._orConditions.length > 0) {
+      for (const orGroup of rel._orConditions) {
+        const { parts, vals } = this._buildConditionsSQL(orGroup, paramIndex);
+        if (parts.length > 0) {
+          // Each OR group is wrapped in parentheses
+          allWhereParts.push(`(${parts.join(' AND ')})`);
+          values.push(...vals);
         }
       }
-      // Only add WHERE if we have actual conditions
-      if (whereParts.length > 0) {
-        sql += ` WHERE ${whereParts.join(' AND ')}`;
+    }
+
+    // Combine WHERE parts
+    if (allWhereParts.length > 0) {
+      // If we have OR conditions, we need special handling:
+      // The first parts (AND and NOT) form the base, OR groups are alternatives
+      if (rel._orConditions && rel._orConditions.length > 0) {
+        // Get the base conditions (AND + NOT)
+        const baseCount = (rel._conditions.length > 0 ? 1 : 0) +
+                          (rel._notConditions && rel._notConditions.length > 0 ? 1 : 0);
+        const baseParts = allWhereParts.slice(0, baseCount);
+        const orParts = allWhereParts.slice(baseCount);
+
+        if (baseParts.length > 0 && orParts.length > 0) {
+          // Combine base with OR: (base) AND (or1 OR or2)
+          // But actually the semantic is: base AND (base OR alt1 OR alt2)
+          // Rails semantics: where(a).or(where(b)) means (a) OR (b)
+          // So we need: (baseParts) OR (orParts joined with OR)
+          const baseSQL = baseParts.join(' AND ');
+          sql += ` WHERE (${baseSQL}) OR ${orParts.join(' OR ')}`;
+        } else if (orParts.length > 0) {
+          // Only OR conditions
+          sql += ` WHERE ${orParts.join(' OR ')}`;
+        } else {
+          // Only base conditions
+          sql += ` WHERE ${baseParts.join(' AND ')}`;
+        }
+      } else {
+        // No OR conditions, just AND everything
+        sql += ` WHERE ${allWhereParts.join(' AND ')}`;
       }
     }
 
@@ -170,6 +209,33 @@ export class ActiveRecordSQL extends ActiveRecordBase {
     }
 
     return { sql, values };
+  }
+
+  // Build SQL clauses from an array of condition objects
+  // Returns { parts: string[], vals: any[] }
+  static _buildConditionsSQL(conditions, paramIndex) {
+    const parts = [];
+    const vals = [];
+
+    for (const cond of conditions) {
+      for (const [key, value] of Object.entries(cond)) {
+        if (Array.isArray(value)) {
+          // IN clause: where({id: [1, 2, 3]})
+          const placeholders = value.map(() => this._param(paramIndex.value++)).join(', ');
+          parts.push(`${key} IN (${placeholders})`);
+          vals.push(...value.map(v => this._formatValue(v)));
+        } else if (value === null) {
+          // IS NULL
+          parts.push(`${key} IS NULL`);
+        } else {
+          // Simple equality
+          parts.push(`${key} = ${this._param(paramIndex.value++)}`);
+          vals.push(this._formatValue(value));
+        }
+      }
+    }
+
+    return { parts, vals };
   }
 
   // Parse order option into [column, direction]

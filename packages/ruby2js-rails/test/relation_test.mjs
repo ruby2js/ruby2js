@@ -389,6 +389,182 @@ describe('PostgreSQL numbered parameters', () => {
   });
 });
 
+// --- NOT Conditions Tests ---
+
+describe('NOT conditions', () => {
+  describe('not() method', () => {
+    it('adds NOT conditions and returns new Relation', () => {
+      const rel1 = new Relation(MockModel);
+      const rel2 = rel1.not({ role: 'guest' });
+
+      // Original unchanged
+      assert.deepEqual(rel1._notConditions, []);
+      // New has NOT condition
+      assert.deepEqual(rel2._notConditions, [{ role: 'guest' }]);
+      // Different instances
+      assert.notEqual(rel1, rel2);
+    });
+
+    it('chains multiple NOT conditions', () => {
+      const rel = new Relation(MockModel)
+        .not({ deleted: true })
+        .not({ banned: true });
+
+      assert.deepEqual(rel._notConditions, [
+        { deleted: true },
+        { banned: true }
+      ]);
+    });
+
+    it('combines with where() conditions', () => {
+      const rel = new Relation(MockModel)
+        .where({ active: true })
+        .not({ role: 'guest' });
+
+      assert.deepEqual(rel._conditions, [{ active: true }]);
+      assert.deepEqual(rel._notConditions, [{ role: 'guest' }]);
+    });
+  });
+
+  describe('SQL building', () => {
+    it('builds NOT clause for single condition', () => {
+      const rel = new Relation(MockModel).not({ deleted: true });
+      const { sql, values } = MockModel._buildRelationSQL(rel);
+
+      assert.equal(sql, 'SELECT * FROM users WHERE NOT (deleted = ?)');
+      assert.deepEqual(values, [true]);
+    });
+
+    it('builds NOT clause with multiple fields', () => {
+      const rel = new Relation(MockModel).not({ deleted: true, banned: true });
+      const { sql, values } = MockModel._buildRelationSQL(rel);
+
+      assert.equal(sql, 'SELECT * FROM users WHERE NOT (deleted = ? AND banned = ?)');
+      assert.deepEqual(values, [true, true]);
+    });
+
+    it('combines WHERE and NOT correctly', () => {
+      const rel = new Relation(MockModel)
+        .where({ active: true })
+        .not({ role: 'guest' });
+      const { sql, values } = MockModel._buildRelationSQL(rel);
+
+      assert.equal(sql, 'SELECT * FROM users WHERE active = ? AND NOT (role = ?)');
+      assert.deepEqual(values, [true, 'guest']);
+    });
+
+    it('handles NOT with IN clause', () => {
+      const rel = new Relation(MockModel).not({ role: ['guest', 'banned'] });
+      const { sql, values } = MockModel._buildRelationSQL(rel);
+
+      assert.equal(sql, 'SELECT * FROM users WHERE NOT (role IN (?, ?))');
+      assert.deepEqual(values, ['guest', 'banned']);
+    });
+
+    it('handles NOT with NULL', () => {
+      const rel = new Relation(MockModel).not({ deleted_at: null });
+      const { sql, values } = MockModel._buildRelationSQL(rel);
+
+      assert.equal(sql, 'SELECT * FROM users WHERE NOT (deleted_at IS NULL)');
+      assert.deepEqual(values, []);
+    });
+  });
+});
+
+// --- OR Conditions Tests ---
+
+describe('OR conditions', () => {
+  describe('or() method', () => {
+    it('accepts conditions object directly', () => {
+      const rel = new Relation(MockModel)
+        .where({ admin: true })
+        .or({ moderator: true });
+
+      assert.deepEqual(rel._conditions, [{ admin: true }]);
+      assert.deepEqual(rel._orConditions, [[{ moderator: true }]]);
+    });
+
+    it('accepts another Relation', () => {
+      const rel1 = new Relation(MockModel).where({ admin: true });
+      const rel2 = new Relation(MockModel).where({ moderator: true });
+      const combined = rel1.or(rel2);
+
+      assert.deepEqual(combined._conditions, [{ admin: true }]);
+      assert.deepEqual(combined._orConditions, [[{ moderator: true }]]);
+    });
+
+    it('chains multiple OR conditions', () => {
+      const rel = new Relation(MockModel)
+        .where({ admin: true })
+        .or({ moderator: true })
+        .or({ editor: true });
+
+      assert.deepEqual(rel._orConditions, [
+        [{ moderator: true }],
+        [{ editor: true }]
+      ]);
+    });
+  });
+
+  describe('SQL building', () => {
+    it('builds OR with base condition', () => {
+      const rel = new Relation(MockModel)
+        .where({ admin: true })
+        .or({ moderator: true });
+      const { sql, values } = MockModel._buildRelationSQL(rel);
+
+      assert.equal(sql, 'SELECT * FROM users WHERE (admin = ?) OR (moderator = ?)');
+      assert.deepEqual(values, [true, true]);
+    });
+
+    it('builds multiple OR alternatives', () => {
+      const rel = new Relation(MockModel)
+        .where({ admin: true })
+        .or({ moderator: true })
+        .or({ editor: true });
+      const { sql, values } = MockModel._buildRelationSQL(rel);
+
+      assert.equal(sql, 'SELECT * FROM users WHERE (admin = ?) OR (moderator = ?) OR (editor = ?)');
+      assert.deepEqual(values, [true, true, true]);
+    });
+
+    it('builds OR with Relation containing multiple conditions', () => {
+      const rel = new Relation(MockModel)
+        .where({ active: true })
+        .or(new Relation(MockModel).where({ role: 'admin' }).where({ verified: true }));
+      const { sql, values } = MockModel._buildRelationSQL(rel);
+
+      assert.equal(sql, 'SELECT * FROM users WHERE (active = ?) OR (role = ? AND verified = ?)');
+      assert.deepEqual(values, [true, 'admin', true]);
+    });
+
+    it('handles OR only (no base conditions)', () => {
+      const rel = new Relation(MockModel)
+        .or({ admin: true })
+        .or({ moderator: true });
+      const { sql, values } = MockModel._buildRelationSQL(rel);
+
+      assert.equal(sql, 'SELECT * FROM users WHERE (admin = ?) OR (moderator = ?)');
+      assert.deepEqual(values, [true, true]);
+    });
+  });
+});
+
+// --- Combined NOT and OR Tests ---
+
+describe('NOT and OR combined', () => {
+  it('builds WHERE with NOT and OR', () => {
+    const rel = new Relation(MockModel)
+      .where({ active: true })
+      .not({ banned: true })
+      .or({ admin: true });
+    const { sql, values } = MockModel._buildRelationSQL(rel);
+
+    assert.equal(sql, 'SELECT * FROM users WHERE (active = ? AND NOT (banned = ?)) OR (admin = ?)');
+    assert.deepEqual(values, [true, true, true]);
+  });
+});
+
 // --- ActiveRecord Static Method Tests ---
 
 describe('ActiveRecordSQL static methods', () => {
