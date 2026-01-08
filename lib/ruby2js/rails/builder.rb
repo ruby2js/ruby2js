@@ -1003,6 +1003,22 @@ class SelfhostBuilder
       puts("  Relation class: relation.mjs")
     end
 
+    # Copy Inflector module (singularize/pluralize for associations)
+    inflector_src = File.join(adapter_dir, 'inflector.mjs')
+    if File.exist?(inflector_src)
+      inflector_dest = File.join(lib_dest, 'inflector.mjs')
+      FileUtils.cp(inflector_src, inflector_dest)
+      puts("  Inflector: inflector.mjs")
+    end
+
+    # Copy SQL parser module (for Dexie raw condition support)
+    sql_parser_src = File.join(adapter_dir, 'sql_parser.mjs')
+    if File.exist?(sql_parser_src)
+      sql_parser_dest = File.join(lib_dest, 'sql_parser.mjs')
+      FileUtils.cp(sql_parser_src, sql_parser_dest)
+      puts("  SQL parser: sql_parser.mjs")
+    end
+
     # Copy dialect files (SQLite, PostgreSQL, or MySQL)
     dialects_src = File.join(adapter_dir, 'dialects')
     if File.directory?(dialects_src)
