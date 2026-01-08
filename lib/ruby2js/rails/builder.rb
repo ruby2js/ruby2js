@@ -640,11 +640,14 @@ class SelfhostBuilder
     self.parse_model_associations()
 
     # Transpile controllers (use 'controllers' section from ruby2js.yml if present)
+    # Skip application_controller.rb - it extends ActionController::Base which has no JS equivalent
+    # The transpiled controllers are modules, not classes, so they don't need a base class
     puts("Controllers:")
     self.transpile_directory(
       File.join(DEMO_ROOT, 'app/controllers'),
       File.join(@dist_dir, 'app/controllers'),
       '**/*.rb',
+      skip: ['application_controller.rb'],
       section: 'controllers'
     )
     puts("")
