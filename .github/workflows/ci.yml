@@ -94,6 +94,9 @@ jobs:
     - name: Build selfhost converter and build.mjs
       run: bundle exec rake -f demo/selfhost/Rakefile build build_mjs
 
+    - name: Install npm dependencies for ruby2js-rails package
+      run: cd packages/ruby2js-rails && npm install
+
     - name: Generate and test blog demo
       run: |
         test/blog/create-blog demo/blog
