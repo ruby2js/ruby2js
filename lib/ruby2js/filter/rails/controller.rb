@@ -251,7 +251,8 @@ module Ruby2JS
             if should_run
               method_node = @rails_private_methods[ba[:method]]
               if method_node
-                params_keys.concat(collect_params_keys(method_node.children[2]))
+                # Note: use push(*arr) for JS compatibility (concat returns new array in JS)
+                params_keys.push(*collect_params_keys(method_node.children[2]))
               end
             end
           end
@@ -399,13 +400,15 @@ module Ruby2JS
           # Match params[:key] pattern
           if node.type == :send
             target, method, *args = node.children
+            # Note: use args[0] instead of args.first for JS compatibility
+            first_arg = args[0]
 
             if target&.type == :send &&
                target.children[0].nil? &&
                target.children[1] == :params &&
                method == :[] &&
-               args.first&.type == :sym
-              keys << args.first.children[0]
+               first_arg&.type == :sym
+              keys << first_arg.children[0]
             end
           end
 
