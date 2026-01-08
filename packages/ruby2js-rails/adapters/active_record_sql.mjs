@@ -13,9 +13,9 @@
 // - static _getRows(result) - extract rows array from result
 // - static _getLastInsertId(result) - get auto-generated ID after insert
 
-import { ActiveRecordBase } from './active_record_base.mjs';
-import { Relation } from './relation.mjs';
-import { singularize } from './inflector.mjs';
+import { ActiveRecordBase } from 'ruby2js-rails/adapters/active_record_base.mjs';
+import { Relation } from 'ruby2js-rails/adapters/relation.mjs';
+import { singularize } from 'ruby2js-rails/adapters/inflector.mjs';
 
 export class ActiveRecordSQL extends ActiveRecordBase {
   // --- Dialect hooks (override in dialect subclass) ---

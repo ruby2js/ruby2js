@@ -3,7 +3,7 @@
 // PGLite provides PostgreSQL compatibility in the browser with optional IndexedDB persistence
 
 import { PostgresDialect, PG_TYPE_MAP } from './dialects/postgres.mjs';
-import { attr_accessor, initTimePolyfill } from './active_record_base.mjs';
+import { attr_accessor, initTimePolyfill } from 'ruby2js-rails/adapters/active_record_base.mjs';
 
 // Re-export shared utilities
 export { attr_accessor };

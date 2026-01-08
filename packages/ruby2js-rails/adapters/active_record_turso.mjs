@@ -5,7 +5,7 @@
 import { createClient } from '@libsql/client';
 
 import { SQLiteDialect, SQLITE_TYPE_MAP } from './dialects/sqlite.mjs';
-import { attr_accessor, initTimePolyfill } from './active_record_base.mjs';
+import { attr_accessor, initTimePolyfill } from 'ruby2js-rails/adapters/active_record_base.mjs';
 
 // Re-export shared utilities
 export { attr_accessor };

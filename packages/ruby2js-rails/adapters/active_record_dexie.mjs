@@ -3,8 +3,8 @@
 // Dexie is ~50KB vs sql.js at ~2.7MB WASM
 
 import Dexie from 'dexie';
-import { ActiveRecordBase, attr_accessor, initTimePolyfill } from './active_record_base.mjs';
-import { parseCondition, applyToDexie, toFilterFunction, canParse } from './sql_parser.mjs';
+import { ActiveRecordBase, attr_accessor, initTimePolyfill } from 'ruby2js-rails/adapters/active_record_base.mjs';
+import { parseCondition, applyToDexie, toFilterFunction, canParse } from 'ruby2js-rails/adapters/sql_parser.mjs';
 
 // Re-export shared utilities
 export { attr_accessor };

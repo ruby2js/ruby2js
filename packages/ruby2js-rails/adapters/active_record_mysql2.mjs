@@ -5,7 +5,7 @@
 import mysql from 'mysql2/promise';
 
 import { MySQLDialect, MYSQL_TYPE_MAP } from './dialects/mysql.mjs';
-import { attr_accessor, initTimePolyfill } from './active_record_base.mjs';
+import { attr_accessor, initTimePolyfill } from 'ruby2js-rails/adapters/active_record_base.mjs';
 
 // Re-export shared utilities
 export { attr_accessor };

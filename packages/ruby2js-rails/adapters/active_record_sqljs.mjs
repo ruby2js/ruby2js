@@ -2,7 +2,7 @@
 // This file is copied to dist/lib/active_record.mjs at build time
 
 import { SQLiteDialect, SQLITE_TYPE_MAP } from './dialects/sqlite.mjs';
-import { attr_accessor, initTimePolyfill } from './active_record_base.mjs';
+import { attr_accessor, initTimePolyfill } from 'ruby2js-rails/adapters/active_record_base.mjs';
 
 // Re-export shared utilities
 export { attr_accessor };

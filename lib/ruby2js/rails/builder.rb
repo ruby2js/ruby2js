@@ -438,7 +438,13 @@ class SelfhostBuilder
   # Common importmap entries for all browser builds
   COMMON_IMPORTMAP_ENTRIES = {
     '@hotwired/turbo' => '/node_modules/@hotwired/turbo/dist/turbo.es2017-esm.js',
-    '@hotwired/stimulus' => '/node_modules/@hotwired/stimulus/dist/stimulus.js'
+    '@hotwired/stimulus' => '/node_modules/@hotwired/stimulus/dist/stimulus.js',
+    # Shared ruby2js-rails modules (imported by adapters, not copied to dist)
+    'ruby2js-rails/adapters/active_record_base.mjs' => '/node_modules/ruby2js-rails/adapters/active_record_base.mjs',
+    'ruby2js-rails/adapters/active_record_sql.mjs' => '/node_modules/ruby2js-rails/adapters/active_record_sql.mjs',
+    'ruby2js-rails/adapters/relation.mjs' => '/node_modules/ruby2js-rails/adapters/relation.mjs',
+    'ruby2js-rails/adapters/inflector.mjs' => '/node_modules/ruby2js-rails/adapters/inflector.mjs',
+    'ruby2js-rails/adapters/sql_parser.mjs' => '/node_modules/ruby2js-rails/adapters/sql_parser.mjs'
   }.freeze
 
   # Database-specific importmap entries for browser builds
@@ -981,43 +987,9 @@ class SelfhostBuilder
     lib_dest = File.join(@dist_dir, 'lib')
     FileUtils.mkdir_p(lib_dest)
 
-    # Copy base class first (all adapters depend on it)
-    base_src = File.join(adapter_dir, 'active_record_base.mjs')
-    base_dest = File.join(lib_dest, 'active_record_base.mjs')
-    FileUtils.cp(base_src, base_dest)
-    puts("  Base class: active_record_base.mjs")
-
-    # Copy SQL base class (shared by all SQL adapters)
-    sql_src = File.join(adapter_dir, 'active_record_sql.mjs')
-    if File.exist?(sql_src)
-      sql_dest = File.join(lib_dest, 'active_record_sql.mjs')
-      FileUtils.cp(sql_src, sql_dest)
-      puts("  SQL base class: active_record_sql.mjs")
-    end
-
-    # Copy Relation class (deferred query building)
-    relation_src = File.join(adapter_dir, 'relation.mjs')
-    if File.exist?(relation_src)
-      relation_dest = File.join(lib_dest, 'relation.mjs')
-      FileUtils.cp(relation_src, relation_dest)
-      puts("  Relation class: relation.mjs")
-    end
-
-    # Copy Inflector module (singularize/pluralize for associations)
-    inflector_src = File.join(adapter_dir, 'inflector.mjs')
-    if File.exist?(inflector_src)
-      inflector_dest = File.join(lib_dest, 'inflector.mjs')
-      FileUtils.cp(inflector_src, inflector_dest)
-      puts("  Inflector: inflector.mjs")
-    end
-
-    # Copy SQL parser module (for Dexie raw condition support)
-    sql_parser_src = File.join(adapter_dir, 'sql_parser.mjs')
-    if File.exist?(sql_parser_src)
-      sql_parser_dest = File.join(lib_dest, 'sql_parser.mjs')
-      FileUtils.cp(sql_parser_src, sql_parser_dest)
-      puts("  SQL parser: sql_parser.mjs")
-    end
+    # Shared modules (active_record_base, active_record_sql, relation, inflector, sql_parser)
+    # are now imported from ruby2js-rails npm package, not copied to dist.
+    # This keeps dist smaller and provides a single source of truth.
 
     # Copy dialect files (SQLite, PostgreSQL, or MySQL)
     dialects_src = File.join(adapter_dir, 'dialects')
