@@ -4,6 +4,7 @@
 
 import Dexie from 'dexie';
 import { ActiveRecordBase, attr_accessor, initTimePolyfill } from './active_record_base.mjs';
+import { parseCondition, applyToDexie, toFilterFunction, canParse } from './sql_parser.mjs';
 
 // Re-export shared utilities
 export { attr_accessor };
@@ -148,8 +149,24 @@ export class ActiveRecord extends ActiveRecordBase {
     return row ? new this(row) : null;
   }
 
-  static async where(conditions) {
-    const rows = await this.table.where(conditions).toArray();
+  // where({active: true}) - hash conditions
+  // where('updated_at > ?', timestamp) - raw SQL with placeholder
+  static async where(conditionOrSql, ...values) {
+    let rows;
+
+    if (typeof conditionOrSql === 'string') {
+      // Raw SQL condition - parse and apply to Dexie
+      const parsed = parseCondition(conditionOrSql, values);
+      if (!parsed) {
+        throw new Error(`Unsupported raw SQL condition for Dexie: ${conditionOrSql}. ` +
+          `Supported patterns: 'col > ?', 'col >= ?', 'col < ?', 'col <= ?', 'col = ?', 'col != ?', 'col BETWEEN ? AND ?'`);
+      }
+      rows = await applyToDexie(this.table, parsed).toArray();
+    } else {
+      // Hash conditions
+      rows = await this.table.where(conditionOrSql).toArray();
+    }
+
     return rows.map(row => new this(row));
   }
 
