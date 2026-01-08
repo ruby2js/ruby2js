@@ -41,7 +41,7 @@ ENV JUNTOS_TARGET=${TARGET}
 RUN bin/juntos build -d ${DATABASE} -t ${TARGET}
 
 # Run migrations (skip for browser targets - they migrate client-side)
-RUN if [ "${TARGET}" != "browser" ]; then bin/juntos migrate -d ${DATABASE} -t ${TARGET}; fi
+RUN if [ "${TARGET}" != "browser" ]; then bin/juntos db prepare -d ${DATABASE} -t ${TARGET}; fi
 
 EXPOSE 3000
 
