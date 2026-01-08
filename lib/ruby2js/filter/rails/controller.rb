@@ -696,6 +696,24 @@ module Ruby2JS
             end
           end
 
+          # Check for chained method calls ending with an AR class method
+          # e.g., Article.includes(:comments).all, Article.where(...).first
+          if target&.type == :send && AR_CLASS_METHODS.include?(method)
+            # Walk up the chain to find the root target
+            chain_start = target
+            while chain_start&.type == :send
+              chain_start = chain_start.children[0]
+            end
+            # If chain starts with a model constant, await the whole thing
+            if chain_start&.type == :const && chain_start.children[0].nil?
+              const_name = chain_start.children[1].to_s
+              model_refs_array = @rails_model_refs ? [*@rails_model_refs] : []
+              if model_refs_array.include?(const_name)
+                return node.updated(:await!)
+              end
+            end
+          end
+
           # Check for instance method calls on local variables (e.g., article.save)
           if target&.type == :lvar && AR_INSTANCE_METHODS.include?(method)
             return node.updated(:await!)

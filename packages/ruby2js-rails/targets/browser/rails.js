@@ -270,6 +270,11 @@ export class Application extends ApplicationBase {
     const adapter = await import('./active_record.mjs');
     this.activeRecordModule = adapter;
 
+    // Populate model registry for association resolution (avoids circular dependencies)
+    if (adapter.modelRegistry && this.models) {
+      Object.assign(adapter.modelRegistry, this.models);
+    }
+
     // Initialize with config
     await adapter.initDatabase({ sqlJsPath: this.sqlJsPath });
 

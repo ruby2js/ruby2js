@@ -134,6 +134,11 @@ export class Relation {
     return this.model._executeRelation(this);
   }
 
+  // Alias for Rails compatibility: Article.includes(:comments).all
+  all() {
+    return this;
+  }
+
   // find() within the relation's scope
   async find(id) {
     const rel = this._clone();

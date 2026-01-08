@@ -656,6 +656,35 @@ module Ruby2JS
             transformed << generate_association_method(assoc)
           end
 
+          # Generate static associations metadata for eager loading
+          if @rails_associations.any?
+            assoc_pairs = @rails_associations.map do |assoc|
+              # Derive class name from association name or options[:class_name]
+              # For has_many, singularize and capitalize: comments -> Comment
+              # For belongs_to, just capitalize: article -> Article
+              class_name = assoc[:options][:class_name]
+              unless class_name
+                name_str = assoc[:name].to_s
+                if assoc[:type] == :has_many
+                  name_str = Ruby2JS::Inflector.singularize(name_str)
+                end
+                class_name = name_str.split('_').map(&:capitalize).join
+              end
+
+              # Build { type: 'has_many', model: 'Comment', foreignKey: 'article_id' }
+              # Use string reference to avoid circular dependency issues
+              props = [
+                s(:pair, s(:sym, :type), s(:str, assoc[:type].to_s)),
+                s(:pair, s(:sym, :model), s(:str, class_name))
+              ]
+              if assoc[:options][:foreign_key]
+                props << s(:pair, s(:sym, :foreignKey), s(:str, assoc[:options][:foreign_key]))
+              end
+              s(:pair, s(:sym, assoc[:name]), s(:hash, *props))
+            end
+            transformed << s(:send, s(:self), :associations=, s(:hash, *assoc_pairs))
+          end
+
           # Generate destroy method if any dependent: :destroy associations
           destroy_method = generate_destroy_method
           transformed << destroy_method if destroy_method

@@ -7,9 +7,10 @@ const { Pool } = pg;
 
 import { PostgresDialect, PG_TYPE_MAP } from './dialects/postgres.mjs';
 import { attr_accessor, initTimePolyfill } from 'ruby2js-rails/adapters/active_record_base.mjs';
+import { modelRegistry } from 'ruby2js-rails/adapters/active_record_sql.mjs';
 
 // Re-export shared utilities
-export { attr_accessor };
+export { attr_accessor, modelRegistry };
 
 // Configuration injected at build time
 const DB_CONFIG = {};

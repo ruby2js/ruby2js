@@ -229,6 +229,12 @@ export class ActiveRecord extends ActiveRecordBase {
     return data.map(row => new this(row));
   }
 
+  // Eager loading hint - Supabase handles this via PostgREST select syntax
+  // For now, returns the class itself for method chaining (no-op)
+  static includes(...associations) {
+    return this;
+  }
+
   static async find(id) {
     const { data, error } = await supabase
       .from(this.tableName)

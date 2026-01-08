@@ -17,6 +17,9 @@ import { ActiveRecordBase } from 'ruby2js-rails/adapters/active_record_base.mjs'
 import { Relation } from 'ruby2js-rails/adapters/relation.mjs';
 import { singularize } from 'ruby2js-rails/adapters/inflector.mjs';
 
+// Model registry for association resolution (populated by Application.registerModels)
+export const modelRegistry = {};
+
 export class ActiveRecordSQL extends ActiveRecordBase {
   // --- Dialect hooks (override in dialect subclass) ---
 
@@ -181,21 +184,13 @@ export class ActiveRecordSQL extends ActiveRecordBase {
 
   // --- Association Loading ---
 
-  // Model registry for resolving association model names to classes
-  // Models register themselves: ActiveRecordSQL._modelRegistry.set('User', User)
-  static _modelRegistry = new Map();
-
-  // Register a model class for association resolution
-  static registerModel(modelClass) {
-    this._modelRegistry.set(modelClass.name, modelClass);
-  }
-
   // Resolve a model name or class to a model class
+  // Uses module-level modelRegistry (populated by Application.registerModels)
   static _resolveModel(modelOrName) {
     if (typeof modelOrName === 'string') {
-      const model = this._modelRegistry.get(modelOrName);
+      const model = modelRegistry[modelOrName];
       if (!model) {
-        throw new Error(`Model '${modelOrName}' not found in registry. Did you forget to call registerModel()?`);
+        throw new Error(`Model '${modelOrName}' not found in registry. Did you forget to call Application.registerModels()?`);
       }
       return model;
     }

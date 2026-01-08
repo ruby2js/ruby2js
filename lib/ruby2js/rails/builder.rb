@@ -2158,11 +2158,29 @@ class SelfhostBuilder
 
     return unless model_files.any?
 
-    index_js = model_files.map do |name|
+    # Build imports, exports, and model registry
+    imports = []
+    exports = []
+    class_names = []
+
+    model_files.each do |name|
       # Use explicit capitalization for JS compatibility
       class_name = name.split('_').map { |s| s[0].upcase + s[1..-1] }.join
-      "export { #{class_name} } from './#{name}.js';"
-    end.join("\n") + "\n"
+      imports << "import { #{class_name} } from './#{name}.js';"
+      exports << "export { #{class_name} };"
+      class_names << class_name
+    end
+
+    # Generate index.js with imports, exports, and model registration
+    index_js = <<~JS
+      #{imports.join("\n")}
+      import { Application } from '../../lib/rails.js';
+
+      // Register models for association resolution (avoids circular dependency issues)
+      Application.registerModels({ #{class_names.join(', ')} });
+
+      #{exports.join("\n")}
+    JS
 
     File.write(File.join(models_dir, 'index.js'), index_js)
     puts("  -> app/models/index.js (re-exports)")

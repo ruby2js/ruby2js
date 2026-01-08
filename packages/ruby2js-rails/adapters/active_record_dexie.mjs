@@ -5,9 +5,13 @@
 import Dexie from 'dexie';
 import { ActiveRecordBase, attr_accessor, initTimePolyfill } from 'ruby2js-rails/adapters/active_record_base.mjs';
 import { parseCondition, applyToDexie, toFilterFunction, canParse } from 'ruby2js-rails/adapters/sql_parser.mjs';
+import { Relation } from 'ruby2js-rails/adapters/relation.mjs';
 
 // Re-export shared utilities
 export { attr_accessor };
+
+// Model registry for association resolution (populated by Application.registerModels)
+export const modelRegistry = {};
 
 // Configuration injected at build time
 const DB_CONFIG = {};
@@ -129,12 +133,34 @@ export class ActiveRecord extends ActiveRecordBase {
     return db.table(this.tableName);
   }
 
-  // --- Class Methods (finders) ---
+  // --- Class Methods (chainable - return Relation) ---
 
-  static async all() {
-    const rows = await this.table.toArray();
-    return rows.map(row => new this(row));
+  // Returns a Relation that can be chained or awaited
+  static all() {
+    return new Relation(this);
   }
+
+  // Returns a Relation with conditions
+  static where(conditionOrSql, ...values) {
+    return new Relation(this).where(conditionOrSql, ...values);
+  }
+
+  // Returns a Relation with ordering
+  static order(options) {
+    return new Relation(this).order(options);
+  }
+
+  // Returns a Relation with limit
+  static limit(n) {
+    return new Relation(this).limit(n);
+  }
+
+  // Returns a Relation with eager-loaded associations
+  static includes(...associations) {
+    return new Relation(this).includes(...associations);
+  }
+
+  // --- Class Methods (terminal - execute immediately) ---
 
   static async find(id) {
     const row = await this.table.get(Number(id));
@@ -149,59 +175,210 @@ export class ActiveRecord extends ActiveRecordBase {
     return row ? new this(row) : null;
   }
 
-  // where({active: true}) - hash conditions
-  // where('updated_at > ?', timestamp) - raw SQL with placeholder
-  static async where(conditionOrSql, ...values) {
-    let rows;
-
-    if (typeof conditionOrSql === 'string') {
-      // Raw SQL condition - parse and apply to Dexie
-      const parsed = parseCondition(conditionOrSql, values);
-      if (!parsed) {
-        throw new Error(`Unsupported raw SQL condition for Dexie: ${conditionOrSql}. ` +
-          `Supported patterns: 'col > ?', 'col >= ?', 'col < ?', 'col <= ?', 'col = ?', 'col != ?', 'col BETWEEN ? AND ?'`);
-      }
-      rows = await applyToDexie(this.table, parsed).toArray();
-    } else {
-      // Hash conditions
-      rows = await this.table.where(conditionOrSql).toArray();
-    }
-
-    return rows.map(row => new this(row));
-  }
-
-  static async count() {
-    return await this.table.count();
-  }
-
-  // Order records by column - returns array of models
-  // Usage: Message.order({created_at: 'asc'}) or Message.order('created_at')
-  static async order(options) {
-    let column, direction;
-    if (typeof options === 'string') {
-      column = options;
-      direction = 'asc';
-    } else {
-      column = Object.keys(options)[0];
-      direction = options[column];
-    }
-
-    let collection = this.table.orderBy(column);
-    if (direction === 'desc' || direction === ':desc') {
-      collection = collection.reverse();
-    }
-    const rows = await collection.toArray();
-    return rows.map(row => new this(row));
-  }
-
+  // Convenience methods that delegate to Relation
   static async first() {
-    const row = await this.table.orderBy('id').first();
-    return row ? new this(row) : null;
+    return new Relation(this).first();
   }
 
   static async last() {
-    const row = await this.table.orderBy('id').last();
-    return row ? new this(row) : null;
+    return new Relation(this).last();
+  }
+
+  static async count() {
+    return new Relation(this).count();
+  }
+
+  // --- Relation execution (called by Relation) ---
+
+  // Execute a Relation query and return model instances
+  static async _executeRelation(rel) {
+    let rows;
+
+    // Build the Dexie query
+    let collection = this.table;
+
+    // Apply conditions
+    if (rel._conditions.length > 0) {
+      // Dexie only supports one where() - combine conditions
+      const combined = Object.assign({}, ...rel._conditions);
+      collection = collection.where(combined);
+    }
+
+    // Apply raw SQL conditions via filter
+    if (rel._rawConditions && rel._rawConditions.length > 0) {
+      // Get all rows first, then filter (Dexie limitation)
+      rows = await collection.toArray();
+      for (const raw of rel._rawConditions) {
+        const parsed = parseCondition(raw.sql, raw.values);
+        if (parsed) {
+          const filterFn = toFilterFunction(parsed);
+          rows = rows.filter(filterFn);
+        }
+      }
+    } else {
+      rows = await collection.toArray();
+    }
+
+    // Apply ordering (in-memory for now)
+    if (rel._order) {
+      const [col, dir] = this._parseOrder(rel._order);
+      rows.sort((a, b) => {
+        const aVal = a[col];
+        const bVal = b[col];
+        if (aVal < bVal) return dir === 'asc' ? -1 : 1;
+        if (aVal > bVal) return dir === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+
+    // Apply offset and limit
+    if (rel._offset != null) {
+      rows = rows.slice(rel._offset);
+    }
+    if (rel._limit != null) {
+      rows = rows.slice(0, rel._limit);
+    }
+
+    // Convert to model instances
+    const records = rows.map(row => new this(row));
+
+    // Load included associations if any
+    if (rel._includes && rel._includes.length > 0) {
+      await this._loadAssociations(records, rel._includes);
+    }
+
+    return records;
+  }
+
+  // Execute a COUNT query for a Relation
+  static async _executeCount(rel) {
+    // For simplicity, get all matching records and count
+    // Could be optimized with Dexie's count() if no complex filters
+    if (rel._conditions.length === 0 && (!rel._rawConditions || rel._rawConditions.length === 0)) {
+      return await this.table.count();
+    }
+    const records = await this._executeRelation(rel);
+    return records.length;
+  }
+
+  // Parse order option into [column, direction]
+  static _parseOrder(order) {
+    if (typeof order === 'string') {
+      return [order, 'asc'];
+    }
+    const col = Object.keys(order)[0];
+    let dir = order[col];
+    if (dir === ':desc') dir = 'desc';
+    if (dir === ':asc') dir = 'asc';
+    return [col, dir];
+  }
+
+  // --- Association loading ---
+
+  // Load associations for a set of records
+  static async _loadAssociations(records, includes) {
+    if (records.length === 0) return;
+
+    for (const include of includes) {
+      if (typeof include === 'string') {
+        await this._loadAssociation(records, include);
+      } else if (typeof include === 'object') {
+        // Nested include: { posts: 'comments' }
+        for (const assocName of Object.keys(include)) {
+          await this._loadAssociation(records, assocName);
+          // TODO: nested loading
+        }
+      }
+    }
+  }
+
+  // Load a single association for a set of records
+  static async _loadAssociation(records, assocName) {
+    const associations = this.associations || {};
+    const assoc = associations[assocName];
+
+    if (!assoc) {
+      console.warn(`Association '${assocName}' not defined on ${this.name}`);
+      return;
+    }
+
+    const AssocModel = this._resolveModel(assoc.model);
+    if (!AssocModel) {
+      console.warn(`Could not resolve model for association '${assocName}'`);
+      return;
+    }
+
+    if (assoc.type === 'has_many') {
+      await this._loadHasMany(records, assocName, assoc, AssocModel);
+    } else if (assoc.type === 'belongs_to') {
+      await this._loadBelongsTo(records, assocName, assoc, AssocModel);
+    }
+  }
+
+  // Load has_many association
+  static async _loadHasMany(records, assocName, assoc, AssocModel) {
+    const pkValues = records.map(r => r.id).filter(v => v != null);
+    if (pkValues.length === 0) return;
+
+    // Determine foreign key (e.g., article_id for Article has_many comments)
+    const foreignKey = assoc.foreignKey || `${this._singularize(this.name).toLowerCase()}_id`;
+
+    // Fetch all related records in one query
+    const related = await AssocModel.table.where(foreignKey).anyOf(pkValues).toArray();
+
+    // Group by foreign key
+    const relatedByFk = new Map();
+    for (const r of related) {
+      const fk = r[foreignKey];
+      if (!relatedByFk.has(fk)) {
+        relatedByFk.set(fk, []);
+      }
+      relatedByFk.get(fk).push(new AssocModel(r));
+    }
+
+    // Attach to parent records (sets _comments so getter returns cached value)
+    for (const record of records) {
+      record[`_${assocName}`] = relatedByFk.get(record.id) || [];
+    }
+  }
+
+  // Load belongs_to association
+  static async _loadBelongsTo(records, assocName, assoc, AssocModel) {
+    const foreignKey = assoc.foreignKey || `${assocName}_id`;
+    const fkValues = [...new Set(
+      records.map(r => r[foreignKey] || r.attributes?.[foreignKey]).filter(v => v != null)
+    )];
+
+    if (fkValues.length === 0) {
+      for (const record of records) {
+        record[assocName] = null;
+      }
+      return;
+    }
+
+    // Fetch all related records
+    const related = await AssocModel.table.where('id').anyOf(fkValues).toArray();
+    const relatedById = new Map(related.map(r => [r.id, new AssocModel(r)]));
+
+    for (const record of records) {
+      const fk = record[foreignKey] || record.attributes?.[foreignKey];
+      record[assocName] = relatedById.get(fk) || null;
+    }
+  }
+
+  // Resolve model class from name or class
+  static _resolveModel(modelOrName) {
+    if (typeof modelOrName === 'function') return modelOrName;
+    // String reference - look up from model registry
+    if (typeof modelOrName === 'string') return modelRegistry[modelOrName];
+    return modelOrName;
+  }
+
+  // Simple singularize (articles -> article)
+  static _singularize(name) {
+    if (name.endsWith('ies')) return name.slice(0, -3) + 'y';
+    if (name.endsWith('s')) return name.slice(0, -1);
+    return name;
   }
 
   // --- Instance Methods ---

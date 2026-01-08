@@ -107,6 +107,7 @@ export class ApplicationBase {
   static migrations = null;
   static activeRecordModule = null;
   static layoutFn = null;
+  static models = {};  // Model registry for association resolution
 
   // Configure the application
   static configure(options) {
@@ -114,6 +115,11 @@ export class ApplicationBase {
     if (options.seeds) this.seeds = options.seeds;
     if (options.migrations) this.migrations = options.migrations;
     if (options.layout) this.layoutFn = options.layout;
+  }
+
+  // Register models for association resolution (avoids circular dependency issues)
+  static registerModels(models) {
+    Object.assign(this.models, models);
   }
 
   // Wrap content in HTML layout
@@ -131,6 +137,11 @@ export class ApplicationBase {
     // Import the adapter (selected at build time)
     const adapter = await import('./active_record.mjs');
     this.activeRecordModule = adapter;
+
+    // Populate model registry for association resolution (avoids circular dependencies)
+    if (adapter.modelRegistry && this.models) {
+      Object.assign(adapter.modelRegistry, this.models);
+    }
 
     // Initialize database connection
     await adapter.initDatabase(options);
