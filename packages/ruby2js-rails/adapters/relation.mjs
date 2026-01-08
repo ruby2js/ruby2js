@@ -19,6 +19,7 @@ export class Relation {
     this._offset = null;
     this._select = null;
     this._distinct = false;
+    this._includes = [];
   }
 
   // --- Chainable methods (return new Relation) ---
@@ -58,6 +59,14 @@ export class Relation {
   distinct() {
     const rel = this._clone();
     rel._distinct = true;
+    return rel;
+  }
+
+  // Eager load associations: User.includes('posts') or User.includes('posts', 'comments')
+  // Also supports nested includes: User.includes({ posts: 'comments' }) or User.includes({ posts: ['comments', 'tags'] })
+  includes(...associations) {
+    const rel = this._clone();
+    rel._includes = [...rel._includes, ...associations];
     return rel;
   }
 
@@ -159,6 +168,7 @@ export class Relation {
     rel._offset = this._offset;
     rel._select = this._select;
     rel._distinct = this._distinct;
+    rel._includes = [...this._includes];
     return rel;
   }
 

@@ -1,6 +1,8 @@
 // Ruby2JS-on-Rails Micro Framework - Base Module
 // Shared routing and helper functionality for all targets
 
+import { pluralize as inflectPlural } from './adapters/inflector.mjs';
+
 // Base Router class with route registration and matching
 export class RouterBase {
   static routes = [];
@@ -278,9 +280,10 @@ export function truncate(text, options = {}) {
 // Pluralize helper (Rails view helper equivalent)
 // pluralize(1, 'error') => '1 error'
 // pluralize(2, 'error') => '2 errors'
+// pluralize(2, 'person') => '2 people' (uses inflector for irregular words)
 // pluralize(2, 'error', 'mistakes') => '2 mistakes'
 export function pluralize(count, singular, plural = null) {
-  const word = count === 1 ? singular : (plural || singular + 's');
+  const word = count === 1 ? singular : (plural || inflectPlural(singular));
   return `${count} ${word}`;
 }
 

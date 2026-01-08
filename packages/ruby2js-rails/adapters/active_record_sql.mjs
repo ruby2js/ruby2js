@@ -15,6 +15,7 @@
 
 import { ActiveRecordBase } from './active_record_base.mjs';
 import { Relation } from './relation.mjs';
+import { singularize } from './inflector.mjs';
 
 export class ActiveRecordSQL extends ActiveRecordBase {
   // --- Dialect hooks (override in dialect subclass) ---
@@ -76,6 +77,11 @@ export class ActiveRecordSQL extends ActiveRecordBase {
     return new Relation(this).distinct();
   }
 
+  // Returns a Relation with eager-loaded associations
+  static includes(...associations) {
+    return new Relation(this).includes(...associations);
+  }
+
   // --- Class Methods (terminal - execute immediately) ---
 
   static async find(id) {
@@ -127,7 +133,14 @@ export class ActiveRecordSQL extends ActiveRecordBase {
   static async _executeRelation(rel) {
     const { sql, values } = this._buildRelationSQL(rel);
     const result = await this._execute(sql, values);
-    return this._getRows(result).map(row => new this(row));
+    const records = this._getRows(result).map(row => new this(row));
+
+    // Load included associations if any
+    if (rel._includes && rel._includes.length > 0) {
+      await this._loadAssociations(records, rel._includes);
+    }
+
+    return records;
   }
 
   // Execute a COUNT query for a Relation
@@ -162,6 +175,190 @@ export class ActiveRecordSQL extends ActiveRecordBase {
     }
     // Multiple columns: return array of arrays
     return rows.map(row => columns.map(col => row[col]));
+  }
+
+  // --- Association Loading ---
+
+  // Model registry for resolving association model names to classes
+  // Models register themselves: ActiveRecordSQL._modelRegistry.set('User', User)
+  static _modelRegistry = new Map();
+
+  // Register a model class for association resolution
+  static registerModel(modelClass) {
+    this._modelRegistry.set(modelClass.name, modelClass);
+  }
+
+  // Resolve a model name or class to a model class
+  static _resolveModel(modelOrName) {
+    if (typeof modelOrName === 'string') {
+      const model = this._modelRegistry.get(modelOrName);
+      if (!model) {
+        throw new Error(`Model '${modelOrName}' not found in registry. Did you forget to call registerModel()?`);
+      }
+      return model;
+    }
+    return modelOrName;
+  }
+
+  // Load associations for a set of records
+  // includes can be: ['posts', 'comments'] or [{ posts: 'comments' }] or [{ posts: ['comments', 'tags'] }]
+  static async _loadAssociations(records, includes) {
+    if (records.length === 0) return;
+
+    for (const include of includes) {
+      if (typeof include === 'string') {
+        // Simple include: 'posts'
+        await this._loadAssociation(records, include);
+      } else if (typeof include === 'object') {
+        // Nested include: { posts: 'comments' } or { posts: ['comments', 'tags'] }
+        const keys = Object.keys(include);
+        for (const assocName of keys) {
+          // Load the association first
+          await this._loadAssociation(records, assocName);
+
+          // Then load nested associations on the loaded records
+          const nested = include[assocName];
+          const nestedIncludes = Array.isArray(nested) ? nested : [nested];
+
+          // Collect all associated records
+          const assocRecords = [];
+          for (const record of records) {
+            const assocValue = record[assocName];
+            if (Array.isArray(assocValue)) {
+              assocRecords.push(...assocValue);
+            } else if (assocValue) {
+              assocRecords.push(assocValue);
+            }
+          }
+
+          // Load nested associations on the collected records
+          if (assocRecords.length > 0) {
+            const AssocModel = this._getAssociationModel(assocName);
+            if (AssocModel) {
+              await AssocModel._loadAssociations(assocRecords, nestedIncludes);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Get the model class for an association name
+  static _getAssociationModel(assocName) {
+    const associations = this.associations || {};
+    const assoc = associations[assocName];
+    if (!assoc) return null;
+    return this._resolveModel(assoc.model);
+  }
+
+  // Load a single association for a set of records
+  static async _loadAssociation(records, assocName) {
+    const associations = this.associations || {};
+    const assoc = associations[assocName];
+
+    if (!assoc) {
+      console.warn(`Association '${assocName}' not defined on ${this.name}`);
+      return;
+    }
+
+    const AssocModel = this._resolveModel(assoc.model);
+
+    if (assoc.type === 'belongs_to') {
+      await this._loadBelongsTo(records, assocName, assoc, AssocModel);
+    } else if (assoc.type === 'has_many') {
+      await this._loadHasMany(records, assocName, assoc, AssocModel);
+    } else if (assoc.type === 'has_one') {
+      await this._loadHasOne(records, assocName, assoc, AssocModel);
+    }
+  }
+
+  // Load belongs_to association (e.g., Post belongs_to User)
+  static async _loadBelongsTo(records, assocName, assoc, AssocModel) {
+    // Collect unique foreign key values
+    const foreignKey = assoc.foreignKey || `${assocName}_id`;
+    const fkValues = [...new Set(
+      records.map(r => r[foreignKey] || r.attributes?.[foreignKey]).filter(v => v != null)
+    )];
+
+    if (fkValues.length === 0) {
+      // No foreign keys, set all to null
+      for (const record of records) {
+        record[assocName] = null;
+      }
+      return;
+    }
+
+    // Single query for all related records
+    const related = await AssocModel.where({ id: fkValues });
+    const relatedById = new Map(related.map(r => [r.id, r]));
+
+    // Attach to parent records
+    for (const record of records) {
+      const fk = record[foreignKey] || record.attributes?.[foreignKey];
+      record[assocName] = relatedById.get(fk) || null;
+    }
+  }
+
+  // Load has_many association (e.g., User has_many Posts)
+  static async _loadHasMany(records, assocName, assoc, AssocModel) {
+    // Collect primary key values
+    const pkValues = records.map(r => r.id).filter(v => v != null);
+
+    if (pkValues.length === 0) {
+      for (const record of records) {
+        record[assocName] = [];
+      }
+      return;
+    }
+
+    // Foreign key on the associated model
+    const foreignKey = assoc.foreignKey || `${singularize(this.name).toLowerCase()}_id`;
+
+    // Single query for all related records
+    const related = await AssocModel.where({ [foreignKey]: pkValues });
+
+    // Group by foreign key
+    const relatedByFk = new Map();
+    for (const r of related) {
+      const fk = r[foreignKey] || r.attributes?.[foreignKey];
+      if (!relatedByFk.has(fk)) {
+        relatedByFk.set(fk, []);
+      }
+      relatedByFk.get(fk).push(r);
+    }
+
+    // Attach to parent records
+    for (const record of records) {
+      record[assocName] = relatedByFk.get(record.id) || [];
+    }
+  }
+
+  // Load has_one association (e.g., User has_one Profile)
+  static async _loadHasOne(records, assocName, assoc, AssocModel) {
+    // Similar to has_many but only take first result
+    const pkValues = records.map(r => r.id).filter(v => v != null);
+
+    if (pkValues.length === 0) {
+      for (const record of records) {
+        record[assocName] = null;
+      }
+      return;
+    }
+
+    const foreignKey = assoc.foreignKey || `${singularize(this.name).toLowerCase()}_id`;
+    const related = await AssocModel.where({ [foreignKey]: pkValues });
+
+    const relatedByFk = new Map();
+    for (const r of related) {
+      const fk = r[foreignKey] || r.attributes?.[foreignKey];
+      if (!relatedByFk.has(fk)) {
+        relatedByFk.set(fk, r);
+      }
+    }
+
+    for (const record of records) {
+      record[assocName] = relatedByFk.get(record.id) || null;
+    }
   }
 
   // Build SQL from a Relation object

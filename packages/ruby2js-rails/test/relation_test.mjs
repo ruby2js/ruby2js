@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 
 import { Relation } from '../adapters/relation.mjs';
 import { ActiveRecordSQL } from '../adapters/active_record_sql.mjs';
+import { singularize, pluralize } from '../adapters/inflector.mjs';
 
 // --- Mock Model Classes ---
 
@@ -1086,6 +1087,607 @@ describe('Static convenience methods', () => {
       assert.equal(MockModel._executedQueries.length, 1);
       const { sql } = MockModel._executedQueries[0];
       assert.equal(sql, 'SELECT DISTINCT role FROM users');
+    });
+  });
+});
+
+// --- Phase 4: Associations Tests ---
+
+describe('includes() method', () => {
+  it('adds includes and returns new Relation', () => {
+    const rel1 = new Relation(MockModel);
+    const rel2 = rel1.includes('posts');
+
+    assert.deepEqual(rel1._includes, []);
+    assert.deepEqual(rel2._includes, ['posts']);
+    assert.notEqual(rel1, rel2);
+  });
+
+  it('chains multiple includes', () => {
+    const rel = new Relation(MockModel)
+      .includes('posts')
+      .includes('comments');
+
+    assert.deepEqual(rel._includes, ['posts', 'comments']);
+  });
+
+  it('accepts multiple associations in one call', () => {
+    const rel = new Relation(MockModel).includes('posts', 'comments');
+
+    assert.deepEqual(rel._includes, ['posts', 'comments']);
+  });
+
+  it('accepts nested includes as objects', () => {
+    const rel = new Relation(MockModel).includes({ posts: 'comments' });
+
+    assert.deepEqual(rel._includes, [{ posts: 'comments' }]);
+  });
+
+  it('clones includes array', () => {
+    const rel1 = new Relation(MockModel).includes('posts');
+    const rel2 = rel1._clone();
+
+    rel2._includes.push('comments');
+    assert.deepEqual(rel1._includes, ['posts']);
+    assert.deepEqual(rel2._includes, ['posts', 'comments']);
+  });
+});
+
+describe('Association loading', () => {
+  // Mock models with associations
+  let queryLog = [];
+
+  class Author extends ActiveRecordSQL {
+    static tableName = 'authors';
+    static get useNumberedParams() { return false; }
+
+    static associations = {
+      posts: { type: 'has_many', model: 'Post', foreignKey: 'author_id' },
+      profile: { type: 'has_one', model: 'Profile', foreignKey: 'author_id' }
+    };
+
+    static _testData = [
+      { id: 1, name: 'Alice' },
+      { id: 2, name: 'Bob' },
+      { id: 3, name: 'Carol' }
+    ];
+
+    static async _execute(sql, params) {
+      queryLog.push({ sql, params });
+      if (sql.includes('FROM authors')) {
+        return { rows: this._testData };
+      }
+      return { rows: [] };
+    }
+
+    static _getRows(result) { return result.rows; }
+    static _getLastInsertId(result) { return 1; }
+
+    constructor(attrs) {
+      super(attrs);
+      Object.assign(this, attrs);
+    }
+  }
+
+  class Post extends ActiveRecordSQL {
+    static tableName = 'posts';
+    static get useNumberedParams() { return false; }
+
+    static associations = {
+      author: { type: 'belongs_to', model: 'Author', foreignKey: 'author_id' },
+      comments: { type: 'has_many', model: 'Comment', foreignKey: 'post_id' }
+    };
+
+    static _testData = [
+      { id: 1, title: 'Post 1', author_id: 1 },
+      { id: 2, title: 'Post 2', author_id: 1 },
+      { id: 3, title: 'Post 3', author_id: 2 }
+    ];
+
+    static async _execute(sql, params) {
+      queryLog.push({ sql, params });
+      if (sql.includes('FROM posts')) {
+        // Filter by author_id if IN clause is present
+        if (sql.includes('author_id IN')) {
+          const ids = params || [];
+          return { rows: this._testData.filter(p => ids.includes(p.author_id)) };
+        }
+        return { rows: this._testData };
+      }
+      return { rows: [] };
+    }
+
+    static _getRows(result) { return result.rows; }
+    static _getLastInsertId(result) { return 1; }
+
+    constructor(attrs) {
+      super(attrs);
+      Object.assign(this, attrs);
+    }
+  }
+
+  class Comment extends ActiveRecordSQL {
+    static tableName = 'comments';
+    static get useNumberedParams() { return false; }
+
+    static associations = {
+      post: { type: 'belongs_to', model: 'Post', foreignKey: 'post_id' }
+    };
+
+    static _testData = [
+      { id: 1, body: 'Comment 1', post_id: 1 },
+      { id: 2, body: 'Comment 2', post_id: 1 },
+      { id: 3, body: 'Comment 3', post_id: 2 }
+    ];
+
+    static async _execute(sql, params) {
+      queryLog.push({ sql, params });
+      if (sql.includes('FROM comments')) {
+        if (sql.includes('post_id IN')) {
+          const ids = params || [];
+          return { rows: this._testData.filter(c => ids.includes(c.post_id)) };
+        }
+        return { rows: this._testData };
+      }
+      return { rows: [] };
+    }
+
+    static _getRows(result) { return result.rows; }
+    static _getLastInsertId(result) { return 1; }
+
+    constructor(attrs) {
+      super(attrs);
+      Object.assign(this, attrs);
+    }
+  }
+
+  class Profile extends ActiveRecordSQL {
+    static tableName = 'profiles';
+    static get useNumberedParams() { return false; }
+
+    static associations = {
+      author: { type: 'belongs_to', model: 'Author', foreignKey: 'author_id' }
+    };
+
+    static _testData = [
+      { id: 1, bio: 'Alice bio', author_id: 1 },
+      { id: 2, bio: 'Bob bio', author_id: 2 }
+    ];
+
+    static async _execute(sql, params) {
+      queryLog.push({ sql, params });
+      if (sql.includes('FROM profiles')) {
+        if (sql.includes('author_id IN')) {
+          const ids = params || [];
+          return { rows: this._testData.filter(p => ids.includes(p.author_id)) };
+        }
+        return { rows: this._testData };
+      }
+      return { rows: [] };
+    }
+
+    static _getRows(result) { return result.rows; }
+    static _getLastInsertId(result) { return 1; }
+
+    constructor(attrs) {
+      super(attrs);
+      Object.assign(this, attrs);
+    }
+  }
+
+  // Register models before tests
+  beforeEach(() => {
+    queryLog = [];
+    ActiveRecordSQL.registerModel(Author);
+    ActiveRecordSQL.registerModel(Post);
+    ActiveRecordSQL.registerModel(Comment);
+    ActiveRecordSQL.registerModel(Profile);
+  });
+
+  describe('belongs_to', () => {
+    it('loads belongs_to association', async () => {
+      // Setup: make Post return data with author_id
+      const originalExecute = Post._execute;
+      Post._execute = async (sql, params) => {
+        queryLog.push({ sql, params });
+        if (sql.includes('FROM posts')) {
+          return { rows: [{ id: 1, title: 'Test Post', author_id: 1 }] };
+        }
+        if (sql.includes('FROM authors')) {
+          return { rows: [{ id: 1, name: 'Alice' }] };
+        }
+        return { rows: [] };
+      };
+      Author._execute = async (sql, params) => {
+        queryLog.push({ sql, params });
+        if (sql.includes('FROM authors')) {
+          return { rows: [{ id: 1, name: 'Alice' }] };
+        }
+        return { rows: [] };
+      };
+
+      const posts = await Post.includes('author');
+
+      assert.equal(posts.length, 1);
+      assert.equal(posts[0].author.name, 'Alice');
+      assert.ok(posts[0].author instanceof Author);
+
+      // Restore
+      Post._execute = originalExecute;
+    });
+
+    it('handles null foreign key', async () => {
+      const originalExecute = Post._execute;
+      Post._execute = async (sql, params) => {
+        queryLog.push({ sql, params });
+        if (sql.includes('FROM posts')) {
+          return { rows: [{ id: 1, title: 'Orphan Post', author_id: null }] };
+        }
+        return { rows: [] };
+      };
+
+      const posts = await Post.includes('author');
+
+      assert.equal(posts.length, 1);
+      assert.equal(posts[0].author, null);
+
+      Post._execute = originalExecute;
+    });
+  });
+
+  describe('has_many', () => {
+    it('loads has_many association', async () => {
+      const originalAuthorExecute = Author._execute;
+      const originalPostExecute = Post._execute;
+
+      Author._execute = async (sql, params) => {
+        queryLog.push({ sql, params });
+        return { rows: [{ id: 1, name: 'Alice' }] };
+      };
+      Post._execute = async (sql, params) => {
+        queryLog.push({ sql, params });
+        if (sql.includes('author_id IN')) {
+          return { rows: [
+            { id: 1, title: 'Post 1', author_id: 1 },
+            { id: 2, title: 'Post 2', author_id: 1 }
+          ]};
+        }
+        return { rows: [] };
+      };
+
+      const authors = await Author.includes('posts');
+
+      assert.equal(authors.length, 1);
+      assert.equal(authors[0].posts.length, 2);
+      assert.equal(authors[0].posts[0].title, 'Post 1');
+      assert.ok(authors[0].posts[0] instanceof Post);
+
+      Author._execute = originalAuthorExecute;
+      Post._execute = originalPostExecute;
+    });
+
+    it('returns empty array for no matches', async () => {
+      const originalAuthorExecute = Author._execute;
+      const originalPostExecute = Post._execute;
+
+      Author._execute = async (sql, params) => {
+        return { rows: [{ id: 99, name: 'New Author' }] };
+      };
+      Post._execute = async (sql, params) => {
+        return { rows: [] };
+      };
+
+      const authors = await Author.includes('posts');
+
+      assert.equal(authors.length, 1);
+      assert.deepEqual(authors[0].posts, []);
+
+      Author._execute = originalAuthorExecute;
+      Post._execute = originalPostExecute;
+    });
+  });
+
+  describe('has_one', () => {
+    it('loads has_one association', async () => {
+      const originalAuthorExecute = Author._execute;
+      const originalProfileExecute = Profile._execute;
+
+      Author._execute = async (sql, params) => {
+        return { rows: [{ id: 1, name: 'Alice' }] };
+      };
+      Profile._execute = async (sql, params) => {
+        if (sql.includes('author_id IN')) {
+          return { rows: [{ id: 1, bio: 'Alice bio', author_id: 1 }] };
+        }
+        return { rows: [] };
+      };
+
+      const authors = await Author.includes('profile');
+
+      assert.equal(authors.length, 1);
+      assert.equal(authors[0].profile.bio, 'Alice bio');
+      assert.ok(authors[0].profile instanceof Profile);
+
+      Author._execute = originalAuthorExecute;
+      Profile._execute = originalProfileExecute;
+    });
+  });
+
+  describe('nested includes', () => {
+    it('loads nested associations', async () => {
+      const originalAuthorExecute = Author._execute;
+      const originalPostExecute = Post._execute;
+      const originalCommentExecute = Comment._execute;
+
+      Author._execute = async (sql, params) => {
+        return { rows: [{ id: 1, name: 'Alice' }] };
+      };
+      Post._execute = async (sql, params) => {
+        if (sql.includes('author_id IN')) {
+          return { rows: [{ id: 1, title: 'Post 1', author_id: 1 }] };
+        }
+        return { rows: [] };
+      };
+      Comment._execute = async (sql, params) => {
+        if (sql.includes('post_id IN')) {
+          return { rows: [
+            { id: 1, body: 'Comment 1', post_id: 1 },
+            { id: 2, body: 'Comment 2', post_id: 1 }
+          ]};
+        }
+        return { rows: [] };
+      };
+
+      const authors = await Author.includes({ posts: 'comments' });
+
+      assert.equal(authors.length, 1);
+      assert.equal(authors[0].posts.length, 1);
+      assert.equal(authors[0].posts[0].comments.length, 2);
+      assert.equal(authors[0].posts[0].comments[0].body, 'Comment 1');
+
+      Author._execute = originalAuthorExecute;
+      Post._execute = originalPostExecute;
+      Comment._execute = originalCommentExecute;
+    });
+
+    it('supports array of nested includes', async () => {
+      const originalAuthorExecute = Author._execute;
+      const originalPostExecute = Post._execute;
+      const originalProfileExecute = Profile._execute;
+
+      Author._execute = async (sql, params) => {
+        return { rows: [{ id: 1, name: 'Alice' }] };
+      };
+      Post._execute = async (sql, params) => {
+        if (sql.includes('author_id IN')) {
+          return { rows: [{ id: 1, title: 'Post 1', author_id: 1 }] };
+        }
+        return { rows: [] };
+      };
+      Profile._execute = async (sql, params) => {
+        if (sql.includes('author_id IN')) {
+          return { rows: [{ id: 1, bio: 'Bio', author_id: 1 }] };
+        }
+        return { rows: [] };
+      };
+
+      const authors = await Author.includes('posts', 'profile');
+
+      assert.equal(authors.length, 1);
+      assert.equal(authors[0].posts.length, 1);
+      assert.equal(authors[0].profile.bio, 'Bio');
+
+      Author._execute = originalAuthorExecute;
+      Post._execute = originalPostExecute;
+      Profile._execute = originalProfileExecute;
+    });
+  });
+
+  describe('N+1 prevention', () => {
+    it('uses batch loading for belongs_to', async () => {
+      const originalPostExecute = Post._execute;
+      const originalAuthorExecute = Author._execute;
+
+      Post._execute = async (sql, params) => {
+        queryLog.push({ sql, params });
+        return { rows: [
+          { id: 1, title: 'Post 1', author_id: 1 },
+          { id: 2, title: 'Post 2', author_id: 2 },
+          { id: 3, title: 'Post 3', author_id: 1 }
+        ]};
+      };
+      Author._execute = async (sql, params) => {
+        queryLog.push({ sql, params });
+        // Should receive both author IDs in one query
+        if (sql.includes('id IN')) {
+          return { rows: [
+            { id: 1, name: 'Alice' },
+            { id: 2, name: 'Bob' }
+          ]};
+        }
+        return { rows: [] };
+      };
+
+      queryLog = [];
+      const posts = await Post.includes('author');
+
+      // Should be 2 queries: one for posts, one for authors (batch)
+      assert.equal(queryLog.length, 2);
+      assert.ok(queryLog[1].sql.includes('id IN'));
+
+      Post._execute = originalPostExecute;
+      Author._execute = originalAuthorExecute;
+    });
+
+    it('uses batch loading for has_many', async () => {
+      const originalAuthorExecute = Author._execute;
+      const originalPostExecute = Post._execute;
+
+      Author._execute = async (sql, params) => {
+        queryLog.push({ sql, params });
+        return { rows: [
+          { id: 1, name: 'Alice' },
+          { id: 2, name: 'Bob' }
+        ]};
+      };
+      Post._execute = async (sql, params) => {
+        queryLog.push({ sql, params });
+        if (sql.includes('author_id IN')) {
+          return { rows: [
+            { id: 1, title: 'Post 1', author_id: 1 },
+            { id: 2, title: 'Post 2', author_id: 2 },
+            { id: 3, title: 'Post 3', author_id: 1 }
+          ]};
+        }
+        return { rows: [] };
+      };
+
+      queryLog = [];
+      const authors = await Author.includes('posts');
+
+      // Should be 2 queries: one for authors, one for posts (batch)
+      assert.equal(queryLog.length, 2);
+      assert.ok(queryLog[1].sql.includes('author_id IN'));
+
+      // Verify correct assignment
+      assert.equal(authors[0].posts.length, 2); // Alice has 2 posts
+      assert.equal(authors[1].posts.length, 1); // Bob has 1 post
+
+      Author._execute = originalAuthorExecute;
+      Post._execute = originalPostExecute;
+    });
+  });
+
+  describe('static includes() method', () => {
+    it('returns a Relation with includes', () => {
+      const rel = Author.includes('posts');
+      assert.ok(rel instanceof Relation);
+      assert.deepEqual(rel._includes, ['posts']);
+    });
+
+    it('chains with other methods', async () => {
+      const originalExecute = Author._execute;
+      Author._execute = async (sql, params) => {
+        queryLog.push({ sql, params });
+        return { rows: [] };
+      };
+      Post._execute = async () => ({ rows: [] });
+
+      queryLog = [];
+      await Author.where({ active: true }).includes('posts').limit(5);
+
+      assert.equal(queryLog.length, 1);
+      assert.ok(queryLog[0].sql.includes('WHERE active = ?'));
+      assert.ok(queryLog[0].sql.includes('LIMIT 5'));
+
+      Author._execute = originalExecute;
+    });
+  });
+});
+
+describe('Model registry', () => {
+  it('registers and retrieves models', () => {
+    class TestModel extends ActiveRecordSQL {
+      static tableName = 'tests';
+    }
+
+    ActiveRecordSQL.registerModel(TestModel);
+
+    const resolved = ActiveRecordSQL._resolveModel('TestModel');
+    assert.equal(resolved, TestModel);
+  });
+
+  it('throws for unregistered model', () => {
+    assert.throws(
+      () => ActiveRecordSQL._resolveModel('NonexistentModel'),
+      /not found in registry/
+    );
+  });
+
+  it('returns model class directly if passed a class', () => {
+    class DirectModel extends ActiveRecordSQL {
+      static tableName = 'direct';
+    }
+
+    const resolved = ActiveRecordSQL._resolveModel(DirectModel);
+    assert.equal(resolved, DirectModel);
+  });
+});
+
+describe('Inflector', () => {
+  describe('singularize', () => {
+    it('removes trailing s', () => {
+      assert.equal(singularize('users'), 'user');
+      assert.equal(singularize('posts'), 'post');
+    });
+
+    it('handles -ies suffix', () => {
+      assert.equal(singularize('categories'), 'category');
+      assert.equal(singularize('entries'), 'entry');
+    });
+
+    it('handles -es suffix', () => {
+      assert.equal(singularize('boxes'), 'box');
+      assert.equal(singularize('matches'), 'match');
+    });
+
+    it('leaves singular words unchanged', () => {
+      assert.equal(singularize('user'), 'user');
+      assert.equal(singularize('post'), 'post');
+    });
+
+    it('handles irregular words', () => {
+      assert.equal(singularize('people'), 'person');
+      assert.equal(singularize('children'), 'child');
+      assert.equal(singularize('men'), 'man');
+      assert.equal(singularize('women'), 'woman');
+    });
+
+    it('handles uncountable words', () => {
+      assert.equal(singularize('sheep'), 'sheep');
+      assert.equal(singularize('fish'), 'fish');
+      assert.equal(singularize('species'), 'species');
+    });
+
+    it('preserves capitalization', () => {
+      assert.equal(singularize('People'), 'Person');
+      assert.equal(singularize('Children'), 'Child');
+    });
+  });
+
+  describe('pluralize', () => {
+    it('adds trailing s', () => {
+      assert.equal(pluralize('user'), 'users');
+      assert.equal(pluralize('post'), 'posts');
+    });
+
+    it('handles -y suffix', () => {
+      assert.equal(pluralize('category'), 'categories');
+      assert.equal(pluralize('entry'), 'entries');
+    });
+
+    it('handles -x, -ch, -sh suffix', () => {
+      assert.equal(pluralize('box'), 'boxes');
+      assert.equal(pluralize('match'), 'matches');
+      assert.equal(pluralize('bush'), 'bushes');
+    });
+
+    it('handles irregular words', () => {
+      assert.equal(pluralize('person'), 'people');
+      assert.equal(pluralize('child'), 'children');
+      assert.equal(pluralize('man'), 'men');
+      assert.equal(pluralize('woman'), 'women');
+    });
+
+    it('handles uncountable words', () => {
+      assert.equal(pluralize('sheep'), 'sheep');
+      assert.equal(pluralize('fish'), 'fish');
+      assert.equal(pluralize('species'), 'species');
+    });
+
+    it('preserves capitalization', () => {
+      assert.equal(pluralize('Person'), 'People');
+      assert.equal(pluralize('Child'), 'Children');
     });
   });
 });
