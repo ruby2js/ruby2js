@@ -1691,3 +1691,187 @@ describe('Inflector', () => {
     });
   });
 });
+
+// --- Raw SQL Conditions Tests ---
+
+describe('Raw SQL conditions', () => {
+  describe('where() with string SQL', () => {
+    it('stores raw condition with values', () => {
+      const rel = new Relation(MockModel)
+        .where('updated_at > ?', '2024-01-01');
+
+      assert.deepEqual(rel._rawConditions, [
+        { sql: 'updated_at > ?', values: ['2024-01-01'] }
+      ]);
+    });
+
+    it('stores multiple raw conditions', () => {
+      const rel = new Relation(MockModel)
+        .where('created_at > ?', '2024-01-01')
+        .where('created_at < ?', '2024-12-31');
+
+      assert.equal(rel._rawConditions.length, 2);
+      assert.deepEqual(rel._rawConditions[0], { sql: 'created_at > ?', values: ['2024-01-01'] });
+      assert.deepEqual(rel._rawConditions[1], { sql: 'created_at < ?', values: ['2024-12-31'] });
+    });
+
+    it('handles multiple placeholders', () => {
+      const rel = new Relation(MockModel)
+        .where('created_at BETWEEN ? AND ?', '2024-01-01', '2024-12-31');
+
+      assert.deepEqual(rel._rawConditions, [
+        { sql: 'created_at BETWEEN ? AND ?', values: ['2024-01-01', '2024-12-31'] }
+      ]);
+    });
+
+    it('mixes with hash conditions', () => {
+      const rel = new Relation(MockModel)
+        .where({ active: true })
+        .where('score > ?', 100);
+
+      assert.deepEqual(rel._conditions, [{ active: true }]);
+      assert.deepEqual(rel._rawConditions, [{ sql: 'score > ?', values: [100] }]);
+    });
+
+    it('clones raw conditions', () => {
+      const rel1 = new Relation(MockModel).where('age > ?', 18);
+      const rel2 = rel1._clone();
+
+      rel2._rawConditions.push({ sql: 'age < ?', values: [65] });
+      assert.equal(rel1._rawConditions.length, 1);
+      assert.equal(rel2._rawConditions.length, 2);
+    });
+  });
+
+  describe('SQL building with raw conditions', () => {
+    it('builds single raw condition (? placeholders)', () => {
+      const rel = new Relation(MockModel)
+        .where('updated_at > ?', '2024-01-01');
+      const { sql, values } = MockModel._buildRelationSQL(rel);
+
+      assert.equal(sql, 'SELECT * FROM users WHERE updated_at > ?');
+      assert.deepEqual(values, ['2024-01-01']);
+    });
+
+    it('builds multiple raw conditions', () => {
+      const rel = new Relation(MockModel)
+        .where('created_at > ?', '2024-01-01')
+        .where('created_at < ?', '2024-12-31');
+      const { sql, values } = MockModel._buildRelationSQL(rel);
+
+      assert.equal(sql, 'SELECT * FROM users WHERE created_at > ? AND created_at < ?');
+      assert.deepEqual(values, ['2024-01-01', '2024-12-31']);
+    });
+
+    it('builds raw condition with multiple placeholders', () => {
+      const rel = new Relation(MockModel)
+        .where('age BETWEEN ? AND ?', 18, 65);
+      const { sql, values } = MockModel._buildRelationSQL(rel);
+
+      assert.equal(sql, 'SELECT * FROM users WHERE age BETWEEN ? AND ?');
+      assert.deepEqual(values, [18, 65]);
+    });
+
+    it('combines hash and raw conditions', () => {
+      const rel = new Relation(MockModel)
+        .where({ active: true })
+        .where('score > ?', 100);
+      const { sql, values } = MockModel._buildRelationSQL(rel);
+
+      assert.equal(sql, 'SELECT * FROM users WHERE active = ? AND score > ?');
+      assert.deepEqual(values, [true, 100]);
+    });
+
+    it('combines raw with NOT and OR conditions', () => {
+      const rel = new Relation(MockModel)
+        .where({ active: true })
+        .where('score > ?', 100)
+        .not({ banned: true });
+      const { sql, values } = MockModel._buildRelationSQL(rel);
+
+      assert.equal(sql, 'SELECT * FROM users WHERE active = ? AND NOT (banned = ?) AND score > ?');
+      assert.deepEqual(values, [true, true, 100]);
+    });
+
+    it('works with ORDER, LIMIT, OFFSET', () => {
+      const rel = new Relation(MockModel)
+        .where('updated_at > ?', '2024-01-01')
+        .order({ created_at: 'desc' })
+        .limit(10)
+        .offset(5);
+      const { sql, values } = MockModel._buildRelationSQL(rel);
+
+      assert.equal(sql, 'SELECT * FROM users WHERE updated_at > ? ORDER BY created_at DESC LIMIT 10 OFFSET 5');
+      assert.deepEqual(values, ['2024-01-01']);
+    });
+  });
+
+  describe('PostgreSQL numbered parameters with raw conditions', () => {
+    it('converts ? to $n placeholders', () => {
+      const rel = new Relation(MockPostgresModel)
+        .where('updated_at > ?', '2024-01-01');
+      const { sql, values } = MockPostgresModel._buildRelationSQL(rel);
+
+      assert.equal(sql, 'SELECT * FROM posts WHERE updated_at > $1');
+      assert.deepEqual(values, ['2024-01-01']);
+    });
+
+    it('numbers placeholders correctly with multiple raw conditions', () => {
+      const rel = new Relation(MockPostgresModel)
+        .where('created_at > ?', '2024-01-01')
+        .where('created_at < ?', '2024-12-31');
+      const { sql, values } = MockPostgresModel._buildRelationSQL(rel);
+
+      assert.equal(sql, 'SELECT * FROM posts WHERE created_at > $1 AND created_at < $2');
+      assert.deepEqual(values, ['2024-01-01', '2024-12-31']);
+    });
+
+    it('numbers placeholders correctly for multiple values in one condition', () => {
+      const rel = new Relation(MockPostgresModel)
+        .where('age BETWEEN ? AND ?', 18, 65);
+      const { sql, values } = MockPostgresModel._buildRelationSQL(rel);
+
+      assert.equal(sql, 'SELECT * FROM posts WHERE age BETWEEN $1 AND $2');
+      assert.deepEqual(values, [18, 65]);
+    });
+
+    it('numbers correctly when combining hash and raw conditions', () => {
+      const rel = new Relation(MockPostgresModel)
+        .where({ active: true })
+        .where('score > ?', 100)
+        .where({ role: 'admin' });
+      const { sql, values } = MockPostgresModel._buildRelationSQL(rel);
+
+      assert.equal(sql, 'SELECT * FROM posts WHERE active = $1 AND role = $2 AND score > $3');
+      assert.deepEqual(values, [true, 'admin', 100]);
+    });
+  });
+
+  describe('Static where() with raw SQL', () => {
+    beforeEach(() => {
+      MockModel.resetQueries();
+    });
+
+    it('accepts raw SQL condition', async () => {
+      await MockModel.where('updated_at > ?', '2024-01-01');
+
+      assert.equal(MockModel._executedQueries.length, 1);
+      const { sql, params } = MockModel._executedQueries[0];
+      assert.equal(sql, 'SELECT * FROM users WHERE updated_at > ?');
+      assert.deepEqual(params, ['2024-01-01']);
+    });
+
+    it('chains with other methods', async () => {
+      await MockModel
+        .where({ active: true })
+        .where('score > ?', 100)
+        .order('name')
+        .limit(5);
+
+      assert.equal(MockModel._executedQueries.length, 1);
+      const { sql, params } = MockModel._executedQueries[0];
+      assert.equal(sql, 'SELECT * FROM users WHERE active = ? AND score > ? ORDER BY name ASC LIMIT 5');
+      assert.deepEqual(params, [true, 100]);
+    });
+  });
+});

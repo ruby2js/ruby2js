@@ -12,6 +12,7 @@ export class Relation {
   constructor(modelClass) {
     this.model = modelClass;
     this._conditions = [];
+    this._rawConditions = [];  // For raw SQL: ['updated_at > ?', timestamp]
     this._notConditions = [];
     this._orConditions = [];
     this._order = null;
@@ -24,9 +25,18 @@ export class Relation {
 
   // --- Chainable methods (return new Relation) ---
 
-  where(conditions) {
+  // where({active: true}) - hash conditions
+  // where('updated_at > ?', timestamp) - raw SQL with placeholder
+  // where('status = ? AND role = ?', 'active', 'admin') - multiple placeholders
+  where(conditionOrSql, ...values) {
     const rel = this._clone();
-    rel._conditions.push(conditions);
+    if (typeof conditionOrSql === 'string') {
+      // Raw SQL condition
+      rel._rawConditions.push({ sql: conditionOrSql, values });
+    } else {
+      // Hash condition
+      rel._conditions.push(conditionOrSql);
+    }
     return rel;
   }
 
@@ -161,6 +171,7 @@ export class Relation {
   _clone() {
     const rel = new Relation(this.model);
     rel._conditions = [...this._conditions];
+    rel._rawConditions = [...this._rawConditions];
     rel._notConditions = [...this._notConditions];
     rel._orConditions = [...this._orConditions];
     rel._order = this._order;

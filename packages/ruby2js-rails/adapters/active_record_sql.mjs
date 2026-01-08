@@ -48,8 +48,10 @@ export class ActiveRecordSQL extends ActiveRecordBase {
   }
 
   // Returns a Relation with conditions
-  static where(conditions) {
-    return new Relation(this).where(conditions);
+  // where({active: true}) - hash conditions
+  // where('updated_at > ?', timestamp) - raw SQL with placeholder
+  static where(conditionOrSql, ...values) {
+    return new Relation(this).where(conditionOrSql, ...values);
   }
 
   // Returns a Relation with ordering
@@ -418,6 +420,19 @@ export class ActiveRecordSQL extends ActiveRecordBase {
           allWhereParts.push(`(${parts.join(' AND ')})`);
           values.push(...vals);
         }
+      }
+    }
+
+    // Build raw SQL conditions (from where('col > ?', value))
+    if (rel._rawConditions && rel._rawConditions.length > 0) {
+      for (const raw of rel._rawConditions) {
+        // Replace ? placeholders with proper parameter markers
+        let sqlPart = raw.sql;
+        for (const val of raw.values) {
+          sqlPart = sqlPart.replace('?', this._param(paramIndex.value++));
+          values.push(this._formatValue(val));
+        }
+        allWhereParts.push(sqlPart);
       }
     }
 
