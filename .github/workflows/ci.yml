@@ -100,12 +100,12 @@ jobs:
     - name: Build selfhost converter, lib files, and build.mjs
       run: bundle exec rake -f demo/selfhost/Rakefile build build_lib build_mjs
 
-    - name: Generate and test blog demo
+    - name: Generate and test blog demo (dexie)
       run: |
         test/blog/create-blog demo/blog
-        node test/smoke-test.mjs demo/blog
+        node test/smoke-test.mjs demo/blog --database dexie
 
-    - name: Generate and test chat demo
+    - name: Generate and test chat demo (sqlite)
       run: |
         test/chat/create-chat demo/chat
-        node test/smoke-test.mjs demo/chat
+        node test/smoke-test.mjs demo/chat --database sqlite
