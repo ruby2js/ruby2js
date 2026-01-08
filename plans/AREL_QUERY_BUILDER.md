@@ -320,7 +320,7 @@ These differences are hidden from the developer. Performance may vary.
 | Phase 1 | ✅ Done | `relation.mjs` with 56 passing tests |
 | Phase 2 | ✅ Done | `not()` and `or()` methods, 72 passing tests |
 | Phase 3 | ✅ Done | `select()`, `distinct()`, `exists()`, `pluck()`, 98 passing tests |
-| Phase 4 | 🔲 TODO | Associations with `includes()` - **critical for Calendar/Showcase** |
+| Phase 4 | ✅ Done | `includes()` with belongs_to/has_many/has_one, inflector, 130 tests |
 | Phase 5 | 🔲 TODO | Scopes (documentation pattern) |
 | Phase 6 | 🔲 TODO | Batching (`find_each`, `find_in_batches`) |
 | Phase 7 | ⏸️ Optional | Aggregations |
