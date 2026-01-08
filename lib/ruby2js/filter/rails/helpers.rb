@@ -1104,8 +1104,10 @@ module Ruby2JS
           attrs << "max=\"#{options[:max]}\"" if options[:max]
           attrs << "step=\"#{options[:step]}\"" if options[:step]
           # Add data-* attributes
+          # Note: use .keys.each for JS compatibility (for...of doesn't work on plain objects)
           if options[:data]
-            options[:data].each do |key, value|
+            options[:data].keys.each do |key|
+              value = options[:data][key]
               attrs << "data-#{key}=\"#{value}\""
             end
           end
@@ -1138,8 +1140,10 @@ module Ruby2JS
           attrs << "max=\"#{options[:max]}\"" if options[:max]
           attrs << "step=\"#{options[:step]}\"" if options[:step]
           # Add data-* attributes
+          # Note: use .keys.each for JS compatibility (for...of doesn't work on plain objects)
           if options[:data]
-            options[:data].each do |key, value|
+            options[:data].keys.each do |key|
+              value = options[:data][key]
               attrs << "data-#{key}=\"#{value}\""
             end
           end
