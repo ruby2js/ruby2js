@@ -367,7 +367,6 @@ task :default => [
   "#{dest}/livedemo.js",
   "#{dest}/ruby2js.js",
   :selfhost,
-  :rails_demo,
   :npm_packages,
   :test_demo
 ]
