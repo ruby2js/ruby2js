@@ -1372,11 +1372,14 @@ module Ruby2JS
         # Process form_with block into JavaScript (Rails 5.1+ preferred form helper)
         # form_with(model: @article) do |form| ... end
         # form_with(url: articles_path, class: "contents") do |form| ... end
+        # form_with(url: "/photos", method: :post) do |form| ... end
         def process_form_with(helper_call, block_args, block_body)
-          # Extract model, url, class, and data from keyword arguments
+          # Extract model, url, method, class, and data from keyword arguments
           model_name = nil
           parent_model_name = nil  # Track parent for nested resources
           model_is_new = false  # Track if model is Model.new (no pre-fill values)
+          url_node = nil  # Track url: option for form action
+          http_method = :post  # Default HTTP method
           css_class = nil
           data_attrs = {}  # Track data-* attributes for form tag
           options_node = helper_call.children[2]
@@ -1423,6 +1426,17 @@ module Ruby2JS
                       end
                     end
                   end
+                when :url
+                  # url: "/photos" or url: photos_path
+                  url_node = value
+                  # Track path helper for import if it's a path helper call
+                  if value.type == :send && value.children[0].nil?
+                    path_helper = value.children[1]
+                    @erb_path_helpers << path_helper unless @erb_path_helpers.include?(path_helper)
+                  end
+                when :method
+                  # method: :post, method: :patch, method: :delete
+                  http_method = value.children[0] if value.type == :sym
                 when :class
                   css_class = extract_class_value(value)
                 when :data
@@ -1518,7 +1532,39 @@ module Ruby2JS
                   s(:str, '<input type="hidden" name="_method" value="patch">')),
                 nil)
             end
+          elsif url_node
+            # Form with explicit url: option
+            # form_with(url: "/photos", method: :post) or form_with(url: photos_path)
+            actual_method = (http_method == :get || http_method == :post) ? http_method : :post
+            needs_method_field = ![:get, :post].include?(http_method)
+
+            if url_node.type == :str
+              # Static URL string: url: "/photos"
+              url_str = url_node.children[0]
+              form_tag = "<form#{class_attr}#{data_attr} action=\"#{url_str}\" method=\"#{actual_method}\">"
+              if needs_method_field
+                form_tag += "\n<input type=\"hidden\" name=\"_method\" value=\"#{http_method}\">"
+              end
+              statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+, s(:str, form_tag))
+            else
+              # Dynamic URL (path helper): url: photos_path
+              url_expr = process(url_node)
+              if needs_method_field
+                statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
+                  s(:dstr,
+                    s(:str, "<form#{class_attr}#{data_attr} action=\""),
+                    s(:begin, url_expr),
+                    s(:str, "\" method=\"#{actual_method}\">\n<input type=\"hidden\" name=\"_method\" value=\"#{http_method}\">")))
+              else
+                statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
+                  s(:dstr,
+                    s(:str, "<form#{class_attr}#{data_attr} action=\""),
+                    s(:begin, url_expr),
+                    s(:str, "\" method=\"#{actual_method}\">")))
+              end
+            end
           else
+            # No model or url - just output a basic form tag
             statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+, s(:str, "<form#{class_attr}#{data_attr}>"))
           end
 

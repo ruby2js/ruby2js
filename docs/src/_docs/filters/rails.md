@@ -392,12 +392,48 @@ function render({ user }) {
 }
 ```
 
-**Form with class attribute:**
+**Form with URL:**
 
-Both `form_for` and `form_with` accept a `class:` option:
+`form_with` can specify an explicit URL instead of a model:
 
 ```erb
-<%= form_with model: @article, class: "contents space-y-4" do |form| %>
+<%= form_with url: "/photos", method: :post, class: "my-form" do |f| %>
+  <%= f.text_field :caption %>
+  <%= f.submit "Save" %>
+<% end %>
+```
+
+```javascript
+_buf += "<form class=\"my-form\" action=\"/photos\" method=\"post\">";
+```
+
+You can also use path helpers:
+
+```erb
+<%= form_with url: photos_path, method: :post do |f| %>
+  <%= f.text_field :caption %>
+<% end %>
+```
+
+HTTP method overrides (`:patch`, `:delete`) add a hidden `_method` field:
+
+```erb
+<%= form_with url: "/photos/1", method: :delete do |f| %>
+  <%= f.submit "Delete" %>
+<% end %>
+```
+
+```javascript
+_buf += "<form action=\"/photos/1\" method=\"post\">";
+_buf += "<input type=\"hidden\" name=\"_method\" value=\"delete\">";
+```
+
+**Form with class and data attributes:**
+
+Both `form_for` and `form_with` accept `class:` and `data:` options:
+
+```erb
+<%= form_with model: @article, class: "contents space-y-4", data: { turbo_frame: "modal" } do |form| %>
   <%= form.text_field :title, class: "input w-full" %>
   <%= form.submit "Save", class: "btn btn-primary" %>
 <% end %>

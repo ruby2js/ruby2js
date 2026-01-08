@@ -82,6 +82,49 @@ describe Ruby2JS::Filter::Rails::Helpers do
       result.must_include '<form'
     end
 
+    it "should handle form_with url: with static string" do
+      return skip() unless defined?(Ruby2JS::Erubi)
+      result = erb_to_js('<%= form_with(url: "/photos", method: :post, class: "my-form") do |f| %><%= f.text_field :caption %><% end %>')
+      result.must_include 'action=\\"/photos\\"'
+      result.must_include 'method=\\"post\\"'
+      result.must_include 'class=\\"my-form\\"'
+      result.must_include '<form'
+    end
+
+    it "should handle form_with url: with path helper" do
+      return skip() unless defined?(Ruby2JS::Erubi)
+      result = erb_to_js('<%= form_with(url: photos_path, method: :post) do |f| %><%= f.text_field :caption %><% end %>')
+      result.must_include 'action="'
+      result.must_include 'photos_path'
+      result.must_include 'method="post"'
+      # Path helper should be imported
+      result.must_include 'import { photos_path }'
+    end
+
+    it "should handle form_with url: with data attributes" do
+      return skip() unless defined?(Ruby2JS::Erubi)
+      result = erb_to_js('<%= form_with(url: "/photos", method: :post, data: { turbo_frame: "modal" }) do |f| %><% end %>')
+      result.must_include 'action=\\"/photos\\"'
+      result.must_include 'data-turbo-frame=\\"modal\\"'
+    end
+
+    it "should handle form_with url: with method override (patch)" do
+      return skip() unless defined?(Ruby2JS::Erubi)
+      result = erb_to_js('<%= form_with(url: "/photos/1", method: :patch) do |f| %><% end %>')
+      result.must_include 'action=\\"/photos/1\\"'
+      result.must_include 'method=\\"post\\"'
+      result.must_include '_method'
+      result.must_include 'patch'
+    end
+
+    it "should handle form_with url: with method override (delete)" do
+      return skip() unless defined?(Ruby2JS::Erubi)
+      result = erb_to_js('<%= form_with(url: "/photos/1", method: :delete) do |f| %><% end %>')
+      result.must_include 'action=\\"/photos/1\\"'
+      result.must_include 'method=\\"post\\"'
+      result.must_include '_method'
+      result.must_include 'delete'
+    end
 
     it "should include class attribute on text_field" do
       return skip() unless defined?(Ruby2JS::Erubi)

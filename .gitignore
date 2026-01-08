@@ -24,6 +24,7 @@ mise.toml
 # Release tarballs
 *.tgz
 
-# Local test blog demo
+# Local test demos (generated Rails apps)
 demo/blog/
 demo/chat/
+demo/photo_gallery/

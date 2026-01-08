@@ -28,16 +28,10 @@ bundle add ruby2js --github ruby2js/ruby2js
 # Ensure git checkout is complete (handles Bundler version upgrade)
 bundle install
 
-# Update Photo model with validations and callbacks
+# Update Photo model with validations (no callbacks - handled by controller)
 cat > app/models/photo.rb << 'MODEL'
 class Photo < ApplicationRecord
   validates :image_data, presence: true
-  validates :taken_at, presence: true
-
-  before_create do
-    self.client_id ||= SecureRandom.uuid
-    self.taken_at ||= Time.current
-  end
 end
 MODEL
 
@@ -51,7 +45,8 @@ class PhotosController < ApplicationController
 
   def create
     @photo = Photo.new(photo_params)
-    @photo.taken_at = Time.current
+    @photo.client_id = globalThis.crypto.randomUUID()
+    @photo.taken_at = new Date()
 
     if @photo.save
       respond_to do |format|
@@ -113,22 +108,22 @@ cat > app/views/photos/index.html.erb << 'VIEW'
     </button>
 
     <!-- New photo form -->
-    <%= form_with model: Photo.new,
+    <%= form_with url: "/photos", method: :post,
                   data: { camera_target: "form", action: "turbo:submit-end->camera#reset" },
                   class: "hidden" do |f| %>
-      <%= f.hidden_field :image_data, data: { camera_target: "imageData" } %>
+      <input type="hidden" name="photo[image_data]" data-camera-target="imageData">
 
       <!-- Image preview after capture -->
       <img data-camera-target="preview" class="w-full max-w-md rounded-lg mb-4" />
 
       <div class="flex gap-4 items-end">
-        <%= f.text_field :caption,
-            placeholder: "Add a caption...",
-            data: { camera_target: "captionInput" },
-            class: "flex-1 border rounded-lg p-3" %>
+        <input type="text" name="photo[caption]"
+               placeholder="Add a caption..."
+               data-camera-target="captionInput"
+               class="flex-1 border rounded-lg p-3">
 
         <%= f.submit "Save Photo",
-            class: "bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition cursor-pointer" %>
+               class: "bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition cursor-pointer" %>
       </div>
     <% end %>
   </div>
@@ -149,12 +144,12 @@ cat > app/views/photos/_photo.html.erb << 'PARTIAL'
 <div id="<%= dom_id(photo) %>" class="bg-white rounded-lg shadow-md overflow-hidden">
   <img src="data:image/jpeg;base64,<%= photo.image_data %>"
        class="w-full h-48 object-cover"
-       alt="<%= photo.caption.presence || 'Photo' %>" />
+       alt="<%= photo.caption || 'Photo' %>" />
   <div class="p-4">
-    <% if photo.caption.present? %>
+    <% if photo.caption %>
       <p class="text-gray-800 mb-2"><%= photo.caption %></p>
     <% end %>
-    <time class="text-gray-500 text-sm"><%= photo.taken_at.strftime("%b %d, %Y at %I:%M %p") %></time>
+    <time class="text-gray-500 text-sm"><%= photo.taken_at.toLocaleString() %></time>
   </div>
 </div>
 PARTIAL
