@@ -47,6 +47,20 @@ export class Relation {
     return rel;
   }
 
+  // Select specific columns: User.select('id', 'name')
+  select(...columns) {
+    const rel = this._clone();
+    rel._select = columns;
+    return rel;
+  }
+
+  // Return distinct results: User.distinct()
+  distinct() {
+    const rel = this._clone();
+    rel._distinct = true;
+    return rel;
+  }
+
   // Negation: where.not({role: 'guest'}) or User.not({deleted: true})
   not(conditions) {
     const rel = this._clone();
@@ -85,6 +99,16 @@ export class Relation {
 
   async count() {
     return this.model._executeCount(this);
+  }
+
+  // Check if any records exist: User.where({admin: true}).exists()
+  async exists() {
+    return this.model._executeExists(this);
+  }
+
+  // Return values instead of models: User.pluck('name') or User.pluck('id', 'name')
+  async pluck(...columns) {
+    return this.model._executePluck(this, columns);
   }
 
   async toArray() {

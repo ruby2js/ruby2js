@@ -808,3 +808,284 @@ describe('Edge cases', () => {
     });
   });
 });
+
+// --- Phase 3: Query Refinement Tests ---
+
+describe('SELECT columns', () => {
+  describe('select() method', () => {
+    it('sets selected columns and returns new Relation', () => {
+      const rel1 = new Relation(MockModel);
+      const rel2 = rel1.select('id', 'name');
+
+      assert.equal(rel1._select, null);
+      assert.deepEqual(rel2._select, ['id', 'name']);
+      assert.notEqual(rel1, rel2);
+    });
+
+    it('chains with other methods', () => {
+      const rel = new Relation(MockModel)
+        .select('id', 'name')
+        .where({ active: true })
+        .limit(10);
+
+      assert.deepEqual(rel._select, ['id', 'name']);
+      assert.deepEqual(rel._conditions, [{ active: true }]);
+      assert.equal(rel._limit, 10);
+    });
+  });
+
+  describe('SQL building', () => {
+    it('builds SELECT with specific columns', () => {
+      const rel = new Relation(MockModel).select('id', 'name');
+      const { sql } = MockModel._buildRelationSQL(rel);
+
+      assert.equal(sql, 'SELECT id, name FROM users');
+    });
+
+    it('builds SELECT with single column', () => {
+      const rel = new Relation(MockModel).select('name');
+      const { sql } = MockModel._buildRelationSQL(rel);
+
+      assert.equal(sql, 'SELECT name FROM users');
+    });
+
+    it('combines SELECT with WHERE', () => {
+      const rel = new Relation(MockModel)
+        .select('id', 'email')
+        .where({ active: true });
+      const { sql, values } = MockModel._buildRelationSQL(rel);
+
+      assert.equal(sql, 'SELECT id, email FROM users WHERE active = ?');
+      assert.deepEqual(values, [true]);
+    });
+  });
+});
+
+describe('DISTINCT', () => {
+  describe('distinct() method', () => {
+    it('sets distinct flag and returns new Relation', () => {
+      const rel1 = new Relation(MockModel);
+      const rel2 = rel1.distinct();
+
+      assert.equal(rel1._distinct, false);
+      assert.equal(rel2._distinct, true);
+      assert.notEqual(rel1, rel2);
+    });
+
+    it('chains with select()', () => {
+      const rel = new Relation(MockModel).distinct().select('role');
+
+      assert.equal(rel._distinct, true);
+      assert.deepEqual(rel._select, ['role']);
+    });
+  });
+
+  describe('SQL building', () => {
+    it('builds SELECT DISTINCT *', () => {
+      const rel = new Relation(MockModel).distinct();
+      const { sql } = MockModel._buildRelationSQL(rel);
+
+      assert.equal(sql, 'SELECT DISTINCT * FROM users');
+    });
+
+    it('builds SELECT DISTINCT with columns', () => {
+      const rel = new Relation(MockModel).distinct().select('role');
+      const { sql } = MockModel._buildRelationSQL(rel);
+
+      assert.equal(sql, 'SELECT DISTINCT role FROM users');
+    });
+
+    it('builds COUNT DISTINCT', () => {
+      const rel = new Relation(MockModel).distinct();
+      const { sql } = MockModel._buildRelationSQL(rel, { count: true });
+
+      assert.equal(sql, 'SELECT COUNT(DISTINCT *) as count FROM users');
+    });
+
+    it('builds COUNT DISTINCT with column', () => {
+      const rel = new Relation(MockModel).distinct().select('role');
+      const { sql } = MockModel._buildRelationSQL(rel, { count: true });
+
+      assert.equal(sql, 'SELECT COUNT(DISTINCT role) as count FROM users');
+    });
+  });
+});
+
+describe('exists()', () => {
+  // Mock model that tracks SQL and returns data
+  class MockExistsModel extends ActiveRecordSQL {
+    static tableName = 'items';
+    static get useNumberedParams() { return false; }
+    static _lastQuery = null;
+
+    static async _execute(sql, params) {
+      this._lastQuery = { sql, params };
+      // Return one row if not checking for nonexistent
+      if (sql.includes('nonexistent')) {
+        return { rows: [] };
+      }
+      return { rows: [{ '1': 1 }] };
+    }
+
+    static _getRows(result) {
+      return result.rows;
+    }
+
+    static _getLastInsertId(result) {
+      return 1;
+    }
+  }
+
+  it('returns true when records exist', async () => {
+    const result = await new Relation(MockExistsModel).where({ active: true }).exists();
+    assert.equal(result, true);
+  });
+
+  it('returns false when no records exist', async () => {
+    class EmptyModel extends MockExistsModel {
+      static async _execute(sql, params) {
+        return { rows: [] };
+      }
+    }
+    const result = await new Relation(EmptyModel).exists();
+    assert.equal(result, false);
+  });
+
+  it('uses LIMIT 1 for efficiency', async () => {
+    await new Relation(MockExistsModel).exists();
+    assert.ok(MockExistsModel._lastQuery.sql.includes('LIMIT 1'));
+  });
+
+  it('selects minimal columns', async () => {
+    await new Relation(MockExistsModel).exists();
+    assert.ok(MockExistsModel._lastQuery.sql.includes('SELECT 1'));
+  });
+});
+
+describe('pluck()', () => {
+  class MockPluckModel extends ActiveRecordSQL {
+    static tableName = 'items';
+    static get useNumberedParams() { return false; }
+    static _lastQuery = null;
+
+    static async _execute(sql, params) {
+      this._lastQuery = { sql, params };
+      // Return mock data based on selected columns
+      if (sql.includes('SELECT name')) {
+        return { rows: [{ name: 'Alice' }, { name: 'Bob' }, { name: 'Carol' }] };
+      }
+      if (sql.includes('SELECT id, name')) {
+        return { rows: [
+          { id: 1, name: 'Alice' },
+          { id: 2, name: 'Bob' },
+          { id: 3, name: 'Carol' }
+        ]};
+      }
+      return { rows: [] };
+    }
+
+    static _getRows(result) {
+      return result.rows;
+    }
+
+    static _getLastInsertId(result) {
+      return 1;
+    }
+  }
+
+  describe('single column', () => {
+    it('returns flat array of values', async () => {
+      const names = await new Relation(MockPluckModel).pluck('name');
+
+      assert.deepEqual(names, ['Alice', 'Bob', 'Carol']);
+    });
+
+    it('executes SELECT with the column', async () => {
+      await new Relation(MockPluckModel).pluck('name');
+
+      assert.ok(MockPluckModel._lastQuery.sql.includes('SELECT name'));
+    });
+  });
+
+  describe('multiple columns', () => {
+    it('returns array of arrays', async () => {
+      const values = await new Relation(MockPluckModel).pluck('id', 'name');
+
+      assert.deepEqual(values, [
+        [1, 'Alice'],
+        [2, 'Bob'],
+        [3, 'Carol']
+      ]);
+    });
+
+    it('executes SELECT with all columns', async () => {
+      await new Relation(MockPluckModel).pluck('id', 'name');
+
+      assert.ok(MockPluckModel._lastQuery.sql.includes('SELECT id, name'));
+    });
+  });
+
+  describe('with conditions', () => {
+    it('combines pluck with where', async () => {
+      await new Relation(MockPluckModel).where({ active: true }).pluck('name');
+
+      assert.ok(MockPluckModel._lastQuery.sql.includes('WHERE active = ?'));
+      assert.ok(MockPluckModel._lastQuery.sql.includes('SELECT name'));
+    });
+  });
+});
+
+describe('Static convenience methods', () => {
+  beforeEach(() => {
+    MockModel.resetQueries();
+  });
+
+  describe('select()', () => {
+    it('returns a Relation with selected columns', () => {
+      const rel = MockModel.select('id', 'name');
+      assert.ok(rel instanceof Relation);
+      assert.deepEqual(rel._select, ['id', 'name']);
+    });
+  });
+
+  describe('distinct()', () => {
+    it('returns a Relation with distinct flag', () => {
+      const rel = MockModel.distinct();
+      assert.ok(rel instanceof Relation);
+      assert.equal(rel._distinct, true);
+    });
+  });
+
+  describe('exists()', () => {
+    it('executes and returns boolean', async () => {
+      const result = await MockModel.exists();
+      // Will be false since mock returns empty
+      assert.equal(typeof result, 'boolean');
+    });
+  });
+
+  describe('pluck()', () => {
+    it('executes and returns array', async () => {
+      const result = await MockModel.pluck('name');
+      assert.ok(Array.isArray(result));
+    });
+  });
+
+  describe('chaining select with distinct', () => {
+    it('chains select().distinct()', async () => {
+      await MockModel.select('role').distinct().where({ active: true });
+
+      assert.equal(MockModel._executedQueries.length, 1);
+      const { sql } = MockModel._executedQueries[0];
+      assert.equal(sql, 'SELECT DISTINCT role FROM users WHERE active = ?');
+    });
+
+    it('chains distinct().select()', async () => {
+      await MockModel.distinct().select('role');
+
+      assert.equal(MockModel._executedQueries.length, 1);
+      const { sql } = MockModel._executedQueries[0];
+      assert.equal(sql, 'SELECT DISTINCT role FROM users');
+    });
+  });
+});

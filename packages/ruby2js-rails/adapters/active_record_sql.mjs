@@ -66,6 +66,16 @@ export class ActiveRecordSQL extends ActiveRecordBase {
     return new Relation(this).offset(n);
   }
 
+  // Returns a Relation with selected columns
+  static select(...columns) {
+    return new Relation(this).select(...columns);
+  }
+
+  // Returns a Relation with distinct
+  static distinct() {
+    return new Relation(this).distinct();
+  }
+
   // --- Class Methods (terminal - execute immediately) ---
 
   static async find(id) {
@@ -101,6 +111,16 @@ export class ActiveRecordSQL extends ActiveRecordBase {
     return new Relation(this).count();
   }
 
+  // Check if any records exist
+  static async exists() {
+    return new Relation(this).exists();
+  }
+
+  // Return values instead of model instances
+  static async pluck(...columns) {
+    return new Relation(this).pluck(...columns);
+  }
+
   // --- Relation Execution (called by Relation class) ---
 
   // Execute a Relation and return model instances
@@ -117,15 +137,58 @@ export class ActiveRecordSQL extends ActiveRecordBase {
     return parseInt(this._getRows(result)[0].count);
   }
 
+  // Execute an EXISTS query for a Relation
+  static async _executeExists(rel) {
+    // Use LIMIT 1 and check if any row returned
+    const limitedRel = Object.create(rel);
+    limitedRel._limit = 1;
+    limitedRel._select = ['1'];  // Minimal select for performance
+    const { sql, values } = this._buildRelationSQL(limitedRel);
+    const result = await this._execute(sql, values);
+    return this._getRows(result).length > 0;
+  }
+
+  // Execute a PLUCK query for a Relation (returns values, not models)
+  static async _executePluck(rel, columns) {
+    const pluckRel = Object.create(rel);
+    pluckRel._select = columns;
+    const { sql, values } = this._buildRelationSQL(pluckRel);
+    const result = await this._execute(sql, values);
+    const rows = this._getRows(result);
+
+    // Single column: return flat array of values
+    if (columns.length === 1) {
+      return rows.map(row => row[columns[0]]);
+    }
+    // Multiple columns: return array of arrays
+    return rows.map(row => columns.map(col => row[col]));
+  }
+
   // Build SQL from a Relation object
   static _buildRelationSQL(rel, options = {}) {
     const values = [];
     let paramIndex = { value: 1 }; // Use object so _buildConditionSQL can mutate it
 
     // SELECT clause
-    let sql = options.count
-      ? `SELECT COUNT(*) as count FROM ${this.tableName}`
-      : `SELECT * FROM ${this.tableName}`;
+    let sql;
+    if (options.count) {
+      // COUNT query: handle DISTINCT specially
+      if (rel._distinct) {
+        const cols = rel._select && rel._select.length > 0
+          ? rel._select.join(', ')
+          : '*';
+        sql = `SELECT COUNT(DISTINCT ${cols}) as count FROM ${this.tableName}`;
+      } else {
+        sql = `SELECT COUNT(*) as count FROM ${this.tableName}`;
+      }
+    } else {
+      // Regular query
+      const distinct = rel._distinct ? 'DISTINCT ' : '';
+      const cols = rel._select && rel._select.length > 0
+        ? rel._select.join(', ')
+        : '*';
+      sql = `SELECT ${distinct}${cols} FROM ${this.tableName}`;
+    }
 
     // Collect all WHERE clause parts
     const allWhereParts = [];
