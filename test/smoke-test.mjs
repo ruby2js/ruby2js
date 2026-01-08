@@ -264,7 +264,8 @@ async function runTests() {
       }
       try {
         const { SelfhostBuilder } = await import(join(PACKAGE_ROOT, 'build.mjs'));
-        const builder = new SelfhostBuilder(selfhostDist);
+        const options = database ? { database } : {};
+        const builder = new SelfhostBuilder(selfhostDist, options);
         await builder.build();
         pass('Selfhost build completed');
         passed++;

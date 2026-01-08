@@ -684,7 +684,9 @@ class SelfhostBuilder
 
       # For edge targets (Cloudflare, Vercel), also copy to public/ for static serving
       edge_targets = %w[cloudflare vercel-edge vercel-node]
-      if edge_targets.include?(@target.to_s) || edge_targets.include?(@runtime.to_s)
+      target_str = @target ? @target.to_s : nil
+      runtime_str = @runtime ? @runtime.to_s : nil
+      if edge_targets.include?(target_str) || edge_targets.include?(runtime_str)
         public_controllers = File.join(@dist_dir, 'public/app/javascript/controllers')
         FileUtils.mkdir_p(public_controllers)
         FileUtils.cp_r(Dir.glob("#{controllers_dest}/*.js"), public_controllers)
@@ -1419,7 +1421,9 @@ class SelfhostBuilder
     # Use CDN URLs for edge targets (Cloudflare, Vercel) since they don't have node_modules
     # Local server targets (Node, Bun, Deno) can serve from node_modules directly
     edge_targets = %w[cloudflare vercel-edge vercel-node]
-    if edge_targets.include?(@target.to_s) || edge_targets.include?(@runtime.to_s)
+    target_str = @target ? @target.to_s : nil
+    runtime_str = @runtime ? @runtime.to_s : nil
+    if edge_targets.include?(target_str) || edge_targets.include?(runtime_str)
       turbo_url = 'https://cdn.jsdelivr.net/npm/@hotwired/turbo@8/dist/turbo.es2017-esm.js'
       stimulus_url = 'https://cdn.jsdelivr.net/npm/@hotwired/stimulus@3/dist/stimulus.js'
     else
