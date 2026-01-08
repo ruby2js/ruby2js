@@ -69,15 +69,16 @@ export class CollectionProxy {
   }
 
   async first() {
-    if (this._records && this._records.length > 0) {
-      return this._records[0];
+    if (this._loaded) {
+      return this._records?.[0] || null;
     }
     return this.toRelation().first();
   }
 
   async last() {
-    if (this._records && this._records.length > 0) {
-      return this._records[this._records.length - 1];
+    if (this._loaded) {
+      const len = this._records?.length || 0;
+      return len > 0 ? this._records[len - 1] : null;
     }
     return this.toRelation().last();
   }

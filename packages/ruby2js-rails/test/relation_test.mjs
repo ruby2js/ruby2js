@@ -1167,6 +1167,8 @@ describe('Association loading', () => {
       super(attrs);
       Object.assign(this, attrs);
     }
+
+    get posts() { return this._posts; }
   }
 
   class Post extends ActiveRecordSQL {
@@ -1204,6 +1206,8 @@ describe('Association loading', () => {
       super(attrs);
       Object.assign(this, attrs);
     }
+
+    get comments() { return this._comments; }
   }
 
   class Comment extends ActiveRecordSQL {
@@ -1359,8 +1363,8 @@ describe('Association loading', () => {
 
       assert.equal(authors.length, 1);
       assert.equal(authors[0].posts.length, 2);
-      assert.equal(authors[0].posts[0].title, 'Post 1');
-      assert.ok(authors[0].posts[0] instanceof Post);
+      assert.equal(authors[0].posts.at(0).title, 'Post 1');
+      assert.ok(authors[0].posts.at(0) instanceof Post);
 
       Author._execute = originalAuthorExecute;
       Post._execute = originalPostExecute;
@@ -1380,7 +1384,7 @@ describe('Association loading', () => {
       const authors = await Author.includes('posts');
 
       assert.equal(authors.length, 1);
-      assert.deepEqual(authors[0].posts, []);
+      assert.deepEqual(authors[0].posts.toArray(), []);
 
       Author._execute = originalAuthorExecute;
       Post._execute = originalPostExecute;
@@ -1442,8 +1446,8 @@ describe('Association loading', () => {
 
       assert.equal(authors.length, 1);
       assert.equal(authors[0].posts.length, 1);
-      assert.equal(authors[0].posts[0].comments.length, 2);
-      assert.equal(authors[0].posts[0].comments[0].body, 'Comment 1');
+      assert.equal(authors[0].posts.at(0).comments.length, 2);
+      assert.equal(authors[0].posts.at(0).comments.at(0).body, 'Comment 1');
 
       Author._execute = originalAuthorExecute;
       Post._execute = originalPostExecute;

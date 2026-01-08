@@ -225,7 +225,9 @@ export class ActiveRecordSQL extends ActiveRecordBase {
           const assocRecords = [];
           for (const record of records) {
             const assocValue = record[assocName];
-            if (Array.isArray(assocValue)) {
+            if (assocValue instanceof CollectionProxy) {
+              assocRecords.push(...assocValue.toArray());
+            } else if (Array.isArray(assocValue)) {
               assocRecords.push(...assocValue);
             } else if (assocValue) {
               assocRecords.push(assocValue);
