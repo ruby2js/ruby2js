@@ -956,6 +956,32 @@ import { Schema } from './config/schema.js';
 const models = Schema.tables;  // ['posts', 'users', 'comments']
 ```
 
+## Database Compatibility
+
+Not all Juntos database adapters work with `juntos console` since it runs in Node.js:
+
+| Adapter | Support | Notes |
+|---------|---------|-------|
+| **sqlite** | MVP | Direct file access via better-sqlite3 |
+| **pg** | Complete | Standard PostgreSQL connection |
+| **mysql2** | Complete | Standard MySQL connection |
+| **neon** | Complete | PostgreSQL via connection string |
+| **turso** | Complete | libsql client for Node.js |
+| **planetscale** | Complete | MySQL or serverless driver |
+| **d1** | Future | Requires Wrangler CLI or D1 HTTP API integration |
+| **supabase** | Future | Verify direct pg connection or add REST adapter |
+| **dexie** | Not possible | IndexedDB is browser-only |
+| **sqljs** | Not applicable | In-memory WASM, no persistent data to query |
+| **pglite** | Not applicable | Client-side WASM, no remote data |
+
+**Implementation phases:**
+
+- **MVP (M3):** SQLite via better-sqlite3 — simplest local development setup
+- **Complete (M5):** Add pg and mysql2 — covers most production databases
+- **Future:** D1 and Supabase — requires additional adapter work
+
+The "Complete" adapters share a common pattern: standard database drivers with connection strings from `DATABASE_URL` or `config/database.yml`. No special infrastructure needed.
+
 ## Open Questions
 
 1. **Ecosystem packages** - Bundle ink-text-input etc. or make optional?
