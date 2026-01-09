@@ -669,16 +669,15 @@ dist/
 
 ### Phase 1: Core Gallery
 
-- [ ] Create Photo model
-- [ ] Create PhotosController with index/create
-- [ ] Create views (index, _photo partial, turbo_stream)
-- [ ] Add CameraController (Stimulus) with browser camera support
+- [x] Create Photo model
+- [x] Create PhotosController with index/create
+- [x] Create views (index, _photo partial, turbo_stream)
+- [x] Add CameraController (Stimulus) with browser camera support
 
 ### Phase 2: Test Core Targets
 
-- [ ] Test browser target with webcam
-- [ ] Test node target with webcam
-- [ ] Test cloudflare/vercel targets
+- [x] Test browser target with webcam (Dexie/IndexedDB)
+- [x] Test server target with webcam (Node/SQLite - same code works on Cloudflare D1, Vercel, etc.)
 
 ### Phase 3: Capacitor Target
 
@@ -714,7 +713,7 @@ dist/
 
 - [ ] Create docs/src/_docs/juntos/demos/photo-gallery.md
 - [ ] Add to demos index
-- [ ] Create test/photo_gallery/create-photo-gallery script
+- [x] Create test/photo_gallery/create-photo-gallery script
 - [ ] Document Capacitor setup and deployment
 - [ ] Document Electron setup and packaging
 
