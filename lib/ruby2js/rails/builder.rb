@@ -53,6 +53,10 @@ class SelfhostBuilder
   # Server-side JavaScript runtimes
   SERVER_RUNTIMES = ['node', 'bun', 'deno', 'cloudflare', 'vercel-edge', 'vercel-node', 'deno-deploy', 'fly'].freeze
 
+  # Desktop/mobile targets (hybrid browser/node)
+  CAPACITOR_RUNTIMES = ['capacitor'].freeze
+  ELECTRON_RUNTIMES = ['electron'].freeze
+
   # Vercel deployment targets
   VERCEL_RUNTIMES = ['vercel-edge', 'vercel-node'].freeze
 
@@ -70,25 +74,29 @@ class SelfhostBuilder
 
   # Valid target environments for each database adapter
   VALID_TARGETS = {
-    'dexie' => ['browser'],
-    'indexeddb' => ['browser'],
-    'sqljs' => ['browser'],
-    'sql.js' => ['browser'],
-    'pglite' => ['browser', 'node'],
-    'better_sqlite3' => ['node', 'bun'],
-    'sqlite3' => ['node', 'bun'],
-    'pg' => ['node', 'bun', 'deno'],
-    'postgres' => ['node', 'bun', 'deno'],
-    'postgresql' => ['node', 'bun', 'deno'],
-    'mysql2' => ['node', 'bun'],
-    'mysql' => ['node', 'bun'],
+    # Browser-only databases (also work in Capacitor which uses WebView)
+    'dexie' => ['browser', 'capacitor'],
+    'indexeddb' => ['browser', 'capacitor'],
+    'sqljs' => ['browser', 'capacitor', 'electron'],
+    'sql.js' => ['browser', 'capacitor', 'electron'],
+    'pglite' => ['browser', 'node', 'capacitor', 'electron'],
+    # Node.js databases (also work in Electron main process)
+    'better_sqlite3' => ['node', 'bun', 'electron'],
+    'sqlite3' => ['node', 'bun', 'electron'],
+    'pg' => ['node', 'bun', 'deno', 'electron'],
+    'postgres' => ['node', 'bun', 'deno', 'electron'],
+    'postgresql' => ['node', 'bun', 'deno', 'electron'],
+    'mysql2' => ['node', 'bun', 'electron'],
+    'mysql' => ['node', 'bun', 'electron'],
+    # Platform-specific databases
     'd1' => ['cloudflare'],
     'mpg' => ['fly'],
-    'neon' => ['browser', 'node', 'bun', 'deno', 'cloudflare', 'vercel-edge', 'vercel-node', 'deno-deploy'],
-    'turso' => ['browser', 'node', 'bun', 'deno', 'cloudflare', 'vercel-edge', 'vercel-node', 'deno-deploy'],
-    'libsql' => ['browser', 'node', 'bun', 'deno', 'cloudflare', 'vercel-edge', 'vercel-node', 'deno-deploy'],
-    'planetscale' => ['browser', 'node', 'bun', 'deno', 'cloudflare', 'vercel-edge', 'vercel-node', 'deno-deploy'],
-    'supabase' => ['browser', 'node', 'bun', 'deno', 'cloudflare', 'vercel-edge', 'vercel-node', 'deno-deploy']
+    # HTTP-based databases (work everywhere including Capacitor/Electron)
+    'neon' => ['browser', 'node', 'bun', 'deno', 'cloudflare', 'vercel-edge', 'vercel-node', 'deno-deploy', 'capacitor', 'electron'],
+    'turso' => ['browser', 'node', 'bun', 'deno', 'cloudflare', 'vercel-edge', 'vercel-node', 'deno-deploy', 'capacitor', 'electron'],
+    'libsql' => ['browser', 'node', 'bun', 'deno', 'cloudflare', 'vercel-edge', 'vercel-node', 'deno-deploy', 'capacitor', 'electron'],
+    'planetscale' => ['browser', 'node', 'bun', 'deno', 'cloudflare', 'vercel-edge', 'vercel-node', 'deno-deploy', 'capacitor', 'electron'],
+    'supabase' => ['browser', 'node', 'bun', 'deno', 'cloudflare', 'vercel-edge', 'vercel-node', 'deno-deploy', 'capacitor', 'electron']
   }.freeze
 
   # Default target for each database adapter (used when target not specified)
@@ -586,8 +594,10 @@ class SelfhostBuilder
     @target ||= ENV['JUNTOS_TARGET'] || DEFAULT_TARGETS[@database] || 'node'
 
     # Set runtime based on target
-    if @target == 'browser'
-      @runtime = nil  # Browser target doesn't use a JS runtime
+    if @target == 'browser' || @target == 'capacitor'
+      @runtime = nil  # Browser/Capacitor targets don't use a server runtime
+    elsif @target == 'electron'
+      @runtime = 'electron'  # Electron has its own runtime
     else
       # Check if database requires a specific runtime
       required_runtime = RUNTIME_REQUIRED[@database]
@@ -608,8 +618,8 @@ class SelfhostBuilder
         @runtime = @target  # node, bun, deno
       end
 
-      unless SERVER_RUNTIMES.include?(@runtime)
-        raise "Unknown runtime: #{@runtime}. Valid options: #{SERVER_RUNTIMES.join(', ')}"
+      unless SERVER_RUNTIMES.include?(@runtime) || @runtime == 'electron'
+        raise "Unknown runtime: #{@runtime}. Valid options: #{SERVER_RUNTIMES.join(', ')}, electron"
       end
     end
 
@@ -759,6 +769,21 @@ class SelfhostBuilder
       puts("")
     end
 
+    # Generate Capacitor deployment files
+    if CAPACITOR_RUNTIMES.include?(@target)
+      puts("Capacitor:")
+      self.generate_capacitor_config()
+      puts("")
+    end
+
+    # Generate Electron deployment files
+    if ELECTRON_RUNTIMES.include?(@target)
+      puts("Electron:")
+      self.generate_electron_main()
+      self.generate_electron_preload()
+      puts("")
+    end
+
     # Handle Tailwind CSS if present
     self.setup_tailwind()
 
@@ -781,8 +806,14 @@ class SelfhostBuilder
 
   def validate_target!()
     # Determine the effective target for validation
-    # For browser target, use 'browser'; for server targets, use the runtime
-    effective_target = @target == 'browser' ? 'browser' : @runtime
+    # For browser/capacitor/electron targets, use the target name directly
+    # For server targets, use the runtime
+    effective_target = case @target
+    when 'browser', 'capacitor', 'electron'
+      @target
+    else
+      @runtime
+    end
 
     valid_targets = VALID_TARGETS[@database]
     return unless valid_targets  # Unknown database, skip validation
@@ -1137,6 +1168,10 @@ class SelfhostBuilder
     # Determine source directory: browser or runtime-specific server target
     if @target == 'browser'
       target_dir = 'browser'
+    elsif @target == 'capacitor'
+      target_dir = 'capacitor'
+    elsif @target == 'electron'
+      target_dir = 'electron'
     elsif FLY_RUNTIMES.include?(@runtime)
       target_dir = 'node'  # Fly.io runs Node.js in containers
     else
@@ -1153,8 +1188,8 @@ class SelfhostBuilder
       puts("    -> #{lib_dest}/rails_base.js")
     end
 
-    # Copy server module (needed by node, bun, deno, cloudflare targets)
-    if @target != 'browser'
+    # Copy server module (needed by server targets, not browser/capacitor)
+    if @target != 'browser' && @target != 'capacitor'
       server_src = File.join(package_dir, 'rails_server.js')
       if File.exist?(server_src)
         FileUtils.cp(server_src, File.join(lib_dest, 'rails_server.js'))
@@ -2044,6 +2079,232 @@ class SelfhostBuilder
     FileUtils.mkdir_p(src_dir)
     File.write(File.join(src_dir, 'index.js'), entry)
     puts("  -> src/index.js")
+  end
+
+  def generate_capacitor_config()
+    # Generate capacitor.config.ts for Capacitor mobile deployment
+    app_name = File.basename(DEMO_ROOT)
+    app_id = "com.example.#{app_name.downcase.gsub(/[^a-z0-9]/, '')}"
+
+    config = <<~TS
+      import type { CapacitorConfig } from '@capacitor/cli';
+
+      const config: CapacitorConfig = {
+        appId: '#{app_id}',
+        appName: '#{app_name}',
+        webDir: 'dist',
+        server: {
+          // For development, use live reload from dev server
+          // url: 'http://localhost:3000',
+          // cleartext: true
+        },
+        plugins: {
+          Camera: {
+            // iOS camera permissions
+            presentationStyle: 'fullScreen'
+          }
+        }
+      };
+
+      export default config;
+    TS
+
+    config_path = File.join(@dist_dir, '..', 'capacitor.config.ts')
+    File.write(config_path, config)
+    puts("  -> capacitor.config.ts")
+
+    # Generate package.json scripts for Capacitor
+    puts("  Add to package.json scripts:")
+    puts("    \"cap:init\": \"npx cap init\"")
+    puts("    \"cap:add:ios\": \"npx cap add ios\"")
+    puts("    \"cap:add:android\": \"npx cap add android\"")
+    puts("    \"cap:sync\": \"npx cap sync\"")
+    puts("    \"cap:open:ios\": \"npx cap open ios\"")
+    puts("    \"cap:open:android\": \"npx cap open android\"")
+  end
+
+  def generate_electron_main()
+    # Generate Electron main process (main.js)
+    app_name = File.basename(DEMO_ROOT)
+
+    main_js = <<~JS
+      // Electron Main Process
+      // Generated by Ruby2JS on Rails
+
+      const { app, BrowserWindow, Tray, Menu, globalShortcut, ipcMain, nativeImage } = require('electron');
+      const path = require('path');
+
+      let mainWindow = null;
+      let tray = null;
+
+      // Hide dock icon on macOS (menu bar app style)
+      if (process.platform === 'darwin') {
+        app.dock.hide();
+      }
+
+      function createWindow() {
+        mainWindow = new BrowserWindow({
+          width: 400,
+          height: 500,
+          show: false,
+          frame: false,
+          resizable: false,
+          skipTaskbar: true,
+          webPreferences: {
+            preload: path.join(__dirname, 'preload.js'),
+            contextIsolation: true,
+            nodeIntegration: false
+          }
+        });
+
+        // Load the app
+        mainWindow.loadFile(path.join(__dirname, 'dist', 'index.html'));
+
+        // Hide instead of close
+        mainWindow.on('close', (event) => {
+          if (!app.isQuitting) {
+            event.preventDefault();
+            mainWindow.hide();
+          }
+        });
+
+        mainWindow.on('blur', () => {
+          mainWindow.hide();
+        });
+      }
+
+      function createTray() {
+        const iconPath = path.join(__dirname, 'assets', 'tray-icon.png');
+        const icon = nativeImage.createFromPath(iconPath);
+        tray = new Tray(icon.resize({ width: 16, height: 16 }));
+
+        const contextMenu = Menu.buildFromTemplate([
+          { label: 'Take Photo', click: () => showAndCapture() },
+          { label: 'Open Gallery', click: () => showWindow() },
+          { type: 'separator' },
+          { label: 'Quit', click: () => {
+            app.isQuitting = true;
+            app.quit();
+          }}
+        ]);
+
+        tray.setToolTip('#{app_name}');
+        tray.setContextMenu(contextMenu);
+
+        tray.on('click', () => {
+          toggleWindow();
+        });
+      }
+
+      function toggleWindow() {
+        if (mainWindow.isVisible()) {
+          mainWindow.hide();
+        } else {
+          showWindow();
+        }
+      }
+
+      function showWindow() {
+        const trayBounds = tray.getBounds();
+        const windowBounds = mainWindow.getBounds();
+
+        // Position window below tray icon
+        const x = Math.round(trayBounds.x + (trayBounds.width / 2) - (windowBounds.width / 2));
+        const y = Math.round(trayBounds.y + trayBounds.height + 4);
+
+        mainWindow.setPosition(x, y, false);
+        mainWindow.show();
+        mainWindow.focus();
+      }
+
+      function showAndCapture() {
+        showWindow();
+        // Send quick-capture event to renderer
+        mainWindow.webContents.send('quick-capture');
+      }
+
+      app.whenReady().then(() => {
+        createWindow();
+        createTray();
+
+        // Register global shortcut (Cmd+Shift+P on Mac, Ctrl+Shift+P on Windows/Linux)
+        const shortcut = process.platform === 'darwin' ? 'CommandOrControl+Shift+P' : 'Ctrl+Shift+P';
+        globalShortcut.register(shortcut, () => {
+          showAndCapture();
+        });
+      });
+
+      app.on('will-quit', () => {
+        globalShortcut.unregisterAll();
+      });
+
+      app.on('window-all-closed', () => {
+        if (process.platform !== 'darwin') {
+          app.quit();
+        }
+      });
+
+      // IPC handlers
+      ipcMain.on('hide-window', () => {
+        mainWindow.hide();
+      });
+    JS
+
+    main_path = File.join(@dist_dir, '..', 'main.js')
+    File.write(main_path, main_js)
+    puts("  -> main.js")
+  end
+
+  def generate_electron_preload()
+    # Generate Electron preload script (preload.js)
+    preload_js = <<~JS
+      // Electron Preload Script
+      // Exposes safe IPC methods to renderer via contextBridge
+
+      const { contextBridge, ipcRenderer } = require('electron');
+
+      contextBridge.exposeInMainWorld('electronAPI', {
+        // Send message to main process
+        send: (channel, ...args) => {
+          const validChannels = ['hide-window', 'photo-saved'];
+          if (validChannels.includes(channel)) {
+            ipcRenderer.send(channel, ...args);
+          }
+        },
+
+        // Invoke main process and get response
+        invoke: (channel, ...args) => {
+          const validChannels = ['get-photos', 'save-photo'];
+          if (validChannels.includes(channel)) {
+            return ipcRenderer.invoke(channel, ...args);
+          }
+        },
+
+        // Listen for quick-capture event from main
+        onQuickCapture: (callback) => {
+          ipcRenderer.on('quick-capture', () => callback());
+        },
+
+        // Listen for window show event
+        onWindowShow: (callback) => {
+          ipcRenderer.on('window-show', () => callback());
+        },
+
+        // Listen for window hide event
+        onWindowHide: (callback) => {
+          ipcRenderer.on('window-hide', () => callback());
+        }
+      });
+    JS
+
+    preload_path = File.join(@dist_dir, '..', 'preload.js')
+    File.write(preload_path, preload_js)
+    puts("  -> preload.js")
+
+    # Create assets directory for tray icon
+    assets_dir = File.join(@dist_dir, '..', 'assets')
+    FileUtils.mkdir_p(assets_dir)
+    puts("  -> assets/ (add tray-icon.png)")
   end
 
   def setup_tailwind()

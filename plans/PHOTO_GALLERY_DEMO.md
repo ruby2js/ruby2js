@@ -681,22 +681,23 @@ dist/
 
 ### Phase 3: Capacitor Target
 
-- [ ] Add Capacitor target to builder
-- [ ] Configure Capacitor camera plugin
+- [x] Add Capacitor target to builder
+- [x] Generate capacitor.config.ts
+- [ ] Configure Capacitor camera plugin in Stimulus controller
 - [ ] Test on iOS simulator
 - [ ] Test on Android emulator
 
 ### Phase 4: Electron Target
 
-- [ ] Add Electron target to builder
-- [ ] Generate main.js (main process)
-- [ ] Generate preload.js (context bridge)
-- [ ] Add system tray with icon
-- [ ] Add global shortcut (Cmd+Shift+P)
-- [ ] Create frameless popup window
-- [ ] Position popup below tray icon
-- [ ] Hide dock icon (macOS)
-- [ ] Add IPC for quick-capture event
+- [x] Add Electron target to builder
+- [x] Generate main.js (main process with tray, shortcuts, IPC)
+- [x] Generate preload.js (context bridge)
+- [x] Add system tray with icon
+- [x] Add global shortcut (Cmd+Shift+P)
+- [x] Create frameless popup window
+- [x] Position popup below tray icon
+- [x] Hide dock icon (macOS)
+- [x] Add IPC for quick-capture event
 - [ ] Test on macOS
 - [ ] Test on Windows
 - [ ] Test on Linux
