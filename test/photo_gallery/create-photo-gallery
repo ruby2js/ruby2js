@@ -180,15 +180,16 @@ class CameraController < Stimulus::Controller
 
   def takePhotoCapacitor
     # Import Camera plugin dynamically
-    Camera = (await import("@capacitor/camera")).Camera
-    CameraResultType = (await import("@capacitor/camera")).CameraResultType
-    CameraSource = (await import("@capacitor/camera")).CameraSource
+    cameraModule = await import("@capacitor/camera")
+    camera = cameraModule.Camera
+    resultType = cameraModule.CameraResultType
+    source = cameraModule.CameraSource
 
-    result = await Camera.getPhoto(
+    result = await camera.getPhoto(
       quality: 80,
       allowEditing: false,
-      resultType: CameraResultType.Base64,
-      source: CameraSource.Camera
+      resultType: resultType.Base64,
+      source: source.Camera
     )
 
     # Result contains base64 string directly
@@ -239,15 +240,16 @@ class CameraController < Stimulus::Controller
   end
 
   def chooseFromGalleryCapacitor
-    Camera = (await import("@capacitor/camera")).Camera
-    CameraResultType = (await import("@capacitor/camera")).CameraResultType
-    CameraSource = (await import("@capacitor/camera")).CameraSource
+    cameraModule = await import("@capacitor/camera")
+    camera = cameraModule.Camera
+    resultType = cameraModule.CameraResultType
+    source = cameraModule.CameraSource
 
-    result = await Camera.getPhoto(
+    result = await camera.getPhoto(
       quality: 80,
       allowEditing: false,
-      resultType: CameraResultType.Base64,
-      source: CameraSource.Photos
+      resultType: resultType.Base64,
+      source: source.Photos
     )
 
     handlePhoto(result.base64String)

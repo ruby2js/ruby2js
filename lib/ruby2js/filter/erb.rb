@@ -168,12 +168,25 @@ module Ruby2JS
             while inner&.type == :begin && inner.children.length == 1
               inner = inner.children.first
             end
+
+            # Check if inner expression needs special processing (e.g., turbo_stream.prepend)
+            # before the normal String() wrapping
+            if inner&.type == :send
+              result = process_erb_send_append(inner)
+              return result if result
+            end
+
             arg = process(inner)
             # Skip String() wrapper if already a string literal
             unless arg&.type == :str
               arg = s(:send, nil, :String, arg)
             end
           else
+            # Handle non-block sends that need special processing
+            if arg&.type == :send && method == :append=
+              result = process_erb_send_append(arg)
+              return result if result
+            end
             arg = process(arg) if arg
           end
 
@@ -211,6 +224,13 @@ module Ruby2JS
       # Returns nil if not handled, or processed AST if handled
       def process_erb_block_append(block_node)
         nil  # Base implementation doesn't handle any block helpers
+      end
+
+      # Hook for subclasses to handle send expressions that produce buffer operations
+      # (e.g., turbo_stream.prepend "photos", @photo)
+      # Return processed AST or nil to fall through to default handling
+      def process_erb_send_append(send_node)
+        nil  # Base implementation doesn't handle any send helpers
       end
 
       # Handle block expressions - subclasses can override for specific helpers

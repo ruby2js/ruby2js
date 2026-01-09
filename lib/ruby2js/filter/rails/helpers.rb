@@ -20,6 +20,7 @@ module Ruby2JS
           @erb_path_helpers = [] # Track path helper usage for imports
           @erb_view_helpers = [] # Track view helper usage (truncate, etc.) for imports
           @erb_partials = []     # Track partial usage for imports
+          @erb_view_modules = [] # Track view module imports (PhotoViews, etc.)
         end
 
         # Add imports for path helpers and view helpers
@@ -49,6 +50,19 @@ module Ruby2JS
                 [s(:pair, s(:sym, :as), s(:const, nil, module_name)),
                  s(:pair, s(:sym, :from), s(:str, "./_#{partial_name}.js"))],
                 s(:str, '*'))
+            end
+          end
+
+          # Add imports for view modules (PhotoViews, etc.)
+          # These are used for turbo_stream shorthand: turbo_stream.prepend "photos", @photo
+          # Import path: ../photos.js (from photos/ subdirectory)
+          unless @erb_view_modules.empty?
+            @erb_view_modules.uniq.each do |view_info|
+              module_name = view_info[:module]
+              resource = view_info[:resource]
+              # Import from parent directory: ../photos.js
+              self.prepend_list << s(:import, "../#{resource}.js",
+                [s(:const, nil, module_name.to_sym)])
             end
           end
         end
@@ -142,6 +156,23 @@ module Ruby2JS
           end
 
           super
+        end
+
+        # Override Erb's hook to handle send expressions that produce buffer operations
+        # Handles turbo_stream.prepend/append/replace shortcuts without blocks
+        def process_erb_send_append(send_node)
+          target, method, *args = send_node.children
+
+          # Handle turbo_stream.prepend/append/replace/etc shorthand form (without block)
+          # turbo_stream.prepend "photos", @photo -> turbo-stream HTML with rendered partial
+          if target&.type == :send && target.children == [nil, :turbo_stream]
+            turbo_actions = [:prepend, :append, :replace, :update, :remove, :before, :after]
+            if turbo_actions.include?(method) && args.length >= 1
+              return process_turbo_stream_shorthand(method, args)
+            end
+          end
+
+          nil  # Not handled
         end
 
         # Override Erb's hook to handle Rails block helpers (form_for, form_tag, etc.)
@@ -780,6 +811,82 @@ module Ruby2JS
             else
               processed = process(block_body)
               statements << processed if processed
+            end
+          end
+
+          # Add closing turbo-stream tag to buffer
+          statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
+            s(:str, "</template></turbo-stream>"))
+
+          # Return a begin node containing all statements
+          if statements.length == 1
+            statements.first
+          else
+            s(:begin, *statements)
+          end
+        end
+
+        # Process turbo_stream shorthand form (without block)
+        # turbo_stream.prepend "photos", @photo
+        # -> <turbo-stream action="prepend" target="photos"><template>..._photo partial...</template></turbo-stream>
+        def process_turbo_stream_shorthand(action, args)
+          target_arg = args[0]
+          model_arg = args[1]  # Optional - if present, render the model's partial
+
+          # Get target as string
+          target_str = if target_arg&.type == :str
+            target_arg.children[0]
+          elsif target_arg&.type == :sym
+            target_arg.children[0].to_s
+          else
+            nil
+          end
+
+          statements = []
+
+          # Add opening turbo-stream tag to buffer
+          if target_str
+            statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
+              s(:str, "<turbo-stream action=\"#{action}\" target=\"#{target_str}\"><template>"))
+          else
+            # Dynamic target
+            target_expr = process(target_arg)
+            statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
+              s(:dstr,
+                s(:str, "<turbo-stream action=\"#{action}\" target=\""),
+                s(:begin, target_expr),
+                s(:str, "\"><template>")))
+          end
+
+          # If model is provided, render its partial
+          if model_arg
+            # For @photo, infer partial as "photos/_photo" and local as "photo"
+            # The model_arg is typically an ivar like s(:ivar, :@photo)
+            if model_arg.type == :ivar
+              ivar_name = model_arg.children[0].to_s.sub('@', '')  # "photo"
+
+              # Track that we need the views module import
+              # The view module name follows the pattern: PhotoViews for photos
+              plural_name = "#{ivar_name}s"
+              view_module = "#{plural_name.split('_').map(&:capitalize).join.chomp('s')}Views"
+              partial_method = "_#{ivar_name}"
+              local_var = ivar_name
+
+              # Add view module to imports
+              view_info = { module: view_module, resource: plural_name }
+              @erb_view_modules << view_info unless @erb_view_modules.any? { |v| v[:module] == view_module }
+
+              # Generate: _buf += PhotoViews._photo($context, {photo})
+              statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
+                s(:send,
+                  s(:const, nil, view_module.to_sym),
+                  partial_method.to_sym,
+                  s(:gvar, :$context),
+                  s(:hash, s(:pair, s(:sym, local_var.to_sym), s(:lvar, local_var.to_sym)))))
+            else
+              # For other expressions, just process and add to buffer
+              statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
+                s(:send, process(model_arg), :toString))
             end
           end
 
