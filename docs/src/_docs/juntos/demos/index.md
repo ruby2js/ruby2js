@@ -17,6 +17,7 @@ Hands-on examples showcasing Juntos capabilities. Each demo is a complete Rails 
 |------|---------------------|
 | **[Blog](/docs/juntos/demos/blog)** | CRUD operations, nested resources, validations, multi-platform deployment |
 | **[Chat](/docs/juntos/demos/chat)** | Real-time Turbo Streams, Stimulus controllers in Ruby, WebSocket broadcasting |
+| **[Photo Gallery](/docs/juntos/demos/photo-gallery)** | Camera integration, Capacitor mobile apps, Electron desktop apps |
 
 ## Running Any Demo
 
@@ -92,6 +93,17 @@ A real-time chat room demonstrating Hotwire patterns:
 - **Format negotiation** — `respond_to` with turbo_stream format
 
 Best for understanding real-time features and Hotwire integration.
+
+### Photo Gallery Demo
+
+A camera-enabled gallery demonstrating native device integration:
+
+- **Browser camera** — `getUserMedia()` for webcam access
+- **Capacitor camera** — Native iOS/Android camera plugin
+- **Electron desktop** — System tray, global shortcuts, background app
+- **Binary storage** — Base64 images in any database
+
+Best for understanding Capacitor and Electron targets.
 
 ## Creating Your Own
 

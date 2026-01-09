@@ -21,6 +21,8 @@ These targets require transpilation. Rails can't run here; Juntos can:
 | **[Vercel Edge](/docs/juntos/deploying/vercel)** | Global edge, auto-scaling | [Neon](/docs/juntos/databases/neon), [Turso](/docs/juntos/databases/turso), [PlanetScale](/docs/juntos/databases/planetscale), [Supabase](/docs/juntos/databases/supabase) |
 | **[Deno Deploy](/docs/juntos/deploying/deno-deploy)** | Edge, Deno/TypeScript native | [Neon](/docs/juntos/databases/neon), [Turso](/docs/juntos/databases/turso), [PlanetScale](/docs/juntos/databases/planetscale), [Supabase](/docs/juntos/databases/supabase) |
 | **[Cloudflare Workers](/docs/juntos/deploying/cloudflare)** | Edge computing, maximum distribution | D1, Turso |
+| **[Capacitor](/docs/juntos/deploying/capacitor)** | iOS/Android mobile apps | Dexie, sql.js, HTTP-based |
+| **[Electron](/docs/juntos/deploying/electron)** | Desktop apps (macOS/Windows/Linux) | SQLite, sql.js, HTTP-based |
 
 ## Also Works
 
@@ -39,14 +41,14 @@ For traditional hosting, Juntos works but Rails does too. Reasons to choose Junt
 
 ## Quick Comparison
 
-| Aspect | Browser | Node.js | Fly.io | Vercel | Deno Deploy | Cloudflare |
-|--------|---------|---------|--------|--------|-------------|------------|
-| Infrastructure | None (static) | Server/container | Container | On-demand | On-demand | On-demand |
-| Scaling | N/A | Manual | Automatic | Automatic | Automatic | Automatic |
-| Cold starts | None | N/A | ~200-500ms | ~50-250ms | ~5-50ms | ~5-50ms |
-| Database | Client-side | TCP/file | MPG (Postgres) | HTTP APIs | HTTP APIs | D1 binding |
-| WebSockets | N/A | Native | Native | Via Pusher | Via Pusher | Durable Objects |
-| Cost model | Hosting only | Server time | Machine time | Per-request | Per-request | Per-request |
+| Aspect | Browser | Node.js | Fly.io | Vercel | Cloudflare | Capacitor | Electron |
+|--------|---------|---------|--------|--------|------------|-----------|----------|
+| Infrastructure | None (static) | Server/container | Container | On-demand | On-demand | App stores | User install |
+| Scaling | N/A | Manual | Automatic | Automatic | Automatic | Per-device | Per-device |
+| Cold starts | None | N/A | ~200-500ms | ~50-250ms | ~5-50ms | None | None |
+| Database | Client-side | TCP/file | MPG (Postgres) | HTTP APIs | D1 binding | Client-side | File/client |
+| Native APIs | Limited | N/A | N/A | N/A | N/A | Full device | Full OS |
+| Distribution | URL | Deploy | Deploy | Deploy | Deploy | App Store | DMG/EXE |
 
 ## Choosing a Target
 
@@ -73,6 +75,18 @@ For traditional hosting, Juntos works but Rails does too. Reasons to choose Junt
 - Your workload benefits from JavaScript's event-driven async model
 - You want one codebase across browser, edge, and server
 - *Rails works here too—but Juntos has advantages*
+
+**Choose Capacitor if:**
+- You want native iOS/Android apps
+- You need device APIs (camera, GPS, push notifications)
+- You want App Store/Google Play distribution
+- *Rails can't do this*
+
+**Choose Electron if:**
+- You want native desktop apps (macOS, Windows, Linux)
+- You need OS integration (system tray, global shortcuts, file system)
+- You want distributable installers (DMG, EXE, AppImage)
+- *Rails can't do this*
 
 ## Default Target Inference
 

@@ -110,6 +110,22 @@ No Ruby required. The generated code is idiomatic JavaScript—ES2022 classes, a
 - Database: D1 binding, Turso
 - Rendering: Returns `Response` objects
 
+### Capacitor (iOS/Android)
+
+- Entry: `index.html` in WebView
+- Routing: Client-side, same as browser
+- Database: IndexedDB (Dexie), SQLite/WASM
+- Native APIs: Camera, filesystem, push notifications via Capacitor plugins
+- Distribution: App Store, Google Play
+
+### Electron (Desktop)
+
+- Entry: `main.js` (main process) + `index.html` (renderer)
+- Routing: Client-side in renderer
+- Database: better-sqlite3 (main process access)
+- Native APIs: System tray, global shortcuts, IPC between processes
+- Distribution: DMG (macOS), NSIS (Windows), AppImage (Linux)
+
 ## WebSocket Support
 
 Turbo Streams broadcasting uses WebSockets for real-time updates. Support varies by target:

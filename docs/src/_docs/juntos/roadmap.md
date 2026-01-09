@@ -13,6 +13,24 @@ Juntos currently supports the core Rails patterns: models, controllers, views, r
 
 ## Recently Implemented
 
+### Capacitor & Electron Targets
+
+Native app support is now available. See the [Photo Gallery demo](/docs/juntos/demos/photo-gallery) for a complete example.
+
+**Capacitor (iOS/Android):**
+
+- **Mobile apps** — Same codebase runs in native WebView
+- **Native APIs** — Camera, filesystem, push notifications via Capacitor plugins
+- **Distribution** — App Store, Google Play
+- **Database** — Dexie (IndexedDB), sql.js, or HTTP-based adapters
+
+**Electron (Desktop):**
+
+- **Desktop apps** — macOS, Windows, Linux
+- **System integration** — Tray icons, global shortcuts, IPC
+- **Distribution** — DMG, NSIS installer, AppImage
+- **Database** — SQLite (better-sqlite3), sql.js, or HTTP-based adapters
+
 ### Hotwire (Turbo + Stimulus)
 
 [Hotwire](https://hotwired.dev/) integration is now available. See the [Hotwire documentation](/docs/juntos/hotwire) for details.

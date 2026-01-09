@@ -91,7 +91,7 @@ bin/juntos build [options]
 
 | Option | Description |
 |--------|-------------|
-| `-t, --target TARGET` | Target (browser, node, bun, deno, vercel, cloudflare) |
+| `-t, --target TARGET` | Target (browser, node, bun, deno, vercel, cloudflare, capacitor, electron) |
 | `-d, --database ADAPTER` | Database adapter |
 | `-e, --environment ENV` | Rails environment (default: development) |
 | `-v, --verbose` | Show detailed output |
@@ -104,6 +104,8 @@ bin/juntos build -d dexie                # Browser build
 bin/juntos build -e production           # Build for production environment
 bin/juntos build -t vercel -d neon       # Vercel Edge build
 bin/juntos build -t cloudflare -d d1     # Cloudflare Workers build
+bin/juntos build -t capacitor -d dexie   # Mobile app (iOS/Android)
+bin/juntos build -t electron -d sqlite   # Desktop app (macOS/Windows/Linux)
 ```
 
 **Output:**
@@ -328,15 +330,15 @@ RewriteRule ^ index.html [L]
 
 | Adapter | Targets | Storage |
 |---------|---------|---------|
-| `dexie` | browser | IndexedDB |
-| `sqljs` | browser | SQLite/WASM |
+| `dexie` | browser, capacitor | IndexedDB |
+| `sqljs` | browser, capacitor, electron | SQLite/WASM |
 | `pglite` | browser, node | PostgreSQL/WASM |
-| `sqlite` | node, bun | SQLite file |
+| `sqlite` | node, bun, electron | SQLite file |
 | `pg` | node, bun, deno | PostgreSQL |
 | `mysql2` | node, bun | MySQL |
-| `neon` | node, vercel | Serverless PostgreSQL |
-| `turso` | node, vercel | SQLite edge |
-| `planetscale` | node, vercel | Serverless MySQL |
+| `neon` | node, vercel, capacitor, electron | Serverless PostgreSQL |
+| `turso` | node, vercel, capacitor, electron | SQLite edge |
+| `planetscale` | node, vercel, capacitor, electron | Serverless MySQL |
 | `d1` | cloudflare | Cloudflare D1 |
 
 ## Default Targets

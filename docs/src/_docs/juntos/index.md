@@ -79,7 +79,7 @@ Full [Hotwire](https://hotwired.dev/) support for the Rails-native approach to i
 
 ### Multi-Target
 
-Write once, deploy anywhere JavaScript runs. The same code runs in browsers with IndexedDB, on Node.js with PostgreSQL, and on V8 Isolates with edge databases.
+Write once, deploy anywhere JavaScript runs. The same code runs in browsers with IndexedDB, on Node.js with PostgreSQL, on V8 Isolates with edge databases, on mobile devices via Capacitor, and on desktop via Electron.
 
 ### Transparency
 
@@ -113,14 +113,15 @@ Hono is more Sinatra than Rails—lightweight routing without opinions about mod
 
 ## Demos
 
-Two demo applications show Juntos in action:
+Three demo applications show Juntos in action:
 
 | Demo | What You Learn |
 |------|---------------|
 | **[Blog](/docs/juntos/demos/blog)** | CRUD operations, associations, validations, multi-platform deployment |
 | **[Chat](/docs/juntos/demos/chat)** | Real-time Turbo Streams, Stimulus controllers in Ruby, WebSocket broadcasting |
+| **[Photo Gallery](/docs/juntos/demos/photo-gallery)** | Camera integration, Capacitor mobile apps, Electron desktop apps |
 
-Both demos run on browser (IndexedDB), Node.js (SQLite), and Cloudflare (D1) from the same code. See [Demo Applications](/docs/juntos/demos/) for the full list and walkthroughs.
+All demos run on browser, Node.js, and edge platforms from the same code. The Photo Gallery also demonstrates mobile (Capacitor) and desktop (Electron) targets. See [Demo Applications](/docs/juntos/demos/) for the full list and walkthroughs.
 
 ## Next Steps
 

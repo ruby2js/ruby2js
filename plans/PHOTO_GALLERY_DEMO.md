@@ -706,17 +706,17 @@ dist/
 
 - [ ] Add loading states
 - [ ] Handle camera permission denial gracefully
-- [ ] Add "Choose from Gallery" option
-- [ ] Responsive grid layout
+- [x] Add "Choose from Gallery" option
+- [x] Responsive grid layout
 - [ ] Electron: dark/light mode tray icons
 
 ### Phase 6: Documentation
 
-- [ ] Create docs/src/_docs/juntos/demos/photo-gallery.md
-- [ ] Add to demos index
+- [x] Create docs/src/_docs/juntos/demos/photo-gallery.md
+- [x] Add to demos index
 - [x] Create test/photo_gallery/create-photo-gallery script
-- [ ] Document Capacitor setup and deployment
-- [ ] Document Electron setup and packaging
+- [x] Document Capacitor setup and deployment
+- [x] Document Electron setup and packaging
 
 ## Success Criteria
 
