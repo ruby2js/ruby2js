@@ -1,0 +1,29 @@
+{
+  "name": "ink-console",
+  "version": "0.1.0",
+  "description": "Interactive database console for Juntos projects",
+  "type": "module",
+  "bin": {
+    "console": "./bin/console"
+  },
+  "scripts": {
+    "build": "ruby scripts/build.rb",
+    "start": "./bin/console",
+    "dev": "ruby scripts/build.rb && ./bin/console"
+  },
+  "dependencies": {
+    "ink": "^4.4.1",
+    "ink-text-input": "^5.0.1",
+    "react": "^18.2.0",
+    "yaml": "^2.3.4"
+  },
+  "optionalDependencies": {
+    "better-sqlite3": "^11.0.0"
+  },
+  "devDependencies": {
+    "ruby2js": "file:../.."
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

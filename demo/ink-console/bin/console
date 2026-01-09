@@ -1,0 +1,191 @@
+#!/usr/bin/env node
+// Ink Console - Interactive database console for Juntos projects
+//
+// Usage:
+//   bin/console                    # Default: development environment
+//   bin/console -e production      # Use production environment
+//   bin/console -d pg              # Override database adapter
+//   bin/console -v                 # Verbose output
+
+import { render, Box, Text } from 'ink';
+import TextInput from 'ink-text-input';
+import React, { useState, useEffect } from 'react';
+import { parseArgs } from 'util';
+import { readFileSync, existsSync } from 'fs';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+import yaml from 'yaml';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const PROJECT_ROOT = join(__dirname, '..');
+
+// Parse command-line arguments
+const { values: args } = parseArgs({
+  options: {
+    database: { type: 'string', short: 'd' },
+    environment: { type: 'string', short: 'e', default: 'development' },
+    verbose: { type: 'boolean', short: 'v', default: false },
+    help: { type: 'boolean', short: 'h', default: false }
+  },
+  strict: false
+});
+
+if (args.help) {
+  console.log(`
+Ink Console - Interactive database console for Juntos projects
+
+Usage:
+  bin/console [options]
+
+Options:
+  -d, --database ADAPTER   Database adapter (overrides database.yml)
+  -e, --environment ENV    Rails environment (default: development)
+  -v, --verbose            Show detailed output
+  -h, --help               Show this help
+
+Examples:
+  bin/console                    # Use development environment
+  bin/console -e production      # Use production environment
+  bin/console -d pg              # Use PostgreSQL adapter
+`);
+  process.exit(0);
+}
+
+// Load database configuration
+function loadDatabaseConfig() {
+  const env = args.environment || process.env.RAILS_ENV || process.env.NODE_ENV || 'development';
+
+  if (args.database) {
+    return { adapter: args.database, _source: 'command line' };
+  }
+
+  const configPath = join(PROJECT_ROOT, 'config/database.yml');
+  if (existsSync(configPath)) {
+    try {
+      const config = yaml.parse(readFileSync(configPath, 'utf8'));
+      if (config && config[env]) {
+        return { ...config[env], _source: `database.yml [${env}]` };
+      }
+    } catch (e) {
+      console.error(`Error reading database.yml: ${e.message}`);
+    }
+  }
+
+  return { adapter: 'sqlite', database: 'db/development.sqlite3', _source: 'default' };
+}
+
+// Simple REPL component (placeholder until Ink filter is implemented)
+// Using React.createElement instead of JSX for Node.js compatibility
+const e = React.createElement;
+
+function Console({ dbConfig, verbose }) {
+  const [query, setQuery] = useState('');
+  const [history, setHistory] = useState([]);
+  const [error, setError] = useState(null);
+  const [models, setModels] = useState({});
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function init() {
+      try {
+        // TODO: Initialize database and load models
+        // const { initDatabase } = await import('../dist/lib/active_record.mjs');
+        // await initDatabase();
+        // const { loadModels } = await import('../lib/model_loader.mjs');
+        // const loadedModels = await loadModels();
+        // setModels(loadedModels);
+        setLoading(false);
+      } catch (err) {
+        setError(err.message);
+        setLoading(false);
+      }
+    }
+    init();
+  }, []);
+
+  const handleSubmit = async (value) => {
+    if (!value.trim()) return;
+
+    const trimmed = value.trim().toLowerCase();
+    if (trimmed === 'exit' || trimmed === 'quit') {
+      process.exit(0);
+    }
+
+    // Add to history
+    setHistory(prev => [...prev, { query: value, result: '(query execution not yet implemented)' }]);
+    setQuery('');
+  };
+
+  if (loading) {
+    return e(Box, { flexDirection: 'column', padding: 1 },
+      e(Text, { color: 'yellow' }, 'Loading...')
+    );
+  }
+
+  const children = [
+    // Header
+    e(Box, { key: 'header', marginBottom: 1 },
+      e(Text, { bold: true, color: 'green' }, 'ink-console'),
+      e(Text, { dimColor: true }, ` (${dbConfig.adapter} via ${dbConfig._source})`)
+    )
+  ];
+
+  // Verbose output
+  if (verbose) {
+    children.push(
+      e(Box, { key: 'verbose', marginBottom: 1 },
+        e(Text, { dimColor: true }, `Database: ${JSON.stringify(dbConfig)}`)
+      )
+    );
+  }
+
+  // Error display
+  if (error) {
+    children.push(
+      e(Box, { key: 'error', marginBottom: 1 },
+        e(Text, { color: 'red' }, `Error: ${error}`)
+      )
+    );
+  }
+
+  // History
+  history.forEach((entry, i) => {
+    children.push(
+      e(Box, { key: `history-${i}`, flexDirection: 'column', marginBottom: 1 },
+        e(Text, { color: 'cyan' }, `> ${entry.query}`),
+        e(Text, null, entry.result)
+      )
+    );
+  });
+
+  // Input prompt
+  children.push(
+    e(Box, { key: 'prompt' },
+      e(Text, { color: 'green' }, '> '),
+      e(TextInput, {
+        value: query,
+        onChange: setQuery,
+        onSubmit: handleSubmit,
+        placeholder: "Enter a query (e.g., Post.all) or 'exit' to quit"
+      })
+    )
+  );
+
+  // Help text
+  children.push(
+    e(Box, { key: 'help', marginTop: 1 },
+      e(Text, { dimColor: true }, "Type 'exit' to quit. Press Ctrl+C to force quit.")
+    )
+  );
+
+  return e(Box, { flexDirection: 'column', padding: 1 }, ...children);
+}
+
+// Main
+const dbConfig = loadDatabaseConfig();
+
+if (args.verbose) {
+  console.log(`Database: ${dbConfig.adapter} (${dbConfig._source})`);
+}
+
+render(e(Console, { dbConfig, verbose: args.verbose }));
