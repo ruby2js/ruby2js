@@ -22,7 +22,8 @@
     "better-sqlite3": "^11.0.0"
   },
   "devDependencies": {
-    "ruby2js": "file:../.."
+    "ruby2js": "file:../..",
+    "ruby2js-rails": "file:../../packages/ruby2js-rails"
   },
   "engines": {
     "node": ">=18.0.0"

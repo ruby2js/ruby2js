@@ -20,6 +20,12 @@ import yaml from 'yaml';
 // Query evaluator
 import { initQueryEvaluator, evaluateQuery, formatResult } from '../lib/query_evaluator.mjs';
 
+// Database and models
+import { initDatabase } from '../dist/lib/active_record.mjs';
+import { Post } from '../dist/models/post.js';
+import { User } from '../dist/models/user.js';
+import { Comment } from '../dist/models/comment.js';
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = join(__dirname, '..');
 
@@ -81,74 +87,8 @@ function loadDatabaseConfig() {
 // React.createElement shorthand
 const e = React.createElement;
 
-// Mock models for testing (until real DB integration)
-class Post {
-  static records = [
-    { id: 1, title: 'Getting Started', published: true, created_at: '2024-01-01' },
-    { id: 2, title: 'Advanced Tips', published: true, created_at: '2024-01-15' },
-    { id: 3, title: 'Draft Post', published: false, created_at: '2024-02-01' }
-  ];
-
-  static all() {
-    return this.records.map(r => new Post(r));
-  }
-
-  static where(conditions) {
-    const filtered = this.records.filter(r => {
-      return Object.entries(conditions).every(([k, v]) => r[k] === v);
-    });
-    return filtered.map(r => new Post(r));
-  }
-
-  static find(id) {
-    const record = this.records.find(r => r.id === id);
-    return record ? new Post(record) : null;
-  }
-
-  static count() {
-    return this.records.length;
-  }
-
-  static first() {
-    return this.records[0] ? new Post(this.records[0]) : null;
-  }
-
-  static last() {
-    return this.records.at(-1) ? new Post(this.records.at(-1)) : null;
-  }
-
-  constructor(attrs) {
-    this.attributes = attrs;
-    Object.assign(this, attrs);
-  }
-}
-
-class User {
-  static records = [
-    { id: 1, name: 'Alice', email: 'alice@example.com', admin: true },
-    { id: 2, name: 'Bob', email: 'bob@example.com', admin: false }
-  ];
-
-  static all() { return this.records.map(r => new User(r)); }
-  static where(conditions) {
-    const filtered = this.records.filter(r =>
-      Object.entries(conditions).every(([k, v]) => r[k] === v)
-    );
-    return filtered.map(r => new User(r));
-  }
-  static find(id) {
-    const record = this.records.find(r => r.id === id);
-    return record ? new User(record) : null;
-  }
-  static count() { return this.records.length; }
-
-  constructor(attrs) {
-    this.attributes = attrs;
-    Object.assign(this, attrs);
-  }
-}
-
-const MODELS = { Post, User };
+// Models for query evaluation
+const MODELS = { Post, User, Comment };
 
 // Result display component
 function ResultDisplay({ result, type }) {
@@ -228,6 +168,7 @@ function Console({ dbConfig, verbose }) {
   useEffect(() => {
     async function init() {
       try {
+        await initDatabase();
         await initQueryEvaluator();
         setLoading(false);
       } catch (err) {

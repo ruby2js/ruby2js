@@ -13,6 +13,7 @@ require 'ruby2js/filter/functions'
 require 'ruby2js/filter/esm'
 require 'ruby2js/filter/return'
 require 'ruby2js/filter/ink'
+require 'ruby2js/filter/rails/model'
 
 class InkConsoleBuilder
   DEMO_ROOT = File.expand_path('..', __dir__)
@@ -35,6 +36,19 @@ class InkConsoleBuilder
     include: [:class, :call],
     autoexports: true,
     filters: [
+      Ruby2JS::Filter::Functions,
+      Ruby2JS::Filter::ESM,
+      Ruby2JS::Filter::Return
+    ]
+  }.freeze
+
+  # Options for model files
+  MODEL_OPTIONS = {
+    eslevel: 2022,
+    include: [:class, :call],
+    autoexports: true,
+    filters: [
+      Ruby2JS::Filter::Rails::Model,
       Ruby2JS::Filter::Functions,
       Ruby2JS::Filter::ESM,
       Ruby2JS::Filter::Return
@@ -96,7 +110,8 @@ class InkConsoleBuilder
       transpile_directory(
         File.join(DEMO_ROOT, 'app/models'),
         File.join(@dist_dir, 'models'),
-        '**/*.rb'
+        '**/*.rb',
+        model: true
       )
       generate_models_index
       puts ""
@@ -144,14 +159,25 @@ class InkConsoleBuilder
       return
     end
 
-    adapter_dest = File.join(@dist_dir, 'lib/active_record.mjs')
-    FileUtils.mkdir_p(File.dirname(adapter_dest))
+    lib_dest = File.join(@dist_dir, 'lib')
+    FileUtils.mkdir_p(lib_dest)
 
     adapter_code = File.read(adapter_src)
     adapter_code = adapter_code.sub('const DB_CONFIG = {};', "const DB_CONFIG = #{JSON.generate(db_config)};")
-    File.write(adapter_dest, adapter_code)
+    File.write(File.join(lib_dest, 'active_record.mjs'), adapter_code)
 
     puts "  Adapter: #{adapter} -> lib/active_record.mjs"
+
+    # Copy dialect files
+    dialects_src = File.join(package_dir, 'adapters/dialects')
+    dialects_dest = File.join(lib_dest, 'dialects')
+    if Dir.exist?(dialects_src)
+      FileUtils.mkdir_p(dialects_dest)
+      Dir.glob(File.join(dialects_src, '*.mjs')).each do |src|
+        FileUtils.cp(src, dialects_dest)
+        puts "  Dialect: #{File.basename(src)} -> lib/dialects/"
+      end
+    end
   end
 
   def copy_lib_files
@@ -180,12 +206,13 @@ class InkConsoleBuilder
     end
   end
 
-  def transpile_file(src_path, dest_path, component: false)
+  def transpile_file(src_path, dest_path, component: false, model: false)
     puts "  Transpiling: #{File.basename(src_path)}"
     source = File.read(src_path)
 
     relative_src = src_path.sub(DEMO_ROOT + '/', '')
-    options = (component ? COMPONENT_OPTIONS : OPTIONS).merge(file: relative_src)
+    base_options = model ? MODEL_OPTIONS : (component ? COMPONENT_OPTIONS : OPTIONS)
+    options = base_options.merge(file: relative_src)
     result = Ruby2JS.convert(source, options)
     js = result.to_s
 
@@ -195,7 +222,7 @@ class InkConsoleBuilder
     puts "    -> #{dest_path.sub(DEMO_ROOT + '/', '')}"
   end
 
-  def transpile_directory(src_dir, dest_dir, pattern = '**/*.rb', skip: [], component: false)
+  def transpile_directory(src_dir, dest_dir, pattern = '**/*.rb', skip: [], component: false, model: false)
     return unless Dir.exist?(src_dir)
 
     files = Dir.glob(File.join(src_dir, pattern))
@@ -210,14 +237,16 @@ class InkConsoleBuilder
 
       relative = src_path.sub(src_dir + '/', '')
       dest_path = File.join(dest_dir, relative.sub(/\.rb$/, '.js'))
-      transpile_file(src_path, dest_path, component: component)
+      transpile_file(src_path, dest_path, component: component, model: model)
     end
   end
 
   def generate_application_record
     wrapper = <<~JS
       // ApplicationRecord - wraps ActiveRecord from adapter
-      import { ActiveRecord } from '../lib/active_record.mjs';
+      import { ActiveRecord, CollectionProxy } from '../lib/active_record.mjs';
+
+      export { CollectionProxy };
 
       export class ApplicationRecord extends ActiveRecord {
       }
