@@ -70,9 +70,19 @@ Capacitor wraps your web app in a native shell, providing access to device APIs 
 bin/juntos build -t capacitor -d dexie
 cd dist
 npm install
+```
+
+### Install Camera Plugin
+
+The demo uses Capacitor's Camera plugin for native camera access. Install it before adding platforms:
+
+```bash
+npm install @capacitor/camera
 npx cap add ios      # Requires Xcode
 npx cap add android  # Requires Android Studio
 ```
+
+Capacitor automatically configures permissions in `Info.plist` (iOS) and `AndroidManifest.xml` (Android) when you add the plugin.
 
 ### Run on iOS
 
@@ -116,10 +126,13 @@ def takePhotoCapacitor
     source: CameraSource.Camera
   )
   handlePhoto(result.base64String)
+rescue => error
+  console.error("Camera error:", error)
+  takePhotoBrowser()  # Fall back to browser camera
 end
 ```
 
-Capacitor automatically adds the required permissions to `Info.plist` (iOS) and `AndroidManifest.xml` (Android).
+The dynamic import (`await import("@capacitor/camera")`) means the plugin is only loaded when needed. If the plugin isn't installed, the `rescue` block falls back to the browser camera.
 
 ## Build for Desktop (Electron)
 

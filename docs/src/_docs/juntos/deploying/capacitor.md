@@ -65,10 +65,17 @@ cd dist
 # Install dependencies
 npm install
 
-# Add platforms
+# Install any Capacitor plugins your app uses
+npm install @capacitor/camera        # If using camera
+npm install @capacitor/geolocation   # If using GPS
+# ... etc
+
+# Add platforms (installs plugins into native projects)
 npx cap add ios
 npx cap add android
 ```
+
+**Important:** Install plugins *before* running `npx cap add`. This ensures the native projects are configured with the correct permissions and dependencies.
 
 ## Project Structure
 
