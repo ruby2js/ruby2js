@@ -131,11 +131,10 @@ cat > app/views/photos/index.html.erb << 'VIEW'
   <!-- Gallery grid -->
   <div id="photos" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
     <%= render @photos %>
+    <p id="empty-message" class="text-gray-500 text-center py-12 col-span-full hidden only:block">
+      No photos yet. Take one to get started!
+    </p>
   </div>
-
-  <% if @photos.empty? %>
-    <p class="text-gray-500 text-center py-12">No photos yet. Take one to get started!</p>
-  <% end %>
 </div>
 VIEW
 
