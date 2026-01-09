@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "ink": "^4.4.1",
+    "ink-spinner": "^5.0.0",
     "ink-text-input": "^5.0.1",
     "react": "^18.2.0",
     "yaml": "^2.3.4"

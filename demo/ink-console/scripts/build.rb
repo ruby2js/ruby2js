@@ -12,8 +12,7 @@ require 'ruby2js'
 require 'ruby2js/filter/functions'
 require 'ruby2js/filter/esm'
 require 'ruby2js/filter/return'
-
-# TODO: require 'ruby2js/filter/ink' once implemented
+require 'ruby2js/filter/ink'
 
 class InkConsoleBuilder
   DEMO_ROOT = File.expand_path('..', __dir__)
@@ -42,14 +41,14 @@ class InkConsoleBuilder
     ]
   }.freeze
 
-  # Options for Ink components (will add Ink filter once implemented)
+  # Options for Ink components
   COMPONENT_OPTIONS = {
     eslevel: 2022,
     include: [:class, :call],
     autoexports: true,
     comparison: :identity,
     filters: [
-      # Ruby2JS::Filter::Ink,  # TODO: implement ink filter
+      Ruby2JS::Filter::Ink,
       Ruby2JS::Filter::Functions,
       Ruby2JS::Filter::ESM,
       Ruby2JS::Filter::Return
