@@ -683,7 +683,7 @@ dist/
 
 - [x] Add Capacitor target to builder
 - [x] Generate capacitor.config.ts
-- [ ] Configure Capacitor camera plugin in Stimulus controller
+- [x] Configure Capacitor camera plugin in Stimulus controller
 - [ ] Test on iOS simulator
 - [ ] Test on Android emulator
 

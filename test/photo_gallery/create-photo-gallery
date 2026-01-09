@@ -163,7 +163,43 @@ TURBO
 mkdir -p app/javascript/controllers
 cat > app/javascript/controllers/camera_controller.rb << 'STIMULUS'
 class CameraController < Stimulus::Controller
+  # Check if running in Capacitor with Camera plugin
+  def isCapacitor
+    window.Capacitor && window.Capacitor.isNativePlatform()
+  end
+
   def takePhoto
+    if isCapacitor
+      # Native mobile - use Capacitor Camera plugin
+      takePhotoCapacitor()
+    else
+      # Browser - use getUserMedia
+      takePhotoBrowser()
+    end
+  end
+
+  def takePhotoCapacitor
+    # Import Camera plugin dynamically
+    Camera = (await import("@capacitor/camera")).Camera
+    CameraResultType = (await import("@capacitor/camera")).CameraResultType
+    CameraSource = (await import("@capacitor/camera")).CameraSource
+
+    result = await Camera.getPhoto(
+      quality: 80,
+      allowEditing: false,
+      resultType: CameraResultType.Base64,
+      source: CameraSource.Camera
+    )
+
+    # Result contains base64 string directly
+    handlePhoto(result.base64String)
+  rescue => error
+    console.error("Camera error:", error)
+    # Fall back to browser camera if Capacitor fails
+    takePhotoBrowser()
+  end
+
+  def takePhotoBrowser
     # Start video stream from webcam
     stream = await navigator.mediaDevices.getUserMedia(video: { facingMode: "user" })
     videoTarget.srcObject = stream
@@ -193,6 +229,34 @@ class CameraController < Stimulus::Controller
   end
 
   def chooseFromGallery
+    if isCapacitor
+      # Native mobile - use Capacitor Camera with Photos source
+      chooseFromGalleryCapacitor()
+    else
+      # Browser - use file input
+      chooseFromGalleryBrowser()
+    end
+  end
+
+  def chooseFromGalleryCapacitor
+    Camera = (await import("@capacitor/camera")).Camera
+    CameraResultType = (await import("@capacitor/camera")).CameraResultType
+    CameraSource = (await import("@capacitor/camera")).CameraSource
+
+    result = await Camera.getPhoto(
+      quality: 80,
+      allowEditing: false,
+      resultType: CameraResultType.Base64,
+      source: CameraSource.Photos
+    )
+
+    handlePhoto(result.base64String)
+  rescue => error
+    console.error("Gallery error:", error)
+    chooseFromGalleryBrowser()
+  end
+
+  def chooseFromGalleryBrowser
     input = document.createElement("input")
     input.type = "file"
     input.accept = "image/*"
