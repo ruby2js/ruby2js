@@ -22,13 +22,22 @@ export async function initQueryEvaluator() {
 
   try {
     // Try to load Ruby2JS from the selfhost bundle
-    const selfhostPath = join(__dirname, '../../../selfhost/dist/ruby2js.mjs');
+    const selfhostPath = join(__dirname, '../../selfhost/ruby2js.js');
     ruby2js = await import(selfhostPath);
+    // Initialize Prism WASM parser
+    if (ruby2js.initPrism) {
+      await ruby2js.initPrism();
+    }
+    // Load the Functions filter for Ruby method mappings
+    await import('../../selfhost/filters/functions.js');
+    // Load our Console filter for AR method await wrapping
+    await import('./console_filter.mjs');
   } catch (e) {
     // Fall back to a simple pass-through for testing
-    console.warn('Ruby2JS selfhost not available, using passthrough mode');
+    console.warn('Ruby2JS selfhost not available:', e.message);
+    console.warn('Using passthrough mode');
     ruby2js = {
-      convert: (source) => ({ to_s: () => source })
+      convert: (source) => ({ toString: () => source })
     };
   }
 }
@@ -66,12 +75,18 @@ export async function evaluateQuery(rubyQuery, models = {}) {
   }
 
   try {
-    // Transpile Ruby to JavaScript
+    // Transpile Ruby to JavaScript with Console and Functions filters
     const result = ruby2js.convert(rubyQuery, {
-      filters: ['functions'],
-      autoreturn: true
+      eslevel: 2022,
+      filters: ['Console', 'Functions']
     });
-    const jsCode = result.to_s ? result.to_s() : result.toString();
+    // The converter object has toString() method
+    const jsCode = String(result);
+
+    // Debug: show transpiled code
+    if (process.env.DEBUG) {
+      console.log('Transpiled:', jsCode);
+    }
 
     // Create a function with models in scope
     const modelNames = Object.keys(models);
@@ -85,7 +100,7 @@ export async function evaluateQuery(rubyQuery, models = {}) {
 
     return queryResult;
   } catch (error) {
-    throw new Error(`Query error: ${error.message}`);
+    throw new Error(`Query error: ${error.message}\n  Stack: ${error.stack}`);
   }
 }
 

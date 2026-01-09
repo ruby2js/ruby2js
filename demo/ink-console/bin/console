@@ -7,14 +7,18 @@
 //   bin/console -d pg              # Override database adapter
 //   bin/console -v                 # Verbose output
 
-import { render, Box, Text } from 'ink';
+import { render, Box, Text, useInput, useApp } from 'ink';
 import TextInput from 'ink-text-input';
+import Spinner from 'ink-spinner';
 import React, { useState, useEffect } from 'react';
 import { parseArgs } from 'util';
 import { readFileSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import yaml from 'yaml';
+
+// Query evaluator
+import { initQueryEvaluator, evaluateQuery, formatResult } from '../lib/query_evaluator.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = join(__dirname, '..');
@@ -74,26 +78,157 @@ function loadDatabaseConfig() {
   return { adapter: 'sqlite', database: 'db/development.sqlite3', _source: 'default' };
 }
 
-// Simple REPL component (placeholder until Ink filter is implemented)
-// Using React.createElement instead of JSX for Node.js compatibility
+// React.createElement shorthand
 const e = React.createElement;
 
+// Mock models for testing (until real DB integration)
+class Post {
+  static records = [
+    { id: 1, title: 'Getting Started', published: true, created_at: '2024-01-01' },
+    { id: 2, title: 'Advanced Tips', published: true, created_at: '2024-01-15' },
+    { id: 3, title: 'Draft Post', published: false, created_at: '2024-02-01' }
+  ];
+
+  static all() {
+    return this.records.map(r => new Post(r));
+  }
+
+  static where(conditions) {
+    const filtered = this.records.filter(r => {
+      return Object.entries(conditions).every(([k, v]) => r[k] === v);
+    });
+    return filtered.map(r => new Post(r));
+  }
+
+  static find(id) {
+    const record = this.records.find(r => r.id === id);
+    return record ? new Post(record) : null;
+  }
+
+  static count() {
+    return this.records.length;
+  }
+
+  static first() {
+    return this.records[0] ? new Post(this.records[0]) : null;
+  }
+
+  static last() {
+    return this.records.at(-1) ? new Post(this.records.at(-1)) : null;
+  }
+
+  constructor(attrs) {
+    this.attributes = attrs;
+    Object.assign(this, attrs);
+  }
+}
+
+class User {
+  static records = [
+    { id: 1, name: 'Alice', email: 'alice@example.com', admin: true },
+    { id: 2, name: 'Bob', email: 'bob@example.com', admin: false }
+  ];
+
+  static all() { return this.records.map(r => new User(r)); }
+  static where(conditions) {
+    const filtered = this.records.filter(r =>
+      Object.entries(conditions).every(([k, v]) => r[k] === v)
+    );
+    return filtered.map(r => new User(r));
+  }
+  static find(id) {
+    const record = this.records.find(r => r.id === id);
+    return record ? new User(record) : null;
+  }
+  static count() { return this.records.length; }
+
+  constructor(attrs) {
+    this.attributes = attrs;
+    Object.assign(this, attrs);
+  }
+}
+
+const MODELS = { Post, User };
+
+// Result display component
+function ResultDisplay({ result, type }) {
+  if (!result) return null;
+
+  if (type === 'table' && Array.isArray(result)) {
+    if (result.length === 0) {
+      return e(Box, { marginY: 1 },
+        e(Text, { dimColor: true }, 'No records found')
+      );
+    }
+
+    const columns = Object.keys(result[0]);
+    const colWidths = columns.map(col => {
+      const maxDataWidth = Math.max(...result.map(r => String(r[col] ?? '').length));
+      return Math.min(Math.max(col.length, maxDataWidth) + 2, 25);
+    });
+
+    return e(Box, { flexDirection: 'column', marginY: 1 },
+      // Header
+      e(Box, null,
+        ...columns.map((col, i) =>
+          e(Box, { key: col, width: colWidths[i] },
+            e(Text, { bold: true }, col)
+          )
+        )
+      ),
+      // Separator
+      e(Box, null,
+        e(Text, { dimColor: true }, columns.map((_, i) => '─'.repeat(colWidths[i] - 1)).join(' '))
+      ),
+      // Rows
+      ...result.map((row, rowIdx) =>
+        e(Box, { key: rowIdx },
+          ...columns.map((col, i) =>
+            e(Box, { key: col, width: colWidths[i] },
+              e(Text, null, String(row[col] ?? 'null').slice(0, colWidths[i] - 2))
+            )
+          )
+        )
+      ),
+      // Count
+      e(Box, { marginTop: 1 },
+        e(Text, { dimColor: true }, `${result.length} record(s)`)
+      )
+    );
+  }
+
+  if (type === 'record') {
+    const entries = Object.entries(result);
+    return e(Box, { flexDirection: 'column', marginY: 1 },
+      ...entries.map(([key, value]) =>
+        e(Box, { key },
+          e(Text, { bold: true }, `${key}: `),
+          e(Text, null, String(value ?? 'null'))
+        )
+      )
+    );
+  }
+
+  // Default: show as JSON
+  return e(Box, { marginY: 1 },
+    e(Text, null, JSON.stringify(result, null, 2))
+  );
+}
+
+// Main Console component
 function Console({ dbConfig, verbose }) {
+  const { exit } = useApp();
   const [query, setQuery] = useState('');
   const [history, setHistory] = useState([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
   const [error, setError] = useState(null);
-  const [models, setModels] = useState({});
   const [loading, setLoading] = useState(true);
+  const [executing, setExecuting] = useState(false);
 
   useEffect(() => {
     async function init() {
       try {
-        // TODO: Initialize database and load models
-        // const { initDatabase } = await import('../dist/lib/active_record.mjs');
-        // await initDatabase();
-        // const { loadModels } = await import('../lib/model_loader.mjs');
-        // const loadedModels = await loadModels();
-        // setModels(loadedModels);
+        await initQueryEvaluator();
         setLoading(false);
       } catch (err) {
         setError(err.message);
@@ -103,22 +238,88 @@ function Console({ dbConfig, verbose }) {
     init();
   }, []);
 
+  // Handle up/down for history navigation
+  useInput((input, key) => {
+    if (key.upArrow && history.length > 0) {
+      const newIndex = historyIndex < history.length - 1 ? historyIndex + 1 : historyIndex;
+      setHistoryIndex(newIndex);
+      setQuery(history[history.length - 1 - newIndex]?.query || '');
+    }
+    if (key.downArrow) {
+      const newIndex = historyIndex > 0 ? historyIndex - 1 : -1;
+      setHistoryIndex(newIndex);
+      setQuery(newIndex >= 0 ? history[history.length - 1 - newIndex]?.query || '' : '');
+    }
+    if (key.ctrl && input === 'c') {
+      exit();
+    }
+  });
+
   const handleSubmit = async (value) => {
     if (!value.trim()) return;
 
     const trimmed = value.trim().toLowerCase();
     if (trimmed === 'exit' || trimmed === 'quit') {
-      process.exit(0);
+      exit();
+      return;
     }
 
-    // Add to history
-    setHistory(prev => [...prev, { query: value, result: '(query execution not yet implemented)' }]);
+    if (trimmed === 'clear') {
+      setHistory([]);
+      setQuery('');
+      setError(null);
+      return;
+    }
+
+    if (trimmed === 'help') {
+      setHistory(prev => [...prev, {
+        query: value,
+        result: 'Available commands:\n  Post.all, Post.find(1), Post.where(published: true)\n  User.all, User.count\n  exit, clear, help',
+        type: 'value'
+      }]);
+      setQuery('');
+      return;
+    }
+
+    setExecuting(true);
+    setError(null);
+
+    try {
+      const result = await evaluateQuery(value, MODELS);
+      const formatted = formatResult(result);
+
+      if (formatted.type === 'command') {
+        if (formatted.data === 'exit') exit();
+        if (formatted.data === 'clear') {
+          setHistory([]);
+          setQuery('');
+        }
+      } else {
+        setHistory(prev => [...prev, {
+          query: value,
+          result: formatted.data,
+          type: formatted.type,
+          count: formatted.count
+        }]);
+      }
+    } catch (err) {
+      setHistory(prev => [...prev, {
+        query: value,
+        error: err.message
+      }]);
+    }
+
     setQuery('');
+    setHistoryIndex(-1);
+    setExecuting(false);
   };
 
   if (loading) {
     return e(Box, { flexDirection: 'column', padding: 1 },
-      e(Text, { color: 'yellow' }, 'Loading...')
+      e(Box, null,
+        e(Spinner, { type: 'dots' }),
+        e(Text, { color: 'yellow' }, ' Initializing Ruby2JS...')
+      )
     );
   }
 
@@ -142,7 +343,7 @@ function Console({ dbConfig, verbose }) {
   // Error display
   if (error) {
     children.push(
-      e(Box, { key: 'error', marginBottom: 1 },
+      e(Box, { key: 'error', marginBottom: 1, borderStyle: 'round', borderColor: 'red', paddingX: 1 },
         e(Text, { color: 'red' }, `Error: ${error}`)
       )
     );
@@ -153,7 +354,9 @@ function Console({ dbConfig, verbose }) {
     children.push(
       e(Box, { key: `history-${i}`, flexDirection: 'column', marginBottom: 1 },
         e(Text, { color: 'cyan' }, `> ${entry.query}`),
-        e(Text, null, entry.result)
+        entry.error
+          ? e(Text, { color: 'red' }, `Error: ${entry.error}`)
+          : e(ResultDisplay, { result: entry.result, type: entry.type })
       )
     );
   });
@@ -161,20 +364,27 @@ function Console({ dbConfig, verbose }) {
   // Input prompt
   children.push(
     e(Box, { key: 'prompt' },
-      e(Text, { color: 'green' }, '> '),
-      e(TextInput, {
-        value: query,
-        onChange: setQuery,
-        onSubmit: handleSubmit,
-        placeholder: "Enter a query (e.g., Post.all) or 'exit' to quit"
-      })
+      executing
+        ? e(Box, null,
+            e(Spinner, { type: 'dots' }),
+            e(Text, { color: 'yellow' }, ' Executing...')
+          )
+        : e(Box, null,
+            e(Text, { color: 'green' }, '> '),
+            e(TextInput, {
+              value: query,
+              onChange: setQuery,
+              onSubmit: handleSubmit,
+              placeholder: "Post.all, User.find(1), or 'help'"
+            })
+          )
     )
   );
 
   // Help text
   children.push(
     e(Box, { key: 'help', marginTop: 1 },
-      e(Text, { dimColor: true }, "Type 'exit' to quit. Press Ctrl+C to force quit.")
+      e(Text, { dimColor: true }, "↑/↓ history • 'help' for commands • 'exit' to quit • Ctrl+C force quit")
     )
   );
 
