@@ -17,14 +17,8 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import yaml from 'yaml';
 
-// Query evaluator
-import { initQueryEvaluator, evaluateQuery, formatResult } from '../lib/query_evaluator.mjs';
-
-// Database and models
-import { initDatabase } from '../dist/lib/active_record.mjs';
-import { Post } from '../dist/models/post.js';
-import { User } from '../dist/models/user.js';
-import { Comment } from '../dist/models/comment.js';
+// Query evaluator (uses Knex for database access)
+import { initKnex, initQueryEvaluator, evaluateQuery, formatResult, getTables } from '../lib/query_evaluator.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = join(__dirname, '..');
@@ -86,9 +80,6 @@ function loadDatabaseConfig() {
 
 // React.createElement shorthand
 const e = React.createElement;
-
-// Models for query evaluation
-const MODELS = { Post, User, Comment };
 
 // Result display component
 function ResultDisplay({ result, type }) {
@@ -168,7 +159,7 @@ function Console({ dbConfig, verbose }) {
   useEffect(() => {
     async function init() {
       try {
-        await initDatabase();
+        await initKnex({ database: dbConfig.database || 'db/development.sqlite3' });
         await initQueryEvaluator();
         setLoading(false);
       } catch (err) {
@@ -215,7 +206,17 @@ function Console({ dbConfig, verbose }) {
     if (trimmed === 'help') {
       setHistory(prev => [...prev, {
         query: value,
-        result: 'Available commands:\n  Post.all, Post.find(1), Post.where(published: true)\n  User.all, User.count\n  exit, clear, help',
+        result: `Available commands:
+  Post.all              - Get all posts
+  Post.find(1)          - Find post by ID
+  Post.where(...)       - Filter posts
+  Post.first / Post.last
+  Post.order(:column)
+  Post.limit(n)
+  Post.count
+
+  tables                - List all tables
+  exit, clear, help`,
         type: 'value'
       }]);
       setQuery('');
@@ -226,8 +227,21 @@ function Console({ dbConfig, verbose }) {
     setError(null);
 
     try {
-      const result = await evaluateQuery(value, MODELS);
+      const result = await evaluateQuery(value);
       const formatted = formatResult(result);
+
+      // Handle 'tables' command
+      if (formatted.type === 'command' && formatted.data === 'tables') {
+        const tables = await getTables();
+        setHistory(prev => [...prev, {
+          query: value,
+          result: tables.length > 0 ? tables.join(', ') : 'No tables found',
+          type: 'value'
+        }]);
+        setQuery('');
+        setExecuting(false);
+        return;
+      }
 
       if (formatted.type === 'command') {
         if (formatted.data === 'exit') exit();
@@ -316,7 +330,7 @@ function Console({ dbConfig, verbose }) {
               value: query,
               onChange: setQuery,
               onSubmit: handleSubmit,
-              placeholder: "Post.all, User.find(1), or 'help'"
+              placeholder: "Post.all, Post.find(1), or 'help'"
             })
           )
     )

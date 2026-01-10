@@ -1,7 +1,7 @@
-// Query Evaluator - Transpiles and executes Ruby-like queries
+// Query Evaluator - Transpiles Ruby AR queries to Knex.js and executes them
 //
-// Uses Ruby2JS self-hosting to transpile Ruby syntax to JavaScript,
-// then executes against the loaded models.
+// Uses Ruby2JS self-hosting to transpile Ruby syntax to Knex.js queries,
+// then executes against the database via Knex.
 
 import { createRequire } from 'module';
 import { fileURLToPath } from 'url';
@@ -12,6 +12,40 @@ const require = createRequire(import.meta.url);
 
 // Ruby2JS will be loaded dynamically
 let ruby2js = null;
+
+// Knex instance
+let knexInstance = null;
+
+/**
+ * Initialize Knex with the provided configuration.
+ *
+ * @param {Object} config - Knex configuration
+ */
+export async function initKnex(config = {}) {
+  if (knexInstance) return knexInstance;
+
+  const Knex = (await import('knex')).default;
+
+  // Default to SQLite
+  const knexConfig = {
+    client: config.client || 'better-sqlite3',
+    connection: config.connection || {
+      filename: config.database || './db/development.sqlite3'
+    },
+    useNullAsDefault: true,
+    ...config
+  };
+
+  knexInstance = Knex(knexConfig);
+  return knexInstance;
+}
+
+/**
+ * Get the Knex instance.
+ */
+export function getKnex() {
+  return knexInstance;
+}
 
 /**
  * Initialize the query evaluator with Ruby2JS.
@@ -30,7 +64,7 @@ export async function initQueryEvaluator() {
     }
     // Load the Functions filter for Ruby method mappings
     await import('../../selfhost/filters/functions.js');
-    // Load our Console filter for AR method await wrapping
+    // Load our Console filter for AR → Knex translation
     await import('./console_filter.mjs');
   } catch (e) {
     // Fall back to a simple pass-through for testing
@@ -43,18 +77,21 @@ export async function initQueryEvaluator() {
 }
 
 /**
- * Evaluate a Ruby-like query string against the provided models.
+ * Evaluate a Ruby-like query string.
  *
  * @param {string} rubyQuery - The Ruby query (e.g., "Post.all" or "Post.where(published: true)")
- * @param {Object} models - Object mapping model names to model classes
  * @returns {Promise<any>} - The query result
  *
  * @example
- *   const result = await evaluateQuery("Post.where(published: true).limit(5)", { Post });
+ *   const result = await evaluateQuery("Post.where(published: true).limit(5)");
  */
-export async function evaluateQuery(rubyQuery, models = {}) {
+export async function evaluateQuery(rubyQuery) {
   if (!ruby2js) {
     await initQueryEvaluator();
+  }
+
+  if (!knexInstance) {
+    throw new Error('Knex not initialized. Call initKnex() first.');
   }
 
   // Handle empty queries
@@ -73,6 +110,9 @@ export async function evaluateQuery(rubyQuery, models = {}) {
   if (trimmed === 'clear') {
     return { __command: 'clear' };
   }
+  if (trimmed === 'tables' || trimmed === '.tables') {
+    return { __command: 'tables' };
+  }
 
   try {
     // Transpile Ruby to JavaScript with Console and Functions filters
@@ -88,20 +128,31 @@ export async function evaluateQuery(rubyQuery, models = {}) {
       console.log('Transpiled:', jsCode);
     }
 
-    // Create a function with models in scope
-    const modelNames = Object.keys(models);
-    const modelValues = Object.values(models);
-
     // Wrap in async IIFE to handle await
     const wrappedCode = `return (async () => { return ${jsCode}; })()`;
 
-    const fn = new Function(...modelNames, wrappedCode);
-    const queryResult = await fn(...modelValues);
+    // Create a function with knex in scope
+    const fn = new Function('knex', wrappedCode);
+    const queryResult = await fn(knexInstance);
 
     return queryResult;
   } catch (error) {
-    throw new Error(`Query error: ${error.message}\n  Stack: ${error.stack}`);
+    throw new Error(`Query error: ${error.message}`);
   }
+}
+
+/**
+ * Get list of tables in the database.
+ */
+export async function getTables() {
+  if (!knexInstance) return [];
+
+  // SQLite-specific query
+  const result = await knexInstance.raw(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'knex_%' ORDER BY name"
+  );
+
+  return result.map(row => row.name);
 }
 
 /**
@@ -119,38 +170,56 @@ export function formatResult(result) {
     return { type: 'command', data: result.__command };
   }
 
+  // Handle Knex count result: [{ 'count(* as count)': 5 }] or similar
+  if (Array.isArray(result) && result.length === 1) {
+    const first = result[0];
+    const keys = Object.keys(first);
+    if (keys.length === 1 && keys[0].includes('count')) {
+      return { type: 'value', data: first[keys[0]] };
+    }
+  }
+
   if (Array.isArray(result)) {
     if (result.length === 0) {
       return { type: 'empty', data: [] };
     }
 
-    // Check if it's an array of model instances
-    if (result[0] && result[0].attributes) {
-      return {
-        type: 'table',
-        data: result.map(r => r.attributes),
-        count: result.length
-      };
-    }
-
-    return { type: 'array', data: result };
-  }
-
-  // Single model instance
-  if (result.attributes) {
+    // Array of row objects
     return {
-      type: 'record',
-      data: result.attributes,
-      model: result.constructor.name
+      type: 'table',
+      data: result,
+      count: result.length
     };
   }
 
-  // Primitive or other object
+  // Single row object
+  if (typeof result === 'object') {
+    return {
+      type: 'record',
+      data: result
+    };
+  }
+
+  // Primitive value
   return { type: 'value', data: result };
 }
 
+/**
+ * Close the Knex connection.
+ */
+export async function closeKnex() {
+  if (knexInstance) {
+    await knexInstance.destroy();
+    knexInstance = null;
+  }
+}
+
 export default {
+  initKnex,
+  getKnex,
   initQueryEvaluator,
   evaluateQuery,
-  formatResult
+  getTables,
+  formatResult,
+  closeKnex
 };

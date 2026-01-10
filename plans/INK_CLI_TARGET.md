@@ -700,118 +700,132 @@ function MyComponent(props) {
 
 ## Implementation Phases
 
-### Phase 0: Infrastructure
+### Phase 0: Infrastructure ✓ COMPLETE
 
-| Task | Description | Estimate |
-|------|-------------|----------|
-| Create demo repo | `ink-db-explorer/` structure | 1 hour |
-| Set up build script | Ruby2JS transpilation | 2 hours |
-| Ink runtime | Base classes, imports | 2 hours |
-| Entry point | `bin/console` that boots app | 1 hour |
+| Task | Status | Notes |
+|------|--------|-------|
+| Create demo repo | ✓ | `demo/ink-console/` |
+| Set up build script | ✓ | `scripts/build.rb` |
+| Ink runtime | ✓ | `lib/ink_runtime.mjs` |
+| Entry point | ✓ | `bin/console` |
 
-### Phase 1: Ink Filter (Core)
+### Phase 1: Ink Filter (Core) ✓ COMPLETE
 
-| Task | Description | Estimate |
-|------|-------------|----------|
-| Base class detection | Detect `Ink::Component` | 1 hour |
-| Element handling | Box, Text → React.createElement | 2 hours |
-| Props handling | Ruby hash → JS props | 1 hour |
-| Children handling | Blocks → children | 2 hours |
-| Instance variables | @vars → state/props | 2 hours |
+| Task | Status | Notes |
+|------|--------|-------|
+| Base class detection | ✓ | Detects `Ink::Component` |
+| Element handling | ✓ | Box, Text → React.createElement |
+| Props handling | ✓ | Ruby hash → JS props |
+| Children handling | ✓ | Blocks → children |
 
-### Phase 2: Key Bindings
+### Phase 2: Console Filter + Knex ← CURRENT
 
-| Task | Description | Estimate |
-|------|-------------|----------|
-| `keys` DSL parsing | Extract key → handler mapping | 2 hours |
-| useInput generation | Transpile to useInput hook | 3 hours |
-| Focus handling | useFocus integration | 2 hours |
+| Task | Description | Status |
+|------|-------------|--------|
+| Knex setup | Add knex + better-sqlite3 to demo | Pending |
+| Console filter | AR → Knex translation filter | Pending |
+| Model → table | Inflection (Post → posts) | Pending |
+| Basic queries | all, where, find, first, last | Pending |
+| Chainable methods | order, limit, offset | Pending |
+| Aggregates | count, pluck | Pending |
+| Query evaluator | Execute transpiled Knex queries | Pending |
+| Integration | Wire up console with Knex | Pending |
 
-### Phase 3: Demo Phase 1 (Minimal REPL)
+**AR → Knex Method Mapping:**
 
-| Task | Description | Estimate |
-|------|-------------|----------|
-| App component | Main container | 1 hour |
-| QueryInput | Text input with submit | 2 hours |
-| ResultsTable | Table display | 2 hours |
-| Query evaluator | Safe Ruby-like query parsing | 3 hours |
-| Integration | Wire up, test | 2 hours |
+| AR Method | Knex Equivalent |
+|-----------|-----------------|
+| `Model.all` | `knex('table')` |
+| `.where(hash)` | `.where(hash)` |
+| `.find(id)` | `.where({id}).first()` |
+| `.first` | `.first()` |
+| `.last` | `.orderBy('id', 'desc').first()` |
+| `.order(:col)` | `.orderBy('col')` |
+| `.order(col: :desc)` | `.orderBy('col', 'desc')` |
+| `.limit(n)` | `.limit(n)` |
+| `.offset(n)` | `.offset(n)` |
+| `.count` | `.count()` |
+| `.pluck(:col)` | `.pluck('col')` |
 
-### Phase 4: Demo Phase 2 (Enhanced)
+### Phase 3: Enhanced Console
 
-| Task | Description | Estimate |
-|------|-------------|----------|
-| Model list | Sidebar with schema models | 2 hours |
-| Two-pane layout | Flexbox layout | 1 hour |
-| Focus management | Tab between panes | 2 hours |
-| Command history | Up/down in query input | 2 hours |
+| Task | Description | Status |
+|------|-------------|--------|
+| Schema introspection | List tables from database | Pending |
+| Tab completion | Complete model/method names | Pending |
+| Command history | Persist across sessions | Pending |
+| Output formatting | Better table display | Pending |
 
-### Phase 5: Demo Phase 3 (Full)
+### Phase 4: Key Bindings (Future)
 
-| Task | Description | Estimate |
-|------|-------------|----------|
-| Detail view | Single record display | 2 hours |
-| CRUD operations | Create, edit, delete | 4 hours |
-| Keyboard shortcuts | Footer with shortcuts | 1 hour |
-| Confirmation prompts | Delete confirmation | 2 hours |
+| Task | Description | Status |
+|------|-------------|--------|
+| `keys` DSL parsing | Extract key → handler mapping | Future |
+| useInput generation | Transpile to useInput hook | Future |
+| Focus handling | useFocus integration | Future |
+
+### Phase 5: Juntos Integration (Future)
+
+| Task | Description | Status |
+|------|-------------|--------|
+| Full AR context | Load actual model classes | Future |
+| Associations | Navigate relationships | Future |
+| Scopes | Use model-defined scopes | Future |
+| Validations | Enforce model validations | Future |
 
 ### Phase 6: INKX Syntax (Future)
 
-| Task | Description | Estimate |
-|------|-------------|----------|
-| INKX parser | JSX + ERB parsing | 8 hours |
-| AST generation | Same output as Ruby DSL | 4 hours |
-| File handling | .inkx extension support | 2 hours |
-| Documentation | Syntax guide | 2 hours |
+| Task | Description | Status |
+|------|-------------|--------|
+| INKX parser | JSX + ERB parsing | Future |
+| AST generation | Same output as Ruby DSL | Future |
+| File handling | .inkx extension support | Future |
 
 ## Milestones
 
-| Milestone | Deliverable | Phases | Total Estimate |
-|-----------|-------------|--------|----------------|
-| **M1** | Ink filter handles basic components | 0, 1 | 12 hours |
-| **M2** | Key bindings work | 2 | 7 hours |
-| **M3** | Minimal REPL demo | 3 | 10 hours |
-| **M4** | Enhanced navigation | 4 | 7 hours |
-| **M5** | Full explorer | 5 | 9 hours |
-| **M6** | INKX syntax | 6 | 16 hours |
-
-**M1-M3 (Proof of Concept): ~29 hours**
-**M1-M5 (Complete Demo): ~45 hours**
-**M1-M6 (With INKX): ~61 hours**
+| Milestone | Deliverable | Status |
+|-----------|-------------|--------|
+| **M1** | Ink filter handles basic components | ✓ Complete |
+| **M2** | Console filter + Knex integration | In Progress |
+| **M3** | Enhanced console (schema, history) | Pending |
+| **M4** | Key bindings (`keys` DSL) | Future |
+| **M5** | Juntos integration | Future |
+| **M6** | INKX syntax | Future |
 
 ## Success Criteria
 
-### M1: Ink Filter
-- [ ] `Ink::Component` base class detected
-- [ ] Box, Text elements transpile correctly
-- [ ] Props pass through
-- [ ] Children render
+### M1: Ink Filter ✓ COMPLETE
+- [x] `Ink::Component` base class detected
+- [x] Box, Text elements transpile correctly
+- [x] Props pass through
+- [x] Children render
 
-### M2: Key Bindings
+### M2: Console Filter + Knex ← CURRENT
+- [ ] Console filter translates AR → Knex
+- [ ] Model names inflect to table names
+- [ ] Basic queries work: all, where, find, first, last
+- [ ] Chainable methods work: order, limit, offset
+- [ ] Aggregates work: count, pluck
+- [ ] Console executes queries against SQLite
+
+### M3: Enhanced Console
+- [ ] Schema introspection shows available tables
+- [ ] Tab completion for model/method names
+- [ ] Command history persists across sessions
+- [ ] Improved table formatting
+
+### M4: Key Bindings (Future)
 - [ ] `keys` DSL parses
 - [ ] Transpiles to `useInput` hook
 - [ ] Handlers called correctly
 
-### M3: Minimal REPL
-- [ ] App renders in terminal
-- [ ] Query input accepts text
-- [ ] Enter executes query
-- [ ] Results display in table
-- [ ] Errors display
+### M5: Juntos Integration (Future)
+- [ ] Full AR model classes loaded
+- [ ] Associations navigable
+- [ ] Scopes available
+- [ ] Validations enforced
 
-### M4: Enhanced Navigation
-- [ ] Two-pane layout works
-- [ ] Tab switches focus
-- [ ] Model list navigable
-- [ ] History works
-
-### M5: Full Explorer
-- [ ] Single record detail view
-- [ ] Create new records
-- [ ] Edit existing records
-- [ ] Delete with confirmation
-
-### M6: INKX Syntax
+### M6: INKX Syntax (Future)
 - [ ] .inkx files parse
 - [ ] JSX elements handled
 - [ ] ERB interpolation works
@@ -850,32 +864,95 @@ The `:ink` filter enables any terminal UI, not just database explorer:
 
 ## Query Execution
 
-Since Ruby2JS self-hosts in Node.js, query execution is straightforward:
+### Architecture: Console Filter + Knex
+
+The demo uses a **console filter** that translates Ruby ActiveRecord-style queries to Knex.js:
+
+```
+Ruby Query → Console Filter → Knex.js → SQL
+```
+
+This approach is:
+- **Self-contained** - No ruby2js-rails dependency, just Knex
+- **Portable** - Works with SQLite, PostgreSQL, MySQL via Knex adapters
+- **Clear demo** - Shows Ruby2JS transpilation in action
+- **Path to Juntos** - Foundation for full Rails console integration later
+
+### Translation Table
+
+| Ruby AR Syntax | Knex.js Output |
+|----------------|----------------|
+| `Post.all` | `await knex('posts')` |
+| `Post.where(published: true)` | `await knex('posts').where({published: true})` |
+| `Post.find(1)` | `await knex('posts').where({id: 1}).first()` |
+| `Post.first` | `await knex('posts').first()` |
+| `Post.last` | `await knex('posts').orderBy('id', 'desc').first()` |
+| `Post.order(:created_at)` | `await knex('posts').orderBy('created_at')` |
+| `Post.order(created_at: :desc)` | `await knex('posts').orderBy('created_at', 'desc')` |
+| `Post.limit(10)` | `await knex('posts').limit(10)` |
+| `Post.count` | `await knex('posts').count()` |
+| `Post.where(user_id: 1).order(:created_at)` | `await knex('posts').where({user_id: 1}).orderBy('created_at')` |
+
+### Console Filter Implementation
+
+```javascript
+// lib/console_filter.mjs
+// Transforms AR class methods to Knex query builder calls
+
+const AR_CLASS_METHODS = ['all', 'where', 'find', 'first', 'last',
+                          'order', 'limit', 'offset', 'count', 'pluck'];
+
+class ConsoleFilter extends Ruby2JS.Filter {
+  on_send(node) {
+    let [target, method, ...args] = node.children;
+
+    // Detect Model.method pattern (e.g., Post.where)
+    if (target?.type === 'const' && target.children[0] === null) {
+      const modelName = target.children[1].toString();
+      const methodStr = method?.toString();
+
+      if (AR_CLASS_METHODS.includes(methodStr)) {
+        // Transform to knex('table_name').method(...)
+        return this.transformToKnex(modelName, methodStr, args, node);
+      }
+    }
+
+    // Handle chained methods on existing knex query
+    // ...
+  }
+}
+```
+
+### Query Evaluator
 
 ```javascript
 // lib/query_evaluator.mjs
 import { convert } from 'ruby2js';
-import * as Models from './models/index.mjs';
 
-async function evaluateQuery(rubyQuery) {
-  // Transpile Ruby to JavaScript
+async function evaluateQuery(rubyQuery, knex) {
+  // Transpile Ruby to Knex.js
   const jsCode = convert(rubyQuery, {
-    filters: ['functions'],
-    autoreturn: true
+    filters: ['Console', 'Functions']
   });
 
-  // Execute with models in scope
-  const fn = new Function(...Object.keys(Models), `return (async () => ${jsCode})()`);
-  return await fn(...Object.values(Models));
+  // Execute with knex in scope
+  const fn = new Function('knex', `return (async () => ${jsCode})()`);
+  return await fn(knex);
 }
 
 // Usage:
-// evaluateQuery("Post.where(published: true).limit(5)")
-// → Transpiles to: await Post.where({published: true}).limit(5)
-// → Executes against actual database
+// evaluateQuery("Post.where(published: true).limit(5)", knex)
+// → Transpiles to: await knex('posts').where({published: true}).limit(5)
+// → Executes via Knex
 ```
 
-No special query parser needed - Ruby2JS handles the transpilation.
+### Future: Juntos Integration
+
+For full Rails console in Juntos projects:
+- Load actual model classes with associations, scopes, validations
+- Use ruby2js-rails ActiveRecord adapters
+- Full application context available
+- Console filter becomes optional (real AR available)
 
 ## Configuration
 
