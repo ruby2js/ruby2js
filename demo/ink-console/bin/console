@@ -18,7 +18,7 @@ import { fileURLToPath } from 'url';
 import yaml from 'yaml';
 
 // Query evaluator (uses Knex for database access)
-import { initKnex, initQueryEvaluator, evaluateQuery, formatResult, getTables } from '../lib/query_evaluator.mjs';
+import { initKnex, initQueryEvaluator, evaluateQuery, formatResult, getTables, getTableColumns, getSchema } from '../lib/query_evaluator.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = join(__dirname, '..');
@@ -140,6 +140,13 @@ function ResultDisplay({ result, type }) {
     );
   }
 
+  // Handle string values (like schema output) - display as-is
+  if (typeof result === 'string') {
+    return e(Box, { marginY: 1 },
+      e(Text, null, result)
+    );
+  }
+
   // Default: show as JSON
   return e(Box, { marginY: 1 },
     e(Text, null, JSON.stringify(result, null, 2))
@@ -206,16 +213,21 @@ function Console({ dbConfig, verbose }) {
     if (trimmed === 'help') {
       setHistory(prev => [...prev, {
         query: value,
-        result: `Available commands:
-  Post.all              - Get all posts
-  Post.find(1)          - Find post by ID
-  Post.where(...)       - Filter posts
+        result: `Query Commands:
+  Post.all              - Get all records
+  Post.find(1)          - Find by ID
+  Post.where(...)       - Filter records
   Post.first / Post.last
   Post.order(:column)
   Post.limit(n)
   Post.count
 
+Schema Commands:
   tables                - List all tables
+  schema                - Show all table schemas
+  schema posts          - Show columns for 'posts' table
+
+Other:
   exit, clear, help`,
         type: 'value'
       }]);
@@ -238,6 +250,49 @@ function Console({ dbConfig, verbose }) {
           result: tables.length > 0 ? tables.join(', ') : 'No tables found',
           type: 'value'
         }]);
+        setQuery('');
+        setExecuting(false);
+        return;
+      }
+
+      // Handle 'schema' command (all tables)
+      if (formatted.type === 'command' && formatted.data === 'schema') {
+        const schema = await getSchema();
+        const schemaText = Object.entries(schema).map(([table, columns]) => {
+          const colDefs = columns.map(col => {
+            let def = `  ${col.name}: ${col.type}`;
+            if (col.primaryKey) def += ' [PK]';
+            if (!col.nullable) def += ' NOT NULL';
+            if (col.default !== null) def += ` DEFAULT ${col.default}`;
+            return def;
+          }).join('\n');
+          return `${table}:\n${colDefs}`;
+        }).join('\n\n');
+        setHistory(prev => [...prev, {
+          query: value,
+          result: schemaText || 'No tables found',
+          type: 'value'
+        }]);
+        setQuery('');
+        setExecuting(false);
+        return;
+      }
+
+      // Handle 'schema tablename' command
+      if (formatted.type === 'command' && formatted.data === 'schema_table') {
+        const columns = await getTableColumns(formatted.table);
+        if (columns.length === 0) {
+          setHistory(prev => [...prev, {
+            query: value,
+            error: `Table '${formatted.table}' not found`
+          }]);
+        } else {
+          setHistory(prev => [...prev, {
+            query: value,
+            result: columns,
+            type: 'table'
+          }]);
+        }
         setQuery('');
         setExecuting(false);
         return;

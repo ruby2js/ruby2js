@@ -113,6 +113,14 @@ export async function evaluateQuery(rubyQuery) {
   if (trimmed === 'tables' || trimmed === '.tables') {
     return { __command: 'tables' };
   }
+  if (trimmed === 'schema' || trimmed === '.schema') {
+    return { __command: 'schema' };
+  }
+  // .schema tablename or schema tablename
+  const schemaMatch = trimmed.match(/^\.?schema\s+(\w+)$/);
+  if (schemaMatch) {
+    return { __command: 'schema_table', table: schemaMatch[1] };
+  }
 
   try {
     // Transpile Ruby to JavaScript with Console and Functions filters
@@ -156,6 +164,67 @@ export async function getTables() {
 }
 
 /**
+ * Get column information for a specific table.
+ */
+export async function getTableColumns(tableName) {
+  if (!knexInstance) return [];
+
+  // SQLite-specific: PRAGMA table_info
+  const result = await knexInstance.raw(`PRAGMA table_info(${tableName})`);
+
+  return result.map(col => ({
+    name: col.name,
+    type: col.type,
+    nullable: col.notnull === 0,
+    default: col.dflt_value,
+    primaryKey: col.pk === 1
+  }));
+}
+
+/**
+ * Get full schema information for all tables.
+ */
+export async function getSchema() {
+  const tables = await getTables();
+  const schema = {};
+
+  for (const tableName of tables) {
+    schema[tableName] = await getTableColumns(tableName);
+  }
+
+  return schema;
+}
+
+/**
+ * Get foreign key information for a table.
+ */
+export async function getForeignKeys(tableName) {
+  if (!knexInstance) return [];
+
+  const result = await knexInstance.raw(`PRAGMA foreign_key_list(${tableName})`);
+
+  return result.map(fk => ({
+    column: fk.from,
+    referencesTable: fk.table,
+    referencesColumn: fk.to
+  }));
+}
+
+/**
+ * Get index information for a table.
+ */
+export async function getIndexes(tableName) {
+  if (!knexInstance) return [];
+
+  const result = await knexInstance.raw(`PRAGMA index_list(${tableName})`);
+
+  return result.map(idx => ({
+    name: idx.name,
+    unique: idx.unique === 1
+  }));
+}
+
+/**
  * Format a query result for display.
  *
  * @param {any} result - The query result
@@ -167,7 +236,8 @@ export function formatResult(result) {
   }
 
   if (result.__command) {
-    return { type: 'command', data: result.__command };
+    // Pass through additional properties like 'table' for schema_table command
+    return { type: 'command', data: result.__command, ...result };
   }
 
   // Handle Knex count result: [{ 'count(* as count)': 5 }] or similar
@@ -220,6 +290,10 @@ export default {
   initQueryEvaluator,
   evaluateQuery,
   getTables,
+  getTableColumns,
+  getSchema,
+  getForeignKeys,
+  getIndexes,
   formatResult,
   closeKnex
 };
