@@ -751,7 +751,7 @@ function MyComponent(props) {
 
 | Task | Description | Status |
 |------|-------------|--------|
-| Schema introspection | List tables from database | Pending |
+| Schema introspection | List tables from database | ✓ Complete |
 | Tab completion | Complete model/method names | Pending |
 | Command history | Persist across sessions | Pending |
 | Output formatting | Better table display | Pending |
@@ -809,7 +809,7 @@ function MyComponent(props) {
 - [ ] Console executes queries against SQLite
 
 ### M3: Enhanced Console
-- [ ] Schema introspection shows available tables
+- [x] Schema introspection shows available tables
 - [ ] Tab completion for model/method names
 - [ ] Command history persists across sessions
 - [ ] Improved table formatting
