@@ -2,3 +2,4 @@ node_modules/
 dist/
 db/*.sqlite3
 .env.local
+.console_history

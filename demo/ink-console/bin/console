@@ -12,7 +12,7 @@ import TextInput from 'ink-text-input';
 import Spinner from 'ink-spinner';
 import React, { useState, useEffect } from 'react';
 import { parseArgs } from 'util';
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import yaml from 'yaml';
@@ -22,6 +22,36 @@ import { initKnex, initQueryEvaluator, evaluateQuery, formatResult, getTables, g
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = join(__dirname, '..');
+const HISTORY_FILE = join(PROJECT_ROOT, '.console_history');
+const MAX_HISTORY = 100;
+
+// Load command history from file
+function loadHistory() {
+  try {
+    if (existsSync(HISTORY_FILE)) {
+      const data = readFileSync(HISTORY_FILE, 'utf8');
+      const queries = data.split('\n').filter(line => line.trim());
+      // Return as history entries (query only, no results for persisted history)
+      return queries.slice(-MAX_HISTORY).map(query => ({ query, persisted: true }));
+    }
+  } catch (e) {
+    // Ignore errors reading history
+  }
+  return [];
+}
+
+// Save command to history file
+function saveToHistory(query) {
+  try {
+    // Append to history file
+    const line = query.trim();
+    if (line && !['exit', 'quit', 'clear', 'help'].includes(line.toLowerCase())) {
+      writeFileSync(HISTORY_FILE, line + '\n', { flag: 'a' });
+    }
+  } catch (e) {
+    // Ignore errors writing history
+  }
+}
 
 // Parse command-line arguments
 const { values: args } = parseArgs({
@@ -168,6 +198,11 @@ function Console({ dbConfig, verbose }) {
       try {
         await initKnex({ database: dbConfig.database || 'db/development.sqlite3' });
         await initQueryEvaluator();
+        // Load persisted history
+        const persistedHistory = loadHistory();
+        if (persistedHistory.length > 0) {
+          setHistory(persistedHistory);
+        }
         setLoading(false);
       } catch (err) {
         setError(err.message);
@@ -244,6 +279,7 @@ Other:
 
       // Handle 'tables' command
       if (formatted.type === 'command' && formatted.data === 'tables') {
+        saveToHistory(value);
         const tables = await getTables();
         setHistory(prev => [...prev, {
           query: value,
@@ -257,6 +293,7 @@ Other:
 
       // Handle 'schema' command (all tables)
       if (formatted.type === 'command' && formatted.data === 'schema') {
+        saveToHistory(value);
         const schema = await getSchema();
         const schemaText = Object.entries(schema).map(([table, columns]) => {
           const colDefs = columns.map(col => {
@@ -280,6 +317,7 @@ Other:
 
       // Handle 'schema tablename' command
       if (formatted.type === 'command' && formatted.data === 'schema_table') {
+        saveToHistory(value);
         const columns = await getTableColumns(formatted.table);
         if (columns.length === 0) {
           setHistory(prev => [...prev, {
@@ -303,8 +341,11 @@ Other:
         if (formatted.data === 'clear') {
           setHistory([]);
           setQuery('');
+          // Clear history file too
+          try { writeFileSync(HISTORY_FILE, ''); } catch (e) {}
         }
       } else {
+        saveToHistory(value);
         setHistory(prev => [...prev, {
           query: value,
           result: formatted.data,
@@ -313,6 +354,7 @@ Other:
         }]);
       }
     } catch (err) {
+      saveToHistory(value);
       setHistory(prev => [...prev, {
         query: value,
         error: err.message
