@@ -753,7 +753,7 @@ function MyComponent(props) {
 |------|-------------|--------|
 | Schema introspection | List tables from database | ✓ Complete |
 | Tab completion | Complete model/method names | Pending |
-| Command history | Persist across sessions | Pending |
+| Command history | Persist across sessions | ✓ Complete |
 | Output formatting | Better table display | Pending |
 
 ### Phase 4: Key Bindings (Future)
@@ -811,7 +811,7 @@ function MyComponent(props) {
 ### M3: Enhanced Console
 - [x] Schema introspection shows available tables
 - [ ] Tab completion for model/method names
-- [ ] Command history persists across sessions
+- [x] Command history persists across sessions
 - [ ] Improved table formatting
 
 ### M4: Key Bindings (Future)
