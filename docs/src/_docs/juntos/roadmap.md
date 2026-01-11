@@ -13,7 +13,7 @@ Juntos currently supports the core Rails patterns: models, controllers, views, r
 
 ## Recently Implemented
 
-### Capacitor & Electron Targets
+### Capacitor, Electron & Tauri Targets
 
 Native app support is now available. See the [Photo Gallery demo](/docs/juntos/demos/photo-gallery) for a complete example.
 
@@ -30,6 +30,14 @@ Native app support is now available. See the [Photo Gallery demo](/docs/juntos/d
 - **System integration** — Tray icons, global shortcuts, IPC
 - **Distribution** — DMG, NSIS installer, AppImage
 - **Database** — SQLite (better-sqlite3), sql.js, or HTTP-based adapters
+
+**Tauri (Lightweight Desktop):**
+
+- **Desktop apps** — macOS, Windows, Linux with ~3-10MB bundles (vs Electron's ~150MB)
+- **System WebView** — Uses native OS WebView instead of bundled Chromium
+- **Native features** — Rust backend for OS integration
+- **Distribution** — DMG, NSIS installer, AppImage
+- **Database** — sql.js, PGlite, or HTTP-based adapters
 
 ### Hotwire (Turbo + Stimulus)
 

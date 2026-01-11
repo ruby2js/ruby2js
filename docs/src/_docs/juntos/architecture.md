@@ -126,6 +126,15 @@ No Ruby required. The generated code is idiomatic JavaScript—ES2022 classes, a
 - Native APIs: System tray, global shortcuts, IPC between processes
 - Distribution: DMG (macOS), NSIS (Windows), AppImage (Linux)
 
+### Tauri (Lightweight Desktop)
+
+- Entry: `index.html` in system WebView
+- Routing: Client-side, same as browser
+- Database: SQLite/WASM, PGlite, or HTTP-based
+- Native APIs: Rust backend via IPC (`invoke` commands)
+- Distribution: DMG (macOS), NSIS (Windows), AppImage (Linux)
+- Bundle size: ~3-10MB (vs Electron's ~150MB)
+
 ## WebSocket Support
 
 Turbo Streams broadcasting uses WebSockets for real-time updates. Support varies by target:
@@ -138,6 +147,7 @@ Turbo Streams broadcasting uses WebSockets for real-time updates. Support varies
 | Deno | Native `Deno.upgradeWebSocket` |
 | Cloudflare | Durable Objects with hibernation |
 | Vercel | Not supported (platform limitation) |
+| Tauri | `BroadcastChannel` (same as browser) |
 
 WebSocket connections use the `/cable` endpoint:
 

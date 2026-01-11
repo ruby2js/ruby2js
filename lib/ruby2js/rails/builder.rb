@@ -69,6 +69,9 @@ class SelfhostBuilder
   # Fly.io target
   FLY_RUNTIMES = ['fly'].freeze
 
+  # Tauri target (Rust backend, system webview)
+  TAURI_RUNTIMES = ['tauri'].freeze
+
   # Databases that require a specific runtime
   RUNTIME_REQUIRED = {
     'd1' => 'cloudflare',
@@ -80,9 +83,9 @@ class SelfhostBuilder
     # Browser-only databases (also work in Capacitor which uses WebView)
     'dexie' => ['browser', 'capacitor'],
     'indexeddb' => ['browser', 'capacitor'],
-    'sqljs' => ['browser', 'capacitor', 'electron'],
-    'sql.js' => ['browser', 'capacitor', 'electron'],
-    'pglite' => ['browser', 'node', 'capacitor', 'electron'],
+    'sqljs' => ['browser', 'capacitor', 'electron', 'tauri'],
+    'sql.js' => ['browser', 'capacitor', 'electron', 'tauri'],
+    'pglite' => ['browser', 'node', 'capacitor', 'electron', 'tauri'],
     # Node.js databases (also work in Electron main process)
     'better_sqlite3' => ['node', 'bun', 'electron'],
     'sqlite3' => ['node', 'bun', 'electron'],
@@ -94,12 +97,12 @@ class SelfhostBuilder
     # Platform-specific databases
     'd1' => ['cloudflare'],
     'mpg' => ['fly'],
-    # HTTP-based databases (work everywhere including Capacitor/Electron)
-    'neon' => ['browser', 'node', 'bun', 'deno', 'cloudflare', 'vercel-edge', 'vercel-node', 'deno-deploy', 'capacitor', 'electron'],
-    'turso' => ['browser', 'node', 'bun', 'deno', 'cloudflare', 'vercel-edge', 'vercel-node', 'deno-deploy', 'capacitor', 'electron'],
-    'libsql' => ['browser', 'node', 'bun', 'deno', 'cloudflare', 'vercel-edge', 'vercel-node', 'deno-deploy', 'capacitor', 'electron'],
-    'planetscale' => ['browser', 'node', 'bun', 'deno', 'cloudflare', 'vercel-edge', 'vercel-node', 'deno-deploy', 'capacitor', 'electron'],
-    'supabase' => ['browser', 'node', 'bun', 'deno', 'cloudflare', 'vercel-edge', 'vercel-node', 'deno-deploy', 'capacitor', 'electron']
+    # HTTP-based databases (work everywhere including Capacitor/Electron/Tauri)
+    'neon' => ['browser', 'node', 'bun', 'deno', 'cloudflare', 'vercel-edge', 'vercel-node', 'deno-deploy', 'capacitor', 'electron', 'tauri'],
+    'turso' => ['browser', 'node', 'bun', 'deno', 'cloudflare', 'vercel-edge', 'vercel-node', 'deno-deploy', 'capacitor', 'electron', 'tauri'],
+    'libsql' => ['browser', 'node', 'bun', 'deno', 'cloudflare', 'vercel-edge', 'vercel-node', 'deno-deploy', 'capacitor', 'electron', 'tauri'],
+    'planetscale' => ['browser', 'node', 'bun', 'deno', 'cloudflare', 'vercel-edge', 'vercel-node', 'deno-deploy', 'capacitor', 'electron', 'tauri'],
+    'supabase' => ['browser', 'node', 'bun', 'deno', 'cloudflare', 'vercel-edge', 'vercel-node', 'deno-deploy', 'capacitor', 'electron', 'tauri']
   }.freeze
 
   # Default target for each database adapter (used when target not specified)
@@ -847,6 +850,13 @@ class SelfhostBuilder
       puts("")
     end
 
+    # Generate Tauri deployment files
+    if TAURI_RUNTIMES.include?(@target)
+      puts("Tauri:")
+      self.generate_tauri_config()
+      puts("")
+    end
+
     # Handle Tailwind CSS if present
     self.setup_tailwind()
 
@@ -1244,6 +1254,8 @@ class SelfhostBuilder
       target_dir = 'capacitor'
     elsif @target == 'electron'
       target_dir = 'electron'
+    elsif @target == 'tauri'
+      target_dir = 'tauri'
     elsif FLY_RUNTIMES.include?(@runtime)
       target_dir = 'node'  # Fly.io runs Node.js in containers
     else
@@ -1260,8 +1272,8 @@ class SelfhostBuilder
       puts("    -> #{lib_dest}/rails_base.js")
     end
 
-    # Copy server module (needed by server targets, not browser/capacitor)
-    if @target != 'browser' && @target != 'capacitor'
+    # Copy server module (needed by server targets, not browser/capacitor/tauri)
+    if @target != 'browser' && @target != 'capacitor' && @target != 'tauri'
       server_src = File.join(package_dir, 'rails_server.js')
       if File.exist?(server_src)
         FileUtils.cp(server_src, File.join(lib_dest, 'rails_server.js'))
@@ -2710,6 +2722,121 @@ class SelfhostBuilder
     assets_dir = File.join(@dist_dir, '..', 'assets')
     FileUtils.mkdir_p(assets_dir)
     puts("  -> assets/ (add tray-icon.png)")
+  end
+
+  def generate_tauri_config()
+    # Generate Tauri configuration (src-tauri/tauri.conf.json)
+    app_name = File.basename(DEMO_ROOT)
+    identifier = "com.example.#{app_name.downcase.gsub(/[^a-z0-9]/, '')}"
+
+    tauri_config = {
+      'productName' => app_name,
+      'version' => '0.1.0',
+      'identifier' => identifier,
+      'build' => {
+        'frontendDist' => '../dist',
+        'devUrl' => 'http://localhost:5173'
+      },
+      'app' => {
+        'windows' => [{
+          'title' => app_name.split(/[-_]/).map(&:capitalize).join(' '),
+          'width' => 1200,
+          'height' => 800,
+          'resizable' => true
+        }],
+        'security' => {
+          'csp' => nil
+        }
+      },
+      'bundle' => {
+        'active' => true,
+        'icon' => ['icons/32x32.png', 'icons/128x128.png', 'icons/icon.icns', 'icons/icon.ico']
+      }
+    }
+
+    # Create src-tauri directory
+    tauri_dir = File.join(@dist_dir, '..', 'src-tauri')
+    FileUtils.mkdir_p(tauri_dir)
+
+    # Write tauri.conf.json
+    config_path = File.join(tauri_dir, 'tauri.conf.json')
+    File.write(config_path, JSON.pretty_generate(tauri_config))
+    puts("  -> src-tauri/tauri.conf.json")
+
+    # Create icons directory
+    icons_dir = File.join(tauri_dir, 'icons')
+    FileUtils.mkdir_p(icons_dir)
+    puts("  -> src-tauri/icons/ (add app icons)")
+
+    # Write README with setup instructions
+    readme = <<~MD
+      # Tauri Setup
+
+      This directory contains the Tauri configuration for your app.
+      The `tauri.conf.json` file has been generated with your app settings.
+
+      ## Prerequisites
+
+      Install Rust and Tauri CLI:
+
+      ```bash
+      # Install Rust (if not already installed)
+      curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+      # Install Tauri CLI
+      cargo install tauri-cli
+      ```
+
+      Platform-specific requirements:
+      - **macOS:** Xcode Command Line Tools (`xcode-select --install`)
+      - **Windows:** Visual Studio Build Tools with C++ workload
+      - **Linux:** `sudo apt install libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev`
+
+      ## Initialize Rust Project
+
+      Run from the parent directory (not src-tauri):
+
+      ```bash
+      cargo tauri init
+      ```
+
+      This will create the Rust source files (`src/main.rs`, `Cargo.toml`, etc.)
+      while preserving your existing `tauri.conf.json`.
+
+      ## Development
+
+      ```bash
+      cargo tauri dev
+      ```
+
+      ## Build for Distribution
+
+      ```bash
+      cargo tauri build
+      ```
+
+      ## Adding App Icons
+
+      Place your app icons in the `icons/` directory:
+      - `32x32.png` - Small icon
+      - `128x128.png` - Medium icon
+      - `icon.icns` - macOS icon
+      - `icon.ico` - Windows icon
+
+      You can generate these from a single source image using:
+      ```bash
+      cargo tauri icon path/to/app-icon.png
+      ```
+
+      ## Documentation
+
+      - [Tauri v2 Documentation](https://v2.tauri.app/)
+      - [Configuration Reference](https://v2.tauri.app/reference/config/)
+    MD
+
+    readme_path = File.join(tauri_dir, 'README.md')
+    File.write(readme_path, readme)
+    puts("  -> src-tauri/README.md")
   end
 
   def setup_tailwind()

@@ -79,7 +79,7 @@ Full [Hotwire](https://hotwired.dev/) support for the Rails-native approach to i
 
 ### Multi-Target
 
-Write once, deploy anywhere JavaScript runs. The same code runs in browsers with IndexedDB, on Node.js with PostgreSQL, on V8 Isolates with edge databases, on mobile devices via Capacitor, and on desktop via Electron.
+Write once, deploy anywhere JavaScript runs. The same code runs in browsers with IndexedDB, on Node.js with PostgreSQL, on V8 Isolates with edge databases, on mobile devices via Capacitor, and on desktop via Electron or Tauri.
 
 ### Transparency
 

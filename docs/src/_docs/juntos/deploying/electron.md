@@ -435,8 +435,9 @@ Or use keyboard shortcut: `Cmd+Option+I` (macOS) / `Ctrl+Shift+I` (Windows/Linux
 | Native access | Full Node.js | Rust backend | Full Node.js |
 | Memory usage | Higher | Lower | Higher |
 | Cross-platform | Excellent | Good | Excellent |
+| **Juntos support** | **Yes** | **[Yes](/docs/juntos/deploying/tauri)** | No |
 
-Electron is the most mature and widely used option. Tauri is smaller but requires Rust for native features.
+Electron is the most mature and widely used option. [Tauri](/docs/juntos/deploying/tauri) is smaller but requires Rust for native features. Juntos supports both Electron and Tauri as deployment targets.
 
 ## Limitations
 
