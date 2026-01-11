@@ -713,23 +713,83 @@ function MyComponent(props) {
 
 | Task | Status | Notes |
 |------|--------|-------|
-| Base class detection | ✓ | Detects `Ink::Component` |
+| Base class detection | ✓ | Detects `class Foo < Ink` inheritance |
 | Element handling | ✓ | Box, Text → React.createElement |
-| Props handling | ✓ | Ruby hash → JS props |
-| Children handling | ✓ | Blocks → children |
+| Props handling | ✓ | Ruby hash → JS props (camelCase conversion) |
+| Children handling | ✓ | Blocks → nested children |
+| useState hooks | ✓ | @ivar → useState + setter |
+| useInput hook | ✓ | use_input block → useInput callback |
+| useApp hook | ✓ | use_app → const app = useApp() |
+| Build script | ✓ | build.mjs transpiles src/*.rb → dist/*.js |
 
-### Phase 2: Console Filter + Knex ← CURRENT
+**Verified working example:**
+
+```ruby
+# src/counter.rb
+class Counter < Ink
+  def initialize
+    @count = 0
+  end
+
+  use_app
+
+  def render
+    Box flexDirection: :column do
+      Text "Count: #{@count}", bold: true
+      Text "Press +/- to change, q to quit", dimColor: true
+    end
+  end
+
+  use_input do |input, key|
+    if input == '+'
+      @count = @count + 1
+    elsif input == '-'
+      @count = @count - 1
+    elsif input == 'q'
+      app.exit()
+    end
+  end
+end
+```
+
+**Transpiles to:**
+
+```javascript
+function Counter(props) {
+  let [count, setCount] = useState(0);
+  let app = useApp();
+
+  useInput((input, key) => {
+    if (input == "+") {
+      return setCount(count + 1)
+    } else if (input == "-") {
+      return setCount(count - 1)
+    } else if (input == "q") {
+      return app.exit()
+    }
+  });
+
+  return React.createElement(
+    Box,
+    {flexDirection: "column"},
+    React.createElement(Text, {bold: true}, `Count: ${count}`),
+    React.createElement(Text, {dimColor: true}, "Press +/- to change, q to quit")
+  )
+}
+```
+
+### Phase 2: Console Filter + Knex ✓ COMPLETE
 
 | Task | Description | Status |
 |------|-------------|--------|
-| Knex setup | Add knex + better-sqlite3 to demo | Pending |
-| Console filter | AR → Knex translation filter | Pending |
-| Model → table | Inflection (Post → posts) | Pending |
-| Basic queries | all, where, find, first, last | Pending |
-| Chainable methods | order, limit, offset | Pending |
-| Aggregates | count, pluck | Pending |
-| Query evaluator | Execute transpiled Knex queries | Pending |
-| Integration | Wire up console with Knex | Pending |
+| Knex setup | Add knex + better-sqlite3 to demo | ✓ |
+| Console filter | AR → Knex translation filter | ✓ |
+| Model → table | Inflection (Post → posts) | ✓ |
+| Basic queries | all, where, find, first, last | ✓ |
+| Chainable methods | order, limit, offset | ✓ |
+| Aggregates | count, pluck | ✓ |
+| Query evaluator | Execute transpiled Knex queries | ✓ |
+| Integration | Wire up console with Knex | ✓ |
 
 **AR → Knex Method Mapping:**
 
@@ -747,16 +807,70 @@ function MyComponent(props) {
 | `.count` | `.count()` |
 | `.pluck(:col)` | `.pluck('col')` |
 
-### Phase 3: Enhanced Console
+### Phase 3: Enhanced Console ✓ COMPLETE
 
 | Task | Description | Status |
 |------|-------------|--------|
 | Schema introspection | List tables from database | ✓ Complete |
-| Tab completion | Complete model/method names | Pending |
 | Command history | Persist across sessions | ✓ Complete |
-| Output formatting | Better table display | Pending |
+| Output formatting | Table display with widths | ✓ Complete |
 
-### Phase 4: Key Bindings (Future)
+### Phase 4: Ruby Console Port ← CURRENT
+
+| Task | Description | Status |
+|------|-------------|--------|
+| Ink filter (JS) | `lib/ink_filter.mjs` | ✓ Complete |
+| Build script | `build.mjs` transpiles src/*.rb | ✓ Complete |
+| Simple console | Basic console in Ruby | ✓ Complete |
+| Console component | Full console in Ruby | ✓ Complete |
+| Query evaluator | Wire up Knex queries | Pending |
+| History navigation | Up/down arrow keys | Pending |
+
+**Working Ruby Console Example:**
+
+```ruby
+# src/console.rb - transpiles to working Ink component
+class Console < Ink
+  def initialize
+    @query = ""
+    @result = nil
+  end
+
+  use_app
+
+  def render
+    Box flexDirection: :column, padding: 1 do
+      Box marginBottom: 1 do
+        Text "ink-console", bold: true, color: :green
+      end
+
+      if @result
+        Box marginBottom: 1 do
+          Text @result.to_s
+        end
+      end
+
+      Box do
+        Text "> ", color: :green
+        TextInput value: @query, onChange: ->(v) { @query = v }, onSubmit: ->(v) { handle_submit(v) }
+      end
+    end
+  end
+
+  def handle_submit(value)
+    @result = "You entered: #{value}"
+    @query = ""
+  end
+
+  use_input do |input, key|
+    if key.ctrl && input == 'c'
+      app.exit()
+    end
+  end
+end
+```
+
+### Phase 5: Key Bindings (Future)
 
 | Task | Description | Status |
 |------|-------------|--------|
@@ -764,7 +878,7 @@ function MyComponent(props) {
 | useInput generation | Transpile to useInput hook | Future |
 | Focus handling | useFocus integration | Future |
 
-### Phase 5: Juntos Integration (Future)
+### Phase 6: Juntos Integration (Future)
 
 | Task | Description | Status |
 |------|-------------|--------|
@@ -773,7 +887,7 @@ function MyComponent(props) {
 | Scopes | Use model-defined scopes | Future |
 | Validations | Enforce model validations | Future |
 
-### Phase 6: INKX Syntax (Future)
+### Phase 7: INKX Syntax (Future)
 
 | Task | Description | Status |
 |------|-------------|--------|
@@ -786,46 +900,58 @@ function MyComponent(props) {
 | Milestone | Deliverable | Status |
 |-----------|-------------|--------|
 | **M1** | Ink filter handles basic components | ✓ Complete |
-| **M2** | Console filter + Knex integration | In Progress |
-| **M3** | Enhanced console (schema, history) | Pending |
-| **M4** | Key bindings (`keys` DSL) | Future |
-| **M5** | Juntos integration | Future |
-| **M6** | INKX syntax | Future |
+| **M2** | Console filter + Knex integration | ✓ Complete |
+| **M3** | Enhanced console (schema, history) | ✓ Complete |
+| **M4** | Ruby console port (transpiled console) | In Progress |
+| **M5** | Key bindings (`keys` DSL) | Future |
+| **M6** | Juntos integration | Future |
+| **M7** | INKX syntax | Future |
 
 ## Success Criteria
 
 ### M1: Ink Filter ✓ COMPLETE
-- [x] `Ink::Component` base class detected
-- [x] Box, Text elements transpile correctly
-- [x] Props pass through
-- [x] Children render
+- [x] `class Foo < Ink` base class detected
+- [x] Box, Text elements transpile to React.createElement
+- [x] Props pass through with camelCase conversion
+- [x] Children render in nested blocks
+- [x] @ivar → useState hooks
+- [x] use_input → useInput hook
+- [x] use_app → useApp hook
 
-### M2: Console Filter + Knex ← CURRENT
-- [ ] Console filter translates AR → Knex
-- [ ] Model names inflect to table names
-- [ ] Basic queries work: all, where, find, first, last
-- [ ] Chainable methods work: order, limit, offset
-- [ ] Aggregates work: count, pluck
-- [ ] Console executes queries against SQLite
+### M2: Console Filter + Knex ✓ COMPLETE
+- [x] Console filter translates AR → Knex
+- [x] Model names inflect to table names
+- [x] Basic queries work: all, where, find, first, last
+- [x] Chainable methods work: order, limit, offset
+- [x] Aggregates work: count, pluck
+- [x] Console executes queries against SQLite
 
-### M3: Enhanced Console
+### M3: Enhanced Console ✓ COMPLETE
 - [x] Schema introspection shows available tables
-- [ ] Tab completion for model/method names
+- [ ] Tab completion for model/method names (future)
 - [x] Command history persists across sessions
-- [ ] Improved table formatting
+- [x] Table formatting with column widths
 
-### M4: Key Bindings (Future)
+### M4: Ruby Console Port ← CURRENT
+- [x] Ink filter created (`lib/ink_filter.mjs`)
+- [x] Build script works (`build.mjs`)
+- [x] Simple console transpiles and runs
+- [x] Console component transpiles correctly
+- [ ] Query evaluator wired up
+- [ ] History navigation working
+
+### M5: Key Bindings (Future)
 - [ ] `keys` DSL parses
 - [ ] Transpiles to `useInput` hook
 - [ ] Handlers called correctly
 
-### M5: Juntos Integration (Future)
+### M6: Juntos Integration (Future)
 - [ ] Full AR model classes loaded
 - [ ] Associations navigable
 - [ ] Scopes available
 - [ ] Validations enforced
 
-### M6: INKX Syntax (Future)
+### M7: INKX Syntax (Future)
 - [ ] .inkx files parse
 - [ ] JSX elements handled
 - [ ] ERB interpolation works

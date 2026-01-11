@@ -37,6 +37,7 @@ require 'ruby2js/filter/jest'
 require 'ruby2js/filter/tagged_templates'
 require 'ruby2js/filter/nokogiri'
 require 'ruby2js/filter/haml'
+require 'ruby2js/filter/react'
 require_relative 'erb_compiler'
 require_relative 'migration_sql'
 require_relative 'seed_sql'
@@ -210,6 +211,21 @@ class SelfhostBuilder
       Ruby2JS::Filter::Rails::Helpers,
       Ruby2JS::Filter::Erb,
       Ruby2JS::Filter::Functions,
+      Ruby2JS::Filter::Return
+    ]
+  }.freeze
+
+  # Options for RBX files (Ruby with JSX syntax via %x{})
+  # RBX files compile to React components with React.createElement output
+  # Note: JSX filter is for Wunderbar syntax (_div {}), not %x{} syntax
+  RBX_OPTIONS = {
+    eslevel: 2022,
+    include: [:class, :call],
+    autoexports: :default,
+    filters: [
+      Ruby2JS::Filter::React,
+      Ruby2JS::Filter::Functions,
+      Ruby2JS::Filter::ESM,
       Ruby2JS::Filter::Return
     ]
   }.freeze
@@ -669,7 +685,9 @@ class SelfhostBuilder
     )
     puts("")
 
-    # Transpile components (Phlex views, use 'components' section from ruby2js.yml)
+    # Transpile components (Phlex views and RBX React components)
+    # - .rb files use 'components' section from ruby2js.yml
+    # - .rbx files use 'rbx' section (React filter)
     components_dir = File.join(DEMO_ROOT, 'app/components')
     if File.exist?(components_dir)
       puts("Components:")
@@ -677,7 +695,7 @@ class SelfhostBuilder
       self.transpile_directory(
         components_dir,
         File.join(@dist_dir, 'app/components'),
-        '**/*.rb',
+        '**/*.{rb,rbx}',
         section: 'components'
       )
       puts("")
@@ -862,6 +880,8 @@ class SelfhostBuilder
       case section
       when 'stimulus'
         STIMULUS_OPTIONS
+      when 'rbx'
+        RBX_OPTIONS
       else
         OPTIONS
       end
@@ -925,6 +945,7 @@ class SelfhostBuilder
     # Framework filters
     'phlex' => Ruby2JS::Filter::Phlex,
     'stimulus' => Ruby2JS::Filter::Stimulus,
+    'react' => Ruby2JS::Filter::React,
 
     # Ruby stdlib filters (selfhost-ready)
     'active_support' => Ruby2JS::Filter::ActiveSupport,
@@ -1517,8 +1538,17 @@ class SelfhostBuilder
       next if skip.include?(basename)
 
       relative = src_path.sub(src_dir + '/', '')
-      dest_path = File.join(dest_dir, relative.sub(/\.rb$/, '.js'))
-      self.transpile_file(src_path, dest_path, section)
+
+      # Determine section based on file extension
+      file_section = section
+      if src_path.end_with?('.rbx')
+        file_section = 'rbx'
+        dest_path = File.join(dest_dir, relative.sub(/\.rbx$/, '.js'))
+      else
+        dest_path = File.join(dest_dir, relative.sub(/\.rb$/, '.js'))
+      end
+
+      self.transpile_file(src_path, dest_path, file_section)
     end
   end
 

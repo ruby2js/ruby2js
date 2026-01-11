@@ -29,6 +29,7 @@
 #
 require 'ruby2js'
 require 'ruby2js/jsx'
+require 'ruby2js/rbx'
 
 module Ruby2JS
   module Filter
@@ -115,12 +116,14 @@ module Ruby2JS
         @react_methods = []
         @react_filter_functions = false
         @jsx = false
+        @rbx_mode = false
         super
       end
 
       def options=(options)
         super
         @react = true if options[:react]
+        @rbx_mode = true if options[:rbx]
         filters = options[:filters] || Filter::DEFAULTS
 
         if \
@@ -1398,6 +1401,15 @@ module Ruby2JS
        source = loc.begin.source_buffer.source
        source = source[loc.begin.end_pos...loc.end.begin_pos].strip
        return super unless @reactClass or source.start_with? '<'
+
+       # RBX mode: convert JSX directly to JavaScript, preserving expressions
+       if @rbx_mode
+         react_name = @react == :Preact ? 'Preact' : 'React'
+         js_code = Ruby2JS.rbx2_js(source, react_name: react_name)
+         return s(:jsraw, js_code)
+       end
+
+       # Standard mode: convert to Ruby AST and process
        source = Ruby2JS.jsx2_rb(source)
        ast =  Ruby2JS.parse(source).first
        # Wrap multiple top-level elements in a fragment
