@@ -1547,42 +1547,43 @@ class SelfhostBuilder
     view_files = []
 
     # ERB files
-    Dir.glob(File.join(resource_dir, '*.html.erb')).each do |path|
-      name = File.basename(path, '.html.erb')
+    # Note: Use file_path instead of path to avoid JS scoping issues with hash key
+    Dir.glob(File.join(resource_dir, '*.html.erb')).each do |file_path|
+      name = File.basename(file_path, '.html.erb')
       next if name.start_with?('_')  # Skip partials
-      view_files << { name: name, ext: '.html.erb', path: path, priority: VIEW_FILE_PRIORITIES['.html.erb'] }
+      view_files << { name: name, ext: '.html.erb', path: file_path, priority: VIEW_FILE_PRIORITIES['.html.erb'] }
     end
 
     # Phlex files (.rb)
-    Dir.glob(File.join(resource_dir, '*.rb')).each do |path|
-      name = File.basename(path, '.rb')
+    Dir.glob(File.join(resource_dir, '*.rb')).each do |file_path|
+      name = File.basename(file_path, '.rb')
       next if name.start_with?('_')  # Skip partials
       # Convert PascalCase to snake_case for view name (Index.rb -> index)
       view_name = name.gsub(/([A-Z]+)([A-Z][a-z])/, '\1_\2')
                       .gsub(/([a-z\d])([A-Z])/, '\1_\2')
                       .downcase
-      view_files << { name: view_name, ext: '.rb', path: path, priority: VIEW_FILE_PRIORITIES['.rb'] }
+      view_files << { name: view_name, ext: '.rb', path: file_path, priority: VIEW_FILE_PRIORITIES['.rb'] }
     end
 
     # RBX files
-    Dir.glob(File.join(resource_dir, '*.rbx')).each do |path|
-      name = File.basename(path, '.rbx')
+    Dir.glob(File.join(resource_dir, '*.rbx')).each do |file_path|
+      name = File.basename(file_path, '.rbx')
       next if name.start_with?('_')
       view_name = name.gsub(/([A-Z]+)([A-Z][a-z])/, '\1_\2')
                       .gsub(/([a-z\d])([A-Z])/, '\1_\2')
                       .downcase
-      view_files << { name: view_name, ext: '.rbx', path: path, priority: VIEW_FILE_PRIORITIES['.rbx'] }
+      view_files << { name: view_name, ext: '.rbx', path: file_path, priority: VIEW_FILE_PRIORITIES['.rbx'] }
     end
 
     # JSX/TSX files
-    Dir.glob(File.join(resource_dir, '*.{jsx,tsx}')).each do |path|
-      ext = File.extname(path)
-      name = File.basename(path, ext)
+    Dir.glob(File.join(resource_dir, '*.{jsx,tsx}')).each do |file_path|
+      ext = File.extname(file_path)
+      name = File.basename(file_path, ext)
       next if name.start_with?('_')
       view_name = name.gsub(/([A-Z]+)([A-Z][a-z])/, '\1_\2')
                       .gsub(/([a-z\d])([A-Z])/, '\1_\2')
                       .downcase
-      view_files << { name: view_name, ext: ext, path: path, priority: VIEW_FILE_PRIORITIES[ext] }
+      view_files << { name: view_name, ext: ext, path: file_path, priority: VIEW_FILE_PRIORITIES[ext] }
     end
 
     view_files
