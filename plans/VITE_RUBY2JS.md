@@ -263,7 +263,7 @@ export default defineConfig({
 | Update CLI | Make `juntos dev` → `vite`, `juntos build` → `vite build` |
 | Add .rbx support | Recognize `.rbx` extension, apply React filter |
 
-**Proving ground:** The workflow demo (`demo/workflow-builder/`) exercises:
+**Proving ground:** The workflow demo (`test/workflow/`) exercises:
 - Models, controllers, views, routes
 - RBX files (Ruby + JSX) with React/ReactFlow
 - Database integration
@@ -392,8 +392,10 @@ See [Ruby Detection Strategy](#appendix-ruby-detection-examples) appendix for ex
 6. `juntos build --target capacitor` produces assets for `cap sync`
 7. `juntos test` runs Vitest with Ruby specs
 
-### Phase 4 (Framework Presets)
-8. React components can be authored in Ruby
+### Phase 2 (continued)
+8. `.rbx` files (Ruby + JSX) work with React filter
+
+### Phase 4 (Framework SFC Presets)
 9. Vue SFCs accept `<script lang="ruby">`
 10. Astro frontmatter accepts `#!ruby`
 
