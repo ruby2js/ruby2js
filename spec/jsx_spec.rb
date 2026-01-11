@@ -162,6 +162,10 @@ describe Ruby2JS::Filter::JSX do
         to_rb('<a b></a>').must_equal "a(b: true) do\nend"
       end
 
+      it "should handle multi-line attributes" do
+        to_rb("<a\n  b=\"1\"\n  c></a>").must_equal "a(b: \"1\", c: true) do\nend"
+      end
+
       it "should detect missing attribute value quotes" do
         _(assert_raises {to_rb '<a b=1>'}.message).
           must_equal 'invalid value for attribute "b" in element "a"'

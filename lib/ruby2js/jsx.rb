@@ -97,7 +97,7 @@ module Ruby2JS
             @tag_stack << [@element, @element_original]
             @state = :text
             @text = ''
-          elsif c == ' '
+          elsif c == ' ' or c == "\n"
             @state = :attr_name
             @attr_name = ''
             @attrs = {}
