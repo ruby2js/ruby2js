@@ -31,11 +31,9 @@ Heads up: we're in the process of consolidating our supported tech stack. Going 
 
 # JavaScript front-end build tools
 
-A plugins is available for [Vite](https://www.npmjs.com/package/@ruby2js/vite-plugin) which supports Hot Module Replacement and Refresh.  The [ESM](/docs/filters/esm)
-filter lets you author `import` and `export` statements, and the
-[autoexports](/docs/options#auto-exports) and
-[autoimports](/docs/options#auto-imports) options can often relieve you of the
-need to do so.
+[Vite](/docs/vite) is the recommended build tool for Ruby2JS projects. The `vite-plugin-ruby2js` package provides Hot Module Replacement, source maps, and framework-specific presets (Rails, Juntos, and more). See the [Vite Integration](/docs/vite) guide for details.
+
+The [ESM](/docs/filters/esm) filter lets you author `import` and `export` statements, and the [autoexports](/docs/options#auto-exports) and [autoimports](/docs/options#auto-imports) options can often relieve you of the need to do so.
 
 # JavaScript bundlers
 

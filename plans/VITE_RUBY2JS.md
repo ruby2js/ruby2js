@@ -251,59 +251,45 @@ export default defineConfig({
 });
 ```
 
-### Phase 2: Juntos Vite Preset
+### Phase 2: Juntos Vite Preset ✅ Complete
 
-**Goal:** Add `juntos()` preset to `ruby2js-rails` that wraps `build.mjs`.
+**Delivered:** `packages/ruby2js-rails/vite.mjs`
 
-| Task | Description |
-|------|-------------|
-| Create `ruby2js-rails/vite.mjs` | Export `juntos()` preset function |
-| Wire structural transforms | Call `build.mjs` functions from Vite hooks |
-| Generate platform config | Output correct entry points for target |
-| Update CLI | Make `juntos dev` → `vite`, `juntos build` → `vite build` |
-| Add .rbx support | Recognize `.rbx` extension, apply React filter |
+| Component | Status |
+|-----------|--------|
+| `juntos()` preset function | ✅ Done |
+| Structural transforms via SelfhostBuilder | ✅ Done |
+| Platform-specific Rollup config | ✅ Done |
+| `.rbx` support (React filter) | ✅ Done |
+| Stimulus HMR | ✅ Done |
+| Documentation | ✅ Done |
+
+```javascript
+// Works today
+import { juntos } from 'ruby2js-rails/vite';
+
+export default juntos({
+  database: 'dexie',
+  target: 'browser'
+});
+```
 
 **Proving ground:** The workflow demo (`test/workflow/`) exercises:
 - Models, controllers, views, routes
 - RBX files (Ruby + JSX) with React/ReactFlow
 - Database integration
 
-This provides a real React app to validate against.
+### Phase 2b: CLI Integration (Optional)
 
-**The preset does what `juntos build` does today, but as Vite plugins:**
+Make the Juntos CLI a thin wrapper around Vite. This is a convenience layer—users can already use Vite directly with the `juntos()` preset.
 
-```javascript
-// ruby2js-rails/vite.mjs
-import ruby2js from 'vite-plugin-ruby2js';
-import { SelfhostBuilder } from './build.mjs';
+| Task | Description |
+|------|-------------|
+| Update `juntos dev` | Run `npx vite` instead of custom dev server |
+| Update `juntos build` | Run `npx vite build` instead of direct SelfhostBuilder |
+| Generate vite.config.js | Create config during `juntos install` if not present |
 
-export function juntos(options = {}) {
-  const builder = new SelfhostBuilder(null, options);
-
-  return [
-    ruby2js({ filters: ['Stimulus', 'Functions', 'ESM', 'Return'] }),
-
-    {
-      name: 'juntos-structure',
-      buildStart() {
-        // Transform models, controllers, views, routes
-        builder.transformStructure();
-      }
-    },
-
-    {
-      name: 'juntos-config',
-      config() {
-        return {
-          build: {
-            rollupOptions: builder.getRollupOptions()
-          }
-        };
-      }
-    }
-  ];
-}
-```
+**Note:** Database commands (`juntos db:migrate`, `juntos db:seed`) remain unchanged.
 
 ### Phase 3: Publish Tarballs
 
@@ -383,54 +369,69 @@ See [Ruby Detection Strategy](#appendix-ruby-detection-examples) appendix for ex
 
 ## Success Criteria
 
-### Phase 2 (Juntos Preset)
-1. `juntos dev` starts Vite with full Rails app transformation
-2. `juntos build` produces deployable output via Vite
-3. Existing blog/chat demos work unchanged
-4. CI smoke tests pass with Vite-based build
-5. `juntos dev --target electron` runs Vite + Electron together
-6. `juntos build --target capacitor` produces assets for `cap sync`
-7. `juntos test` runs Vitest with Ruby specs
+### Phase 2 (Juntos Preset) ✅
+1. `juntos()` preset returns working Vite plugin array
+2. Structural transforms (models, controllers, views, routes) run in buildStart
+3. `.rbx` files (Ruby + JSX) work with React filter
+4. Platform-specific Rollup config generated for each target
+5. Stimulus HMR works for controller changes
+6. Documentation covers preset usage
 
-### Phase 2 (continued)
-8. `.rbx` files (Ruby + JSX) work with React filter
+### Phase 2b (CLI Integration)
+7. `juntos dev` starts Vite with full Rails app transformation
+8. `juntos build` produces deployable output via Vite
+9. `juntos dev --target electron` runs Vite + Electron together
+10. `juntos build --target capacitor` produces assets for `cap sync`
+11. `juntos test` runs Vitest with Ruby specs
 
 ### Phase 4 (Framework SFC Presets)
-9. Vue SFCs accept `<script lang="ruby">`
-10. Astro frontmatter accepts `#!ruby`
+12. Vue SFCs accept `<script lang="ruby">`
+13. Astro frontmatter accepts `#!ruby`
 
 ### Phase 6 (Extensibility)
-11. Hanami app works with extracted shared infrastructure
-12. Framework-specific code is <1000 lines
+14. Hanami app works with extracted shared infrastructure
+15. Framework-specific code is <1000 lines
 
 ---
 
 ## Migration Path
 
-### For Existing Juntos Apps
+### Use Vite Directly (Available Now)
 
-No breaking changes. The CLI commands work the same:
+Create a `vite.config.js` and use Vite commands:
 
-```bash
-# Before (custom build system)
-juntos dev    # → ruby2js-rails-dev
-juntos build  # → SelfhostBuilder
+```javascript
+// vite.config.js
+import { juntos } from 'ruby2js-rails/vite';
 
-# After (Vite foundation)
-juntos dev    # → vite
-juntos build  # → vite build
+export default juntos({
+  database: 'dexie',
+  target: 'browser'
+});
 ```
 
-The difference is internal — Vite runs the show, Juntos is the configuration.
+```bash
+npx vite          # Development
+npx vite build    # Production
+```
 
-### For Users Who Want Control
+The Juntos CLI continues to work unchanged for database commands:
+```bash
+bin/juntos db:migrate
+bin/juntos db:seed
+```
+
+### After Phase 2b (CLI Integration)
+
+Once Phase 2b is complete, the CLI becomes a thin wrapper:
 
 ```bash
-# Eject to pure Vite
-cp node_modules/ruby2js-rails/vite-template.config.js vite.config.js
-# Now it's just a Vite project
-npx vite
+# These will run Vite internally
+juntos dev    # → npx vite
+juntos build  # → npx vite build
 ```
+
+No breaking changes — same commands, Vite foundation underneath.
 
 ---
 
