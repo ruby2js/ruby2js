@@ -8,12 +8,271 @@ module Ruby2JS
 
       LITELEMENT_IMPORT = s(:import,
         [s(:pair, s(:sym, :from), s(:str, "lit"))],
-        [s(:const, nil, :LitElement), s(:attr, nil, :css), s(:attr, nil, :html)]) 
+        [s(:const, nil, :LitElement), s(:attr, nil, :css), s(:attr, nil, :html)])
+
+      # Import just html for Phlex+Lit mode
+      # Structure: s(:import, [from_pair], [named_imports])
+      HTML_IMPORT = s(:import,
+        [s(:pair, s(:sym, :from), s(:str, "lit"))],
+        [s(:const, nil, :html)])
 
       def initialize(node)
         super
         @le_props = nil
+        @lit_phlex_mode = false
       end
+
+      def options=(options)
+        super
+        # Detect if Phlex filter is present for Phlex → Lit compilation
+        filters = options[:filters] || Filter::DEFAULTS
+        if defined?(Ruby2JS::Filter::Phlex) && filters.include?(Ruby2JS::Filter::Phlex)
+          @lit_phlex_mode = true
+        end
+      end
+
+      # Handle pnode (from Phlex filter) - convert to Lit tagged template
+      def on_pnode(node)
+        return super unless @lit_phlex_mode
+
+        # Add html import if not already present
+        add_html_import
+
+        tag, attrs, *children = node.children
+
+        # Build the template literal content
+        dstr_parts = build_lit_template(tag, attrs, children)
+
+        # Wrap in html tagged template
+        s(:taglit, s(:sym, :html), s(:dstr, *dstr_parts))
+      end
+
+      def add_html_import
+        return unless respond_to?(:prepend_list) && respond_to?(:modules_enabled?)
+        return unless modules_enabled?
+
+        # Check if we already have the html import
+        has_import = prepend_list.any? do |node|
+          next false unless node.respond_to?(:type) && node.type == :import
+          # Check for our HTML_IMPORT pattern - children[1] can be an array
+          second_child = node.children[1]
+          if second_child.is_a?(Array)
+            second_child.any? { |c| c.respond_to?(:type) && c.type == :const && c.children[1] == :html }
+          elsif second_child.respond_to?(:type)
+            second_child.type == :const && second_child.children[1] == :html
+          else
+            false
+          end
+        end
+
+        prepend_list << HTML_IMPORT unless has_import
+      end
+
+      # Handle pnode_text (from Phlex filter)
+      def on_pnode_text(node)
+        return super unless @lit_phlex_mode
+
+        content = node.children.first
+        if content.type == :str
+          content
+        else
+          s(:begin, process(content))
+        end
+      end
+
+      private
+
+      # Build template literal parts for a pnode
+      def build_lit_template(tag, attrs, children)
+        parts = []
+
+        if tag.nil?
+          # Fragment - just children
+          children.each do |child|
+            parts.concat(build_lit_child(child))
+          end
+        elsif tag.to_s[0] =~ /[A-Z]/
+          # Component - render as function call within interpolation
+          # ${ComponentName.render({props})}
+          component_call = s(:send, s(:const, nil, tag), :render, attrs || s(:hash))
+          parts << s(:str, '')
+          parts << s(:begin, component_call)
+          parts << s(:str, '')
+        else
+          # HTML element
+          tag_str = tag.to_s
+          opening = "<#{tag_str}"
+          opening += build_lit_attrs_static(attrs)
+
+          # Check for dynamic attrs
+          dynamic_attrs = build_lit_attrs_dynamic(attrs)
+          if dynamic_attrs.empty?
+            opening += ">"
+            parts << s(:str, opening)
+          else
+            parts << s(:str, opening)
+            dynamic_attrs.each do |attr_part|
+              parts.concat(attr_part)
+            end
+            parts << s(:str, ">")
+          end
+
+          # Void elements
+          void_elements = %i[area base br col embed hr img input link meta param source track wbr]
+          unless void_elements.include?(tag_str.to_sym)
+            children.each do |child|
+              parts.concat(build_lit_child(child))
+            end
+            parts << s(:str, "</#{tag_str}>")
+          end
+        end
+
+        # Merge adjacent string parts
+        merge_string_parts(parts)
+      end
+
+      def build_lit_child(child)
+        parts = []
+        case child.type
+        when :pnode_text
+          content = child.children.first
+          if content.type == :str
+            parts << content
+          else
+            parts << s(:begin, process(content))
+          end
+        when :pnode
+          tag, attrs, *grandchildren = child.children
+          parts.concat(build_lit_template(tag, attrs, grandchildren))
+        when :block
+          # Loop - convert to .map() with html template body
+          parts << s(:begin, build_lit_loop(child))
+        when :for, :for_of
+          # Converted loop - wrap body in html template
+          parts << s(:begin, build_lit_for_loop(child))
+        else
+          # Other expression - wrap in interpolation
+          parts << s(:begin, process(child))
+        end
+        parts
+      end
+
+      # Convert a block loop to use .map() with html template
+      def build_lit_loop(block_node)
+        send_node, block_args, block_body = block_node.children
+        return process(block_node) unless send_node.type == :send
+
+        target, method, *args = send_node.children
+
+        # Convert .each to .map for template interpolation
+        if [:each, :each_with_index].include?(method)
+          method = :map
+        end
+
+        # Build the body as an html template
+        body_parts = []
+        if block_body.type == :pnode
+          tag, attrs, *children = block_body.children
+          body_parts = build_lit_template(tag, attrs, children)
+        else
+          # Process as regular expression
+          return process(block_node)
+        end
+
+        # Return array.map(args => html`...`)
+        html_body = s(:taglit, s(:sym, :html), s(:dstr, *merge_string_parts(body_parts)))
+        s(:block,
+          s(:send, process(target), method, *args.map { |a| process(a) }),
+          block_args,
+          html_body)
+      end
+
+      # Handle for/for_of loops
+      def build_lit_for_loop(for_node)
+        # For now, just process as-is (functions filter may have converted)
+        process(for_node)
+      end
+
+      def build_lit_attrs_static(attrs)
+        return '' unless attrs&.type == :hash
+
+        result = ''
+        attrs.children.each do |pair|
+          next unless pair.type == :pair
+          key_node, value_node = pair.children
+
+          key = case key_node.type
+          when :sym then key_node.children.first.to_s
+          when :str then key_node.children.first
+          else next
+          end
+
+          # Convert underscores to dashes
+          key = key.gsub('_', '-')
+
+          case value_node.type
+          when :str
+            result += " #{key}=\"#{value_node.children.first.gsub('"', '&quot;')}\""
+          when :sym
+            result += " #{key}=\"#{value_node.children.first}\""
+          when :true
+            result += " #{key}"
+          when :false
+            # Skip false boolean attributes
+          end
+        end
+        result
+      end
+
+      def build_lit_attrs_dynamic(attrs)
+        return [] unless attrs&.type == :hash
+
+        result = []
+        attrs.children.each do |pair|
+          next unless pair.type == :pair
+          key_node, value_node = pair.children
+
+          key = case key_node.type
+          when :sym then key_node.children.first.to_s
+          when :str then key_node.children.first
+          else next
+          end
+
+          key = key.gsub('_', '-')
+
+          # Only handle dynamic values here
+          unless [:str, :sym, :true, :false].include?(value_node.type)
+            result << [s(:str, " #{key}=\""), s(:begin, process(value_node)), s(:str, "\"")]
+          end
+        end
+        result
+      end
+
+      def merge_string_parts(parts)
+        return parts if parts.empty?
+
+        merged = []
+        current_str = nil
+
+        parts.each do |part|
+          if part.type == :str
+            if current_str
+              current_str = s(:str, current_str.children.first + part.children.first)
+            else
+              current_str = part
+            end
+          else
+            merged << current_str if current_str
+            current_str = nil
+            merged << part
+          end
+        end
+
+        merged << current_str if current_str
+        merged
+      end
+
+      public
 
       def on_ivar(node)
         return super unless @le_props&.include?(node.children.first) # Pragma: hash

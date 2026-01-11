@@ -63,16 +63,25 @@ module Ruby2JS
         @phlex_buffer = nil
         @phlex_ivars = nil
         @phlex_react_mode = false
+        @phlex_lit_mode = false
         super
       end
 
       def options=(options)
         super
-        # Detect if React filter is present for "write once, target both"
+        # Detect framework filters for "write once, target both"
         filters = options[:filters] || Filter::DEFAULTS
         if defined?(Ruby2JS::Filter::React) && filters.include?(Ruby2JS::Filter::React)
           @phlex_react_mode = true
         end
+        if defined?(Ruby2JS::Filter::Lit) && filters.include?(Ruby2JS::Filter::Lit)
+          @phlex_lit_mode = true
+        end
+      end
+
+      # Check if we're in a framework mode (React or Lit)
+      def phlex_framework_mode?
+        @phlex_react_mode || @phlex_lit_mode
       end
 
       # Detect Phlex component class definition
@@ -153,10 +162,10 @@ module Ruby2JS
           # Transform the body
           transformed_body = process(body)
 
-          if @phlex_react_mode
-            # React mode: return pnodes directly (no buffer pattern)
+          if phlex_framework_mode?
+            # Framework mode (React/Lit): return pnodes directly (no buffer pattern)
             # The transformed_body contains pnodes wrapped in buffer ops - extract them
-            new_body = build_react_render_body(transformed_body)
+            new_body = build_framework_render_body(transformed_body)
           else
             # Buffer mode: wrap in buffer initialization and return
             init = s(:lvasgn, @phlex_buffer, s(:str, ''))
@@ -387,11 +396,11 @@ module Ruby2JS
         end
       end
 
-      # Build render body for React mode
-      def build_react_render_body(transformed_body)
+      # Build render body for framework mode (React/Lit)
+      def build_framework_render_body(transformed_body)
         return s(:return, s(:nil)) unless transformed_body
 
-        # In React mode, transformed_body contains raw pnodes (not buffer ops)
+        # In framework mode, transformed_body contains raw pnodes (not buffer ops)
         pnodes = collect_pnodes(transformed_body)
 
         if pnodes.empty?
@@ -441,8 +450,8 @@ module Ruby2JS
         # Create pnode
         pnode = s(:pnode, tag, attrs, *children)
 
-        if @phlex_react_mode
-          # React mode: return pnode directly (will be processed later as a batch)
+        if phlex_framework_mode?
+          # Framework mode (React/Lit): return pnode directly (will be processed later)
           pnode
         else
           # Buffer mode: process and wrap in buffer operation
@@ -470,8 +479,8 @@ module Ruby2JS
         # Create pnode with uppercase symbol for component
         pnode = s(:pnode, component_name, attrs, *children)
 
-        if @phlex_react_mode
-          # React mode: return pnode directly
+        if phlex_framework_mode?
+          # Framework mode (React/Lit): return pnode directly
           pnode
         else
           # Buffer mode: process and wrap in buffer operation
@@ -495,8 +504,8 @@ module Ruby2JS
         # Create pnode with string tag for custom element
         pnode = s(:pnode, tag_name, attrs, *children)
 
-        if @phlex_react_mode
-          # React mode: return pnode directly
+        if phlex_framework_mode?
+          # Framework mode (React/Lit): return pnode directly
           pnode
         else
           # Buffer mode: process and wrap in buffer operation
@@ -515,8 +524,8 @@ module Ruby2JS
         # Create fragment pnode (nil tag)
         pnode = s(:pnode, nil, s(:hash), *children)
 
-        if @phlex_react_mode
-          # React mode: return pnode directly
+        if phlex_framework_mode?
+          # Framework mode (React/Lit): return pnode directly
           pnode
         else
           # Buffer mode: process and wrap in buffer operation
