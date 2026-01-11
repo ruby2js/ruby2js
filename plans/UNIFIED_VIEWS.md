@@ -959,10 +959,13 @@ views:
 - [x] Dynamic attrs via :attr="value" (v-bind shorthand)
 - [x] v-for for loops, v-if for conditionals
 
-### Phase 8: Unified Views Module
-- [ ] Generate combined module from mixed file types
-- [ ] Handle naming conflicts
-- [ ] Source maps for all formats
+### Phase 8: Unified Views Module ✓
+- [x] Generate combined module from mixed file types
+- [x] Handle naming conflicts (priority: Phlex > RBX > JSX > ERB)
+- [x] Source maps for all formats
+- [x] Support all view types in same resource directory (.html.erb, .rb, .rbx, .jsx, .tsx)
+- [x] PascalCase to snake_case conversion for view names
+- [x] Unified module exports with correct import patterns per file type
 
 ---
 

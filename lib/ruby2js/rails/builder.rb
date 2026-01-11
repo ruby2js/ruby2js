@@ -1463,6 +1463,16 @@ class SelfhostBuilder
     js
   end
 
+  # File type priorities for conflict resolution
+  # Higher priority formats take precedence when same view name exists in multiple formats
+  VIEW_FILE_PRIORITIES = {
+    '.rb' => 1,        # Phlex (highest priority)
+    '.rbx' => 2,       # RBX
+    '.jsx' => 3,       # JSX
+    '.tsx' => 3,       # TSX (same as JSX)
+    '.html.erb' => 4   # ERB (lowest priority)
+  }.freeze
+
   def transpile_erb_directory()
     views_root = File.join(DEMO_ROOT, 'app/views')
     return unless Dir.exist?(views_root)
@@ -1480,48 +1490,210 @@ class SelfhostBuilder
     FileUtils.mkdir_p(views_dist_dir)
 
     resource_dirs.each do |resource|
-      transpile_resource_views(resource, views_root, views_dist_dir)
+      transpile_unified_views(resource, views_root, views_dist_dir)
       transpile_turbo_stream_views(resource, views_root, views_dist_dir)
     end
   end
 
-  def transpile_resource_views(resource, views_root, views_dist_dir)
-    erb_dir = File.join(views_root, resource)
-    erb_files = Dir.glob(File.join(erb_dir, '*.html.erb'))
-    return if erb_files.empty?
+  # Unified view transpilation - handles all view file types in a resource directory
+  # Supports: .html.erb (ERB), .rb (Phlex), .rbx (RBX), .jsx/.tsx (JSX)
+  # Generates a combined module exporting all render functions
+  def transpile_unified_views(resource, views_root, views_dist_dir)
+    resource_dir = File.join(views_root, resource)
+
+    # Collect all view files with their types
+    view_files = collect_view_files(resource_dir)
+    return if view_files.empty?
 
     # Create resource subdirectory in dist
     resource_dist_dir = File.join(views_dist_dir, resource)
     FileUtils.mkdir_p(resource_dist_dir)
 
-    # Transpile each ERB file
-    erb_files.each do |src_path|
-      basename = File.basename(src_path, '.html.erb')
-      self.transpile_erb_file(src_path, File.join(resource_dist_dir, "#{basename}.js"))
+    # Group files by view name and resolve conflicts
+    views_by_name = resolve_view_conflicts(view_files)
+
+    # Track source format for each view (for module comments)
+    source_formats = []
+
+    # Transpile each view file
+    views_by_name.each do |view_name, file_info|
+      src_path = file_info[:path]
+      ext = file_info[:ext]
+      dest_path = File.join(resource_dist_dir, "#{view_name}.js")
+
+      case ext
+      when '.html.erb'
+        self.transpile_erb_file(src_path, dest_path)
+        source_formats << "#{view_name}: ERB"
+      when '.rb'
+        self.transpile_phlex_view_file(src_path, dest_path)
+        source_formats << "#{view_name}: Phlex"
+      when '.rbx'
+        self.transpile_file(src_path, dest_path, 'rbx')
+        source_formats << "#{view_name}: RBX"
+      when '.jsx', '.tsx'
+        self.transform_jsx_file(src_path, dest_path)
+        source_formats << "#{view_name}: JSX"
+      end
     end
 
-    # Create combined module that exports all render functions
+    # Generate combined module
+    generate_unified_views_module(resource, views_by_name, views_dist_dir, source_formats)
+  end
+
+  # Collect all view files from a resource directory
+  # Returns array of { name: 'index', ext: '.html.erb', path: '/full/path', priority: 4 }
+  def collect_view_files(resource_dir)
+    view_files = []
+
+    # ERB files
+    Dir.glob(File.join(resource_dir, '*.html.erb')).each do |path|
+      name = File.basename(path, '.html.erb')
+      next if name.start_with?('_')  # Skip partials
+      view_files << { name: name, ext: '.html.erb', path: path, priority: VIEW_FILE_PRIORITIES['.html.erb'] }
+    end
+
+    # Phlex files (.rb)
+    Dir.glob(File.join(resource_dir, '*.rb')).each do |path|
+      name = File.basename(path, '.rb')
+      next if name.start_with?('_')  # Skip partials
+      # Convert PascalCase to snake_case for view name (Index.rb -> index)
+      view_name = name.gsub(/([A-Z]+)([A-Z][a-z])/, '\1_\2')
+                      .gsub(/([a-z\d])([A-Z])/, '\1_\2')
+                      .downcase
+      view_files << { name: view_name, ext: '.rb', path: path, priority: VIEW_FILE_PRIORITIES['.rb'] }
+    end
+
+    # RBX files
+    Dir.glob(File.join(resource_dir, '*.rbx')).each do |path|
+      name = File.basename(path, '.rbx')
+      next if name.start_with?('_')
+      view_name = name.gsub(/([A-Z]+)([A-Z][a-z])/, '\1_\2')
+                      .gsub(/([a-z\d])([A-Z])/, '\1_\2')
+                      .downcase
+      view_files << { name: view_name, ext: '.rbx', path: path, priority: VIEW_FILE_PRIORITIES['.rbx'] }
+    end
+
+    # JSX/TSX files
+    Dir.glob(File.join(resource_dir, '*.{jsx,tsx}')).each do |path|
+      ext = File.extname(path)
+      name = File.basename(path, ext)
+      next if name.start_with?('_')
+      view_name = name.gsub(/([A-Z]+)([A-Z][a-z])/, '\1_\2')
+                      .gsub(/([a-z\d])([A-Z])/, '\1_\2')
+                      .downcase
+      view_files << { name: view_name, ext: ext, path: path, priority: VIEW_FILE_PRIORITIES[ext] }
+    end
+
+    view_files
+  end
+
+  # Resolve conflicts when multiple files have the same view name
+  # Higher priority (lower number) wins
+  def resolve_view_conflicts(view_files)
+    views_by_name = {}
+
+    view_files.each do |file_info|
+      name = file_info[:name]
+
+      if views_by_name[name]
+        existing = views_by_name[name]
+        if file_info[:priority] < existing[:priority]
+          # New file has higher priority, use it
+          puts("  Note: #{File.basename(file_info[:path])} takes precedence over #{File.basename(existing[:path])}")
+          views_by_name[name] = file_info
+        else
+          # Existing file has higher or equal priority, keep it
+          puts("  Note: #{File.basename(existing[:path])} takes precedence over #{File.basename(file_info[:path])}")
+        end
+      else
+        views_by_name[name] = file_info
+      end
+    end
+
+    views_by_name
+  end
+
+  # Transpile a Phlex view file (for views directory, not components)
+  # Uses the components section options but outputs to views
+  def transpile_phlex_view_file(src_path, dest_path)
+    puts("Transpiling Phlex view: #{File.basename(src_path)}")
+    source = File.read(src_path)
+
+    relative_src = src_path.sub(DEMO_ROOT + '/', '')
+    options = self.build_options('components').merge(file: relative_src)
+
+    # Add component map for import resolution if available
+    if @component_map && @component_map.any?  # Pragma: hash
+      options[:component_map] = @component_map
+      options[:file_path] = relative_src
+    end
+
+    result = Ruby2JS.convert(source, options)
+    js = result.to_s
+
+    FileUtils.mkdir_p(File.dirname(dest_path))
+
+    # Copy source file alongside transpiled output for source maps
+    src_basename = File.basename(src_path)
+    copied_src_path = File.join(File.dirname(dest_path), src_basename)
+    File.write(copied_src_path, source)
+
+    # Generate sourcemap
+    map_path = "#{dest_path}.map"
+    sourcemap = result.sourcemap
+    sourcemap[:sourcesContent] = [source]
+    sourcemap[:sources] = ["./#{src_basename}"]
+
+    js_with_map = "#{js}\n//# sourceMappingURL=#{File.basename(map_path)}\n"
+    File.write(dest_path, js_with_map)
+    File.write(map_path, JSON.generate(sourcemap))
+
+    puts("  -> #{dest_path}")
+  end
+
+  # Generate the combined views module that exports all render functions
+  def generate_unified_views_module(resource, views_by_name, views_dist_dir, source_formats)
     # Convert resource name to class-like name (messages -> Message, articles -> Article)
     class_name = resource.chomp('s').split('_').map(&:capitalize).join
     views_class = "#{class_name}Views"
 
-    erb_views_js = <<~JS
-      // #{class_name} views - auto-generated from .html.erb templates
-      // Each exported function is a render function that takes { #{resource.chomp('s')} } or { #{resource} }
+    # Determine what file types are present
+    file_types = views_by_name.values.map { |v| v[:ext] }.uniq.sort
+
+    unified_js = <<~JS
+      // #{class_name} views - auto-generated from mixed source files
+      // Sources: #{source_formats.sort.join(', ')}
+      // File types: #{file_types.join(', ')}
 
     JS
 
     render_exports = []
     has_new = false
-    erb_files.sort.each do |erb_path|
-      name = File.basename(erb_path, '.html.erb')
-      has_new = true if name == 'new'
-      # Import from ./#{resource}/ subdirectory
-      erb_views_js += "import { render as #{name}_render } from './#{resource}/#{name}.js';\n"
-      render_exports << "#{name}: #{name}_render"
+
+    views_by_name.keys.sort.each do |view_name|
+      file_info = views_by_name[view_name]
+      has_new = true if view_name == 'new'
+
+      # Different file types have different export patterns
+      case file_info[:ext]
+      when '.html.erb'
+        # ERB exports: export function render(...)
+        unified_js += "import { render as #{view_name}_render } from './#{resource}/#{view_name}.js';\n"
+        render_exports << "#{view_name}: #{view_name}_render"
+      when '.rb'
+        # Phlex exports: export default function render(...) or export function render(...)
+        # Try to import default first, fall back to named
+        unified_js += "import #{view_name}_module from './#{resource}/#{view_name}.js';\n"
+        render_exports << "#{view_name}: #{view_name}_module.render || #{view_name}_module"
+      when '.rbx', '.jsx', '.tsx'
+        # RBX/JSX exports: export default function/component
+        unified_js += "import #{view_name}_component from './#{resource}/#{view_name}.js';\n"
+        render_exports << "#{view_name}: #{view_name}_component"
+      end
     end
 
-    erb_views_js += <<~JS
+    unified_js += <<~JS
 
       // Export #{views_class} - method names match controller action names
       export const #{views_class} = {
@@ -1530,8 +1702,8 @@ class SelfhostBuilder
     JS
 
     # Write combined module to app/views/#{resource}.js
-    File.write(File.join(views_dist_dir, "#{resource}.js"), erb_views_js)
-    puts("  -> app/views/#{resource}.js (combined ERB module)")
+    File.write(File.join(views_dist_dir, "#{resource}.js"), unified_js)
+    puts("  -> app/views/#{resource}.js (unified views module)")
   end
 
   def transpile_turbo_stream_views(resource, views_root, views_dist_dir)
