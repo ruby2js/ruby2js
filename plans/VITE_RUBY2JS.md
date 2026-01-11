@@ -1,6 +1,32 @@
-# Vite Ruby2JS Ecosystem
+# Ruby in the Modern Frontend Ecosystem
 
-A unified Vite plugin that makes Ruby a first-class frontend language, targeting Rails-style apps, Vue, Svelte, Astro, and Phlex components.
+A Vite plugin that makes Ruby a first-class language in the standard frontend toolchain.
+
+## Strategic Context
+
+**Vite is not just a build tool—it's the infrastructure standard for modern frontend development.**
+
+| Framework | Vite Status |
+|-----------|-------------|
+| Vue 3 / Nuxt 3 | Default (same creator) |
+| Svelte / SvelteKit | Default |
+| Astro | Built on Vite |
+| Solid / SolidStart | Default |
+| Qwik | Default |
+| Remix | Migrated to Vite |
+| Preact | Official preset |
+| Lit | Recommended |
+
+The notable exception is Next.js (uses Turbopack). But for the broader ecosystem, **Vite is the common denominator**.
+
+A single `vite-plugin-ruby2js` automatically works everywhere Vite runs:
+- `npm create vue@latest` → add plugin → Ruby in Vue
+- `npm create svelte@latest` → add plugin → Ruby in Svelte
+- `npm create astro@latest` → add plugin → Ruby in Astro
+
+**This plan is not about "adding Vite as a feature." It's about making the strategic investments to plug Ruby into the ecosystem standard.**
+
+---
 
 ## Blog Post Series Context
 
@@ -10,127 +36,140 @@ This is **Post 3** in a four-part series demonstrating Ruby2JS/Juntos capabiliti
 |------|------|-------|-----------|
 | 1 | — | Patterns | Rails conventions transpile to JS |
 | 2 | [HOTWIRE_TURBO.md](./HOTWIRE_TURBO.md) | Frameworks | Ruby becomes valid Stimulus/Turbo JS |
-| **3** | **VITE_RUBY2JS.md** | **Tooling** | **Ruby as first-class frontend language** |
-| 4 | [PHLEX_UNIFICATION.md](./PHLEX_UNIFICATION.md) | Portability | Same Ruby → Phlex JS or React |
+| **3** | **VITE_RUBY2JS.md** | **Ecosystem** | **Ruby joins the standard frontend toolchain** |
+| 4 | [PHLEX_UNIFICATION.md](./PHLEX_UNIFICATION.md) | Portability | Same Ruby → any framework |
 
-**Builds on Post 2:** Stimulus controllers already work. Now we add HMR—edit a Ruby controller, see instant updates.
+**Builds on Post 2:** Stimulus controllers work. Now Ruby works in *any* Vite-based project.
 
-**This post proves:** Ruby integrates with modern frontend tooling (Vite) like any other language—HMR, source maps, tree shaking.
-
-**Teaser for next post:** "HMR works for Stimulus. What about React components?"
+**This post proves:** Ruby is a first-class frontend language—not a Rails-only solution.
 
 ---
 
-## Next Iteration Scope (Post 3)
+## Current State Assessment
 
-### In Scope
+### Selfhost Readiness by Ecosystem Value
 
-| Component | Description | Status |
-|-----------|-------------|--------|
-| Core Vite plugin | Basic `.rb` file transformation | To build |
-| Rails preset | Juntos/Rails apps with HMR | To build |
-| Source maps | Ruby visible in DevTools | To build |
-| Error handling | Ruby line numbers in errors | To build |
-| Production builds | Tree shaking, code splitting | To build |
+The Vite plugin runs in Node/browser via the selfhost transpiler. Filter readiness determines what's possible:
 
-### Demo
+| Tier | Purpose | Filters | Selfhost | Ecosystem Unlock |
+|------|---------|---------|----------|------------------|
+| **1 - Core** | Basic Ruby→JS | functions, esm, return, camelCase | ✅ Ready | Any Vite project |
+| **2 - Rails** | Hotwire/Stimulus | stimulus, erb, rails_* | ✅ Ready | Rails-style apps |
+| **3 - React** | React ecosystem | react, jsx, preact | ⚠️ Partial | React, Preact, Remix |
+| **4 - Phlex** | Multi-framework | phlex | ⚠️ Partial | [UNIFIED_VIEWS](./UNIFIED_VIEWS.md) gateway |
+| **5 - Frameworks** | Direct targets | vue, astro, lit | ⚠️ Partial | Vue, Astro, Lit |
+| **6 - Enhancement** | Progressive | alpine, turbo | ⚠️ Partial | htmx/Alpine patterns |
 
-Use the existing **chat app** from Post 2. Add Vite configuration, show:
-1. Edit `chat_controller.rb` → instant update without page refresh
-2. Source maps show Ruby in browser DevTools
-3. Production build is optimized
+### Key Insight
 
-### Out of Scope (Future Iterations)
+**Tiers 1-2 are ready.** A working Vite plugin with Rails/Stimulus support can ship immediately.
 
-| Component | Description | Why Deferred |
-|-----------|-------------|--------------|
-| React preset | Phlex → React output | Depends on [PHLEX_UNIFICATION.md](./PHLEX_UNIFICATION.md) |
-| Next.js preset | RSC directives + React | Depends on React preset + [VERCEL_TARGET.md](./VERCEL_TARGET.md) |
-| Vue preset | Ruby in Vue SFCs | Framework complexity, uncertain audience |
-| Svelte preset | Ruby in Svelte components | Needs `reactive {}` DSL |
-| Astro preset | Ruby in Astro frontmatter | Lower priority |
-| Phlex preset | Phlex components as ES modules | Depends on Phlex filter maturity |
-| Advanced HMR | Controller/model-level updates | Core HMR first |
+**Tier 3 (React) is the highest-value investment.** The React ecosystem is massive.
 
-React/Next.js presets are Post 4 scope. Other presets remain future iterations.
+**Tier 4 (Phlex) is the force multiplier.** Once Phlex selfhost is ready, [UNIFIED_VIEWS.md](./UNIFIED_VIEWS.md) kicks in—same source targets React, Vue, Astro, Lit.
+
+### Foundation Work Complete
+
+The [UNIFIED_VIEWS.md](./UNIFIED_VIEWS.md) plan phases 1-8 are complete in Ruby:
+- Unified function signature ✓
+- Phlex pnode AST ✓
+- Vue, Astro, Lit filters ✓ (Ruby CLI)
+- RBX support ✓
+- Import resolution ✓
+
+The bottleneck is selfhost. The Ruby filters exist; they need to pass selfhost specs.
 
 ---
 
-## Vision
+## Implementation Strategy
 
-Today: "Ruby2JS lets you write Ruby instead of JavaScript"
+### Phase 1: Ship What's Ready
 
-With this plan: **Ruby becomes a universal frontend language** that targets any framework, any platform, with modern tooling.
+**Goal:** Working Vite plugin using ready selfhost filters.
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                    Vite Dev Server                       │
-│              (HMR, fast builds, optimization)            │
-├─────────────────────────────────────────────────────────┤
-│              vite-plugin-ruby2js (core)                  │
-│            (selfhost transpiler, source maps)            │
-├──────────┬──────────┬──────────┬──────────┬─────────────┤
-│  Rails   │   Vue    │  Svelte  │  Astro   │   Phlex     │
-│  preset  │  preset  │  preset  │  preset  │   preset    │
-└──────────┴──────────┴──────────┴──────────┴─────────────┘
-```
+| Task | Status |
+|------|--------|
+| Package structure (`packages/vite-plugin-ruby2js/`) | To build |
+| Core plugin (`.rb` → `.js` transformation) | To build |
+| Rails preset (stimulus, erb, rails filters) | To build |
+| Source maps (Ruby visible in DevTools) | To build |
+| Error handling (Ruby line numbers) | To build |
+| HMR for Stimulus controllers | To build |
 
-## Why This Matters
+**Filters used:** functions, esm, return, camelCase, stimulus, erb, rails_* — all ✅ Ready
 
-### For Rails Developers
-- HMR with state preservation (no full page refresh)
-- Modern build tooling (tree shaking, code splitting)
-- Path to adding Vue/Svelte interactivity without leaving Ruby
+**Demo:** Existing chat app from Post 2. Edit `chat_controller.rb` → instant HMR update.
 
-### For Frontend Developers
-- Ruby's expressiveness in Vue/Svelte/Astro components
-- Gradual adoption (one component at a time)
-- Same tooling they already know (Vite)
+### Phase 2: Selfhost Investment — React
 
-### For Everyone
-- One language across the stack
-- Portable Phlex components (use anywhere)
-- No context switching between Ruby and JavaScript
+**Goal:** Unlock React ecosystem access.
 
-## Advantages
+| Task | Status |
+|------|--------|
+| Promote `react_spec.rb` to ready | To do |
+| Promote `jsx_spec.rb` to ready | To do |
+| Promote `preact_spec.rb` to ready | To do |
 
-### Developer Experience
+**Unlocks:** React, Preact, Remix, and most SPAs built on Vite.
 
-| Feature | Without Vite | With Vite |
-|---------|--------------|-----------|
-| Hot reload | Full page refresh | HMR — state preserved |
-| Rebuild speed | Full project | Module-level |
-| Error display | Console only | Rich browser overlay |
-| CSS handling | Separate CLI | Built-in PostCSS |
-| TypeScript | Not supported | Native support |
+### Phase 3: React Preset
 
-### Production Benefits
+**Goal:** Full React component authoring in Ruby.
 
-| Feature | Without Vite | With Vite |
-|---------|--------------|-----------|
-| Tree shaking | None | Automatic |
-| Code splitting | None | Automatic |
-| Minification | Optional | Built-in |
-| Asset handling | Manual | Hashing, optimization |
+| Task | Status |
+|------|--------|
+| React preset for Vite plugin | To build |
+| RBX file support (`.rbx` → React) | To build |
+| JSX passthrough (`.jsx`/`.tsx` via esbuild) | To build |
 
-### Ecosystem Access
-- 500+ Vite plugins available
-- Framework-agnostic architecture
-- Native ES modules, import maps
-- Standard compliance
+**Depends on:** Phase 2 selfhost work.
 
-## Prerequisites
+### Phase 4: Selfhost Investment — Phlex
 
-The selfhost transpiler must handle the target files. Current status:
+**Goal:** Unlock multi-framework targeting.
 
-| Component | Status |
-|-----------|--------|
-| Core transpiler | ✅ Working |
-| `functions` filter | ✅ Working |
-| `esm` filter | ✅ Working |
-| Rails filters | ✅ Working |
-| Phlex filter | ✅ Beta |
-| Lesser-used filters | ⏳ Parallel track |
+| Task | Status |
+|------|--------|
+| Promote `phlex_spec.rb` to ready | To do |
+
+**Unlocks:** [UNIFIED_VIEWS.md](./UNIFIED_VIEWS.md) — same Phlex source targets React, Vue, Astro, Lit.
+
+### Phase 5: Phlex Preset
+
+**Goal:** Phlex components as portable ES modules.
+
+| Task | Status |
+|------|--------|
+| Phlex preset for Vite plugin (`.phlex.rb`) | To build |
+| Component composition detection | To build |
+| Framework target selection (React, Vue, etc.) | To build |
+
+**Depends on:** Phase 4 selfhost work.
+
+### Phase 6: Selfhost Investment — Framework Filters
+
+**Goal:** Enable direct framework output.
+
+| Task | Status |
+|------|--------|
+| Promote `vue_spec.rb` to ready | To do |
+| Promote `astro_spec.rb` to ready | To do |
+| Promote `lit_spec.rb` to ready | To do |
+
+**Unlocks:** Direct SFC generation without Phlex intermediate.
+
+### Phase 7: Framework Presets
+
+**Goal:** Native integration with each framework's ecosystem.
+
+| Preset | Description | Depends On |
+|--------|-------------|------------|
+| Vue | Ruby in `<script>` blocks, Phlex → `.vue` SFC | Phase 6 |
+| Astro | Ruby in frontmatter, Phlex → `.astro` | Phase 6 |
+| Lit | Phlex → Web Components | Phase 6 |
+| Svelte | Ruby in `<script>` blocks | New svelte filter needed |
+
+---
 
 ## Architecture
 
@@ -141,42 +180,219 @@ packages/vite-plugin-ruby2js/
 ├── package.json
 ├── src/
 │   ├── index.ts           # Core plugin
-│   ├── transform.ts       # Ruby → JS transformation
-│   ├── hmr.ts            # HMR handling
-│   ├── sourcemap.ts      # Source map generation
+│   ├── transform.ts       # Ruby → JS via selfhost
+│   ├── hmr.ts             # HMR handling
+│   ├── sourcemap.ts       # Source map generation
 │   └── presets/
-│       ├── rails.ts      # Rails/Juntos preset
-│       ├── vue.ts        # Vue SFC preset
-│       ├── svelte.ts     # Svelte SFC preset
-│       ├── astro.ts      # Astro preset
-│       └── phlex.ts      # Phlex component preset
+│       ├── rails.ts       # Rails/Stimulus (Phase 1)
+│       ├── react.ts       # React/RBX (Phase 3)
+│       ├── phlex.ts       # Phlex components (Phase 5)
+│       ├── vue.ts         # Vue SFC (Phase 7)
+│       └── astro.ts       # Astro (Phase 7)
 └── README.md
 ```
 
 ### Transform Pipeline
 
 ```
-Source File
+Source File (.rb, .rbx, .phlex.rb)
      ↓
-Preset (extract Ruby from SFC if needed)
+Preset (configure filters, extract from SFC if needed)
      ↓
 Selfhost Transpiler (Ruby → JS)
      ↓
 Source Map Generation
      ↓
-HMR Handling
+HMR Wrapper
      ↓
-Vite (serves/bundles)
+Vite (serves in dev, bundles for prod)
 ```
 
-## Core Plugin
+### Package Dependencies
 
-The foundation that all presets build on:
+The Vite plugin depends on the existing `ruby2js` npm package, which provides the selfhost transpiler.
+
+**Existing package hierarchy:**
+
+```
+vite-plugin-ruby2js (new)
+  └── ruby2js (existing - converter + filters)
+        └── @ruby/prism (parser)
+
+ruby2js-rails (existing - Rails runtime)
+  └── ruby2js
+```
+
+**Current distribution (beta):**
+
+```json
+{
+  "dependencies": {
+    "ruby2js": "https://www.ruby2js.com/releases/ruby2js-beta.tgz"
+  }
+}
+```
+
+**Future (stable release):**
+
+```json
+{
+  "dependencies": {
+    "ruby2js": "^6.0.0"
+  }
+}
+```
+
+The `ruby2js` package is built from `demo/selfhost/` and includes:
+- Core converter (`ruby2js.js`)
+- All filters (`filters/*.js`)
+- CLI tool (`ruby2js-cli.js`)
+- Depends on `@ruby/prism` for parsing
+
+See [NPM_SELFHOST_MIGRATION.md](./NPM_SELFHOST_MIGRATION.md) for full package structure details.
+
+**Transform implementation:**
+
+```typescript
+// packages/vite-plugin-ruby2js/src/transform.ts
+import { Ruby2JS } from 'ruby2js';
+
+export async function transform(code: string, options: TransformOptions) {
+  return Ruby2JS.convert(code, {
+    filters: options.filters,
+    eslevel: options.eslevel ?? 2022,
+    ...options.ruby2jsOptions
+  });
+}
+```
+
+No bundling required—the Vite plugin simply imports from the `ruby2js` dependency.
+
+---
+
+## Ruby Detection Strategy
+
+A Juntos application can mix JavaScript, TypeScript, and Ruby components. Each context uses its native mechanism for language selection.
+
+### Detection by Context
+
+| Context | Ruby Signal | Example |
+|---------|-------------|---------|
+| Standalone file | File extension | `.rb`, `.rbx` |
+| Vue `<script>` | `lang` attribute | `<script lang="ruby">` |
+| Svelte `<script>` | `lang` attribute | `<script lang="ruby">` |
+| Astro `<script>` | `lang` attribute | `<script lang="ruby">` |
+| Astro frontmatter | Shebang | `#!ruby` |
+
+### Standalone Files
+
+Different extensions for different source languages:
+
+| Language | Plain | With JSX |
+|----------|-------|----------|
+| JavaScript | `.js` | `.jsx` |
+| TypeScript | `.ts` | `.tsx` |
+| Ruby | `.rb` | `.rbx` |
+
+### SFC Script Blocks (Vue, Svelte, Astro)
+
+Follows the established `lang` attribute pattern (same as TypeScript):
+
+```vue
+<!-- Vue with Ruby -->
+<script lang="ruby">
+def increment
+  @count += 1
+end
+</script>
+
+<template>
+  <button @click="increment">{{ count }}</button>
+</template>
+```
+
+```svelte
+<!-- Svelte with Ruby -->
+<script lang="ruby">
+count = 0
+
+def increment
+  count += 1
+end
+</script>
+
+<button on:click={increment}>{count}</button>
+```
+
+A single project can mix languages:
+
+```
+src/components/
+├── Button.vue          # <script> (JavaScript)
+├── Card.vue            # <script lang="ts"> (TypeScript)
+├── Modal.vue           # <script lang="ruby"> (Ruby)
+└── Dialog.vue          # <script lang="ruby"> (Ruby)
+```
+
+### Astro Frontmatter
+
+Astro frontmatter uses `---` fences without a `lang` attribute. Detection uses a shebang:
+
+```astro
+---
+#!ruby
+posts = Post.published.limit(10)
+featured = posts.select { |p| p.featured? }
+---
+
+<Layout>
+  {featured.map { |post| <Card post={post} /> }}
+</Layout>
+```
+
+The `#!ruby` shebang is stripped during transformation—Astro never sees it.
+
+**Why shebang?**
+- `#` is not valid JavaScript at the start of a line (JS uses `//` for comments)
+- Familiar convention from Unix scripts
+- Visually distinct and self-documenting
+- Any Ruby comment would work (`# lang: ruby`, `# ruby2js`), but `#!ruby` is canonical
+
+**JavaScript frontmatter (default):**
+```astro
+---
+const posts = await fetchPosts();
+const featured = posts.filter(p => p.featured);
+---
+```
+
+No shebang = JavaScript (the default).
+
+### Implementation
+
+The preset detects Ruby and transforms before the framework compiler sees it:
+
+```typescript
+// Vue preset detection
+function isRubyScript(scriptContent: string, attrs: Record<string, string>): boolean {
+  return attrs.lang === 'ruby';
+}
+
+// Astro frontmatter detection
+function isRubyFrontmatter(content: string): boolean {
+  const firstLine = content.trim().split('\n')[0];
+  return firstLine.startsWith('#!ruby') || firstLine.startsWith('# lang: ruby');
+}
+```
+
+---
+
+## Core Plugin
 
 ```typescript
 // packages/vite-plugin-ruby2js/src/index.ts
 import type { Plugin } from 'vite';
-import { Ruby2JS } from 'ruby2js-selfhost';
+import { Ruby2JS } from 'ruby2js';
 
 export interface Ruby2JSOptions {
   filters?: string[];
@@ -192,7 +408,7 @@ export default function ruby2js(options: Ruby2JSOptions = {}): Plugin {
   } = options;
 
   return {
-    name: 'ruby2js',
+    name: 'vite-plugin-ruby2js',
 
     transform(code: string, id: string) {
       if (!id.endsWith('.rb')) return null;
@@ -214,19 +430,20 @@ export default function ruby2js(options: Ruby2JSOptions = {}): Plugin {
 
 // Re-export presets
 export { rails } from './presets/rails';
-export { vue } from './presets/vue';
-export { svelte } from './presets/svelte';
-export { astro } from './presets/astro';
+export { react } from './presets/react';
 export { phlex } from './presets/phlex';
+export { vue } from './presets/vue';
+export { astro } from './presets/astro';
 ```
+
+---
 
 ## Presets
 
-### Rails/Juntos Preset
+### Rails Preset (Phase 1)
 
-For Rails-style applications with models, controllers, ERB views.
+For Rails-style applications with Stimulus controllers, ERB views.
 
-**Usage:**
 ```javascript
 // vite.config.js
 import { defineConfig } from 'vite';
@@ -237,19 +454,16 @@ export default defineConfig({
 });
 ```
 
-**Implementation:**
 ```typescript
 // src/presets/rails.ts
 import type { Plugin } from 'vite';
 import ruby2js from '../index';
-import { transformErb } from '../transform';
 
 export function rails(options = {}): Plugin[] {
   return [
     ruby2js({
       filters: [
-        'rails/model',
-        'rails/controller',
+        'stimulus',
         'rails/helpers',
         'functions',
         'esm',
@@ -259,23 +473,15 @@ export function rails(options = {}): Plugin[] {
     }),
 
     {
-      name: 'ruby2js-rails-erb',
-      transform(code, id) {
-        if (!id.endsWith('.erb')) return null;
-        return transformErb(code, id, options);
-      }
-    },
-
-    {
       name: 'ruby2js-rails-hmr',
       handleHotUpdate({ file, server }) {
-        if (file.includes('/views/')) {
+        if (file.endsWith('_controller.rb')) {
           server.ws.send({
             type: 'custom',
-            event: 'ruby2js:view-update',
+            event: 'ruby2js:stimulus-update',
             data: { file }
           });
-          return []; // Prevent full reload
+          return []; // HMR handled, prevent full reload
         }
       }
     },
@@ -286,8 +492,8 @@ export function rails(options = {}): Plugin[] {
         return {
           resolve: {
             alias: {
+              '@controllers': 'app/javascript/controllers',
               '@models': 'app/models',
-              '@controllers': 'app/controllers',
               '@views': 'app/views'
             }
           }
@@ -298,18 +504,93 @@ export function rails(options = {}): Plugin[] {
 }
 ```
 
-**HMR Behavior:**
-- View changes → Re-render current view (preserve model data)
-- Controller changes → Re-run current action
-- Model changes → Full reload (instances become stale)
+### React Preset (Phase 3)
 
----
+For React components in Ruby, including RBX files.
 
-### Vue Preset
+```javascript
+// vite.config.js
+import { defineConfig } from 'vite';
+import { react } from 'vite-plugin-ruby2js';
 
-For Ruby inside Vue single-file components.
+export default defineConfig({
+  plugins: [react()]
+});
+```
 
-**Usage:**
+```typescript
+// src/presets/react.ts
+import type { Plugin } from 'vite';
+import ruby2js from '../index';
+
+export function react(options = {}): Plugin[] {
+  return [
+    // Handle .rb files with React filter
+    ruby2js({
+      filters: ['react', 'functions', 'esm', 'return'],
+      ...options
+    }),
+
+    // Handle .rbx files (Ruby + JSX)
+    {
+      name: 'ruby2js-rbx',
+      transform(code, id) {
+        if (!id.endsWith('.rbx')) return null;
+
+        return transform(code, {
+          filters: ['react', 'functions', 'esm', 'return'],
+          rbx: true, // Enable RBX mode
+          ...options
+        });
+      }
+    }
+  ];
+}
+```
+
+### Phlex Preset (Phase 5)
+
+For Phlex components as portable modules.
+
+```javascript
+// vite.config.js
+import { defineConfig } from 'vite';
+import { phlex } from 'vite-plugin-ruby2js';
+
+export default defineConfig({
+  plugins: [phlex({ target: 'react' })] // or 'vue', 'astro', 'lit', 'ssr'
+});
+```
+
+```typescript
+// src/presets/phlex.ts
+import type { Plugin } from 'vite';
+import ruby2js from '../index';
+
+type PhlexTarget = 'ssr' | 'react' | 'vue' | 'astro' | 'lit';
+
+export function phlex(options: { target?: PhlexTarget } = {}): Plugin {
+  const target = options.target ?? 'ssr';
+
+  const targetFilters: Record<PhlexTarget, string[]> = {
+    ssr: ['phlex', 'functions', 'esm', 'return'],
+    react: ['phlex', 'react', 'functions', 'esm', 'return'],
+    vue: ['phlex', 'vue', 'functions', 'esm', 'return'],
+    astro: ['phlex', 'astro', 'functions', 'esm', 'return'],
+    lit: ['phlex', 'lit', 'functions', 'esm', 'return'],
+  };
+
+  return ruby2js({
+    filters: targetFilters[target],
+    ...options
+  });
+}
+```
+
+### Vue Preset (Phase 7)
+
+For Ruby in Vue Single File Components via `<script lang="ruby">`.
+
 ```javascript
 // vite.config.js
 import { defineConfig } from 'vite';
@@ -317,15 +598,59 @@ import { vue } from 'vite-plugin-ruby2js';
 import vuePlugin from '@vitejs/plugin-vue';
 
 export default defineConfig({
-  plugins: [vue(), vuePlugin()]
+  plugins: [
+    vue(),       // Must come BEFORE vuePlugin
+    vuePlugin()
+  ]
 });
 ```
 
-**Example component:**
+```typescript
+// src/presets/vue.ts
+import type { Plugin } from 'vite';
+import { Ruby2JS } from 'ruby2js';
+
+export function vue(options = {}): Plugin {
+  return {
+    name: 'ruby2js-vue',
+    enforce: 'pre',  // Run BEFORE @vitejs/plugin-vue
+
+    transform(code: string, id: string) {
+      if (!id.endsWith('.vue')) return null;
+
+      // Match all script blocks (regular and setup)
+      const scriptRegex = /<script(\s[^>]*)?>([\\s\\S]*?)<\/script>/g;
+      let result = code;
+      let hasRuby = false;
+
+      result = result.replace(scriptRegex, (match, attrs = '', content) => {
+        // Check for lang="ruby"
+        if (!attrs.includes('lang="ruby"')) return match;
+
+        hasRuby = true;
+
+        // Transform Ruby → JS
+        const js = Ruby2JS.convert(content, {
+          filters: ['functions', 'esm'],
+          ...options
+        });
+
+        // Remove lang="ruby", keep other attrs (like "setup")
+        const newAttrs = attrs.replace(/\s*lang="ruby"/, '');
+        return `<script${newAttrs}>${js.toString()}</script>`;
+      });
+
+      return hasRuby ? result : null;
+    }
+  };
+}
+```
+
+**Example Vue component:**
+
 ```vue
-<script setup>
+<script setup lang="ruby">
 count = ref(0)
-doubled = computed { count.value * 2 }
 
 def increment
   count.value += 1
@@ -333,78 +658,30 @@ end
 </script>
 
 <template>
-  <button @click="increment">{{ count }} (doubled: {{ doubled }})</button>
+  <button @click="increment">Count: {{ count }}</button>
 </template>
 ```
 
-**Converts to:**
+**After transformation (what @vitejs/plugin-vue sees):**
+
 ```vue
 <script setup>
 const count = ref(0);
-const doubled = computed(() => count.value * 2);
 
 function increment() {
   count.value++;
 }
 </script>
+
+<template>
+  <button @click="increment">Count: {{ count }}</button>
+</template>
 ```
 
-**Implementation:**
-```typescript
-// src/presets/vue.ts
-import type { Plugin } from 'vite';
-import { Ruby2JS } from 'ruby2js-selfhost';
+### Svelte Preset (Phase 7)
 
-export function vue(options = {}): Plugin {
-  return {
-    name: 'ruby2js-vue',
-    enforce: 'pre',
+For Ruby in Svelte components via `<script lang="ruby">`.
 
-    async transform(code, id) {
-      if (!id.endsWith('.vue')) return null;
-
-      const { parse } = await import('@vue/compiler-sfc');
-      const { descriptor } = parse(code);
-
-      let result = code;
-
-      // Transform <script> block
-      if (descriptor.script?.content) {
-        const js = Ruby2JS.convert(descriptor.script.content, {
-          filters: ['functions', 'esm'],
-          plain_properties: true, // this.foo not this._foo
-          ...options
-        });
-        result = result.replace(descriptor.script.content, js.toString());
-      }
-
-      // Transform <script setup> block
-      if (descriptor.scriptSetup?.content) {
-        const js = Ruby2JS.convert(descriptor.scriptSetup.content, {
-          filters: ['functions', 'esm'],
-          ...options
-        });
-        result = result.replace(descriptor.scriptSetup.content, js.toString());
-      }
-
-      return result;
-    }
-  };
-}
-```
-
-**Notes:**
-- Composition API works cleanly (no `this.` needed)
-- Options API needs `plain_properties: true` option
-- Template expressions can optionally be converted
-
----
-
-### Svelte Preset
-
-For Ruby inside Svelte components.
-
-**Usage:**
 ```javascript
 // vite.config.js
 import { defineConfig } from 'vite';
@@ -412,92 +689,71 @@ import { svelte } from 'vite-plugin-ruby2js';
 import sveltePlugin from '@sveltejs/vite-plugin-svelte';
 
 export default defineConfig({
-  plugins: [svelte(), sveltePlugin()]
+  plugins: [
+    svelte(),       // Must come BEFORE sveltePlugin
+    sveltePlugin()
+  ]
 });
 ```
 
-**Example component:**
-```svelte
-<script>
-count = 0
-
-def increment
-  count += 1
-end
-
-# Reactive declaration
-reactive { doubled = count * 2 }
-</script>
-
-<button on:click={increment}>
-  {count} (doubled: {doubled})
-</button>
-```
-
-**Converts to:**
-```svelte
-<script>
-let count = 0;
-
-function increment() {
-  count++;
-}
-
-$: doubled = count * 2;
-</script>
-```
-
-**Implementation:**
 ```typescript
 // src/presets/svelte.ts
 import type { Plugin } from 'vite';
-import { Ruby2JS } from 'ruby2js-selfhost';
+import { Ruby2JS } from 'ruby2js';
 
 export function svelte(options = {}): Plugin {
   return {
     name: 'ruby2js-svelte',
-    enforce: 'pre',
+    enforce: 'pre',  // Run BEFORE @sveltejs/vite-plugin-svelte
 
-    async transform(code, id) {
+    transform(code: string, id: string) {
       if (!id.endsWith('.svelte')) return null;
 
-      const { parse } = await import('svelte/compiler');
-      const ast = parse(code);
+      // Match script block
+      const scriptRegex = /<script(\s[^>]*)?>([\\s\\S]*?)<\/script>/;
+      const match = code.match(scriptRegex);
 
-      if (!ast.instance) return null;
+      if (!match) return null;
 
-      const scriptStart = ast.instance.content.start;
-      const scriptEnd = ast.instance.content.end;
-      const scriptContent = code.slice(scriptStart, scriptEnd);
+      const [fullMatch, attrs = '', content] = match;
 
-      const js = Ruby2JS.convert(scriptContent, {
-        filters: ['functions', 'svelte'], // svelte filter handles reactive {}
+      // Check for lang="ruby"
+      if (!attrs.includes('lang="ruby"')) return null;
+
+      // Transform Ruby → JS
+      const js = Ruby2JS.convert(content, {
+        filters: ['functions', 'esm'],
         ...options
       });
 
-      return (
-        code.slice(0, scriptStart) +
-        js.toString() +
-        code.slice(scriptEnd)
-      );
+      // Remove lang="ruby"
+      const newAttrs = attrs.replace(/\s*lang="ruby"/, '');
+      const newScript = `<script${newAttrs}>${js.toString()}</script>`;
+
+      return code.replace(fullMatch, newScript);
     }
   };
 }
 ```
 
-**Proposed DSL for Svelte reactivity:**
-```ruby
-reactive { doubled = count * 2 }     # → $: doubled = count * 2
-reactive { console.log(count) }      # → $: console.log(count)
+**Example Svelte component:**
+
+```svelte
+<script lang="ruby">
+count = 0
+
+def increment
+  count += 1
+end
+</script>
+
+<button on:click={increment}>Count: {count}</button>
 ```
 
----
+### Astro Preset (Phase 7)
 
-### Astro Preset
+For Ruby in Astro components via `<script lang="ruby">` and `#!ruby` frontmatter.
 
-For Ruby in Astro components (frontmatter and scripts).
-
-**Usage:**
 ```javascript
 // vite.config.js
 import { defineConfig } from 'vite';
@@ -508,351 +764,278 @@ export default defineConfig({
 });
 ```
 
-**Example component:**
-```astro
----
-# Frontmatter (build-time)
-title = "My Page"
-posts = await fetch_posts()
-featured = posts.select { |p| p.featured }.first(3)
----
-
-<Layout title={title}>
-  <h1>{title}</h1>
-  {featured.map { |post|
-    <li><a href={post.url}>{post.title}</a></li>
-  }}
-</Layout>
-
-<script>
-  # Client-side
-  def handle_click(event)
-    console.log("clicked", event.target)
-  end
-
-  document.querySelector("button")&.addEventListener("click", handle_click)
-</script>
-```
-
-**Implementation:**
 ```typescript
 // src/presets/astro.ts
 import type { Plugin } from 'vite';
-import { Ruby2JS } from 'ruby2js-selfhost';
+import { Ruby2JS } from 'ruby2js';
 
 export function astro(options = {}): Plugin {
   return {
     name: 'ruby2js-astro',
-    enforce: 'pre',
+    enforce: 'pre',  // Run before Astro's Vite plugin
 
-    async transform(code, id) {
+    transform(code: string, id: string) {
       if (!id.endsWith('.astro')) return null;
 
-      const { parse } = await import('@astrojs/compiler');
-      const ast = await parse(code);
-
       let result = code;
+      let hasRuby = false;
 
-      // Transform frontmatter (between --- fences)
-      if (ast.frontmatter) {
-        const js = Ruby2JS.convert(ast.frontmatter.content, {
+      // 1. Check frontmatter for #!ruby shebang
+      const frontmatterRegex = /^---\n([\s\S]*?)\n---/;
+      const fmMatch = result.match(frontmatterRegex);
+
+      if (fmMatch) {
+        const frontmatter = fmMatch[1];
+        const firstLine = frontmatter.trim().split('\n')[0];
+
+        if (firstLine.startsWith('#!ruby') || firstLine.startsWith('# lang: ruby')) {
+          hasRuby = true;
+
+          // Remove shebang line, transform rest
+          const rubyCode = frontmatter.replace(/^#!ruby\n?|^# lang: ruby\n?/, '');
+          const js = Ruby2JS.convert(rubyCode, {
+            filters: ['functions', 'esm'],
+            ...options
+          });
+
+          result = result.replace(frontmatterRegex, `---\n${js.toString()}\n---`);
+        }
+      }
+
+      // 2. Check script tags for lang="ruby"
+      const scriptRegex = /<script(\s[^>]*)?>([\\s\\S]*?)<\/script>/g;
+
+      result = result.replace(scriptRegex, (match, attrs = '', content) => {
+        if (!attrs.includes('lang="ruby"')) return match;
+
+        hasRuby = true;
+
+        const js = Ruby2JS.convert(content, {
           filters: ['functions', 'esm'],
           ...options
         });
-        result = result.replace(ast.frontmatter.content, js.toString());
-      }
 
-      // Transform <script> tags
-      // ... similar extraction and replacement
+        const newAttrs = attrs.replace(/\s*lang="ruby"/, '');
+        return `<script${newAttrs}>${js.toString()}</script>`;
+      });
 
-      return result;
+      return hasRuby ? result : null;
     }
   };
 }
 ```
 
-**Notes:**
-- Cleanest integration (clear script boundaries)
-- Frontmatter is explicitly for build-time logic
-- Works with any UI framework for islands
+**Example Astro component with Ruby frontmatter:**
+
+```astro
+---
+#!ruby
+posts = await fetch_posts()
+featured = posts.select { |p| p.featured? }.first(3)
+---
+
+<Layout>
+  {featured.map { |post| <Card post={post} /> }}
+</Layout>
+```
+
+**Example Astro component with Ruby client script:**
+
+```astro
+---
+const title = "My Page";
+---
+
+<h1>{title}</h1>
+
+<script lang="ruby">
+def handle_click(event)
+  console.log("clicked", event.target)
+end
+
+document.querySelector("button")&.addEventListener("click", handle_click)
+</script>
+```
 
 ---
 
-### Phlex Preset
+## Summary: Plugin Simplicity
 
-For Phlex components as standalone files.
+The entire Vite integration is thin because complexity lives elsewhere:
 
-**Usage:**
-```javascript
-// vite.config.js
-import { defineConfig } from 'vite';
-import { phlex } from 'vite-plugin-ruby2js';
+| Layer | Responsibility | Complexity |
+|-------|----------------|------------|
+| `ruby2js` package | Transpile Ruby → JS | High (but already exists) |
+| Framework plugins | Compile Vue/Svelte/Astro | High (but maintained by framework teams) |
+| **vite-plugin-ruby2js** | **Wire them together** | **Low** |
 
-export default defineConfig({
-  plugins: [phlex()]
-});
-```
+**Core plugin:** ~30 lines — detect `.rb` files, call `Ruby2JS.convert()`
 
-**Example component:**
-```ruby
-# components/card.phlex.rb
-class Card < Phlex::HTML
-  def initialize(title:, items:)
-    @title = title
-    @items = items
-  end
+**Each preset:** ~40 lines — detect `lang="ruby"`, transform, pass to framework plugin
 
-  def view_template
-    div(class: "card") do
-      h1 { @title }
-      ul do
-        @items.each do |item|
-          li { item.name }
-        end
-      end
-    end
-  end
-end
-```
+---
 
-**With component composition:**
-```ruby
-# components/page.phlex.rb
-class Page < Phlex::HTML
-  def view_template
-    render Header.new(title: @title)
-    div { @content }
-    render Footer.new
-  end
-end
-```
+## HMR Runtime
 
-**Output:**
-```javascript
-import Header from './header.phlex.rb';
-import Footer from './footer.phlex.rb';
-
-export function render({ content, title }) {
-  let _phlex_out = "";
-  _phlex_out += Header.render({ title });
-  _phlex_out += `<div>${content}</div>`;
-  _phlex_out += Footer.render({});
-  return _phlex_out;
-}
-```
-
-**Implementation:**
-```typescript
-// src/presets/phlex.ts
-import type { Plugin } from 'vite';
-import { Ruby2JS } from 'ruby2js-selfhost';
-
-export function phlex(options = {}): Plugin {
-  return {
-    name: 'ruby2js-phlex',
-
-    transform(code, id) {
-      if (!id.endsWith('.phlex.rb')) return null;
-
-      const js = Ruby2JS.convert(code, {
-        filters: ['phlex', 'functions', 'esm'],
-        ...options
-      });
-
-      // Analyze for component references
-      // Add import statements
-      // Export render function
-
-      return {
-        code: js.toString(),
-        map: js.sourcemap
-      };
-    }
-  };
-}
-```
-
-**Why Phlex is strategic:**
-- Users already chose Ruby for views — natural audience
-- Pure Ruby (no template syntax to parse)
-- Works with all other presets
-- Components portable across frameworks
-
-## Shared Infrastructure
-
-### HMR Runtime
-
-Injected into the browser for all presets:
+Injected into the browser for Stimulus/Rails apps:
 
 ```typescript
-// src/hmr.ts
+// src/hmr-runtime.ts
 if (import.meta.hot) {
-  // View updates (Rails, Phlex)
-  import.meta.hot.on('ruby2js:view-update', async (data) => {
-    const newModule = await import(data.file + '?t=' + Date.now());
-    Application?.rerender?.(newModule.render);
-  });
+  import.meta.hot.on('ruby2js:stimulus-update', async (data) => {
+    // Re-register the updated controller
+    const module = await import(data.file + '?t=' + Date.now());
+    const controllerName = data.file
+      .replace(/.*\//, '')
+      .replace('_controller.rb', '')
+      .replace(/_/g, '-');
 
-  // Controller updates (Rails)
-  import.meta.hot.on('ruby2js:controller-update', async (data) => {
-    const newController = await import(data.file + '?t=' + Date.now());
-    Application?.rerunAction?.(newController);
-  });
-
-  // Component updates (Phlex)
-  import.meta.hot.on('ruby2js:component-update', async (data) => {
-    // Re-render components of this type
+    if (window.Stimulus) {
+      // Stimulus handles controller replacement
+      window.Stimulus.register(controllerName, module.default);
+    }
   });
 }
 ```
 
-### Source Maps
+---
 
-All presets generate source maps back to original Ruby:
+## Source Maps
+
+All transformations generate source maps back to original Ruby:
 
 ```typescript
 // src/sourcemap.ts
-export function generateSourceMap(result, originalSource, filePath) {
+export function generateSourceMap(
+  result: TransformResult,
+  originalSource: string,
+  filePath: string
+) {
   const map = result.sourcemap;
-  map.sources = [filePath];
-  map.sourcesContent = [originalSource];
+  if (map) {
+    map.sources = [filePath];
+    map.sourcesContent = [originalSource];
+  }
   return map;
 }
 ```
 
-For SFCs, chain maps: Ruby in `<script>` → JS → final output.
+Browser DevTools show Ruby source, breakpoints work on Ruby lines.
 
-### Instance Variable Handling
-
-Different frameworks need different `@foo` behavior:
-
-| Context | `@foo` becomes | Option |
-|---------|----------------|--------|
-| Juntos/Rails | `this._foo` | Default |
-| Vue Options API | `this.foo` | `plain_properties: true` |
-| Svelte | `foo` (module scope) | `no_this: true` |
-
-## Use Cases Unlocked
-
-### 1. Full-Stack Ruby SPA
-
-```
-app/
-├── models/          # ActiveRecord patterns
-├── controllers/     # Request handling
-├── views/           # ERB templates
-└── components/      # Interactive parts
-    ├── search.vue       # Vue + Ruby
-    ├── dashboard.svelte # Svelte + Ruby
-    └── chart.phlex.rb   # Phlex component
-```
-
-### 2. Island Architecture
-
-```astro
----
-articles = Article.published.limit(10)
 ---
 
-<!-- Static HTML (fast) -->
-{articles.map { |a| <Card article={a} /> }}
+## Why This Matters
 
-<!-- Interactive island (Svelte + Ruby) -->
-<Comments client:visible article={@article} />
-```
+### For Rails Developers
+- HMR with state preservation (no full page refresh)
+- Modern build tooling (tree shaking, code splitting)
+- Path to adding React/Vue interactivity without leaving Ruby
 
-### 3. Gradual Migration
+### For Frontend Developers
+- Ruby's expressiveness in their framework of choice
+- Gradual adoption (one component at a time)
+- Same tooling they already know (Vite)
 
-| Week | Action |
-|------|--------|
-| 1 | Add Vite to existing Rails app |
-| 2 | Convert one JS file to Ruby |
-| 3 | Add Vue component in Ruby |
-| 4 | Replace complex JS with Phlex |
+### For Everyone
+- One language across the stack
+- Portable components (Phlex works everywhere)
+- No context switching between Ruby and JavaScript
 
-### 4. Portable Component Library
+---
 
-```bash
-npm install @acme/ruby-components
-```
+## Developer Experience
 
-```ruby
-# Works in any Vite project
-import DataTable from "@acme/ruby-components/data_table.phlex.rb"
-render DataTable.new(data: @users)
-```
+| Feature | Without Vite | With Vite |
+|---------|--------------|-----------|
+| Hot reload | Full page refresh | HMR — state preserved |
+| Rebuild speed | Full project | Module-level |
+| Error display | Console only | Rich browser overlay |
+| Debugging | Generated JS | Source maps to Ruby |
+| Production | Manual optimization | Tree shaking, splitting |
 
-## Implementation Phases
-
-### Phase 1: Core Plugin
-- [ ] Package structure and build setup
-- [ ] Basic `.rb` file transformation
-- [ ] Source map generation
-- [ ] Error handling with Ruby line numbers
-
-### Phase 2: Rails Preset
-- [ ] ERB file transformation
-- [ ] Directory conventions and aliases
-- [ ] View-level HMR
-- [ ] Controller-level HMR
-- [ ] Integration with existing Juntos apps
-
-### Phase 3: Phlex Preset
-- [ ] Component file transformation (`.phlex.rb`)
-- [ ] Component composition detection
-- [ ] ES module import generation
-- [ ] HMR for component updates
-
-### Phase 4: Vue Preset
-- [ ] Script block extraction
-- [ ] `<script setup>` support
-- [ ] Composition API testing
-- [ ] Options API with `plain_properties`
-- [ ] Template expression conversion (optional)
-
-### Phase 5: Svelte Preset
-- [ ] Script block extraction
-- [ ] `reactive {}` DSL for `$:` declarations
-- [ ] Basic component testing
-- [ ] Store handling (optional)
-
-### Phase 6: Astro Preset
-- [ ] Frontmatter extraction
-- [ ] Client script extraction
-- [ ] Island component testing
-- [ ] Integration with other presets
-
-### Phase 7: Polish
-- [ ] Unified plugin with auto-detection
-- [ ] Comprehensive source maps
-- [ ] Documentation and examples
-- [ ] npm package publication
-- [ ] Demo applications
+---
 
 ## Success Criteria
 
-1. `vite dev` transforms Ruby files with HMR
-2. Editing a view preserves application state
-3. Vue/Svelte components work with Ruby scripts
-4. Phlex components compose via ES imports
-5. Source maps show original Ruby in DevTools
-6. Production builds are optimized (tree shaking, splitting)
-7. Migration from current Juntos dev server is seamless
+### Phase 1 (Ship What's Ready)
+1. `npm create vite` + plugin → Ruby files transform
+2. Rails preset works with Stimulus controllers
+3. HMR updates controllers without page refresh
+4. Source maps show Ruby in DevTools
+5. Production builds are optimized
+
+### Phase 3 (React)
+6. React components can be authored in Ruby
+7. RBX files (Ruby + JSX) work seamlessly
+
+### Phase 5 (Phlex)
+8. Phlex components work as ES modules
+9. Same Phlex source targets multiple frameworks
+
+### Phase 7 (Frameworks)
+10. Vue SFC `<script>` blocks accept Ruby
+11. Astro frontmatter accepts Ruby
+
+---
+
+## Decisions Made
+
+### Ruby Fallback (Open Question #1 — Resolved)
+
+**Decision: No Ruby fallback. Selfhost-only.**
+
+Rationale:
+- Adding Ruby dependency defeats the purpose (pure JS toolchain)
+- Forces prioritization of selfhost investment
+- Cleaner user experience (no "works in dev, breaks in CI")
+- Selfhost gaps are the critical path—address them directly
+
+If a filter isn't ready in selfhost, it's not available in the Vite plugin until it is.
+
+### Language Detection (Open Question #4 — Resolved)
+
+**Decision: Use native detection mechanisms for each context.**
+
+See [Ruby Detection Strategy](#ruby-detection-strategy) for full details.
+
+| Context | Detection | Example |
+|---------|-----------|---------|
+| Standalone | File extension | `.rb`, `.rbx`, `.phlex.rb` |
+| Vue/Svelte/Astro scripts | `lang` attribute | `<script lang="ruby">` |
+| Astro frontmatter | Shebang | `#!ruby` |
+
+This enables mixed-language projects: JavaScript, TypeScript, and Ruby components coexist in the same codebase. No new file extensions needed—`.vue` files can contain Ruby via `lang="ruby"`, following the same pattern as TypeScript.
+
+---
 
 ## Open Questions
 
-1. **Ruby fallback**: Shell out to Ruby CLI when selfhost lacks filter support?
-2. **Caching**: Disk cache for faster cold starts?
-3. **IDE support**: Syntax highlighting for Ruby in SFCs?
-4. **File extensions**: `.vue` vs `.vue.rb` for Ruby Vue components?
-5. **Monorepo**: Multiple apps with shared components?
+1. **Caching**: Disk cache for faster cold starts? Vite has built-in caching; may be sufficient.
+
+2. **IDE support**: Syntax highlighting for Ruby in Vue/Svelte SFCs? Possible via VS Code language injection.
+
+3. **Monorepo**: Multiple apps with shared Ruby components? Standard Vite monorepo patterns should work.
+
+4. **Svelte filter**: Not yet implemented. Needs `reactive {}` DSL for `$:` declarations. Lower priority than React/Phlex.
+
+---
 
 ## References
 
+### Vite
 - [Vite Plugin API](https://vitejs.dev/guide/api-plugin.html)
 - [Vite HMR API](https://vitejs.dev/guide/api-hmr.html)
-- [@vue/compiler-sfc](https://www.npmjs.com/package/@vue/compiler-sfc)
-- [svelte/compiler](https://svelte.dev/docs/svelte-compiler)
-- [@astrojs/compiler](https://www.npmjs.com/package/@astrojs/compiler)
-- [Ruby2JS Selfhost](../demo/selfhost/)
-- [Phlex Filter](../lib/ruby2js/filter/phlex.rb)
+
+### Existing Packages
+- [ruby2js package](https://www.ruby2js.com/releases/ruby2js-beta.tgz) — Selfhost transpiler + filters
+- [ruby2js-rails package](https://www.ruby2js.com/releases/ruby2js-rails-beta.tgz) — Rails runtime adapters
+- [NPM_SELFHOST_MIGRATION.md](./NPM_SELFHOST_MIGRATION.md) — Package structure documentation
+
+### Related Plans
+- [UNIFIED_VIEWS.md](./UNIFIED_VIEWS.md) — Multi-framework view targeting
+- [HOTWIRE_TURBO.md](./HOTWIRE_TURBO.md) — Stimulus/Turbo integration (Post 2)
+
+### Source
+- [Selfhost source](../demo/selfhost/) — Transpiler built from here
+- [Selfhost spec manifest](../demo/selfhost/spec_manifest.json) — Filter readiness tracking
+- [ruby2js-rails source](../packages/ruby2js-rails/) — Rails runtime package
