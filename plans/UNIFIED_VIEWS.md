@@ -921,40 +921,40 @@ views:
 - [x] Update partial render calls in helpers filter
 - [x] Update controller filter for new calling convention
 
-### Phase 2: Lit Target (Low Effort)
-- [ ] Add Lit mode to Phlex filter (html`` tagged template)
-- [ ] Add `lit` import generation
-- [ ] ~15 lines of code total
+### Phase 2: Lit Target ✓
+- [x] Add Lit mode to Phlex filter (html`` tagged template)
+- [x] Add `lit` import generation
+- [x] Handle loops (.each → .map with html`` body)
 
-### Phase 4: RBX Support
+### Phase 3: RBX Support
 - [ ] Add `.rbx` file detection to builder
 - [ ] Create RBX transpilation options (React filter)
 - [ ] Test RBX → React element output
 
-### Phase 5: JSX Passthrough
+### Phase 4: JSX Passthrough
 - [ ] Add `.jsx`/`.tsx` detection to builder
 - [ ] Integrate esbuild for JSX transpilation
 - [ ] Handle import resolution for JSX files
 
-### Phase 6: Import Resolution
+### Phase 5: Import Resolution
 - [ ] Build component map at build time
 - [ ] Rewrite bare specifiers in ESM filter
 - [ ] Support `components/Name` convention
 
-### Phase 7: Astro Target (Full Support)
+### Phase 6: Astro Target (Full Support)
 - [ ] Create Astro serializer for pnode AST
 - [ ] Phlex + Astro filter → `.astro` output (frontmatter + template)
 - [ ] Integrate with Astro build pipeline
 - [ ] Template uses JSX-style `{expr}` (same as React, simpler than Vue)
 - [ ] Support client directives as passthrough attributes
 
-### Phase 8: Vue Target (Substantial Support)
+### Phase 7: Vue Target (Substantial Support)
 - [ ] Create Vue serializer for pnode AST
 - [ ] Phlex + Vue filter → `.vue` SFC output
 - [ ] Integrate vue-compiler-sfc in builder
 - [ ] Core patterns: props, v-if, v-for, @events
 
-### Phase 9: Unified Views Module
+### Phase 8: Unified Views Module
 - [ ] Generate combined module from mixed file types
 - [ ] Handle naming conflicts
 - [ ] Source maps for all formats
@@ -963,22 +963,22 @@ views:
 
 ### Future Exploration
 
-### Phase 10: Solid.js Target
+### Phase 9: Solid.js Target
 - [ ] Add Solid.js mode (JSX output, different imports)
 - [ ] Handle Solid-specific reactivity patterns
 - [ ] Low effort if React works
 
-### Phase 11: Svelte Target
+### Phase 10: Svelte Target
 - [ ] Create Svelte serializer for pnode AST
 - [ ] Phlex + Svelte filter → `.svelte` output
 - [ ] Integrate svelte/compiler in builder
 
-### Phase 12: Advanced Framework Features
+### Phase 11: Advanced Framework Features
 - [ ] Vue: v-model, slots, scoped styles, Composition API
 - [ ] Svelte: reactive declarations, transitions, stores, runes
 - [ ] Astro: island framework integrations (React+Vue+Svelte in same app)
 
-### Phase 13: Alternative Rendering Strategies
+### Phase 12: Alternative Rendering Strategies
 MVP uses target-aware defaults (SSR for servers, CSR for browser/mobile/desktop). Future phases add flexibility to override these defaults:
 
 **Force CSR on server targets:**
