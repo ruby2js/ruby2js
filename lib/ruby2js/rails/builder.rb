@@ -685,11 +685,15 @@ class SelfhostBuilder
     )
     puts("")
 
+    # Build component map for import resolution before transpiling
+    # Maps component names to their paths (e.g., 'Button' => 'app/components/Button.js')
+    components_dir = File.join(DEMO_ROOT, 'app/components')
+    @component_map = self.build_component_map(components_dir)
+
     # Transpile components (Phlex views, RBX, and JSX React components)
     # - .rb files use 'components' section from ruby2js.yml
     # - .rbx files use 'rbx' section (React filter with rbx2_js)
     # - .jsx/.tsx files use esbuild for JSX transformation
-    components_dir = File.join(DEMO_ROOT, 'app/components')
     if File.exist?(components_dir)
       puts("Components:")
       self.copy_phlex_runtime()
@@ -1255,6 +1259,43 @@ class SelfhostBuilder
     puts("    -> #{dest_path}")
   end
 
+  # Build a map of component names to their output paths
+  # Used for import resolution: 'components/Button' → relative path
+  #
+  # Returns a hash like:
+  #   { 'Button' => 'app/components/Button.js',
+  #     'users/UserCard' => 'app/components/users/UserCard.js' }
+  def build_component_map(components_dir)
+    return {} unless File.exist?(components_dir)
+
+    component_map = {}
+
+    # Scan for all component files
+    Dir.glob(File.join(components_dir, '**/*.{rb,rbx,jsx,tsx}')).each do |src_path|
+      # Get path relative to components_dir
+      relative = src_path.sub(components_dir + '/', '')
+
+      # Get the component name (without extension)
+      # e.g., 'Button.rb' → 'Button', 'users/UserCard.jsx' → 'users/UserCard'
+      component_name = relative.sub(/\.(rb|rbx|jsx|tsx)$/, '')
+
+      # Output path (relative to dist root)
+      output_path = "app/components/#{component_name}.js"
+
+      # Map both the full path and just the basename for convenience
+      # 'components/Button' and 'components/users/UserCard'
+      component_map["components/#{component_name}"] = output_path
+
+      # Also map just the basename if unique (for simpler imports)
+      basename = File.basename(component_name)
+      unless component_map.key?("components/#{basename}") && basename != component_name
+        component_map["components/#{basename}"] = output_path
+      end
+    end
+
+    component_map
+  end
+
   def transpile_file(src_path, dest_path, section = nil)
     puts("Transpiling: #{File.basename(src_path)}")
     source = File.read(src_path)
@@ -1262,6 +1303,12 @@ class SelfhostBuilder
     # Use relative path for cleaner display in browser debugger
     relative_src = src_path.sub(DEMO_ROOT + '/', '')
     options = self.build_options(section).merge(file: relative_src)
+
+    # Add component map for import resolution if available
+    if @component_map && @component_map.any?
+      options[:component_map] = @component_map
+      options[:file_path] = relative_src  # Needed to compute relative imports
+    end
     result = Ruby2JS.convert(source, options)
     js = result.to_s
 

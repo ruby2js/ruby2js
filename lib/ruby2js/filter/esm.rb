@@ -23,6 +23,10 @@ module Ruby2JS
         @esm_top = nil
         @esm_require_recursive = options[:require_recursive]
 
+        # Component map for import resolution (from builder)
+        @esm_component_map = options[:component_map] || {}
+        @esm_file_path = options[:file_path]
+
         # don't convert requires if Require filter is included (it will inline them)
         filters = options[:filters] || Filter::DEFAULTS
         if \
@@ -30,6 +34,30 @@ module Ruby2JS
           filters.include? Ruby2JS::Filter::Require
         then
           @esm_skip_require = true
+        end
+      end
+
+      # Resolve a bare specifier to a relative path using the component map
+      # e.g., 'components/Button' → './Button.js' or '../components/Button.js'
+      def resolve_component_import(specifier)
+        return specifier if @esm_component_map.empty?
+        return specifier unless specifier.is_a?(String)
+        return specifier if specifier.start_with?('.') || specifier.start_with?('/')
+
+        # Check if this is a component import
+        target_path = @esm_component_map[specifier]
+        return specifier unless target_path
+
+        # Compute relative path from current file to the component
+        if @esm_file_path
+          current_dir = File.dirname(@esm_file_path)
+          relative = Pathname.new(target_path).relative_path_from(Pathname.new(current_dir)).to_s
+          # Ensure it starts with ./ for ESM compatibility
+          relative = "./#{relative}" unless relative.start_with?('.')
+          relative
+        else
+          # Fallback: just prepend ./ and use the target path
+          "./#{target_path}"
         end
       end
 
@@ -193,7 +221,8 @@ module Ruby2JS
           if args[0].type == :str and args.length == 1
             # import "file.css"
             #   => import "file.css"
-            s(:import, args[0].children[0])
+            path = resolve_component_import(args[0].children[0])
+            s(:import, path)
           elsif args.length == 1 and \
             args[0].type == :send and \
             args[0].children[0].nil? and \
@@ -205,8 +234,9 @@ module Ruby2JS
             #  => import name from "file.js"
                         @esm_explicit_tokens << args[0].children[1]
 
+            path = resolve_component_import(args[0].children[2].children[2].children[0])
             s(:import,
-              [args[0].children[2].children[2].children[0]],
+              [path],
               process(s(:attr, nil, args[0].children[1])))
 
           else
@@ -231,7 +261,23 @@ module Ruby2JS
               imports << process_all(args.shift.children)
             end
 
-            s(:import, args[0].children, *imports) unless args[0].nil?
+            # Resolve component imports for string paths
+            if args[0] && args[0].type == :str
+              path = resolve_component_import(args[0].children[0])
+              s(:import, path, *imports)
+            elsif args[0]
+              # Hash-based syntax (from:, as:) - resolve paths within the hash
+              resolved_children = args[0].children.map do |child|
+                if child.type == :pair && child.children[0].children[0] == :from && child.children[1].type == :str
+                  # from: "path" - resolve the path
+                  resolved_path = resolve_component_import(child.children[1].children[0])
+                  s(:pair, child.children[0], s(:str, resolved_path))
+                else
+                  child
+                end
+              end
+              s(:import, resolved_children, *imports)
+            end
           end
         elsif method == :export
           # Collect comments from child nodes BEFORE processing

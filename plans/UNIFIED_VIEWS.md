@@ -938,10 +938,10 @@ views:
 - [x] Integrate esbuild for JSX transpilation (with fallback warning)
 - [x] Support both `.jsx` and `.tsx` extensions
 
-### Phase 5: Import Resolution
-- [ ] Build component map at build time
-- [ ] Rewrite bare specifiers in ESM filter
-- [ ] Support `components/Name` convention
+### Phase 5: Import Resolution ✓
+- [x] Build component map at build time (scans app/components/)
+- [x] Rewrite bare specifiers in ESM filter (resolve_component_import)
+- [x] Support `components/Name` convention (maps to relative paths)
 
 ### Phase 6: Astro Target (Full Support)
 - [ ] Create Astro serializer for pnode AST

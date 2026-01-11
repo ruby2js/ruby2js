@@ -295,6 +295,102 @@ describe Ruby2JS::Filter::ESM do
     end
   end
 
+  describe "component import resolution" do
+    def to_js_with_components(string, file_path, component_map = {})
+      _(Ruby2JS.convert(string,
+        eslevel: 2017,
+        filters: [Ruby2JS::Filter::ESM],
+        component_map: component_map,
+        file_path: file_path
+      ).to_s)
+    end
+
+    it "should resolve component imports to relative paths" do
+      component_map = {
+        "components/Button" => "app/components/Button.js"
+      }
+      to_js_with_components(
+        'import Button from "components/Button"',
+        "app/views/articles/Index.rb",
+        component_map
+      ).must_include 'import Button from "../../components/Button.js"'
+    end
+
+    it "should resolve imports from within components directory" do
+      component_map = {
+        "components/Button" => "app/components/Button.js"
+      }
+      to_js_with_components(
+        'import Button from "components/Button"',
+        "app/components/Card.rb",
+        component_map
+      ).must_include 'import Button from "./Button.js"'
+    end
+
+    it "should not resolve non-component imports" do
+      component_map = {
+        "components/Button" => "app/components/Button.js"
+      }
+      to_js_with_components(
+        'import React from "react"',
+        "app/views/articles/Index.rb",
+        component_map
+      ).must_include 'import React from "react"'
+    end
+
+    it "should not resolve relative imports" do
+      component_map = {
+        "components/Button" => "app/components/Button.js"
+      }
+      to_js_with_components(
+        'import Utils from "./utils"',
+        "app/views/articles/Index.rb",
+        component_map
+      ).must_include 'import Utils from "./utils"'
+    end
+
+    it "should handle import with from: syntax" do
+      component_map = {
+        "components/Card" => "app/components/Card.js"
+      }
+      to_js_with_components(
+        'import Card, from: "components/Card"',
+        "app/views/articles/Index.rb",
+        component_map
+      ).must_include 'import Card from "../../components/Card.js"'
+    end
+
+    it "should handle bare import (no default)" do
+      component_map = {
+        "components/styles" => "app/components/styles.js"
+      }
+      to_js_with_components(
+        'import "components/styles"',
+        "app/components/Card.rb",
+        component_map
+      ).must_include 'import "./styles.js"'
+    end
+
+    it "should work without component_map option" do
+      to_js_with_components(
+        'import Button from "components/Button"',
+        "app/views/Index.rb",
+        {}
+      ).must_include 'import Button from "components/Button"'
+    end
+
+    it "should resolve nested component paths" do
+      component_map = {
+        "components/users/Avatar" => "app/components/users/Avatar.js"
+      }
+      to_js_with_components(
+        'import Avatar from "components/users/Avatar"',
+        "app/views/articles/Index.rb",
+        component_map
+      ).must_include 'import Avatar from "../../components/users/Avatar.js"'
+    end
+  end
+
   describe Ruby2JS::Filter::DEFAULTS do
     it "should include ESM" do
       _(Ruby2JS::Filter::DEFAULTS).must_include Ruby2JS::Filter::ESM
