@@ -1,0 +1,37 @@
+{
+  "name": "vite-plugin-ruby2js",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Vite plugin for Ruby2JS - transform Ruby to JavaScript",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./presets/rails": "./src/presets/rails.js"
+  },
+  "files": [
+    "src/"
+  ],
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "keywords": [
+    "vite",
+    "vite-plugin",
+    "ruby2js",
+    "ruby",
+    "javascript",
+    "transpiler"
+  ],
+  "author": "Sam Ruby",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ruby2js/ruby2js"
+  },
+  "peerDependencies": {
+    "vite": "^5.0.0 || ^6.0.0"
+  },
+  "dependencies": {
+    "ruby2js": "https://www.ruby2js.com/releases/ruby2js-beta.tgz"
+  }
+}
