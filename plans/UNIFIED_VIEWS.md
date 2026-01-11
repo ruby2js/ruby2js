@@ -926,15 +926,17 @@ views:
 - [x] Add `lit` import generation
 - [x] Handle loops (.each → .map with html`` body)
 
-### Phase 3: RBX Support
-- [ ] Add `.rbx` file detection to builder
-- [ ] Create RBX transpilation options (React filter)
-- [ ] Test RBX → React element output
+### Phase 3: RBX Support ✓
+- [x] Add `.rbx` file detection to builder
+- [x] Create RBX transpilation options (React filter)
+- [x] Create rbx2_js converter (direct JSX → React.createElement)
+- [x] Add :jsraw node type for verbatim JS output
+- [x] Test RBX → React element output
 
-### Phase 4: JSX Passthrough
-- [ ] Add `.jsx`/`.tsx` detection to builder
-- [ ] Integrate esbuild for JSX transpilation
-- [ ] Handle import resolution for JSX files
+### Phase 4: JSX Passthrough ✓
+- [x] Add `.jsx`/`.tsx` detection to builder
+- [x] Integrate esbuild for JSX transpilation (with fallback warning)
+- [x] Support both `.jsx` and `.tsx` extensions
 
 ### Phase 5: Import Resolution
 - [ ] Build component map at build time

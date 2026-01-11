@@ -685,9 +685,10 @@ class SelfhostBuilder
     )
     puts("")
 
-    # Transpile components (Phlex views and RBX React components)
+    # Transpile components (Phlex views, RBX, and JSX React components)
     # - .rb files use 'components' section from ruby2js.yml
-    # - .rbx files use 'rbx' section (React filter)
+    # - .rbx files use 'rbx' section (React filter with rbx2_js)
+    # - .jsx/.tsx files use esbuild for JSX transformation
     components_dir = File.join(DEMO_ROOT, 'app/components')
     if File.exist?(components_dir)
       puts("Components:")
@@ -695,7 +696,7 @@ class SelfhostBuilder
       self.transpile_directory(
         components_dir,
         File.join(@dist_dir, 'app/components'),
-        '**/*.{rb,rbx}',
+        '**/*.{rb,rbx,jsx,tsx}',
         section: 'components'
       )
       puts("")
@@ -1285,6 +1286,55 @@ class SelfhostBuilder
     puts("  -> #{dest_path}")
   end
 
+  # Transform JSX/TSX files using esbuild
+  # Converts JSX syntax to plain JavaScript while preserving ES modules
+  def transform_jsx_file(src_path, dest_path)
+    puts("Transforming JSX: #{File.basename(src_path)}")
+
+    FileUtils.mkdir_p(File.dirname(dest_path))
+
+    # Copy source file alongside output for debugging
+    src_basename = File.basename(src_path)
+    copied_src_path = File.join(File.dirname(dest_path), src_basename)
+    FileUtils.cp(src_path, copied_src_path)
+
+    # Determine loader based on extension
+    loader = src_path.end_with?('.tsx') ? 'tsx' : 'jsx'
+
+    # Use esbuild to transform JSX (not bundle, just transform)
+    # --loader: jsx or tsx
+    # --jsx: transform (converts JSX to React.createElement)
+    # --format: esm (keep ES modules)
+    # --sourcemap: generate source map
+    esbuild_cmd = [
+      'npx', 'esbuild',
+      src_path,
+      "--loader=#{loader}",
+      '--jsx=transform',
+      '--format=esm',
+      "--outfile=#{dest_path}",
+      '--sourcemap'
+    ]
+
+    Dir.chdir(@dist_dir) do
+      success = system(*esbuild_cmd, [:out, :err] => File::NULL)
+      unless success
+        # If esbuild fails, try without npx (maybe esbuild is in PATH)
+        esbuild_cmd[0] = 'esbuild'
+        esbuild_cmd.delete_at(0) # remove 'npx'
+        success = system('esbuild', *esbuild_cmd[1..], [:out, :err] => File::NULL)
+
+        unless success
+          puts("  WARNING: esbuild not available, copying file as-is")
+          puts("  Install esbuild: npm install esbuild")
+          FileUtils.cp(src_path, dest_path)
+        end
+      end
+    end
+
+    puts("  -> #{dest_path}")
+  end
+
   def transpile_erb_file(src_path, dest_path)
     puts("Transpiling ERB: #{File.basename(src_path)}")
     template = File.read(src_path)
@@ -1539,16 +1589,20 @@ class SelfhostBuilder
 
       relative = src_path.sub(src_dir + '/', '')
 
-      # Determine section based on file extension
+      # Determine section and output path based on file extension
       file_section = section
-      if src_path.end_with?('.rbx')
+      if src_path.end_with?('.jsx') || src_path.end_with?('.tsx')
+        # JSX/TSX files: transform with esbuild
+        dest_path = File.join(dest_dir, relative.sub(/\.[jt]sx$/, '.js'))
+        self.transform_jsx_file(src_path, dest_path)
+      elsif src_path.end_with?('.rbx')
         file_section = 'rbx'
         dest_path = File.join(dest_dir, relative.sub(/\.rbx$/, '.js'))
+        self.transpile_file(src_path, dest_path, file_section)
       else
         dest_path = File.join(dest_dir, relative.sub(/\.rb$/, '.js'))
+        self.transpile_file(src_path, dest_path, file_section)
       end
-
-      self.transpile_file(src_path, dest_path, file_section)
     end
   end
 
