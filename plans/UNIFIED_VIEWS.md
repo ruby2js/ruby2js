@@ -950,11 +950,14 @@ views:
 - [x] Template uses JSX-style `{expr}` (same as React, simpler than Vue)
 - [x] Props extracted from render method args → `const { } = Astro.props;`
 
-### Phase 7: Vue Target (Substantial Support)
-- [ ] Create Vue serializer for pnode AST
-- [ ] Phlex + Vue filter → `.vue` SFC output
-- [ ] Integrate vue-compiler-sfc in builder
-- [ ] Core patterns: props, v-if, v-for, @events
+### Phase 7: Vue Target (Substantial Support) ✓
+- [x] Create Vue filter for pnode AST
+- [x] Phlex + Vue filter → `.vue` SFC output (<template> + <script setup>)
+- [x] Add Vue section to builder (transpile_vue_file)
+- [x] Template uses {{ expr }} interpolation
+- [x] Props via defineProps(['prop1', 'prop2'])
+- [x] Dynamic attrs via :attr="value" (v-bind shorthand)
+- [x] v-for for loops, v-if for conditionals
 
 ### Phase 8: Unified Views Module
 - [ ] Generate combined module from mixed file types

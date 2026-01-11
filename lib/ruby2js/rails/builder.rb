@@ -39,6 +39,7 @@ require 'ruby2js/filter/nokogiri'
 require 'ruby2js/filter/haml'
 require 'ruby2js/filter/react'
 require 'ruby2js/filter/astro'
+require 'ruby2js/filter/vue'
 require_relative 'erb_compiler'
 require_relative 'migration_sql'
 require_relative 'seed_sql'
@@ -239,6 +240,18 @@ class SelfhostBuilder
     filters: [
       Ruby2JS::Filter::Phlex,
       Ruby2JS::Filter::Astro,
+      Ruby2JS::Filter::Functions
+    ]
+  }.freeze
+
+  # Vue files compile Phlex components to .vue SFC format
+  # Produces <template> + <script setup> sections
+  VUE_OPTIONS = {
+    eslevel: 2022,
+    include: [:class, :call],
+    filters: [
+      Ruby2JS::Filter::Phlex,
+      Ruby2JS::Filter::Vue,
       Ruby2JS::Filter::Functions
     ]
   }.freeze
@@ -902,6 +915,8 @@ class SelfhostBuilder
         RBX_OPTIONS
       when 'astro'
         ASTRO_OPTIONS
+      when 'vue'
+        VUE_OPTIONS
       else
         OPTIONS
       end
@@ -967,6 +982,7 @@ class SelfhostBuilder
     'stimulus' => Ruby2JS::Filter::Stimulus,
     'react' => Ruby2JS::Filter::React,
     'astro' => Ruby2JS::Filter::Astro,
+    'vue' => Ruby2JS::Filter::Vue,
 
     # Ruby stdlib filters (selfhost-ready)
     'active_support' => Ruby2JS::Filter::ActiveSupport,
@@ -1666,6 +1682,10 @@ class SelfhostBuilder
         # Astro mode: output .astro files for Phlex components
         dest_path = File.join(dest_dir, relative.sub(/\.rb$/, '.astro'))
         self.transpile_astro_file(src_path, dest_path)
+      elsif section == 'vue'
+        # Vue mode: output .vue SFC files for Phlex components
+        dest_path = File.join(dest_dir, relative.sub(/\.rb$/, '.vue'))
+        self.transpile_vue_file(src_path, dest_path)
       else
         dest_path = File.join(dest_dir, relative.sub(/\.rb$/, '.js'))
         self.transpile_file(src_path, dest_path, file_section)
@@ -1687,6 +1707,24 @@ class SelfhostBuilder
 
     FileUtils.mkdir_p(File.dirname(dest_path))
     File.write(dest_path, astro_content)
+
+    puts("  -> #{dest_path}")
+  end
+
+  # Transpile a Phlex component to Vue SFC format
+  def transpile_vue_file(src_path, dest_path)
+    puts("Transpiling to Vue: #{File.basename(src_path)}")
+    source = File.read(src_path)
+
+    # Use relative path for cleaner display
+    relative_src = src_path.sub(DEMO_ROOT + '/', '')
+    options = self.build_options('vue').merge(file: relative_src)
+
+    result = Ruby2JS.convert(source, options)
+    vue_content = result.to_s
+
+    FileUtils.mkdir_p(File.dirname(dest_path))
+    File.write(dest_path, vue_content)
 
     puts("  -> #{dest_path}")
   end
