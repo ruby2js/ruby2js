@@ -1662,7 +1662,8 @@ class SelfhostBuilder
     views_class = "#{class_name}Views"
 
     # Determine what file types are present
-    file_types = views_by_name.values.map { |v| v[:ext] }.uniq.sort
+    # Use .values() with parens to trigger Object.values() conversion for JS
+    file_types = views_by_name.values().map { |v| v[:ext] }.uniq.sort
 
     unified_js = <<~JS
       // #{class_name} views - auto-generated from mixed source files
