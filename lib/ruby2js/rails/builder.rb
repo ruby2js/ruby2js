@@ -1516,7 +1516,9 @@ class SelfhostBuilder
     source_formats = []
 
     # Transpile each view file
-    views_by_name.each do |view_name, file_info|
+    # Use .keys.each for JS compatibility (can't iterate hash directly in JS)
+    views_by_name.keys.each do |view_name|
+      file_info = views_by_name[view_name]
       src_path = file_info[:path]
       ext = file_info[:ext]
       dest_path = File.join(resource_dist_dir, "#{view_name}.js")
