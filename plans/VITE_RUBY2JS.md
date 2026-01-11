@@ -288,8 +288,43 @@ Make the Juntos CLI a thin wrapper around Vite. This is a convenience layer—us
 | Update `juntos dev` | Run `npx vite` instead of custom dev server |
 | Update `juntos build` | Run `npx vite build` instead of direct SelfhostBuilder |
 | Generate vite.config.js | Create config during `juntos install` if not present |
+| Vite middleware mode | For Node server targets, use `ssrLoadModule` for instant updates |
 
 **Note:** Database commands (`juntos db:migrate`, `juntos db:seed`) remain unchanged.
+
+**Vite Middleware Mode (Node Server Targets):**
+
+For `--target node` (and similar server targets), use Vite's middleware mode instead of standalone dev server. This enables instant server-side updates without rebuilding:
+
+```javascript
+// juntos dev --target node
+import express from 'express';
+import { createServer as createViteServer } from 'vite';
+
+const app = express();
+
+const vite = await createViteServer({
+  server: { middlewareMode: true },
+  appType: 'custom'
+});
+
+app.use(vite.middlewares);  // HMR client, asset transforms
+
+app.get('*', async (req, res) => {
+  // ssrLoadModule: transforms Ruby → JS on-demand, caches until file changes
+  const { Application } = await vite.ssrLoadModule('/dist/application.js');
+  const html = await Application.render(req);
+  res.send(html);
+});
+```
+
+| Component | Purpose |
+|-----------|---------|
+| `middlewareMode` | Vite runs inside the app server |
+| `ssrLoadModule` | Loads server modules on-demand, invalidates on file change |
+| `transformIndexHtml` | Injects HMR client into HTML responses |
+
+This follows the same pattern used by Remix, SvelteKit, and other SSR frameworks.
 
 ### Phase 2c: Full HMR for Structural Changes
 
