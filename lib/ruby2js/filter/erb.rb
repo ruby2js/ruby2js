@@ -79,27 +79,29 @@ module Ruby2JS
           all_params << local
         end
 
-        # Allow subclasses to prepend extra args (e.g., $context)
-        extra = erb_render_extra_args
+        # Allow subclasses to prepend extra kwargs (e.g., $context)
+        # All args are now kwargs in a single destructured object
+        extra_kwargs = erb_render_extra_args
 
-        # Filter out params that are already provided as extra args
-        # (e.g., $context references added by helpers should not appear in kwargs)
-        extra_arg_names = extra.map { |arg| arg.children.first }
-        all_params = all_params.reject { |name| extra_arg_names.include?(name) }
+        # Build unified kwargs list - extra first, then params
+        all_kwargs = []
 
-        if all_params.empty?
-          kwargs = []
-        else
-          kwargs = all_params.map { |name| s(:kwarg, name) }
+        # Add extra kwargs (e.g., $context)
+        extra_kwargs.each do |kwarg|
+          all_kwargs << kwarg
         end
-        if extra.empty? && kwargs.empty?
+
+        # Add params as kwargs (excluding any that are in extra)
+        extra_kwarg_names = extra_kwargs.map { |kwarg| kwarg.children.first }
+        all_params.each do |name|
+          next if extra_kwarg_names.include?(name)
+          all_kwargs << s(:kwarg, name)
+        end
+
+        if all_kwargs.empty?
           args = s(:args)
-        elsif extra.empty?
-          args = s(:args, *kwargs)
-        elsif kwargs.empty?
-          args = s(:args, *extra)
         else
-          args = s(:args, *extra, *kwargs)
+          args = s(:args, *all_kwargs)
         end
 
         # Wrap in arrow function or regular function

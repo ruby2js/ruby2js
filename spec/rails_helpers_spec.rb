@@ -22,7 +22,7 @@ describe Ruby2JS::Filter::Rails::Helpers do
     it "should compile simple ERB templates" do
       return skip() unless defined?(Ruby2JS::Erubi)
       result = erb_to_js('<h1><%= @title %></h1>')
-      result.must_include 'function render($context, { title })'
+      result.must_include 'function render({ $context, title })'
       result.must_include '_buf += "<h1>"'
       result.must_include 'String(title)'
     end
@@ -30,7 +30,7 @@ describe Ruby2JS::Filter::Rails::Helpers do
     it "should handle block expressions like form_for" do
       return skip() unless defined?(Ruby2JS::Erubi)
       result = erb_to_js('<%= form_for @user do |f| %><%= f.text_field :name %><% end %>')
-      result.must_include 'function render($context, { user })'
+      result.must_include 'function render({ $context, user })'
       # The form_for block should generate HTML form tags (escaped in JS string)
       result.must_include 'data-model'
       result.must_include '</form>'
@@ -442,7 +442,7 @@ describe Ruby2JS::Filter::Rails::Helpers do
         # Path helpers should be imported, not function parameters
         result.must_include 'import { article_path, articles_path } from'
         # The render function should only have article as parameter
-        result.must_include 'function render($context, { article })'
+        result.must_include 'function render({ $context, article })'
         # Should NOT have path helpers as function parameters
         result.wont_include '{ article, article_path'
         result.wont_include '{ article, articles_path'

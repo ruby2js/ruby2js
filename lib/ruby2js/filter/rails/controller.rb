@@ -661,7 +661,7 @@ module Ruby2JS
         end
 
         # Generate turbo_stream template render call
-        # Returns: { turbo_stream: MessageTurboStreams.create(context, {message}) }
+        # Returns: { turbo_stream: MessageTurboStreams.create({$context: context, message}) }
         def generate_turbo_stream_template_render
           @rails_needs_turbo_stream_views = true
 
@@ -669,14 +669,15 @@ module Ruby2JS
           view_module = "#{@rails_controller_name}TurboStreams"
           action = @rails_current_action
 
-          # Build view call: MessageTurboStreams.create(context, {message: message})
+          # Build view call: MessageTurboStreams.create({$context: context, message})
           s(:hash,
             s(:pair, s(:sym, :turbo_stream),
               s(:send,
                 s(:const, nil, view_module.to_sym),
                 action,
-                s(:lvar, :context),
-                s(:hash, s(:pair, s(:sym, model_name), s(:lvar, model_name))))))
+                s(:hash,
+                  s(:pair, s(:sym, :"$context"), s(:lvar, :context)),
+                  s(:pair, s(:sym, model_name), s(:lvar, model_name))))))
         end
 
         # Wrap ActiveRecord operations with await for async database support
@@ -792,7 +793,7 @@ module Ruby2JS
           target = args.first
 
           if target.type == :sym
-            # render :new -> ArticleViews.$new(context, {article})
+            # render :new -> ArticleViews.$new({$context: context, article})
             # Call the view directly with the model (including validation errors)
             action = target.children[0]
             model_name = @rails_controller_name.downcase.to_sym
@@ -801,14 +802,15 @@ module Ruby2JS
             # Use $new for reserved word (matches view module export)
             view_action = action == :new ? :$new : action
 
-            # Build view call with context and model: ArticleViews.$new(context, {article: article})
+            # Build view call with unified props: ArticleViews.$new({$context: context, article})
             s(:hash,
               s(:pair, s(:sym, :render),
                 s(:send,
                   s(:const, nil, view_module.to_sym),
                   view_action,
-                  s(:lvar, :context),
-                  s(:hash, s(:pair, s(:sym, model_name), s(:lvar, model_name))))))
+                  s(:hash,
+                    s(:pair, s(:sym, :"$context"), s(:lvar, :context)),
+                    s(:pair, s(:sym, model_name), s(:lvar, model_name))))))
           else
             # More complex render - pass through for now
             nil
@@ -917,16 +919,16 @@ module Ruby2JS
                         else action_name
                         end
 
-          # Build hash of ivars: { articles: articles }
-          pairs = ivars.map do |ivar|
-            s(:pair, s(:sym, ivar), s(:lvar, ivar))
+          # Build unified props hash: { $context: context, articles }
+          pairs = [s(:pair, s(:sym, :"$context"), s(:lvar, :context))]
+          ivars.each do |ivar|
+            pairs << s(:pair, s(:sym, ivar), s(:lvar, ivar))
           end
 
-          # Pass context as first argument, then locals hash
+          # Pass single props object with $context and locals
           s(:send,
             s(:const, nil, view_module.to_sym),
             view_action,
-            s(:lvar, :context),
             s(:hash, *pairs))
         end
 

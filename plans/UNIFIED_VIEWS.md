@@ -919,11 +919,11 @@ views:
 
 ---
 
-### Phase 1: Unified Signature
-- [ ] Change ERB filter to use single destructured object
-- [ ] Update `erb_render_extra_args` to return kwarg instead of positional arg
-- [ ] Update partial render calls in helpers filter
-- [ ] Update controller filter for new calling convention
+### Phase 1: Unified Signature ✓
+- [x] Change ERB filter to use single destructured object
+- [x] Update `erb_render_extra_args` to return kwarg instead of positional arg
+- [x] Update partial render calls in helpers filter
+- [x] Update controller filter for new calling convention
 
 ### Phase 2: ERB Multi-Target Foundation
 - [ ] Add framework mode detection to ERB filter (like Phlex)

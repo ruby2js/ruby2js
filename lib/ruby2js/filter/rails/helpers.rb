@@ -67,11 +67,12 @@ module Ruby2JS
           end
         end
 
-        # Override Erb filter's hook to add $context as first parameter
+        # Override Erb filter's hook to add $context as keyword arg
         # Views need $context for flash, contentFor, params, etc.
         # Using $ prefix to avoid conflicts with @context instance variables
+        # Now returns kwarg for unified signature: render({ $context, articles })
         def erb_render_extra_args
-          [s(:arg, :"$context")]
+          [s(:kwarg, :"$context")]
         end
 
         def on_send(node)
@@ -876,13 +877,14 @@ module Ruby2JS
               view_info = { module: view_module, resource: plural_name }
               @erb_view_modules << view_info unless @erb_view_modules.any? { |v| v[:module] == view_module }
 
-              # Generate: _buf += PhotoViews._photo($context, {photo})
+              # Generate: _buf += PhotoViews._photo({$context, photo})
               statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
                 s(:send,
                   s(:const, nil, view_module.to_sym),
                   partial_method.to_sym,
-                  s(:gvar, :$context),
-                  s(:hash, s(:pair, s(:sym, local_var.to_sym), s(:lvar, local_var.to_sym)))))
+                  s(:hash,
+                    s(:pair, s(:sym, :"$context"), s(:gvar, :$context)),
+                    s(:pair, s(:sym, local_var.to_sym), s(:lvar, local_var.to_sym)))))
             else
               # For other expressions, just process and add to buffer
               statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
@@ -1086,21 +1088,20 @@ module Ruby2JS
           # Track this partial for import generation
           @erb_partials << partial_name unless @erb_partials.include?(partial_name)
 
-          # Build the partial function call: _form_module.render(context, {article})
+          # Build the partial function call: _form_module.render({$context, article})
           module_name = "_#{partial_name}_module".to_sym
 
-          # Build locals hash for the call
-          pairs = []
+          # Build unified props hash with $context and locals
+          pairs = [s(:pair, s(:sym, :"$context"), s(:lvar, :"$context"))]
           locals.keys.each do |key|
             pairs << s(:pair, s(:sym, key), process(locals[key]))
           end
 
           render_call = s(:send, s(:lvar, module_name), :render,
-            s(:lvar, :"$context"),
-            pairs.empty? ? s(:hash) : s(:hash, *pairs))
+            s(:hash, *pairs))
 
           # For collections, wrap in map().join('')
-          # messages.map(message => _message_module.render($context, {message})).join('')
+          # messages.map(message => _message_module.render({$context, message})).join('')
           if is_collection
             s(:send,
               s(:send,
