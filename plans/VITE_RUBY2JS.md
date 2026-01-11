@@ -291,6 +291,46 @@ Make the Juntos CLI a thin wrapper around Vite. This is a convenience layer—us
 
 **Note:** Database commands (`juntos db:migrate`, `juntos db:seed`) remain unchanged.
 
+### Phase 2c: Full HMR for Structural Changes
+
+Extend HMR beyond Stimulus controllers to cover all structural changes. When a model, controller, or view file changes, re-transpile incrementally and push updates to the browser without a full page reload.
+
+| File Type | HMR Behavior |
+|-----------|--------------|
+| Model (`.rb`) | Re-transpile model, update associations, notify dependents |
+| Controller (`.rb`) | Re-transpile controller, update route handlers |
+| View (`.html.erb`) | Re-compile ERB template, update view module |
+| View (`.rbx`) | Re-transpile with React filter, trigger React HMR |
+| Routes (`routes.rb`) | Re-generate `routes.js` and `paths.js` |
+
+**Implementation approach:**
+
+```javascript
+{
+  name: 'juntos-structure',
+
+  buildStart() {
+    // Full build on startup (existing)
+    builder.build();
+  },
+
+  handleHotUpdate({ file, server }) {
+    // Incremental rebuild on file change
+    if (file.includes('app/models/')) {
+      builder.transpile_file(file, destPath, 'models');
+      return affectedModules;
+    }
+    if (file.includes('app/controllers/')) {
+      builder.transpile_file(file, destPath, 'controllers');
+      return affectedModules;
+    }
+    // ... views, routes
+  }
+}
+```
+
+**Dependencies:** Requires `SelfhostBuilder` methods to support single-file transpilation (already exists: `transpile_file()`).
+
 ### Phase 3: Publish Tarballs
 
 | Tarball | Contents |
@@ -384,13 +424,20 @@ See [Ruby Detection Strategy](#appendix-ruby-detection-examples) appendix for ex
 10. `juntos build --target capacitor` produces assets for `cap sync`
 11. `juntos test` runs Vitest with Ruby specs
 
+### Phase 2c (Full HMR)
+12. Model changes trigger HMR without page reload
+13. Controller changes update route handlers via HMR
+14. ERB view changes trigger HMR
+15. RBX component changes trigger React HMR
+16. Route file changes regenerate routes.js via HMR
+
 ### Phase 4 (Framework SFC Presets)
-12. Vue SFCs accept `<script lang="ruby">`
-13. Astro frontmatter accepts `#!ruby`
+17. Vue SFCs accept `<script lang="ruby">`
+18. Astro frontmatter accepts `#!ruby`
 
 ### Phase 6 (Extensibility)
-14. Hanami app works with extracted shared infrastructure
-15. Framework-specific code is <1000 lines
+19. Hanami app works with extracted shared infrastructure
+20. Framework-specific code is <1000 lines
 
 ---
 
