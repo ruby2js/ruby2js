@@ -261,6 +261,14 @@ export default defineConfig({
 | Wire structural transforms | Call `build.mjs` functions from Vite hooks |
 | Generate platform config | Output correct entry points for target |
 | Update CLI | Make `juntos dev` → `vite`, `juntos build` → `vite build` |
+| Add .rbx support | Recognize `.rbx` extension, apply React filter |
+
+**Proving ground:** The workflow demo (`demo/workflow-builder/`) exercises:
+- Models, controllers, views, routes
+- RBX files (Ruby + JSX) with React/ReactFlow
+- Database integration
+
+This provides a real React app to validate against.
 
 **The preset does what `juntos build` does today, but as Vite plugins:**
 
@@ -306,18 +314,19 @@ export function juntos(options = {}) {
 
 Update documentation to show Vite-first approach.
 
-### Phase 4: Framework Presets
+### Phase 4: Framework SFC Presets
 
-Once the Rails/Juntos pattern is solid, add presets for other frameworks:
+Once the Rails/Juntos pattern is solid, add presets for Single File Components:
 
 | Preset | Description | Priority |
 |--------|-------------|----------|
-| React | `.rb`/`.rbx` → React components | High |
-| Vue | `<script lang="ruby">` in SFCs | Medium |
-| Svelte | `<script lang="ruby">` in components | Medium |
-| Astro | Ruby frontmatter (`#!ruby`) | Medium |
+| Vue | `<script lang="ruby">` in `.vue` files | Medium |
+| Svelte | `<script lang="ruby">` in `.svelte` files | Medium |
+| Astro | Ruby frontmatter (`#!ruby`) in `.astro` files | Medium |
 
-These are thin (~40 lines each) — detect Ruby, transform, pass to framework plugin.
+These are thin (~40 lines each) — detect `lang="ruby"`, transform, pass to framework plugin.
+
+**Note:** Basic `.rbx` support (Ruby + JSX) is in Phase 2. Phase 4 is about parsing framework-specific SFC formats and extracting Ruby script blocks.
 
 ---
 
