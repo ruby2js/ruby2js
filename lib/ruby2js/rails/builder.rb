@@ -525,6 +525,7 @@ class SelfhostBuilder
   #   database: Database adapter (for importmap)
   #   css: CSS framework ('none', 'tailwind', 'pico', 'bootstrap', 'bulma')
   #   output_path: Where to write the file (if nil, returns string)
+  #   importmap: Hash of additional import map entries (e.g., {'react' => 'https://esm.sh/react'})
   # Returns: HTML string (also writes to output_path if specified)
   def self.generate_index_html(options = {})
     app_name = options[:app_name] || 'Ruby2JS App'
@@ -533,10 +534,11 @@ class SelfhostBuilder
     output_path = options[:output_path]
     # Base path for assets - '/dist' when serving from app root, '' when serving from dist/
     base_path = options[:base_path] || '/dist'
+    user_importmap = options[:importmap] || {}
 
-    # Build importmap - merge common entries with database-specific entries
+    # Build importmap - merge common entries with database-specific and user entries
     db_entries = IMPORTMAP_ENTRIES[database] || IMPORTMAP_ENTRIES['dexie']
-    importmap_entries = COMMON_IMPORTMAP_ENTRIES.merge(db_entries)
+    importmap_entries = COMMON_IMPORTMAP_ENTRIES.merge(db_entries).merge(user_importmap)
     importmap = {
       'imports' => importmap_entries
     }
@@ -2885,7 +2887,8 @@ class SelfhostBuilder
 end
 
 # CLI entry point - only run if this file is executed directly
-if __FILE__ == $0
+# Guard: defined? check ensures process.argv[1] exists in transpiled JS
+if defined?(process.argv[1]) && __FILE__ == $0
   dist_dir = ARGV[0] ? File.expand_path(ARGV[0]) : nil
   builder = SelfhostBuilder.new(dist_dir)
   builder.build()
