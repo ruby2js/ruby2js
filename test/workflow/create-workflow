@@ -1,0 +1,525 @@
+#!/usr/bin/env bash
+# Create a Ruby2JS workflow builder demo with React Flow
+# Usage: create-workflow [app-name]
+#
+# Creates a Rails app with Workflow, Node, and Edge models,
+# ERB views for listing, and RBX views for React Flow canvas.
+# Demonstrates using React ecosystem libraries via RBX files.
+
+set -e
+
+APP_NAME="${1:-workflow}"
+
+echo "Creating Ruby2JS workflow builder: $APP_NAME"
+echo ""
+
+# Create Rails app (minimal, with Tailwind for nice styling)
+rails new "$APP_NAME" --skip-git --skip-docker --css tailwind
+cd "$APP_NAME"
+
+# Generate Workflow model
+rails generate model Workflow name:string
+
+# Generate Node model (belongs to workflow)
+rails generate model Node workflow:references label:string node_type:string position_x:float position_y:float
+
+# Generate Edge model (connects nodes within a workflow)
+rails generate model Edge workflow:references source_node_id:integer target_node_id:integer
+
+# Create database
+rails db:create
+
+# Add ruby2js gem from GitHub
+bundle add ruby2js --github ruby2js/ruby2js
+
+# Ensure git checkout is complete (handles Bundler version upgrade)
+bundle install
+
+# Update Workflow model with associations and validations
+cat > app/models/workflow.rb << 'MODEL'
+class Workflow < ApplicationRecord
+  has_many :nodes, dependent: :destroy
+  has_many :edges, dependent: :destroy
+
+  validates :name, presence: true
+end
+MODEL
+
+# Update Node model
+cat > app/models/node.rb << 'MODEL'
+class Node < ApplicationRecord
+  belongs_to :workflow
+
+  validates :position_x, :position_y, presence: true
+  validates :label, presence: true
+end
+MODEL
+
+# Update Edge model
+cat > app/models/edge.rb << 'MODEL'
+class Edge < ApplicationRecord
+  belongs_to :workflow
+  belongs_to :source_node, class_name: 'Node'
+  belongs_to :target_node, class_name: 'Node'
+end
+MODEL
+
+# Set up routes
+cat > config/routes.rb << 'ROUTES'
+Rails.application.routes.draw do
+  root "workflows#index"
+
+  resources :workflows do
+    resources :nodes, only: [:create, :update, :destroy]
+    resources :edges, only: [:create, :destroy]
+    member do
+      patch :update_positions
+    end
+  end
+end
+ROUTES
+
+# Create WorkflowsController
+mkdir -p app/controllers
+cat > app/controllers/workflows_controller.rb << 'CONTROLLER'
+class WorkflowsController < ApplicationController
+  def index
+    @workflows = Workflow.all
+  end
+
+  def show
+    @workflow = Workflow.includes(:nodes, :edges).find(params[:id])
+  end
+
+  def new
+    @workflow = Workflow.new
+  end
+
+  def create
+    @workflow = Workflow.new(workflow_params)
+    if @workflow.save
+      redirect_to @workflow, notice: "Workflow created."
+    else
+      render :new, status: :unprocessable_entity
+    end
+  end
+
+  def edit
+    @workflow = Workflow.find(params[:id])
+  end
+
+  def update
+    @workflow = Workflow.find(params[:id])
+    if @workflow.update(workflow_params)
+      redirect_to @workflow, notice: "Workflow updated."
+    else
+      render :edit, status: :unprocessable_entity
+    end
+  end
+
+  def destroy
+    @workflow = Workflow.find(params[:id])
+    @workflow.destroy
+    redirect_to workflows_path, notice: "Workflow deleted."
+  end
+
+  # Bulk update node positions from React Flow
+  def update_positions
+    @workflow = Workflow.find(params[:id])
+    nodes_data = params[:nodes] || []
+
+    nodes_data.each do |node_data|
+      node = @workflow.nodes.find_by(id: node_data[:id])
+      node&.update(
+        position_x: node_data[:position][:x],
+        position_y: node_data[:position][:y]
+      )
+    end
+
+    head :ok
+  end
+
+  private
+
+  def workflow_params
+    params.require(:workflow).permit(:name)
+  end
+end
+CONTROLLER
+
+# Create NodesController
+cat > app/controllers/nodes_controller.rb << 'CONTROLLER'
+class NodesController < ApplicationController
+  before_action :set_workflow
+
+  def create
+    @node = @workflow.nodes.build(node_params)
+    if @node.save
+      render json: @node
+    else
+      render json: { errors: @node.errors }, status: :unprocessable_entity
+    end
+  end
+
+  def update
+    @node = @workflow.nodes.find(params[:id])
+    if @node.update(node_params)
+      render json: @node
+    else
+      render json: { errors: @node.errors }, status: :unprocessable_entity
+    end
+  end
+
+  def destroy
+    @node = @workflow.nodes.find(params[:id])
+    @node.destroy
+    head :ok
+  end
+
+  private
+
+  def set_workflow
+    @workflow = Workflow.find(params[:workflow_id])
+  end
+
+  def node_params
+    params.require(:node).permit(:label, :node_type, :position_x, :position_y)
+  end
+end
+CONTROLLER
+
+# Create EdgesController
+cat > app/controllers/edges_controller.rb << 'CONTROLLER'
+class EdgesController < ApplicationController
+  before_action :set_workflow
+
+  def create
+    @edge = @workflow.edges.build(edge_params)
+    if @edge.save
+      render json: @edge
+    else
+      render json: { errors: @edge.errors }, status: :unprocessable_entity
+    end
+  end
+
+  def destroy
+    @edge = @workflow.edges.find(params[:id])
+    @edge.destroy
+    head :ok
+  end
+
+  private
+
+  def set_workflow
+    @workflow = Workflow.find(params[:workflow_id])
+  end
+
+  def edge_params
+    params.require(:edge).permit(:source_node_id, :target_node_id)
+  end
+end
+CONTROLLER
+
+# Create views directory
+mkdir -p app/views/workflows
+
+# Create index view (ERB - no React needed for list)
+cat > app/views/workflows/index.html.erb << 'VIEW'
+<div class="container mx-auto px-4 py-8">
+  <h1 class="text-3xl font-bold mb-8">Workflows</h1>
+
+  <div class="grid gap-4 mb-8">
+    <% @workflows.each do |workflow| %>
+      <%= render workflow %>
+    <% end %>
+  </div>
+
+  <%= link_to "New Workflow", new_workflow_path,
+      class: "bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700" %>
+</div>
+VIEW
+
+# Create workflow partial (ERB)
+cat > app/views/workflows/_workflow.html.erb << 'PARTIAL'
+<div id="<%= dom_id(workflow) %>" class="p-4 bg-white rounded-lg shadow flex justify-between items-center">
+  <div>
+    <h2 class="text-xl font-semibold"><%= workflow.name %></h2>
+    <p class="text-gray-500 text-sm">
+      <%= pluralize(workflow.nodes.size, "node") %>,
+      <%= pluralize(workflow.edges.size, "edge") %>
+    </p>
+  </div>
+  <div class="flex gap-2">
+    <%= link_to "Edit", workflow_path(workflow),
+        class: "bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700" %>
+    <%= button_to "Delete", workflow_path(workflow), method: :delete,
+        class: "bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700",
+        data: { confirm: "Delete this workflow?" } %>
+  </div>
+</div>
+PARTIAL
+
+# Create new/edit views (ERB)
+cat > app/views/workflows/new.html.erb << 'VIEW'
+<div class="container mx-auto px-4 py-8">
+  <h1 class="text-3xl font-bold mb-8">New Workflow</h1>
+  <%= render "form", workflow: @workflow %>
+</div>
+VIEW
+
+cat > app/views/workflows/edit.html.erb << 'VIEW'
+<div class="container mx-auto px-4 py-8">
+  <h1 class="text-3xl font-bold mb-8">Edit Workflow</h1>
+  <%= render "form", workflow: @workflow %>
+</div>
+VIEW
+
+cat > app/views/workflows/_form.html.erb << 'FORM'
+<%= form_with model: workflow, class: "space-y-4 max-w-md" do |f| %>
+  <div>
+    <%= f.label :name, class: "block font-medium mb-1" %>
+    <%= f.text_field :name, class: "w-full border rounded p-2" %>
+  </div>
+  <div class="flex gap-2">
+    <%= f.submit class: "bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 cursor-pointer" %>
+    <%= link_to "Cancel", workflows_path, class: "text-gray-600 px-4 py-2" %>
+  </div>
+<% end %>
+FORM
+
+# Create show view (RBX - uses React Flow)
+cat > app/views/workflows/Show.rbx << 'RBX'
+import WorkflowCanvas from 'components/WorkflowCanvas'
+
+export default
+def Show(workflow:, nodes:, edges:)
+  # Convert Rails nodes to React Flow format
+  flow_nodes = nodes.map do |node|
+    {
+      id: node.id.to_s,
+      type: 'default',
+      position: { x: node.position_x, y: node.position_y },
+      data: { label: node.label }
+    }
+  end
+
+  # Convert Rails edges to React Flow format
+  flow_edges = edges.map do |edge|
+    {
+      id: edge.id.to_s,
+      source: edge.source_node_id.to_s,
+      target: edge.target_node_id.to_s
+    }
+  end
+
+  handle_save = ->(updated_nodes) {
+    fetch("/workflows/#{workflow.id}/update_positions",
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(nodes: updated_nodes)
+    )
+  }
+
+  handle_add_node = ->(position) {
+    fetch("/workflows/#{workflow.id}/nodes",
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(node: {
+        label: "New Node",
+        node_type: "default",
+        position_x: position.x,
+        position_y: position.y
+      })
+    ).then(->(r) { r.json() })
+  }
+
+  handle_add_edge = ->(source_id, target_id) {
+    fetch("/workflows/#{workflow.id}/edges",
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(edge: {
+        source_node_id: source_id,
+        target_node_id: target_id
+      })
+    ).then(->(r) { r.json() })
+  }
+
+  %x{
+    <div className="container mx-auto px-4 py-8">
+      <div className="flex justify-between items-center mb-4">
+        <h1 className="text-3xl font-bold">{workflow.name}</h1>
+        <a href="/workflows" className="text-blue-600 hover:underline">
+          Back to Workflows
+        </a>
+      </div>
+      <WorkflowCanvas
+        initialNodes={flow_nodes}
+        initialEdges={flow_edges}
+        onSave={handle_save}
+        onAddNode={handle_add_node}
+        onAddEdge={handle_add_edge}
+      />
+    </div>
+  }
+end
+RBX
+
+# Create components directory and WorkflowCanvas component
+mkdir -p app/components
+cat > app/components/WorkflowCanvas.rbx << 'COMPONENT'
+import ReactFlow, [Background, Controls, MiniMap, useNodesState, useEdgesState, addEdge], from: 'reactflow'
+import 'reactflow/dist/style.css'
+
+export default
+def WorkflowCanvas(initialNodes:, initialEdges:, onSave:, onAddNode:, onAddEdge:)
+  nodes, setNodes, onNodesChange = useNodesState(initialNodes)
+  edges, setEdges, onEdgesChange = useEdgesState(initialEdges)
+
+  # Handle new connections between nodes
+  handle_connect = ->(connection) {
+    onAddEdge(connection.source, connection.target).then(->(edge) {
+      setEdges(->(eds) {
+        addEdge({ **connection, id: edge.id.to_s }, eds)
+      })
+    })
+  }
+
+  # Save positions after drag ends
+  handle_node_drag_stop = ->(_event, _node) {
+    # Collect all node positions
+    positions = nodes.map do |n|
+      { id: n.id, position: n.position }
+    end
+    onSave(positions)
+  }
+
+  # Double-click to add new node
+  handle_pane_click = ->(event) {
+    return unless event.detail == 2  # double-click
+
+    # Get click position relative to the flow
+    bounds = event.target.getBoundingClientRect()
+    position = {
+      x: event.clientX - bounds.left,
+      y: event.clientY - bounds.top
+    }
+
+    onAddNode(position).then(->(node) {
+      new_node = {
+        id: node.id.to_s,
+        type: 'default',
+        position: { x: node.position_x, y: node.position_y },
+        data: { label: node.label }
+      }
+      setNodes(->(nds) { [*nds, new_node] })
+    })
+  }
+
+  %x{
+    <div style={{ width: '100%', height: '600px', border: '1px solid #ddd', borderRadius: '8px' }}>
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onConnect={handle_connect}
+        onNodeDragStop={handle_node_drag_stop}
+        onPaneClick={handle_pane_click}
+        fitView
+      >
+        <Background color="#aaa" gap={16} />
+        <Controls />
+        <MiniMap />
+      </ReactFlow>
+      <p className="text-gray-500 text-sm mt-2 text-center">
+        Double-click to add nodes. Drag from node handles to connect.
+      </p>
+    </div>
+  }
+end
+COMPONENT
+
+# Rebuild Tailwind CSS to include all view classes
+bin/rails tailwindcss:build
+
+# Create seeds with sample workflow
+cat > db/seeds.rb << 'SEEDS'
+# Sample workflow for the demo
+return if Workflow.count > 0
+
+workflow = Workflow.create!(name: "User Registration Flow")
+
+# Create nodes
+start_node = workflow.nodes.create!(
+  label: "Start",
+  node_type: "input",
+  position_x: 250,
+  position_y: 0
+)
+
+email_node = workflow.nodes.create!(
+  label: "Enter Email",
+  node_type: "default",
+  position_x: 100,
+  position_y: 100
+)
+
+password_node = workflow.nodes.create!(
+  label: "Create Password",
+  node_type: "default",
+  position_x: 400,
+  position_y: 100
+)
+
+verify_node = workflow.nodes.create!(
+  label: "Verify Email",
+  node_type: "default",
+  position_x: 250,
+  position_y: 200
+)
+
+complete_node = workflow.nodes.create!(
+  label: "Registration Complete",
+  node_type: "output",
+  position_x: 250,
+  position_y: 300
+)
+
+# Create edges
+workflow.edges.create!(source_node: start_node, target_node: email_node)
+workflow.edges.create!(source_node: start_node, target_node: password_node)
+workflow.edges.create!(source_node: email_node, target_node: verify_node)
+workflow.edges.create!(source_node: password_node, target_node: verify_node)
+workflow.edges.create!(source_node: verify_node, target_node: complete_node)
+
+puts "Created workflow '#{workflow.name}' with #{workflow.nodes.count} nodes and #{workflow.edges.count} edges"
+SEEDS
+
+# Run ruby2js:install generator to set up dist/, package.json, and npm dependencies
+bin/rails generate ruby2js:install
+
+# Add React dependencies to ruby2js.yml
+cat >> config/ruby2js.yml << 'DEPS'
+
+# React ecosystem dependencies for RBX files
+dependencies:
+  react: "^18.2.0"
+  react-dom: "^18.2.0"
+  reactflow: "^11.10.0"
+DEPS
+
+echo ""
+echo "Workflow builder created: $APP_NAME/"
+echo ""
+echo "To run with Juntos (transpiled to JavaScript):"
+echo "  cd $APP_NAME"
+echo "  bin/juntos dev -d dexie      # Browser with IndexedDB"
+echo ""
+echo "The workflow canvas uses React Flow for drag-and-drop node editing."
+echo "Double-click to add nodes, drag handles to connect them."
+echo ""
+echo "To run with Rails:"
+echo "  cd $APP_NAME"
+echo "  bin/rails db:prepare"
+echo "  bin/rails server"
+echo ""
