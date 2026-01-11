@@ -163,10 +163,12 @@ module Ruby2JS
           elsif c == '/' and @attr_name == ''
             @state = :void
           elsif c == ' ' or c == "\n" or c == '>'
+            # Boolean attribute (no value) - treat as true
             if not @attr_name.empty?
-              raise SyntaxError.new("missing \"=\" after attribute #{@attr_name.inspect} " +
-                "in element #{@element.inspect}")
-            elsif c == '>'
+              @attrs[@attr_name] = 'true'
+              @attr_name = ''
+            end
+            if c == '>'
               @result << "#{element_call(@element, @element_original, @attrs)} do"
               @tag_stack << [@element, @element_original]
               @state = :text

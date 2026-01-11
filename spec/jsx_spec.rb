@@ -158,9 +158,8 @@ describe Ruby2JS::Filter::JSX do
           must_equal 'invalid character in attribute name: "/"'
       end
 
-      it "should detect missing attribute value" do
-        _(assert_raises {to_rb '<a b>'}.message).
-          must_equal 'missing "=" after attribute "b" in element "a"'
+      it "should handle boolean attributes" do
+        to_rb('<a b></a>').must_equal "a(b: true) do\nend"
       end
 
       it "should detect missing attribute value quotes" do
