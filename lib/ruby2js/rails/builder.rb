@@ -1661,9 +1661,10 @@ class SelfhostBuilder
     class_name = resource.chomp('s').split('_').map(&:capitalize).join
     views_class = "#{class_name}Views"
 
-    # Determine what file types are present
-    # Use .values() with parens to trigger Object.values() conversion for JS
-    file_types = views_by_name.values().map { |v| v[:ext] }.uniq.sort
+    # Determine what file types are present - collect unique extensions via hash keys
+    ext_set = {}
+    views_by_name.values().each { |v| ext_set[v[:ext]] = true }
+    file_types = ext_set.keys().sort
 
     unified_js = <<~JS
       // #{class_name} views - auto-generated from mixed source files
@@ -1675,7 +1676,7 @@ class SelfhostBuilder
     render_exports = []
     has_new = false
 
-    views_by_name.keys.sort.each do |view_name|
+    views_by_name.keys().sort.each do |view_name|
       file_info = views_by_name[view_name]
       has_new = true if view_name == 'new'
 
