@@ -1516,8 +1516,8 @@ class SelfhostBuilder
     source_formats = []
 
     # Transpile each view file
-    # Use .keys.each for JS compatibility (can't iterate hash directly in JS)
-    views_by_name.keys.each do |view_name|
+    # Use .keys().each for JS compatibility - parens trigger Object.keys() conversion
+    views_by_name.keys().each do |view_name|
       file_info = views_by_name[view_name]
       src_path = file_info[:path]
       ext = file_info[:ext]
