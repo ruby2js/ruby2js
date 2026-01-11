@@ -8,11 +8,12 @@
 
 | Capability | Rails Today | Juntos Unified Views |
 |------------|-------------|----------------------|
-| ERB/Phlex → React components | Rewrite required | Same source, new target |
+| Phlex → React components | Rewrite required | Same source, new target |
 | Switch frameworks (React↔Vue↔Svelte) | Rewrite all views | Change one config line |
 | Web + mobile + desktop | Separate codebases | Same views everywhere |
 | Multi-framework app | Not practical | Astro islands |
 | Progressive enhancement | Turbo/Stimulus | htmx/Alpine (works today) |
+| ERB templates | Rails only | Works with Hotwire (SSR strings) |
 
 ### Assessment
 
@@ -26,26 +27,26 @@
 
 | Target | Support Level | Notes |
 |--------|---------------|-------|
-| React/Preact | Full | Phlex→React exists, add ERB→React |
+| React/Preact | Full | Phlex→React exists, RBX for JSX syntax |
 | Lit | Full | ~20 lines change from SSR strings |
 | Astro | Full | Simpler than Vue, multi-framework escape hatch |
 | Vue | Substantial | Core patterns work, defer v-model/slots |
 | htmx/Alpine | Works today | Just HTML attributes |
+| ERB | SSR only | String output for Hotwire (cannot target React) |
 
 ### Estimated Timeline to MVP
 
 | Phase | Scope | Effort |
 |-------|-------|--------|
 | 1. Unified signature | Props pattern change | Small |
-| 2. ERB multi-target | ERB→React (pattern exists in Phlex) | Medium |
-| 3. Lit target | Tagged template literals | Trivial |
-| 4-5. RBX + JSX | New file formats, esbuild integration | Small |
-| 6. Import resolution | Component path rewriting | Medium |
-| 7. Astro target | Frontmatter + JSX-style template | Medium |
-| 8. Vue target | SFC generation | Medium |
-| 9. Unified module | Combined exports, source maps | Medium |
+| 2. Lit target | Tagged template literals | Trivial |
+| 3-4. RBX + JSX | New file formats, esbuild integration | Small |
+| 5. Import resolution | Component path rewriting | Medium |
+| 6. Astro target | Frontmatter + JSX-style template | Medium |
+| 7. Vue target | SFC generation | Medium |
+| 8. Unified module | Combined exports, source maps | Medium |
 
-**Rough estimate: 4-8 weeks** depending on focus and parallelization. Each phase is independently deliverable.
+**Rough estimate: 3-6 weeks** depending on focus and parallelization. Each phase is independently deliverable.
 
 ### Why Now
 
@@ -109,12 +110,14 @@ All view formats describe the same thing—UI structure with dynamic data:
 
 | Format | Input | Syntax | Output |
 |--------|-------|--------|--------|
-| ERB | props | `<%= %>` template | string or framework component |
+| ERB | props | `<%= %>` template | strings (Hotwire) |
 | Phlex | props | Ruby DSL (`div`, `form`) | string or framework component |
 | RBX | props | Ruby + JSX (`%x{}`) | React element |
 | JSX | props | JavaScript + JSX | React element |
 
-Both ERB and Phlex parse to an intermediate AST representation. The framework target determines how that AST is serialized—strings, React elements, Vue SFCs, Svelte components, or Astro components.
+Phlex parses to an intermediate pnode AST representation. The framework target determines how that AST is serialized—strings, React elements, Vue SFCs, Svelte components, or Astro components.
+
+**ERB limitation:** ERB uses string concatenation and allows arbitrary HTML fragments (e.g., a closing `</div>` tag without its opening tag in a conditional block). This is incompatible with React's tree-based model, so ERB stays SSR-only. For React output, use Phlex or RBX.
 
 The unification enables:
 - Start with SSR (strings), graduate to a framework when needed
@@ -689,54 +692,54 @@ Builder scans `app/components/` at build time and rewrites imports.
 
 ### By Source Format
 
-| Source | Tool | Intermediate |
-|--------|------|--------------|
-| `.html.erb` | Ruby2JS (ERB filter) | pnode AST |
-| `.rb` (Phlex) | Ruby2JS (Phlex filter) | pnode AST |
-| `.rbx` | Ruby2JS (React filter) | React JS |
-| `.jsx` / `.tsx` | esbuild | React JS |
-| `.vue` | vue-compiler-sfc | Vue JS |
-| `.svelte` | svelte/compiler | Svelte JS |
+| Source | Tool | Intermediate | Framework Targets |
+|--------|------|--------------|-------------------|
+| `.html.erb` | Ruby2JS (ERB filter) | strings | SSR only (Hotwire) |
+| `.rb` (Phlex) | Ruby2JS (Phlex filter) | pnode AST | Any |
+| `.rbx` | Ruby2JS (React filter) | React JS | React/Preact |
+| `.jsx` / `.tsx` | esbuild | React JS | React/Preact |
+| `.vue` | vue-compiler-sfc | Vue JS | Vue |
+| `.svelte` | svelte/compiler | Svelte JS | Svelte |
 
 ### By Target Framework
 
-Both ERB and Phlex produce pnode AST, then serialize based on target:
+Phlex produces pnode AST, then serializes based on target. ERB produces strings (SSR only):
 
-| Target | ERB/Phlex Serialization | Then |
-|--------|-------------------------|------|
-| None (SSR) | Template literal strings | Done |
-| React | React.createElement calls | Done (or bundle) |
-| Vue | `.vue` SFC text | vue-compiler-sfc |
-| Svelte | `.svelte` text | svelte/compiler |
-| Astro | `.astro` text | astro build |
+| Target | Phlex Serialization | ERB Serialization |
+|--------|---------------------|-------------------|
+| None (SSR) | Template literal strings | Template literal strings |
+| React | React.createElement calls | N/A (use Phlex or RBX) |
+| Vue | `.vue` SFC text | N/A (use Phlex) |
+| Svelte | `.svelte` text | N/A (use Phlex) |
+| Astro | `.astro` text | N/A (use Phlex) |
 
 ### Unified AST Flow
 
 ```
-ERB Source (.html.erb)     Phlex Source (.rb)
-        │                          │
-        ▼                          ▼
-   ERB Filter               Phlex Filter
-        │                          │
-        └──────────┬───────────────┘
-                   │
-                   ▼
-             pnode AST
-                   │
-    ┌──────────────┼──────────────────┐
-    │              │                  │
-    ▼              ▼                  ▼
-String Mode    React Mode       Vue/Svelte/Astro Mode
-    │              │                  │
-    ▼              ▼                  ▼
- `<div>`    createElement()      .vue/.svelte/.astro
-    │              │                  │
-    ▼              ▼                  ▼
-  Done           Done          Framework Compiler
-                                      │
-                                      ▼
-                                JavaScript
+ERB Source (.html.erb)                  Phlex Source (.rb)
+        │                                       │
+        ▼                                       ▼
+   ERB Filter                            Phlex Filter
+        │                                       │
+        ▼                                       ▼
+Template literal strings                  pnode AST
+        │                                       │
+        ▼                        ┌──────────────┼──────────────────┐
+   SSR only                      │              │                  │
+   (Hotwire)                     ▼              ▼                  ▼
+                           String Mode    React Mode       Vue/Svelte/Astro Mode
+                                 │              │                  │
+                                 ▼              ▼                  ▼
+                              `<div>`    createElement()      .vue/.svelte/.astro
+                                 │              │                  │
+                                 ▼              ▼                  ▼
+                               Done           Done          Framework Compiler
+                                                                   │
+                                                                   ▼
+                                                             JavaScript
 ```
+
+**Why ERB can't target React:** ERB templates use string concatenation, allowing arbitrary HTML fragments. A conditional block might contain just a closing `</div>` tag without its opening tag. This is valid for string output but incompatible with React's tree model which requires complete elements.
 
 ### Builder Implementation
 
@@ -776,9 +779,9 @@ def framework_filters(framework)
 end
 ```
 
-## ERB and Phlex Multi-Target
+## Phlex Multi-Target
 
-Both ERB and Phlex parse templates to an intermediate AST. The framework target determines serialization.
+Phlex parses to an intermediate pnode AST. The framework target determines serialization.
 
 ### Phlex (Existing + Extended)
 
@@ -798,55 +801,47 @@ Ruby2JS.convert(source, filters: [:phlex, :vue])
 Ruby2JS.convert(source, filters: [:phlex, :svelte])
 ```
 
-### ERB (New Multi-Target)
+### ERB (SSR Only)
 
-The ERB filter currently outputs strings only. Add framework mode detection:
-
-```ruby
-# In erb.rb filter
-def options=(options)
-  super
-  filters = options[:filters] || Filter::DEFAULTS
-
-  if defined?(Ruby2JS::Filter::React) && filters.include?(Ruby2JS::Filter::React)
-    @erb_react_mode = true
-  elsif defined?(Ruby2JS::Filter::Vue) && filters.include?(Ruby2JS::Filter::Vue)
-    @erb_vue_mode = true
-  elsif defined?(Ruby2JS::Filter::Svelte) && filters.include?(Ruby2JS::Filter::Svelte)
-    @erb_svelte_mode = true
-  end
-end
-```
-
-Then ERB works the same as Phlex:
-
-```ruby
-# String output (SSR) - current behavior
-Ruby2JS.convert(erb_source, filters: [:erb, :helpers])
-
-# React output (new)
-Ruby2JS.convert(erb_source, filters: [:erb, :helpers, :react])
-
-# Vue output (new)
-Ruby2JS.convert(erb_source, filters: [:erb, :helpers, :vue])
-
-# Svelte output (new)
-Ruby2JS.convert(erb_source, filters: [:erb, :helpers, :svelte])
-```
-
-### Same Template, Any Framework
+ERB stays string-output only. Its string concatenation model allows arbitrary HTML fragments that are incompatible with tree-based frameworks:
 
 ```erb
-<%# app/views/articles/index.html.erb %>
-<div class="articles">
-  <h1>Articles</h1>
-  <% articles.each do |article| %>
-    <div class="card">
-      <h2><%= article.title %></h2>
-      <p><%= article.body %></p>
-    </div>
-  <% end %>
-</div>
+<%# This is valid ERB but can't become React %>
+<% if show_wrapper %>
+  <div class="wrapper">
+<% end %>
+  <p>Content</p>
+<% if show_wrapper %>
+  </div>
+<% end %>
+```
+
+The opening and closing `<div>` tags are in separate conditional blocks—valid for string concatenation, impossible for React's element tree.
+
+```ruby
+# String output (SSR) - only mode for ERB
+Ruby2JS.convert(erb_source, filters: [:erb, :helpers])
+
+# For React output, use Phlex or RBX instead
+```
+
+### Same Phlex Source, Any Framework
+
+```ruby
+# app/views/articles/Index.rb
+class Index < Phlex::HTML
+  def view_template
+    div(class: "articles") do
+      h1 { "Articles" }
+      articles.each do |article|
+        div(class: "card") do
+          h2 { article.title }
+          p { article.body }
+        end
+      end
+    end
+  end
+end
 ```
 
 | Target | Output |
@@ -856,7 +851,7 @@ Ruby2JS.convert(erb_source, filters: [:erb, :helpers, :svelte])
 | Vue | `<template><div class="articles"><div v-for="article in articles">...` |
 | Svelte | `<div class="articles">{#each articles as article}<div>...{/each}</div>` |
 
-Same ERB source, different output based on framework target.
+Same Phlex source, different output based on framework target.
 
 ## Configuration
 
@@ -899,17 +894,18 @@ views:
 ### MVP Scope
 
 **Full support (no open questions):**
-- React — Phlex→React exists, add ERB→React, SSR + hydration
+- React — Phlex→React exists, RBX for JSX syntax, SSR + hydration
 - Preact — Already supported via React filter, SSR + hydration
-- Lit — Trivial change from SSR strings, SSR + hydration
+- Lit — Trivial change from SSR strings (Phlex only), SSR + hydration
 - Astro — Simpler than Vue (frontmatter + JSX-style template), islands architecture
 
 **Substantial support (core patterns work):**
-- Vue — SFC generation, SSR + hydration, defer advanced features
+- Vue — SFC generation (Phlex only), SSR + hydration, defer advanced features
 
 **Works today (no changes needed):**
 - htmx — Just HTML attributes, works with SSR
 - Alpine.js — Just HTML attributes, works with SSR
+- ERB — SSR string output for Hotwire (cannot target React/Vue/etc.)
 
 **Rendering strategy (MVP default — target-aware):**
 - Server targets (Node, Bun, Deno, Edge): SSR + hydration
@@ -925,17 +921,10 @@ views:
 - [x] Update partial render calls in helpers filter
 - [x] Update controller filter for new calling convention
 
-### Phase 2: ERB Multi-Target Foundation
-- [ ] Add framework mode detection to ERB filter (like Phlex)
-- [ ] Refactor ERB to use intermediate pnode representation
-- [ ] ERB + React filter → React.createElement output
-- [ ] Test ERB → React element output
-
-### Phase 3: Lit Target (Low Effort)
+### Phase 2: Lit Target (Low Effort)
 - [ ] Add Lit mode to Phlex filter (html`` tagged template)
-- [ ] Add Lit mode to ERB filter
 - [ ] Add `lit` import generation
-- [ ] ~20 lines of code total
+- [ ] ~15 lines of code total
 
 ### Phase 4: RBX Support
 - [ ] Add `.rbx` file detection to builder
@@ -954,15 +943,13 @@ views:
 
 ### Phase 7: Astro Target (Full Support)
 - [ ] Create Astro serializer for pnode AST
-- [ ] ERB + Astro filter → `.astro` output (frontmatter + template)
-- [ ] Phlex + Astro filter → `.astro` output
+- [ ] Phlex + Astro filter → `.astro` output (frontmatter + template)
 - [ ] Integrate with Astro build pipeline
 - [ ] Template uses JSX-style `{expr}` (same as React, simpler than Vue)
 - [ ] Support client directives as passthrough attributes
 
 ### Phase 8: Vue Target (Substantial Support)
 - [ ] Create Vue serializer for pnode AST
-- [ ] ERB + Vue filter → `.vue` SFC output
 - [ ] Phlex + Vue filter → `.vue` SFC output
 - [ ] Integrate vue-compiler-sfc in builder
 - [ ] Core patterns: props, v-if, v-for, @events
@@ -983,7 +970,6 @@ views:
 
 ### Phase 11: Svelte Target
 - [ ] Create Svelte serializer for pnode AST
-- [ ] ERB + Svelte filter → `.svelte` output
 - [ ] Phlex + Svelte filter → `.svelte` output
 - [ ] Integrate svelte/compiler in builder
 
