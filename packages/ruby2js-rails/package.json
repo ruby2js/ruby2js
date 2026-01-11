@@ -22,7 +22,9 @@
     "./build.mjs": "./build.mjs",
     "./dev-server.mjs": "./dev-server.mjs",
     "./server.mjs": "./server.mjs",
-    "./migrate.mjs": "./migrate.mjs"
+    "./migrate.mjs": "./migrate.mjs",
+    "./vite": "./vite.mjs",
+    "./vite.mjs": "./vite.mjs"
   },
   "files": [
     "adapters/",
@@ -34,11 +36,13 @@
     "build.mjs",
     "dev-server.mjs",
     "server.mjs",
-    "migrate.mjs"
+    "migrate.mjs",
+    "vite.mjs"
   ],
   "keywords": [
     "ruby2js",
     "rails",
+    "vite",
     "activerecord",
     "erb",
     "phlex",
@@ -54,5 +58,21 @@
     "chokidar": "^3.5.3",
     "js-yaml": "^4.1.0",
     "ws": "^8.14.2"
+  },
+  "peerDependencies": {
+    "vite": "^5.0.0 || ^6.0.0",
+    "vite-plugin-ruby2js": "*",
+    "ruby2js": "*"
+  },
+  "peerDependenciesMeta": {
+    "vite": {
+      "optional": true
+    },
+    "vite-plugin-ruby2js": {
+      "optional": true
+    },
+    "ruby2js": {
+      "optional": true
+    }
   }
 }
