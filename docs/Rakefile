@@ -328,7 +328,7 @@ end
 # Build ruby2js-rails npm package tarball
 # Package now lives at packages/ruby2js-rails/
 # Depends on selfhost_build to generate build.mjs with npm package imports
-task :ruby2js_rails_tarball => [:ruby2js_tarball, :selfhost_build] do
+task :ruby2js_rails_tarball => [:vite_plugin_tarball, :selfhost_build] do
   rails_pkg_dir = "#{root}/packages/ruby2js-rails"
   Dir.chdir(rails_pkg_dir) do
     # Clean up old tarballs
@@ -336,6 +336,39 @@ task :ruby2js_rails_tarball => [:ruby2js_tarball, :selfhost_build] do
 
     # Set timestamped version
     version = "6.0.0-beta.#{Time.now.strftime('%Y%m%d%H%M')}"
+    sh "npm version #{version} --no-git-tag-version --allow-same-version"
+
+    # Add dependencies for the published package
+    sh "npm pkg set dependencies.ruby2js=https://www.ruby2js.com/releases/ruby2js-beta.tgz"
+    sh "npm pkg set dependencies.vite-plugin-ruby2js=https://www.ruby2js.com/releases/vite-plugin-ruby2js-beta.tgz"
+
+    # Pack
+    sh "npm pack"
+
+    # Remove dependencies (keep source clean for development)
+    sh "npm pkg delete dependencies.ruby2js"
+    sh "npm pkg delete dependencies.vite-plugin-ruby2js"
+
+    # Copy to releases with stable name
+    tarball = Dir.glob("ruby2js-rails-*.tgz").first
+    cp tarball, "#{releases_dir}/ruby2js-rails-beta.tgz"
+    puts "  ruby2js-rails-beta.tgz (#{(File.size("#{releases_dir}/ruby2js-rails-beta.tgz") / 1024.0).round(1)} KB)"
+
+    # Reset version for git
+    sh "npm version 6.0.0-beta --no-git-tag-version --allow-same-version"
+  end
+end
+
+# Build vite-plugin-ruby2js npm package tarball
+# Package lives at packages/vite-plugin-ruby2js/
+task :vite_plugin_tarball => [:ruby2js_tarball, releases_dir] do
+  vite_pkg_dir = "#{root}/packages/vite-plugin-ruby2js"
+  Dir.chdir(vite_pkg_dir) do
+    # Clean up old tarballs
+    FileUtils.rm_f Dir.glob("vite-plugin-ruby2js-*.tgz")
+
+    # Set timestamped version
+    version = "1.0.0-beta.#{Time.now.strftime('%Y%m%d%H%M')}"
     sh "npm version #{version} --no-git-tag-version --allow-same-version"
 
     # Add ruby2js dependency for the published package
@@ -348,17 +381,17 @@ task :ruby2js_rails_tarball => [:ruby2js_tarball, :selfhost_build] do
     sh "npm pkg delete dependencies.ruby2js"
 
     # Copy to releases with stable name
-    tarball = Dir.glob("ruby2js-rails-*.tgz").first
-    cp tarball, "#{releases_dir}/ruby2js-rails-beta.tgz"
-    puts "  ruby2js-rails-beta.tgz (#{(File.size("#{releases_dir}/ruby2js-rails-beta.tgz") / 1024.0).round(1)} KB)"
+    tarball = Dir.glob("vite-plugin-ruby2js-*.tgz").first
+    cp tarball, "#{releases_dir}/vite-plugin-ruby2js-beta.tgz"
+    puts "  vite-plugin-ruby2js-beta.tgz (#{(File.size("#{releases_dir}/vite-plugin-ruby2js-beta.tgz") / 1024.0).round(1)} KB)"
 
     # Reset version for git
-    sh "npm version 6.0.0-beta --no-git-tag-version --allow-same-version"
+    sh "npm version 1.0.0-beta --no-git-tag-version --allow-same-version"
   end
 end
 
 desc "Build npm package tarballs for beta distribution"
-task :npm_packages => [:ruby2js_tarball, :ruby2js_rails_tarball]
+task :npm_packages => [:ruby2js_tarball, :ruby2js_rails_tarball, :vite_plugin_tarball]
 
 task :default => [
   "#{dest}/index.erb",

@@ -14,7 +14,7 @@ Ruby2JS provides first-class Vite support through `vite-plugin-ruby2js`. Transfo
 ## Installation
 
 ```bash
-npm install vite-plugin-ruby2js
+npm install https://www.ruby2js.com/releases/vite-plugin-ruby2js-beta.tgz
 ```
 
 The plugin depends on `ruby2js` which will be installed automatically.

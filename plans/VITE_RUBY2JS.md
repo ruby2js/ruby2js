@@ -346,14 +346,15 @@ Extend HMR beyond Stimulus controllers. Easy wins implemented; full dependency t
 
 **Deferred:** Full incremental HMR for models/controllers/routes would require dependency tracking to know what else to invalidate. Current approach is safe and fast enough for most workflows.
 
-### Phase 3: Publish Tarballs
+### Phase 3: Publish Tarballs ✅ Complete
 
-| Tarball | Contents |
-|---------|----------|
-| `vite-plugin-ruby2js-beta.tgz` | Core Vite plugin |
-| `ruby2js-rails-beta.tgz` | Updated with Vite preset |
+| Tarball | URL |
+|---------|-----|
+| `ruby2js-beta.tgz` | `https://www.ruby2js.com/releases/ruby2js-beta.tgz` |
+| `vite-plugin-ruby2js-beta.tgz` | `https://www.ruby2js.com/releases/vite-plugin-ruby2js-beta.tgz` |
+| `ruby2js-rails-beta.tgz` | `https://www.ruby2js.com/releases/ruby2js-rails-beta.tgz` |
 
-Update documentation to show Vite-first approach.
+Added `:vite_plugin_tarball` task to `docs/Rakefile`. All three tarballs are built during `rake npm_packages` and deployed to ruby2js.com.
 
 ### Phase 4: Framework SFC Presets
 
