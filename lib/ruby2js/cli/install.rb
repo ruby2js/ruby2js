@@ -19,13 +19,14 @@ module Ruby2JS
           require 'ruby2js/rails/builder'
 
           setup_dist_directory!
-          create_package_json!
+          create_package_json!(options)
+          create_vite_config!(options)
           install_dependencies!
           create_binstub!
 
           puts "Installation complete."
-          puts "  Run 'bin/juntos build' to transpile your app"
-          puts "  Run 'bin/juntos dev' to start the development server"
+          puts "  Run 'bin/juntos dev' to start the Vite dev server"
+          puts "  Run 'bin/juntos build' to build with Vite"
           puts ""
           puts "Note: You can also use 'rails generate ruby2js:install' for Rails integration."
         end
@@ -33,14 +34,25 @@ module Ruby2JS
         private
 
         def parse_options(args)
-          options = {}
+          options = {
+            database: ENV['JUNTOS_DATABASE'],
+            target: ENV['JUNTOS_TARGET']
+          }
 
           parser = OptionParser.new do |opts|
             opts.banner = "Usage: ruby2js install [options]"
             opts.separator ""
-            opts.separator "Set up dist/ directory with package.json and npm dependencies."
+            opts.separator "Set up dist/ directory with Vite, package.json, and npm dependencies."
             opts.separator ""
             opts.separator "Options:"
+
+            opts.on("-d", "--database ADAPTER", "Database adapter (default: auto-detected from database.yml)") do |db|
+              options[:database] = db
+            end
+
+            opts.on("-t", "--target TARGET", "Build target: browser, node, electron (default: browser)") do |target|
+              options[:target] = target
+            end
 
             opts.on("-h", "--help", "Show this help message") do
               puts opts
@@ -69,17 +81,17 @@ module Ruby2JS
           puts "Created #{DIST_DIR}/ directory"
         end
 
-        def create_package_json!
+        def create_package_json!(options)
           package_path = File.join(DIST_DIR, 'package.json')
 
           if File.exist?(package_path)
-            merge_package_json!(package_path)
+            merge_package_json!(package_path, options)
           else
-            write_package_json!(package_path)
+            write_package_json!(package_path, options)
           end
         end
 
-        def write_package_json!(package_path)
+        def write_package_json!(package_path, options)
           puts "Creating #{package_path}..."
 
           app_name = detect_app_name
@@ -87,12 +99,16 @@ module Ruby2JS
             app_name: app_name,
             app_root: Dir.pwd
           )
+
+          # Add Vite dependencies (always included now)
+          add_vite_dependencies!(package)
+
           File.write(package_path, JSON.pretty_generate(package) + "\n")
 
           puts "  Created #{package_path}"
         end
 
-        def merge_package_json!(package_path)
+        def merge_package_json!(package_path, options)
           puts "Updating #{package_path}..."
 
           existing = JSON.parse(File.read(package_path))
@@ -101,12 +117,26 @@ module Ruby2JS
             app_root: Dir.pwd
           )
 
+          # Add Vite dependencies (always included now)
+          add_vite_dependencies!(required)
+
           # Merge dependencies (add missing, don't overwrite existing)
           existing["dependencies"] ||= {}
           required["dependencies"].each do |name, version|
             unless existing["dependencies"].key?(name)
               existing["dependencies"][name] = version
               puts "  Added dependency: #{name}"
+            end
+          end
+
+          # Merge devDependencies
+          if required["devDependencies"]
+            existing["devDependencies"] ||= {}
+            required["devDependencies"].each do |name, version|
+              unless existing["devDependencies"].key?(name)
+                existing["devDependencies"][name] = version
+                puts "  Added devDependency: #{name}"
+              end
             end
           end
 
@@ -134,6 +164,59 @@ module Ruby2JS
           existing["type"] ||= "module"
 
           File.write(package_path, JSON.pretty_generate(existing) + "\n")
+        end
+
+        def add_vite_dependencies!(package)
+          package["devDependencies"] ||= {}
+          package["devDependencies"]["vite"] = "^6.0.0"
+          package["devDependencies"]["vite-plugin-ruby2js"] = "*"
+
+          # Add Vite scripts
+          package["scripts"] ||= {}
+          package["scripts"]["vite"] = "vite"
+          package["scripts"]["vite:build"] = "vite build"
+          package["scripts"]["vite:preview"] = "vite preview"
+        end
+
+        def create_vite_config!(options)
+          config_path = File.join(DIST_DIR, 'vite.config.js')
+
+          if File.exist?(config_path)
+            puts "  vite.config.js already exists, skipping"
+            return
+          end
+
+          database = options[:database] || detect_database
+          target = options[:target] || 'browser'
+
+          config_content = <<~JS
+            import { juntos } from 'ruby2js-rails/vite';
+
+            export default juntos({
+              database: '#{database}',
+              target: '#{target}',
+              appRoot: '..'  // Source files are in parent directory
+            });
+          JS
+
+          File.write(config_path, config_content)
+          puts "  Created vite.config.js"
+        end
+
+        def detect_database
+          return 'dexie' unless File.exist?("config/database.yml")
+
+          require 'yaml'
+          db_config = YAML.load_file("config/database.yml")
+          adapter = db_config.dig('development', 'adapter') ||
+                    db_config.dig('default', 'adapter')
+
+          case adapter
+          when 'postgresql', 'pg' then 'pg'
+          when 'mysql2' then 'mysql'
+          when 'sqlite3' then 'sqlite'
+          else 'dexie'
+          end
         end
 
         def install_dependencies!

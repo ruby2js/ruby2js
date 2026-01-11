@@ -50,7 +50,7 @@ module Ruby2JS
               options[:verbose] = true
             end
 
-            opts.on("--selfhost", "Use JavaScript transpiler instead of Ruby") do
+            opts.on("--selfhost", "Use JavaScript transpiler instead of Ruby (legacy mode)") do
               options[:selfhost] = true
             end
 
@@ -89,7 +89,11 @@ module Ruby2JS
         def build(options)
           puts "Building application..."
 
-          success = if options[:selfhost]
+          vite_config = File.join(DIST_DIR, 'vite.config.js')
+
+          success = if File.exist?(vite_config)
+            build_with_vite(options)
+          elsif options[:selfhost]
             # Use JavaScript transpiler via npm (run from dist/)
             Dir.chdir(DIST_DIR) do
               if options[:verbose]
@@ -111,6 +115,16 @@ module Ruby2JS
             puts "Build complete. Output in dist/"
           else
             abort "Error: Build failed. Run with --verbose for details."
+          end
+        end
+
+        def build_with_vite(options)
+          Dir.chdir(DIST_DIR) do
+            if options[:verbose]
+              system("npx vite build")
+            else
+              system("npx vite build > /dev/null 2>&1")
+            end
           end
         end
       end

@@ -1,52 +1,35 @@
 ---
 order: 612
-title: Using Vite
+title: Vite Configuration
 top_section: Juntos
 category: juntos
 ---
 
 # Juntos + Vite
 
-Use Vite directly with the `juntos()` preset for full control over your build process. This is an alternative to the [Juntos CLI](/docs/juntos/cli)—same transformations, but you manage Vite yourself.
+Juntos uses Vite as its build tool. When you run `juntos install`, a `vite.config.js` is created automatically. This page covers how to customize the Vite configuration.
 
 {% toc %}
 
-## When to Use Vite Directly
+## Default Setup
 
-| Use Case | Recommended Approach |
-|----------|---------------------|
-| Quick start, standard setup | Juntos CLI (`bin/juntos dev`) |
-| Custom Vite plugins needed | Vite + juntos preset |
-| Integrating with existing Vite project | Vite + juntos preset |
-| Non-standard build requirements | Vite + juntos preset |
-| Just want it to work | Juntos CLI |
-
-## Installation
-
-Ensure you have the required packages:
-
-```bash
-npm install vite vite-plugin-ruby2js ruby2js-rails ruby2js
-```
-
-## Configuration
-
-Create a `vite.config.js` in your Rails app root:
+After running `juntos install`, your `dist/vite.config.js` looks like:
 
 ```javascript
 import { juntos } from 'ruby2js-rails/vite';
 
 export default juntos({
   database: 'dexie',
-  target: 'browser'
+  target: 'browser',
+  appRoot: '..'  // Source files are in parent directory
 });
 ```
 
-Then run Vite directly:
+The CLI commands use this configuration automatically:
 
 ```bash
-npx vite          # Development server
-npx vite build    # Production build
+bin/juntos dev    # Runs Vite dev server
+bin/juntos build  # Runs Vite build
 ```
 
 ## Options
@@ -98,7 +81,7 @@ The `juntos()` preset returns an array of Vite plugins:
 
 ### Structural Transforms
 
-On build start, the preset runs the same transformations as `bin/juntos build`:
+On build start, the preset runs the same transformations as the Ruby transpiler:
 
 - **Models** — ActiveRecord classes with associations, validations, callbacks
 - **Controllers** — Action methods, before_action, params handling
@@ -160,7 +143,7 @@ controllers:
     - functions
 ```
 
-## Combining with Other Plugins
+## Adding Custom Plugins
 
 Since `juntos()` returns a plugin array, combine with other Vite plugins:
 
@@ -187,27 +170,27 @@ The preset configures these aliases automatically:
 | `@views` | `app/views` |
 | `components` | `app/components` |
 
-## Migrating from CLI
+## Running Vite Directly
 
-To migrate from `bin/juntos dev` to Vite directly:
+You can bypass the CLI and run Vite directly:
 
-1. Create `vite.config.js` as shown above
-2. Add Vite scripts to `package.json`:
-   ```json
-   {
-     "scripts": {
-       "dev": "vite",
-       "build": "vite build"
-     }
-   }
-   ```
-3. Run `npm run dev` instead of `bin/juntos dev`
-
-Database commands still use the CLI:
 ```bash
-bin/juntos db:migrate
-bin/juntos db:seed
+cd dist
+npx vite          # Development server
+npx vite build    # Production build
+npx vite preview  # Preview production build
 ```
+
+This is useful for debugging or when integrating with other tools.
+
+## Opting Out of Vite
+
+To use the legacy dev server instead of Vite:
+
+1. Delete `dist/vite.config.js`
+2. Run `bin/juntos dev` — it will fall back to the legacy server
+
+The legacy server uses full page reloads instead of HMR.
 
 ## Next Steps
 

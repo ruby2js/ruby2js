@@ -23,7 +23,8 @@ module Ruby2JS
           options = {
             port: 3000,
             open: false,
-            selfhost: false
+            selfhost: false,
+            target: ENV['JUNTOS_TARGET']
           }
 
           parser = OptionParser.new do |opts|
@@ -45,8 +46,12 @@ module Ruby2JS
               options[:open] = true
             end
 
-            opts.on("--selfhost", "Use JavaScript transpiler instead of Ruby") do
+            opts.on("--selfhost", "Use JavaScript transpiler instead of Ruby (legacy mode)") do
               options[:selfhost] = true
+            end
+
+            opts.on("-t", "--target TARGET", "Build target: browser, node, electron") do |target|
+              options[:target] = target
             end
 
             opts.on("-h", "--help", "Show this help message") do
@@ -88,6 +93,53 @@ module Ruby2JS
         end
 
         def start_dev_server(options)
+          vite_config = File.join(DIST_DIR, 'vite.config.js')
+
+          if File.exist?(vite_config)
+            start_vite_server(options)
+          else
+            start_legacy_server(options)
+          end
+        end
+
+        def start_vite_server(options)
+          # For Node targets, use SSR middleware mode
+          if server_target?(options[:target])
+            start_vite_ssr_server(options)
+          else
+            start_vite_browser_server(options)
+          end
+        end
+
+        def server_target?(target)
+          %w[node bun deno].include?(target)
+        end
+
+        def start_vite_browser_server(options)
+          cmd = ["npx", "vite"]
+          cmd << "--port" << options[:port].to_s if options[:port] != 5173
+          cmd << "--open" if options[:open]
+
+          puts "Starting Vite dev server..."
+          Dir.chdir(DIST_DIR) do
+            exec(*cmd)
+          end
+        end
+
+        def start_vite_ssr_server(options)
+          # Set environment for the SSR server
+          ENV['PORT'] = options[:port].to_s
+          ENV['JUNTOS_APP_ROOT'] = Dir.pwd
+
+          cmd = ["node", "node_modules/ruby2js-rails/vite-ssr-dev.mjs"]
+
+          puts "Starting Vite SSR dev server (target: #{options[:target]})..."
+          Dir.chdir(DIST_DIR) do
+            exec(*cmd)
+          end
+        end
+
+        def start_legacy_server(options)
           cmd = ["npm", "run", "dev"]
           extra_args = []
 

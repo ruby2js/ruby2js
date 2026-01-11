@@ -10,7 +10,8 @@
     "ruby2js-rails-dev": "./dev-server.mjs",
     "ruby2js-rails-server": "./server.mjs",
     "ruby2js-rails-build": "./build.mjs",
-    "ruby2js-rails-migrate": "./migrate.mjs"
+    "ruby2js-rails-migrate": "./migrate.mjs",
+    "ruby2js-rails-vite-ssr": "./vite-ssr-dev.mjs"
   },
   "exports": {
     "./adapters/*": "./adapters/*",
@@ -24,7 +25,9 @@
     "./server.mjs": "./server.mjs",
     "./migrate.mjs": "./migrate.mjs",
     "./vite": "./vite.mjs",
-    "./vite.mjs": "./vite.mjs"
+    "./vite.mjs": "./vite.mjs",
+    "./vite-ssr-dev": "./vite-ssr-dev.mjs",
+    "./vite-ssr-dev.mjs": "./vite-ssr-dev.mjs"
   },
   "files": [
     "adapters/",
@@ -37,7 +40,8 @@
     "dev-server.mjs",
     "server.mjs",
     "migrate.mjs",
-    "vite.mjs"
+    "vite.mjs",
+    "vite-ssr-dev.mjs"
   ],
   "keywords": [
     "ruby2js",
