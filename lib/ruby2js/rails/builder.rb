@@ -475,6 +475,18 @@ class SelfhostBuilder
       updated = true
     end
 
+    # Add user-specified dependencies from ruby2js.yml
+    user_deps = load_ruby2js_config('dependencies')
+    if user_deps.is_a?(Hash)
+      user_deps.each do |name, version|
+        unless deps.key?(name)
+          deps[name] = version
+          puts("  Adding dependency: #{name}@#{version}")
+          updated = true
+        end
+      end
+    end
+
     return false unless updated
 
     package['dependencies'] = deps
