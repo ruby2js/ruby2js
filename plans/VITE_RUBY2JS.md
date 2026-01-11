@@ -328,45 +328,23 @@ app.get('*', async (req, res) => {
 
 This follows the same pattern used by Remix, SvelteKit, and other SSR frameworks.
 
-### Phase 2c: Full HMR for Structural Changes
+### Phase 2c: HMR for Structural Changes (Partial ✅)
 
-Extend HMR beyond Stimulus controllers to cover all structural changes. When a model, controller, or view file changes, re-transpile incrementally and push updates to the browser without a full page reload.
+Extend HMR beyond Stimulus controllers. Easy wins implemented; full dependency tracking deferred.
 
-| File Type | HMR Behavior |
-|-----------|--------------|
-| Model (`.rb`) | Re-transpile model, update associations, notify dependents |
-| Controller (`.rb`) | Re-transpile controller, update route handlers |
-| View (`.html.erb`) | Re-compile ERB template, update view module |
-| View (`.rbx`) | Re-transpile with React filter, trigger React HMR |
-| Routes (`routes.rb`) | Re-generate `routes.js` and `paths.js` |
+| File Type | HMR Behavior | Status |
+|-----------|--------------|--------|
+| Stimulus (`.rb`) | Hot swap via custom event | ✅ Done |
+| View (`.rbx`) | React HMR | ✅ Done (Vite default) |
+| View (`.html.erb`) | Vite module invalidation | ✅ Done (Vite default) |
+| Plain Ruby (`.rb`) | Vite module invalidation | ✅ Done (Vite default) |
+| Model (`.rb`) | Full reload | ✅ Done (safe fallback) |
+| Rails Controller (`.rb`) | Full reload | ✅ Done (safe fallback) |
+| Routes (`routes.rb`) | Full reload | ✅ Done (safe fallback) |
 
-**Implementation approach:**
+**What's implemented:** Models, Rails controllers, and routes trigger full page reload. Everything else uses Vite's default HMR (module invalidation).
 
-```javascript
-{
-  name: 'juntos-structure',
-
-  buildStart() {
-    // Full build on startup (existing)
-    builder.build();
-  },
-
-  handleHotUpdate({ file, server }) {
-    // Incremental rebuild on file change
-    if (file.includes('app/models/')) {
-      builder.transpile_file(file, destPath, 'models');
-      return affectedModules;
-    }
-    if (file.includes('app/controllers/')) {
-      builder.transpile_file(file, destPath, 'controllers');
-      return affectedModules;
-    }
-    // ... views, routes
-  }
-}
-```
-
-**Dependencies:** Requires `SelfhostBuilder` methods to support single-file transpilation (already exists: `transpile_file()`).
+**Deferred:** Full incremental HMR for models/controllers/routes would require dependency tracking to know what else to invalidate. Current approach is safe and fast enough for most workflows.
 
 ### Phase 3: Publish Tarballs
 

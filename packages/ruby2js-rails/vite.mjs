@@ -340,15 +340,45 @@ function getNativeModules(database) {
 }
 
 /**
- * HMR plugin for Stimulus controllers.
+ * HMR plugin for Stimulus controllers and structural changes.
+ *
+ * HMR behavior:
+ * - Models, non-Stimulus controllers, routes → full reload
+ * - Stimulus controllers → hot swap via custom event
+ * - ERB views, RBX files, plain Ruby → Vite default HMR
  */
 function createHmrPlugin() {
   return {
     name: 'juntos-hmr',
 
     handleHotUpdate({ file, server, modules }) {
-      // Handle Stimulus controller updates (.rb and .rbx)
-      if (file.match(/_controller\.(rb|rbx)$/)) {
+      // Normalize path for matching
+      const normalizedFile = file.replace(/\\/g, '/');
+
+      // Models: full reload (associations, dependencies unknown)
+      if (normalizedFile.includes('/app/models/') && file.endsWith('.rb')) {
+        console.log('[juntos] Model changed, triggering full reload:', file);
+        server.ws.send({ type: 'full-reload' });
+        return [];
+      }
+
+      // Routes: full reload (need full regeneration)
+      if (normalizedFile.includes('/config/routes')) {
+        console.log('[juntos] Routes changed, triggering full reload:', file);
+        server.ws.send({ type: 'full-reload' });
+        return [];
+      }
+
+      // Rails controllers (app/controllers/): full reload (route handlers)
+      if (normalizedFile.includes('/app/controllers/') && file.endsWith('.rb')) {
+        console.log('[juntos] Rails controller changed, triggering full reload:', file);
+        server.ws.send({ type: 'full-reload' });
+        return [];
+      }
+
+      // Stimulus controllers (app/javascript/controllers/): hot swap
+      if (normalizedFile.includes('/app/javascript/controllers/') &&
+          file.match(/_controller\.(rb|rbx)$/)) {
         const controllerName = extractControllerName(file);
 
         server.ws.send({
@@ -360,8 +390,12 @@ function createHmrPlugin() {
           }
         });
 
+        console.log('[juntos] Hot updating Stimulus controller:', controllerName);
         return modules;
       }
+
+      // ERB views, RBX files, plain Ruby: let Vite handle HMR
+      // (default behavior - return undefined to use Vite's module graph)
     },
 
     transformIndexHtml(html) {

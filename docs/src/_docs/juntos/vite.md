@@ -90,6 +90,22 @@ On build start, the preset runs the same transformations as the Ruby transpiler:
 - **Migrations** — Schema changes for the target database
 - **Stimulus** — Controllers transpiled with HMR support
 
+### Hot Module Replacement
+
+During development, file changes trigger different behaviors:
+
+| File Type | Behavior |
+|-----------|----------|
+| Stimulus controllers | Hot swap (no reload) |
+| RBX components | React HMR |
+| ERB views | Module refresh |
+| Plain Ruby files | Module refresh |
+| Models | Full page reload |
+| Rails controllers | Full page reload |
+| Routes | Full page reload |
+
+Models, Rails controllers, and routes trigger full reloads because they have complex dependencies. Everything else updates instantly without losing page state.
+
 ## RBX Files
 
 `.rbx` files combine Ruby and JSX for React components:
