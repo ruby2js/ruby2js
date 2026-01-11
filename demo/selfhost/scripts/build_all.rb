@@ -22,6 +22,7 @@ require 'ruby2js/filter/polyfill'
 require 'ruby2js/filter/functions'
 require 'ruby2js/filter/return'
 require 'ruby2js/filter/esm'
+require 'ruby2js/filter/node'
 
 # Load manifest
 def manifest
@@ -48,6 +49,7 @@ FILTER_FILTERS = [
   Ruby2JS::Filter::Selfhost::Core,
   Ruby2JS::Filter::Selfhost::Converter,
   Ruby2JS::Filter::Polyfill,
+  Ruby2JS::Filter::Node,
   Ruby2JS::Filter::Functions,
   Ruby2JS::Filter::Return,
   Ruby2JS::Filter::ESM

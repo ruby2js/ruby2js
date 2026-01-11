@@ -64,6 +64,7 @@ module Ruby2JS
         @phlex_ivars = nil
         @phlex_react_mode = false
         @phlex_lit_mode = false
+        @phlex_astro_mode = false
         super
       end
 
@@ -77,11 +78,14 @@ module Ruby2JS
         if defined?(Ruby2JS::Filter::Lit) && filters.include?(Ruby2JS::Filter::Lit)
           @phlex_lit_mode = true
         end
+        if defined?(Ruby2JS::Filter::Astro) && filters.include?(Ruby2JS::Filter::Astro)
+          @phlex_astro_mode = true
+        end
       end
 
-      # Check if we're in a framework mode (React or Lit)
+      # Check if we're in a framework mode (React, Lit, or Astro)
       def phlex_framework_mode?
-        @phlex_react_mode || @phlex_lit_mode
+        @phlex_react_mode || @phlex_lit_mode || @phlex_astro_mode
       end
 
       # Detect Phlex component class definition

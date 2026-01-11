@@ -943,12 +943,12 @@ views:
 - [x] Rewrite bare specifiers in ESM filter (resolve_component_import)
 - [x] Support `components/Name` convention (maps to relative paths)
 
-### Phase 6: Astro Target (Full Support)
-- [ ] Create Astro serializer for pnode AST
-- [ ] Phlex + Astro filter → `.astro` output (frontmatter + template)
-- [ ] Integrate with Astro build pipeline
-- [ ] Template uses JSX-style `{expr}` (same as React, simpler than Vue)
-- [ ] Support client directives as passthrough attributes
+### Phase 6: Astro Target (Full Support) ✓
+- [x] Create Astro filter for pnode AST
+- [x] Phlex + Astro filter → `.astro` output (frontmatter + template)
+- [x] Add Astro section to builder (transpile_astro_file)
+- [x] Template uses JSX-style `{expr}` (same as React, simpler than Vue)
+- [x] Props extracted from render method args → `const { } = Astro.props;`
 
 ### Phase 7: Vue Target (Substantial Support)
 - [ ] Create Vue serializer for pnode AST

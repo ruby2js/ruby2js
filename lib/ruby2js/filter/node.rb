@@ -29,8 +29,8 @@ module Ruby2JS
         @import_os ||= s(:import, ['node:os'], s(:attr, nil, :os))
       end
 
-      def import_path
-        @import_path ||= s(:import, ['node:path'], s(:attr, nil, :path))
+      def node_import_path
+        @node_import_path ||= s(:import, ['node:path'], s(:attr, nil, :path))
       end
 
       def setup_argv
@@ -189,23 +189,23 @@ module Ruby2JS
 
           elsif target.children.last == :File
             if method == :absolute_path or method == :expand_path
-              self.prepend_list << import_path
+              self.prepend_list << node_import_path
               S(:send, s(:attr, nil, :path), :resolve,
                 *process_all(args.reverse))
             elsif method == :absolute_path?
-              self.prepend_list << import_path
+              self.prepend_list << node_import_path
               S(:send, s(:attr, nil, :path), :isAbsolute, *process_all(args))
             elsif method == :basename
-              self.prepend_list << import_path
+              self.prepend_list << node_import_path
               S(:send, s(:attr, nil, :path), :basename, *process_all(args))
             elsif method == :dirname
-              self.prepend_list << import_path
+              self.prepend_list << node_import_path
               S(:send, s(:attr, nil, :path), :dirname, *process_all(args))
             elsif method == :extname
-              self.prepend_list << import_path
+              self.prepend_list << node_import_path
               S(:send, s(:attr, nil, :path), :extname, *process_all(args))
             elsif method == :join
-              self.prepend_list << import_path
+              self.prepend_list << node_import_path
               S(:send, s(:attr, nil, :path), :join, *process_all(args))
             else
               super
@@ -361,7 +361,7 @@ module Ruby2JS
               args.first.children[0].children == [nil, :Pathname] and
               args.first.children[1] == :new
         then
-          self.prepend_list << import_path
+          self.prepend_list << node_import_path
           # path.relative(from, to) - note: args order is reversed from Ruby
           from_path = process(args.first.children[2])
           to_path = process(target.children[2])
@@ -405,10 +405,10 @@ module Ruby2JS
           S(:attr, s(:attr, nil, :process), :stderr)
         elsif node.children.first == s(:const, nil, :File)
           if node.children.last == :SEPARATOR
-            self.prepend_list << import_path
+            self.prepend_list << node_import_path
             S(:attr, s(:attr, nil, :path), :sep)
           elsif node.children.last == :PATH_SEPARATOR
-            self.prepend_list << import_path
+            self.prepend_list << node_import_path
             S(:attr, s(:attr, nil, :path), :delimiter)
           else
             super

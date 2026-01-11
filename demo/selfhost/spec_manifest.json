@@ -34,6 +34,7 @@
     "node_spec.rb",
     "jsx_spec.rb",
     "lit_spec.rb",
+    "astro_spec.rb",
     "combiner_spec.rb",
     "require_spec.rb",
     "action_cable_spec.rb",
