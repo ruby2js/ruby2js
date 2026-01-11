@@ -107,6 +107,11 @@ describe Ruby2JS::Filter::ESM do
         must_include "export default hash = {a: 123}"
     end
 
+    it "should merge standalone export default with following function" do
+      to_js("export default\ndef Show(x:)\n  x\nend").
+        must_include "export default function Show"
+    end
+
     it "should handle named exports" do
       to_js("export class X < Y\nend").
         must_include "export class X extends Y {"

@@ -1019,8 +1019,11 @@ module Ruby2JS
               hash = s(:nil)
             end
 
-            # Process children in the block
+            # Process children in the block - unwrap :begin node if present
             block_children = node.children[2..-1]
+            if block_children.length == 1 && block_children.first&.type == :begin
+              block_children = block_children.first.children
+            end
             children_ast = block_children.map { |c| process(c) }
 
             return build_react_element([s(:str, tag), hash, *children_ast])
@@ -1036,8 +1039,11 @@ module Ruby2JS
             hash = component_args.find { |arg| arg.type == :hash }
             hash = hash ? process(hash) : s(:nil)
 
-            # Process children in the block
+            # Process children in the block - unwrap :begin node if present
             block_children = node.children[2..-1]
+            if block_children.length == 1 && block_children.first&.type == :begin
+              block_children = block_children.first.children
+            end
             children_ast = block_children.map { |c| process(c) }
 
             return build_react_element([component_const, hash, *children_ast])
@@ -1052,8 +1058,11 @@ module Ruby2JS
             hash = tag_args.find { |arg| arg.type == :hash }
             hash = hash ? process(hash) : s(:nil)
 
-            # Process children in the block
+            # Process children in the block - unwrap :begin node if present
             block_children = node.children[2..-1]
+            if block_children.length == 1 && block_children.first&.type == :begin
+              block_children = block_children.first.children
+            end
             children_ast = block_children.map { |c| process(c) }
 
             return build_react_element([tag_name, hash, *children_ast])

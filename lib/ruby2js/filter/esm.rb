@@ -71,8 +71,39 @@ module Ruby2JS
 
         @esm_top = list
 
+        # Merge standalone "export default" with the following statement
+        # This handles: export default; def Foo() ... end => export default def Foo() ... end
+        merged = []
+        merge_happened = false
+        i = 0
+        while i < list.length
+          child = list[i]
+          if child.respond_to?(:type) && child.type == :send &&
+             child.children[0..1] == [nil, :export] &&
+             child.children[2]&.type == :send &&
+             child.children[2].children[0..1] == [nil, :default] &&
+             child.children[2].children.length == 2 &&  # just "default" with no args
+             i + 1 < list.length
+            # Merge with next statement
+            next_stmt = list[i + 1]
+            merged << s(:send, nil, :export, s(:send, nil, :default, next_stmt))
+            i += 2  # skip both statements
+            merge_happened = true
+          else
+            merged << child
+            i += 1
+          end
+        end
+
+        # If we merged, rebuild the node with the merged list
+        if merge_happened
+          list = merged
+          @esm_top = list
+          node = node.updated(:begin, list)
+        end
+
         # Process the AST first (let other filters transform it)
-        result = super
+        result = super(node)
 
         # Then apply autoexports to the processed result
         return result unless @esm_autoexports

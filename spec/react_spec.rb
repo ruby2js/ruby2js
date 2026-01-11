@@ -93,13 +93,20 @@ describe Ruby2JS::Filter::React do
   describe "JSX" do
     it "should wrap list" do
       to_js( 'class Foo<React; def render; %x{<p/><p/>}; end; end' ).
-        must_include 'React.createElement(React.Fragment, null, ' + 
+        must_include 'React.createElement(React.Fragment, null, ' +
           'React.createElement("p"), React.createElement("p"))'
     end
 
     it "should handle stateless components" do
       to_js( 'Button = ->(x) { %x(<button>{x}</button>)}' ).
         must_equal 'const Button = x => (React.createElement("button", null, x))'
+    end
+
+    it "should separate sibling elements with commas not semicolons" do
+      result = to_js( 'class Foo<React; def render; %x{<div><h1>title</h1><p>text</p></div>}; end; end' )
+      result.must_include 'React.createElement("h1", null, "title"),'
+      result.must_include 'React.createElement("p", null, "text")'
+      result.wont_include 'React.createElement("h1", null, "title");'
     end
   end
 
