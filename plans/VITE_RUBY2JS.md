@@ -279,16 +279,18 @@ export default juntos({
 - RBX files (Ruby + JSX) with React/ReactFlow
 - Database integration
 
-### Phase 2b: CLI Integration (Optional)
+### Phase 2b: CLI Integration ✅ Complete
 
-Make the Juntos CLI a thin wrapper around Vite. This is a convenience layer—users can already use Vite directly with the `juntos()` preset.
+Make the Juntos CLI a thin wrapper around Vite. Vite is now the default—no flags needed.
 
-| Task | Description |
-|------|-------------|
-| Update `juntos dev` | Run `npx vite` instead of custom dev server |
-| Update `juntos build` | Run `npx vite build` instead of direct SelfhostBuilder |
-| Generate vite.config.js | Create config during `juntos install` if not present |
-| Vite middleware mode | For Node server targets, use `ssrLoadModule` for instant updates |
+| Task | Status |
+|------|--------|
+| Update `juntos dev` | ✅ Auto-detects vite.config.js |
+| Update `juntos build` | ✅ Auto-detects vite.config.js |
+| Generate vite.config.js | ✅ Created by `juntos install` |
+| Vite middleware mode | ✅ SSR dev server for Node targets |
+
+**Design:** Presence of `dist/vite.config.js` determines Vite vs legacy mode. Delete the file to opt out.
 
 **Note:** Database commands (`juntos db:migrate`, `juntos db:seed`) remain unchanged.
 
