@@ -490,7 +490,7 @@ class SelfhostBuilder
     # Add user-specified dependencies from ruby2js.yml
     user_deps = load_ruby2js_config('dependencies')
     if user_deps.is_a?(Hash)
-      user_deps.each do |name, version|
+      user_deps.each do |name, version| # Pragma: entries
         unless deps.key?(name)
           deps[name] = version
           puts("  Adding dependency: #{name}@#{version}")
