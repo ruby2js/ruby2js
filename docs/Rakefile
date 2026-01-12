@@ -10,8 +10,7 @@ end
 # Standard set of tasks, which you can customize if you wish:
 #
 desc "Build the Bridgetown site for deployment"
-#task :deploy => [:bt_clean, :clean, "frontend:build", :default] do
-task :deploy => [:bt_clean, "frontend:build"] do
+task :deploy => [:bt_clean, "frontend:build", :npm_packages] do
   Bridgetown::Commands::Build.start
 end
 
