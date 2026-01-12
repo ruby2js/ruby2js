@@ -547,10 +547,31 @@ class SelfhostBuilder
     # Base path for assets - '/dist' when serving from app root, '' when serving from dist/
     base_path = options[:base_path] || '/dist'
     user_importmap = options[:importmap] || {}
+    dependencies = options[:dependencies] || {}
+    dist_dir = options[:dist_dir]
 
     # Build importmap - merge common entries with database-specific and user entries
     db_entries = IMPORTMAP_ENTRIES[database] || IMPORTMAP_ENTRIES['dexie']
     importmap_entries = COMMON_IMPORTMAP_ENTRIES.merge(db_entries).merge(user_importmap)
+
+    # Add dependencies from ruby2js.yml to importmap
+    # Read each package's package.json to find ESM entry point
+    dependencies.each do |pkg_name, _version| # Pragma: entries
+      next if importmap_entries.key?(pkg_name)  # Don't override existing entries
+
+      pkg_json_path = dist_dir ? File.join(dist_dir, 'node_modules', pkg_name, 'package.json') : nil
+      if pkg_json_path && File.exist?(pkg_json_path)
+        begin
+          pkg_json = JSON.parse(File.read(pkg_json_path))
+          # Prefer "module" (ESM), fall back to "main"
+          entry_point = pkg_json['module'] || pkg_json['main'] || 'index.js'
+          importmap_entries[pkg_name] = "/node_modules/#{pkg_name}/#{entry_point}"
+        rescue JSON::ParserError
+          # Skip if package.json is invalid
+        end
+      end
+    end
+
     importmap = {
       'imports' => importmap_entries
     }
@@ -1748,6 +1769,15 @@ class SelfhostBuilder
       end
     end
 
+    # Also import and export partials (files starting with _)
+    # These are used by turbo stream templates: PhotoViews._photo({...})
+    resource_dist_dir = File.join(views_dist_dir, resource)
+    Dir.glob(File.join(resource_dist_dir, '_*.js')).each do |partial_path|
+      partial_basename = File.basename(partial_path, '.js')  # e.g., "_photo"
+      unified_js += "import { render as #{partial_basename}_render } from './#{resource}/#{partial_basename}.js';\n"
+      render_exports << "#{partial_basename}: #{partial_basename}_render"
+    end
+
     unified_js += <<~JS
 
       // Export #{views_class} - method names match controller action names
@@ -2221,12 +2251,15 @@ class SelfhostBuilder
 
     # Write index.html to dist/ - self-contained, served from dist root
     output_path = File.join(@dist_dir, 'index.html')
+    user_deps = self.load_ruby2js_config('dependencies') || {}
     SelfhostBuilder.generate_index_html(
       app_name: app_name,
       database: @database,
       css: css,
       output_path: output_path,
-      base_path: ''  # Serving from dist/ root, not /dist
+      base_path: '',  # Serving from dist/ root, not /dist
+      dependencies: user_deps,
+      dist_dir: @dist_dir
     )
     puts("  -> dist/index.html")
   end

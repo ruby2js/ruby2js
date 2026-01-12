@@ -168,7 +168,7 @@ class CameraController < Stimulus::Controller
   end
 
   def takePhoto
-    if isCapacitor
+    if isCapacitor()
       # Native mobile - use Capacitor Camera plugin
       takePhotoCapacitor()
     else
@@ -229,7 +229,7 @@ class CameraController < Stimulus::Controller
   end
 
   def chooseFromGallery
-    if isCapacitor
+    if isCapacitor()
       # Native mobile - use Capacitor Camera with Photos source
       chooseFromGalleryCapacitor()
     else
