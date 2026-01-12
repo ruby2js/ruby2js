@@ -560,6 +560,7 @@ class SelfhostBuilder
     base_path = options[:base_path] || '/dist'
     user_importmap = options[:importmap] || {}
     dependencies = options[:dependencies] || {}
+    stylesheets = options[:stylesheets] || []
     dist_dir = options[:dist_dir]
 
     # Build importmap - merge common entries with database-specific and user entries
@@ -603,6 +604,15 @@ class SelfhostBuilder
       '' # No default CSS - apps without a framework don't need a stylesheet link
     end
 
+    # Add additional stylesheets from ruby2js.yml
+    # These are CSS files from npm packages (e.g., 'reactflow/dist/style.css')
+    stylesheet_links = stylesheets.map do |path|
+      "<link rel=\"stylesheet\" href=\"/node_modules/#{path}\">"
+    end.join("\n    ")
+
+    # Combine framework CSS with additional stylesheets
+    all_css_links = [css_link, stylesheet_links].reject { |s| s.to_s.empty? }.join("\n    ")
+
     # Main container class based on CSS framework
     main_class = case css.to_s
     when 'pico' then 'container'
@@ -619,7 +629,7 @@ class SelfhostBuilder
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>#{app_name}</title>
-        #{css_link}
+        #{all_css_links}
         <script type="importmap">
         #{JSON.pretty_generate(importmap)}
         </script>
@@ -2264,6 +2274,7 @@ class SelfhostBuilder
     # Write index.html to dist/ - self-contained, served from dist root
     output_path = File.join(@dist_dir, 'index.html')
     user_deps = self.load_ruby2js_config('dependencies') || {}
+    user_stylesheets = self.load_ruby2js_config('stylesheets') || []
     SelfhostBuilder.generate_index_html(
       app_name: app_name,
       database: @database,
@@ -2271,6 +2282,7 @@ class SelfhostBuilder
       output_path: output_path,
       base_path: '',  # Serving from dist/ root, not /dist
       dependencies: user_deps,
+      stylesheets: user_stylesheets,
       dist_dir: @dist_dir
     )
     puts("  -> dist/index.html")

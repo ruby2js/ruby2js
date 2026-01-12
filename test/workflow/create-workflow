@@ -368,7 +368,7 @@ RBX
 mkdir -p app/components
 cat > app/components/WorkflowCanvas.rbx << 'COMPONENT'
 import ReactFlow, [Background, Controls, MiniMap, useNodesState, useEdgesState, addEdge], from: 'reactflow'
-import 'reactflow/dist/style.css'
+# Note: reactflow CSS is loaded via stylesheets config in ruby2js.yml
 
 export default
 def WorkflowCanvas(initialNodes:, initialEdges:, onSave:, onAddNode:, onAddEdge:)
@@ -503,6 +503,10 @@ dependencies:
   react: "^18.2.0"
   react-dom: "^18.2.0"
   reactflow: "^11.10.0"
+
+# CSS files from npm packages to include in index.html
+stylesheets:
+  - reactflow/dist/style.css
 CONFIG
 
 # Run ruby2js:install generator to set up dist/, package.json, and npm dependencies
