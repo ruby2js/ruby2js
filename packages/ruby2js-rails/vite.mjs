@@ -252,6 +252,7 @@ function createConfigPlugin(config, appRoot) {
         build: {
           outDir: 'dist',
           target: buildTarget,
+          emptyOutDir: false, // Preserve node_modules, package.json, etc.
           rollupOptions
         },
         resolve: {
