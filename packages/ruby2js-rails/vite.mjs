@@ -234,7 +234,9 @@ function createConfigPlugin(config, appRoot) {
         '@controllers': path.join(appRoot, 'app/javascript/controllers'),
         '@models': path.join(appRoot, 'app/models'),
         '@views': path.join(appRoot, 'app/views'),
-        'components': path.join(appRoot, 'app/components')
+        'components': path.join(appRoot, 'app/components'),
+        // Alias for Rails importmap-style imports in Stimulus controllers
+        'controllers/application': path.join(appRoot, 'app/javascript/controllers/application.js')
       };
 
       const rollupOptions = getRollupOptions(config.target, config.database);

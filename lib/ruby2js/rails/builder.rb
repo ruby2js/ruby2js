@@ -767,6 +767,13 @@ class SelfhostBuilder
       controllers_dest = File.join(@dist_dir, 'app/javascript/controllers')
       self.process_stimulus_controllers(stimulus_dir, controllers_dest)
 
+      # Copy generated index.js back to source for Vite compatibility
+      # (Rails generates importmap-style imports that don't work with Vite bundling)
+      generated_index = File.join(controllers_dest, 'index.js')
+      if File.exist?(generated_index)
+        FileUtils.cp(generated_index, File.join(stimulus_dir, 'index.js'))
+      end
+
       # For edge targets (Cloudflare, Vercel), also copy to public/ for static serving
       edge_targets = %w[cloudflare vercel-edge vercel-node]
       target_str = @target ? @target.to_s : nil
