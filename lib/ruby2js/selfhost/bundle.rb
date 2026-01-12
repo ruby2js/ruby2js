@@ -45,6 +45,9 @@ require_relative '../../ruby2js/filter/processor'
 # Pipeline (orchestration: filters + converter)
 require_relative '../../ruby2js/pipeline'
 
+# JSX parser (converts JSX syntax to Ruby DSL for RBX files)
+require_relative '../../ruby2js/jsx'
+
 # Regexp Scanner (minimal regex group parsing for selfhost filters)
 # Inlined directly to avoid require_relative processing issues
 def scanRegexpGroups(pattern)
@@ -95,8 +98,26 @@ end
 await initPrism()
 
 # ============================================================================
-# Convert function using Pipeline
+# Parse and Convert functions using Pipeline
 # ============================================================================
+
+# Parse Ruby source to AST
+# @param source [String] Ruby source code
+# @param file [String] Optional file name
+# @return [Array] [ast, source_buffer]
+export def parse(source, file=nil)
+  prism_parse = getPrismParse()
+  parse_result = prism_parse(source)
+
+  if parse_result.errors && parse_result.errors.length > 0
+    raise parse_result.errors[0].message
+  end
+
+  walker = Ruby2JS::PrismWalker.new(source, file)
+  ast = walker.visit(parse_result.value)
+
+  [ast, walker.source_buffer]
+end
 
 # Convert Ruby source to JavaScript
 # @param source [String] Ruby source code

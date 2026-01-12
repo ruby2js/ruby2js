@@ -8,7 +8,7 @@
 
 set -e
 
-APP_NAME="${1:-workflow}"
+APP_NAME="${1:-workflow_builder}"
 
 echo "Creating Ruby2JS workflow builder: $APP_NAME"
 echo ""

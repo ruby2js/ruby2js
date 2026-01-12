@@ -25,9 +25,9 @@ WORKDIR /app
 
 # Copy and run the workflow creation script
 COPY create-workflow .
-RUN chmod +x create-workflow && ./create-workflow workflow
+RUN chmod +x create-workflow && ./create-workflow workflow_builder
 
-WORKDIR /app/workflow
+WORKDIR /app/workflow_builder
 
 # Build args for Juntos
 ARG DATABASE=sqlite
@@ -39,7 +39,7 @@ ENV JUNTOS_DATABASE=${DATABASE}
 ENV JUNTOS_TARGET=${TARGET}
 
 # Build with specified database and target
-RUN bin/juntos build -d ${DATABASE} -t ${TARGET}
+RUN bin/juntos build -d ${DATABASE} -t ${TARGET} --verbose
 
 # Run migrations (skip for browser targets - they migrate client-side)
 RUN if [ "${TARGET}" != "browser" ]; then bin/juntos db prepare -d ${DATABASE} -t ${TARGET}; fi

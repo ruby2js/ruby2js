@@ -25,12 +25,14 @@ module Ruby2JS
   JSX_ALL_ELEMENTS = (JSX_VOID_ELEMENTS + JSX_HTML_ELEMENTS).freeze
 
   def self.jsx2_rb(string)
-    JsxParser.new(string.chars.each).parse.join("\n")
+    parser = JsxParser.new(string.chars)
+    result = parser.parse()
+    result.join("\n")
   end
 
   class JsxParser
     def initialize(stream)
-      @stream = stream.respond_to?(:next) ? stream : OpalEnumerator.new(stream)
+      @stream = stream.respond_to?(:next) ? stream : ArrayIterator.new(stream)
       @state = :text
       @text = ''
       @result = []
@@ -52,6 +54,7 @@ module Ruby2JS
 
       loop do
         c = @stream.next
+        break if c.nil?
 
         if c == "\n"
           backtrace = ''
@@ -64,7 +67,7 @@ module Ruby2JS
           if c == '<'
             @result << "plain \"#{@text.strip}\"" unless @text.strip.empty?
             if @tag_stack.empty?
-              @result += self.class.new(@stream).parse(:element)
+              @result += self.class.new(@stream).parse(:element) # Pragma: array
               @state = :text
               @text = ''
             else
@@ -77,7 +80,7 @@ module Ruby2JS
             @text += c + c
           elsif c == '{'
             @result << "plain \"#{@text}\"" unless @text.empty?
-            @result += parse_expr
+            @result += parse_expr # Pragma: array
             @text = ''
           else
             @text += c unless @text.empty? and c =~ /\s/
@@ -304,7 +307,7 @@ module Ruby2JS
         raise RangeError.new("internal state error in JSX: #{@state.inspect}")
       end
 
-      @result
+      return @result
     rescue SyntaxError => e
       e.set_backtrace backtrace
       raise e
@@ -374,25 +377,27 @@ module Ruby2JS
 
     # Format attributes hash as Ruby keyword arguments
     def format_attrs(attrs)
-      attrs.map { |name, value| "#{name}: #{value}" }.join(', ')
+      attrs.map { |name, value| "#{name}: #{value}" }.join(', ') # Pragma: entries
     end
   end
 
-  # Opal's enumerator doesn't currently support next and peek methods.
-  # Build a wrapper that adds those methods.
-  class OpalEnumerator
+  # Iterator wrapper that provides next/peek interface for arrays.
+  # Uses JS-style nil returns (not Ruby-style StopIteration exceptions)
+  # so it works identically in Ruby, Opal, and transpiled JavaScript.
+  class ArrayIterator
     def initialize(stream)
-      @stream = stream.to_a
+      # Use Array() for Ruby compatibility, transpiles to Array.from() in JS
+      @stream = Array(stream)
     end
 
     def next
-      raise StopIteration.new if @stream.empty?
+      return nil if @stream.empty?
       @stream.shift
     end
 
     def peek
-      raise StopIteration.new if @stream.empty?
-      @stream.first
+      return nil if @stream.empty?
+      @stream[0]
     end
   end
 end

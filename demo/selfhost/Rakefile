@@ -38,8 +38,8 @@ runtime_deps = FileList["#{ROOT}/lib/ruby2js/selfhost/runtime.rb"]
 # Prism browser dependencies
 prism_browser_deps = FileList["#{ROOT}/lib/ruby2js/selfhost/prism_browser.rb"]
 
-# Bundle dependencies (includes CLI)
-bundle_deps = FileList["#{ROOT}/lib/ruby2js/selfhost/bundle.rb", "#{ROOT}/lib/ruby2js/selfhost/cli.rb"]
+# Bundle dependencies (includes CLI and JSX parser)
+bundle_deps = FileList["#{ROOT}/lib/ruby2js/selfhost/bundle.rb", "#{ROOT}/lib/ruby2js/selfhost/cli.rb", "#{ROOT}/lib/ruby2js/jsx.rb"]
 
 # ERB Compiler dependencies
 erb_compiler_deps = FileList["#{ROOT}/lib/ruby2js/rails/erb_compiler.rb"]

@@ -98,8 +98,9 @@ filter_runtime_file = File.expand_path('../filter_runtime.js', __dir__)
 filter_runtime = File.read(filter_runtime_file)
 
 # Remove the import, change Parser to reassignment, remove duplicate Ruby2JS export
+# Also add parse to Ruby2JS object (jsx2_rb is already in Ruby2JS from IIFE return)
 filter_runtime = filter_runtime
-  .sub(/import \{ Ruby2JS \} from '\.\/ruby2js\.js';\n+/, '')
+  .sub(/import \{ Ruby2JS \} from '\.\/ruby2js\.js';\n+/, "// Attach parse to Ruby2JS object for filter access\nRuby2JS.parse = parse;\n\n")
   .sub(/export const Parser =/, 'Parser =')
   .sub(/\n\/\/ Re-export Ruby2JS.*\nexport \{ Ruby2JS \};/, '')
 
