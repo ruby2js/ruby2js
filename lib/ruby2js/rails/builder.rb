@@ -2274,7 +2274,8 @@ class SelfhostBuilder
     # Write index.html to dist/ - self-contained, served from dist root
     output_path = File.join(@dist_dir, 'index.html')
     user_deps = self.load_ruby2js_config('dependencies') || {}
-    user_stylesheets = self.load_ruby2js_config('stylesheets') || []
+    user_stylesheets = self.load_ruby2js_config('stylesheets')
+    user_stylesheets = [] unless user_stylesheets.is_a?(Array)
     SelfhostBuilder.generate_index_html(
       app_name: app_name,
       database: @database,
