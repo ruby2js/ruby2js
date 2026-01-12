@@ -22,6 +22,7 @@ module Ruby2JS
         def parse_options(args)
           options = {
             port: 3000,
+            host: nil,
             open: false,
             selfhost: false,
             target: ENV['JUNTOS_TARGET']
@@ -36,6 +37,10 @@ module Ruby2JS
 
             opts.on("-p", "--port PORT", Integer, "Port to run the dev server on (default: 3000)") do |port|
               options[:port] = port
+            end
+
+            opts.on("--host HOST", "Host to bind to (use 0.0.0.0 for Docker)") do |host|
+              options[:host] = host
             end
 
             opts.on("-e", "--environment ENV", "Rails environment (default: development)") do |env|
@@ -118,6 +123,7 @@ module Ruby2JS
         def start_vite_browser_server(options)
           cmd = ["npx", "vite"]
           cmd << "--port" << options[:port].to_s if options[:port] != 5173
+          cmd << "--host" << options[:host] if options[:host]
           cmd << "--open" if options[:open]
 
           puts "Starting Vite dev server..."

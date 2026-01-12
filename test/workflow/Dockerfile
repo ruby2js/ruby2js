@@ -39,7 +39,7 @@ ENV JUNTOS_DATABASE=${DATABASE}
 ENV JUNTOS_TARGET=${TARGET}
 
 # Build with specified database and target
-RUN bin/juntos build -d ${DATABASE} -t ${TARGET} --verbose
+RUN bin/juntos build -d ${DATABASE} -t ${TARGET}
 
 # Run migrations (skip for browser targets - they migrate client-side)
 RUN if [ "${TARGET}" != "browser" ]; then bin/juntos db prepare -d ${DATABASE} -t ${TARGET}; fi
