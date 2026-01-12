@@ -206,9 +206,18 @@ task "build_mjs:npm" => :build_mjs do
   # After build_mjs, paths are ../../demo/selfhost/... - convert to ruby2js package
   content = content.gsub('../../demo/selfhost/ruby2js.js', 'ruby2js')
   content = content.gsub('../../demo/selfhost/filters/', 'ruby2js/filters/')
-  content = content.gsub('../../demo/selfhost/lib/', 'ruby2js/lib/')
+  # Rails-specific lib files (erb_compiler, migration_sql, seed_sql) stay in ruby2js-rails
+  content = content.gsub('../../demo/selfhost/lib/', './lib/')
   File.write(BUILD_MJS, content)
   puts "Converted to npm package imports: #{BUILD_MJS}"
+
+  # Build Rails-specific lib files into ruby2js-rails package
+  lib_dir = File.join(PACKAGE, 'lib')
+  FileUtils.mkdir_p(lib_dir)
+  sh bundle_exec("ruby #{SELFHOST}/scripts/transpile_erb_compiler.rb > #{lib_dir}/erb_compiler.js")
+  sh bundle_exec("ruby #{SELFHOST}/scripts/transpile_migration_sql.rb > #{lib_dir}/migration_sql.js")
+  sh bundle_exec("ruby #{SELFHOST}/scripts/transpile_seed_sql.rb > #{lib_dir}/seed_sql.js")
+  puts "Built lib files in #{lib_dir}"
 end
 
 desc "Build and run all tests"
