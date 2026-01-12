@@ -337,6 +337,10 @@ task :ruby2js_rails_tarball => [:vite_plugin_tarball, :selfhost_build] do
     version = "6.0.0-beta.#{Time.now.strftime('%Y%m%d%H%M')}"
     sh "npm version #{version} --no-git-tag-version --allow-same-version"
 
+    # Remove peerDependencies first (npm quirk: peerDeps with "*" override dependency URLs)
+    sh "npm pkg delete peerDependencies.ruby2js"
+    sh "npm pkg delete peerDependencies.vite-plugin-ruby2js"
+
     # Add dependencies for the published package
     sh "npm pkg set dependencies.ruby2js=https://www.ruby2js.com/releases/ruby2js-beta.tgz"
     sh "npm pkg set dependencies.vite-plugin-ruby2js=https://www.ruby2js.com/releases/vite-plugin-ruby2js-beta.tgz"
@@ -344,7 +348,9 @@ task :ruby2js_rails_tarball => [:vite_plugin_tarball, :selfhost_build] do
     # Pack
     sh "npm pack"
 
-    # Remove dependencies (keep source clean for development)
+    # Restore peerDependencies and remove dependencies (keep source clean for development)
+    sh "npm pkg set peerDependencies.ruby2js='*'"
+    sh "npm pkg set peerDependencies.vite-plugin-ruby2js='*'"
     sh "npm pkg delete dependencies.ruby2js"
     sh "npm pkg delete dependencies.vite-plugin-ruby2js"
 
