@@ -65,17 +65,35 @@ cd dist
 # Install dependencies
 npm install
 
-# Install any Capacitor plugins your app uses
-npm install @capacitor/camera        # If using camera
-npm install @capacitor/geolocation   # If using GPS
-# ... etc
-
 # Add platforms (installs plugins into native projects)
 npx cap add ios
 npx cap add android
 ```
 
-**Important:** Install plugins *before* running `npx cap add`. This ensures the native projects are configured with the correct permissions and dependencies.
+### Pre-configuring Plugins
+
+Add Capacitor plugins to `config/ruby2js.yml` so they're automatically included in the build:
+
+```yaml
+# config/ruby2js.yml
+dependencies:
+  "@capacitor/camera": "^6.0.0"
+  "@capacitor/geolocation": "^6.0.0"
+```
+
+These dependencies are added to the generated `package.json` and installed with `npm install`.
+
+### Adding Plugins Later
+
+To add plugins after the initial build:
+
+```bash
+cd dist
+npm install @capacitor/camera
+npx cap sync
+```
+
+**Important:** Run `npx cap sync` after adding plugins to update the native projects with permissions and dependencies.
 
 ## Project Structure
 
@@ -194,13 +212,14 @@ This opens Android Studio. Select an emulator and click Run.
 
 ## Native Plugins
 
-Capacitor plugins provide access to native APIs. Install and use them in your Ruby Stimulus controllers:
+Capacitor plugins provide access to native APIs. Pre-configure them in `config/ruby2js.yml` or install manually, then use them in your Ruby Stimulus controllers:
 
 ### Camera
 
-```bash
-npm install @capacitor/camera
-npx cap sync
+```yaml
+# config/ruby2js.yml
+dependencies:
+  "@capacitor/camera": "^6.0.0"
 ```
 
 ```ruby
@@ -222,9 +241,10 @@ end
 
 ### Geolocation
 
-```bash
-npm install @capacitor/geolocation
-npx cap sync
+```yaml
+# config/ruby2js.yml
+dependencies:
+  "@capacitor/geolocation": "^6.0.0"
 ```
 
 ```ruby
@@ -241,9 +261,10 @@ end
 
 ### Push Notifications
 
-```bash
-npm install @capacitor/push-notifications
-npx cap sync
+```yaml
+# config/ruby2js.yml
+dependencies:
+  "@capacitor/push-notifications": "^6.0.0"
 ```
 
 ```ruby

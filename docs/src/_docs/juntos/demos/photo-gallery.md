@@ -70,19 +70,11 @@ Capacitor wraps your web app in a native shell, providing access to device APIs 
 bin/juntos build -t capacitor -d dexie
 cd dist
 npm install
-```
-
-### Install Camera Plugin
-
-The demo uses Capacitor's Camera plugin for native camera access. Install it before adding platforms:
-
-```bash
-npm install @capacitor/camera
 npx cap add ios      # Requires Xcode
 npx cap add android  # Requires Android Studio
 ```
 
-Capacitor automatically configures permissions in `Info.plist` (iOS) and `AndroidManifest.xml` (Android) when you add the plugin.
+The Camera plugin is pre-configured in `config/ruby2js.yml`. When you add platforms, Capacitor automatically installs the native plugin code and configures permissions in `Info.plist` (iOS) and `AndroidManifest.xml` (Android).
 
 ### Run on iOS
 

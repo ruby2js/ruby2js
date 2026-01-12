@@ -166,7 +166,8 @@ module Ruby2JS
 
           # Handle turbo_stream.prepend/append/replace/etc shorthand form (without block)
           # turbo_stream.prepend "photos", @photo -> turbo-stream HTML with rendered partial
-          if target&.type == :send && target.children == [nil, :turbo_stream]
+          # Note: Use element-by-element comparison for JS compatibility (array == doesn't work in JS)
+          if target&.type == :send && target.children[0].nil? && target.children[1] == :turbo_stream
             turbo_actions = [:prepend, :append, :replace, :update, :remove, :before, :after]
             if turbo_actions.include?(method) && args.length >= 1
               return process_turbo_stream_shorthand(method, args)

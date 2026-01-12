@@ -436,6 +436,24 @@ disable_filters:
 | `include` | array | Methods to opt-in for conversion |
 | `exclude` | array | Methods to exclude |
 | `strict` | boolean | Add "use strict" directive |
+| `dependencies` | object | NPM packages to add to generated package.json |
+| `external` | array | Modules to externalize (not bundled, resolved at runtime) |
+
+**Build configuration:**
+
+```yaml
+# Add npm dependencies to the generated package.json
+# These are installed and bundled by Vite
+dependencies:
+  "@capacitor/camera": "^6.0.0"
+  "chart.js": "^4.0.0"
+
+# Externalize modules (resolve at runtime, not bundled)
+# Use for CDN-loaded libraries or platform-provided modules
+external:
+  - "react"
+  - "react-dom"
+```
 
 **Available filters:**
 
