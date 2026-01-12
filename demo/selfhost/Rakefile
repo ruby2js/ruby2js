@@ -147,15 +147,24 @@ task :test_walker => [:npm_install, "#{SELFHOST}/ruby2js.js"] do
   end
 end
 
+desc "Create symlink to spec/require for ESM require tests"
+task :setup_require_symlink do
+  require_link = File.join(DIST, 'require')
+  require_target = File.join(ROOT, 'spec/require')
+  unless File.exist?(require_link)
+    FileUtils.ln_s(File.join('..', '..', '..', 'spec', 'require'), require_link)
+  end
+end
+
 desc "Run spec tests (requires build first)"
-task :test_specs => :npm_install do
+task :test_specs => [:npm_install, :setup_require_symlink] do
   Dir.chdir(SELFHOST) do
     sh "node run_all_specs.mjs --skip-transpile"
   end
 end
 
 desc "Run only ready spec tests"
-task :test_ready => :npm_install do
+task :test_ready => [:npm_install, :setup_require_symlink] do
   Dir.chdir(SELFHOST) do
     sh "node run_all_specs.mjs --skip-transpile --ready-only"
   end

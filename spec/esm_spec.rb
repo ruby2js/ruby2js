@@ -239,7 +239,8 @@ describe Ruby2JS::Filter::ESM do
     it "should not autoimport if magic comment is present" do
       # Skip in selfhost - pragma filter is auto-applied in Ruby but not in selfhost
       # (selfhost only applies explicitly listed filters)
-      return skip() unless Ruby2JS.respond_to?(:parse)
+      # Check for import.meta which only exists in ES module (JS) context
+      return skip() if defined?(import.meta)
       to_js("# autoimports: false\nfunc(1)", autoimports: {[:func, :another] => 'func.js'}).
         must_equal "// autoimports: false\nfunc(1)"
     end

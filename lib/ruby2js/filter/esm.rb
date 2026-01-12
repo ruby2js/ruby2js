@@ -398,10 +398,25 @@ module Ruby2JS
 
       private
 
+      # Convert a file:// URL to a filesystem path
+      # Handles both Ruby file paths and JavaScript import.meta.url values
+      def url_to_path(file_url)
+        return file_url unless file_url.start_with?('file://')
+
+        # Handle file:// URLs (from import.meta.url in JavaScript)
+        # Strip file:// prefix and handle file:/// for absolute paths
+        path = file_url.sub(/^file:\/\//, '')
+        # On Unix, file:///path becomes /path (strip leading //)
+        # On Windows, file:///C:/path becomes C:/path
+        path = path.sub(/^\/([A-Za-z]:)/, '\1') if path.match?(/^\/[A-Za-z]:/)
+        path
+      end
+
       # Convert require/require_relative to import statement by parsing the file
       # and detecting its exports
       def convert_require_to_import(node, method, basename)
-        base_dirname = File.dirname(File.expand_path(@options[:file]))
+        file = url_to_path(@options[:file])
+        base_dirname = File.dirname(File.expand_path(file))
         collect_imports_from_file(base_dirname, basename, base_dirname, node)
       end
 
@@ -451,7 +466,7 @@ module Ruby2JS
             if nested_result
               if nested_result.type == :begin
                 # Flatten nested begin nodes (multiple imports)
-                recursive_imports.concat(nested_result.children)
+                recursive_imports += nested_result.children
               elsif nested_result.type == :import
                 recursive_imports << nested_result
               end
@@ -505,7 +520,7 @@ module Ruby2JS
             all_imports << s(:import, importname, *imports)
           end
           # Then add nested imports (dependencies come after)
-          all_imports.concat(recursive_imports)
+          all_imports += recursive_imports
           return s(:begin, *all_imports) if all_imports.length > 1
           return all_imports.first if all_imports.length == 1
           return fallback_node
