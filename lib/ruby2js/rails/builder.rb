@@ -376,6 +376,18 @@ class SelfhostBuilder
       deps['tailwindcss'] = '^3.4.0'
     end
 
+    # Add user dependencies from ruby2js.yml
+    config_path = app_root ? File.join(app_root, 'config/ruby2js.yml') : 'config/ruby2js.yml'
+    if File.exist?(config_path)
+      begin
+        config = YAML.load_file(config_path, aliases: true) || {}
+        user_deps = config['dependencies'] || {}
+        deps.merge!(user_deps)
+      rescue StandardError
+        # Skip if config is invalid
+      end
+    end
+
     # Base scripts - server scripts added at build time based on target
     scripts = {
       'dev' => 'ruby2js-rails-dev',
