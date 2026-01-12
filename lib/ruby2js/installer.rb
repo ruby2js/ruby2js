@@ -37,7 +37,16 @@ module Ruby2JS
       local_plugin = File.join(gem_root, "packages/vite-plugin-ruby2js")
       dist_dir = File.join(app_root || Dir.pwd, 'dist')
 
+      # Only use local plugin if running from development checkout
+      # (gem_root is a parent of the app, not installed in bundle/gems)
+      use_local = false
       if File.directory?(local_plugin)
+        app_path = Pathname.new(app_root || Dir.pwd).expand_path
+        gem_path = Pathname.new(gem_root).expand_path
+        use_local = app_path.to_s.start_with?(gem_path.to_s)
+      end
+
+      if use_local
         relative_path = Pathname.new(local_plugin).relative_path_from(Pathname.new(dist_dir))
         package["devDependencies"]["vite-plugin-ruby2js"] = "file:#{relative_path}"
       else

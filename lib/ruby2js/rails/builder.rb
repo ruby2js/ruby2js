@@ -349,7 +349,16 @@ class SelfhostBuilder
     # Path is relative to dist/ directory where package.json lives
     dist_dir = File.join(app_root || Dir.pwd, 'dist')
 
-    use_local = File.directory?(local_package) && !options[:for_deploy]
+    # Only use local package if running from development checkout
+    # (gem_root is a parent of the app, not installed in bundle/gems)
+    use_local = false
+    if File.directory?(local_package) && !options[:for_deploy]
+      # Check if app_root is within the gem source tree (development scenario)
+      app_path = Pathname.new(app_root || Dir.pwd).expand_path
+      gem_path = Pathname.new(gem_root).expand_path
+      use_local = app_path.to_s.start_with?(gem_path.to_s)
+    end
+
     deps = if use_local
       relative_path = Pathname.new(local_package).relative_path_from(Pathname.new(dist_dir))
       { 'ruby2js-rails' => "file:#{relative_path}" }
