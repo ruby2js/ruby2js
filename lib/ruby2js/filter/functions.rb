@@ -1656,7 +1656,10 @@ module Ruby2JS
       # Map Ruby exception classes to JavaScript equivalents
       def on_const(node)
         # JSON::ParserError => SyntaxError (JSON.parse throws SyntaxError in JS)
-        if node.children == [s(:const, nil, :JSON), :ParserError]
+        # Note: Use element comparison for JS compatibility (array == doesn't work in JS)
+        if node.children.length == 2 &&
+           node.children[0] == s(:const, nil, :JSON) &&
+           node.children[1] == :ParserError
           s(:const, nil, :SyntaxError)
         else
           super
