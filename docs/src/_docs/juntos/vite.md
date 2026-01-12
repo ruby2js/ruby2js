@@ -157,7 +157,28 @@ controllers:
   filters:
     - rails/controller
     - functions
+
+# NPM packages to install and add to importmap
+dependencies:
+  "@capacitor/camera": "^6.0.0"
+  "some-library": "^1.0.0"
+
+# Packages resolved at runtime (not bundled by Rollup)
+external:
+  - "@hotwired/turbo"
+  - "@hotwired/stimulus"
 ```
+
+### dependencies vs external
+
+| Option | Purpose | Added to importmap? | Bundled by Rollup? |
+|--------|---------|---------------------|-------------------|
+| `dependencies` | Packages your app imports | Yes | No (external) |
+| `external` | Already-installed packages to keep external | Yes | No |
+
+**dependencies** are added to `package.json` during `juntos install` and included in the browser importmap. Use this for npm packages your Ruby code imports.
+
+**external** tells Rollup not to bundle these packages—they're resolved via importmap at runtime. The preset automatically externalizes `@hotwired/turbo`, `@hotwired/stimulus`, and packages listed in `dependencies`.
 
 ## Adding Custom Plugins
 
