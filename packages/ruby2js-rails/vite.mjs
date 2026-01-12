@@ -74,13 +74,15 @@ export function loadConfig(appRoot, overrides = {}) {
                  SelfhostBuilder.DEFAULT_TARGETS?.[database] ||
                  'browser';
 
+  // Spread configs first, then override with our calculated values
+  // This ensures env vars take precedence over hardcoded vite.config.js values
   return {
-    eslevel: ruby2jsConfig.eslevel || 2022,
+    ...ruby2jsConfig,
+    ...overrides,
+    eslevel: ruby2jsConfig.eslevel || overrides.eslevel || 2022,
     database: database || 'dexie',
     target,
-    broadcast: overrides.broadcast || ruby2jsConfig.broadcast,
-    ...ruby2jsConfig,
-    ...overrides
+    broadcast: overrides.broadcast || ruby2jsConfig.broadcast
   };
 }
 
