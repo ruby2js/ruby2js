@@ -16,6 +16,7 @@ require 'ruby2js/filter/selfhost'
 require 'ruby2js/filter/selfhost/filter'
 require 'ruby2js/filter/polyfill'
 require 'ruby2js/filter/functions'
+require 'ruby2js/filter/node'
 require 'ruby2js/filter/return'
 require 'ruby2js/filter/esm'
 
@@ -37,6 +38,7 @@ js = Ruby2JS.convert(source,
     Ruby2JS::Filter::Selfhost::Converter,
     Ruby2JS::Filter::Polyfill,
     Ruby2JS::Filter::Functions,
+    Ruby2JS::Filter::Node,
     Ruby2JS::Filter::Return,
     Ruby2JS::Filter::ESM
   ]

@@ -483,6 +483,12 @@ module Ruby2JS
             process S(:send, target, :charCodeAt, s(:int, 0))
           end
 
+        elsif method == :getbyte and args.length == 1
+          # str.getbyte(n) → str.charCodeAt(n)
+          # Note: getbyte returns byte value, charCodeAt returns char code
+          # For ASCII (which is what is_method? checks for), these are equivalent
+          process S(:send, target, :charCodeAt, *args)
+
         elsif method == :chr and args.length == 0
           if target.type == :int
             process S(:str, target.children.last.chr)

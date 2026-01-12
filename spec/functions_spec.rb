@@ -203,6 +203,11 @@ describe Ruby2JS::Filter::Functions do
       to_js( 'a.chr' ).must_equal 'String.fromCharCode(a)'
     end
 
+    it 'should handle getbyte' do
+      to_js( 'str.getbyte(0)' ).must_equal 'str.charCodeAt(0)'
+      to_js( 'str.getbyte(n)' ).must_equal 'str.charCodeAt(n)'
+    end
+
     it "should handle downcase" do
       to_js( 'x.downcase()' ).must_equal 'x.toLowerCase()'
     end

@@ -43,6 +43,7 @@ If you set the `eslevel` option to `2021` or newer, the Functions filter enables
 * `.flat_map {}` {{ caret }} `.flatMap()`
 * `.floor` {{ caret }} `Math.floor()`
 * `.freeze` {{ caret }} `Object.freeze()`
+* `.getbyte(n)` {{ caret }} `charCodeAt(n)`
 * `.group_by {}` {{ caret }} `Object.groupBy()` (ES2024+) or `.reduce()` fallback
 * `.group_by {|k,v| ...}` {{ caret }} destructuring support `([k, v]) => ...`
 * `.gsub` {{ caret }} `replace(//g)`
