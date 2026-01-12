@@ -3,6 +3,7 @@
 require 'json'
 require 'yaml'
 require 'fileutils'
+require 'pathname'
 
 module Ruby2JS
   # Shared installer logic for both Rails generator and CLI install command.
@@ -21,15 +22,27 @@ module Ruby2JS
         app_root: app_root
       )
 
-      add_vite_dependencies(package)
+      add_vite_dependencies(package, app_root: app_root)
       package
     end
 
     # Add Vite dependencies and scripts to a package hash
-    def add_vite_dependencies(package)
+    # Uses local file path when running from ruby2js repo, tarball URL otherwise
+    def add_vite_dependencies(package, app_root: nil)
       package["devDependencies"] ||= {}
       package["devDependencies"]["vite"] = "^6.0.0"
-      package["devDependencies"]["vite-plugin-ruby2js"] = "*"
+
+      # Check for local vite-plugin-ruby2js (when running from ruby2js repo)
+      gem_root = File.expand_path("../..", __dir__)
+      local_plugin = File.join(gem_root, "packages/vite-plugin-ruby2js")
+      dist_dir = File.join(app_root || Dir.pwd, 'dist')
+
+      if File.directory?(local_plugin)
+        relative_path = Pathname.new(local_plugin).relative_path_from(Pathname.new(dist_dir))
+        package["devDependencies"]["vite-plugin-ruby2js"] = "file:#{relative_path}"
+      else
+        package["devDependencies"]["vite-plugin-ruby2js"] = "https://www.ruby2js.com/releases/vite-plugin-ruby2js-beta.tgz"
+      end
 
       package["scripts"] ||= {}
       package["scripts"]["vite"] = "vite"
