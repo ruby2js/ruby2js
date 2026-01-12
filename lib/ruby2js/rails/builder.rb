@@ -449,7 +449,7 @@ class SelfhostBuilder
       target_deps = is_native ? optional_deps : deps
       dep_type = is_native ? 'optional dependency' : 'dependency'
 
-      required.each do |name, version|
+      required.each do |name, version| # Pragma: entries
         next if target_deps.key?(name) || deps.key?(name)
         target_deps[name] = version
         puts("  Adding #{dep_type}: #{name}@#{version}")
@@ -470,7 +470,7 @@ class SelfhostBuilder
 
     broadcast_deps = BROADCAST_ADAPTER_DEPENDENCIES[broadcast]
     if broadcast_deps
-      broadcast_deps.each do |name, version|
+      broadcast_deps.each do |name, version| # Pragma: entries
         next if deps.key?(name)
         deps[name] = version
         puts("  Adding broadcast dependency: #{name}@#{version}")
