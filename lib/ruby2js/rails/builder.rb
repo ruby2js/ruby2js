@@ -635,12 +635,12 @@ class SelfhostBuilder
     # These are managed by ruby2js install and shouldn't be removed during builds
     # Also preserve database files (SQLite, etc.)
     if File.directory?(@dist_dir)
-      Dir.glob(File.join(@dist_dir, '*')).each do |path|
-        basename = File.basename(path)
+      Dir.glob(File.join(@dist_dir, '*')).each do |entry_path|
+        basename = File.basename(entry_path)
         next if ['package.json', 'package-lock.json', 'node_modules'].include?(basename)
         # Preserve SQLite database files (including WAL mode files)
         next if basename.end_with?('.sqlite3', '.db', '-shm', '-wal')
-        FileUtils.rm_rf(path)
+        FileUtils.rm_rf(entry_path)
       end
     else
       FileUtils.mkdir_p(@dist_dir)
