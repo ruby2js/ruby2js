@@ -449,8 +449,8 @@ class SelfhostBuilder
       target_deps = is_native ? optional_deps : deps
       dep_type = is_native ? 'optional dependency' : 'dependency'
 
-      missing = required.reject { |name, _version| target_deps.key?(name) || deps.key?(name) }
-      missing.each do |name, version|
+      required.each do |name, version|
+        next if target_deps.key?(name) || deps.key?(name)
         target_deps[name] = version
         puts("  Adding #{dep_type}: #{name}@#{version}")
         updated = true
@@ -470,8 +470,8 @@ class SelfhostBuilder
 
     broadcast_deps = BROADCAST_ADAPTER_DEPENDENCIES[broadcast]
     if broadcast_deps
-      missing = broadcast_deps.reject { |name, _version| deps.key?(name) }
-      missing.each do |name, version|
+      broadcast_deps.each do |name, version|
+        next if deps.key?(name)
         deps[name] = version
         puts("  Adding broadcast dependency: #{name}@#{version}")
         updated = true
@@ -635,12 +635,11 @@ class SelfhostBuilder
     # These are managed by ruby2js install and shouldn't be removed during builds
     # Also preserve database files (SQLite, etc.)
     if File.directory?(@dist_dir)
-      Dir.glob(File.join(@dist_dir, '*')).each do |entry_path|
-        basename = File.basename(entry_path)
+      Dir.children(@dist_dir).each do |basename|
         next if ['package.json', 'package-lock.json', 'node_modules'].include?(basename)
         # Preserve SQLite database files (including WAL mode files)
         next if basename.end_with?('.sqlite3', '.db', '-shm', '-wal')
-        FileUtils.rm_rf(entry_path)
+        FileUtils.rm_rf(File.join(@dist_dir, basename))
       end
     else
       FileUtils.mkdir_p(@dist_dir)

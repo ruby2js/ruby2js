@@ -1,7 +1,6 @@
 # Ruby2JS Blog Demo
 #
 # Demonstrates running a Rails-generated blog with Juntos.
-# Uses Ruby transpilation (not WASM-based selfhost) so Node 20 is sufficient.
 #
 # Build and run:
 #   docker build -t ruby2js-blog .
@@ -14,8 +13,11 @@
 
 FROM ruby
 
-# Install Node.js (Trixie includes Node 20) and git
-RUN apt-get update && apt-get install -y nodejs npm git && rm -rf /var/lib/apt/lists/*
+# Install Node.js 24 (LTS) from NodeSource and git
+RUN apt-get update && apt-get install -y ca-certificates curl gnupg && \
+    curl -fsSL https://deb.nodesource.com/setup_24.x | bash - && \
+    apt-get install -y nodejs git && \
+    rm -rf /var/lib/apt/lists/*
 
 # Install Rails
 RUN gem install rails
@@ -38,7 +40,7 @@ ENV JUNTOS_DATABASE=${DATABASE}
 ENV JUNTOS_TARGET=${TARGET}
 
 # Build with specified database and target
-RUN bin/juntos build -d ${DATABASE} -t ${TARGET}
+RUN bin/juntos build -d ${DATABASE} -t ${TARGET} --verbose
 
 # Run migrations (skip for browser targets - they migrate client-side)
 RUN if [ "${TARGET}" != "browser" ]; then bin/juntos db prepare -d ${DATABASE} -t ${TARGET}; fi
