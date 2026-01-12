@@ -631,12 +631,12 @@ class SelfhostBuilder
 
   # Note: Using explicit () on all method calls for JS transpilation compatibility
   def build()
-    # Clean dist directory but preserve package.json, package-lock.json, and node_modules
-    # These are managed by ruby2js install and shouldn't be removed during builds
+    # Clean dist directory but preserve files managed by ruby2js install
+    # These shouldn't be removed during builds
     # Also preserve database files (SQLite, etc.)
     if File.directory?(@dist_dir)
       Dir.children(@dist_dir).each do |basename|
-        next if ['package.json', 'package-lock.json', 'node_modules'].include?(basename)
+        next if ['package.json', 'package-lock.json', 'node_modules', 'vite.config.js'].include?(basename)
         # Preserve SQLite database files (including WAL mode files)
         next if basename.end_with?('.sqlite3', '.db', '-shm', '-wal')
         FileUtils.rm_rf(File.join(@dist_dir, basename))
@@ -921,9 +921,10 @@ class SelfhostBuilder
     # Ruby 3.4+ requires aliases: true for YAML anchors
     config = YAML.load_file(config_path, aliases: true)
 
-    # If a specific section is requested (e.g., 'controllers', 'components')
-    if section && config.key?(section)
-      return config[section]
+    # If a specific section is requested (e.g., 'controllers', 'components', 'dependencies')
+    # Return the section if it exists, otherwise empty hash
+    if section
+      return config[section] || {}
     end
 
     # Support environment-specific or flat config

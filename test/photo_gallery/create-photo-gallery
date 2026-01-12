@@ -305,6 +305,13 @@ cat > db/seeds.rb << 'SEEDS'
 puts "Photo gallery ready - take some photos!"
 SEEDS
 
+# Create ruby2js.yml with external modules config
+# @capacitor/* modules are only available at runtime on mobile devices
+cat > config/ruby2js.yml << 'CONFIG'
+external:
+  - "@capacitor/*"
+CONFIG
+
 # Run ruby2js:install generator to set up dist/, package.json, and npm dependencies
 bin/rails generate ruby2js:install
 

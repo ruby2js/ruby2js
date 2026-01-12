@@ -34,6 +34,8 @@ import 'ruby2js/filters/react.js';
  * @property {string} [appRoot] - Application root directory (default: process.cwd())
  * @property {boolean} [hmr] - Enable HMR for Stimulus controllers (default: true)
  * @property {number} [eslevel] - ES level to target (default: 2022)
+ * @property {string[]} [external] - Modules to externalize (not bundled, resolved at runtime)
+ *   Supports exact matches ('lodash') and prefix patterns ('@capacitor/*')
  */
 
 /**
@@ -48,11 +50,16 @@ export function loadConfig(appRoot, overrides = {}) {
 
   // Load ruby2js.yml if it exists
   let ruby2jsConfig = {};
+  let topLevelConfig = {};
   const ruby2jsPath = path.join(appRoot, 'config/ruby2js.yml');
   if (fs.existsSync(ruby2jsPath)) {
     try {
       const parsed = yaml.load(fs.readFileSync(ruby2jsPath, 'utf8'));
-      ruby2jsConfig = parsed?.[env] || parsed?.default || parsed || {};
+      // Environment-specific config (nested under development/production/etc)
+      ruby2jsConfig = parsed?.[env] || parsed?.default || {};
+      // Top-level config (not nested under environment) - for settings like 'external'
+      // that don't vary by environment
+      topLevelConfig = parsed || {};
     } catch (e) {
       console.warn(`[juntos] Warning: Failed to parse ruby2js.yml: ${e.message}`);
     }
@@ -74,6 +81,12 @@ export function loadConfig(appRoot, overrides = {}) {
                  SelfhostBuilder.DEFAULT_TARGETS?.[database] ||
                  'browser';
 
+  // External modules: top-level config, then env-specific, then overrides
+  const external = overrides.external ||
+                   ruby2jsConfig.external ||
+                   topLevelConfig.external ||
+                   [];
+
   // Spread configs first, then override with our calculated values
   // This ensures env vars take precedence over hardcoded vite.config.js values
   return {
@@ -82,7 +95,8 @@ export function loadConfig(appRoot, overrides = {}) {
     eslevel: ruby2jsConfig.eslevel || overrides.eslevel || 2022,
     database: database || 'dexie',
     target,
-    broadcast: overrides.broadcast || ruby2jsConfig.broadcast
+    broadcast: overrides.broadcast || ruby2jsConfig.broadcast,
+    external
   };
 }
 
@@ -97,14 +111,18 @@ export function juntos(options = {}) {
     database,
     target,
     broadcast,
-    appRoot = process.cwd(),
+    appRoot: appRootOption = process.cwd(),
     hmr = true,
     eslevel = 2022,
+    external,
     ...ruby2jsOptions
   } = options;
 
-  // Load and merge configuration
-  const config = loadConfig(appRoot, { database, target, broadcast, eslevel });
+  // Resolve appRoot to absolute path to avoid path resolution issues
+  const appRoot = path.resolve(appRootOption);
+
+  // Load and merge configuration (external comes from ruby2js.yml or options)
+  const config = loadConfig(appRoot, { database, target, broadcast, eslevel, external });
 
   return [
     // Core Ruby transformation with Rails filters
@@ -116,7 +134,7 @@ export function juntos(options = {}) {
     // Structural transforms (models, controllers, views, routes)
     createStructurePlugin(config, appRoot),
 
-    // Platform-specific Vite configuration
+    // Platform-specific Vite configuration (includes external from ruby2js.yml)
     createConfigPlugin(config, appRoot),
 
     // HMR support for Stimulus controllers
@@ -233,24 +251,50 @@ function createStructurePlugin(config, appRoot) {
 function createConfigPlugin(config, appRoot) {
   return {
     name: 'juntos-config',
+    enforce: 'post',  // Run after other plugins to ensure our config takes precedence
 
-    config() {
+    config(userConfig, { command }) {
+      const distDir = path.join(appRoot, 'dist');
       const aliases = {
         '@controllers': path.join(appRoot, 'app/javascript/controllers'),
         '@models': path.join(appRoot, 'app/models'),
         '@views': path.join(appRoot, 'app/views'),
         'components': path.join(appRoot, 'app/components'),
         // Alias for Rails importmap-style imports in Stimulus controllers
-        'controllers/application': path.join(appRoot, 'app/javascript/controllers/application.js')
+        'controllers/application': path.join(appRoot, 'app/javascript/controllers/application.js'),
+        // Hotwire packages are in dist/node_modules, not appRoot/node_modules
+        '@hotwired/stimulus': path.join(distDir, 'node_modules/@hotwired/stimulus'),
+        '@hotwired/turbo': path.join(distDir, 'node_modules/@hotwired/turbo'),
+        '@hotwired/turbo-rails': path.join(distDir, 'node_modules/@hotwired/turbo-rails')
       };
 
       const rollupOptions = getRollupOptions(config.target, config.database);
       const buildTarget = getBuildTarget(config.target);
 
+      // Add external patterns from config (e.g., from ruby2js.yml)
+      // Merge with any user-provided external function
+      if (config.external && config.external.length > 0) {
+        const juntosExternal = createExternalMatcher(config.external);
+        const userExternal = userConfig?.build?.rollupOptions?.external;
+
+        if (typeof userExternal === 'function') {
+          // Combine user and juntos external functions
+          rollupOptions.external = (id, ...args) =>
+            juntosExternal(id) || userExternal(id, ...args);
+        } else if (Array.isArray(userExternal)) {
+          // Combine user array with juntos function
+          rollupOptions.external = (id, ...args) =>
+            juntosExternal(id) || userExternal.includes(id);
+        } else {
+          rollupOptions.external = juntosExternal;
+        }
+      }
+
+      // Note: We don't set root here - Vite should use its default (directory of vite.config.js)
+      // which is dist/. The index.html and all built files are in dist/.
+      // The aliases above point to source files in appRoot (parent of dist/).
       return {
-        root: appRoot,
         build: {
-          outDir: 'dist',
           target: buildTarget,
           emptyOutDir: false, // Preserve node_modules, package.json, etc.
           rollupOptions
@@ -261,6 +305,29 @@ function createConfigPlugin(config, appRoot) {
       };
     }
   };
+}
+
+/**
+ * Create an external matcher function from patterns.
+ *
+ * @param {string[]} patterns - Module patterns to externalize
+ *   - Exact match: 'lodash' matches only 'lodash'
+ *   - Wildcard: '@capacitor/*' matches '@capacitor/camera', '@capacitor/filesystem', etc.
+ * @returns {Function} Matcher function for rollupOptions.external
+ */
+function createExternalMatcher(patterns) {
+  // Convert patterns to matchers
+  const matchers = patterns.map(pattern => {
+    if (pattern.endsWith('/*')) {
+      // Wildcard pattern: '@capacitor/*' -> matches '@capacitor/anything'
+      const prefix = pattern.slice(0, -1); // Remove the '*', keep the '/'
+      return (id) => id.startsWith(prefix);
+    }
+    // Exact match
+    return (id) => id === pattern;
+  });
+
+  return (id) => matchers.some(matcher => matcher(id));
 }
 
 /**
@@ -290,8 +357,8 @@ function getBuildTarget(target) {
 function getRollupOptions(target, database) {
   switch (target) {
     case 'browser':
-    case 'capacitor':
     case 'pwa':
+    case 'capacitor':
       return {
         input: 'index.html'
       };
