@@ -2,7 +2,7 @@
 
 require 'rails/generators'
 require 'json'
-require 'fileutils'
+require 'ruby2js/installer'
 
 # Use Ruby2js (lowercase 'js') so Rails finds this as 'ruby2js:install'
 # rather than 'ruby2_j_s:install'
@@ -10,7 +10,7 @@ module Ruby2js
   class InstallGenerator < Rails::Generators::Base
     desc "Set up Ruby2JS/Juntos for transpiling Rails to JavaScript"
 
-    DIST_DIR = 'dist'
+    DIST_DIR = Ruby2JS::Installer::DIST_DIR
 
     def setup_dist_directory
       empty_directory DIST_DIR
@@ -18,8 +18,6 @@ module Ruby2js
     end
 
     def create_package_json
-      require 'ruby2js/rails/builder'
-
       package_path = File.join(DIST_DIR, 'package.json')
 
       if File.exist?(package_path)
@@ -27,6 +25,20 @@ module Ruby2js
       else
         write_package_json(package_path)
       end
+    end
+
+    def create_vite_config
+      config_path = File.join(DIST_DIR, 'vite.config.js')
+
+      if File.exist?(config_path)
+        say_status :skip, "vite.config.js already exists"
+        return
+      end
+
+      database = Ruby2JS::Installer.detect_database(destination_root)
+      config_content = Ruby2JS::Installer.generate_vite_config(database: database)
+
+      create_file config_path, config_content
     end
 
     def install_dependencies
@@ -44,20 +56,7 @@ module Ruby2js
         return
       end
 
-      binstub_content = <<~RUBY
-        #!/usr/bin/env ruby
-        # frozen_string_literal: true
-
-        # Juntos - Rails patterns, JavaScript runtimes
-        # This binstub delegates to the ruby2js gem's Juntos CLI
-
-        require "bundler/setup"
-        require "ruby2js/cli/juntos"
-
-        Ruby2JS::CLI::Juntos.run(ARGV)
-      RUBY
-
-      create_file binstub_path, binstub_content
+      create_file binstub_path, Ruby2JS::Installer.generate_binstub
       chmod binstub_path, 0755
     end
 
@@ -66,9 +65,9 @@ module Ruby2js
       say "Ruby2JS/Juntos installed!", :green
       say ""
       say "Next steps:"
-      say "  bin/juntos build              - Transpile your app"
-      say "  bin/juntos dev -d dexie       - Development server (browser)"
-      say "  bin/juntos server -d sqlite   - Production server (Node.js)"
+      say "  bin/juntos dev                - Start Vite dev server"
+      say "  bin/juntos build              - Build with Vite"
+      say "  bin/juntos server             - Production server (Node.js)"
       say ""
     end
 
@@ -77,11 +76,12 @@ module Ruby2js
     def write_package_json(package_path)
       say_status :create, package_path
 
-      app_name = detect_app_name
-      package = SelfhostBuilder.generate_package_json(
+      app_name = Ruby2JS::Installer.detect_app_name(destination_root)
+      package = Ruby2JS::Installer.generate_package_json(
         app_name: app_name,
         app_root: destination_root
       )
+
       create_file package_path, JSON.pretty_generate(package) + "\n"
     end
 
@@ -89,57 +89,20 @@ module Ruby2js
       say_status :update, package_path
 
       existing = JSON.parse(File.read(package_path))
-      required = SelfhostBuilder.generate_package_json(
-        app_name: existing["name"] || detect_app_name,
+      app_name = Ruby2JS::Installer.detect_app_name(destination_root)
+      required = Ruby2JS::Installer.generate_package_json(
+        app_name: existing["name"] || app_name,
         app_root: destination_root
       )
 
-      # Merge dependencies (add missing, don't overwrite existing)
-      existing["dependencies"] ||= {}
-      required["dependencies"].each do |name, version|
-        unless existing["dependencies"].key?(name)
-          existing["dependencies"][name] = version
-          say_status :add, "dependency: #{name}"
-        end
+      added = Ruby2JS::Installer.merge_package_dependencies(existing, required)
+
+      added.each do |type, name|
+        say_status :add, "#{type}: #{name}"
       end
 
-      # Merge optional dependencies
-      if required["optionalDependencies"]
-        existing["optionalDependencies"] ||= {}
-        required["optionalDependencies"].each do |name, version|
-          unless existing["optionalDependencies"].key?(name)
-            existing["optionalDependencies"][name] = version
-            say_status :add, "optional dependency: #{name}"
-          end
-        end
-      end
-
-      # Merge scripts (add missing, don't overwrite existing)
-      existing["scripts"] ||= {}
-      required["scripts"].each do |name, command|
-        unless existing["scripts"].key?(name)
-          existing["scripts"][name] = command
-          say_status :add, "script: #{name}"
-        end
-      end
-
-      # Ensure type is module
-      existing["type"] ||= "module"
-
-      # Use gsub_file would require the file to exist with specific content
-      # Instead, remove and recreate
       remove_file package_path
       create_file package_path, JSON.pretty_generate(existing) + "\n"
-    end
-
-    def detect_app_name
-      if File.exist?("config/application.rb")
-        content = File.read("config/application.rb")
-        if content =~ /module\s+(\w+)/
-          return $1.gsub(/([a-z])([A-Z])/, '\1_\2').downcase
-        end
-      end
-      File.basename(destination_root).gsub(/[^a-z0-9_-]/i, '_').downcase
     end
   end
 end
