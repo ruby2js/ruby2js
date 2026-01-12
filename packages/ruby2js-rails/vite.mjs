@@ -338,7 +338,10 @@ function getNativeModules(database) {
     d1: []
   };
 
-  return [...baseModules, ...(dbModules[database] || [])];
+  // Client-side framework modules that should not be bundled in server builds
+  const clientModules = ['@hotwired/stimulus', '@hotwired/turbo', '@hotwired/turbo-rails'];
+
+  return [...baseModules, ...(dbModules[database] || []), ...clientModules];
 }
 
 /**
