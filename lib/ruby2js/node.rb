@@ -54,7 +54,10 @@ module Ruby2JS
       end
 
       return true unless selector && selector.respond_to?(:source_buffer) && selector.source_buffer
-      selector.source_buffer.source[selector.end_pos] == '('
+      # Use byte-based check since Prism gives byte offsets
+      # 0x28 is ASCII for '(' - works with both byte and char indexing for ASCII
+      source = selector.source_buffer.source
+      source.getbyte(selector.end_pos) == 0x28
     end
 
     # For compatibility with code that checks Parser::AST::Node
