@@ -245,11 +245,13 @@ function createConfigPlugin(config, appRoot) {
       };
 
       const rollupOptions = getRollupOptions(config.target, config.database);
+      const buildTarget = getBuildTarget(config.target);
 
       return {
         root: appRoot,
         build: {
           outDir: 'dist',
+          target: buildTarget,
           rollupOptions
         },
         resolve: {
@@ -258,6 +260,27 @@ function createConfigPlugin(config, appRoot) {
       };
     }
   };
+}
+
+/**
+ * Get Vite build target based on platform.
+ */
+function getBuildTarget(target) {
+  switch (target) {
+    case 'node':
+    case 'fly':
+      return 'node18';
+    case 'bun':
+      return 'node18'; // Bun is Node-compatible
+    case 'deno':
+      return 'esnext';
+    case 'cloudflare':
+    case 'vercel-edge':
+    case 'deno-deploy':
+      return 'esnext'; // Edge runtimes support modern JS
+    default:
+      return undefined; // Use Vite's default browser targets
+  }
 }
 
 /**
