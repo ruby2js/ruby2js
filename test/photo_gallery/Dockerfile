@@ -1,7 +1,6 @@
 # Ruby2JS Photo Gallery Demo
 #
 # Demonstrates camera integration with browser getUserMedia API.
-# Uses Ruby transpilation (not WASM-based selfhost) so Node 20 is sufficient.
 #
 # Build and run:
 #   docker build -t ruby2js-photo-gallery .
@@ -13,8 +12,11 @@
 
 FROM ruby
 
-# Install Node.js (Trixie includes Node 20) and git
-RUN apt-get update && apt-get install -y nodejs npm git && rm -rf /var/lib/apt/lists/*
+# Install Node.js 24 (LTS) from NodeSource and git
+RUN apt-get update && apt-get install -y ca-certificates curl gnupg && \
+    curl -fsSL https://deb.nodesource.com/setup_24.x | bash - && \
+    apt-get install -y nodejs git && \
+    rm -rf /var/lib/apt/lists/*
 
 # Install Rails
 RUN gem install rails
