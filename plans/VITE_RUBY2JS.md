@@ -356,7 +356,106 @@ Extend HMR beyond Stimulus controllers. Easy wins implemented; full dependency t
 
 Added `:vite_plugin_tarball` task to `docs/Rakefile`. All three tarballs are built during `rake npm_packages` and deployed to ruby2js.com.
 
-### Phase 4: Framework SFC Presets
+### Phase 3b: Docker/Node Target Verification ✅ Complete
+
+**Verified:** Full Docker build with `--target node --database sqlite` works end-to-end.
+
+| Component | Status |
+|-----------|--------|
+| Vite respects `JUNTOS_TARGET` env var | ✅ Fixed (env vars override vite.config.js) |
+| Server-side build target (`node18`) | ✅ Added (enables top-level await) |
+| Rollup input path for server.mjs | ✅ Fixed (points to node_modules) |
+| `emptyOutDir: false` preserves node_modules | ✅ Added |
+| Hotwire packages externalized | ✅ Added (@hotwired/stimulus, turbo) |
+| Docker build + db prepare + server start | ✅ Verified |
+
+**Test workflow:**
+```bash
+cd test/blog
+docker build -t ruby2js-blog .
+docker run -p 3000:3000 ruby2js-blog
+# Server runs at http://localhost:3000 with seeded data
+```
+
+**Key fixes applied:**
+- `loadConfig()` now checks `process.env.JUNTOS_TARGET` before `overrides.target`
+- Spread order fixed so calculated values aren't overwritten
+- `getBuildTarget()` returns `node18` for server targets (supports top-level await)
+- Server entry point: `node_modules/ruby2js-rails/server.mjs`
+
+### Phase 4: Production Asset Pipeline (Planned)
+
+Rails-equivalent of `assets:precompile` — client-side bundling, tree shaking, and fingerprinting for production deployments.
+
+**Current state (import maps):**
+```html
+<script type="importmap">
+  { "imports": { "@hotwired/turbo": "/node_modules/..." } }
+</script>
+<script type="module">
+  import * as Turbo from '@hotwired/turbo';
+</script>
+```
+
+**Target state (bundled):**
+```html
+<script type="module" src="/assets/app-Bx7K3j2F.js"></script>
+```
+
+| Task | Description | Status |
+|------|-------------|--------|
+| Conditional index.html | Import maps for dev, bundled script for prod | Planned |
+| Client-side Vite build | Bundle JS for browser targets in production | Planned |
+| Tree shaking | Remove unused code from Turbo/Stimulus | Planned |
+| Asset fingerprinting | Content-hash filenames (like Sprockets/Propshaft) | Planned (Vite built-in) |
+| CSS bundling | Include Tailwind in Vite pipeline | Planned |
+| Manifest generation | Map logical names to fingerprinted paths | Planned (Vite built-in) |
+
+**Implementation approach:**
+
+1. **Environment detection** — Check `NODE_ENV=production` or `--mode production`
+
+2. **Template index.html differently:**
+   ```javascript
+   // vite.mjs - transformIndexHtml hook
+   transformIndexHtml(html, { mode }) {
+     if (mode === 'production') {
+       // Remove importmap, Vite injects bundled scripts
+       return html.replace(/<script type="importmap">.*?<\/script>/s, '');
+     }
+     return html;
+   }
+   ```
+
+3. **Enable Vite bundling for browser production:**
+   ```javascript
+   // getRollupOptions for browser + production
+   case 'browser':
+     return {
+       input: 'index.html',
+       // Vite automatically bundles, tree-shakes, fingerprints
+     };
+   ```
+
+4. **CLI integration:**
+   ```bash
+   juntos build                    # Development (import maps)
+   juntos build --mode production  # Production (bundled)
+   juntos assets:precompile        # Alias for production build
+   ```
+
+**Benefits over import maps:**
+- Smaller payloads (tree shaking removes unused code)
+- Fewer HTTP requests (bundled chunks)
+- Aggressive caching (fingerprinted filenames)
+- Minification
+
+**Trade-offs:**
+- Build step required
+- Slower builds
+- More complex debugging (source maps help)
+
+### Phase 5: Framework SFC Presets
 
 Once the Rails/Juntos pattern is solid, add presets for Single File Components:
 
@@ -368,13 +467,13 @@ Once the Rails/Juntos pattern is solid, add presets for Single File Components:
 
 These are thin (~40 lines each) — detect `lang="ruby"`, transform, pass to framework plugin.
 
-**Note:** Basic `.rbx` support (Ruby + JSX) is in Phase 2. Phase 4 is about parsing framework-specific SFC formats and extracting Ruby script blocks.
+**Note:** Basic `.rbx` support (Ruby + JSX) is in Phase 2. Phase 5 is about parsing framework-specific SFC formats and extracting Ruby script blocks.
 
 ---
 
 ## Future: Extensibility
 
-### Phase 5: Extract Shared Infrastructure
+### Phase 6: Extract Shared Infrastructure
 
 After Rails is solid, refactor for other Ruby frameworks:
 
@@ -392,7 +491,7 @@ ruby2js-rails (becomes thin)
 └── vite-preset.js     # Rails-specific Vite config
 ```
 
-### Phase 6: Prove with Second Framework
+### Phase 7: Prove with Second Framework
 
 Validate the extraction by supporting Hanami:
 
@@ -447,13 +546,19 @@ See [Ruby Detection Strategy](#appendix-ruby-detection-examples) appendix for ex
 15. RBX component changes trigger React HMR
 16. Route file changes regenerate routes.js via HMR
 
-### Phase 4 (Framework SFC Presets)
-17. Vue SFCs accept `<script lang="ruby">`
-18. Astro frontmatter accepts `#!ruby`
+### Phase 4 (Production Asset Pipeline)
+17. `juntos build --mode production` bundles client JS
+18. Tree shaking removes unused Turbo/Stimulus code
+19. Asset fingerprinting produces content-hashed filenames
+20. `juntos assets:precompile` works as alias
 
-### Phase 6 (Extensibility)
-19. Hanami app works with extracted shared infrastructure
-20. Framework-specific code is <1000 lines
+### Phase 5 (Framework SFC Presets)
+21. Vue SFCs accept `<script lang="ruby">`
+22. Astro frontmatter accepts `#!ruby`
+
+### Phase 7 (Extensibility)
+23. Hanami app works with extracted shared infrastructure
+24. Framework-specific code is <1000 lines
 
 ---
 
