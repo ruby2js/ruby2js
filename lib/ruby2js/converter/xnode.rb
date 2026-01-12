@@ -43,7 +43,7 @@ module Ruby2JS
       put '<'
       put nodename
 
-      attrs.each do |name, value|
+      attrs.each do |name, value| # Pragma: entries
         next if value.nil?
         put ' '
         put name

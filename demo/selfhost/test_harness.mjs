@@ -253,9 +253,56 @@ export function refute_includes(collection, item) {
   }
 }
 
+export function assert_raises(fnOrClass, maybeFn) {
+  // Ruby's assert_raises can be called two ways:
+  // 1. assert_raises { block } - returns the exception
+  // 2. assert_raises(ErrorClass) { block } - checks error type, returns exception
+  let fn, errorClass;
+  if (typeof fnOrClass === 'function' && maybeFn === undefined) {
+    fn = fnOrClass;
+    errorClass = null;
+  } else {
+    errorClass = fnOrClass;
+    fn = maybeFn;
+  }
+
+  try {
+    fn();
+    throw new Error(`Expected an exception to be raised, but nothing was raised`);
+  } catch (e) {
+    // Check if it's our "nothing raised" error
+    if (e.message.startsWith('Expected') && e.message.includes('to be raised')) {
+      throw e;
+    }
+    // If no error class specified, just return the exception
+    if (!errorClass) {
+      return e;
+    }
+    // Check if it's the expected error type
+    if (errorClass === SyntaxError && e instanceof SyntaxError) return e;
+    if (errorClass === RangeError && e instanceof RangeError) return e;
+    if (errorClass === TypeError && e instanceof TypeError) return e;
+    if (errorClass === Error && e instanceof Error) return e;
+    // Also handle string class names
+    if (typeof errorClass === 'string' && e.name === errorClass) return e;
+    if (typeof errorClass === 'string' && e.constructor.name === errorClass) return e;
+    // If error type doesn't match, re-throw with details
+    throw new Error(`Expected ${errorClass.name || errorClass} but got ${e.constructor.name}: ${e.message}`);
+  }
+}
+
 globalThis.assert_equal = assert_equal;
 globalThis.assert_includes = assert_includes;
 globalThis.refute_includes = refute_includes;
+globalThis.assert_raises = assert_raises;
+
+// Error.prototype.set_backtrace - Ruby method, no-op in JS
+if (!Error.prototype.set_backtrace) {
+  Error.prototype.set_backtrace = function(backtrace) {
+    // Store it but don't modify the actual stack trace
+    this.rubyBacktrace = backtrace;
+  };
+}
 
 // before hooks - store to run before each test
 export function before(fn) {

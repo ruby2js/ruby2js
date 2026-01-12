@@ -42,7 +42,8 @@ const FILTER_NAME_EXCEPTIONS = {
 
 // Additional filter dependencies (spec name => additional filter files to load)
 const FILTER_DEPENDENCIES = {
-  'camelcase_spec.rb': ['lit.js']
+  'camelcase_spec.rb': ['lit.js'],
+  'jsx_spec.rb': ['react.js', 'functions.js']
 };
 
 // Derive filter file path from spec name

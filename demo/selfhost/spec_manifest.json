@@ -24,7 +24,8 @@
     "camelcase_spec.rb",
     "tagged_templates_spec.rb",
     "nokogiri_spec.rb",
-    "haml_spec.rb"
+    "haml_spec.rb",
+    "jsx_spec.rb"
   ],
   "partial": [
     "phlex_spec.rb",
@@ -32,7 +33,6 @@
     "pragma_spec.rb",
     "react_spec.rb",
     "node_spec.rb",
-    "jsx_spec.rb",
     "lit_spec.rb",
     "astro_spec.rb",
     "vue_spec.rb",

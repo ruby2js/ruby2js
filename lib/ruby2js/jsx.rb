@@ -49,7 +49,7 @@ module Ruby2JS
     def parse(state = :text, wrap_value = true)
       @wrap_value = wrap_value
       @state = state
-      backtrace = ''
+      @backtrace = ''
       prev = nil
 
       loop do
@@ -57,9 +57,9 @@ module Ruby2JS
         break if c.nil?
 
         if c == "\n"
-          backtrace = ''
+          @backtrace = ''
         else
-          backtrace += c
+          @backtrace += c
         end
 
         case @state
@@ -309,7 +309,7 @@ module Ruby2JS
 
       return @result
     rescue SyntaxError => e
-      e.set_backtrace backtrace
+      e.set_backtrace @backtrace
       raise e
     end
 
