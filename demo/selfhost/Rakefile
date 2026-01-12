@@ -217,6 +217,14 @@ task "build_mjs:npm" => :build_mjs do
   sh bundle_exec("ruby #{SELFHOST}/scripts/transpile_erb_compiler.rb > #{lib_dir}/erb_compiler.js")
   sh bundle_exec("ruby #{SELFHOST}/scripts/transpile_migration_sql.rb > #{lib_dir}/migration_sql.js")
   sh bundle_exec("ruby #{SELFHOST}/scripts/transpile_seed_sql.rb > #{lib_dir}/seed_sql.js")
+
+  # Fix imports in lib files to use npm package instead of relative paths
+  Dir.glob("#{lib_dir}/*.js").each do |file|
+    content = File.read(file)
+    content = content.gsub('../ruby2js.js', 'ruby2js')
+    content = content.gsub('"ruby2js"', '"ruby2js/ruby2js.js"')  # Need full path for named exports
+    File.write(file, content)
+  end
   puts "Built lib files in #{lib_dir}"
 end
 
