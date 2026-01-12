@@ -143,6 +143,11 @@ module Ruby2JS
               fs_exists_call(path_arg),
               s(:send, fs_call(:statSync, path_arg), :isFile))
 
+          elsif method == :symlink? and args.length == 1
+            # File.symlink?(path) → fs.lstatSync(path).isSymbolicLink()
+            # Use lstat (not stat) to check the link itself, not what it points to
+            s(:send, fs_call(:lstatSync, process(args.first)), :isSymbolicLink)
+
           elsif method == :readlink and args.length == 1
             fs_call(:readlinkSync, process(args.first))
 

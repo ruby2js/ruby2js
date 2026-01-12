@@ -49,6 +49,7 @@ The **Node** filter provides a number of convenience methods and variables which
 * `File::SEPARATOR` {{ caret }} `path.sep`
 * `File.stat` {{ caret }} `fs.statSync`
 * `File.symlink` {{ caret }} `fs.symlinkSync`
+* `File.symlink?` {{ caret }} `fs.lstatSync(p).isSymbolicLink()`
 * `File.truncate` {{ caret }} `fs.truncateSync`
 * `File.unlink` {{ caret }} `fs.unlinkSync`
 * `FileUtils.cd` {{ caret }} `process.chdir`

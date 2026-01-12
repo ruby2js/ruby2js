@@ -104,6 +104,12 @@ describe Ruby2JS::Filter::Node do
           'fs.existsSync("bar") && fs.statSync("bar").isFile()'
     end
 
+    it 'should handle File.symlink?' do
+      to_js( 'File.symlink?("link")' ).
+        must_equal 'const fs = require("node:fs"); ' +
+          'fs.lstatSync("link").isSymbolicLink()'
+    end
+
     it 'should handle File.readlink' do
       to_js( 'File.readlink("foo")' ).
         must_equal 'const fs = require("node:fs"); fs.readlinkSync("foo")'

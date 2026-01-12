@@ -1236,8 +1236,9 @@ class SelfhostBuilder
     pkg_package_dir = File.join(DEMO_ROOT, '../../packages/ruby2js-rails')
     vendor_package_dir = File.join(DEMO_ROOT, 'vendor/ruby2js')
 
-    # When running from within ruby2js repo, prefer packages directory over stale npm module
-    if File.exist?(pkg_package_dir) && File.exist?(npm_package_dir)
+    # When running from within ruby2js repo, remove stale npm module UNLESS it's
+    # already a symlink (from file: dependency in package.json) pointing to local packages
+    if File.exist?(pkg_package_dir) && File.exist?(npm_package_dir) && !File.symlink?(npm_package_dir)
       puts "  Removing stale npm module (using local packages instead)"
       FileUtils.rm_rf(npm_package_dir)
     end
