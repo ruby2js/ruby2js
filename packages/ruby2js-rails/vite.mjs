@@ -58,15 +58,18 @@ export function loadConfig(appRoot, overrides = {}) {
     }
   }
 
-  // Get database from overrides, env, or database.yml
-  let database = overrides.database;
+  // Get database from env, overrides, or database.yml
+  // Priority: JUNTOS_DATABASE env > overrides > database.yml > default
+  let database = process.env.JUNTOS_DATABASE || overrides.database;
   if (!database) {
     const dbConfig = SelfhostBuilder.load_database_config(appRoot, { quiet: true });
     database = dbConfig?.adapter || 'dexie';
   }
 
-  // Derive target from database if not specified
-  const target = overrides.target ||
+  // Derive target from env, overrides, config, or database
+  // Priority: JUNTOS_TARGET env > overrides > ruby2js.yml > default from database
+  const target = process.env.JUNTOS_TARGET ||
+                 overrides.target ||
                  ruby2jsConfig.target ||
                  SelfhostBuilder.DEFAULT_TARGETS?.[database] ||
                  'browser';
