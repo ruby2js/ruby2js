@@ -1652,6 +1652,16 @@ module Ruby2JS
           super S(:class, name, inheritance, *body)
         end
       end
+
+      # Map Ruby exception classes to JavaScript equivalents
+      def on_const(node)
+        # JSON::ParserError => SyntaxError (JSON.parse throws SyntaxError in JS)
+        if node.children == [s(:const, nil, :JSON), :ParserError]
+          s(:const, nil, :SyntaxError)
+        else
+          super
+        end
+      end
     end
 
     DEFAULTS.push Functions

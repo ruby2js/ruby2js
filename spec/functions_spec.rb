@@ -95,6 +95,10 @@ describe Ruby2JS::Filter::Functions do
     it "should handle JSON.pretty_generate" do
       to_js( 'JSON.pretty_generate(obj)' ).must_equal 'JSON.stringify(obj, null, 2)'
     end
+
+    it "should map JSON::ParserError to SyntaxError" do
+      to_js( 'begin; rescue JSON::ParserError; end' ).must_equal 'try {} catch ($EXCEPTION) {if ($EXCEPTION instanceof SyntaxError) {} else {throw $EXCEPTION}}'
+    end
   end
 
   describe :irange do
