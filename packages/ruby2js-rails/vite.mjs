@@ -292,7 +292,7 @@ function getRollupOptions(target, database) {
     case 'bun':
     case 'deno':
       return {
-        input: 'server.mjs',
+        input: 'node_modules/ruby2js-rails/server.mjs',
         external: getNativeModules(database)
       };
 
@@ -316,7 +316,7 @@ function getRollupOptions(target, database) {
 
     case 'fly':
       return {
-        input: 'server.mjs',
+        input: 'node_modules/ruby2js-rails/server.mjs',
         external: getNativeModules(database)
       };
 
