@@ -23,6 +23,7 @@ module Ruby2JS
           options = {
             verbose: false,
             selfhost: false,
+            sourcemap: false,
             target: ENV['JUNTOS_TARGET'],
             database: ENV['JUNTOS_DATABASE']
           }
@@ -48,6 +49,10 @@ module Ruby2JS
 
             opts.on("-v", "--verbose", "Show detailed build output") do
               options[:verbose] = true
+            end
+
+            opts.on("--sourcemap", "Generate source maps (useful for debugging production builds)") do
+              options[:sourcemap] = true
             end
 
             opts.on("--selfhost", "Use JavaScript transpiler instead of Ruby (legacy mode)") do
@@ -126,6 +131,7 @@ module Ruby2JS
           # Derive Vite mode from RAILS_ENV or NODE_ENV (RAILS_ENV takes precedence)
           mode = ENV['RAILS_ENV'] || ENV['NODE_ENV'] || 'development'
           cmd = "npx vite build --mode #{mode}"
+          cmd += " --sourcemap" if options[:sourcemap]
 
           Dir.chdir(DIST_DIR) do
             if options[:verbose]

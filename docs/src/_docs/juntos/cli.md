@@ -63,6 +63,7 @@ bin/juntos up [options]
 | `-e, --environment ENV` | Rails environment (default: development) |
 | `-p, --port PORT` | Server port (default: 3000) |
 | `-v, --verbose` | Show detailed output |
+| `--sourcemap` | Generate source maps |
 | `-h, --help` | Show help |
 
 **Examples:**
@@ -97,6 +98,7 @@ bin/juntos build [options]
 | `-d, --database ADAPTER` | Database adapter |
 | `-e, --environment ENV` | Rails environment (default: development) |
 | `-v, --verbose` | Show detailed output |
+| `--sourcemap` | Generate source maps |
 | `-h, --help` | Show help |
 
 **Examples:**
@@ -109,6 +111,7 @@ bin/juntos build -t cloudflare -d d1     # Cloudflare Workers build
 bin/juntos build -t capacitor -d dexie   # Mobile app (iOS/Android)
 bin/juntos build -t electron -d sqlite   # Desktop app (macOS/Windows/Linux)
 bin/juntos build -t tauri -d sqljs       # Lightweight desktop app
+bin/juntos build -e production --sourcemap  # Production with source maps
 ```
 
 **Output:**

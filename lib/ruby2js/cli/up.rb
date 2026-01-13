@@ -30,7 +30,8 @@ module Ruby2JS
             port: 3000,
             target: ENV['JUNTOS_TARGET'],
             database: ENV['JUNTOS_DATABASE'],
-            verbose: false
+            verbose: false,
+            sourcemap: false
           }
 
           parser = OptionParser.new do |opts|
@@ -58,6 +59,10 @@ module Ruby2JS
 
             opts.on("-v", "--verbose", "Show detailed output") do
               options[:verbose] = true
+            end
+
+            opts.on("--sourcemap", "Generate source maps (useful for debugging production builds)") do
+              options[:sourcemap] = true
             end
 
             opts.on("-h", "--help", "Show this help message") do
@@ -96,8 +101,10 @@ module Ruby2JS
             # Derive Vite mode from RAILS_ENV or NODE_ENV (RAILS_ENV takes precedence)
             mode = ENV['RAILS_ENV'] || ENV['NODE_ENV'] || 'development'
             puts "\nBundling with Vite (mode: #{mode})..."
+            cmd = "npx vite build --mode #{mode}"
+            cmd += " --sourcemap" if options[:sourcemap]
             Dir.chdir(DIST_DIR) do
-              success = system("npx vite build --mode #{mode}")
+              success = system(cmd)
               abort "Error: Vite build failed." unless success
             end
           end
