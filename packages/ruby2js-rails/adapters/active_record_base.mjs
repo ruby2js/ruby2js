@@ -32,15 +32,29 @@ export class ActiveRecordBase {
 
   constructor(attributes = {}) {
     this._id = attributes.id || null;
-    this.attributes = { ...attributes };
     this._persisted = !!attributes.id;
     this._changes = {};
     this._errors = { _all: [] };
 
-    // Set attribute accessors for direct property access (article.title)
+    // Initialize attributes, but don't copy association objects (they have setters)
+    // This prevents storing full objects in the database and avoids reconstruction issues
+    this.attributes = {};
     for (const [key, value] of Object.entries(attributes)) {
-      if (key !== 'id' && !(key in this)) {
-        this[key] = value;
+      const descriptor = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(this), key);
+      if (descriptor?.set) {
+        // Don't copy to attributes - the setter will handle storing the FK
+        // But only call setter if value is a model instance (has .id getter)
+        // Skip if it's a plain object from DB reconstruction
+        if (value && typeof value === 'object' && 'id' in value && typeof value.id !== 'undefined') {
+          this[key] = value;
+        }
+        // If value is a plain object with _id (from DB), skip - the FK should already be set
+      } else {
+        // Regular attribute - copy to attributes and set as property
+        this.attributes[key] = value;
+        if (key !== 'id' && !(key in this)) {
+          this[key] = value;
+        }
       }
     }
   }

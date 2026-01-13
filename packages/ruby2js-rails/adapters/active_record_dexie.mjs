@@ -340,10 +340,10 @@ export class ActiveRecord extends ActiveRecordBase {
 
     // Attach to parent records as CollectionProxy (sets _comments so getter returns cached value)
     for (const record of records) {
-      const related = relatedByFk.get(record.id) || [];
+      const relatedRecords = relatedByFk.get(record.id) || [];
       const fk = assoc.foreignKey || `${this._singularize(this.table_name)}_id`;
       const proxy = new CollectionProxy(record, { name: assocName, type: 'has_many', foreignKey: fk }, AssocModel);
-      proxy.load(related);
+      proxy.load(relatedRecords);
       record[`_${assocName}`] = proxy;
     }
   }
