@@ -373,6 +373,11 @@ class SelfhostBuilder
     deps['@hotwired/turbo'] = '^8.0.0'
     deps['@hotwired/stimulus'] = '^3.2.0'
 
+    # React - used by rails.js for rendering React elements
+    # Apps can override versions in config/ruby2js.yml
+    deps['react'] = '^18.2.0'
+    deps['react-dom'] = '^18.2.0'
+
     # Add tailwindcss if tailwindcss-rails gem is detected
     tailwind_css = app_root ? File.join(app_root, 'app/assets/tailwind/application.css') : 'app/assets/tailwind/application.css'
     if File.exist?(tailwind_css)

@@ -295,8 +295,6 @@ SEEDS
 cat > config/ruby2js.yml << 'CONFIG'
 dependencies:
   "@capacitor/camera": "^6.0.0"
-  react: "^18.2.0"
-  react-dom: "^18.2.0"
 CONFIG
 
 # Run ruby2js:install generator to set up dist/, package.json, and npm dependencies
