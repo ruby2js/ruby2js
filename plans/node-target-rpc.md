@@ -1,5 +1,47 @@
 # Plan: Node Target Support for Ruby2JS-Rails
 
+## Status (2025-01-12)
+
+**Phase 1-4: COMPLETE** - RPC transport layer implemented and integrated.
+
+### Completed
+- `packages/ruby2js-rails/rpc/client.mjs` - Browser RPC client with CSRF tokens
+- `packages/ruby2js-rails/rpc/server.mjs` - Server handler with registry, CSRF validation
+- `packages/ruby2js-rails/adapters/active_record_rpc.mjs` - ActiveRecord adapter using RPC
+- `packages/ruby2js-rails/targets/node/rails.js` - RPC dispatch integrated before routing
+- `lib/ruby2js/rails/builder.rb` - Copies RPC adapter for server targets
+- `packages/ruby2js-rails/vite.mjs` - Aliases client imports to RPC adapter
+- `packages/ruby2js-rails/package.json` - Exports RPC modules
+
+### Build Output (verified working)
+```
+bin/juntos up -t node -d sqlite
+```
+Creates:
+- `lib/active_record.mjs` → SQLite adapter (for server runtime)
+- `lib/active_record_client.mjs` → RPC adapter (for browser bundles via Vite alias)
+
+### Blocking Issue: CSS Imports in Node.js
+
+The workflow demo fails to start because `WorkflowCanvas.rbx` imports React Flow's CSS:
+```ruby
+import 'reactflow/dist/style.css'
+```
+Node.js cannot load CSS files directly.
+
+**Proposed solution**: Add a `# Pragma: browser` directive that:
+- Browser target: keeps the import (Vite bundles the CSS)
+- Server target: skips the import (Node.js can't load CSS)
+
+Alternative: Auto-detect side-effect CSS imports and skip them for server targets.
+
+### Next Steps
+1. Implement CSS import handling (pragma or auto-detect)
+2. Test full RPC flow with workflow demo
+3. Add CSRF meta tag to server-rendered layouts
+
+---
+
 ## Goal
 
 Enable the same source code to work on both browser and Node targets without changes. The workflow builder demo should work identically whether running purely in-browser (Dexie/IndexedDB) or against a Node.js server (SQLite/PostgreSQL).
