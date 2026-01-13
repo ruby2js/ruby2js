@@ -18,6 +18,7 @@ Hands-on examples showcasing Juntos capabilities. Each demo is a complete Rails 
 | **[Blog](/docs/juntos/demos/blog)** | CRUD operations, nested resources, validations, multi-platform deployment |
 | **[Chat](/docs/juntos/demos/chat)** | Real-time Turbo Streams, Stimulus controllers in Ruby, WebSocket broadcasting |
 | **[Photo Gallery](/docs/juntos/demos/photo-gallery)** | Camera integration, Capacitor mobile apps, Electron desktop apps |
+| **[Workflow Builder](/docs/juntos/demos/workflow-builder)** | React Flow integration, real-time collaboration, JSON broadcasting |
 
 ## Running Any Demo
 
@@ -104,6 +105,17 @@ A camera-enabled gallery demonstrating native device integration:
 - **Binary storage** — Base64 images in any database
 
 Best for understanding Capacitor and Electron targets.
+
+### Workflow Builder Demo
+
+A visual workflow editor demonstrating React integration and real-time collaboration:
+
+- **React Flow** — Third-party React library for node-based editors
+- **JSON broadcasting** — `broadcast_json_to` for React state updates
+- **Stimulus bridge** — WebSocket subscription via Stimulus controller
+- **Real-time sync** — Multiple users see changes instantly
+
+Best for understanding React component integration and JSON broadcasting patterns.
 
 ## Creating Your Own
 

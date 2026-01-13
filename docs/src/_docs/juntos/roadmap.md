@@ -47,6 +47,7 @@ Native app support is now available. See the [Photo Gallery demo](/docs/juntos/d
 
 - **Turbo Streams Broadcasting** — Real-time DOM updates via WebSocket
   - `broadcast_append_to`, `broadcast_prepend_to`, `broadcast_replace_to`, `broadcast_remove_to`
+  - `broadcast_json_to` for React/JavaScript component integration (sends JSON instead of HTML)
   - WebSocket support on Node.js, Bun, Deno, and Cloudflare (Durable Objects)
   - Browser-side `BroadcastChannel` for same-origin tabs
 
@@ -55,6 +56,8 @@ Native app support is now available. See the [Photo Gallery demo](/docs/juntos/d
 - **Stimulus Controllers** — Write controllers in Ruby, transpile to JavaScript
   - Rails middleware serves `.rb` controllers as `.js` on-the-fly
   - Juntos builder generates `controllers/index.js` manifest
+
+See the [Workflow Builder demo](/docs/juntos/demos/workflow-builder) for React integration with JSON broadcasting.
 
 ## Planned
 

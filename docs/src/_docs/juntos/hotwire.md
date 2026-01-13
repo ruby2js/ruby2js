@@ -58,6 +58,7 @@ end
 | `broadcast_update_to` | Update target content |
 | `broadcast_before_to` | Insert before target |
 | `broadcast_after_to` | Insert after target |
+| `broadcast_json_to` | Send JSON event (for React/JS components) |
 
 ### View Subscription
 
@@ -82,6 +83,95 @@ Subscribe to broadcasts in your views:
 ```
 
 The `turbo_stream_from` helper generates a `<turbo-cable-stream-source>` element that establishes the WebSocket connection.
+
+### JSON Broadcasting for React Components
+
+Turbo Streams broadcast HTML fragments, which works great for server-rendered views but conflicts with React's DOM management. Use `broadcast_json_to` to send JSON events that React components can use to update their state:
+
+```ruby
+# app/models/node.rb
+class Node < ApplicationRecord
+  belongs_to :workflow
+
+  after_create_commit do
+    broadcast_json_to "workflow_#{workflow_id}", "node_created"
+  end
+
+  after_update_commit do
+    broadcast_json_to "workflow_#{workflow_id}", "node_updated"
+  end
+
+  after_destroy_commit do
+    broadcast_json_to "workflow_#{workflow_id}", "node_destroyed"
+  end
+end
+```
+
+This broadcasts JSON events:
+
+```json
+{
+  "type": "node_created",
+  "model": "Node",
+  "id": 42,
+  "data": {"id": 42, "label": "New Node", "position_x": 100, "position_y": 200, ...}
+}
+```
+
+**Subscribing with Stimulus:**
+
+Create a Stimulus controller to handle WebSocket subscription and dispatch events to React:
+
+```ruby
+# app/javascript/controllers/workflow_channel_controller.rb
+class WorkflowChannelController < Stimulus::Controller
+  def connect
+    @channel = "workflow_#{idValue}"
+    @ws = WebSocket.new("ws://#{window.location.host}/cable")
+
+    @ws.onopen = -> {
+      @ws.send!(JSON.stringify({ type: 'subscribe', stream: @channel }))
+    }
+
+    @ws.onmessage = ->(event) {
+      msg = JSON.parse(event.data)
+      return unless msg.type == 'message'
+      payload = JSON.parse(msg.message)
+      received(payload)
+    }
+  end
+
+  def received(data)
+    # Dispatch custom event for React to handle
+    event = CustomEvent.new("workflow:broadcast", { detail: data, bubbles: true })
+    element.dispatchEvent(event)
+  end
+end
+```
+
+**React component listening for events:**
+
+```ruby
+# In your React component
+useEffect(-> {
+  handle_broadcast = ->(event) {
+    payload = event.detail
+    case payload.type
+    when 'node_created'
+      setNodes(prev => [...prev, to_flow_node(payload.data)])
+    when 'node_updated'
+      setNodes(prev => prev.map { |n| n.id == payload.id.to_s ? to_flow_node(payload.data) : n })
+    when 'node_destroyed'
+      setNodes(prev => prev.filter { |n| n.id != payload.id.to_s })
+    end
+  }
+
+  element.addEventListener('workflow:broadcast', handle_broadcast)
+  -> { element.removeEventListener('workflow:broadcast', handle_broadcast) }
+}, [])
+```
+
+See the [Workflow Builder demo](/docs/juntos/demos/workflow-builder) for a complete example.
 
 ## Turbo Frames
 
