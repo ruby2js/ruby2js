@@ -233,7 +233,8 @@ class SelfhostBuilder
       Ruby2JS::Filter::React,
       Ruby2JS::Filter::Functions,
       Ruby2JS::Filter::ESM,
-      Ruby2JS::Filter::Return
+      Ruby2JS::Filter::Return,
+      Ruby2JS::Filter::Pragma
     ]
   }.freeze
 
@@ -1083,6 +1084,9 @@ class SelfhostBuilder
     if section == 'controllers' && @model_associations && @model_associations.any?  # Pragma: hash
       options[:model_associations] = @model_associations
     end
+
+    # Pass target for target-specific pragmas (browser, node, server, etc.)
+    options[:target] = @target if @target
 
     options
   end

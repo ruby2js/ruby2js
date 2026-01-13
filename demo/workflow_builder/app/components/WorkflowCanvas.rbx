@@ -1,9 +1,20 @@
 import React from 'react'
-import ReactFlow, [Background, Controls, MiniMap, useNodesState, useEdgesState, addEdge], from: 'reactflow'
-import 'reactflow/dist/style.css'
+# React Flow is browser-only (visual canvas library)
+import ReactFlow, [Background, Controls, MiniMap, useNodesState, useEdgesState, addEdge], from: 'reactflow' # Pragma: browser
+import 'reactflow/dist/style.css' # Pragma: browser
 
 export default
 def WorkflowCanvas(initialNodes:, initialEdges:, onSave:, onAddNode:, onAddEdge:)
+  # SSR-safe: only render canvas when ReactFlow is available
+  unless defined?(ReactFlow)
+    return %x{
+      <div style={{ width: '100%', height: '600px', border: '1px solid #ddd', borderRadius: '8px' }}
+           className="flex items-center justify-center bg-gray-100">
+        <p className="text-gray-500">Workflow canvas requires browser environment</p>
+      </div>
+    }
+  end
+
   nodes, setNodes, onNodesChange = useNodesState(initialNodes)
   edges, setEdges, onEdgesChange = useEdgesState(initialEdges)
 
@@ -25,10 +36,8 @@ def WorkflowCanvas(initialNodes:, initialEdges:, onSave:, onAddNode:, onAddEdge:
     onSave(positions)
   }
 
-  # Double-click to add new node (use onDoubleClick instead of checking event.detail)
+  # Double-click to add new node
   handle_double_click = ->(event) {
-    console.log('Double click detected', event)
-
     # Get click position relative to the flow
     bounds = event.target.getBoundingClientRect()
     position = {
