@@ -36,7 +36,8 @@ module Ruby2JS
             environment: ENV['RAILS_ENV'] || 'production',
             verbose: false,
             skip_build: false,
-            force: false
+            force: false,
+            sourcemap: false
           }
 
           parser = OptionParser.new do |opts|
@@ -68,6 +69,10 @@ module Ruby2JS
 
             opts.on("-v", "--verbose", "Show detailed output") do
               options[:verbose] = true
+            end
+
+            opts.on("--sourcemap", "Generate source maps") do
+              options[:sourcemap] = true
             end
 
             opts.on("-h", "--help", "Show this help message") do
@@ -143,6 +148,19 @@ module Ruby2JS
             builder_opts = { target: target }
             builder_opts[:database] = options[:database] if options[:database]
             SelfhostBuilder.new(nil, **builder_opts).build
+
+            # Run Vite build if vite.config.js exists
+            vite_config = File.join(DIST_DIR, 'vite.config.js')
+            if File.exist?(vite_config)
+              mode = options[:environment] || 'production'
+              puts "\nBundling with Vite (mode: #{mode})..."
+              cmd = "npx vite build --mode #{mode}"
+              cmd += " --sourcemap" if options[:sourcemap]
+              Dir.chdir(DIST_DIR) do
+                success = system(cmd)
+                abort "Error: Vite build failed." unless success
+              end
+            end
           end
 
           # Regenerate package.json with tarball URL for deploy

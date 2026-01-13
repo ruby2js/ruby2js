@@ -277,6 +277,7 @@ bin/juntos deploy [options]
 | `--skip-build` | Use existing dist/ |
 | `-f, --force` | Clear remote build cache |
 | `-v, --verbose` | Show detailed output |
+| `--sourcemap` | Generate source maps |
 | `-h, --help` | Show help |
 
 **Examples:**
@@ -286,6 +287,7 @@ bin/juntos deploy -e production       # Deploy production (adapter from database
 bin/juntos deploy -d neon             # Vercel with Neon (target inferred)
 bin/juntos deploy -d d1               # Cloudflare with D1 (target inferred)
 bin/juntos deploy -d neon --force     # Clear cache and deploy
+bin/juntos deploy --sourcemap         # Deploy with source maps for debugging
 ```
 
 **What it does:**

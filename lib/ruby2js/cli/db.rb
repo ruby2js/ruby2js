@@ -1050,6 +1050,17 @@ module Ruby2JS
           end
 
           SelfhostBuilder.new(nil, **builder_opts).build
+
+          # Run Vite build if vite.config.js exists
+          vite_config = File.join(DIST_DIR, 'vite.config.js')
+          if File.exist?(vite_config)
+            mode = options[:environment] || 'development'
+            puts "\nBundling with Vite (mode: #{mode})..."
+            Dir.chdir(DIST_DIR) do
+              success = system("npx vite build --mode #{mode}")
+              abort "Error: Vite build failed." unless success
+            end
+          end
         end
       end
     end
