@@ -562,32 +562,8 @@ class SelfhostBuilder
     dependencies = options[:dependencies] || {}
     stylesheets = options[:stylesheets] || []
     dist_dir = options[:dist_dir]
-
-    # Build importmap - merge common entries with database-specific and user entries
-    db_entries = IMPORTMAP_ENTRIES[database] || IMPORTMAP_ENTRIES['dexie']
-    importmap_entries = COMMON_IMPORTMAP_ENTRIES.merge(db_entries).merge(user_importmap)
-
-    # Add dependencies from ruby2js.yml to importmap
-    # Read each package's package.json to find ESM entry point
-    dependencies.each do |pkg_name, _version| # Pragma: entries
-      next if importmap_entries.key?(pkg_name)  # Don't override existing entries
-
-      pkg_json_path = dist_dir ? File.join(dist_dir, 'node_modules', pkg_name, 'package.json') : nil
-      if pkg_json_path && File.exist?(pkg_json_path)
-        begin
-          pkg_json = JSON.parse(File.read(pkg_json_path))
-          # Prefer "module" (ESM), fall back to "main"
-          entry_point = pkg_json['module'] || pkg_json['main'] || 'index.js'
-          importmap_entries[pkg_name] = "/node_modules/#{pkg_name}/#{entry_point}"
-        rescue JSON::ParserError
-          # Skip if package.json is invalid
-        end
-      end
-    end
-
-    importmap = {
-      'imports' => importmap_entries
-    }
+    # bundled: true generates index.html for Vite bundling (no importmap)
+    bundled = options[:bundled] || false
 
     # CSS link based on framework
     # This method is only used for browser targets, which serve from dist/ root
@@ -604,15 +580,6 @@ class SelfhostBuilder
       '' # No default CSS - apps without a framework don't need a stylesheet link
     end
 
-    # Add additional stylesheets from ruby2js.yml
-    # These are CSS files from npm packages (e.g., 'reactflow/dist/style.css')
-    stylesheet_links = stylesheets.map do |path|
-      "<link rel=\"stylesheet\" href=\"/node_modules/#{path}\">"
-    end.join("\n    ")
-
-    # Combine framework CSS with additional stylesheets
-    all_css_links = [css_link, stylesheet_links].reject { |s| s.to_s.empty? }.join("\n    ")
-
     # Main container class based on CSS framework
     main_class = case css.to_s
     when 'pico' then 'container'
@@ -622,33 +589,106 @@ class SelfhostBuilder
     else '' # No classes without a CSS framework
     end
 
-    html = <<~HTML
-      <!DOCTYPE html>
-      <html lang="en">
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>#{app_name}</title>
-        #{all_css_links}
-        <script type="importmap">
-        #{JSON.pretty_generate(importmap)}
-        </script>
-      </head>
-      <body>
-        <div id="loading">Loading...</div>
-        <div id="app" style="display:none">
-          <main class="#{main_class}" id="content"></main>
-        </div>
-        <script type="module">
+    if bundled
+      # For Vite bundling: no importmap, reference main.js entry point
+      # Vite will bundle all imports including npm dependencies
+      # CSS is handled via main.js imports, but keep framework CSS link
+      html = <<~HTML
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>#{app_name}</title>
+          #{css_link}
+        </head>
+        <body>
+          <div id="loading">Loading...</div>
+          <div id="app" style="display:none">
+            <main class="#{main_class}" id="content"></main>
+          </div>
+          <script type="module" src="./main.js"></script>
+        </body>
+        </html>
+      HTML
+
+      # Also generate main.js entry point for Vite to bundle
+      if dist_dir
+        main_js = <<~JS
+          // Main entry point for Vite bundling
           import * as Turbo from '@hotwired/turbo';
-          import { Application } from '#{base_path}/config/routes.js';
-          import '#{base_path}/app/javascript/controllers/index.js';
+          import { Application } from './config/routes.js';
+          import './app/javascript/controllers/index.js';
           window.Turbo = Turbo;
           Application.start();
-        </script>
-      </body>
-      </html>
-    HTML
+        JS
+        File.write(File.join(dist_dir, 'main.js'), main_js)
+      end
+    else
+      # For importmap mode: include importmap for unbundled development
+      # Build importmap - merge common entries with database-specific and user entries
+      db_entries = IMPORTMAP_ENTRIES[database] || IMPORTMAP_ENTRIES['dexie']
+      importmap_entries = COMMON_IMPORTMAP_ENTRIES.merge(db_entries).merge(user_importmap)
+
+      # Add dependencies from ruby2js.yml to importmap
+      # Read each package's package.json to find ESM entry point
+      dependencies.each do |pkg_name, _version| # Pragma: entries
+        next if importmap_entries.key?(pkg_name)  # Don't override existing entries
+
+        pkg_json_path = dist_dir ? File.join(dist_dir, 'node_modules', pkg_name, 'package.json') : nil
+        if pkg_json_path && File.exist?(pkg_json_path)
+          begin
+            pkg_json = JSON.parse(File.read(pkg_json_path))
+            # Prefer "module" (ESM), fall back to "main"
+            entry_point = pkg_json['module'] || pkg_json['main'] || 'index.js'
+            importmap_entries[pkg_name] = "/node_modules/#{pkg_name}/#{entry_point}"
+          rescue JSON::ParserError
+            # Skip if package.json is invalid
+          end
+        end
+      end
+
+      importmap = {
+        'imports' => importmap_entries
+      }
+
+      # Add additional stylesheets from ruby2js.yml (only needed in unbundled mode)
+      # These are CSS files from npm packages (e.g., 'reactflow/dist/style.css')
+      stylesheet_links = stylesheets.map do |path|
+        "<link rel=\"stylesheet\" href=\"/node_modules/#{path}\">"
+      end.join("\n    ")
+
+      # Combine framework CSS with additional stylesheets
+      all_css_links = [css_link, stylesheet_links].reject { |s| s.to_s.empty? }.join("\n    ")
+
+      html = <<~HTML
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>#{app_name}</title>
+          #{all_css_links}
+          <script type="importmap">
+          #{JSON.pretty_generate(importmap)}
+          </script>
+        </head>
+        <body>
+          <div id="loading">Loading...</div>
+          <div id="app" style="display:none">
+            <main class="#{main_class}" id="content"></main>
+          </div>
+          <script type="module">
+            import * as Turbo from '@hotwired/turbo';
+            import { Application } from '#{base_path}/config/routes.js';
+            import '#{base_path}/app/javascript/controllers/index.js';
+            window.Turbo = Turbo;
+            Application.start();
+          </script>
+        </body>
+        </html>
+      HTML
+    end
 
     if output_path
       FileUtils.mkdir_p(File.dirname(output_path))
@@ -2284,9 +2324,11 @@ class SelfhostBuilder
       base_path: '',  # Serving from dist/ root, not /dist
       dependencies: user_deps,
       stylesheets: user_stylesheets,
-      dist_dir: @dist_dir
+      dist_dir: @dist_dir,
+      bundled: true  # Use Vite bundling for browser targets
     )
     puts("  -> dist/index.html")
+    puts("  -> dist/main.js")
   end
 
   def generate_vercel_config()

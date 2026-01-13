@@ -65,9 +65,9 @@
     "ws": "^8.14.2"
   },
   "peerDependencies": {
+    "ruby2js": "*",
     "vite": "^5.0.0 || ^6.0.0",
-    "vite-plugin-ruby2js": "*",
-    "ruby2js": "*"
+    "vite-plugin-ruby2js": "*"
   },
   "peerDependenciesMeta": {
     "vite": {

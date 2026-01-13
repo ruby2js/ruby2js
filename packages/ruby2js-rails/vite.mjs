@@ -296,6 +296,7 @@ function createConfigPlugin(config, appRoot) {
       return {
         build: {
           target: buildTarget,
+          outDir: '.', // Output to current directory (dist/), not dist/dist/
           emptyOutDir: false, // Preserve node_modules, package.json, etc.
           rollupOptions
         },

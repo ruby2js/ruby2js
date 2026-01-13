@@ -171,14 +171,14 @@ external:
 
 ### dependencies vs external
 
-| Option | Purpose | Added to importmap? | Bundled by Rollup? |
-|--------|---------|---------------------|-------------------|
-| `dependencies` | Packages your app imports | Yes | No (external) |
-| `external` | Already-installed packages to keep external | Yes | No |
+| Option | Purpose | Bundled by Vite? |
+|--------|---------|------------------|
+| `dependencies` | NPM packages your app imports | Yes (browser targets) |
+| `external` | Packages resolved at runtime | No |
 
-**dependencies** are added to `package.json` during `juntos install` and included in the browser importmap. Use this for npm packages your Ruby code imports.
+**dependencies** are added to `package.json` during `juntos install`. For browser targets, Vite bundles these packages into the final JavaScript output. This handles complex npm packages with deep dependency trees (like React Flow with its sub-packages) and CSS imports.
 
-**external** tells Rollup not to bundle these packages—they're resolved via importmap at runtime. The preset automatically externalizes `@hotwired/turbo`, `@hotwired/stimulus`, and packages listed in `dependencies`.
+**external** tells Vite/Rollup not to bundle these packages—they must be available at runtime via `<script>` tags or importmaps. The preset automatically externalizes `@hotwired/turbo` and `@hotwired/stimulus`.
 
 ## Adding Custom Plugins
 

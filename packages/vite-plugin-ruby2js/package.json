@@ -1,6 +1,6 @@
 {
   "name": "vite-plugin-ruby2js",
-  "version": "0.1.0",
+  "version": "1.0.0-beta",
   "type": "module",
   "description": "Vite plugin for Ruby2JS - transform Ruby to JavaScript",
   "main": "src/index.js",
@@ -30,8 +30,5 @@
   },
   "peerDependencies": {
     "vite": "^5.0.0 || ^6.0.0"
-  },
-  "dependencies": {
-    "ruby2js": "https://www.ruby2js.com/releases/ruby2js-beta.tgz"
   }
 }
