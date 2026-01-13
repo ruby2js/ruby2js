@@ -118,58 +118,54 @@ This broadcasts JSON events:
 }
 ```
 
-**Subscribing with Stimulus:**
+**Subscribing with JsonStreamProvider:**
 
-Create a Stimulus controller to handle WebSocket subscription and dispatch events to React:
+Use the `JsonStreamProvider` React context to handle subscriptions. It automatically uses WebSocket on server targets and BroadcastChannel on the browser target:
 
 ```ruby
-# app/javascript/controllers/workflow_channel_controller.rb
-class WorkflowChannelController < Stimulus::Controller
-  def connect
-    @channel = "workflow_#{idValue}"
-    @ws = WebSocket.new("ws://#{window.location.host}/cable")
+# app/views/workflows/Show.rbx
+import JsonStreamProvider from 'components/JsonStreamProvider'
+import WorkflowCanvas from 'components/WorkflowCanvas'
 
-    @ws.onopen = -> {
-      @ws.send!(JSON.stringify({ type: 'subscribe', stream: @channel }))
-    }
-
-    @ws.onmessage = ->(event) {
-      msg = JSON.parse(event.data)
-      return unless msg.type == 'message'
-      payload = JSON.parse(msg.message)
-      received(payload)
-    }
-  end
-
-  def received(data)
-    # Dispatch custom event for React to handle
-    event = CustomEvent.new("workflow:broadcast", { detail: data, bubbles: true })
-    element.dispatchEvent(event)
-  end
+export default
+def Show(workflow:)
+  %x{
+    <JsonStreamProvider stream={`workflow_${workflow.id}`}>
+      <WorkflowCanvas ... />
+    </JsonStreamProvider>
+  }
 end
 ```
 
-**React component listening for events:**
+**React component using the context:**
 
 ```ruby
-# In your React component
-useEffect(-> {
-  handle_broadcast = ->(event) {
-    payload = event.detail
+# app/components/WorkflowCanvas.rbx
+import [useJsonStream], from: './JsonStreamProvider.js'
+
+export default
+def WorkflowCanvas(...)
+  stream = useJsonStream()
+
+  useEffect(-> {
+    return unless stream.lastMessage
+    payload = stream.lastMessage
+
     case payload.type
     when 'node_created'
-      setNodes(prev => [...prev, to_flow_node(payload.data)])
+      setNodes(->(prev) { [*prev, to_flow_node(payload.data)] })
     when 'node_updated'
-      setNodes(prev => prev.map { |n| n.id == payload.id.to_s ? to_flow_node(payload.data) : n })
+      setNodes(->(prev) { prev.map { |n| n.id == payload.id.to_s ? to_flow_node(payload.data) : n } })
     when 'node_destroyed'
-      setNodes(prev => prev.filter { |n| n.id != payload.id.to_s })
+      setNodes(->(prev) { prev.filter { |n| n.id != payload.id.to_s } })
     end
-  }
-
-  element.addEventListener('workflow:broadcast', handle_broadcast)
-  -> { element.removeEventListener('workflow:broadcast', handle_broadcast) }
-}, [])
+  }, [stream.lastMessage])
+end
 ```
+
+The provider handles the transport automatically:
+- **Browser target**: Uses `BroadcastChannel` for same-origin tab sync
+- **Node target**: Uses WebSocket to `/cable` endpoint
 
 See the [Workflow Builder demo](/docs/juntos/demos/workflow-builder) for a complete example.
 

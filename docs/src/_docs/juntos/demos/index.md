@@ -112,8 +112,8 @@ A visual workflow editor demonstrating React integration and real-time collabora
 
 - **React Flow** — Third-party React library for node-based editors
 - **JSON broadcasting** — `broadcast_json_to` for React state updates
-- **Stimulus bridge** — WebSocket subscription via Stimulus controller
-- **Real-time sync** — Multiple users see changes instantly
+- **React Context** — `JsonStreamProvider` for subscription management
+- **Multi-target** — BroadcastChannel (browser) or WebSocket (server)
 
 Best for understanding React component integration and JSON broadcasting patterns.
 

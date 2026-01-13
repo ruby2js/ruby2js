@@ -10,6 +10,8 @@
 # - Uses `# Pragma: browser` for browser-only React Flow imports
 # - Uses `defined?(ReactFlow)` for SSR-safe rendering
 # - Works with both browser (Dexie) and server (Node/Rails) targets
+# - Real-time collaboration via broadcast_json_to and JsonStreamProvider
+# - BroadcastChannel (browser) or WebSocket (node) for cross-tab/client sync
 
 set -e
 
@@ -50,22 +52,44 @@ class Workflow < ApplicationRecord
 end
 MODEL
 
-# Update Node model
+# Update Node model with JSON broadcasting for real-time collaboration
 cat > app/models/node.rb << 'MODEL'
 class Node < ApplicationRecord
   belongs_to :workflow
 
   validates :position_x, :position_y, presence: true
   validates :label, presence: true
+
+  # Broadcast JSON events for real-time collaboration
+  after_create_commit do
+    broadcast_json_to "workflow_#{workflow_id}", "node_created"
+  end
+
+  after_update_commit do
+    broadcast_json_to "workflow_#{workflow_id}", "node_updated"
+  end
+
+  after_destroy_commit do
+    broadcast_json_to "workflow_#{workflow_id}", "node_destroyed"
+  end
 end
 MODEL
 
-# Update Edge model
+# Update Edge model with JSON broadcasting
 cat > app/models/edge.rb << 'MODEL'
 class Edge < ApplicationRecord
   belongs_to :workflow
   belongs_to :source_node, class_name: 'Node'
   belongs_to :target_node, class_name: 'Node'
+
+  # Broadcast JSON events for real-time collaboration
+  after_create_commit do
+    broadcast_json_to "workflow_#{workflow_id}", "edge_created"
+  end
+
+  after_destroy_commit do
+    broadcast_json_to "workflow_#{workflow_id}", "edge_destroyed"
+  end
 end
 MODEL
 
@@ -292,12 +316,14 @@ cat > app/views/workflows/_form.html.erb << 'FORM'
 <% end %>
 FORM
 
-# Create show view (RBX - uses React Flow)
+# Create show view (RBX - uses React Flow with real-time collaboration)
 # Uses model operations directly (Node.create, Edge.create) instead of fetch()
 # This makes the view target-agnostic: works with both browser (Dexie) and Node (RPC) targets
+# JsonStreamProvider handles real-time updates via BroadcastChannel (browser) or WebSocket (node)
 cat > app/views/workflows/Show.rbx << 'RBX'
 import React from 'react'
 import WorkflowCanvas from 'components/WorkflowCanvas'
+import JsonStreamProvider from 'components/JsonStreamProvider'
 import [Node], from: '../../models/node.js'
 import [Edge], from: '../../models/edge.js'
 
@@ -363,26 +389,114 @@ def Show(workflow:)
           Back to Workflows
         </a>
       </div>
-      <WorkflowCanvas
-        initialNodes={flow_nodes}
-        initialEdges={flow_edges}
-        onSave={handle_save}
-        onAddNode={handle_add_node}
-        onAddEdge={handle_add_edge}
-      />
+      <JsonStreamProvider stream={`workflow_${workflow.id}`}>
+        <WorkflowCanvas
+          initialNodes={flow_nodes}
+          initialEdges={flow_edges}
+          onSave={handle_save}
+          onAddNode={handle_add_node}
+          onAddEdge={handle_add_edge}
+        />
+      </JsonStreamProvider>
     </div>
   }
 end
 RBX
 
-# Create components directory and WorkflowCanvas component
-# Uses target pragma to mark React Flow as browser-only
+# Create components directory
 mkdir -p app/components
+
+# Create JsonStreamProvider component for real-time subscriptions
+# Handles WebSocket (node target) or BroadcastChannel (browser target) automatically
+cat > app/components/JsonStreamProvider.rbx << 'COMPONENT'
+import React, [createContext, useContext, useState, useEffect, useCallback], from: 'react'
+
+# Context for JSON stream messages
+JsonStreamContext = createContext(nil)
+
+# Hook to access the JSON stream context
+export
+def useJsonStream()
+  context = useContext(JsonStreamContext)
+  unless context
+    raise "useJsonStream must be used within a JsonStreamProvider"
+  end
+  context
+end
+
+# Provider component that handles WebSocket/BroadcastChannel subscription
+export default
+def JsonStreamProvider(stream:, children:)
+  lastMessage, setLastMessage = useState(nil)
+  connected, setConnected = useState(false)
+
+  useEffect(-> {
+    # Browser target: use BroadcastChannel
+    # Node target: use WebSocket
+    if defined?(BroadcastChannel) && typeof(WebSocket) == 'undefined'
+      # Browser target - BroadcastChannel for same-origin tabs
+      channel = BroadcastChannel.new(stream)
+      setConnected(true)
+
+      channel.onmessage = ->(event) {
+        setLastMessage(event.data)
+      }
+
+      return -> {
+        channel.close()
+        setConnected(false)
+      }
+    else
+      # Node target - WebSocket to /cable
+      ws = WebSocket.new("ws://#{window.location.host}/cable")
+
+      ws.onopen = -> {
+        ws.send!(JSON.stringify({ type: 'subscribe', stream: stream }))
+        setConnected(true)
+      }
+
+      ws.onmessage = ->(event) {
+        msg = JSON.parse(event.data)
+        return unless msg.type == 'message'
+        payload = JSON.parse(msg.message)
+        setLastMessage(payload)
+      }
+
+      ws.onerror = ->(error) {
+        console.error("JsonStreamProvider error:", error)
+      }
+
+      ws.onclose = -> {
+        setConnected(false)
+      }
+
+      return -> {
+        if ws.readyState == WebSocket::OPEN
+          ws.send!(JSON.stringify({ type: 'unsubscribe', stream: stream }))
+        end
+        ws.close()
+      }
+    end
+  }, [stream])
+
+  value = { lastMessage: lastMessage, connected: connected, stream: stream }
+
+  %x{
+    <JsonStreamContext.Provider value={value}>
+      {children}
+    </JsonStreamContext.Provider>
+  }
+end
+COMPONENT
+
+# Create WorkflowCanvas component with real-time updates via useJsonStream hook
+# Uses target pragma to mark React Flow as browser-only
 cat > app/components/WorkflowCanvas.rbx << 'COMPONENT'
-import React from 'react'
+import React, [useEffect], from: 'react'
 # React Flow is browser-only (visual canvas library)
 import ReactFlow, [Background, Controls, MiniMap, useNodesState, useEdgesState, addEdge], from: 'reactflow' # Pragma: browser
 import 'reactflow/dist/style.css' # Pragma: browser
+import [useJsonStream], from: './JsonStreamProvider.js'
 
 export default
 def WorkflowCanvas(initialNodes:, initialEdges:, onSave:, onAddNode:, onAddEdge:)
@@ -398,6 +512,55 @@ def WorkflowCanvas(initialNodes:, initialEdges:, onSave:, onAddNode:, onAddEdge:
 
   nodes, setNodes, onNodesChange = useNodesState(initialNodes)
   edges, setEdges, onEdgesChange = useEdgesState(initialEdges)
+
+  # Get JSON stream messages from context provider
+  stream = useJsonStream()
+
+  # Handle incoming broadcast messages for real-time collaboration
+  useEffect(-> {
+    return unless stream.lastMessage
+    payload = stream.lastMessage
+
+    case payload.type
+    when 'node_created'
+      new_node = {
+        id: payload.id.to_s,
+        type: 'default',
+        position: { x: payload.data.position_x, y: payload.data.position_y },
+        data: { label: payload.data.label }
+      }
+      setNodes(->(nds) { [*nds, new_node] })
+
+    when 'node_updated'
+      setNodes(->(nds) {
+        nds.map do |n|
+          if n.id == payload.id.to_s
+            {
+              **n,
+              position: { x: payload.data.position_x, y: payload.data.position_y },
+              data: { label: payload.data.label }
+            }
+          else
+            n
+          end
+        end
+      })
+
+    when 'node_destroyed'
+      setNodes(->(nds) { nds.filter(->(n) { n.id != payload.id.to_s }) })
+
+    when 'edge_created'
+      new_edge = {
+        id: payload.id.to_s,
+        source: payload.data.source_node_id.to_s,
+        target: payload.data.target_node_id.to_s
+      }
+      setEdges(->(eds) { [*eds, new_edge] })
+
+    when 'edge_destroyed'
+      setEdges(->(eds) { eds.filter(->(e) { e.id != payload.id.to_s }) })
+    end
+  }, [stream.lastMessage])
 
   # Handle new connections between nodes
   handle_connect = ->(connection) {
@@ -536,17 +699,20 @@ echo ""
 echo "To run with Juntos (transpiled to JavaScript):"
 echo "  cd $APP_NAME"
 echo "  bin/juntos dev -d dexie              # Browser with IndexedDB"
+echo "  bin/juntos up -t node -d sqlite      # Node.js with SQLite"
 echo ""
-echo "To build for specific targets:"
-echo "  bin/juntos build -t browser          # Browser build (includes React Flow)"
-echo "  bin/juntos build -t node             # Server build (excludes React Flow)"
-echo ""
-echo "The WorkflowCanvas component uses target-specific pragmas:"
-echo "  - Browser target: includes React Flow for interactive canvas"
-echo "  - Server target: shows placeholder (SSR-safe fallback)"
+echo "Real-time collaboration:"
+echo "  - Browser target: changes sync across tabs via BroadcastChannel"
+echo "  - Node target: changes sync across clients via WebSocket"
+echo "  - Open multiple browser windows to see real-time updates!"
 echo ""
 echo "The canvas uses React Flow for drag-and-drop node editing."
 echo "Double-click to add nodes, drag handles to connect them."
+echo ""
+echo "Key components:"
+echo "  - JsonStreamProvider: React context for real-time subscriptions"
+echo "  - useJsonStream hook: access broadcast messages in components"
+echo "  - broadcast_json_to: model callbacks send JSON events"
 echo ""
 echo "To run with Rails:"
 echo "  cd $APP_NAME"

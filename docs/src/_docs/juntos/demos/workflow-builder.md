@@ -16,8 +16,9 @@ This demo shows how to integrate third-party React libraries (React Flow) with J
 
 - **React Flow** — Node-based visual editor for workflows
 - **JSON broadcasting** — `broadcast_json_to` for React state updates
-- **Stimulus bridge** — WebSocket subscription via Stimulus controller
+- **React Context** — `JsonStreamProvider` for subscription management
 - **Real-time sync** — Multiple users see changes instantly
+- **Multi-target** — Works on both browser (BroadcastChannel) and node (WebSocket) targets
 
 Unlike Turbo Streams (which broadcast HTML), this demo uses JSON events that React components can use to update their internal state.
 
@@ -26,8 +27,8 @@ Unlike Turbo Streams (which broadcast HTML), this demo uses JSON events that Rea
 Turbo Streams work great for server-rendered HTML, but React manages its own DOM. Broadcasting HTML fragments would conflict with React's reconciliation. The solution:
 
 1. **Models broadcast JSON events** — not HTML
-2. **Stimulus handles WebSocket subscription** — Rails-like pattern
-3. **React listens for custom events** — updates state accordingly
+2. **React Context handles subscription** — automatic transport selection
+3. **Components use hooks** — idiomatic React pattern
 
 ## The Code
 
@@ -86,128 +87,146 @@ class Edge < ApplicationRecord
 end
 ```
 
-### Stimulus Controller for WebSocket
+### JsonStreamProvider Component
+
+The provider handles WebSocket (node target) or BroadcastChannel (browser target) automatically:
 
 ```ruby
-# app/javascript/controllers/workflow_channel_controller.rb
-class WorkflowChannelController < Stimulus::Controller
-  def connect
-    @channel = "workflow_#{idValue}"
-    @ws = WebSocket.new("ws://#{window.location.host}/cable")
+# app/components/JsonStreamProvider.rbx
+import React, [createContext, useContext, useState, useEffect], from: 'react'
 
-    @ws.onopen = -> {
-      @ws.send!(JSON.stringify({ type: 'subscribe', stream: @channel }))
-      console.log("WorkflowChannel: subscribed to #{@channel}")
-    }
+JsonStreamContext = createContext(nil)
 
-    @ws.onmessage = ->(event) {
-      msg = JSON.parse(event.data)
-      return unless msg.type == 'message'
-      payload = JSON.parse(msg.message)
-      received(payload)
-    }
-
-    @ws.onerror = ->(error) {
-      console.error("WorkflowChannel error:", error)
-    }
-
-    @ws.onclose = -> {
-      console.log("WorkflowChannel: disconnected from #{@channel}")
-    }
+export
+def useJsonStream()
+  context = useContext(JsonStreamContext)
+  unless context
+    raise "useJsonStream must be used within a JsonStreamProvider"
   end
+  context
+end
 
-  def disconnect
-    if @ws
-      @ws.send!(JSON.stringify({ type: 'unsubscribe', stream: @channel }))
-      @ws.close()
-      @ws = nil
+export default
+def JsonStreamProvider(stream:, children:)
+  lastMessage, setLastMessage = useState(nil)
+  connected, setConnected = useState(false)
+
+  useEffect(-> {
+    # Browser target: BroadcastChannel
+    # Node target: WebSocket
+    if defined?(BroadcastChannel) && typeof(WebSocket) == 'undefined'
+      channel = BroadcastChannel.new(stream)
+      setConnected(true)
+      channel.onmessage = ->(event) { setLastMessage(event.data) }
+      return -> { channel.close() }
+    else
+      ws = WebSocket.new("ws://#{window.location.host}/cable")
+      ws.onopen = -> {
+        ws.send!(JSON.stringify({ type: 'subscribe', stream: stream }))
+        setConnected(true)
+      }
+      ws.onmessage = ->(event) {
+        msg = JSON.parse(event.data)
+        return unless msg.type == 'message'
+        setLastMessage(JSON.parse(msg.message))
+      }
+      return -> { ws.close() }
     end
-  end
+  }, [stream])
 
-  def received(data)
-    # Dispatch custom event for React to handle
-    event = CustomEvent.new("workflow:broadcast", { detail: data, bubbles: true })
-    element.dispatchEvent(event)
-  end
+  value = { lastMessage: lastMessage, connected: connected, stream: stream }
+
+  %x{
+    <JsonStreamContext.Provider value={value}>
+      {children}
+    </JsonStreamContext.Provider>
+  }
 end
 ```
 
-### View with Stimulus Controller
+### View with Provider
 
 ```ruby
 # app/views/workflows/Show.rbx
-<div data-controller="workflow-channel" data-workflow-channel-id-value={workflow.id}>
-  <WorkflowCanvas
-    initialNodes={flow_nodes}
-    initialEdges={flow_edges}
-    onSave={handle_save}
-    onAddNode={handle_add_node}
-    onAddEdge={handle_add_edge}
-  />
-</div>
+import JsonStreamProvider from 'components/JsonStreamProvider'
+import WorkflowCanvas from 'components/WorkflowCanvas'
+
+export default
+def Show(workflow:)
+  %x{
+    <div className="container mx-auto px-4 py-8">
+      <h1 className="text-3xl font-bold">{workflow.name}</h1>
+      <JsonStreamProvider stream={`workflow_${workflow.id}`}>
+        <WorkflowCanvas
+          initialNodes={flow_nodes}
+          initialEdges={flow_edges}
+          onSave={handle_save}
+          onAddNode={handle_add_node}
+          onAddEdge={handle_add_edge}
+        />
+      </JsonStreamProvider>
+    </div>
+  }
+end
 ```
 
-### React Component Listening for Events
+### React Component Using the Hook
 
 ```ruby
 # app/components/WorkflowCanvas.rbx
-import React, [useState, useCallback, useRef, useEffect], from: 'react'
+import React, [useEffect], from: 'react'
 import ReactFlow, [...], from: 'reactflow' # Pragma: browser
+import [useJsonStream], from: './JsonStreamProvider.js'
 
 export default
 def WorkflowCanvas(initialNodes:, initialEdges:, onSave:, onAddNode:, onAddEdge:)
   nodes, setNodes, onNodesChange = useNodesState(initialNodes)
   edges, setEdges, onEdgesChange = useEdgesState(initialEdges)
-  containerRef = useRef(nil)
 
-  # Listen for broadcast events from Stimulus controller
+  # Get JSON stream from context
+  stream = useJsonStream()
+
+  # Handle incoming broadcast messages
   useEffect(-> {
-    container = containerRef.current
-    return unless container
+    return unless stream.lastMessage
+    payload = stream.lastMessage
 
-    handle_broadcast = ->(event) {
-      payload = event.detail
+    case payload.type
+    when 'node_created'
+      new_node = {
+        id: payload.id.to_s,
+        type: 'default',
+        position: { x: payload.data.position_x, y: payload.data.position_y },
+        data: { label: payload.data.label }
+      }
+      setNodes(->(nds) { [*nds, new_node] })
 
-      case payload.type
-      when 'node_created'
-        new_node = {
-          id: payload.data.id.to_s,
-          type: 'default',
-          position: { x: payload.data.position_x, y: payload.data.position_y },
-          data: { label: payload.data.label }
-        }
-        setNodes(->(prev) { [...prev, new_node] })
+    when 'node_updated'
+      setNodes(->(nds) {
+        nds.map do |n|
+          if n.id == payload.id.to_s
+            { **n, position: { x: payload.data.position_x, y: payload.data.position_y } }
+          else
+            n
+          end
+        end
+      })
 
-      when 'node_updated'
-        setNodes(->(prev) {
-          prev.map { |n|
-            if n.id == payload.id.to_s
-              { **n, position: { x: payload.data.position_x, y: payload.data.position_y } }
-            else
-              n
-            end
-          }
-        })
+    when 'node_destroyed'
+      setNodes(->(nds) { nds.filter(->(n) { n.id != payload.id.to_s }) })
 
-      when 'node_destroyed'
-        setNodes(->(prev) { prev.filter { |n| n.id != payload.id.to_s } })
+    when 'edge_created'
+      new_edge = {
+        id: payload.id.to_s,
+        source: payload.data.source_node_id.to_s,
+        target: payload.data.target_node_id.to_s
+      }
+      setEdges(->(eds) { [*eds, new_edge] })
 
-      when 'edge_created'
-        new_edge = {
-          id: payload.data.id.to_s,
-          source: payload.data.source_node_id.to_s,
-          target: payload.data.target_node_id.to_s
-        }
-        setEdges(->(prev) { [...prev, new_edge] })
-
-      when 'edge_destroyed'
-        setEdges(->(prev) { prev.filter { |e| e.id != payload.id.to_s } })
-      end
-    }
-
-    container.addEventListener('workflow:broadcast', handle_broadcast)
-    -> { container.removeEventListener('workflow:broadcast', handle_broadcast) }
-  }, [])
+    when 'edge_destroyed'
+      setEdges(->(eds) { eds.filter(->(e) { e.id != payload.id.to_s }) })
+    end
+  }, [stream.lastMessage])
 
   # ... rest of component (drag handlers, etc.)
 end
@@ -218,11 +237,11 @@ end
 1. **User creates a node** — double-click on canvas
 2. **React calls `onAddNode`** — creates Node in database
 3. **Model callback fires** — `after_create_commit` broadcasts JSON
-4. **WebSocket delivers** — to all subscribers on the channel
-5. **Stimulus receives** — dispatches `workflow:broadcast` event
-6. **React handles** — updates state, re-renders
+4. **Transport delivers** — WebSocket (node) or BroadcastChannel (browser)
+5. **Provider receives** — updates `lastMessage` in context
+6. **useEffect triggers** — component updates state, React re-renders
 
-The key insight: Stimulus handles the "Rails-like" WebSocket subscription, while React handles its own state. They communicate via DOM events.
+The key insight: React Context handles subscription management, while the provider abstracts the transport mechanism.
 
 ## Turbo Streams vs JSON Broadcasting
 
@@ -232,40 +251,43 @@ The key insight: Stimulus handles the "Rails-like" WebSocket subscription, while
 | **DOM update** | Turbo handles | React handles |
 | **Best for** | Server-rendered views | React/JS components |
 | **Method** | `broadcast_append_to` | `broadcast_json_to` |
+| **Subscription** | `turbo_stream_from` | `JsonStreamProvider` |
 
 Use Turbo Streams for ERB views. Use JSON broadcasting for React components.
 
-## Real-Time Collaboration
+## Multi-Target Support
 
-With JSON broadcasting, multiple users can:
+The `JsonStreamProvider` automatically selects the right transport:
 
-- See new nodes appear instantly
-- Watch nodes move as others drag them
-- See edges created between nodes
-- Observe deletions in real-time
+| Target | Transport | Scope |
+|--------|-----------|-------|
+| **Browser** | `BroadcastChannel` | Same-origin tabs |
+| **Node.js** | WebSocket | All connected clients |
+| **Bun** | WebSocket | All connected clients |
+| **Deno** | WebSocket | All connected clients |
 
-Each browser maintains its own React state, but the state stays synchronized via WebSocket broadcasts.
+This means the same React component code works in both browser-only mode (local development, offline apps) and server mode (multi-user collaboration).
 
 ## What This Demo Shows
 
 ### JSON Broadcasting Pattern
 
 - `broadcast_json_to` — send JSON instead of HTML
-- Custom events — bridge Stimulus and React
-- State synchronization — multiple clients stay in sync
+- React Context — manage subscription state
+- Multi-target transport — automatic WebSocket/BroadcastChannel selection
 
 ### React Integration
 
 - Third-party React libraries (React Flow)
 - Ruby syntax for React components (`.rbx` files)
-- `useEffect` for event listeners
+- Context providers and hooks
 - State management with `useState`
 
-### Stimulus as WebSocket Client
+### Real-Time Collaboration
 
-- WebSocket subscription in Stimulus
-- Dispatch custom events to React
-- Clean disconnect handling
+- Multiple users see changes instantly
+- Works in browser (same device) and server (across devices) modes
+- No custom WebSocket code in components
 
 ## Next Steps
 

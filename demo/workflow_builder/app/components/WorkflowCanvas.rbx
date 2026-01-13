@@ -1,7 +1,8 @@
-import React, [useEffect, useRef], from: 'react'
+import React, [useEffect], from: 'react'
 # React Flow is browser-only (visual canvas library)
 import ReactFlow, [Background, Controls, MiniMap, useNodesState, useEdgesState, addEdge], from: 'reactflow' # Pragma: browser
 import 'reactflow/dist/style.css' # Pragma: browser
+import [useJsonStream], from: './JsonStreamProvider.js'
 
 export default
 def WorkflowCanvas(initialNodes:, initialEdges:, onSave:, onAddNode:, onAddEdge:)
@@ -17,63 +18,55 @@ def WorkflowCanvas(initialNodes:, initialEdges:, onSave:, onAddNode:, onAddEdge:
 
   nodes, setNodes, onNodesChange = useNodesState(initialNodes)
   edges, setEdges, onEdgesChange = useEdgesState(initialEdges)
-  containerRef = useRef(nil)
 
-  # Listen for broadcasts from Stimulus workflow-channel controller
+  # Get JSON stream messages from context provider
+  stream = useJsonStream()
+
+  # Handle incoming broadcast messages
   useEffect(-> {
-    container = containerRef.current
-    return unless container
+    return unless stream.lastMessage
+    payload = stream.lastMessage
 
-    handle_broadcast = ->(event) {
-      payload = event.detail
+    case payload.type
+    when 'node_created'
+      new_node = {
+        id: payload.id.to_s,
+        type: 'default',
+        position: { x: payload.data.position_x, y: payload.data.position_y },
+        data: { label: payload.data.label }
+      }
+      setNodes(->(nds) { [*nds, new_node] })
 
-      case payload.type
-      when 'node_created'
-        new_node = {
-          id: payload.id.to_s,
-          type: 'default',
-          position: { x: payload.data.position_x, y: payload.data.position_y },
-          data: { label: payload.data.label }
-        }
-        setNodes(->(nds) { [*nds, new_node] })
-
-      when 'node_updated'
-        setNodes(->(nds) {
-          nds.map do |n|
-            if n.id == payload.id.to_s
-              {
-                **n,
-                position: { x: payload.data.position_x, y: payload.data.position_y },
-                data: { label: payload.data.label }
-              }
-            else
-              n
-            end
+    when 'node_updated'
+      setNodes(->(nds) {
+        nds.map do |n|
+          if n.id == payload.id.to_s
+            {
+              **n,
+              position: { x: payload.data.position_x, y: payload.data.position_y },
+              data: { label: payload.data.label }
+            }
+          else
+            n
           end
-        })
+        end
+      })
 
-      when 'node_destroyed'
-        setNodes(->(nds) { nds.filter(->(n) { n.id != payload.id.to_s }) })
+    when 'node_destroyed'
+      setNodes(->(nds) { nds.filter(->(n) { n.id != payload.id.to_s }) })
 
-      when 'edge_created'
-        new_edge = {
-          id: payload.id.to_s,
-          source: payload.data.source_node_id.to_s,
-          target: payload.data.target_node_id.to_s
-        }
-        setEdges(->(eds) { [*eds, new_edge] })
+    when 'edge_created'
+      new_edge = {
+        id: payload.id.to_s,
+        source: payload.data.source_node_id.to_s,
+        target: payload.data.target_node_id.to_s
+      }
+      setEdges(->(eds) { [*eds, new_edge] })
 
-      when 'edge_destroyed'
-        setEdges(->(eds) { eds.filter(->(e) { e.id != payload.id.to_s }) })
-      end
-    }
-
-    # Listen for broadcasts bubbling up from parent Stimulus controller
-    container.addEventListener('workflow:broadcast', handle_broadcast)
-
-    # Cleanup
-    -> { container.removeEventListener('workflow:broadcast', handle_broadcast) }
-  }, [])
+    when 'edge_destroyed'
+      setEdges(->(eds) { eds.filter(->(e) { e.id != payload.id.to_s }) })
+    end
+  }, [stream.lastMessage])
 
   # Handle new connections between nodes
   handle_connect = ->(connection) {
@@ -114,7 +107,7 @@ def WorkflowCanvas(initialNodes:, initialEdges:, onSave:, onAddNode:, onAddEdge:
   }
 
   %x{
-    <div ref={containerRef} style={{ width: '100%', height: '600px', border: '1px solid #ddd', borderRadius: '8px' }} onDoubleClick={handle_double_click}>
+    <div style={{ width: '100%', height: '600px', border: '1px solid #ddd', borderRadius: '8px' }} onDoubleClick={handle_double_click}>
       <ReactFlow
         nodes={nodes}
         edges={edges}

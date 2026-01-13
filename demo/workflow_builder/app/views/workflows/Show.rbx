@@ -1,5 +1,6 @@
 import React from 'react'
 import WorkflowCanvas from 'components/WorkflowCanvas'
+import JsonStreamProvider from 'components/JsonStreamProvider'
 import [Node], from: '../../models/node.js'
 import [Edge], from: '../../models/edge.js'
 
@@ -65,7 +66,7 @@ def Show(workflow:)
           Back to Workflows
         </a>
       </div>
-      <div data-controller="workflow-channel" data-workflow-channel-id-value={workflow.id}>
+      <JsonStreamProvider stream={`workflow_${workflow.id}`}>
         <WorkflowCanvas
           initialNodes={flow_nodes}
           initialEdges={flow_edges}
@@ -73,7 +74,7 @@ def Show(workflow:)
           onAddNode={handle_add_node}
           onAddEdge={handle_add_edge}
         />
-      </div>
+      </JsonStreamProvider>
     </div>
   }
 end
