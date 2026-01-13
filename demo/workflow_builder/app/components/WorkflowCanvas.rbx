@@ -25,9 +25,9 @@ def WorkflowCanvas(initialNodes:, initialEdges:, onSave:, onAddNode:, onAddEdge:
     onSave(positions)
   }
 
-  # Double-click to add new node
-  handle_pane_click = ->(event) {
-    return unless event.detail == 2  # double-click
+  # Double-click to add new node (use onDoubleClick instead of checking event.detail)
+  handle_double_click = ->(event) {
+    console.log('Double click detected', event)
 
     # Get click position relative to the flow
     bounds = event.target.getBoundingClientRect()
@@ -48,7 +48,7 @@ def WorkflowCanvas(initialNodes:, initialEdges:, onSave:, onAddNode:, onAddEdge:
   }
 
   %x{
-    <div style={{ width: '100%', height: '600px', border: '1px solid #ddd', borderRadius: '8px' }}>
+    <div style={{ width: '100%', height: '600px', border: '1px solid #ddd', borderRadius: '8px' }} onDoubleClick={handle_double_click}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -56,7 +56,7 @@ def WorkflowCanvas(initialNodes:, initialEdges:, onSave:, onAddNode:, onAddEdge:
         onEdgesChange={onEdgesChange}
         onConnect={handle_connect}
         onNodeDragStop={handle_node_drag_stop}
-        onPaneClick={handle_pane_click}
+        zoomOnDoubleClick={false}
         fitView
       >
         <Background color="#aaa" gap={16} />

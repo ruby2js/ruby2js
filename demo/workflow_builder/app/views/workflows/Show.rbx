@@ -1,5 +1,7 @@
 import React from 'react'
 import WorkflowCanvas from 'components/WorkflowCanvas'
+import [Node], from: '../../models/node.js'
+import [Edge], from: '../../models/edge.js'
 
 export default
 def Show(workflow:)
@@ -27,35 +29,32 @@ def Show(workflow:)
   end
 
   handle_save = ->(updated_nodes) {
-    fetch("/workflows/#{workflow.id}/update_positions",
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(nodes: updated_nodes)
-    )
+    # Update node positions directly in the database
+    updated_nodes.each do |node_data|
+      Node.find(node_data.id.to_i).then(->(node) {
+        node.update(position_x: node_data.position.x, position_y: node_data.position.y)
+      })
+    end
   }
 
   handle_add_node = ->(position) {
-    fetch("/workflows/#{workflow.id}/nodes",
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(node: {
-        label: "New Node",
-        node_type: "default",
-        position_x: position.x,
-        position_y: position.y
-      })
-    ).then(->(r) { r.json() })
+    # Create node directly in the database
+    Node.create(
+      label: "New Node",
+      node_type: "default",
+      position_x: position.x,
+      position_y: position.y,
+      workflow_id: workflow.id
+    )
   }
 
   handle_add_edge = ->(source_id, target_id) {
-    fetch("/workflows/#{workflow.id}/edges",
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(edge: {
-        source_node_id: source_id,
-        target_node_id: target_id
-      })
-    ).then(->(r) { r.json() })
+    # Create edge directly in the database
+    Edge.create(
+      source_node_id: source_id.to_i,
+      target_node_id: target_id.to_i,
+      workflow_id: workflow.id
+    )
   }
 
   %x{

@@ -91,9 +91,30 @@ export class Router extends RouterBase {
   }
 
   // Render content and handle flash cookie
-  static renderContent(context, html) {
-    const fullHtml = Application.wrapInLayout(context, html);
-    document.getElementById('content').innerHTML = fullHtml;
+  static renderContent(context, content) {
+    const container = document.getElementById('content');
+
+    // Check if content is a React element (has $$typeof Symbol)
+    if (content && typeof content === 'object' && content.$$typeof) {
+      // React element - use ReactDOM to render
+      // Wrap in layout if needed (layout returns React element or passes through)
+      const wrappedContent = Application.wrapInLayout(context, content);
+
+      // Import ReactDOM dynamically and render
+      import('react-dom/client').then(({ createRoot }) => {
+        // Clear any existing React root
+        if (container._reactRoot) {
+          container._reactRoot.unmount();
+        }
+        const root = createRoot(container);
+        container._reactRoot = root;
+        root.render(wrappedContent);
+      });
+    } else {
+      // HTML string - use innerHTML
+      const fullHtml = Application.wrapInLayout(context, content);
+      container.innerHTML = fullHtml;
+    }
 
     // Clear flash cookie after rendering (consumed)
     context.flash.writeToCookie();
