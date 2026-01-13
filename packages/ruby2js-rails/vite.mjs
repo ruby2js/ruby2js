@@ -657,7 +657,10 @@ function createHmrPlugin() {
       // (default behavior - return undefined to use Vite's module graph)
     },
 
-    transformIndexHtml(html) {
+    transformIndexHtml(html, { server }) {
+      // Only inject HMR runtime in dev mode (when server is present)
+      if (!server) return html;
+
       return {
         html,
         tags: [

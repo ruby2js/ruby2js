@@ -48,7 +48,7 @@ bin/juntos dev -e test            # Use test environment from database.yml
 
 ## juntos up
 
-Build and start a server for Node.js/Bun/Deno targets.
+Build and run a server locally. Supports all targets including browser.
 
 ```bash
 bin/juntos up [options]
@@ -58,7 +58,7 @@ bin/juntos up [options]
 
 | Option | Description |
 |--------|-------------|
-| `-t, --target TARGET` | Runtime target (node, bun, deno) |
+| `-t, --target TARGET` | Runtime target (browser, node, bun, deno) |
 | `-d, --database ADAPTER` | Database adapter |
 | `-e, --environment ENV` | Rails environment (default: development) |
 | `-p, --port PORT` | Server port (default: 3000) |
@@ -68,16 +68,18 @@ bin/juntos up [options]
 **Examples:**
 
 ```bash
+bin/juntos up -d dexie            # Browser with IndexedDB
 bin/juntos up -d sqlite           # Node.js with SQLite
 bin/juntos up -t bun -d postgres  # Bun with PostgreSQL
-bin/juntos up -e production       # Use production environment
+bin/juntos up -e production       # Production build (bundled, minified)
 ```
 
 **What it does:**
 
 1. Builds the app to `dist/`
-2. Starts the server using the specified runtime
-3. Connects to the configured database
+2. For browser targets: runs Vite production build (bundles, tree-shakes, fingerprints)
+3. Starts a static server (browser) or runtime server (Node/Bun/Deno)
+4. Connects to the configured database
 
 ## juntos build
 
@@ -120,6 +122,14 @@ Creates the `dist/` directory containing:
 - `index.html` — Entry point (browser targets)
 - `api/` or `src/` — Entry point (serverless targets)
 - `package.json` — Dependencies
+- `assets/` — Bundled JS/CSS with fingerprinted filenames (production builds)
+
+**Production vs Development:**
+
+The build mode is derived from `RAILS_ENV` or `NODE_ENV`:
+
+- **Development** (default): Unbundled modules, fast rebuilds
+- **Production** (`-e production`): Vite bundles, tree-shakes, minifies, and fingerprints assets
 
 ## juntos db
 

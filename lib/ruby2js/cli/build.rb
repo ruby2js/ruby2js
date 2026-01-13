@@ -119,11 +119,19 @@ module Ruby2JS
         end
 
         def build_with_vite(options)
+          # Set environment variables for Vite
+          ENV['JUNTOS_DATABASE'] = options[:database] if options[:database]
+          ENV['JUNTOS_TARGET'] = options[:target] if options[:target]
+
+          # Derive Vite mode from RAILS_ENV or NODE_ENV (RAILS_ENV takes precedence)
+          mode = ENV['RAILS_ENV'] || ENV['NODE_ENV'] || 'development'
+          cmd = "npx vite build --mode #{mode}"
+
           Dir.chdir(DIST_DIR) do
             if options[:verbose]
-              system("npx vite build")
+              system(cmd)
             else
-              system("npx vite build > /dev/null 2>&1")
+              system("#{cmd} > /dev/null 2>&1")
             end
           end
         end

@@ -106,6 +106,31 @@ During development, file changes trigger different behaviors:
 
 Models, Rails controllers, and routes trigger full reloads because they have complex dependencies. Everything else updates instantly without losing page state.
 
+### Production Builds
+
+For browser targets, production builds use Vite's full bundling pipeline:
+
+```bash
+bin/juntos build -e production    # Build only
+bin/juntos up -e production       # Build + serve
+```
+
+The build mode is derived from `RAILS_ENV` or `NODE_ENV`:
+
+| Mode | What Happens |
+|------|--------------|
+| `development` | Unbundled modules, fast rebuilds, HMR runtime injected |
+| `production` | Bundled JS, tree-shaking, minification, fingerprinted assets |
+
+Production output:
+```
+dist/
+  index.html              # References bundled assets
+  assets/
+    index-Bc1LXpoP.js     # Bundled, minified app (fingerprinted)
+    index-DHh-_50G.css    # Bundled CSS (fingerprinted)
+```
+
 ## RBX Files
 
 `.rbx` files combine Ruby and JSX for React components:
