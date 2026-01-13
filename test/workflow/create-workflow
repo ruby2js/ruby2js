@@ -325,7 +325,7 @@ FORM
 cat > app/views/workflows/Show.rbx << 'RBX'
 import React from 'react'
 import WorkflowCanvas from 'components/WorkflowCanvas'
-import JsonStreamProvider from 'components/JsonStreamProvider'
+import JsonStreamProvider from '../../../lib/JsonStreamProvider.js'
 import [Node], from: '../../models/node.js'
 import [Edge], from: '../../models/edge.js'
 
@@ -424,88 +424,6 @@ RBX
 # Create components directory
 mkdir -p app/components
 
-# Create JsonStreamProvider component for real-time subscriptions
-# Handles WebSocket (node target) or BroadcastChannel (browser target) automatically
-cat > app/components/JsonStreamProvider.rbx << 'COMPONENT'
-import React, [createContext, useContext, useState, useEffect, useMemo], from: 'react'
-
-# Context for JSON stream messages
-JsonStreamContext = createContext(nil)
-
-# Hook to access the JSON stream context
-export def useJsonStream()
-  context = useContext(JsonStreamContext)
-  unless context
-    raise "useJsonStream must be used within a JsonStreamProvider"
-  end
-  context
-end
-
-# Provider component that handles WebSocket/BroadcastChannel subscription
-export default
-def JsonStreamProvider(stream:, children:)
-  lastMessage, setLastMessage = useState(nil)
-  connected, setConnected = useState(false)
-
-  useEffect(-> {
-    # Browser target: use BroadcastChannel
-    # Node target: use WebSocket
-    if defined?(BroadcastChannel) && typeof(WebSocket) == 'undefined'
-      # Browser target - BroadcastChannel for same-origin tabs
-      channel = BroadcastChannel.new(stream)
-      setConnected(true)
-
-      channel.onmessage = ->(event) {
-        setLastMessage(event.data)
-      }
-
-      return -> {
-        channel.close()
-        setConnected(false)
-      }
-    else
-      # Node target - WebSocket to /cable
-      ws = WebSocket.new("ws://#{window.location.host}/cable")
-
-      ws.onopen = -> {
-        ws.send!(JSON.stringify({ type: 'subscribe', stream: stream }))
-        setConnected(true)
-      }
-
-      ws.onmessage = ->(event) {
-        msg = JSON.parse(event.data)
-        return unless msg.type == 'message'
-        payload = JSON.parse(msg.message)
-        setLastMessage(payload)
-      }
-
-      ws.onerror = ->(error) {
-        console.error("JsonStreamProvider error:", error)
-      }
-
-      ws.onclose = -> {
-        setConnected(false)
-      }
-
-      return -> {
-        if ws.readyState == WebSocket::OPEN
-          ws.send!(JSON.stringify({ type: 'unsubscribe', stream: stream }))
-        end
-        ws.close()
-      }
-    end
-  }, [stream])
-
-  value = useMemo(-> { { lastMessage: lastMessage, connected: connected, stream: stream } }, [lastMessage, connected, stream])
-
-  %x{
-    <JsonStreamContext.Provider value={value}>
-      {children}
-    </JsonStreamContext.Provider>
-  }
-end
-COMPONENT
-
 # Create WorkflowCanvas component with real-time updates via useJsonStream hook
 # Uses target pragma to mark React Flow as browser-only
 cat > app/components/WorkflowCanvas.rbx << 'COMPONENT'
@@ -513,7 +431,7 @@ import React, [useState, useEffect, useCallback], from: 'react'
 # React Flow is browser-only (visual canvas library)
 import ReactFlow, [Background, Controls, MiniMap, useNodesState, useEdgesState, addEdge], from: 'reactflow' # Pragma: browser
 import 'reactflow/dist/style.css' # Pragma: browser
-import [useJsonStream], from: './JsonStreamProvider.js'
+import [useJsonStream], from: '../../lib/JsonStreamProvider.js'
 
 export default
 def WorkflowCanvas(initialNodes:, initialEdges:, onSave:, onAddNode:, onAddEdge:, onDeleteNode:, onUpdateNode:)
@@ -759,10 +677,10 @@ echo "  - Double-click node to edit label"
 echo "  - Select node + Delete key to remove"
 echo "  - Drag handles to connect nodes"
 echo ""
-echo "Key components:"
+echo "Real-time components (from ruby2js-rails package):"
 echo "  - JsonStreamProvider: React context for real-time subscriptions"
 echo "  - useJsonStream hook: access broadcast messages in components"
-echo "  - broadcast_json_to: model callbacks send JSON events"
+echo "  - broadcast_json_to: model callback sends JSON events"
 echo ""
 echo "To run with Rails:"
 echo "  cd $APP_NAME"

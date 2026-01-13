@@ -124,7 +124,7 @@ Use the `JsonStreamProvider` React context to handle subscriptions. It automatic
 
 ```ruby
 # app/views/workflows/Show.rbx
-import JsonStreamProvider from 'components/JsonStreamProvider'
+import JsonStreamProvider from '../../../lib/JsonStreamProvider.js'
 import WorkflowCanvas from 'components/WorkflowCanvas'
 
 export default
@@ -141,7 +141,7 @@ end
 
 ```ruby
 # app/components/WorkflowCanvas.rbx
-import [useJsonStream], from: './JsonStreamProvider.js'
+import [useJsonStream], from: '../../lib/JsonStreamProvider.js'
 
 export default
 def WorkflowCanvas(...)

@@ -1,6 +1,6 @@
 import React from 'react'
 import WorkflowCanvas from 'components/WorkflowCanvas'
-import JsonStreamProvider from 'components/JsonStreamProvider'
+import JsonStreamProvider from '../../../lib/JsonStreamProvider.js'
 import [Node], from: '../../models/node.js'
 import [Edge], from: '../../models/edge.js'
 

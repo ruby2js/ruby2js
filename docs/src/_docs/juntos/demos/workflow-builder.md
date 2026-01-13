@@ -16,7 +16,7 @@ This demo shows how to integrate third-party React libraries (React Flow) with J
 
 - **React Flow** — Node-based visual editor for workflows
 - **JSON broadcasting** — `broadcast_json_to` for React state updates
-- **React Context** — `JsonStreamProvider` for subscription management
+- **React Context** — `JsonStreamProvider` (from ruby2js-rails) for subscription management
 - **Real-time sync** — Multiple users see changes instantly
 - **Multi-target** — Works on both browser (BroadcastChannel) and node (WebSocket) targets
 
@@ -89,66 +89,32 @@ end
 
 ### JsonStreamProvider Component
 
-The provider handles WebSocket (node target) or BroadcastChannel (browser target) automatically:
+The `JsonStreamProvider` is included in the ruby2js-rails package. It handles WebSocket (node target) or BroadcastChannel (browser target) automatically:
 
 ```ruby
-# app/components/JsonStreamProvider.rbx
-import React, [createContext, useContext, useState, useEffect], from: 'react'
+# Import from lib/ (copied during build) - use relative path from your file
+# From app/views/workflows/Show.rbx:
+import JsonStreamProvider from '../../../lib/JsonStreamProvider.js'
 
-JsonStreamContext = createContext(nil)
-
-export
-def useJsonStream()
-  context = useContext(JsonStreamContext)
-  unless context
-    raise "useJsonStream must be used within a JsonStreamProvider"
-  end
-  context
-end
-
-export default
-def JsonStreamProvider(stream:, children:)
-  lastMessage, setLastMessage = useState(nil)
-  connected, setConnected = useState(false)
-
-  useEffect(-> {
-    # Browser target: BroadcastChannel
-    # Node target: WebSocket
-    if defined?(BroadcastChannel) && typeof(WebSocket) == 'undefined'
-      channel = BroadcastChannel.new(stream)
-      setConnected(true)
-      channel.onmessage = ->(event) { setLastMessage(event.data) }
-      return -> { channel.close() }
-    else
-      ws = WebSocket.new("ws://#{window.location.host}/cable")
-      ws.onopen = -> {
-        ws.send!(JSON.stringify({ type: 'subscribe', stream: stream }))
-        setConnected(true)
-      }
-      ws.onmessage = ->(event) {
-        msg = JSON.parse(event.data)
-        return unless msg.type == 'message'
-        setLastMessage(JSON.parse(msg.message))
-      }
-      return -> { ws.close() }
-    end
-  }, [stream])
-
-  value = { lastMessage: lastMessage, connected: connected, stream: stream }
-
-  %x{
-    <JsonStreamContext.Provider value={value}>
-      {children}
-    </JsonStreamContext.Provider>
-  }
-end
+# From app/components/WorkflowCanvas.rbx:
+import [useJsonStream], from: '../../lib/JsonStreamProvider.js'
 ```
+
+**Props:**
+- `stream` — Channel name to subscribe to (e.g., `"workflow_123"`)
+- `endpoint` — WebSocket path (default: `"/cable"`)
+- `children` — React children to render
+
+**Hook return value:**
+- `lastMessage` — Most recent JSON payload
+- `connected` — Boolean connection status
+- `stream` — The stream name
 
 ### View with Provider
 
 ```ruby
 # app/views/workflows/Show.rbx
-import JsonStreamProvider from 'components/JsonStreamProvider'
+import JsonStreamProvider from '../../../lib/JsonStreamProvider.js'
 import WorkflowCanvas from 'components/WorkflowCanvas'
 
 export default
@@ -156,7 +122,7 @@ def Show(workflow:)
   %x{
     <div className="container mx-auto px-4 py-8">
       <h1 className="text-3xl font-bold">{workflow.name}</h1>
-      <JsonStreamProvider stream={`workflow_${workflow.id}`}>
+      <JsonStreamProvider stream={"workflow_#{workflow.id}"}>
         <WorkflowCanvas
           initialNodes={flow_nodes}
           initialEdges={flow_edges}
@@ -176,7 +142,7 @@ end
 # app/components/WorkflowCanvas.rbx
 import React, [useEffect], from: 'react'
 import ReactFlow, [...], from: 'reactflow' # Pragma: browser
-import [useJsonStream], from: './JsonStreamProvider.js'
+import [useJsonStream], from: '../../lib/JsonStreamProvider.js'
 
 export default
 def WorkflowCanvas(initialNodes:, initialEdges:, onSave:, onAddNode:, onAddEdge:)

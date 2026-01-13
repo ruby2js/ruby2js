@@ -834,6 +834,7 @@ class SelfhostBuilder
     if File.exist?(components_dir)
       puts("Components:")
       self.copy_phlex_runtime()
+      self.copy_json_stream_provider()
       self.transpile_directory(
         components_dir,
         File.join(@dist_dir, 'app/components'),
@@ -1432,6 +1433,20 @@ class SelfhostBuilder
     dest_path = File.join(lib_dest, 'phlex_runtime.mjs')
     FileUtils.cp(src_path, dest_path)
     puts("  Copying: phlex_runtime.mjs")
+    puts("    -> #{dest_path}")
+  end
+
+  def copy_json_stream_provider()
+    lib_dest = File.join(@dist_dir, 'lib')
+    FileUtils.mkdir_p(lib_dest)
+
+    package_dir = find_package_dir
+    src_path = File.join(package_dir, 'components/JsonStreamProvider.js')
+    return unless File.exist?(src_path)
+
+    dest_path = File.join(lib_dest, 'JsonStreamProvider.js')
+    FileUtils.cp(src_path, dest_path)
+    puts("  Copying: JsonStreamProvider.js")
     puts("    -> #{dest_path}")
   end
 

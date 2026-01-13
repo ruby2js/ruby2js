@@ -15,6 +15,7 @@
   },
   "exports": {
     "./adapters/*": "./adapters/*",
+    "./components/*": "./components/*",
     "./targets/*": "./targets/*",
     "./rpc/client.mjs": "./rpc/client.mjs",
     "./rpc/server.mjs": "./rpc/server.mjs",
@@ -33,6 +34,7 @@
   },
   "files": [
     "adapters/",
+    "components/",
     "lib/",
     "rpc/",
     "targets/",
