@@ -171,8 +171,8 @@ describe "Unified Views Module" do
       _(File.exist?(module_path)).must_equal true
 
       content = File.read(module_path)
-      _(content).must_include "import { render as index_render } from './articles/index.js'"
-      _(content).must_include "import { render as show_render } from './articles/show.js'"
+      _(content).must_include "import { render as index_render } from './articles/index.html.erb'"
+      _(content).must_include "import { render as show_render } from './articles/show.html.erb'"
       _(content).must_include 'export const ArticleViews'
       _(content).must_include 'index: index_render'
       _(content).must_include 'show: show_render'
@@ -192,7 +192,7 @@ describe "Unified Views Module" do
       end
 
       content = File.read(File.join(views_dist_dir, 'articles.js'))
-      _(content).must_include "import index_module from './articles/index.js'"
+      _(content).must_include "import index_module from './articles/Index.rb'"
       _(content).must_include 'index: index_module.render || index_module'
     end
 
@@ -210,7 +210,7 @@ describe "Unified Views Module" do
       end
 
       content = File.read(File.join(views_dist_dir, 'admin.js'))
-      _(content).must_include "import dashboard_component from './admin/dashboard.js'"
+      _(content).must_include "import dashboard_component from './admin/Dashboard.jsx'"
       _(content).must_include 'dashboard: dashboard_component'
     end
 
