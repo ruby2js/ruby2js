@@ -281,7 +281,7 @@ cat > app/views/workflows/_workflow.html.erb << 'PARTIAL'
     </p>
   </div>
   <div class="flex gap-2">
-    <%= link_to "Edit", workflow_path(workflow),
+    <%= link_to "Edit", edit_workflow_path(workflow),
         class: "bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700" %>
     <%= button_to "Delete", workflow_path(workflow), method: :delete,
         class: "bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700",
@@ -427,7 +427,7 @@ mkdir -p app/components
 # Create JsonStreamProvider component for real-time subscriptions
 # Handles WebSocket (node target) or BroadcastChannel (browser target) automatically
 cat > app/components/JsonStreamProvider.rbx << 'COMPONENT'
-import React, [createContext, useContext, useState, useEffect, useCallback], from: 'react'
+import React, [createContext, useContext, useState, useEffect, useMemo], from: 'react'
 
 # Context for JSON stream messages
 JsonStreamContext = createContext(nil)
@@ -497,7 +497,7 @@ def JsonStreamProvider(stream:, children:)
     end
   }, [stream])
 
-  value = { lastMessage: lastMessage, connected: connected, stream: stream }
+  value = useMemo(-> { { lastMessage: lastMessage, connected: connected, stream: stream } }, [lastMessage, connected, stream])
 
   %x{
     <JsonStreamContext.Provider value={value}>
@@ -510,7 +510,7 @@ COMPONENT
 # Create WorkflowCanvas component with real-time updates via useJsonStream hook
 # Uses target pragma to mark React Flow as browser-only
 cat > app/components/WorkflowCanvas.rbx << 'COMPONENT'
-import React, [useEffect], from: 'react'
+import React, [useState, useEffect, useCallback], from: 'react'
 # React Flow is browser-only (visual canvas library)
 import ReactFlow, [Background, Controls, MiniMap, useNodesState, useEdgesState, addEdge], from: 'reactflow' # Pragma: browser
 import 'reactflow/dist/style.css' # Pragma: browser
@@ -530,6 +530,7 @@ def WorkflowCanvas(initialNodes:, initialEdges:, onSave:, onAddNode:, onAddEdge:
 
   nodes, setNodes, onNodesChange = useNodesState(initialNodes)
   edges, setEdges, onEdgesChange = useEdgesState(initialEdges)
+  reactFlowInstance, setReactFlowInstance = useState(nil)
 
   # Get JSON stream messages from context provider
   stream = useJsonStream()
@@ -598,14 +599,14 @@ def WorkflowCanvas(initialNodes:, initialEdges:, onSave:, onAddNode:, onAddEdge:
     onSave(positions)
   }
 
-  # Double-click on canvas to add new node
-  handle_double_click = ->(event) {
-    # Get click position relative to the flow
-    bounds = event.target.getBoundingClientRect()
-    position = {
-      x: event.clientX - bounds.left,
-      y: event.clientY - bounds.top
-    }
+  # Double-click on pane to add new node (uses viewport-aware coordinates)
+  handle_pane_double_click = useCallback(->(event) {
+    return unless reactFlowInstance
+    # Convert screen coordinates to flow coordinates (accounts for zoom/pan)
+    position = reactFlowInstance.screenToFlowPosition({
+      x: event.clientX,
+      y: event.clientY
+    })
 
     onAddNode(position).then(->(node) {
       new_node = {
@@ -616,7 +617,7 @@ def WorkflowCanvas(initialNodes:, initialEdges:, onSave:, onAddNode:, onAddEdge:
       }
       setNodes(->(nds) { [*nds, new_node] })
     })
-  }
+  }, [reactFlowInstance, onAddNode])
 
   # Delete selected nodes via keyboard (Backspace/Delete)
   handle_nodes_delete = ->(deleted_nodes) {
@@ -644,7 +645,7 @@ def WorkflowCanvas(initialNodes:, initialEdges:, onSave:, onAddNode:, onAddEdge:
   }
 
   %x{
-    <div style={{ width: '100%', height: '600px', border: '1px solid #ddd', borderRadius: '8px' }} onDoubleClick={handle_double_click}>
+    <div style={{ width: '100%', height: '600px', border: '1px solid #ddd', borderRadius: '8px' }}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -654,6 +655,8 @@ def WorkflowCanvas(initialNodes:, initialEdges:, onSave:, onAddNode:, onAddEdge:
         onNodeDragStop={handle_node_drag_stop}
         onNodesDelete={handle_nodes_delete}
         onNodeDoubleClick={handle_node_double_click}
+        onPaneDoubleClick={handle_pane_double_click}
+        onInit={setReactFlowInstance}
         zoomOnDoubleClick={false}
         fitView
       >
