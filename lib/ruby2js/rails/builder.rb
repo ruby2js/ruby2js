@@ -159,7 +159,9 @@ class SelfhostBuilder
     'turso' => 'active_record_turso.mjs',
     'libsql' => 'active_record_turso.mjs',
     'planetscale' => 'active_record_planetscale.mjs',
-    'supabase' => 'active_record_supabase.mjs'
+    'supabase' => 'active_record_supabase.mjs',
+    # RPC adapter (proxies to server, used with server targets)
+    'rpc' => 'active_record_rpc.mjs'
   }.freeze
 
   # Map broadcast adapter to source file
@@ -1264,6 +1266,18 @@ class SelfhostBuilder
     puts("  Adapter: #{@database} -> lib/active_record.mjs")
     if db_config['database'] || db_config[:database]
       puts("  Database: #{db_config['database'] || db_config[:database]}")
+    end
+
+    # For server targets, also copy the RPC adapter for client-side use
+    # Client bundles (Vite) will use active_record_client.mjs via alias
+    # Server runtime will use active_record.mjs (the SQL adapter)
+    if SERVER_RUNTIMES.include?(@target)
+      rpc_adapter_src = File.join(adapter_dir, 'active_record_rpc.mjs')
+      if File.exist?(rpc_adapter_src)
+        rpc_adapter_dest = File.join(lib_dest, 'active_record_client.mjs')
+        FileUtils.cp(rpc_adapter_src, rpc_adapter_dest)
+        puts("  RPC Adapter: lib/active_record_client.mjs (for browser)")
+      end
     end
   end
 

@@ -268,6 +268,20 @@ function createConfigPlugin(config, appRoot) {
         '@hotwired/turbo-rails': path.join(distDir, 'node_modules/@hotwired/turbo-rails')
       };
 
+      // For server targets, client bundles should use RPC adapter instead of SQL adapter
+      // This redirects lib/active_record.mjs imports to lib/active_record_client.mjs
+      // The server runtime uses lib/active_record.mjs directly (SQL adapter)
+      if (isServerTarget(config.target)) {
+        const rpcAdapterPath = path.join(distDir, 'lib/active_record_client.mjs');
+        if (fs.existsSync(rpcAdapterPath)) {
+          // Match both relative and absolute paths to lib/active_record.mjs
+          aliases['lib/active_record.mjs'] = rpcAdapterPath;
+          aliases['./lib/active_record.mjs'] = rpcAdapterPath;
+          aliases['../lib/active_record.mjs'] = rpcAdapterPath;
+          aliases['../../lib/active_record.mjs'] = rpcAdapterPath;
+        }
+      }
+
       const rollupOptions = getRollupOptions(config.target, config.database);
       const buildTarget = getBuildTarget(config.target);
 
@@ -329,6 +343,18 @@ function createExternalMatcher(patterns) {
   });
 
   return (id) => matchers.some(matcher => matcher(id));
+}
+
+/**
+ * Server-side JavaScript runtimes (must match builder.rb SERVER_RUNTIMES)
+ */
+const SERVER_RUNTIMES = ['node', 'bun', 'deno', 'cloudflare', 'vercel-edge', 'vercel-node', 'deno-deploy', 'fly'];
+
+/**
+ * Check if target is a server runtime (requires RPC for client-side model access)
+ */
+function isServerTarget(target) {
+  return SERVER_RUNTIMES.includes(target);
 }
 
 /**

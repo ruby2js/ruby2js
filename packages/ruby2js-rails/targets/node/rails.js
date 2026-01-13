@@ -26,8 +26,16 @@ import {
   TurboBroadcast
 } from './rails_server.js';
 
+import { createRPCHandler, getRegistry, csrfMetaTag } from 'ruby2js-rails/rpc/server.mjs';
+
+// RPC handler instance (initialized when models are registered)
+let rpcHandler = null;
+
 // Re-export everything from server module
 export { createContext, createFlash, truncate, pluralize, dom_id, navigate, submitForm, formData, handleFormResult, setupFormHandlers };
+
+// Re-export RPC utilities for layout integration
+export { csrfMetaTag, getRegistry as getRPCRegistry };
 
 // Re-export TurboBroadcast and alias as BroadcastChannel for model compatibility
 export { TurboBroadcast, TurboBroadcast as BroadcastChannel };
@@ -101,6 +109,12 @@ export class Router extends RouterServer {
     // Try static files first (CSS, JS, images, etc.)
     if (await this.serveStatic(req, res)) {
       return;
+    }
+
+    // Handle RPC requests (model operations from browser)
+    if (rpcHandler && req.headers['x-rpc-action']) {
+      const handled = await rpcHandler(req, res);
+      if (handled) return;
     }
 
     const parsedUrl = parseUrl(req.url, true);
@@ -318,6 +332,19 @@ export class Router extends RouterServer {
 // Application with Node.js-specific startup
 export class Application extends ApplicationServer {
   static wsServer = null;
+
+  // Register models with RPC registry for remote model operations
+  // Call this after registering models to enable RPC access
+  static registerModelsForRPC(models) {
+    const registry = getRegistry();
+    for (const [name, Model] of Object.entries(models)) {
+      registry.registerModel(name, Model);
+      console.log(`  Registered RPC handlers for ${name}`);
+    }
+    // Initialize RPC handler after models are registered
+    rpcHandler = createRPCHandler({ registry });
+    console.log('RPC handler initialized');
+  }
 
   // Start the HTTP server using http.createServer
   // Includes WebSocket support for Turbo Streams broadcasting
