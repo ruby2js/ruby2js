@@ -107,6 +107,10 @@ module Ruby2JS
           elsif c == '-'
             @element += '_'
             @element_original += '-'
+          elsif c == '.'
+            # Support dotted names like Context.Provider
+            @element += '.'
+            @element_original += '.'
           elsif c =~ /^\w$/
             @element += c
             @element_original += c
@@ -136,6 +140,10 @@ module Ruby2JS
           elsif c == '-' && !@element.empty?
             @element += '_'
             @element_original += '-'
+          elsif c == '.' && !@element.empty?
+            # Support dotted names like Context.Provider
+            @element += '.'
+            @element_original += '.'
           elsif c != ' '
             raise SyntaxError.new("invalid character in element: #{c.inspect}")
           end

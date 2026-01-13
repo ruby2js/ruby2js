@@ -85,6 +85,13 @@ class NotImplementedError extends Error {
   }
 }
 
+// Error.prototype.set_backtrace - Ruby method, no-op in JS
+if (!Error.prototype.set_backtrace) {
+  Error.prototype.set_backtrace = function(backtrace) {
+    return backtrace;
+  };
+}
+
 // Parser stub - the Ruby source uses defined?(Parser::AST::Node) checks
 // which transpile to typeof Parser.AST.Node !== 'undefined'.
 // We define Parser with AST.Node = undefined so the check safely returns false.

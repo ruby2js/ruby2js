@@ -1,11 +1,11 @@
-import React, [useEffect], from: 'react'
+import React, [useState, useEffect, useCallback], from: 'react'
 # React Flow is browser-only (visual canvas library)
 import ReactFlow, [Background, Controls, MiniMap, useNodesState, useEdgesState, addEdge], from: 'reactflow' # Pragma: browser
 import 'reactflow/dist/style.css' # Pragma: browser
 import [useJsonStream], from: './JsonStreamProvider.js'
 
 export default
-def WorkflowCanvas(initialNodes:, initialEdges:, onSave:, onAddNode:, onAddEdge:)
+def WorkflowCanvas(initialNodes:, initialEdges:, onSave:, onAddNode:, onAddEdge:, onDeleteNode:, onUpdateNode:)
   # SSR-safe: only render canvas when ReactFlow is available
   unless defined?(ReactFlow)
     return %x{
@@ -18,11 +18,12 @@ def WorkflowCanvas(initialNodes:, initialEdges:, onSave:, onAddNode:, onAddEdge:
 
   nodes, setNodes, onNodesChange = useNodesState(initialNodes)
   edges, setEdges, onEdgesChange = useEdgesState(initialEdges)
+  reactFlowInstance, setReactFlowInstance = useState(nil)
 
   # Get JSON stream messages from context provider
   stream = useJsonStream()
 
-  # Handle incoming broadcast messages
+  # Handle incoming broadcast messages for real-time collaboration
   useEffect(-> {
     return unless stream.lastMessage
     payload = stream.lastMessage
@@ -86,14 +87,14 @@ def WorkflowCanvas(initialNodes:, initialEdges:, onSave:, onAddNode:, onAddEdge:
     onSave(positions)
   }
 
-  # Double-click to add new node
-  handle_double_click = ->(event) {
-    # Get click position relative to the flow
-    bounds = event.target.getBoundingClientRect()
-    position = {
-      x: event.clientX - bounds.left,
-      y: event.clientY - bounds.top
-    }
+  # Double-click on pane to add new node (uses viewport-aware coordinates)
+  handle_pane_double_click = useCallback(->(event) {
+    return unless reactFlowInstance
+    # Convert screen coordinates to flow coordinates (accounts for zoom/pan)
+    position = reactFlowInstance.screenToFlowPosition({
+      x: event.clientX,
+      y: event.clientY
+    })
 
     onAddNode(position).then(->(node) {
       new_node = {
@@ -104,10 +105,35 @@ def WorkflowCanvas(initialNodes:, initialEdges:, onSave:, onAddNode:, onAddEdge:
       }
       setNodes(->(nds) { [*nds, new_node] })
     })
+  }, [reactFlowInstance, onAddNode])
+
+  # Delete selected nodes via keyboard (Backspace/Delete)
+  handle_nodes_delete = ->(deleted_nodes) {
+    deleted_nodes.each do |node|
+      onDeleteNode(node.id)
+    end
+  }
+
+  # Double-click on node to edit label
+  handle_node_double_click = ->(_event, node) {
+    new_label = prompt("Edit node label:", node.data.label)
+    if new_label && new_label != node.data.label
+      onUpdateNode(node.id, new_label)
+      # Optimistic update - real-time broadcast will confirm
+      setNodes(->(nds) {
+        nds.map do |n|
+          if n.id == node.id
+            { **n, data: { **n.data, label: new_label } }
+          else
+            n
+          end
+        end
+      })
+    end
   }
 
   %x{
-    <div style={{ width: '100%', height: '600px', border: '1px solid #ddd', borderRadius: '8px' }} onDoubleClick={handle_double_click}>
+    <div style={{ width: '100%', height: '600px', border: '1px solid #ddd', borderRadius: '8px' }}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -115,6 +141,10 @@ def WorkflowCanvas(initialNodes:, initialEdges:, onSave:, onAddNode:, onAddEdge:
         onEdgesChange={onEdgesChange}
         onConnect={handle_connect}
         onNodeDragStop={handle_node_drag_stop}
+        onNodesDelete={handle_nodes_delete}
+        onNodeDoubleClick={handle_node_double_click}
+        onPaneDoubleClick={handle_pane_double_click}
+        onInit={setReactFlowInstance}
         zoomOnDoubleClick={false}
         fitView
       >
@@ -123,7 +153,7 @@ def WorkflowCanvas(initialNodes:, initialEdges:, onSave:, onAddNode:, onAddEdge:
         <MiniMap />
       </ReactFlow>
       <p className="text-gray-500 text-sm mt-2 text-center">
-        Double-click to add nodes. Drag from node handles to connect.
+        Double-click canvas to add nodes. Double-click node to edit label. Select + Delete to remove. Drag handles to connect.
       </p>
     </div>
   }

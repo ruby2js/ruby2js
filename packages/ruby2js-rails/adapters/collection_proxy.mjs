@@ -56,7 +56,8 @@ export class CollectionProxy {
   async create(params = {}) {
     const record = this.build(params);
     await record.save();
-    if (this._records) this._records.push(record);
+    if (!this._records) this._records = [];
+    this._records.push(record);
     return record;
   }
 

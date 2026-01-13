@@ -405,7 +405,7 @@ def Show(workflow:)
           Back to Workflows
         </a>
       </div>
-      <JsonStreamProvider stream={`workflow_${workflow.id}`}>
+      <JsonStreamProvider stream={"workflow_#{workflow.id}"}>
         <WorkflowCanvas
           initialNodes={flow_nodes}
           initialEdges={flow_edges}
@@ -433,8 +433,7 @@ import React, [createContext, useContext, useState, useEffect, useMemo], from: '
 JsonStreamContext = createContext(nil)
 
 # Hook to access the JSON stream context
-export
-def useJsonStream()
+export def useJsonStream()
   context = useContext(JsonStreamContext)
   unless context
     raise "useJsonStream must be used within a JsonStreamProvider"

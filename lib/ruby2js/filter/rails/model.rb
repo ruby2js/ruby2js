@@ -788,7 +788,7 @@ module Ruby2JS
             assoc_metadata,
             s(:const, nil, class_name.to_sym))
 
-          # Getter: returns cache if set, otherwise creates new CollectionProxy
+          # Getter: returns cache if set, otherwise creates and caches new CollectionProxy
           getter = s(:defget, association_name,
             s(:args),
             s(:begin,
@@ -797,7 +797,8 @@ module Ruby2JS
                 s(:attr, s(:self), cache_name),
                 s(:return, s(:attr, s(:self), cache_name)),
                 nil),
-              s(:return, collection_proxy)))
+              # return this._comments = new CollectionProxy(...);
+              s(:return, s(:send, s(:self), "#{cache_name}=".to_sym, collection_proxy))))
 
           # Setter: allows preloading with article.comments = await Comment.where(...)
           # Use method name with = suffix, class2 converter handles this as a setter

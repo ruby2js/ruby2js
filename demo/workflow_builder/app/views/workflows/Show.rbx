@@ -58,6 +58,20 @@ def Show(workflow:)
     )
   }
 
+  handle_delete_node = ->(node_id) {
+    # Delete node from database (also deletes associated edges via dependent: :destroy)
+    Node.find(node_id.to_i).then(->(node) {
+      node.destroy()
+    })
+  }
+
+  handle_update_node = ->(node_id, label) {
+    # Update node label in database
+    Node.find(node_id.to_i).then(->(node) {
+      node.update(label: label)
+    })
+  }
+
   %x{
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-4">
@@ -66,13 +80,15 @@ def Show(workflow:)
           Back to Workflows
         </a>
       </div>
-      <JsonStreamProvider stream={`workflow_${workflow.id}`}>
+      <JsonStreamProvider stream={"workflow_#{workflow.id}"}>
         <WorkflowCanvas
           initialNodes={flow_nodes}
           initialEdges={flow_edges}
           onSave={handle_save}
           onAddNode={handle_add_node}
           onAddEdge={handle_add_edge}
+          onDeleteNode={handle_delete_node}
+          onUpdateNode={handle_update_node}
         />
       </JsonStreamProvider>
     </div>

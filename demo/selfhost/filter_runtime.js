@@ -12,6 +12,14 @@ if (!Array.prototype.dup) {
   };
 }
 
+// Error.prototype.set_backtrace - Ruby method, no-op in JS
+if (!Error.prototype.set_backtrace) {
+  Error.prototype.set_backtrace = function(backtrace) {
+    // In Ruby, this sets the backtrace; in JS we ignore it
+    return backtrace;
+  };
+}
+
 // String.prototype.capitalize - Ruby's capitalize (first char upper, rest lower)
 if (!String.prototype.capitalize) {
   Object.defineProperty(String.prototype, 'capitalize', {
