@@ -989,6 +989,244 @@ describe Ruby2JS::Filter::Pragma do
     end
   end
 
+  describe "target pragmas" do
+    def to_js_with_target(string, target, options={})
+      _(Ruby2JS.convert(string, options.merge(
+        eslevel: options[:eslevel] || 2021,
+        target: target,
+        filters: [Ruby2JS::Filter::Pragma]
+      )).to_s)
+    end
+
+    describe "browser target" do
+      it "should include import with browser pragma when target is browser" do
+        to_js_with_target("import 'reactflow/dist/style.css' # Pragma: browser", 'browser').
+          must_include 'reactflow'
+      end
+
+      it "should skip import with browser pragma when target is node" do
+        to_js_with_target("import 'reactflow/dist/style.css' # Pragma: browser", 'node').
+          wont_include 'reactflow'
+      end
+
+      it "should skip import with browser pragma when target is capacitor" do
+        to_js_with_target("import 'reactflow/dist/style.css' # Pragma: browser", 'capacitor').
+          wont_include 'reactflow'
+      end
+    end
+
+    describe "capacitor target" do
+      it "should include import with capacitor pragma when target is capacitor" do
+        to_js_with_target("import '@capacitor/camera' # Pragma: capacitor", 'capacitor').
+          must_include '@capacitor/camera'
+      end
+
+      it "should skip import with capacitor pragma when target is browser" do
+        to_js_with_target("import '@capacitor/camera' # Pragma: capacitor", 'browser').
+          wont_include '@capacitor/camera'
+      end
+
+      it "should skip import with capacitor pragma when target is node" do
+        to_js_with_target("import '@capacitor/camera' # Pragma: capacitor", 'node').
+          wont_include '@capacitor/camera'
+      end
+    end
+
+    describe "server target" do
+      it "should include import with server pragma when target is node" do
+        to_js_with_target("import 'pg' # Pragma: server", 'node').
+          must_include 'pg'
+      end
+
+      it "should include import with server pragma when target is bun" do
+        to_js_with_target("import 'pg' # Pragma: server", 'bun').
+          must_include 'pg'
+      end
+
+      it "should include import with server pragma when target is deno" do
+        to_js_with_target("import 'pg' # Pragma: server", 'deno').
+          must_include 'pg'
+      end
+
+      it "should include import with server pragma when target is cloudflare" do
+        to_js_with_target("import 'pg' # Pragma: server", 'cloudflare').
+          must_include 'pg'
+      end
+
+      it "should include import with server pragma when target is vercel" do
+        to_js_with_target("import 'pg' # Pragma: server", 'vercel').
+          must_include 'pg'
+      end
+
+      it "should include import with server pragma when target is fly" do
+        to_js_with_target("import 'pg' # Pragma: server", 'fly').
+          must_include 'pg'
+      end
+
+      it "should skip import with server pragma when target is browser" do
+        to_js_with_target("import 'pg' # Pragma: server", 'browser').
+          wont_include 'pg'
+      end
+
+      it "should skip import with server pragma when target is capacitor" do
+        to_js_with_target("import 'pg' # Pragma: server", 'capacitor').
+          wont_include 'pg'
+      end
+    end
+
+    describe "node target" do
+      it "should include import with node pragma when target is node" do
+        to_js_with_target("import 'fs' # Pragma: node", 'node').
+          must_include 'fs'
+      end
+
+      it "should skip import with node pragma when target is browser" do
+        to_js_with_target("import 'fs' # Pragma: node", 'browser').
+          wont_include 'fs'
+      end
+
+      it "should skip import with node pragma when target is bun" do
+        to_js_with_target("import 'fs' # Pragma: node", 'bun').
+          wont_include 'fs'
+      end
+    end
+
+    describe "cloudflare target" do
+      it "should include import with cloudflare pragma when target is cloudflare" do
+        to_js_with_target("import '@cloudflare/workers-types' # Pragma: cloudflare", 'cloudflare').
+          must_include '@cloudflare/workers-types'
+      end
+
+      it "should skip import with cloudflare pragma when target is node" do
+        to_js_with_target("import '@cloudflare/workers-types' # Pragma: cloudflare", 'node').
+          wont_include '@cloudflare/workers-types'
+      end
+    end
+
+    describe "vercel target" do
+      it "should include import with vercel pragma when target is vercel" do
+        to_js_with_target("import '@vercel/og' # Pragma: vercel", 'vercel').
+          must_include '@vercel/og'
+      end
+
+      it "should skip import with vercel pragma when target is browser" do
+        to_js_with_target("import '@vercel/og' # Pragma: vercel", 'browser').
+          wont_include '@vercel/og'
+      end
+    end
+
+    describe "electron target" do
+      it "should include import with electron pragma when target is electron" do
+        to_js_with_target("import 'electron' # Pragma: electron", 'electron').
+          must_include 'electron'
+      end
+
+      it "should skip import with electron pragma when target is browser" do
+        to_js_with_target("import 'electron' # Pragma: electron", 'browser').
+          wont_include 'electron'
+      end
+    end
+
+    describe "tauri target" do
+      it "should include import with tauri pragma when target is tauri" do
+        to_js_with_target("import '@tauri-apps/api' # Pragma: tauri", 'tauri').
+          must_include '@tauri-apps/api'
+      end
+
+      it "should skip import with tauri pragma when target is browser" do
+        to_js_with_target("import '@tauri-apps/api' # Pragma: tauri", 'browser').
+          wont_include '@tauri-apps/api'
+      end
+    end
+
+    describe "no target specified" do
+      it "should include all imports when no target is set" do
+        # When no target is set, include everything
+        to_js("import '@capacitor/camera' # Pragma: capacitor").
+          must_include '@capacitor/camera'
+      end
+
+      it "should include browser-only imports when no target is set" do
+        to_js("import 'reactflow/dist/style.css' # Pragma: browser").
+          must_include 'reactflow'
+      end
+
+      it "should include server-only imports when no target is set" do
+        to_js("import 'pg' # Pragma: server").
+          must_include 'pg'
+      end
+    end
+
+    describe "require and require_relative" do
+      it "should skip require with target pragma when target doesn't match" do
+        to_js_with_target("require 'pg' # Pragma: server", 'browser').
+          wont_include 'pg'
+      end
+
+      it "should include require with target pragma when target matches" do
+        to_js_with_target("require 'pg' # Pragma: server", 'node').
+          must_include 'pg'
+      end
+
+      it "should skip require_relative with target pragma when target doesn't match" do
+        to_js_with_target("require_relative 'server_utils' # Pragma: node", 'browser').
+          wont_include 'server_utils'
+      end
+
+      it "should include require_relative with target pragma when target matches" do
+        to_js_with_target("require_relative 'server_utils' # Pragma: node", 'node').
+          must_include 'server_utils'
+      end
+    end
+
+    describe "multiple imports with different targets" do
+      it "should selectively include imports based on target" do
+        code = <<~RUBY
+          import 'reactflow/dist/style.css' # Pragma: browser
+          import '@capacitor/camera' # Pragma: capacitor
+          import 'common-utils'
+        RUBY
+
+        # Browser target: include browser and common, skip capacitor
+        js_browser = to_js_with_target(code, 'browser')
+        js_browser.must_include 'reactflow'
+        js_browser.wont_include '@capacitor/camera'
+        js_browser.must_include 'common-utils'
+
+        # Capacitor target: include capacitor and common, skip browser
+        js_capacitor = to_js_with_target(code, 'capacitor')
+        js_capacitor.wont_include 'reactflow'
+        js_capacitor.must_include '@capacitor/camera'
+        js_capacitor.must_include 'common-utils'
+      end
+    end
+
+    describe "case insensitivity" do
+      it "should handle uppercase pragma names" do
+        to_js_with_target("import 'reactflow' # Pragma: BROWSER", 'browser').
+          must_include 'reactflow'
+      end
+
+      it "should handle mixed case pragma names" do
+        to_js_with_target("import 'reactflow' # Pragma: Browser", 'browser').
+          must_include 'reactflow'
+      end
+    end
+
+    describe "combined with skip pragma" do
+      it "should skip import with skip pragma regardless of target" do
+        to_js_with_target("import 'skip-me' # Pragma: skip", 'browser').
+          wont_include 'skip-me'
+      end
+
+      it "should handle both skip and target pragmas" do
+        # Skip takes precedence
+        to_js_with_target("import 'skip-me' # Pragma: browser # Pragma: skip", 'browser').
+          wont_include 'skip-me'
+      end
+    end
+  end
+
   describe "pragma filter reorder" do
     it "should position pragma first in filter list" do
       require 'ruby2js/filter/require'

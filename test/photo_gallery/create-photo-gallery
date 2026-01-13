@@ -3,7 +3,13 @@
 # Usage: create-photo-gallery [app-name]
 #
 # Creates a Rails app with a Photo model, camera controller,
-# and browser camera integration via getUserMedia().
+# and platform-specific camera integration using target pragmas.
+#
+# Features:
+# - Browser target: uses getUserMedia() for webcam access
+# - Capacitor target: uses @capacitor/camera for native camera
+# - Uses `# Pragma: capacitor` for compile-time target selection
+# - Uses `defined?(Camera)` for runtime branching
 
 set -e
 
@@ -159,16 +165,15 @@ cat > app/views/photos/create.turbo_stream.erb << 'TURBO'
 TURBO
 
 # Create Stimulus camera controller (Ruby)
+# Uses target-specific pragmas for compile-time platform selection
 mkdir -p app/javascript/controllers
 cat > app/javascript/controllers/camera_controller.rb << 'STIMULUS'
-class CameraController < Stimulus::Controller
-  # Check if running in Capacitor with Camera plugin
-  def isCapacitor
-    window.Capacitor && window.Capacitor.isNativePlatform()
-  end
+# Capacitor Camera plugin - only included when building for capacitor target
+import { Camera, CameraResultType, CameraSource } from '@capacitor/camera' # Pragma: capacitor
 
+class CameraController < Stimulus::Controller
   def takePhoto
-    if isCapacitor()
+    if defined?(Camera)
       # Native mobile - use Capacitor Camera plugin
       takePhotoCapacitor()
     else
@@ -178,25 +183,14 @@ class CameraController < Stimulus::Controller
   end
 
   def takePhotoCapacitor
-    # Import Camera plugin dynamically
-    cameraModule = await import("@capacitor/camera")
-    camera = cameraModule.Camera
-    resultType = cameraModule.CameraResultType
-    source = cameraModule.CameraSource
-
-    result = await camera.getPhoto(
+    # Camera is guaranteed to exist when building for capacitor target
+    result = await Camera.getPhoto(
       quality: 80,
       allowEditing: false,
-      resultType: resultType.Base64,
-      source: source.Camera
+      resultType: CameraResultType.Base64,
+      source: CameraSource.Camera
     )
-
-    # Result contains base64 string directly
     handlePhoto(result.base64String)
-  rescue => error
-    console.error("Camera error:", error)
-    # Fall back to browser camera if Capacitor fails
-    takePhotoBrowser()
   end
 
   def takePhotoBrowser
@@ -229,7 +223,7 @@ class CameraController < Stimulus::Controller
   end
 
   def chooseFromGallery
-    if isCapacitor()
+    if defined?(Camera)
       # Native mobile - use Capacitor Camera with Photos source
       chooseFromGalleryCapacitor()
     else
@@ -239,22 +233,13 @@ class CameraController < Stimulus::Controller
   end
 
   def chooseFromGalleryCapacitor
-    cameraModule = await import("@capacitor/camera")
-    camera = cameraModule.Camera
-    resultType = cameraModule.CameraResultType
-    source = cameraModule.CameraSource
-
-    result = await camera.getPhoto(
+    result = await Camera.getPhoto(
       quality: 80,
       allowEditing: false,
-      resultType: resultType.Base64,
-      source: source.Photos
+      resultType: CameraResultType.Base64,
+      source: CameraSource.Photos
     )
-
     handlePhoto(result.base64String)
-  rescue => error
-    console.error("Gallery error:", error)
-    chooseFromGalleryBrowser()
   end
 
   def chooseFromGalleryBrowser
@@ -320,10 +305,18 @@ echo "Photo gallery created: $APP_NAME/"
 echo ""
 echo "To run with Juntos (transpiled to JavaScript):"
 echo "  cd $APP_NAME"
-echo "  bin/juntos dev -d dexie      # Browser with IndexedDB"
+echo "  bin/juntos dev -d dexie              # Browser with IndexedDB"
 echo ""
-echo "Camera will request permission to access your webcam."
-echo "Click 'Take Photo' to start, then 'Capture' to snap a picture."
+echo "To build for specific targets:"
+echo "  bin/juntos build -t browser          # Browser build (uses getUserMedia)"
+echo "  bin/juntos build -t capacitor        # Capacitor build (uses native Camera)"
+echo ""
+echo "The camera controller uses target-specific pragmas:"
+echo "  - Browser target: excludes @capacitor/camera, uses getUserMedia"
+echo "  - Capacitor target: includes @capacitor/camera, uses native camera"
+echo ""
+echo "Camera will request permission to access your webcam (browser) or"
+echo "native camera (Capacitor). Click 'Take Photo' to start."
 echo ""
 echo "To run with Rails:"
 echo "  cd $APP_NAME"

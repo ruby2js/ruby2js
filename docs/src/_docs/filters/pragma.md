@@ -551,6 +551,107 @@ like `String`, `Array`, or `Number`, or extend classes defined elsewhere.
 Since the pragma is a Ruby comment, it's ignored when code runs in Ruby,
 making it ideal for dual-target development.
 
+## Target-Specific Pragmas
+
+Target pragmas allow you to conditionally include or exclude import statements
+based on the deployment target. When building for a specific target, imports
+marked for a different target are removed from the output.
+
+### Available Targets
+
+| Pragma | Description |
+|--------|-------------|
+| `browser` | Browser/web applications |
+| `capacitor` | Capacitor mobile apps |
+| `electron` | Electron desktop apps |
+| `tauri` | Tauri desktop apps |
+| `node` | Node.js runtime |
+| `bun` | Bun runtime |
+| `deno` | Deno runtime |
+| `cloudflare` | Cloudflare Workers |
+| `vercel` | Vercel Edge Functions |
+| `fly` | Fly.io |
+| `server` | Any server target (node, bun, deno, cloudflare, vercel, fly) |
+
+### Basic Usage
+
+```ruby
+import 'reactflow/dist/style.css' # Pragma: browser
+import '@capacitor/camera' # Pragma: capacitor
+import '@vercel/og' # Pragma: vercel
+import 'common-utils'  # No pragma - included for all targets
+```
+
+When building with `target: 'browser'`:
+- `reactflow/dist/style.css` is included
+- `@capacitor/camera` is excluded
+- `@vercel/og` is excluded
+- `common-utils` is included
+
+When building with `target: 'capacitor'`:
+- `reactflow/dist/style.css` is excluded
+- `@capacitor/camera` is included
+- `@vercel/og` is excluded
+- `common-utils` is included
+
+### Using with `defined?` for Runtime Branching
+
+Combine target pragmas with `defined?` to write code that adapts to the
+available imports:
+
+```ruby
+import Camera from '@capacitor/camera' # Pragma: capacitor
+
+def take_photo
+  if defined?(Camera)
+    # Capacitor path - uses native camera
+    result = await Camera.getPhoto(quality: 80)
+    result.base64String
+  else
+    # Browser fallback - uses getUserMedia
+    stream = await navigator.mediaDevices.getUserMedia(video: true)
+    capture_from_stream(stream)
+  end
+end
+```
+
+When building for `capacitor`, the Camera import is included and `defined?(Camera)`
+is true. When building for `browser`, the import is excluded and the else branch
+is used.
+
+### The `server` Meta-Target
+
+The `server` pragma matches any server-side runtime:
+
+```ruby
+import 'pg' # Pragma: server
+```
+
+This import is included when the target is `node`, `bun`, `deno`, `cloudflare`,
+`vercel`, or `fly`, but excluded for `browser`, `capacitor`, `electron`, or `tauri`.
+
+### Specifying the Target
+
+The target is specified when calling `Ruby2JS.convert`:
+
+```ruby
+Ruby2JS.convert(code, target: 'browser', filters: [Ruby2JS::Filter::Pragma])
+```
+
+With Juntos, use the `-t` flag:
+
+```bash
+bin/juntos build -t browser
+bin/juntos build -t capacitor
+bin/juntos deploy -t cloudflare
+```
+
+### No Target = Include All
+
+When no target is specified, all imports are included regardless of their
+target pragma. This is useful during development when you want to see the
+complete output.
+
 ## Usage Notes
 
 ### Case Insensitivity

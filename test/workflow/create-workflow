@@ -6,9 +6,10 @@
 # ERB views for listing, and RBX views for React Flow canvas.
 # Demonstrates using React ecosystem libraries via RBX files.
 #
-# The generated app works with both:
-# - Browser target (Dexie/IndexedDB) via bin/juntos dev -d dexie
-# - Rails backend via bin/rails server
+# Features:
+# - Uses `# Pragma: browser` for browser-only React Flow imports
+# - Uses `defined?(ReactFlow)` for SSR-safe rendering
+# - Works with both browser (Dexie) and server (Node/Rails) targets
 
 set -e
 
@@ -375,14 +376,26 @@ end
 RBX
 
 # Create components directory and WorkflowCanvas component
+# Uses target pragma to mark React Flow as browser-only
 mkdir -p app/components
 cat > app/components/WorkflowCanvas.rbx << 'COMPONENT'
 import React from 'react'
-import ReactFlow, [Background, Controls, MiniMap, useNodesState, useEdgesState, addEdge], from: 'reactflow'
-import 'reactflow/dist/style.css'
+# React Flow is browser-only (visual canvas library)
+import ReactFlow, [Background, Controls, MiniMap, useNodesState, useEdgesState, addEdge], from: 'reactflow' # Pragma: browser
+import 'reactflow/dist/style.css' # Pragma: browser
 
 export default
 def WorkflowCanvas(initialNodes:, initialEdges:, onSave:, onAddNode:, onAddEdge:)
+  # SSR-safe: only render canvas when ReactFlow is available
+  unless defined?(ReactFlow)
+    return %x{
+      <div style={{ width: '100%', height: '600px', border: '1px solid #ddd', borderRadius: '8px' }}
+           className="flex items-center justify-center bg-gray-100">
+        <p className="text-gray-500">Workflow canvas requires browser environment</p>
+      </div>
+    }
+  end
+
   nodes, setNodes, onNodesChange = useNodesState(initialNodes)
   edges, setEdges, onEdgesChange = useEdgesState(initialEdges)
 
@@ -404,10 +417,8 @@ def WorkflowCanvas(initialNodes:, initialEdges:, onSave:, onAddNode:, onAddEdge:
     onSave(positions)
   }
 
-  # Double-click to add new node (use onDoubleClick instead of checking event.detail)
+  # Double-click to add new node
   handle_double_click = ->(event) {
-    console.log('Double click detected', event)
-
     # Get click position relative to the flow
     bounds = event.target.getBoundingClientRect()
     position = {
@@ -524,9 +535,17 @@ echo "Workflow builder created: $APP_NAME/"
 echo ""
 echo "To run with Juntos (transpiled to JavaScript):"
 echo "  cd $APP_NAME"
-echo "  bin/juntos dev -d dexie      # Browser with IndexedDB"
+echo "  bin/juntos dev -d dexie              # Browser with IndexedDB"
 echo ""
-echo "The workflow canvas uses React Flow for drag-and-drop node editing."
+echo "To build for specific targets:"
+echo "  bin/juntos build -t browser          # Browser build (includes React Flow)"
+echo "  bin/juntos build -t node             # Server build (excludes React Flow)"
+echo ""
+echo "The WorkflowCanvas component uses target-specific pragmas:"
+echo "  - Browser target: includes React Flow for interactive canvas"
+echo "  - Server target: shows placeholder (SSR-safe fallback)"
+echo ""
+echo "The canvas uses React Flow for drag-and-drop node editing."
 echo "Double-click to add nodes, drag handles to connect them."
 echo ""
 echo "To run with Rails:"

@@ -45,8 +45,38 @@ module Ruby2JS
         # Statement control pragmas
         'skip' => :skip,             # skip statement (require, def, defs, alias)
         # Class pragmas
-        'extend' => :extend          # extend existing JS class (monkey patch)
+        'extend' => :extend,         # extend existing JS class (monkey patch)
+        # Target-specific pragmas (for conditional imports)
+        'browser' => :target_browser,
+        'capacitor' => :target_capacitor,
+        'electron' => :target_electron,
+        'tauri' => :target_tauri,
+        'node' => :target_node,
+        'bun' => :target_bun,
+        'deno' => :target_deno,
+        'cloudflare' => :target_cloudflare,
+        'vercel' => :target_vercel,
+        'fly' => :target_fly,
+        'server' => :target_server   # alias for node/bun/deno/cloudflare/vercel/fly
       }.freeze
+
+      # Map target pragma symbols to their target names
+      TARGET_PRAGMAS = {
+        target_browser: 'browser',
+        target_capacitor: 'capacitor',
+        target_electron: 'electron',
+        target_tauri: 'tauri',
+        target_node: 'node',
+        target_bun: 'bun',
+        target_deno: 'deno',
+        target_cloudflare: 'cloudflare',
+        target_vercel: 'vercel',
+        target_fly: 'fly',
+        target_server: 'server'
+      }.freeze
+
+      # Server-side targets (for 'server' meta-target)
+      SERVER_TARGETS = %w[node bun deno cloudflare vercel fly].freeze
 
       # Mapping from AST node types to inferred types
       TYPE_INFERENCE = {
@@ -73,6 +103,7 @@ module Ruby2JS
 
       def options=(options)
         super
+        @pragma_target = options[:target]
       end
 
       # Infer type from an AST node (literal or constructor call)
@@ -370,6 +401,25 @@ module Ruby2JS
         @pragmas[key_no_source]&.include?(pragma_sym)
       end
 
+      # Check if a node has a target pragma that doesn't match the current target
+      # Returns true if the statement should be skipped (target doesn't match)
+      def skip_for_target?(node)
+        return false unless @pragma_target  # No target set = include everything
+
+        TARGET_PRAGMAS.each do |pragma_sym, target_name|
+          if pragma?(node, pragma_sym)
+            # Handle 'server' meta-target
+            if target_name == 'server'
+              return !SERVER_TARGETS.include?(@pragma_target)
+            else
+              return @pragma_target != target_name
+            end
+          end
+        end
+
+        false  # No target pragma = include for all targets
+      end
+
       # Get the source buffer name and line number for a node
       def node_source_and_line(node)
         return [nil, nil] unless node.respond_to?(:loc) && node.loc
@@ -572,14 +622,20 @@ module Ruby2JS
       def on_send(node)
         target, method, *args = node.children
 
-        # Skip pragma: remove require/require_relative statements
-        if target.nil? && [:require, :require_relative].include?(method)
+        # Skip pragma and target pragmas: remove require/require_relative/import statements
+        if target.nil? && [:require, :require_relative, :import].include?(method)
           if pragma?(node, :skip)
             return s(:hide)
           end
 
+          # Target-specific pragma: skip if target doesn't match
+          if skip_for_target?(node)
+            return s(:hide)
+          end
+
           # require 'sorbet-runtime' → remove (Sorbet is Ruby-only)
-          if args.length == 1 && args.first.type == :str &&
+          if [:require, :require_relative].include?(method) &&
+             args.length == 1 && args.first.type == :str &&
              args.first.children.first == 'sorbet-runtime'
             return s(:begin)
           end
