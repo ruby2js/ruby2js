@@ -114,8 +114,8 @@ describe Ruby2JS::Filter::Rails::Model do
         end
       RUBY
       assert_includes result, 'get article()'
-      # Access via _attributes property with bracket notation
-      assert_includes result, 'this._attributes["article_id"'
+      # Access via attributes property with bracket notation
+      assert_includes result, 'this.attributes["article_id"'
       assert_includes result, 'Article.find('
     end
 
@@ -127,7 +127,7 @@ describe Ruby2JS::Filter::Rails::Model do
       RUBY
       assert_includes result, 'get author()'
       # Should check for nil before finding
-      assert_includes result, 'this._attributes["author_id"'
+      assert_includes result, 'this.attributes["author_id"'
       assert_includes result, '?'
     end
 
@@ -138,7 +138,7 @@ describe Ruby2JS::Filter::Rails::Model do
         end
       RUBY
       assert_includes result, 'get creator()'
-      assert_includes result, 'this._attributes["creator_id"'
+      assert_includes result, 'this.attributes["creator_id"'
       assert_includes result, 'User.find('
     end
   end

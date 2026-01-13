@@ -84,7 +84,7 @@ mkdir -p app/controllers
 cat > app/controllers/workflows_controller.rb << 'CONTROLLER'
 class WorkflowsController < ApplicationController
   def index
-    @workflows = Workflow.all
+    @workflows = Workflow.includes(:nodes, :edges).all
   end
 
   def show
