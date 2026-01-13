@@ -281,7 +281,9 @@ cat > app/views/workflows/_workflow.html.erb << 'PARTIAL'
     </p>
   </div>
   <div class="flex gap-2">
-    <%= link_to "Edit", edit_workflow_path(workflow),
+    <%= link_to "Open", workflow_path(workflow),
+        class: "bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700" %>
+    <%= link_to "Rename", edit_workflow_path(workflow),
         class: "bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700" %>
     <%= button_to "Delete", workflow_path(workflow), method: :delete,
         class: "bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700",

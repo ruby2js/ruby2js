@@ -26,6 +26,9 @@ import { SelfhostBuilder } from './build.mjs';
 // Import React filter for .rbx files
 import 'ruby2js/filters/react.js';
 
+// Import ERB compiler for .erb files
+import { ErbCompiler } from './lib/erb_compiler.js';
+
 /**
  * @typedef {Object} JuntosOptions
  * @property {string} [database] - Database adapter (dexie, sqlite, pg, etc.)
@@ -131,6 +134,9 @@ export function juntos(options = {}) {
     // RBX file handling (Ruby + JSX)
     createRbxPlugin(config),
 
+    // ERB file handling (server-rendered templates as JS modules)
+    createErbPlugin(config),
+
     // Structural transforms (models, controllers, views, routes)
     createStructurePlugin(config, appRoot),
 
@@ -217,6 +223,102 @@ function createRbxPlugin(config) {
 }
 
 /**
+ * ERB plugin for Rails ERB templates.
+ * Compiles ERB → Ruby → JavaScript with HMR support.
+ */
+function createErbPlugin(config) {
+  let convert, initPrism;
+  let prismReady = false;
+
+  async function ensureReady() {
+    if (!convert) {
+      const ruby2jsModule = await import('ruby2js');
+      convert = ruby2jsModule.convert;
+      initPrism = ruby2jsModule.initPrism;
+
+      // Import ERB filters AFTER ruby2js module to ensure they register correctly
+      await import('ruby2js/filters/erb.js');
+      await import('ruby2js/filters/rails/helpers.js');
+    }
+    if (!prismReady && initPrism) {
+      await initPrism();
+      prismReady = true;
+    }
+  }
+
+  async function transformErb(code, id) {
+    await ensureReady();
+
+    console.log('[juntos-erb] Transforming:', id);
+
+    // Step 1: Compile ERB to Ruby
+    const compiler = new ErbCompiler(code);
+    const rubySrc = compiler.src;
+
+    // Step 2: Convert Ruby to JavaScript with ERB filters
+    // Note: Rails_Helpers must come before Erb for method overrides
+    const result = convert(rubySrc, {
+      filters: ['Rails_Helpers', 'Erb', 'Functions', 'Return'],
+      eslevel: config.eslevel,
+      include: ['class', 'call'],
+      database: config.database,
+      target: config.target,
+      file: id
+    });
+
+    // Step 3: Export the render function
+    let js = result.toString();
+    js = js.replace(/^function render/, 'export function render');
+
+    // Step 4: Generate source map pointing to original ERB
+    const map = result.sourcemap;
+    if (map) {
+      map.sources = [id];
+      map.sourcesContent = [code];
+    }
+
+    return { code: js, map };
+  }
+
+  return {
+    name: 'juntos-erb',
+    enforce: 'pre',  // Run before other plugins
+
+    async buildStart() {
+      await ensureReady();
+    },
+
+    // Use load hook to handle .erb files as JavaScript modules
+    async load(id) {
+      if (!id.endsWith('.erb')) return null;
+
+      try {
+        // Read the file content
+        const code = await fs.promises.readFile(id, 'utf-8');
+        return await transformErb(code, id);
+      } catch (error) {
+        const errorMsg = error?.message || error?.toString?.() || String(error);
+        console.error('[juntos-erb] Transform error details:', error);
+        throw new Error(`Juntos ERB transform error in ${id}: ${errorMsg}`);
+      }
+    },
+
+    // Transform hook as backup (load should handle most cases)
+    async transform(code, id) {
+      if (!id.endsWith('.erb')) return null;
+
+      try {
+        return await transformErb(code, id);
+      } catch (error) {
+        const errorMsg = error?.message || error?.toString?.() || String(error);
+        console.error('[juntos-erb] Transform error details:', error);
+        throw new Error(`Juntos ERB transform error in ${id}: ${errorMsg}`);
+      }
+    }
+  };
+}
+
+/**
  * Structure plugin - runs SelfhostBuilder for models, controllers, views, routes.
  */
 function createStructurePlugin(config, appRoot) {
@@ -260,12 +362,19 @@ function createConfigPlugin(config, appRoot) {
         '@models': path.join(appRoot, 'app/models'),
         '@views': path.join(appRoot, 'app/views'),
         'components': path.join(appRoot, 'app/components'),
+        // lib/ folder is in dist/ (contains runtime helpers like JsonStreamProvider)
+        'lib': path.join(distDir, 'lib'),
         // Alias for Rails importmap-style imports in Stimulus controllers
         'controllers/application': path.join(appRoot, 'app/javascript/controllers/application.js'),
         // Hotwire packages are in dist/node_modules, not appRoot/node_modules
         '@hotwired/stimulus': path.join(distDir, 'node_modules/@hotwired/stimulus'),
         '@hotwired/turbo': path.join(distDir, 'node_modules/@hotwired/turbo'),
-        '@hotwired/turbo-rails': path.join(distDir, 'node_modules/@hotwired/turbo-rails')
+        '@hotwired/turbo-rails': path.join(distDir, 'node_modules/@hotwired/turbo-rails'),
+        // React packages for source file imports from app/ directory
+        'react': path.join(distDir, 'node_modules/react'),
+        'react-dom': path.join(distDir, 'node_modules/react-dom'),
+        'reactflow': path.join(distDir, 'node_modules/reactflow'),
+        'reactflow/dist/style.css': path.join(distDir, 'node_modules/reactflow/dist/style.css')
       };
 
       // For server targets, client bundles should use RPC adapter instead of SQL adapter
@@ -315,7 +424,9 @@ function createConfigPlugin(config, appRoot) {
           rollupOptions
         },
         resolve: {
-          alias: aliases
+          alias: aliases,
+          // Add Ruby extensions for auto-resolution
+          extensions: ['.mjs', '.js', '.mts', '.ts', '.jsx', '.tsx', '.json', '.rbx', '.rb']
         }
       };
     }
@@ -468,16 +579,24 @@ function getNativeModules(database) {
 }
 
 /**
- * HMR plugin for Stimulus controllers and structural changes.
+ * HMR plugin for Stimulus controllers, views, and structural changes.
  *
  * HMR behavior:
- * - Models, non-Stimulus controllers, routes → full reload
+ * - Models, Rails controllers, routes → full reload (structural changes)
  * - Stimulus controllers → hot swap via custom event
- * - ERB views, RBX files, plain Ruby → Vite default HMR
+ * - ERB views → HMR via juntos-erb transform (imported directly from source)
+ * - RBX views → HMR via juntos-rbx transform (imported directly from source)
+ * - Plain Ruby → Vite default HMR
  */
 function createHmrPlugin() {
   return {
     name: 'juntos-hmr',
+
+    // Watch ERB files even though they're not in the module graph
+    configureServer(server) {
+      // Add app/views/**/*.erb to Vite's watcher
+      server.watcher.add('**/app/views/**/*.erb');
+    },
 
     handleHotUpdate({ file, server, modules }) {
       // Normalize path for matching
@@ -522,7 +641,19 @@ function createHmrPlugin() {
         return modules;
       }
 
-      // ERB views, RBX files, plain Ruby: let Vite handle HMR
+      // ERB views: now imported directly, Vite handles HMR via juntos-erb transform
+      if (file.endsWith('.erb') && normalizedFile.includes('/app/views/')) {
+        console.log('[juntos] Hot updating ERB view:', file);
+        return modules;
+      }
+
+      // RBX views: now imported directly, Vite handles HMR via juntos-rbx transform
+      if (file.endsWith('.rbx') && normalizedFile.includes('/app/views/')) {
+        console.log('[juntos] Hot updating RBX view:', file);
+        return modules;
+      }
+
+      // Plain Ruby files: let Vite handle HMR
       // (default behavior - return undefined to use Vite's module graph)
     },
 
