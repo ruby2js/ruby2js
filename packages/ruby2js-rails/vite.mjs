@@ -320,8 +320,124 @@ function createErbPlugin(config) {
 
 /**
  * Structure plugin - runs SelfhostBuilder for models, controllers, views, routes.
+ * Also watches source files and syncs changes to dist/ for HMR.
  */
 function createStructurePlugin(config, appRoot) {
+  const distDir = path.join(appRoot, 'dist');
+  let convert, initPrism;
+  let prismReady = false;
+
+  // Ensure ruby2js is ready for transpilation
+  async function ensureReady() {
+    if (!convert) {
+      const ruby2jsModule = await import('ruby2js');
+      convert = ruby2jsModule.convert;
+      initPrism = ruby2jsModule.initPrism;
+    }
+    if (!prismReady && initPrism) {
+      await initPrism();
+      prismReady = true;
+    }
+  }
+
+  // Transpile a single Ruby file to JavaScript
+  async function transpileRubyFile(srcPath, destPath) {
+    await ensureReady();
+
+    const code = await fs.promises.readFile(srcPath, 'utf-8');
+    const filters = ['Functions', 'ESM', 'Return'];
+
+    // Add Stimulus filter for controllers
+    if (srcPath.includes('/javascript/controllers/')) {
+      filters.unshift('Stimulus');
+    }
+
+    try {
+      const result = convert(code, {
+        filters,
+        eslevel: config.eslevel || 2022,
+        file: srcPath
+      });
+
+      const jsPath = destPath.replace(/\.rb$/, '.js');
+      await fs.promises.mkdir(path.dirname(jsPath), { recursive: true });
+      await fs.promises.writeFile(jsPath, result.toString());
+
+      return jsPath;
+    } catch (error) {
+      console.error(`[juntos] Transpile error in ${srcPath}:`, error.message);
+      return null;
+    }
+  }
+
+  // Copy a file from source to dist
+  async function copyFile(srcPath, destPath) {
+    await fs.promises.mkdir(path.dirname(destPath), { recursive: true });
+    await fs.promises.copyFile(srcPath, destPath);
+    return destPath;
+  }
+
+  // Rebuild routes (generates multiple files)
+  async function rebuildRoutes() {
+    const originalRoot = SelfhostBuilder.DEMO_ROOT;
+    SelfhostBuilder.DEMO_ROOT = appRoot;
+
+    try {
+      const builder = new SelfhostBuilder(null, {
+        database: config.database,
+        target: config.target,
+        broadcast: config.broadcast
+      });
+      // Just rebuild routes
+      builder.transpile_routes_files();
+      console.log(`[juntos] Rebuilt routes`);
+    } finally {
+      SelfhostBuilder.DEMO_ROOT = originalRoot;
+    }
+  }
+
+  // Handle a source file change
+  async function handleFileChange(file, server) {
+    // Calculate relative path from appRoot
+    const relativePath = path.relative(appRoot, file);
+
+    // Skip if not in watched directories
+    if (!relativePath.startsWith('app/') && !relativePath.startsWith('config/')) {
+      return;
+    }
+
+    console.log(`[juntos] Source file changed: ${relativePath}`);
+
+    // Special case: routes.rb needs full rebuild (generates multiple files)
+    if (relativePath === 'config/routes.rb') {
+      await rebuildRoutes();
+      return;
+    }
+
+    const destPath = path.join(distDir, relativePath);
+
+    // Determine how to handle the file
+    if (file.endsWith('.erb') || file.endsWith('.rbx')) {
+      // ERB and RBX files: copy to dist, Vite transforms on-the-fly
+      await copyFile(file, destPath);
+      console.log(`[juntos] Copied ${relativePath} to dist/`);
+    } else if (file.endsWith('.rb')) {
+      // Ruby files: transpile to JavaScript
+      // Note: Models and Rails controllers use rails/* filters which may not be
+      // fully supported in the JS transpiler yet. Full parity is tracked in
+      // plans/VITE_RUBY2JS.md under "Selfhost Transpiler Requirements".
+      // Stimulus controllers work well since Stimulus filter is available.
+      const jsPath = await transpileRubyFile(file, destPath);
+      if (jsPath) {
+        console.log(`[juntos] Transpiled ${relativePath} to ${path.relative(distDir, jsPath)}`);
+      }
+    } else {
+      // Other files (CSS, etc.): just copy
+      await copyFile(file, destPath);
+      console.log(`[juntos] Copied ${relativePath} to dist/`);
+    }
+  }
+
   return {
     name: 'juntos-structure',
 
@@ -343,6 +459,51 @@ function createStructurePlugin(config, appRoot) {
         // Restore original root
         SelfhostBuilder.DEMO_ROOT = originalRoot;
       }
+    },
+
+    // Watch source files and sync to dist for HMR
+    configureServer(server) {
+      // Watch source directories
+      const watchDirs = [
+        path.join(appRoot, 'app'),
+        path.join(appRoot, 'config')
+      ];
+
+      // Add directories to Vite's watcher
+      watchDirs.forEach(dir => {
+        if (fs.existsSync(dir)) {
+          server.watcher.add(dir);
+        }
+      });
+
+      // Handle file changes
+      server.watcher.on('change', async (file) => {
+        // Only handle files in appRoot (not dist/)
+        if (!file.startsWith(appRoot) || file.startsWith(distDir)) {
+          return;
+        }
+
+        try {
+          await handleFileChange(file, server);
+        } catch (error) {
+          console.error(`[juntos] Error handling file change:`, error);
+        }
+      });
+
+      // Handle new files
+      server.watcher.on('add', async (file) => {
+        if (!file.startsWith(appRoot) || file.startsWith(distDir)) {
+          return;
+        }
+
+        try {
+          await handleFileChange(file, server);
+        } catch (error) {
+          console.error(`[juntos] Error handling new file:`, error);
+        }
+      });
+
+      console.log(`[juntos] Watching source files in ${appRoot}`);
     }
   };
 }

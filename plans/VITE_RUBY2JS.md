@@ -455,6 +455,138 @@ Rails-equivalent of `assets:precompile` — client-side bundling, tree shaking, 
 - Slower builds
 - More complex debugging (source maps help)
 
+### Phase 4b: Source File Watching (Bridge)
+
+As an interim step toward the ultimate architecture, add source file watching to enable HMR when editing original source files.
+
+**Current limitation:** Vite runs from `dist/`, so editing original source doesn't trigger HMR.
+
+**Bridge solution:**
+1. Vite plugin watches original source directory (via `appRoot`)
+2. On file change, re-transpile just that file to dist/
+3. Vite picks up the dist/ change and does HMR
+
+```javascript
+// In configureServer hook
+server.watcher.add(path.join(appRoot, 'app'));
+server.watcher.on('change', async (file) => {
+  if (file.startsWith(appRoot) && file.endsWith('.rb')) {
+    await transpileFile(file, distDir);
+    // Vite automatically picks up dist/ change
+  }
+});
+```
+
+This maintains the current architecture while providing good DX.
+
+---
+
+## Ultimate Architecture: TypeScript Model
+
+The long-term vision is to make Ruby2JS work like TypeScript + Vite:
+
+| TypeScript | Ruby2JS |
+|------------|---------|
+| Source is `.ts` | Source is `.rb`, `.rbx`, `.erb` |
+| Vite transforms via esbuild (fast JS compiler) | Vite transforms via selfhost transpiler |
+| `tsc` exists but not required for dev | Ruby transpiler exists but not required for dev |
+| `dist/` is production output only | `dist/` is production output only |
+
+### Current vs Ultimate Directory Structure
+
+**Current (dist/ as working directory):**
+```
+my-app/
+├── app/                    # Original source
+│   ├── models/
+│   ├── controllers/
+│   └── views/
+├── config/
+│   ├── database.yml
+│   └── routes.rb
+├── dist/                   # Working directory (problematic)
+│   ├── vite.config.js      # ❌ Should be in project root
+│   ├── package.json        # ❌ Should be in project root
+│   ├── node_modules/       # ❌ Should be in project root
+│   ├── app/                # Transpiled copies
+│   └── lib/                # Runtime (copied)
+```
+
+**Ultimate (source-first, like TypeScript):**
+```
+my-app/
+├── app/                    # Source (Vite serves directly)
+│   ├── models/*.rb
+│   ├── controllers/*.rb
+│   └── views/*.erb, *.rbx
+├── config/
+│   ├── database.yml
+│   └── routes.rb
+├── vite.config.js          # ✅ Project root
+├── package.json            # ✅ Project root
+├── node_modules/           # ✅ Project root
+└── dist/                   # Output only (gitignored)
+    └── assets/             # Bundled production assets
+```
+
+### Files That Should Move to Project Root
+
+| File | Current Location | Ultimate Location | Reason |
+|------|------------------|-------------------|--------|
+| `vite.config.js` | `dist/` | Project root | Standard Vite convention |
+| `package.json` | `dist/` | Project root | Standard npm convention |
+| `node_modules/` | `dist/` | Project root | Standard npm convention |
+| `index.html` | `dist/` | Project root or `public/` | Vite convention |
+| `tailwind.config.js` | `dist/` | Project root | Standard Tailwind convention |
+
+### Files That Stay in dist/ (Output Only)
+
+| File | Purpose |
+|------|---------|
+| `assets/*.js` | Bundled, fingerprinted JavaScript |
+| `assets/*.css` | Bundled, fingerprinted CSS |
+| `index.html` | Production HTML with asset references |
+
+### Runtime Files Strategy
+
+**Current:** Runtime (`lib/active_record.mjs`, adapters, etc.) copied to `dist/lib/`.
+
+**Ultimate:** Runtime installed as npm package, imported directly:
+```javascript
+// In transpiled output
+import { ActiveRecord } from 'ruby2js-rails/runtime';
+```
+
+No copying needed—Vite resolves from `node_modules/`.
+
+### Migration Path to Ultimate Architecture
+
+1. **Phase 4b (now):** Source watching as bridge—current architecture, good DX
+2. **Selfhost parity:** Complete JavaScript transpiler to match Ruby transpiler
+3. **Vite plugin transformation:** Plugin uses selfhost for on-the-fly `.rb` → `.js`
+4. **Move config files:** `vite.config.js`, `package.json` to project root
+5. **Remove dist/ copying:** Vite serves source directly, dist/ is output only
+
+### Selfhost Transpiler Requirements
+
+For the ultimate architecture, the selfhost transpiler must handle:
+
+| Category | Status |
+|----------|--------|
+| Core Ruby syntax | ✅ Complete |
+| Functions filter | ✅ Complete |
+| ESM filter | ✅ Complete |
+| React filter | ✅ Complete |
+| ERB compilation | ✅ Complete (`ErbCompiler.js` + `erb.js` filter) |
+| Rails helpers filter | ✅ Complete (`rails/helpers.js`) |
+| Stimulus filter | 🔄 In progress |
+| Rails model filter | 🔄 In progress |
+| Rails controller filter | 🔄 In progress |
+
+Once these filters work in JavaScript, the Vite plugin can transform on-the-fly without pre-building.
+
+---
+
 ### Phase 5: Framework SFC Presets
 
 Once the Rails/Juntos pattern is solid, add presets for Single File Components:
