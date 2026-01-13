@@ -250,6 +250,15 @@ module Ruby2JS
               end
             end
 
+            # Check for association creates (e.g., workflow.nodes.create, article.comments.create!)
+            if %i[create create!].include?(method)
+              # Wrap with await, process target and args
+              new_target = wrap_ar_operations(target)
+              new_args = args.map { |a| wrap_ar_operations(a) }
+              new_node = node.updated(nil, [new_target, method, *new_args])
+              return new_node.updated(:await!)
+            end
+
             # Process children recursively
             new_children = node.children.map do |c|
               c.respond_to?(:type) ? wrap_ar_operations(c) : c

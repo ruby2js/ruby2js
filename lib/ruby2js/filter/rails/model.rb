@@ -822,43 +822,72 @@ module Ruby2JS
         end
 
         def generate_belongs_to_method(assoc)
-          # belongs_to :article -> get article() { return Article.find(this._attributes['article_id']) }
-          # Use :defget for getter (no parentheses needed when accessing)
-          # Use :attr for property access to _attributes, bracket notation for key
+          # belongs_to :article generates:
+          #   get article() { return this._article || Article.find(this._attributes['article_id']) }
+          #   set article(value) {
+          #     this._article = value;
+          #     this._attributes['article_id'] = value ? value.id : null;
+          #   }
           association_name = assoc[:name]
+          cache_name = "_#{association_name}".to_sym
           class_name = assoc[:options][:class_name] || association_name.to_s.capitalize
           foreign_key = assoc[:options][:foreign_key] || "#{association_name}_id"
 
           # Track model reference for import generation
           @rails_model_refs.add(class_name)
 
-          # Access foreign key from _attributes - use :attr for property access
+          # Access foreign key from attributes - use :attr for property access
           # Use .to_s to force bracket notation (Ruby2JS optimizes literal strings to dot notation)
-          fk_access = s(:send, s(:attr, s(:self), :_attributes), :[],
+          fk_access = s(:send, s(:attr, s(:self), :attributes), :[],
             s(:send, s(:str, foreign_key), :to_s))
 
-          # Handle optional: true
+          # Getter: return cached object or find by foreign key
+          # this._article || Article.find(this.attributes['article_id'])
+          find_call = s(:send,
+            s(:const, nil, class_name.to_sym),
+            :find,
+            fk_access)
+
           if assoc[:options][:optional]
-            # Return nil if foreign key is nil
-            s(:defget, association_name,
+            # Return nil if foreign key is nil: this._article || (fk && Model.find(fk))
+            getter = s(:defget, association_name,
               s(:args),
               s(:autoreturn,
-                s(:if,
-                  fk_access,
-                  s(:send,
-                    s(:const, nil, class_name.to_sym),
-                    :find,
-                    fk_access),
-                  s(:nil))))
+                s(:or,
+                  s(:attr, s(:self), cache_name),
+                  s(:if,
+                    fk_access,
+                    find_call,
+                    s(:nil)))))
           else
-            s(:defget, association_name,
+            getter = s(:defget, association_name,
               s(:args),
               s(:autoreturn,
-                s(:send,
-                  s(:const, nil, class_name.to_sym),
-                  :find,
-                  fk_access)))
+                s(:or,
+                  s(:attr, s(:self), cache_name),
+                  find_call)))
           end
+
+          # Setter: set article(value) {
+          #   this._article = value;
+          #   this._attributes['article_id'] = value ? value.id : null;
+          # }
+          setter_name = "#{association_name}=".to_sym
+          setter = s(:def, setter_name,
+            s(:args, s(:arg, :value)),
+            s(:begin,
+              # this._article = value
+              s(:send, s(:self), "#{cache_name}=".to_sym, s(:lvar, :value)),
+              # this.attributes['article_id'] = value ? value.id : null
+              s(:send,
+                s(:attr, s(:self), :attributes),
+                :[]=,
+                s(:send, s(:str, foreign_key), :to_s),
+                s(:if, s(:lvar, :value),
+                  s(:attr, s(:lvar, :value), :id),
+                  s(:nil)))))
+
+          s(:begin, getter, setter)
         end
 
         def generate_destroy_method
