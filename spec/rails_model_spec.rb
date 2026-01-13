@@ -425,9 +425,37 @@ describe Ruby2JS::Filter::Rails::Model do
           end
         end
       RUBY
-      # Non-remove actions use record.toHTML() for content
-      assert_includes result, 'record.toHTML()'
+      # Non-remove actions use $record.toHTML() for content
+      assert_includes result, '$record.toHTML()'
       assert_includes result, '<template>'
+    end
+
+    it "transforms broadcast_json_to with $record receiver" do
+      result = to_js(<<~RUBY)
+        class Node < ApplicationRecord
+          after_create_commit do
+            broadcast_json_to "workflow_\#{workflow_id}", "node_created"
+          end
+        end
+      RUBY
+      # Uses $record. receiver for broadcast calls in callbacks
+      assert_includes result, '$record.broadcast_json_to'
+      # References workflow_id as $record.workflow_id
+      assert_includes result, '$record.workflow_id'
+    end
+
+    it "adds $record receiver to bare broadcast calls" do
+      result = to_js(<<~RUBY)
+        class Edge < ApplicationRecord
+          after_destroy_commit do
+            broadcast_json_to "workflow_\#{workflow_id}", "edge_destroyed"
+          end
+        end
+      RUBY
+      # Callback uses $record parameter (no parens for single arg arrow function)
+      assert_includes result, '$record =>'
+      # broadcast_json_to gets $record receiver
+      assert_includes result, '$record.broadcast_json_to'
     end
   end
 end

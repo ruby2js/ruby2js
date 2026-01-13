@@ -276,6 +276,55 @@ export class ActiveRecordBase {
     return `${modelName}_${this.id}`;
   }
 
+  // --- Broadcasting methods ---
+
+  // Broadcast JSON event for React components
+  // Usage: this.broadcast_json_to("workflow_1", "node_created")
+  broadcast_json_to(channel, event, data = null) {
+    const BroadcastChannel = globalThis.BroadcastChannel;
+    if (!BroadcastChannel?.broadcast) return;
+
+    const payload = JSON.stringify({
+      type: event,
+      model: this.constructor.name,
+      id: this.id,
+      data: data || { ...this.attributes, id: this.id }
+    });
+    BroadcastChannel.broadcast(channel, payload);
+  }
+
+  // Broadcast Turbo Stream append for ERB views
+  broadcast_append_to(channel, options = {}) {
+    const BroadcastChannel = globalThis.BroadcastChannel;
+    if (!BroadcastChannel?.broadcast) return;
+
+    const target = options.target || this.constructor.tableName;
+    const html = options.html || this.toHTML();
+    const stream = `<turbo-stream action="append" target="${target}"><template>${html}</template></turbo-stream>`;
+    BroadcastChannel.broadcast(channel, stream);
+  }
+
+  // Broadcast Turbo Stream replace for ERB views
+  broadcast_replace_to(channel, options = {}) {
+    const BroadcastChannel = globalThis.BroadcastChannel;
+    if (!BroadcastChannel?.broadcast) return;
+
+    const target = options.target || this.domId();
+    const html = options.html || this.toHTML();
+    const stream = `<turbo-stream action="replace" target="${target}"><template>${html}</template></turbo-stream>`;
+    BroadcastChannel.broadcast(channel, stream);
+  }
+
+  // Broadcast Turbo Stream remove for ERB views
+  broadcast_remove_to(channel, options = {}) {
+    const BroadcastChannel = globalThis.BroadcastChannel;
+    if (!BroadcastChannel?.broadcast) return;
+
+    const target = options.target || this.domId();
+    const stream = `<turbo-stream action="remove" target="${target}"></turbo-stream>`;
+    BroadcastChannel.broadcast(channel, stream);
+  }
+
   async belongsTo(modelClass, foreignKey) {
     const fkValue = this.attributes[foreignKey];
     if (!fkValue) return null;

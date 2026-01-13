@@ -40,6 +40,9 @@ export { csrfMetaTag, getRegistry as getRPCRegistry };
 // Re-export TurboBroadcast and alias as BroadcastChannel for model compatibility
 export { TurboBroadcast, TurboBroadcast as BroadcastChannel };
 
+// Set global BroadcastChannel for ActiveRecord broadcast methods
+globalThis.BroadcastChannel = TurboBroadcast;
+
 // Router with Node.js-specific dispatch (uses req/res instead of Fetch API)
 export class Router extends RouterServer {
   // Try to serve a static file, returns true if served

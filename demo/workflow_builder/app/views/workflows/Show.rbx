@@ -65,13 +65,15 @@ def Show(workflow:)
           Back to Workflows
         </a>
       </div>
-      <WorkflowCanvas
-        initialNodes={flow_nodes}
-        initialEdges={flow_edges}
-        onSave={handle_save}
-        onAddNode={handle_add_node}
-        onAddEdge={handle_add_edge}
-      />
+      <div data-controller="workflow-channel" data-workflow-channel-id-value={workflow.id}>
+        <WorkflowCanvas
+          initialNodes={flow_nodes}
+          initialEdges={flow_edges}
+          onSave={handle_save}
+          onAddNode={handle_add_node}
+          onAddEdge={handle_add_edge}
+        />
+      </div>
     </div>
   }
 end

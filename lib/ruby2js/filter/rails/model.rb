@@ -26,6 +26,7 @@ module Ruby2JS
           broadcast_update_to broadcast_update_later_to
           broadcast_remove_to broadcast_remove_later_to
           broadcast_before_to broadcast_after_to
+          broadcast_json_to
         ].freeze
 
         # Map broadcast methods to their turbo-stream actions
@@ -179,13 +180,13 @@ module Ruby2JS
           processed_body = process(transformed_body)
           @in_callback_block = false
 
-          # Generate: ClassName.callback_method((record) => { ... })
+          # Generate: ClassName.callback_method(($record) => { ... })
           s(:send,
             s(:const, nil, @rails_model_name.to_sym),
             method,
             s(:block,
               s(:send, nil, :proc),
-              s(:args, s(:arg, :record)),
+              s(:args, s(:arg, :"$record")),
               processed_body))
         end
 
@@ -207,34 +208,44 @@ module Ruby2JS
 
         private
 
-        # Transform callback body to use 'record' parameter instead of self/id
+        # Transform callback body to use '$record' parameter instead of self/id
+        # Uses $record to avoid conflicts with user-defined 'record' variables
         def transform_callback_body(node)
           return node unless node.respond_to?(:type)
 
           case node.type
           when :self
-            # self -> record
-            s(:lvar, :record)
+            # self -> $record
+            s(:lvar, :"$record")
 
           when :send
             target, method, *args = node.children
 
             if target.nil?
-              # Bare method call - could be a record attribute/method
-              # id, article_id, created_at, etc. -> record.id, record.article_id, etc.
+              # Bare method call - could be a record attribute/method or broadcast_json_to
               if instance_method?(method)
+                # id, article_id, created_at, etc. -> $record.id, $record.article_id, etc.
                 # Use :attr for property access (no parentheses in JS)
                 s(:attr,
-                  s(:lvar, :record),
+                  s(:lvar, :"$record"),
                   method)
+              elsif method == :broadcast_json_to
+                # broadcast_json_to -> $record.broadcast_json_to(...)
+                # Add $record receiver - the method is called directly (no HTML transformation)
+                # Other turbo-stream broadcast methods are handled by on_send
+                s(:send,
+                  s(:lvar, :"$record"),
+                  method,
+                  *args.map { |arg| transform_callback_body(arg) })
               else
-                # Keep other bare calls (like broadcast_append_to)
+                # Keep other bare calls (including turbo-stream broadcast methods)
+                # These will be processed by on_send
                 node.updated(nil, [target, method, *args.map { |arg| transform_callback_body(arg) }])
               end
             elsif target&.type == :self
-              # self.foo -> record.foo (property access)
+              # self.foo -> $record.foo (property access)
               s(:attr,
-                s(:lvar, :record),
+                s(:lvar, :"$record"),
                 method)
             else
               # Recurse into target and args
@@ -368,8 +379,8 @@ module Ruby2JS
 
         # Build the turbo-stream HTML for broadcasting
         def build_broadcast_stream_html(action, channel_node, target_node, partial_node, locals_node)
-          # Use 'record' in callbacks, 'this' otherwise
-          receiver = @in_callback_block ? s(:lvar, :record) : s(:self)
+          # Use '$record' in callbacks, 'this' otherwise
+          receiver = @in_callback_block ? s(:lvar, :"$record") : s(:self)
 
           # For remove action, no template content needed
           if action == :remove
