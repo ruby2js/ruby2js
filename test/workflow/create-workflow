@@ -327,9 +327,9 @@ FORM
 cat > app/views/workflows/Show.rbx << 'RBX'
 import React from 'react'
 import WorkflowCanvas from 'components/WorkflowCanvas'
-import JsonStreamProvider from '../../../lib/JsonStreamProvider.js'
-import [Node], from: '../../models/node.js'
-import [Edge], from: '../../models/edge.js'
+import JsonStreamProvider from '/lib/JsonStreamProvider.js'
+import [Node], from: '/app/models/node.js'
+import [Edge], from: '/app/models/edge.js'
 
 export default
 def Show(workflow:)
@@ -433,7 +433,7 @@ import React, [useState, useEffect, useCallback], from: 'react'
 # React Flow is browser-only (visual canvas library)
 import ReactFlow, [Background, Controls, MiniMap, useNodesState, useEdgesState, addEdge], from: 'reactflow' # Pragma: browser
 import 'reactflow/dist/style.css' # Pragma: browser
-import [useJsonStream], from: '../../lib/JsonStreamProvider.js'
+import [useJsonStream], from: '/lib/JsonStreamProvider.js'
 
 export default
 def WorkflowCanvas(initialNodes:, initialEdges:, onSave:, onAddNode:, onAddEdge:, onDeleteNode:, onUpdateNode:)

@@ -1,8 +1,8 @@
 import React from 'react'
 import WorkflowCanvas from 'components/WorkflowCanvas'
-import JsonStreamProvider from '../../../lib/JsonStreamProvider.js'
-import [Node], from: '../../models/node.js'
-import [Edge], from: '../../models/edge.js'
+import JsonStreamProvider from '/lib/JsonStreamProvider.js'
+import [Node], from: '/app/models/node.js'
+import [Edge], from: '/app/models/edge.js'
 
 export default
 def Show(workflow:)
