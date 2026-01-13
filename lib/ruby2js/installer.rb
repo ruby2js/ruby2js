@@ -60,15 +60,15 @@ module Ruby2JS
     end
 
     # Generate vite.config.js content
-    def generate_vite_config(database:, target: 'browser')
+    # Database and target are controlled via JUNTOS_DATABASE/JUNTOS_TARGET env vars
+    # or auto-detected from database.yml
+    def generate_vite_config(database: nil, target: nil)
       <<~JS
         import { defineConfig } from 'vite';
         import { juntos } from 'ruby2js-rails/vite';
 
         export default defineConfig({
           plugins: juntos({
-            database: '#{database}',
-            target: '#{target}',
             appRoot: '..'  // Source files are in parent directory
           })
         });

@@ -870,7 +870,7 @@ module Ruby2JS
 
           # Setter: set article(value) {
           #   this._article = value;
-          #   this._attributes['article_id'] = value ? value.id : null;
+          #   this.attributes['article_id'] = value ? value.id : null;
           # }
           setter_name = "#{association_name}=".to_sym
           setter = s(:def, setter_name,
@@ -887,7 +887,12 @@ module Ruby2JS
                   s(:attr, s(:lvar, :value), :id),
                   s(:nil)))))
 
-          s(:begin, getter, setter)
+          # Foreign key getter: get article_id() { return this.attributes['article_id'] }
+          fk_getter = s(:defget, foreign_key.to_sym,
+            s(:args),
+            s(:autoreturn, fk_access))
+
+          s(:begin, getter, setter, fk_getter)
         end
 
         def generate_destroy_method

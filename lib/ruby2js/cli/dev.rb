@@ -59,6 +59,10 @@ module Ruby2JS
               options[:target] = target
             end
 
+            opts.on("-d", "--database DATABASE", "Database adapter: dexie, sqlite, pg, etc.") do |db|
+              options[:database] = db
+            end
+
             opts.on("-h", "--help", "Show this help message") do
               puts opts
               exit
@@ -98,6 +102,10 @@ module Ruby2JS
         end
 
         def start_dev_server(options)
+          # Set environment variables for Vite plugin (overrides vite.config.js)
+          ENV['JUNTOS_DATABASE'] = options[:database] if options[:database]
+          ENV['JUNTOS_TARGET'] = options[:target] if options[:target]
+
           vite_config = File.join(DIST_DIR, 'vite.config.js')
 
           if File.exist?(vite_config)

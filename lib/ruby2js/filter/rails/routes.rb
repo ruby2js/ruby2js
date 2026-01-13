@@ -860,6 +860,10 @@ module Ruby2JS
         BROWSER_DATABASES = %w[dexie indexeddb sqljs sql.js pglite].freeze
 
         def server_target?
+          # Explicit target option takes precedence
+          target = @options[:target]
+          return false if target && target.to_s.downcase == 'browser'
+
           database = @options[:database]
           return false unless database
           database = database.to_s.downcase

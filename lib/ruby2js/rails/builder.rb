@@ -3050,7 +3050,7 @@ class SelfhostBuilder
 
     # Generate routes.js (imports path helpers from paths.js)
     puts("Transpiling: routes.rb -> routes.js")
-    routes_options = base_options.merge(file: relative_src, paths_file: './paths.js', database: @database)
+    routes_options = base_options.merge(file: relative_src, paths_file: './paths.js', database: @database, target: @target)
     result = Ruby2JS.convert(source, routes_options)
     routes_js = result.to_s
 

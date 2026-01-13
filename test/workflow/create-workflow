@@ -5,6 +5,10 @@
 # Creates a Rails app with Workflow, Node, and Edge models,
 # ERB views for listing, and RBX views for React Flow canvas.
 # Demonstrates using React ecosystem libraries via RBX files.
+#
+# The generated app works with both:
+# - Browser target (Dexie/IndexedDB) via bin/juntos dev -d dexie
+# - Rails backend via bin/rails server
 
 set -e
 
@@ -288,11 +292,20 @@ cat > app/views/workflows/_form.html.erb << 'FORM'
 FORM
 
 # Create show view (RBX - uses React Flow)
+# Uses model operations directly (Node.create, Edge.create) instead of fetch()
+# This makes the view target-agnostic: works with both browser (Dexie) and Node (RPC) targets
 cat > app/views/workflows/Show.rbx << 'RBX'
+import React from 'react'
 import WorkflowCanvas from 'components/WorkflowCanvas'
+import [Node], from: '../../models/node.js'
+import [Edge], from: '../../models/edge.js'
 
 export default
-def Show(workflow:, nodes:, edges:)
+def Show(workflow:)
+  # Get nodes and edges from workflow (preloaded by controller)
+  nodes = workflow.nodes
+  edges = workflow.edges
+
   # Convert Rails nodes to React Flow format
   flow_nodes = nodes.map do |node|
     {
@@ -313,35 +326,32 @@ def Show(workflow:, nodes:, edges:)
   end
 
   handle_save = ->(updated_nodes) {
-    fetch("/workflows/#{workflow.id}/update_positions",
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(nodes: updated_nodes)
-    )
+    # Update node positions directly in the database
+    updated_nodes.each do |node_data|
+      Node.find(node_data.id.to_i).then(->(node) {
+        node.update(position_x: node_data.position.x, position_y: node_data.position.y)
+      })
+    end
   }
 
   handle_add_node = ->(position) {
-    fetch("/workflows/#{workflow.id}/nodes",
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(node: {
-        label: "New Node",
-        node_type: "default",
-        position_x: position.x,
-        position_y: position.y
-      })
-    ).then(->(r) { r.json() })
+    # Create node directly in the database
+    Node.create(
+      label: "New Node",
+      node_type: "default",
+      position_x: position.x,
+      position_y: position.y,
+      workflow_id: workflow.id
+    )
   }
 
   handle_add_edge = ->(source_id, target_id) {
-    fetch("/workflows/#{workflow.id}/edges",
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(edge: {
-        source_node_id: source_id,
-        target_node_id: target_id
-      })
-    ).then(->(r) { r.json() })
+    # Create edge directly in the database
+    Edge.create(
+      source_node_id: source_id.to_i,
+      target_node_id: target_id.to_i,
+      workflow_id: workflow.id
+    )
   }
 
   %x{
@@ -367,6 +377,7 @@ RBX
 # Create components directory and WorkflowCanvas component
 mkdir -p app/components
 cat > app/components/WorkflowCanvas.rbx << 'COMPONENT'
+import React from 'react'
 import ReactFlow, [Background, Controls, MiniMap, useNodesState, useEdgesState, addEdge], from: 'reactflow'
 import 'reactflow/dist/style.css'
 
@@ -393,9 +404,9 @@ def WorkflowCanvas(initialNodes:, initialEdges:, onSave:, onAddNode:, onAddEdge:
     onSave(positions)
   }
 
-  # Double-click to add new node
-  handle_pane_click = ->(event) {
-    return unless event.detail == 2  # double-click
+  # Double-click to add new node (use onDoubleClick instead of checking event.detail)
+  handle_double_click = ->(event) {
+    console.log('Double click detected', event)
 
     # Get click position relative to the flow
     bounds = event.target.getBoundingClientRect()
@@ -416,7 +427,7 @@ def WorkflowCanvas(initialNodes:, initialEdges:, onSave:, onAddNode:, onAddEdge:
   }
 
   %x{
-    <div style={{ width: '100%', height: '600px', border: '1px solid #ddd', borderRadius: '8px' }}>
+    <div style={{ width: '100%', height: '600px', border: '1px solid #ddd', borderRadius: '8px' }} onDoubleClick={handle_double_click}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -424,7 +435,7 @@ def WorkflowCanvas(initialNodes:, initialEdges:, onSave:, onAddNode:, onAddEdge:
         onEdgesChange={onEdgesChange}
         onConnect={handle_connect}
         onNodeDragStop={handle_node_drag_stop}
-        onPaneClick={handle_pane_click}
+        zoomOnDoubleClick={false}
         fitView
       >
         <Background color="#aaa" gap={16} />
@@ -499,7 +510,6 @@ SEEDS
 # These get added to dist/package.json and bundled by Vite
 cat > config/ruby2js.yml << 'CONFIG'
 # React ecosystem dependencies for RBX files
-# CSS imports in your code (import 'pkg/style.css') are handled by Vite bundler
 dependencies:
   react: "^18.2.0"
   react-dom: "^18.2.0"
