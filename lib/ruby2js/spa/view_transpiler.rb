@@ -155,8 +155,9 @@ module Ruby2JS
         js = Ruby2JS.convert(ruby_src, options).to_s
 
         # Ensure export is present
+        # Note: Function may not be at start if imports were added by rails/helpers filter
         unless js.include?('export ')
-          js = js.sub(/^function render/, 'export function render')
+          js = js.sub(/(^|\n)function render/, '\1export function render')
         end
 
         js

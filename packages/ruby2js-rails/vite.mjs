@@ -267,8 +267,9 @@ function createErbPlugin(config) {
     });
 
     // Step 3: Export the render function
+    // Note: Function may not be at start if imports were added by rails/helpers filter
     let js = result.toString();
-    js = js.replace(/^function render/, 'export function render');
+    js = js.replace(/(^|\n)function render/, '$1export function render');
 
     // Step 4: Generate source map pointing to original ERB
     const map = result.sourcemap;

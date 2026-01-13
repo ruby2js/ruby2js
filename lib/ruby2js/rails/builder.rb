@@ -1598,7 +1598,8 @@ class SelfhostBuilder
     result.erb_position_map = compiler.position_map
 
     js = result.to_s
-    js = js.sub(/^function render/, 'export function render')
+    # Note: Function may not be at start if imports were added by rails/helpers filter
+    js = js.sub(/(^|\n)function render/, '\1export function render')
 
     FileUtils.mkdir_p(File.dirname(dest_path))
 
