@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'optparse'
+require_relative 'build_helper'
 
 module Ruby2JS
   module CLI
@@ -94,12 +95,8 @@ module Ruby2JS
         def build(options)
           puts "Building application..."
 
-          vite_config = File.join(DIST_DIR, 'vite.config.js')
-
-          success = if File.exist?(vite_config)
-            build_with_vite(options)
-          elsif options[:selfhost]
-            # Use JavaScript transpiler via npm (run from dist/)
+          success = if options[:selfhost] && !BuildHelper.vite_configured?
+            # Legacy: Use JavaScript transpiler via npm (run from dist/)
             Dir.chdir(DIST_DIR) do
               if options[:verbose]
                 system("npm run build")
@@ -108,37 +105,14 @@ module Ruby2JS
               end
             end
           else
-            # Use Ruby transpiler directly
-            require 'ruby2js/rails/builder'
-            builder_opts = { target: options[:target] }
-            builder_opts[:database] = options[:database] if options[:database]
-            SelfhostBuilder.new(nil, **builder_opts).build
-            true
+            # Use unified build (Vite if configured, else Ruby builder)
+            BuildHelper.build(options)
           end
 
           if success
             puts "Build complete. Output in dist/"
           else
             abort "Error: Build failed. Run with --verbose for details."
-          end
-        end
-
-        def build_with_vite(options)
-          # Set environment variables for Vite
-          ENV['JUNTOS_DATABASE'] = options[:database] if options[:database]
-          ENV['JUNTOS_TARGET'] = options[:target] if options[:target]
-
-          # Derive Vite mode from RAILS_ENV or NODE_ENV (RAILS_ENV takes precedence)
-          mode = ENV['RAILS_ENV'] || ENV['NODE_ENV'] || 'development'
-          cmd = "npx vite build --mode #{mode}"
-          cmd += " --sourcemap" if options[:sourcemap]
-
-          Dir.chdir(DIST_DIR) do
-            if options[:verbose]
-              system(cmd)
-            else
-              system("#{cmd} > /dev/null 2>&1")
-            end
           end
         end
       end

@@ -2,6 +2,7 @@
 
 require 'optparse'
 require 'fileutils'
+require_relative 'build_helper'
 
 module Ruby2JS
   module CLI
@@ -144,23 +145,13 @@ module Ruby2JS
           # Build first unless skipped
           unless options[:skip_build]
             puts "Building for #{target} (#{options[:environment]})..."
-            require 'ruby2js/rails/builder'
-            builder_opts = { target: target }
-            builder_opts[:database] = options[:database] if options[:database]
-            SelfhostBuilder.new(nil, **builder_opts).build
-
-            # Run Vite build if vite.config.js exists
-            vite_config = File.join(DIST_DIR, 'vite.config.js')
-            if File.exist?(vite_config)
-              mode = options[:environment] || 'production'
-              puts "\nBundling with Vite (mode: #{mode})..."
-              cmd = "npx vite build --mode #{mode}"
-              cmd += " --sourcemap" if options[:sourcemap]
-              Dir.chdir(DIST_DIR) do
-                success = system(cmd)
-                abort "Error: Vite build failed." unless success
-              end
-            end
+            BuildHelper.build(
+              target: target,
+              database: options[:database],
+              environment: options[:environment],
+              sourcemap: options[:sourcemap],
+              default_mode: 'production'  # Deploy defaults to production
+            )
           end
 
           # Regenerate package.json with tarball URL for deploy

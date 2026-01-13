@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'optparse'
+require_relative 'build_helper'
 
 module Ruby2JS
   module CLI
@@ -84,40 +85,7 @@ module Ruby2JS
 
         def build_app(options)
           puts "Building application..."
-
-          require 'ruby2js/rails/builder'
-
-          builder_opts = {}
-          builder_opts[:target] = options[:target] if options[:target]
-          builder_opts[:database] = options[:database] if options[:database]
-
-          # Run Ruby builder for structural transforms (models, controllers, views, routes)
-          SelfhostBuilder.new(nil, **builder_opts).build
-
-          # For browser targets with vite.config.js, run Vite production build
-          # This bundles JS, resolves aliases, tree-shakes, and fingerprints assets
-          vite_config = File.join(DIST_DIR, 'vite.config.js')
-          if File.exist?(vite_config) && browser_target?(options[:target], builder_opts)
-            # Derive Vite mode from RAILS_ENV or NODE_ENV (RAILS_ENV takes precedence)
-            mode = ENV['RAILS_ENV'] || ENV['NODE_ENV'] || 'development'
-            puts "\nBundling with Vite (mode: #{mode})..."
-            cmd = "npx vite build --mode #{mode}"
-            cmd += " --sourcemap" if options[:sourcemap]
-            Dir.chdir(DIST_DIR) do
-              success = system(cmd)
-              abort "Error: Vite build failed." unless success
-            end
-          end
-        end
-
-        def browser_target?(explicit_target, builder_opts)
-          # Check explicit target first
-          return explicit_target == 'browser' if explicit_target
-
-          # Otherwise detect from database config
-          require 'ruby2js/rails/builder'
-          config = SelfhostBuilder.detect_runtime
-          config[:target] == 'browser'
+          BuildHelper.build(options)
         end
 
         def start_server(options)

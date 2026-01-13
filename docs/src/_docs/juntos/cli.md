@@ -77,10 +77,9 @@ bin/juntos up -e production       # Production build (bundled, minified)
 
 **What it does:**
 
-1. Builds the app to `dist/`
-2. For browser targets: runs Vite production build (bundles, tree-shakes, fingerprints)
-3. Starts a static server (browser) or runtime server (Node/Bun/Deno)
-4. Connects to the configured database
+1. Builds the app to `dist/` (uses Vite if configured, bundles and fingerprints assets)
+2. Starts a static server (browser) or runtime server (Node/Bun/Deno)
+3. Connects to the configured database
 
 ## juntos build
 

@@ -4,6 +4,7 @@ require 'optparse'
 require 'fileutils'
 require 'json'
 require 'yaml'
+require_relative 'build_helper'
 
 module Ruby2JS
   module CLI
@@ -1038,29 +1039,13 @@ module Ruby2JS
         def build_app(options)
           puts "Building application..."
 
-          require 'ruby2js/rails/builder'
-
-          builder_opts = {}
-          builder_opts[:target] = options[:target] if options[:target]
-          builder_opts[:database] = options[:database] if options[:database]
-
-          # Default target based on database
-          if d1?(options) && !builder_opts[:target]
-            builder_opts[:target] = 'cloudflare'
+          # Default target to cloudflare for D1 database
+          build_options = options.dup
+          if d1?(options) && !build_options[:target]
+            build_options[:target] = 'cloudflare'
           end
 
-          SelfhostBuilder.new(nil, **builder_opts).build
-
-          # Run Vite build if vite.config.js exists
-          vite_config = File.join(DIST_DIR, 'vite.config.js')
-          if File.exist?(vite_config)
-            mode = options[:environment] || 'development'
-            puts "\nBundling with Vite (mode: #{mode})..."
-            Dir.chdir(DIST_DIR) do
-              success = system("npx vite build --mode #{mode}")
-              abort "Error: Vite build failed." unless success
-            end
-          end
+          BuildHelper.build(build_options)
         end
       end
     end
