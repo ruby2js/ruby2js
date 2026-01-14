@@ -33,27 +33,13 @@ jobs:
         with:
           node-version: "24"
 
-      - name: Install selfhost dependencies
-        run: cd demo/selfhost && npm install
-
-      - name: Install ruby2js-rails dependencies
-        run: cd packages/ruby2js-rails && npm install
-
-      - name: Build selfhost (converter, lib, filters)
-        run: bundle exec rake -f demo/selfhost/Rakefile build build_lib build_mjs:npm
-
-      - name: Pack tarballs
+      - name: Install npm dependencies
         run: |
-          mkdir -p artifacts/tarballs
-          # ruby2js from demo/selfhost (Prism-based, matches build.mjs imports)
-          cd demo/selfhost && npm pack --pack-destination ../../artifacts/tarballs
-          cd ../../packages/ruby2js-rails && npm pack --pack-destination ../../artifacts/tarballs
-          cd ../vite-plugin-ruby2js && npm pack --pack-destination ../../artifacts/tarballs
-          # Rename to stable names (strip version numbers)
-          cd ../../artifacts/tarballs
-          mv ruby2js-6*.tgz ruby2js-beta.tgz 2>/dev/null || mv ruby2js-*.tgz ruby2js-beta.tgz
-          mv ruby2js-rails-*.tgz ruby2js-rails-beta.tgz
-          mv vite-plugin-ruby2js-*.tgz vite-plugin-ruby2js-beta.tgz
+          cd demo/selfhost && npm install
+          cd ../../packages/ruby2js-rails && npm install
+
+      - name: Build and pack tarballs
+        run: bundle exec rake -f demo/selfhost/Rakefile release
 
       - name: Upload tarballs
         uses: actions/upload-artifact@v4
@@ -310,84 +296,6 @@ jobs:
       - name: Run smoke test
         run: node test/smoke-test.mjs artifacts/chat --database ${{ matrix.database }}
 
-  smoke-test-photo-gallery:
-    needs: [build-tarballs, create-photo-gallery]
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        database: [dexie]
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: "3.4"
-          bundler-cache: true
-
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "24"
-
-      - name: Download tarballs
-        uses: actions/download-artifact@v4
-        with:
-          name: tarballs
-          path: artifacts/tarballs
-
-      - name: Download photo_gallery demo
-        uses: actions/download-artifact@v4
-        with:
-          name: demo-photo-gallery
-          path: artifacts/photo_gallery
-
-      - name: Install ruby2js-rails from tarball
-        run: npm install artifacts/tarballs/ruby2js-beta.tgz artifacts/tarballs/ruby2js-rails-beta.tgz
-
-      - name: Run smoke test
-        run: node test/smoke-test.mjs artifacts/photo_gallery --database ${{ matrix.database }}
-
-  smoke-test-workflow:
-    needs: [build-tarballs, create-workflow]
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        database: [dexie, sqlite]
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: "3.4"
-          bundler-cache: true
-
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "24"
-
-      - name: Download tarballs
-        uses: actions/download-artifact@v4
-        with:
-          name: tarballs
-          path: artifacts/tarballs
-
-      - name: Download workflow demo
-        uses: actions/download-artifact@v4
-        with:
-          name: demo-workflow
-          path: artifacts/workflow
-
-      - name: Install ruby2js-rails from tarball
-        run: npm install artifacts/tarballs/ruby2js-beta.tgz artifacts/tarballs/ruby2js-rails-beta.tgz
-
-      - name: Run smoke test
-        run: node test/smoke-test.mjs artifacts/workflow --database ${{ matrix.database }}
-
   # ===========================================================================
   # Stage 2: Deploy (runs in parallel with tests, depends on Stage 1)
   # ===========================================================================
@@ -402,8 +310,7 @@ jobs:
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: "3.4"
-          # Don't use bundler-cache: build-site needs both docs and main project gems
-          # and the cache key only covers one Gemfile.lock
+          bundler-cache: true
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -415,79 +322,45 @@ jobs:
         with:
           path: artifacts
 
-      - name: Install main project gems
-        run: bundle install
-
-      - name: Install docs dependencies
-        run: |
-          cd docs
-          yarn install
-          bundle install
-
-      - name: Install selfhost dependencies
-        run: |
-          cd demo/selfhost
-          npm install
-
-      - name: Install ruby2js-rails dependencies
-        run: |
-          cd packages/ruby2js-rails
-          npm install
-
-      - name: Build selfhost
-        run: bundle exec rake -f demo/selfhost/Rakefile build build_lib
-
-      - name: Build docs site
-        run: |
-          cd docs
-          BRIDGETOWN_ENV=production bundle exec rake
-
-      - name: Install tarballs for browser builds
+      - name: Install tarballs
         run: npm install artifacts/tarballs/ruby2js-beta.tgz artifacts/tarballs/ruby2js-rails-beta.tgz
 
       - name: Build browser demos
         run: |
           for demo in blog chat photo_gallery workflow; do
             echo "Building $demo for browser..."
-            demo_path=$GITHUB_WORKSPACE/artifacts/demo-$demo
-            [ ! -d "$demo_path" ] && demo_path=$GITHUB_WORKSPACE/artifacts/demo-${demo//_/-}
+            demo_path=artifacts/demo-$demo
+            [ ! -d "$demo_path" ] && demo_path=artifacts/demo-${demo//_/-}
 
-            # Use JS builder from installed tarball (has npm-style imports)
-            base_path="/demos/${demo//_/-}/"
-            node -e "
-              process.chdir('$demo_path');
-              const { SelfhostBuilder } = await import('ruby2js-rails/build.mjs');
-              const builder = new SelfhostBuilder('dist', { database: 'dexie', target: 'browser', base: '$base_path' });
-              await builder.build();
-            "
+            # Build using juntos CLI from the demo's bin directory
+            base_path="/${demo//_/-}/"
+            (cd "$demo_path" && bin/juntos build -d dexie -t browser --base "$base_path")
           done
 
       - name: Assemble site
         run: |
           mkdir -p _site
-          cp -r docs/output/* _site/
 
           # Copy tarballs to releases/
           mkdir -p _site/releases
           cp artifacts/tarballs/*.tgz _site/releases/
 
           # Copy browser demos
-          mkdir -p _site/demos
-          cp -r artifacts/demo-blog/dist _site/demos/blog
-          cp -r artifacts/demo-chat/dist _site/demos/chat
-          cp -r artifacts/demo-photo-gallery/dist _site/demos/photo-gallery
-          cp -r artifacts/demo-workflow/dist _site/demos/workflow
+          cp -r artifacts/demo-blog/dist _site/blog
+          cp -r artifacts/demo-chat/dist _site/chat
+          cp -r artifacts/demo-photo-gallery/dist _site/photo-gallery
+          cp -r artifacts/demo-workflow/dist _site/workflow
 
-          # Create demos index page
-          cat > _site/demos/index.html << 'EOF'
+          # Create index page
+          cat > _site/index.html << 'EOF'
           <!DOCTYPE html>
           <html lang="en">
           <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Ruby2JS Live Demos</title>
+            <title>Ruby2JS Demos</title>
             <style>
-              body { font-family: system-ui, sans-serif; max-width: 800px; margin: 0 auto; padding: 2rem; }
+              body { font-family: system-ui, sans-serif; max-width: 800px; margin: 0 auto; padding: 2rem; line-height: 1.6; }
               h1 { color: #1a202c; }
               .demos { display: grid; gap: 1rem; margin-top: 2rem; }
               .demo { padding: 1.5rem; background: #f7fafc; border-radius: 8px; border: 1px solid #e2e8f0; }
@@ -495,15 +368,18 @@ jobs:
               .demo h2 a { color: #2563eb; text-decoration: none; }
               .demo h2 a:hover { text-decoration: underline; }
               .demo p { margin: 0; color: #4a5568; }
+              .releases { margin-top: 2rem; padding: 1rem; background: #edf2f7; border-radius: 8px; }
+              .releases h2 { margin: 0 0 0.5rem 0; font-size: 1rem; }
+              .releases a { color: #2563eb; }
             </style>
           </head>
           <body>
-            <h1>Ruby2JS Live Demos</h1>
+            <h1>Ruby2JS Demos</h1>
             <p>Rails applications running entirely in the browser with IndexedDB storage.</p>
             <div class="demos">
               <div class="demo">
                 <h2><a href="blog/">Blog</a></h2>
-                <p>CRUD, associations, nested routes. Articles with comments.</p>
+                <p>CRUD operations, nested routes, validations. Articles with comments.</p>
               </div>
               <div class="demo">
                 <h2><a href="chat/">Chat</a></h2>
@@ -517,6 +393,10 @@ jobs:
                 <h2><a href="workflow/">Workflow Builder</a></h2>
                 <p>React Flow integration, drag-and-drop nodes.</p>
               </div>
+            </div>
+            <div class="releases">
+              <h2>NPM Packages</h2>
+              <a href="releases/">Download beta tarballs</a>
             </div>
           </body>
           </html>

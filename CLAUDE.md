@@ -194,6 +194,23 @@ The `demo/selfhost/spec_manifest.json` tracks which specs work with the selfhost
 - **partial**: Specs being worked on (failures are informational)
 - **blocked**: Specs waiting on dependencies (e.g., filters not yet transpiled)
 
+### Building Selfhost
+
+Run from the repository root:
+
+```bash
+# Build everything for local development
+bundle exec rake -f demo/selfhost/Rakefile local
+
+# Build everything for npm release (tarballs in artifacts/tarballs/)
+bundle exec rake -f demo/selfhost/Rakefile release
+
+# Clean all generated files
+bundle exec rake -f demo/selfhost/Rakefile clean
+```
+
+The `local` build uses relative paths for development. The `release` build converts to npm package imports and creates tarballs.
+
 ### Running Selfhost Tests
 
 ```bash
@@ -220,10 +237,10 @@ node run_all_specs.mjs --skip-transpile
 To debug a failing spec with full details:
 
 ```bash
-cd demo/selfhost
+# Rebuild everything (from repository root)
+bundle exec rake -f demo/selfhost/Rakefile local
 
-# Rebuild everything
-npm run build
+cd demo/selfhost
 
 # Transpile just one spec
 bundle exec ruby scripts/transpile_spec.rb ../../spec/serializer_spec.rb > dist/serializer_spec.mjs
@@ -260,105 +277,19 @@ When a partial spec passes all tests:
 
 ### Debugging Selfhost Transpilation Failures
 
-When a selfhost test fails, follow this methodology to diagnose and fix:
+**Never edit generated files.** Files ending in `.js` in the selfhost directory are generated outputs. Fix issues in the original source:
+- Ruby source in `lib/ruby2js/` (for dual-compatible code)
+- Converter handlers in `lib/ruby2js/converter/`
+- Filters in `lib/ruby2js/filter/`
 
-**Important: Never edit generated files.** In the selfhost directory, files ending in `.js` are typically generated outputs (e.g., `ruby2js.js`, `filters/phlex.js`). If a `.js` file needs fixing, make the change to the original source instead:
-- Ruby source files in `lib/ruby2js/` (for dual-compatible code changes)
-- Converter handlers in `lib/ruby2js/converter/` (for AST-to-JS conversion fixes)
-- Filters in `lib/ruby2js/filter/` (for AST transformation fixes)
+**Approach selection:**
+- Few occurrences → change Ruby source (e.g., add explicit `self.`)
+- Pervasive pattern → change selfhost filter
+- Affects all users → change core Ruby2JS filter
 
-If a pattern is common, fixing the transpiler is preferred over changing individual source files.
-
-#### 1. Identify the Problem in Transpiled Output
-
-Look at the failing test and find the transpiled JavaScript that behaves differently from Ruby:
-
-```bash
-# Rebuild and run tests to see failures
-cd demo/selfhost
-npm run build
-node run_all_specs.mjs --verbose
-```
-
-#### 2. Isolate to a Single Source File
-
-Create a minimal reproduction by transpiling just the problematic code:
-
-```bash
-# Transpile a minimal example through the selfhost filter
-bin/ruby2js --filter selfhost -e '
-class Processor
-  def on_send(node)
-    return on_block(node)  # Bug: produces on_block() not this.on_block()
-  end
-end
-'
-```
-
-#### 3. Examine the AST
-
-Use `--filtered-ast` to see what the converter receives:
-
-```bash
-bin/ruby2js --filter selfhost --filtered-ast -e 'return on_block(node)'
-```
-
-Look for the root cause. Example: `s(:send, nil, :on_block, ...)` - the `nil` receiver means no `this.` prefix in JavaScript.
-
-#### 4. Identify Potential Solutions
-
-There are typically multiple ways to fix a transpilation issue:
-
-| Approach                       | When to Use                                                                       |
-| ------------------------------ | --------------------------------------------------------------------------------- |
-| **Change Ruby source**         | Problem is isolated (few occurrences), fix is simple (e.g., add explicit `self.`) |
-| **Change selfhost filter**     | Problem is pervasive, pattern is predictable, worth automating                    |
-| **Change core Ruby2JS filter** | Problem affects all users, not just selfhost                                      |
-
-#### 5. Assess Pervasiveness
-
-Before choosing an approach, check how widespread the problem is:
-
-```bash
-# Find all occurrences of the pattern
-grep -rn "return on_" lib/ruby2js/filter/*.rb | grep -v "self\."
-```
-
-If only a few occurrences exist, prefer changing the Ruby source. If dozens exist with a consistent pattern, consider a filter-based solution.
-
-#### 6. Example: Implicit Self Method Calls
-
-**Problem:** Ruby allows `on_block(...)` to implicitly call `self.on_block(...)`, but JavaScript requires explicit `this.`.
-
-**Diagnosis:**
-```bash
-# Shows: on_block(...) instead of this.on_block(...)
-bin/ruby2js --filter selfhost -e 'def foo; on_block(x); end'
-
-# AST shows nil receiver
-bin/ruby2js --filter selfhost --filtered-ast -e 'def foo; on_block(x); end'
-# => s(:send, nil, :on_block, ...)  # nil = no receiver
-```
-
-**Solution options:**
-1. **Change Ruby source** - Add explicit `self.on_block(...)` (chosen: only 9 occurrences)
-2. **Change selfhost filter** - Detect `on_*` calls inside filter classes and add `s(:self)` receiver (not chosen: overkill for 9 cases)
-
-**Assessment:** Grep found only 9 implicit `on_*` calls across all filter files. The simpler fix of adding `self.` to those 9 lines was preferred over building filter logic to handle this automatically.
-
-#### 7. Verify the Fix
-
-After making changes, verify with the same minimal reproduction:
-
-```bash
-# Should now show this.on_block(...)
-bin/ruby2js --filter selfhost -e '
-class Processor
-  def on_send(node)
-    return self.on_block(node)
-  end
-end
-'
-```
-
-Then rebuild and run the full test suite to confirm the fix resolves the original failure.
+**Workflow:**
+1. Rebuild and run tests: `bundle exec rake -f demo/selfhost/Rakefile local && cd demo/selfhost && node run_all_specs.mjs --verbose`
+2. Create minimal reproduction: `bin/ruby2js --filter selfhost -e 'your_code'`
+3. Examine AST: `bin/ruby2js --filter selfhost --filtered-ast -e 'your_code'`
+4. Assess how widespread the issue is with grep
+5. Fix and verify

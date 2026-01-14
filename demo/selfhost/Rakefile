@@ -1,5 +1,18 @@
 # Selfhost Rake tasks
 # These build and test the self-hosted Ruby2JS converter
+#
+# Run from the repository root:
+#   bundle exec rake -f demo/selfhost/Rakefile <task>
+#
+# Main tasks (run with -T for full list):
+#
+#   rake local      - Build everything for local development
+#   rake release    - Build everything for npm release (includes tarballs)
+#   rake clean      - Remove all generated files
+#   rake test       - Build and run all tests
+#
+# The `local` build produces files that reference local paths (../../demo/selfhost/).
+# The `release` build converts these to npm package imports (ruby2js, ruby2js-rails).
 
 require 'json'
 require 'fileutils'
@@ -251,6 +264,47 @@ task :clean do
   rm_f "#{SELFHOST}/ruby2js.js"
   rm_f "#{SELFHOST}/prism_browser.js"
   rm_f BUILD_MJS
+  rm_f File.join(PACKAGE, 'lib/erb_compiler.js')
+  rm_f File.join(PACKAGE, 'lib/migration_sql.js')
+  rm_f File.join(PACKAGE, 'lib/seed_sql.js')
+end
+
+# ===========================================================================
+# Main entry-point tasks
+# ===========================================================================
+
+desc "Build everything for local development"
+task :local => [:build, :build_lib, :build_mjs] do
+  puts ""
+  puts "Local build complete. Files reference local paths."
+  puts "To test: node ruby2js.mjs -e 'puts 1'"
+end
+
+desc "Build everything for npm release (tarballs in artifacts/tarballs/)"
+task :release => [:build, :build_lib, "build_mjs:npm"] do
+  tarballs_dir = File.join(ROOT, 'artifacts/tarballs')
+  FileUtils.mkdir_p(tarballs_dir)
+
+  Dir.chdir(SELFHOST) do
+    sh "npm pack --pack-destination #{tarballs_dir}"
+  end
+  Dir.chdir(PACKAGE) do
+    sh "npm pack --pack-destination #{tarballs_dir}"
+  end
+  Dir.chdir(File.join(ROOT, 'packages/vite-plugin-ruby2js')) do
+    sh "npm pack --pack-destination #{tarballs_dir}"
+  end
+
+  # Rename to stable names (strip version numbers for predictable paths)
+  Dir.chdir(tarballs_dir) do
+    Dir.glob('ruby2js-6*.tgz').each { |f| FileUtils.mv(f, 'ruby2js-beta.tgz') }
+    Dir.glob('ruby2js-[0-9]*.tgz').each { |f| FileUtils.mv(f, 'ruby2js-beta.tgz') } if !File.exist?('ruby2js-beta.tgz')
+    Dir.glob('ruby2js-rails-*.tgz').each { |f| FileUtils.mv(f, 'ruby2js-rails-beta.tgz') }
+    Dir.glob('vite-plugin-ruby2js-*.tgz').each { |f| FileUtils.mv(f, 'vite-plugin-ruby2js-beta.tgz') }
+  end
+
+  puts ""
+  puts "Release build complete. Tarballs in artifacts/tarballs/"
 end
 
 task :default => :test

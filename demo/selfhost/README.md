@@ -146,24 +146,48 @@ The unified bundle is transpiled from Ruby source files:
 
 ## Rake Tasks
 
-The Rakefile provides more comprehensive build control:
+Run from the repository root:
 
 ```bash
-cd demo/selfhost
-
-bundle exec rake build          # Build all (bundle, filters, specs)
-bundle exec rake build_ready    # Build only ready specs
-bundle exec rake test           # Build and run all tests
-bundle exec rake ci             # CI mode (ready must pass, partial informational)
-bundle exec rake test_smoke     # Compare Ruby vs selfhost output
-bundle exec rake clean          # Remove generated files
+bundle exec rake -f demo/selfhost/Rakefile <task>
 ```
 
-For the `ruby2js-rails` npm package (at `packages/ruby2js-rails/`):
+### Main Tasks
+
+| Task      | Description                                            |
+| --------- | ------------------------------------------------------ |
+| `local`   | Build everything for local development                 |
+| `release` | Build everything for npm release (creates tarballs)    |
+| `clean`   | Remove all generated files                             |
+| `test`    | Build and run all tests                                |
+
+### Additional Tasks
+
+| Task            | Description                                        |
+| --------------- | -------------------------------------------------- |
+| `build`         | Build bundle, prism_browser, filters, specs        |
+| `build_ready`   | Build only ready specs                             |
+| `build_partial` | Build only partial specs                           |
+| `build_lib`     | Build lib files (erb_compiler, migration_sql, etc) |
+| `build_mjs`     | Build build.mjs with local paths                   |
+| `build_mjs:npm` | Build build.mjs with npm package imports           |
+| `build_filters` | Build all manifest filters                         |
+| `ci`            | CI mode (ready must pass, partial informational)   |
+
+### Examples
 
 ```bash
-bundle exec rake build_mjs      # Generate build.mjs with dev paths
-bundle exec rake build_mjs:npm  # Generate build.mjs with npm package imports
+# Build for local development
+bundle exec rake -f demo/selfhost/Rakefile local
+
+# Build release tarballs (outputs to artifacts/tarballs/)
+bundle exec rake -f demo/selfhost/Rakefile release
+
+# Clean all generated files
+bundle exec rake -f demo/selfhost/Rakefile clean
+
+# Run tests
+bundle exec rake -f demo/selfhost/Rakefile test
 ```
 
 ## Spec Runner Options
