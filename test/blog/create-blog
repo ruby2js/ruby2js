@@ -96,7 +96,8 @@ cat > app/views/articles/_article.html.erb << 'PARTIAL'
 </div>
 PARTIAL
 
-# Update CommentsController for nested routes with Turbo Stream responses
+# Update CommentsController for nested routes
+# Note: broadcasts_to handles real-time updates automatically, so we just use simple redirects
 cat > app/controllers/comments_controller.rb << 'CONTROLLER'
 class CommentsController < ApplicationController
   before_action :set_article
@@ -104,10 +105,7 @@ class CommentsController < ApplicationController
   def create
     @comment = @article.comments.build(comment_params)
     if @comment.save
-      respond_to do |format|
-        format.turbo_stream
-        format.html { redirect_to @article, notice: "Comment was successfully created." }
-      end
+      redirect_to @article, notice: "Comment was successfully created."
     else
       redirect_to @article, alert: "Could not create comment."
     end
@@ -116,10 +114,7 @@ class CommentsController < ApplicationController
   def destroy
     @comment = @article.comments.find(params[:id])
     @comment.destroy
-    respond_to do |format|
-      format.turbo_stream
-      format.html { redirect_to @article, notice: "Comment was successfully deleted." }
-    end
+    redirect_to @article, notice: "Comment was successfully deleted."
   end
 
   private
