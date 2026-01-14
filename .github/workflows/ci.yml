@@ -186,6 +186,7 @@ jobs:
     # No artifact dependencies - runs immediately with Stage 1
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         ruby: ["3.2", "3.3", "3.4", "4.0"]
     steps:

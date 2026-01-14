@@ -4,8 +4,7 @@
 # - RUBY2JS_PARSER=parser      - force whitequark parser gem
 # - unset                      - auto-detect based on Ruby version:
 #                                Ruby 3.4+: Prism walker (direct)
-#                                Ruby 3.3:  Prism translation layer
-#                                Ruby <3.3: parser gem
+#                                Ruby <3.4: parser gem
 #
 # Note: Opal always uses the parser gem (no Prism support in browser)
 if RUBY_ENGINE == 'opal'
@@ -30,26 +29,13 @@ else
   else
     # Auto-detect based on Ruby version
     # Ruby 3.4+: use direct Prism walker (stable API)
-    # Ruby 3.3: use Prism translation layer (handles API differences)
-    # Ruby <3.3: use parser gem
+    # Ruby <3.4: use parser gem
     ruby_version = Gem::Version.new(RUBY_VERSION)
     if ruby_version >= Gem::Version.new('3.4')
       begin
         require 'prism'
         require 'ruby2js/prism_walker'
         RUBY2JS_PARSER = :prism
-      rescue LoadError
-        old_verbose, $VERBOSE = $VERBOSE, nil
-        require 'parser/current'
-        $VERBOSE = old_verbose
-        RUBY2JS_PARSER = :parser
-      end
-    elsif ruby_version >= Gem::Version.new('3.3')
-      begin
-        require 'prism'
-        require 'prism/translation/parser'
-        require 'parser/current'
-        RUBY2JS_PARSER = :translation
       rescue LoadError
         old_verbose, $VERBOSE = $VERBOSE, nil
         require 'parser/current'
