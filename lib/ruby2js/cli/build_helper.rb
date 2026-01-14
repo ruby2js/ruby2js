@@ -47,6 +47,7 @@ module Ruby2JS
           # Set environment variables for Vite plugin
           ENV['JUNTOS_DATABASE'] = options[:database] if options[:database]
           ENV['JUNTOS_TARGET'] = options[:target] if options[:target]
+          ENV['JUNTOS_BASE'] = options[:base] if options[:base]
 
           # Derive Vite mode from RAILS_ENV or NODE_ENV (RAILS_ENV takes precedence)
           # Default varies by context: deploy defaults to production, others to development

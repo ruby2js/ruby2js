@@ -59,6 +59,14 @@ module Ruby2JS
 
         private
 
+        # Get the base path prefix from options (e.g., '/blog' when serving from subdirectory)
+        # Removes trailing slash to avoid double slashes when concatenating
+        def base_path
+          base = @options[:base]
+          return '' unless base
+          base.to_s.chomp('/')
+        end
+
         def routes_draw_block?(node)
           return false unless node&.type == :send
 
@@ -139,10 +147,10 @@ module Ruby2JS
           action_name = transform_action_name(action.to_sym)
 
           # Track root path for Router.root() generation
-          @rails_root_path = "/#{controller}"
+          @rails_root_path = "#{base_path}/#{controller}"
 
           @rails_routes_list << {
-            path: '/',
+            path: "#{base_path}/",
             controller: controller_name,
             action: action_name.to_s
           }
@@ -150,7 +158,7 @@ module Ruby2JS
           # Add root_path helper
           @rails_path_helpers << {
             name: :root_path,
-            path: '/',
+            path: "#{base_path}/",
             params: []
           }
         end
@@ -165,7 +173,7 @@ module Ruby2JS
           args.each do |arg|
             case arg.type
             when :str, :sym
-              path ||= "/#{arg.children[0]}"
+              path ||= "#{base_path}/#{arg.children[0]}"
             when :hash
               arg.children.each do |pair|
                 key = pair.children[0]
@@ -187,7 +195,7 @@ module Ruby2JS
           return unless path && controller && action
 
           @rails_routes_list << {
-            path: path,
+            path: path,  # base_path already included above
             controller: controller,
             action: transform_action_name(action.to_sym).to_s,
             method: http_method.to_s.upcase
@@ -213,9 +221,9 @@ module Ruby2JS
             actions = actions.reject { |a| except_actions.include?(a) }
           end
 
-          # Build path prefix from nesting
+          # Build path prefix from nesting (base_path always prepended)
           path_prefix = @rails_route_nesting.map { |n| "/#{n[:path]}/:#{n[:param]}" }.join
-          resource_path = "#{path_prefix}/#{resource_name}"
+          resource_path = "#{base_path}#{path_prefix}/#{resource_name}"
 
           controller_name = "#{resource_name.to_s.split('_').map(&:capitalize).join}Controller"
           singular_name = Ruby2JS::Inflector.singularize(resource_name.to_s)
@@ -287,8 +295,9 @@ module Ruby2JS
             actions = actions.reject { |a| except_actions.include?(a) }
           end
 
+          # Build path prefix from nesting (base_path always prepended)
           path_prefix = @rails_route_nesting.map { |n| "/#{n[:path]}/:#{n[:param]}" }.join
-          resource_path = "#{path_prefix}/#{resource_name}"
+          resource_path = "#{base_path}#{path_prefix}/#{resource_name}"
 
           controller_name = "#{resource_name.to_s.split('_').map(&:capitalize).join}Controller"
 

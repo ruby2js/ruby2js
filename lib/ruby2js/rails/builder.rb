@@ -710,13 +710,14 @@ class SelfhostBuilder
   # Instance methods
   # ============================================================
 
-  def initialize(dist_dir = nil, target: nil, database: nil, broadcast: nil)
+  def initialize(dist_dir = nil, target: nil, database: nil, broadcast: nil, base: nil)
     @dist_dir = dist_dir || File.join(DEMO_ROOT, 'dist')
     @database_override = database  # CLI override for database adapter
     @database = nil  # Set during build from config or override
     @target = target # Can be set explicitly or derived from database
     @runtime = nil   # For server targets: 'node', 'bun', or 'deno'
     @broadcast = broadcast  # Broadcast adapter: 'supabase', 'pusher', or nil (use native WebSocket)
+    @base = base  # Base path for routes (e.g., '/blog' when serving from subdirectory)
     @model_associations = {}  # model_name -> [association_names]
   end
 
@@ -3077,7 +3078,7 @@ class SelfhostBuilder
 
     # Generate paths.js first (with only path helpers)
     puts("Transpiling: routes.rb -> paths.js")
-    paths_options = base_options.merge(file: relative_src, paths_only: true)
+    paths_options = base_options.merge(file: relative_src, paths_only: true, base: @base)
     result = Ruby2JS.convert(source, paths_options)
     paths_js = result.to_s
 
@@ -3095,7 +3096,7 @@ class SelfhostBuilder
 
     # Generate routes.js (imports path helpers from paths.js)
     puts("Transpiling: routes.rb -> routes.js")
-    routes_options = base_options.merge(file: relative_src, paths_file: './paths.js', database: @database, target: @target)
+    routes_options = base_options.merge(file: relative_src, paths_file: './paths.js', database: @database, target: @target, base: @base)
     result = Ruby2JS.convert(source, routes_options)
     routes_js = result.to_s
 
