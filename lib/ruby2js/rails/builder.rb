@@ -968,8 +968,8 @@ class SelfhostBuilder
     # Handle Tailwind CSS if present
     self.setup_tailwind()
 
-    # Skip npm install for browser target (everything is bundled with esbuild)
-    if @needs_npm_install && @target != 'browser'
+    # Run npm install if dependencies were added to package.json
+    if @needs_npm_install
       puts("Installing dependencies...")
       Dir.chdir(@dist_dir) do
         system('npm', 'install', '--silent')
