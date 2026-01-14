@@ -439,7 +439,7 @@ jobs:
       - name: Build docs site
         run: |
           cd docs
-          BRIDGETOWN_ENV=production bundle exec rake
+          BRIDGETOWN_ENV=production BUNDLE_FROZEN=false bundle exec rake
 
       - name: Build browser demos
         run: |
