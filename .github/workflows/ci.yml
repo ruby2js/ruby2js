@@ -353,7 +353,7 @@ jobs:
           for demo in blog chat photo_gallery workflow; do
             echo "Building $demo for browser..."
             base_path="/ruby2js/${demo//_/-}/"
-            (cd "artifacts/$demo" && bundle install --quiet && bin/juntos build -d dexie -t browser --base "$base_path")
+            (cd "artifacts/$demo" && bundle install --quiet && bin/juntos build -d dexie -t browser --base "$base_path" --sourcemap)
           done
 
       - name: Assemble site
