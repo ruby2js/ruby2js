@@ -39,7 +39,7 @@ rails generate model Edge workflow:references source_node_id:integer target_node
 rails db:create
 
 # Add ruby2js gem from GitHub
-bundle add ruby2js --github ruby2js/ruby2js
+bundle add ruby2js --github ruby2js/ruby2js --branch master
 
 # Ensure git checkout is complete (handles Bundler version upgrade)
 bundle install

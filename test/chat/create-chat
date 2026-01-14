@@ -30,7 +30,7 @@ rm -f app/views/messages/show.html.erb \
 rails db:create
 
 # Add ruby2js gem from GitHub
-bundle add ruby2js --github ruby2js/ruby2js
+bundle add ruby2js --github ruby2js/ruby2js --branch master
 
 # Ensure git checkout is complete
 bundle install

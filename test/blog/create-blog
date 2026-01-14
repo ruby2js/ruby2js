@@ -25,8 +25,8 @@ rails generate scaffold Comment article:references commenter:string body:text
 # Create database (migration and seeding done separately)
 rails db:create
 
-# Add ruby2js gem from GitHub
-bundle add ruby2js --github ruby2js/ruby2js
+# Add ruby2js gem from GitHub (branch required for bundle config local to work)
+bundle add ruby2js --github ruby2js/ruby2js --branch master
 
 # Ensure git checkout is complete (handles Bundler version upgrade)
 bundle install
