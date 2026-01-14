@@ -2,9 +2,10 @@
 // Smoke test for Ruby2JS demo builds
 // Compares Ruby and selfhost builds, validates JS syntax
 //
-// Usage: node test/smoke-test.mjs <demo-directory> [--database <adapter>] [--diff]
+// Usage: node test/smoke-test.mjs <demo-directory> [options]
 //        node test/smoke-test.mjs demo/blog --database dexie
 //        node test/smoke-test.mjs demo/chat --database sqlite --diff
+//        node test/smoke-test.mjs demo/blog --target browser --database dexie
 
 import { execSync } from 'child_process';
 import { readFileSync, readdirSync, statSync, existsSync, mkdtempSync, rmSync } from 'fs';
@@ -34,19 +35,28 @@ if (dbIndex !== -1 && args[dbIndex + 1]) {
   database = args[dbIndex + 1];
 }
 
-const demoDir = args.find(arg => !arg.startsWith('-') && arg !== database);
+// Parse --target or -t argument
+let target = null;
+const targetIndex = args.findIndex(arg => arg === '--target' || arg === '-t');
+if (targetIndex !== -1 && args[targetIndex + 1]) {
+  target = args[targetIndex + 1];
+}
+
+const demoDir = args.find(arg => !arg.startsWith('-') && arg !== database && arg !== target);
 
 if (!demoDir) {
-  console.error('Usage: node test/smoke-test.mjs <demo-directory> [--database <adapter>] [--diff]');
+  console.error('Usage: node test/smoke-test.mjs <demo-directory> [options]');
   console.error('');
   console.error('Options:');
   console.error('  --database, -db  Database adapter (dexie, sqljs, sqlite, etc.)');
+  console.error('  --target, -t     Build target (node, browser)');
   console.error('  --diff, -d       Show unified diff for content differences');
   console.error('');
   console.error('Example:');
   console.error('  node test/smoke-test.mjs demo/blog');
   console.error('  node test/smoke-test.mjs demo/blog --database dexie');
   console.error('  node test/smoke-test.mjs demo/chat --database sqlite --diff');
+  console.error('  node test/smoke-test.mjs demo/blog --target browser --database dexie');
   process.exit(1);
 }
 
@@ -228,8 +238,9 @@ function compareDirs(dir1, dir2, label1 = 'dir1', label2 = 'dir2') {
 // Main test runner
 async function runTests() {
   const demoName = demoDir.split('/').pop();
-  const dbLabel = database ? ` (${database})` : '';
-  log(`\n=== Smoke Test: ${demoName}${dbLabel} ===\n`, BOLD);
+  const optLabels = [database, target].filter(Boolean).join(', ');
+  const optLabel = optLabels ? ` (${optLabels})` : '';
+  log(`\n=== Smoke Test: ${demoName}${optLabel} ===\n`, BOLD);
 
   let passed = 0;
   let failed = 0;
@@ -244,8 +255,12 @@ async function runTests() {
     // The demo's Gemfile uses ruby2js from GitHub, but we want to test local changes
     log('1. Ruby build', BOLD);
     try {
-      const dbArg = database ? `, database: '${database}'` : '';
-      execSync(`BUNDLE_GEMFILE="${PROJECT_ROOT}/Gemfile" bundle exec ruby -r ruby2js/rails/builder -e "SelfhostBuilder.new('${rubyDist}'${dbArg}).build"`, {
+      const optArgs = [
+        database ? `database: '${database}'` : null,
+        target ? `target: '${target}'` : null
+      ].filter(Boolean).join(', ');
+      const optStr = optArgs ? `, ${optArgs}` : '';
+      execSync(`BUNDLE_GEMFILE="${PROJECT_ROOT}/Gemfile" bundle exec ruby -r ruby2js/rails/builder -e "SelfhostBuilder.new('${rubyDist}'${optStr}).build"`, {
         cwd: DEMO_ROOT,
         encoding: 'utf8',
         stdio: ['pipe', 'pipe', 'pipe']
@@ -270,7 +285,9 @@ async function runTests() {
       }
       try {
         const { SelfhostBuilder } = await import(join(PACKAGE_ROOT, 'build.mjs'));
-        const options = database ? { database } : {};
+        const options = {};
+        if (database) options.database = database;
+        if (target) options.target = target;
         const builder = new SelfhostBuilder(selfhostDist, options);
         await builder.build();
         pass('Selfhost build completed');
