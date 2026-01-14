@@ -452,6 +452,8 @@ jobs:
             cd $GITHUB_WORKSPACE/artifacts/demo-$demo || cd $GITHUB_WORKSPACE/artifacts/demo-${demo//_/-}
             # Make bin scripts executable (permissions not preserved in artifacts)
             chmod +x bin/*
+            # Install gems (demos have their own Gemfiles)
+            bundle install
             # Use --base for correct asset paths when served from /demos/<name>/
             base_path="/demos/${demo//_/-}/"
             bin/juntos build -d dexie -t browser --base "$base_path"
