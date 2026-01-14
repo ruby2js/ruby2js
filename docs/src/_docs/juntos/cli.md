@@ -98,6 +98,7 @@ bin/juntos build [options]
 | `-e, --environment ENV` | Rails environment (default: development) |
 | `-v, --verbose` | Show detailed output |
 | `--sourcemap` | Generate source maps |
+| `--base PATH` | Base public path for assets (e.g., `/demos/blog/`) |
 | `-h, --help` | Show help |
 
 **Examples:**
@@ -111,6 +112,7 @@ bin/juntos build -t capacitor -d dexie   # Mobile app (iOS/Android)
 bin/juntos build -t electron -d sqlite   # Desktop app (macOS/Windows/Linux)
 bin/juntos build -t tauri -d sqljs       # Lightweight desktop app
 bin/juntos build -e production --sourcemap  # Production with source maps
+bin/juntos build -d dexie --base /app/   # Serve from subdirectory
 ```
 
 **Output:**
@@ -306,6 +308,16 @@ Browser builds (`dexie`, `sqljs`, `pglite`) produce static files in `dist/` that
 bin/juntos build -d dexie
 cd dist && npx serve -s
 ```
+
+### Subdirectory Hosting
+
+When hosting at a path other than root (e.g., `https://example.com/myapp/`), use `--base` to rewrite asset paths:
+
+```bash
+bin/juntos build -d dexie --base /myapp/
+```
+
+This ensures all asset references use the correct base path (e.g., `/myapp/assets/application.js` instead of `/assets/application.js`).
 
 ### Production Hosting
 

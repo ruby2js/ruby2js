@@ -1,111 +1,515 @@
-name: CI Test
+name: CI
 
 on:
   pull_request:
-    branches:
-      - "*"
+    branches: ["*"]
   push:
-    branches:
-      - master
+    branches: [master]
+
+# Sets permissions for GitHub Pages deployment
+permissions:
+  contents: read
+  pages: write
+  id-token: write
 
 jobs:
+  # ===========================================================================
+  # Stage 1: Build artifacts (all run in parallel)
+  # ===========================================================================
+
+  build-tarballs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+          bundler-cache: true
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Install selfhost dependencies
+        run: cd demo/selfhost && npm install
+
+      - name: Install ruby2js-rails dependencies
+        run: cd packages/ruby2js-rails && npm install
+
+      - name: Build selfhost (converter, lib, filters)
+        run: bundle exec rake -f demo/selfhost/Rakefile build build_lib build_mjs
+
+      - name: Pack tarballs
+        run: |
+          mkdir -p artifacts/tarballs
+          cd packages/ruby2js && npm pack --pack-destination ../../artifacts/tarballs
+          cd ../ruby2js-rails && npm pack --pack-destination ../../artifacts/tarballs
+          cd ../vite-plugin-ruby2js && npm pack --pack-destination ../../artifacts/tarballs
+          # Rename to stable names (strip version numbers)
+          cd ../../artifacts/tarballs
+          mv ruby2js-*.tgz ruby2js-beta.tgz
+          mv ruby2js-rails-*.tgz ruby2js-rails-beta.tgz
+          mv vite-plugin-ruby2js-*.tgz vite-plugin-ruby2js-beta.tgz
+
+      - name: Upload tarballs
+        uses: actions/upload-artifact@v4
+        with:
+          name: tarballs
+          path: artifacts/tarballs/
+          retention-days: 7
+
+  create-blog:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+          bundler-cache: true
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Install Rails
+        run: gem install rails
+
+      - name: Create blog demo
+        run: test/blog/create-blog artifacts/blog
+
+      - name: Upload blog demo
+        uses: actions/upload-artifact@v4
+        with:
+          name: demo-blog
+          path: artifacts/blog/
+          retention-days: 7
+
+  create-chat:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+          bundler-cache: true
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Install Rails
+        run: gem install rails
+
+      - name: Create chat demo
+        run: test/chat/create-chat artifacts/chat
+
+      - name: Upload chat demo
+        uses: actions/upload-artifact@v4
+        with:
+          name: demo-chat
+          path: artifacts/chat/
+          retention-days: 7
+
+  create-photo-gallery:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+          bundler-cache: true
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Install Rails
+        run: gem install rails
+
+      - name: Create photo_gallery demo
+        run: test/photo_gallery/create-photo-gallery artifacts/photo_gallery
+
+      - name: Upload photo_gallery demo
+        uses: actions/upload-artifact@v4
+        with:
+          name: demo-photo-gallery
+          path: artifacts/photo_gallery/
+          retention-days: 7
+
+  create-workflow:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+          bundler-cache: true
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Install Rails
+        run: gem install rails
+
+      - name: Create workflow demo
+        run: test/workflow/create-workflow artifacts/workflow
+
+      - name: Upload workflow demo
+        uses: actions/upload-artifact@v4
+        with:
+          name: demo-workflow
+          path: artifacts/workflow/
+          retention-days: 7
+
+  # ===========================================================================
+  # Stage 2: Tests (some run immediately, others depend on Stage 1 artifacts)
+  # ===========================================================================
+
   gem-test:
+    # No artifact dependencies - runs immediately with Stage 1
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        ruby: ["3.2", "3.3", "3.4", "4.0"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.ruby }}
+          bundler-cache: true
+
+      - name: Run tests
+        run: bundle exec rake test
+
+  selfhost-test:
+    needs: [build-tarballs]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+          bundler-cache: true
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Download tarballs
+        uses: actions/download-artifact@v4
+        with:
+          name: tarballs
+          path: artifacts/tarballs
+
+      - name: Install from tarballs
+        run: |
+          cd demo/selfhost
+          npm install ../../artifacts/tarballs/ruby2js-beta.tgz
+
+      - name: Run selfhost CI tests
+        run: bundle exec rake -f demo/selfhost/Rakefile ci
+
+  smoke-test-blog:
+    needs: [build-tarballs, create-blog]
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        ruby: [3.2, 3.3, 3.4]
-    runs-on: ubuntu-latest
-
+        database: [dexie, sqlite]
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Set up Ruby
-      uses: ruby/setup-ruby@v1
-      with:
-        ruby-version: ${{ matrix.ruby }}
-        bundler-cache: true
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+          bundler-cache: true
 
-    - name: Run tests
-      run: bundle exec rake test
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
 
-  package-test:
+      - name: Download tarballs
+        uses: actions/download-artifact@v4
+        with:
+          name: tarballs
+          path: artifacts/tarballs
+
+      - name: Download blog demo
+        uses: actions/download-artifact@v4
+        with:
+          name: demo-blog
+          path: artifacts/blog
+
+      - name: Run smoke test
+        run: node test/smoke-test.mjs artifacts/blog --database ${{ matrix.database }}
+
+  smoke-test-chat:
+    needs: [build-tarballs, create-chat]
     runs-on: ubuntu-latest
-
+    strategy:
+      fail-fast: false
+      matrix:
+        database: [dexie, sqlite]
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Set up Ruby
-      uses: ruby/setup-ruby@v1
-      with:
-        ruby-version: 3.3
-        bundler-cache: true
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+          bundler-cache: true
 
-    - name: Set up Node
-      uses: actions/setup-node@v4
-      with:
-        node-version: '24'
-        cache: 'yarn'
-        cache-dependency-path: 'packages/**/yarn.lock'
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
 
-    - run: cd packages/ruby2js && yarn install
-    - name: Run tests
-      run: bundle exec rake packages:test
+      - name: Download tarballs
+        uses: actions/download-artifact@v4
+        with:
+          name: tarballs
+          path: artifacts/tarballs
 
-  selfhost-test:
+      - name: Download chat demo
+        uses: actions/download-artifact@v4
+        with:
+          name: demo-chat
+          path: artifacts/chat
+
+      - name: Run smoke test
+        run: node test/smoke-test.mjs artifacts/chat --database ${{ matrix.database }}
+
+  smoke-test-photo-gallery:
+    needs: [build-tarballs, create-photo-gallery]
     runs-on: ubuntu-latest
-
+    strategy:
+      fail-fast: false
+      matrix:
+        database: [dexie]
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Set up Ruby
-      uses: ruby/setup-ruby@v1
-      with:
-        ruby-version: 3.3
-        bundler-cache: true
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+          bundler-cache: true
 
-    - name: Set up Node
-      uses: actions/setup-node@v4
-      with:
-        node-version: '24'
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
 
-    - name: Run selfhost CI tests
-      run: bundle exec rake -f demo/selfhost/Rakefile ci
+      - name: Download tarballs
+        uses: actions/download-artifact@v4
+        with:
+          name: tarballs
+          path: artifacts/tarballs
 
-  demo-test:
+      - name: Download photo_gallery demo
+        uses: actions/download-artifact@v4
+        with:
+          name: demo-photo-gallery
+          path: artifacts/photo_gallery
+
+      - name: Run smoke test
+        run: node test/smoke-test.mjs artifacts/photo_gallery --database ${{ matrix.database }}
+
+  smoke-test-workflow:
+    needs: [build-tarballs, create-workflow]
     runs-on: ubuntu-latest
-
+    strategy:
+      fail-fast: false
+      matrix:
+        database: [dexie, sqlite]
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Set up Ruby
-      uses: ruby/setup-ruby@v1
-      with:
-        ruby-version: 3.3
-        bundler-cache: true
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+          bundler-cache: true
 
-    - name: Set up Node
-      uses: actions/setup-node@v4
-      with:
-        node-version: '24'
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
 
-    - name: Install Rails
-      run: gem install rails
+      - name: Download tarballs
+        uses: actions/download-artifact@v4
+        with:
+          name: tarballs
+          path: artifacts/tarballs
 
-    - name: Install npm dependencies for selfhost (@ruby/prism)
-      run: cd demo/selfhost && npm install
+      - name: Download workflow demo
+        uses: actions/download-artifact@v4
+        with:
+          name: demo-workflow
+          path: artifacts/workflow
 
-    - name: Install npm dependencies for ruby2js-rails package
-      run: cd packages/ruby2js-rails && npm install
+      - name: Run smoke test
+        run: node test/smoke-test.mjs artifacts/workflow --database ${{ matrix.database }}
 
-    - name: Build selfhost converter, lib files, and build.mjs
-      run: bundle exec rake -f demo/selfhost/Rakefile build build_lib build_mjs
+  # ===========================================================================
+  # Stage 2: Deploy (runs in parallel with tests, depends on Stage 1)
+  # ===========================================================================
 
-    - name: Generate and test blog demo (dexie)
-      run: |
-        test/blog/create-blog demo/blog
-        node test/smoke-test.mjs demo/blog --database dexie
+  build-site:
+    needs: [build-tarballs, create-blog, create-chat, create-photo-gallery, create-workflow]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
-    - name: Generate and test chat demo (sqlite)
-      run: |
-        test/chat/create-chat demo/chat
-        node test/smoke-test.mjs demo/chat --database sqlite
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+          bundler-cache: true
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Install docs dependencies
+        run: |
+          cd docs
+          yarn install
+          bundle install
+
+      - name: Install selfhost dependencies
+        run: |
+          cd demo/selfhost
+          npm install
+
+      - name: Install ruby2js-rails dependencies
+        run: |
+          cd packages/ruby2js-rails
+          npm install
+
+      - name: Build selfhost
+        run: bundle exec rake -f demo/selfhost/Rakefile build build_lib
+
+      - name: Build docs site
+        run: |
+          cd docs
+          BRIDGETOWN_ENV=production bundle exec rake
+
+      - name: Build browser demos
+        run: |
+          # Use downloaded tarballs for builds
+          export TARBALL_PATH=$GITHUB_WORKSPACE/artifacts/tarballs
+
+          for demo in blog chat photo_gallery workflow; do
+            echo "Building $demo for browser..."
+            cd $GITHUB_WORKSPACE/artifacts/demo-$demo || cd $GITHUB_WORKSPACE/artifacts/demo-${demo//_/-}
+            # Use --base for correct asset paths when served from /demos/<name>/
+            base_path="/demos/${demo//_/-}/"
+            bin/juntos build -d dexie -t browser --base "$base_path"
+          done
+
+      - name: Assemble site
+        run: |
+          mkdir -p _site
+          cp -r docs/output/* _site/
+
+          # Copy tarballs to releases/
+          mkdir -p _site/releases
+          cp artifacts/tarballs/*.tgz _site/releases/
+
+          # Copy browser demos
+          mkdir -p _site/demos
+          cp -r artifacts/demo-blog/dist _site/demos/blog
+          cp -r artifacts/demo-chat/dist _site/demos/chat
+          cp -r artifacts/demo-photo-gallery/dist _site/demos/photo-gallery
+          cp -r artifacts/demo-workflow/dist _site/demos/workflow
+
+          # Create demos index page
+          cat > _site/demos/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Ruby2JS Live Demos</title>
+            <style>
+              body { font-family: system-ui, sans-serif; max-width: 800px; margin: 0 auto; padding: 2rem; }
+              h1 { color: #1a202c; }
+              .demos { display: grid; gap: 1rem; margin-top: 2rem; }
+              .demo { padding: 1.5rem; background: #f7fafc; border-radius: 8px; border: 1px solid #e2e8f0; }
+              .demo h2 { margin: 0 0 0.5rem 0; }
+              .demo h2 a { color: #2563eb; text-decoration: none; }
+              .demo h2 a:hover { text-decoration: underline; }
+              .demo p { margin: 0; color: #4a5568; }
+            </style>
+          </head>
+          <body>
+            <h1>Ruby2JS Live Demos</h1>
+            <p>Rails applications running entirely in the browser with IndexedDB storage.</p>
+            <div class="demos">
+              <div class="demo">
+                <h2><a href="blog/">Blog</a></h2>
+                <p>CRUD, associations, nested routes. Articles with comments.</p>
+              </div>
+              <div class="demo">
+                <h2><a href="chat/">Chat</a></h2>
+                <p>Real-time Turbo Streams, Stimulus controllers.</p>
+              </div>
+              <div class="demo">
+                <h2><a href="photo-gallery/">Photo Gallery</a></h2>
+                <p>Camera integration via getUserMedia.</p>
+              </div>
+              <div class="demo">
+                <h2><a href="workflow/">Workflow Builder</a></h2>
+                <p>React Flow integration, drag-and-drop nodes.</p>
+              </div>
+            </div>
+          </body>
+          </html>
+          EOF
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: [build-site]
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

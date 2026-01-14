@@ -22,6 +22,7 @@ module Ruby2JS
         # @option options [String] :environment Rails environment (development, production)
         # @option options [Boolean] :sourcemap Generate source maps
         # @option options [Boolean] :verbose Show detailed output
+        # @option options [String] :base Base public path for assets (e.g., /demos/blog/)
         # @return [Boolean] true if build succeeded
         def build(options = {})
           vite_config = File.join(DIST_DIR, 'vite.config.js')
@@ -55,6 +56,7 @@ module Ruby2JS
           # Build command
           cmd = "npx vite build --mode #{mode}"
           cmd += " --sourcemap" if options[:sourcemap]
+          cmd += " --base #{options[:base]}" if options[:base]
 
           puts "Bundling with Vite (mode: #{mode})..."
 

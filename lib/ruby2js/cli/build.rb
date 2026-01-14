@@ -25,6 +25,7 @@ module Ruby2JS
             verbose: false,
             selfhost: false,
             sourcemap: false,
+            base: nil,
             target: ENV['JUNTOS_TARGET'],
             database: ENV['JUNTOS_DATABASE']
           }
@@ -54,6 +55,10 @@ module Ruby2JS
 
             opts.on("--sourcemap", "Generate source maps (useful for debugging production builds)") do
               options[:sourcemap] = true
+            end
+
+            opts.on("--base PATH", "Base public path for assets (e.g., /demos/blog/)") do |path|
+              options[:base] = path
             end
 
             opts.on("--selfhost", "Use JavaScript transpiler instead of Ruby (legacy mode)") do
