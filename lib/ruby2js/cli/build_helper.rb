@@ -88,6 +88,7 @@ module Ruby2JS
           builder_opts = {}
           builder_opts[:target] = options[:target] if options[:target]
           builder_opts[:database] = options[:database] if options[:database]
+          builder_opts[:base] = options[:base] if options[:base]
 
           SelfhostBuilder.new(nil, **builder_opts).build
           true

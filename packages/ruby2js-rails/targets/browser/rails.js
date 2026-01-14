@@ -542,8 +542,17 @@ export class Application extends ApplicationBase {
         }
       });
 
-      // Initial route
-      await Router.dispatch(location.pathname || '/');
+      // Initial route - check for GitHub Pages SPA redirect first
+      // When 404.html redirects here, it stores the original path in sessionStorage
+      let initialPath = location.pathname || '/';
+      const redirectPath = sessionStorage.getItem('spa-redirect-path');
+      if (redirectPath) {
+        sessionStorage.removeItem('spa-redirect-path');
+        initialPath = redirectPath;
+        // Update URL to show the correct path
+        history.replaceState({}, '', initialPath);
+      }
+      await Router.dispatch(initialPath);
     } catch (e) {
       document.getElementById('loading').innerHTML =
         `<p style="color: red;">Error: ${e.message}</p><pre>${e.stack}</pre>`;

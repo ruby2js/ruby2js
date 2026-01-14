@@ -422,6 +422,42 @@ jobs:
           </html>
           EOF
 
+          # Create 404.html for SPA routing on GitHub Pages
+          # When a route like /ruby2js/blog/articles/new is accessed directly,
+          # GitHub serves 404.html. This script detects the demo and redirects
+          # with the path stored in sessionStorage, which the SPA reads on load.
+          cat > _site/404.html << 'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="utf-8">
+            <title>Redirecting...</title>
+            <script>
+              // GitHub Pages SPA redirect for direct URL access
+              // Detects which demo the path belongs to and redirects there
+              const path = location.pathname;
+              const demos = ['blog', 'chat', 'photo-gallery', 'workflow'];
+              const base = '/ruby2js/';
+
+              // Find which demo this path belongs to
+              for (const demo of demos) {
+                const demoPath = base + demo + '/';
+                if (path.startsWith(demoPath) || path === base + demo) {
+                  // Store the full path for the SPA to read after redirect
+                  sessionStorage.setItem('spa-redirect-path', path);
+                  // Redirect to the demo's index.html
+                  location.replace(demoPath);
+                  break;
+                }
+              }
+            </script>
+          </head>
+          <body>
+            <p>Redirecting...</p>
+          </body>
+          </html>
+          EOF
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:

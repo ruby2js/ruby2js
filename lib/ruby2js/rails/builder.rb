@@ -2388,6 +2388,11 @@ class SelfhostBuilder
     )
     puts("  -> dist/index.html")
     puts("  -> dist/main.js")
+
+    # Create 404.html as copy of index.html for GitHub Pages SPA support
+    # GitHub Pages serves 404.html for missing routes, allowing client-side routing
+    FileUtils.cp(output_path, File.join(@dist_dir, '404.html'))
+    puts("  -> dist/404.html")
   end
 
   def generate_vercel_config()
