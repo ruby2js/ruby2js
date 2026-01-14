@@ -304,18 +304,6 @@ function createErbPlugin(config) {
       }
     },
 
-    // Transform hook as backup (load should handle most cases)
-    async transform(code, id) {
-      if (!id.endsWith('.erb')) return null;
-
-      try {
-        return await transformErb(code, id);
-      } catch (error) {
-        const errorMsg = error?.message || error?.toString?.() || String(error);
-        console.error('[juntos-erb] Transform error details:', error);
-        throw new Error(`Juntos ERB transform error in ${id}: ${errorMsg}`);
-      }
-    }
   };
 }
 
