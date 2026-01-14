@@ -49,8 +49,9 @@ jobs:
           cd ../ruby2js-rails && npm pack --pack-destination ../../artifacts/tarballs
           cd ../vite-plugin-ruby2js && npm pack --pack-destination ../../artifacts/tarballs
           # Rename to stable names (strip version numbers)
+          # @ruby2js/ruby2js produces ruby2js-ruby2js-*.tgz
           cd ../../artifacts/tarballs
-          mv ruby2js-*.tgz ruby2js-beta.tgz
+          mv ruby2js-ruby2js-*.tgz ruby2js-beta.tgz
           mv ruby2js-rails-*.tgz ruby2js-rails-beta.tgz
           mv vite-plugin-ruby2js-*.tgz vite-plugin-ruby2js-beta.tgz
 

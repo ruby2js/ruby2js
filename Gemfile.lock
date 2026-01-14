@@ -12,27 +12,28 @@ GEM
     base64 (0.3.0)
     erubi (1.13.1)
     execjs (2.10.0)
-    haml (7.0.2)
+    haml (7.2.0)
       temple (>= 0.8.2)
       thor
       tilt
-    json (2.16.0)
-    minitest (5.26.2)
-    nokogiri (1.18.10-aarch64-linux-gnu)
+    json (2.18.0)
+    minitest (6.0.1)
+      prism (~> 1.5)
+    nokogiri (1.19.0-aarch64-linux-gnu)
       racc (~> 1.4)
-    nokogiri (1.18.10-aarch64-linux-musl)
+    nokogiri (1.19.0-aarch64-linux-musl)
       racc (~> 1.4)
-    nokogiri (1.18.10-arm-linux-gnu)
+    nokogiri (1.19.0-arm-linux-gnu)
       racc (~> 1.4)
-    nokogiri (1.18.10-arm-linux-musl)
+    nokogiri (1.19.0-arm-linux-musl)
       racc (~> 1.4)
-    nokogiri (1.18.10-arm64-darwin)
+    nokogiri (1.19.0-arm64-darwin)
       racc (~> 1.4)
-    nokogiri (1.18.10-x86_64-darwin)
+    nokogiri (1.19.0-x86_64-darwin)
       racc (~> 1.4)
-    nokogiri (1.18.10-x86_64-linux-gnu)
+    nokogiri (1.19.0-x86_64-linux-gnu)
       racc (~> 1.4)
-    nokogiri (1.18.10-x86_64-linux-musl)
+    nokogiri (1.19.0-x86_64-linux-musl)
       racc (~> 1.4)
     opal (1.8.2)
       ast (>= 2.3.0)
@@ -40,12 +41,13 @@ GEM
     parser (3.3.10.0)
       ast (~> 2.4.1)
       racc
+    prism (1.8.0)
     racc (1.8.1)
     rake (13.3.1)
     regexp_parser (2.11.3)
     temple (0.10.4)
-    thor (1.4.0)
-    tilt (2.6.1)
+    thor (1.5.0)
+    tilt (2.7.0)
     wunderbar (1.6.0)
       json
 
@@ -72,4 +74,4 @@ DEPENDENCIES
   wunderbar
 
 BUNDLED WITH
-   4.0.3
+  4.0.3
