@@ -458,4 +458,102 @@ describe Ruby2JS::Filter::Rails::Model do
       assert_includes result, '$record.broadcast_json_to'
     end
   end
+
+  describe "broadcasts_to" do
+    it "generates after_create_commit with append" do
+      result = to_js(<<~RUBY)
+        class Message < ApplicationRecord
+          broadcasts_to -> { "chat_room" }
+        end
+      RUBY
+      assert_includes result, 'Message.after_create_commit'
+      assert_includes result, 'action="append"'
+      # Target as template literal interpolation
+      assert_includes result, '"messages"'
+    end
+
+    it "generates after_create_commit with prepend when inserts_by: :prepend" do
+      result = to_js(<<~RUBY)
+        class Message < ApplicationRecord
+          broadcasts_to -> { "chat_room" }, inserts_by: :prepend
+        end
+      RUBY
+      assert_includes result, 'Message.after_create_commit'
+      assert_includes result, 'action="prepend"'
+    end
+
+    it "generates after_update_commit with replace" do
+      result = to_js(<<~RUBY)
+        class Message < ApplicationRecord
+          broadcasts_to -> { "chat_room" }
+        end
+      RUBY
+      assert_includes result, 'Message.after_update_commit'
+      assert_includes result, 'action="replace"'
+      # Replace uses dom_id for target
+      assert_includes result, 'message_${$record.id}'
+    end
+
+    it "generates after_destroy_commit with remove" do
+      result = to_js(<<~RUBY)
+        class Message < ApplicationRecord
+          broadcasts_to -> { "chat_room" }
+        end
+      RUBY
+      assert_includes result, 'Message.after_destroy_commit'
+      assert_includes result, 'action="remove"'
+      # Remove uses dom_id for target
+      assert_includes result, 'message_${$record.id}'
+    end
+
+    it "uses custom target when specified" do
+      result = to_js(<<~RUBY)
+        class Message < ApplicationRecord
+          broadcasts_to -> { "chat_room" }, target: "chat_messages"
+        end
+      RUBY
+      # Create uses custom target (in template literal)
+      assert_includes result, '"chat_messages"'
+    end
+
+    it "handles dynamic stream names" do
+      result = to_js(<<~RUBY)
+        class Comment < ApplicationRecord
+          broadcasts_to -> { "article_\#{article_id}_comments" }
+        end
+      RUBY
+      # Dynamic stream via template literal
+      assert_includes result, '`article_${'
+      assert_includes result, '$record.article_id'
+    end
+
+    it "imports BroadcastChannel" do
+      result = to_js(<<~RUBY)
+        class Message < ApplicationRecord
+          broadcasts_to -> { "chat_room" }
+        end
+      RUBY
+      assert_includes result, 'import { BroadcastChannel }'
+    end
+
+    it "uses $record.toHTML() for content" do
+      result = to_js(<<~RUBY)
+        class Message < ApplicationRecord
+          broadcasts_to -> { "chat_room" }
+        end
+      RUBY
+      assert_includes result, '$record.toHTML()'
+    end
+
+    it "broadcasts to BroadcastChannel" do
+      result = to_js(<<~RUBY)
+        class Message < ApplicationRecord
+          broadcasts_to -> { "chat_room" }
+        end
+      RUBY
+      # Channel name passed to broadcast
+      assert_includes result, 'BroadcastChannel.broadcast'
+      assert_includes result, '"chat_room"'
+    end
+  end
 end

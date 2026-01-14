@@ -41,19 +41,8 @@ class Message < ApplicationRecord
   validates :username, presence: true
   validates :body, presence: true
 
-  # Broadcast new messages to all chat room subscribers
-  after_create_commit do
-    broadcast_append_to "chat_room",
-      target: "messages",
-      partial: "messages/message",
-      locals: { message: self }
-  end
-
-  # Broadcast removal when message is deleted
-  after_destroy_commit do
-    broadcast_remove_to "chat_room",
-      target: "message_#{id}"
-  end
+  # Broadcast all changes (create, update, destroy) to chat room subscribers
+  broadcasts_to -> { "chat_room" }, target: "messages"
 end
 MODEL
 

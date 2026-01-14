@@ -56,6 +56,7 @@ module Ruby2JS
           # Note: use plain hash for JS compatibility (Hash.new with block doesn't transpile)
           @rails_callbacks = {}
           @rails_scopes = []
+          @rails_broadcasts_to = []  # broadcasts_to declarations
           @rails_model_private_methods = {}
           @rails_model_refs = Set.new
           @in_callback_block = false  # Track when processing callback body
@@ -114,7 +115,8 @@ module Ruby2JS
           end
 
           # Check if model uses broadcast methods (for BroadcastChannel import)
-          uses_broadcast = body_uses_broadcasts?(body)
+          # Include both explicit broadcast_*_to calls and broadcasts_to declarations
+          uses_broadcast = body_uses_broadcasts?(body) || @rails_broadcasts_to.any?
           if uses_broadcast
             broadcast_import = s(:send, nil, :import,
               s(:array, s(:const, nil, :BroadcastChannel)),
@@ -154,6 +156,7 @@ module Ruby2JS
           # Note: use plain hash for JS compatibility (Hash.new with block doesn't transpile)
           @rails_callbacks = {}
           @rails_scopes = []
+          @rails_broadcasts_to = []
           @rails_model_private_methods = {}
           @rails_model_refs = Set.new
 
@@ -516,6 +519,8 @@ module Ruby2JS
               collect_validation(args)
             when :scope
               collect_scope(args)
+            when :broadcasts_to
+              collect_broadcasts_to(args)
             when *CALLBACKS
               collect_callback(method_name, args)
             end
@@ -593,6 +598,41 @@ module Ruby2JS
           })
         end
 
+        # Collect broadcasts_to declarations
+        # broadcasts_to ->(record) { "stream_name" }
+        # broadcasts_to ->(record) { "stream_name" }, inserts_by: :prepend
+        # broadcasts_to ->(record) { "stream_name" }, inserts_by: :prepend, target: "items"
+        def collect_broadcasts_to(args)
+          return if args.empty?
+
+          # First arg is lambda/proc for stream name
+          stream_lambda = args[0]
+          return unless stream_lambda&.type == :block
+
+          # Extract the lambda body (the stream expression)
+          # ->(record) { "stream_name" } has structure: block(send(nil, :lambda), args, body)
+          stream_body = stream_lambda.children[2]
+
+          # Extract options from second arg (hash)
+          options = {}
+          if args[1]&.type == :hash
+            args[1].children.each do |pair|
+              key_node, value_node = pair.children
+              if key_node.type == :sym
+                key = key_node.children[0]
+                options[key] = extract_value(value_node)
+              end
+            end
+          end
+
+          # Note: use push instead of << for JS compatibility
+          @rails_broadcasts_to.push({
+            stream: stream_body,
+            inserts_by: options[:inserts_by] || :append,
+            target: options[:target]
+          })
+        end
+
         def collect_callback(type, args)
           # Initialize key if needed (JS compatibility - no Hash.new with default)
           @rails_callbacks[type] ||= []
@@ -657,7 +697,7 @@ module Ruby2JS
             # Skip DSL declarations (already collected)
             if child.type == :send && child.children[0].nil?
               method = child.children[1]
-              next if %i[has_many has_one belongs_to validates scope].include?(method)
+              next if %i[has_many has_one belongs_to validates scope broadcasts_to].include?(method)
               next if CALLBACKS.include?(method)
             end
 
@@ -724,6 +764,11 @@ module Ruby2JS
           # Generate scope methods
           @rails_scopes.each do |scope|
             transformed << generate_scope_method(scope)
+          end
+
+          # Generate callbacks from broadcasts_to declarations
+          @rails_broadcasts_to.each do |broadcast|
+            transformed << generate_broadcasts_to_callbacks(broadcast)
           end
 
           # Keep private methods that aren't inlined elsewhere
@@ -1072,6 +1117,164 @@ module Ruby2JS
               return node
             end
           end
+        end
+
+        # Generate callbacks from broadcasts_to declaration
+        # broadcasts_to ->(record) { "stream" }, inserts_by: :prepend, target: "items"
+        # Generates:
+        #   Model.after_create_commit(($record) => BroadcastChannel.broadcast(...))
+        #   Model.after_update_commit(($record) => BroadcastChannel.broadcast(...))
+        #   Model.after_destroy_commit(($record) => BroadcastChannel.broadcast(...))
+        def generate_broadcasts_to_callbacks(broadcast)
+          stream_expr = broadcast[:stream]
+          inserts_by = broadcast[:inserts_by]
+          custom_target = broadcast[:target]
+
+          # Determine create action based on inserts_by option
+          create_action = inserts_by == :prepend ? :prepend : :append
+
+          # Infer target from model name if not specified
+          # Article -> "articles", Message -> "messages"
+          default_target = Ruby2JS::Inflector.pluralize(@rails_model_name.downcase)
+          target = custom_target || default_target
+
+          # Infer partial from model name: Article -> "articles/article"
+          partial_name = "#{default_target}/#{@rails_model_name.downcase}"
+
+          # Transform stream expression to use $record instead of the lambda parameter
+          # The lambda body might reference the record parameter
+          transformed_stream = transform_broadcasts_to_stream(stream_expr)
+
+          # Generate the three callbacks
+          callbacks = []
+
+          # after_create_commit - append or prepend
+          callbacks.push(generate_broadcast_callback(
+            :after_create_commit, create_action, transformed_stream, target, partial_name))
+
+          # after_update_commit - replace
+          callbacks.push(generate_broadcast_callback(
+            :after_update_commit, :replace, transformed_stream, nil, partial_name))
+
+          # after_destroy_commit - remove
+          callbacks.push(generate_broadcast_callback(
+            :after_destroy_commit, :remove, transformed_stream, nil, nil))
+
+          s(:begin, *callbacks)
+        end
+
+        # Transform the stream expression from broadcasts_to lambda
+        # Replace references to the lambda parameter with $record
+        def transform_broadcasts_to_stream(node)
+          return node unless node.respond_to?(:type)
+
+          case node.type
+          when :lvar
+            # Local variable reference - likely the lambda parameter
+            # Replace with $record.attribute access or just use the expression as-is
+            # For simple cases like "articles" string, just return as-is
+            node
+          when :send
+            target, method, *args = node.children
+            if target.nil?
+              # Bare method call - treat as record attribute
+              s(:attr, s(:lvar, :"$record"), method)
+            else
+              new_target = transform_broadcasts_to_stream(target)
+              new_args = args.map { |a| transform_broadcasts_to_stream(a) }
+              node.updated(nil, [new_target, method, *new_args])
+            end
+          when :dstr
+            # String interpolation - transform each part
+            new_children = node.children.map do |child|
+              if child.respond_to?(:type)
+                transform_broadcasts_to_stream(child)
+              else
+                child
+              end
+            end
+            node.updated(nil, new_children)
+          when :begin
+            # Begin block (interpolation content)
+            new_children = node.children.map do |child|
+              transform_broadcasts_to_stream(child)
+            end
+            node.updated(nil, new_children)
+          else
+            if node.children.any?
+              new_children = node.children.map do |c|
+                c.respond_to?(:type) ? transform_broadcasts_to_stream(c) : c
+              end
+              node.updated(nil, new_children)
+            else
+              node
+            end
+          end
+        end
+
+        # Generate a single broadcast callback
+        def generate_broadcast_callback(callback_type, action, stream_node, target, partial_name)
+          # Build the broadcast call body
+          broadcast_body = build_broadcasts_to_body(action, stream_node, target, partial_name)
+
+          # Model.callback_type(($record) => { ... })
+          s(:send,
+            s(:const, nil, @rails_model_name.to_sym),
+            callback_type,
+            s(:block,
+              s(:send, nil, :proc),
+              s(:args, s(:arg, :"$record")),
+              broadcast_body))
+        end
+
+        # Build the body of a broadcast callback
+        def build_broadcasts_to_body(action, stream_node, target, partial_name)
+          receiver = s(:lvar, :"$record")
+
+          # For remove action, use dom_id for target
+          if action == :remove
+            # Target is dom_id($record) -> "model_123"
+            dom_id_expr = s(:dstr,
+              s(:str, "#{@rails_model_name.downcase}_"),
+              s(:begin, s(:attr, receiver, :id)))
+
+            html = s(:dstr,
+              s(:str, '<turbo-stream action="remove" target="'),
+              s(:begin, dom_id_expr),
+              s(:str, '"></turbo-stream>'))
+
+            return s(:send,
+              s(:const, nil, :BroadcastChannel),
+              :broadcast,
+              process(stream_node),
+              html)
+          end
+
+          # For replace action, target is also dom_id
+          if action == :replace
+            target_expr = s(:dstr,
+              s(:str, "#{@rails_model_name.downcase}_"),
+              s(:begin, s(:attr, receiver, :id)))
+          else
+            # For append/prepend, use the specified target
+            target_expr = s(:str, target)
+          end
+
+          # Content is $record.toHTML() - the partial rendering is handled at runtime
+          content_expr = s(:send, receiver, :toHTML)
+
+          html = s(:dstr,
+            s(:str, "<turbo-stream action=\"#{action}\" target=\""),
+            s(:begin, target_expr),
+            s(:str, '"><template>'),
+            s(:begin, content_expr),
+            s(:str, '</template></turbo-stream>'))
+
+          s(:send,
+            s(:const, nil, :BroadcastChannel),
+            :broadcast,
+            process(stream_node),
+            html)
         end
       end
     end

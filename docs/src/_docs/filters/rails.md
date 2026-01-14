@@ -130,7 +130,7 @@ export class Article extends ApplicationRecord {
 }
 ```
 
-**Supported callbacks:** `before_validation`, `after_validation`, `before_save`, `after_save`, `before_create`, `after_create`, `before_update`, `after_update`, `before_destroy`, `after_destroy`
+**Supported callbacks:** `before_validation`, `after_validation`, `before_save`, `after_save`, `before_create`, `after_create`, `before_update`, `after_update`, `before_destroy`, `after_destroy`, `after_commit`, `after_create_commit`, `after_update_commit`, `after_destroy_commit`, `after_save_commit`
 
 {% rendercontent "docs/note", type: "info", title: "Method vs Getter Handling" %}
 The model filter intelligently determines whether a `def` should become a JavaScript method (with parentheses) or a getter:
@@ -139,6 +139,87 @@ The model filter intelligently determines whether a `def` should become a JavaSc
 - **Getters**: Simple property accessors without arguments default to getters
 
 This ensures proper `this.methodName()` call semantics for lifecycle methods while keeping property access clean for simple accessors.
+{% endrendercontent %}
+
+### Turbo Streams Broadcasting
+
+The `broadcasts_to` macro provides a declarative way to broadcast model changes to subscribed clients. It automatically generates `after_create_commit`, `after_update_commit`, and `after_destroy_commit` callbacks.
+
+```ruby
+class Message < ApplicationRecord
+  broadcasts_to -> { "chat_room" }
+end
+```
+
+```javascript
+import { ApplicationRecord } from "./application_record.js";
+import { BroadcastChannel } from "../../lib/rails.js";
+
+export class Message extends ApplicationRecord {
+};
+Message.table_name = "messages";
+
+Message.after_create_commit($record => (
+  BroadcastChannel.broadcast("chat_room",
+    `<turbo-stream action="append" target="${"messages"}">
+      <template>${$record.toHTML()}</template>
+    </turbo-stream>`)
+));
+
+Message.after_update_commit($record => (
+  BroadcastChannel.broadcast("chat_room",
+    `<turbo-stream action="replace" target="${`message_${$record.id}`}">
+      <template>${$record.toHTML()}</template>
+    </turbo-stream>`)
+));
+
+Message.after_destroy_commit($record => (
+  BroadcastChannel.broadcast("chat_room",
+    `<turbo-stream action="remove" target="${`message_${$record.id}`}">
+    </turbo-stream>`)
+));
+```
+
+**Options:**
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `inserts_by:` | Insert position for new records: `:append` or `:prepend` | `:append` |
+| `target:` | DOM element ID for append/prepend operations | Pluralized model name |
+
+**Examples:**
+
+```ruby
+# Prepend new messages (newest first)
+broadcasts_to -> { "chat_room" }, inserts_by: :prepend
+
+# Custom target element
+broadcasts_to -> { "chat_room" }, target: "chat_messages"
+
+# Dynamic stream name using record attributes
+broadcasts_to -> { "article_#{article_id}_comments" }
+```
+
+**Generated callbacks:**
+
+| Callback | Action | Target |
+|----------|--------|--------|
+| `after_create_commit` | `append` or `prepend` (based on `inserts_by:`) | Custom target or pluralized model name |
+| `after_update_commit` | `replace` | `dom_id` of record (e.g., `message_123`) |
+| `after_destroy_commit` | `remove` | `dom_id` of record |
+
+{% rendercontent "docs/note", type: "info", title: "Explicit Callbacks Still Supported" %}
+For more control, you can still use explicit `broadcast_*_to` methods in callbacks:
+
+```ruby
+class Message < ApplicationRecord
+  after_create_commit do
+    broadcast_append_to "chat_room", target: "messages", partial: "messages/message"
+  end
+end
+```
+
+See the [Turbo filter](/docs/filters/turbo) for more broadcast methods.
 {% endrendercontent %}
 
 ### Scopes
