@@ -449,15 +449,17 @@ jobs:
 
           for demo in blog chat photo_gallery workflow; do
             echo "Building $demo for browser..."
-            cd $GITHUB_WORKSPACE/artifacts/demo-$demo || cd $GITHUB_WORKSPACE/artifacts/demo-${demo//_/-}
-            # Make bin scripts executable (permissions not preserved in artifacts)
-            chmod +x bin/*
-            # Install dependencies
-            bundle install
-            npm install
-            # Use --base for correct asset paths when served from /demos/<name>/
+            demo_path=$GITHUB_WORKSPACE/artifacts/demo-$demo
+            [ ! -d "$demo_path" ] && demo_path=$GITHUB_WORKSPACE/artifacts/demo-${demo//_/-}
+
+            # Use JS builder directly (demos don't have package.json)
             base_path="/demos/${demo//_/-}/"
-            bin/juntos build -d dexie -t browser --base "$base_path"
+            node -e "
+              process.chdir('$demo_path');
+              const { SelfhostBuilder } = await import('$GITHUB_WORKSPACE/packages/ruby2js-rails/build.mjs');
+              const builder = new SelfhostBuilder('dist', { database: 'dexie', target: 'browser', base: '$base_path' });
+              await builder.build();
+            "
           done
 
       - name: Assemble site
