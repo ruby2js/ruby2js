@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# Create a Ruby2JS photo gallery demo with camera integration
+# Create a Ruby2JS photo gallery demo with camera integration and real-time updates
 # Usage: create-photo-gallery [app-name]
 #
 # Creates a Rails app with a Photo model, camera controller,
 # and platform-specific camera integration using target pragmas.
 #
 # Features:
+# - Real-time updates via broadcasts_to (photos appear for all users)
 # - Browser target: uses getUserMedia() for webcam access
 # - Capacitor target: uses @capacitor/camera for native camera
 # - Uses `# Pragma: capacitor` for compile-time target selection
@@ -34,10 +35,13 @@ bundle add ruby2js --github ruby2js/ruby2js --branch master
 # Ensure git checkout is complete (handles Bundler version upgrade)
 bundle install
 
-# Update Photo model with validations (no callbacks - handled by controller)
+# Update Photo model with validations and real-time broadcasting
 cat > app/models/photo.rb << 'MODEL'
 class Photo < ApplicationRecord
   validates :image_data, presence: true
+
+  # Broadcast new photos to all connected users
+  broadcasts_to -> { "photos" }, inserts_by: :prepend
 end
 MODEL
 
@@ -85,6 +89,9 @@ mkdir -p app/views/photos
 
 # Create index view with camera UI
 cat > app/views/photos/index.html.erb << 'VIEW'
+<%# Subscribe to real-time photo updates from all users %>
+<%= turbo_stream_from "photos" %>
+
 <div class="container mx-auto px-4 py-8" data-controller="camera">
   <h1 class="text-3xl font-bold mb-8">Photo Gallery</h1>
 
@@ -303,6 +310,11 @@ bin/rails generate ruby2js:install
 echo ""
 echo "Photo gallery created: $APP_NAME/"
 echo ""
+echo "Features:"
+echo "  - Real-time updates via Turbo Streams broadcasting"
+echo "  - Photos appear instantly for all connected users"
+echo "  - Platform-specific camera integration (browser/Capacitor)"
+echo ""
 echo "To run with Juntos (transpiled to JavaScript):"
 echo "  cd $APP_NAME"
 echo "  bin/juntos dev -d dexie              # Browser with IndexedDB"
@@ -317,6 +329,8 @@ echo "  - Capacitor target: includes @capacitor/camera, uses native camera"
 echo ""
 echo "Camera will request permission to access your webcam (browser) or"
 echo "native camera (Capacitor). Click 'Take Photo' to start."
+echo ""
+echo "Open multiple browser tabs to see real-time photo sharing!"
 echo ""
 echo "To run with Rails:"
 echo "  cd $APP_NAME"
