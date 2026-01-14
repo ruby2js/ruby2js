@@ -40,18 +40,18 @@ jobs:
         run: cd packages/ruby2js-rails && npm install
 
       - name: Build selfhost (converter, lib, filters)
-        run: bundle exec rake -f demo/selfhost/Rakefile build build_lib build_mjs
+        run: bundle exec rake -f demo/selfhost/Rakefile build build_lib build_mjs:npm
 
       - name: Pack tarballs
         run: |
           mkdir -p artifacts/tarballs
-          cd packages/ruby2js && npm pack --pack-destination ../../artifacts/tarballs
-          cd ../ruby2js-rails && npm pack --pack-destination ../../artifacts/tarballs
+          # ruby2js from demo/selfhost (Prism-based, matches build.mjs imports)
+          cd demo/selfhost && npm pack --pack-destination ../../artifacts/tarballs
+          cd ../../packages/ruby2js-rails && npm pack --pack-destination ../../artifacts/tarballs
           cd ../vite-plugin-ruby2js && npm pack --pack-destination ../../artifacts/tarballs
           # Rename to stable names (strip version numbers)
-          # @ruby2js/ruby2js produces ruby2js-ruby2js-*.tgz
           cd ../../artifacts/tarballs
-          mv ruby2js-ruby2js-*.tgz ruby2js-beta.tgz
+          mv ruby2js-6*.tgz ruby2js-beta.tgz 2>/dev/null || mv ruby2js-*.tgz ruby2js-beta.tgz
           mv ruby2js-rails-*.tgz ruby2js-rails-beta.tgz
           mv vite-plugin-ruby2js-*.tgz vite-plugin-ruby2js-beta.tgz
 
