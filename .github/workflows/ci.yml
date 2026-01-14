@@ -347,6 +347,9 @@ jobs:
 
       - name: Build browser demos
         run: |
+          # Point bundler to the checked-out ruby2js repo instead of fetching from GitHub
+          bundle config local.ruby2js $GITHUB_WORKSPACE
+
           for demo in blog chat photo_gallery workflow; do
             echo "Building $demo for browser..."
             base_path="/${demo//_/-}/"
