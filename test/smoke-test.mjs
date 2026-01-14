@@ -15,7 +15,13 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const PROJECT_ROOT = join(__dirname, '..');
-const PACKAGE_ROOT = join(PROJECT_ROOT, 'packages/ruby2js-rails');
+
+// Try node_modules first (CI with installed tarball), then packages (local dev)
+const PACKAGE_LOCATIONS = [
+  join(PROJECT_ROOT, 'node_modules/ruby2js-rails'),
+  join(PROJECT_ROOT, 'packages/ruby2js-rails')
+];
+const PACKAGE_ROOT = PACKAGE_LOCATIONS.find(p => existsSync(join(p, 'build.mjs'))) || PACKAGE_LOCATIONS[1];
 
 // Parse command line
 const args = process.argv.slice(2);

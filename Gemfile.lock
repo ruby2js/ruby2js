@@ -38,6 +38,7 @@ GEM
     opal (1.8.2)
       ast (>= 2.3.0)
       parser (~> 3.0, >= 3.0.3.2)
+    ostruct (0.6.3)
     parser (3.3.10.0)
       ast (~> 2.4.1)
       racc
@@ -69,6 +70,7 @@ DEPENDENCIES
   minitest
   nokogiri
   opal (~> 1.8)
+  ostruct
   rake
   ruby2js!
   wunderbar

@@ -9,6 +9,7 @@ group :development, :test do
   gem 'nokogiri'
   gem 'opal', '~> 1.8'
   gem 'base64' # Required for Opal on Ruby 3.4+
+  gem 'ostruct' # Required for Ruby 4.0+
 end
 
 group :test do

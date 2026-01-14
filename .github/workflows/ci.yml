@@ -264,6 +264,9 @@ jobs:
           name: demo-blog
           path: artifacts/blog
 
+      - name: Install ruby2js-rails from tarball
+        run: npm install artifacts/tarballs/ruby2js-beta.tgz artifacts/tarballs/ruby2js-rails-beta.tgz
+
       - name: Run smoke test
         run: node test/smoke-test.mjs artifacts/blog --database ${{ matrix.database }}
 
@@ -299,6 +302,9 @@ jobs:
         with:
           name: demo-chat
           path: artifacts/chat
+
+      - name: Install ruby2js-rails from tarball
+        run: npm install artifacts/tarballs/ruby2js-beta.tgz artifacts/tarballs/ruby2js-rails-beta.tgz
 
       - name: Run smoke test
         run: node test/smoke-test.mjs artifacts/chat --database ${{ matrix.database }}
@@ -336,6 +342,9 @@ jobs:
           name: demo-photo-gallery
           path: artifacts/photo_gallery
 
+      - name: Install ruby2js-rails from tarball
+        run: npm install artifacts/tarballs/ruby2js-beta.tgz artifacts/tarballs/ruby2js-rails-beta.tgz
+
       - name: Run smoke test
         run: node test/smoke-test.mjs artifacts/photo_gallery --database ${{ matrix.database }}
 
@@ -371,6 +380,9 @@ jobs:
         with:
           name: demo-workflow
           path: artifacts/workflow
+
+      - name: Install ruby2js-rails from tarball
+        run: npm install artifacts/tarballs/ruby2js-beta.tgz artifacts/tarballs/ruby2js-rails-beta.tgz
 
       - name: Run smoke test
         run: node test/smoke-test.mjs artifacts/workflow --database ${{ matrix.database }}
