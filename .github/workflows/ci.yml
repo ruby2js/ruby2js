@@ -348,12 +348,12 @@ jobs:
       - name: Build browser demos
         run: |
           # Point bundler to the checked-out ruby2js repo instead of fetching from GitHub
-          bundle config local.ruby2js $GITHUB_WORKSPACE
+          bundle config set --global local.ruby2js $GITHUB_WORKSPACE
 
           for demo in blog chat photo_gallery workflow; do
             echo "Building $demo for browser..."
             base_path="/${demo//_/-}/"
-            (cd "artifacts/$demo" && bin/juntos build -d dexie -t browser --base "$base_path")
+            (cd "artifacts/$demo" && bundle install --quiet && bin/juntos build -d dexie -t browser --base "$base_path")
           done
 
       - name: Assemble site
