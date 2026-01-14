@@ -352,7 +352,7 @@ jobs:
 
           for demo in blog chat photo_gallery workflow; do
             echo "Building $demo for browser..."
-            base_path="/${demo//_/-}/"
+            base_path="/ruby2js/${demo//_/-}/"
             (cd "artifacts/$demo" && bundle install --quiet && bin/juntos build -d dexie -t browser --base "$base_path")
           done
 
@@ -363,6 +363,7 @@ jobs:
           # Copy tarballs to releases/
           mkdir -p _site/releases
           cp artifacts/tarballs/*.tgz _site/releases/
+          cp artifacts/demo-*/demo-*.tar.gz _site/releases/
 
           # Copy browser demos
           cp -r artifacts/blog/dist _site/blog
@@ -414,8 +415,8 @@ jobs:
               </div>
             </div>
             <div class="releases">
-              <h2>NPM Packages</h2>
-              <a href="releases/">Download beta tarballs</a>
+              <h2>Downloads</h2>
+              <p><a href="releases/">NPM packages and demo app tarballs</a></p>
             </div>
           </body>
           </html>
