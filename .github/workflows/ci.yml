@@ -442,21 +442,21 @@ jobs:
           cd docs
           BRIDGETOWN_ENV=production bundle exec rake
 
+      - name: Install tarballs for browser builds
+        run: npm install artifacts/tarballs/ruby2js-beta.tgz artifacts/tarballs/ruby2js-rails-beta.tgz
+
       - name: Build browser demos
         run: |
-          # Use downloaded tarballs for builds
-          export TARBALL_PATH=$GITHUB_WORKSPACE/artifacts/tarballs
-
           for demo in blog chat photo_gallery workflow; do
             echo "Building $demo for browser..."
             demo_path=$GITHUB_WORKSPACE/artifacts/demo-$demo
             [ ! -d "$demo_path" ] && demo_path=$GITHUB_WORKSPACE/artifacts/demo-${demo//_/-}
 
-            # Use JS builder directly (demos don't have package.json)
+            # Use JS builder from installed tarball (has npm-style imports)
             base_path="/demos/${demo//_/-}/"
             node -e "
               process.chdir('$demo_path');
-              const { SelfhostBuilder } = await import('$GITHUB_WORKSPACE/packages/ruby2js-rails/build.mjs');
+              const { SelfhostBuilder } = await import('ruby2js-rails/build.mjs');
               const builder = new SelfhostBuilder('dist', { database: 'dexie', target: 'browser', base: '$base_path' });
               await builder.build();
             "
