@@ -273,6 +273,16 @@ describe Ruby2JS::Filter::Rails::Helpers do
       result.must_include 'errors ?'
       result.must_include 'text-red'
     end
+
+    it "should convert link_to with bare method call (partial local) to path helper" do
+      # In ERB partials, local variables like 'article' are parsed as bare method calls (:send with nil receiver)
+      # link_to("Show", article) should generate article_path(article), not article()
+      erb_src = '_erbout = +\'\'; _erbout.<<(( link_to("Show", article) ).to_s); _erbout'
+      result = to_js(erb_src)
+      result.must_include 'article_path(article)'
+      result.wont_include 'article()'
+      result.must_include '>Show</a>'
+    end
   end
 
   describe 'button_to helper' do
@@ -310,6 +320,16 @@ describe Ruby2JS::Filter::Rails::Helpers do
       result.must_include 'method="post"'
       result.must_include '_method" value="delete"'
       result.must_include 'article_path(article)'
+    end
+
+    it "should convert button_to with bare method call (partial local) to path helper" do
+      # In ERB partials, local variables like 'article' are parsed as bare method calls (:send with nil receiver)
+      # button_to("Delete", article, method: :delete) should use article_path(article), not article()
+      erb_src = '_erbout = +\'\'; _erbout.<<(( button_to("Delete", article, method: :delete) ).to_s); _erbout'
+      result = to_js(erb_src)
+      result.must_include 'article_path(article)'
+      result.wont_include 'article()'
+      result.must_include '>Delete</button>'
     end
   end
 

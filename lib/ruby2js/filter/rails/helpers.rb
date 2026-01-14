@@ -396,6 +396,13 @@ module Ruby2JS
             path_helper = "#{model_name}_path".to_sym
             @erb_path_helpers << path_helper unless @erb_path_helpers.include?(path_helper)
             path_expr = s(:send, nil, path_helper, path_node)
+          elsif path_node.type == :send && path_node.children[0].nil? && path_node.children.length == 2
+            # Bare method call (parser treats partial locals as method calls): article -> article_path(article)
+            model_name = path_node.children[1].to_s
+            path_helper = "#{model_name}_path".to_sym
+            @erb_path_helpers << path_helper unless @erb_path_helpers.include?(path_helper)
+            # Use the same node type (send) to preserve how the variable is referenced in this context
+            path_expr = s(:send, nil, path_helper, s(:lvar, model_name.to_sym))
           elsif path_node.type == :array && path_node.children.length == 2
             # Nested resource: [@article, comment] -> comment_path(article, comment)
             parent, child = path_node.children
@@ -636,6 +643,12 @@ module Ruby2JS
             path_helper = "#{model_name}_path".to_sym
             @erb_path_helpers << path_helper unless @erb_path_helpers.include?(path_helper)
             # In ERB context, ivars are passed as locals
+            path_expr = s(:send, nil, path_helper, s(:lvar, model_name.to_sym))
+          elsif path_node&.type == :send && path_node.children[0].nil? && path_node.children.length == 2
+            # Bare method call (parser treats partial locals as method calls): article -> article_path(article)
+            model_name = path_node.children[1].to_s
+            path_helper = "#{model_name}_path".to_sym
+            @erb_path_helpers << path_helper unless @erb_path_helpers.include?(path_helper)
             path_expr = s(:send, nil, path_helper, s(:lvar, model_name.to_sym))
           elsif path_node&.type == :array && path_node.children.length == 2
             # Nested resource: [@article, comment] -> comment_path(article, comment)
