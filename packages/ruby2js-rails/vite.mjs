@@ -452,7 +452,8 @@ function createStructurePlugin(config, appRoot) {
         const builder = new SelfhostBuilder(null, {
           database: config.database,
           target: config.target,
-          broadcast: config.broadcast
+          broadcast: config.broadcast,
+          base: process.env.JUNTOS_BASE
         });
 
         // Run the full build pipeline
