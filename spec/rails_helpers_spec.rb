@@ -340,6 +340,41 @@ describe Ruby2JS::Filter::Rails::Helpers do
       result.wont_include 'article()'
       result.must_include '>Delete</button>'
     end
+
+    it "should handle button_to with nested resource array path" do
+      # button_to("Delete", [comment.article, comment], method: :delete)
+      # Should generate comment_path(comment.article, comment)
+      erb_src = '_erbout = +\'\'; _erbout.<<(( button_to("Delete", [comment.article, comment], method: :delete) ).to_s); _erbout'
+      result = to_js(erb_src)
+      result.must_include 'comment_path('
+      result.must_include 'comment.article'
+      result.wont_include '{ _path }'  # Should not import generic _path
+      result.must_include '>Delete</button>'
+    end
+  end
+
+  describe 'render helper' do
+    it "should handle render with method call collection" do
+      # render @article.comments -> article.comments.map(comment => _comment_module.render(...)).join('')
+      erb_src = '_erbout = +\'\'; _erbout.<<(( render(@article.comments) ).to_s); _erbout'
+      result = to_js(erb_src)
+      # Should import from the model's view directory
+      result.must_include 'import * as _comment_module from "../comments/_comment.js"'
+      # Should map over the collection
+      result.must_include 'article.comments.map'
+      result.must_include '_comment_module.render'
+    end
+
+    it "should handle render with ivar collection" do
+      # render @messages -> messages.map(message => _message_module.render(...)).join('')
+      erb_src = '_erbout = +\'\'; _erbout.<<(( render(@messages) ).to_s); _erbout'
+      result = to_js(erb_src)
+      # Should import from current directory (same as singular model name)
+      result.must_include 'import * as _message_module from "./_message.js"'
+      # Should map over the collection
+      result.must_include 'messages.map'
+      result.must_include '_message_module.render'
+    end
   end
 
   describe 'truncate helper' do

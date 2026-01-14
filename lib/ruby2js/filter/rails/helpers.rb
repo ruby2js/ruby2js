@@ -41,14 +41,27 @@ module Ruby2JS
 
           # Add imports for partials
           # render "form" -> import * as _form_module from './_form.js'
+          # render @article.comments -> import * as _comment_module from '../comments/_comment.js'
           # Then call _form_module.render({article})
           unless @erb_partials.empty?
-            @erb_partials.uniq.sort.each do |partial_name|
+            @erb_partials.uniq { |p| [p[:name], p[:directory]] }.sort_by { |p| p[:name] }.each do |partial_info|
+              partial_name = partial_info[:name]
+              partial_directory = partial_info[:directory]
               module_name = "_#{partial_name}_module".to_sym
+
+              # Generate import path based on whether partial is in a different directory
+              import_path = if partial_directory
+                # Cross-directory partial: ../comments/_comment.js
+                "../#{partial_directory}/_#{partial_name}.js"
+              else
+                # Same directory partial: ./_form.js
+                "./_#{partial_name}.js"
+              end
+
               # Path array format: [as_pair, from_pair] for "import * as X from Y"
               self.prepend_list << s(:import,
                 [s(:pair, s(:sym, :as), s(:const, nil, module_name)),
-                 s(:pair, s(:sym, :from), s(:str, "./_#{partial_name}.js"))],
+                 s(:pair, s(:sym, :from), s(:str, import_path))],
                 s(:str, '*'))
             end
           end
@@ -667,13 +680,20 @@ module Ruby2JS
             end
           elsif path_node&.type == :array && path_node.children.length == 2
             # Nested resource: [@article, comment] -> comment_path(article, comment)
+            # or [comment.article, comment] -> comment_path(comment.article, comment)
             parent, child = path_node.children
-            child_name = child.type == :ivar ? child.children.first.to_s.sub(/^@/, '') : child.children.first.to_s
+            # Extract child name from different node types
+            child_name = case child.type
+              when :ivar then child.children.first.to_s.sub(/^@/, '')
+              when :lvar then child.children.first.to_s
+              when :send then child.children[1].to_s  # send node: [receiver, method_name, ...]
+              else child.children.first.to_s
+            end
             path_helper = "#{child_name}_path".to_sym
             @erb_path_helpers << path_helper unless @erb_path_helpers.include?(path_helper)
             # Convert ivars to lvars for ERB context
-            parent_arg = parent.type == :ivar ? s(:lvar, parent.children.first.to_s.sub(/^@/, '').to_sym) : parent
-            child_arg = child.type == :ivar ? s(:lvar, child.children.first.to_s.sub(/^@/, '').to_sym) : child
+            parent_arg = parent.type == :ivar ? s(:lvar, parent.children.first.to_s.sub(/^@/, '').to_sym) : process(parent)
+            child_arg = child.type == :ivar ? s(:lvar, child.children.first.to_s.sub(/^@/, '').to_sym) : process(child)
             path_expr = s(:send, nil, path_helper, parent_arg, child_arg)
           else
             path_expr = process(path_node)
@@ -1110,12 +1130,28 @@ module Ruby2JS
             singular_name = partial_name.to_sym
             locals[singular_name] = s(:lvar, singular_name) if is_collection
             locals[var_name.to_sym] = first_arg unless is_collection
+
+          elsif first_arg.type == :send && first_arg.children[0]
+            # render @article.comments -> renders _comment partial for each item (collection)
+            # render article.comments -> same, method call returning a collection
+            method_name = first_arg.children[1].to_s
+            partial_name = singularize_partial_name(method_name)
+            is_collection = (partial_name != method_name)
+            collection_var = first_arg
+            singular_name = partial_name.to_sym
+            locals[singular_name] = s(:lvar, singular_name) if is_collection
+            # For method calls like @article.comments, the directory is the method name (comments/)
+            partial_directory = method_name if is_collection
           end
 
           return nil unless partial_name
 
           # Track this partial for import generation
-          @erb_partials << partial_name unless @erb_partials.include?(partial_name)
+          # Store as hash with name and optional directory for cross-directory partials
+          partial_info = { name: partial_name, directory: partial_directory }
+          unless @erb_partials.any? { |p| p[:name] == partial_name && p[:directory] == partial_directory }
+            @erb_partials << partial_info
+          end
 
           # Build the partial function call: _form_module.render({$context, article})
           module_name = "_#{partial_name}_module".to_sym
