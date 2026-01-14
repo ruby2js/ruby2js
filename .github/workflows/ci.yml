@@ -402,7 +402,8 @@ jobs:
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: "3.4"
-          bundler-cache: true
+          # Don't use bundler-cache: build-site needs both docs and main project gems
+          # and the cache key only covers one Gemfile.lock
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -413,6 +414,9 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: artifacts
+
+      - name: Install main project gems
+        run: bundle install
 
       - name: Install docs dependencies
         run: |
@@ -430,16 +434,13 @@ jobs:
           cd packages/ruby2js-rails
           npm install
 
-      - name: Install main project gems
-        run: bundle install
-
       - name: Build selfhost
         run: bundle exec rake -f demo/selfhost/Rakefile build build_lib
 
       - name: Build docs site
         run: |
           cd docs
-          BRIDGETOWN_ENV=production BUNDLE_FROZEN=false bundle exec rake
+          BRIDGETOWN_ENV=production bundle exec rake
 
       - name: Build browser demos
         run: |
