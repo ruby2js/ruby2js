@@ -7,21 +7,23 @@ import { pluralize as inflectPlural } from 'ruby2js-rails/adapters/inflector.mjs
 export class RouterBase {
   static routes = [];
   static controllers = {};
+  static basePath = '';  // Base path prefix for all routes (e.g., '/ruby2js/blog')
 
   // Register RESTful routes for a resource
   static resources(name, controller, options = {}) {
     this.controllers[name] = controller;
     const nested = options.nested || [];
     const only = options.only;
+    const base = this.basePath;
 
     const actions = [
-      { method: 'GET', path: `/${name}`, action: 'index' },
-      { method: 'GET', path: `/${name}/new`, action: 'new' },
-      { method: 'GET', path: `/${name}/:id`, action: 'show' },
-      { method: 'GET', path: `/${name}/:id/edit`, action: 'edit' },
-      { method: 'POST', path: `/${name}`, action: 'create' },
-      { method: 'PATCH', path: `/${name}/:id`, action: 'update' },
-      { method: 'DELETE', path: `/${name}/:id`, action: 'destroy' }
+      { method: 'GET', path: `${base}/${name}`, action: 'index' },
+      { method: 'GET', path: `${base}/${name}/new`, action: 'new' },
+      { method: 'GET', path: `${base}/${name}/:id`, action: 'show' },
+      { method: 'GET', path: `${base}/${name}/:id/edit`, action: 'edit' },
+      { method: 'POST', path: `${base}/${name}`, action: 'create' },
+      { method: 'PATCH', path: `${base}/${name}/:id`, action: 'update' },
+      { method: 'DELETE', path: `${base}/${name}/:id`, action: 'destroy' }
     ];
 
     actions.forEach(route => {
@@ -48,15 +50,16 @@ export class RouterBase {
   // Register nested RESTful routes
   static nestedResources(parentName, name, controller, only) {
     this.controllers[name] = controller;
+    const base = this.basePath;
 
     const actions = [
-      { method: 'GET', path: `/${parentName}/:parent_id/${name}`, action: 'index' },
-      { method: 'GET', path: `/${parentName}/:parent_id/${name}/new`, action: 'new' },
-      { method: 'GET', path: `/${parentName}/:parent_id/${name}/:id`, action: 'show' },
-      { method: 'GET', path: `/${parentName}/:parent_id/${name}/:id/edit`, action: 'edit' },
-      { method: 'POST', path: `/${parentName}/:parent_id/${name}`, action: 'create' },
-      { method: 'PATCH', path: `/${parentName}/:parent_id/${name}/:id`, action: 'update' },
-      { method: 'DELETE', path: `/${parentName}/:parent_id/${name}/:id`, action: 'destroy' }
+      { method: 'GET', path: `${base}/${parentName}/:parent_id/${name}`, action: 'index' },
+      { method: 'GET', path: `${base}/${parentName}/:parent_id/${name}/new`, action: 'new' },
+      { method: 'GET', path: `${base}/${parentName}/:parent_id/${name}/:id`, action: 'show' },
+      { method: 'GET', path: `${base}/${parentName}/:parent_id/${name}/:id/edit`, action: 'edit' },
+      { method: 'POST', path: `${base}/${parentName}/:parent_id/${name}`, action: 'create' },
+      { method: 'PATCH', path: `${base}/${parentName}/:parent_id/${name}/:id`, action: 'update' },
+      { method: 'DELETE', path: `${base}/${parentName}/:parent_id/${name}/:id`, action: 'destroy' }
     ];
 
     actions.forEach(route => {
@@ -83,6 +86,9 @@ export class RouterBase {
   // controller: the controller class
   // action: the action name (default: "index")
   static root(basePath, controller, action = 'index') {
+    // Store base path (without trailing slash) for resources() to use
+    this.basePath = basePath.replace(/\/$/, '');
+
     // Escape special regex characters and make trailing slash optional
     const escaped = basePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const pattern = new RegExp(`^${escaped.replace(/\/$/, '')}\\/?$`);
