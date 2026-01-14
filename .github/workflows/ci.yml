@@ -450,6 +450,8 @@ jobs:
           for demo in blog chat photo_gallery workflow; do
             echo "Building $demo for browser..."
             cd $GITHUB_WORKSPACE/artifacts/demo-$demo || cd $GITHUB_WORKSPACE/artifacts/demo-${demo//_/-}
+            # Make bin scripts executable (permissions not preserved in artifacts)
+            chmod +x bin/*
             # Use --base for correct asset paths when served from /demos/<name>/
             base_path="/demos/${demo//_/-}/"
             bin/juntos build -d dexie -t browser --base "$base_path"
