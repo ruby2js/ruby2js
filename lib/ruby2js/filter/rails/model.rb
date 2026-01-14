@@ -1165,6 +1165,7 @@ module Ruby2JS
 
         # Transform the stream expression from broadcasts_to lambda
         # Replace references to the lambda parameter with $record
+        # Note: explicit returns and == nil for JS compatibility
         def transform_broadcasts_to_stream(node)
           return node unless node.respond_to?(:type)
 
@@ -1173,41 +1174,43 @@ module Ruby2JS
             # Local variable reference - likely the lambda parameter
             # Replace with $record.attribute access or just use the expression as-is
             # For simple cases like "articles" string, just return as-is
-            node
+            return node
           when :send
-            target, method, *args = node.children
-            if target.nil?
+            target = node.children[0]
+            method = node.children[1]
+            args = node.children[2..-1] || []
+            # Note: use == nil for JS compatibility (nil? doesn't exist in JS)
+            if target == nil
               # Bare method call - treat as record attribute
-              s(:attr, s(:lvar, :"$record"), method)
+              return s(:attr, s(:lvar, :"$record"), method)
             else
               new_target = transform_broadcasts_to_stream(target)
-              new_args = args.map { |a| transform_broadcasts_to_stream(a) }
-              node.updated(nil, [new_target, method, *new_args])
+              new_args = args.map { |a| a.respond_to?(:type) ? transform_broadcasts_to_stream(a) : a }
+              return node.updated(nil, [new_target, method, *new_args])
             end
           when :dstr
             # String interpolation - transform each part
             new_children = node.children.map do |child|
-              if child.respond_to?(:type)
-                transform_broadcasts_to_stream(child)
-              else
-                child
-              end
+              child.respond_to?(:type) ? transform_broadcasts_to_stream(child) : child
             end
-            node.updated(nil, new_children)
+            return node.updated(nil, new_children)
           when :begin
             # Begin block (interpolation content)
             new_children = node.children.map do |child|
-              transform_broadcasts_to_stream(child)
+              child.respond_to?(:type) ? transform_broadcasts_to_stream(child) : child
             end
-            node.updated(nil, new_children)
+            return node.updated(nil, new_children)
+          when :str
+            # Simple string - return as-is
+            return node
           else
             if node.children.any?
               new_children = node.children.map do |c|
                 c.respond_to?(:type) ? transform_broadcasts_to_stream(c) : c
               end
-              node.updated(nil, new_children)
+              return node.updated(nil, new_children)
             else
-              node
+              return node
             end
           end
         end
