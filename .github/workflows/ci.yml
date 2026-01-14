@@ -430,6 +430,9 @@ jobs:
           cd packages/ruby2js-rails
           npm install
 
+      - name: Install main project gems
+        run: bundle install
+
       - name: Build selfhost
         run: bundle exec rake -f demo/selfhost/Rakefile build build_lib
 
