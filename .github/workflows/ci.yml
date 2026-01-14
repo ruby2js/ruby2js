@@ -68,13 +68,15 @@ jobs:
         run: gem install rails
 
       - name: Create blog demo
-        run: test/blog/create-blog artifacts/blog
+        run: |
+          test/blog/create-blog artifacts/blog
+          tar -czf artifacts/demo-blog.tar.gz -C artifacts blog
 
       - name: Upload blog demo
         uses: actions/upload-artifact@v4
         with:
           name: demo-blog
-          path: artifacts/blog/
+          path: artifacts/demo-blog.tar.gz
           retention-days: 7
 
   create-chat:
@@ -97,13 +99,15 @@ jobs:
         run: gem install rails
 
       - name: Create chat demo
-        run: test/chat/create-chat artifacts/chat
+        run: |
+          test/chat/create-chat artifacts/chat
+          tar -czf artifacts/demo-chat.tar.gz -C artifacts chat
 
       - name: Upload chat demo
         uses: actions/upload-artifact@v4
         with:
           name: demo-chat
-          path: artifacts/chat/
+          path: artifacts/demo-chat.tar.gz
           retention-days: 7
 
   create-photo-gallery:
@@ -126,13 +130,15 @@ jobs:
         run: gem install rails
 
       - name: Create photo_gallery demo
-        run: test/photo_gallery/create-photo-gallery artifacts/photo_gallery
+        run: |
+          test/photo_gallery/create-photo-gallery artifacts/photo_gallery
+          tar -czf artifacts/demo-photo-gallery.tar.gz -C artifacts photo_gallery
 
       - name: Upload photo_gallery demo
         uses: actions/upload-artifact@v4
         with:
           name: demo-photo-gallery
-          path: artifacts/photo_gallery/
+          path: artifacts/demo-photo-gallery.tar.gz
           retention-days: 7
 
   create-workflow:
@@ -155,13 +161,15 @@ jobs:
         run: gem install rails
 
       - name: Create workflow demo
-        run: test/workflow/create-workflow artifacts/workflow
+        run: |
+          test/workflow/create-workflow artifacts/workflow
+          tar -czf artifacts/demo-workflow.tar.gz -C artifacts workflow
 
       - name: Upload workflow demo
         uses: actions/upload-artifact@v4
         with:
           name: demo-workflow
-          path: artifacts/workflow/
+          path: artifacts/demo-workflow.tar.gz
           retention-days: 7
 
   # ===========================================================================
@@ -249,7 +257,10 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: demo-blog
-          path: artifacts/blog
+          path: artifacts
+
+      - name: Extract blog demo
+        run: tar -xzf artifacts/demo-blog.tar.gz -C artifacts
 
       - name: Install ruby2js-rails from tarball
         run: npm install artifacts/tarballs/ruby2js-beta.tgz artifacts/tarballs/ruby2js-rails-beta.tgz
@@ -288,7 +299,10 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: demo-chat
-          path: artifacts/chat
+          path: artifacts
+
+      - name: Extract chat demo
+        run: tar -xzf artifacts/demo-chat.tar.gz -C artifacts
 
       - name: Install ruby2js-rails from tarball
         run: npm install artifacts/tarballs/ruby2js-beta.tgz artifacts/tarballs/ruby2js-rails-beta.tgz
@@ -322,6 +336,12 @@ jobs:
         with:
           path: artifacts
 
+      - name: Extract demo tarballs
+        run: |
+          for tarball in artifacts/demo-*/demo-*.tar.gz; do
+            tar -xzf "$tarball" -C artifacts
+          done
+
       - name: Install tarballs
         run: npm install artifacts/tarballs/ruby2js-beta.tgz artifacts/tarballs/ruby2js-rails-beta.tgz
 
@@ -329,12 +349,8 @@ jobs:
         run: |
           for demo in blog chat photo_gallery workflow; do
             echo "Building $demo for browser..."
-            demo_path=artifacts/demo-$demo
-            [ ! -d "$demo_path" ] && demo_path=artifacts/demo-${demo//_/-}
-
-            # Build using juntos CLI from the demo's bin directory
             base_path="/${demo//_/-}/"
-            (cd "$demo_path" && bin/juntos build -d dexie -t browser --base "$base_path")
+            (cd "artifacts/$demo" && bin/juntos build -d dexie -t browser --base "$base_path")
           done
 
       - name: Assemble site
@@ -346,10 +362,10 @@ jobs:
           cp artifacts/tarballs/*.tgz _site/releases/
 
           # Copy browser demos
-          cp -r artifacts/demo-blog/dist _site/blog
-          cp -r artifacts/demo-chat/dist _site/chat
-          cp -r artifacts/demo-photo-gallery/dist _site/photo-gallery
-          cp -r artifacts/demo-workflow/dist _site/workflow
+          cp -r artifacts/blog/dist _site/blog
+          cp -r artifacts/chat/dist _site/chat
+          cp -r artifacts/photo_gallery/dist _site/photo-gallery
+          cp -r artifacts/workflow/dist _site/workflow
 
           # Create index page
           cat > _site/index.html << 'EOF'
