@@ -78,6 +78,7 @@ rm -f app/views/articles/index.html.erb.bak
 
 # Update article partial with ID for targeting and comment count
 # The ID allows turbo streams to target individual articles for updates/removal
+# Action buttons are in the scaffold-generated index.html.erb, not here
 cat > app/views/articles/_article.html.erb << 'PARTIAL'
 <div id="<%= dom_id(article) %>" class="p-4 border rounded mb-4">
   <h2 class="text-xl font-bold">
@@ -87,12 +88,6 @@ cat > app/views/articles/_article.html.erb << 'PARTIAL'
     </span>
   </h2>
   <p class="text-gray-700 mt-2"><%= truncate(article.body, length: 100) %></p>
-  <div class="mt-2 space-x-2">
-    <%= link_to "Show", article, class: "text-blue-600" %>
-    <%= link_to "Edit", edit_article_path(article), class: "text-blue-600" %>
-    <%= button_to "Delete", article, method: :delete, class: "text-red-600",
-        data: { turbo_confirm: "Are you sure?" } %>
-  </div>
 </div>
 PARTIAL
 
