@@ -312,9 +312,10 @@ module Ruby2JS
           unless name == @erb_bufvar
             @erb_locals << name
           end
-        elsif node.type == :send && node.children.first.nil?
-          # Method call with no receiver: could be a local variable reference
-          # In ERB, article.title has article as s(:send, nil, :article)
+        elsif node.type == :send && node.children.first.nil? && node.children.length == 2
+          # Bare method call with no receiver and no arguments: likely a local variable reference
+          # In ERB, article.title has article as s(:send, nil, :article) with 2 children
+          # Calls like render(x) have 3+ children and should not be treated as locals
           name = node.children[1]
           name_str = name.to_s
           # Only track lowercase names that look like variables (not constants or keywords)
