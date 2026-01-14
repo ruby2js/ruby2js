@@ -275,6 +275,11 @@ end
 
 desc "Build everything for local development"
 task :local => [:build, :build_lib, :build_mjs] do
+  # Copy lib files to packages/ruby2js-rails/lib/ for local vite.mjs imports
+  package_lib = File.join(PACKAGE, 'lib')
+  FileUtils.mkdir_p(package_lib)
+  FileUtils.cp Dir.glob("#{SELFHOST}/lib/*.js"), package_lib
+
   puts ""
   puts "Local build complete. Files reference local paths."
   puts "To test: node ruby2js.mjs -e 'puts 1'"
@@ -282,6 +287,11 @@ end
 
 desc "Build everything for npm release (tarballs in artifacts/tarballs/)"
 task :release => [:build, :build_lib, "build_mjs:npm"] do
+  # Copy lib files to packages/ruby2js-rails/lib/ for npm pack
+  package_lib = File.join(PACKAGE, 'lib')
+  FileUtils.mkdir_p(package_lib)
+  FileUtils.cp Dir.glob("#{SELFHOST}/lib/*.js"), package_lib
+
   tarballs_dir = File.join(ROOT, 'artifacts/tarballs')
   FileUtils.mkdir_p(tarballs_dir)
 

@@ -364,7 +364,13 @@ class SelfhostBuilder
 
     deps = if use_local
       relative_path = Pathname.new(local_package).relative_path_from(Pathname.new(dist_dir))
-      { 'ruby2js-rails' => "file:#{relative_path}" }
+      # Also add ruby2js directly - Node's module resolution doesn't follow symlinks
+      # in file: dependencies, so the peerDep in ruby2js-rails isn't found
+      selfhost_path = Pathname.new(File.join(gem_root, "demo/selfhost")).relative_path_from(Pathname.new(dist_dir))
+      {
+        'ruby2js-rails' => "file:#{relative_path}",
+        'ruby2js' => "file:#{selfhost_path}"
+      }
     else
       { 'ruby2js-rails' => 'https://www.ruby2js.com/releases/ruby2js-rails-beta.tgz' }
     end
@@ -523,7 +529,13 @@ class SelfhostBuilder
 
     package['dependencies'] = deps
     package['optionalDependencies'] = optional_deps unless optional_deps.empty?
-    File.write(package_path, JSON.pretty_generate(package) + "\n")
+
+    # Use atomic write (temp file + rename) to avoid race conditions
+    # where other processes might read a partially written file
+    temp_path = "#{package_path}.tmp"
+    File.write(temp_path, JSON.pretty_generate(package) + "\n")
+    File.rename(temp_path, package_path)
+
     puts("  Updated package.json")
 
     true  # npm install needed

@@ -1,3 +1,50 @@
+# Ruby2JS Demos
+
+## Running a Demo Locally
+
+From a clean clone of the repository:
+
+```bash
+# Install Ruby dependencies
+bundle install
+
+# Build selfhost (required for bin/juntos to work)
+cd demo/selfhost && npm install && cd ../..
+bundle exec rake -f demo/selfhost/Rakefile local
+
+# Tell bundler to use your local ruby2js checkout
+bundle config set --global local.ruby2js $(pwd)
+
+# Create and run a demo
+cd demo
+../test/blog/create-blog blog
+cd blog
+bundle install
+bin/juntos dev -d dexie
+```
+
+Available demos:
+- `test/blog/create-blog` - Blog with articles and comments
+- `test/chat/create-chat` - Chat app with Turbo Streams
+- `test/photo_gallery/create-photo-gallery` - Photo gallery with camera
+- `test/workflow/create-workflow` - Workflow builder with React Flow
+
+To recreate a demo:
+```bash
+cd demo
+rm -rf blog
+../test/blog/create-blog blog
+cd blog
+bundle install
+bin/juntos dev -d dexie
+```
+
+See [test/README.md](../test/README.md) for more details on demos and smoke tests.
+
+---
+
+# Opal-based Live Demo (docs site)
+
 TL;DR. add the following before a ruby code block in Markdown, adjusting the
 options as needed:
 
