@@ -283,6 +283,15 @@ describe Ruby2JS::Filter::Rails::Helpers do
       result.wont_include 'article()'
       result.must_include '>Show</a>'
     end
+
+    it "should not double _path suffix when path helper is already specified" do
+      # link_to("Back", articles_path) should generate articles_path(), not articles_path_path()
+      erb_src = '_erbout = +\'\'; _erbout.<<(( link_to("Back", articles_path) ).to_s); _erbout'
+      result = to_js(erb_src)
+      result.must_include 'articles_path()'
+      result.wont_include 'articles_path_path'
+      result.must_include '>Back</a>'
+    end
   end
 
   describe 'button_to helper' do
