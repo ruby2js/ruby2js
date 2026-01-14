@@ -280,6 +280,9 @@ task :local => [:build, :build_lib, :build_mjs] do
   FileUtils.mkdir_p(package_lib)
   FileUtils.cp Dir.glob("#{SELFHOST}/lib/*.js"), package_lib
 
+  # Copy ruby2js.js to package root (lib files import ../ruby2js.js)
+  FileUtils.cp File.join(SELFHOST, 'ruby2js.js'), PACKAGE
+
   puts ""
   puts "Local build complete. Files reference local paths."
   puts "To test: node ruby2js.mjs -e 'puts 1'"
@@ -291,6 +294,9 @@ task :release => [:build, :build_lib, "build_mjs:npm"] do
   package_lib = File.join(PACKAGE, 'lib')
   FileUtils.mkdir_p(package_lib)
   FileUtils.cp Dir.glob("#{SELFHOST}/lib/*.js"), package_lib
+
+  # Copy ruby2js.js to package root (lib files import ../ruby2js.js)
+  FileUtils.cp File.join(SELFHOST, 'ruby2js.js'), PACKAGE
 
   tarballs_dir = File.join(ROOT, 'artifacts/tarballs')
   FileUtils.mkdir_p(tarballs_dir)
