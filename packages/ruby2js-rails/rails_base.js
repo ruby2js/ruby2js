@@ -78,12 +78,20 @@ export class RouterBase {
     });
   }
 
-  // Add a simple redirect route
-  static root(path) {
+  // Register the root route - renders controller action directly (no redirect)
+  // basePath: the path to match (e.g., "/" or "/blog/")
+  // controller: the controller class
+  // action: the action name (default: "index")
+  static root(basePath, controller, action = 'index') {
+    // Escape special regex characters and make trailing slash optional
+    const escaped = basePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const pattern = new RegExp(`^${escaped.replace(/\/$/, '')}\\/?$`);
     this.routes.unshift({
       method: 'GET',
-      pattern: /^\/$/,
-      redirect: path
+      pattern: pattern,
+      controller: controller,
+      controllerName: 'root',
+      action: action
     });
   }
 

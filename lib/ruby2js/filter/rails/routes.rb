@@ -26,7 +26,7 @@ module Ruby2JS
           @rails_path_helpers = []
           @rails_route_nesting = []
           @rails_resources = []  # Track resources for Router.resources() generation
-          @rails_root_path = nil
+          @rails_root_route = nil
         end
 
         # Detect Rails.application.routes.draw block
@@ -52,7 +52,7 @@ module Ruby2JS
           @rails_path_helpers = []
           @rails_route_nesting = []
           @rails_resources = []
-          @rails_root_path = nil
+          @rails_root_route = nil
 
           result
         end
@@ -146,8 +146,14 @@ module Ruby2JS
           controller_name = "#{controller.capitalize}Controller"
           action_name = transform_action_name(action.to_sym)
 
-          # Track root path for Router.root() generation
-          @rails_root_path = "#{base_path}/#{controller}"
+          # Track root route info for Router.root() generation
+          # Use plain action name for Router.root() (not transformed)
+          root_base = base_path.empty? ? '/' : "#{base_path}/"
+          @rails_root_route = {
+            base: root_base,
+            controller: controller_name,
+            action: action  # Plain action name, not transformed
+          }
 
           @rails_routes_list << {
             path: "#{base_path}/",
@@ -501,10 +507,13 @@ module Ruby2JS
           end
 
           # Generate Router.root() if defined
-          if @rails_root_path
+          # Pass base path, controller, and action (renders directly, no redirect)
+          if @rails_root_route
             statements << s(:send,
               s(:const, nil, :Router), :root,
-              s(:str, @rails_root_path))
+              s(:str, @rails_root_route[:base]),
+              s(:const, nil, @rails_root_route[:controller].to_sym),
+              s(:str, @rails_root_route[:action]))
           end
 
           # Generate Router.resources() calls for each top-level resource

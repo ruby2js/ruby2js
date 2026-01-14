@@ -59,7 +59,16 @@ describe Ruby2JS::Filter::Rails::Routes do
           root 'articles#index'
         end
       RUBY
-      assert_includes result, 'Router.root("/articles")'
+      assert_includes result, 'Router.root("/", ArticlesController, "index")'
+    end
+
+    it "generates Router.root() with base path for subdirectory hosting" do
+      result = to_js(<<~RUBY, base: '/blog')
+        Rails.application.routes.draw do
+          root 'articles#index'
+        end
+      RUBY
+      assert_includes result, 'Router.root("/blog/", ArticlesController, "index")'
     end
   end
 
