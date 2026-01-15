@@ -1887,11 +1887,13 @@ class SelfhostBuilder
         unified_js += "import { render as #{view_name}_render } from './#{resource}/#{target_file}';\n"
         render_exports << "#{view_name}: #{view_name}_render"
       elsif ext == '.rb'
-        target_file = use_source_imports ? source_filename : source_filename.sub('.rb', '.js')
+        # Use view_name (snake_case) for compiled output, source_filename for Vite HMR
+        target_file = use_source_imports ? source_filename : "#{view_name}.js"
         unified_js += "import #{view_name}_module from './#{resource}/#{target_file}';\n"
         render_exports << "#{view_name}: #{view_name}_module.render || #{view_name}_module"
       elsif ext == '.rbx' || ext == '.jsx' || ext == '.tsx'
-        target_file = use_source_imports ? source_filename : source_filename.sub(/\.(rbx|jsx|tsx)$/, '.js')
+        # Use view_name (snake_case) for compiled output, source_filename for Vite HMR
+        target_file = use_source_imports ? source_filename : "#{view_name}.js"
         unified_js += "import #{view_name}_component from './#{resource}/#{target_file}';\n"
         render_exports << "#{view_name}: #{view_name}_component"
       end
