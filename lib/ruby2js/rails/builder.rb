@@ -1877,24 +1877,22 @@ class SelfhostBuilder
       has_new = true if view_name == 'new'
 
       source_filename = File.basename(file_info[:path])
+      ext = file_info[:ext]
 
-      # Different file types have different export patterns
-      case file_info[:ext]
-      when '.html.erb'
-        # ERB exports: export function render(...)
-        import_file = use_source_imports ? source_filename : source_filename.sub('.html.erb', '.js')
-        unified_js += "import { render as #{view_name}_render } from './#{resource}/#{import_file}';\n"
+      # Determine import file based on source imports setting
+      # For Vite (browser): import from source files for HMR
+      # For Node/other: import from compiled .js files
+      if ext == '.html.erb'
+        target_file = use_source_imports ? source_filename : source_filename.sub('.html.erb', '.js')
+        unified_js += "import { render as #{view_name}_render } from './#{resource}/#{target_file}';\n"
         render_exports << "#{view_name}: #{view_name}_render"
-      when '.rb'
-        # Phlex exports: export default function render(...) or export function render(...)
-        # Try to import default first, fall back to named
-        import_file = use_source_imports ? source_filename : source_filename.sub('.rb', '.js')
-        unified_js += "import #{view_name}_module from './#{resource}/#{import_file}';\n"
+      elsif ext == '.rb'
+        target_file = use_source_imports ? source_filename : source_filename.sub('.rb', '.js')
+        unified_js += "import #{view_name}_module from './#{resource}/#{target_file}';\n"
         render_exports << "#{view_name}: #{view_name}_module.render || #{view_name}_module"
-      when '.rbx', '.jsx', '.tsx'
-        # RBX/JSX exports: export default function/component
-        import_file = use_source_imports ? source_filename : source_filename.sub(/\.(rbx|jsx|tsx)$/, '.js')
-        unified_js += "import #{view_name}_component from './#{resource}/#{import_file}';\n"
+      elsif ext == '.rbx' || ext == '.jsx' || ext == '.tsx'
+        target_file = use_source_imports ? source_filename : source_filename.sub(/\.(rbx|jsx|tsx)$/, '.js')
+        unified_js += "import #{view_name}_component from './#{resource}/#{target_file}';\n"
         render_exports << "#{view_name}: #{view_name}_component"
       end
     end
@@ -1905,8 +1903,8 @@ class SelfhostBuilder
     Dir.glob(File.join(resource_dist_dir, '_*.html.erb')).each do |partial_path|
       partial_filename = File.basename(partial_path)  # e.g., "_photo.html.erb"
       partial_basename = File.basename(partial_path, '.html.erb')  # e.g., "_photo"
-      import_file = use_source_imports ? partial_filename : partial_filename.sub('.html.erb', '.js')
-      unified_js += "import { render as #{partial_basename}_render } from './#{resource}/#{import_file}';\n"
+      partial_target = use_source_imports ? partial_filename : partial_filename.sub('.html.erb', '.js')
+      unified_js += "import { render as #{partial_basename}_render } from './#{resource}/#{partial_target}';\n"
       render_exports << "#{partial_basename}: #{partial_basename}_render"
     end
 
