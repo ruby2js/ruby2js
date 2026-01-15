@@ -26,8 +26,8 @@ echo ""
 rails new "$APP_NAME" --skip-git --skip-docker --css tailwind
 cd "$APP_NAME"
 
-# Generate Workflow model
-rails generate model Workflow name:string
+# Generate Workflow model (--force needed because Rails reserves this name)
+rails generate model Workflow name:string --force
 
 # Generate Node model (belongs to workflow)
 rails generate model Node workflow:references label:string node_type:string position_x:float position_y:float

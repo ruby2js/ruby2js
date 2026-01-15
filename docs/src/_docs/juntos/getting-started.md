@@ -250,5 +250,6 @@ Nested routes and path helpers work as expected.
 - **[Demo Applications](/docs/juntos/demos/)** — Hands-on examples
 - **[CLI Reference](/docs/juntos/cli)** — All commands and options
 - **[Architecture](/docs/juntos/architecture)** — What gets generated
+- **[Testing](/docs/juntos/testing)** — Write tests for your transpiled app
 - **[Hotwire](/docs/juntos/hotwire)** — Real-time features
 - **[Deployment](/docs/juntos/deploying/)** — Platform-specific guides

@@ -130,4 +130,5 @@ All demos run on browser, Node.js, and edge platforms from the same code. The Ph
 - **[Hotwire](/docs/juntos/hotwire)** — Real-time features and Stimulus controllers
 - **[CLI Reference](/docs/juntos/cli)** — The `juntos` commands
 - **[Architecture](/docs/juntos/architecture)** — What gets generated and how it works
+- **[Testing](/docs/juntos/testing)** — Write tests for your transpiled app
 - **[Deployment](/docs/juntos/deploying/)** — Deploy to any target

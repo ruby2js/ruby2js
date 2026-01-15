@@ -307,3 +307,9 @@ After building, you can take `dist/` and develop purely in JavaScript:
 4. Modify transpiled files as needed
 
 The generated code isn't obfuscated or minified—it's meant to be readable and maintainable. This is an intentional escape hatch: Juntos gets you started quickly, but you're not locked in.
+
+## Next Steps
+
+- **[Testing](/docs/juntos/testing)** — Write tests for your transpiled app
+- **[Hotwire](/docs/juntos/hotwire)** — Real-time features with Turbo and Stimulus
+- **[Deployment](/docs/juntos/deploying/)** — Platform-specific deployment guides
