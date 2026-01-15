@@ -353,7 +353,8 @@ jobs:
           for demo in blog chat photo_gallery workflow; do
             echo "Building $demo for browser..."
             base_path="/ruby2js/${demo//_/-}/"
-            (cd "artifacts/$demo" && bundle install --quiet && bin/juntos build -d dexie -t browser --base "$base_path" --sourcemap)
+            # Install fresh tarballs into demo (overrides old packages from demo tarball)
+            (cd "artifacts/$demo" && npm install ../tarballs/ruby2js-rails-beta.tgz && bundle install --quiet && bin/juntos build -d dexie -t browser --base "$base_path" --sourcemap)
           done
 
       - name: Assemble site
