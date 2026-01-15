@@ -417,6 +417,9 @@ jobs:
         run: |
           mkdir -p _site
 
+          # Copy favicon
+          cp docs/src/favicon.ico _site/
+
           # Copy tarballs to releases/
           mkdir -p _site/releases
           cp artifacts/tarballs/*.tgz _site/releases/

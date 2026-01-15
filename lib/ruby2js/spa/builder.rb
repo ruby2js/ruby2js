@@ -397,7 +397,8 @@ module Ruby2JS
 
         # Base dependencies
         dependencies = {
-          "ruby2js-rails" => "https://www.ruby2js.com/releases/ruby2js-rails-beta.tgz"
+          "ruby2js" => "https://ruby2js.github.io/ruby2js/releases/ruby2js-beta.tgz",
+          "ruby2js-rails" => "https://ruby2js.github.io/ruby2js/releases/ruby2js-rails-beta.tgz"
         }
 
         # Add database-specific dependency

@@ -372,7 +372,10 @@ class SelfhostBuilder
         'ruby2js' => "file:#{selfhost_path}"
       }
     else
-      { 'ruby2js-rails' => 'https://www.ruby2js.com/releases/ruby2js-rails-beta.tgz' }
+      {
+        'ruby2js' => 'https://ruby2js.github.io/ruby2js/releases/ruby2js-beta.tgz',
+        'ruby2js-rails' => 'https://ruby2js.github.io/ruby2js/releases/ruby2js-rails-beta.tgz'
+      }
     end
 
     # Hotwire Turbo and Stimulus - used by all targets

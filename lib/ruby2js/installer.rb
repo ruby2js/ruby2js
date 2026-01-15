@@ -50,7 +50,7 @@ module Ruby2JS
         relative_path = Pathname.new(local_plugin).relative_path_from(Pathname.new(dist_dir))
         package["devDependencies"]["vite-plugin-ruby2js"] = "file:#{relative_path}"
       else
-        package["devDependencies"]["vite-plugin-ruby2js"] = "https://www.ruby2js.com/releases/vite-plugin-ruby2js-beta.tgz"
+        package["devDependencies"]["vite-plugin-ruby2js"] = "https://ruby2js.github.io/ruby2js/releases/vite-plugin-ruby2js-beta.tgz"
       end
 
       package["scripts"] ||= {}
