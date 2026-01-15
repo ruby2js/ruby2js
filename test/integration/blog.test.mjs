@@ -351,6 +351,22 @@ describe('Blog Integration Tests', () => {
       expect(html).toContain(`/articles/${article.id}/comments/${comment.id}`);
     });
 
+    it('path helpers should not double the base path', async () => {
+      // Import path helpers and verify they have single base path
+      const { article_path, articles_path } = await import(join(DIST_DIR, 'config/paths.js'));
+
+      // articles_path should be /articles (no base in test build)
+      // or /ruby2js/blog/articles (with base) - but NOT doubled
+      const articlesPath = articles_path();
+      console.log('articles_path():', articlesPath);
+      expect(articlesPath).not.toContain('/ruby2js/blog/ruby2js/blog');
+
+      // article_path should not have doubled base
+      const articlePath = article_path({ id: 1 });
+      console.log('article_path({id: 1}):', articlePath);
+      expect(articlePath).not.toContain('/ruby2js/blog/ruby2js/blog');
+    });
+
     it('form actions should include base path when configured', async () => {
       // This test checks view-generated form actions (separate issue from redirect_to)
       const article = await Article.create({

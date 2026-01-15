@@ -69,6 +69,8 @@ jobs:
 
       - name: Create blog demo
         run: |
+          # Point bundler to the checked-out ruby2js repo instead of fetching from GitHub
+          bundle config set --global local.ruby2js $GITHUB_WORKSPACE
           test/blog/create-blog artifacts/blog
           tar -czf artifacts/demo-blog.tar.gz -C artifacts blog
 
@@ -100,6 +102,8 @@ jobs:
 
       - name: Create chat demo
         run: |
+          # Point bundler to the checked-out ruby2js repo instead of fetching from GitHub
+          bundle config set --global local.ruby2js $GITHUB_WORKSPACE
           test/chat/create-chat artifacts/chat
           tar -czf artifacts/demo-chat.tar.gz -C artifacts chat
 
@@ -131,6 +135,8 @@ jobs:
 
       - name: Create photo_gallery demo
         run: |
+          # Point bundler to the checked-out ruby2js repo instead of fetching from GitHub
+          bundle config set --global local.ruby2js $GITHUB_WORKSPACE
           test/photo_gallery/create-photo-gallery artifacts/photo_gallery
           tar -czf artifacts/demo-photo-gallery.tar.gz -C artifacts photo_gallery
 
@@ -162,6 +168,8 @@ jobs:
 
       - name: Create workflow demo
         run: |
+          # Point bundler to the checked-out ruby2js repo instead of fetching from GitHub
+          bundle config set --global local.ruby2js $GITHUB_WORKSPACE
           test/workflow/create-workflow artifacts/workflow
           tar -czf artifacts/demo-workflow.tar.gz -C artifacts workflow
 
