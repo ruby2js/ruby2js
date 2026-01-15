@@ -430,6 +430,62 @@ beforeEach(async () => {
 
 Each test gets a clean slate. No cleanup needed. Tests can run in parallel without interference.
 
+## Testing React Components
+
+Applications using RBX files with React (like the workflow demo) need jsdom for DOM simulation:
+
+```bash
+npm install --save-dev jsdom
+```
+
+Update `vitest.config.mjs`:
+
+```javascript
+import { defineConfig } from 'vitest/config';
+import { resolve } from 'path';
+
+export default defineConfig({
+  test: {
+    testTimeout: 30000,
+    environment: 'jsdom',  // Enable DOM simulation
+    css: false,            // Mock CSS imports
+  },
+  resolve: {
+    alias: {
+      'ruby2js-rails': resolve(__dirname, 'workspace/myapp/dist/node_modules/ruby2js-rails'),
+      // Map absolute imports used by React components
+      '/lib/': resolve(__dirname, 'workspace/myapp/dist/lib') + '/',
+      '/app/': resolve(__dirname, 'workspace/myapp/dist/app') + '/',
+    }
+  }
+});
+```
+
+The `/lib/` and `/app/` aliases resolve absolute imports like `import JsonStreamProvider from '/lib/JsonStreamProvider.js'` that React components use.
+
+### Testing Controllers with React Views
+
+Controllers that return React component output work the same way:
+
+```javascript
+describe('WorkflowsController', () => {
+  it('show renders workflow canvas', async () => {
+    const workflow = await Workflow.create({ name: 'Test Flow' });
+
+    const context = {
+      params: { id: workflow.id },
+      flash: { get: () => '', consumeNotice: () => '', consumeAlert: () => '' },
+      contentFor: {}
+    };
+
+    const result = await WorkflowsController.show(context, workflow.id);
+
+    // React components return rendered output
+    expect(result).toBeDefined();
+  });
+});
+```
+
 ## Running Tests
 
 ```bash

@@ -8,7 +8,9 @@
     "test:watch": "vitest"
   },
   "devDependencies": {
-    "vitest": "^3.0.0",
-    "better-sqlite3": "^11.10.0"
+    "@vitejs/plugin-react": "^5.1.2",
+    "better-sqlite3": "^11.10.0",
+    "jsdom": "^27.0.1",
+    "vitest": "^3.0.0"
   }
 }

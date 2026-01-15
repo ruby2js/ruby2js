@@ -442,6 +442,9 @@ module Ruby2JS
               return transform_redirect_to(args)
             elsif target.nil? && method == :render
               return transform_render(args)
+            elsif target.nil? && method == :head
+              # head :ok -> nil (just an acknowledgment, no response body)
+              return s(:nil)
             elsif target&.type == :send &&
                   target.children[0].nil? &&
                   target.children[1] == :params &&
@@ -811,6 +814,19 @@ module Ruby2JS
                   s(:hash,
                     s(:pair, s(:sym, :"$context"), s(:lvar, :context)),
                     s(:pair, s(:sym, model_name), s(:lvar, model_name))))))
+          elsif target.type == :hash
+            # render json: @node -> return the expression directly
+            # render json: { errors: @node.errors }, status: :unprocessable_entity -> return errors hash
+            target.children.each do |pair|
+              next unless pair.type == :pair
+              key = pair.children[0]
+              value = pair.children[1]
+              if key.type == :sym && key.children[0] == :json
+                # Transform the value (convert @ivar to local var)
+                return transform_ivars_to_locals(value)
+              end
+            end
+            nil
           else
             # More complex render - pass through for now
             nil

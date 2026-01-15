@@ -221,6 +221,61 @@ describe Ruby2JS::Filter::Rails::Controller do
       result = to_js(source)
       _(result).must_include '{render:'
     end
+
+    it "converts render json: @model to return the model" do
+      source = <<~RUBY
+        class ArticlesController < ApplicationController
+          def create
+            @article = Article.new
+            if @article.save
+              render json: @article
+            else
+              render json: { errors: @article.errors }
+            end
+          end
+        end
+      RUBY
+
+      result = to_js(source)
+      # Should return article directly, not wrapped in render hash
+      _(result).must_include 'await article.save() ? article :'
+      _(result).wont_include '{render:'
+    end
+
+    it "converts render json: hash to return the hash" do
+      source = <<~RUBY
+        class ArticlesController < ApplicationController
+          def create
+            @article = Article.new
+            render json: { errors: @article.errors }
+          end
+        end
+      RUBY
+
+      result = to_js(source)
+      # Should return the error hash directly
+      _(result).must_include '{errors: article.errors}'
+      _(result).wont_include '{render:'
+    end
+  end
+
+  describe 'head transformation' do
+    it "converts head :ok to return null" do
+      source = <<~RUBY
+        class ArticlesController < ApplicationController
+          def destroy
+            @article = Article.find(params[:id])
+            @article.destroy
+            head :ok
+          end
+        end
+      RUBY
+
+      result = to_js(source)
+      # head :ok should become null (no response body)
+      _(result).must_include 'return null'
+      _(result).wont_include 'head('
+    end
   end
 
   describe 'before_action' do

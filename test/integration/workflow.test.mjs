@@ -35,21 +35,15 @@ describe('Workflow Builder Integration Tests', () => {
     Node = models.Node;
     Edge = models.Edge;
 
-    // Import controllers (may fail due to React dependencies in views)
-    // Controller tests are skipped if imports fail
-    try {
-      const workflowsCtrl = await import(join(DIST_DIR, 'app/controllers/workflows_controller.js'));
-      WorkflowsController = workflowsCtrl.WorkflowsController;
+    // Import controllers
+    const workflowsCtrl = await import(join(DIST_DIR, 'app/controllers/workflows_controller.js'));
+    WorkflowsController = workflowsCtrl.WorkflowsController;
 
-      const nodesCtrl = await import(join(DIST_DIR, 'app/controllers/nodes_controller.js'));
-      NodesController = nodesCtrl.NodesController;
+    const nodesCtrl = await import(join(DIST_DIR, 'app/controllers/nodes_controller.js'));
+    NodesController = nodesCtrl.NodesController;
 
-      const edgesCtrl = await import(join(DIST_DIR, 'app/controllers/edges_controller.js'));
-      EdgesController = edgesCtrl.EdgesController;
-    } catch (e) {
-      // Controllers use React views that don't work in Node.js test environment
-      console.log('Skipping controller imports (React dependencies):', e.message);
-    }
+    const edgesCtrl = await import(join(DIST_DIR, 'app/controllers/edges_controller.js'));
+    EdgesController = edgesCtrl.EdgesController;
 
     // Configure Application with migrations
     Application.configure({ migrations });
@@ -293,8 +287,7 @@ describe('Workflow Builder Integration Tests', () => {
     });
   });
 
-  // Controller tests are skipped because workflow uses React views that require browser environment
-  describe.skipIf(!WorkflowsController)('WorkflowsController', () => {
+  describe('WorkflowsController', () => {
     it('index action returns workflow list', async () => {
       await Workflow.create({ name: 'Listed Workflow' });
 
@@ -360,7 +353,7 @@ describe('Workflow Builder Integration Tests', () => {
     });
   });
 
-  describe.skipIf(!NodesController)('NodesController', () => {
+  describe('NodesController', () => {
     let workflow;
 
     beforeEach(async () => {
@@ -380,13 +373,12 @@ describe('Workflow Builder Integration Tests', () => {
         position_y: 75
       };
 
-      const result = await NodesController.create(context, workflow.id, params);
+      await NodesController.create(context, workflow.id, params);
 
-      expect(result.id).toBeDefined();
-      expect(result.label).toBe('New Node');
-
+      // Verify node was created in database
       const nodes = await Node.where({ workflow_id: workflow.id });
       expect(nodes.length).toBe(1);
+      expect(nodes[0].label).toBe('New Node');
     });
 
     it('update action modifies node', async () => {
@@ -430,7 +422,7 @@ describe('Workflow Builder Integration Tests', () => {
     });
   });
 
-  describe.skipIf(!EdgesController)('EdgesController', () => {
+  describe('EdgesController', () => {
     let workflow, sourceNode, targetNode;
 
     beforeEach(async () => {
