@@ -785,7 +785,8 @@ module Ruby2JS
 
         def build_path_helper(helper)
           # Build the path string with interpolations for params
-          path = helper[:path]
+          # Prepend base path if configured (e.g., '/ruby2js/blog' for subdirectory deployments)
+          path = base_path + helper[:path]
           params = helper[:params]
 
           if params.empty?

@@ -315,8 +315,8 @@ task :release => [:build, :build_lib, "build_mjs:npm"] do
   Dir.chdir(tarballs_dir) do
     Dir.glob('ruby2js-6*.tgz').each { |f| FileUtils.mv(f, 'ruby2js-beta.tgz') }
     Dir.glob('ruby2js-[0-9]*.tgz').each { |f| FileUtils.mv(f, 'ruby2js-beta.tgz') } if !File.exist?('ruby2js-beta.tgz')
-    Dir.glob('ruby2js-rails-*.tgz').each { |f| FileUtils.mv(f, 'ruby2js-rails-beta.tgz') }
-    Dir.glob('vite-plugin-ruby2js-*.tgz').each { |f| FileUtils.mv(f, 'vite-plugin-ruby2js-beta.tgz') }
+    Dir.glob('ruby2js-rails-*.tgz').reject { |f| f == 'ruby2js-rails-beta.tgz' }.each { |f| FileUtils.mv(f, 'ruby2js-rails-beta.tgz') }
+    Dir.glob('vite-plugin-ruby2js-*.tgz').reject { |f| f == 'vite-plugin-ruby2js-beta.tgz' }.each { |f| FileUtils.mv(f, 'vite-plugin-ruby2js-beta.tgz') }
   end
 
   puts ""
