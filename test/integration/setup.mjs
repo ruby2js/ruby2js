@@ -66,7 +66,12 @@ async function setup() {
     }
     console.log('1. Copying local tarballs...');
     execSync(`cp ${localTarballs}/*.tgz ${tarballs}/`);
-    execSync(`cp ${PROJECT_ROOT}/artifacts/demo-${demoHyphen}/demo-${demoHyphen}.tar.gz ${tarballs}/`);
+    // CI downloads artifact to artifacts/demo-*.tar.gz directly
+    // Local rake builds to artifacts/demo-*/demo-*.tar.gz
+    const ciPath = join(PROJECT_ROOT, `artifacts/demo-${demoHyphen}.tar.gz`);
+    const localPath = join(PROJECT_ROOT, `artifacts/demo-${demoHyphen}/demo-${demoHyphen}.tar.gz`);
+    const demoTarball = existsSync(ciPath) ? ciPath : localPath;
+    execSync(`cp ${demoTarball} ${tarballs}/`);
   } else if (useLocalPackages) {
     // Download demo from releases, use local npm packages
     const localTarballs = join(PROJECT_ROOT, 'artifacts/tarballs');

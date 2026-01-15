@@ -14,6 +14,7 @@ demo/selfhost/filters/
 demo/selfhost/lib/
 packages/ruby2js-rails/build.mjs
 packages/ruby2js-rails/lib/
+packages/ruby2js-rails/ruby2js.js
 
 # Editor swap files
 *.swp

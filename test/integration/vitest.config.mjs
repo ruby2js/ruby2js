@@ -23,6 +23,12 @@ export default defineConfig({
     globals: true,
     testTimeout: 30000,
     hookTimeout: 30000,
+    // Mock CSS imports (for React Flow in workflow demo)
+    css: false,
+  },
+  // Disable sourcemap processing to avoid issues with some generated maps
+  build: {
+    sourcemap: false,
   },
   resolve: {
     alias: ruby2jsRailsPath ? {
@@ -31,5 +37,10 @@ export default defineConfig({
     } : {},
   },
   // Treat .erb files as assets (don't try to parse them)
-  assetsInclude: ['**/*.erb', '**/*.rb'],
+  assetsInclude: ['**/*.erb', '**/*.rb', '**/*.css'],
+  // SSR options for workflow demo's React dependencies
+  ssr: {
+    // Don't try to externalize React/ReactFlow (let Vite handle them)
+    noExternal: ['react', 'react-dom', 'reactflow'],
+  },
 });

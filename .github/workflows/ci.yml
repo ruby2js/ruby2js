@@ -318,6 +318,46 @@ jobs:
       - name: Run smoke test
         run: node test/smoke-test.mjs artifacts/chat --database ${{ matrix.database }}
 
+  integration-test:
+    needs: [build-tarballs, create-blog, create-chat, create-photo-gallery, create-workflow]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        demo: [blog, chat, photo_gallery, workflow]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+          bundler-cache: true
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Download tarballs
+        uses: actions/download-artifact@v4
+        with:
+          name: tarballs
+          path: artifacts/tarballs
+
+      - name: Download demo
+        uses: actions/download-artifact@v4
+        with:
+          name: demo-${{ matrix.demo == 'photo_gallery' && 'photo-gallery' || matrix.demo }}
+          path: artifacts
+
+      - name: Run integration tests
+        run: |
+          cd test/integration
+          npm install
+          node setup.mjs --local ${{ matrix.demo }}
+          npm test -- ${{ matrix.demo }}.test.mjs
+
   # ===========================================================================
   # Stage 2: Deploy (runs in parallel with tests, depends on Stage 1)
   # ===========================================================================

@@ -9,10 +9,8 @@ docs/.bridgetown-cache
 docs/.bridgetown-metadata
 
 # Dependencies (reinstalled in container)
-docs/node_modules
+node_modules
 docs/vendor
-demo/selfhost/node_modules
-packages/ruby2js-rails/node_modules
 
 # Environment/secrets
 .env
@@ -24,6 +22,7 @@ packages/ruby2js-rails/node_modules
 *.swo
 .idea
 .vscode
+mise.toml
 
 # Logs
 *.log
@@ -43,12 +42,19 @@ demo/selfhost/ruby2js.mjs
 demo/selfhost/prism_browser.js
 demo/selfhost/filters/
 demo/selfhost/lib/
+packages/ruby2js-rails/build.mjs
+packages/ruby2js-rails/lib/
+packages/ruby2js-rails/ruby2js.js
 
-# Release tarballs
+# Build artifacts
+pkg
 *.tgz
 
-# Local test demos (generated Rails apps)
+# Local test demos and generated files
+demo/assets
+demo/filters.opal
 demo/blog/
 demo/chat/
 demo/photo_gallery/
 demo/workflow_builder/
+testrails
