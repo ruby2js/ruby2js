@@ -186,10 +186,12 @@ describe Ruby2JS::Filter::Rails::Controller do
       RUBY
 
       result = to_js(source)
-      _(result).must_include '{redirect: "/articles"}'
+      # Now uses path helper instead of hardcoded path (respects base path config)
+      _(result).must_include '{redirect: articles_path}'
+      _(result).must_include 'import([articles_path],' # path helper is imported
     end
 
-    it "converts redirect_to @model to dynamic path" do
+    it "converts redirect_to @model to path helper call" do
       source = <<~RUBY
         class ArticlesController < ApplicationController
           def create
@@ -200,7 +202,9 @@ describe Ruby2JS::Filter::Rails::Controller do
       RUBY
 
       result = to_js(source)
-      _(result).must_include '{redirect: `/articles/${article.id'
+      # Now uses path helper instead of hardcoded path (respects base path config)
+      _(result).must_include '{redirect: article_path(article)}'
+      _(result).must_include 'import([article_path]' # path helper is imported
     end
   end
 

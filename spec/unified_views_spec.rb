@@ -162,7 +162,8 @@ describe "Unified Views Module" do
       views_dist_dir = File.join(@dist_dir, 'app/views')
       FileUtils.mkdir_p(views_dist_dir)
 
-      builder = SelfhostBuilder.new(@dist_dir)
+      # vite: true enables source imports for Vite HMR
+      builder = SelfhostBuilder.new(@dist_dir, vite: true)
       capture_io do
         builder.send(:generate_unified_views_module, 'articles', views_by_name, views_dist_dir, ['index: ERB', 'show: ERB'])
       end
@@ -186,7 +187,8 @@ describe "Unified Views Module" do
       views_dist_dir = File.join(@dist_dir, 'app/views')
       FileUtils.mkdir_p(views_dist_dir)
 
-      builder = SelfhostBuilder.new(@dist_dir)
+      # vite: true enables source imports for Vite HMR
+      builder = SelfhostBuilder.new(@dist_dir, vite: true)
       capture_io do
         builder.send(:generate_unified_views_module, 'articles', views_by_name, views_dist_dir, ['index: Phlex'])
       end
@@ -204,7 +206,8 @@ describe "Unified Views Module" do
       views_dist_dir = File.join(@dist_dir, 'app/views')
       FileUtils.mkdir_p(views_dist_dir)
 
-      builder = SelfhostBuilder.new(@dist_dir)
+      # vite: true enables source imports for Vite HMR
+      builder = SelfhostBuilder.new(@dist_dir, vite: true)
       capture_io do
         builder.send(:generate_unified_views_module, 'admin', views_by_name, views_dist_dir, ['dashboard: JSX'])
       end
