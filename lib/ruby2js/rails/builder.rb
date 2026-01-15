@@ -722,7 +722,7 @@ class SelfhostBuilder
   # Instance methods
   # ============================================================
 
-  def initialize(dist_dir = nil, target: nil, database: nil, broadcast: nil, base: nil, vite: nil)
+  def initialize(dist_dir = nil, target: nil, database: nil, broadcast: nil, base: nil, vite: nil, sourcemap: true)
     @dist_dir = dist_dir || File.join(DEMO_ROOT, 'dist')
     @database_override = database  # CLI override for database adapter
     @database = nil  # Set during build from config or override
@@ -732,6 +732,7 @@ class SelfhostBuilder
     @base = base  # Base path for routes (e.g., '/blog' when serving from subdirectory)
     @model_associations = {}  # model_name -> [association_names]
     @vite = vite  # nil = auto (true for browser), false = force compiled imports
+    @sourcemap = sourcemap  # Generate sourcemaps for transpiled files
   end
 
   # Note: Using explicit () on all method calls for JS transpilation compatibility
@@ -1525,21 +1526,25 @@ class SelfhostBuilder
 
     FileUtils.mkdir_p(File.dirname(dest_path))
 
-    # Copy source file alongside transpiled output for source maps
-    src_basename = File.basename(src_path)
-    copied_src_path = File.join(File.dirname(dest_path), src_basename)
-    File.write(copied_src_path, source)
+    if @sourcemap
+      # Copy source file alongside transpiled output for source maps
+      src_basename = File.basename(src_path)
+      copied_src_path = File.join(File.dirname(dest_path), src_basename)
+      File.write(copied_src_path, source)
 
-    # Generate sourcemap - source is in same directory
-    map_path = "#{dest_path}.map"
-    sourcemap = result.sourcemap
-    sourcemap[:sourcesContent] = [source]
-    sourcemap[:sources] = ["./#{src_basename}"]
+      # Generate sourcemap - source is in same directory
+      map_path = "#{dest_path}.map"
+      sourcemap = result.sourcemap
+      sourcemap[:sourcesContent] = [source]
+      sourcemap[:sources] = ["./#{src_basename}"]
 
-    # Add sourcemap reference to JS file
-    js_with_map = "#{js}\n//# sourceMappingURL=#{File.basename(map_path)}\n"
-    File.write(dest_path, js_with_map)
-    File.write(map_path, JSON.generate(sourcemap))
+      # Add sourcemap reference to JS file
+      js_with_map = "#{js}\n//# sourceMappingURL=#{File.basename(map_path)}\n"
+      File.write(dest_path, js_with_map)
+      File.write(map_path, JSON.generate(sourcemap))
+    else
+      File.write(dest_path, js)
+    end
 
     puts("  -> #{dest_path}")
   end
@@ -1563,16 +1568,16 @@ class SelfhostBuilder
     # --loader: jsx or tsx
     # --jsx: transform (converts JSX to React.createElement)
     # --format: esm (keep ES modules)
-    # --sourcemap: generate source map
+    # --sourcemap: generate source map (optional)
     esbuild_cmd = [
       'npx', 'esbuild',
       src_path,
       "--loader=#{loader}",
       '--jsx=transform',
       '--format=esm',
-      "--outfile=#{dest_path}",
-      '--sourcemap'
+      "--outfile=#{dest_path}"
     ]
+    esbuild_cmd << '--sourcemap' if @sourcemap
 
     Dir.chdir(@dist_dir) do
       success = system(*esbuild_cmd, [:out, :err] => File::NULL)
@@ -1623,21 +1628,25 @@ class SelfhostBuilder
 
     FileUtils.mkdir_p(File.dirname(dest_path))
 
-    # Copy source file alongside transpiled output for source maps
-    src_basename = File.basename(src_path)
-    copied_src_path = File.join(File.dirname(dest_path), src_basename)
-    File.write(copied_src_path, template)
+    if @sourcemap
+      # Copy source file alongside transpiled output for source maps
+      src_basename = File.basename(src_path)
+      copied_src_path = File.join(File.dirname(dest_path), src_basename)
+      File.write(copied_src_path, template)
 
-    # Generate source map - source is in same directory
-    map_path = "#{dest_path}.map"
-    sourcemap = result.sourcemap
-    sourcemap[:sourcesContent] = [template]  # Use original ERB, not Ruby
-    sourcemap[:sources] = ["./#{src_basename}"]
+      # Generate source map - source is in same directory
+      map_path = "#{dest_path}.map"
+      sourcemap = result.sourcemap
+      sourcemap[:sourcesContent] = [template]  # Use original ERB, not Ruby
+      sourcemap[:sources] = ["./#{src_basename}"]
 
-    # Add sourcemap reference to JS file
-    js_with_map = "#{js}\n//# sourceMappingURL=#{File.basename(map_path)}\n"
-    File.write(dest_path, js_with_map)
-    File.write(map_path, JSON.generate(sourcemap))
+      # Add sourcemap reference to JS file
+      js_with_map = "#{js}\n//# sourceMappingURL=#{File.basename(map_path)}\n"
+      File.write(dest_path, js_with_map)
+      File.write(map_path, JSON.generate(sourcemap))
+    else
+      File.write(dest_path, js)
+    end
 
     puts("  -> #{dest_path}")
     js
@@ -1824,20 +1833,24 @@ class SelfhostBuilder
 
     FileUtils.mkdir_p(File.dirname(dest_path))
 
-    # Copy source file alongside transpiled output for source maps
-    src_basename = File.basename(src_path)
-    copied_src_path = File.join(File.dirname(dest_path), src_basename)
-    File.write(copied_src_path, source)
+    if @sourcemap
+      # Copy source file alongside transpiled output for source maps
+      src_basename = File.basename(src_path)
+      copied_src_path = File.join(File.dirname(dest_path), src_basename)
+      File.write(copied_src_path, source)
 
-    # Generate sourcemap
-    map_path = "#{dest_path}.map"
-    sourcemap = result.sourcemap
-    sourcemap[:sourcesContent] = [source]
-    sourcemap[:sources] = ["./#{src_basename}"]
+      # Generate sourcemap
+      map_path = "#{dest_path}.map"
+      sourcemap = result.sourcemap
+      sourcemap[:sourcesContent] = [source]
+      sourcemap[:sources] = ["./#{src_basename}"]
 
-    js_with_map = "#{js}\n//# sourceMappingURL=#{File.basename(map_path)}\n"
-    File.write(dest_path, js_with_map)
-    File.write(map_path, JSON.generate(sourcemap))
+      js_with_map = "#{js}\n//# sourceMappingURL=#{File.basename(map_path)}\n"
+      File.write(dest_path, js_with_map)
+      File.write(map_path, JSON.generate(sourcemap))
+    else
+      File.write(dest_path, js)
+    end
 
     puts("  -> #{dest_path}")
   end
@@ -2299,21 +2312,25 @@ class SelfhostBuilder
 
     FileUtils.mkdir_p(File.dirname(dest_path))
 
-    # Copy source file alongside transpiled output for source maps
-    src_basename = File.basename(src_path)
-    copied_src_path = File.join(File.dirname(dest_path), src_basename)
-    File.write(copied_src_path, source)
+    if @sourcemap
+      # Copy source file alongside transpiled output for source maps
+      src_basename = File.basename(src_path)
+      copied_src_path = File.join(File.dirname(dest_path), src_basename)
+      File.write(copied_src_path, source)
 
-    # Generate sourcemap
-    map_path = "#{dest_path}.map"
-    sourcemap = result.sourcemap
-    sourcemap[:sourcesContent] = [source]
-    sourcemap[:sources] = ["./#{src_basename}"]
+      # Generate sourcemap
+      map_path = "#{dest_path}.map"
+      sourcemap = result.sourcemap
+      sourcemap[:sourcesContent] = [source]
+      sourcemap[:sources] = ["./#{src_basename}"]
 
-    # Add sourcemap reference to JS file
-    js_with_map = "#{js}\n//# sourceMappingURL=#{File.basename(map_path)}\n"
-    File.write(dest_path, js_with_map)
-    File.write(map_path, JSON.generate(sourcemap))
+      # Add sourcemap reference to JS file
+      js_with_map = "#{js}\n//# sourceMappingURL=#{File.basename(map_path)}\n"
+      File.write(dest_path, js_with_map)
+      File.write(map_path, JSON.generate(sourcemap))
+    else
+      File.write(dest_path, js)
+    end
 
     puts("  -> #{dest_path}")
   end
@@ -3116,12 +3133,14 @@ class SelfhostBuilder
     File.write(paths_path, paths_js)
     puts("  -> #{paths_path}")
 
-    # Generate sourcemap for paths.js
-    map_path = "#{paths_path}.map"
-    sourcemap = result.sourcemap
-    sourcemap[:sourcesContent] = [source]
-    File.write(map_path, JSON.generate(sourcemap))
-    puts("  -> #{map_path}")
+    if @sourcemap
+      # Generate sourcemap for paths.js
+      map_path = "#{paths_path}.map"
+      sourcemap = result.sourcemap
+      sourcemap[:sourcesContent] = [source]
+      File.write(map_path, JSON.generate(sourcemap))
+      puts("  -> #{map_path}")
+    end
 
     # Generate routes.js (imports path helpers from paths.js)
     puts("Transpiling: routes.rb -> routes.js")
@@ -3133,12 +3152,14 @@ class SelfhostBuilder
     File.write(routes_path, routes_js)
     puts("  -> #{routes_path}")
 
-    # Generate sourcemap for routes.js
-    map_path = "#{routes_path}.map"
-    sourcemap = result.sourcemap
-    sourcemap[:sourcesContent] = [source]
-    File.write(map_path, JSON.generate(sourcemap))
-    puts("  -> #{map_path}")
+    if @sourcemap
+      # Generate sourcemap for routes.js
+      map_path = "#{routes_path}.map"
+      sourcemap = result.sourcemap
+      sourcemap[:sourcesContent] = [source]
+      File.write(map_path, JSON.generate(sourcemap))
+      puts("  -> #{map_path}")
+    end
   end
 
   def generate_models_index()

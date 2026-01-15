@@ -116,8 +116,9 @@ async function setup() {
 
   // Use the Ruby builder since it's more reliable
   // Point to the local ruby2js gem for building
+  // sourcemap: false avoids Vite SSR transform issues with generated sourcemaps
   execSync(
-    `BUNDLE_GEMFILE="${PROJECT_ROOT}/Gemfile" bundle exec ruby -r ruby2js/rails/builder -e "SelfhostBuilder.new('dist', database: 'sqlite', target: 'browser', vite: false).build"`,
+    `BUNDLE_GEMFILE="${PROJECT_ROOT}/Gemfile" bundle exec ruby -r ruby2js/rails/builder -e "SelfhostBuilder.new('dist', database: 'sqlite', target: 'browser', vite: false, sourcemap: false).build"`,
     {
       cwd: demoDir,
       stdio: 'inherit'
