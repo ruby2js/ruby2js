@@ -8,11 +8,7 @@
     "test:watch": "vitest"
   },
   "devDependencies": {
-    "vitest": "^3.0.0"
-  },
-  "dependencies": {
-    "better-sqlite3": "^11.10.0",
-    "ruby2js": "file:workspace/tarballs/ruby2js-beta.tgz",
-    "ruby2js-rails": "file:workspace/tarballs/ruby2js-rails-beta.tgz"
+    "vitest": "^3.0.0",
+    "better-sqlite3": "^11.10.0"
   }
 }
