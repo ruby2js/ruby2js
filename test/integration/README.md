@@ -70,29 +70,60 @@ npm run setup -- --local-packages blog
 
 ```
 test/integration/
-├── package.json       # vitest, better-sqlite3 dependencies
-├── vitest.config.mjs  # Test configuration
-├── setup.mjs          # Downloads tarballs, builds demo
-├── blog.test.mjs      # Blog demo scenarios
-└── workspace/         # Created by setup.mjs
-    └── blog/
-        └── dist/      # Built demo (what tests import)
+├── package.json           # vitest, better-sqlite3 dependencies
+├── vitest.config.mjs      # Test configuration
+├── setup.mjs              # Downloads tarballs, builds demo
+├── blog.test.mjs          # Blog demo tests (articles, comments)
+├── chat.test.mjs          # Chat demo tests (messages)
+├── photo_gallery.test.mjs # Photo gallery tests (photos)
+├── workflow.test.mjs      # Workflow builder tests (workflows, nodes, edges)
+└── workspace/             # Created by setup.mjs
+    └── <demo>/
+        └── dist/          # Built demo (what tests import)
 ```
 
-## Adding Tests for Other Demos
+## Running Tests for Different Demos
 
-1. Run setup with the demo name: `node setup.mjs chat`
-2. Create a test file: `chat.test.mjs`
-3. Import from `workspace/chat/dist/`
+Each demo has its own test file. Setup the demo first, then run its tests:
+
+```bash
+# Blog demo (default)
+npm run setup
+npm test -- blog.test.mjs
+
+# Chat demo
+npm run setup -- chat
+npm test -- chat.test.mjs
+
+# Photo gallery demo
+npm run setup -- photo_gallery
+npm test -- photo_gallery.test.mjs
+
+# Workflow builder demo
+npm run setup -- workflow
+npm test -- workflow.test.mjs
+```
+
+## What Each Demo Tests
+
+| Demo | Models | Features |
+|------|--------|----------|
+| blog | Article, Comment | has_many, belongs_to, nested routes, validations |
+| chat | Message | simple CRUD, broadcasts_to |
+| photo_gallery | Photo | image data handling, optional fields |
+| workflow | Workflow, Node, Edge | multiple associations, nested resources, cascade delete |
 
 ## CI Integration
 
-These tests can be added to CI after the build-tarballs job:
+These tests can be added to CI after the build-tarballs and create-demo jobs:
 
 ```yaml
 integration-test:
-  needs: [build-tarballs]
+  needs: [build-tarballs, create-blog]  # Add other demos as needed
   runs-on: ubuntu-latest
+  strategy:
+    matrix:
+      demo: [blog]  # Add: chat, photo_gallery, workflow
   steps:
     - uses: actions/checkout@v4
     - uses: actions/setup-node@v4
@@ -102,10 +133,15 @@ integration-test:
       with:
         name: tarballs
         path: artifacts/tarballs
+    - name: Download demo
+      uses: actions/download-artifact@v4
+      with:
+        name: demo-${{ matrix.demo }}
+        path: artifacts
     - name: Run integration tests
       run: |
         cd test/integration
         npm install
-        node setup.mjs --local
-        npm test
+        node setup.mjs --local ${{ matrix.demo }}
+        npm test -- ${{ matrix.demo }}.test.mjs
 ```

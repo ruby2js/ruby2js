@@ -23,6 +23,8 @@ const useLocal = process.argv.includes('--local');
 const useLocalPackages = process.argv.includes('--local-packages');
 // Find demo name: skip node executable, script path, and flags
 const demo = process.argv.slice(2).find(arg => !arg.startsWith('-')) || 'blog';
+// Tarball names use hyphens (demo-photo-gallery), directories use underscores (photo_gallery)
+const demoHyphen = demo.replace(/_/g, '-');
 
 const sourceDesc = useLocal ? 'local artifacts (all)'
   : useLocalPackages ? 'remote demo + local packages'
@@ -31,11 +33,15 @@ const sourceDesc = useLocal ? 'local artifacts (all)'
 console.log(`Setting up integration tests for: ${demo}`);
 console.log(`Source: ${sourceDesc}\n`);
 
-// Clean and create workspace
-if (existsSync(WORK_DIR)) {
-  rmSync(WORK_DIR, { recursive: true });
-}
+// Create workspace if it doesn't exist
 mkdirSync(WORK_DIR, { recursive: true });
+
+// Clean existing demo directory if it exists
+const existingDemo = join(WORK_DIR, demo);
+if (existsSync(existingDemo)) {
+  console.log(`Removing existing ${demo} directory...`);
+  rmSync(existingDemo, { recursive: true });
+}
 
 async function downloadFile(url, dest) {
   console.log(`  Downloading ${url}...`);
@@ -49,7 +55,7 @@ async function downloadFile(url, dest) {
 
 async function setup() {
   const tarballs = join(WORK_DIR, 'tarballs');
-  mkdirSync(tarballs);
+  mkdirSync(tarballs, { recursive: true });
 
   if (useLocal) {
     // Copy everything from local artifacts
@@ -60,7 +66,7 @@ async function setup() {
     }
     console.log('1. Copying local tarballs...');
     execSync(`cp ${localTarballs}/*.tgz ${tarballs}/`);
-    execSync(`cp ${PROJECT_ROOT}/artifacts/demo-${demo}/demo-${demo}.tar.gz ${tarballs}/`);
+    execSync(`cp ${PROJECT_ROOT}/artifacts/demo-${demoHyphen}/demo-${demoHyphen}.tar.gz ${tarballs}/`);
   } else if (useLocalPackages) {
     // Download demo from releases, use local npm packages
     const localTarballs = join(PROJECT_ROOT, 'artifacts/tarballs');
@@ -69,32 +75,33 @@ async function setup() {
       process.exit(1);
     }
     console.log('1. Downloading demo tarball + copying local packages...');
-    await downloadFile(`${RELEASES_URL}/demo-${demo}.tar.gz`, join(tarballs, `demo-${demo}.tar.gz`));
+    await downloadFile(`${RELEASES_URL}/demo-${demoHyphen}.tar.gz`, join(tarballs, `demo-${demoHyphen}.tar.gz`));
     execSync(`cp ${localTarballs}/*.tgz ${tarballs}/`);
   } else {
     // Download everything from releases
     console.log('1. Downloading tarballs from releases...');
     await downloadFile(`${RELEASES_URL}/ruby2js-beta.tgz`, join(tarballs, 'ruby2js-beta.tgz'));
     await downloadFile(`${RELEASES_URL}/ruby2js-rails-beta.tgz`, join(tarballs, 'ruby2js-rails-beta.tgz'));
-    await downloadFile(`${RELEASES_URL}/demo-${demo}.tar.gz`, join(tarballs, `demo-${demo}.tar.gz`));
+    await downloadFile(`${RELEASES_URL}/demo-${demoHyphen}.tar.gz`, join(tarballs, `demo-${demoHyphen}.tar.gz`));
   }
 
   // Extract demo
   console.log(`\n2. Extracting ${demo} demo...`);
-  execSync(`tar -xzf ${tarballs}/demo-${demo}.tar.gz -C ${WORK_DIR}`);
+  execSync(`tar -xzf ${tarballs}/demo-${demoHyphen}.tar.gz -C ${WORK_DIR}`);
 
   const demoDir = join(WORK_DIR, demo);
+  const distDir = join(demoDir, 'dist');
 
-  // Install dependencies
-  console.log('\n3. Installing dependencies...');
+  // Install dependencies in dist/ (where package.json lives and builder looks for adapters)
+  console.log('\n3. Installing dependencies in dist/...');
   execSync(`npm install ${tarballs}/ruby2js-beta.tgz ${tarballs}/ruby2js-rails-beta.tgz`, {
-    cwd: demoDir,
+    cwd: distDir,
     stdio: 'inherit'
   });
 
-  // Install better-sqlite3 for the demo
+  // Install better-sqlite3 in dist/ for the demo
   execSync('npm install better-sqlite3', {
-    cwd: demoDir,
+    cwd: distDir,
     stdio: 'inherit'
   });
 
@@ -111,8 +118,6 @@ async function setup() {
       stdio: 'inherit'
     }
   );
-
-  const distDir = join(demoDir, 'dist');
 
   // When using local packages, reinstall them in dist/ to override the build's npm install
   // (the build's package.json has hardcoded URLs to released packages)
