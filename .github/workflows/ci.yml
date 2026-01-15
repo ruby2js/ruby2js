@@ -362,8 +362,8 @@ jobs:
             echo "Building $demo for browser..."
             base_path="/ruby2js/${demo//_/-}/"
             # Install fresh tarballs into demo (overrides old packages from demo tarball)
-            # Must install both: ruby2js (transpiler with filters) and ruby2js-rails (runtime)
-            (cd "artifacts/$demo" && npm install ../tarballs/ruby2js-beta.tgz ../tarballs/ruby2js-rails-beta.tgz && bundle install --quiet && bin/juntos build -d dexie -t browser --base "$base_path" --sourcemap)
+            # Must install all three: ruby2js (transpiler), ruby2js-rails (runtime), vite-plugin-ruby2js (build plugin)
+            (cd "artifacts/$demo" && npm install ../tarballs/ruby2js-beta.tgz ../tarballs/ruby2js-rails-beta.tgz ../tarballs/vite-plugin-ruby2js-beta.tgz && bundle install --quiet && bin/juntos build -d dexie -t browser --base "$base_path" --sourcemap)
           done
 
       - name: Assemble site
