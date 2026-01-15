@@ -441,6 +441,7 @@ jobs:
                 <li><a href="ruby2js-beta.tgz">ruby2js-beta.tgz</a> - Core transpiler</li>
                 <li><a href="ruby2js-rails-beta.tgz">ruby2js-rails-beta.tgz</a> - Rails integration</li>
                 <li><a href="vite-plugin-ruby2js-beta.tgz">vite-plugin-ruby2js-beta.tgz</a> - Vite plugin</li>
+                <li><a href="esbuild-plugin-ruby2js-beta.tgz">esbuild-plugin-ruby2js-beta.tgz</a> - esbuild plugin</li>
               </ul>
             </div>
             <div class="section">

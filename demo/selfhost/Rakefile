@@ -316,12 +316,19 @@ task :release => [:build, :build_lib, "build_mjs:npm"] do
     sh "npm version 1.0.0-beta --no-git-tag-version --allow-same-version"
   end
 
+  Dir.chdir(File.join(ROOT, 'packages/esbuild-plugin-ruby2js')) do
+    sh "npm version #{vite_plugin_version} --no-git-tag-version --allow-same-version"
+    sh "npm pack --pack-destination #{tarballs_dir}"
+    sh "npm version 1.0.0-beta --no-git-tag-version --allow-same-version"
+  end
+
   # Rename to stable names (strip version numbers for predictable paths)
   Dir.chdir(tarballs_dir) do
     Dir.glob('ruby2js-6*.tgz').each { |f| FileUtils.mv(f, 'ruby2js-beta.tgz') }
     Dir.glob('ruby2js-[0-9]*.tgz').each { |f| FileUtils.mv(f, 'ruby2js-beta.tgz') } if !File.exist?('ruby2js-beta.tgz')
     Dir.glob('ruby2js-rails-*.tgz').reject { |f| f == 'ruby2js-rails-beta.tgz' }.each { |f| FileUtils.mv(f, 'ruby2js-rails-beta.tgz') }
     Dir.glob('vite-plugin-ruby2js-*.tgz').reject { |f| f == 'vite-plugin-ruby2js-beta.tgz' }.each { |f| FileUtils.mv(f, 'vite-plugin-ruby2js-beta.tgz') }
+    Dir.glob('esbuild-plugin-ruby2js-*.tgz').reject { |f| f == 'esbuild-plugin-ruby2js-beta.tgz' }.each { |f| FileUtils.mv(f, 'esbuild-plugin-ruby2js-beta.tgz') }
   end
 
   puts ""

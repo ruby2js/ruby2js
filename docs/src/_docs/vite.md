@@ -158,16 +158,19 @@ RBX files are processed with the React filter and support:
 - React hooks
 - Component exports
 
-## Comparison with Other Bundlers
+## Comparison with esbuild
 
-| Feature | Vite | esbuild | Rollup | Webpack |
-|---------|------|---------|--------|---------|
-| Hot Module Replacement | Yes | No | No | Yes |
-| Dev Server | Built-in | No | No | Separate |
-| Source Maps | Yes | Yes | Yes | Yes |
-| Framework Presets | Yes | No | No | No |
+| Feature | Vite | esbuild |
+|---------|------|---------|
+| Hot Module Replacement | Yes | No |
+| Dev Server | Built-in | No |
+| Source Maps | Yes | No |
+| Framework Presets | Yes | No |
+| Build Speed | Fast | Fastest |
 
-Vite is recommended for new projects due to its fast dev server and built-in HMR.
+**Use Vite for:** Web applications, SPAs, projects needing HMR and dev server.
+
+**Use esbuild for:** CLI tools, Lambda functions, build scripts, backend services. See the [esbuild integration](/docs/esbuild) for details.
 
 ## Next Steps
 

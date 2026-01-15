@@ -37,12 +37,12 @@ The [ESM](/docs/filters/esm) filter lets you author `import` and `export` statem
 
 # JavaScript bundlers
 
-An [esbuild](https://www.npmjs.com/package/@ruby2js/esbuild-plugin) plugin,
-[Rollup](https://www.npmjs.com/package/@ruby2js/rollup-plugin) plugin,
-and a [Webpack](https://www.npmjs.com/package/@ruby2js/webpack-loader) loader are
-available.  Again, the [ESM](/docs/filters/esm)
-filter and [autoexports](/docs/options#auto-exports) and
-[autoimports](/docs/options#auto-imports) options are useful with bundlers.
+An [esbuild](/docs/esbuild) plugin is available for fast builds of CLI tools,
+serverless functions, and other non-web projects. For web applications with
+hot module replacement, see the [Vite](/docs/vite) integration.
+
+The [ESM](/docs/filters/esm) filter and [autoexports](/docs/options#auto-exports)
+and [autoimports](/docs/options#auto-imports) options are useful with bundlers.
 
 # Web Components
 
