@@ -290,25 +290,30 @@ end
 
 desc "Build everything for npm release (tarballs in artifacts/tarballs/)"
 task :release => [:build, :build_lib, "build_mjs:npm"] do
-  # Copy lib files to packages/ruby2js-rails/lib/ for npm pack
-  package_lib = File.join(PACKAGE, 'lib')
-  FileUtils.mkdir_p(package_lib)
-  FileUtils.cp Dir.glob("#{SELFHOST}/lib/*.js"), package_lib
-
-  # Copy ruby2js.js to package root (lib files import ../ruby2js.js)
-  FileUtils.cp File.join(SELFHOST, 'ruby2js.js'), PACKAGE
-
   tarballs_dir = File.join(ROOT, 'artifacts/tarballs')
   FileUtils.mkdir_p(tarballs_dir)
 
+  # Timestamped version for npm cache invalidation
+  timestamp = Time.now.strftime('%Y%m%d%H%M')
+  ruby2js_version = "6.0.0-beta.#{timestamp}"
+  vite_plugin_version = "1.0.0-beta.#{timestamp}"
+
   Dir.chdir(SELFHOST) do
+    sh "npm version #{ruby2js_version} --no-git-tag-version --allow-same-version"
     sh "npm pack --pack-destination #{tarballs_dir}"
+    sh "npm version 6.0.0-beta --no-git-tag-version --allow-same-version"
   end
+
   Dir.chdir(PACKAGE) do
+    sh "npm version #{ruby2js_version} --no-git-tag-version --allow-same-version"
     sh "npm pack --pack-destination #{tarballs_dir}"
+    sh "npm version 6.0.0-beta --no-git-tag-version --allow-same-version"
   end
+
   Dir.chdir(File.join(ROOT, 'packages/vite-plugin-ruby2js')) do
+    sh "npm version #{vite_plugin_version} --no-git-tag-version --allow-same-version"
     sh "npm pack --pack-destination #{tarballs_dir}"
+    sh "npm version 1.0.0-beta --no-git-tag-version --allow-same-version"
   end
 
   # Rename to stable names (strip version numbers for predictable paths)
