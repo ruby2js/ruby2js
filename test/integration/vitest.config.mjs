@@ -42,6 +42,10 @@ export default defineConfig({
     // Mock CSS imports (for React Flow in workflow demo)
     css: false,
   },
+  // Disable sourcemap processing to avoid issues with some generated maps
+  build: {
+    sourcemap: false,
+  },
   resolve: {
     alias: aliases,
   },
