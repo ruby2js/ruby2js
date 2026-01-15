@@ -22,6 +22,7 @@ module Ruby2JS
           @rails_before_actions = []
           @rails_private_methods = {}
           @rails_model_refs = Set.new
+          @rails_path_helpers = Set.new  # Track which path helpers are used
           @rails_needs_views = false
           @rails_needs_turbo_stream_views = false
           @rails_current_action = nil
@@ -93,6 +94,7 @@ module Ruby2JS
           @rails_before_actions = []
           @rails_private_methods = {}
           @rails_model_refs = Set.new
+          @rails_path_helpers = Set.new
           @rails_needs_views = false
           @rails_needs_turbo_stream_views = false
 
@@ -752,25 +754,23 @@ module Ruby2JS
           end
 
           # Note: avoid case-as-expression for JS compatibility (doesn't transpile correctly)
+          # Use path helper functions to respect base path configuration
           path = nil
           if target.type == :ivar
-            # redirect_to @article -> "/articles/#{article.id}"
+            # redirect_to @article -> article_path(article)
+            # Uses path helper to include base path (e.g., /ruby2js/blog/articles/1)
             ivar_name = target.children[0].to_s.sub(/^@/, '')
-            resource = ivar_name.downcase
-            path = s(:dstr,
-              s(:str, "/#{resource}s/"),
-              s(:begin, s(:attr, s(:lvar, ivar_name.to_sym), :id)))
+            singular_name = ivar_name.downcase
+            path_helper = "#{singular_name}_path".to_sym
+            @rails_path_helpers.add(path_helper)
+            path = s(:send, nil, path_helper, s(:lvar, singular_name.to_sym))
           elsif target.type == :send
-            # redirect_to articles_path -> "/articles"
+            # redirect_to articles_path -> articles_path()
+            # Pass through to path helper (already handles base path)
             if target.children[0].nil? && target.children[1].to_s.end_with?('_path')
-              path_helper = target.children[1].to_s
-              if path_helper =~ /^(\w+)_path$/
-                # Path helper name already contains the pluralized resource name
-                # e.g., messages_path -> /messages, articles_path -> /articles
-                path = s(:str, "/#{$1}")
-              else
-                path = s(:str, '/')
-              end
+              path_helper = target.children[1]
+              @rails_path_helpers.add(path_helper)
+              path = target
             else
               path = transform_ivars_to_locals(target)
             end
@@ -973,6 +973,14 @@ module Ruby2JS
             imports << s(:send, nil, :import,
               s(:array, s(:const, nil, turbo_module.to_sym)),
               s(:str, "../views/#{@rails_controller_plural}_turbo_streams.js"))
+          end
+
+          # Import path helpers used by redirect_to
+          if @rails_path_helpers && !@rails_path_helpers.empty?
+            path_helper_consts = [*@rails_path_helpers].sort.map { |h| s(:const, nil, h) }
+            imports << s(:send, nil, :import,
+              s(:array, *path_helper_consts),
+              s(:str, "../../config/paths.js"))
           end
 
           imports

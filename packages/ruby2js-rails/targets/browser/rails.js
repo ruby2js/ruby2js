@@ -337,6 +337,7 @@ export class Application extends ApplicationBase {
 
   // Run pending migrations and track them in schema_migrations
   // Returns { ran: number, wasFresh: boolean }
+  // Supports both Dexie (IndexedDB) and SQL adapters (sql.js, pglite, better-sqlite3)
   static async runMigrations(adapter) {
     if (!this.migrations || this.migrations.length === 0) {
       // Fall back to schema if no migrations
@@ -346,17 +347,28 @@ export class Application extends ApplicationBase {
       return { ran: 0, wasFresh: true };
     }
 
-    // Get already-run migrations
-    const db = adapter.getDatabase();
+    // Detect adapter type: SQL adapters have query/execute, Dexie doesn't
+    const isSqlAdapter = typeof adapter.query === 'function' && typeof adapter.execute === 'function';
     let appliedVersions = new Set();
 
-    try {
-      // Check if schema_migrations table has data
-      const applied = await db.table('schema_migrations').toArray();
-      appliedVersions = new Set(applied.map(r => r.version));
-    } catch (e) {
-      // Table might not exist or be empty on first run
-      console.log('First database initialization');
+    if (isSqlAdapter) {
+      // SQL adapter path (sql.js, pglite, better-sqlite3)
+      try {
+        await adapter.execute('CREATE TABLE IF NOT EXISTS schema_migrations (version TEXT PRIMARY KEY)');
+        const applied = await adapter.query('SELECT version FROM schema_migrations');
+        appliedVersions = new Set(applied.map(r => r.version));
+      } catch (e) {
+        console.log('First database initialization');
+      }
+    } else {
+      // Dexie (IndexedDB) path
+      const db = adapter.getDatabase();
+      try {
+        const applied = await db.table('schema_migrations').toArray();
+        appliedVersions = new Set(applied.map(r => r.version));
+      } catch (e) {
+        console.log('First database initialization');
+      }
     }
 
     // Track if database was fresh (no prior migrations)
@@ -373,7 +385,11 @@ export class Application extends ApplicationBase {
       try {
         await migration.up();
         // Record that this migration ran
-        await db.table('schema_migrations').add({ version: migration.version });
+        if (isSqlAdapter) {
+          await adapter.execute('INSERT INTO schema_migrations (version) VALUES (?)', [migration.version]);
+        } else {
+          await adapter.getDatabase().table('schema_migrations').add({ version: migration.version });
+        }
         ran++;
       } catch (e) {
         console.error(`Migration ${migration.version} failed:`, e);

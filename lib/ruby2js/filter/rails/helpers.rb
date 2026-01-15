@@ -680,7 +680,7 @@ module Ruby2JS
             end
           elsif path_node&.type == :array && path_node.children.length == 2
             # Nested resource: [@article, comment] -> comment_path(article, comment)
-            # or [comment.article, comment] -> comment_path(comment.article, comment)
+            # or [comment.article, comment] -> comment_path(comment.article_id, comment)
             parent, child = path_node.children
             # Extract child name from different node types
             child_name = case child.type
@@ -692,7 +692,18 @@ module Ruby2JS
             path_helper = "#{child_name}_path".to_sym
             @erb_path_helpers << path_helper unless @erb_path_helpers.include?(path_helper)
             # Convert ivars to lvars for ERB context
-            parent_arg = parent.type == :ivar ? s(:lvar, parent.children.first.to_s.sub(/^@/, '').to_sym) : process(parent)
+            # For association access like comment.article, use comment.article_id instead
+            # (associations return Promises, but _id is a sync attribute)
+            if parent.type == :send && parent.children[0] && parent.children[1]
+              # Pattern: receiver.association -> receiver.association_id
+              receiver = parent.children[0]
+              assoc_name = parent.children[1]
+              parent_arg = s(:attr, process(receiver), "#{assoc_name}_id".to_sym)
+            elsif parent.type == :ivar
+              parent_arg = s(:lvar, parent.children.first.to_s.sub(/^@/, '').to_sym)
+            else
+              parent_arg = process(parent)
+            end
             child_arg = child.type == :ivar ? s(:lvar, child.children.first.to_s.sub(/^@/, '').to_sym) : process(child)
             path_expr = s(:send, nil, path_helper, parent_arg, child_arg)
           else

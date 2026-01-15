@@ -722,7 +722,7 @@ class SelfhostBuilder
   # Instance methods
   # ============================================================
 
-  def initialize(dist_dir = nil, target: nil, database: nil, broadcast: nil, base: nil)
+  def initialize(dist_dir = nil, target: nil, database: nil, broadcast: nil, base: nil, vite: nil)
     @dist_dir = dist_dir || File.join(DEMO_ROOT, 'dist')
     @database_override = database  # CLI override for database adapter
     @database = nil  # Set during build from config or override
@@ -731,6 +731,7 @@ class SelfhostBuilder
     @broadcast = broadcast  # Broadcast adapter: 'supabase', 'pusher', or nil (use native WebSocket)
     @base = base  # Base path for routes (e.g., '/blog' when serving from subdirectory)
     @model_associations = {}  # model_name -> [association_names]
+    @vite = vite  # nil = auto (true for browser), false = force compiled imports
   end
 
   # Note: Using explicit () on all method calls for JS transpilation compatibility
@@ -1862,40 +1863,50 @@ class SelfhostBuilder
     render_exports = []
     has_new = false
 
+    # For browser target with Vite: import from source files for HMR
+    # For node/server targets: import from compiled .js files (no Vite transform)
+    # @vite can override: nil = auto, true = source imports, false = compiled imports
+    use_source_imports = if @vite.nil?
+      @target == 'browser' || @target == 'capacitor'
+    else
+      @vite
+    end
+
     views_by_name.keys().sort.each do |view_name|
       file_info = views_by_name[view_name]
       has_new = true if view_name == 'new'
 
-      # Import from source files directly (enables Vite HMR via transform plugins)
-      # Source files are copied to dist alongside compiled .js for source maps
       source_filename = File.basename(file_info[:path])
 
       # Different file types have different export patterns
       case file_info[:ext]
       when '.html.erb'
         # ERB exports: export function render(...)
-        unified_js += "import { render as #{view_name}_render } from './#{resource}/#{source_filename}';\n"
+        import_file = use_source_imports ? source_filename : source_filename.sub('.html.erb', '.js')
+        unified_js += "import { render as #{view_name}_render } from './#{resource}/#{import_file}';\n"
         render_exports << "#{view_name}: #{view_name}_render"
       when '.rb'
         # Phlex exports: export default function render(...) or export function render(...)
         # Try to import default first, fall back to named
-        unified_js += "import #{view_name}_module from './#{resource}/#{source_filename}';\n"
+        import_file = use_source_imports ? source_filename : source_filename.sub('.rb', '.js')
+        unified_js += "import #{view_name}_module from './#{resource}/#{import_file}';\n"
         render_exports << "#{view_name}: #{view_name}_module.render || #{view_name}_module"
       when '.rbx', '.jsx', '.tsx'
         # RBX/JSX exports: export default function/component
-        unified_js += "import #{view_name}_component from './#{resource}/#{source_filename}';\n"
+        import_file = use_source_imports ? source_filename : source_filename.sub(/\.(rbx|jsx|tsx)$/, '.js')
+        unified_js += "import #{view_name}_component from './#{resource}/#{import_file}';\n"
         render_exports << "#{view_name}: #{view_name}_component"
       end
     end
 
     # Also import and export partials (files starting with _)
     # These are used by turbo stream templates: PhotoViews._photo({...})
-    # Find source files (ERB partials) instead of compiled .js
     resource_dist_dir = File.join(views_dist_dir, resource)
     Dir.glob(File.join(resource_dist_dir, '_*.html.erb')).each do |partial_path|
       partial_filename = File.basename(partial_path)  # e.g., "_photo.html.erb"
       partial_basename = File.basename(partial_path, '.html.erb')  # e.g., "_photo"
-      unified_js += "import { render as #{partial_basename}_render } from './#{resource}/#{partial_filename}';\n"
+      import_file = use_source_imports ? partial_filename : partial_filename.sub('.html.erb', '.js')
+      unified_js += "import { render as #{partial_basename}_render } from './#{resource}/#{import_file}';\n"
       render_exports << "#{partial_basename}: #{partial_basename}_render"
     end
 
