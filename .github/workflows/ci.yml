@@ -338,6 +338,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "24"
+          cache: 'npm'
+          cache-dependency-path: test/integration/package-lock.json
+
+      - name: Cache better-sqlite3 prebuild
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm/_prebuilds
+          key: ${{ runner.os }}-better-sqlite3-${{ hashFiles('test/integration/package-lock.json') }}
 
       - name: Download tarballs
         uses: actions/download-artifact@v4
