@@ -209,9 +209,9 @@ export class FormHandler {
     console.log(`Processing ${controller.name}#create (${parentName}_id: ${parentId})`);
     console.log('  Parameters:', params);
 
-    await controller.create(context, parentId, params);
-    console.log(`  Redirected to /${parentName}/${parentId}`);
-    await Router.navigate(`/${parentName}/${parentId}`);
+    const response = await controller.create(context, parentId, params);
+    // Use controller's redirect path (includes base path from path helpers)
+    await this.handleResult(context, response, controllerName, 'create', controller);
     return false;
   }
 
@@ -224,9 +224,9 @@ export class FormHandler {
 
     console.log(`Processing ${controller.name}#destroy (${parentName}_id: ${parentId}, id: ${id})`);
 
-    await controller.destroy(context, parentId, id);
-    console.log(`  Redirected to /${parentName}/${parentId}`);
-    await Router.navigate(`/${parentName}/${parentId}`);
+    const response = await controller.destroy(context, parentId, id);
+    // Use controller's redirect path (includes base path from path helpers)
+    await this.handleResult(context, response, controllerName, 'destroy', controller, id);
   }
 
   // Extract form parameters
@@ -482,25 +482,13 @@ export class Application extends ApplicationBase {
             const parentId = parseInt(match[1]);
             const id = match[2] ? parseInt(match[2]) : null;
             const response = await route.controller.destroy(context, parentId, id);
-            // Handle turbo_stream response or navigate back
-            if (response?.turbo_stream) {
-              await FormHandler.handleResult(context, response, route.controllerName, 'destroy', route.controller, id);
-            } else {
-              const parentPath = '/' + route.parentName + '/' + parentId;
-              history.pushState({}, '', parentPath);
-              await Router.dispatch(parentPath);
-            }
+            // Use controller's redirect path (includes base path from path helpers)
+            await FormHandler.handleResult(context, response, route.controllerName, 'destroy', route.controller, id);
           } else {
             const id = match[1] ? parseInt(match[1]) : null;
             const response = await route.controller.destroy(context, id);
-            // Handle turbo_stream response or navigate back
-            if (response?.turbo_stream) {
-              await FormHandler.handleResult(context, response, route.controllerName, 'destroy', route.controller, id);
-            } else {
-              const indexPath = '/' + route.controllerName;
-              history.pushState({}, '', indexPath);
-              await Router.dispatch(indexPath);
-            }
+            // Use controller's redirect path (includes base path from path helpers)
+            await FormHandler.handleResult(context, response, route.controllerName, 'destroy', route.controller, id);
           }
         } else if (method === 'POST' || method === 'PATCH' || method === 'PUT') {
           // Extract form params from the fetch body (body already defined above)
