@@ -39,7 +39,8 @@ class Article < ApplicationRecord
   has_many :comments, dependent: :destroy
 
   # Broadcast article changes to index page subscribers
-  broadcasts_to -> { "articles" }, inserts_by: :prepend
+  # Lambda receives the record being broadcast
+  broadcasts_to ->(_article) { "articles" }, inserts_by: :prepend
 
   validates :title, presence: true
   validates :body, presence: true, length: { minimum: 10 }
@@ -52,7 +53,8 @@ class Comment < ApplicationRecord
   belongs_to :article
 
   # Broadcast comment changes to article show page subscribers
-  broadcasts_to -> { "article_#{article_id}_comments" }, target: "comments"
+  # Lambda receives the record being broadcast
+  broadcasts_to ->(comment) { "article_#{comment.article_id}_comments" }, target: "comments"
 end
 MODEL
 

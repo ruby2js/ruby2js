@@ -350,9 +350,6 @@ jobs:
             tar -xzf "$tarball" -C artifacts
           done
 
-      - name: Install tarballs
-        run: npm install artifacts/tarballs/ruby2js-beta.tgz artifacts/tarballs/ruby2js-rails-beta.tgz
-
       - name: Build browser demos
         run: |
           # Point bundler to the checked-out ruby2js repo instead of fetching from GitHub
@@ -361,9 +358,11 @@ jobs:
           for demo in blog chat photo_gallery workflow; do
             echo "Building $demo for browser..."
             base_path="/ruby2js/${demo//_/-}/"
-            # Install fresh tarballs into demo (overrides old packages from demo tarball)
+            # Install fresh tarballs into demo's dist/ directory (where package.json lives)
             # Must install all three: ruby2js (transpiler), ruby2js-rails (runtime), vite-plugin-ruby2js (build plugin)
-            (cd "artifacts/$demo" && npm install ../tarballs/ruby2js-beta.tgz ../tarballs/ruby2js-rails-beta.tgz ../tarballs/vite-plugin-ruby2js-beta.tgz && bundle install --quiet && bin/juntos build -d dexie -t browser --base "$base_path" --sourcemap)
+            (cd "artifacts/$demo/dist" && npm install ../../tarballs/ruby2js-beta.tgz ../../tarballs/ruby2js-rails-beta.tgz ../../tarballs/vite-plugin-ruby2js-beta.tgz)
+            # Build from demo root (bin/juntos expects to be run from app root)
+            (cd "artifacts/$demo" && bundle install --quiet && bin/juntos build -d dexie -t browser --base "$base_path" --sourcemap)
           done
 
       - name: Assemble site

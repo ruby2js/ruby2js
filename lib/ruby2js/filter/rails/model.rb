@@ -610,8 +610,15 @@ module Ruby2JS
           return unless stream_lambda&.type == :block
 
           # Extract the lambda body (the stream expression)
-          # ->(record) { "stream_name" } has structure: block(send(nil, :lambda), args, body)
+          # ->(record) { "stream_name" } has structure: block(send(nil, :lambda), args(arg(:record)), body)
+          lambda_args = stream_lambda.children[1]
           stream_body = stream_lambda.children[2]
+
+          # Get lambda parameter name (e.g., :comment from ->(comment) { ... })
+          param_name = nil
+          if lambda_args&.type == :args && lambda_args.children[0]&.type == :arg
+            param_name = lambda_args.children[0].children[0]
+          end
 
           # Extract options from second arg (hash)
           options = {}
@@ -628,6 +635,7 @@ module Ruby2JS
           # Note: use push instead of << for JS compatibility
           @rails_broadcasts_to.push({
             stream: stream_body,
+            param_name: param_name,
             inserts_by: options[:inserts_by] || :append,
             target: options[:target]
           })
@@ -1127,6 +1135,7 @@ module Ruby2JS
         #   Model.after_destroy_commit(($record) => BroadcastChannel.broadcast(...))
         def generate_broadcasts_to_callbacks(broadcast)
           stream_expr = broadcast[:stream]
+          param_name = broadcast[:param_name]
           inserts_by = broadcast[:inserts_by]
           custom_target = broadcast[:target]
 
@@ -1142,8 +1151,8 @@ module Ruby2JS
           partial_name = "#{default_target}/#{@rails_model_name.downcase}"
 
           # Transform stream expression to use $record instead of the lambda parameter
-          # The lambda body might reference the record parameter
-          transformed_stream = transform_broadcasts_to_stream(stream_expr)
+          # The lambda body might reference the record parameter (e.g., comment.article_id)
+          transformed_stream = transform_broadcasts_to_stream(stream_expr, param_name)
 
           # Generate the three callbacks
           callbacks = []
@@ -1166,14 +1175,17 @@ module Ruby2JS
         # Transform the stream expression from broadcasts_to lambda
         # Replace references to the lambda parameter with $record
         # Note: explicit returns and == nil for JS compatibility
-        def transform_broadcasts_to_stream(node)
+        def transform_broadcasts_to_stream(node, param_name = nil)
           return node unless node.respond_to?(:type)
 
           case node.type
           when :lvar
-            # Local variable reference - likely the lambda parameter
-            # Replace with $record.attribute access or just use the expression as-is
-            # For simple cases like "articles" string, just return as-is
+            # Local variable reference - check if it matches the lambda parameter
+            var_name = node.children[0]
+            if param_name && var_name == param_name
+              # Replace lambda parameter with $record
+              return s(:lvar, :"$record")
+            end
             return node
           when :send
             target = node.children[0]
@@ -1184,20 +1196,20 @@ module Ruby2JS
               # Bare method call - treat as record attribute
               return s(:attr, s(:lvar, :"$record"), method)
             else
-              new_target = transform_broadcasts_to_stream(target)
-              new_args = args.map { |a| a.respond_to?(:type) ? transform_broadcasts_to_stream(a) : a }
+              new_target = transform_broadcasts_to_stream(target, param_name)
+              new_args = args.map { |a| a.respond_to?(:type) ? transform_broadcasts_to_stream(a, param_name) : a }
               return node.updated(nil, [new_target, method, *new_args])
             end
           when :dstr
             # String interpolation - transform each part
             new_children = node.children.map do |child|
-              child.respond_to?(:type) ? transform_broadcasts_to_stream(child) : child
+              child.respond_to?(:type) ? transform_broadcasts_to_stream(child, param_name) : child
             end
             return node.updated(nil, new_children)
           when :begin
             # Begin block (interpolation content)
             new_children = node.children.map do |child|
-              child.respond_to?(:type) ? transform_broadcasts_to_stream(child) : child
+              child.respond_to?(:type) ? transform_broadcasts_to_stream(child, param_name) : child
             end
             return node.updated(nil, new_children)
           when :str
@@ -1206,7 +1218,7 @@ module Ruby2JS
           else
             if node.children.any?
               new_children = node.children.map do |c|
-                c.respond_to?(:type) ? transform_broadcasts_to_stream(c) : c
+                c.respond_to?(:type) ? transform_broadcasts_to_stream(c, param_name) : c
               end
               return node.updated(nil, new_children)
             else
