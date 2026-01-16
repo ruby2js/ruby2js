@@ -1,0 +1,18 @@
+<div id="<%= dom_id(workflow) %>" class="p-4 bg-white rounded-lg shadow flex justify-between items-center">
+  <div>
+    <h2 class="text-xl font-semibold"><%= workflow.name %></h2>
+    <p class="text-gray-500 text-sm">
+      <%= pluralize(workflow.nodes.size, "node") %>,
+      <%= pluralize(workflow.edges.size, "edge") %>
+    </p>
+  </div>
+  <div class="flex gap-2">
+    <%= link_to "Open", workflow_path(workflow),
+        class: "bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700" %>
+    <%= link_to "Rename", edit_workflow_path(workflow),
+        class: "bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700" %>
+    <%= button_to "Delete", workflow_path(workflow), method: :delete,
+        class: "bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700",
+        data: { confirm: "Delete this workflow?" } %>
+  </div>
+</div>

@@ -31,6 +31,14 @@ if (!ruby2jsRailsPath) {
 
 // Build aliases - use array format for regex-based aliases
 const aliases = [];
+
+// Ensure all React imports use the same instance (fixes hooks errors)
+// When RBX components bundle their own React, we need to redirect to test's React
+const reactPath = resolve(__dirname, 'node_modules/react');
+const reactDomPath = resolve(__dirname, 'node_modules/react-dom');
+aliases.push({ find: 'react', replacement: reactPath });
+aliases.push({ find: 'react-dom', replacement: reactDomPath });
+
 if (ruby2jsRailsPath) {
   // Match ruby2js-rails subpath imports and map to package directory
   aliases.push({

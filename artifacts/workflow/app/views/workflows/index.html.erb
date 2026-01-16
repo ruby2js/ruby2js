@@ -1,0 +1,12 @@
+<div class="container mx-auto px-4 py-8">
+  <h1 class="text-3xl font-bold mb-8">Workflows</h1>
+
+  <div class="grid gap-4 mb-8">
+    <% @workflows.each do |workflow| %>
+      <%= render workflow %>
+    <% end %>
+  </div>
+
+  <%= link_to "New Workflow", new_workflow_path,
+      class: "bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700" %>
+</div>
