@@ -55,6 +55,7 @@ demo/assets
 demo/filters.opal
 demo/blog/
 demo/chat/
+demo/notes/
 demo/photo_gallery/
 demo/workflow_builder/
 testrails

@@ -29,5 +29,6 @@ mise.toml
 # Local test demos (generated Rails apps)
 demo/blog/
 demo/chat/
+demo/notes/
 demo/photo_gallery/
 demo/workflow_builder/

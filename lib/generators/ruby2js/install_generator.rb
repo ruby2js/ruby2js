@@ -42,17 +42,20 @@ module Ruby2js
     end
 
     def install_dependencies
-      say_status :run, "npm install in #{DIST_DIR}/"
+      say_status :run, "npm install from \"./#{DIST_DIR}\""
       inside DIST_DIR do
         # Use verbose: true so npm errors are visible
+        # Include dev dependencies explicitly to ensure vite is installed
         run "npm install", verbose: true
       end
 
       # Verify critical package was installed
       vite_path = File.join(DIST_DIR, 'node_modules', 'vite')
       unless File.directory?(vite_path)
-        say_status :error, "npm install may have failed - vite not found", :red
-        say "Try running: cd #{DIST_DIR} && npm install"
+        say_status :warn, "vite not found, installing explicitly"
+        inside DIST_DIR do
+          run "npm install vite@^6.0.0 --save-dev", verbose: true
+        end
       end
     end
 

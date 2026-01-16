@@ -520,6 +520,23 @@ describe Ruby2JS do
         must_equal 'if (x === 1 || ITEMS.includes(x)) {puts("match")}'
     end
 
+    it "should hoist variable declarations from case branches" do
+      # Variables assigned in any case branch are hoisted before the switch
+      # to avoid JavaScript's temporal dead zone issues
+      to_js( 'case x; when :a; type = 1; when :b; type = 2; end' ).
+        must_equal 'let type; switch (x) {case "a": type = 1; break; case "b": type = 2}'
+    end
+
+    it "should hoist multiple variables from case branches" do
+      to_js( 'case x; when :a; foo = 1; bar = 2; when :b; foo = 3; baz = 4; end' ).
+        must_equal 'let foo, bar, baz; switch (x) {case "a": foo = 1; bar = 2; break; case "b": foo = 3; baz = 4}'
+    end
+
+    it "should not hoist already declared variables in case" do
+      to_js( 'type = nil; case x; when :a; type = 1; when :b; type = 2; end' ).
+        must_equal 'let type = null; switch (x) {case "a": type = 1; break; case "b": type = 2}'
+    end
+
     it "should handle a for loop" do
       to_js( 'a = {}; b = {}; for i in a; b[i] = a[i]; end' ).
         must_equal 'let a = {}; let b = {}; for (let i in a) {b[i] = a[i]}'

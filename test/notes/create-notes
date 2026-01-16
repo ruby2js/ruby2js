@@ -1,0 +1,403 @@
+#!/usr/bin/env bash
+# Create a Ruby2JS notes demo with path helper RPC
+# Usage: create-notes [app-name]
+#
+# Creates a Rails app with Note model featuring:
+# - Path helper RPC for CRUD operations (get, post, patch, delete)
+# - RBX views with React components
+# - Same source runs on browser (Dexie) and server (SQLite) targets
+# - Search with query parameters
+# - Real-time updates via Turbo Streams
+
+set -e
+
+APP_NAME="${1:-notes}"
+
+echo "Creating Ruby2JS notes demo: $APP_NAME"
+echo ""
+
+# Create Rails app (minimal, with Tailwind for styling)
+rails new "$APP_NAME" --skip-git --skip-docker --css tailwind
+cd "$APP_NAME"
+
+# Generate Note scaffold
+rails generate scaffold Note title:string body:text
+
+# Create database
+rails db:create
+
+# Add ruby2js gem from GitHub
+bundle add ruby2js --github ruby2js/ruby2js --branch master
+bundle install
+
+# Update Note model with validations
+cat > app/models/note.rb << 'MODEL'
+class Note < ApplicationRecord
+  validates :title, presence: true
+  validates :body, presence: true
+
+  scope :search, ->(query) {
+    where("title LIKE ?", "%#{query}%") if query.present?
+  }
+
+  scope :recent, -> { order(updated_at: :desc) }
+end
+MODEL
+
+# Set up routes
+cat > config/routes.rb << 'ROUTES'
+Rails.application.routes.draw do
+  root "notes#index"
+  resources :notes
+end
+ROUTES
+
+# Update NotesController to support JSON and search
+cat > app/controllers/notes_controller.rb << 'CONTROLLER'
+class NotesController < ApplicationController
+  before_action :set_note, only: [:show, :edit, :update, :destroy]
+
+  def index
+    @notes = Note.recent
+    @notes = @notes.search(params[:q]) if params[:q].present?
+
+    respond_to do |format|
+      format.html
+      format.json { render json: @notes }
+    end
+  end
+
+  def show
+    respond_to do |format|
+      format.html
+      format.json { render json: @note }
+    end
+  end
+
+  def new
+    @note = Note.new
+  end
+
+  def edit
+  end
+
+  def create
+    @note = Note.new(note_params)
+
+    respond_to do |format|
+      if @note.save
+        format.html { redirect_to @note, notice: "Note was successfully created." }
+        format.json { render json: @note, status: :created }
+      else
+        format.html { render :new, status: :unprocessable_entity }
+        format.json { render json: @note.errors, status: :unprocessable_entity }
+      end
+    end
+  end
+
+  def update
+    respond_to do |format|
+      if @note.update(note_params)
+        format.html { redirect_to @note, notice: "Note was successfully updated." }
+        format.json { render json: @note }
+      else
+        format.html { render :edit, status: :unprocessable_entity }
+        format.json { render json: @note.errors, status: :unprocessable_entity }
+      end
+    end
+  end
+
+  def destroy
+    @note.destroy
+
+    respond_to do |format|
+      format.html { redirect_to notes_path, notice: "Note was successfully deleted." }
+      format.json { head :no_content }
+    end
+  end
+
+  private
+
+  def set_note
+    @note = Note.find(params[:id])
+  end
+
+  def note_params
+    params.require(:note).permit(:title, :body)
+  end
+end
+CONTROLLER
+
+# Create seeds with sample notes
+cat > db/seeds.rb << 'SEEDS'
+# Sample notes for the demo
+return if Note.count > 0
+
+Note.create!(
+  title: "Welcome to Notes",
+  body: "This is a demo of Ruby2JS path helper RPC. The same source code runs on browser (Dexie/IndexedDB) and server (SQLite/Postgres) targets."
+)
+
+Note.create!(
+  title: "Path Helper Methods",
+  body: "Path helpers now have HTTP methods: notes_path.get(), notes_path.post(note: {...}), note_path(id).patch(note: {...}), note_path(id).delete()"
+)
+
+Note.create!(
+  title: "Search Support",
+  body: "Use query parameters: notes_path.get(q: 'search term') - parameters become query string for GET requests."
+)
+
+Note.create!(
+  title: "JSON by Default",
+  body: "Path helper methods default to JSON format, which is most common for React components. Use format: :html for explicit HTML."
+)
+
+puts "Created #{Note.count} notes"
+SEEDS
+
+# Run ruby2js:install generator
+bin/rails generate ruby2js:install
+
+# Create RBX-based index view that demonstrates path helper RPC
+mkdir -p app/views/notes
+
+cat > app/views/notes/Index.rbx << 'RBX'
+import React, [useState, useEffect, useCallback], from: 'react'
+import [notes_path, note_path], from: '/config/routes.js'
+
+# SearchField component
+def SearchField(value:, onChange:)
+  handleChange = ->(e) { onChange(e.target.value) }
+
+  %x{
+    <input
+      type="text"
+      value={value}
+      onChange={handleChange}
+      placeholder="Search notes..."
+      className="w-full border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+    />
+  }
+end
+
+# NotePreview component for sidebar
+def NotePreview(note:, selected:, onClick:)
+  className = "p-3 border-b cursor-pointer hover:bg-gray-50"
+  className += " bg-blue-50 border-l-4 border-l-blue-500" if selected
+
+  %x{
+    <div onClick={onClick} className={className}>
+      <h3 className="font-medium truncate">{note.title}</h3>
+      <p className="text-sm text-gray-500 truncate">{note.body}</p>
+      <p className="text-xs text-gray-400 mt-1">
+        {new Date(note.updated_at).toLocaleDateString()}
+      </p>
+    </div>
+  }
+end
+
+# Editor component
+def Editor(note:, onUpdate:, onDelete:)
+  noteTitle, setNoteTitle = useState(note.title)
+  noteBody, setNoteBody = useState(note.body)
+  saving, setSaving = useState(false)
+
+  # Reset when note changes
+  useEffect(-> {
+    setNoteTitle(note.title)
+    setNoteBody(note.body)
+  }, [note.id])
+
+  handleTitleChange = ->(e) { setNoteTitle(e.target.value) }
+  handleBodyChange = ->(e) { setNoteBody(e.target.value) }
+
+  handleSave = -> {
+    setSaving(true)
+    onUpdate({ title: noteTitle, body: noteBody }).then(-> { setSaving(false) })
+  }
+
+  saveLabel = saving ? "Saving..." : "Save"
+
+  %x{
+    <div className="h-full flex flex-col">
+      <input
+        type="text"
+        value={noteTitle}
+        onChange={handleTitleChange}
+        className="text-2xl font-bold border-0 border-b focus:outline-none focus:border-blue-500 pb-2 mb-4"
+        placeholder="Note title"
+      />
+      <textarea
+        value={noteBody}
+        onChange={handleBodyChange}
+        className="flex-1 resize-none border rounded p-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        placeholder="Write your note..."
+      />
+      <div className="flex justify-between mt-4">
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
+        >
+          {saveLabel}
+        </button>
+        <button
+          onClick={onDelete}
+          className="text-red-600 px-4 py-2 rounded hover:bg-red-50"
+        >
+          Delete
+        </button>
+      </div>
+    </div>
+  }
+end
+
+# Main Index component
+export default def Index()
+  notes, setNotes = useState([])
+  selectedId, setSelectedId = useState(nil)
+  searchQuery, setSearchQuery = useState("")
+  loading, setLoading = useState(true)
+
+  # Load notes on mount and when search changes
+  useEffect(-> {
+    setLoading(true)
+    params = {}
+    params[:q] = searchQuery if searchQuery.length > 0
+
+    notes_path.get(params).then do |response|
+      response.json.then do |data|
+        setNotes(data)
+        setLoading(false)
+      end
+    end
+  }, [searchQuery])
+
+  selectedNote = notes.find { |n| n.id == selectedId }
+
+  handleCreate = -> {
+    notes_path.post(note: { title: "Untitled", body: "" }).then do |response|
+      response.json.then do |note|
+        setNotes([note, *notes])
+        setSelectedId(note.id)
+      end
+    end
+  }
+
+  handleUpdate = ->(updates) {
+    note_path(selectedId).patch(note: updates).then do |response|
+      response.json.then do |updated|
+        setNotes(notes.map { |n| n.id == updated.id ? updated : n })
+      end
+    end
+  }
+
+  handleDelete = -> {
+    note_path(selectedId).delete.then do
+      setNotes(notes.filter { |n| n.id != selectedId })
+      setSelectedId(nil)
+    end
+  }
+
+  handleSelectNote = ->(id) { setSelectedId(id) }
+
+  renderNoteList = -> {
+    if loading
+      %x{<div className="p-4 text-gray-500 text-center">Loading...</div>}
+    elsif notes.length == 0
+      %x{<div className="p-4 text-gray-500 text-center">No notes found</div>}
+    else
+      notes.map do |note|
+        onClick = -> { handleSelectNote(note.id) }
+        %x{
+          <NotePreview
+            key={note.id}
+            note={note}
+            selected={note.id === selectedId}
+            onClick={onClick}
+          />
+        }
+      end
+    end
+  }
+
+  renderEditor = -> {
+    if selectedNote
+      %x{
+        <Editor
+          note={selectedNote}
+          onUpdate={handleUpdate}
+          onDelete={handleDelete}
+        />
+      }
+    else
+      %x{
+        <div className="h-full flex items-center justify-center text-gray-500">
+          Select a note or create a new one
+        </div>
+      }
+    end
+  }
+
+  %x{
+    <div className="flex h-screen bg-gray-100">
+      <div className="w-80 bg-white border-r flex flex-col">
+        <div className="p-4 border-b">
+          <h1 className="text-xl font-bold mb-4">Notes</h1>
+          <SearchField value={searchQuery} onChange={setSearchQuery} />
+          <button
+            onClick={handleCreate}
+            className="mt-3 w-full bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+          >
+            New Note
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto">
+          {renderNoteList()}
+        </div>
+      </div>
+      <div className="flex-1 p-6">
+        {renderEditor()}
+      </div>
+    </div>
+  }
+end
+RBX
+
+# Remove scaffold-generated ERB views (we use RBX instead)
+rm -f app/views/notes/index.html.erb
+rm -f app/views/notes/show.html.erb
+rm -f app/views/notes/new.html.erb
+rm -f app/views/notes/edit.html.erb
+rm -f app/views/notes/_form.html.erb
+rm -f app/views/notes/_note.html.erb
+
+# Configure ruby2js for the notes demo
+cat > config/ruby2js.yml << 'CONFIG'
+# React ecosystem dependencies for RBX files
+dependencies:
+  react: "^18.2.0"
+  react-dom: "^18.2.0"
+CONFIG
+
+# Rebuild Tailwind CSS
+bin/rails tailwindcss:build
+
+echo ""
+echo "Notes demo created: $APP_NAME/"
+echo ""
+echo "Features:"
+echo "  - Path helper RPC for CRUD (get, post, patch, delete)"
+echo "  - Same source runs on browser and server targets"
+echo "  - Search with query parameters"
+echo "  - React components with RBX syntax"
+echo ""
+echo "To run with browser target (Dexie/IndexedDB):"
+echo "  cd $APP_NAME"
+echo "  bin/juntos dev -d dexie"
+echo ""
+echo "To run with server target (SQLite):"
+echo "  cd $APP_NAME"
+echo "  bin/juntos dev -d sqlite -t node"
+echo ""

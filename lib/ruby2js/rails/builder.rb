@@ -1423,6 +1423,19 @@ class SelfhostBuilder
         puts("  Copying: rails_server.js")
         puts("    -> #{lib_dest}/rails_server.js")
       end
+
+      # Copy RPC directory (server.mjs imported by rails_server.js)
+      rpc_src = File.join(package_dir, 'rpc')
+      if File.directory?(rpc_src)
+        rpc_dest = File.join(lib_dest, 'rpc')
+        FileUtils.mkdir_p(rpc_dest)
+        Dir.glob(File.join(rpc_src, '*.mjs')).each do |src_path|
+          dest_path = File.join(rpc_dest, File.basename(src_path))
+          FileUtils.cp(src_path, dest_path)
+          puts("  Copying: rpc/#{File.basename(src_path)}")
+          puts("    -> #{dest_path}")
+        end
+      end
     end
 
     # Copy target-specific files (rails.js from targets/browser, node, bun, or deno)

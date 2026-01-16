@@ -19,6 +19,16 @@ module Ruby2JS
 
         inner, @inner = @inner, @ast
 
+        # Hoist local variable declarations from all branches to avoid
+        # temporal dead zone issues in JavaScript switch statements.
+        # In JS, let/const in one case is hoisted to switch block but
+        # uninitialized, causing TDZ errors if another case runs first.
+        hoisted = find_case_lvasgns(whens, other)
+        unless hoisted.empty?
+          put "let #{hoisted.join(', ')}#{@sep}"
+          hoisted.each { |name| @vars[name] = true }
+        end
+
         has_range = whens.any? do |node|
           node.children.any? {|child| [:irange, :erange].include? child&.type}
         end
@@ -128,6 +138,36 @@ module Ruby2JS
         end
       ensure
         @inner = inner
+      end
+    end
+
+    # Find all local variable assignments in case branches that would need
+    # hoisting. Returns names of variables that are new (not yet in @vars).
+    def find_case_lvasgns(whens, other)
+      names = []
+
+      whens.each do |w|
+        find_lvasgns_in_ast(w.children.last, names)
+      end
+      find_lvasgns_in_ast(other, names) if other
+
+      # Only return names not already declared
+      names.uniq.reject { |name| @vars.key?(name) }
+    end
+
+    # Recursively find all lvasgn nodes in an AST, collecting their names
+    def find_lvasgns_in_ast(node, names)
+      return unless ast_node?(node)
+
+      if node.type == :lvasgn
+        names << node.children.first
+      end
+
+      # Don't descend into nested scopes that have their own variable scope
+      return if [:def, :defs, :class, :module, :sclass, :lambda, :block].include?(node.type)
+
+      node.children.each do |child|
+        find_lvasgns_in_ast(child, names)
       end
     end
   end

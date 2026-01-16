@@ -109,7 +109,8 @@ export function getClient(options = {}) {
  * @returns {Promise<any>} Result from the server
  *
  * @example
- * import { rpc } from './rpc/client.mjs';
+ * // In your module:
+ * // import { rpc } from 'ruby2js-rails/rpc/client.mjs';
  * const user = await rpc('User.find', [1]);
  */
 export async function rpc(action, args = []) {
