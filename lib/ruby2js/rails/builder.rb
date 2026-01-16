@@ -229,6 +229,7 @@ class SelfhostBuilder
     eslevel: 2022,
     include: [:class, :call],
     autoexports: :default,
+    rbx: true,  # Enable RBX mode for auto-import React
     filters: [
       Ruby2JS::Filter::React,
       Ruby2JS::Filter::Functions,

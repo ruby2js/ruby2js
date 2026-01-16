@@ -7,7 +7,7 @@
 # - RBX views with React components
 # - Same source runs on browser (Dexie) and server (SQLite) targets
 # - Search with query parameters
-# - Real-time updates via Turbo Streams
+# - Real-time updates via JsonStreamProvider (multi-window sync)
 
 set -e
 
@@ -30,11 +30,19 @@ rails db:create
 bundle add ruby2js --github ruby2js/ruby2js --branch master
 bundle install
 
-# Update Note model with validations
+# Update Note model with validations and real-time broadcasting
 cat > app/models/note.rb << 'MODEL'
 class Note < ApplicationRecord
   validates :title, presence: true
   validates :body, presence: true
+
+  # Real-time updates via JsonStreamProvider
+  after_create_commit -> { broadcast_json_to "notes", "note_created" }
+  after_update_commit -> { broadcast_json_to "notes", "note_updated" }
+  after_destroy_commit -> { broadcast_json_to "notes", "note_destroyed" }
+
+  scope :recent, -> { order(updated_at: :desc) }
+  scope :search, ->(query) { where("title LIKE ?", "%#{query}%") if query.present? }
 end
 MODEL
 
@@ -159,6 +167,7 @@ cat > app/views/notes/Index.rbx << 'RBX'
 # React is auto-imported when JSX is used (React 17+ style)
 import [useState, useEffect], from: 'react'
 import [notes_path, note_path], from: '../../../config/paths.js'
+import JsonStreamProvider, [useJsonStream], from: 'ruby2js-rails/components/JsonStreamProvider'
 
 # SearchField component
 def SearchField(value:, onChange:)
@@ -247,12 +256,28 @@ def Editor(note:, onUpdate:, onDelete:)
   }
 end
 
-# Main Index component
-export default def Index()
+# NotesApp component - handles state and real-time updates
+def NotesApp()
   notes, setNotes = useState([])
   selectedId, setSelectedId = useState(nil)
   searchQuery, setSearchQuery = useState("")
   loading, setLoading = useState(true)
+
+  # Real-time updates from other windows/clients
+  { lastMessage } = useJsonStream()
+
+  useEffect(-> {
+    return unless lastMessage
+    case lastMessage.type
+    when "note_created"
+      setNotes([lastMessage.data, *notes])
+    when "note_updated"
+      setNotes(notes.map { |n| n.id == lastMessage.data.id ? lastMessage.data : n })
+    when "note_destroyed"
+      setNotes(notes.filter { |n| n.id != lastMessage.data.id })
+      setSelectedId(nil) if selectedId == lastMessage.data.id
+    end
+  }, [lastMessage])
 
   # Load notes on mount and when search changes
   useEffect(-> {
@@ -357,6 +382,15 @@ export default def Index()
     </div>
   }
 end
+
+# Main Index component - wraps NotesApp in JsonStreamProvider for real-time updates
+export default def Index()
+  %x{
+    <JsonStreamProvider stream="notes">
+      <NotesApp />
+    </JsonStreamProvider>
+  }
+end
 RBX
 
 # Create Show view
@@ -414,6 +448,7 @@ echo "Features:"
 echo "  - Path helper RPC for CRUD (get, post, patch, delete)"
 echo "  - Same source runs on browser and server targets"
 echo "  - Search with query parameters"
+echo "  - Real-time updates (open two windows, changes sync automatically)"
 echo "  - React components with RBX syntax"
 echo ""
 echo "To run with browser target (Dexie/IndexedDB):"

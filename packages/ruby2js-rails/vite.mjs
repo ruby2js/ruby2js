@@ -198,7 +198,8 @@ function createRbxPlugin(config) {
           filters: ['React', 'Functions', 'ESM', 'Return'],
           eslevel: config.eslevel,
           autoexports: 'default',
-          file: id
+          file: id,
+          rbx: true  // Enable RBX mode for auto-import React
         });
 
         const js = result.toString();
