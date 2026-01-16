@@ -50,6 +50,15 @@ describe Ruby2JS::Filter::Rails::Routes do
       RUBY
       assert_includes result, 'import { ArticlesController } from "../app/controllers/articles_controller.js"'
     end
+
+    it "imports createPathHelper for path helper methods" do
+      result = to_js(<<~RUBY)
+        Rails.application.routes.draw do
+          resources :articles
+        end
+      RUBY
+      assert_includes result, 'import { createPathHelper } from "ruby2js-rails/path_helper.mjs"'
+    end
   end
 
   describe "root route" do
@@ -207,7 +216,7 @@ describe Ruby2JS::Filter::Rails::Routes do
         end
       RUBY
       assert_includes result, 'function articles_path()'
-      assert_includes result, 'return "/articles"'
+      assert_includes result, 'return createPathHelper("/articles")'
     end
 
     it "generates member path helper with extract_id" do
@@ -227,7 +236,7 @@ describe Ruby2JS::Filter::Rails::Routes do
         end
       RUBY
       assert_includes result, 'function new_article_path()'
-      assert_includes result, 'return "/articles/new"'
+      assert_includes result, 'return createPathHelper("/articles/new")'
     end
 
     it "generates edit path helper" do
@@ -270,7 +279,7 @@ describe Ruby2JS::Filter::Rails::Routes do
         end
       RUBY
       assert_includes result, 'function root_path()'
-      assert_includes result, 'return "/"'
+      assert_includes result, 'return createPathHelper("/")'
     end
   end
 end

@@ -541,6 +541,13 @@ function createConfigPlugin(config, appRoot) {
           aliases['../lib/active_record.mjs'] = rpcAdapterPath;
           aliases['../../lib/active_record.mjs'] = rpcAdapterPath;
         }
+      } else {
+        // For browser targets, use path_helper_browser.mjs (direct controller invocation)
+        // instead of path_helper.mjs (fetch-based for server targets)
+        const browserPathHelper = path.join(distDir, 'path_helper_browser.mjs');
+        if (fs.existsSync(browserPathHelper)) {
+          aliases['ruby2js-rails/path_helper.mjs'] = browserPathHelper;
+        }
       }
 
       const rollupOptions = getRollupOptions(config.target, config.database);

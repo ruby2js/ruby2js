@@ -195,7 +195,7 @@ export default def Index()
 
   # Load notes on mount and when search changes
   useEffect(-> {
-    notes_path.get(q: searchQuery, format: :json).then do |response|
+    notes_path.get(q: searchQuery).then do |response|
       response.json.then { |data| setNotes(data) }
     end
   }, [searchQuery])
@@ -203,7 +203,7 @@ export default def Index()
   selectedNote = notes.find { |n| n.id == selectedId }
 
   handleCreate = -> {
-    notes_path.post(note: { title: "Untitled", body: "" }, format: :json).then do |response|
+    notes_path.post(note: { title: "Untitled", body: "" }).then do |response|
       response.json.then do |note|
         setNotes([note, ...notes])
         setSelectedId(note.id)
@@ -212,7 +212,7 @@ export default def Index()
   }
 
   handleUpdate = ->(updates) {
-    note_path(selectedId).patch(note: updates, format: :json).then do |response|
+    note_path(selectedId).patch(note: updates).then do |response|
       response.json.then do |updated|
         setNotes(notes.map { |n| n.id == updated.id ? updated : n })
       end
@@ -269,13 +269,15 @@ end
 
 ## Path Helper Usage Summary
 
+JSON is the default format for path helper methods:
+
 | Action | Path Helper Call |
 |--------|-----------------|
-| List all notes | `notes_path.get(format: :json)` |
-| Search notes | `notes_path.get(q: "query", format: :json)` |
-| Get single note | `note_path(id).get(format: :json)` |
-| Create note | `notes_path.post(note: {...}, format: :json)` |
-| Update note | `note_path(id).patch(note: {...}, format: :json)` |
+| List all notes | `notes_path.get()` |
+| Search notes | `notes_path.get(q: "query")` |
+| Get single note | `note_path(id).get()` |
+| Create note | `notes_path.post(note: {...})` |
+| Update note | `note_path(id).patch(note: {...})` |
 | Delete note | `note_path(id).delete` |
 
 ## Implementation Phases

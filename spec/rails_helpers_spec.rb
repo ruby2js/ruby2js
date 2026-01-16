@@ -591,6 +591,39 @@ describe Ruby2JS::Filter::Rails::Helpers do
     end
   end
 
+  describe 'csrf_meta_tags helper' do
+    it "should return the CSRF meta tag from context" do
+      erb_src = '_erbout = +\'\'; _erbout.<<(( csrf_meta_tags ).to_s); _erbout'
+      result = to_js(erb_src)
+      # csrf_meta_tags returns the global $csrfMetaTag or empty string
+      result.must_include '$csrfMetaTag'
+      result.must_include '?? ""'  # Uses nullish coalescing
+    end
+  end
+
+  describe 'authenticity_token in forms' do
+    it "should include authenticity_token hidden field in button_to delete form" do
+      erb_src = '_erbout = +\'\'; _erbout.<<(( button_to("Delete", @article, method: :delete) ).to_s); _erbout'
+      result = to_js(erb_src)
+      result.must_include 'name="authenticity_token"'
+      result.must_include '$context.authenticityToken'
+    end
+
+    it "should include authenticity_token hidden field in form_for" do
+      return skip() unless defined?(Ruby2JS::Erubi)
+      result = erb_to_js('<%= form_for @user do |f| %><%= f.submit %><% end %>')
+      result.must_include 'name="authenticity_token"'
+      result.must_include '$context.authenticityToken'
+    end
+
+    it "should include authenticity_token hidden field in form_with" do
+      return skip() unless defined?(Ruby2JS::Erubi)
+      result = erb_to_js('<%= form_with(model: @article) do |form| %><%= form.submit %><% end %>')
+      result.must_include 'name="authenticity_token"'
+      result.must_include '$context.authenticityToken'
+    end
+  end
+
   describe Ruby2JS::Filter::DEFAULTS do
     it "should include Rails::Helpers" do
       _(Ruby2JS::Filter::DEFAULTS).must_include Ruby2JS::Filter::Rails::Helpers

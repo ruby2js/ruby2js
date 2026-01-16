@@ -26,7 +26,7 @@ import {
   TurboBroadcast
 } from './rails_server.js';
 
-import { createRPCHandler, getRegistry, csrfMetaTag } from 'ruby2js-rails/rpc/server.mjs';
+import { createRPCHandler, getRegistry, getCSRF, csrfMetaTag } from 'ruby2js-rails/rpc/server.mjs';
 
 // RPC handler instance (initialized when models are registered)
 let rpcHandler = null;
@@ -134,6 +134,20 @@ export class Router extends RouterServer {
       }
     } else if (['PATCH', 'PUT', 'DELETE'].includes(method)) {
       params = await this.parseBodyNode(req);
+    }
+
+    // Validate CSRF token for mutating requests
+    if (['POST', 'PATCH', 'PUT', 'DELETE'].includes(method)) {
+      const token = req.headers['x-authenticity-token'] || params.authenticity_token;
+      const csrf = getCSRF();
+      if (!csrf.validateToken(token)) {
+        console.warn('  CSRF token invalid');
+        res.writeHead(422, { 'Content-Type': 'text/html' });
+        res.end('<h1>422 Invalid Authenticity Token</h1>');
+        return;
+      }
+      // Remove token from params so it doesn't pollute controller params
+      delete params.authenticity_token;
     }
 
     // Create request context

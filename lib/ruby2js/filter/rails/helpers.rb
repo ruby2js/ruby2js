@@ -132,9 +132,10 @@ module Ruby2JS
             return process_content_for(args)
           end
 
-          # Handle csrf_meta_tags - stub for demo (returns empty string)
+          # Handle csrf_meta_tags - returns the CSRF meta tag from server context
+          # The server passes $csrfMetaTag when rendering views (from csrfMetaTag() in rpc/server.mjs)
           if method == :csrf_meta_tags && target.nil?
-            return s(:str, '')
+            return s(:or, s(:gvar, :$csrfMetaTag), s(:str, ''))
           end
 
           # Handle csp_meta_tag - stub for demo (returns empty string)
@@ -714,10 +715,13 @@ module Ruby2JS
           turbo_confirm = " data-turbo-confirm=\"#{confirm_str}\""
 
           # Generate form with action and method - Turbo handles the submission
+          # Include authenticity_token for CSRF protection
           s(:dstr,
             s(:str, "<form method=\"post\" action=\""),
             s(:begin, path_expr),
-            s(:str, "\"#{form_class_attr}#{form_style}#{turbo_confirm}><input type=\"hidden\" name=\"_method\" value=\"delete\"><button type=\"submit\"#{btn_class_attr}>#{text_str}</button></form>"))
+            s(:str, "\"#{form_class_attr}#{form_style}#{turbo_confirm}><input type=\"hidden\" name=\"_method\" value=\"delete\"><input type=\"hidden\" name=\"authenticity_token\" value=\""),
+            s(:begin, s(:or, s(:attr, s(:gvar, :$context), :authenticityToken), s(:str, ''))),
+            s(:str, "\"><button type=\"submit\"#{btn_class_attr}>#{text_str}</button></form>"))
         end
 
         # Build a regular form button
@@ -729,12 +733,15 @@ module Ruby2JS
           form_class_attr = form_class ? " class=\"#{form_class}\"" : ""
           form_style = form_class ? "" : " style=\"display:inline\""
 
+          # Include authenticity_token for CSRF protection
           s(:dstr,
             s(:str, '<form method="'),
             s(:str, http_method.to_s),
             s(:str, '" action="'),
             s(:begin, path_expr),
-            s(:str, "\"#{form_class_attr}#{form_style}><button type=\"submit\"#{btn_class_attr}>#{text_str}</button></form>"))
+            s(:str, "\"#{form_class_attr}#{form_style}><input type=\"hidden\" name=\"authenticity_token\" value=\""),
+            s(:begin, s(:or, s(:attr, s(:gvar, :$context), :authenticityToken), s(:str, ''))),
+            s(:str, "\"><button type=\"submit\"#{btn_class_attr}>#{text_str}</button></form>"))
         end
 
         # Process truncate helper
@@ -1533,6 +1540,13 @@ module Ruby2JS
           form_attrs = model_name ? " data-model=\"#{model_name}\"" : ""
           statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+, s(:str, "<form#{form_attrs}>"))
 
+          # Add authenticity_token hidden field for CSRF protection
+          statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
+            s(:dstr,
+              s(:str, '<input type="hidden" name="authenticity_token" value="'),
+              s(:begin, s(:or, s(:attr, s(:gvar, :$context), :authenticityToken), s(:str, ''))),
+              s(:str, "\">\n")))
+
           if block_body
             if block_body.type == :begin
               block_body.children.each do |child|
@@ -1752,6 +1766,13 @@ module Ruby2JS
             statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+, s(:str, "<form#{class_attr}#{data_attr}>"))
           end
 
+          # Add authenticity_token hidden field for CSRF protection
+          statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
+            s(:dstr,
+              s(:str, '<input type="hidden" name="authenticity_token" value="'),
+              s(:begin, s(:or, s(:attr, s(:gvar, :$context), :authenticityToken), s(:str, ''))),
+              s(:str, "\">\n")))
+
           if block_body
             if block_body.type == :begin
               block_body.children.each do |child|
@@ -1798,6 +1819,13 @@ module Ruby2JS
 
           # Generate standard form with action/method - Turbo intercepts submissions automatically
           statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+, build_server_form_tag(path_node, http_method))
+
+          # Add authenticity_token hidden field for CSRF protection
+          statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
+            s(:dstr,
+              s(:str, '<input type="hidden" name="authenticity_token" value="'),
+              s(:begin, s(:or, s(:attr, s(:gvar, :$context), :authenticityToken), s(:str, ''))),
+              s(:str, "\">\n")))
 
           if block_body
             if block_body.type == :begin

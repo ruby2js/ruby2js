@@ -495,6 +495,10 @@ module Ruby2JS
                 helper_names.map { |name| s(:const, nil, name) })
             end
           else
+            # Import createPathHelper for callable path helpers with HTTP methods
+            statements << s(:import, 'ruby2js-rails/path_helper.mjs',
+              s(:array, s(:const, nil, :createPathHelper)))
+
             # Generate extract_id helper if we have path helpers with params
             if @rails_path_helpers.any? { |h| h[:params].any? }
               statements << build_extract_id_helper
@@ -791,7 +795,7 @@ module Ruby2JS
 
           if params.empty?
             # Simple static path
-            body = s(:str, path)
+            path_expr = s(:str, path)
           else
             # Path with interpolations
             parts = []
@@ -820,12 +824,15 @@ module Ruby2JS
 
             parts << s(:str, remaining) unless remaining.empty?
 
-            body = if parts.length == 1 && parts[0].type == :str
-                     parts[0]
-                   else
-                     s(:dstr, *parts)
-                   end
+            path_expr = if parts.length == 1 && parts[0].type == :str
+                          parts[0]
+                        else
+                          s(:dstr, *parts)
+                        end
           end
+
+          # Wrap path in createPathHelper() for callable path helpers with HTTP methods
+          body = s(:send, nil, :createPathHelper, path_expr)
 
           args = params.map { |p| s(:arg, p) }
 
@@ -853,6 +860,10 @@ module Ruby2JS
         # Build a module with only path helpers (for paths.js)
         def build_paths_only_module
           statements = []
+
+          # Import createPathHelper for callable path helpers with HTTP methods
+          statements << s(:import, 'ruby2js-rails/path_helper.mjs',
+            s(:array, s(:const, nil, :createPathHelper)))
 
           # Generate extract_id helper if we have path helpers with params
           if @rails_path_helpers.any? { |h| h[:params].any? }

@@ -16,6 +16,8 @@ import {
   setupFormHandlers
 } from './rails_base.js';
 
+import { getCSRF } from './rpc/server.mjs';
+
 // Re-export base helpers
 export { createFlash, truncate, pluralize, dom_id, navigate, submitForm, formData, handleFormResult, setupFormHandlers };
 
@@ -157,6 +159,21 @@ export class Router extends RouterBase {
       }
     } else if (['PATCH', 'PUT', 'DELETE'].includes(method)) {
       params = await this.parseBody(req);
+    }
+
+    // Validate CSRF token for mutating requests
+    if (['POST', 'PATCH', 'PUT', 'DELETE'].includes(method)) {
+      const token = getHeader(req, 'x-authenticity-token') || params.authenticity_token;
+      const csrf = getCSRF();
+      if (!csrf.validateToken(token)) {
+        console.warn('  CSRF token invalid');
+        return new Response('<h1>422 Invalid Authenticity Token</h1>', {
+          status: 422,
+          headers: { 'Content-Type': 'text/html' }
+        });
+      }
+      // Remove token from params so it doesn't pollute controller params
+      delete params.authenticity_token;
     }
 
     // Create request context with flash, params, etc.

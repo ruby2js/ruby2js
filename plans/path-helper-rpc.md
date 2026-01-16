@@ -42,18 +42,23 @@ new_article_path()     // → "/articles/new"
 
 ## Target State
 
-Path helpers return objects with HTTP methods that return `Response` objects:
+Path helpers return objects with HTTP methods that return `Response` objects.
+Default format is JSON (most common for RBX component data fetching):
 
 ```ruby
-# GET requests - params become query string
-articles_path.get(format: :json)           # GET /articles.json
-articles_path.get(page: 2, format: :json)  # GET /articles.json?page=2
+# GET requests - params become query string (JSON default)
+articles_path.get()                        # GET /articles.json
+articles_path.get(page: 2)                 # GET /articles.json?page=2
 
 # POST/PUT/PATCH/DELETE - params become JSON body
-articles_path.post(title: "New", format: :json)  # POST /articles.json
-article_path(1).get(format: :json)               # GET /articles/1.json
-article_path(1).patch(title: "Updated")          # PATCH /articles/1
-article_path(1).delete                           # DELETE /articles/1
+articles_path.post(title: "New")           # POST /articles.json
+article_path(1).get()                      # GET /articles/1.json
+article_path(1).patch(title: "Updated")    # PATCH /articles/1.json
+article_path(1).delete                     # DELETE /articles/1.json
+
+# Explicit format when needed
+articles_path.get(format: :html)           # GET /articles.html
+article_path(1).patch(title: "X", format: :turbo_stream)
 ```
 
 ## Target-Specific Behavior
@@ -74,10 +79,12 @@ This mirrors the model adapter pattern (Dexie vs RPC). Implementation via either
 ### Format Parameter (Rails Convention)
 
 All HTTP methods accept a `format` parameter:
-- `:json` → appends `.json` to URL
-- `:html` → appends `.html` (or no extension, default)
+- `:json` → appends `.json` to URL (default for path helper methods)
+- `:html` → appends `.html`
 - `:turbo_stream` → appends `.turbo_stream`
 - String values also accepted: `format: 'json'`
+
+**Default is JSON** - when calling path helper methods from RBX views, JSON is the most common format for fetching/updating data in React components. HTML can be explicitly requested when needed.
 
 ### GET Requests
 
