@@ -1,6 +1,6 @@
 # Plan: Node Target Support for Ruby2JS-Rails
 
-## Status (2025-01-12)
+## Status (2026-01-15)
 
 **Phase 1-4: COMPLETE** - RPC transport layer implemented and integrated.
 
@@ -12,6 +12,7 @@
 - `lib/ruby2js/rails/builder.rb` - Copies RPC adapter for server targets
 - `packages/ruby2js-rails/vite.mjs` - Aliases client imports to RPC adapter
 - `packages/ruby2js-rails/package.json` - Exports RPC modules
+- `csrfMetaTag()` helper for server-rendered layouts
 
 ### Build Output (verified working)
 ```
@@ -21,24 +22,15 @@ Creates:
 - `lib/active_record.mjs` → SQLite adapter (for server runtime)
 - `lib/active_record_client.mjs` → RPC adapter (for browser bundles via Vite alias)
 
-### Blocking Issue: CSS Imports in Node.js
+### Resolved: CSS Imports in Node.js
 
-The workflow demo fails to start because `WorkflowCanvas.rbx` imports React Flow's CSS:
-```ruby
-import 'reactflow/dist/style.css'
-```
-Node.js cannot load CSS files directly.
+Previously blocked by CSS imports (e.g., `import 'reactflow/dist/style.css'`) which Node.js cannot load directly.
 
-**Proposed solution**: Add a `# Pragma: browser` directive that:
-- Browser target: keeps the import (Vite bundles the CSS)
-- Server target: skips the import (Node.js can't load CSS)
-
-Alternative: Auto-detect side-effect CSS imports and skip them for server targets.
+**Resolution**: Vite is now a prerequisite for all targets. Vite handles CSS imports natively - bundling them for browser builds and excluding them from server-side code. No pragma directive needed.
 
 ### Next Steps
-1. Implement CSS import handling (pragma or auto-detect)
-2. Test full RPC flow with workflow demo
-3. Add CSRF meta tag to server-rendered layouts
+
+See [path-helper-rpc.md](./path-helper-rpc.md) for the next phase: enabling RBX views to call controller actions via path helpers with HTTP method semantics.
 
 ---
 
@@ -46,7 +38,7 @@ Alternative: Auto-detect side-effect CSS imports and skip them for server target
 
 Enable the same source code to work on both browser and Node targets without changes. The workflow builder demo should work identically whether running purely in-browser (Dexie/IndexedDB) or against a Node.js server (SQLite/PostgreSQL).
 
-**Future direction**: Align with React Server Components pattern (`"use server"` / `"use client"` directives).
+**Future direction**: Path helpers with HTTP methods for controller actions (see [path-helper-rpc.md](./path-helper-rpc.md)), then React Server Components pattern (`"use server"` / `"use client"` directives).
 
 ## Architecture: Unified RPC Transport
 
@@ -61,9 +53,9 @@ Enable the same source code to work on both browser and Node targets without cha
         ▲              ▲              ▲
         │              │              │
    ┌────┴────┐   ┌─────┴─────┐   ┌───┴────┐
-   │  Model  │   │   App     │   │ "use   │
-   │ Adapter │   │   RPCs    │   │server" │
-   │ (now)   │   │  (now)    │   │(future)│
+   │  Model  │   │   Path    │   │ "use   │
+   │ Adapter │   │  Helpers  │   │server" │
+   │  (done) │   │  (next)   │   │(future)│
    └─────────┘   └───────────┘   └────────┘
 ```
 
