@@ -1,3 +1,23 @@
+# Preface
+
+If I were to start a separate Claude session and ask if it were possible to run Rails apps on GitHub pages, Cloudflare Workers, Android Phones, or to integrate with React in ways that are comparable to React Server Components, the answer would be no. But the key is in how the question is phrased: none of that is possible with Ruby on Rails, all of it is possible with JavaScript, so the remaining task is Ruby to JavaScript, and Ruby2JS has already made substantial progress on making that a reality, and what is left is merely work to the done.
+
+Once the three plans (node-target-rpc.md, path-helper-rpc.md, and notes-demo.md) are complete I'll post to twitter, bluesky, mastadon and linkedin a link to a blog post. The blog post will link to demos and docs. The goal will be to attract users and contributors.
+
+I'm retired and the code is open source; there are no deadlines. If in the course of implementing these plans we find a transpilation bug or a missing feature, I would rather pause progress on plans, fix the bug or add the feature, complete with tests and docs, then resume the plan. To do anything less incurs technical debt.
+
+A few links for when the time comes. I'm posting them here because undoubtedly there will be need to compact and I don't want the context to be lost:
+
+- `CLAUDE.md` - project instructions for Claude Code
+- `./docs/src/_docs` - documentation
+- `test/integration` - integration tests
+- `./demo/selfhost/spec_manifest.json` - selfhost status
+- `./docs/src/_docs/filters/pragma.md` - pragmas
+- `.github/workflows/ci.yml` - publishes the demos
+- `packages/ruby2js-rails/` - npm package with runtime (rpc/, adapters/, targets/)
+
+The bulk of the code is written in Ruby and transpiles to JavaScript. Vite run the JavaScript, so it is important that the implementation transpiles correctly. If need be we may need to add pragmas or complete more of the selfhost effort.
+
 # Plan: Path Helper RPC for Ruby2JS-Rails
 
 ## Goal
