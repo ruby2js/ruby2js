@@ -1414,9 +1414,10 @@ module Ruby2JS
        # Auto-import React when JSX is used (React 17+ allows omitting explicit import,
        # but we use React.createElement which requires React in scope)
        # Skip if user already imported React/Preact (check full source for import statement)
+       # Handles both JS style (from "react") and Ruby style (from: "react")
        if self.modules_enabled?() and source.start_with?('<')
          full_source = loc.begin.source_buffer.source
-         has_react_import = full_source.match?(/^\s*import\s+.*\bfrom\s*['"](?:react|preact)['"]/m)
+         has_react_import = full_source.match?(/^\s*import\s+.*\bfrom:?\s*['"](?:react|preact)['"]/m)
 
          unless has_react_import
            react_name = @react == :Preact ? 'Preact' : 'React'
