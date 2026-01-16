@@ -264,20 +264,20 @@ def NotesApp()
   loading, setLoading = useState(true)
 
   # Real-time updates from other windows/clients
-  { lastMessage } = useJsonStream()
+  stream = useJsonStream()
 
   useEffect(-> {
-    return unless lastMessage
-    case lastMessage.type
+    return unless stream.lastMessage
+    case stream.lastMessage.type
     when "note_created"
-      setNotes([lastMessage.data, *notes])
+      setNotes([stream.lastMessage.data, *notes])
     when "note_updated"
-      setNotes(notes.map { |n| n.id == lastMessage.data.id ? lastMessage.data : n })
+      setNotes(notes.map { |n| n.id == stream.lastMessage.data.id ? stream.lastMessage.data : n })
     when "note_destroyed"
-      setNotes(notes.filter { |n| n.id != lastMessage.data.id })
-      setSelectedId(nil) if selectedId == lastMessage.data.id
+      setNotes(notes.filter { |n| n.id != stream.lastMessage.data.id })
+      setSelectedId(nil) if selectedId == stream.lastMessage.data.id
     end
-  }, [lastMessage])
+  }, [stream.lastMessage])
 
   # Load notes on mount and when search changes
   useEffect(-> {
