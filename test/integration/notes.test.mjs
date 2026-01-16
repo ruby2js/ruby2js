@@ -188,8 +188,9 @@ describe('Notes Integration Tests', () => {
       const context = createContext();
       const result = await NotesController.index(context);
 
-      // Should return view content (string) for HTML request
-      expect(typeof result).toBe('string');
+      // RBX views return objects (React components), not strings
+      expect(result).toBeDefined();
+      expect(typeof result).toBe('object');
     });
 
     it('show action returns note details', async () => {
@@ -201,7 +202,9 @@ describe('Notes Integration Tests', () => {
       const context = createContext({ params: { id: note.id } });
       const result = await NotesController.show(context, note.id);
 
-      expect(typeof result).toBe('string');
+      // RBX views return objects (React components), not strings
+      expect(result).toBeDefined();
+      expect(typeof result).toBe('object');
     });
 
     it('create action adds a new note', async () => {
