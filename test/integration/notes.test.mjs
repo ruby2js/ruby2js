@@ -1,8 +1,7 @@
 // Integration tests for the notes demo
-// Tests CRUD operations, validations, scopes, and JSON API responses
+// Tests CRUD operations, validations, and JSON API responses
 // Uses better-sqlite3 with :memory: for fast, isolated tests
-
-// @vitest-environment node
+// Uses jsdom environment (default) for React component testing
 
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { join, dirname } from 'path';
