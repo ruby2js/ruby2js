@@ -1199,7 +1199,7 @@ class SelfhostBuilder
     adapter_file = ADAPTER_FILES[@database]
 
     unless adapter_file
-      valid = ADAPTER_FILES.keys.join(', ')
+      valid = ADAPTER_FILES.keys().join(', ')
       raise "Unknown DATABASE adapter: #{@database}. Valid options: #{valid}"
     end
 

@@ -218,8 +218,16 @@ export class Router extends RouterServer {
         }
       }
 
-      console.log(`  Rendering ${controllerName}/${action}`);
-      this.sendHtml(context, res, html);
+      // Check if result is a JSON response
+      console.log('  DEBUG: Got result from controller');
+      console.log('  Result type:', typeof html, html && typeof html === 'object' ? Object.keys(html).slice(0, 5) : 'n/a');
+      if (html && typeof html === 'object' && 'json' in html) {
+        console.log(`  Rendering JSON for ${controllerName}/${action}`);
+        this.sendJson(res, html.json);
+      } else {
+        console.log(`  Rendering ${controllerName}/${action}`);
+        this.sendHtml(context, res, html);
+      }
     } catch (e) {
       console.error('  Error:', e.message || e);
       res.writeHead(500, { 'Content-Type': 'text/html' });
@@ -279,7 +287,11 @@ export class Router extends RouterServer {
 
   // Handle controller result for Node.js
   static handleResultNode(context, res, result, defaultRedirect) {
-    if (result.turbo_stream) {
+    if (result.json) {
+      // JSON response
+      console.log('  Rendering JSON response');
+      this.sendJson(res, result.json, result.status || 200);
+    } else if (result.turbo_stream) {
       // Turbo Stream response - return with proper content type
       console.log('  Rendering turbo_stream response');
       this.sendTurboStream(context, res, result.turbo_stream);
@@ -344,11 +356,67 @@ export class Router extends RouterServer {
     res.writeHead(status, headers);
     res.end(fullHtml);
   }
+
+  // Send JSON response
+  static sendJson(res, data, status = 200) {
+    res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify(data));
+  }
 }
 
 // Application with Node.js-specific startup
 export class Application extends ApplicationServer {
   static wsServer = null;
+
+  // Run pending migrations and track them in schema_migrations
+  // Returns { ran: number, wasFresh: boolean }
+  // Supports SQL adapters (better-sqlite3, pglite)
+  static async runMigrations(adapter) {
+    if (!this.migrations || this.migrations.length === 0) {
+      // Fall back to schema if no migrations
+      if (this.schema && this.schema.create_tables) {
+        this.schema.create_tables();
+      }
+      return { ran: 0, wasFresh: true };
+    }
+
+    // SQL adapter path
+    let appliedVersions = new Set();
+    try {
+      await adapter.execute('CREATE TABLE IF NOT EXISTS schema_migrations (version TEXT PRIMARY KEY)');
+      const applied = await adapter.query('SELECT version FROM schema_migrations');
+      appliedVersions = new Set(applied.map(r => r.version));
+    } catch (e) {
+      console.log('First database initialization');
+    }
+
+    // Track if database was fresh (no prior migrations)
+    const wasFresh = appliedVersions.size === 0;
+
+    // Run pending migrations in order
+    let ran = 0;
+    for (const migration of this.migrations) {
+      if (appliedVersions.has(migration.version)) {
+        continue;
+      }
+
+      console.log(`Running migration ${migration.version}...`);
+      try {
+        await migration.up();
+        await adapter.execute('INSERT INTO schema_migrations (version) VALUES (?)', [migration.version]);
+        ran++;
+      } catch (e) {
+        console.error(`Migration ${migration.version} failed:`, e);
+        throw e;
+      }
+    }
+
+    if (ran > 0) {
+      console.log(`Ran ${ran} migration(s)`);
+    }
+
+    return { ran, wasFresh };
+  }
 
   // Register models with RPC registry for remote model operations
   // Call this after registering models to enable RPC access

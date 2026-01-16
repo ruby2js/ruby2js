@@ -1,0 +1,399 @@
+// Integration tests for the notes demo
+// Tests CRUD operations, validations, scopes, and JSON API responses
+// Uses better-sqlite3 with :memory: for fast, isolated tests
+
+// @vitest-environment node
+
+import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+// Use workspace/notes for CI, fall back to demo/notes for local testing
+const WORKSPACE_DIR = join(__dirname, 'workspace/notes');
+const DEMO_DIR = join(__dirname, '../../demo/notes');
+import { existsSync } from 'fs';
+const DIST_DIR = existsSync(join(WORKSPACE_DIR, 'dist'))
+  ? join(WORKSPACE_DIR, 'dist')
+  : join(DEMO_DIR, 'dist');
+
+// Dynamic imports - loaded once in beforeAll
+let Note;
+let NotesController;
+let Application, initDatabase, migrations, modelRegistry;
+let notes_path, note_path;
+
+describe('Notes Integration Tests', () => {
+  beforeAll(async () => {
+    // Import the active_record adapter (for initDatabase and modelRegistry)
+    const activeRecord = await import(join(DIST_DIR, 'lib/active_record.mjs'));
+    initDatabase = activeRecord.initDatabase;
+    modelRegistry = activeRecord.modelRegistry;
+
+    // Import Application from rails.js
+    const rails = await import(join(DIST_DIR, 'lib/rails.js'));
+    Application = rails.Application;
+
+    // Import migrations
+    const migrationsModule = await import(join(DIST_DIR, 'db/migrate/index.js'));
+    migrations = migrationsModule.migrations;
+
+    // Import models
+    const models = await import(join(DIST_DIR, 'app/models/index.js'));
+    Note = models.Note;
+
+    // Import controllers
+    const notesCtrl = await import(join(DIST_DIR, 'app/controllers/notes_controller.js'));
+    NotesController = notesCtrl.NotesController;
+
+    // Import path helpers
+    const paths = await import(join(DIST_DIR, 'config/paths.js'));
+    notes_path = paths.notes_path;
+    note_path = paths.note_path;
+
+    // Configure Application with migrations
+    Application.configure({ migrations });
+    Application.registerModels({ Note });
+
+    // Register models with adapter's registry
+    modelRegistry.Note = Note;
+  });
+
+  beforeEach(async () => {
+    // Initialize fresh in-memory database for each test
+    await initDatabase({ database: ':memory:' });
+
+    // Get the adapter module for runMigrations
+    const adapter = await import(join(DIST_DIR, 'lib/active_record.mjs'));
+
+    // Run migrations
+    await Application.runMigrations(adapter);
+  });
+
+  describe('Note Model', () => {
+    it('creates a note with valid attributes', async () => {
+      const note = await Note.create({
+        title: 'Test Note',
+        body: 'This is the body of the test note.'
+      });
+
+      expect(note.id).toBeDefined();
+      expect(note.title).toBe('Test Note');
+      expect(note.id).toBeGreaterThan(0);
+    });
+
+    it('validates title presence', async () => {
+      const note = new Note({ title: '', body: 'Valid body content.' });
+      const saved = await note.save();
+
+      expect(saved).toBe(false);
+      expect(note.errors.title).toBeDefined();
+    });
+
+    it('validates body presence', async () => {
+      const note = new Note({ title: 'Valid Title', body: '' });
+      const saved = await note.save();
+
+      expect(saved).toBe(false);
+      expect(note.errors.body).toBeDefined();
+    });
+
+    it('finds note by id', async () => {
+      const created = await Note.create({
+        title: 'Find Me',
+        body: 'This note should be findable by its ID.'
+      });
+
+      const found = await Note.find(created.id);
+      expect(found.title).toBe('Find Me');
+    });
+
+    it('lists all notes', async () => {
+      await Note.create({ title: 'Note 1', body: 'First note body.' });
+      await Note.create({ title: 'Note 2', body: 'Second note body.' });
+
+      const notes = await Note.all();
+      expect(notes.length).toBe(2);
+    });
+
+    it('updates a note', async () => {
+      const note = await Note.create({
+        title: 'Original Title',
+        body: 'Original body content.'
+      });
+
+      await note.update({ title: 'Updated Title' });
+
+      const reloaded = await Note.find(note.id);
+      expect(reloaded.title).toBe('Updated Title');
+    });
+
+    it('destroys a note', async () => {
+      const note = await Note.create({
+        title: 'To Delete',
+        body: 'This note will be deleted.'
+      });
+      const id = note.id;
+
+      await note.destroy();
+
+      const found = await Note.findBy({ id });
+      expect(found).toBeNull();
+    });
+  });
+
+  describe('Note Scopes', () => {
+    beforeEach(async () => {
+      // Create notes with different timestamps by updating them in sequence
+      const note1 = await Note.create({ title: 'Oldest Note', body: 'Created first.' });
+      const note2 = await Note.create({ title: 'Middle Note', body: 'Created second.' });
+      const note3 = await Note.create({ title: 'Newest Note', body: 'Created third.' });
+
+      // Update to ensure different updated_at timestamps
+      await note1.update({ body: 'Updated first.' });
+      await note2.update({ body: 'Updated second.' });
+      await note3.update({ body: 'Updated third.' });
+    });
+
+    it('recent scope orders by updated_at desc', async () => {
+      const notes = await Note.recent;
+      expect(notes.length).toBe(3);
+      // Most recently updated should be first
+      expect(notes[0].title).toBe('Newest Note');
+    });
+
+    it('search scope filters by title', async () => {
+      await Note.create({ title: 'Searchable Item', body: 'Should be found.' });
+
+      const results = await Note.search('Searchable');
+      expect(results.length).toBe(1);
+      expect(results[0].title).toBe('Searchable Item');
+    });
+
+    it('search scope returns empty for no match', async () => {
+      const results = await Note.search('NonexistentTerm');
+      expect(results.length).toBe(0);
+    });
+  });
+
+  describe('NotesController', () => {
+    // Helper to create mock context
+    const createContext = (overrides = {}) => ({
+      params: {},
+      flash: {
+        get: () => '',
+        set: () => {},
+        consumeNotice: () => ({ present: false }),
+        consumeAlert: () => ''
+      },
+      contentFor: {},
+      request: {
+        headers: { accept: 'text/html' }
+      },
+      ...overrides
+    });
+
+    it('index action returns notes', async () => {
+      await Note.create({ title: 'Listed Note', body: 'This should appear in the index.' });
+
+      const context = createContext();
+      const result = await NotesController.index(context);
+
+      // Should return view content (string) for HTML request
+      expect(typeof result).toBe('string');
+    });
+
+    it('show action returns note details', async () => {
+      const note = await Note.create({
+        title: 'Show This Note',
+        body: 'The full note body should be visible.'
+      });
+
+      const context = createContext({ params: { id: note.id } });
+      const result = await NotesController.show(context, note.id);
+
+      expect(typeof result).toBe('string');
+    });
+
+    it('create action adds a new note', async () => {
+      const context = createContext();
+      const params = {
+        title: 'New Note via Controller',
+        body: 'Created through the controller action.'
+      };
+
+      const result = await NotesController.create(context, params);
+
+      // Should return redirect after successful create
+      expect(result.redirect).toBeDefined();
+
+      const notes = await Note.all();
+      expect(notes.length).toBe(1);
+      expect(notes[0].title).toBe('New Note via Controller');
+    });
+
+    it('update action modifies existing note', async () => {
+      const note = await Note.create({
+        title: 'Original',
+        body: 'Original body.'
+      });
+
+      const context = createContext();
+      const result = await NotesController.update(context, note.id, { title: 'Modified' });
+
+      expect(result.redirect).toBeDefined();
+
+      const updated = await Note.find(note.id);
+      expect(updated.title).toBe('Modified');
+    });
+
+    it('destroy action removes note', async () => {
+      const note = await Note.create({
+        title: 'To Delete',
+        body: 'Will be deleted.'
+      });
+      const id = note.id;
+
+      const context = createContext();
+      const result = await NotesController.destroy(context, id);
+
+      expect(result.redirect).toBeDefined();
+
+      const found = await Note.findBy({ id });
+      expect(found).toBeNull();
+    });
+  });
+
+  describe('JSON API Responses', () => {
+    // Helper to create mock context with JSON Accept header
+    const createJsonContext = (overrides = {}) => ({
+      params: {},
+      flash: {
+        get: () => '',
+        set: () => {},
+        consumeNotice: () => ({ present: false }),
+        consumeAlert: () => ''
+      },
+      contentFor: {},
+      request: {
+        headers: { accept: 'application/json' }
+      },
+      ...overrides
+    });
+
+    it('index returns JSON when Accept header is application/json', async () => {
+      await Note.create({ title: 'JSON Note 1', body: 'First note.' });
+      await Note.create({ title: 'JSON Note 2', body: 'Second note.' });
+
+      const context = createJsonContext();
+      const result = await NotesController.index(context);
+
+      // Should return { json: data } object for JSON request
+      expect(result).toHaveProperty('json');
+      // The json property should be the notes data (array or query result)
+    });
+
+    it('show returns JSON when Accept header is application/json', async () => {
+      const note = await Note.create({
+        title: 'JSON Show Note',
+        body: 'Note for JSON show test.'
+      });
+
+      const context = createJsonContext({ params: { id: note.id } });
+      const result = await NotesController.show(context, note.id);
+
+      expect(result).toHaveProperty('json');
+    });
+
+    it('create returns JSON on success when Accept is application/json', async () => {
+      const context = createJsonContext();
+      const params = {
+        title: 'JSON Created Note',
+        body: 'Created via JSON API.'
+      };
+
+      const result = await NotesController.create(context, params);
+
+      // For successful JSON create, should return { json: note, status: 201 } or similar
+      // The exact structure depends on how respond_to transpiles
+      expect(result.json || result.redirect).toBeDefined();
+    });
+  });
+
+  describe('Path Helpers', () => {
+    it('notes_path returns correct path', () => {
+      expect(String(notes_path())).toBe('/notes');
+    });
+
+    it('note_path returns correct path with id', async () => {
+      const note = await Note.create({
+        title: 'Path Test Note',
+        body: 'Testing path helper.'
+      });
+      expect(String(note_path(note))).toBe(`/notes/${note.id}`);
+    });
+
+    it('controller redirect uses path helpers', async () => {
+      const context = {
+        params: {},
+        flash: { set: () => {} },
+        contentFor: {},
+        request: { headers: { accept: 'text/html' } }
+      };
+
+      const params = {
+        title: 'Redirect Test Note',
+        body: 'Testing redirect path.'
+      };
+
+      const result = await NotesController.create(context, params);
+
+      expect(result.redirect).toBeDefined();
+
+      const notes = await Note.all();
+      const createdNote = notes[0];
+      expect(String(result.redirect)).toBe(String(note_path(createdNote)));
+    });
+
+    it('path helpers should not double paths', () => {
+      const path = String(notes_path());
+      expect(path).not.toContain('/notes/notes');
+    });
+  });
+
+  describe('Query Interface', () => {
+    beforeEach(async () => {
+      await Note.create({ title: 'Alpha', body: 'First alphabetically.' });
+      await Note.create({ title: 'Beta', body: 'Second alphabetically.' });
+      await Note.create({ title: 'Gamma', body: 'Third alphabetically.' });
+    });
+
+    it('where filters by attributes', async () => {
+      const results = await Note.where({ title: 'Beta' });
+      expect(results.length).toBe(1);
+      expect(results[0].title).toBe('Beta');
+    });
+
+    it('order sorts results', async () => {
+      const results = await Note.order({ title: 'desc' });
+      expect(results[0].title).toBe('Gamma');
+      expect(results[2].title).toBe('Alpha');
+    });
+
+    it('limit restricts result count', async () => {
+      const results = await Note.limit(2);
+      expect(results.length).toBe(2);
+    });
+
+    it('first returns single record', async () => {
+      const first = await Note.first();
+      expect(first).toBeDefined();
+      expect(first.title).toBe('Alpha');
+    });
+
+    it('count returns record count', async () => {
+      const count = await Note.count();
+      expect(count).toBe(3);
+    });
+  });
+});

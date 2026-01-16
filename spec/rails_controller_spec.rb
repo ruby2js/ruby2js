@@ -431,5 +431,65 @@ describe Ruby2JS::Filter::Rails::Controller do
       # Should NOT have turbo-stream check when only html format
       _(result).wont_include 'text/vnd.turbo-stream.html'
     end
+
+    it "generates Accept header check for format.json" do
+      source = <<~RUBY
+        class ArticlesController < ApplicationController
+          def index
+            @articles = Article.all
+            respond_to do |format|
+              format.html
+              format.json { render json: @articles }
+            end
+          end
+        end
+      RUBY
+
+      result = to_js(source)
+      # Should check Accept header for JSON
+      _(result).must_include 'context.request.headers.accept'
+      _(result).must_include 'application/json'
+      # Should return json wrapper for JSON response
+      _(result).must_include '{json: articles}'
+    end
+
+    it "handles json-only respond_to" do
+      source = <<~RUBY
+        class ArticlesController < ApplicationController
+          def index
+            @articles = Article.all
+            respond_to do |format|
+              format.json { render json: @articles }
+            end
+          end
+        end
+      RUBY
+
+      result = to_js(source)
+      # Should check Accept header
+      _(result).must_include 'application/json'
+      _(result).must_include '{json: articles}'
+    end
+
+    it "handles html and json respond_to" do
+      source = <<~RUBY
+        class ArticlesController < ApplicationController
+          def show
+            @article = Article.find(params[:id])
+            respond_to do |format|
+              format.html
+              format.json { render json: @article }
+            end
+          end
+        end
+      RUBY
+
+      result = to_js(source)
+      # Should have conditional for JSON
+      _(result).must_include 'application/json'
+      _(result).must_include '{json: article}'
+      # Should have HTML fallback (view call)
+      _(result).must_include 'ArticleViews.show'
+    end
   end
 end

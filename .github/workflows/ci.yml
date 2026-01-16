@@ -180,6 +180,39 @@ jobs:
           path: artifacts/demo-workflow.tar.gz
           retention-days: 7
 
+  create-notes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+          bundler-cache: true
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Install Rails
+        run: gem install rails
+
+      - name: Create notes demo
+        run: |
+          # Point bundler to the checked-out ruby2js repo instead of fetching from GitHub
+          bundle config set --global local.ruby2js $GITHUB_WORKSPACE
+          test/notes/create-notes artifacts/notes
+          tar -czf artifacts/demo-notes.tar.gz -C artifacts notes
+
+      - name: Upload notes demo
+        uses: actions/upload-artifact@v4
+        with:
+          name: demo-notes
+          path: artifacts/demo-notes.tar.gz
+          retention-days: 7
+
   # ===========================================================================
   # Stage 2: Tests (some run immediately, others depend on Stage 1 artifacts)
   # ===========================================================================
@@ -319,12 +352,12 @@ jobs:
         run: node test/smoke-test.mjs artifacts/chat --database ${{ matrix.database }}
 
   integration-test:
-    needs: [build-tarballs, create-blog, create-chat, create-photo-gallery, create-workflow]
+    needs: [build-tarballs, create-blog, create-chat, create-photo-gallery, create-workflow, create-notes]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        demo: [blog, chat, photo_gallery, workflow]
+        demo: [blog, chat, photo_gallery, workflow, notes]
     steps:
       - uses: actions/checkout@v4
 
@@ -371,7 +404,7 @@ jobs:
   # ===========================================================================
 
   build-site:
-    needs: [build-tarballs, create-blog, create-chat, create-photo-gallery, create-workflow]
+    needs: [build-tarballs, create-blog, create-chat, create-photo-gallery, create-workflow, create-notes]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -403,7 +436,7 @@ jobs:
           # Point bundler to the checked-out ruby2js repo instead of fetching from GitHub
           bundle config set --global local.ruby2js $GITHUB_WORKSPACE
 
-          for demo in blog chat photo_gallery workflow; do
+          for demo in blog chat photo_gallery workflow notes; do
             echo "Building $demo for browser..."
             base_path="/ruby2js/${demo//_/-}/"
             # Install fresh tarballs into demo's dist/ directory (where package.json lives)
@@ -460,6 +493,7 @@ jobs:
               <ul>
                 <li><a href="demo-blog.tar.gz">demo-blog.tar.gz</a> - Blog demo (CRUD, nested routes)</li>
                 <li><a href="demo-chat.tar.gz">demo-chat.tar.gz</a> - Chat demo (Turbo Streams)</li>
+                <li><a href="demo-notes.tar.gz">demo-notes.tar.gz</a> - Notes demo (JSON API, scopes)</li>
                 <li><a href="demo-photo-gallery.tar.gz">demo-photo-gallery.tar.gz</a> - Photo gallery demo</li>
                 <li><a href="demo-workflow.tar.gz">demo-workflow.tar.gz</a> - Workflow builder demo</li>
               </ul>
@@ -472,6 +506,7 @@ jobs:
           # Copy browser demos
           cp -r artifacts/blog/dist _site/blog
           cp -r artifacts/chat/dist _site/chat
+          cp -r artifacts/notes/dist _site/notes
           cp -r artifacts/photo_gallery/dist _site/photo-gallery
           cp -r artifacts/workflow/dist _site/workflow
 
@@ -510,6 +545,10 @@ jobs:
                 <p>Real-time Turbo Streams, Stimulus controllers.</p>
               </div>
               <div class="demo">
+                <h2><a href="notes/">Notes</a></h2>
+                <p>JSON API, scopes, search. Simple single-model CRUD.</p>
+              </div>
+              <div class="demo">
                 <h2><a href="photo-gallery/">Photo Gallery</a></h2>
                 <p>Camera integration via getUserMedia.</p>
               </div>
@@ -540,7 +579,7 @@ jobs:
               // GitHub Pages SPA redirect for direct URL access
               // Detects which demo the path belongs to and redirects there
               const path = location.pathname;
-              const demos = ['blog', 'chat', 'photo-gallery', 'workflow'];
+              const demos = ['blog', 'chat', 'notes', 'photo-gallery', 'workflow'];
               const base = '/ruby2js/';
 
               // Find which demo this path belongs to

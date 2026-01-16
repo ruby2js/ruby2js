@@ -538,8 +538,10 @@ module Ruby2JS
             return s(:if, condition, then_branch, else_branch)
 
           when :begin
-            # Multiple statements - collect format.html and format.turbo_stream blocks
+            # Multiple statements - collect format.html, format.json, and format.turbo_stream blocks
             html_block = nil
+            html_template = false  # format.html without block - render default template
+            json_block = nil
             turbo_stream_block = nil
             turbo_stream_template = false  # format.turbo_stream without block
 
@@ -552,17 +554,23 @@ module Ruby2JS
                   if receiver&.type == :lvar
                     if method == :html
                       html_block = child.children[2]
+                    elsif method == :json
+                      json_block = child.children[2]
                     elsif method == :turbo_stream
                       turbo_stream_block = child.children[2]
                     end
                   end
                 end
               elsif child.type == :send
-                # format.turbo_stream without block - render template
+                # format.html or format.turbo_stream without block - render template
                 receiver = child.children[0]
                 method = child.children[1]
-                if receiver&.type == :lvar && method == :turbo_stream
-                  turbo_stream_template = true
+                if receiver&.type == :lvar
+                  if method == :turbo_stream
+                    turbo_stream_template = true
+                  elsif method == :html
+                    html_template = true
+                  end
                 end
               end
             end
@@ -577,6 +585,12 @@ module Ruby2JS
             # If both formats present, generate Accept header conditional
             if html_block && turbo_stream_block
               return generate_format_conditional(html_block, turbo_stream_block)
+            elsif json_block && (html_block || html_template)
+              # JSON + HTML: check Accept header for application/json
+              return generate_json_format_conditional(html_block, json_block)
+            elsif json_block
+              # Only JSON - still need Accept header check and {json:} wrapper
+              return generate_json_format_conditional(nil, json_block)
             elsif html_block
               return transform_ivars_to_locals(html_block)
             elsif turbo_stream_block
@@ -589,13 +603,18 @@ module Ruby2JS
             return s(:begin, *new_children)
 
           when :block
-            # Single format block - check if it's format.html or format.turbo_stream
+            # Single format block - check if it's format.html, format.json, or format.turbo_stream
             block_send = node.children[0]
             if block_send&.type == :send
               receiver = block_send.children[0]
               method = block_send.children[1]
-              if receiver&.type == :lvar && (method == :html || method == :turbo_stream)
-                return transform_ivars_to_locals(node.children[2])
+              if receiver&.type == :lvar
+                if method == :json
+                  # Single format.json - wrap with Accept header check and {json:} wrapper
+                  return generate_json_format_conditional(nil, node.children[2])
+                elsif method == :html || method == :turbo_stream
+                  return transform_ivars_to_locals(node.children[2])
+                end
               end
             end
             # Not a format block - transform normally
@@ -606,6 +625,47 @@ module Ruby2JS
 
           else
             return transform_ivars_to_locals(node)
+          end
+        end
+
+        # Generate conditional for JSON content negotiation
+        # Checks Accept header for 'application/json'
+        # When format.html has no block (implicit view render), html_block is nil
+        # and we return early for JSON, letting the normal view render handle HTML
+        def generate_json_format_conditional(html_block, json_block)
+          # Build: const accept = context.request.headers.accept || '';
+          #        if (accept.includes('application/json')) { return json_response }
+          #        // else fall through to view render (or html_block if provided)
+          accept_var = s(:lvasgn, :accept,
+            s(:or,
+              s(:attr,
+                s(:attr,
+                  s(:attr, s(:lvar, :context), :request),
+                  :headers),
+                :accept),
+              s(:str, '')))
+
+          condition = s(:send,
+            s(:lvar, :accept),
+            :includes,
+            s(:str, 'application/json'))
+
+          # Wrap JSON block in return statement and add {json: data} wrapper
+          json_content = transform_ivars_to_locals(json_block)
+          json_return = s(:return, s(:hash, s(:pair, s(:sym, :json), json_content)))
+
+          if html_block
+            # Both JSON and HTML have explicit blocks
+            html_branch = s(:return, transform_ivars_to_locals(html_block))
+            s(:begin,
+              accept_var,
+              s(:if, condition, json_return, html_branch))
+          else
+            # JSON block with implicit HTML (view render)
+            # Just check for JSON and return early, let normal view render handle HTML
+            s(:begin,
+              accept_var,
+              s(:if, condition, json_return, nil))
           end
         end
 

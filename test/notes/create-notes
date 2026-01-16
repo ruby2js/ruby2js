@@ -164,7 +164,7 @@ mkdir -p app/views/notes
 
 cat > app/views/notes/Index.rbx << 'RBX'
 import React, [useState, useEffect, useCallback], from: 'react'
-import [notes_path, note_path], from: '/config/routes.js'
+import [notes_path, note_path], from: '/config/paths.js'
 
 # SearchField component
 def SearchField(value:, onChange:)
