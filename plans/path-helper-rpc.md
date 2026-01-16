@@ -248,6 +248,49 @@ Vite aliasing swaps implementations:
 - Server targets: `lib/path_helper.mjs` (fetch-based)
 - Browser target: `lib/path_helper_browser.mjs` (direct invocation)
 
+### Phase 1c: CSRF Token Integration
+
+Currently CSRF tokens work for RPC model calls but not for regular form submissions or path helper calls.
+
+**Server validation** - Update `Router.dispatch()` in `rails_server.js`:
+
+```javascript
+// After parsing body, before processing mutating requests
+if (['POST', 'PATCH', 'PUT', 'DELETE'].includes(method)) {
+  const token = req.headers['x-authenticity-token'] || params.authenticity_token;
+  if (!csrf.validateToken(token)) {
+    res.writeHead(422, { 'Content-Type': 'text/html' });
+    res.end('<h1>422 Invalid Authenticity Token</h1>');
+    return;
+  }
+}
+```
+
+**Layout meta tag** - Update `csrf_meta_tags` helper in `rails/helpers.rb`:
+
+```ruby
+# Currently stubbed - change to:
+if method == :csrf_meta_tags && target.nil?
+  # Reference token from context passed to render function
+  return s(:gvar, :$csrfMetaTag)
+end
+```
+
+The server passes `$csrfMetaTag` when rendering views (output of `csrfMetaTag()` from rpc/server.mjs).
+
+**Form hidden fields** - Update form helpers (form_with, form_for, form_tag, button_to):
+
+```html
+<input type="hidden" name="authenticity_token" value="${$context.authenticityToken}">
+```
+
+Forms reference `$context.authenticityToken` which is passed at render time.
+
+**File changes:**
+- `packages/ruby2js-rails/rails_server.js` - Add token validation to dispatch
+- `packages/ruby2js-rails/targets/node/rails.js` - Add token validation to dispatch
+- `lib/ruby2js/filter/rails/helpers.rb` - Update csrf_meta_tags, add hidden field to forms
+
 ### Phase 2: Update rails/routes Filter
 
 **File**: `lib/ruby2js/filter/rails/routes.rb`
@@ -319,6 +362,9 @@ Recommend Option B initially - explicit imports are clearer and match the model 
 | `lib/ruby2js/filter/rails/routes.rb` | Update to use createPathHelper() |
 | `packages/ruby2js-rails/vite.mjs` | Alias path_helper based on target |
 | `packages/ruby2js-rails/package.json` | Export path_helper modules |
+| `packages/ruby2js-rails/rails_server.js` | Add CSRF validation to dispatch |
+| `packages/ruby2js-rails/targets/node/rails.js` | Add CSRF validation to dispatch |
+| `lib/ruby2js/filter/rails/helpers.rb` | csrf_meta_tags output, form hidden fields |
 
 ## Usage Examples
 
