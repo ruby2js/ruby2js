@@ -35,12 +35,6 @@ cat > app/models/note.rb << 'MODEL'
 class Note < ApplicationRecord
   validates :title, presence: true
   validates :body, presence: true
-
-  scope :search, ->(query) {
-    where("title LIKE ?", "%#{query}%") if query.present?
-  }
-
-  scope :recent, -> { order(updated_at: :desc) }
 end
 MODEL
 
@@ -58,8 +52,7 @@ class NotesController < ApplicationController
   before_action :set_note, only: [:show, :edit, :update, :destroy]
 
   def index
-    @notes = Note.recent
-    @notes = @notes.search(params[:q]) if params[:q].present?
+    @notes = Note.order(updated_at: :desc)
 
     respond_to do |format|
       format.html
@@ -360,6 +353,35 @@ export default def Index()
       <div className="flex-1 p-6">
         {renderEditor()}
       </div>
+    </div>
+  }
+end
+RBX
+
+# Create Show view
+cat > app/views/notes/Show.rbx << 'RBX'
+import React from: 'react'
+import [note_path, notes_path], from: '../../../config/paths.js'
+
+# Show component for a single note
+export default def Show(note:)
+  handleBack = -> { window.location.href = notes_path }
+
+  %x{
+    <div className="max-w-2xl mx-auto p-6">
+      <h1 className="text-2xl font-bold mb-4">{note.title}</h1>
+      <div className="prose mb-6">
+        <p>{note.body}</p>
+      </div>
+      <p className="text-sm text-gray-500 mb-4">
+        Last updated: {new Date(note.updated_at).toLocaleDateString()}
+      </p>
+      <button
+        onClick={handleBack}
+        className="text-blue-600 hover:underline"
+      >
+        Back to Notes
+      </button>
     </div>
   }
 end

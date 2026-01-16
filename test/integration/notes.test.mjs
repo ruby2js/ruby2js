@@ -142,37 +142,26 @@ describe('Notes Integration Tests', () => {
     });
   });
 
-  describe('Note Scopes', () => {
-    beforeEach(async () => {
-      // Create notes with different timestamps by updating them in sequence
-      const note1 = await Note.create({ title: 'Oldest Note', body: 'Created first.' });
-      const note2 = await Note.create({ title: 'Middle Note', body: 'Created second.' });
-      const note3 = await Note.create({ title: 'Newest Note', body: 'Created third.' });
+  describe('Note Ordering', () => {
+    it('order method sorts by updated_at desc', async () => {
+      // Create notes in order
+      await Note.create({ title: 'First Note', body: 'Created first.' });
+      await Note.create({ title: 'Second Note', body: 'Created second.' });
+      await Note.create({ title: 'Third Note', body: 'Created third.' });
 
-      // Update to ensure different updated_at timestamps
-      await note1.update({ body: 'Updated first.' });
-      await note2.update({ body: 'Updated second.' });
-      await note3.update({ body: 'Updated third.' });
-    });
-
-    it('recent scope orders by updated_at desc', async () => {
-      const notes = await Note.recent;
+      const notes = await Note.order({ updated_at: 'desc' });
       expect(notes.length).toBe(3);
-      // Most recently updated should be first
-      expect(notes[0].title).toBe('Newest Note');
+      // Most recently created should be first (since updated_at == created_at initially)
+      expect(notes[0].title).toBe('Third Note');
     });
 
-    it('search scope filters by title', async () => {
-      await Note.create({ title: 'Searchable Item', body: 'Should be found.' });
+    it('where method filters by attributes', async () => {
+      await Note.create({ title: 'Find This', body: 'Should be found.' });
+      await Note.create({ title: 'Other Note', body: 'Not this one.' });
 
-      const results = await Note.search('Searchable');
+      const results = await Note.where({ title: 'Find This' });
       expect(results.length).toBe(1);
-      expect(results[0].title).toBe('Searchable Item');
-    });
-
-    it('search scope returns empty for no match', async () => {
-      const results = await Note.search('NonexistentTerm');
-      expect(results.length).toBe(0);
+      expect(results[0].title).toBe('Find This');
     });
   });
 

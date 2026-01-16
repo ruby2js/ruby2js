@@ -410,8 +410,8 @@ describe Ruby2JS::Filter::Rails::Controller do
       RUBY
 
       result = to_js(source)
-      # Should check Accept header
-      _(result).must_include 'context.request.headers.accept'
+      # Should check Accept header (uses optional chaining for safety)
+      _(result).must_include 'context?.request?.headers?.accept'
       _(result).must_include 'text/vnd.turbo-stream.html'
     end
 
@@ -446,8 +446,8 @@ describe Ruby2JS::Filter::Rails::Controller do
       RUBY
 
       result = to_js(source)
-      # Should check Accept header for JSON
-      _(result).must_include 'context.request.headers.accept'
+      # Should check Accept header for JSON (uses optional chaining for safety)
+      _(result).must_include 'context?.request?.headers?.accept'
       _(result).must_include 'application/json'
       # Should return json wrapper for JSON response
       _(result).must_include '{json: articles}'
