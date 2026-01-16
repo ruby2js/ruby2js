@@ -633,14 +633,15 @@ module Ruby2JS
         # When format.html has no block (implicit view render), html_block is nil
         # and we return early for JSON, letting the normal view render handle HTML
         def generate_json_format_conditional(html_block, json_block)
-          # Build: const accept = context.request.headers.accept || '';
+          # Build: const accept = context.request?.headers?.accept ?? '';
           #        if (accept.includes('application/json')) { return json_response }
           #        // else fall through to view render (or html_block if provided)
+          # Use cattr for optional property access (?.) to handle missing request/headers
           accept_var = s(:lvasgn, :accept,
             s(:or,
-              s(:attr,
-                s(:attr,
-                  s(:attr, s(:lvar, :context), :request),
+              s(:cattr,
+                s(:cattr,
+                  s(:cattr, s(:lvar, :context), :request),
                   :headers),
                 :accept),
               s(:str, '')))
@@ -672,14 +673,14 @@ module Ruby2JS
         # Generate conditional for Turbo Stream content negotiation
         # Checks Accept header for 'text/vnd.turbo-stream.html'
         def generate_format_conditional(html_block, turbo_stream_block)
-          # Build: const accept = context.request.headers.accept || '';
+          # Build: const accept = context.request?.headers?.accept ?? '';
           #        if (accept.includes('text/vnd.turbo-stream.html')) { ... } else { ... }
-          # Use :attr for property access instead of :send for method calls
+          # Use cattr for optional property access (?.) to handle missing request/headers
           accept_var = s(:lvasgn, :accept,
             s(:or,
-              s(:attr,
-                s(:attr,
-                  s(:attr, s(:lvar, :context), :request),
+              s(:cattr,
+                s(:cattr,
+                  s(:cattr, s(:lvar, :context), :request),
                   :headers),
                 :accept),
               s(:str, '')))
@@ -704,14 +705,15 @@ module Ruby2JS
         def generate_format_conditional_with_template(html_block)
           @rails_needs_turbo_stream_views = true
 
-          # Build: (context.request.headers.accept || '').includes('text/vnd.turbo-stream.html')
+          # Build: (context.request?.headers?.accept ?? '').includes('text/vnd.turbo-stream.html')
           #        ? { turbo_stream: ... } : html_response
+          # Use cattr for optional property access (?.) to handle missing request/headers
           accept_check = s(:send,
             s(:begin,
               s(:or,
-                s(:attr,
-                  s(:attr,
-                    s(:attr, s(:lvar, :context), :request),
+                s(:cattr,
+                  s(:cattr,
+                    s(:cattr, s(:lvar, :context), :request),
                     :headers),
                   :accept),
                 s(:str, ''))),
