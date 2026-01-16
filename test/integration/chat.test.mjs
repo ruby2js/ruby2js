@@ -238,7 +238,8 @@ describe('Chat Integration Tests', () => {
     });
 
     it('messages_path returns correct path', () => {
-      expect(messages_path()).toBe('/messages');
+      // Use String() since path helpers return objects with toString() methods
+      expect(String(messages_path())).toBe('/messages');
     });
 
     it('message_path returns correct path with id', async () => {
@@ -246,11 +247,12 @@ describe('Chat Integration Tests', () => {
         username: 'Test',
         body: 'Test message'
       });
-      expect(message_path(message)).toBe(`/messages/${message.id}`);
+      // Use String() since path helpers return objects with toString() methods
+      expect(String(message_path(message))).toBe(`/messages/${message.id}`);
     });
 
     it('path helpers should not double the base path', () => {
-      const path = messages_path();
+      const path = String(messages_path());
       expect(path).not.toContain('/messages/messages');
     });
   });

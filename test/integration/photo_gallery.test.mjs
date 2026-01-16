@@ -264,11 +264,12 @@ describe('Photo Gallery Integration Tests', () => {
     });
 
     it('photos_path returns correct path', () => {
-      expect(photos_path()).toBe('/photos');
+      // Use String() since path helpers return objects with toString() methods
+      expect(String(photos_path())).toBe('/photos');
     });
 
     it('path helpers should not double the base path', () => {
-      const path = photos_path();
+      const path = String(photos_path());
       expect(path).not.toContain('/photos/photos');
     });
   });

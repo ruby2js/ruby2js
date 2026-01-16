@@ -529,30 +529,35 @@ describe('Workflow Builder Integration Tests', () => {
     });
 
     it('workflows_path returns correct path', () => {
-      expect(workflows_path()).toBe('/workflows');
+      // Use String() since path helpers return objects with toString() methods
+      expect(String(workflows_path())).toBe('/workflows');
     });
 
     it('workflow_path returns correct path with id', async () => {
       const workflow = await Workflow.create({ name: 'Test' });
-      expect(workflow_path(workflow)).toBe(`/workflows/${workflow.id}`);
+      // Use String() since path helpers return objects with toString() methods
+      expect(String(workflow_path(workflow))).toBe(`/workflows/${workflow.id}`);
     });
 
     it('new_workflow_path returns correct path', () => {
-      expect(new_workflow_path()).toBe('/workflows/new');
+      // Use String() since path helpers return objects with toString() methods
+      expect(String(new_workflow_path())).toBe('/workflows/new');
     });
 
     it('edit_workflow_path returns correct path', async () => {
       const workflow = await Workflow.create({ name: 'Test' });
-      expect(edit_workflow_path(workflow)).toBe(`/workflows/${workflow.id}/edit`);
+      // Use String() since path helpers return objects with toString() methods
+      expect(String(edit_workflow_path(workflow))).toBe(`/workflows/${workflow.id}/edit`);
     });
 
     it('nodes_path returns nested path', async () => {
       const workflow = await Workflow.create({ name: 'Test' });
-      expect(nodes_path(workflow)).toBe(`/workflows/${workflow.id}/nodes`);
+      // Use String() since path helpers return objects with toString() methods
+      expect(String(nodes_path(workflow))).toBe(`/workflows/${workflow.id}/nodes`);
     });
 
     it('path helpers should not double the base path', () => {
-      const path = workflows_path();
+      const path = String(workflows_path());
       expect(path).not.toContain('/workflows/workflows');
     });
   });
