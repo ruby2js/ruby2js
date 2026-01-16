@@ -259,9 +259,10 @@ describe('Blog Integration Tests', () => {
       expect(result.redirect).toBeDefined();
 
       // Verify redirect matches what article_path() returns for article id 1
+      // Use String() since path helpers return objects with toString() methods
       const articles = await Article.all();
       const createdArticle = articles[0];
-      expect(result.redirect).toBe(article_path(createdArticle));
+      expect(String(result.redirect)).toBe(String(article_path(createdArticle)));
     });
 
     it('CommentsController redirect_to uses path helpers', async () => {
@@ -284,8 +285,9 @@ describe('Blog Integration Tests', () => {
       );
 
       // Should redirect to article_path(article)
+      // Use String() since path helpers return objects with toString() methods
       expect(result.redirect).toBeDefined();
-      expect(result.redirect).toBe(article_path(article));
+      expect(String(result.redirect)).toBe(String(article_path(article)));
     });
 
     it('CommentsController destroy uses correct path (not [object Promise])', async () => {
@@ -314,10 +316,11 @@ describe('Blog Integration Tests', () => {
       );
 
       // Should redirect to article_path(article), not contain [object Promise]
+      // Use String() since path helpers return objects with toString() methods
       expect(result.redirect).toBeDefined();
-      expect(result.redirect).not.toContain('[object');
-      expect(result.redirect).not.toContain('Promise');
-      expect(result.redirect).toBe(article_path(article));
+      expect(String(result.redirect)).not.toContain('[object');
+      expect(String(result.redirect)).not.toContain('Promise');
+      expect(String(result.redirect)).toBe(String(article_path(article)));
     });
 
     it('comment delete button URL does not contain [object Promise]', async () => {
