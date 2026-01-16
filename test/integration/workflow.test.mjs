@@ -14,6 +14,10 @@ let Workflow, Node, Edge;
 let WorkflowsController, NodesController, EdgesController;
 let Application, initDatabase, migrations, modelRegistry;
 
+// Note: The workflow Show view uses React Flow with browser-only pragmas.
+// Testing it would require mocking React Flow. See notes.test.mjs for
+// React Testing Library patterns that could be adapted here.
+
 describe('Workflow Builder Integration Tests', () => {
   beforeAll(async () => {
     // Import the active_record adapter (for initDatabase and modelRegistry)

@@ -3,9 +3,11 @@
 // Uses better-sqlite3 with :memory: for fast, isolated tests
 // Uses jsdom environment (default) for React component testing
 
-import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { render, screen, cleanup } from '@testing-library/react';
+import React from 'react';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // Use workspace/notes for CI, fall back to demo/notes for local testing
@@ -19,6 +21,7 @@ const DIST_DIR = existsSync(join(WORKSPACE_DIR, 'dist'))
 // Dynamic imports - loaded once in beforeAll
 let Note;
 let NotesController;
+let NoteViews;  // For direct view testing
 let Application, initDatabase, migrations, modelRegistry;
 let notes_path, note_path;
 
@@ -44,6 +47,15 @@ describe('Notes Integration Tests', () => {
     // Import controllers
     const notesCtrl = await import(join(DIST_DIR, 'app/controllers/notes_controller.js'));
     NotesController = notesCtrl.NotesController;
+
+    // Import views for direct React component testing
+    // Each RBX file becomes a separate .js file with default export
+    const indexView = await import(join(DIST_DIR, 'app/views/notes/index.js'));
+    const showView = await import(join(DIST_DIR, 'app/views/notes/show.js'));
+    NoteViews = {
+      Index: indexView.default,
+      Show: showView.default
+    };
 
     // Import path helpers
     const paths = await import(join(DIST_DIR, 'config/paths.js'));
@@ -165,6 +177,11 @@ describe('Notes Integration Tests', () => {
   });
 
   describe('NotesController', () => {
+    // Cleanup React Testing Library after each test
+    afterEach(() => {
+      cleanup();
+    });
+
     // Helper to create mock context
     const createContext = (overrides = {}) => ({
       params: {},
@@ -181,17 +198,35 @@ describe('Notes Integration Tests', () => {
       ...overrides
     });
 
-    // Skip: Index view uses React hooks (useState, useEffect) which require
-    // React's render cycle. Would need React Testing Library to properly test.
-    it.skip('index action returns notes', async () => {
+    it('index view renders with React Testing Library', async () => {
+      // Create test data
       await Note.create({ title: 'Listed Note', body: 'This should appear in the index.' });
 
-      const context = createContext();
-      const result = await NotesController.index(context);
+      // Render the Index component directly using React Testing Library
+      // The Index component uses hooks (useState, useEffect) so we must render it properly
+      render(React.createElement(NoteViews.Index));
 
-      // RBX views return objects (React components), not strings
-      expect(result).toBeDefined();
-      expect(typeof result).toBe('object');
+      // The component should render its basic structure
+      // Note: The actual data fetching happens async via useEffect
+      expect(screen.getByText('Notes')).toBeDefined();
+      expect(screen.getByRole('button', { name: 'New Note' })).toBeDefined();
+    });
+
+    it('show view renders note details', async () => {
+      // Create test data
+      const note = await Note.create({
+        title: 'View Test Note',
+        body: 'This note body should be visible.',
+        updated_at: new Date().toISOString()
+      });
+
+      // Render the Show component with note prop
+      render(React.createElement(NoteViews.Show, { note }));
+
+      // The component should render the note details
+      expect(screen.getByText('View Test Note')).toBeDefined();
+      expect(screen.getByText('This note body should be visible.')).toBeDefined();
+      expect(screen.getByRole('button', { name: 'Back to Notes' })).toBeDefined();
     });
 
     it('show action returns note details', async () => {
