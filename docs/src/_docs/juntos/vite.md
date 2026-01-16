@@ -135,6 +135,11 @@ dist/
 
 `.rbx` files combine Ruby and JSX for React components:
 
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["react", "esm", "functions"]
+}'></div>
+
 ```ruby
 # app/components/WorkflowCanvas.rbx
 import ReactFlow, [Background, Controls], from: 'reactflow'

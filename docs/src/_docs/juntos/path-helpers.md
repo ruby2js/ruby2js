@@ -238,6 +238,11 @@ The helpers implement `toString()` and `valueOf()` for seamless string conversio
 
 For path helpers to return JSON, controllers must respond to JSON format:
 
+<div data-controller="combo" data-selfhost="true" data-options='{
+  "eslevel": 2022,
+  "filters": ["controller", "esm", "functions"]
+}'></div>
+
 ```ruby
 class NotesController < ApplicationController
   def index

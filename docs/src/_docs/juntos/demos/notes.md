@@ -167,6 +167,11 @@ end
 
 The view uses path helpers to fetch and mutate data:
 
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["react", "esm", "functions"]
+}'></div>
+
 ```ruby
 # app/views/notes/Index.rbx
 import React, [useState, useEffect], from: 'react'

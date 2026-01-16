@@ -34,6 +34,11 @@ Turbo Streams work great for server-rendered HTML, but React manages its own DOM
 
 ### Node Model with JSON Broadcasting
 
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["model", "esm", "functions"]
+}'></div>
+
 ```ruby
 # app/models/node.rb
 class Node < ApplicationRecord
@@ -69,6 +74,11 @@ The `broadcast_json_to` method sends:
 ```
 
 ### Edge Model
+
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["model", "esm", "functions"]
+}'></div>
 
 ```ruby
 # app/models/edge.rb
@@ -112,6 +122,11 @@ import [useJsonStream], from: '../../lib/JsonStreamProvider.js'
 
 ### View with Provider
 
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["react", "esm", "functions"]
+}'></div>
+
 ```ruby
 # app/views/workflows/Show.rbx
 import JsonStreamProvider from '../../../lib/JsonStreamProvider.js'
@@ -137,6 +152,11 @@ end
 ```
 
 ### React Component Using the Hook
+
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["react", "esm", "functions"]
+}'></div>
 
 ```ruby
 # app/components/WorkflowCanvas.rbx

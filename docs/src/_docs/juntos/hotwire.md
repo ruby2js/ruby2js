@@ -122,6 +122,11 @@ This broadcasts JSON events:
 
 Use the `JsonStreamProvider` React context to handle subscriptions. It automatically uses WebSocket on server targets and BroadcastChannel on the browser target:
 
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["react", "esm", "functions"]
+}'></div>
+
 ```ruby
 # app/views/workflows/Show.rbx
 import JsonStreamProvider from '../../../lib/JsonStreamProvider.js'
@@ -138,6 +143,11 @@ end
 ```
 
 **React component using the context:**
+
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["react", "esm", "functions"]
+}'></div>
 
 ```ruby
 # app/components/WorkflowCanvas.rbx
