@@ -15,7 +15,8 @@ module Ruby2JS
     EXPRESSIONS = [ :array, :float, :hash, :int, :lvar, :nil, :send, :send!, :attr,
       :str, :sym, :dstr, :dsym, :cvar, :ivar, :zsuper, :super, :or, :and,
       :block, :const, :true, :false, :xnode, :taglit, :self,
-      :op_asgn, :and_asgn, :or_asgn, :taglit, :gvar, :csend, :call, :typeof ]
+      :op_asgn, :and_asgn, :or_asgn, :taglit, :gvar, :csend, :call, :typeof,
+      :jsraw ]  # jsraw is used by RBX mode for JSX
 
     handle :autoreturn do |*statements|
       return if statements.length == 1 && statements.first.nil?
