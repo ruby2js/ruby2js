@@ -360,7 +360,7 @@ RBX
 
 # Create Show view
 cat > app/views/notes/Show.rbx << 'RBX'
-import React from: 'react'
+import React, from: 'react'
 import [note_path, notes_path], from: '../../../config/paths.js'
 
 # Show component for a single note
