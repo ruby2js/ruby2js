@@ -84,15 +84,29 @@ Builds and deploys to serverless platforms.
 
 ## Database Adapters
 
-| Adapter | Runtime | Storage |
-|---------|---------|---------|
-| `dexie` | Browser | IndexedDB |
-| `sqljs` | Browser | SQLite/WASM |
-| `pglite` | Browser, Node | PostgreSQL/WASM |
-| `sqlite` | Node, Bun | SQLite file |
-| `pg` | Node, Bun, Deno | PostgreSQL |
-| `neon` | Vercel | Serverless PostgreSQL |
-| `d1` | Cloudflare | Edge SQLite |
+| Adapter | Runtime | Storage | Model Operations |
+|---------|---------|---------|------------------|
+| `dexie` | Browser | IndexedDB | Direct (local) |
+| `sqljs` | Browser | SQLite/WASM | Direct (local) |
+| `pglite` | Browser, Node | PostgreSQL/WASM | Direct (local) |
+| `sqlite` | Node, Bun | SQLite file | Direct (server) |
+| `pg` | Node, Bun, Deno | PostgreSQL | Direct (server) |
+| `neon` | Vercel | Serverless PostgreSQL | Direct (server) |
+| `d1` | Cloudflare | Edge SQLite | Direct (server) |
+
+### RPC for Server Targets
+
+When using server targets (Node.js, Cloudflare, etc.), browser-side code uses RPC to communicate with the server for model operations. The same Ruby code works on both sides:
+
+```ruby
+# This code works identically on both targets
+@articles = Article.where(status: 'published')
+```
+
+- **Browser target**: Queries IndexedDB directly via Dexie
+- **Server target**: Browser sends RPC request → Server queries SQLite → Returns results
+
+The RPC transport is transparent—your code doesn't change. See [Architecture](/docs/juntos/architecture) for details.
 
 ## Development to Production Workflow
 
@@ -248,6 +262,7 @@ Nested routes and path helpers work as expected.
 ## Next Steps
 
 - **[Demo Applications](/docs/juntos/demos/)** — Hands-on examples
+- **[Path Helpers](/docs/juntos/path-helpers)** — RSC-style data fetching with path helper RPC
 - **[CLI Reference](/docs/juntos/cli)** — All commands and options
 - **[Architecture](/docs/juntos/architecture)** — What gets generated
 - **[Testing](/docs/juntos/testing)** — Write tests for your transpiled app

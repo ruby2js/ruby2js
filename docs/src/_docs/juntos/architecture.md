@@ -160,6 +160,61 @@ ws.send(JSON.stringify({ command: 'subscribe', channel: 'chat_room' }));
 TurboBroadcast.broadcast('chat_room', '<turbo-stream action="append">...</turbo-stream>');
 ```
 
+## RPC Transport Layer
+
+For server targets (Node.js, Cloudflare, etc.), Juntos provides an RPC transport layer that enables browser-side code to call server-side model operations transparently.
+
+### How It Works
+
+When running with a server target, model operations in the browser are proxied to the server via RPC:
+
+```
+Browser                              Server
+───────                              ──────
+Article.find(1)
+    │
+    ├──▶ POST /__rpc                 ──▶ Article.find(1)
+         X-RPC-Action: Article.find       │
+         Body: { args: [1] }              │
+                                          ▼
+    ◀── { result: { id: 1, ... } } ◀── SQLite query
+```
+
+### RPC vs Path Helpers
+
+Both RPC and path helpers enable browser-to-server communication, but serve different purposes:
+
+| Feature | RPC (Model Operations) | Path Helpers |
+|---------|----------------------|--------------|
+| **Purpose** | Database operations | Controller actions |
+| **Endpoint** | `/__rpc` (single) | RESTful routes |
+| **Called by** | Model classes | View components |
+| **Example** | `Article.find(1)` | `articles_path.get()` |
+
+### Same Source, Two Modes
+
+The key benefit is that the same Ruby source code works on both browser and server targets:
+
+```ruby
+# This code works on both targets
+@articles = Article.where(status: 'published').order(created_at: :desc)
+```
+
+- **Browser target**: Queries IndexedDB via Dexie directly
+- **Server target**: Sends RPC request, server queries SQLite/PostgreSQL
+
+### CSRF Protection
+
+All RPC requests include CSRF tokens automatically:
+
+```javascript
+// Headers sent with every RPC request
+'X-Authenticity-Token': csrfToken
+'X-RPC-Action': 'Article.find'
+```
+
+The server validates tokens before processing any RPC request.
+
 ## The Runtime
 
 ### Application
@@ -191,18 +246,40 @@ Router.resources('comments', CommentsController, { shallow: true });
 Router.root('articles#index');
 ```
 
-Path helpers are generated as standalone functions:
+Path helpers are generated as callable objects with HTTP methods:
 
 ```javascript
 // config/paths.js
+import { createPathHelper } from 'ruby2js-rails/path_helper.mjs';
+
 export function article_path(article) {
-  return `/articles/${article.id || article}`;
+  return createPathHelper(`/articles/${article.id || article}`);
 }
 
-export function edit_article_path(article) {
-  return `/articles/${article.id || article}/edit`;
+export function articles_path() {
+  return createPathHelper('/articles');
 }
 ```
+
+Path helpers return objects with `get()`, `post()`, `patch()`, `put()`, and `delete()` methods that return `Response` objects:
+
+```javascript
+// GET request - params become query string
+articles_path().get({ page: 2 })           // GET /articles.json?page=2
+
+// POST request - params become JSON body
+articles_path().post({ article: { title: 'New' } })  // POST /articles.json
+
+// PATCH request
+article_path(1).patch({ article: { title: 'Updated' } })  // PATCH /articles/1.json
+
+// DELETE request
+article_path(1).delete()                   // DELETE /articles/1.json
+```
+
+Path helpers default to JSON format and include CSRF tokens automatically for mutating requests. They also maintain backward compatibility—string coercion still works for URLs in links and templates.
+
+See [Path Helpers](/docs/juntos/path-helpers) for complete documentation.
 
 ### ActiveRecord
 

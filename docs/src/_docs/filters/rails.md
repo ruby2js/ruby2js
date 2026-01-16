@@ -324,6 +324,55 @@ export const ArticlesController = {
 - `redirect_to` → redirect object
 - `new` action → `$new` (reserved word)
 
+### Format Negotiation (respond_to)
+
+Controllers can respond to multiple formats using `respond_to`:
+
+```ruby
+class ArticlesController < ApplicationController
+  def index
+    @articles = Article.all
+
+    respond_to do |format|
+      format.html
+      format.json { render json: @articles }
+    end
+  end
+end
+```
+
+```javascript
+export const ArticlesController = {
+  async index(context) {
+    let articles = await Article.all();
+
+    if (context.request.headers.accept?.includes("application/json")) {
+      return {json: articles}
+    } else {
+      return ArticleViews.index({$context: context, articles})
+    }
+  }
+};
+```
+
+**Supported formats:**
+
+| Format | Accept Header | Response |
+|--------|---------------|----------|
+| `format.html` | `text/html` | View render (default) |
+| `format.json` | `application/json` | `{json: data}` wrapper |
+| `format.turbo_stream` | `text/vnd.turbo-stream.html` | Turbo Stream actions |
+
+JSON responses are wrapped in `{json: ...}` for the runtime to handle serialization. For JSON-only endpoints:
+
+```ruby
+respond_to do |format|
+  format.json { render json: @articles }
+end
+```
+
+This generates an Accept header check and returns the JSON wrapper directly.
+
 ## Routes
 
 Transforms `config/routes.rb` to a JavaScript router configuration.
@@ -355,18 +404,49 @@ export const Routes = {
     {method: "DELETE", path: "/articles/:id", action: ArticlesController.destroy},
     {method: "POST", path: "/articles/:article_id/comments", action: CommentsController.create},
     {method: "DELETE", path: "/articles/:article_id/comments/:id", action: CommentsController.destroy}
-  ],
-
-  articles_path() { return "/articles" },
-  new_article_path() { return "/articles/new" },
-  article_path(id) { return `/articles/${id}` },
-  edit_article_path(id) { return `/articles/${id}/edit` }
+  ]
 };
 ```
 
 **Supported route methods:** `root`, `resources`, `resource`, `get`, `post`, `patch`, `put`, `delete`, `namespace`, `scope`
 
 **Supported options:** `:only`, `:except`, `:path`, `:as`
+
+### Path Helpers with HTTP Methods
+
+Path helpers are generated in a separate `config/paths.js` file. They return callable objects with HTTP methods:
+
+```javascript
+// config/paths.js
+import { createPathHelper } from 'ruby2js-rails/path_helper.mjs';
+
+export function articles_path() {
+  return createPathHelper('/articles');
+}
+
+export function article_path(article) {
+  return createPathHelper(`/articles/${extract_id(article)}`);
+}
+```
+
+Usage in views:
+
+```ruby
+# GET request - params become query string
+articles_path.get()                      # GET /articles.json
+articles_path.get(page: 2)               # GET /articles.json?page=2
+
+# POST request - params become JSON body
+articles_path.post(article: { title: 'New' })  # POST /articles.json
+
+# PATCH/DELETE requests
+article_path(1).patch(article: { title: 'Updated' })  # PATCH /articles/1.json
+article_path(1).delete                   # DELETE /articles/1.json
+```
+
+All methods return `Response` objects. Default format is JSON; use `format: 'html'` for HTML responses. CSRF tokens are included automatically for mutating requests.
+
+See [Path Helpers](/docs/juntos/path-helpers) for complete documentation.
 
 ## Migration
 

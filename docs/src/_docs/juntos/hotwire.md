@@ -319,9 +319,45 @@ The `TurboBroadcaster` class handles:
 - Broadcasting to subscribers
 - Hibernation for cost efficiency
 
+## RPC and Real-Time Features
+
+Juntos provides two complementary mechanisms for browser-server communication:
+
+| Feature | RPC Transport | Broadcasting |
+|---------|---------------|--------------|
+| **Direction** | Browser → Server (request/response) | Server → Browser (push) |
+| **Use case** | Model operations, data fetching | Real-time updates |
+| **Endpoint** | `/__rpc` | `/cable` (WebSocket) |
+| **Data flow** | Synchronous call, wait for result | Async event subscription |
+
+### How They Work Together
+
+A typical workflow:
+
+1. **User action** → Path helper makes RPC call (e.g., `notes_path.post(...)`)
+2. **Server processes** → Controller creates record, triggers `after_create_commit`
+3. **Broadcast** → Turbo Stream or JSON event sent to all subscribers
+4. **UI updates** → All connected clients receive the update
+
+```ruby
+# Model broadcasts on create
+class Note < ApplicationRecord
+  after_create_commit { broadcast_append_to "notes" }
+end
+
+# View fetches via path helper, subscribes to broadcasts
+notes_path.get().then { |r| r.json.then { |data| setNotes(data) } }
+turbo_stream_from "notes"  # Receives broadcasts from other users
+```
+
+This pattern enables:
+- **Optimistic updates**: UI updates immediately via local state
+- **Consistency**: Broadcasts sync all clients to server state
+- **Offline support**: Browser target works without server, syncs when reconnected
+
 ## Demo
 
-See the [Chat Demo](/docs/juntos/demos/chat) for a complete example of Turbo Streams broadcasting, Stimulus controllers in Ruby, and real-time features across platforms.
+See the [Chat Demo](/docs/juntos/demos/chat) for Turbo Streams broadcasting and Stimulus controllers, or the [Notes Demo](/docs/juntos/demos/notes) for path helper RPC with JSON broadcasting.
 
 ## Limitations
 
