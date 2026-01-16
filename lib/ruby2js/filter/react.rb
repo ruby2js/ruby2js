@@ -1411,15 +1411,17 @@ module Ruby2JS
        source = source[loc.begin.end_pos...loc.end.begin_pos].strip
        return super unless @reactClass or source.start_with? '<'
 
+       # Auto-import React when JSX is used (React 17+ allows omitting explicit import,
+       # but we use React.createElement which requires React in scope)
+       if self.modules_enabled?() and source.start_with?('<')
+         react_name = @react == :Preact ? 'Preact' : 'React'
+         import_key = react_name == 'Preact' ? :Preact : :React
+         self.prepend_list << REACT_IMPORTS[import_key] unless self.prepend_list.include?(REACT_IMPORTS[import_key])
+       end
+
        # RBX mode: convert JSX directly to JavaScript, preserving expressions
        if @rbx_mode
          react_name = @react == :Preact ? 'Preact' : 'React'
-         # Auto-import React when JSX is used (React 17+ allows omitting this,
-         # but we use React.createElement which requires React in scope)
-         if self.modules_enabled?() and source.start_with?('<')
-           import_key = react_name == 'Preact' ? :Preact : :React
-           self.prepend_list << REACT_IMPORTS[import_key] unless self.prepend_list.include?(REACT_IMPORTS[import_key])
-         end
          js_code = Ruby2JS.rbx2_js(source, react_name: react_name)
          return s(:jsraw, js_code)
        end
