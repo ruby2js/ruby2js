@@ -1,4 +1,5 @@
 require 'ruby2js'
+require 'ruby2js/node'
 require 'ruby2js/svelte_template_compiler'
 
 module Ruby2JS

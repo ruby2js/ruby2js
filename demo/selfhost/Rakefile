@@ -176,8 +176,14 @@ TRANSFORMER_TARGETS = [
   "#{SELFHOST}/dist/vue_component_transformer.mjs"
 ]
 
+desc "Build SFC filter (required by transformers)"
+file "#{SELFHOST}/filters/sfc.js" => ["#{SELFHOST}/ruby2js.js", "#{ROOT}/lib/ruby2js/filter/sfc.rb"] do
+  FileUtils.mkdir_p("#{SELFHOST}/filters")
+  sh bundle_exec("ruby #{SELFHOST}/scripts/transpile_sfc_filter.rb > #{SELFHOST}/filters/sfc.js")
+end
+
 desc "Build framework transformers (Vue, Svelte, Astro)"
-task :build_transformers => TRANSFORMER_TARGETS
+task :build_transformers => [*TRANSFORMER_TARGETS, "#{SELFHOST}/filters/sfc.js"]
 
 desc "Build manifest filters (batch)"
 task :build_filters => ["#{SELFHOST}/ruby2js.js"] do
