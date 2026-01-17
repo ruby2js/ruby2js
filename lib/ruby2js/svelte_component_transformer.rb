@@ -167,7 +167,7 @@ module Ruby2JS
 
     # Analyze AST to find instance variables, methods, etc.
     def analyze_ast(node)
-      return unless node.is_a?(Ruby2JS::Node)
+      return unless Ruby2JS.ast_node?(node)
 
       case node.type
       when :ivasgn
@@ -206,7 +206,7 @@ module Ruby2JS
           when :params
             @imports[:sveltekitStores] << 'page' # Pragma: set
           end
-        elsif target.is_a?(Ruby2JS::Node) && target.type == :send
+        elsif Ruby2JS.ast_node?(target) && target.type == :send
           inner_target, inner_method = target.children
           if inner_target.nil? && inner_method == :params
             @imports[:sveltekitStores] << 'page' # Pragma: set
@@ -223,7 +223,7 @@ module Ruby2JS
 
       # Recurse into children
       node.children.each do |child|
-        analyze_ast(child) if child.is_a?(Ruby2JS::Node)
+        analyze_ast(child) if Ruby2JS.ast_node?(child)
       end
     end
 

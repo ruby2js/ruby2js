@@ -141,7 +141,7 @@ module Ruby2JS
 
     # Analyze AST to find instance variables, methods, etc.
     def analyze_ast(node)
-      return unless node.is_a?(Ruby2JS::Node)
+      return unless Ruby2JS.ast_node?(node)
 
       case node.type
       when :ivasgn
@@ -168,7 +168,7 @@ module Ruby2JS
           when :props
             @uses_props = true
           end
-        elsif target.is_a?(Ruby2JS::Node) && target.type == :send
+        elsif Ruby2JS.ast_node?(target) && target.type == :send
           inner_target, inner_method = target.children
           if inner_target.nil?
             if inner_method == :params
@@ -197,7 +197,7 @@ module Ruby2JS
       # Recurse into children
       # Check child is an object before checking for :type (JS compatibility)
       node.children.each do |child|
-        analyze_ast(child) if child.is_a?(Ruby2JS::Node)
+        analyze_ast(child) if Ruby2JS.ast_node?(child)
       end
     end
 

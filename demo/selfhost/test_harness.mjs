@@ -113,6 +113,8 @@ globalThis.SEXP = SEXP;
 Ruby2JS.ast_node = Ruby2JS.ast_node || function(obj) {
   return typeof obj === 'object' && obj !== null && 'type' in obj && 'children' in obj;
 };
+// camelCase alias for transformers (transpiled with CamelCase filter)
+Ruby2JS.astNode = Ruby2JS.ast_node;
 
 // Re-export initPrism from bundle (already initialized at module load)
 export async function initPrism() {
