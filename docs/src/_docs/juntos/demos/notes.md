@@ -6,7 +6,7 @@ category: juntos/demos
 hide_in_toc: true
 ---
 
-A notes app demonstrating RSC-style path helpers. Path helpers return objects with HTTP methods (get, post, patch, delete) that return Response objects. The same code runs on Rails, in browsers with IndexedDB, and on Node.js with SQLite.
+A notes app demonstrating Server Functions-style path helpers. Path helpers return objects with HTTP methods (get, post, patch, delete) that return Response objects. The same code runs on Rails, in browsers with IndexedDB, and on Node.js with SQLite.
 
 {% toc %}
 
@@ -84,13 +84,11 @@ All methods return native `Response` objects (or synthetic equivalents in the br
 
 ```ruby
 # Fetch notes and parse JSON
-notes_path.get().then do |response|
-  response.json.then { |data| setNotes(data) }
-end
+notes_path.get.json { |data| setNotes(data) }
 
 # Create a note
-notes_path.post(note: { title: "Hello", body: "World" }).then do |response|
-  response.json.then { |note| setNotes([note, *notes]) }
+notes_path.post(note: { title: "Hello", body: "World" }).json do |note|
+  setNotes([note, *notes])
 end
 ```
 
@@ -186,22 +184,18 @@ export default def Index()
     params = {}
     params[:q] = searchQuery if searchQuery.length > 0
 
-    notes_path.get(params).then do |response|
-      response.json.then { |data| setNotes(data) }
-    end
+    notes_path.get(params).json { |data| setNotes(data) }
   }, [searchQuery])
 
   handleCreate = -> {
-    notes_path.post(note: { title: "Untitled", body: "" }).then do |response|
-      response.json.then { |note| setNotes([note, *notes]) }
+    notes_path.post(note: { title: "Untitled", body: "" }).json do |note|
+      setNotes([note, *notes])
     end
   }
 
   handleUpdate = ->(id, updates) {
-    note_path(id).patch(note: updates).then do |response|
-      response.json.then do |updated|
-        setNotes(notes.map { |n| n.id == updated.id ? updated : n })
-      end
+    note_path(id).patch(note: updates).json do |updated|
+      setNotes(notes.map { |n| n.id == updated.id ? updated : n })
     end
   }
 
@@ -242,13 +236,13 @@ On Node.js (or Cloudflare, Vercel, etc.), `notes_path.get()` makes an HTTP reque
 
 ## What This Demo Shows
 
-### RSC-Style Data Fetching
+### Server Functions-Style Data Fetching
 
-This pattern is inspired by React Server Components—data fetching happens through a unified API that works on both client and server:
+This pattern is inspired by React Server Functions—data fetching happens through a unified API that works on both client and server:
 
 ```ruby
 # Same code works everywhere
-notes_path.get().then { |r| r.json.then { |data| ... } }
+notes_path.get.json { |data| ... }
 ```
 
 ### Format Negotiation
@@ -284,7 +278,7 @@ notes_path.get(q: searchQuery)
 | Response format | HTML | JSON |
 | View rendering | ERB templates | React components (RBX) |
 | Reactivity | Turbo Streams | useState/useEffect |
-| Pattern | Traditional Rails | RSC-style |
+| Pattern | Traditional Rails | Server Functions-style |
 
 The Blog demo shows traditional Rails patterns. The Notes demo shows a modern React-style approach where the view layer manages state and fetches data via API calls.
 

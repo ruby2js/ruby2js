@@ -262,7 +262,7 @@ Nested routes and path helpers work as expected.
 ## Next Steps
 
 - **[Demo Applications](/docs/juntos/demos/)** — Hands-on examples
-- **[Path Helpers](/docs/juntos/path-helpers)** — RSC-style data fetching with path helper RPC
+- **[Path Helpers](/docs/juntos/path-helpers)** — Server Functions-style data fetching with path helper RPC
 - **[CLI Reference](/docs/juntos/cli)** — All commands and options
 - **[Architecture](/docs/juntos/architecture)** — What gets generated
 - **[Testing](/docs/juntos/testing)** — Write tests for your transpiled app

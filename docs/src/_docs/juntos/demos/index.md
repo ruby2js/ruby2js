@@ -19,7 +19,7 @@ Hands-on examples showcasing Juntos capabilities. Each demo is a complete Rails 
 | **[Chat](/docs/juntos/demos/chat)** | Real-time Turbo Streams, Stimulus controllers in Ruby, WebSocket broadcasting |
 | **[Photo Gallery](/docs/juntos/demos/photo-gallery)** | Camera integration, Capacitor mobile apps, Electron desktop apps |
 | **[Workflow Builder](/docs/juntos/demos/workflow-builder)** | React Flow integration, real-time collaboration, JSON broadcasting |
-| **[Notes](/docs/juntos/demos/notes)** | Path helper RPC, JSON API, RSC-style data fetching, React components |
+| **[Notes](/docs/juntos/demos/notes)** | Path helper RPC, JSON API, Server Functions-style data fetching, React components |
 
 ## Running Any Demo
 
@@ -120,14 +120,14 @@ Best for understanding React component integration and JSON broadcasting pattern
 
 ### Notes Demo
 
-A notes app demonstrating RSC-style path helpers and JSON API patterns:
+A notes app demonstrating Server Functions-style path helpers and JSON API patterns:
 
 - **Path helper RPC** — `notes_path.get()`, `note_path(id).patch()` return Response objects
 - **JSON by default** — Path helpers default to JSON format for React data fetching
 - **RBX components** — React components written in Ruby syntax
 - **Unified API** — Same code works on browser (direct invocation) and server (HTTP fetch)
 
-Best for understanding RSC-style data fetching and JSON API patterns with React.
+Best for understanding Server Functions-style data fetching and JSON API patterns with React.
 
 ## Creating Your Own
 

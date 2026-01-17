@@ -7,7 +7,7 @@ category: juntos
 
 # Path Helpers
 
-Path helpers in Juntos return callable objects with HTTP methods. This enables RSC-style data fetching where the same code works on both browser and server targets.
+Path helpers in Juntos return callable objects with HTTP methods. This enables Server Functions-style data fetching where the same code works on both browser and server targets.
 
 {% toc %}
 
