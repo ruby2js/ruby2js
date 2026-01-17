@@ -15,150 +15,234 @@ If you know Astro, you'll appreciate Ruby2JS's approach to multi-framework compo
 
 | Astro | Ruby2JS |
 |-------|---------|
-| `.astro` components | `.erb.rb` pages (server) |
-| React/Vue/Svelte islands | `.jsx.rb`, `.vue.rb`, `.svelte.rb` |
+| `.astro` components | `.astro.rb` components |
 | `---` frontmatter | Ruby code before `__END__` |
-| `{expression}` | `<%= expression %>` (ERB) |
+| `{expression}` | `{ruby_expression}` (auto-converted) |
+| `{items.map(i => <jsx>)}` | `{items.map { \|i\| <jsx> }}` |
+| `client:load` | Preserved |
 | File-based routing | Same convention |
-| `client:load` | Automatic hydration |
 
-## Quick Start
+## The `.astro.rb` Format
 
-**1. Server-rendered page with Ruby:**
+Write Astro components in Ruby. The format mirrors Astro's structure:
 
 ```ruby
-# app/pages/posts/[slug].erb.rb
+# src/pages/posts/[slug].astro.rb
 @post = Post.find_by(slug: params[:slug])
 @related = Post.where(category: @post.category).limit(3)
 __END__
-<!DOCTYPE html>
-<html>
-<head>
-  <title><%= @post.title %></title>
-</head>
-<body>
+<Layout title={post.title}>
   <article>
-    <h1><%= @post.title %></h1>
-    <%= @post.body %>
+    <h1>{post.title}</h1>
+    <div set:html={post.body} />
   </article>
 
   <aside>
     <h2>Related Posts</h2>
     <ul>
-      <% @related.each do |post| %>
-        <li><a href="/posts/<%= post.slug %>"><%= post.title %></a></li>
-      <% end %>
+      {related.map { |p| <li><a href={"/posts/#{p.slug}"}>{p.title}</a></li> }}
     </ul>
   </aside>
-</body>
-</html>
+</Layout>
 ```
 
-**2. Interactive component (island):**
+This compiles to a standard `.astro` file:
+
+```astro
+---
+import { Post } from '../models/post'
+
+const { slug } = Astro.params
+const post = Post.findBy({slug: slug})
+const related = Post.where({category: post.category}).limit(3)
+---
+
+<Layout title={post.title}>
+  <article>
+    <h1>{post.title}</h1>
+    <div set:html={post.body} />
+  </article>
+
+  <aside>
+    <h2>Related Posts</h2>
+    <ul>
+      {related.map(p => <li><a href={`/posts/${p.slug}`}>{p.title}</a></li>)}
+    </ul>
+  </aside>
+</Layout>
+```
+
+## Template Syntax
+
+### Ruby Blocks → Arrow Functions
+
+The key transformation: Ruby blocks with JSX become JavaScript arrow functions:
 
 ```ruby
-# app/components/Counter.jsx.rb
-export default
-def Counter(initial: 0)
-  count, setCount = useState(initial)
+# Ruby syntax in template
+{posts.map { |post| <Card post={post} /> }}
 
-  %x{
-    <button onClick={() => setCount(count + 1)}>
-      Count: {count}
-    </button>
-  }
-end
+# Becomes JavaScript
+{posts.map(post => <Card post={post} />)}
 ```
 
-**3. Use the component in your page:**
-
-```erb
-<body>
-  <h1>Welcome</h1>
-
-  <!-- Interactive island -->
-  <div data-component="Counter" data-props='{"initial": 5}'></div>
-
-  <!-- Rest is static HTML -->
-  <footer>Static content</footer>
-</body>
-```
-
-## Content Collections
-
-### Blog with Markdown
+This works for all iteration patterns:
 
 ```ruby
-# app/pages/blog/[slug].erb.rb
-@post = Content.find('blog', params[:slug])
-@prev_post = Content.prev('blog', @post)
-@next_post = Content.next('blog', @post)
-__END__
-<article>
-  <h1><%= @post.title %></h1>
-  <time><%= @post.date.strftime('%B %d, %Y') %></time>
-
-  <%= @post.content %>
-
-  <nav class="pagination">
-    <% if @prev_post %>
-      <a href="/blog/<%= @prev_post.slug %>">← <%= @prev_post.title %></a>
-    <% end %>
-    <% if @next_post %>
-      <a href="/blog/<%= @next_post.slug %>"><%= @next_post.title %> →</a>
-    <% end %>
-  </nav>
-</article>
+{items.each { |item| <li>{item.name}</li> }}      # → items.map(...)
+{users.select { |u| u.active }}                    # → users.filter(...)
+{data.map { |d, idx| <Row data={d} index={idx} /> }}
 ```
 
-### Dynamic Routes
+### Snake Case → Camel Case
 
-```
-app/pages/
-  blog/
-    index.erb.rb       → /blog
-    [slug].erb.rb      → /blog/:slug
-  docs/
-    [...path].erb.rb   → /docs/*path
-```
-
-## Multi-Framework Islands
-
-Use the right framework for each component:
+Ruby conventions automatically convert to JavaScript:
 
 ```ruby
-# React for complex state
-# app/components/DataTable.jsx.rb
-export default
-def DataTable(data:, columns:)
-  # Complex sorting, filtering, pagination...
-end
+# Ruby (snake_case)
+@user_name = "Alice"
+@is_loading = false
+__END__
+<p show_loading={is_loading}>{user_name}</p>
 
-# Vue for form handling
-# app/components/ContactForm.vue.rb
-@name = ""
-@email = ""
-@submitted = false
+# JavaScript (camelCase)
+const userName = "Alice"
+const isLoading = false
+---
+<p showLoading={isLoading}>{userName}</p>
+```
 
-def submit
-  # Form logic...
+### Astro Directives Preserved
+
+All Astro-specific attributes work as expected:
+
+```ruby
+__END__
+<Counter initial={count} client:load />
+<Chart data={data} client:visible />
+<ReactComponent client:only="react" />
+<div set:html={raw_content} />
+<pre is:raw>{code}</pre>
+```
+
+## Instance Variables and Params
+
+### Instance Variables → Const
+
+Instance variables in the Ruby code become `const` declarations:
+
+```ruby
+@title = "Hello"
+@count = 0
+@posts = Post.all
+__END__
+<h1>{title}</h1>
+```
+
+### Route Params
+
+Access route parameters via `params`:
+
+```ruby
+# src/pages/posts/[id].astro.rb
+@id = params[:id]
+@post = Post.find(@id)
+__END__
+<h1>{post.title}</h1>
+```
+
+Becomes:
+
+```astro
+---
+const { id } = Astro.params
+const post = Post.find(id)
+---
+<h1>{post.title}</h1>
+```
+
+## Model Imports
+
+Model references are automatically detected and imported:
+
+```ruby
+@post = Post.find(1)
+@comments = Comment.where(post_id: @post.id)
+__END__
+...
+```
+
+Generates:
+
+```javascript
+import { Post } from '../models/post'
+import { Comment } from '../models/comment'
+```
+
+## Component Patterns
+
+### Layout Component
+
+```ruby
+# src/pages/index.astro.rb
+@title = "Home"
+@description = "Welcome to my site"
+__END__
+<Layout title={title} description={description}>
+  <main>
+    <h1>Welcome</h1>
+  </main>
+</Layout>
+```
+
+### Named Slots
+
+```ruby
+__END__
+<Layout>
+  <div slot="sidebar">
+    {sidebar_content}
+  </div>
+  <main>
+    Main content
+  </main>
+</Layout>
+```
+
+### Interactive Islands
+
+```ruby
+@initial_count = 5
+__END__
+<Counter initial={initial_count} client:load />
+<HeavyChart data={chart_data} client:visible />
+```
+
+## Methods → Functions
+
+Methods defined in Ruby become JavaScript functions:
+
+```ruby
+def format_date(date)
+  date.strftime("%Y-%m-%d")
 end
 __END__
-<form @submit.prevent="submit">
-  <!-- Vue template -->
-</form>
+<time>{format_date(post.created_at)}</time>
+```
 
-# Svelte for animations
-# app/components/AnimatedList.svelte.rb
-@items = []
+## Multi-Framework Components
 
-def on_mount
-  # Animation setup...
-end
-__END__
-{#each items as item (item.id)}
-  <div transition:slide>{item.name}</div>
-{/each}
+Use `.astro.rb` for pages, and framework-specific extensions for components:
+
+```
+src/
+  pages/
+    index.astro.rb         # Astro page (Ruby)
+    posts/[slug].astro.rb  # Dynamic route (Ruby)
+  components/
+    Counter.jsx.rb         # React island (Ruby)
+    Form.vue.rb            # Vue island (Ruby)
+    Animation.svelte.rb    # Svelte island (Ruby)
 ```
 
 ## The Ruby Advantage
@@ -166,7 +250,7 @@ __END__
 ### Server-Side Logic
 
 ```ruby
-# Astro frontmatter
+# Astro (JavaScript)
 ---
 const posts = await fetch('api/posts').then(r => r.json())
 const featured = posts.filter(p => p.featured)
@@ -183,11 +267,8 @@ const featured = posts.filter(p => p.featured)
 # Astro
 {`Hello, ${user.name}!`}
 
-# Ruby2JS (ERB)
-Hello, <%= user.name %>!
-
-# Ruby2JS (component)
-"Hello, #{user[:name]}!"
+# Ruby2JS
+{"Hello, #{user.name}!"}
 ```
 
 ### Built-in ORM
@@ -200,65 +281,11 @@ Hello, <%= user.name %>!
 # No separate API needed for server-rendered content
 ```
 
-## ISR and Caching
-
-Like Astro's hybrid rendering:
-
-```ruby
-# Pragma: revalidate 3600
-
-# This page regenerates every hour
-@posts = Post.published.limit(20)
-__END__
-<ul>
-  <% @posts.each do |post| %>
-    <li><%= post.title %></li>
-  <% end %>
-</ul>
-```
-
-## Key Differences
-
-### Template Syntax
-
-Astro uses `{expression}`, Ruby2JS uses ERB for server pages:
-
-```erb
-<!-- Astro -->
-<h1>{post.title}</h1>
-{#if post.featured}
-  <span class="featured">★</span>
-{/if}
-
-<!-- Ruby2JS (ERB) -->
-<h1><%= @post.title %></h1>
-<% if @post.featured %>
-  <span class="featured">★</span>
-<% end %>
-```
-
-### Component Scripts
-
-Astro has frontmatter, Ruby2JS has `__END__`:
-
-```ruby
-# Astro
----
-const data = await fetch('...').then(r => r.json())
----
-<div>{data.title}</div>
-
-# Ruby2JS
-@data = fetch_data
-__END__
-<div><%= @data[:title] %></div>
-```
-
-### File Extensions
+## File Extensions
 
 | Astro | Ruby2JS |
 |-------|---------|
-| `.astro` | `.erb.rb` (server) |
+| `.astro` | `.astro.rb` |
 | `.jsx` | `.jsx.rb` |
 | `.vue` | `.vue.rb` |
 | `.svelte` | `.svelte.rb` |
@@ -267,27 +294,19 @@ __END__
 
 Ruby2JS supports the same deployment targets:
 
-```ruby
-# Vercel Edge
-# packages/ruby2js-rails/targets/vercel-edge/
-
-# Cloudflare Workers
-# packages/ruby2js-rails/targets/cloudflare/
-
-# Node.js
-# packages/ruby2js-rails/targets/node/
-```
+- **Vercel Edge** - `packages/ruby2js-rails/targets/vercel-edge/`
+- **Cloudflare Workers** - `packages/ruby2js-rails/targets/cloudflare/`
+- **Node.js** - `packages/ruby2js-rails/targets/node/`
 
 ## Migration Path
 
-1. **Start with pages**: Convert `.astro` to `.erb.rb`
-2. **Keep components**: React/Vue/Svelte components stay similar
-3. **Update imports**: Use Ruby2JS conventions
+1. **Rename files**: `.astro` → `.astro.rb`
+2. **Move frontmatter**: `---` block → Ruby code before `__END__`
+3. **Convert expressions**: JavaScript → Ruby syntax
 4. **Add models**: Replace API calls with direct database access
 
 ## Next Steps
 
-- **[ERB Templates](/docs/filters/erb)** - Server-side templating
-- **[React Filter](/docs/filters/react)** - React component support
-- **[Vue Filter](/docs/filters/vue)** - Vue component support
-- **[Deployment](/docs/juntos/deployment)** - Edge and server deployment
+- **[Vue Components](/docs/coming-from/vue)** - Vue component support
+- **[Svelte Components](/docs/coming-from/svelte)** - Svelte component support
+- **[React Components](/docs/coming-from/react)** - React component support

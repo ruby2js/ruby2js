@@ -29,6 +29,23 @@ A documentation site rebuild that dogfoods Ruby2JS while showcasing Astro and Cl
 | Personalization | None |
 | User data | None |
 
+## Already Implemented
+
+The core components for Astro with Ruby are now complete:
+
+| Component | Location | Status |
+|-----------|----------|--------|
+| Astro Filter | `lib/ruby2js/filter/astro.rb` | ✅ Converts Phlex → Astro |
+| Astro Template Compiler | `lib/ruby2js/astro_template_compiler.rb` | ✅ Ruby→JS in templates |
+| Astro Component Transformer | `lib/ruby2js/astro_component_transformer.rb` | ✅ `.astro.rb` → `.astro` |
+| Vue Template Compiler | `lib/ruby2js/vue_template_compiler.rb` | ✅ Expression conversion |
+| Vue Component Transformer | `lib/ruby2js/vue_component_transformer.rb` | ✅ `.vue.rb` → `.vue` |
+| Svelte Template Compiler | `lib/ruby2js/svelte_template_compiler.rb` | ✅ Expression conversion |
+| Svelte Component Transformer | `lib/ruby2js/svelte_component_transformer.rb` | ✅ `.svelte.rb` → `.svelte` |
+| Vite Plugin | `packages/vite-plugin-ruby2js/` | ✅ Transforms .rb → .js |
+| Cloudflare Workers | `packages/ruby2js-rails/targets/cloudflare/` | ✅ Full Worker/D1/DO support |
+| ISR Adapters | `packages/ruby2js-rails/targets/*/isr.mjs` | ✅ Vercel + Cloudflare |
+
 ## Target State
 
 | Aspect | Astro + Cloudflare |
@@ -43,80 +60,48 @@ A documentation site rebuild that dogfoods Ruby2JS while showcasing Astro and Cl
 
 ---
 
-## Ruby in Astro Files
+## Ruby in Astro Files: `.astro.rb` Format
 
-Astro files have three places for code. All three should support Ruby:
+The implemented approach uses `.astro.rb` files, matching the pattern established for Vue (`.vue.rb`) and Svelte (`.svelte.rb`):
 
-### 1. Frontmatter
+### File Format
 
-```astro
----
-#!ruby
-# Server-side, runs at build/request time
-filters = Filter.all.order(:name)
-current = filters.find { |f| f.slug == Astro.params.slug }
-related = filters.select { |f| f.category == current.category }
----
-```
-
-### 2. Template Expressions
-
-```astro
-<Layout title={current.name}>
-  <nav>
-    {filters.map { |f| <FilterLink filter={f} active={f == current} /> }}
-  </nav>
-
-  <main>
-    <h1>{current.name}</h1>
-    <p>{current.description}</p>
-
-    {current.examples.map { |ex|
-      <Example ruby={ex.ruby} js={ex.js} />
+```ruby
+# src/pages/posts/[slug].astro.rb
+@post = Post.find_by(slug: params[:slug])
+@comments = @post.comments
+__END__
+<Layout title={post.title}>
+  <article>
+    <h1>{post.title}</h1>
+    <div set:html={post.body} />
+  </article>
+  <section>
+    <h2>Comments</h2>
+    {comments.map { |comment|
+      <Comment comment={comment} />
     }}
-  </main>
+  </section>
 </Layout>
 ```
 
-### 3. Client Scripts
+### Key Transformations
 
-```astro
-<script lang="ruby">
-  # Client-side, runs in browser
-  document.querySelectorAll('.copy-button').forEach do |btn|
-    btn.addEventListener('click') do |e|
-      navigator.clipboard.writeText(btn.dataset.code)
-      btn.textContent = 'Copied!'
-    end
-  end
-</script>
-```
+| Ruby | JavaScript |
+|------|------------|
+| `@variable` | `const variable` |
+| `params[:id]` | `Astro.params.id` |
+| `snake_case` | `camelCase` |
+| `{items.map { \|i\| <jsx> }}` | `{items.map(i => <jsx>)}` |
+| `{items.select { \|i\| cond }}` | `{items.filter(i => cond)}` |
+| Model references | Auto-imported |
 
-### Implementation Approach
+### Astro Directives Preserved
 
-The existing `ErbCompiler.js` extracts Ruby from ERB and compiles it. A similar `AstroCompiler.js` would:
-
-1. Detect `#!ruby` shebang in frontmatter
-2. Extract and compile frontmatter Ruby → JS
-3. Detect Ruby in `{...}` expressions (heuristics or explicit marker)
-4. Detect `<script lang="ruby">` tags
-5. Reassemble into valid Astro with JS
-
-This becomes a Vite plugin that runs before Astro's own processing.
-
-### Compiler Implementation
-
-A new `AstroCompiler` is needed (not a reuse of `ErbCompiler`):
-
-| ERB | Astro |
-|-----|-------|
-| `<% %>` delimiters | `---` frontmatter, `{...}` expressions, `<script>` tags |
-| Single buffer output | Three outputs: frontmatter JS, template, client script |
-| Simple tag matching | Brace-matching parser for nested `{...}` |
-
-**Reference:** `lib/ruby2js/rails/erb_compiler.rb` for position mapping and source map patterns.
-
-**Approach:** Build `AstroCompiler` separately, then refactor common utilities (position mapping, string escaping) into shared code if patterns emerge.
+All Astro-specific attributes work unchanged:
+- `client:load`, `client:visible`, `client:idle`, `client:only`
+- `set:html={expr}`, `set:text={expr}`
+- `is:raw`, `is:inline`
 
 ---
 
@@ -169,10 +154,17 @@ url = R2.url("examples/#{id}.rb")
 Parity with current site, plus Ruby-in-Astro:
 
 - [ ] All existing docs migrated to Astro Content Collections
-- [ ] Ruby frontmatter for data fetching
-- [ ] Interactive transpiler demos (selfhost)
+- [x] Astro template compiler (Ruby expressions → JS)
+- [x] Astro component transformer (`.astro.rb` → `.astro`)
+- [x] Interactive transpiler demos (selfhost) - already exists
 - [ ] Responsive design, dark mode
 - [ ] Basic navigation, table of contents
+
+**Prerequisites implemented:**
+- [x] Vite plugin for .rb files
+- [x] Astro filter (Phlex → Astro)
+- [x] Template expression compilers (Vue, Svelte, Astro)
+- [x] Component transformers (Vue, Svelte, Astro)
 
 ### Phase 2: AI-Powered Search
 
@@ -234,15 +226,15 @@ docs/
 │   │   ├── filters/          # Filter documentation
 │   │   └── demos/            # Demo descriptions
 │   ├── pages/
-│   │   ├── index.astro       # Home page (Ruby frontmatter)
-│   │   ├── docs/[...slug].astro
+│   │   ├── index.astro.rb    # Home page (Ruby)
+│   │   ├── docs/[...slug].astro.rb
 │   │   └── api/              # API routes for AI, user data
 │   ├── components/
-│   │   ├── Transpiler.astro  # Interactive demo
-│   │   ├── Search.astro      # AI search
+│   │   ├── Transpiler.astro.rb  # Interactive demo
+│   │   ├── Search.astro.rb      # AI search
 │   │   └── ...
 │   └── layouts/
-│       └── DocsLayout.astro
+│       └── DocsLayout.astro.rb
 ├── functions/                 # Cloudflare Workers
 │   ├── search.js             # Vectorize queries
 │   ├── ai.js                 # Workers AI
@@ -250,25 +242,22 @@ docs/
 └── wrangler.toml             # Cloudflare config
 ```
 
-### Vite Plugin: vite-plugin-astro-ruby
+### Vite Plugin Integration
+
+The existing `vite-plugin-ruby2js` needs an extension to handle `.astro.rb` files:
 
 ```javascript
-// Processes .astro files before Astro's compiler
-export default function astroRuby() {
-  return {
-    name: 'astro-ruby',
-    enforce: 'pre',
-    transform(code, id) {
-      if (!id.endsWith('.astro')) return;
-      if (!hasRuby(code)) return;
+// vite.config.mjs
+import ruby2js from 'vite-plugin-ruby2js';
 
-      return {
-        code: compileRubyInAstro(code),
-        map: generateSourceMap(code)
-      };
-    }
-  };
-}
+export default {
+  plugins: [
+    ruby2js({
+      // Handles .astro.rb → .astro transformation
+      astro: true
+    })
+  ]
+};
 ```
 
 ---
@@ -338,7 +327,8 @@ AI_GATEWAY=xxx
 
 ### Phase 1 (Core)
 - [ ] All existing docs accessible at same URLs
-- [ ] Ruby frontmatter working in Astro files
+- [x] Ruby template expressions working in Astro files
+- [x] `.astro.rb` → `.astro` transformation working
 - [ ] Interactive demos functional
 - [ ] Page load faster than current site
 - [ ] Lighthouse score 90+
@@ -387,38 +377,23 @@ Based on Cloudflare free tiers and moderate traffic:
 
 ## Design Decisions
 
-### File-Level Ruby Opt-In
+### File-Based Ruby Components (`.astro.rb`)
 
-The `#!ruby` shebang in frontmatter applies to the **entire file**:
+Following the established pattern for Vue and Svelte:
 
-```astro
----
-#!ruby
-# Shebang here means ALL code in this file is Ruby
-posts = Post.all
----
-
-<Layout>
-  {posts.map { |post| <Card post={post} /> }}  <!-- Ruby -->
-
-  <script>
-    # Also Ruby
-    document.querySelector('button').addEventListener('click') { |e| ... }
-  </script>
-</Layout>
+```ruby
+# Ruby code (frontmatter equivalent)
+@posts = Post.all
+__END__
+<!-- Astro template with Ruby expressions -->
+{posts.map { |post| <Card post={post} /> }}
 ```
 
-**Escape hatch:** Import external JS files when needed:
-
-```astro
-<script src="/js/third-party.js"></script>
-```
-
-This is simpler than per-expression detection and follows the principle of least surprise.
-
----
-
-## Design Decisions (continued)
+This approach:
+- Keeps Ruby code separate from template
+- Uses familiar `__END__` convention
+- Matches `.vue.rb` and `.svelte.rb` patterns
+- Allows full Ruby syntax in the code section
 
 ### Anonymous by Default
 
@@ -461,4 +436,5 @@ Once partial specs complete, Opal demo can be retired. This is progress-dependen
 - [Cloudflare Vectorize](https://developers.cloudflare.com/vectorize/)
 - [Cloudflare Workers AI](https://developers.cloudflare.com/workers-ai/)
 - Current site: https://www.ruby2js.com/
-- Existing ERB compiler: `demo/selfhost/ErbCompiler.js`
+- Astro Template Compiler: `lib/ruby2js/astro_template_compiler.rb`
+- Astro Component Transformer: `lib/ruby2js/astro_component_transformer.rb`

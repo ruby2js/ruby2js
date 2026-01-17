@@ -166,6 +166,8 @@ module Ruby2JS
       ruby2js = Converter.new(ast, comments)
       ruby2js.eslevel = options[:eslevel] || @@eslevel_default
       ruby2js.file_name = options[:file] || ''
+      # Set template if option specified and template was extracted
+      ruby2js.template = template if options[:template] && template
       return ruby2js
     end
 

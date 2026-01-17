@@ -160,10 +160,10 @@ end
 ```
 
 **Definition of done:**
-- [ ] `Ruby2JS.convert` accepts `template: :erb | :vue | :svelte` option
-- [ ] Returns `{js:, template:}` when template option specified
-- [ ] Template content extracted correctly (without `__END__` marker)
-- [ ] Source maps work for Ruby portion
+- [x] `Ruby2JS.convert` accepts `template: :erb | :vue | :svelte` option
+- [x] Returns `{js:, template:}` when template option specified
+- [x] Template content extracted correctly (without `__END__` marker)
+- [x] Source maps work for Ruby portion
 
 ### 1.2 File-Based Routing
 
@@ -218,9 +218,9 @@ end
 ```
 
 **Definition of done:**
-- [ ] `FileRouter.discover_routes` returns route configs from file structure
-- [ ] Dynamic segments parsed correctly
-- [ ] Integrates with existing Router infrastructure
+- [x] `FileRouter.discover_routes` returns route configs from file structure
+- [x] Dynamic segments parsed correctly
+- [x] Integrates with existing Router infrastructure
 - [ ] Works with `juntos build`
 
 ---
@@ -310,9 +310,9 @@ export class ISRCache {
 ```
 
 **Definition of done:**
-- [ ] Pages with `# Pragma: revalidate N` get cached
-- [ ] Stale content served while regenerating
-- [ ] On-demand revalidation endpoint works
+- [x] Pages with `# Pragma: revalidate N` get cached
+- [x] Stale content served while regenerating
+- [x] On-demand revalidation endpoint works
 - [ ] Example app demonstrating ISR
 
 ### 2.3 Cloudflare ISR Adapter
@@ -374,10 +374,10 @@ export class ISRCache {
 ```
 
 **Definition of done:**
-- [ ] Same pragma syntax works on Cloudflare
-- [ ] Cache API correctly stores/retrieves pages
-- [ ] Background regeneration works via `waitUntil`
-- [ ] On-demand revalidation clears cache
+- [x] Same pragma syntax works on Cloudflare
+- [x] Cache API correctly stores/retrieves pages
+- [x] Background regeneration works via `waitUntil`
+- [x] On-demand revalidation clears cache
 
 ---
 
@@ -445,10 +445,10 @@ end
 ```
 
 **Definition of done:**
-- [ ] `{{ expression }}` with Ruby expressions works
-- [ ] `v-for` with Ruby collections works
-- [ ] `v-if` with Ruby conditions works
-- [ ] Event handlers reference transpiled methods
+- [x] `{{ expression }}` with Ruby expressions works
+- [x] `v-for` with Ruby collections works
+- [x] `v-if` with Ruby conditions works
+- [x] Event handlers reference transpiled methods
 - [ ] Source maps point to original template
 
 ### 3.2 Svelte Template Syntax Parser
@@ -559,11 +559,11 @@ end
 ```
 
 **Definition of done:**
-- [ ] `{expression}` with Ruby expressions works
-- [ ] `{#each}` / `{/each}` blocks work
-- [ ] `{#if}` / `{:else}` / `{/if}` blocks work
-- [ ] Nested blocks handled correctly
-- [ ] Event handlers (`on:click={method}`) work
+- [x] `{expression}` with Ruby expressions works
+- [x] `{#each}` / `{/each}` blocks work
+- [x] `{#if}` / `{:else}` / `{/if}` blocks work
+- [x] Nested blocks handled correctly
+- [x] Event handlers (`on:click={method}`) work
 - [ ] Source maps point to original template
 
 ---
@@ -636,11 +636,11 @@ async function deletePost() {
 ```
 
 **Definition of done:**
-- [ ] Full page components transform correctly
-- [ ] Instance variables → `ref()` reactive state
-- [ ] Methods → functions
-- [ ] Lifecycle hooks map (mounted → onMounted, etc.)
-- [ ] Vue Router integration for navigation
+- [x] Full page components transform correctly
+- [x] Instance variables → `ref()` reactive state
+- [x] Methods → functions
+- [x] Lifecycle hooks map (mounted → onMounted, etc.)
+- [x] Vue Router integration for navigation
 - [ ] Example app works end-to-end
 
 ### 4.2 Svelte Target (New)
@@ -764,11 +764,11 @@ end
 ```
 
 **Definition of done:**
-- [ ] Instance variables → reactive `let` declarations
-- [ ] Methods → functions
-- [ ] Lifecycle hooks mapped correctly
-- [ ] SvelteKit routing integration ($page, goto)
-- [ ] Template syntax processed correctly
+- [x] Instance variables → reactive `let` declarations
+- [x] Methods → functions
+- [x] Lifecycle hooks mapped correctly
+- [x] SvelteKit routing integration ($page, goto)
+- [x] Template syntax processed correctly
 - [ ] Example app works end-to-end
 
 ---
@@ -916,11 +916,11 @@ Phase 5 (Docs) - needs Phase 4
 
 **Proof points achieved:**
 
-- [ ] ISR works on 2 platforms (Vercel, Cloudflare) with same Ruby code
-- [ ] Reactivity works with 3 frameworks (React, Vue, Svelte)
-- [ ] Template syntax works with 3 styles (ERB, Vue, Svelte)
-- [ ] File-based routing works across all targets
-- [ ] Documentation welcomes developers from 6 ecosystems
+- [x] ISR works on 2 platforms (Vercel, Cloudflare) with same Ruby code
+- [x] Reactivity works with 3 frameworks (React, Vue, Svelte)
+- [x] Template syntax works with 3 styles (ERB, Vue, Svelte)
+- [x] File-based routing works across all targets
+- [x] Documentation welcomes developers from 6 ecosystems
 
 **Credibility statement becomes true:**
 
