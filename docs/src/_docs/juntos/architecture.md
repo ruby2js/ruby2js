@@ -348,6 +348,8 @@ record.reload()                          // Refresh from database
 
 **Note:** Raw SQL conditions work on all SQL adapters. For Dexie (IndexedDB), simple conditions like `>`, `<`, `>=`, `<=`, `=` are translated to Dexie's query API; complex conditions fall back to JavaScript filtering.
 
+See [Active Record](/docs/juntos/active-record) for complete documentation of the query interface, validations, callbacks, and limitations.
+
 ## Sourcemaps
 
 Each transpiled file includes a sourcemap linking back to the original Ruby:

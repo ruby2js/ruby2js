@@ -262,6 +262,7 @@ Nested routes and path helpers work as expected.
 ## Next Steps
 
 - **[Demo Applications](/docs/juntos/demos/)** — Hands-on examples
+- **[Active Record](/docs/juntos/active-record)** — Query interface, associations, validations, and limitations
 - **[Path Helpers](/docs/juntos/path-helpers)** — Server Functions-style data fetching with path helper RPC
 - **[CLI Reference](/docs/juntos/cli)** — All commands and options
 - **[Architecture](/docs/juntos/architecture)** — What gets generated

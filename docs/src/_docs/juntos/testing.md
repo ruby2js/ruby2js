@@ -526,6 +526,7 @@ it('debug example', async () => {
 
 ## Next Steps
 
+- See [Active Record](/docs/juntos/active-record) for the full query interface, validations, and callbacks
 - See the [Architecture](/docs/juntos/architecture) to understand what gets generated
 - Check [Demo Applications](/docs/juntos/demos/) for complete test examples
 - Review the Ruby2JS [integration tests](https://github.com/ruby2js/ruby2js/tree/master/test/integration) for real-world patterns

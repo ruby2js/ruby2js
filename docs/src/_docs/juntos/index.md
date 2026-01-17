@@ -127,6 +127,8 @@ All demos run on browser, Node.js, and edge platforms from the same code. The Ph
 
 - **[Getting Started](/docs/juntos/getting-started)** — Install and run your first app
 - **[Demo Applications](/docs/juntos/demos/)** — Hands-on examples
+- **[Active Record](/docs/juntos/active-record)** — Query interface, associations, validations
+- **[Path Helpers](/docs/juntos/path-helpers)** — Server Functions-style data fetching
 - **[Hotwire](/docs/juntos/hotwire)** — Real-time features and Stimulus controllers
 - **[CLI Reference](/docs/juntos/cli)** — The `juntos` commands
 - **[Architecture](/docs/juntos/architecture)** — What gets generated and how it works
