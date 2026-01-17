@@ -1768,10 +1768,11 @@ class SelfhostBuilder
       view_files << { name: name, ext: '.html.erb', path: file_path, priority: VIEW_FILE_PRIORITIES['.html.erb'] }
     end
 
-    # Phlex files (.rb)
+    # Phlex files (.rb) - exclude compound extensions like .jsx.rb, .vue.rb, etc.
     Dir.glob(File.join(resource_dir, '*.rb')).each do |file_path|
       name = File.basename(file_path, '.rb')
       next if name.start_with?('_')  # Skip partials
+      next if name.end_with?('.jsx', '.vue', '.svelte', '.erb')  # Skip compound extensions
       # Convert PascalCase to snake_case for view name (Index.rb -> index)
       view_name = name.gsub(/([A-Z]+)([A-Z][a-z])/, '\1_\2')
                       .gsub(/([a-z\d])([A-Z])/, '\1_\2')
