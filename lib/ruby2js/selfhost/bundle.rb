@@ -131,6 +131,13 @@ export def convert(source, options = {})
     raise parse_result.errors[0].message
   end
 
+  # Extract template from __END__ data section if present
+  template = nil
+  if parse_result.dataLoc
+    template_raw = source[parse_result.dataLoc.startOffset, parse_result.dataLoc.length]
+    template = template_raw.sub(/\A__END__\r?\n?/, '')
+  end
+
   walker = Ruby2JS::PrismWalker.new(source, options[:file])
   ast = walker.visit(parse_result.value)
 
@@ -166,6 +173,9 @@ export def convert(source, options = {})
 
   # Set file name for sourcemap generation
   result.file_name = options[:file] if options[:file]
+
+  # Set template if extracted and option specified
+  result.template = template if options[:template] && template
 
   # Return result object (has .toString() and .sourcemap methods)
   result

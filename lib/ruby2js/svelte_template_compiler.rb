@@ -91,7 +91,7 @@ module Ruby2JS
 
     # Class method for simple one-shot compilation
     def self.compile(template, options = {})
-      new(template, options).compile
+      self.new(template, options).compile
     end
 
     private
@@ -164,63 +164,53 @@ module Ruby2JS
     def process_brace_content(content)
       content = content.strip
 
-      # Handle block constructs
-      case content
-      when /^#each\s+(.+?)\s+as\s+(.+)$/
+      # Handle block constructs using if/elsif for JS compatibility
+      # (Ruby case/when with regex doesn't transpile to JS switch correctly)
+      if content =~ /^#each\s+(.+?)\s+as\s+(.+)$/
         # {#each collection as item} or {#each collection as item, index} or {#each collection as item (key)}
         process_each_block($1, $2)
-
-      when /^#if\s+(.+)$/
+      elsif content =~ /^#if\s+(.+)$/
         # {#if condition}
         process_if_block($1)
-
-      when /^:else\s+if\s+(.+)$/
+      elsif content =~ /^:else\s+if\s+(.+)$/
         # {:else if condition}
         process_else_if_block($1)
-
-      when /^:else$/
+      elsif content =~ /^:else$/
         # {:else}
         content
-
-      when /^\/each$/, /^\/if$/, /^\/await$/, /^\/key$/
+      elsif content =~ /^\/each$/ || content =~ /^\/if$/ || content =~ /^\/await$/ || content =~ /^\/key$/
         # Closing tags - pass through
         content
-
-      when /^#await\s+(.+)$/
+      elsif content =~ /^#await\s+(.+)$/
         # {#await promise}
         process_await_block($1)
-
-      when /^:then\s*(.*)$/
+      elsif content =~ /^:then\s*(.*)$/
         # {:then value}
         process_then_block($1)
-
-      when /^:catch\s*(.*)$/
+      elsif content =~ /^:catch\s*(.*)$/
         # {:catch error}
         process_catch_block($1)
-
-      when /^#key\s+(.+)$/
+      elsif content =~ /^#key\s+(.+)$/
         # {#key expression}
         process_key_block($1)
-
-      when /^@html\s+(.+)$/
+      elsif content =~ /^@html\s+(.+)$/
         # {@html expression}
         "@html #{convert_expression($1)}"
-
-      when /^@debug\s+(.+)$/
+      elsif content =~ /^@debug\s+(.+)$/
         # {@debug variables}
         "@debug #{convert_expression($1)}"
-
-      when /^@const\s+(\w+)\s*=\s*(.+)$/
+      elsif content =~ /^@const\s+(\w+)\s*=\s*(.+)$/
         # {@const name = expression}
         "@const #{$1} = #{convert_expression($2)}"
-
       else
-        # Plain expression
-        convert_expression(content)
+        # Plain expression - use begin/rescue with explicit returns for JS compatibility
+        begin
+          return convert_expression(content)
+        rescue => e
+          @errors << { type: :expression, content: content, error: e.message }
+          return content
+        end
       end
-    rescue => e
-      @errors << { type: :expression, content: content, error: e.message }
-      content
     end
 
     # Process {#each collection as item} or {#each collection as item, index (key)}
@@ -316,7 +306,8 @@ module Ruby2JS
       filters = Array(@options[:filters]).dup
 
       # Add camelCase filter if enabled (default)
-      if @options.fetch(:camelCase, true)
+      camel_case_enabled = @options.fetch(:camelCase, true)
+      if camel_case_enabled
         require 'ruby2js/filter/camelCase'
         filters << Ruby2JS::Filter::CamelCase unless filters.include?(Ruby2JS::Filter::CamelCase)
       end

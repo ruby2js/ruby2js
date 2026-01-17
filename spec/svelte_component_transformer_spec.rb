@@ -27,7 +27,7 @@ describe Ruby2JS::SvelteComponentTransformer do
       result = transform(source)
 
       _(result.errors).wont_be_empty
-      _(result.errors.first[:type]).must_equal :no_template
+      _(result.errors.first[:type]).must_equal 'noTemplate'
     end
   end
 
@@ -61,7 +61,7 @@ describe Ruby2JS::SvelteComponentTransformer do
 
       result = transform(source)
 
-      _(result.imports[:svelte]).must_include 'onMount'
+      _([*result.imports[:svelte]]).must_include 'onMount'
       _(result.script).must_include "import { onMount } from 'svelte'"
     end
 
@@ -76,7 +76,7 @@ describe Ruby2JS::SvelteComponentTransformer do
 
       result = transform(source)
 
-      _(result.imports[:svelte]).must_include 'onDestroy'
+      _([*result.imports[:svelte]]).must_include 'onDestroy'
     end
 
     it "imports beforeUpdate for before_update hook" do
@@ -90,7 +90,7 @@ describe Ruby2JS::SvelteComponentTransformer do
 
       result = transform(source)
 
-      _(result.imports[:svelte]).must_include 'beforeUpdate'
+      _([*result.imports[:svelte]]).must_include 'beforeUpdate'
     end
 
     it "imports afterUpdate for after_update hook" do
@@ -104,7 +104,7 @@ describe Ruby2JS::SvelteComponentTransformer do
 
       result = transform(source)
 
-      _(result.imports[:svelte]).must_include 'afterUpdate'
+      _([*result.imports[:svelte]]).must_include 'afterUpdate'
     end
   end
 
@@ -120,7 +120,7 @@ describe Ruby2JS::SvelteComponentTransformer do
 
       result = transform(source)
 
-      _(result.imports[:sveltekit_navigation]).must_include 'goto'
+      _([*result.imports[:sveltekitNavigation]]).must_include 'goto'
       _(result.script).must_include "import { goto } from '$app/navigation'"
     end
 
@@ -135,7 +135,7 @@ describe Ruby2JS::SvelteComponentTransformer do
 
       result = transform(source)
 
-      _(result.imports[:sveltekit_stores]).must_include 'page'
+      _([*result.imports[:sveltekitStores]]).must_include 'page'
       _(result.script).must_include "import { page } from '$app/stores'"
     end
   end
@@ -152,7 +152,7 @@ describe Ruby2JS::SvelteComponentTransformer do
 
       result = transform(source)
 
-      _(result.imports[:models]).must_include 'Post'
+      _([*result.imports[:models]]).must_include 'Post'
       _(result.script).must_include "import { Post } from '$lib/models/post'"
     end
   end
@@ -247,10 +247,10 @@ describe Ruby2JS::SvelteComponentTransformer do
       _(result.errors).must_be_empty
 
       # Check imports
-      _(result.imports[:svelte]).must_include 'onMount'
-      _(result.imports[:sveltekit_navigation]).must_include 'goto'
-      _(result.imports[:sveltekit_stores]).must_include 'page'
-      _(result.imports[:models]).must_include 'Post'
+      _([*result.imports[:svelte]]).must_include 'onMount'
+      _([*result.imports[:sveltekitNavigation]]).must_include 'goto'
+      _([*result.imports[:sveltekitStores]]).must_include 'page'
+      _([*result.imports[:models]]).must_include 'Post'
 
       # Check component structure
       _(result.component).must_include '<script>'

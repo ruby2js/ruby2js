@@ -404,6 +404,19 @@ describe Ruby2JS::Filter::Functions do
       to_js( 'a.nil?' ).must_equal 'a == null'
     end
 
+    it "should handle nil? on index result with === -1" do
+      # Ruby's String#index returns nil when not found, but JS indexOf returns -1
+      # When a variable is assigned from .index(), .nil? should use === -1
+      to_js( 'idx = str.index("x"); idx.nil?' ).must_equal 'let idx = str.indexOf("x"); idx === -1'
+    end
+
+    it "should reset index tracking per method" do
+      # Variables assigned from .index() in one method should not affect
+      # .nil? checks in other methods
+      to_js( 'def foo; idx = s.index("x"); idx.nil?; end; def bar; idx = 1; idx.nil?; end' ).
+        must_equal 'function foo() {let idx = s.indexOf("x"); idx === -1}; function bar() {let idx = 1; idx == null}'
+    end
+
     it "should handle zero?" do
       to_js( 'n.zero?' ).must_equal 'n === 0'
     end

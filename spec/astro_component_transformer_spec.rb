@@ -26,7 +26,7 @@ describe Ruby2JS::AstroComponentTransformer do
       result = transform(source)
 
       _(result.errors).wont_be_empty
-      _(result.errors.first[:type]).must_equal :no_template
+      _(result.errors.first[:type]).must_equal 'noTemplate'
     end
 
     it "handles component with minimal frontmatter" do
@@ -95,7 +95,7 @@ describe Ruby2JS::AstroComponentTransformer do
 
       result = transform(source)
 
-      _(result.imports[:models]).must_include 'Post'
+      _([*result.imports[:models]]).must_include 'Post'
       _(result.frontmatter).must_include "import { Post } from '../models/post'"
     end
 
@@ -109,8 +109,8 @@ describe Ruby2JS::AstroComponentTransformer do
 
       result = transform(source)
 
-      _(result.imports[:models]).must_include 'Post'
-      _(result.imports[:models]).must_include 'Comment'
+      _([*result.imports[:models]]).must_include 'Post'
+      _([*result.imports[:models]]).must_include 'Comment'
     end
   end
 
@@ -196,7 +196,7 @@ describe Ruby2JS::AstroComponentTransformer do
       _(result.errors).must_be_empty
 
       # Check imports
-      _(result.imports[:models]).must_include 'Post'
+      _([*result.imports[:models]]).must_include 'Post'
 
       # Check component structure
       _(result.component).must_include '---'

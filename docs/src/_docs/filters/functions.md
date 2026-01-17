@@ -69,7 +69,7 @@ If you set the `eslevel` option to `2021` or newer, the Functions filter enables
 * `.none?` {{ caret }} `!.some` (with block) or `!.some(Boolean)` (without block)
 * `[-n] = x` {{ caret }} `[*.length-n] = x` for literal negative index assignment
 * `.new(size,default)` {{ caret }} `== .new(size).fill(default)`
-* `.nil?` {{ caret }} `== null`
+* `.nil?` {{ caret }} `== null` (see [index result tracking](#index-result-tracking) for special case)
 * `.ord` {{ caret }} `charCodeAt(0)`
 * `.positive?` {{ caret }} `> 0`
 * `puts` {{ caret }} `console.log`
@@ -318,6 +318,36 @@ The following mappings will only be done if explicitly included
 {:.functions-list}
 * `.class` {{ caret }} `.constructor`
 * `a.call` {{ caret }} `a()`
+
+## Index Result Tracking
+
+Ruby's `String#index` and `Array#index` return `nil` when the element is not found,
+but JavaScript's `indexOf` returns `-1`. The Functions filter tracks local variables
+assigned from `.index()` calls and converts `.nil?` checks on those variables to
+use `=== -1` instead of `== null`:
+
+```ruby
+idx = str.index("x")
+return nil if idx.nil?
+# => let idx = str.indexOf("x"); if (idx === -1) return null
+```
+
+This tracking is scoped per method, so variables in different methods are handled
+independently:
+
+```ruby
+def find_char(str)
+  idx = str.index("x")
+  return nil if idx.nil?  # Uses === -1
+  idx
+end
+
+def other_method
+  idx = some_value
+  return nil if idx.nil?  # Uses == null (normal behavior)
+  idx
+end
+```
 
 {% rendercontent "docs/note", extra_margin: true %}
 More examples of how this filter works are in the [specs file](https://github.com/ruby2js/ruby2js/blob/master/spec/functions_spec.rb).

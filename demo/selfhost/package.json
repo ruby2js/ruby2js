@@ -11,14 +11,20 @@
     ".": "./ruby2js.js",
     "./ruby2js.js": "./ruby2js.js",
     "./filters/*": "./filters/*",
-    "./lib/*": "./lib/*"
+    "./filters/sfc": "./filters/sfc.js",
+    "./lib/*": "./lib/*",
+    "./dist/*": "./dist/*",
+    "./astro": "./dist/astro_component_transformer.mjs",
+    "./svelte": "./dist/svelte_component_transformer.mjs",
+    "./vue": "./dist/vue_component_transformer.mjs"
   },
   "files": [
     "ruby2js.js",
     "ruby2js-cli.js",
     "prism_browser.js",
     "filters/",
-    "lib/"
+    "lib/",
+    "dist/"
   ],
   "scripts": {
     "build": "mkdir -p dist filters lib && npm run build:prism-browser && npm run build:bundle && npm run build:spec && npm run build:filters && npm run build:erb-compiler",

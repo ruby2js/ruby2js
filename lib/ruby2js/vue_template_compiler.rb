@@ -49,7 +49,7 @@ module Ruby2JS
 
     # Compile the template, returning a Result
     def compile
-      result = @template.dup
+      result = @template.to_s  # Use to_s instead of dup for JS compatibility
 
       # Process Vue interpolations: {{ expression }}
       result = process_interpolations(result)
@@ -75,7 +75,7 @@ module Ruby2JS
 
     # Class method for simple one-shot compilation
     def self.compile(template, options = {})
-      new(template, options).compile
+      self.new(template, options).compile
     end
 
     private
@@ -84,13 +84,16 @@ module Ruby2JS
     def process_interpolations(template)
       template.gsub(/\{\{\s*(.+?)\s*\}\}/m) do |match|
         ruby_expr = $1
+        # Store result in variable to ensure proper return in transpiled JS
+        result = nil
         begin
           js_expr = convert_expression(ruby_expr)
-          "{{ #{js_expr} }}"
+          result = "{{ #{js_expr} }}"
         rescue => e
           @errors << { type: :interpolation, expression: ruby_expr, error: e.message }
-          match # Return original on error
+          result = match
         end
+        result
       end
     end
 
@@ -104,13 +107,16 @@ module Ruby2JS
       template.gsub(/v-for="(.+?)\s+in\s+(.+?)"/) do |match|
         vars = $1
         ruby_collection = $2.strip
+        # Store result in variable to ensure proper return in transpiled JS
+        result = nil
         begin
           js_collection = convert_expression(ruby_collection)
-          "v-for=\"#{vars} in #{js_collection}\""
+          result = "v-for=\"#{vars} in #{js_collection}\""
         rescue => e
           @errors << { type: :v_for, expression: ruby_collection, error: e.message }
-          match
+          result = match
         end
+        result
       end
     end
 
@@ -118,17 +124,20 @@ module Ruby2JS
     def process_conditionals(template)
       # Process v-if="condition"
       result = template.gsub(/v-if="(.+?)"/) do |match|
-        process_directive_expression('v-if', $1, match)
+        ruby_expr = $1
+        process_directive_expression('v-if', ruby_expr, match)
       end
 
       # Process v-else-if="condition"
       result = result.gsub(/v-else-if="(.+?)"/) do |match|
-        process_directive_expression('v-else-if', $1, match)
+        ruby_expr = $1
+        process_directive_expression('v-else-if', ruby_expr, match)
       end
 
       # Process v-show="condition"
       result = result.gsub(/v-show="(.+?)"/) do |match|
-        process_directive_expression('v-show', $1, match)
+        ruby_expr = $1
+        process_directive_expression('v-show', ruby_expr, match)
       end
 
       result
@@ -140,26 +149,32 @@ module Ruby2JS
       result = template.gsub(/(?<!:):(\w[\w-]*)="(.+?)"/) do |match|
         prop = $1
         ruby_value = $2
+        # Store result in variable to ensure proper return in transpiled JS
+        replacement = nil
         begin
           js_value = convert_expression(ruby_value)
-          ":#{prop}=\"#{js_value}\""
+          replacement = ":#{prop}=\"#{js_value}\""
         rescue => e
           @errors << { type: :binding, prop: prop, expression: ruby_value, error: e.message }
-          match
+          replacement = match
         end
+        replacement
       end
 
       # Process v-bind:prop="value"
       result = result.gsub(/v-bind:(\w[\w-]*)="(.+?)"/) do |match|
         prop = $1
         ruby_value = $2
+        # Store result in variable to ensure proper return in transpiled JS
+        replacement = nil
         begin
           js_value = convert_expression(ruby_value)
-          "v-bind:#{prop}=\"#{js_value}\""
+          replacement = "v-bind:#{prop}=\"#{js_value}\""
         rescue => e
           @errors << { type: :v_bind, prop: prop, expression: ruby_value, error: e.message }
-          match
+          replacement = match
         end
+        replacement
       end
 
       result
@@ -169,23 +184,31 @@ module Ruby2JS
     def process_v_model(template)
       template.gsub(/v-model="(.+?)"/) do |match|
         ruby_ref = $1
+        # Store result in variable to ensure proper return in transpiled JS
+        result = nil
         begin
           js_ref = convert_expression(ruby_ref)
-          "v-model=\"#{js_ref}\""
+          result = "v-model=\"#{js_ref}\""
         rescue => e
           @errors << { type: :v_model, expression: ruby_ref, error: e.message }
-          match
+          result = match
         end
+        result
       end
     end
 
     # Helper to process a directive with an expression
     def process_directive_expression(directive, ruby_expr, original)
-      js_expr = convert_expression(ruby_expr)
-      "#{directive}=\"#{js_expr}\""
-    rescue => e
-      @errors << { type: directive.to_sym, expression: ruby_expr, error: e.message }
-      original
+      # Store result in variable to ensure proper return in transpiled JS
+      result = nil
+      begin
+        js_expr = convert_expression(ruby_expr)
+        result = "#{directive}=\"#{js_expr}\""
+      rescue => e
+        @errors << { type: directive.to_sym, expression: ruby_expr, error: e.message }
+        result = original
+      end
+      result
     end
 
     # Convert a Ruby expression to JavaScript using Ruby2JS
@@ -222,10 +245,12 @@ module Ruby2JS
 
     # Build the filter list for Ruby2JS conversion
     def build_filters
-      filters = Array(@options[:filters]).dup
+      # Note: Use spread [...] instead of .dup for JS compatibility
+      filters = [*@options[:filters]]
 
       # Add camelCase filter if enabled (default)
-      if @options.fetch(:camelCase, true)
+      camel_case_enabled = @options.fetch(:camelCase, true)
+      if camel_case_enabled
         require 'ruby2js/filter/camelCase'
         filters << Ruby2JS::Filter::CamelCase unless filters.include?(Ruby2JS::Filter::CamelCase)
       end

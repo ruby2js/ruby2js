@@ -29,7 +29,7 @@ describe Ruby2JS::VueComponentTransformer do
       result = transform(source)
 
       _(result.errors).wont_be_empty
-      _(result.errors.first[:type]).must_equal :no_template
+      _(result.errors.first[:type]).must_equal 'noTemplate'
     end
   end
 
@@ -44,7 +44,7 @@ describe Ruby2JS::VueComponentTransformer do
 
       result = transform(source)
 
-      _(result.imports[:vue]).must_include 'ref'
+      _([*result.imports[:vue]]).must_include 'ref'
     end
 
     it "converts instance variable initialization to ref" do
@@ -74,7 +74,7 @@ describe Ruby2JS::VueComponentTransformer do
 
       result = transform(source)
 
-      _(result.imports[:vue]).must_include 'onMounted'
+      _([*result.imports[:vue]]).must_include 'onMounted'
     end
 
     it "imports onUpdated for updated hook" do
@@ -88,7 +88,7 @@ describe Ruby2JS::VueComponentTransformer do
 
       result = transform(source)
 
-      _(result.imports[:vue]).must_include 'onUpdated'
+      _([*result.imports[:vue]]).must_include 'onUpdated'
     end
 
     it "imports onUnmounted for unmounted hook" do
@@ -102,7 +102,7 @@ describe Ruby2JS::VueComponentTransformer do
 
       result = transform(source)
 
-      _(result.imports[:vue]).must_include 'onUnmounted'
+      _([*result.imports[:vue]]).must_include 'onUnmounted'
     end
   end
 
@@ -118,7 +118,7 @@ describe Ruby2JS::VueComponentTransformer do
 
       result = transform(source)
 
-      _(result.imports[:vue_router]).must_include 'useRouter'
+      _([*result.imports[:vueRouter]]).must_include 'useRouter'
       _(result.script).must_include "const router = useRouter()"
     end
 
@@ -133,7 +133,7 @@ describe Ruby2JS::VueComponentTransformer do
 
       result = transform(source)
 
-      _(result.imports[:vue_router]).must_include 'useRoute'
+      _([*result.imports[:vueRouter]]).must_include 'useRoute'
       _(result.script).must_include "const route = useRoute()"
     end
   end
@@ -150,7 +150,7 @@ describe Ruby2JS::VueComponentTransformer do
 
       result = transform(source)
 
-      _(result.imports[:models]).must_include 'Post'
+      _([*result.imports[:models]]).must_include 'Post'
       _(result.script).must_include "import { Post } from '@/models/post'"
     end
   end
@@ -238,11 +238,11 @@ describe Ruby2JS::VueComponentTransformer do
       _(result.errors).must_be_empty
 
       # Check imports
-      _(result.imports[:vue]).must_include 'ref'
-      _(result.imports[:vue]).must_include 'onMounted'
-      _(result.imports[:vue_router]).must_include 'useRouter'
-      _(result.imports[:vue_router]).must_include 'useRoute'
-      _(result.imports[:models]).must_include 'Post'
+      _([*result.imports[:vue]]).must_include 'ref'
+      _([*result.imports[:vue]]).must_include 'onMounted'
+      _([*result.imports[:vueRouter]]).must_include 'useRouter'
+      _([*result.imports[:vueRouter]]).must_include 'useRoute'
+      _([*result.imports[:models]]).must_include 'Post'
 
       # Check SFC structure
       _(result.sfc).must_include '<script setup>'

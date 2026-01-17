@@ -9,6 +9,16 @@
  *   export default defineConfig({
  *     plugins: [ruby2js()]
  *   });
+ *
+ * For SFC (Single File Component) support with __END__ templates:
+ *   export default defineConfig({
+ *     plugins: [ruby2js({ sfc: true })]
+ *   });
+ *
+ * This enables automatic transformation of:
+ *   - .vue.rb files (Ruby script + Vue template)
+ *   - .svelte.rb files (Ruby script + Svelte template)
+ *   - .astro.rb files (Ruby script + Astro template)
  */
 
 import { convert, initPrism } from 'ruby2js';
@@ -20,6 +30,35 @@ import 'ruby2js/filters/esm.js';
 import 'ruby2js/filters/cjs.js';
 import 'ruby2js/filters/camelCase.js';
 import 'ruby2js/filters/return.js';
+
+// Import SFC component transformers (lazy loaded when needed)
+let VueComponentTransformer = null;
+let SvelteComponentTransformer = null;
+let AstroComponentTransformer = null;
+
+async function getVueTransformer() {
+  if (!VueComponentTransformer) {
+    const mod = await import('ruby2js/vue');
+    VueComponentTransformer = mod.VueComponentTransformer;
+  }
+  return VueComponentTransformer;
+}
+
+async function getSvelteTransformer() {
+  if (!SvelteComponentTransformer) {
+    const mod = await import('ruby2js/svelte');
+    SvelteComponentTransformer = mod.SvelteComponentTransformer;
+  }
+  return SvelteComponentTransformer;
+}
+
+async function getAstroTransformer() {
+  if (!AstroComponentTransformer) {
+    const mod = await import('ruby2js/astro');
+    AstroComponentTransformer = mod.AstroComponentTransformer;
+  }
+  return AstroComponentTransformer;
+}
 
 // Initialize Prism lazily
 let prismInitialized = false;
@@ -72,6 +111,7 @@ export default function ruby2js(options = {}) {
     eslevel = 2022,
     include = ['**/*.rb'],
     exclude = [],
+    sfc = false,
     ...ruby2jsOptions
   } = options;
 
@@ -103,6 +143,11 @@ export default function ruby2js(options = {}) {
 
       // Ensure Prism is initialized
       await ensurePrism();
+
+      // Handle SFC files (.vue.rb, .svelte.rb, .astro.rb)
+      if (sfc || id.endsWith('.vue.rb') || id.endsWith('.svelte.rb') || id.endsWith('.astro.rb')) {
+        return await this.transformSFC(code, id, eslevel, ruby2jsOptions);
+      }
 
       try {
         const result = convert(code, {
@@ -143,6 +188,50 @@ export default function ruby2js(options = {}) {
           };
         }
 
+        throw enhancedError;
+      }
+    },
+
+    async transformSFC(code, id, eslevel, ruby2jsOptions) {
+      try {
+        let Transformer;
+        let framework;
+
+        if (id.endsWith('.vue.rb')) {
+          Transformer = await getVueTransformer();
+          framework = 'Vue';
+        } else if (id.endsWith('.svelte.rb')) {
+          Transformer = await getSvelteTransformer();
+          framework = 'Svelte';
+        } else if (id.endsWith('.astro.rb')) {
+          Transformer = await getAstroTransformer();
+          framework = 'Astro';
+        } else {
+          return null;
+        }
+
+        const result = Transformer.transform(code, {
+          eslevel,
+          ...ruby2jsOptions
+        });
+
+        if (result.errors && result.errors.length > 0) {
+          const errorMsg = result.errors.map(e =>
+            typeof e === 'string' ? e : JSON.stringify(e)
+          ).join(', ');
+          throw new Error(`${framework} transform errors: ${errorMsg}`);
+        }
+
+        return {
+          code: result.component,
+          map: null
+        };
+      } catch (error) {
+        const enhancedError = new Error(
+          `Ruby2JS SFC transform error in ${id}: ${error.message}`
+        );
+        enhancedError.id = id;
+        enhancedError.plugin = 'vite-plugin-ruby2js';
         throw enhancedError;
       }
     }

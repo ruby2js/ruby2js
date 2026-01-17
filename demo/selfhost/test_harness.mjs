@@ -372,6 +372,58 @@ Array.prototype.must_include = function(item) {
   return this;
 };
 
+// Array must_be_empty / wont_be_empty
+Object.defineProperty(Array.prototype, 'must_be_empty', {
+  get: function() {
+    if (this.length !== 0) {
+      throw new Error(`Expected array to be empty but had ${this.length} items`);
+    }
+    return this;
+  },
+  configurable: true
+});
+
+Object.defineProperty(Array.prototype, 'wont_be_empty', {
+  get: function() {
+    if (this.length === 0) {
+      throw new Error(`Expected array not to be empty`);
+    }
+    return this;
+  },
+  configurable: true
+});
+
+// Object/value wont_be_nil
+Object.defineProperty(Object.prototype, 'wont_be_nil', {
+  get: function() {
+    if (this === null || this === undefined) {
+      throw new Error(`Expected value not to be nil/null/undefined`);
+    }
+    return this;
+  },
+  configurable: true
+});
+
+// Object must_include for strings in objects
+Object.defineProperty(Object.prototype, 'must_include', {
+  value: function(item) {
+    if (typeof this === 'string' || this instanceof String) {
+      if (!this.includes(item)) {
+        throw new Error(`Expected "${this.valueOf()}" to include "${item}"`);
+      }
+    } else if (Array.isArray(this)) {
+      if (!this.includes(item)) {
+        throw new Error(`Expected array to include ${item}`);
+      }
+    } else {
+      throw new Error(`must_include not supported on ${typeof this}`);
+    }
+    return this;
+  },
+  configurable: true,
+  writable: true
+});
+
 // Number assertions
 Number.prototype.must_equal = function(expected) {
   if (this.valueOf() !== expected) {

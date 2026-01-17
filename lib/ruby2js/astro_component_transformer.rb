@@ -65,9 +65,15 @@ module Ruby2JS
 
     # Transform the component, returning a Result
     def transform
-      # Build conversion options with camelCase filter
+      # Build conversion options with SFC and camelCase filters
       convert_options = @options.merge(template: :astro)
       convert_options[:filters] ||= []
+
+      # Add SFC filter for @var → const var transformation
+      require 'ruby2js/filter/sfc'
+      unless convert_options[:filters].include?(Ruby2JS::Filter::SFC)
+        convert_options[:filters] = convert_options[:filters] + [Ruby2JS::Filter::SFC]
+      end
 
       # Add camelCase filter for method/variable name conversion
       require 'ruby2js/filter/camelCase'
@@ -81,7 +87,7 @@ module Ruby2JS
       template_raw = result.template
 
       if template_raw.nil? || template_raw.empty?
-        @errors << { type: :no_template, message: "No __END__ template found" }
+        @errors << { type: 'noTemplate', message: "No __END__ template found" }
         return Result.new(
           component: nil,
           frontmatter: script_js,
@@ -114,7 +120,7 @@ module Ruby2JS
 
     # Class method for simple one-shot transformation
     def self.transform(source, options = {})
-      new(source, options).transform
+      self.new(source, options).transform
     end
 
     private
@@ -128,13 +134,13 @@ module Ruby2JS
         ast, _ = Ruby2JS.parse(ruby_code)
         analyze_ast(ast) if ast
       rescue => e
-        @errors << { type: :parse_error, message: e.message }
+        @errors << { type: 'parseError', message: e.message }
       end
     end
 
     # Analyze AST to find instance variables, methods, etc.
     def analyze_ast(node)
-      return unless node.respond_to?(:type)
+      return unless node.is_a?(Ruby2JS::Node)
 
       case node.type
       when :ivasgn
@@ -161,19 +167,19 @@ module Ruby2JS
           when :props
             @uses_props = true
           end
-        elsif target.respond_to?(:type) && target.type == :send
+        elsif target.is_a?(Ruby2JS::Node) && target.type == :send
           inner_target, inner_method = target.children
           if inner_target.nil?
             if inner_method == :params
               @uses_params = true
               # Track which param is accessed
               if args.first&.type == :sym
-                @prop_names << args.first.children.first.to_s
+                @prop_names << args.first.children.first.to_s # Pragma: set
               end
             elsif inner_method == :props
               @uses_props = true
               if args.first&.type == :sym
-                @prop_names << args.first.children.first.to_s
+                @prop_names << args.first.children.first.to_s # Pragma: set
               end
             end
           end
@@ -183,13 +189,14 @@ module Ruby2JS
         # Model references
         const_name = node.children.last.to_s
         if const_name =~ /^[A-Z]/
-          @imports[:models] << const_name
+          @imports[:models] << const_name # Pragma: set
         end
       end
 
       # Recurse into children
+      # Check child is an object before checking for :type (JS compatibility)
       node.children.each do |child|
-        analyze_ast(child) if child.respond_to?(:type)
+        analyze_ast(child) if child.is_a?(Ruby2JS::Node)
       end
     end
 
@@ -206,8 +213,8 @@ module Ruby2JS
 
       # Add Astro.params destructuring if params are used
       if @uses_params
-        if @prop_names.any?
-          camel_names = @prop_names.map { |n| to_camel_case(n) }
+        if @prop_names.size > 0
+          camel_names = [*@prop_names].map { |n| to_camel_case(n) }
           lines << "const { #{camel_names.join(', ')} } = Astro.params"
         else
           lines << "const params = Astro.params"
@@ -216,8 +223,8 @@ module Ruby2JS
 
       # Add Astro.props destructuring if props are used
       if @uses_props
-        if @prop_names.any?
-          camel_names = @prop_names.map { |n| to_camel_case(n) }
+        if @prop_names.size > 0
+          camel_names = [*@prop_names].map { |n| to_camel_case(n) }
           lines << "const { #{camel_names.join(', ')} } = Astro.props"
         else
           lines << "const props = Astro.props"
@@ -233,7 +240,7 @@ module Ruby2JS
 
     # Transform the main script content
     def transform_script_content(js)
-      result = js.dup
+      result = js.to_s  # Use to_s instead of dup for JS compatibility (strings are immutable)
 
       # Transform params[:id] to id (already destructured from Astro.params)
       result.gsub!(/params\[:([\w]+)\]/) do
@@ -263,7 +270,7 @@ module Ruby2JS
     # Compile the template using AstroTemplateCompiler
     def compile_template(template)
       result = AstroTemplateCompiler.compile(template, @options)
-      @errors.concat(result.errors.map { |e| { type: :template_error, **e } })
+      @errors.concat(result.errors.map { |e| { type: 'templateError', **e } })
       result.template
     end
 

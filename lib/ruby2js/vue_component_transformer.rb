@@ -83,16 +83,22 @@ module Ruby2JS
       @lifecycle_hooks = []
       @imports = {
         vue: Set.new,
-        vue_router: Set.new,
+        vueRouter: Set.new,
         models: Set.new
       }
     end
 
     # Transform the component, returning a Result
     def transform
-      # Build conversion options with camelCase filter
+      # Build conversion options with SFC and camelCase filters
       convert_options = @options.merge(template: :vue)
       convert_options[:filters] ||= []
+
+      # Add SFC filter for @var → const var = ref(value) transformation
+      require 'ruby2js/filter/sfc'
+      unless convert_options[:filters].include?(Ruby2JS::Filter::SFC)
+        convert_options[:filters] = convert_options[:filters] + [Ruby2JS::Filter::SFC]
+      end
 
       # Add camelCase filter for method/variable name conversion
       require 'ruby2js/filter/camelCase'
@@ -106,7 +112,7 @@ module Ruby2JS
       template_raw = result.template
 
       if template_raw.nil? || template_raw.empty?
-        @errors << { type: :no_template, message: "No __END__ template found" }
+        @errors << { type: 'noTemplate', message: "No __END__ template found" }
         return Result.new(
           sfc: nil,
           script: script_js,
@@ -139,7 +145,7 @@ module Ruby2JS
 
     # Class method for simple one-shot transformation
     def self.transform(source, options = {})
-      new(source, options).transform
+      self.new(source, options).transform
     end
 
     private
@@ -153,32 +159,32 @@ module Ruby2JS
         ast, _ = Ruby2JS.parse(ruby_code)
         analyze_ast(ast) if ast
       rescue => e
-        @errors << { type: :parse_error, message: e.message }
+        @errors << { type: 'parseError', message: e.message }
       end
     end
 
     # Analyze AST to find instance variables, methods, etc.
     def analyze_ast(node)
-      return unless node.respond_to?(:type)
+      return unless node.is_a?(Ruby2JS::Node)
 
       case node.type
       when :ivasgn
         # Instance variable assignment → ref
         var_name = node.children.first.to_s[1..-1]  # Remove @
         @refs << var_name unless @refs.include?(var_name)
-        @imports[:vue] << 'ref'
+        @imports[:vue] << 'ref' # Pragma: set
 
       when :ivar
         # Instance variable reference
         var_name = node.children.first.to_s[1..-1]
         @refs << var_name unless @refs.include?(var_name)
-        @imports[:vue] << 'ref'
+        @imports[:vue] << 'ref' # Pragma: set
 
       when :def
         method_name = node.children.first
         if LIFECYCLE_HOOKS.key?(method_name)
           @lifecycle_hooks << method_name
-          @imports[:vue] << LIFECYCLE_HOOKS[method_name].to_s
+          @imports[:vue] << LIFECYCLE_HOOKS[method_name].to_s # Pragma: set
         else
           @methods << method_name
         end
@@ -189,14 +195,14 @@ module Ruby2JS
         if target.nil?
           case method
           when :router, :navigate
-            @imports[:vue_router] << 'useRouter'
+            @imports[:vueRouter] << 'useRouter' # Pragma: set
           when :route, :params
-            @imports[:vue_router] << 'useRoute'
+            @imports[:vueRouter] << 'useRoute' # Pragma: set
           end
-        elsif target.respond_to?(:type) && target.type == :send
+        elsif target.is_a?(Ruby2JS::Node) && target.type == :send
           inner_target, inner_method = target.children
           if inner_target.nil? && inner_method == :params
-            @imports[:vue_router] << 'useRoute'
+            @imports[:vueRouter] << 'useRoute' # Pragma: set
           end
         end
 
@@ -204,13 +210,13 @@ module Ruby2JS
         # Model references
         const_name = node.children.last.to_s
         if const_name =~ /^[A-Z]/
-          @imports[:models] << const_name
+          @imports[:models] << const_name # Pragma: set
         end
       end
 
       # Recurse into children
       node.children.each do |child|
-        analyze_ast(child) if child.respond_to?(:type)
+        analyze_ast(child) if child.is_a?(Ruby2JS::Node)
       end
     end
 
@@ -219,12 +225,13 @@ module Ruby2JS
       lines = []
 
       # Build imports
-      vue_imports = @imports[:vue].to_a.sort
+      # Note: Use Array() instead of .to_a for JS compatibility (Sets)
+      vue_imports = Array(@imports[:vue]).sort
       unless vue_imports.empty?
         lines << "import { #{vue_imports.join(', ')} } from 'vue'"
       end
 
-      router_imports = @imports[:vue_router].to_a.sort
+      router_imports = Array(@imports[:vueRouter]).sort
       unless router_imports.empty?
         lines << "import { #{router_imports.join(', ')} } from 'vue-router'"
       end
@@ -236,10 +243,11 @@ module Ruby2JS
       lines << "" if lines.any?
 
       # Add router/route initialization
-      if @imports[:vue_router].include?('useRouter')
+      # Note: Use router_imports array (already converted from Set) for JS compatibility
+      if router_imports.include?('useRouter')
         lines << "const router = useRouter()"
       end
-      if @imports[:vue_router].include?('useRoute')
+      if router_imports.include?('useRoute')
         lines << "const route = useRoute()"
       end
 
@@ -252,7 +260,7 @@ module Ruby2JS
 
     # Transform the main script content
     def transform_script_content(js)
-      result = js.dup
+      result = js.to_s  # Use to_s instead of dup for JS compatibility (strings are immutable)
 
       # Transform instance variable declarations to refs
       # Pattern: let varName = value → const varName = ref(value)
@@ -295,7 +303,7 @@ module Ruby2JS
     # Compile the template using VueTemplateCompiler
     def compile_template(template)
       result = VueTemplateCompiler.compile(template, @options)
-      @errors.concat(result.errors.map { |e| { type: :template_error, **e } })
+      @errors.concat(result.errors.map { |e| { type: 'templateError', **e } })
       result.template
     end
 
@@ -313,8 +321,10 @@ module Ruby2JS
     end
 
     # Indent template content for prettier output
+    # Note: Use split instead of lines for JS compatibility
+    # Note: Use explicit parens for JS compatibility
     def indent_template(template)
-      template.lines.map { |line| "  #{line.rstrip}" }.join("\n").strip
+      template.split("\n").map { |line| "  " + line.rstrip() }.join("\n").strip()
     end
 
     # Convert camelCase to snake_case

@@ -48,6 +48,28 @@ module Ruby2JS
 
       def initialize(*args)
         @jsx = false
+        @index_result_vars = Set.new
+        super
+      end
+
+      # Reset index tracking per method scope
+      def on_def(node)
+        @index_result_vars = Set.new
+        super
+      end
+
+      def on_defs(node)
+        @index_result_vars = Set.new
+        super
+      end
+
+      # Track local variables assigned from .index() calls
+      # so we can convert .nil? checks to === -1
+      def on_lvasgn(node)
+        var_name, value = node.children
+        if value&.type == :send && value.children[1] == :index
+          @index_result_vars << var_name
+        end
         super
       end
 
@@ -500,7 +522,13 @@ module Ruby2JS
           process S(:send, S(:attr, target, :length), :==, s(:int, 0))
 
         elsif method == :nil? and args.length == 0
-          process S(:send, target, :==, s(:nil))
+          # If target is a local var from .index(), use === -1 instead of == null
+          # because JS indexOf returns -1 (not null) when not found
+          if target&.type == :lvar && @index_result_vars.include?(target.children[0])
+            process S(:send, target, :===, s(:int, -1))
+          else
+            process S(:send, target, :==, s(:nil))
+          end
 
         elsif method == :zero? and args.length == 0
           process S(:send, target, :===, s(:int, 0))

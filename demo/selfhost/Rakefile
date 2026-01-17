@@ -119,6 +119,66 @@ FILTER_TARGETS = manifest_filters.map { |name| "#{filters_dir}/#{name}.js" }
 desc "Build lib files (erb_compiler, migration_sql, seed_sql)"
 task :build_lib => ["#{SELFHOST}/lib/erb_compiler.js", "#{SELFHOST}/lib/migration_sql.js", "#{SELFHOST}/lib/seed_sql.js"]
 
+# ===========================================================================
+# Framework Transformers (Vue, Svelte, Astro)
+# ===========================================================================
+
+# Transformer dependencies
+astro_template_deps = FileList["#{ROOT}/lib/ruby2js/astro_template_compiler.rb"]
+svelte_template_deps = FileList["#{ROOT}/lib/ruby2js/svelte_template_compiler.rb"]
+vue_template_deps = FileList["#{ROOT}/lib/ruby2js/vue_template_compiler.rb"]
+astro_component_deps = FileList["#{ROOT}/lib/ruby2js/astro_component_transformer.rb"]
+svelte_component_deps = FileList["#{ROOT}/lib/ruby2js/svelte_component_transformer.rb"]
+vue_component_deps = FileList["#{ROOT}/lib/ruby2js/vue_component_transformer.rb"]
+
+desc "Build astro_template_compiler.mjs"
+file "#{SELFHOST}/dist/astro_template_compiler.mjs" => [*astro_template_deps, "#{SELFHOST}/ruby2js.js"] do
+  FileUtils.mkdir_p(DIST)
+  sh bundle_exec("ruby #{SELFHOST}/scripts/transpile_astro_template_compiler.rb > #{SELFHOST}/dist/astro_template_compiler.mjs")
+end
+
+desc "Build svelte_template_compiler.mjs"
+file "#{SELFHOST}/dist/svelte_template_compiler.mjs" => [*svelte_template_deps, "#{SELFHOST}/ruby2js.js"] do
+  FileUtils.mkdir_p(DIST)
+  sh bundle_exec("ruby #{SELFHOST}/scripts/transpile_svelte_template_compiler.rb > #{SELFHOST}/dist/svelte_template_compiler.mjs")
+end
+
+desc "Build vue_template_compiler.mjs"
+file "#{SELFHOST}/dist/vue_template_compiler.mjs" => [*vue_template_deps, "#{SELFHOST}/ruby2js.js"] do
+  FileUtils.mkdir_p(DIST)
+  sh bundle_exec("ruby #{SELFHOST}/scripts/transpile_vue_template_compiler.rb > #{SELFHOST}/dist/vue_template_compiler.mjs")
+end
+
+desc "Build astro_component_transformer.mjs"
+file "#{SELFHOST}/dist/astro_component_transformer.mjs" => [*astro_component_deps, "#{SELFHOST}/dist/astro_template_compiler.mjs"] do
+  FileUtils.mkdir_p(DIST)
+  sh bundle_exec("ruby #{SELFHOST}/scripts/transpile_astro_component_transformer.rb > #{SELFHOST}/dist/astro_component_transformer.mjs")
+end
+
+desc "Build svelte_component_transformer.mjs"
+file "#{SELFHOST}/dist/svelte_component_transformer.mjs" => [*svelte_component_deps, "#{SELFHOST}/dist/svelte_template_compiler.mjs"] do
+  FileUtils.mkdir_p(DIST)
+  sh bundle_exec("ruby #{SELFHOST}/scripts/transpile_svelte_component_transformer.rb > #{SELFHOST}/dist/svelte_component_transformer.mjs")
+end
+
+desc "Build vue_component_transformer.mjs"
+file "#{SELFHOST}/dist/vue_component_transformer.mjs" => [*vue_component_deps, "#{SELFHOST}/dist/vue_template_compiler.mjs"] do
+  FileUtils.mkdir_p(DIST)
+  sh bundle_exec("ruby #{SELFHOST}/scripts/transpile_vue_component_transformer.rb > #{SELFHOST}/dist/vue_component_transformer.mjs")
+end
+
+TRANSFORMER_TARGETS = [
+  "#{SELFHOST}/dist/astro_template_compiler.mjs",
+  "#{SELFHOST}/dist/svelte_template_compiler.mjs",
+  "#{SELFHOST}/dist/vue_template_compiler.mjs",
+  "#{SELFHOST}/dist/astro_component_transformer.mjs",
+  "#{SELFHOST}/dist/svelte_component_transformer.mjs",
+  "#{SELFHOST}/dist/vue_component_transformer.mjs"
+]
+
+desc "Build framework transformers (Vue, Svelte, Astro)"
+task :build_transformers => TRANSFORMER_TARGETS
+
 desc "Build manifest filters (batch)"
 task :build_filters => ["#{SELFHOST}/ruby2js.js"] do
   puts "Building filters..."
@@ -191,6 +251,28 @@ task :test_partial => :npm_install do
   end
 end
 
+TRANSFORMER_SPECS = %w[
+  astro_component_transformer_spec
+  svelte_component_transformer_spec
+  vue_component_transformer_spec
+]
+
+desc "Build transformer specs"
+task :build_transformer_specs => :build_transformers do
+  TRANSFORMER_SPECS.each do |spec|
+    source = "#{ROOT}/spec/#{spec}.rb"
+    output = "#{SELFHOST}/dist/#{spec}.mjs"
+    sh bundle_exec("ruby #{SELFHOST}/scripts/transpile_spec.rb #{source} > #{output}")
+  end
+end
+
+desc "Run transformer spec tests"
+task :test_transformers => [:npm_install, :build_transformer_specs] do
+  Dir.chdir(SELFHOST) do
+    sh "node run_transformer_specs.mjs"
+  end
+end
+
 PACKAGE = File.join(ROOT, 'packages/ruby2js-rails')
 BUILD_MJS = File.join(PACKAGE, 'build.mjs')
 
@@ -251,10 +333,10 @@ task "build_mjs:npm" => :build_mjs do
 end
 
 desc "Build and run all tests"
-task :test => [:build, :test_walker, :test_specs]
+task :test => [:build, :test_walker, :test_specs, :test_transformers]
 
 desc "Build and run CI tests (ready must pass, partial informational)"
-task :ci => [:build_ready, :build_partial, :test_walker, :test_ready, :test_partial]
+task :ci => [:build_ready, :build_partial, :test_walker, :test_ready, :test_partial, :test_transformers]
 
 desc "Clean dist directory and generated files"
 task :clean do
@@ -274,11 +356,17 @@ end
 # ===========================================================================
 
 desc "Build everything for local development"
-task :local => [:build, :build_lib, :build_mjs] do
+task :local => [:build, :build_lib, :build_transformers, :build_mjs] do
   # Copy lib files to packages/ruby2js-rails/lib/ for local vite.mjs imports
   package_lib = File.join(PACKAGE, 'lib')
   FileUtils.mkdir_p(package_lib)
   FileUtils.cp Dir.glob("#{SELFHOST}/lib/*.js"), package_lib
+
+  # Copy transformer files to package dist/ for local imports
+  package_dist = File.join(PACKAGE, 'dist')
+  FileUtils.mkdir_p(package_dist)
+  FileUtils.cp Dir.glob("#{SELFHOST}/dist/*_compiler.mjs"), package_dist
+  FileUtils.cp Dir.glob("#{SELFHOST}/dist/*_transformer.mjs"), package_dist
 
   # Copy ruby2js.js to package root (lib files import ../ruby2js.js)
   FileUtils.cp File.join(SELFHOST, 'ruby2js.js'), PACKAGE
@@ -289,7 +377,7 @@ task :local => [:build, :build_lib, :build_mjs] do
 end
 
 desc "Build everything for npm release (tarballs in artifacts/tarballs/)"
-task :release => [:build, :build_lib, "build_mjs:npm"] do
+task :release => [:build, :build_lib, :build_transformers, "build_mjs:npm"] do
   tarballs_dir = File.join(ROOT, 'artifacts/tarballs')
   FileUtils.mkdir_p(tarballs_dir)
 

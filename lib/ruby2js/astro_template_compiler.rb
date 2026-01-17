@@ -99,7 +99,7 @@ module Ruby2JS
 
     # Class method for simple one-shot compilation
     def self.compile(template, options = {})
-      new(template, options).compile
+      self.new(template, options).compile
     end
 
     private
@@ -107,7 +107,8 @@ module Ruby2JS
     # Convert snake_case attribute names to camelCase in JSX
     # e.g., show_count={true} → showCount={true}
     def convert_attribute_names(template)
-      return template unless @options.fetch(:camelCase, true)
+      camel_case_enabled = @options.fetch(:camelCase, true)
+      return template unless camel_case_enabled
 
       # Match attribute patterns: name={...} or name="..."
       # Only convert snake_case names (containing underscores)
@@ -230,11 +231,13 @@ module Ruby2JS
         return "#{js_collection}.filter(#{block_var} => #{js_body})"
       end
 
-      # Regular expression
-      convert_expression(content)
-    rescue => e
-      @errors << { type: :expression, content: content, error: e.message }
-      content
+      # Regular expression - use begin/rescue with explicit returns for JS compatibility
+      begin
+        return convert_expression(content)
+      rescue => e
+        @errors << { type: :expression, content: content, error: e.message }
+        return content
+      end
     end
 
     # Process a .map block with JSX body
@@ -313,7 +316,8 @@ module Ruby2JS
       filters = Array(@options[:filters]).dup
 
       # Add camelCase filter if enabled (default)
-      if @options.fetch(:camelCase, true)
+      camel_case_enabled = @options.fetch(:camelCase, true)
+      if camel_case_enabled
         require 'ruby2js/filter/camelCase'
         filters << Ruby2JS::Filter::CamelCase unless filters.include?(Ruby2JS::Filter::CamelCase)
       end

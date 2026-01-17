@@ -149,6 +149,13 @@ module Ruby2JS
             return process s(:send, nil, :ast_node, *args)
           end
 
+          # Convert Ruby2JS.convert(...) to convert(...)
+          # convert is imported from ruby2js.js
+          if target&.type == :const && target.children == [nil, :Ruby2JS] &&
+             method_name == :convert
+            return process s(:send, nil, :convert, *args)
+          end
+
           # Convert length/size/count to :attr nodes to ensure property access.
           # Without this, nodes created with s() (no location info) get is_method?=true
           # and output as method calls like body.length() instead of body.length.

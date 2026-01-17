@@ -58,11 +58,12 @@ module Ruby2JS
     Result = Struct.new(:component, :script, :template, :imports, :errors, keyword_init: true)
 
     # Svelte lifecycle hook mappings (Ruby method name → Svelte)
+    # Use string keys to prevent camelCase conversion during transpilation
     LIFECYCLE_HOOKS = {
-      on_mount: :onMount,
-      on_destroy: :onDestroy,
-      before_update: :beforeUpdate,
-      after_update: :afterUpdate
+      'on_mount' => 'onMount',
+      'on_destroy' => 'onDestroy',
+      'before_update' => 'beforeUpdate',
+      'after_update' => 'afterUpdate'
     }.freeze
 
     # Default options
@@ -82,17 +83,23 @@ module Ruby2JS
       @lifecycle_hooks = []
       @imports = {
         svelte: Set.new,
-        sveltekit_navigation: Set.new,
-        sveltekit_stores: Set.new,
+        sveltekitNavigation: Set.new,
+        sveltekitStores: Set.new,
         models: Set.new
       }
     end
 
     # Transform the component, returning a Result
     def transform
-      # Build conversion options with camelCase filter
+      # Build conversion options with SFC and camelCase filters
       convert_options = @options.merge(template: :svelte)
       convert_options[:filters] ||= []
+
+      # Add SFC filter for @var → let var transformation
+      require 'ruby2js/filter/sfc'
+      unless convert_options[:filters].include?(Ruby2JS::Filter::SFC)
+        convert_options[:filters] = convert_options[:filters] + [Ruby2JS::Filter::SFC]
+      end
 
       # Add camelCase filter for method/variable name conversion
       require 'ruby2js/filter/camelCase'
@@ -106,7 +113,7 @@ module Ruby2JS
       template_raw = result.template
 
       if template_raw.nil? || template_raw.empty?
-        @errors << { type: :no_template, message: "No __END__ template found" }
+        @errors << { type: 'noTemplate', message: "No __END__ template found" }
         return Result.new(
           component: nil,
           script: script_js,
@@ -139,7 +146,7 @@ module Ruby2JS
 
     # Class method for simple one-shot transformation
     def self.transform(source, options = {})
-      new(source, options).transform
+      self.new(source, options).transform
     end
 
     private
@@ -153,13 +160,13 @@ module Ruby2JS
         ast, _ = Ruby2JS.parse(ruby_code)
         analyze_ast(ast) if ast
       rescue => e
-        @errors << { type: :parse_error, message: e.message }
+        @errors << { type: 'parseError', message: e.message }
       end
     end
 
     # Analyze AST to find instance variables, methods, etc.
     def analyze_ast(node)
-      return unless node.respond_to?(:type)
+      return unless node.is_a?(Ruby2JS::Node)
 
       case node.type
       when :ivasgn
@@ -174,9 +181,10 @@ module Ruby2JS
 
       when :def
         method_name = node.children.first
-        if LIFECYCLE_HOOKS.key?(method_name)
+        method_name_str = method_name.to_s
+        if LIFECYCLE_HOOKS.key?(method_name_str)
           @lifecycle_hooks << method_name
-          @imports[:svelte] << LIFECYCLE_HOOKS[method_name].to_s
+          @imports[:svelte] << LIFECYCLE_HOOKS[method_name_str] # Pragma: set
         else
           @methods << method_name
         end
@@ -187,20 +195,20 @@ module Ruby2JS
         if target.nil?
           case method
           when :goto
-            @imports[:sveltekit_navigation] << 'goto'
+            @imports[:sveltekitNavigation] << 'goto' # Pragma: set
           when :invalidate
-            @imports[:sveltekit_navigation] << 'invalidate'
+            @imports[:sveltekitNavigation] << 'invalidate' # Pragma: set
           when :invalidate_all
-            @imports[:sveltekit_navigation] << 'invalidateAll'
+            @imports[:sveltekitNavigation] << 'invalidateAll' # Pragma: set
           when :prefetch
-            @imports[:sveltekit_navigation] << 'prefetch'
+            @imports[:sveltekitNavigation] << 'prefetch' # Pragma: set
           when :params
-            @imports[:sveltekit_stores] << 'page'
+            @imports[:sveltekitStores] << 'page' # Pragma: set
           end
-        elsif target.respond_to?(:type) && target.type == :send
+        elsif target.is_a?(Ruby2JS::Node) && target.type == :send
           inner_target, inner_method = target.children
           if inner_target.nil? && inner_method == :params
-            @imports[:sveltekit_stores] << 'page'
+            @imports[:sveltekitStores] << 'page' # Pragma: set
           end
         end
 
@@ -208,13 +216,13 @@ module Ruby2JS
         # Model references
         const_name = node.children.last.to_s
         if const_name =~ /^[A-Z]/
-          @imports[:models] << const_name
+          @imports[:models] << const_name # Pragma: set
         end
       end
 
       # Recurse into children
       node.children.each do |child|
-        analyze_ast(child) if child.respond_to?(:type)
+        analyze_ast(child) if child.is_a?(Ruby2JS::Node)
       end
     end
 
@@ -223,17 +231,18 @@ module Ruby2JS
       lines = []
 
       # Build imports
-      svelte_imports = @imports[:svelte].to_a.sort
+      # Note: Use Array() instead of .to_a for JS compatibility (Sets)
+      svelte_imports = Array(@imports[:svelte]).sort
       unless svelte_imports.empty?
         lines << "import { #{svelte_imports.join(', ')} } from 'svelte'"
       end
 
-      nav_imports = @imports[:sveltekit_navigation].to_a.sort
+      nav_imports = Array(@imports[:sveltekitNavigation]).sort
       unless nav_imports.empty?
         lines << "import { #{nav_imports.join(', ')} } from '$app/navigation'"
       end
 
-      store_imports = @imports[:sveltekit_stores].to_a.sort
+      store_imports = Array(@imports[:sveltekitStores]).sort
       unless store_imports.empty?
         lines << "import { #{store_imports.join(', ')} } from '$app/stores'"
       end
@@ -253,7 +262,7 @@ module Ruby2JS
 
     # Transform the main script content
     def transform_script_content(js)
-      result = js.dup
+      result = js.to_s  # Use to_s instead of dup for JS compatibility (strings are immutable)
 
       # Transform lifecycle hooks
       LIFECYCLE_HOOKS.each do |ruby_name, svelte_name|
@@ -285,7 +294,7 @@ module Ruby2JS
     # Compile the template using SvelteTemplateCompiler
     def compile_template(template)
       result = SvelteTemplateCompiler.compile(template, @options)
-      @errors.concat(result.errors.map { |e| { type: :template_error, **e } })
+      @errors.concat(result.errors.map { |e| { type: 'templateError', **e } })
       result.template
     end
 

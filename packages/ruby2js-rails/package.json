@@ -17,6 +17,7 @@
     "./adapters/*": "./adapters/*",
     "./components/*": "./components/*",
     "./targets/*": "./targets/*",
+    "./dist/*": "./dist/*",
     "./rpc/client.mjs": "./rpc/client.mjs",
     "./rpc/server.mjs": "./rpc/server.mjs",
     "./path_helper.mjs": "./path_helper.mjs",
@@ -32,11 +33,15 @@
     "./vite": "./vite.mjs",
     "./vite.mjs": "./vite.mjs",
     "./vite-ssr-dev": "./vite-ssr-dev.mjs",
-    "./vite-ssr-dev.mjs": "./vite-ssr-dev.mjs"
+    "./vite-ssr-dev.mjs": "./vite-ssr-dev.mjs",
+    "./astro": "./dist/astro_component_transformer.mjs",
+    "./svelte": "./dist/svelte_component_transformer.mjs",
+    "./vue": "./dist/vue_component_transformer.mjs"
   },
   "files": [
     "adapters/",
     "components/",
+    "dist/",
     "lib/",
     "rpc/",
     "targets/",
