@@ -850,9 +850,9 @@ class SelfhostBuilder
     components_dir = File.join(DEMO_ROOT, 'app/components')
     @component_map = self.build_component_map(components_dir)
 
-    # Transpile components (Phlex views, RBX, and JSX React components)
+    # Transpile components (Phlex views, JSX.rb, and JSX React components)
     # - .rb files use 'components' section from ruby2js.yml
-    # - .rbx files use 'rbx' section (React filter with rbx2_js)
+    # - .jsx.rb files use 'rbx' section (React filter with rbx2_js)
     # - .jsx/.tsx files use esbuild for JSX transformation
     if File.exist?(components_dir)
       puts("Components:")
@@ -861,7 +861,7 @@ class SelfhostBuilder
       self.transpile_directory(
         components_dir,
         File.join(@dist_dir, 'app/components'),
-        '**/*.{rb,rbx,jsx,tsx}',
+        '**/*.{rb,jsx.rb,jsx,tsx}',
         section: 'components'
       )
       puts("")
@@ -1499,13 +1499,13 @@ class SelfhostBuilder
     component_map = {}
 
     # Scan for all component files
-    Dir.glob(File.join(components_dir, '**/*.{rb,rbx,jsx,tsx}')).each do |src_path|
+    Dir.glob(File.join(components_dir, '**/*.{rb,jsx.rb,jsx,tsx}')).each do |src_path|
       # Get path relative to components_dir
       relative = src_path.sub(components_dir + '/', '')
 
       # Get the component name (without extension)
       # e.g., 'Button.rb' → 'Button', 'users/UserCard.jsx' → 'users/UserCard'
-      component_name = relative.sub(/\.(rb|rbx|jsx|tsx)$/, '')
+      component_name = relative.sub(/\.(jsx\.rb|rb|jsx|tsx)$/, '')
 
       # Output path (relative to dist root)
       output_path = "app/components/#{component_name}.js"
@@ -1672,7 +1672,7 @@ class SelfhostBuilder
   # Higher priority formats take precedence when same view name exists in multiple formats
   VIEW_FILE_PRIORITIES = {
     '.rb' => 1,        # Phlex (highest priority)
-    '.rbx' => 2,       # RBX
+    '.jsx.rb' => 2,    # JSX.rb (Ruby + JSX)
     '.jsx' => 3,       # JSX
     '.tsx' => 3,       # TSX (same as JSX)
     '.html.erb' => 4   # ERB (lowest priority)
@@ -1701,7 +1701,7 @@ class SelfhostBuilder
   end
 
   # Unified view transpilation - handles all view file types in a resource directory
-  # Supports: .html.erb (ERB), .rb (Phlex), .rbx (RBX), .jsx/.tsx (JSX)
+  # Supports: .html.erb (ERB), .rb (Phlex), .jsx.rb (JSX.rb), .jsx/.tsx (JSX)
   # Generates a combined module exporting all render functions
   def transpile_unified_views(resource, views_root, views_dist_dir)
     resource_dir = File.join(views_root, resource)
@@ -1742,9 +1742,9 @@ class SelfhostBuilder
       when '.rb'
         self.transpile_phlex_view_file(src_path, dest_path)
         source_formats << "#{view_name}: Phlex"
-      when '.rbx'
+      when '.jsx.rb'
         self.transpile_file(src_path, dest_path, 'rbx')
-        source_formats << "#{view_name}: RBX"
+        source_formats << "#{view_name}: JSX.rb"
       when '.jsx', '.tsx'
         self.transform_jsx_file(src_path, dest_path)
         source_formats << "#{view_name}: JSX"
@@ -1779,14 +1779,14 @@ class SelfhostBuilder
       view_files << { name: view_name, ext: '.rb', path: file_path, priority: VIEW_FILE_PRIORITIES['.rb'] }
     end
 
-    # RBX files
-    Dir.glob(File.join(resource_dir, '*.rbx')).each do |file_path|
-      name = File.basename(file_path, '.rbx')
+    # JSX.rb files (Ruby + JSX)
+    Dir.glob(File.join(resource_dir, '*.jsx.rb')).each do |file_path|
+      name = File.basename(file_path, '.jsx.rb')
       next if name.start_with?('_')
       view_name = name.gsub(/([A-Z]+)([A-Z][a-z])/, '\1_\2')
                       .gsub(/([a-z\d])([A-Z])/, '\1_\2')
                       .downcase
-      view_files << { name: view_name, ext: '.rbx', path: file_path, priority: VIEW_FILE_PRIORITIES['.rbx'] }
+      view_files << { name: view_name, ext: '.jsx.rb', path: file_path, priority: VIEW_FILE_PRIORITIES['.jsx.rb'] }
     end
 
     # JSX/TSX files
@@ -1920,7 +1920,7 @@ class SelfhostBuilder
         target_file = use_source_imports ? source_filename : "#{view_name}.js"
         unified_js += "import #{view_name}_module from './#{resource}/#{target_file}';\n"
         render_exports << "#{view_name}: #{view_name}_module.render || #{view_name}_module"
-      elsif ext == '.rbx' || ext == '.jsx' || ext == '.tsx'
+      elsif ext == '.jsx.rb' || ext == '.jsx' || ext == '.tsx'
         # Use view_name (snake_case) for compiled output, source_filename for Vite HMR
         target_file = use_source_imports ? source_filename : "#{view_name}.js"
         unified_js += "import #{view_name}_component from './#{resource}/#{target_file}';\n"
@@ -2092,9 +2092,9 @@ class SelfhostBuilder
         # JSX/TSX files: transform with esbuild
         dest_path = File.join(dest_dir, relative.sub(/\.[jt]sx$/, '.js'))
         self.transform_jsx_file(src_path, dest_path)
-      elsif src_path.end_with?('.rbx')
+      elsif src_path.end_with?('.jsx.rb')
         file_section = 'rbx'
-        dest_path = File.join(dest_dir, relative.sub(/\.rbx$/, '.js'))
+        dest_path = File.join(dest_dir, relative.sub(/\.jsx\.rb$/, '.js'))
         self.transpile_file(src_path, dest_path, file_section)
       elsif section == 'astro'
         # Astro mode: output .astro files for Phlex components

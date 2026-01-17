@@ -160,10 +160,10 @@ SEEDS
 # Run ruby2js:install generator
 bin/rails generate ruby2js:install
 
-# Create RBX-based index view that demonstrates path helper RPC
+# Create JSX.rb-based index view that demonstrates path helper RPC
 mkdir -p app/views/notes
 
-cat > app/views/notes/Index.rbx << 'RBX'
+cat > app/views/notes/Index.jsx.rb << 'RBX'
 # React is auto-imported when JSX is used (React 17+ style)
 import [useState, useEffect], from: 'react'
 import [notes_path, note_path], from: '../../../config/paths.js'
@@ -388,7 +388,7 @@ end
 RBX
 
 # Create Show view
-cat > app/views/notes/Show.rbx << 'RBX'
+cat > app/views/notes/Show.jsx.rb << 'RBX'
 # React is auto-imported when JSX is used (React 17+ style)
 import [note_path, notes_path], from: '../../../config/paths.js'
 

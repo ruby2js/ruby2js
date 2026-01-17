@@ -324,7 +324,7 @@ FORM
 # Uses model operations directly (Node.create, Edge.create) instead of fetch()
 # This makes the view target-agnostic: works with both browser (Dexie) and Node (RPC) targets
 # JsonStreamProvider handles real-time updates via BroadcastChannel (browser) or WebSocket (node)
-cat > app/views/workflows/Show.rbx << 'RBX'
+cat > app/views/workflows/Show.jsx.rb << 'RBX'
 import React from 'react'
 import WorkflowCanvas from 'components/WorkflowCanvas'
 import JsonStreamProvider from '/lib/JsonStreamProvider.js'
@@ -428,7 +428,7 @@ mkdir -p app/components
 
 # Create WorkflowCanvas component with real-time updates via useJsonStream hook
 # Uses target pragma to mark React Flow as browser-only
-cat > app/components/WorkflowCanvas.rbx << 'COMPONENT'
+cat > app/components/WorkflowCanvas.jsx.rb << 'COMPONENT'
 import React, [useState, useEffect, useCallback], from: 'react'
 # React Flow is browser-only (visual canvas library)
 import ReactFlow, [Background, Controls, MiniMap, useNodesState, useEdgesState, addEdge], from: 'reactflow' # Pragma: browser

@@ -171,7 +171,7 @@ The view uses path helpers to fetch and mutate data:
 }'></div>
 
 ```ruby
-# app/views/notes/Index.rbx
+# app/views/notes/Index.jsx.rb
 import React, [useState, useEffect], from: 'react'
 import [notes_path, note_path], from: '/config/paths.js'
 

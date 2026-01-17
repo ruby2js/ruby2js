@@ -3,7 +3,7 @@
  *
  * Provides full Rails app transformation including:
  * - Ruby file transformation (.rb → .js)
- * - RBX file support (Ruby + JSX with React)
+ * - JSX.rb file support (Ruby + JSX with React)
  * - Structural transforms (models, controllers, views, routes)
  * - Stimulus HMR
  * - Platform-specific configuration
@@ -23,7 +23,7 @@ import yaml from 'js-yaml';
 import ruby2js from 'vite-plugin-ruby2js';
 import { SelfhostBuilder } from './build.mjs';
 
-// Import React filter for .rbx files
+// Import React filter for .jsx.rb files
 import 'ruby2js/filters/react.js';
 
 // Import ERB compiler for .erb files
@@ -131,8 +131,8 @@ export function juntos(options = {}) {
     // Core Ruby transformation with Rails filters
     createRubyPlugin(config, ruby2jsOptions),
 
-    // RBX file handling (Ruby + JSX)
-    createRbxPlugin(config),
+    // JSX.rb file handling (Ruby + JSX)
+    createJsxRbPlugin(config),
 
     // ERB file handling (server-rendered templates as JS modules)
     createErbPlugin(config),
@@ -155,21 +155,21 @@ function createRubyPlugin(config, options) {
   return ruby2js({
     filters: ['Stimulus', 'ESM', 'Functions', 'Return'],
     eslevel: config.eslevel,
-    exclude: ['**/*.rbx'], // RBX files handled separately
+    exclude: ['**/*.jsx.rb'], // JSX.rb files handled separately
     ...options
   });
 }
 
 /**
- * RBX plugin for Ruby + JSX files.
+ * JSX.rb plugin for Ruby + JSX files.
  */
-function createRbxPlugin(config) {
+function createJsxRbPlugin(config) {
   // Import convert function dynamically
   let convert, initPrism;
   let prismReady = false;
 
   return {
-    name: 'juntos-rbx',
+    name: 'juntos-jsx-rb',
 
     async buildStart() {
       // Lazy import ruby2js
@@ -185,7 +185,7 @@ function createRbxPlugin(config) {
     },
 
     async transform(code, id) {
-      if (!id.endsWith('.rbx')) return null;
+      if (!id.endsWith('.jsx.rb')) return null;
 
       // Ensure Prism is ready
       if (!prismReady && initPrism) {
@@ -212,10 +212,10 @@ function createRbxPlugin(config) {
         return { code: js, map };
       } catch (error) {
         const enhancedError = new Error(
-          `Juntos RBX transform error in ${id}: ${error.message}`
+          `Juntos JSX.rb transform error in ${id}: ${error.message}`
         );
         enhancedError.id = id;
-        enhancedError.plugin = 'juntos-rbx';
+        enhancedError.plugin = 'juntos-jsx-rb';
         throw enhancedError;
       }
     }
@@ -407,8 +407,8 @@ function createStructurePlugin(config, appRoot) {
     const destPath = path.join(distDir, relativePath);
 
     // Determine how to handle the file
-    if (file.endsWith('.erb') || file.endsWith('.rbx')) {
-      // ERB and RBX files: copy to dist, Vite transforms on-the-fly
+    if (file.endsWith('.erb') || file.endsWith('.jsx.rb')) {
+      // ERB and JSX.rb files: copy to dist, Vite transforms on-the-fly
       await copyFile(file, destPath);
       console.log(`[juntos] Copied ${relativePath} to dist/`);
     } else if (file.endsWith('.rb')) {
@@ -585,7 +585,7 @@ function createConfigPlugin(config, appRoot) {
         resolve: {
           alias: aliases,
           // Add Ruby extensions for auto-resolution
-          extensions: ['.mjs', '.js', '.mts', '.ts', '.jsx', '.tsx', '.json', '.rbx', '.rb']
+          extensions: ['.mjs', '.js', '.mts', '.ts', '.jsx', '.tsx', '.json', '.jsx.rb', '.rb']
         }
       };
     }
@@ -744,7 +744,7 @@ function getNativeModules(database) {
  * - Models, Rails controllers, routes → full reload (structural changes)
  * - Stimulus controllers → hot swap via custom event
  * - ERB views → HMR via juntos-erb transform (imported directly from source)
- * - RBX views → HMR via juntos-rbx transform (imported directly from source)
+ * - JSX.rb views → HMR via juntos-jsx-rb transform (imported directly from source)
  * - Plain Ruby → Vite default HMR
  */
 function createHmrPlugin() {
@@ -784,7 +784,7 @@ function createHmrPlugin() {
 
       // Stimulus controllers (app/javascript/controllers/): hot swap
       if (normalizedFile.includes('/app/javascript/controllers/') &&
-          file.match(/_controller\.(rb|rbx)$/)) {
+          file.match(/_controller(\.jsx)?\.rb$/)) {
         const controllerName = extractControllerName(file);
 
         server.ws.send({
@@ -806,9 +806,9 @@ function createHmrPlugin() {
         return modules;
       }
 
-      // RBX views: now imported directly, Vite handles HMR via juntos-rbx transform
-      if (file.endsWith('.rbx') && normalizedFile.includes('/app/views/')) {
-        console.log('[juntos] Hot updating RBX view:', file);
+      // JSX.rb views: now imported directly, Vite handles HMR via juntos-jsx-rb transform
+      if (file.endsWith('.jsx.rb') && normalizedFile.includes('/app/views/')) {
+        console.log('[juntos] Hot updating JSX.rb view:', file);
         return modules;
       }
 
@@ -842,7 +842,7 @@ function createHmrPlugin() {
 function extractControllerName(filePath) {
   const fileName = filePath.split('/').pop() || '';
   return fileName
-    .replace(/_controller\.(rb|rbx)$/, '')
+    .replace(/_controller(\.jsx)?\.rb$/, '')
     .replace(/_/g, '-');
 }
 
@@ -857,7 +857,7 @@ if (import.meta.hot) {
     try {
       // Import the updated module with cache bust
       const timestamp = Date.now();
-      const modulePath = file.replace(/\\.(rb|rbx)$/, '.js');
+      const modulePath = file.replace(/(\\.jsx)?\\.rb$/, '.js');
       const newModule = await import(/* @vite-ignore */ modulePath + '?t=' + timestamp);
 
       // Re-register with Stimulus if available

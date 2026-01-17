@@ -135,12 +135,12 @@ The Rails preset includes HMR for Stimulus controllers. When you edit a `*_contr
 3. The updated controller is registered
 4. No full page reload required
 
-## RBX Files (Ruby + JSX)
+## JSX.rb Files (Ruby + JSX)
 
-The Juntos preset supports `.rbx` files—Ruby with embedded JSX:
+The Juntos preset supports `.jsx.rb` files—Ruby with embedded JSX:
 
 ```ruby
-# components/Counter.rbx
+# components/Counter.jsx.rb
 export default
 def Counter(initial: 0)
   count, setCount = useState(initial)

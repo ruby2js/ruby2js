@@ -74,7 +74,7 @@ The `juntos()` preset returns an array of Vite plugins:
 | Plugin | Purpose |
 |--------|---------|
 | `vite-plugin-ruby2js` | Core `.rb` → `.js` transformation |
-| `juntos-rbx` | `.rbx` files (Ruby + JSX) with React filter |
+| `juntos-jsx-rb` | `.jsx.rb` files (Ruby + JSX) with React filter |
 | `juntos-structure` | Models, controllers, views, routes transformation |
 | `juntos-config` | Platform-specific Vite/Rollup configuration |
 | `juntos-hmr` | Stimulus controller hot module replacement |
@@ -97,7 +97,7 @@ During development, file changes trigger different behaviors:
 | File Type | Behavior |
 |-----------|----------|
 | Stimulus controllers | Hot swap (no reload) |
-| RBX components | React HMR |
+| JSX.rb components | React HMR |
 | ERB views | Module refresh |
 | Plain Ruby files | Module refresh |
 | Models | Full page reload |
@@ -131,9 +131,9 @@ dist/
     index-DHh-_50G.css    # Bundled CSS (fingerprinted)
 ```
 
-## RBX Files
+## JSX.rb Files
 
-`.rbx` files combine Ruby and JSX for React components:
+`.jsx.rb` files combine Ruby and JSX for React components:
 
 <div data-controller="combo" data-options='{
   "eslevel": 2022,
@@ -141,7 +141,7 @@ dist/
 }'></div>
 
 ```ruby
-# app/components/WorkflowCanvas.rbx
+# app/components/WorkflowCanvas.jsx.rb
 import ReactFlow, [Background, Controls], from: 'reactflow'
 import 'reactflow/dist/style.css'
 

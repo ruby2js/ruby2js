@@ -103,10 +103,10 @@ The `JsonStreamProvider` is included in the ruby2js-rails package. It handles We
 
 ```ruby
 # Import from lib/ (copied during build) - use relative path from your file
-# From app/views/workflows/Show.rbx:
+# From app/views/workflows/Show.jsx.rb:
 import JsonStreamProvider from '../../../lib/JsonStreamProvider.js'
 
-# From app/components/WorkflowCanvas.rbx:
+# From app/components/WorkflowCanvas.jsx.rb:
 import [useJsonStream], from: '../../lib/JsonStreamProvider.js'
 ```
 
@@ -128,7 +128,7 @@ import [useJsonStream], from: '../../lib/JsonStreamProvider.js'
 }'></div>
 
 ```ruby
-# app/views/workflows/Show.rbx
+# app/views/workflows/Show.jsx.rb
 import JsonStreamProvider from '../../../lib/JsonStreamProvider.js'
 import WorkflowCanvas from 'components/WorkflowCanvas'
 
@@ -159,7 +159,7 @@ end
 }'></div>
 
 ```ruby
-# app/components/WorkflowCanvas.rbx
+# app/components/WorkflowCanvas.jsx.rb
 import React, [useEffect], from: 'react'
 import ReactFlow, [...], from: 'reactflow' # Pragma: browser
 import [useJsonStream], from: '../../lib/JsonStreamProvider.js'
@@ -265,7 +265,7 @@ This means the same React component code works in both browser-only mode (local 
 ### React Integration
 
 - Third-party React libraries (React Flow)
-- Ruby syntax for React components (`.rbx` files)
+- Ruby syntax for React components (`.jsx.rb` files)
 - Context providers and hooks
 - State management with `useState`
 
