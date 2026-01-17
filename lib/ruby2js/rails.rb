@@ -60,6 +60,20 @@ class Ruby2JSRailtie < Rails::Railtie
     end
   end
 
+  # Tell Zeitwerk to ignore compound extension .rb files (Ruby + template for transpilation)
+  # These files are processed by Ruby2JS, not loaded directly by Rails
+  # Extensions: .jsx.rb (React), .vue.rb (Vue), .svelte.rb (Svelte), .erb.rb (ERB pages)
+  initializer "ruby2js.zeitwerk_ignore", before: :set_autoload_paths do |app|
+    %w[app/components app/views app/javascript app/pages].each do |dir|
+      full_path = ::Rails.root.join(dir)
+      next unless full_path.exist?
+
+      Dir.glob(full_path.join("**/*.{jsx,vue,svelte,erb}.rb")).each do |file|
+        Rails.autoloaders.main.ignore(file)
+      end
+    end
+  end
+
   # Configuration namespace
   config.ruby2js = ActiveSupport::OrderedOptions.new
 end

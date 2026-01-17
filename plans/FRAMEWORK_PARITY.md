@@ -44,6 +44,80 @@ Every feature is a **transpilation task**. Ruby2JS handles transformation; platf
 
 ---
 
+## File Naming Conventions
+
+Ruby2JS follows Rails' compound extension pattern: `name.output.processor`. The processor (rightmost extension) indicates how the file is processed; the output extension indicates what it produces.
+
+### Extension Mapping
+
+| Extension | Processor | Output | Template Syntax | Use Case |
+|-----------|-----------|--------|-----------------|----------|
+| `.jsx.rb` | Ruby2JS + React filter | `.js` | JSX via `%x{}` blocks | React components |
+| `.vue.rb` | Ruby2JS + Vue filter | `.vue` | Vue template after `__END__` | Vue SFCs |
+| `.svelte.rb` | Ruby2JS + Svelte filter | `.svelte` | Svelte template after `__END__` | Svelte components |
+| `.erb.rb` | Ruby2JS | `.js` | ERB after `__END__` | Server-rendered pages |
+
+### Examples
+
+```ruby
+# app/components/Counter.jsx.rb → Counter.js
+export default
+def Counter(initial: 0)
+  count, setCount = useState(initial)
+  %x{<button onClick={() => setCount(count + 1)}>Count: {count}</button>}
+end
+```
+
+```ruby
+# app/pages/posts/[id].vue.rb → [id].vue
+@post = nil
+
+def mounted
+  @post = await Post.find(params[:id])
+end
+__END__
+<article v-if="post">
+  <h1>{{ post.title }}</h1>
+</article>
+```
+
+```ruby
+# app/pages/posts/[id].svelte.rb → [id].svelte
+@post = nil
+
+def on_mount
+  @post = await Post.find(params[:id])
+end
+__END__
+{#if post}
+  <article><h1>{post.title}</h1></article>
+{/if}
+```
+
+### Rails Integration (Zeitwerk)
+
+Rails' Zeitwerk autoloader loads all `.rb` files and interprets filenames as constant names. Files like `Counter.jsx.rb` would fail with "wrong constant name Counter.jsx".
+
+The Ruby2JS Railtie configures Zeitwerk to ignore these compound extensions:
+
+```ruby
+# lib/ruby2js/rails.rb
+initializer "ruby2js.zeitwerk_ignore", before: :set_autoload_paths do |app|
+  %w[app/components app/views app/javascript app/pages].each do |dir|
+    full_path = ::Rails.root.join(dir)
+    next unless full_path.exist?
+
+    Dir.glob(full_path.join("**/*.{jsx,vue,svelte,erb}.rb")).each do |file|
+      Rails.autoloaders.main.ignore(file)
+    end
+  end
+end
+```
+
+This is automatic when using `ruby2js-rails`. No user configuration required.
+
+---
+
 ## Phase 1: Foundation
 
 ### 1.1 `__END__` Template Extraction
@@ -57,7 +131,7 @@ Every feature is a **transpilation task**. Ruby2JS handles transformation; platf
 
 **File format:**
 ```ruby
-# app/pages/blog/[slug].rb
+# app/pages/blog/[slug].erb.rb
 @post = Post.find(params[:slug])
 __END__
 <article>
@@ -510,7 +584,7 @@ end
 
 **Component structure:**
 ```ruby
-# Input: app/pages/posts/[id].rb
+# Input: app/pages/posts/[id].vue.rb
 @post = nil
 
 def mounted
@@ -531,7 +605,7 @@ __END__
 ```
 
 ```vue
-<!-- Output: app/pages/posts/[id].vue -->
+<!-- Output: app/pages/posts/[id].vue (generated) -->
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
@@ -575,7 +649,7 @@ async function deletePost() {
 
 **Component structure:**
 ```ruby
-# Input: app/pages/posts/[id].rb
+# Input: app/pages/posts/[id].svelte.rb
 @post = nil
 
 def on_mount
@@ -599,7 +673,7 @@ __END__
 ```
 
 ```svelte
-<!-- Output: app/pages/posts/[id].svelte -->
+<!-- Output: app/pages/posts/[id].svelte (generated) -->
 <script>
   import { onMount } from 'svelte'
   import { goto } from '$app/navigation'

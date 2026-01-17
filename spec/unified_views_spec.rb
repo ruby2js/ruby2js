@@ -46,15 +46,15 @@ describe "Unified Views Module" do
       _(names).must_include 'show_article'
     end
 
-    it "should collect RBX files" do
-      File.write(File.join(@views_dir, 'Index.rbx'), 'def Index(); end')
+    it "should collect JSX.rb files" do
+      File.write(File.join(@views_dir, 'Index.jsx.rb'), 'def Index(); end')
 
       builder = SelfhostBuilder.new(@dist_dir)
       files = builder.send(:collect_view_files, @views_dir)
 
       _(files.length).must_equal 1
       _(files[0][:name]).must_equal 'index'
-      _(files[0][:ext]).must_equal '.rbx'
+      _(files[0][:ext]).must_equal '.jsx.rb'
     end
 
     it "should collect JSX/TSX files" do
@@ -99,17 +99,17 @@ describe "Unified Views Module" do
       _(result['index'][:ext]).must_equal '.rb'
     end
 
-    it "should give RBX priority over ERB" do
+    it "should give JSX.rb priority over ERB" do
       files = [
         { name: 'show', ext: '.html.erb', path: '/path/show.html.erb', priority: 4 },
-        { name: 'show', ext: '.rbx', path: '/path/Show.rbx', priority: 2 }
+        { name: 'show', ext: '.jsx.rb', path: '/path/Show.jsx.rb', priority: 2 }
       ]
 
       builder = SelfhostBuilder.new(@dist_dir)
       result = nil
       capture_io { result = builder.send(:resolve_view_conflicts, files) }
 
-      _(result['show'][:ext]).must_equal '.rbx'
+      _(result['show'][:ext]).must_equal '.jsx.rb'
     end
 
     it "should give JSX priority over ERB but not over Phlex" do
@@ -145,8 +145,8 @@ describe "Unified Views Module" do
       priorities = SelfhostBuilder::VIEW_FILE_PRIORITIES
 
       # Lower number = higher priority
-      _(priorities['.rb']).must_be :<, priorities['.rbx']
-      _(priorities['.rbx']).must_be :<, priorities['.jsx']
+      _(priorities['.rb']).must_be :<, priorities['.jsx.rb']
+      _(priorities['.jsx.rb']).must_be :<, priorities['.jsx']
       _(priorities['.jsx']).must_equal priorities['.tsx']
       _(priorities['.jsx']).must_be :<, priorities['.html.erb']
     end
