@@ -176,6 +176,98 @@ describe('createPathHelper()', () => {
     });
   });
 
+  describe('PathHelperPromise convenience methods', () => {
+    let originalFetch;
+    let fetchCalls;
+
+    beforeEach(() => {
+      fetchCalls = [];
+      originalFetch = globalThis.fetch;
+      globalThis.fetch = mock.fn((url, options) => {
+        fetchCalls.push({ url, options });
+        return Promise.resolve(new Response('{"name":"test","id":1}', {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        }));
+      });
+    });
+
+    afterEach(() => {
+      globalThis.fetch = originalFetch;
+    });
+
+    it('.json() without callback returns parsed JSON', async () => {
+      const helper = createPathHelper('/articles');
+      const data = await helper.get().json();
+      assert.deepEqual(data, { name: 'test', id: 1 });
+    });
+
+    it('.json(callback) passes parsed JSON to callback', async () => {
+      const helper = createPathHelper('/articles');
+      let received = null;
+      await helper.get().json(data => { received = data; });
+      assert.deepEqual(received, { name: 'test', id: 1 });
+    });
+
+    it('.json(callback) returns callback result', async () => {
+      const helper = createPathHelper('/articles');
+      const result = await helper.get().json(data => data.name.toUpperCase());
+      assert.equal(result, 'TEST');
+    });
+
+    it('.text() without callback returns text', async () => {
+      const helper = createPathHelper('/articles');
+      const text = await helper.get().text();
+      assert.equal(text, '{"name":"test","id":1}');
+    });
+
+    it('.text(callback) passes text to callback', async () => {
+      const helper = createPathHelper('/articles');
+      let received = null;
+      await helper.get().text(text => { received = text; });
+      assert.equal(received, '{"name":"test","id":1}');
+    });
+
+    it('works with post()', async () => {
+      const helper = createPathHelper('/articles');
+      const data = await helper.post({ title: 'New' }).json();
+      assert.deepEqual(data, { name: 'test', id: 1 });
+    });
+
+    it('works with patch()', async () => {
+      const helper = createPathHelper('/articles/1');
+      const data = await helper.patch({ title: 'Updated' }).json();
+      assert.deepEqual(data, { name: 'test', id: 1 });
+    });
+
+    it('supports .then() chaining after .json(callback)', async () => {
+      const helper = createPathHelper('/articles');
+      const result = await helper.get().json(data => data.id).then(id => id * 2);
+      assert.equal(result, 2);
+    });
+
+    it('supports await directly (thenable)', async () => {
+      const helper = createPathHelper('/articles');
+      const response = await helper.get();
+      assert.equal(response.status, 200);
+    });
+
+    it('supports .catch() for error handling', async () => {
+      globalThis.fetch = mock.fn(() => Promise.reject(new Error('Network error')));
+      const helper = createPathHelper('/articles');
+      let caught = null;
+      await helper.get().catch(err => { caught = err; });
+      assert.equal(caught.message, 'Network error');
+    });
+
+    it('supports .finally()', async () => {
+      const helper = createPathHelper('/articles');
+      let finallyCalled = false;
+      await helper.get().finally(() => { finallyCalled = true; });
+      assert.equal(finallyCalled, true);
+    });
+  });
+
   describe('CSRF token handling', () => {
     let originalFetch;
     let originalDocument;

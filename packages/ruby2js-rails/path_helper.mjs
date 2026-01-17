@@ -12,7 +12,89 @@
  *   article_path(1).patch({ title: 'Updated' }) // PATCH /articles/1.json with JSON body
  *   article_path(1).delete()                    // DELETE /articles/1.json
  *   articles_path.get({ format: 'html' })       // GET /articles.html (explicit HTML)
+ *
+ * Response convenience methods (shorthand for nested .then chains):
+ *   articles_path.get().json(data => ...)       // Shorthand for .then(r => r.json().then(...))
+ *   articles_path.get().text(html => ...)       // Shorthand for .then(r => r.text().then(...))
+ *   articles_path.get().json()                  // Shorthand for .then(r => r.json())
  */
+
+/**
+ * PathHelperPromise wraps a Promise<Response> with convenience methods.
+ * Provides .json(), .text(), .blob(), .arrayBuffer() that can accept optional callbacks.
+ *
+ * With callback:  promise.json(data => ...) is shorthand for promise.then(r => r.json().then(data => ...))
+ * Without callback: promise.json() is shorthand for promise.then(r => r.json())
+ */
+class PathHelperPromise {
+  constructor(promise) {
+    this._promise = promise;
+  }
+
+  // Delegate standard Promise methods
+  then(onFulfilled, onRejected) {
+    return this._promise.then(onFulfilled, onRejected);
+  }
+
+  catch(onRejected) {
+    return this._promise.catch(onRejected);
+  }
+
+  finally(onFinally) {
+    return this._promise.finally(onFinally);
+  }
+
+  /**
+   * Parse response as JSON, optionally passing to callback
+   * @param {Function} [callback] - Optional callback to receive parsed JSON
+   * @returns {Promise} - Promise resolving to JSON data or callback result
+   */
+  json(callback) {
+    if (callback) {
+      return this._promise.then(response => response.json().then(callback));
+    }
+    return this._promise.then(response => response.json());
+  }
+
+  /**
+   * Get response as text, optionally passing to callback
+   * @param {Function} [callback] - Optional callback to receive text
+   * @returns {Promise} - Promise resolving to text or callback result
+   */
+  text(callback) {
+    if (callback) {
+      return this._promise.then(response => response.text().then(callback));
+    }
+    return this._promise.then(response => response.text());
+  }
+
+  /**
+   * Get response as Blob, optionally passing to callback
+   * @param {Function} [callback] - Optional callback to receive Blob
+   * @returns {Promise} - Promise resolving to Blob or callback result
+   */
+  blob(callback) {
+    if (callback) {
+      return this._promise.then(response => response.blob().then(callback));
+    }
+    return this._promise.then(response => response.blob());
+  }
+
+  /**
+   * Get response as ArrayBuffer, optionally passing to callback
+   * @param {Function} [callback] - Optional callback to receive ArrayBuffer
+   * @returns {Promise} - Promise resolving to ArrayBuffer or callback result
+   */
+  arrayBuffer(callback) {
+    if (callback) {
+      return this._promise.then(response => response.arrayBuffer().then(callback));
+    }
+    return this._promise.then(response => response.arrayBuffer());
+  }
+}
+
+// Make PathHelperPromise thenable (works with await)
+PathHelperPromise.prototype[Symbol.toStringTag] = 'PathHelperPromise';
 
 /**
  * Get CSRF token from meta tag
@@ -110,52 +192,53 @@ export function createPathHelper(path) {
     /**
      * GET request - params become query string
      * @param {Object} params - Query parameters (format is special)
-     * @returns {Promise<Response>}
+     * @returns {PathHelperPromise} - Promise with .json(), .text() convenience methods
      */
-    async get(params = {}) {
+    get(params = {}) {
       const { format, ...query } = params;
       const url = buildUrl(path, format, query);
-      return fetch(url, {
+      const promise = fetch(url, {
         method: 'GET',
         headers: { 'Accept': acceptHeader(format) },
         credentials: 'same-origin'
       });
+      return new PathHelperPromise(promise);
     },
 
     /**
      * POST request - params become JSON body
      * @param {Object} params - Body parameters (format is special)
-     * @returns {Promise<Response>}
+     * @returns {PathHelperPromise} - Promise with .json(), .text() convenience methods
      */
-    async post(params = {}) {
-      return mutatingRequest('POST', path, params);
+    post(params = {}) {
+      return new PathHelperPromise(mutatingRequest('POST', path, params));
     },
 
     /**
      * PUT request - params become JSON body
      * @param {Object} params - Body parameters (format is special)
-     * @returns {Promise<Response>}
+     * @returns {PathHelperPromise} - Promise with .json(), .text() convenience methods
      */
-    async put(params = {}) {
-      return mutatingRequest('PUT', path, params);
+    put(params = {}) {
+      return new PathHelperPromise(mutatingRequest('PUT', path, params));
     },
 
     /**
      * PATCH request - params become JSON body
      * @param {Object} params - Body parameters (format is special)
-     * @returns {Promise<Response>}
+     * @returns {PathHelperPromise} - Promise with .json(), .text() convenience methods
      */
-    async patch(params = {}) {
-      return mutatingRequest('PATCH', path, params);
+    patch(params = {}) {
+      return new PathHelperPromise(mutatingRequest('PATCH', path, params));
     },
 
     /**
      * DELETE request - params become JSON body
      * @param {Object} params - Body parameters (format is special)
-     * @returns {Promise<Response>}
+     * @returns {PathHelperPromise} - Promise with .json(), .text() convenience methods
      */
-    async delete(params = {}) {
-      return mutatingRequest('DELETE', path, params);
+    delete(params = {}) {
+      return new PathHelperPromise(mutatingRequest('DELETE', path, params));
     }
   };
 

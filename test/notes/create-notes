@@ -285,30 +285,24 @@ def NotesApp()
     params = {}
     params[:q] = searchQuery if searchQuery.length > 0
 
-    notes_path.get(params).then do |response|
-      response.json.then do |data|
-        setNotes(data)
-        setLoading(false)
-      end
+    notes_path.get(params).json do |data|
+      setNotes(data)
+      setLoading(false)
     end
   }, [searchQuery])
 
   selectedNote = notes.find { |n| n.id == selectedId }
 
   handleCreate = -> {
-    notes_path.post(note: { title: "Untitled", body: "" }).then do |response|
-      response.json.then do |note|
-        setNotes([note, *notes])
-        setSelectedId(note.id)
-      end
+    notes_path.post(note: { title: "Untitled", body: "" }).json do |note|
+      setNotes([note, *notes])
+      setSelectedId(note.id)
     end
   }
 
   handleUpdate = ->(updates) {
-    note_path(selectedId).patch(note: updates).then do |response|
-      response.json.then do |updated|
-        setNotes(notes.map { |n| n.id == updated.id ? updated : n })
-      end
+    note_path(selectedId).patch(note: updates).json do |updated|
+      setNotes(notes.map { |n| n.id == updated.id ? updated : n })
     end
   }
 

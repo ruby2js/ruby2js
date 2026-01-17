@@ -87,18 +87,35 @@ note_path(1).delete
 
 ## Response Objects
 
-All methods return `Response` objects with standard methods:
+All HTTP methods return a `PathHelperPromise` that wraps the response. This provides convenience methods for common patterns:
+
+### Shorthand Syntax (Recommended)
+
+The `.json`, `.text`, `.blob`, and `.arrayBuffer` methods accept an optional block, providing a concise way to handle responses:
 
 ```ruby
 # Parse JSON response
-notes_path.get().then do |response|
-  response.json.then do |data|
-    # data is parsed JSON array
-    setNotes(data)
-  end
+notes_path.get.json do |data|
+  setNotes(data)
 end
 
-# Check status
+# Create and use result
+notes_path.post(note: params).json do |note|
+  setNotes([note, *notes])
+end
+
+# Get text response
+article_path(1).get(format: 'html').text do |html|
+  setContent(html)
+end
+```
+
+### Full Response Access
+
+When you need access to response status, headers, or conditional parsing, use `.then`:
+
+```ruby
+# Check status before parsing
 notes_path.post(note: params).then do |response|
   if response.ok
     response.json.then { |note| handleSuccess(note) }
@@ -106,11 +123,16 @@ notes_path.post(note: params).then do |response|
     response.json.then { |errors| handleErrors(errors) }
   end
 end
+```
 
-# Get text response
-article_path(1).get(format: 'html').then do |response|
-  response.text.then { |html| setContent(html) }
-end
+### Without Block
+
+The convenience methods also work without a block, returning a promise that resolves directly to the parsed data:
+
+```ruby
+# These return Promise<data> instead of Promise<Response>
+data = await notes_path.get.json
+text = await article_path(1).get(format: 'html').text
 ```
 
 ### Response Methods
@@ -214,8 +236,8 @@ This abstraction enables truly portable code:
 
 ```ruby
 # This exact code works on both targets
-notes_path.get(q: searchQuery).then do |response|
-  response.json.then { |data| setNotes(data) }
+notes_path.get(q: searchQuery).json do |data|
+  setNotes(data)
 end
 ```
 
@@ -280,11 +302,9 @@ export default def NotesList()
   loading, setLoading = useState(true)
 
   useEffect(-> {
-    notes_path.get().then do |response|
-      response.json.then do |data|
-        setNotes(data)
-        setLoading(false)
-      end
+    notes_path.get.json do |data|
+      setNotes(data)
+      setLoading(false)
     end
   }, [])
 
@@ -300,16 +320,16 @@ handleCreate = ->(params) {
   tempNote = { id: "temp", ...params }
   setNotes([tempNote, *notes])
 
-  notes_path.post(note: params).then do |response|
-    response.json.then do |note|
-      # Replace placeholder with real record
-      setNotes(notes.map { |n| n.id == "temp" ? note : n })
-    end
+  notes_path.post(note: params).json do |note|
+    # Replace placeholder with real record
+    setNotes(notes.map { |n| n.id == "temp" ? note : n })
   end
 }
 ```
 
 ### Update with Error Handling
+
+When you need to check response status, use `.then` for full response access:
 
 ```ruby
 handleUpdate = ->(id, updates) {
@@ -321,6 +341,16 @@ handleUpdate = ->(id, updates) {
     else
       response.json.then { |errors| setErrors(errors) }
     end
+  end
+}
+```
+
+For simpler cases where you just need the data:
+
+```ruby
+handleUpdate = ->(id, updates) {
+  note_path(id).patch(note: updates).json do |updated|
+    setNotes(notes.map { |n| n.id == id ? updated : n })
   end
 }
 ```
@@ -343,8 +373,8 @@ handleDelete = ->(id) {
 
 ```ruby
 loadPage = ->(page) {
-  notes_path.get(page: page, per_page: 20).then do |response|
-    response.json.then { |data| setNotes(data) }
+  notes_path.get(page: page, per_page: 20).json do |data|
+    setNotes(data)
   end
 }
 ```
@@ -358,8 +388,8 @@ handleSearch = ->(query) {
   clearTimeout(searchTimeout) if searchTimeout
 
   timeout = setTimeout(-> {
-    notes_path.get(q: query).then do |response|
-      response.json.then { |data| setNotes(data) }
+    notes_path.get(q: query).json do |data|
+      setNotes(data)
     end
   }, 300)
 
@@ -373,8 +403,8 @@ For Turbo Stream responses, use the `turbo_stream` format:
 
 ```ruby
 handleUpdate = ->(id, updates) {
-  note_path(id).patch(note: updates, format: 'turbo_stream').then do |response|
-    response.text.then { |html| Turbo.renderStreamMessage(html) }
+  note_path(id).patch(note: updates, format: 'turbo_stream').text do |html|
+    Turbo.renderStreamMessage(html)
   end
 }
 ```
