@@ -240,6 +240,7 @@ module Ruby2JS
   class Serializer
     attr_reader :timestamps
     attr_accessor :file_name
+    attr_accessor :template  # For __END__ template extraction
     attr_accessor :erb_source, :erb_position_map  # For ERB->JS source maps
 
     def initialize

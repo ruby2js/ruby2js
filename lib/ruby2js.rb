@@ -116,6 +116,13 @@ module Ruby2JS
     obj.respond_to?(:type) && obj.respond_to?(:children) && obj.respond_to?(:updated)
   end
 
+  # Extract template content from source after __END__ marker
+  def self.extract_template_from_source(source)
+    match = source.match(/^__END__\r?\n?/m)
+    return nil unless match
+    source[match.end(0)..-1]
+  end
+
   module Filter
     # DEFAULTS, SEXP module, and Processor class are defined in filter/processor.rb
   end
@@ -125,10 +132,11 @@ module Ruby2JS
     options = options.dup
 
     # Handle different source types (Ruby-specific: Proc handling)
+    template = nil
     if Proc === source
       file, line = source.source_location
       source = IO.read(file)
-      ast, comments = parse(source)
+      ast, comments, template = parse(source)
       ast, block_range = find_block(ast, line)
       # Filter _raw comments to only those within the block's source range.
       # This preserves trailing/orphan comments inside the block while
@@ -150,7 +158,7 @@ module Ruby2JS
       ast, comments = source, {}
       source = ""
     else
-      ast, comments = parse(source, options[:file])
+      ast, comments, template = parse(source, options[:file])
     end
 
     # Return empty result for empty source
@@ -243,6 +251,11 @@ module Ruby2JS
 
     ruby2js.file_name = options[:file] || ''
 
+    # Set template if option specified and template was extracted
+    if options[:template] && template
+      ruby2js.template = template
+    end
+
     ruby2js
   end
 
@@ -284,7 +297,14 @@ module Ruby2JS
     comments_hash = associate_comments(ast, raw_comments)
     comments_hash[:_raw] = raw_comments
 
-    [ast, comments_hash]
+    # Extract template from __END__ data section if present
+    template = nil
+    if result.data_loc
+      template_raw = result.data_loc.slice
+      template = template_raw.sub(/\A__END__\r?\n?/, '')
+    end
+
+    [ast, comments_hash, template]
   end
 
   # Parse using Prism's Translation::Parser layer (requires parser gem)
@@ -305,7 +325,10 @@ module Ruby2JS
     # Store raw comments for filters that may need them (e.g., for magic comments)
     comments_hash[:_raw] = comments
 
-    [ast, comments_hash]
+    # Extract template from __END__ data section if present
+    template = extract_template_from_source(source)
+
+    [ast, comments_hash, template]
   end
 
   # CommentsMap - just a Hash subclass for type identification
@@ -490,7 +513,10 @@ module Ruby2JS
     # Store raw comments for filters that may need them
     comments_hash[:_raw] = comments
 
-    [ast, comments_hash]
+    # Extract template from __END__ data section if present
+    template = extract_template_from_source(source)
+
+    [ast, comments_hash, template]
   end
 
   # Find a block at the given line and return [body_ast, block_range]
