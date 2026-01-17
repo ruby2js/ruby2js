@@ -85,9 +85,20 @@ export default function ruby2js(options = {}) {
       // Only process .rb files
       if (!id.endsWith('.rb')) return null;
 
-      // Check exclude patterns
+      // Check exclude patterns (supports glob patterns like **/*.jsx.rb)
       for (const pattern of exclude) {
-        if (id.includes(pattern)) return null;
+        // Handle glob patterns
+        if (pattern.includes('*')) {
+          // Convert glob to regex: ** -> .*, * -> [^/]*, . -> \.
+          const regexStr = pattern
+            .replace(/\./g, '\\.')
+            .replace(/\*\*/g, '.*')
+            .replace(/\*/g, '[^/]*');
+          if (new RegExp(regexStr + '$').test(id)) return null;
+        } else {
+          // Simple substring match
+          if (id.includes(pattern)) return null;
+        }
       }
 
       // Ensure Prism is initialized
