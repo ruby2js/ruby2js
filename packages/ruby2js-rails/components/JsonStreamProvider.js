@@ -36,7 +36,7 @@ export default function JsonStreamProvider({ stream, endpoint = "/cable", childr
   useEffect(() => {
     // Browser target: use BroadcastChannel (no WebSocket needed)
     // Node target: use WebSocket to server
-    if (typeof BroadcastChannel !== "undefined" && typeof WebSocket === "undefined") {
+    if (typeof BroadcastChannel !== "undefined") {
       // Browser target - BroadcastChannel for same-origin tabs
       const channel = new BroadcastChannel(stream);
       setConnected(true);
@@ -51,7 +51,8 @@ export default function JsonStreamProvider({ stream, endpoint = "/cable", childr
       };
     } else {
       // Node target - WebSocket to server
-      const ws = new WebSocket(`ws://${window.location.host}${endpoint}`);
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      const ws = new WebSocket(`${protocol}//${window.location.host}${endpoint}`);
 
       ws.onopen = () => {
         ws.send(JSON.stringify({ type: "subscribe", stream }));

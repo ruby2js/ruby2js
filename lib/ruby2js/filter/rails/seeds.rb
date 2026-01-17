@@ -250,8 +250,8 @@ module Ruby2JS
               end
             end
 
-            # Check for association creates (e.g., workflow.nodes.create, article.comments.create!)
-            if %i[create create!].include?(method)
+            # Check for association methods (e.g., workflow.nodes.create!, article.comments.count)
+            if %i[create create! count first last].include?(method)
               # Wrap with await, process target and args
               new_target = wrap_ar_operations(target)
               new_args = args.map { |a| wrap_ar_operations(a) }
