@@ -21,7 +21,7 @@ If you know React, you'll find Ruby2JS provides a familiar component model with 
 | `useEffect(() => {}, [])` | `useEffect(-> {}, [])` |
 | `{count}` (JSX) | `{count}` (JSX via `%x{}`) |
 | `onClick={() => setCount(c => c + 1)}` | `onClick: -> { setCount(->(c) { c + 1 }) }` |
-| `export default function Counter()` | `export default; def Counter()` |
+| `export default function Counter()` | `def Counter()` (auto-exported) |
 
 ## Quick Start
 
@@ -33,7 +33,6 @@ If you know React, you'll find Ruby2JS provides a familiar component model with 
 }'></div>
 
 ```ruby
-export default
 def Counter(initial: 0)
   count, setCount = useState(initial)
 
@@ -217,9 +216,9 @@ def Example(title:, content:, value:)
 end
 ```
 
-### Component Naming
+### Auto-Export
 
-Export your component function with `export default`:
+When your file defines exactly one function or class, it's automatically exported as default:
 
 <div data-controller="combo" data-options='{
   "eslevel": 2022,
@@ -227,7 +226,6 @@ Export your component function with `export default`:
 }'></div>
 
 ```ruby
-export default
 def MyComponent(name:)
   %x{<h1>Hello, {name}!</h1>}
 end

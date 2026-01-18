@@ -46,7 +46,6 @@ app/pages/
 
 ```ruby
 # app/pages/posts/[id].jsx.rb
-export default
 def PostPage()
   router = useRouter()
   id = router.query[:id]
@@ -100,7 +99,6 @@ export default function PostPage() {
 
 ```ruby
 # app/pages/users/[id].jsx.rb
-export default
 def UserProfile()
   router = useRouter()
   id = router.query[:id]
@@ -108,7 +106,6 @@ def UserProfile()
 end
 
 # app/pages/posts/[...slug].jsx.rb (catch-all)
-export default
 def BlogPost()
   router = useRouter()
   slug = router.query[:slug]  # Array of path segments
@@ -170,7 +167,6 @@ end
 }'></div>
 
 ```ruby
-export default
 def Dashboard()
   data, setData = useState(nil)
   loading, setLoading = useState(true)
@@ -207,7 +203,6 @@ Use pragmas to enable ISR:
 ```ruby
 # Pragma: revalidate 60
 
-export default
 def PostsList()
   # This page will be regenerated every 60 seconds
   posts, setPosts = useState([])
@@ -235,7 +230,6 @@ end
 
 ```ruby
 # app/api/posts.rb
-export default
 def handler(req, res)
   if req.method == 'GET'
     posts = Post.all
@@ -265,7 +259,6 @@ class Post < ApplicationRecord
 end
 
 # API route (Ruby2JS)
-export default
 def handler(req, res)
   posts = Post.published.order(created_at: :desc)
   res.status(200).json(posts)
@@ -278,7 +271,6 @@ ActiveRecord in your API routes—no separate ORM to learn:
 
 ```ruby
 # app/api/posts/[id].rb
-export default
 def handler(req, res)
   post = Post.find(req.query[:id])
 
@@ -381,7 +373,6 @@ def Layout(children:)
 end
 
 # app/pages/index.jsx.rb
-export default
 def HomePage()
   %x{
     <Layout>
