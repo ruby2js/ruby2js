@@ -53,7 +53,7 @@ js = Ruby2JS.convert(source,
 # Add imports for dependencies
 # Note: Filters must be imported to register with Ruby2JS.Filter
 imports = <<~JS
-import { convert, astNode, parse } from '../ruby2js.js';
+import { convert, ast_node as astNode, parse } from '../ruby2js.js';
 import { Ruby2JS } from '../ruby2js.js';
 import { AstroTemplateCompiler } from './astro_template_compiler.mjs';
 import '../filters/esm.js';
