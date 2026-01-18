@@ -210,6 +210,69 @@ wrangler dev
 
 This runs locally with a local D1 instance.
 
+## ISR (Incremental Static Regeneration)
+
+Juntos supports ISR for pages that benefit from caching. Add a pragma comment to cache pages:
+
+```ruby
+# Pragma: revalidate 60
+
+@posts = Post.all
+__END__
+<ul>
+  <% @posts.each do |post| %>
+    <li><%= post.title %></li>
+  <% end %>
+</ul>
+```
+
+The `revalidate` value is in seconds. The Cloudflare ISR adapter uses the Cache API:
+
+- First request renders and caches the page
+- Subsequent requests serve the cached version
+- After the revalidate period, stale content is served while regenerating in the background via `waitUntil`
+
+### How It Works
+
+The adapter checks the cache, serves cached responses, and handles background regeneration:
+
+```javascript
+// Simplified - actual implementation in the adapter
+const cache = caches.default;
+let response = await cache.match(cacheKey);
+
+if (response && age < revalidate) {
+  return response;  // Fresh cache hit
+}
+
+if (response) {
+  // Stale - serve and regenerate in background
+  context.waitUntil(regenerate(context, cacheKey, renderFn));
+  return response;
+}
+
+// Cache miss - generate and cache
+return await regenerate(context, cacheKey, renderFn);
+```
+
+### On-Demand Revalidation
+
+For immediate cache invalidation (e.g., after a content update):
+
+```ruby
+class ArticlesController < ApplicationController
+  def update
+    @article.update!(article_params)
+    ISR.revalidate("/articles/#{@article.id}")
+    redirect_to @article
+  end
+end
+```
+
+This deletes the cached page, forcing regeneration on the next request.
+
+🧪 **Feedback requested** — [Share your experience](https://github.com/ruby2js/ruby2js/discussions)
+
 ## Limitations
 
 - **No filesystem** — Use R2 for object storage

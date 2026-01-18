@@ -264,6 +264,56 @@ Pusher's free tier includes:
 
 Sufficient for development and small apps.
 
+## ISR (Incremental Static Regeneration)
+
+Juntos supports ISR for pages that benefit from caching. Add a pragma comment to cache pages:
+
+```ruby
+# Pragma: revalidate 60
+
+@posts = Post.all
+__END__
+<ul>
+  <% @posts.each do |post| %>
+    <li><%= post.title %></li>
+  <% end %>
+</ul>
+```
+
+The `revalidate` value is in seconds. Vercel handles caching automatically:
+
+- First request renders and caches the page
+- Subsequent requests serve the cached version
+- After the revalidate period, Vercel serves stale content while regenerating in the background
+
+### Cache-Control Headers
+
+The ISR adapter sets appropriate headers:
+
+```
+Cache-Control: s-maxage=60, stale-while-revalidate=86400
+```
+
+This tells Vercel's edge cache to:
+- Cache for 60 seconds
+- Serve stale content for up to 24 hours while regenerating
+
+### On-Demand Revalidation
+
+For immediate cache invalidation (e.g., after a content update):
+
+```ruby
+class ArticlesController < ApplicationController
+  def update
+    @article.update!(article_params)
+    ISR.revalidate("/articles/#{@article.id}")
+    redirect_to @article
+  end
+end
+```
+
+🧪 **Feedback requested** — [Share your experience](https://github.com/ruby2js/ruby2js/discussions)
+
 ## Limitations
 
 - **No filesystem writes** — Use object storage (Vercel Blob, S3)

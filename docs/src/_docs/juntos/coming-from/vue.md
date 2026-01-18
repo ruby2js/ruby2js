@@ -278,6 +278,22 @@ app/pages/
     [id].vue.rb       → [id].vue
 ```
 
+## Caching (ISR)
+
+For pages that benefit from caching, add a pragma comment:
+
+```ruby
+# Pragma: revalidate 60
+
+@posts = Post.published
+__END__
+<ul>
+  <li v-for="post in posts" :key="post.id">{{ post.title }}</li>
+</ul>
+```
+
+See [Vercel Deployment](/docs/juntos/deploying/vercel#isr-incremental-static-regeneration) or [Cloudflare Deployment](/docs/juntos/deploying/cloudflare#isr-incremental-static-regeneration) for details.
+
 ## Next Steps
 
 - **[Vue Filter](/docs/filters/vue)** - Full Vue filter documentation

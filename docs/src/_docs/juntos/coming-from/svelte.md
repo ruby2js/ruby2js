@@ -318,6 +318,24 @@ Or with explicit reactive blocks in the template:
 <p>Doubled: {doubled}</p>
 ```
 
+## Caching (ISR)
+
+For pages that benefit from caching, add a pragma comment:
+
+```ruby
+# Pragma: revalidate 60
+
+@posts = Post.published
+__END__
+<ul>
+  {#each posts as post (post.id)}
+    <li>{post.title}</li>
+  {/each}
+</ul>
+```
+
+See [Vercel Deployment](/docs/juntos/deploying/vercel#isr-incremental-static-regeneration) or [Cloudflare Deployment](/docs/juntos/deploying/cloudflare#isr-incremental-static-regeneration) for details.
+
 ## Next Steps
 
 - **[Svelte Template Compiler](/docs/filters/svelte)** - Full Svelte support documentation

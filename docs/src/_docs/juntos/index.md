@@ -7,26 +7,23 @@ category: juntos
 
 # Juntos
 
-Juntos is a set of Ruby2JS filters that implement a Rails-compatible framework for JavaScript runtimes. Write Rails—models, controllers, views, routes—and deploy to browsers, Node.js, or edge platforms.
+Juntos is a set of Ruby2JS filters that implement a Rails-compatible framework for JavaScript runtimes. Write Rails—models, controllers, views, routes—and deploy anywhere JavaScript runs.
 
 {% toc %}
 
 ## The Vision
 
-Rails is the fastest way to go from idea to working application. But traditional hosting means paying for capacity whether you use it or not. V8 Isolates—lightweight JavaScript environments that spin up on demand—offer a different model: deploy once, run globally, scale automatically, pay only for what you use.
+Rails is the fastest way to go from idea to working application. The JavaScript ecosystem has the broadest reach—browsers, servers, edge, mobile, desktop. Juntos brings them together: **Rails patterns for the backend, JavaScript ecosystem for the frontend, one codebase for every platform.**
 
-The catch? V8 runs JavaScript, not Ruby.
+Write models, controllers, and views in Ruby. Deploy to:
 
-Juntos bridges this gap by transpiling Rails to JavaScript. This unlocks platforms Rails can't reach:
+- **Edge** (Cloudflare Workers, Vercel Edge, Deno Deploy) — global, serverless, scales to zero
+- **Browser** (IndexedDB, SQLite/WASM) — offline-first, local-first, zero infrastructure
+- **Server** (Node.js, Bun, Deno) — SQLite, PostgreSQL, or MySQL
+- **Mobile** (Capacitor) — native iOS and Android from the same code
+- **Desktop** (Electron, Tauri) — native apps with full system access
 
-- **V8 Isolates** (Cloudflare Workers, Vercel Edge, Deno Deploy) — Rails can't run here; Juntos can
-- **Browsers** (IndexedDB, SQLite/WASM) — offline-first apps, local-first data, zero infrastructure
-
-And works everywhere JavaScript runs:
-
-- **Node.js, Bun, Deno** with SQLite, PostgreSQL, or MySQL
-
-Same models, controllers, and views. The sweet spot is where transpilation is necessary—V8 Isolates and browsers—but one codebase runs everywhere.
+Juntos reimplements proven Rails patterns but doesn't reinvent reactivity, bundling, or platform integration. Those come from Vue, Svelte, React, Vite, Capacitor, and the rest of the JavaScript ecosystem. You get Rails' developer experience with JavaScript's reach.
 
 ## How It Works
 
@@ -79,7 +76,7 @@ Full [Hotwire](https://hotwired.dev/) support for the Rails-native approach to i
 
 ### Multi-Target
 
-Write once, deploy anywhere JavaScript runs. The same code runs in browsers with IndexedDB, on Node.js with PostgreSQL, on V8 Isolates with edge databases, on mobile devices via Capacitor, and on desktop via Electron or Tauri.
+One codebase, every platform. No conditional compilation, no platform-specific forks—the same models, controllers, and views run everywhere.
 
 ### Transparency
 
@@ -88,12 +85,6 @@ The generated `dist/` directory is a complete, standalone JavaScript application
 ### Minimal Runtime
 
 The generated code is ~95% your application, ~5% framework glue. No massive dependency tree. No framework lock-in beyond what you can read and understand.
-
-## Coming From Other Frameworks?
-
-If you're familiar with Vue, Svelte, Astro, or React, see [Coming From...](/docs/juntos/coming-from/) for how Ruby2JS maps to patterns you already know.
-
-Juntos reimplements proven Rails patterns—ActiveRecord, ActionController, routing—but doesn't reinvent the wheel for frontend concerns. Reactivity comes from Vue, Svelte, or React. Bundling comes from Vite or esbuild. Mobile comes from Capacitor. Desktop from Electron or Tauri. Juntos targets and integrates with the JavaScript ecosystem rather than replacing it.
 
 ## Demos
 
@@ -106,6 +97,10 @@ Three demo applications show Juntos in action:
 | **[Photo Gallery](/docs/juntos/demos/photo-gallery)** | Camera integration, Capacitor mobile apps, Electron desktop apps |
 
 All demos run on browser, Node.js, and edge platforms from the same code. The Photo Gallery also demonstrates mobile (Capacitor) and desktop (Electron) targets. See [Demo Applications](/docs/juntos/demos/) for the full list and walkthroughs.
+
+## Coming From Other Frameworks?
+
+If you're familiar with Vue, Svelte, Astro, or React, see [Coming From...](/docs/juntos/coming-from/) for how Ruby2JS maps to patterns you already know.
 
 ## Next Steps
 

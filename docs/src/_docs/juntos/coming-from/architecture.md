@@ -267,6 +267,36 @@ export class ISRCache {
 
 The Ruby code remains identical—only the adapter changes.
 
+## File Naming Conventions
+
+Ruby2JS follows Rails' compound extension pattern: `name.output.processor`. The rightmost extension indicates how the file is processed; the preceding extension indicates what it produces.
+
+| Extension | Output | Template Location | Use Case |
+|-----------|--------|-------------------|----------|
+| `.jsx.rb` | `.js` | JSX via `%x{}` blocks | React components |
+| `.vue.rb` | `.vue` | After `__END__` | Vue SFCs |
+| `.svelte.rb` | `.svelte` | After `__END__` | Svelte components |
+| `.astro.rb` | `.astro` | After `__END__` | Astro components |
+| `.erb.rb` | `.js` | ERB after `__END__` | Server-rendered pages |
+
+### Directory Structure
+
+```
+app/
+  pages/
+    index.vue.rb        → index.vue
+    about.svelte.rb     → about.svelte
+    posts/
+      [id].astro.rb     → [id].astro
+  components/
+    Counter.jsx.rb      → Counter.js
+    Form.vue.rb         → Form.vue
+```
+
+### Rails Integration (Zeitwerk)
+
+Rails' Zeitwerk autoloader would normally try to load `Counter.jsx.rb` as a Ruby constant. The Ruby2JS Railtie automatically configures Zeitwerk to ignore these compound extensions—no user configuration required.
+
 ## Design Principles
 
 1. **No Runtime Library**: Generated code runs without Ruby2JS at runtime
@@ -284,3 +314,16 @@ The Ruby code remains identical—only the adapter changes.
 - **Cache Pages**: Platform adapters manage caching
 
 This separation of concerns means Ruby2JS stays focused on one thing: transforming Ruby syntax into framework-native JavaScript.
+
+## Framework Integrations
+
+Each framework has its preferred way to handle custom file types:
+
+| Framework | Integration Type | Watch Mode | Status |
+|-----------|-----------------|------------|--------|
+| **SvelteKit** | Preprocessor (`extensions` config) | Native HMR | Implemented |
+| **Nuxt** | Module (adds Vite plugin) | Native HMR | Implemented |
+| **Astro** | Integration (file watcher) | Page reload | Implemented |
+| **Vite** | Plugin (`vite-plugin-ruby2js`) | Native HMR | Implemented |
+
+🧪 **Feedback requested** — [Share your experience](https://github.com/ruby2js/ruby2js/discussions)

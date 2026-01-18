@@ -302,6 +302,22 @@ Ruby2JS supports the same deployment targets:
 - **Cloudflare Workers** - `packages/ruby2js-rails/targets/cloudflare/`
 - **Node.js** - `packages/ruby2js-rails/targets/node/`
 
+### Caching (ISR)
+
+For pages that benefit from caching, add a pragma comment:
+
+```ruby
+# Pragma: revalidate 60
+
+@posts = Post.published
+__END__
+<Layout>
+  {posts.map { |p| <Card post={p} /> }}
+</Layout>
+```
+
+See [Vercel Deployment](/docs/juntos/deploying/vercel#isr-incremental-static-regeneration) or [Cloudflare Deployment](/docs/juntos/deploying/cloudflare#isr-incremental-static-regeneration) for details.
+
 ## Migration Path
 
 1. **Rename files**: `.astro` → `.astro.rb`
