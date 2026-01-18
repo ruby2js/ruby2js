@@ -1,8 +1,9 @@
 ---
-order: 570
+order: 682
 title: Architecture
-top_section: Coming From
-category: coming-from
+top_section: Juntos
+category: juntos/coming-from
+hide_in_toc: true
 ---
 
 # How Ruby2JS Targets Work

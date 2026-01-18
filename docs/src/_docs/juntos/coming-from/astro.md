@@ -1,8 +1,9 @@
 ---
-order: 550
+order: 680
 title: Coming from Astro
-top_section: Coming From
-category: coming-from
+top_section: Juntos
+category: juntos/coming-from
+hide_in_toc: true
 ---
 
 # Coming from Astro
@@ -325,6 +326,6 @@ Ruby2JS supports the same deployment targets:
 
 ## Next Steps
 
-- **[Vue Components](/docs/coming-from/vue)** - Vue component support
-- **[Svelte Components](/docs/coming-from/svelte)** - Svelte component support
-- **[React Components](/docs/coming-from/react)** - React component support
+- **[Vue Components](/docs/juntos/coming-from/vue)** - Vue component support
+- **[Svelte Components](/docs/juntos/coming-from/svelte)** - Svelte component support
+- **[React Components](/docs/juntos/coming-from/react)** - React component support

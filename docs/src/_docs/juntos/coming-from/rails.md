@@ -1,8 +1,9 @@
 ---
-order: 560
+order: 681
 title: Coming from Rails
-top_section: Coming From
-category: coming-from
+top_section: Juntos
+category: juntos/coming-from
+hide_in_toc: true
 ---
 
 # Coming from Rails

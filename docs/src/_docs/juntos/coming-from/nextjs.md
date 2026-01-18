@@ -1,8 +1,9 @@
 ---
-order: 540
+order: 679
 title: Coming from Next.js
-top_section: Coming From
-category: coming-from
+top_section: Juntos
+category: juntos/coming-from
+hide_in_toc: true
 ---
 
 # Coming from Next.js
