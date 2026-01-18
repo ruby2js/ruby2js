@@ -86,6 +86,26 @@ module Ruby2JS
           dynamic_super_call(method_name, args)
         end
 
+        # Convert Ruby2JS.ast_node?(x) to ast_node(x)
+        # Convert Ruby2JS.convert(...) to convert(...)
+        # These functions are imported from ruby2js.js, not methods on Ruby2JS module
+        def on_send(node)
+          target, method_name, *args = node.children
+
+          if target&.type == :const && target.children == [nil, :Ruby2JS]
+            case method_name
+            when :ast_node?
+              return process s(:send, nil, :ast_node, *args)
+            when :convert
+              return process s(:send, nil, :convert, *args)
+            when :parse
+              return process s(:send, nil, :parse, *args)
+            end
+          end
+
+          super
+        end
+
         private
 
         # Extract lvar references from an args node for zsuper

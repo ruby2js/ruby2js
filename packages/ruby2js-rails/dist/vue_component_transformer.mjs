@@ -1,4 +1,4 @@
-import { convert } from '../ruby2js.js';
+import { convert, astNode } from '../ruby2js.js';
 import { Ruby2JS } from '../ruby2js.js';
 import { VueTemplateCompiler } from './vue_template_compiler.mjs';
 import '../filters/sfc.js';
@@ -134,7 +134,7 @@ export class VueComponentTransformer {
 
     {
       try {
-        let [ast, _] = Ruby2JS.parse(rubyCode);
+        let [ast, _] = parse(rubyCode);
         if (ast) this.#analyzeAst(ast)
       } catch (e) {
         this.#errors.push({type: "parseError", message: e.message})
@@ -144,7 +144,7 @@ export class VueComponentTransformer {
 
   // Analyze AST to find instance variables, methods, etc.
   #analyzeAst(node) {
-    if (!node instanceof Ruby2JS.Node) return;
+    if (!astNode(node)) return;
     let varName, methodName, target, method, args, innerTarget, innerMethod, constName;
 
     switch (node.type) {
@@ -188,7 +188,7 @@ export class VueComponentTransformer {
         case "params":
           this.#imports.vueRouter.add("useRoute")
         }
-      } else if (target instanceof Ruby2JS.Node && target.type == "send") {
+      } else if (astNode(target) && target.type == "send") {
         [innerTarget, innerMethod] = target.children;
 
         if (innerTarget == null && innerMethod == "params") {
@@ -207,7 +207,7 @@ export class VueComponentTransformer {
 
     // Recurse into children
     for (let child of node.children) {
-      if (child instanceof Ruby2JS.Node) this.#analyzeAst(child)
+      if (astNode(child)) this.#analyzeAst(child)
     }
   };
 
@@ -284,14 +284,6 @@ export class VueComponentTransformer {
       )
     };
 
-    // Close the lifecycle hook properly
-    // This is simplified - real implementation would need proper brace matching
-    // Transform params[:id] to route.params.id
-    result = result.replaceAll(/params\[:(\w+)\]/g, "route.params.$1");
-    result = result.replaceAll(/params\["(\w+)"\]/g, "route.params.$1");
-    result = result.replaceAll(/params\.(\w+)/g, "route.params.$1");
-
-    // Transform router.push
     result = result.replaceAll(/router\.push\(/g, "router.push(");
     return result
   };

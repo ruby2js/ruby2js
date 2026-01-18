@@ -1,4 +1,4 @@
-import { convert } from '../ruby2js.js';
+import { convert, astNode } from '../ruby2js.js';
 import { Ruby2JS } from '../ruby2js.js';
 import { SvelteTemplateCompiler } from './svelte_template_compiler.mjs';
 import '../filters/sfc.js';
@@ -137,7 +137,7 @@ export class SvelteComponentTransformer {
 
     {
       try {
-        let [ast, _] = Ruby2JS.parse(rubyCode);
+        let [ast, _] = parse(rubyCode);
         if (ast) this.#analyzeAst(ast)
       } catch (e) {
         this.#errors.push({type: "parseError", message: e.message})
@@ -147,7 +147,7 @@ export class SvelteComponentTransformer {
 
   // Analyze AST to find instance variables, methods, etc.
   #analyzeAst(node) {
-    if (!node instanceof Ruby2JS.Node) return;
+    if (!astNode(node)) return;
     let varName, methodName, methodNameStr, target, method, args, innerTarget, innerMethod, constName;
 
     switch (node.type) {
@@ -200,7 +200,7 @@ export class SvelteComponentTransformer {
         case "params":
           this.#imports.sveltekitStores.add("page")
         }
-      } else if (target instanceof Ruby2JS.Node && target.type == "send") {
+      } else if (astNode(target) && target.type == "send") {
         [innerTarget, innerMethod] = target.children;
 
         if (innerTarget == null && innerMethod == "params") {
@@ -219,7 +219,7 @@ export class SvelteComponentTransformer {
 
     // Recurse into children
     for (let child of node.children) {
-      if (child instanceof Ruby2JS.Node) this.#analyzeAst(child)
+      if (astNode(child)) this.#analyzeAst(child)
     }
   };
 
@@ -290,9 +290,6 @@ export class SvelteComponentTransformer {
       )
     };
 
-    result = result.replaceAll(/params\[:(\w+)\]/g, "$page.params.$1");
-    result = result.replaceAll(/params\["(\w+)"\]/g, "$page.params.$1");
-    result = result.replaceAll(/params\.(\w+)/g, "$page.params.$1");
     return result
   };
 

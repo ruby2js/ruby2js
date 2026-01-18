@@ -1,23 +1,21 @@
-import { convert } from '../ruby2js.js';
+import { convert, astNode } from '../ruby2js.js';
 import { Ruby2JS } from '../ruby2js.js';
 import { AstroTemplateCompiler } from './astro_template_compiler.mjs';
+import '../filters/esm.js';
+import '../filters/functions.js';
+import '../filters/return.js';
 import '../filters/sfc.js';
 import '../filters/camelCase.js';
 
 export class AstroComponentTransformer {
   #errors;
   #imports;
-  #methods;
   #options;
-  #propNames;
   #source;
-  #usesParams;
-  #usesProps;
-  #vars;
 
   // Result of component transformation
-  static Result({ component=null, frontmatter=null, template=null, imports=null, errors=null } = {}) {
-    return {component, frontmatter, template, imports, errors}
+  static Result({ component=null, frontmatter=null, template=null, errors=null } = {}) {
+    return {component, frontmatter, template, errors}
   };
 
   // Default options
@@ -44,12 +42,7 @@ export class AstroComponentTransformer {
     };
 
     this.#errors = [];
-    this.#vars = [];
-    this.#methods = [];
-    this.#imports = {models: new Set};
-    this.#usesParams = false;
-    this.#usesProps = false;
-    this.#propNames = new Set
+    this.#imports = {models: new Set}
   };
 
   // Transform the component, returning a Result
@@ -57,6 +50,24 @@ export class AstroComponentTransformer {
     // Build conversion options with SFC and camelCase filters
     let convertOptions = {...this.#options, template: "astro"};
     convertOptions.filters ??= [];
+
+    // Add ESM filter for import/export handling
+    
+    if (!convertOptions.filters.includes(Ruby2JS.Filter.ESM)) {
+      convertOptions.filters = convertOptions.filters.concat([Ruby2JS.Filter.ESM])
+    };
+
+    // Add functions filter for method parentheses (.pop → .pop())
+    
+    if (!convertOptions.filters.includes(Ruby2JS.Filter.Functions)) {
+      convertOptions.filters = convertOptions.filters.concat([Ruby2JS.Filter.Functions])
+    };
+
+    // Add return filter for implicit returns in blocks
+    
+    if (!convertOptions.filters.includes(Ruby2JS.Filter.Return)) {
+      convertOptions.filters = convertOptions.filters.concat([Ruby2JS.Filter.Return])
+    };
 
     // Add SFC filter for @var → const var transformation
     
@@ -85,16 +96,16 @@ export class AstroComponentTransformer {
         component: null,
         frontmatter: scriptJs,
         template: null,
-        imports: {},
         errors: this.#errors
       })
     };
 
-    // Analyze the Ruby code to find vars, methods, params/props usage
+    // Analyze the Ruby code to find model references
     this.#analyzeRubyCode;
 
-    // Transform the script to Astro frontmatter
-    let transformedFrontmatter = this.#transformFrontmatter(scriptJs);
+    // The converted JS is already transformed by filters (ESM, SFC, etc.)
+    // Prepend model imports if any were detected
+    let transformedFrontmatter = this.#prependModelImports(scriptJs);
 
     // Compile the template (convert Ruby expressions if any)
     let compiledTemplate = this.#compileTemplate(templateRaw);
@@ -109,7 +120,6 @@ export class AstroComponentTransformer {
       component,
       frontmatter: transformedFrontmatter,
       template: compiledTemplate,
-      imports: this.#imports,
       errors: this.#errors
     })
   };
@@ -119,14 +129,14 @@ export class AstroComponentTransformer {
     return new this(source, options).transform
   };
 
-  // Analyze Ruby source to extract component structure
+  // Analyze Ruby source to extract model references
   get #analyzeRubyCode() {
     // Parse just the Ruby code (before __END__)
     let rubyCode = this.#source.split(/^__END__\r?\n?/m, 2)[0];
 
     {
       try {
-        let [ast, _] = Ruby2JS.parse(rubyCode);
+        let [ast, _] = parse(rubyCode);
         if (ast) this.#analyzeAst(ast)
       } catch (e) {
         this.#errors.push({type: "parseError", message: e.message})
@@ -134,152 +144,51 @@ export class AstroComponentTransformer {
     }
   };
 
-  // Analyze AST to find instance variables, methods, etc.
+  // Framework-provided constants that should not be auto-imported
+  static FRAMEWORK_CONSTANTS = Object.freeze(["Astro"]);
+
+  // Analyze AST to find model references (capitalized constants)
   #analyzeAst(node) {
-    if (!node instanceof Ruby2JS.Node) return;
-    let varName, methodName, target, method, args, innerTarget, innerMethod, constName;
+    if (!astNode(node)) return;
+    let constName;
 
     switch (node.type) {
-    case "ivasgn":
-
-      // Instance variable assignment → const declaration
-      varName = node.children[0].toString().slice(1) // Remove @;
-      if (!this.#vars.includes(varName)) this.#vars.push(varName);
-      break;
-
-    case "ivar":
-
-      // Instance variable reference
-      varName = node.children[0].toString().slice(1);
-      if (!this.#vars.includes(varName)) this.#vars.push(varName);
-      break;
-
-    case "def":
-      methodName = node.children[0];
-      this.#methods.push(methodName);
-      break;
-
-    case "send":
-      [target, method, ...args] = node.children;
-
-      if (target == null) {
-        switch (method) {
-        case "params":
-          this.#usesParams = true;
-          break;
-
-        case "props":
-          this.#usesProps = true
-        }
-      } else if (target instanceof Ruby2JS.Node && target.type == "send") {
-        [innerTarget, innerMethod] = target.children;
-
-        if (innerTarget == null) {
-          if (innerMethod == "params") {
-            this.#usesParams = true;
-
-            // Track which param is accessed
-            if (args[0]?.type == "sym") {
-              this.#propNames.add(args[0].children[0].toString())
-            }
-          } else if (innerMethod == "props") {
-            this.#usesProps = true;
-
-            if (args[0]?.type == "sym") {
-              this.#propNames.add(args[0].children[0].toString())
-            }
-          }
-        }
-      };
-
-      break;
-
     case "const":
 
-      // Model references
+      // Model references - any capitalized constant except framework globals
       constName = node.children.at(-1).toString();
-      if (/^[A-Z]/m.test(constName)) this.#imports.models.add(constName)
+
+      if (/^[A-Z]/m.test(constName) && !AstroComponentTransformer.FRAMEWORK_CONSTANTS.includes(constName)) {
+        this.#imports.models.add(constName)
+      }
     };
 
     // Recurse into children
-    // Check child is an object before checking for :type (JS compatibility)
     for (let child of node.children) {
-      if (child instanceof Ruby2JS.Node) this.#analyzeAst(child)
+      if (astNode(child)) this.#analyzeAst(child)
     }
   };
 
-  // Transform JavaScript to Astro frontmatter style
-  #transformFrontmatter(js) {
-    let camelNames;
+  // Prepend model imports to the frontmatter
+  #prependModelImports(js) {
+    if (this.#imports.models.length == 0) return js;
     let lines = [];
 
     for (let model of this.#imports.models) {
       lines.push(`import { ${model} } from '../models/${this.#toSnakeCase(model)}'`)
     };
 
-    if (lines.some(Boolean)) lines.push("");
-
-    // Add Astro.params destructuring if params are used
-    if (this.#usesParams) {
-      if (this.#propNames.size > 0) {
-        camelNames = [...this.#propNames].map(n => this.#toCamelCase(n));
-        lines.push(`const { ${camelNames.join(", ")} } = Astro.params`)
-      } else {
-        lines.push("const params = Astro.params")
-      }
-    };
-
-    // Add Astro.props destructuring if props are used
-    if (this.#usesProps) {
-      if (this.#propNames.size > 0) {
-        camelNames = [...this.#propNames].map(n => this.#toCamelCase(n));
-        lines.push(`const { ${camelNames.join(", ")} } = Astro.props`)
-      } else {
-        lines.push("const props = Astro.props")
-      }
-    };
-
-    // Transform the script content
-    let transformed = this.#transformScriptContent(js);
-    if (transformed.length != 0) lines.push(transformed);
+    lines.push("");
+    lines.push(js);
     return lines.join(`\n`)
   };
 
-  // Transform the main script content
-  #transformScriptContent(js) {
-    let result = js.toString() // Use to_s instead of dup for JS compatibility (strings are immutable);
-
-    result = result.replaceAll(
-      /params\[:([\w]+)\]/g,
-      () => this.#toCamelCase(RegExp.$1)
-    );
-
-    result = result.replaceAll(
-      /params\["([\w]+)"\]/g,
-      () => this.#toCamelCase(RegExp.$1)
-    );
-
-    result = result.replaceAll(
-      /params\.([\w]+)/g,
-      () => this.#toCamelCase(RegExp.$1)
-    );
-
-    result = result.replaceAll(
-      /props\[:([\w]+)\]/g,
-      () => this.#toCamelCase(RegExp.$1)
-    );
-
-    result = result.replaceAll(
-      /props\["([\w]+)"\]/g,
-      () => this.#toCamelCase(RegExp.$1)
-    );
-
-    result = result.replaceAll(
-      /props\.([\w]+)/g,
-      () => this.#toCamelCase(RegExp.$1)
-    );
-
-    return result
+  // Convert CamelCase to snake_case
+  #toSnakeCase(str) {
+    return str.replaceAll(/([A-Z])/g, "_$1").toLowerCase().replace(
+      /^_/m,
+      ""
+    )
   };
 
   // Compile the template using AstroTemplateCompiler
@@ -297,18 +206,5 @@ export class AstroComponentTransformer {
   // Build the final Astro component
   #buildComponent(frontmatter, template) {
     return frontmatter && frontmatter.trim().length != 0 ? `---\n${frontmatter}\n---\n\n${template}\n` : template
-  };
-
-  // Convert camelCase to snake_case
-  #toSnakeCase(str) {
-    return str.replaceAll(/([A-Z])/g, "_$1").toLowerCase().replace(
-      /^_/m,
-      ""
-    )
-  };
-
-  // Convert snake_case to camelCase
-  #toCamelCase(str) {
-    return str.replaceAll(/_([a-z])/g, () => RegExp.$1.toUpperCase())
   }
 }
