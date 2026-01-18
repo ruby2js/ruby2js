@@ -278,3 +278,5 @@ Check `tauri.conf.json` has valid window configuration:
 - [Tauri Configuration Reference](https://v2.tauri.app/reference/config/)
 - [Tauri GitHub Repository](https://github.com/tauri-apps/tauri)
 - [Tauri Discord Community](https://discord.com/invite/tauri)
+
+🧪 **Feedback requested** — [Share your experience](https://github.com/ruby2js/ruby2js/discussions)

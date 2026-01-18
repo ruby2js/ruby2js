@@ -379,3 +379,5 @@ Capacitor is ideal when you have an existing web app (like a Juntos app) and wan
 - **Platform differences** — Some CSS/JS may behave differently
 - **App size** — WebView apps are typically larger than pure native
 - **Background execution** — Limited compared to native apps
+
+🧪 **Feedback requested** — [Share your experience](https://github.com/ruby2js/ruby2js/discussions)

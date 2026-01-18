@@ -299,3 +299,5 @@ See [Vercel Deployment](/docs/juntos/deploying/vercel#isr-incremental-static-reg
 - **[Vue Filter](/docs/filters/vue)** - Full Vue filter documentation
 - **[File-Based Routing](/docs/juntos/routing)** - Next.js-style routing
 - **[User's Guide](/docs/users-guide/introduction)** - General Ruby2JS patterns
+
+🧪 **Feedback requested** — [Share your experience](https://github.com/ruby2js/ruby2js/discussions)

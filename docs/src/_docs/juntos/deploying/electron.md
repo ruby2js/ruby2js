@@ -445,3 +445,5 @@ Electron is the most mature and widely used option. [Tauri](/docs/juntos/deployi
 - **Memory usage** — Each app runs its own Chromium instance
 - **Startup time** — Slower than native apps
 - **Native look** — Requires extra work to match platform conventions
+
+🧪 **Feedback requested** — [Share your experience](https://github.com/ruby2js/ruby2js/discussions)

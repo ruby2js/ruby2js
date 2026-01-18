@@ -330,3 +330,5 @@ See [Vercel Deployment](/docs/juntos/deploying/vercel#isr-incremental-static-reg
 - **[Vue Components](/docs/juntos/coming-from/vue)** - Vue component support
 - **[Svelte Components](/docs/juntos/coming-from/svelte)** - Svelte component support
 - **[React Components](/docs/juntos/coming-from/react)** - React component support
+
+🧪 **Feedback requested** — [Share your experience](https://github.com/ruby2js/ruby2js/discussions)

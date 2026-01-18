@@ -341,3 +341,5 @@ See [Vercel Deployment](/docs/juntos/deploying/vercel#isr-incremental-static-reg
 - **[Svelte Template Compiler](/docs/filters/svelte)** - Full Svelte support documentation
 - **[File-Based Routing](/docs/juntos/routing)** - SvelteKit-style routing
 - **[User's Guide](/docs/users-guide/introduction)** - General Ruby2JS patterns
+
+🧪 **Feedback requested** — [Share your experience](https://github.com/ruby2js/ruby2js/discussions)
