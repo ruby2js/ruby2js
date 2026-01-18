@@ -112,6 +112,58 @@ describe Ruby2JS::AstroComponentTransformer do
       _(result.frontmatter).must_include "Post.find(1)"
       _(result.frontmatter).must_include "Comment.where"
     end
+
+    it "auto-imports detected models" do
+      source = <<~RUBY
+        @post = Post.find(1)
+        __END__
+        <p>{post.title}</p>
+      RUBY
+
+      result = transform(source)
+
+      _(result.frontmatter).must_include "import { Post } from '../models/post'"
+    end
+
+    it "auto-imports multiple models" do
+      source = <<~RUBY
+        @post = Post.find(1)
+        @comments = Comment.where(post_id: 1)
+        @author = User.find(@post.author_id)
+        __END__
+        <p>{post.title}</p>
+      RUBY
+
+      result = transform(source)
+
+      _(result.frontmatter).must_include "import { Post } from '../models/post'"
+      _(result.frontmatter).must_include "import { Comment } from '../models/comment'"
+      _(result.frontmatter).must_include "import { User } from '../models/user'"
+    end
+
+    it "converts CamelCase model names to snake_case paths" do
+      source = <<~RUBY
+        @item = BlogPost.find(1)
+        __END__
+        <p>{item.title}</p>
+      RUBY
+
+      result = transform(source)
+
+      _(result.frontmatter).must_include "import { BlogPost } from '../models/blog_post'"
+    end
+
+    it "does not import non-model constants like Astro" do
+      source = <<~RUBY
+        @id = Astro.params[:id]
+        __END__
+        <p>{id}</p>
+      RUBY
+
+      result = transform(source)
+
+      _(result.frontmatter).wont_include "import { Astro }"
+    end
   end
 
   describe "template compilation" do

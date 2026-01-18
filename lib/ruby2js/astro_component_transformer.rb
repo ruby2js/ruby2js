@@ -51,6 +51,9 @@ module Ruby2JS
       @source = source
       @options = DEFAULT_OPTIONS.merge(options)
       @errors = []
+      @imports = {
+        models: Set.new
+      }
     end
 
     # Transform the component, returning a Result
@@ -104,8 +107,12 @@ module Ruby2JS
         )
       end
 
+      # Analyze the Ruby code to find model references
+      analyze_ruby_code
+
       # The converted JS is already transformed by filters (ESM, SFC, etc.)
-      transformed_frontmatter = script_js
+      # Prepend model imports if any were detected
+      transformed_frontmatter = prepend_model_imports(script_js)
 
       # Compile the template (convert Ruby expressions if any)
       compiled_template = compile_template(template_raw)
@@ -127,6 +134,60 @@ module Ruby2JS
     end
 
     private
+
+    # Analyze Ruby source to extract model references
+    def analyze_ruby_code
+      # Parse just the Ruby code (before __END__)
+      ruby_code = @source.split(/^__END__\r?\n?/, 2).first
+
+      begin
+        ast, _ = Ruby2JS.parse(ruby_code)
+        analyze_ast(ast) if ast
+      rescue => e
+        @errors << { type: 'parseError', message: e.message }
+      end
+    end
+
+    # Framework-provided constants that should not be auto-imported
+    FRAMEWORK_CONSTANTS = %w[Astro].freeze
+
+    # Analyze AST to find model references (capitalized constants)
+    def analyze_ast(node)
+      return unless Ruby2JS.ast_node?(node)
+
+      case node.type
+      when :const
+        # Model references - any capitalized constant except framework globals
+        const_name = node.children.last.to_s
+        if const_name =~ /^[A-Z]/ && !FRAMEWORK_CONSTANTS.include?(const_name)
+          @imports[:models] << const_name # Pragma: set
+        end
+      end
+
+      # Recurse into children
+      node.children.each do |child|
+        analyze_ast(child) if Ruby2JS.ast_node?(child)
+      end
+    end
+
+    # Prepend model imports to the frontmatter
+    def prepend_model_imports(js)
+      return js if @imports[:models].empty?
+
+      lines = []
+      @imports[:models].each do |model|
+        lines << "import { #{model} } from '../models/#{to_snake_case(model)}'"
+      end
+      lines << ""
+      lines << js
+
+      lines.join("\n")
+    end
+
+    # Convert CamelCase to snake_case
+    def to_snake_case(str)
+      str.gsub(/([A-Z])/, '_\1').downcase.sub(/^_/, '')
+    end
 
     # Compile the template using AstroTemplateCompiler
     def compile_template(template)
