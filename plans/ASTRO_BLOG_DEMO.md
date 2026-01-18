@@ -290,39 +290,13 @@ __END__
 
 ### Creation Script
 
-#### Current State (Prebuild Script)
-
-The current implementation uses a manual prebuild script because Astro doesn't support custom page extensions. This requires:
-- A `scripts/prebuild.mjs` file with ~80 lines of transformation logic
-- Modified npm scripts: `"dev": "npm run prebuild && astro dev"`
-- No watch mode - must restart dev server for Ruby changes
-
-See `test/astro-blog/create-astro-blog` for the full implementation.
-
-#### Future State (With `ruby2js-astro` Integration)
-
-**Dependency:** Requires `ruby2js-astro` package from FRAMEWORK_PARITY.md Phase 6.3
-
-Once the Astro integration exists, the creation script simplifies dramatically:
+The `test/astro-blog/create-astro-blog` script uses the `ruby2js-astro` integration:
 
 ```bash
-#!/usr/bin/env bash
-# Create an Astro blog demo with .astro.rb files
-# Usage: create-astro-blog [app-name]
+# Install ruby2js and ruby2js-astro
+npm install ruby2js ruby2js-astro
 
-set -e
-APP_NAME="${1:-astro-blog}"
-
-echo "Creating Astro blog: $APP_NAME"
-
-# Create Astro project
-npm create astro@latest "$APP_NAME" -- --template minimal --no-git --skip-houston --yes
-cd "$APP_NAME"
-
-# Install ruby2js-astro integration (single package!)
-npm install ruby2js-astro
-
-# Update astro.config.mjs (one line added!)
+# Configure astro.config.mjs
 cat > astro.config.mjs << 'CONFIG'
 import { defineConfig } from 'astro/config';
 import ruby2js from 'ruby2js-astro';
@@ -331,49 +305,22 @@ export default defineConfig({
   integrations: [ruby2js()]
 });
 CONFIG
-
-# Create directory structure and content files
-mkdir -p src/content/posts src/layouts src/components src/pages/posts public
-
-# Create .astro.rb files...
-# (content creation - unchanged)
-
-echo "Done! Run: cd $APP_NAME && npm run dev"
 ```
 
-**What's removed:**
-- ❌ `scripts/prebuild.mjs` (80 lines) - handled by integration
-- ❌ `npm pkg set scripts.prebuild=...` - not needed
-- ❌ `npm pkg set scripts.dev="npm run prebuild && ..."` - not needed
-- ❌ Manual Prism initialization - handled by integration
+The integration provides:
+- Watch mode with HMR during `astro dev`
+- Proper error reporting via Astro's build system
+- Automatic transformation of `.astro.rb` files
 
-**What's gained:**
-- ✅ Watch mode during `astro dev`
-- ✅ Proper error reporting via Astro's build system
-- ✅ Single package install instead of manual script setup
-
-### Migration Path
-
-When `ruby2js-astro` is published:
-
-1. Update `test/astro-blog/create-astro-blog` to use the simplified script
-2. Remove prebuild script generation
-3. Update package.json script modifications
-4. Test that watch mode works
+See `test/astro-blog/create-astro-blog` for the full implementation.
 
 ### Definition of Done
 
-**Current (with prebuild):**
 - [x] `create-astro-blog` script creates working demo
-- [x] `npm run dev` works locally (no watch)
+- [x] `ruby2js-astro` integration with watch mode (HMR)
+- [x] `npm run dev` works locally with hot reload
 - [x] `npm run build` produces static site
 - [x] Demo deploys to GitHub Pages
-
-**Future (with integration):**
-- [x] `ruby2js-astro` package published
-- [x] Creation script simplified (no prebuild)
-- [x] Watch mode works during development
-- [x] Demo updated to use integration
 
 ---
 
@@ -573,8 +520,6 @@ const demos = ['blog', 'chat', 'notes', 'photo-gallery', 'workflow', 'astro-blog
 | 8 | Full CRUD and ISR | Phase 6 or 7 |
 | 9 | Multi-target and documentation | Phase 8 |
 
-**Estimated effort:** Phases 1-5: 2-3 days; Phase 6: 3-4 days; Phase 7: 2-3 days; Phases 8-9: 2-3 days
-
 ## Success Criteria (Phases 1-5)
 
 - [x] All 6 transformers (Vue, Svelte, Astro × template + component) are selfhosted
@@ -655,11 +600,27 @@ This demonstrates that Ruby2JS **enhances** Astro at each stage—it doesn't req
 ### Transpilation Pipeline
 
 ```
-.jsx.rb (Ruby)  →  vite-plugin-ruby2js  →  .jsx (Preact)  →  Astro build
-                   (React filter)
+.jsx.rb (Ruby with inline JSX)
+    ↓
+vite-plugin-ruby2js (React + JSX + Functions + ESM filters)
+    ↓
+xnode AST → xnode converter
+    ↓
+.jsx output (actual JSX syntax: <div className={...}>)
+    ↓
+Vite/Astro (with @astrojs/preact)
+    ↓
+Preact h() calls
 ```
 
-The vite plugin uses Ruby2JS with the React filter to transpile `.jsx.rb` files to Preact-compatible JSX.
+The pipeline uses **existing Ruby2JS infrastructure**—no new transformer needed:
+
+1. **React filter**: Converts pnode AST to xnode AST (when JSX filter present)
+2. **JSX filter**: Signals React filter to output xnode instead of createElement
+3. **xnode converter**: Serializes xnode AST to actual JSX syntax
+4. **Vite**: Transforms JSX to Preact's `h()` calls via `@astrojs/preact`
+
+This differs from `.astro.rb` files which use `AstroComponentTransformer` with `__END__` templates. `.jsx.rb` files use **inline JSX** (JSX embedded in Ruby code, not separated by `__END__`).
 
 ### Demo Structure
 
@@ -699,11 +660,13 @@ export default {
   plugins: [
     ruby2js({
       include: ['**/*.jsx.rb'],
-      filters: ['React', 'Functions', 'ESM']
+      filters: ['React', 'JSX', 'Functions', 'ESM']
     })
   ]
 };
 ```
+
+**Note:** The `JSX` filter is required to output actual JSX syntax (e.g., `<div className={...}>`) instead of `React.createElement()` calls. This allows Vite to further transform the JSX with Preact's pragma.
 
 ### Example: Static Content (Level 1)
 
