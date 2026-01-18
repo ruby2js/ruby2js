@@ -568,8 +568,12 @@ const demos = ['blog', 'chat', 'notes', 'photo-gallery', 'workflow', 'astro-blog
 | 3 | Create demo | Phase 2 |
 | 4 | Add integration test | Phase 3 |
 | 5 | Update CI | Phases 3, 4 |
+| 6 | Full-stack demo with Preact islands (.jsx.rb) | Phases 1-5 |
+| 7 | ERB → pnode transformer (.erb.rb) | Phase 6 |
+| 8 | Full CRUD and ISR | Phase 6 or 7 |
+| 9 | Multi-target and documentation | Phase 8 |
 
-**Estimated effort:** 2-3 days
+**Estimated effort:** Phases 1-5: 2-3 days; Phase 6: 3-4 days; Phase 7: 2-3 days; Phases 8-9: 2-3 days
 
 ## Success Criteria (Phases 1-5)
 
@@ -582,13 +586,33 @@ const demos = ['blog', 'chat', 'notes', 'photo-gallery', 'workflow', 'astro-blog
 
 ---
 
-## Phase 6: Full-Stack Demo with ActiveRecord and ISR
+## Phase 6: Full-Stack Demo with ActiveRecord and Preact Islands
 
 ### Vision
 
 Replace the current markdown-based astro-blog demo with a full-stack demonstration that proves the documentation at https://www.ruby2js.com/docs/juntos/coming-from/astro is real and working.
 
 **Note:** The existing Rails blog demo remains unchanged. This phase evolves only the astro-blog demo into a self-contained app with both authoring and publishing capabilities via Astro islands.
+
+### Content Progression
+
+The demo showcases how Ruby2JS fits naturally into Astro projects at every level of complexity:
+
+| Level | Standard Astro | Ruby2JS | Demo Example |
+|-------|----------------|---------|--------------|
+| 1. Static content | `.md` | `.md` (unchanged) | About page |
+| 2. Astro pages | `.astro` | `.astro.rb` | Layout, index, post shell |
+| 3. Islands | `.jsx` / `.tsx` | `.jsx.rb` or `.erb.rb` | PostList, PostForm |
+
+This demonstrates that Ruby2JS **enhances** Astro at each stage—it doesn't require full client-side interactivity. Simple content stays simple.
+
+### Why Preact (for Islands)?
+
+- **Rails-like DX**: Write Ruby code (`.jsx.rb` files) that transpiles to JSX
+- **Native Astro support**: `client:load` hydration works out of the box
+- **Tiny footprint**: ~3KB gzipped
+- **Familiar patterns**: `useState`, `useEffect` map nicely to Ruby
+- **View Transitions**: Best integration with Astro's navigation features
 
 ### Architecture: Self-Contained Astro App
 
@@ -597,16 +621,21 @@ Replace the current markdown-based astro-blog demo with a full-stack demonstrati
 │                     Astro Blog Demo                          │
 │                                                              │
 │  ┌─────────────────────────────────────────────────────┐    │
-│  │              Static Shell (Astro SSG)                │    │
-│  │  - Landing page (/)                                  │    │
-│  │  - About page (/about)                               │    │
-│  │  - Post list shell (/posts)                          │    │
-│  │  - Post detail shell (/posts/[slug])                 │    │
+│  │              Static Content                          │    │
+│  │  - About page (/about)        [.md]                  │    │
+│  └─────────────────────────────────────────────────────┘    │
+│                                                              │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │              Astro Pages (SSG)                       │    │
+│  │  - Landing page (/)           [.astro.rb]            │    │
+│  │  - Post list shell (/posts)   [.astro.rb]            │    │
+│  │  - Post detail (/posts/[slug]) [.astro.rb]           │    │
 │  └─────────────────────────────────────────────────────┘    │
 │                           │                                  │
 │                           ▼                                  │
 │  ┌─────────────────────────────────────────────────────┐    │
-│  │           Islands (client:load hydration)            │    │
+│  │        Preact Islands (client:load hydration)        │    │
+│  │                    [.jsx.rb files]                    │    │
 │  │                                                      │    │
 │  │  ┌──────────────┐    ┌──────────────┐               │    │
 │  │  │ PostList.jsx │    │ PostForm.jsx │               │    │
@@ -617,21 +646,770 @@ Replace the current markdown-based astro-blog demo with a full-stack demonstrati
 │  │                   │                                  │    │
 │  │            ┌──────▼──────┐                           │    │
 │  │            │  IndexedDB  │                           │    │
-│  │            │   + ISR     │                           │    │
+│  │            │   (Dexie)   │                           │    │
 │  │            └─────────────┘                           │    │
 │  └─────────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### ISR Implementation (In-Memory)
+### Transpilation Pipeline
 
-For the demo, ISR uses a simple in-memory cache with stale-while-revalidate semantics:
+```
+.jsx.rb (Ruby)  →  vite-plugin-ruby2js  →  .jsx (Preact)  →  Astro build
+                   (React filter)
+```
+
+The vite plugin uses Ruby2JS with the React filter to transpile `.jsx.rb` files to Preact-compatible JSX.
+
+### Demo Structure
+
+**Level 1 - Static content** (`.md` → rendered as-is):
+- `/about` - Simple markdown page
+
+**Level 2 - Astro pages** (`.astro.rb` → rendered at build time):
+- `/` - Landing page with site intro
+- `/posts` - Post listing shell (hosts islands)
+- `/posts/[slug]` - Post detail shell (hosts islands)
+
+**Level 3 - Islands** (`.jsx.rb` → hydrate on client):
+- `PostList` - Displays posts from IndexedDB
+- `PostForm` - Creates/edits posts
+
+### Configuration
+
+**astro.config.mjs:**
+```javascript
+import { defineConfig } from 'astro/config';
+import preact from '@astrojs/preact';
+import ruby2js from 'ruby2js-astro';
+
+export default defineConfig({
+  integrations: [
+    ruby2js(),
+    preact()
+  ]
+});
+```
+
+**vite.config.js** (for .jsx.rb handling):
+```javascript
+import ruby2js from 'vite-plugin-ruby2js';
+
+export default {
+  plugins: [
+    ruby2js({
+      include: ['**/*.jsx.rb'],
+      filters: ['React', 'Functions', 'ESM']
+    })
+  ]
+};
+```
+
+### Example: Static Content (Level 1)
+
+**src/pages/about.md:**
+```markdown
+---
+layout: ../layouts/Layout.astro
+title: About
+---
+
+# About This Blog
+
+This is a demo of Ruby2JS with Astro. It shows how Ruby can be used
+at every level of an Astro project—from simple markdown content like
+this page, to Astro components, to interactive islands.
+
+Built with ❤️ using Ruby2JS.
+```
+
+No Ruby required. Markdown stays markdown.
+
+### Post Model
+
+```ruby
+# src/models/Post.rb
+class Post < ActiveRecord
+  self.table_name = 'posts'
+
+  # title, slug, body, excerpt, published_at
+  validates_presence_of :title
+  validates_presence_of :body
+
+  scope :published, -> { where.not(published_at: nil) }
+end
+```
+
+Transpiles to JavaScript using the Dexie adapter for IndexedDB storage.
+
+### Example Preact Island (Ruby)
+
+**src/islands/PostList.jsx.rb:**
+```ruby
+import { useState, useEffect } from 'preact/hooks'
+import Post from '../models/Post'
+
+def PostList()
+  posts, setPosts = useState([])
+  loading, setLoading = useState(true)
+
+  useEffect -> {
+    Post.all.then do |data|
+      setPosts(data)
+      setLoading(false)
+    end
+  }, []
+
+  return <div class="loading">Loading...</div> if loading
+
+  <div class="posts">
+    {posts.map do |post|
+      <article key={post.id} class="post-card">
+        <h2><a href={"/posts/#{post.slug}"}>{post.title}</a></h2>
+        <p>{post.excerpt || post.body.slice(0, 100)}...</p>
+      </article>
+    end}
+  </div>
+end
+
+export default PostList
+```
+
+**Transpiles to:**
+```jsx
+import { useState, useEffect } from 'preact/hooks';
+import Post from '../models/Post';
+
+function PostList() {
+  const [posts, setPosts] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Post.all.then(data => {
+      setPosts(data);
+      setLoading(false);
+    });
+  }, []);
+
+  if (loading) return <div class="loading">Loading...</div>;
+
+  return (
+    <div class="posts">
+      {posts.map(post => (
+        <article key={post.id} class="post-card">
+          <h2><a href={`/posts/${post.slug}`}>{post.title}</a></h2>
+          <p>{post.excerpt || post.body.slice(0, 100)}...</p>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+export default PostList;
+```
+
+### Example Authoring Island (Ruby)
+
+**src/islands/PostForm.jsx.rb:**
+```ruby
+import { useState } from 'preact/hooks'
+import Post from '../models/Post'
+
+def PostForm(props)
+  title, setTitle = useState(props[:post]&.title || "")
+  body, setBody = useState(props[:post]&.body || "")
+  saving, setSaving = useState(false)
+
+  handleSubmit = ->(e) {
+    e.preventDefault
+    setSaving(true)
+
+    post = props[:post] || Post.new
+    post.title = title
+    post.body = body
+
+    post.save.then do
+      setTitle("")
+      setBody("")
+      setSaving(false)
+      props[:onSave]&.(post)
+    end
+  }
+
+  <form onSubmit={handleSubmit} class="post-form">
+    <input
+      value={title}
+      onInput={(e) => setTitle(e.target.value)}
+      placeholder="Title"
+      disabled={saving}
+    />
+    <textarea
+      value={body}
+      onInput={(e) => setBody(e.target.value)}
+      placeholder="Write your post..."
+      rows={6}
+      disabled={saving}
+    />
+    <button type="submit" disabled={saving}>
+      {saving ? "Saving..." : (props[:post] ? "Update" : "Create Post")}
+    </button>
+  </form>
+end
+
+export default PostForm
+```
+
+### Astro Page Shell
+
+**src/pages/posts/index.astro.rb:**
+```ruby
+import Layout from '../../layouts/Layout.astro'
+import PostList from '../../islands/PostList'
+import PostForm from '../../islands/PostForm'
+
+@title = "Blog Posts"
+__END__
+<Layout title={title}>
+  <main class="container">
+    <h1>Blog Posts</h1>
+
+    <section class="posts-section">
+      <PostList client:load />
+    </section>
+
+    <section class="create-section">
+      <h2>Create New Post</h2>
+      <PostForm client:load />
+    </section>
+  </main>
+</Layout>
+```
+
+### Layout with View Transitions
+
+**src/layouts/Layout.astro.rb:**
+```ruby
+import { ViewTransitions } from 'astro:transitions'
+
+@title = Astro.props[:title] || "Astro Blog"
+__END__
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{title}</title>
+  <ViewTransitions />
+  <style>
+    .container { max-width: 800px; margin: 0 auto; padding: 2rem; }
+    .post-card { padding: 1rem; margin: 1rem 0; border: 1px solid #ddd; border-radius: 8px; }
+    .post-form input, .post-form textarea { width: 100%; margin: 0.5rem 0; padding: 0.5rem; }
+    .post-form button { background: #3b82f6; color: white; padding: 0.5rem 1rem; border: none; border-radius: 4px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <nav style="padding: 1rem; border-bottom: 1px solid #ddd;">
+    <a href="/">Home</a> | <a href="/posts">Posts</a> | <a href="/about">About</a>
+  </nav>
+  <slot />
+</body>
+</html>
+```
+
+View Transitions provide smooth animated navigation between pages - a key Astro 3+ feature that works seamlessly with the Ruby integration.
+
+### Demo Flow
+
+Within the same Astro app:
+
+1. **View posts** → PostList island queries IndexedDB via Dexie, displays results
+2. **Create post** → PostForm island saves to IndexedDB
+3. **See update** → PostList re-fetches on navigation (View Transitions)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     Astro Blog Demo                          │
+│                                                              │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │                    /posts page                        │   │
+│  │                                                       │   │
+│  │  ┌─────────────────┐         ┌─────────────────┐     │   │
+│  │  │   PostList      │         │   PostForm      │     │   │
+│  │  │   (Preact)      │◀────────│   (Preact)      │     │   │
+│  │  │                 │ refresh │                 │     │   │
+│  │  │  - First Post   │         │  Title: [____]  │     │   │
+│  │  │  - Second Post  │         │  Body:  [____]  │     │   │
+│  │  │  - Third Post   │         │  [Create Post]  │     │   │
+│  │  └────────┬────────┘         └────────┬────────┘     │   │
+│  │           │                           │              │   │
+│  │           └───────────┬───────────────┘              │   │
+│  │                       │                              │   │
+│  │                ┌──────▼──────┐                       │   │
+│  │                │  IndexedDB  │                       │   │
+│  │                │   (Dexie)   │                       │   │
+│  │                └─────────────┘                       │   │
+│  └──────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Database Setup
+
+**src/lib/db.js:**
+```javascript
+import { initDatabase, defineSchema, openDatabase, registerSchema } from 'ruby2js-rails/adapters/active_record_dexie.mjs';
+
+// Register table schemas
+registerSchema('posts', '++id, title, slug, created_at, updated_at');
+
+// Initialize and open
+export async function setupDatabase() {
+  await initDatabase({ database: 'astro_blog' });
+  defineSchema(1);
+  await openDatabase();
+}
+```
+
+**src/lib/seeds.js:**
+```javascript
+import Post from '../models/Post';
+
+export async function runSeeds() {
+  const count = await Post.count();
+  if (count > 0) return; // Already seeded
+
+  await Post.create({
+    title: 'Getting Started with Ruby2JS',
+    body: 'Ruby2JS allows you to write your Astro components in Ruby...',
+    slug: 'getting-started'
+  });
+
+  await Post.create({
+    title: 'Preact Islands in Astro',
+    body: 'Astro islands provide partial hydration for interactive components...',
+    slug: 'preact-islands'
+  });
+
+  await Post.create({
+    title: 'ActiveRecord in the Browser',
+    body: 'With Dexie.js as the backend, you can use ActiveRecord patterns...',
+    slug: 'activerecord-browser'
+  });
+
+  console.log('Seeded 3 posts');
+}
+```
+
+### Dockerfile
+
+Builds a static Astro site that runs entirely in the browser:
+
+```dockerfile
+FROM node:24-slim
+
+WORKDIR /app
+
+# Copy the creation script
+COPY create-astro-blog .
+RUN chmod +x create-astro-blog && ./create-astro-blog astro-blog
+
+WORKDIR /app/astro-blog
+
+# Build the static site
+RUN npm run build
+
+# Serve with a simple static server
+RUN npm install -g serve
+
+EXPOSE 4321
+
+CMD ["serve", "-s", "dist", "-l", "4321"]
+```
+
+**Build and run:**
+```bash
+docker build -t astro-blog .
+docker run -p 4321:4321 astro-blog
+```
+
+The demo runs entirely client-side with IndexedDB - no server database needed.
+
+### Definition of Done
+
+**Level 1 - Static content:**
+- [ ] About page (`src/pages/about.md`)
+
+**Level 2 - Astro pages:**
+- [ ] Landing page (`src/pages/index.astro.rb`)
+- [ ] Post list shell (`src/pages/posts/index.astro.rb`)
+- [ ] Post detail shell (`src/pages/posts/[slug].astro.rb`)
+- [ ] Layout with View Transitions (`src/layouts/Layout.astro.rb`)
+
+**Level 3 - Islands:**
+- [ ] PostList island (`src/islands/PostList.jsx.rb`)
+- [ ] PostForm island (`src/islands/PostForm.jsx.rb`)
+- [ ] Post model with ActiveRecord queries (Dexie/IndexedDB)
+- [ ] Seed data (3 posts)
+
+**Infrastructure:**
+- [ ] vite-plugin-ruby2js configured for `.jsx.rb` → JSX
+- [ ] Dockerfile for containerized deployment
+- [ ] Update integration test (`test/integration/astro_blog.test.mjs`)
+- [ ] Full authoring → publishing workflow demonstrated
+
+### Integration Test Updates
+
+The existing test validates static markdown content. Update to test:
 
 ```javascript
-// ~30 lines of ISR adapter
+describe('Astro Blog Integration Tests', () => {
+  describe('Build Output', () => {
+    it('generates static pages', () => {
+      // Landing page, about page, and posts shell exist
+      expect(existsSync(join(DIST_DIR, 'index.html'))).toBe(true);
+      expect(existsSync(join(DIST_DIR, 'about/index.html'))).toBe(true);
+      expect(existsSync(join(DIST_DIR, 'posts/index.html'))).toBe(true);
+    });
+  });
+
+  describe('Preact Islands', () => {
+    it('includes PostList island with client:load', () => {
+      const html = readFileSync(join(DIST_DIR, 'posts/index.html'), 'utf-8');
+      // Astro adds hydration scripts for client:load components
+      expect(html).toContain('astro-island');
+    });
+
+    it('transpiled .jsx.rb to valid JSX', () => {
+      // Check that the bundled JS doesn't contain Ruby syntax
+      const jsFiles = globSync(join(DIST_DIR, '_astro/*.js'));
+      expect(jsFiles.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('ActiveRecord', () => {
+    it('includes Dexie for IndexedDB', () => {
+      const html = readFileSync(join(DIST_DIR, 'posts/index.html'), 'utf-8');
+      // Should reference the database setup
+      expect(html).toMatch(/dexie|indexeddb/i);
+    });
+  });
+
+  describe('View Transitions', () => {
+    it('includes ViewTransitions in layout', () => {
+      const html = readFileSync(join(DIST_DIR, 'index.html'), 'utf-8');
+      expect(html).toContain('view-transition');
+    });
+  });
+});
+```
+
+### Success Criteria
+
+- [ ] **Three levels demonstrated**: static `.md`, Astro `.astro.rb`, islands `.jsx.rb`
+- [ ] `.astro.rb` files transpile to valid Astro components
+- [ ] `.jsx.rb` files transpile to valid Preact components
+- [ ] Preact islands hydrate with `client:load`
+- [ ] Post model works with IndexedDB via Dexie
+- [ ] Create post in form → see it appear in list
+- [ ] View Transitions provide smooth navigation
+- [ ] Demo proves Ruby2JS enhances Astro at every level, not just full interactivity
+
+---
+
+## Phase 7: ERB → pnode Transformer for Islands
+
+### Overview
+
+Add an alternative authoring experience for Preact islands using ERB-style templates (`.erb.rb` files) instead of JSX-style (`.jsx.rb` files). This provides a more Rails-like developer experience.
+
+### Why ERB?
+
+- **Rails-familiar syntax**: `<%= %>` and `<% %>` feel natural to Rails developers
+- **HTML-centric**: Focus on markup with embedded Ruby, not Ruby with embedded JSX
+- **Single File Components**: Ruby code before `__END__`, ERB template after
+- **Leverages existing infrastructure**: pnodes + React filter already handle component output
+
+### Architecture
+
+```
+.erb.rb (Ruby SFC)  →  pnode AST  →  React filter  →  Preact JSX
+                    ↑
+    ┌───────────────┴───────────────┐
+    │  1. Parse Ruby code (Prism)   │
+    │  2. Parse ERB template (XML)  │
+    │  3. Convert HTML → pnodes     │
+    │  4. Merge into Ruby AST       │
+    └───────────────────────────────┘
+```
+
+### pnode Format
+
+The existing pnode representation is used:
+
+```ruby
+s(:pnode, :div, {class: "posts"},
+  s(:pnode, :h1, {}, "Hello"),
+  s(:pnode, nil, {}, *children)  # Fragment
+)
+```
+
+### Transpilation Pipeline
+
+1. **Split SFC**: Separate Ruby code from `__END__` template
+2. **Parse Ruby**: Standard Prism/Ruby2JS parsing
+3. **Parse ERB template**: Simple recursive descent XML parser
+   - Well-formed XML only (JSX subset)
+   - `<%= expr %>` → expression interpolation
+   - `<% code %>` → control flow
+4. **Convert to pnodes**: HTML elements become pnode AST nodes
+5. **Emit via React filter**: pnodes → `React.createElement()` (Preact-compatible)
+
+### HTML Parser Approach
+
+Since we're targeting JSX-subset (well-formed XML), the parser is simple:
+
+```ruby
+# lib/ruby2js/erb_pnode_transformer.rb
+class ErbPnodeTransformer
+  def parse_element(scanner)
+    return parse_text(scanner) unless scanner.scan(/</)
+
+    tag = scanner.scan(/\w+/)
+    attrs = parse_attributes(scanner)
+
+    if scanner.scan(/\/>/)
+      # Self-closing: <br />
+      return s(:pnode, tag.to_sym, attrs)
+    end
+
+    scanner.scan(/>/)
+    children = parse_children(scanner)
+    scanner.scan(/<\/#{tag}>/)
+
+    s(:pnode, tag.to_sym, attrs, *children)
+  end
+
+  def parse_erb_expression(text)
+    # <%= expr %> → Ruby expression → pnode child
+    # <% code %> → control flow (map, if, etc.)
+  end
+end
+```
+
+### File Extension
+
+`.erb.rb` - Follows the established pattern:
+- `.astro.rb` → Astro components
+- `.vue.rb` → Vue components
+- `.jsx.rb` → Preact/React components (JSX syntax)
+- `.erb.rb` → Preact/React components (ERB syntax)
+
+### Example: PostList.erb.rb
+
+**Input (Ruby SFC with ERB template):**
+```ruby
+# src/islands/PostList.erb.rb
+import { useState, useEffect } from 'preact/hooks'
+import Post from '../models/Post'
+
+def PostList()
+  posts, setPosts = useState([])
+  loading, setLoading = useState(true)
+
+  useEffect -> {
+    Post.all.then do |data|
+      setPosts(data)
+      setLoading(false)
+    end
+  }, []
+
+  render
+end
+
+export default PostList
+__END__
+<% if loading %>
+  <div class="loading">Loading...</div>
+<% else %>
+  <div class="posts">
+    <% posts.each do |post| %>
+      <article key={post.id} class="post-card">
+        <h2><a href="/posts/<%= post.slug %>"><%= post.title %></a></h2>
+        <p><%= post.excerpt || post.body.slice(0, 100) %>...</p>
+      </article>
+    <% end %>
+  </div>
+<% end %>
+```
+
+**Output (Preact JSX):**
+```jsx
+import { useState, useEffect } from 'preact/hooks';
+import Post from '../models/Post';
+
+function PostList() {
+  const [posts, setPosts] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Post.all.then(data => {
+      setPosts(data);
+      setLoading(false);
+    });
+  }, []);
+
+  return loading ? (
+    <div class="loading">Loading...</div>
+  ) : (
+    <div class="posts">
+      {posts.map(post => (
+        <article key={post.id} class="post-card">
+          <h2><a href={`/posts/${post.slug}`}>{post.title}</a></h2>
+          <p>{post.excerpt || post.body.slice(0, 100)}...</p>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+export default PostList;
+```
+
+### Implementation Steps
+
+1. **Create ErbPnodeTransformer** (`lib/ruby2js/erb_pnode_transformer.rb`)
+   - SFC splitting (reuse pattern from other transformers)
+   - XML parser for well-formed HTML
+   - ERB expression parsing (`<%= %>`, `<% %>`)
+   - pnode AST generation
+
+2. **Update vite-plugin-ruby2js**
+   - Add `.erb.rb` extension handling
+   - Route through ErbPnodeTransformer
+   - Apply React filter for pnode → JSX output
+
+3. **Add transpile script** (`demo/selfhost/scripts/transpile_erb_pnode_transformer.rb`)
+   - Selfhost the transformer for browser use
+
+4. **Add tests**
+   - Unit tests for XML parsing
+   - Unit tests for ERB expression handling
+   - Integration tests for full SFC → JSX pipeline
+
+### ERB Tag Mapping
+
+| ERB Syntax | Meaning | pnode Output |
+|------------|---------|--------------|
+| `<%= expr %>` | Output expression | Expression as child |
+| `<%- expr %>` | Output (trimmed) | Expression as child |
+| `<% code %>` | Execute code | Control flow AST node |
+| `<% if %>...<% end %>` | Conditional | Ternary or `&&` expression |
+| `<% each %>...<% end %>` | Iteration | `.map()` call |
+
+### Comparison: JSX vs ERB
+
+**JSX style (.jsx.rb):**
+```ruby
+<div class="posts">
+  {posts.map do |post|
+    <article key={post.id}>
+      <h2>{post.title}</h2>
+    </article>
+  end}
+</div>
+```
+
+**ERB style (.erb.rb):**
+```erb
+<div class="posts">
+  <% posts.each do |post| %>
+    <article key={post.id}>
+      <h2><%= post.title %></h2>
+    </article>
+  <% end %>
+</div>
+```
+
+Both produce the same Preact output. ERB is more familiar to Rails developers; JSX is more familiar to React/Preact developers.
+
+### Definition of Done
+
+- [ ] `ErbPnodeTransformer` class with XML parser
+- [ ] ERB expression handling (`<%= %>`, `<% %>`)
+- [ ] Control flow mapping (if/else, each → map)
+- [ ] pnode output compatible with React filter
+- [ ] vite-plugin-ruby2js handles `.erb.rb` files
+- [ ] Selfhosted transformer for browser use
+- [ ] Unit tests for parser
+- [ ] Integration tests for full pipeline
+- [ ] Demo includes at least one `.erb.rb` island
+
+### Success Criteria
+
+- [ ] `PostList.erb.rb` transpiles to valid Preact JSX
+- [ ] ERB and JSX styles can coexist in same project
+- [ ] Rails developers recognize the authoring experience
+- [ ] pnode → React filter pipeline works correctly
+
+---
+
+## Phase 8: Full CRUD and ISR
+
+### Overview
+
+Extend the basic demo with edit/delete functionality and ISR caching.
+
+### Edit/Delete Islands
+
+**src/islands/PostDetail.jsx.rb:**
+```ruby
+import { useState } from 'preact/hooks'
+import Post from '../models/Post'
+import PostForm from './PostForm'
+
+def PostDetail(props)
+  post, setPost = useState(props[:post])
+  editing, setEditing = useState(false)
+  deleted, setDeleted = useState(false)
+
+  handleDelete = -> {
+    return unless confirm("Delete this post?")
+    post.destroy.then do
+      setDeleted(true)
+    end
+  }
+
+  handleSave = ->(updated) {
+    setPost(updated)
+    setEditing(false)
+  }
+
+  return <p>Post deleted. <a href="/posts">Back to posts</a></p> if deleted
+
+  if editing
+    <PostForm post={post} onSave={handleSave} onCancel={-> { setEditing(false) }} />
+  else
+    <article>
+      <h1>{post.title}</h1>
+      <div class="content">{post.body}</div>
+      <div class="actions">
+        <button onClick={-> { setEditing(true) }}>Edit</button>
+        <button onClick={handleDelete} class="danger">Delete</button>
+      </div>
+    </article>
+  end
+end
+
+export default PostDetail
+```
+
+### ISR Implementation
+
+**src/lib/isr.js:**
+```javascript
+// In-memory cache with stale-while-revalidate semantics
 const cache = new Map();
 
-async function withRevalidate(key, ttlSeconds, fetcher) {
+export async function withRevalidate(key, ttlSeconds, fetcher) {
   const cached = cache.get(key);
   const now = Date.now();
 
@@ -652,139 +1430,50 @@ async function withRevalidate(key, ttlSeconds, fetcher) {
   cache.set(key, { data, staleAt: now + ttlSeconds * 1000 });
   return data;
 }
+
+export function invalidate(key) {
+  cache.delete(key);
+}
 ```
 
-The `# Pragma: revalidate 60` pragma triggers this pattern.
-
-### Demo Structure
-
-**Static pages** (rendered at build time):
-- `/` - Landing page with site intro
-- `/about` - Static about page
-
-**Dynamic pages** (ActiveRecord + ISR via islands):
-- `/posts` - Post listing island + authoring form island
-- `/posts/[slug]` - Individual post island + edit form island
-
-**Post Model:**
+**Usage in PostList.jsx.rb:**
 ```ruby
-# models/post.rb
-class Post < ApplicationRecord
-  # title, slug, body, excerpt, published_at
-  scope :published, -> { where.not(published_at: nil) }
+import { useState, useEffect } from 'preact/hooks'
+import { withRevalidate } from '../lib/isr'
+import Post from '../models/Post'
+
+def PostList()
+  posts, setPosts = useState([])
+
+  useEffect -> {
+    withRevalidate('posts:all', 60, -> { Post.all }).then do |data|
+      setPosts(data)
+    end
+  }, []
+
+  # ... render posts
 end
 ```
 
-**Example Page Shell:**
-```ruby
-# pages/posts/index.astro.rb
-__END__
-<Layout title="Posts">
-  <Header />
-  <PostList client:load />
-  <PostForm client:load />
-</Layout>
-```
+### Definition of Done
 
-**Example Publishing Island:**
-```ruby
-# components/PostList.jsx.rb
-# Pragma: revalidate 60
+- [ ] Edit post functionality
+- [ ] Delete post with confirmation
+- [ ] ISR adapter with `withRevalidate(key, ttl, fetcher)`
+- [ ] Cache invalidation on create/update/delete
+- [ ] `# Pragma: revalidate 60` support (optional)
 
-@posts, @setPosts = useState([])
+---
 
-useEffect [] do
-  data = await Post.published.order(published_at: :desc)
-  setPosts(data)
-end
-__END__
-<div class="posts">
-  {posts.map { |post| <PostCard post={post} /> }}
-</div>
-```
+## Phase 9: Multi-Target and Documentation
 
-**Example Authoring Island:**
-```ruby
-# components/PostForm.jsx.rb
+### Overview
 
-@title, @setTitle = useState("")
-@body, @setBody = useState("")
+Add Juntos integration for multi-target deployment and complete documentation.
 
-def handleSubmit(e)
-  e.preventDefault
-  post = Post.new(title: @title, body: @body, slug: @title.parameterize)
-  await post.save
-  setTitle("")
-  setBody("")
-end
-__END__
-<form onSubmit={handleSubmit}>
-  <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" />
-  <textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder="Body" />
-  <button type="submit">Create Post</button>
-</form>
-```
+### Multi-Target Support
 
-**Layout with View Transitions:**
-```ruby
-# layouts/Layout.astro.rb
-import { ViewTransitions } from 'astro:transitions'
-
-@title = props[:title]
-__END__
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>{title}</title>
-  <ViewTransitions />
-</head>
-<body>
-  <slot />
-</body>
-</html>
-```
-
-View Transitions provide smooth animated navigation between pages - a key Astro 3+ feature that works seamlessly with the Ruby integration.
-
-### Demo Flow
-
-Within the same Astro app:
-
-1. **View posts** → PostList island queries IndexedDB, displays cached results
-2. **Create post** → PostForm island saves to IndexedDB
-3. **See update** → After revalidate period, PostList fetches fresh data
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     Astro Blog Demo                          │
-│                                                              │
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │                    /posts page                        │   │
-│  │                                                       │   │
-│  │  ┌─────────────────┐         ┌─────────────────┐     │   │
-│  │  │   PostList      │         │   PostForm      │     │   │
-│  │  │   (publishing)  │◀────────│   (authoring)   │     │   │
-│  │  │                 │  ISR    │                 │     │   │
-│  │  │  - First Post   │ refresh │  Title: [____]  │     │   │
-│  │  │  - Second Post  │         │  Body:  [____]  │     │   │
-│  │  │  - Third Post   │         │  [Create Post]  │     │   │
-│  │  └────────┬────────┘         └────────┬────────┘     │   │
-│  │           │                           │              │   │
-│  │           └───────────┬───────────────┘              │   │
-│  │                       │                              │   │
-│  │                ┌──────▼──────┐                       │   │
-│  │                │  IndexedDB  │                       │   │
-│  │                └─────────────┘                       │   │
-│  └──────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### Dockerfile
-
-Uses the same Juntos commands as other demos, supporting multiple targets:
-
+**Dockerfile (multi-target):**
 ```dockerfile
 FROM ruby
 
@@ -803,8 +1492,8 @@ RUN chmod +x create-astro-blog && ./create-astro-blog astro-blog
 WORKDIR /app/astro-blog
 
 # Build args for Juntos
-ARG DATABASE=sqlite
-ARG TARGET=node
+ARG DATABASE=dexie
+ARG TARGET=browser
 
 ENV JUNTOS_DATABASE=${DATABASE}
 ENV JUNTOS_TARGET=${TARGET}
@@ -824,71 +1513,9 @@ CMD ["bin/juntos", "server"]
 
 | Command | Database | Target | Use Case |
 |---------|----------|--------|----------|
-| `docker build -t astro-blog .` | SQLite | Node.js | Self-hosted server |
-| `docker build --build-arg DATABASE=dexie --build-arg TARGET=browser -t astro-blog .` | IndexedDB | Browser | Static hosting / CDN |
-
-Run with: `docker run -p 4321:4321 astro-blog`
-
-Same Ruby code works in both environments - the Post model automatically uses the appropriate database backend.
-
-### Definition of Done
-
-- [ ] Post model with ActiveRecord queries (IndexedDB)
-- [ ] Seed data (3 posts)
-- [ ] Static pages: index (landing), about
-- [ ] Publishing islands: PostList, PostCard, PostDetail
-- [ ] Authoring islands: PostForm (create/edit)
-- [ ] View Transitions for smooth page navigation
-- [ ] In-memory ISR adapter (~30 lines)
-- [ ] `# Pragma: revalidate` working in islands
-- [ ] Dockerfile for containerized deployment
-- [ ] Update integration test (`test/integration/astro_blog.test.mjs`)
-- [ ] Documentation: ISR page, demo page, cross-references
-- [ ] Full authoring → publishing workflow demonstrated
-
-### Integration Test Updates
-
-The existing test validates static markdown content. Update to test:
-
-```javascript
-describe('Astro Blog Integration Tests', () => {
-  describe('Build Output', () => {
-    it('generates static pages', () => {
-      // Landing page and about page exist
-    });
-
-    it('generates post shell pages', () => {
-      // /posts/index.html and /posts/[slug]/index.html exist
-    });
-  });
-
-  describe('Islands', () => {
-    it('includes PostList island with client:load', () => {
-      // Check for hydration script
-    });
-
-    it('includes PostForm island with client:load', () => {
-      // Check for form component
-    });
-  });
-
-  describe('ActiveRecord', () => {
-    it('includes Post model', () => {
-      // Check for model JS in build output
-    });
-
-    it('includes seed data', () => {
-      // Seeds should be bundled for browser target
-    });
-  });
-
-  describe('ISR', () => {
-    it('includes ISR adapter', () => {
-      // Check for withRevalidate function
-    });
-  });
-});
-```
+| `docker build -t astro-blog .` | IndexedDB | Browser | Static hosting / CDN |
+| `docker build --build-arg DATABASE=sqlite --build-arg TARGET=node -t astro-blog .` | SQLite | Node.js | Self-hosted server |
+| `docker build --build-arg DATABASE=turso --build-arg TARGET=cloudflare -t astro-blog .` | Turso | Cloudflare | Edge deployment |
 
 ### Documentation Updates
 
@@ -921,7 +1548,7 @@ Demo documentation covering:
 
 Add to Available Demos table:
 ```markdown
-| **[Astro Blog](/docs/juntos/demos/astro-blog)** | Astro islands, ISR caching, ActiveRecord with IndexedDB/SQLite, authoring + publishing |
+| **[Astro Blog](/docs/juntos/demos/astro-blog)** | Astro islands, ActiveRecord with IndexedDB/SQLite, authoring + publishing |
 ```
 
 **Update: `docs/src/_docs/juntos/coming-from/astro.md`**
@@ -938,27 +1565,30 @@ Add ISR section linking to the main ISR page.
 **Update: `docs/src/_docs/juntos/roadmap.md`**
 
 Add to "Recently Implemented":
+- Astro Blog demo with Preact islands
 - In-memory ISR for browser and Node.js targets
 - `# Pragma: revalidate` support
 
-### Success Criteria
+### Definition of Done
 
-- [ ] Demo proves https://www.ruby2js.com/docs/juntos/coming-from/astro is real
-- [ ] Create post in form → see it appear in list (after revalidate)
-- [ ] Edit post → see changes reflected
-- [ ] Delete post → see it removed
-- [ ] ISR caching observable (fast loads within TTL)
-- [ ] Documentation complete (ISR page, demo page, cross-references)
+- [ ] Juntos CLI works with Astro projects
+- [ ] Multi-target Dockerfile
+- [ ] ISR documentation page
+- [ ] Astro Blog demo documentation page
+- [ ] Cross-references in existing docs
+- [ ] Roadmap updated
 
-### Future Roadmap (If Demand)
+---
 
-These enhancements are documented but not implemented in the initial demo:
+## Future Roadmap (If Demand)
+
+These enhancements are documented but not planned for initial implementation:
 
 | Feature | Current | Future |
 |---------|---------|--------|
 | Browser ISR | In-memory cache | Service Worker + Cache API |
 | Node.js ISR | In-memory cache | Redis |
 | Offline support | Not implemented | Service Worker |
-| Multiple platforms | Browser only | Node.js, Cloudflare, Vercel, Electron, Tauri, Capacitor |
+| Additional platforms | Browser, Node.js | Electron, Tauri, Capacitor |
 
 The architecture supports these upgrades without changing application code—only the ISR adapter implementation would change.
