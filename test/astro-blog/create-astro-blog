@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
-# Create an Astro blog demo with .astro.rb files
+# Create an Astro blog demo with .astro.rb and .jsx.rb files
 # Usage: create-astro-blog [app-name]
 #
-# Creates a static blog featuring:
-# - Ruby code in Astro components (.astro.rb files)
-# - Markdown blog posts with frontmatter
-# - Automatic slug-based routing
-# - Clean, minimal styling
+# Creates a full-stack blog demo featuring:
+# - Level 1: Static content (.md) - About page
+# - Level 2: Astro pages (.astro.rb) - Layout, landing, post shells
+# - Level 3: Preact Islands (.jsx.rb) - PostList, PostForm with IndexedDB
+#
+# This demonstrates Ruby2JS at every level of an Astro project.
 
 set -e
 
@@ -34,140 +35,88 @@ npm create astro@latest "$APP_NAME" -- --template minimal --no-git --skip-housto
 
 cd "$APP_DIR"
 
-# Install ruby2js and ruby2js-astro from local paths or tarballs
+# Install dependencies
 # In CI, these will be replaced with the actual tarball paths
 if [ -n "$RUBY2JS_TARBALL" ]; then
-  npm install "$RUBY2JS_TARBALL" "$ASTRO_INTEGRATION_TARBALL"
+  npm install "$RUBY2JS_TARBALL" "$ASTRO_INTEGRATION_TARBALL" "$VITE_PLUGIN_TARBALL" "$RAILS_TARBALL"
+  npm install @astrojs/preact preact dexie
 else
   # Default: assume we're in the ruby2js repo for local dev
-  npm install "$REPO_ROOT/demo/selfhost" "$REPO_ROOT/packages/ruby2js-astro"
+  npm install "$REPO_ROOT/demo/selfhost" "$REPO_ROOT/packages/ruby2js-astro" "$REPO_ROOT/packages/vite-plugin-ruby2js" "$REPO_ROOT/packages/ruby2js-rails"
+  npm install @astrojs/preact preact dexie
 fi
-
-# Update astro.config.mjs to use ruby2js-astro integration
-cat > astro.config.mjs << 'CONFIG'
-import { defineConfig } from 'astro/config';
-import ruby2js from 'ruby2js-astro';
-
-export default defineConfig({
-  integrations: [ruby2js()]
-});
-CONFIG
 
 # Remove the default index.astro from the template
 rm -f src/pages/index.astro
 
 # Create directory structure
-mkdir -p src/content/posts src/layouts src/components src/pages/posts public
+mkdir -p src/layouts src/pages/posts src/islands src/models src/lib public
 
 # ============================================
-# Create markdown blog posts
+# Astro configuration with Preact + Ruby2JS
 # ============================================
 
-cat > src/content/posts/getting-started.md << 'POST'
----
-title: Getting Started with Ruby2JS
-date: 2024-01-15
-excerpt: Learn how to write Astro components using Ruby syntax.
----
+cat > astro.config.mjs << 'CONFIG'
+import { defineConfig } from 'astro/config';
+import preact from '@astrojs/preact';
+import ruby2js from 'ruby2js-astro';
+import ruby2jsVite from 'vite-plugin-ruby2js';
 
-Ruby2JS allows you to write your Astro component logic in Ruby, which gets
-transpiled to JavaScript at build time.
-
-## Why Ruby?
-
-If you're coming from a Rails background, Ruby's syntax feels natural. You can
-use familiar patterns like blocks, method chaining, and snake_case identifiers.
-
-## Example
-
-```ruby
-@posts = Astro.glob("../content/posts/*.md")
-@sorted = @posts.sort_by { |p| p.frontmatter.date }.reverse
-```
-
-This Ruby code becomes clean JavaScript:
-
-```javascript
-const posts = await Astro.glob("../content/posts/*.md");
-const sorted = posts.sort((a, b) => b.frontmatter.date - a.frontmatter.date);
-```
-POST
-
-cat > src/content/posts/astro-components.md << 'POST'
----
-title: Writing Astro Components in Ruby
-date: 2024-01-20
-excerpt: Explore the .astro.rb file format and template syntax.
----
-
-Astro components written in Ruby use the `.astro.rb` extension and follow a
-simple two-part structure.
-
-## File Structure
-
-```ruby
-# Ruby code for the component
-@title = Astro.props[:title]
-@items = await fetch_items()
-__END__
-<!-- Astro template below -->
-<div>
-  <h1>{title}</h1>
-  {items.map(item => <Item item={item} />)}
-</div>
-```
-
-## Instance Variables
-
-Instance variables (`@var`) become local `const` declarations:
-
-- `@title = "Hello"` becomes `const title = "Hello"`
-- Use them in templates as `{title}`
-
-## Props Access
-
-Access component props with `Astro.props[:name]`:
-
-- `@user = Astro.props[:user]`
-- Destructured in output: `const { user } = Astro.props`
-POST
-
-cat > src/content/posts/deployment.md << 'POST'
----
-title: Deploying Your Astro Blog
-date: 2024-01-25
-excerpt: Build and deploy your Ruby-powered Astro site.
----
-
-Since Astro generates static HTML, deployment is straightforward.
-
-## Build Command
-
-```bash
-npm run build
-```
-
-This creates a `dist/` folder with your static site.
-
-## Deployment Options
-
-1. **GitHub Pages** - Free hosting for static sites
-2. **Netlify** - Automatic builds from Git
-3. **Vercel** - Zero-config deployment
-4. **Cloudflare Pages** - Fast global CDN
-
-## CI Integration
-
-The Ruby2JS CI builds and deploys this demo automatically to GitHub Pages
-at `ruby2js.github.io/ruby2js/astro-blog/`.
-POST
+export default defineConfig({
+  integrations: [
+    ruby2js(),
+    preact()
+  ],
+  vite: {
+    plugins: [
+      // Handle .jsx.rb files -> JSX with React+JSX filters
+      ruby2jsVite({
+        include: ['**/*.jsx.rb'],
+        // Note: vite-plugin-ruby2js automatically uses React+JSX+Functions+ESM filters for .jsx.rb
+      })
+    ]
+  }
+});
+CONFIG
 
 # ============================================
-# Create layout component
+# Level 1: Static Content (Markdown)
+# ============================================
+
+cat > src/pages/about.md << 'ABOUT'
+---
+layout: ../layouts/Layout.astro
+title: About
+---
+
+# About This Blog
+
+This is a demo of Ruby2JS with Astro. It shows how Ruby can be used
+at every level of an Astro project:
+
+1. **Static content** (this page) - Plain markdown, no Ruby required
+2. **Astro pages** - Ruby code in `.astro.rb` files, rendered at build time
+3. **Interactive islands** - Preact components in `.jsx.rb` files, hydrated on client
+
+## How It Works
+
+- Posts are stored in **IndexedDB** using [Dexie.js](https://dexie.org/)
+- The **PostList** island displays posts from the database
+- The **PostForm** island creates new posts
+- All Ruby code transpiles to JavaScript via Ruby2JS
+
+Built with Ruby2JS.
+ABOUT
+
+# ============================================
+# Level 2: Layout with View Transitions
 # ============================================
 
 cat > src/layouts/Layout.astro.rb << 'LAYOUT'
-@title = Astro.props[:title] || "My Blog"
+import ['ViewTransitions'], from: 'astro:transitions'
+
+# Support both direct props (Astro pages) and frontmatter (markdown pages)
+@title = Astro.props[:title] || Astro.props[:frontmatter]&.[](:title) || "Astro Blog"
 __END__
 <!DOCTYPE html>
 <html lang="en">
@@ -175,12 +124,14 @@ __END__
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>{title}</title>
+  <ViewTransitions />
   <style>
     :root {
       --color-bg: #f8fafc;
       --color-text: #1e293b;
       --color-primary: #3b82f6;
       --color-muted: #64748b;
+      --color-border: #e2e8f0;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -196,9 +147,51 @@ __END__
     }
     a { color: var(--color-primary); text-decoration: none; }
     a:hover { text-decoration: underline; }
+    nav {
+      padding: 1rem 2rem;
+      border-bottom: 1px solid var(--color-border);
+      background: white;
+    }
+    nav a { margin-right: 1rem; }
+    .post-card {
+      padding: 1rem;
+      margin: 1rem 0;
+      background: white;
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+    }
+    .post-form input, .post-form textarea {
+      width: 100%;
+      margin: 0.5rem 0;
+      padding: 0.75rem;
+      border: 1px solid var(--color-border);
+      border-radius: 4px;
+      font-size: 1rem;
+    }
+    .post-form button {
+      background: var(--color-primary);
+      color: white;
+      padding: 0.75rem 1.5rem;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 1rem;
+    }
+    .post-form button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .loading { color: var(--color-muted); }
+    h1 { margin-bottom: 1rem; }
+    h2 { margin: 1.5rem 0 1rem; }
   </style>
 </head>
 <body>
+  <nav>
+    <a href="/">Home</a>
+    <a href="/posts">Posts</a>
+    <a href="/about">About</a>
+  </nav>
   <div class="container">
     <slot />
   </div>
@@ -207,138 +200,387 @@ __END__
 LAYOUT
 
 # ============================================
-# Create header component
-# ============================================
-
-cat > src/components/Header.astro.rb << 'HEADER'
-@site_title = "Ruby2JS Blog"
-__END__
-<header style="margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: 1px solid #e2e8f0;">
-  <h1 style="font-size: 1.5rem; margin-bottom: 0.5rem;">
-    <a href="/" style="color: inherit;">{siteTitle}</a>
-  </h1>
-  <p style="color: var(--color-muted); font-size: 0.875rem;">
-    Static blog powered by Astro + Ruby2JS
-  </p>
-</header>
-HEADER
-
-# ============================================
-# Create post card component
-# ============================================
-
-cat > src/components/PostCard.astro.rb << 'POSTCARD'
-@post = Astro.props[:post]
-@title = @post.frontmatter.title
-@date = @post.frontmatter.date
-@excerpt = @post.frontmatter.excerpt
-@url = @post.url
-__END__
-<article style="margin-bottom: 1.5rem; padding: 1rem; background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-  <h2 style="font-size: 1.25rem; margin-bottom: 0.5rem;">
-    <a href={url}>{title}</a>
-  </h2>
-  <time style="color: var(--color-muted); font-size: 0.875rem;" datetime={date}>
-    {new Date(date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
-  </time>
-  <p style="margin-top: 0.5rem; color: var(--color-text);">{excerpt}</p>
-</article>
-POSTCARD
-
-# ============================================
-# Create index page
+# Level 2: Landing Page
 # ============================================
 
 cat > src/pages/index.astro.rb << 'INDEX'
-import Layout from '../layouts/Layout.astro'
-import Header from '../components/Header.astro'
-import PostCard from '../components/PostCard.astro'
+import Layout, from: '../layouts/Layout.astro'
 
-@title = "Recent Posts"
-@posts = await Astro.glob("../content/posts/*.md")
-@sorted_posts = @posts.sort_by { |p| p.frontmatter.date }.reverse
+@title = "Astro Blog with Ruby2JS"
 __END__
 <Layout title={title}>
-  <Header />
   <main>
-    <h2 style="font-size: 1.5rem; margin-bottom: 1rem;">Recent Posts</h2>
-    <div>
-      {sortedPosts.map(post => <PostCard post={post} />)}
-    </div>
+    <h1>Welcome to the Astro Blog</h1>
+    <p style="margin-bottom: 2rem;">
+      This demo shows Ruby2JS working at every level of an Astro project.
+    </p>
+
+    <section style="margin-bottom: 2rem;">
+      <h2>Three Levels of Ruby</h2>
+      <ul style="list-style: disc; padding-left: 1.5rem;">
+        <li><strong>Level 1:</strong> Static markdown (<a href="/about">About page</a>)</li>
+        <li><strong>Level 2:</strong> Astro pages in <code>.astro.rb</code> (this page)</li>
+        <li><strong>Level 3:</strong> Preact islands in <code>.jsx.rb</code> (<a href="/posts">Posts page</a>)</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Get Started</h2>
+      <p>
+        Visit the <a href="/posts">Posts page</a> to create and view blog posts.
+        Posts are stored in your browser's IndexedDB.
+      </p>
+    </section>
   </main>
 </Layout>
 INDEX
 
 # ============================================
-# Create dynamic post page
+# Level 2: Posts Shell (hosts islands)
 # ============================================
 
-mkdir -p src/pages/posts
+cat > src/pages/posts/index.astro.rb << 'POSTS'
+import Layout, from: '../../layouts/Layout.astro'
+import PostList, from: '../../islands/PostList.jsx'
+import PostForm, from: '../../islands/PostForm.jsx'
 
-cat > 'src/pages/posts/[...slug].astro.rb' << 'POSTPAGE'
-import Layout from '../../layouts/Layout.astro'
-import Header from '../../components/Header.astro'
-
-# Astro requires getStaticPaths for dynamic routes
-export async def get_static_paths
-  posts = await Astro.glob("../../content/posts/*.md")
-  posts.map do |post|
-    slug = post.file.split('/').pop.replace('.md', '')
-    { params: { slug: slug }, props: { post: post } }
-  end
-end
-
-@post = Astro.props[:post]
-@title = @post.frontmatter.title
-@date = @post.frontmatter.date
-@Content = @post.Content
+@title = "Blog Posts"
 __END__
 <Layout title={title}>
-  <Header />
+  <main>
+    <h1>Blog Posts</h1>
+
+    <section style="margin-bottom: 2rem;">
+      <PostList client:load />
+    </section>
+
+    <section>
+      <h2>Create New Post</h2>
+      <PostForm client:load />
+    </section>
+  </main>
+</Layout>
+POSTS
+
+# ============================================
+# Level 2: Post Detail Shell
+# ============================================
+
+cat > 'src/pages/posts/[slug].astro.rb' << 'POSTDETAIL'
+import Layout, from: '../../layouts/Layout.astro'
+
+# Return empty paths - this route loads data client-side from IndexedDB
+# Routes are accessed via View Transitions navigation, not pre-rendered
+export def getStaticPaths
+  []
+end
+
+@slug = Astro.params.slug
+@title = "Post"
+__END__
+<Layout title={title}>
   <article>
-    <header style="margin-bottom: 2rem;">
-      <h1 style="font-size: 2rem; margin-bottom: 0.5rem;">{title}</h1>
-      <time style="color: var(--color-muted);" datetime={date}>
-        {new Date(date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
-      </time>
-    </header>
-    <div class="content" style="line-height: 1.8;">
-      <Content />
+    <div id="post-content" data-slug={slug}>
+      <p class="loading">Loading post...</p>
     </div>
-    <footer style="margin-top: 2rem; padding-top: 1rem; border-top: 1px solid #e2e8f0;">
-      <a href="/">&larr; Back to all posts</a>
+    <footer style="margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--color-border);">
+      <a href="/posts">&larr; Back to all posts</a>
     </footer>
   </article>
+
+  <script>
+    // Client-side: load post from IndexedDB
+    import { setupDatabase, Post } from '../../lib/db.js';
+
+    const container = document.getElementById('post-content');
+    const slug = container?.dataset.slug;
+
+    if (slug) {
+      setupDatabase().then(async () => {
+        const post = await Post.findBy({ slug });
+        if (post) {
+          container.innerHTML = `
+            <h1>${post.title}</h1>
+            <time style="color: var(--color-muted);">${new Date(post.createdAt).toLocaleDateString()}</time>
+            <div style="margin-top: 1rem; white-space: pre-wrap;">${post.body}</div>
+          `;
+        } else {
+          container.innerHTML = '<p>Post not found.</p>';
+        }
+      });
+    }
+  </script>
 </Layout>
-
-<style>
-  .content :global(h2) { font-size: 1.5rem; margin: 1.5rem 0 0.5rem; }
-  .content :global(h3) { font-size: 1.25rem; margin: 1.25rem 0 0.5rem; }
-  .content :global(p) { margin-bottom: 1rem; }
-  .content :global(pre) { background: #1e293b; color: #e2e8f0; padding: 1rem; border-radius: 8px; overflow-x: auto; margin-bottom: 1rem; }
-  .content :global(code) { font-family: 'Fira Code', monospace; font-size: 0.875rem; }
-  .content :global(ul), .content :global(ol) { margin-bottom: 1rem; padding-left: 1.5rem; }
-</style>
-POSTPAGE
+POSTDETAIL
 
 # ============================================
-# Create favicon
+# Database Setup (JavaScript)
 # ============================================
 
-# Simple SVG favicon
+cat > src/lib/db.js << 'DATABASE'
+import Dexie from 'dexie';
+
+// Create the database
+const db = new Dexie('astro_blog');
+
+// Define schema (using camelCase to match Ruby2JS transpiled code)
+db.version(1).stores({
+  posts: '++id, title, slug, createdAt, updatedAt'
+});
+
+// Simple Post model wrapping Dexie
+export class Post {
+  constructor(attrs = {}) {
+    Object.assign(this, attrs);
+  }
+
+  static get table() {
+    return db.posts;
+  }
+
+  static async all() {
+    const rows = await this.table.orderBy('createdAt').reverse().toArray();
+    return rows.map(r => new Post(r));
+  }
+
+  static async find(id) {
+    const row = await this.table.get(Number(id));
+    return row ? new Post(row) : null;
+  }
+
+  static async findBy(conditions) {
+    const row = await this.table.where(conditions).first();
+    return row ? new Post(row) : null;
+  }
+
+  static async count() {
+    return await this.table.count();
+  }
+
+  static async create(attrs) {
+    const now = new Date().toISOString();
+    const data = {
+      ...attrs,
+      slug: attrs.slug || attrs.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
+      createdAt: attrs.createdAt || now,
+      updatedAt: now
+    };
+    const id = await this.table.add(data);
+    return new Post({ ...data, id });
+  }
+
+  async save() {
+    const now = new Date().toISOString();
+    this.updatedAt = now;
+    if (!this.slug) {
+      this.slug = this.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    }
+    if (this.id) {
+      await Post.table.put({ ...this });
+    } else {
+      this.createdAt = this.createdAt || now;
+      this.id = await Post.table.add({ ...this });
+    }
+    return this;
+  }
+
+  async destroy() {
+    if (this.id) {
+      await Post.table.delete(this.id);
+    }
+  }
+}
+
+// Setup and seed database
+export async function setupDatabase() {
+  await db.open();
+
+  // Seed if empty
+  const count = await Post.count();
+  if (count === 0) {
+    await Post.create({
+      title: 'Getting Started with Ruby2JS',
+      body: 'Ruby2JS allows you to write your Astro components in Ruby, which gets transpiled to JavaScript at build time.\n\nThis post was seeded automatically to demonstrate the blog functionality.',
+      slug: 'getting-started'
+    });
+
+    await Post.create({
+      title: 'Preact Islands in Astro',
+      body: 'Astro islands provide partial hydration for interactive components. This demo uses Preact for the PostList and PostForm islands.\n\nThe Ruby code in .jsx.rb files transpiles to JSX, which Astro then processes with Preact.',
+      slug: 'preact-islands'
+    });
+
+    await Post.create({
+      title: 'ActiveRecord in the Browser',
+      body: 'With Dexie.js as the backend, you can use ActiveRecord-like patterns in the browser.\n\nPost.all, Post.find, Post.create - familiar patterns for Rails developers.',
+      slug: 'activerecord-browser'
+    });
+
+    console.log('Seeded 3 posts');
+  }
+
+  return db;
+}
+
+export { db };
+DATABASE
+
+# ============================================
+# Level 3: PostList Island (.jsx.rb)
+# ============================================
+
+cat > src/islands/PostList.jsx.rb << 'POSTLIST'
+import ['useState', 'useEffect'], from: 'preact/hooks'
+import ['setupDatabase', 'Post'], from: '../lib/db.js'
+
+def PostList()
+  posts, setPosts = useState([])
+  loading, setLoading = useState(true)
+
+  loadPosts = -> {
+    Post.all().then do |data|
+      setPosts(data)
+      setLoading(false)
+    end
+  }
+
+  useEffect -> {
+    setupDatabase().then { loadPosts.() }
+  }, []
+
+  # Listen for new posts
+  useEffect -> {
+    handler = ->(e) { loadPosts.() }
+    window.addEventListener('post-created', handler)
+    -> { window.removeEventListener('post-created', handler) }
+  }, []
+
+  return `<div class="loading">Loading posts...</div>` if loading
+  return `<p>No posts yet. Create one below!</p>` if posts.length == 0
+
+  # Render a single post card - defined separately to avoid arrow function parsing issues in JSX
+  renderPost = ->(post) {
+    `<article key={post.id} class="post-card">
+      <h3>
+        <a href={"/posts/" + post.slug}>{post.title}</a>
+      </h3>
+      <time style="color: var(--color-muted); font-size: 0.875rem;">
+        {new Date(post.created_at).toLocaleDateString()}
+      </time>
+      <p style="margin-top: 0.5rem;">
+        {post.body.slice(0, 150)}...
+      </p>
+    </article>`
+  }
+
+  `<div class="posts">
+    {posts.map(renderPost)}
+  </div>`
+end
+
+export default PostList
+POSTLIST
+
+# ============================================
+# Level 3: PostForm Island (.jsx.rb)
+# ============================================
+
+cat > src/islands/PostForm.jsx.rb << 'POSTFORM'
+import ['useState'], from: 'preact/hooks'
+import ['Post'], from: '../lib/db.js'
+
+def PostForm()
+  postTitle, setPostTitle = useState("")
+  postBody, setPostBody = useState("")
+  saving, setSaving = useState(false)
+
+  handleSubmit = ->(e) {
+    e.preventDefault()
+    return if postTitle.trim() == "" || postBody.trim() == ""
+
+    setSaving(true)
+
+    Post.create({ title: postTitle, body: postBody }).then do |post|
+      setPostTitle("")
+      setPostBody("")
+      setSaving(false)
+      # Notify PostList to refresh
+      window.dispatchEvent(new CustomEvent('post-created'))
+    end
+  }
+
+  `<form onSubmit={handleSubmit} class="post-form">
+    <input
+      type="text"
+      value={postTitle}
+      onInput={->(e) { setPostTitle(e.target.value) }}
+      placeholder="Post title"
+      disabled={saving}
+    />
+    <textarea
+      value={postBody}
+      onInput={->(e) { setPostBody(e.target.value) }}
+      placeholder="Write your post..."
+      rows={6}
+      disabled={saving}
+    />
+    <button type="submit" disabled={saving || postTitle.trim() == "" || postBody.trim() == ""}>
+      {saving ? "Creating..." : "Create Post"}
+    </button>
+  </form>`
+end
+
+export default PostForm
+POSTFORM
+
+# ============================================
+# Favicon
+# ============================================
+
 cat > public/favicon.svg << 'FAVICON'
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
   <text y="0.9em" font-size="80">💎</text>
 </svg>
 FAVICON
 
-# Update package.json to reference the favicon
-# (Astro handles this automatically)
+# ============================================
+# Dockerfile
+# ============================================
+
+cat > Dockerfile << 'DOCKERFILE'
+FROM node:24-slim
+
+WORKDIR /app
+
+# Copy package files and install dependencies
+COPY package*.json ./
+RUN npm install
+
+# Copy source files
+COPY . .
+
+# Build the static site
+RUN npm run build
+
+# Serve with a simple static server
+RUN npm install -g serve
+
+EXPOSE 4321
+
+CMD ["serve", "-s", "dist", "-l", "4321"]
+DOCKERFILE
 
 echo ""
 echo "==================================="
 echo "Astro blog created: $APP_NAME"
 echo "==================================="
+echo ""
+echo "Features:"
+echo "  - Level 1: Static markdown (/about)"
+echo "  - Level 2: Astro pages in .astro.rb"
+echo "  - Level 3: Preact islands in .jsx.rb"
+echo "  - IndexedDB storage via Dexie.js"
+echo "  - View Transitions for smooth navigation"
 echo ""
 echo "To run locally:"
 echo "  cd $APP_NAME"
@@ -346,4 +588,8 @@ echo "  npm run dev"
 echo ""
 echo "To build for production:"
 echo "  npm run build"
+echo ""
+echo "To run with Docker:"
+echo "  docker build -t astro-blog ."
+echo "  docker run -p 4321:4321 astro-blog"
 echo ""

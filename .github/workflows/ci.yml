@@ -234,6 +234,8 @@ jobs:
         run: |
           export RUBY2JS_TARBALL="$GITHUB_WORKSPACE/artifacts/tarballs/ruby2js-beta.tgz"
           export ASTRO_INTEGRATION_TARBALL="$GITHUB_WORKSPACE/artifacts/tarballs/ruby2js-astro-beta.tgz"
+          export VITE_PLUGIN_TARBALL="$GITHUB_WORKSPACE/artifacts/tarballs/vite-plugin-ruby2js-beta.tgz"
+          export RAILS_TARBALL="$GITHUB_WORKSPACE/artifacts/tarballs/ruby2js-rails-beta.tgz"
           test/astro-blog/create-astro-blog artifacts/astro-blog
           tar -czf artifacts/demo-astro-blog.tar.gz -C artifacts astro-blog
 
@@ -483,8 +485,8 @@ jobs:
           echo "Building astro-blog for GitHub Pages..."
           base_path="/ruby2js/astro-blog/"
           cd artifacts/astro-blog
-          # Install ruby2js packages from tarballs
-          npm install ../tarballs/ruby2js-beta.tgz ../tarballs/ruby2js-astro-beta.tgz
+          # Install ruby2js packages from tarballs (includes vite-plugin for .jsx.rb support)
+          npm install ../tarballs/ruby2js-beta.tgz ../tarballs/ruby2js-astro-beta.tgz ../tarballs/vite-plugin-ruby2js-beta.tgz ../tarballs/ruby2js-rails-beta.tgz
           # Build with base path for GitHub Pages
           npm run build -- --base "$base_path"
 

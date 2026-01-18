@@ -1,11 +1,17 @@
-// Integration tests for the Astro blog demo
-// Unlike Rails demos, this validates static site build output
-// No database or controller testing - just HTML generation
+// Integration tests for the Astro blog demo (Phase 6)
+// Tests the three-level architecture:
+// - Level 1: Static markdown (about page)
+// - Level 2: Astro pages (.astro.rb)
+// - Level 3: Preact islands (.jsx.rb)
+//
+// Note: Posts are stored in IndexedDB (client-side), so we can't test
+// post content at build time. We verify structure and island inclusion.
 
 import { describe, it, expect, beforeAll } from 'vitest';
 import { readFileSync, existsSync, readdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { globSync } from 'glob';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DEMO_DIR = join(__dirname, 'workspace/astro_blog');
@@ -17,149 +23,188 @@ describe('Astro Blog Integration Tests', () => {
     expect(existsSync(DIST_DIR)).toBe(true);
   });
 
-  describe('Build Output', () => {
-    it('generates index.html', () => {
+  describe('Build Output Structure', () => {
+    it('generates index.html (landing page)', () => {
       const indexPath = join(DIST_DIR, 'index.html');
       expect(existsSync(indexPath)).toBe(true);
 
       const html = readFileSync(indexPath, 'utf-8');
-      expect(html).toContain('Recent Posts');
-      expect(html).toContain('Ruby2JS Blog');
+      expect(html).toContain('Welcome to the Astro Blog');
+      expect(html).toContain('Three Levels of Ruby');
     });
 
-    it('generates post pages', () => {
-      // Check that post directories were created
-      const postsDir = join(DIST_DIR, 'posts');
-      expect(existsSync(postsDir)).toBe(true);
+    it('generates about page (Level 1 - markdown)', () => {
+      const aboutPath = join(DIST_DIR, 'about/index.html');
+      expect(existsSync(aboutPath)).toBe(true);
 
-      // Should have directories for each post
-      const postDirs = readdirSync(postsDir, { withFileTypes: true })
-        .filter(d => d.isDirectory())
-        .map(d => d.name);
-
-      expect(postDirs).toContain('getting-started');
-      expect(postDirs).toContain('astro-components');
-      expect(postDirs).toContain('deployment');
+      const html = readFileSync(aboutPath, 'utf-8');
+      expect(html).toContain('About This Blog');
+      expect(html).toContain('Static content');
+      expect(html).toContain('IndexedDB');
     });
 
-    it('generates valid post HTML', () => {
-      const postPath = join(DIST_DIR, 'posts/getting-started/index.html');
-      expect(existsSync(postPath)).toBe(true);
+    it('generates posts index page (Level 2 - hosts islands)', () => {
+      const postsPath = join(DIST_DIR, 'posts/index.html');
+      expect(existsSync(postsPath)).toBe(true);
 
-      const html = readFileSync(postPath, 'utf-8');
-      expect(html).toContain('Getting Started with Ruby2JS');
-      // Astro adds data-astro-cid attributes to elements
-      expect(html).toMatch(/<article[^>]*>/);
-      expect(html).toContain('Back to all posts');
-    });
-  });
-
-  describe('Ruby Transformation', () => {
-    it('transforms snake_case to camelCase in output', () => {
-      const indexPath = join(DIST_DIR, 'index.html');
-      const html = readFileSync(indexPath, 'utf-8');
-
-      // sorted_posts should become sortedPosts
-      // The generated JS would have been executed, but we can check
-      // that the output looks correct (posts are sorted by date)
-      expect(html).not.toContain('sorted_posts');
-      expect(html).not.toContain('site_title');
+      const html = readFileSync(postsPath, 'utf-8');
+      expect(html).toContain('Blog Posts');
+      expect(html).toContain('Create New Post');
     });
 
-    it('transforms Ruby blocks to arrow functions (posts are mapped)', () => {
-      const indexPath = join(DIST_DIR, 'index.html');
-      const html = readFileSync(indexPath, 'utf-8');
-
-      // The index page should have multiple post cards from .map
-      // Count the post card articles
-      const postCardMatches = html.match(/<article[^>]*style=/g);
-      expect(postCardMatches).not.toBeNull();
-      expect(postCardMatches.length).toBeGreaterThanOrEqual(3); // 3 posts
-    });
-
-    it('transforms instance variables to const declarations', () => {
-      // The transformation happens at build time, and variables become
-      // JavaScript consts. We can verify the output uses the values correctly.
-      const postPath = join(DIST_DIR, 'posts/deployment/index.html');
-      const html = readFileSync(postPath, 'utf-8');
-
-      // @title becomes title, used in <h1>{title}</h1>
-      expect(html).toContain('Deploying Your Astro Blog');
-    });
-  });
-
-  describe('Content', () => {
-    it('renders markdown content in posts', () => {
-      const postPath = join(DIST_DIR, 'posts/getting-started/index.html');
-      const html = readFileSync(postPath, 'utf-8');
-
-      // Should contain rendered markdown
-      expect(html).toContain('<h2');
-      expect(html).toContain('Why Ruby?');
-      expect(html).toContain('<code');
-    });
-
-    it('includes all expected posts on index', () => {
-      const indexPath = join(DIST_DIR, 'index.html');
-      const html = readFileSync(indexPath, 'utf-8');
-
-      // All 3 posts should be listed
-      expect(html).toContain('Getting Started with Ruby2JS');
-      expect(html).toContain('Writing Astro Components in Ruby');
-      expect(html).toContain('Deploying Your Astro Blog');
-    });
-
-    it('posts are sorted by date (newest first)', () => {
-      const indexPath = join(DIST_DIR, 'index.html');
-      const html = readFileSync(indexPath, 'utf-8');
-
-      // Get positions of each post title
-      const deploymentPos = html.indexOf('Deploying Your Astro Blog');
-      const astroPos = html.indexOf('Writing Astro Components');
-      const gettingStartedPos = html.indexOf('Getting Started with Ruby2JS');
-
-      // Deployment (Jan 25) should come before Astro (Jan 20) should come before Getting Started (Jan 15)
-      expect(deploymentPos).toBeLessThan(astroPos);
-      expect(astroPos).toBeLessThan(gettingStartedPos);
-    });
-  });
-
-  describe('Layout and Components', () => {
-    it('applies layout to all pages', () => {
-      const indexPath = join(DIST_DIR, 'index.html');
-      const html = readFileSync(indexPath, 'utf-8');
-
-      expect(html).toContain('<!DOCTYPE html>');
-      expect(html).toContain('<meta charset="UTF-8"');
-      expect(html).toContain('class="container"');
-    });
-
-    it('includes header component', () => {
-      const indexPath = join(DIST_DIR, 'index.html');
-      const html = readFileSync(indexPath, 'utf-8');
-
-      expect(html).toContain('Ruby2JS Blog');
-      expect(html).toContain('Static blog powered by Astro + Ruby2JS');
-    });
-
-    it('post cards have proper structure', () => {
-      const indexPath = join(DIST_DIR, 'index.html');
-      const html = readFileSync(indexPath, 'utf-8');
-
-      // Each post card should have title, date, and excerpt
-      // Note: post.url isn't set for glob'd markdown files, so href may be empty
-      // This is a known Astro limitation when using Astro.glob() on content files
-      expect(html).toContain('<time');
-      expect(html).toContain('datetime=');
-      // Check that post titles are wrapped in links (even if href is empty)
-      expect(html).toMatch(/<a[^>]*>Deploying Your Astro Blog<\/a>/);
-    });
-  });
-
-  describe('Static Assets', () => {
-    it('includes favicon', () => {
+    it('generates static assets', () => {
       const faviconPath = join(DIST_DIR, 'favicon.svg');
       expect(existsSync(faviconPath)).toBe(true);
+    });
+  });
+
+  describe('Preact Islands (Level 3)', () => {
+    it('includes PostList island with client:load hydration', () => {
+      const postsPath = join(DIST_DIR, 'posts/index.html');
+      const html = readFileSync(postsPath, 'utf-8');
+
+      // Astro adds astro-island elements for hydrated components
+      expect(html).toContain('astro-island');
+      // client:load adds specific hydration markers
+      expect(html).toMatch(/client="load"/);
+    });
+
+    it('includes PostForm island with client:load hydration', () => {
+      const postsPath = join(DIST_DIR, 'posts/index.html');
+      const html = readFileSync(postsPath, 'utf-8');
+
+      // Should have multiple islands (PostList and PostForm)
+      const islandMatches = html.match(/astro-island/g);
+      expect(islandMatches).not.toBeNull();
+      expect(islandMatches.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('transpiled .jsx.rb files to valid JavaScript', () => {
+      // Check that JS bundles were created
+      const jsFiles = globSync(join(DIST_DIR, '_astro/*.js'));
+      expect(jsFiles.length).toBeGreaterThan(0);
+
+      // Check that at least one bundle contains Preact-related code
+      // (either direct references or minified equivalents)
+      let hasPreactCode = false;
+      for (const file of jsFiles) {
+        const content = readFileSync(file, 'utf-8');
+        // Look for signs of transpiled JSX/Preact code
+        if (content.includes('useState') ||
+            content.includes('useEffect') ||
+            content.includes('createElement') ||
+            content.includes('preact')) {
+          hasPreactCode = true;
+          break;
+        }
+      }
+      expect(hasPreactCode).toBe(true);
+    });
+
+    it('does not contain Ruby syntax in bundled JS', () => {
+      const jsFiles = globSync(join(DIST_DIR, '_astro/*.js'));
+
+      for (const file of jsFiles) {
+        const content = readFileSync(file, 'utf-8');
+        // Should not contain Ruby-specific syntax
+        expect(content).not.toMatch(/\bdef\s+\w+\(/);  // Ruby method definitions
+        expect(content).not.toMatch(/\bdo\s*\|/);      // Ruby block syntax
+        expect(content).not.toContain('__END__');       // Ruby template separator
+      }
+    });
+  });
+
+  describe('View Transitions', () => {
+    it('includes ViewTransitions in layout', () => {
+      const indexPath = join(DIST_DIR, 'index.html');
+      const html = readFileSync(indexPath, 'utf-8');
+
+      // Astro View Transitions add specific meta tags and scripts
+      expect(html).toMatch(/view-transition|astro:transitions/i);
+    });
+
+    it('all pages use the shared layout', () => {
+      const pages = [
+        join(DIST_DIR, 'index.html'),
+        join(DIST_DIR, 'about/index.html'),
+        join(DIST_DIR, 'posts/index.html')
+      ];
+
+      for (const pagePath of pages) {
+        const html = readFileSync(pagePath, 'utf-8');
+        expect(html).toContain('<!DOCTYPE html>');
+        expect(html).toContain('<nav>');
+        expect(html).toContain('Home');
+        expect(html).toContain('Posts');
+        expect(html).toContain('About');
+      }
+    });
+  });
+
+  describe('Ruby Transformation (.astro.rb)', () => {
+    it('transforms instance variables to const declarations', () => {
+      // The landing page uses @title = "Astro Blog with Ruby2JS"
+      // This should be transformed to const title = ...
+      const indexPath = join(DIST_DIR, 'index.html');
+      const html = readFileSync(indexPath, 'utf-8');
+
+      // The title should appear in the <title> tag
+      expect(html).toContain('<title>Astro Blog with Ruby2JS</title>');
+    });
+
+    it('transforms snake_case to camelCase', () => {
+      // Check that no snake_case remains in output
+      const indexPath = join(DIST_DIR, 'index.html');
+      const html = readFileSync(indexPath, 'utf-8');
+
+      // Should not contain common Ruby snake_case patterns
+      expect(html).not.toContain('post_card');
+      expect(html).not.toContain('site_title');
+      expect(html).not.toContain('sorted_posts');
+    });
+
+    it('renders Astro.props correctly', () => {
+      // The layout uses Astro.props[:title]
+      // Different pages should have different titles
+      const aboutPath = join(DIST_DIR, 'about/index.html');
+      const postsPath = join(DIST_DIR, 'posts/index.html');
+
+      const aboutHtml = readFileSync(aboutPath, 'utf-8');
+      const postsHtml = readFileSync(postsPath, 'utf-8');
+
+      expect(aboutHtml).toContain('<title>About</title>');
+      expect(postsHtml).toContain('<title>Blog Posts</title>');
+    });
+  });
+
+  describe('Navigation', () => {
+    it('has working navigation links', () => {
+      const indexPath = join(DIST_DIR, 'index.html');
+      const html = readFileSync(indexPath, 'utf-8');
+
+      expect(html).toContain('href="/"');
+      expect(html).toContain('href="/posts"');
+      expect(html).toContain('href="/about"');
+    });
+
+    it('posts page links to about page', () => {
+      const postsPath = join(DIST_DIR, 'posts/index.html');
+      const html = readFileSync(postsPath, 'utf-8');
+
+      expect(html).toContain('href="/about"');
+    });
+  });
+
+  describe('Styling', () => {
+    it('includes CSS styles in output', () => {
+      const indexPath = join(DIST_DIR, 'index.html');
+      const html = readFileSync(indexPath, 'utf-8');
+
+      // Should have either inline styles or linked CSS
+      expect(html).toMatch(/<style|\.css/);
+
+      // Should include CSS custom properties from layout
+      expect(html).toContain('--color-primary');
     });
   });
 });

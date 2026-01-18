@@ -19,6 +19,7 @@
  *   - .vue.rb files (Ruby script + Vue template)
  *   - .svelte.rb files (Ruby script + Svelte template)
  *   - .astro.rb files (Ruby script + Astro template)
+ *   - .jsx.rb files (Ruby with inline JSX → JSX output)
  */
 
 import { convert, initPrism } from 'ruby2js';
@@ -30,6 +31,10 @@ import 'ruby2js/filters/esm.js';
 import 'ruby2js/filters/cjs.js';
 import 'ruby2js/filters/camelCase.js';
 import 'ruby2js/filters/return.js';
+
+// Import React/JSX filters for .jsx.rb support
+import 'ruby2js/filters/react.js';
+import 'ruby2js/filters/jsx.js';
 
 // Import SFC component transformers (lazy loaded when needed)
 let VueComponentTransformer = null;
@@ -149,6 +154,12 @@ export default function ruby2js(options = {}) {
         return await this.transformSFC(code, id, eslevel, ruby2jsOptions);
       }
 
+      // Handle .jsx.rb files - Ruby with inline JSX → JSX output
+      // Uses React + JSX filters to output actual JSX syntax
+      if (id.endsWith('.jsx.rb')) {
+        return await this.transformJSX(code, id, eslevel, ruby2jsOptions);
+      }
+
       try {
         const result = convert(code, {
           filters: normalizedFilters,
@@ -232,6 +243,55 @@ export default function ruby2js(options = {}) {
         );
         enhancedError.id = id;
         enhancedError.plugin = 'vite-plugin-ruby2js';
+        throw enhancedError;
+      }
+    },
+
+    // Transform .jsx.rb files - Ruby with inline JSX to JSX output
+    // Uses React + JSX filters to produce actual JSX syntax that Vite can process
+    async transformJSX(code, id, eslevel, ruby2jsOptions) {
+      try {
+        // Use React + JSX filters for JSX output
+        // JSX filter causes React filter to output xnode AST which serializes to JSX syntax
+        const jsxFilters = ['React', 'JSX', 'Functions', 'ESM', 'CamelCase'];
+
+        const result = convert(code, {
+          filters: jsxFilters,
+          eslevel,
+          file: id,
+          ...ruby2jsOptions
+        });
+
+        const jsx = result.toString();
+        const map = result.sourcemap;
+
+        // Ensure source map has correct source reference
+        if (map) {
+          map.sources = [id];
+          map.sourcesContent = [code];
+        }
+
+        return {
+          code: jsx,
+          map
+        };
+      } catch (error) {
+        const enhancedError = new Error(
+          `Ruby2JS JSX transform error in ${id}: ${error.message}`
+        );
+        enhancedError.id = id;
+        enhancedError.plugin = 'vite-plugin-ruby2js';
+
+        // Try to extract line/column from error message
+        const lineMatch = error.message?.match(/line (\d+)/i);
+        if (lineMatch) {
+          enhancedError.loc = {
+            file: id,
+            line: parseInt(lineMatch[1], 10),
+            column: 0
+          };
+        }
+
         throw enhancedError;
       }
     }

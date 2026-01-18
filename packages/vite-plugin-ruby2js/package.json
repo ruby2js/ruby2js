@@ -28,6 +28,9 @@
     "type": "git",
     "url": "https://github.com/ruby2js/ruby2js"
   },
+  "dependencies": {
+    "ruby2js": "file:../../demo/selfhost"
+  },
   "peerDependencies": {
     "vite": "^5.0.0 || ^6.0.0"
   }

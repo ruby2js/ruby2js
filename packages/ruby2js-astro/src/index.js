@@ -26,7 +26,15 @@ import { readdir, readFile, writeFile, stat } from 'fs/promises';
 import { join, relative } from 'path';
 import { fileURLToPath } from 'url';
 import { AstroComponentTransformer } from 'ruby2js/astro';
-import { initPrism } from 'ruby2js';
+import { convert, initPrism } from 'ruby2js';
+
+// Import filters for JSX transformation
+import 'ruby2js/filters/react.js';
+import 'ruby2js/filters/jsx.js';
+import 'ruby2js/filters/functions.js';
+import 'ruby2js/filters/esm.js';
+import 'ruby2js/filters/camelCase.js';
+import 'ruby2js/filters/return.js';
 
 let prismReady = false;
 
@@ -40,11 +48,12 @@ async function ensurePrism() {
 /**
  * Transform a single .astro.rb file to .astro
  */
-async function transformFile(filePath, options = {}) {
+async function transformAstroFile(filePath, options = {}) {
   const source = await readFile(filePath, 'utf-8');
   const result = AstroComponentTransformer.transform(source, {
     eslevel: 2022,
     camelCase: true,
+    autoImports: false,  // Disable auto-importing models - use explicit imports
     ...options
   });
 
@@ -59,6 +68,31 @@ async function transformFile(filePath, options = {}) {
   await writeFile(outputPath, result.component);
   return outputPath;
 }
+
+/**
+ * Transform a single .jsx.rb file to .jsx
+ * Uses React + JSX filters to output actual JSX syntax
+ */
+async function transformJsxFile(filePath, options = {}) {
+  const source = await readFile(filePath, 'utf-8');
+  const jsxFilters = ['React', 'JSX', 'Functions', 'ESM', 'CamelCase', 'Return'];
+
+  // Use Preact mode by default for Astro islands (can be overridden via options)
+  const result = convert(source, {
+    filters: jsxFilters,
+    eslevel: options.eslevel || 2022,
+    react: options.react || 'Preact',
+    file: filePath,
+    ...options
+  });
+
+  const outputPath = filePath.replace(/\.jsx\.rb$/, '.jsx');
+  await writeFile(outputPath, result.toString());
+  return outputPath;
+}
+
+// Backward compatibility alias
+const transformFile = transformAstroFile;
 
 /**
  * Recursively find all .astro.rb files in a directory
@@ -89,21 +123,65 @@ async function findAstroRbFiles(dir) {
 }
 
 /**
- * Transform all .astro.rb files in the src directory
+ * Recursively find all .jsx.rb files in a directory
+ */
+async function findJsxRbFiles(dir) {
+  const files = [];
+
+  async function walk(currentDir) {
+    let entries;
+    try {
+      entries = await readdir(currentDir, { withFileTypes: true });
+    } catch {
+      return; // Directory doesn't exist or not readable
+    }
+
+    for (const entry of entries) {
+      const fullPath = join(currentDir, entry.name);
+      if (entry.isDirectory()) {
+        await walk(fullPath);
+      } else if (entry.name.endsWith('.jsx.rb')) {
+        files.push(fullPath);
+      }
+    }
+  }
+
+  await walk(dir);
+  return files;
+}
+
+/**
+ * Transform all .astro.rb and .jsx.rb files in the src directory
  */
 async function transformAll(srcDir, options = {}, logger = console) {
   await ensurePrism();
-  const files = await findAstroRbFiles(srcDir);
 
-  if (files.length === 0) {
+  const astroFiles = await findAstroRbFiles(srcDir);
+  const jsxFiles = await findJsxRbFiles(srcDir);
+
+  if (astroFiles.length === 0 && jsxFiles.length === 0) {
     return [];
   }
 
   const transformed = [];
-  for (const file of files) {
+
+  // Transform .astro.rb files
+  for (const file of astroFiles) {
     try {
-      const outputPath = await transformFile(file, options);
-      transformed.push({ input: file, output: outputPath });
+      const outputPath = await transformAstroFile(file, options);
+      transformed.push({ input: file, output: outputPath, type: 'astro' });
+      logger.info?.(`  ${relative(srcDir, file)} → ${relative(srcDir, outputPath)}`);
+    } catch (error) {
+      logger.error?.(`  Error transforming ${file}: ${error.message}`);
+      throw error;
+    }
+  }
+
+  // Transform .jsx.rb files
+  for (const file of jsxFiles) {
+    try {
+      const outputPath = await transformJsxFile(file, options);
+      transformed.push({ input: file, output: outputPath, type: 'jsx' });
       logger.info?.(`  ${relative(srcDir, file)} → ${relative(srcDir, outputPath)}`);
     } catch (error) {
       logger.error?.(`  Error transforming ${file}: ${error.message}`);
@@ -157,7 +235,7 @@ export default function ruby2jsIntegration(options = {}) {
                   logger.info(`ruby2js: Re-transforming ${relative(srcDir, file)}`);
                   try {
                     await ensurePrism();
-                    await transformFile(file, options);
+                    await transformAstroFile(file, options);
                     // Trigger reload of the .astro file
                     const astroFile = file.replace(/\.astro\.rb$/, '.astro');
                     const mod = server.moduleGraph.getModuleById(astroFile);
@@ -168,16 +246,39 @@ export default function ruby2jsIntegration(options = {}) {
                   } catch (error) {
                     logger.error(`ruby2js: Transform error: ${error.message}`);
                   }
+                } else if (file.endsWith('.jsx.rb')) {
+                  logger.info(`ruby2js: Re-transforming ${relative(srcDir, file)}`);
+                  try {
+                    await ensurePrism();
+                    await transformJsxFile(file, options);
+                    // Trigger reload of the .jsx file
+                    const jsxFile = file.replace(/\.jsx\.rb$/, '.jsx');
+                    const mod = server.moduleGraph.getModuleById(jsxFile);
+                    if (mod) {
+                      server.moduleGraph.invalidateModule(mod);
+                      return [mod];
+                    }
+                  } catch (error) {
+                    logger.error(`ruby2js: Transform error: ${error.message}`);
+                  }
                 }
               },
               configureServer(server) {
-                // Watch for new .astro.rb files
+                // Watch for new .astro.rb and .jsx.rb files
                 server.watcher.on('add', async (file) => {
                   if (file.endsWith('.astro.rb')) {
                     logger.info(`ruby2js: New file ${relative(srcDir, file)}`);
                     try {
                       await ensurePrism();
-                      await transformFile(file, options);
+                      await transformAstroFile(file, options);
+                    } catch (error) {
+                      logger.error(`ruby2js: Transform error: ${error.message}`);
+                    }
+                  } else if (file.endsWith('.jsx.rb')) {
+                    logger.info(`ruby2js: New file ${relative(srcDir, file)}`);
+                    try {
+                      await ensurePrism();
+                      await transformJsxFile(file, options);
                     } catch (error) {
                       logger.error(`ruby2js: Transform error: ${error.message}`);
                     }
@@ -206,4 +307,4 @@ export default function ruby2jsIntegration(options = {}) {
 
 // Named exports
 export { ruby2jsIntegration as ruby2js };
-export { transformFile, findAstroRbFiles, transformAll };
+export { transformFile, transformAstroFile, transformJsxFile, findAstroRbFiles, findJsxRbFiles, transformAll };

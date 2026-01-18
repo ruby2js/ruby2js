@@ -1,4 +1,4 @@
-import { convert, astNode, parse } from '../ruby2js.js';
+import { convert, ast_node as astNode, parse } from '../ruby2js.js';
 import { Ruby2JS } from '../ruby2js.js';
 import { SvelteTemplateCompiler } from './svelte_template_compiler.mjs';
 import '../filters/sfc.js';

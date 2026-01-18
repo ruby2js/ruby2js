@@ -1,4 +1,4 @@
-import { convert, astNode, parse } from '../ruby2js.js';
+import { convert, ast_node as astNode, parse } from '../ruby2js.js';
 import { Ruby2JS } from '../ruby2js.js';
 import { AstroTemplateCompiler } from './astro_template_compiler.mjs';
 import '../filters/esm.js';
@@ -19,7 +19,11 @@ export class AstroComponentTransformer {
   };
 
   // Default options
-  static DEFAULT_OPTIONS = Object.freeze({eslevel: 2_022, filters: []});
+  static DEFAULT_OPTIONS = Object.freeze({
+    eslevel: 2_022,
+    filters: [],
+    autoImports: true
+  });
 
   get source() {
     return this.#source
@@ -172,6 +176,7 @@ export class AstroComponentTransformer {
   // Prepend model imports to the frontmatter
   #prependModelImports(js) {
     if (this.#imports.models.length == 0) return js;
+    if (!this.#options.autoImports) return js;
     let lines = [];
 
     for (let model of this.#imports.models) {

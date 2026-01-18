@@ -869,6 +869,8 @@ module Ruby2JS
       end
 
       def build_react_element(params)
+        element = nil
+
         if @jsx
           # Output xnode for JSX serialization
           tag_node, attrs, *children = params
@@ -1417,7 +1419,7 @@ module Ruby2JS
        # Handles both JS style (from "react") and Ruby style (from: "react")
        if self.modules_enabled?() and source.start_with?('<')
          full_source = loc.begin.source_buffer.source
-         has_react_import = full_source.match?(/^\s*import\s+.*\bfrom:?\s*['"](?:react|preact)['"]/m)
+         has_react_import = full_source.match?(/^\s*import\s+.*\bfrom:?\s*['"](?:react|preact)(?:\/[^'"]*)?['"]/m)
 
          unless has_react_import
            react_name = @react == :Preact ? 'Preact' : 'React'

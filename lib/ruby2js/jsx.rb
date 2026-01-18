@@ -22,7 +22,7 @@ module Ruby2JS
     template textarea tfoot th thead time title tr u ul var video
   ].freeze
 
-  JSX_ALL_ELEMENTS = (JSX_VOID_ELEMENTS + JSX_HTML_ELEMENTS).freeze
+  JSX_ALL_ELEMENTS = [*JSX_VOID_ELEMENTS, *JSX_HTML_ELEMENTS].freeze
 
   def self.jsx2_rb(string)
     parser = JsxParser.new(string.chars)

@@ -42,7 +42,8 @@ module Ruby2JS
     # Default options
     DEFAULT_OPTIONS = {
       eslevel: 2022,
-      filters: []
+      filters: [],
+      auto_imports: true  # Set to false to disable auto-importing models
     }.freeze
 
     attr_reader :source, :options, :errors
@@ -173,6 +174,7 @@ module Ruby2JS
     # Prepend model imports to the frontmatter
     def prepend_model_imports(js)
       return js if @imports[:models].empty?
+      return js unless @options[:auto_imports]
 
       lines = []
       @imports[:models].each do |model|

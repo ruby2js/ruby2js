@@ -999,25 +999,25 @@ The demo runs entirely client-side with IndexedDB - no server database needed.
 ### Definition of Done
 
 **Level 1 - Static content:**
-- [ ] About page (`src/pages/about.md`)
+- [x] About page (`src/pages/about.md`)
 
 **Level 2 - Astro pages:**
-- [ ] Landing page (`src/pages/index.astro.rb`)
-- [ ] Post list shell (`src/pages/posts/index.astro.rb`)
-- [ ] Post detail shell (`src/pages/posts/[slug].astro.rb`)
-- [ ] Layout with View Transitions (`src/layouts/Layout.astro.rb`)
+- [x] Landing page (`src/pages/index.astro.rb`)
+- [x] Post list shell (`src/pages/posts/index.astro.rb`)
+- [x] Post detail shell (`src/pages/posts/[slug].astro.rb`)
+- [x] Layout with View Transitions (`src/layouts/Layout.astro.rb`)
 
 **Level 3 - Islands:**
-- [ ] PostList island (`src/islands/PostList.jsx.rb`)
-- [ ] PostForm island (`src/islands/PostForm.jsx.rb`)
-- [ ] Post model with ActiveRecord queries (Dexie/IndexedDB)
-- [ ] Seed data (3 posts)
+- [x] PostList island (`src/islands/PostList.jsx.rb`)
+- [x] PostForm island (`src/islands/PostForm.jsx.rb`)
+- [x] Post model with ActiveRecord queries (Dexie/IndexedDB)
+- [x] Seed data (3 posts)
 
 **Infrastructure:**
-- [ ] vite-plugin-ruby2js configured for `.jsx.rb` → JSX
-- [ ] Dockerfile for containerized deployment
-- [ ] Update integration test (`test/integration/astro_blog.test.mjs`)
-- [ ] Full authoring → publishing workflow demonstrated
+- [x] vite-plugin-ruby2js configured for `.jsx.rb` → JSX
+- [x] Dockerfile for containerized deployment
+- [x] Update integration test (`test/integration/astro_blog.test.mjs`)
+- [x] Full authoring → publishing workflow demonstrated
 
 ### Integration Test Updates
 
@@ -1067,14 +1067,14 @@ describe('Astro Blog Integration Tests', () => {
 
 ### Success Criteria
 
-- [ ] **Three levels demonstrated**: static `.md`, Astro `.astro.rb`, islands `.jsx.rb`
-- [ ] `.astro.rb` files transpile to valid Astro components
-- [ ] `.jsx.rb` files transpile to valid Preact components
-- [ ] Preact islands hydrate with `client:load`
-- [ ] Post model works with IndexedDB via Dexie
-- [ ] Create post in form → see it appear in list
-- [ ] View Transitions provide smooth navigation
-- [ ] Demo proves Ruby2JS enhances Astro at every level, not just full interactivity
+- [x] **Three levels demonstrated**: static `.md`, Astro `.astro.rb`, islands `.jsx.rb`
+- [x] `.astro.rb` files transpile to valid Astro components
+- [x] `.jsx.rb` files transpile to valid Preact components
+- [x] Preact islands hydrate with `client:load`
+- [x] Post model works with IndexedDB via Dexie
+- [x] Create post in form → see it appear in list
+- [x] View Transitions provide smooth navigation
+- [x] Demo proves Ruby2JS enhances Astro at every level, not just full interactivity
 
 ---
 
