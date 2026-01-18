@@ -93,9 +93,9 @@ Add template compilers and component transformers to the selfhost build.
 
 ### Definition of Done
 
-- [ ] All 6 transformers transpile without errors
-- [ ] Selfhost tests pass for transformer specs
-- [ ] Exports work: `import { AstroComponentTransformer } from 'ruby2js/lib/astro_component_transformer.js'`
+- [x] All 6 transformers transpile without errors
+- [x] Selfhost tests pass for transformer specs
+- [x] Exports work: `import { AstroComponentTransformer } from 'ruby2js/lib/astro_component_transformer.js'`
 
 ---
 
@@ -169,10 +169,10 @@ export default function ruby2js(options = {}) {
 
 ### Definition of Done
 
-- [ ] `vite-plugin-ruby2js` transforms `.vue.rb` → `.vue`
-- [ ] `vite-plugin-ruby2js` transforms `.svelte.rb` → `.svelte`
-- [ ] `vite-plugin-ruby2js` transforms `.astro.rb` → `.astro`
-- [ ] Plugin tests pass
+- [x] `vite-plugin-ruby2js` transforms `.vue.rb` → `.vue`
+- [x] `vite-plugin-ruby2js` transforms `.svelte.rb` → `.svelte`
+- [x] `vite-plugin-ruby2js` transforms `.astro.rb` → `.astro`
+- [x] Plugin tests pass
 
 ---
 
@@ -367,13 +367,13 @@ When `ruby2js-astro` is published:
 - [x] `create-astro-blog` script creates working demo
 - [x] `npm run dev` works locally (no watch)
 - [x] `npm run build` produces static site
-- [ ] Demo deploys to GitHub Pages
+- [x] Demo deploys to GitHub Pages
 
 **Future (with integration):**
-- [ ] `ruby2js-astro` package published
-- [ ] Creation script simplified (no prebuild)
-- [ ] Watch mode works during development
-- [ ] Demo updated to use integration
+- [x] `ruby2js-astro` package published
+- [x] Creation script simplified (no prebuild)
+- [x] Watch mode works during development
+- [x] Demo updated to use integration
 
 ---
 
@@ -471,9 +471,9 @@ if (demo === 'astro-blog') {
 
 ### Definition of Done
 
-- [ ] `node setup.mjs astro-blog` works
-- [ ] `npm test -- astro_blog.test.mjs` passes
-- [ ] Tests validate transformation correctness
+- [x] `node setup.mjs astro_blog` works
+- [x] `npm test -- astro_blog.test.mjs` passes
+- [x] Tests validate transformation correctness
 
 ---
 
@@ -552,10 +552,10 @@ const demos = ['blog', 'chat', 'notes', 'photo-gallery', 'workflow', 'astro-blog
 
 ### Definition of Done
 
-- [ ] `create-astro-blog` job runs in CI
-- [ ] Integration test passes in CI
-- [ ] Astro demo deploys to `ruby2js.github.io/ruby2js/astro-blog/`
-- [ ] Demo is accessible and functional
+- [x] `create-astro-blog` job runs in CI
+- [x] Integration test passes in CI
+- [x] Astro demo deploys to `ruby2js.github.io/ruby2js/astro-blog/`
+- [x] Demo is accessible and functional
 
 ---
 
@@ -571,11 +571,394 @@ const demos = ['blog', 'chat', 'notes', 'photo-gallery', 'workflow', 'astro-blog
 
 **Estimated effort:** 2-3 days
 
-## Success Criteria
+## Success Criteria (Phases 1-5)
 
-- [ ] All 6 transformers (Vue, Svelte, Astro × template + component) are selfhosted
-- [ ] Vite plugin handles `.vue.rb`, `.svelte.rb`, `.astro.rb` files
-- [ ] Astro blog demo builds and runs locally
-- [ ] Integration tests validate correct transformation
-- [ ] Demo is live at `ruby2js.github.io/ruby2js/astro-blog/`
-- [ ] FRAMEWORK_PARITY.md Phase 4 marked complete with working demos
+- [x] All 6 transformers (Vue, Svelte, Astro × template + component) are selfhosted
+- [x] Vite plugin handles `.vue.rb`, `.svelte.rb`, `.astro.rb` files
+- [x] Astro blog demo builds and runs locally
+- [x] Integration tests validate correct transformation
+- [x] Demo is live at `ruby2js.github.io/ruby2js/astro-blog/`
+- [x] FRAMEWORK_PARITY.md Phase 6 marked complete with working packages
+
+---
+
+## Phase 6: Full-Stack Demo with ActiveRecord and ISR
+
+### Vision
+
+Replace the current markdown-based astro-blog demo with a full-stack demonstration that proves the documentation at https://www.ruby2js.com/docs/juntos/coming-from/astro is real and working.
+
+**Note:** The existing Rails blog demo remains unchanged. This phase evolves only the astro-blog demo into a self-contained app with both authoring and publishing capabilities via Astro islands.
+
+### Architecture: Self-Contained Astro App
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     Astro Blog Demo                          │
+│                                                              │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │              Static Shell (Astro SSG)                │    │
+│  │  - Landing page (/)                                  │    │
+│  │  - About page (/about)                               │    │
+│  │  - Post list shell (/posts)                          │    │
+│  │  - Post detail shell (/posts/[slug])                 │    │
+│  └─────────────────────────────────────────────────────┘    │
+│                           │                                  │
+│                           ▼                                  │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │           Islands (client:load hydration)            │    │
+│  │                                                      │    │
+│  │  ┌──────────────┐    ┌──────────────┐               │    │
+│  │  │ PostList.jsx │    │ PostForm.jsx │               │    │
+│  │  │ (publishing) │    │ (authoring)  │               │    │
+│  │  └──────┬───────┘    └──────┬───────┘               │    │
+│  │         │                   │                        │    │
+│  │         └─────────┬─────────┘                        │    │
+│  │                   │                                  │    │
+│  │            ┌──────▼──────┐                           │    │
+│  │            │  IndexedDB  │                           │    │
+│  │            │   + ISR     │                           │    │
+│  │            └─────────────┘                           │    │
+│  └─────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### ISR Implementation (In-Memory)
+
+For the demo, ISR uses a simple in-memory cache with stale-while-revalidate semantics:
+
+```javascript
+// ~30 lines of ISR adapter
+const cache = new Map();
+
+async function withRevalidate(key, ttlSeconds, fetcher) {
+  const cached = cache.get(key);
+  const now = Date.now();
+
+  if (cached && now < cached.staleAt) {
+    return cached.data; // Fresh
+  }
+
+  if (cached) {
+    // Stale - return cached, revalidate in background
+    fetcher().then(data => {
+      cache.set(key, { data, staleAt: now + ttlSeconds * 1000 });
+    });
+    return cached.data;
+  }
+
+  // Missing - fetch fresh
+  const data = await fetcher();
+  cache.set(key, { data, staleAt: now + ttlSeconds * 1000 });
+  return data;
+}
+```
+
+The `# Pragma: revalidate 60` pragma triggers this pattern.
+
+### Demo Structure
+
+**Static pages** (rendered at build time):
+- `/` - Landing page with site intro
+- `/about` - Static about page
+
+**Dynamic pages** (ActiveRecord + ISR via islands):
+- `/posts` - Post listing island + authoring form island
+- `/posts/[slug]` - Individual post island + edit form island
+
+**Post Model:**
+```ruby
+# models/post.rb
+class Post < ApplicationRecord
+  # title, slug, body, excerpt, published_at
+  scope :published, -> { where.not(published_at: nil) }
+end
+```
+
+**Example Page Shell:**
+```ruby
+# pages/posts/index.astro.rb
+__END__
+<Layout title="Posts">
+  <Header />
+  <PostList client:load />
+  <PostForm client:load />
+</Layout>
+```
+
+**Example Publishing Island:**
+```ruby
+# components/PostList.jsx.rb
+# Pragma: revalidate 60
+
+@posts, @setPosts = useState([])
+
+useEffect [] do
+  data = await Post.published.order(published_at: :desc)
+  setPosts(data)
+end
+__END__
+<div class="posts">
+  {posts.map { |post| <PostCard post={post} /> }}
+</div>
+```
+
+**Example Authoring Island:**
+```ruby
+# components/PostForm.jsx.rb
+
+@title, @setTitle = useState("")
+@body, @setBody = useState("")
+
+def handleSubmit(e)
+  e.preventDefault
+  post = Post.new(title: @title, body: @body, slug: @title.parameterize)
+  await post.save
+  setTitle("")
+  setBody("")
+end
+__END__
+<form onSubmit={handleSubmit}>
+  <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" />
+  <textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder="Body" />
+  <button type="submit">Create Post</button>
+</form>
+```
+
+**Layout with View Transitions:**
+```ruby
+# layouts/Layout.astro.rb
+import { ViewTransitions } from 'astro:transitions'
+
+@title = props[:title]
+__END__
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{title}</title>
+  <ViewTransitions />
+</head>
+<body>
+  <slot />
+</body>
+</html>
+```
+
+View Transitions provide smooth animated navigation between pages - a key Astro 3+ feature that works seamlessly with the Ruby integration.
+
+### Demo Flow
+
+Within the same Astro app:
+
+1. **View posts** → PostList island queries IndexedDB, displays cached results
+2. **Create post** → PostForm island saves to IndexedDB
+3. **See update** → After revalidate period, PostList fetches fresh data
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     Astro Blog Demo                          │
+│                                                              │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │                    /posts page                        │   │
+│  │                                                       │   │
+│  │  ┌─────────────────┐         ┌─────────────────┐     │   │
+│  │  │   PostList      │         │   PostForm      │     │   │
+│  │  │   (publishing)  │◀────────│   (authoring)   │     │   │
+│  │  │                 │  ISR    │                 │     │   │
+│  │  │  - First Post   │ refresh │  Title: [____]  │     │   │
+│  │  │  - Second Post  │         │  Body:  [____]  │     │   │
+│  │  │  - Third Post   │         │  [Create Post]  │     │   │
+│  │  └────────┬────────┘         └────────┬────────┘     │   │
+│  │           │                           │              │   │
+│  │           └───────────┬───────────────┘              │   │
+│  │                       │                              │   │
+│  │                ┌──────▼──────┐                       │   │
+│  │                │  IndexedDB  │                       │   │
+│  │                └─────────────┘                       │   │
+│  └──────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Dockerfile
+
+Uses the same Juntos commands as other demos, supporting multiple targets:
+
+```dockerfile
+FROM ruby
+
+# Install Node.js 24 (LTS)
+RUN apt-get update && apt-get install -y ca-certificates curl gnupg && \
+    curl -fsSL https://deb.nodesource.com/setup_24.x | bash - && \
+    apt-get install -y nodejs git && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy and run the creation script
+COPY create-astro-blog .
+RUN chmod +x create-astro-blog && ./create-astro-blog astro-blog
+
+WORKDIR /app/astro-blog
+
+# Build args for Juntos
+ARG DATABASE=sqlite
+ARG TARGET=node
+
+ENV JUNTOS_DATABASE=${DATABASE}
+ENV JUNTOS_TARGET=${TARGET}
+
+# Build with specified database and target
+RUN bin/juntos build -d ${DATABASE} -t ${TARGET}
+
+# Run migrations (skip for browser targets - they migrate client-side)
+RUN if [ "${TARGET}" != "browser" ]; then bin/juntos db prepare -d ${DATABASE} -t ${TARGET}; fi
+
+EXPOSE 4321
+
+CMD ["bin/juntos", "server"]
+```
+
+**Build options:**
+
+| Command | Database | Target | Use Case |
+|---------|----------|--------|----------|
+| `docker build -t astro-blog .` | SQLite | Node.js | Self-hosted server |
+| `docker build --build-arg DATABASE=dexie --build-arg TARGET=browser -t astro-blog .` | IndexedDB | Browser | Static hosting / CDN |
+
+Run with: `docker run -p 4321:4321 astro-blog`
+
+Same Ruby code works in both environments - the Post model automatically uses the appropriate database backend.
+
+### Definition of Done
+
+- [ ] Post model with ActiveRecord queries (IndexedDB)
+- [ ] Seed data (3 posts)
+- [ ] Static pages: index (landing), about
+- [ ] Publishing islands: PostList, PostCard, PostDetail
+- [ ] Authoring islands: PostForm (create/edit)
+- [ ] View Transitions for smooth page navigation
+- [ ] In-memory ISR adapter (~30 lines)
+- [ ] `# Pragma: revalidate` working in islands
+- [ ] Dockerfile for containerized deployment
+- [ ] Update integration test (`test/integration/astro_blog.test.mjs`)
+- [ ] Documentation: ISR page, demo page, cross-references
+- [ ] Full authoring → publishing workflow demonstrated
+
+### Integration Test Updates
+
+The existing test validates static markdown content. Update to test:
+
+```javascript
+describe('Astro Blog Integration Tests', () => {
+  describe('Build Output', () => {
+    it('generates static pages', () => {
+      // Landing page and about page exist
+    });
+
+    it('generates post shell pages', () => {
+      // /posts/index.html and /posts/[slug]/index.html exist
+    });
+  });
+
+  describe('Islands', () => {
+    it('includes PostList island with client:load', () => {
+      // Check for hydration script
+    });
+
+    it('includes PostForm island with client:load', () => {
+      // Check for form component
+    });
+  });
+
+  describe('ActiveRecord', () => {
+    it('includes Post model', () => {
+      // Check for model JS in build output
+    });
+
+    it('includes seed data', () => {
+      // Seeds should be bundled for browser target
+    });
+  });
+
+  describe('ISR', () => {
+    it('includes ISR adapter', () => {
+      // Check for withRevalidate function
+    });
+  });
+});
+```
+
+### Documentation Updates
+
+**New file: `docs/src/_docs/juntos/isr.md`**
+
+Standalone ISR documentation covering:
+- Concept: stale-while-revalidate caching
+- Unified pragma syntax: `# Pragma: revalidate 60`
+- Per-target implementation table:
+
+| Target | Cache Layer | Implementation |
+|--------|-------------|----------------|
+| Browser | In-memory | JavaScript Map with TTL |
+| Node.js | In-memory | JavaScript Map with TTL |
+| Vercel | Native | `revalidate` export |
+| Cloudflare | Cache API | Native edge caching |
+
+- Link to Astro Blog demo as working example
+- Future roadmap: Service Worker, Redis
+
+**New file: `docs/src/_docs/juntos/demos/astro-blog.md`**
+
+Demo documentation covering:
+- What it demonstrates (Astro islands, ISR, ActiveRecord, authoring + publishing)
+- How to run (browser, Node.js, Docker)
+- Architecture diagram
+- Key files walkthrough
+
+**Update: `docs/src/_docs/juntos/demos/index.md`**
+
+Add to Available Demos table:
+```markdown
+| **[Astro Blog](/docs/juntos/demos/astro-blog)** | Astro islands, ISR caching, ActiveRecord with IndexedDB/SQLite, authoring + publishing |
+```
+
+**Update: `docs/src/_docs/juntos/coming-from/astro.md`**
+
+Update ISR section (lines 305-319) to:
+- Link to new ISR page
+- Reference the working Astro Blog demo
+- Show authoring + publishing pattern
+
+**Update: `docs/src/_docs/juntos/deploying/browser.md` and `node.md`**
+
+Add ISR section linking to the main ISR page.
+
+**Update: `docs/src/_docs/juntos/roadmap.md`**
+
+Add to "Recently Implemented":
+- In-memory ISR for browser and Node.js targets
+- `# Pragma: revalidate` support
+
+### Success Criteria
+
+- [ ] Demo proves https://www.ruby2js.com/docs/juntos/coming-from/astro is real
+- [ ] Create post in form → see it appear in list (after revalidate)
+- [ ] Edit post → see changes reflected
+- [ ] Delete post → see it removed
+- [ ] ISR caching observable (fast loads within TTL)
+- [ ] Documentation complete (ISR page, demo page, cross-references)
+
+### Future Roadmap (If Demand)
+
+These enhancements are documented but not implemented in the initial demo:
+
+| Feature | Current | Future |
+|---------|---------|--------|
+| Browser ISR | In-memory cache | Service Worker + Cache API |
+| Node.js ISR | In-memory cache | Redis |
+| Offline support | Not implemented | Service Worker |
+| Multiple platforms | Browser only | Node.js, Cloudflare, Vercel, Electron, Tauri, Capacitor |
+
+The architecture supports these upgrades without changing application code—only the ISR adapter implementation would change.

@@ -958,9 +958,9 @@ export function ruby2jsPreprocess(options = {}) {
 - ✅ HMR support
 
 **Definition of done**:
-- [ ] `npm install ruby2js-svelte` works
-- [ ] `.svelte.rb` files recognized as pages
-- [ ] Watch mode triggers on Ruby file changes
+- [x] `npm install ruby2js-svelte` works
+- [x] `.svelte.rb` files recognized as pages
+- [x] Watch mode triggers on Ruby file changes
 - [ ] Example SvelteKit app demonstrates full workflow
 
 ---
@@ -1034,9 +1034,9 @@ export default defineNuxtModule({
 - ✅ Integrates with Nuxt DevTools
 
 **Definition of done**:
-- [ ] `npm install ruby2js-nuxt` works
-- [ ] `.vue.rb` files recognized as pages
-- [ ] Watch mode triggers on Ruby file changes
+- [x] `npm install ruby2js-nuxt` works
+- [x] `.vue.rb` files recognized as pages
+- [x] Watch mode triggers on Ruby file changes
 - [ ] Example Nuxt app demonstrates full workflow
 
 ---
@@ -1184,10 +1184,10 @@ export default function ruby2jsIntegration(options = {}) {
 - ✅ Proper error reporting
 
 **Definition of done**:
-- [ ] `npm install ruby2js-astro` works
-- [ ] `astro dev` watches `.astro.rb` files
-- [ ] `astro build` transforms files automatically
-- [ ] Example Astro app demonstrates full workflow
+- [x] `npm install ruby2js-astro` works
+- [x] `astro dev` watches `.astro.rb` files
+- [x] `astro build` transforms files automatically
+- [x] Example Astro app demonstrates full workflow (astro-blog demo)
 
 ---
 
@@ -1275,7 +1275,7 @@ Phase 6 (Framework Integrations) - needs Phase 4
 - [x] Template syntax works with 3 styles (ERB, Vue, Svelte)
 - [x] File-based routing works across all targets
 - [x] Documentation welcomes developers from 6 ecosystems
-- [ ] Framework integrations provide native DX (SvelteKit, Nuxt, Astro)
+- [x] Framework integrations provide native DX (SvelteKit, Nuxt, Astro)
 
 **Credibility statement becomes true:**
 
