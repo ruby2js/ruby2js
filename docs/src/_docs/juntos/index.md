@@ -89,27 +89,11 @@ The generated `dist/` directory is a complete, standalone JavaScript application
 
 The generated code is ~95% your application, ~5% framework glue. No massive dependency tree. No framework lock-in beyond what you can read and understand.
 
-## Juntos vs. Other Frameworks
+## Coming From Other Frameworks?
 
-| Framework | Similarity to Rails | Multi-Target | Generated Code |
-|-----------|--------------------|--------------| ---------------|
-| **AdonisJS** | Inspired by | Node.js only | N/A (runtime) |
-| **Next.js** | Different paradigm | Vercel-focused | React/JSX |
-| **Remix** | Loaders/actions | Node/Edge | React |
-| **Hono** | Minimal (Sinatra-like) | Yes | N/A (runtime) |
-| **Juntos** | Direct mapping | Browser/Node/Edge | Idiomatic JS |
+If you're familiar with Vue, Svelte, Astro, or React, see [Coming From...](/docs/juntos/coming-from/) for how Ruby2JS maps to patterns you already know.
 
-### Why not target AdonisJS?
-
-AdonisJS is excellent, but the mapping isn't 1:1. Controllers have different lifecycle hooks. The ORM (Lucid) has different patterns. You'd be learning "Ruby that becomes AdonisJS," not "Rails in JavaScript."
-
-### Why not target Next.js?
-
-Next.js is React-based with a fundamentally different paradigm. App Router, Server Components, and client/server boundaries don't map to Rails MVC. The mental models are too different for a clean transpilation.
-
-### Why not target Hono?
-
-Hono is more Sinatra than Rails—lightweight routing without opinions about models, views, or structure. You'd be starting from scratch on everything Rails provides for free.
+Juntos reimplements proven Rails patterns—ActiveRecord, ActionController, routing—but doesn't reinvent the wheel for frontend concerns. Reactivity comes from Vue, Svelte, or React. Bundling comes from Vite or esbuild. Mobile comes from Capacitor. Desktop from Electron or Tauri. Juntos targets and integrates with the JavaScript ecosystem rather than replacing it.
 
 ## Demos
 
