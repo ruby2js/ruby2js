@@ -226,37 +226,75 @@ def handler(req, res)
 end
 ```
 
-## The Ruby Advantage
+## Why Ruby2JS for Next.js?
 
-### Cleaner Conditionals
+Next.js gives you file-based routing and React. Ruby2JS adds the Rails ecosystem:
+
+### Full-Stack Ruby
+
+Same language in your pages, API routes, and backend. Rails patterns everywhere:
 
 ```ruby
-# Next.js
-{loading ? <Loading /> : <Content data={data} />}
+# Backend model (Rails)
+class Post < ApplicationRecord
+  validates :title, presence: true
+  scope :published, -> { where(published: true) }
+end
 
-# Ruby2JS
+# API route (Ruby2JS)
+export default
+def handler(req, res)
+  posts = Post.published.order(created_at: :desc)
+  res.status(200).json(posts)
+end
+```
+
+### Built-in ORM
+
+ActiveRecord in your API routes—no separate ORM to learn:
+
+```ruby
+# app/api/posts/[id].rb
+export default
+def handler(req, res)
+  post = Post.find(req.query[:id])
+
+  case req.method
+  when 'GET'
+    res.json(post.as_json(include: :comments))
+  when 'PUT'
+    post.update(req.body)
+    res.json(post)
+  when 'DELETE'
+    post.destroy
+    res.status(204).end()
+  end
+end
+```
+
+### Rails Ecosystem
+
+Validations, associations, scopes—the full ActiveRecord toolkit:
+
+```ruby
+@post = Post.find(id)
+@comments = @post.comments.includes(:author).order(created_at: :desc)
+@related = Post.where(category: @post.category).published.limit(3)
+```
+
+### Syntax Benefits
+
+Cleaner Ruby syntax throughout:
+
+```ruby
+# Conditionals
 return %x{<Loading />} if loading
-%x{<Content data={data} />}
-```
 
-### String Interpolation
-
-```ruby
-# Next.js
-`/posts/${post.id}`
-
-# Ruby2JS
+# String interpolation
 "/posts/#{post[:id]}"
-```
 
-### Array Methods
-
-```ruby
-# Next.js
-posts.filter(p => p.published).map(p => <Post key={p.id} {...p} />)
-
-# Ruby2JS
-posts.select { |p| p[:published] }.map { |p| %x{<Post key={p.id} {...p} />} }
+# Blocks
+posts.select { |p| p[:published] }.map { |p| %x{<Post {...p} />} }
 ```
 
 ## Key Differences

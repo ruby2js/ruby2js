@@ -5,32 +5,32 @@ top_section: Juntos
 category: juntos-coming-from
 ---
 
-# Coming From Another Framework?
+# Coming From...
 
-If you're familiar with a JavaScript framework, these guides show how your existing knowledge maps to Ruby2JS and Juntos.
+Juntos bridges two worlds:
+
+- **Rails developers** gain access to platforms Rails can't reach—browser, edge, mobile, desktop
+- **JavaScript developers** gain access to the Rails ecosystem—ActiveRecord, validations, associations, conventions
 
 {% toc %}
 
-## Frontend Frameworks
+## From JavaScript Frameworks
 
-| Your Background | What You'll Learn |
-|-----------------|-------------------|
-| **[React](/docs/juntos/coming-from/react)** | Hooks → instance variables, JSX via `%x{}`, functional components |
-| **[Vue](/docs/juntos/coming-from/vue)** | Composition API mapping, SFC structure, template syntax |
-| **[Svelte](/docs/juntos/coming-from/svelte)** | Reactive declarations, SFC components, familiar template syntax |
+You know the framework. Juntos adds the Rails ecosystem—ORM, validations, associations—without leaving your familiar patterns.
 
-## Meta-Frameworks
+| Your Background | What You Gain |
+|-----------------|---------------|
+| **[React](/docs/juntos/coming-from/react)** | ActiveRecord in your components, same hooks you know |
+| **[Vue](/docs/juntos/coming-from/vue)** | Full ORM, cleaner Composition API, same templates |
+| **[Svelte](/docs/juntos/coming-from/svelte)** | Database queries in components, same reactive syntax |
+| **[Next.js](/docs/juntos/coming-from/nextjs)** | Rails patterns in your API routes and pages |
+| **[Astro](/docs/juntos/coming-from/astro)** | ORM in frontmatter, multi-framework islands |
 
-| Your Background | What You'll Learn |
-|-----------------|-------------------|
-| **[Next.js](/docs/juntos/coming-from/nextjs)** | File-based routing, React components in Ruby |
-| **[Astro](/docs/juntos/coming-from/astro)** | Multi-framework components, `.astro.rb` files |
+## From Rails
 
-## Ruby Ecosystem
+You know Rails. Juntos takes those patterns to platforms Rails can't reach.
 
-| Your Background | What You'll Learn |
-|-----------------|-------------------|
-| **[Rails](/docs/juntos/coming-from/rails)** | Stimulus in Ruby, same ERB templates, Hotwire integration |
+**[Coming from Rails](/docs/juntos/coming-from/rails)** — Deploy to browser, edge, mobile, and desktop with the same models and conventions you already know.
 
 ## Deep Dive
 

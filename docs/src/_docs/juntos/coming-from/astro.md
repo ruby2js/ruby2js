@@ -264,40 +264,60 @@ src/
     Animation.svelte.rb    # Svelte island (Ruby)
 ```
 
-## The Ruby Advantage
+## Why Ruby2JS for Astro?
 
-### Server-Side Logic
+Astro's content-focused approach pairs well with Rails' data patterns:
 
-```ruby
-# Astro (JavaScript)
----
-const posts = await fetch('api/posts').then(r => r.json())
-const featured = posts.filter(p => p.featured)
----
+### Full-Stack Ruby
 
-# Ruby2JS
-@posts = Post.all
-@featured = @posts.select { |p| p.featured }
-```
-
-### String Interpolation
+Same language in your Astro frontmatter and your backend. Rails models work directly:
 
 ```ruby
-# Astro
-{`Hello, ${user.name}!`}
+# Backend model (Rails)
+class Post < ApplicationRecord
+  scope :published, -> { where(published: true) }
+  scope :featured, -> { where(featured: true) }
+end
 
-# Ruby2JS
-{"Hello, #{user.name}!"}
+# Astro page (Ruby2JS)
+@posts = Post.published.order(date: :desc)
+@featured = Post.featured.limit(3)
 ```
 
 ### Built-in ORM
 
+Direct database access in frontmatter—no API endpoints, no fetch:
+
 ```ruby
-# Direct database access in page logic
+# Instead of:
+# const posts = await fetch('api/posts').then(r => r.json())
+
+# Write:
 @posts = Post.published.order(date: :desc).limit(10)
 @categories = Category.with_post_counts
+@author = User.find_by(slug: @@author)
+```
 
-# No separate API needed for server-rendered content
+### Rails Ecosystem
+
+ActiveRecord queries, associations, scopes—all in your Astro pages:
+
+```ruby
+@post = Post.find_by(slug: @@slug)
+@comments = @post.comments.includes(:author)
+@related = Post.where(category: @post.category).limit(3)
+```
+
+### Syntax Benefits
+
+Ruby syntax in your frontmatter:
+
+```ruby
+# String interpolation
+{"Hello, #{user.name}!"}
+
+# Blocks in templates
+{posts.map { |p| <Card post={p} /> }}
 ```
 
 ## File Extensions

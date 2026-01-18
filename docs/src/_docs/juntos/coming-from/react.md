@@ -135,38 +135,59 @@ def Settings()
 end
 ```
 
-## The Ruby Advantage
+## Why Ruby2JS for React?
 
-### Cleaner Destructuring
+The syntax improvements are nice, but the real value is what Ruby brings beyond JSX:
+
+### Full-Stack Ruby
+
+Same language on frontend and backend. If you know Rails, the patterns transfer:
 
 ```ruby
-# React
-const { name, email, address: { city } } = user
+# Backend model (Rails)
+class Post < ApplicationRecord
+  validates :title, presence: true
+  has_many :comments
+end
 
-# Ruby2JS
-name, email, city = user.name, user.email, user.address.city
-# or with the functions filter:
-{ name:, email:, address: { city: } } = user
+# React component (Ruby2JS)
+def PostList()
+  posts, setPosts = useState([])
+
+  useEffect -> {
+    Post.published.order(created_at: :desc).then { |p| setPosts(p) }
+  }, []
+  # ...
+end
 ```
 
-### String Interpolation
+### Rails Ecosystem
+
+ActiveRecord queries, validations, associations—directly in your React components:
 
 ```ruby
-# React
-`Hello, ${user.name}!`
-
-# Ruby2JS
-"Hello, #{user.name}!"
+def PostPage()
+  post = useLoaderData()  # From server: Post.find(params[:id])
+  comments = post.comments.includes(:author)
+  related = Post.where(category: post.category).limit(3)
+  # ...
+end
 ```
 
-### Implicit Returns
+### Syntax Benefits
+
+The syntax improvements add up across a codebase:
 
 ```ruby
-# React
-const double = (n) => n * 2
+# Cleaner string interpolation
+"Hello, #{user.name}!"  # vs `Hello, ${user.name}!`
 
-# Ruby2JS
-double = ->(n) { n * 2 }
+# Implicit returns
+double = ->(n) { n * 2 }  # vs const double = (n) => n * 2
+
+# Cleaner conditionals
+return %x{<Loading />} if loading
+%x{<Content data={data} />}
 ```
 
 ## Key Differences

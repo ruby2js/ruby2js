@@ -176,53 +176,65 @@ onMount(() => {
 })
 ```
 
-## The Ruby Advantage
+## Why Ruby2JS for Svelte?
 
-### Familiar Variable Assignment
+Svelte already has clean syntax—so why add Ruby? The value isn't in syntax transformation, it's in what Ruby brings to the table:
+
+### Full-Stack Ruby
+
+Use the same language for your SvelteKit frontend and your backend. If you know Rails, you already know the patterns:
 
 ```ruby
-# Svelte
-let count = 0
-let items = []
-let user = null
+# Backend model (Rails)
+class Post < ApplicationRecord
+  validates :title, presence: true
+  has_many :comments
+end
 
-# Ruby2JS - instance variables become reactive let
-@count = 0
-@items = []
-@user = nil
+# Frontend component (Ruby2JS → Svelte)
+@posts = Post.published.order(created_at: :desc)
 ```
 
-### Cleaner Lifecycle Hooks
+### Built-in ORM
+
+Direct database access in your components—no API endpoints, no fetch calls:
 
 ```ruby
-# Svelte
+# Instead of this:
+def on_mount
+  fetch('/api/posts')
+    .then(->(r) { r.json })
+    .then(->(data) { @posts = data })
+end
+
+# Write this:
+@posts = Post.where(published: true).limit(10)
+@categories = Category.with_post_counts
+```
+
+### Rails Ecosystem
+
+ActiveRecord validations, associations, and query interface—all available in your Svelte components:
+
+```ruby
+@post = Post.find(@@id)
+@comments = @post.comments.includes(:author)
+@related = Post.where(category: @post.category).limit(3)
+```
+
+### Syntax Benefits
+
+The syntax improvements are modest but add up:
+
+```ruby
+# Svelte lifecycle hooks need imports
 import { onMount, onDestroy } from 'svelte'
+onMount(() => { /* setup */ })
 
-onMount(() => {
-  // setup
-  return () => {
-    // cleanup
-  }
-})
-
-# Ruby2JS
+# Ruby2JS - just define methods
 def on_mount
   # setup
 end
-
-def on_destroy
-  # cleanup
-end
-```
-
-### String Interpolation in Logic
-
-```ruby
-# Svelte
-const message = `Hello, ${user.name}!`
-
-# Ruby2JS
-message = "Hello, #{@user[:name]}!"
 ```
 
 ## Template Syntax

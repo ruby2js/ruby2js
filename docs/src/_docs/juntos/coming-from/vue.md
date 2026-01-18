@@ -181,55 +181,68 @@ onMounted(() => {
 })
 ```
 
-## The Ruby Advantage
+## Why Ruby2JS for Vue?
 
-### No .value Ceremony
+Vue's Composition API is already good—so what does Ruby add?
+
+### Full-Stack Ruby
+
+Same language on frontend and backend. Rails patterns transfer directly:
 
 ```ruby
-# Vue 3 Composition API
-const count = ref(0)
-count.value += 1
-console.log(count.value)
+# Backend model (Rails)
+class Post < ApplicationRecord
+  validates :title, presence: true
+  has_many :comments
+end
 
-# Ruby2JS
-@count = 0
-@count += 1
-console.log(@count)
+# Vue component (Ruby2JS)
+@posts = Post.published.order(created_at: :desc)
+@categories = Category.with_post_counts
 ```
 
-### Cleaner Lifecycle Hooks
+### Built-in ORM
+
+Direct database access in your components—no API layer needed:
 
 ```ruby
-# Vue
-onMounted(() => {
-  // setup
-})
-
-onUnmounted(() => {
-  // cleanup
-})
-
-# Ruby2JS
+# Instead of fetch calls:
 def mounted
-  # setup
+  fetch('/api/posts').then(->(r) { r.json }).then(->(data) { @posts = data })
 end
 
-def unmounted
-  # cleanup
-end
+# Write this:
+@posts = Post.where(published: true).includes(:author)
 ```
 
-### Instance Variables Are Reactive State
+### Rails Ecosystem
+
+ActiveRecord validations, associations, and query interface:
 
 ```ruby
-# All instance variables become refs automatically
+@post = Post.find(@@id)
+@comments = @post.comments.order(created_at: :desc)
+@related = Post.where(category: @post.category).limit(3)
+```
+
+### Vue-Specific Wins
+
+Ruby2JS also removes Vue's Composition API friction:
+
+```ruby
+# No .value ceremony
+@count = 0       # vs const count = ref(0)
+@count += 1      # vs count.value += 1
+
+# Instance variables are automatically reactive refs
 @user = nil
 @posts = []
 @loading = true
 
-# Nested updates just work
-@user[:name] = "New Name"
-@posts.push(new_post)
+# Methods instead of callback imports
+def mounted      # vs onMounted(() => {})
+  # setup
+end
 ```
 
 ## Lifecycle Hook Mapping

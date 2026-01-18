@@ -8,31 +8,81 @@ hide_in_toc: true
 
 # Coming from Rails
 
-If you know Rails, Ruby2JS lets you write frontend JavaScript using Ruby—the same language you use on the backend.
+You know Rails. Juntos takes those patterns to platforms Rails can't reach.
 
 {% toc %}
 
+## Why Juntos for Rails Developers?
+
+Rails is powerful but limited to traditional servers. Juntos unlocks:
+
+| Platform | What It Enables | Rails? |
+|----------|-----------------|--------|
+| **[Browser](/docs/juntos/deploying/browser)** | Offline-first apps, zero infrastructure | No |
+| **[Vercel Edge](/docs/juntos/deploying/vercel)** | Global edge, auto-scaling, ~50ms cold starts | No |
+| **[Cloudflare Workers](/docs/juntos/deploying/cloudflare)** | Edge computing, ~5ms cold starts | No |
+| **[Capacitor](/docs/juntos/deploying/capacitor)** | Native iOS/Android apps | No |
+| **[Electron](/docs/juntos/deploying/electron)** | Desktop apps (macOS/Windows/Linux) | No |
+| **[Tauri](/docs/juntos/deploying/tauri)** | Lightweight desktop apps (~3MB) | No |
+
+Your Rails knowledge transfers directly—same ActiveRecord patterns, same MVC structure, same conventions.
+
+## Same Models, New Platforms
+
+Your ActiveRecord models work everywhere:
+
+```ruby
+# This exact model runs in browser, edge, mobile, and desktop
+class Post < ApplicationRecord
+  validates :title, presence: true
+  has_many :comments, dependent: :destroy
+  scope :published, -> { where(published: true) }
+end
+
+# Same queries everywhere
+@posts = Post.published.order(created_at: :desc).limit(10)
+@post = Post.find(params[:id])
+@comments = @post.comments.includes(:author)
+```
+
 ## What You Know → What You Write
 
-| Rails | Ruby2JS |
-|-------|---------|
-| ERB templates | ERB templates (same!) |
-| Stimulus controllers | Stimulus controllers in Ruby |
-| Turbo | Works unchanged |
-| ActiveRecord models | JavaScript model classes |
+| Rails | Juntos |
+|-------|--------|
+| ActiveRecord models | Same models, transpiled |
+| Validations | Same validations |
+| Associations | Same associations |
+| Scopes | Same scopes |
+| Controllers | Same MVC pattern |
 | `rails routes` | File-based routing |
-| Hotwire | Full support |
+| Hotwire | Full Turbo/Stimulus support |
 
-## Quick Start
+## Two Ways to Use Ruby2JS
 
-**1. Add Ruby2JS to your Rails app:**
+### 1. Juntos: Rails Patterns, New Platforms
+
+Build complete apps that deploy to browser, edge, mobile, or desktop:
+
+```bash
+# Create a new Juntos app
+npx create-juntos my-app
+cd my-app
+
+# Develop locally with SQLite
+bin/juntos up -d sqlite
+
+# Deploy to Vercel Edge with Neon
+bin/juntos deploy -t vercel -d neon
+```
+
+### 2. Ruby2JS-Rails: Enhance Existing Apps
+
+Add Ruby2JS to your existing Rails app for frontend JavaScript:
 
 ```ruby
 # Gemfile
 gem 'ruby2js-rails'
 ```
-
-**2. Write Stimulus controllers in Ruby:**
 
 ```ruby
 # app/javascript/controllers/hello_controller.rb
@@ -47,8 +97,6 @@ class HelloController < Stimulus::Controller
   end
 end
 ```
-
-**3. Use in your view (unchanged):**
 
 ```erb
 <div data-controller="hello">
@@ -230,99 +278,70 @@ class CounterController < Stimulus::Controller
 end
 ```
 
-## The Ruby Advantage
+## Offline-First Apps
 
-### Same Language, Same Patterns
+Juntos enables offline-first apps that sync with a Rails backend:
 
 ```ruby
-# Backend (Rails)
-class PostsController < ApplicationController
-  def create
-    @post = Post.new(post_params)
-    if @post.save
-      redirect_to @post
-    else
-      render :new
-    end
-  end
-end
+# Browser app uses IndexedDB
+@posts = Post.where(published: true)  # Works offline!
 
-# Frontend (Ruby2JS)
-class PostFormController < Stimulus::Controller
-  def submit
-    post = Post.new(form_data)
-    if post.valid?
-      post.save.then { navigate_to(post) }
-    else
-      show_errors(post.errors)
-    end
-  end
-end
+# Same models sync with Rails API when online
+Post.sync_with_server  # Push/pull changes
 ```
 
-### Familiar Iteration
+This pattern works for:
+- Mobile apps in spotty connectivity
+- Field data collection
+- Event scoring systems
+- Any scenario requiring offline capability
+
+## Key Differences from Traditional Rails
+
+### With Juntos: Full ORM Works
+
+Juntos transpiles ActiveRecord patterns—queries work in browser, edge, and mobile:
 
 ```ruby
-# Both work the same way
-items.each do |item|
-  puts item.name
-end
-
-items.select { |i| i.active }.map { |i| i.name }
-
-items.find { |i| i.id == target_id }
+# This works in Juntos (browser, edge, mobile, desktop)
+@posts = Post.published.order(created_at: :desc)
+@comments = @post.comments.includes(:author)
 ```
 
-### String Interpolation
+### With Ruby2JS-Rails: API-Based
+
+When adding Ruby2JS to an existing Rails app, frontend code calls your Rails API:
 
 ```ruby
-# Works everywhere
-"Hello, #{user.name}!"
-"/posts/#{post.id}/comments"
-```
-
-## Key Differences
-
-### No Server-Side Execution
-
-Ruby2JS code runs in the browser, not on the server:
-
-```ruby
-# This WON'T work - no database access in browser
-Post.where(published: true)  # ❌
-
-# Use API calls instead
-fetch('/api/posts?published=true')  # ✓
-```
-
-### Async Operations
-
-Browser operations are async:
-
-```ruby
-# Rails (synchronous)
-@post = Post.find(params[:id])
-render :show
-
-# Ruby2JS (asynchronous)
+# Frontend Stimulus controller calls Rails backend
 Post.find(id).then do |post|
   render_post(post)
 end
 ```
 
-### File Organization
+### Same Ruby, Different Contexts
 
-```
-app/
-  javascript/
-    controllers/      # Stimulus controllers (.rb)
-    models/           # JavaScript model classes (.rb)
-    components/       # Reusable JS components (.rb)
+```ruby
+# These patterns work everywhere
+items.select { |i| i.active }.map { |i| i.name }
+"Hello, #{user.name}!"
+"/posts/#{post.id}/comments"
 ```
 
 ## Deployment
 
-Works with your existing Rails deployment:
+### Juntos: Deploy Anywhere
+
+```bash
+bin/juntos deploy -t vercel -d neon    # Edge with Postgres
+bin/juntos deploy -t cloudflare -d d1  # Edge with SQLite
+bin/juntos deploy -t capacitor         # iOS/Android
+bin/juntos deploy -t electron          # Desktop
+```
+
+See [Deployment Overview](/docs/juntos/deploying/) for all targets.
+
+### Ruby2JS-Rails: Enhance Existing Apps
 
 ```ruby
 # config/environments/production.rb
@@ -332,16 +351,16 @@ config.ruby2js.eslevel = 2022
 
 The build process transpiles `.rb` files to `.js` automatically.
 
-## Migration Path
-
-1. **Start with Stimulus**: Convert one controller at a time
-2. **Keep ERB**: Your views don't change
-3. **Add models**: Extract API logic into model classes
-4. **Gradual adoption**: Mix JavaScript and Ruby2JS freely
-
 ## Next Steps
+
+### For New Projects (Juntos)
+
+- **[Getting Started](/docs/juntos/getting-started)** - Create your first Juntos app
+- **[Deployment Overview](/docs/juntos/deploying/)** - Choose your target platform
+- **[Active Record](/docs/juntos/active-record)** - ORM in JavaScript runtimes
+
+### For Existing Rails Apps (Ruby2JS-Rails)
 
 - **[Stimulus Filter](/docs/filters/stimulus)** - Full Stimulus support
 - **[Rails Helpers](/docs/filters/rails)** - Rails-compatible helpers
-- **[Ruby2JS on Rails](/docs/users-guide/ruby2js-on-rails)** - Setup guide
 - **[User's Guide](/docs/users-guide/introduction)** - General patterns
