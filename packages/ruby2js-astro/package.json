@@ -1,0 +1,31 @@
+{
+  "name": "ruby2js-astro",
+  "version": "1.0.0-beta",
+  "type": "module",
+  "description": "Astro integration for Ruby2JS - write Astro components in Ruby",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "files": [
+    "src/"
+  ],
+  "keywords": [
+    "astro",
+    "astro-integration",
+    "ruby2js",
+    "ruby",
+    "javascript",
+    "transpiler"
+  ],
+  "author": "Sam Ruby",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ruby2js/ruby2js"
+  },
+  "peerDependencies": {
+    "astro": "^4.0.0 || ^5.0.0",
+    "ruby2js": "*"
+  }
+}

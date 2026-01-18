@@ -34,118 +34,24 @@ npm create astro@latest "$APP_NAME" -- --template minimal --no-git --skip-housto
 
 cd "$APP_DIR"
 
-# Install ruby2js and vite-plugin-ruby2js from local tarballs or registry
+# Install ruby2js and ruby2js-astro from local paths or tarballs
 # In CI, these will be replaced with the actual tarball paths
 if [ -n "$RUBY2JS_TARBALL" ]; then
-  npm install "$RUBY2JS_TARBALL" "$VITE_PLUGIN_TARBALL"
+  npm install "$RUBY2JS_TARBALL" "$ASTRO_INTEGRATION_TARBALL"
 else
   # Default: assume we're in the ruby2js repo for local dev
-  npm install "$REPO_ROOT/demo/selfhost" "$REPO_ROOT/packages/vite-plugin-ruby2js"
+  npm install "$REPO_ROOT/demo/selfhost" "$REPO_ROOT/packages/ruby2js-astro"
 fi
 
-# Update astro.config.mjs to use vite-plugin-ruby2js
+# Update astro.config.mjs to use ruby2js-astro integration
 cat > astro.config.mjs << 'CONFIG'
 import { defineConfig } from 'astro/config';
-import ruby2js from 'vite-plugin-ruby2js';
+import ruby2js from 'ruby2js-astro';
 
 export default defineConfig({
-  vite: {
-    plugins: [ruby2js({ sfc: true })]
-  }
+  integrations: [ruby2js()]
 });
 CONFIG
-
-# Create scripts directory and prebuild script
-mkdir -p scripts
-
-cat > scripts/prebuild.mjs << 'PREBUILD'
-#!/usr/bin/env node
-/**
- * Prebuild script: Transform .astro.rb files to .astro
- *
- * Astro doesn't support custom page extensions, so we transform
- * .astro.rb files to .astro before the build runs.
- */
-import { readdir, readFile, writeFile, mkdir, rm } from 'fs/promises';
-import { join, dirname, relative } from 'path';
-import { fileURLToPath } from 'url';
-import { existsSync } from 'fs';
-
-// Dynamically import the transformer
-const { AstroComponentTransformer } = await import('ruby2js/astro');
-const { initPrism } = await import('ruby2js');
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const srcDir = join(__dirname, '../src');
-
-async function findAstroRbFiles(dir) {
-  const files = [];
-  const entries = await readdir(dir, { withFileTypes: true });
-
-  for (const entry of entries) {
-    const fullPath = join(dir, entry.name);
-    if (entry.isDirectory()) {
-      files.push(...await findAstroRbFiles(fullPath));
-    } else if (entry.name.endsWith('.astro.rb')) {
-      files.push(fullPath);
-    }
-  }
-  return files;
-}
-
-async function transformFile(filePath) {
-  const source = await readFile(filePath, 'utf-8');
-  const result = AstroComponentTransformer.transform(source, {
-    eslevel: 2022,
-    camelCase: true
-  });
-
-  if (result.errors && result.errors.length > 0) {
-    console.error(`Error transforming ${filePath}:`, result.errors);
-    throw new Error(`Transform failed for ${filePath}`);
-  }
-
-  // Write to .astro file (same location, different extension)
-  const outputPath = filePath.replace('.astro.rb', '.astro');
-  await writeFile(outputPath, result.component);
-
-  console.log(`  ${relative(srcDir, filePath)} -> ${relative(srcDir, outputPath)}`);
-}
-
-async function main() {
-  console.log('Transforming .astro.rb files...');
-
-  // Initialize Prism for Ruby parsing
-  await initPrism();
-
-  // Find all .astro.rb files
-  const files = await findAstroRbFiles(srcDir);
-
-  if (files.length === 0) {
-    console.log('  No .astro.rb files found');
-    return;
-  }
-
-  // Transform each file
-  for (const file of files) {
-    await transformFile(file);
-  }
-
-  console.log(`Done! Transformed ${files.length} file(s)`);
-}
-
-main().catch(err => {
-  console.error(err);
-  process.exit(1);
-});
-PREBUILD
-
-chmod +x scripts/prebuild.mjs
-
-# Update package.json to run prebuild before build/dev
-npm pkg set scripts.prebuild="node scripts/prebuild.mjs"
-npm pkg set scripts.dev="npm run prebuild && astro dev"
-npm pkg set scripts.build="npm run prebuild && astro build"
 
 # Remove the default index.astro from the template
 rm -f src/pages/index.astro
