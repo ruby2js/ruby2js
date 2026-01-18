@@ -428,7 +428,8 @@ jobs:
           cd test/integration
           npm install
           node setup.mjs --local ${{ matrix.demo }}
-          npm test -- "./${{ matrix.demo }}.test.mjs"
+          # blog uses rails_blog.test.mjs to avoid vitest matching astro_blog.test.mjs
+          npm test -- "./${{ matrix.demo == 'blog' && 'rails_blog' || matrix.demo }}.test.mjs"
 
   # ===========================================================================
   # Stage 2: Deploy (runs in parallel with tests, depends on Stage 1)
