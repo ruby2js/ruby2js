@@ -486,6 +486,9 @@ jobs:
                 <li><a href="ruby2js-rails-beta.tgz">ruby2js-rails-beta.tgz</a> - Rails integration</li>
                 <li><a href="vite-plugin-ruby2js-beta.tgz">vite-plugin-ruby2js-beta.tgz</a> - Vite plugin</li>
                 <li><a href="esbuild-plugin-ruby2js-beta.tgz">esbuild-plugin-ruby2js-beta.tgz</a> - esbuild plugin</li>
+                <li><a href="ruby2js-astro-beta.tgz">ruby2js-astro-beta.tgz</a> - Astro integration</li>
+                <li><a href="ruby2js-svelte-beta.tgz">ruby2js-svelte-beta.tgz</a> - SvelteKit preprocessor</li>
+                <li><a href="ruby2js-nuxt-beta.tgz">ruby2js-nuxt-beta.tgz</a> - Nuxt module</li>
               </ul>
             </div>
             <div class="section">
