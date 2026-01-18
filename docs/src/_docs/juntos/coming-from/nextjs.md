@@ -39,6 +39,11 @@ app/pages/
 
 **2. Create a page:**
 
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["esm", "react", "jsx", "functions"]
+}'></div>
+
 ```ruby
 # app/pages/posts/[id].jsx.rb
 export default
@@ -113,6 +118,11 @@ end
 
 ### Navigation
 
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["esm", "react", "jsx", "functions"]
+}'></div>
+
 ```ruby
 def Navigation()
   router = useRouter()
@@ -127,8 +137,8 @@ def Navigation()
 
   %x{
     <nav>
-      <button onClick={goBack}>Back</button>
-      <button onClick={() => goToPost(123)}>View Post</button>
+      <button onClick={go_back}>Back</button>
+      <button onClick={-> { go_to_post(123) }}>View Post</button>
     </nav>
   }
 end
@@ -153,6 +163,11 @@ end
 ## Data Fetching
 
 ### Client-Side Fetching
+
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["esm", "react", "jsx", "functions"]
+}'></div>
 
 ```ruby
 export default
@@ -184,6 +199,11 @@ end
 
 Use pragmas to enable ISR:
 
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["esm", "react", "jsx", "functions"]
+}'></div>
+
 ```ruby
 # Pragma: revalidate 60
 
@@ -200,15 +220,18 @@ def PostsList()
 
   %x{
     <ul>
-      {posts.map((post) => (
-        <li key={post.id}>{post.title}</li>
-      ))}
+      {posts.map { |post| <li key={post.id}>{post.title}</li> }}
     </ul>
   }
 end
 ```
 
 ## API Routes
+
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["esm", "functions"]
+}'></div>
 
 ```ruby
 # app/api/posts.rb
@@ -339,6 +362,11 @@ page = router.query[:page] || 1
 ```
 
 ## Layout Pattern
+
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["esm", "react", "jsx", "functions"]
+}'></div>
 
 ```ruby
 # app/layouts/default.jsx.rb

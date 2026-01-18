@@ -84,6 +84,11 @@ Add Ruby2JS to your existing Rails app for frontend JavaScript:
 gem 'ruby2js-rails'
 ```
 
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["esm", "stimulus", "functions"]
+}'></div>
+
 ```ruby
 # app/javascript/controllers/hello_controller.rb
 class HelloController < Stimulus::Controller
@@ -109,6 +114,11 @@ end
 ## Stimulus Controllers
 
 ### Data Attributes
+
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["esm", "stimulus", "functions"]
+}'></div>
 
 ```ruby
 # app/javascript/controllers/slideshow_controller.rb
@@ -137,6 +147,11 @@ end
 ```
 
 ### Outlets
+
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["esm", "stimulus", "functions"]
+}'></div>
 
 ```ruby
 class SearchController < Stimulus::Controller
@@ -217,6 +232,11 @@ end
 
 Ruby2JS works seamlessly with Turbo:
 
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["esm", "stimulus", "functions"]
+}'></div>
+
 ```ruby
 # app/javascript/controllers/form_controller.rb
 class FormController < Stimulus::Controller
@@ -264,6 +284,11 @@ end
   <button data-action="counter#increment">+</button>
 </div>
 ```
+
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["esm", "stimulus", "functions"]
+}'></div>
 
 ```ruby
 # app/javascript/controllers/counter_controller.rb

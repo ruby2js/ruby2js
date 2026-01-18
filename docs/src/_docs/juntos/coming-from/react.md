@@ -25,10 +25,14 @@ If you know React, you'll find Ruby2JS provides a familiar component model with 
 
 ## Quick Start
 
-**1. Create a component:**
+**Try it live** — edit the Ruby code and see the JavaScript output:
+
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["esm", "react", "jsx", "functions"]
+}'></div>
 
 ```ruby
-# app/components/Counter.jsx.rb
 export default
 def Counter(initial: 0)
   count, setCount = useState(initial)
@@ -36,7 +40,7 @@ def Counter(initial: 0)
   %x{
     <div>
       <p>Count: {count}</p>
-      <button onClick={() => setCount(count + 1)}>
+      <button onClick={-> { setCount(count + 1) }}>
         Increment
       </button>
     </div>
@@ -44,29 +48,16 @@ def Counter(initial: 0)
 end
 ```
 
-**2. The generated JavaScript:**
-
-```jsx
-export default function Counter({initial = 0}) {
-  const [count, setCount] = useState(initial);
-
-  return (
-    <div>
-      <p>Count: {count}</p>
-      <button onClick={() => setCount(count + 1)}>
-        Increment
-      </button>
-    </div>
-  );
-}
-```
-
 ## Component Patterns
 
 ### Functional Components with Hooks
 
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["esm", "react", "jsx", "functions"]
+}'></div>
+
 ```ruby
-# Ruby2JS
 def UserProfile(user_id:)
   user, setUser = useState(nil)
   loading, setLoading = useState(true)
@@ -93,6 +84,11 @@ end
 
 ### Event Handlers
 
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["esm", "react", "jsx", "functions"]
+}'></div>
+
 ```ruby
 def Form()
   name, setName = useState("")
@@ -106,7 +102,7 @@ def Form()
     <form onSubmit={handleSubmit}>
       <input
         value={name}
-        onChange={(e) => setName(e.target.value)}
+        onChange={->(e) { setName(e.target.value) }}
       />
       <button type="submit">Submit</button>
     </form>
@@ -115,6 +111,11 @@ end
 ```
 
 ### Custom Hooks
+
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["esm", "react", "jsx", "functions"]
+}'></div>
 
 ```ruby
 def useLocalStorage(key, initial_value)
@@ -196,33 +197,50 @@ return %x{<Loading />} if loading
 
 Ruby2JS uses `%x{}` blocks for JSX:
 
-```ruby
-# Ruby2JS uses %x{} for JSX
-%x{<Component prop={value} />}
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["esm", "react", "jsx", "functions"]
+}'></div>
 
-# Multi-line works naturally
-%x{
-  <div>
-    <h1>{title}</h1>
-    <p>{content}</p>
-  </div>
-}
+```ruby
+def Example(title:, content:, value:)
+  # Inline JSX
+  %x{<Component prop={value} />}
+
+  # Multi-line works naturally
+  %x{
+    <div>
+      <h1>{title}</h1>
+      <p>{content}</p>
+    </div>
+  }
+end
 ```
 
 ### Component Naming
 
 Export your component function with `export default`:
 
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["esm", "react", "jsx", "functions"]
+}'></div>
+
 ```ruby
 export default
-def MyComponent(props)
-  # ...
+def MyComponent(name:)
+  %x{<h1>Hello, {name}!</h1>}
 end
 ```
 
 ### Props vs Instance Variables
 
 In React components, use props directly. Instance variables (`@`) are for class components:
+
+<div data-controller="combo" data-options='{
+  "eslevel": 2022,
+  "filters": ["esm", "react", "jsx", "functions"]
+}'></div>
 
 ```ruby
 # Functional component (recommended)
