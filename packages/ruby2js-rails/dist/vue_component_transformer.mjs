@@ -1,4 +1,4 @@
-import { convert, astNode } from '../ruby2js.js';
+import { convert, astNode, parse } from '../ruby2js.js';
 import { Ruby2JS } from '../ruby2js.js';
 import { VueTemplateCompiler } from './vue_template_compiler.mjs';
 import '../filters/sfc.js';

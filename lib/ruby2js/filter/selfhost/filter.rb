@@ -156,6 +156,13 @@ module Ruby2JS
             return process s(:send, nil, :convert, *args)
           end
 
+          # Convert Ruby2JS.parse(...) to parse(...)
+          # parse is imported from ruby2js.js
+          if target&.type == :const && target.children == [nil, :Ruby2JS] &&
+             method_name == :parse
+            return process s(:send, nil, :parse, *args)
+          end
+
           # Convert length/size/count to :attr nodes to ensure property access.
           # Without this, nodes created with s() (no location info) get is_method?=true
           # and output as method calls like body.length() instead of body.length.
@@ -272,6 +279,8 @@ module Ruby2JS
                        s(:const, nil, :s),
                        s(:const, nil, :S),
                        s(:const, nil, :ast_node),
+                       s(:const, nil, :convert),
+                       s(:const, nil, :parse),
                        s(:const, nil, :include),
                        s(:const, nil, :Filter),
                        s(:const, nil, :DEFAULTS),
