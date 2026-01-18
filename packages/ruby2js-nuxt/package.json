@@ -1,0 +1,33 @@
+{
+  "name": "ruby2js-nuxt",
+  "version": "1.0.0-beta",
+  "type": "module",
+  "description": "Nuxt module for Ruby2JS - write Vue components in Ruby",
+  "main": "src/module.js",
+  "exports": {
+    ".": "./src/module.js"
+  },
+  "files": [
+    "src/"
+  ],
+  "keywords": [
+    "nuxt",
+    "nuxt-module",
+    "vue",
+    "ruby2js",
+    "ruby",
+    "javascript",
+    "transpiler"
+  ],
+  "author": "Sam Ruby",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ruby2js/ruby2js"
+  },
+  "peerDependencies": {
+    "nuxt": "^3.0.0",
+    "ruby2js": "*",
+    "vite-plugin-ruby2js": "*"
+  }
+}

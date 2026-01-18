@@ -1,0 +1,32 @@
+{
+  "name": "ruby2js-svelte",
+  "version": "1.0.0-beta",
+  "type": "module",
+  "description": "SvelteKit preprocessor for Ruby2JS - write Svelte components in Ruby",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "files": [
+    "src/"
+  ],
+  "keywords": [
+    "svelte",
+    "sveltekit",
+    "preprocessor",
+    "ruby2js",
+    "ruby",
+    "javascript",
+    "transpiler"
+  ],
+  "author": "Sam Ruby",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ruby2js/ruby2js"
+  },
+  "peerDependencies": {
+    "svelte": "^4.0.0 || ^5.0.0",
+    "ruby2js": "*"
+  }
+}

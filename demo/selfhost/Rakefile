@@ -422,6 +422,18 @@ task :release => [:build, :build_lib, :build_transformers, "build_mjs:npm"] do
     sh "npm version 1.0.0-beta --no-git-tag-version --allow-same-version"
   end
 
+  Dir.chdir(File.join(ROOT, 'packages/ruby2js-svelte')) do
+    sh "npm version #{vite_plugin_version} --no-git-tag-version --allow-same-version"
+    sh "npm pack --pack-destination #{tarballs_dir}"
+    sh "npm version 1.0.0-beta --no-git-tag-version --allow-same-version"
+  end
+
+  Dir.chdir(File.join(ROOT, 'packages/ruby2js-nuxt')) do
+    sh "npm version #{vite_plugin_version} --no-git-tag-version --allow-same-version"
+    sh "npm pack --pack-destination #{tarballs_dir}"
+    sh "npm version 1.0.0-beta --no-git-tag-version --allow-same-version"
+  end
+
   # Rename to stable names (strip version numbers for predictable paths)
   Dir.chdir(tarballs_dir) do
     Dir.glob('ruby2js-6*.tgz').each { |f| FileUtils.mv(f, 'ruby2js-beta.tgz') }
@@ -430,6 +442,8 @@ task :release => [:build, :build_lib, :build_transformers, "build_mjs:npm"] do
     Dir.glob('vite-plugin-ruby2js-*.tgz').reject { |f| f == 'vite-plugin-ruby2js-beta.tgz' }.each { |f| FileUtils.mv(f, 'vite-plugin-ruby2js-beta.tgz') }
     Dir.glob('esbuild-plugin-ruby2js-*.tgz').reject { |f| f == 'esbuild-plugin-ruby2js-beta.tgz' }.each { |f| FileUtils.mv(f, 'esbuild-plugin-ruby2js-beta.tgz') }
     Dir.glob('ruby2js-astro-*.tgz').reject { |f| f == 'ruby2js-astro-beta.tgz' }.each { |f| FileUtils.mv(f, 'ruby2js-astro-beta.tgz') }
+    Dir.glob('ruby2js-svelte-*.tgz').reject { |f| f == 'ruby2js-svelte-beta.tgz' }.each { |f| FileUtils.mv(f, 'ruby2js-svelte-beta.tgz') }
+    Dir.glob('ruby2js-nuxt-*.tgz').reject { |f| f == 'ruby2js-nuxt-beta.tgz' }.each { |f| FileUtils.mv(f, 'ruby2js-nuxt-beta.tgz') }
   end
 
   puts ""
