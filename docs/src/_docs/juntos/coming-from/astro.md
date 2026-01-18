@@ -25,9 +25,10 @@ If you know Astro, you'll appreciate Ruby2JS's approach to multi-framework compo
 
 Write Astro components in Ruby. The format mirrors Astro's structure:
 
+<div data-controller="combo" data-options='{"eslevel": 2022, "template": "astro", "filters": ["sfc", "esm", "functions"]}'></div>
+
 ```ruby
-# src/pages/posts/[slug].astro.rb
-@post = Post.find_by(slug: params[:slug])
+@post = Post.find_by(slug: @@slug)
 @related = Post.where(category: @post.category).limit(3)
 __END__
 <Layout title={post.title}>
@@ -40,32 +41,6 @@ __END__
     <h2>Related Posts</h2>
     <ul>
       {related.map { |p| <li><a href={"/posts/#{p.slug}"}>{p.title}</a></li> }}
-    </ul>
-  </aside>
-</Layout>
-```
-
-This compiles to a standard `.astro` file:
-
-```astro
----
-import { Post } from '../models/post'
-
-const { slug } = Astro.params
-const post = Post.findBy({slug: slug})
-const related = Post.where({category: post.category}).limit(3)
----
-
-<Layout title={post.title}>
-  <article>
-    <h1>{post.title}</h1>
-    <div set:html={post.body} />
-  </article>
-
-  <aside>
-    <h2>Related Posts</h2>
-    <ul>
-      {related.map(p => <li><a href={`/posts/${p.slug}`}>{p.title}</a></li>)}
     </ul>
   </aside>
 </Layout>
@@ -97,18 +72,13 @@ This works for all iteration patterns:
 
 Ruby conventions automatically convert to JavaScript:
 
+<div data-controller="combo" data-options='{"eslevel": 2022, "template": "astro", "filters": ["sfc", "esm", "functions"]}'></div>
+
 ```ruby
-# Ruby (snake_case)
 @user_name = "Alice"
 @is_loading = false
 __END__
 <p show_loading={is_loading}>{user_name}</p>
-
-# JavaScript (camelCase)
-const userName = "Alice"
-const isLoading = false
----
-<p showLoading={isLoading}>{userName}</p>
 ```
 
 ### Astro Directives Preserved
@@ -130,6 +100,8 @@ __END__
 
 Instance variables in the Ruby code become `const` declarations:
 
+<div data-controller="combo" data-options='{"eslevel": 2022, "template": "astro", "filters": ["sfc", "esm", "functions"]}'></div>
+
 ```ruby
 @title = "Hello"
 @count = 0
@@ -142,19 +114,11 @@ __END__
 
 Use the `@@` sigil for concise route parameter access:
 
+<div data-controller="combo" data-options='{"eslevel": 2022, "template": "astro", "filters": ["sfc", "esm", "functions"]}'></div>
+
 ```ruby
-# src/pages/posts/[id].astro.rb
 @post = Post.find(@@id)
 __END__
-<h1>{post.title}</h1>
-```
-
-Becomes:
-
-```astro
----
-const post = Post.find(Astro.params.id)
----
 <h1>{post.title}</h1>
 ```
 
@@ -200,8 +164,9 @@ import { Comment } from '../models/comment'
 
 ### Layout Component
 
+<div data-controller="combo" data-options='{"eslevel": 2022, "template": "astro", "filters": ["sfc", "esm", "functions"]}'></div>
+
 ```ruby
-# src/pages/index.astro.rb
 @title = "Home"
 @description = "Welcome to my site"
 __END__
@@ -238,6 +203,8 @@ __END__
 ## Methods → Functions
 
 Methods defined in Ruby become JavaScript functions:
+
+<div data-controller="combo" data-options='{"eslevel": 2022, "template": "astro", "filters": ["sfc", "esm", "functions"]}'></div>
 
 ```ruby
 def format_date(date)

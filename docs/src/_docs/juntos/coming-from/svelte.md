@@ -24,10 +24,9 @@ If you know Svelte, Ruby2JS provides the same reactive simplicity with Ruby synt
 
 ## Quick Start
 
-**1. Create a component:**
+<div data-controller="combo" data-options='{"eslevel": 2022, "template": "svelte", "filters": ["sfc", "esm", "functions"]}'></div>
 
 ```ruby
-# app/pages/counter.svelte.rb
 @count = 0
 
 def increment
@@ -40,29 +39,13 @@ __END__
 </div>
 ```
 
-**2. The generated Svelte component:**
-
-```svelte
-<script>
-let count = 0
-
-function increment() {
-  count += 1
-}
-</script>
-
-<div>
-  <p>Count: {count}</p>
-  <button on:click={increment}>+1</button>
-</div>
-```
-
 ## Component Patterns
 
 ### Data Fetching with Lifecycle
 
+<div data-controller="combo" data-options='{"eslevel": 2022, "template": "svelte", "filters": ["sfc", "esm", "functions"]}'></div>
+
 ```ruby
-# app/pages/posts/[id].svelte.rb
 @post = nil
 @loading = true
 
@@ -94,6 +77,8 @@ __END__
 
 ### Forms and Binding
 
+<div data-controller="combo" data-options='{"eslevel": 2022, "template": "svelte", "filters": ["sfc", "esm", "functions"]}'></div>
+
 ```ruby
 @name = ""
 @email = ""
@@ -117,6 +102,8 @@ __END__
 ```
 
 ### Each Blocks with Index and Key
+
+<div data-controller="combo" data-options='{"eslevel": 2022, "template": "svelte", "filters": ["sfc", "esm", "functions"]}'></div>
 
 ```ruby
 @items = [

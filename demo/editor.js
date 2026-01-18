@@ -3,6 +3,7 @@ import {EditorState} from "@codemirror/state"
 import {StreamLanguage, indentOnInput, bracketMatching, syntaxHighlighting, defaultHighlightStyle} from "@codemirror/language"
 import {ruby} from "@codemirror/legacy-modes/mode/ruby"
 import {javascript} from "@codemirror/lang-javascript"
+import {html} from "@codemirror/lang-html"
 import {history, historyKeymap, defaultKeymap} from "@codemirror/commands"
 import {closeBrackets, closeBracketsKeymap} from "@codemirror/autocomplete"
 import {searchKeymap, highlightSelectionMatches} from "@codemirror/search"
@@ -56,6 +57,20 @@ globalThis.CodeMirror = class {
         extensions: [
           setup,
           javascript({ jsx: true }),
+          EditorView.editable.of(false)
+        ]
+      }),
+      parent
+    })
+  }
+
+  static sfcEditor(parent) {
+    return new EditorView({
+      state: EditorState.create({
+        doc: 'content',
+        extensions: [
+          setup,
+          html(),
           EditorView.editable.of(false)
         ]
       }),

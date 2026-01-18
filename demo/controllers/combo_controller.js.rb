@@ -14,10 +14,21 @@ class ComboController < DemoController
     tab = document.createElement('sl-tab')
     tab.setAttribute 'slot', 'nav'
     tab.setAttribute 'panel', 'js'
-    # Check if jsx filter is enabled
+    # Check template option and filters to determine appropriate tab label
     options = JSON.parse(element.dataset.options || '{}')
     filters = options.filters || []
-    tab.textContent = filters.include?('jsx') ? 'JSX' : 'JavaScript'
+    # Determine tab label based on template type or filters
+    js_label = filters.include?('jsx') ? 'JSX' : 'JavaScript'
+    tab.textContent = case options.template
+    when 'vue'
+      'Vue SFC'
+    when 'svelte'
+      'Svelte'
+    when 'astro'
+      'Astro'
+    else
+      js_label
+    end
     tab_group.appendChild(tab)
 
     # result tab (if there are children present)

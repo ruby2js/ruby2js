@@ -24,10 +24,9 @@ If you know Vue, you'll feel at home with Ruby2JS targeting Vue. The template sy
 
 ## Quick Start
 
-**1. Create a component:**
+<div data-controller="combo" data-options='{"eslevel": 2022, "template": "vue", "filters": ["sfc", "esm", "functions"]}'></div>
 
 ```ruby
-# app/pages/counter.vue.rb
 @count = 0
 
 def increment
@@ -40,33 +39,13 @@ __END__
 </div>
 ```
 
-**2. The generated Vue SFC:**
-
-```vue
-<script setup>
-import { ref } from 'vue'
-
-const count = ref(0)
-
-function increment() {
-  count.value += 1
-}
-</script>
-
-<template>
-  <div>
-    <p>Count: {{ count }}</p>
-    <button @click="increment">+1</button>
-  </div>
-</template>
-```
-
 ## Component Patterns
 
 ### Data Fetching with Lifecycle Hooks
 
+<div data-controller="combo" data-options='{"eslevel": 2022, "template": "vue", "filters": ["sfc", "esm", "functions"]}'></div>
+
 ```ruby
-# app/pages/posts/[id].vue.rb
 @post = nil
 @loading = true
 
@@ -97,6 +76,8 @@ __END__
 
 ### Forms and v-model
 
+<div data-controller="combo" data-options='{"eslevel": 2022, "template": "vue", "filters": ["sfc", "esm", "functions"]}'></div>
+
 ```ruby
 @name = ""
 @email = ""
@@ -118,6 +99,8 @@ __END__
 ### Computed Properties
 
 Use methods or Ruby2JS reactive statements:
+
+<div data-controller="combo" data-options='{"eslevel": 2022, "template": "vue", "filters": ["sfc", "esm", "functions"]}'></div>
 
 ```ruby
 @items = []

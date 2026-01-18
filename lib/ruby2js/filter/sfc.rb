@@ -21,7 +21,15 @@ module Ruby2JS
 
         var_name = node.children.first.to_s[1..-1]  # strip @
         var_name = sfc_to_camel_case(var_name)  # convert to camelCase
-        value = node.children.last ? process(node.children.last) : nil
+
+        # For op_asgn like @count += 1, ivasgn only has one child (the name)
+        # For regular assignment like @count = 0, it has two children (name and value)
+        if node.children.length > 1
+          value = process(node.children[1])
+        else
+          # This is part of an op_asgn - just transform to lvasgn for the target
+          return s(:lvasgn, var_name)
+        end
 
         case @options[:template].to_sym
         when :astro

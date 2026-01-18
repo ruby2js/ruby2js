@@ -8,6 +8,7 @@
     "esbuild-dev": "yarn shoelace:copy-assets && node esbuild.config.js --watch"
   },
   "devDependencies": {
+    "@codemirror/lang-html": "^6.0.0",
     "@codemirror/lang-javascript": "^6.0.0",
     "@codemirror/language": "^6.0.0",
     "@codemirror/legacy-modes": "^6.0.0",

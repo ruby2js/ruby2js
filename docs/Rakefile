@@ -128,19 +128,19 @@ end
 
 file "#{dest}/editor.js" => ["#{root}/demo/editor.js"] do
   sh "cat #{root}/demo/editor.js | " +
-    "npx rollup -f iife -p @rollup/plugin-node-resolve |" +
+    "npx rollup -f iife -p @rollup/plugin-node-resolve 2>/dev/null | " +
     "#{terser} > src/demo/editor.js"
 end
 
 file "#{dest}/litelement.js" => ["#{root}/demo/litelement.js"] do
   sh "cat #{root}/demo/litelement.js | " +
-    "npx rollup -f iife -p @rollup/plugin-node-resolve |" +
+    "npx rollup -f iife -p @rollup/plugin-node-resolve 2>/dev/null | " +
     "#{terser} > src/demo/litelement.js"
 end
 
 file "#{dest}/livedemo.js" => ["#{root}/demo/livedemo.js.rb", *controller_files] do
   sh "#{RbConfig.ruby} #{root}/demo/ruby2js.rb --filter esm --filter require --filter stimulus --filter functions --identity --es2020 #{root}/demo/livedemo.js.rb | " +
-    "npx rollup -f iife --context window -p @rollup/plugin-node-resolve | " +
+    "npx rollup -f iife --context window -p @rollup/plugin-node-resolve 2>/dev/null | " +
     "#{terser} > #{dest}/livedemo.js"
 end
 

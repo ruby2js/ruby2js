@@ -33,12 +33,22 @@ class JSController < DemoController
   async def setup()
     await codemirror_ready()
 
-    # create another editor below the output
-    @outputDiv = document.createElement('div')
-    @outputDiv.classList.add('editor', 'js')
-    element.appendChild(@outputDiv)
+    # create editor containers
+    @jsOutputDiv = document.createElement('div')
+    @jsOutputDiv.classList.add('editor', 'js')
+    element.appendChild(@jsOutputDiv)
 
-    @jsEditor = CodeMirror.jsEditor(@outputDiv)
+    @sfcOutputDiv = document.createElement('div')
+    @sfcOutputDiv.classList.add('editor', 'sfc')
+    @sfcOutputDiv.style.display = 'none'
+    element.appendChild(@sfcOutputDiv)
+
+    # create both editors
+    @jsEditor = CodeMirror.jsEditor(@jsOutputDiv)
+    @sfcEditor = CodeMirror.sfcEditor(@sfcOutputDiv)
+
+    # track which editor is active
+    @is_sfc = false
 
     @jspre = element.querySelector('pre.js')
     if @jspre
@@ -59,17 +69,41 @@ class JSController < DemoController
     element.style.display = 'block'
   end
 
+  # detect if content is an SFC (contains <script and <template or similar)
+  def is_sfc?(content)
+    return false unless content
+    # Vue/Svelte SFC pattern
+    return true if content.include?('<script') && content.include?('<template')
+    # Svelte without explicit template (just <script> + HTML)
+    return true if content.include?('<script>') && content =~ /<\/script>\s*\n\s*</
+    # Astro pattern (--- frontmatter ---)
+    return true if content.start_with?('---') && content.include?('---', 3)
+    false
+  end
+
   # update contents
   def contents=(script)
-    return unless @jsEditor
+    return unless @jsEditor && @sfcEditor
 
-    @jsEditor.dispatch(
-      changes: {from: 0, to: @jsEditor.state.doc.length, insert: script}
-    )
+    sfc_mode = is_sfc?(script)
 
+    if sfc_mode
+      @sfcEditor.dispatch(
+        changes: {from: 0, to: @sfcEditor.state.doc.length, insert: script}
+      )
+      @jsOutputDiv.style.display = 'none'
+      @sfcOutputDiv.style.display = 'block'
+    else
+      @jsEditor.dispatch(
+        changes: {from: 0, to: @jsEditor.state.doc.length, insert: script}
+      )
+      @jsOutputDiv.style.display = 'block'
+      @sfcOutputDiv.style.display = 'none'
+    end
+
+    @is_sfc = sfc_mode
     @jspre.classList.remove 'exception'
     @jspre.style.display = 'none'
-    @outputDiv.style.display = 'block'
   end
 
   # display an error
@@ -78,11 +112,13 @@ class JSController < DemoController
     @jspre.textContent = message
     @jspre.classList.add 'exception'
     @jspre.style.display = 'block'
-    @outputDiv.style.display = 'none'
+    @jsOutputDiv.style.display = 'none'
+    @sfcOutputDiv.style.display = 'none'
   end
 
   # remove editor on disconnect
   def teardown()
-    element.querySelector('.editor.js').remove()
+    element.querySelector('.editor.js')&.remove()
+    element.querySelector('.editor.sfc')&.remove()
   end
 end

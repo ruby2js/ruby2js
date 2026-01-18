@@ -24,6 +24,22 @@ class RubyController < DemoController
     convert()
   end
 
+  # Build SFC output from script and template
+  def build_sfc(script, template, framework)
+    # Note: use explicit return to ensure JS transpilation returns the value
+    case framework
+    when :vue
+      return "<script setup>\n#{script}\n</script>\n\n<template>\n#{template}\n</template>"
+    when :svelte
+      return "<script>\n#{script}\n</script>\n\n#{template}"
+    when :astro
+      return "---\n#{script}\n---\n\n#{template}"
+    else
+      # Default Vue-style if no framework detected
+      return "<script setup>\n#{script}\n</script>\n\n<template>\n#{template}\n</template>"
+    end
+  end
+
   async def setup()
     @ast = false
     @options ||= {}
@@ -132,10 +148,33 @@ class RubyController < DemoController
 
     ruby = @rubyEditor.state.doc.to_s
     begin
-      js = Ruby2JS.convert(ruby, @options)
-      targets.each {|target| target.contents = js.to_s}
+      # Check for __END__ marker indicating SFC format
+      is_sfc = ruby.include?("__END__")
 
-      if ruby != '' and @ast and parsed and filtered
+      if is_sfc
+        # Split into Ruby code and template
+        parts = ruby.split(/^__END__\r?\n?/, 2)
+        ruby_code = parts[0]
+        template = parts[1] || ''
+
+        # Get framework from template option (vue, svelte, astro)
+        # Note: use string key since @options is a JS object from JSON.parse
+        framework = (@options['template'] || 'vue').to_sym
+
+        # Convert the Ruby code with template option
+        js = Ruby2JS.convert(ruby_code, @options)
+
+        # Build the SFC output
+        sfc_output = build_sfc(js.to_s.strip, template.strip, framework)
+        targets.each {|target| target.contents = sfc_output}
+      else
+        # Normal conversion (no __END__)
+        js = Ruby2JS.convert(ruby, @options)
+        targets.each {|target| target.contents = js.to_s}
+      end
+
+      # AST display (only for non-SFC mode as AST doesn't include template)
+      if !is_sfc and ruby != '' and @ast and parsed and filtered
         raw, comments = Ruby2JS.parse(ruby)
         trees = [walk(raw).join(''), walk(js.ast).join('')]
 

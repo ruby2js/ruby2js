@@ -20,6 +20,22 @@ class SelfhostRubyController < DemoController
     convert()
   end
 
+  # Build SFC output from script and template
+  def build_sfc(script, template, framework)
+    # Note: use explicit return to ensure JS transpilation returns the value
+    case framework
+    when :vue
+      return "<script setup>\n#{script}\n</script>\n\n<template>\n#{template}\n</template>"
+    when :svelte
+      return "<script>\n#{script}\n</script>\n\n#{template}"
+    when :astro
+      return "---\n#{script}\n---\n\n#{template}"
+    else
+      # Default Vue-style if no framework detected
+      return "<script setup>\n#{script}\n</script>\n\n<template>\n#{template}\n</template>"
+    end
+  end
+
   async def setup()
     @options ||= {}
     @selfhost_ready = false
@@ -172,6 +188,9 @@ class SelfhostRubyController < DemoController
         ruby = compiler.src
       end
 
+      # Check for __END__ marker indicating SFC format
+      is_sfc = ruby.include?("__END__")
+
       # Load required filters
       filter_names = @options[:filters] || []
       loaded_filters = []
@@ -200,11 +219,29 @@ class SelfhostRubyController < DemoController
       # Add other options
       convert_options[:comparison] = @options[:comparison] if @options[:comparison]
 
-      # Convert using selfhost
-      result = @selfhost_convert.call(ruby, convert_options)
-      js = result.to_s
+      if is_sfc
+        # Split into Ruby code and template
+        parts = ruby.split(/^__END__\r?\n?/, 2)
+        ruby_code = parts[0]
+        template = parts[1] || ''
 
-      targets.each {|target| target.contents = js}
+        # Get framework from template option (vue, svelte, astro)
+        # Note: use string key since @options is a JS object from JSON.parse
+        framework = (@options['template'] || 'vue').to_s.to_sym
+
+        # Convert the Ruby code
+        result = @selfhost_convert.call(ruby_code, convert_options)
+
+        # Build the SFC output
+        sfc_output = build_sfc(result.to_s.strip, template.strip, framework)
+        targets.each {|target| target.contents = sfc_output}
+      else
+        # Convert using selfhost
+        result = @selfhost_convert.call(ruby, convert_options)
+        js = result.to_s
+
+        targets.each {|target| target.contents = js}
+      end
     rescue => e
       console.error("[SelfhostRubyController] conversion error:", e)
       targets.each {|target| target.exception = e.to_s}

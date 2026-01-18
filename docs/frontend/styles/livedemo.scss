@@ -1,6 +1,6 @@
 // read-only JSEditor
 .js {
-  &.editor { 
+  &.editor {
     background-color: #ffffcc;
     margin-bottom: 1em;
   }
@@ -11,6 +11,23 @@
 
     .cm-content .cm-activeLine {
       background-color: #ffffcc;
+    }
+  }
+}
+
+// read-only SFC Editor (Vue, Svelte, Astro)
+.sfc {
+  &.editor {
+    background-color: #e6eeff;
+    margin-bottom: 1em;
+  }
+
+  .cm-wrap {
+     background-color: #eef2ff;
+     height: 100%;
+
+    .cm-content .cm-activeLine {
+      background-color: #e6eeff;
     }
   }
 }
