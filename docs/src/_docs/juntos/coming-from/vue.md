@@ -6,8 +6,6 @@ category: juntos/coming-from
 hide_in_toc: true
 ---
 
-# Coming from Vue
-
 If you know Vue, you'll feel at home with Ruby2JS targeting Vue. The template syntax stays the same—you just write your script in Ruby.
 
 {% toc %}

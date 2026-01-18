@@ -6,8 +6,6 @@ category: juntos/coming-from
 hide_in_toc: true
 ---
 
-# Coming from Svelte
-
 If you know Svelte, Ruby2JS provides the same reactive simplicity with Ruby syntax for your component logic.
 
 {% toc %}

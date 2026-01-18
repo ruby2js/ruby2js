@@ -6,8 +6,6 @@ category: juntos/coming-from
 hide_in_toc: true
 ---
 
-# Coming from Next.js
-
 If you know Next.js, you'll find Ruby2JS provides similar file-based routing and React components—with Ruby syntax.
 
 {% toc %}

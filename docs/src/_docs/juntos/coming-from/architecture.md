@@ -6,8 +6,6 @@ category: juntos/coming-from
 hide_in_toc: true
 ---
 
-# How Ruby2JS Targets Work
-
 Ruby2JS doesn't implement frameworks—it transforms Ruby into framework-native code. Each target framework handles its own reactivity, rendering, and runtime behavior.
 
 {% toc %}

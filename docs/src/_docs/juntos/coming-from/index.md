@@ -5,8 +5,6 @@ top_section: Juntos
 category: juntos-coming-from
 ---
 
-# Coming From...
-
 Juntos bridges two worlds:
 
 - **Rails developers** gain access to platforms Rails can't reach—browser, edge, mobile, desktop

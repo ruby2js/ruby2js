@@ -6,8 +6,6 @@ category: juntos/coming-from
 hide_in_toc: true
 ---
 
-# Coming from Rails
-
 You know Rails. Juntos takes those patterns to platforms Rails can't reach.
 
 {% toc %}

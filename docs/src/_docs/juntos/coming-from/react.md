@@ -6,8 +6,6 @@ category: juntos/coming-from
 hide_in_toc: true
 ---
 
-# Coming from React
-
 If you know React, you'll find Ruby2JS provides a familiar component model with cleaner syntax.
 
 {% toc %}

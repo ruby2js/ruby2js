@@ -6,8 +6,6 @@ category: juntos/coming-from
 hide_in_toc: true
 ---
 
-# Coming from Astro
-
 If you know Astro, you'll appreciate Ruby2JS's approach to multi-framework components with a focus on minimal JavaScript.
 
 {% toc %}
