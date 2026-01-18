@@ -50,7 +50,8 @@ import {
   associateComments,
   initPrism as sharedInitPrism,
   getPrismParse,
-  convert as bundleConvert
+  convert as bundleConvert,
+  parse as bundleParse
 } from './ruby2js.js';
 
 // Import Node.js module system for require shim
@@ -166,6 +167,13 @@ Ruby2JS.convert = function(source, opts = {}) {
     return { toString: () => `[ERROR: ${e.message}]`, error: e };
   }
 };
+
+// Expose convert, parse, and ast_node as globals for transpiled specs
+// (The selfhost filter transforms Ruby2JS.convert() to convert() etc.)
+globalThis.convert = Ruby2JS.convert;
+globalThis.parse = bundleParse;
+globalThis.ast_node = Ruby2JS.ast_node;
+globalThis.astNode = Ruby2JS.ast_node;
 
 let currentDescribe = [];
 let testCount = 0;
