@@ -874,6 +874,354 @@ Each is typically 100-300 lines of transformation rules.
 
 ---
 
+## Phase 6: Framework Integrations
+
+Move from prebuild scripts to proper framework integration APIs. Each framework has its own extension point for custom file types.
+
+### Current State (Prebuild Scripts)
+
+The Astro demo uses a prebuild script that:
+1. Manually finds `.astro.rb` files via recursive directory walk
+2. Transforms each file and writes `.astro` alongside it
+3. Runs once before build/dev starts
+4. No watch mode - must restart dev server for Ruby changes
+
+This is a workaround, not a proper integration.
+
+### 6.1 SvelteKit Integration
+
+**SvelteKit advantage**: Native `extensions` config recognizes custom file types as pages.
+
+```js
+// svelte.config.js
+import { ruby2jsPreprocess } from 'ruby2js-svelte';
+
+export default {
+  preprocess: [ruby2jsPreprocess()],
+  extensions: ['.svelte', '.svelte.rb'],  // ← Custom page extensions!
+  kit: { /* ... */ }
+};
+```
+
+**Package structure**:
+```
+packages/ruby2js-svelte/
+├── package.json
+├── src/
+│   └── index.js          # Exports preprocessor
+└── README.md
+```
+
+**Implementation**:
+```js
+// packages/ruby2js-svelte/src/index.js
+import { SvelteComponentTransformer } from 'ruby2js/svelte';
+import { initPrism } from 'ruby2js';
+
+export function ruby2jsPreprocess(options = {}) {
+  let prismReady = false;
+
+  return {
+    name: 'ruby2js',
+
+    async markup({ content, filename }) {
+      if (!filename.endsWith('.svelte.rb')) return;
+
+      if (!prismReady) {
+        await initPrism();
+        prismReady = true;
+      }
+
+      const result = SvelteComponentTransformer.transform(content, {
+        eslevel: 2022,
+        camelCase: true,
+        ...options
+      });
+
+      if (result.errors?.length > 0) {
+        throw new Error(`Transform errors in ${filename}: ${JSON.stringify(result.errors)}`);
+      }
+
+      return {
+        code: result.component,
+        // TODO: source map support
+      };
+    }
+  };
+}
+```
+
+**Benefits over prebuild**:
+- ✅ Watch mode works automatically
+- ✅ No duplicate files in source tree
+- ✅ Page routing works natively
+- ✅ HMR support
+
+**Definition of done**:
+- [ ] `npm install ruby2js-svelte` works
+- [ ] `.svelte.rb` files recognized as pages
+- [ ] Watch mode triggers on Ruby file changes
+- [ ] Example SvelteKit app demonstrates full workflow
+
+---
+
+### 6.2 Nuxt Integration
+
+**Nuxt advantage**: Module API allows extending page extensions and adding Vite plugins.
+
+```js
+// nuxt.config.ts
+export default defineNuxtConfig({
+  modules: ['ruby2js-nuxt'],
+  ruby2js: {
+    // options
+  }
+});
+```
+
+**Package structure**:
+```
+packages/ruby2js-nuxt/
+├── package.json
+├── src/
+│   ├── module.ts         # Nuxt module definition
+│   └── runtime/          # Runtime utilities if needed
+└── README.md
+```
+
+**Implementation**:
+```ts
+// packages/ruby2js-nuxt/src/module.ts
+import { defineNuxtModule, addVitePlugin } from '@nuxt/kit';
+import ruby2jsVitePlugin from 'vite-plugin-ruby2js';
+
+export default defineNuxtModule({
+  meta: {
+    name: 'ruby2js-nuxt',
+    configKey: 'ruby2js'
+  },
+
+  defaults: {
+    eslevel: 2022,
+    camelCase: true
+  },
+
+  setup(options, nuxt) {
+    // Add .vue.rb to page extensions
+    nuxt.options.extensions.push('.vue.rb');
+
+    // Add Vite plugin for transformation
+    addVitePlugin(ruby2jsVitePlugin({
+      sfc: true,
+      ...options
+    }));
+
+    // Watch .vue.rb files
+    nuxt.hook('builder:watch', async (event, path) => {
+      if (path.endsWith('.vue.rb')) {
+        // Trigger rebuild
+        await nuxt.callHook('builder:generateApp');
+      }
+    });
+  }
+});
+```
+
+**Benefits over prebuild**:
+- ✅ Single `npm install` setup
+- ✅ Page routing works natively
+- ✅ Watch mode with proper HMR
+- ✅ Integrates with Nuxt DevTools
+
+**Definition of done**:
+- [ ] `npm install ruby2js-nuxt` works
+- [ ] `.vue.rb` files recognized as pages
+- [ ] Watch mode triggers on Ruby file changes
+- [ ] Example Nuxt app demonstrates full workflow
+
+---
+
+### 6.3 Astro Integration
+
+**Astro limitation**: Page routing only recognizes `.astro` extension. Unlike SvelteKit/Nuxt, this cannot be configured.
+
+**Workaround**: Astro integration that transforms files before build and watches during dev.
+
+```js
+// astro.config.mjs
+import { defineConfig } from 'astro/config';
+import ruby2js from 'ruby2js-astro';
+
+export default defineConfig({
+  integrations: [ruby2js()]
+});
+```
+
+**Package structure**:
+```
+packages/ruby2js-astro/
+├── package.json
+├── src/
+│   └── index.js          # Astro integration
+└── README.md
+```
+
+**Implementation**:
+```js
+// packages/ruby2js-astro/src/index.js
+import { AstroComponentTransformer } from 'ruby2js/astro';
+import { initPrism } from 'ruby2js';
+import { readdir, readFile, writeFile, watch } from 'fs/promises';
+import { join, relative } from 'path';
+
+export default function ruby2jsIntegration(options = {}) {
+  let prismReady = false;
+
+  async function ensurePrism() {
+    if (!prismReady) {
+      await initPrism();
+      prismReady = true;
+    }
+  }
+
+  async function transformFile(filePath) {
+    const source = await readFile(filePath, 'utf-8');
+    const result = AstroComponentTransformer.transform(source, {
+      eslevel: 2022,
+      camelCase: true,
+      ...options
+    });
+
+    if (result.errors?.length > 0) {
+      throw new Error(`Transform errors in ${filePath}: ${JSON.stringify(result.errors)}`);
+    }
+
+    const outputPath = filePath.replace('.astro.rb', '.astro');
+    await writeFile(outputPath, result.component);
+    return outputPath;
+  }
+
+  async function findAndTransform(srcDir) {
+    const files = [];
+
+    async function walk(dir) {
+      const entries = await readdir(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        const fullPath = join(dir, entry.name);
+        if (entry.isDirectory()) {
+          await walk(fullPath);
+        } else if (entry.name.endsWith('.astro.rb')) {
+          files.push(fullPath);
+        }
+      }
+    }
+
+    await walk(srcDir);
+
+    for (const file of files) {
+      await transformFile(file);
+    }
+
+    return files;
+  }
+
+  return {
+    name: 'ruby2js-astro',
+
+    hooks: {
+      'astro:config:setup': async ({ config, command, addWatchFile }) => {
+        await ensurePrism();
+        const srcDir = new URL('./src', config.root).pathname;
+
+        // Transform all .astro.rb files
+        const files = await findAndTransform(srcDir);
+        console.log(`ruby2js: Transformed ${files.length} .astro.rb file(s)`);
+
+        // In dev mode, watch for changes
+        if (command === 'dev') {
+          for (const file of files) {
+            addWatchFile(file);
+          }
+        }
+      },
+
+      'astro:server:setup': async ({ server }) => {
+        // Watch for .astro.rb changes during dev
+        server.watcher.on('change', async (file) => {
+          if (file.endsWith('.astro.rb')) {
+            console.log(`ruby2js: Transforming ${file}`);
+            await transformFile(file);
+          }
+        });
+
+        server.watcher.on('add', async (file) => {
+          if (file.endsWith('.astro.rb')) {
+            console.log(`ruby2js: New file ${file}`);
+            await transformFile(file);
+          }
+        });
+      },
+
+      'astro:build:start': async ({ buildConfig }) => {
+        await ensurePrism();
+        const srcDir = new URL('./src', buildConfig.root || '.').pathname;
+        const files = await findAndTransform(srcDir);
+        console.log(`ruby2js: Transformed ${files.length} .astro.rb file(s) for build`);
+      }
+    }
+  };
+}
+```
+
+**Limitations**:
+- ⚠️ Still writes `.astro` files to disk (Astro requirement)
+- ⚠️ Both `.astro.rb` and `.astro` exist in source tree
+
+**Benefits over manual prebuild**:
+- ✅ Watch mode works during `astro dev`
+- ✅ Single config line instead of npm script chains
+- ✅ Integrates with Astro's lifecycle hooks
+- ✅ Proper error reporting
+
+**Definition of done**:
+- [ ] `npm install ruby2js-astro` works
+- [ ] `astro dev` watches `.astro.rb` files
+- [ ] `astro build` transforms files automatically
+- [ ] Example Astro app demonstrates full workflow
+
+---
+
+### 6.4 Package Publishing
+
+All three packages should be published to npm:
+
+```
+packages/
+├── vite-plugin-ruby2js/   # ✅ Exists - core Vite plugin
+├── ruby2js-svelte/        # New - SvelteKit preprocessor
+├── ruby2js-nuxt/          # New - Nuxt module
+└── ruby2js-astro/         # New - Astro integration
+```
+
+**CI updates needed**:
+- Build and test each package
+- Publish to npm on release
+- Update demo apps to use published packages
+
+---
+
+### Comparison Summary
+
+| Aspect | Prebuild Script | SvelteKit | Nuxt | Astro |
+|--------|-----------------|-----------|------|-------|
+| Setup | Manual npm scripts | `npm install` | `npm install` | `npm install` |
+| Watch mode | ❌ Restart needed | ✅ Native | ✅ Native | ✅ Via integration |
+| Page routing | ✅ Via prebuild | ✅ Native | ✅ Native | ✅ Via prebuild |
+| File duplication | ❌ Both exist | ✅ Virtual | ✅ Virtual | ⚠️ Both exist |
+| HMR | ❌ None | ✅ Full | ✅ Full | ⚠️ Page reload |
+
+---
+
 ## Implementation Order
 
 **Dependencies:**
@@ -898,6 +1246,11 @@ Phase 4 (Targets) - needs Phase 3
 
 Phase 5 (Docs) - needs Phase 4
   └── 5.1-5.2 Documentation (needs working examples)
+
+Phase 6 (Framework Integrations) - needs Phase 4
+  ├── 6.1 SvelteKit preprocessor (needs 4.2)
+  ├── 6.2 Nuxt module (needs 4.1)
+  └── 6.3 Astro integration (needs transformers)
 ```
 
 **Suggested execution:**
@@ -909,6 +1262,7 @@ Phase 5 (Docs) - needs Phase 4
 | 3 | 3.1 Vue syntax + 3.2 Svelte syntax |
 | 4 | 4.1 Vue target + 4.2 Svelte target |
 | 5 | 5.1 Coming-from guides + 5.2 Architecture docs |
+| 6 | 6.1 SvelteKit + 6.2 Nuxt + 6.3 Astro integrations |
 
 ---
 
@@ -921,7 +1275,12 @@ Phase 5 (Docs) - needs Phase 4
 - [x] Template syntax works with 3 styles (ERB, Vue, Svelte)
 - [x] File-based routing works across all targets
 - [x] Documentation welcomes developers from 6 ecosystems
+- [ ] Framework integrations provide native DX (SvelteKit, Nuxt, Astro)
 
 **Credibility statement becomes true:**
 
 > "Ruby2JS supports multiple deployment targets (edge, browser, server), multiple UI frameworks (React, Vue, Svelte), and multiple template syntaxes. Adding another platform or framework is incremental—the architecture is proven."
+
+**Developer experience goal:**
+
+> "Install a single package, add one line to your config, and `.vue.rb`/`.svelte.rb`/`.astro.rb` files just work—with watch mode, HMR, and proper error reporting."

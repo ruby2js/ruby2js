@@ -290,77 +290,90 @@ __END__
 
 ### Creation Script
 
+#### Current State (Prebuild Script)
+
+The current implementation uses a manual prebuild script because Astro doesn't support custom page extensions. This requires:
+- A `scripts/prebuild.mjs` file with ~80 lines of transformation logic
+- Modified npm scripts: `"dev": "npm run prebuild && astro dev"`
+- No watch mode - must restart dev server for Ruby changes
+
+See `test/astro-blog/create-astro-blog` for the full implementation.
+
+#### Future State (With `ruby2js-astro` Integration)
+
+**Dependency:** Requires `ruby2js-astro` package from FRAMEWORK_PARITY.md Phase 6.3
+
+Once the Astro integration exists, the creation script simplifies dramatically:
+
 ```bash
 #!/usr/bin/env bash
 # Create an Astro blog demo with .astro.rb files
 # Usage: create-astro-blog [app-name]
 
 set -e
-
 APP_NAME="${1:-astro-blog}"
 
 echo "Creating Astro blog: $APP_NAME"
 
 # Create Astro project
-npm create astro@latest "$APP_NAME" -- --template minimal --no-git --no-install
-
+npm create astro@latest "$APP_NAME" -- --template minimal --no-git --skip-houston --yes
 cd "$APP_NAME"
 
-# Add vite-plugin-ruby2js
-npm install vite-plugin-ruby2js@file:../../packages/vite-plugin-ruby2js
+# Install ruby2js-astro integration (single package!)
+npm install ruby2js-astro
 
-# Update astro.config.mjs
+# Update astro.config.mjs (one line added!)
 cat > astro.config.mjs << 'CONFIG'
 import { defineConfig } from 'astro/config';
-import ruby2js from 'vite-plugin-ruby2js';
+import ruby2js from 'ruby2js-astro';
 
 export default defineConfig({
-  vite: {
-    plugins: [ruby2js({ astro: true })]
-  }
+  integrations: [ruby2js()]
 });
 CONFIG
 
-# Create directory structure
+# Create directory structure and content files
 mkdir -p src/content/posts src/layouts src/components src/pages/posts public
 
-# Create content files...
 # Create .astro.rb files...
-# (full script implementation)
+# (content creation - unchanged)
 
 echo "Done! Run: cd $APP_NAME && npm run dev"
 ```
 
-### Dockerfile
+**What's removed:**
+- ❌ `scripts/prebuild.mjs` (80 lines) - handled by integration
+- ❌ `npm pkg set scripts.prebuild=...` - not needed
+- ❌ `npm pkg set scripts.dev="npm run prebuild && ..."` - not needed
+- ❌ Manual Prism initialization - handled by integration
 
-```dockerfile
-FROM node:24-slim
+**What's gained:**
+- ✅ Watch mode during `astro dev`
+- ✅ Proper error reporting via Astro's build system
+- ✅ Single package install instead of manual script setup
 
-WORKDIR /app
+### Migration Path
 
-# Copy creation script
-COPY create-astro-blog /usr/local/bin/
-RUN chmod +x /usr/local/bin/create-astro-blog
+When `ruby2js-astro` is published:
 
-# Create demo
-RUN create-astro-blog demo
-
-WORKDIR /app/demo
-
-# Build for production
-RUN npm run build
-
-# Serve static files
-RUN npm install -g serve
-CMD ["serve", "dist", "-p", "3000"]
-```
+1. Update `test/astro-blog/create-astro-blog` to use the simplified script
+2. Remove prebuild script generation
+3. Update package.json script modifications
+4. Test that watch mode works
 
 ### Definition of Done
 
-- [ ] `create-astro-blog` script creates working demo
-- [ ] `npm run dev` works locally
-- [ ] `npm run build` produces static site
+**Current (with prebuild):**
+- [x] `create-astro-blog` script creates working demo
+- [x] `npm run dev` works locally (no watch)
+- [x] `npm run build` produces static site
 - [ ] Demo deploys to GitHub Pages
+
+**Future (with integration):**
+- [ ] `ruby2js-astro` package published
+- [ ] Creation script simplified (no prebuild)
+- [ ] Watch mode works during development
+- [ ] Demo updated to use integration
 
 ---
 
