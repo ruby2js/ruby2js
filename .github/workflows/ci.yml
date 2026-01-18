@@ -213,6 +213,37 @@ jobs:
           path: artifacts/demo-notes.tar.gz
           retention-days: 7
 
+  create-astro-blog:
+    needs: [build-tarballs]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Download tarballs
+        uses: actions/download-artifact@v4
+        with:
+          name: tarballs
+          path: artifacts/tarballs
+
+      - name: Create astro-blog demo
+        run: |
+          export RUBY2JS_TARBALL="$GITHUB_WORKSPACE/artifacts/tarballs/ruby2js-beta.tgz"
+          export ASTRO_INTEGRATION_TARBALL="$GITHUB_WORKSPACE/artifacts/tarballs/ruby2js-astro-beta.tgz"
+          test/astro-blog/create-astro-blog artifacts/astro-blog
+          tar -czf artifacts/demo-astro-blog.tar.gz -C artifacts astro-blog
+
+      - name: Upload astro-blog demo
+        uses: actions/upload-artifact@v4
+        with:
+          name: demo-astro-blog
+          path: artifacts/demo-astro-blog.tar.gz
+          retention-days: 7
+
   # ===========================================================================
   # Stage 2: Tests (some run immediately, others depend on Stage 1 artifacts)
   # ===========================================================================
@@ -352,12 +383,12 @@ jobs:
         run: node test/smoke-test.mjs artifacts/chat --database ${{ matrix.database }}
 
   integration-test:
-    needs: [build-tarballs, create-blog, create-chat, create-photo-gallery, create-workflow, create-notes]
+    needs: [build-tarballs, create-blog, create-chat, create-photo-gallery, create-workflow, create-notes, create-astro-blog]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        demo: [blog, chat, photo_gallery, workflow, notes]
+        demo: [blog, chat, photo_gallery, workflow, notes, astro_blog]
     steps:
       - uses: actions/checkout@v4
 
@@ -389,7 +420,7 @@ jobs:
       - name: Download demo
         uses: actions/download-artifact@v4
         with:
-          name: demo-${{ matrix.demo == 'photo_gallery' && 'photo-gallery' || matrix.demo }}
+          name: demo-${{ matrix.demo == 'photo_gallery' && 'photo-gallery' || matrix.demo == 'astro_blog' && 'astro-blog' || matrix.demo }}
           path: artifacts
 
       - name: Run integration tests
@@ -404,7 +435,7 @@ jobs:
   # ===========================================================================
 
   build-site:
-    needs: [build-tarballs, create-blog, create-chat, create-photo-gallery, create-workflow, create-notes]
+    needs: [build-tarballs, create-blog, create-chat, create-photo-gallery, create-workflow, create-notes, create-astro-blog]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -445,6 +476,16 @@ jobs:
             # Build from demo root (bin/juntos expects to be run from app root)
             (cd "artifacts/$demo" && bundle install --quiet && bin/juntos build -d dexie -t browser --base "$base_path" --sourcemap)
           done
+
+      - name: Build Astro demo
+        run: |
+          echo "Building astro-blog for GitHub Pages..."
+          base_path="/ruby2js/astro-blog/"
+          cd artifacts/astro-blog
+          # Install ruby2js packages from tarballs
+          npm install ../tarballs/ruby2js-beta.tgz ../tarballs/ruby2js-astro-beta.tgz
+          # Build with base path for GitHub Pages
+          npm run build -- --base "$base_path"
 
       - name: Assemble site
         run: |
@@ -499,6 +540,7 @@ jobs:
                 <li><a href="demo-notes.tar.gz">demo-notes.tar.gz</a> - Notes demo (JSON API, scopes)</li>
                 <li><a href="demo-photo-gallery.tar.gz">demo-photo-gallery.tar.gz</a> - Photo gallery demo</li>
                 <li><a href="demo-workflow.tar.gz">demo-workflow.tar.gz</a> - Workflow builder demo</li>
+                <li><a href="demo-astro-blog.tar.gz">demo-astro-blog.tar.gz</a> - Astro blog demo (static site)</li>
               </ul>
             </div>
             <p class="back"><a href="../">← Back to demos</a></p>
@@ -512,6 +554,7 @@ jobs:
           cp -r artifacts/notes/dist _site/notes
           cp -r artifacts/photo_gallery/dist _site/photo-gallery
           cp -r artifacts/workflow/dist _site/workflow
+          cp -r artifacts/astro-blog/dist _site/astro-blog
 
           # Create index page
           cat > _site/index.html << 'EOF'
@@ -537,7 +580,7 @@ jobs:
           </head>
           <body>
             <h1>Ruby2JS Demos</h1>
-            <p>Rails applications running entirely in the browser with IndexedDB storage.</p>
+            <p>Example applications showcasing Ruby2JS. Rails apps run in the browser with IndexedDB, Astro generates static sites.</p>
             <div class="demos">
               <div class="demo">
                 <h2><a href="blog/">Blog</a></h2>
@@ -558,6 +601,10 @@ jobs:
               <div class="demo">
                 <h2><a href="workflow/">Workflow Builder</a></h2>
                 <p>React Flow integration, drag-and-drop nodes.</p>
+              </div>
+              <div class="demo">
+                <h2><a href="astro-blog/">Astro Blog</a></h2>
+                <p>Static site with .astro.rb files. Ruby syntax in Astro components.</p>
               </div>
             </div>
             <div class="releases">
@@ -582,7 +629,7 @@ jobs:
               // GitHub Pages SPA redirect for direct URL access
               // Detects which demo the path belongs to and redirects there
               const path = location.pathname;
-              const demos = ['blog', 'chat', 'notes', 'photo-gallery', 'workflow'];
+              const demos = ['blog', 'chat', 'notes', 'photo-gallery', 'workflow', 'astro-blog'];
               const base = '/ruby2js/';
 
               // Find which demo this path belongs to
