@@ -72,7 +72,7 @@ function increment() {
 @loading = true
 
 def mounted
-  id = params[:id]
+  id = @@id
   fetch("/api/posts/#{id}")
     .then(->(r) { r.json })
     .then(->(data) {
@@ -156,9 +156,9 @@ def go_back
   router.back()
 end
 
-# Access route params
+# Access route params with @@ sigil
 def mounted
-  id = params[:id]  # Becomes route.params.id
+  id = @@id  # Becomes route.params.id
   query = route.query
 end
 ```

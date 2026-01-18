@@ -21,7 +21,7 @@ If you know Svelte, Ruby2JS provides the same reactive simplicity with Ruby synt
 | `{#if condition}` | `{#if condition}` |
 | `on:click={handler}` | `on:click={handler}` |
 | `onMount(() => {})` | `def on_mount` |
-| `$page.params.id` | `params[:id]` |
+| `$page.params.id` | `@@id` |
 
 ## Quick Start
 
@@ -68,7 +68,7 @@ function increment() {
 @loading = true
 
 def on_mount
-  id = params[:id]
+  id = @@id
   fetch("/api/posts/#{id}")
     .then(->(r) { r.json })
     .then(->(data) {
@@ -154,9 +154,9 @@ def go_back
   goto(-1)
 end
 
-# Access page data
+# Access page params with @@ sigil
 def on_mount
-  id = params[:id]  # Becomes $page.params.id
+  id = @@id  # Becomes $page.params.id
 end
 ```
 

@@ -5,11 +5,10 @@ module Ruby2JS
   # Transforms Ruby component files with __END__ templates into Astro components.
   #
   # Input format:
-  #   @post = nil
   #   @comments = []
   #
-  #   # Fetch data at build/request time
-  #   @post = await Post.find(params[:id])
+  #   # Fetch data at build/request time (@@id -> Astro.params.id)
+  #   @post = await Post.find(@@id)
   #   @comments = await @post.comments
   #   __END__
   #   <Layout title={post.title}>
@@ -24,8 +23,7 @@ module Ruby2JS
   #   ---
   #   import { Post } from '../models/post'
   #
-  #   const { id } = Astro.params
-  #   const post = await Post.find(id)
+  #   const post = await Post.find(Astro.params.id)
   #   const comments = await post.comments
   #   ---
   #

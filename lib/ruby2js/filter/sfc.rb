@@ -55,6 +55,32 @@ module Ruby2JS
           s(:lvar, var_name)
         end
       end
+
+      # Transform class variable to framework-specific params access
+      # @@id becomes:
+      #   Astro:  Astro.params.id
+      #   Vue:    route.params.id
+      #   Svelte: $page.params.id
+      def on_cvar(node)
+        return super unless @options[:template]
+
+        param_name = node.children.first.to_s[2..-1]  # strip @@
+        param_name = sfc_to_camel_case(param_name)  # convert to camelCase
+
+        case @options[:template].to_sym
+        when :astro
+          # Astro.params.id
+          s(:attr, s(:attr, s(:const, nil, :Astro), :params), param_name)
+        when :vue
+          # route.params.id
+          s(:attr, s(:attr, s(:lvar, :route), :params), param_name)
+        when :svelte
+          # $page.params.id
+          s(:attr, s(:attr, s(:gvar, :$page), :params), param_name)
+        else
+          super
+        end
+      end
     end
 
     DEFAULTS.push SFC

@@ -139,14 +139,13 @@ __END__
 <h1>{title}</h1>
 ```
 
-### Route Params
+### Route Params with `@@` Sigil
 
-Access route parameters via `params`:
+Use the `@@` sigil for concise route parameter access:
 
 ```ruby
 # src/pages/posts/[id].astro.rb
-@id = params[:id]
-@post = Post.find(@id)
+@post = Post.find(@@id)
 __END__
 <h1>{post.title}</h1>
 ```
@@ -155,9 +154,28 @@ Becomes:
 
 ```astro
 ---
-const { id } = Astro.params
-const post = Post.find(id)
+const post = Post.find(Astro.params.id)
 ---
+<h1>{post.title}</h1>
+```
+
+The `@@` sigil automatically converts snake_case to camelCase:
+
+| Ruby | JavaScript |
+|------|------------|
+| `@@id` | `Astro.params.id` |
+| `@@user_id` | `Astro.params.userId` |
+| `@@post_slug` | `Astro.params.postSlug` |
+
+### Explicit Params Access
+
+You can also access params explicitly via `Astro.params`:
+
+```ruby
+# src/pages/posts/[id].astro.rb
+@id = Astro.params[:id]
+@post = Post.find(@id)
+__END__
 <h1>{post.title}</h1>
 ```
 

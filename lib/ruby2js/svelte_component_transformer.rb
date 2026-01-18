@@ -9,7 +9,7 @@ module Ruby2JS
   #   @post = nil
   #
   #   def on_mount
-  #     @post = await Post.find(params[:id])
+  #     @post = await Post.find(@@id)
   #   end
   #
   #   def delete_post
@@ -283,11 +283,6 @@ module Ruby2JS
           "#{indent}#{svelte_name}(#{is_async}() => {"
         end
       end
-
-      # Transform params[:id] to $page.params.id
-      result.gsub!(/params\[:(\w+)\]/, '$page.params.\1')
-      result.gsub!(/params\["(\w+)"\]/, '$page.params.\1')
-      result.gsub!(/params\.(\w+)/, '$page.params.\1')
 
       result
     end

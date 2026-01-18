@@ -9,7 +9,7 @@ module Ruby2JS
   #   @post = nil
   #
   #   def mounted
-  #     @post = await Post.find(params[:id])
+  #     @post = await Post.find(@@id)
   #   end
   #
   #   def delete_post
@@ -289,11 +289,6 @@ module Ruby2JS
         # Close the lifecycle hook properly
         # This is simplified - real implementation would need proper brace matching
       end
-
-      # Transform params[:id] to route.params.id
-      result.gsub!(/params\[:(\w+)\]/, 'route.params.\1')
-      result.gsub!(/params\["(\w+)"\]/, 'route.params.\1')
-      result.gsub!(/params\.(\w+)/, 'route.params.\1')
 
       # Transform router.push
       result.gsub!(/router\.push\(/, 'router.push(')
