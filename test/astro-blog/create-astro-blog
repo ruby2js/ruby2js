@@ -1,0 +1,443 @@
+#!/usr/bin/env bash
+# Create an Astro blog demo with .astro.rb files
+# Usage: create-astro-blog [app-name]
+#
+# Creates a static blog featuring:
+# - Ruby code in Astro components (.astro.rb files)
+# - Markdown blog posts with frontmatter
+# - Automatic slug-based routing
+# - Clean, minimal styling
+
+set -e
+
+APP_NAME="${1:-astro-blog}"
+
+# Calculate script location before cd'ing anywhere
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+echo "Creating Astro blog: $APP_NAME"
+echo ""
+
+# Get the directory name for cd (handle both relative and absolute paths)
+APP_DIR="$APP_NAME"
+if [[ "$APP_NAME" == /* ]]; then
+  # Absolute path - use as-is
+  APP_DIR="$APP_NAME"
+else
+  # Relative path - will be created in current directory
+  APP_DIR="$PWD/$APP_NAME"
+fi
+
+# Create Astro project (minimal template, no git, skip prompts)
+npm create astro@latest "$APP_NAME" -- --template minimal --no-git --skip-houston --yes
+
+cd "$APP_DIR"
+
+# Install ruby2js and vite-plugin-ruby2js from local tarballs or registry
+# In CI, these will be replaced with the actual tarball paths
+if [ -n "$RUBY2JS_TARBALL" ]; then
+  npm install "$RUBY2JS_TARBALL" "$VITE_PLUGIN_TARBALL"
+else
+  # Default: assume we're in the ruby2js repo for local dev
+  npm install "$REPO_ROOT/demo/selfhost" "$REPO_ROOT/packages/vite-plugin-ruby2js"
+fi
+
+# Update astro.config.mjs to use vite-plugin-ruby2js
+cat > astro.config.mjs << 'CONFIG'
+import { defineConfig } from 'astro/config';
+import ruby2js from 'vite-plugin-ruby2js';
+
+export default defineConfig({
+  vite: {
+    plugins: [ruby2js({ sfc: true })]
+  }
+});
+CONFIG
+
+# Create scripts directory and prebuild script
+mkdir -p scripts
+
+cat > scripts/prebuild.mjs << 'PREBUILD'
+#!/usr/bin/env node
+/**
+ * Prebuild script: Transform .astro.rb files to .astro
+ *
+ * Astro doesn't support custom page extensions, so we transform
+ * .astro.rb files to .astro before the build runs.
+ */
+import { readdir, readFile, writeFile, mkdir, rm } from 'fs/promises';
+import { join, dirname, relative } from 'path';
+import { fileURLToPath } from 'url';
+import { existsSync } from 'fs';
+
+// Dynamically import the transformer
+const { AstroComponentTransformer } = await import('ruby2js/astro');
+const { initPrism } = await import('ruby2js');
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const srcDir = join(__dirname, '../src');
+
+async function findAstroRbFiles(dir) {
+  const files = [];
+  const entries = await readdir(dir, { withFileTypes: true });
+
+  for (const entry of entries) {
+    const fullPath = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...await findAstroRbFiles(fullPath));
+    } else if (entry.name.endsWith('.astro.rb')) {
+      files.push(fullPath);
+    }
+  }
+  return files;
+}
+
+async function transformFile(filePath) {
+  const source = await readFile(filePath, 'utf-8');
+  const result = AstroComponentTransformer.transform(source, {
+    eslevel: 2022,
+    camelCase: true
+  });
+
+  if (result.errors && result.errors.length > 0) {
+    console.error(`Error transforming ${filePath}:`, result.errors);
+    throw new Error(`Transform failed for ${filePath}`);
+  }
+
+  // Write to .astro file (same location, different extension)
+  const outputPath = filePath.replace('.astro.rb', '.astro');
+  await writeFile(outputPath, result.component);
+
+  console.log(`  ${relative(srcDir, filePath)} -> ${relative(srcDir, outputPath)}`);
+}
+
+async function main() {
+  console.log('Transforming .astro.rb files...');
+
+  // Initialize Prism for Ruby parsing
+  await initPrism();
+
+  // Find all .astro.rb files
+  const files = await findAstroRbFiles(srcDir);
+
+  if (files.length === 0) {
+    console.log('  No .astro.rb files found');
+    return;
+  }
+
+  // Transform each file
+  for (const file of files) {
+    await transformFile(file);
+  }
+
+  console.log(`Done! Transformed ${files.length} file(s)`);
+}
+
+main().catch(err => {
+  console.error(err);
+  process.exit(1);
+});
+PREBUILD
+
+chmod +x scripts/prebuild.mjs
+
+# Update package.json to run prebuild before build/dev
+npm pkg set scripts.prebuild="node scripts/prebuild.mjs"
+npm pkg set scripts.dev="npm run prebuild && astro dev"
+npm pkg set scripts.build="npm run prebuild && astro build"
+
+# Remove the default index.astro from the template
+rm -f src/pages/index.astro
+
+# Create directory structure
+mkdir -p src/content/posts src/layouts src/components src/pages/posts public
+
+# ============================================
+# Create markdown blog posts
+# ============================================
+
+cat > src/content/posts/getting-started.md << 'POST'
+---
+title: Getting Started with Ruby2JS
+date: 2024-01-15
+excerpt: Learn how to write Astro components using Ruby syntax.
+---
+
+Ruby2JS allows you to write your Astro component logic in Ruby, which gets
+transpiled to JavaScript at build time.
+
+## Why Ruby?
+
+If you're coming from a Rails background, Ruby's syntax feels natural. You can
+use familiar patterns like blocks, method chaining, and snake_case identifiers.
+
+## Example
+
+```ruby
+@posts = Astro.glob("../content/posts/*.md")
+@sorted = @posts.sort_by { |p| p.frontmatter.date }.reverse
+```
+
+This Ruby code becomes clean JavaScript:
+
+```javascript
+const posts = await Astro.glob("../content/posts/*.md");
+const sorted = posts.sort((a, b) => b.frontmatter.date - a.frontmatter.date);
+```
+POST
+
+cat > src/content/posts/astro-components.md << 'POST'
+---
+title: Writing Astro Components in Ruby
+date: 2024-01-20
+excerpt: Explore the .astro.rb file format and template syntax.
+---
+
+Astro components written in Ruby use the `.astro.rb` extension and follow a
+simple two-part structure.
+
+## File Structure
+
+```ruby
+# Ruby code for the component
+@title = Astro.props[:title]
+@items = await fetch_items()
+__END__
+<!-- Astro template below -->
+<div>
+  <h1>{title}</h1>
+  {items.map(item => <Item item={item} />)}
+</div>
+```
+
+## Instance Variables
+
+Instance variables (`@var`) become local `const` declarations:
+
+- `@title = "Hello"` becomes `const title = "Hello"`
+- Use them in templates as `{title}`
+
+## Props Access
+
+Access component props with `Astro.props[:name]`:
+
+- `@user = Astro.props[:user]`
+- Destructured in output: `const { user } = Astro.props`
+POST
+
+cat > src/content/posts/deployment.md << 'POST'
+---
+title: Deploying Your Astro Blog
+date: 2024-01-25
+excerpt: Build and deploy your Ruby-powered Astro site.
+---
+
+Since Astro generates static HTML, deployment is straightforward.
+
+## Build Command
+
+```bash
+npm run build
+```
+
+This creates a `dist/` folder with your static site.
+
+## Deployment Options
+
+1. **GitHub Pages** - Free hosting for static sites
+2. **Netlify** - Automatic builds from Git
+3. **Vercel** - Zero-config deployment
+4. **Cloudflare Pages** - Fast global CDN
+
+## CI Integration
+
+The Ruby2JS CI builds and deploys this demo automatically to GitHub Pages
+at `ruby2js.github.io/ruby2js/astro-blog/`.
+POST
+
+# ============================================
+# Create layout component
+# ============================================
+
+cat > src/layouts/Layout.astro.rb << 'LAYOUT'
+@title = Astro.props[:title] || "My Blog"
+__END__
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{title}</title>
+  <style>
+    :root {
+      --color-bg: #f8fafc;
+      --color-text: #1e293b;
+      --color-primary: #3b82f6;
+      --color-muted: #64748b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: var(--color-bg);
+      color: var(--color-text);
+      line-height: 1.6;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+    a { color: var(--color-primary); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <slot />
+  </div>
+</body>
+</html>
+LAYOUT
+
+# ============================================
+# Create header component
+# ============================================
+
+cat > src/components/Header.astro.rb << 'HEADER'
+@site_title = "Ruby2JS Blog"
+__END__
+<header style="margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: 1px solid #e2e8f0;">
+  <h1 style="font-size: 1.5rem; margin-bottom: 0.5rem;">
+    <a href="/" style="color: inherit;">{siteTitle}</a>
+  </h1>
+  <p style="color: var(--color-muted); font-size: 0.875rem;">
+    Static blog powered by Astro + Ruby2JS
+  </p>
+</header>
+HEADER
+
+# ============================================
+# Create post card component
+# ============================================
+
+cat > src/components/PostCard.astro.rb << 'POSTCARD'
+@post = Astro.props[:post]
+@title = @post.frontmatter.title
+@date = @post.frontmatter.date
+@excerpt = @post.frontmatter.excerpt
+@url = @post.url
+__END__
+<article style="margin-bottom: 1.5rem; padding: 1rem; background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+  <h2 style="font-size: 1.25rem; margin-bottom: 0.5rem;">
+    <a href={url}>{title}</a>
+  </h2>
+  <time style="color: var(--color-muted); font-size: 0.875rem;" datetime={date}>
+    {new Date(date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+  </time>
+  <p style="margin-top: 0.5rem; color: var(--color-text);">{excerpt}</p>
+</article>
+POSTCARD
+
+# ============================================
+# Create index page
+# ============================================
+
+cat > src/pages/index.astro.rb << 'INDEX'
+import Layout from '../layouts/Layout.astro'
+import Header from '../components/Header.astro'
+import PostCard from '../components/PostCard.astro'
+
+@title = "Recent Posts"
+@posts = await Astro.glob("../content/posts/*.md")
+@sorted_posts = @posts.sort_by { |p| p.frontmatter.date }.reverse
+__END__
+<Layout title={title}>
+  <Header />
+  <main>
+    <h2 style="font-size: 1.5rem; margin-bottom: 1rem;">Recent Posts</h2>
+    <div>
+      {sortedPosts.map(post => <PostCard post={post} />)}
+    </div>
+  </main>
+</Layout>
+INDEX
+
+# ============================================
+# Create dynamic post page
+# ============================================
+
+mkdir -p src/pages/posts
+
+cat > 'src/pages/posts/[...slug].astro.rb' << 'POSTPAGE'
+import Layout from '../../layouts/Layout.astro'
+import Header from '../../components/Header.astro'
+
+# Astro requires getStaticPaths for dynamic routes
+export async def get_static_paths
+  posts = await Astro.glob("../../content/posts/*.md")
+  posts.map do |post|
+    slug = post.file.split('/').pop.replace('.md', '')
+    { params: { slug: slug }, props: { post: post } }
+  end
+end
+
+@post = Astro.props[:post]
+@title = @post.frontmatter.title
+@date = @post.frontmatter.date
+@Content = @post.Content
+__END__
+<Layout title={title}>
+  <Header />
+  <article>
+    <header style="margin-bottom: 2rem;">
+      <h1 style="font-size: 2rem; margin-bottom: 0.5rem;">{title}</h1>
+      <time style="color: var(--color-muted);" datetime={date}>
+        {new Date(date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+      </time>
+    </header>
+    <div class="content" style="line-height: 1.8;">
+      <Content />
+    </div>
+    <footer style="margin-top: 2rem; padding-top: 1rem; border-top: 1px solid #e2e8f0;">
+      <a href="/">&larr; Back to all posts</a>
+    </footer>
+  </article>
+</Layout>
+
+<style>
+  .content :global(h2) { font-size: 1.5rem; margin: 1.5rem 0 0.5rem; }
+  .content :global(h3) { font-size: 1.25rem; margin: 1.25rem 0 0.5rem; }
+  .content :global(p) { margin-bottom: 1rem; }
+  .content :global(pre) { background: #1e293b; color: #e2e8f0; padding: 1rem; border-radius: 8px; overflow-x: auto; margin-bottom: 1rem; }
+  .content :global(code) { font-family: 'Fira Code', monospace; font-size: 0.875rem; }
+  .content :global(ul), .content :global(ol) { margin-bottom: 1rem; padding-left: 1.5rem; }
+</style>
+POSTPAGE
+
+# ============================================
+# Create favicon
+# ============================================
+
+# Simple SVG favicon
+cat > public/favicon.svg << 'FAVICON'
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <text y="0.9em" font-size="80">💎</text>
+</svg>
+FAVICON
+
+# Update package.json to reference the favicon
+# (Astro handles this automatically)
+
+echo ""
+echo "==================================="
+echo "Astro blog created: $APP_NAME"
+echo "==================================="
+echo ""
+echo "To run locally:"
+echo "  cd $APP_NAME"
+echo "  npm run dev"
+echo ""
+echo "To build for production:"
+echo "  npm run build"
+echo ""

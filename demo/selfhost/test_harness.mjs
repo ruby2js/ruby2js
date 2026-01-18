@@ -9,6 +9,35 @@ if (!Array.prototype.uniq) {
   });
 }
 
+// Polyfill for Ruby's Struct - creates a factory function for named attributes
+globalThis.Struct = function Struct(...args) {
+  // Handle keyword_init option
+  let options = {};
+  if (typeof args[args.length - 1] === 'object' && args[args.length - 1] !== null) {
+    const lastArg = args[args.length - 1];
+    if (lastArg.keywordInit !== undefined) {
+      options = lastArg;
+      args = args.slice(0, -1);
+    }
+  }
+
+  const fields = args;
+
+  // Return a factory function that creates objects with the given fields
+  // Can be called with or without 'new' (both work)
+  const factory = function(values = {}) {
+    const obj = {};
+    if (options.keywordInit || typeof values === 'object') {
+      for (const field of fields) {
+        obj[field] = values[field];
+      }
+    }
+    return obj;
+  };
+
+  return factory;
+};
+
 // Import from the unified bundle (same code used by CLI and browser)
 import {
   Ruby2JS,

@@ -6,6 +6,11 @@ module Ruby2JS
       include SEXP
       extend SEXP
 
+      # Convert snake_case to camelCase
+      def sfc_to_camel_case(str)
+        str.to_s.gsub(/_([a-z])/) { $1.upcase }.to_sym
+      end
+
       # Transform instance variable assignment to framework-appropriate declaration
       # @title = "Hello" becomes:
       #   Astro:  const title = "Hello"
@@ -14,7 +19,8 @@ module Ruby2JS
       def on_ivasgn(node)
         return super unless @options[:template]
 
-        var_name = node.children.first.to_s[1..-1].to_sym  # strip @
+        var_name = node.children.first.to_s[1..-1]  # strip @
+        var_name = sfc_to_camel_case(var_name)  # convert to camelCase
         value = node.children.last ? process(node.children.last) : nil
 
         case @options[:template].to_sym
@@ -37,7 +43,8 @@ module Ruby2JS
       def on_ivar(node)
         return super unless @options[:template]
 
-        var_name = node.children.first.to_s[1..-1].to_sym  # strip @
+        var_name = node.children.first.to_s[1..-1]  # strip @
+        var_name = sfc_to_camel_case(var_name)  # convert to camelCase
 
         case @options[:template].to_sym
         when :vue

@@ -60,33 +60,34 @@ describe Ruby2JS::AstroComponentTransformer do
   end
 
   describe "params access" do
-    it "transforms params[:id] to Astro.params" do
+    it "preserves params access in frontmatter" do
       source = <<~RUBY
-        @id = params[:id]
+        @id = Astro.params[:id]
         __END__
         <p>ID: {id}</p>
       RUBY
 
       result = transform(source)
 
-      _(result.frontmatter).must_include 'Astro.params'
+      # Users write Astro.params explicitly in Ruby
+      _(result.frontmatter).must_include 'Astro.params.id'
     end
 
-    it "destructures specific params" do
+    it "handles explicit Astro.params access" do
       source = <<~RUBY
-        @slug = params[:slug]
+        @post_slug = Astro.params[:slug]
         __END__
-        <p>{slug}</p>
+        <p>{postSlug}</p>
       RUBY
 
       result = transform(source)
 
-      _(result.frontmatter).must_include 'const { slug } = Astro.params'
+      _(result.frontmatter).must_include 'Astro.params'
     end
   end
 
-  describe "model imports" do
-    it "detects model references" do
+  describe "model references" do
+    it "preserves model class calls in frontmatter" do
       source = <<~RUBY
         @post = Post.find(1)
         __END__
@@ -95,8 +96,7 @@ describe Ruby2JS::AstroComponentTransformer do
 
       result = transform(source)
 
-      _([*result.imports[:models]]).must_include 'Post'
-      _(result.frontmatter).must_include "import { Post } from '../models/post'"
+      _(result.frontmatter).must_include "Post.find(1)"
     end
 
     it "handles multiple model references" do
@@ -109,8 +109,8 @@ describe Ruby2JS::AstroComponentTransformer do
 
       result = transform(source)
 
-      _([*result.imports[:models]]).must_include 'Post'
-      _([*result.imports[:models]]).must_include 'Comment'
+      _(result.frontmatter).must_include "Post.find(1)"
+      _(result.frontmatter).must_include "Comment.where"
     end
   end
 
@@ -174,7 +174,7 @@ describe Ruby2JS::AstroComponentTransformer do
     it "transforms a full component correctly" do
       source = <<~RUBY
         @post = nil
-        @post = Post.find(params[:id])
+        @post = Post.find(Astro.params[:id])
         @comments = @post.comments
         __END__
         <Layout title={post.title}>
@@ -195,13 +195,10 @@ describe Ruby2JS::AstroComponentTransformer do
 
       _(result.errors).must_be_empty
 
-      # Check imports
-      _([*result.imports[:models]]).must_include 'Post'
-
       # Check component structure
       _(result.component).must_include '---'
-      _(result.component).must_include "import { Post } from '../models/post'"
       _(result.component).must_include 'Astro.params'
+      _(result.component).must_include 'Post.find'
 
       # Check template
       _(result.template).must_include 'title={post.title}'

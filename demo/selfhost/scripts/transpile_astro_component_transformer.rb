@@ -21,12 +21,12 @@ source = source.sub(/^end\s*\z/, '')
 source = source.gsub(/^  /, '')
 
 # Replace Struct.new with a simple class-based approach that transpiles cleanly
-# Result = Struct.new(:component, :frontmatter, :template, :imports, :errors, keyword_init: true)
+# Result = Struct.new(:component, :frontmatter, :template, :errors, keyword_init: true)
 source = source.sub(
-  /Result = Struct\.new\(:component, :frontmatter, :template, :imports, :errors, keyword_init: true\)/,
+  /Result = Struct\.new\(:component, :frontmatter, :template, :errors, keyword_init: true\)/,
   <<~RUBY.strip
-    def self.Result(component: nil, frontmatter: nil, template: nil, imports: nil, errors: nil)
-      {component: component, frontmatter: frontmatter, template: template, imports: imports, errors: errors}
+    def self.Result(component: nil, frontmatter: nil, template: nil, errors: nil)
+      {component: component, frontmatter: frontmatter, template: template, errors: errors}
     end
   RUBY
 )
@@ -56,6 +56,9 @@ imports = <<~JS
 import { convert } from '../ruby2js.js';
 import { Ruby2JS } from '../ruby2js.js';
 import { AstroTemplateCompiler } from './astro_template_compiler.mjs';
+import '../filters/esm.js';
+import '../filters/functions.js';
+import '../filters/return.js';
 import '../filters/sfc.js';
 import '../filters/camelCase.js';
 
