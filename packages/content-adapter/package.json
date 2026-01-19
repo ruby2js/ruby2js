@@ -1,0 +1,44 @@
+{
+  "name": "@ruby2js/content-adapter",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "ActiveRecord-like query API over markdown content collections",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./vite": "./src/vite.js"
+  },
+  "files": [
+    "src/"
+  ],
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "keywords": [
+    "ruby2js",
+    "content",
+    "collections",
+    "activerecord",
+    "markdown",
+    "ssg",
+    "vite-plugin"
+  ],
+  "author": "Sam Ruby",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ruby2js/ruby2js"
+  },
+  "dependencies": {
+    "gray-matter": "^4.0.3",
+    "marked": "^15.0.0"
+  },
+  "peerDependencies": {
+    "vite": "^5.0.0 || ^6.0.0"
+  },
+  "peerDependenciesMeta": {
+    "vite": {
+      "optional": true
+    }
+  }
+}
