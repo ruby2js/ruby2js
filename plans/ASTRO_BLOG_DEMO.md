@@ -519,6 +519,7 @@ const demos = ['blog', 'chat', 'notes', 'photo-gallery', 'workflow', 'astro-blog
 | 7 | ERB → pnode transformer (.erb.rb) | Phase 6 |
 | 8 | Full CRUD and ISR | Phase 6 or 7 |
 | 9 | Multi-target and documentation | Phase 8 |
+| 10 | Ruby-idiomatic Astro syntax | Phase 6 |
 
 ## Success Criteria (Phases 1-5)
 
@@ -1540,6 +1541,215 @@ Add to "Recently Implemented":
 - [x] Astro Blog demo documentation page
 - [x] Cross-references in existing docs
 - [x] Roadmap updated
+
+---
+
+## Phase 10: Ruby-Idiomatic Astro Syntax
+
+### Overview
+
+Improve ergonomics by making Astro patterns feel native to Ruby. For transpilation-only features (no runtime behavior), syntax ergonomics is the primary value proposition.
+
+### Guiding Principle
+
+Ruby developers expect declarative, class-macro-style configuration:
+
+```ruby
+# Rails patterns
+class Post < ApplicationRecord
+  has_many :comments
+  validates :title, presence: true
+  normalizes :email, with: -> { _1.downcase }
+end
+```
+
+Astro configuration should follow the same pattern—top-level method calls that read like declarations.
+
+### Page Configuration Exports
+
+**Current (JavaScript-style):**
+```ruby
+# Pragma: revalidate 60
+export const prerender = false
+```
+
+**Proposed (Ruby-style):**
+```ruby
+revalidate 60
+prerender false
+partial true
+```
+
+**Transpiles to:**
+```javascript
+export const revalidate = 60;
+export const prerender = false;
+export const partial = true;
+```
+
+| Ruby | JavaScript | Purpose |
+|------|------------|---------|
+| `revalidate 60` | `export const revalidate = 60` | ISR cache TTL |
+| `prerender false` | `export const prerender = false` | Disable static generation |
+| `prerender true` | `export const prerender = true` | Force static generation |
+| `partial true` | `export const partial = true` | Page partial (Astro 4.5+) |
+
+### Route Parameters
+
+**Current (already implemented):**
+```ruby
+@post = Post.find(@@id)           # @@id → Astro.params.id
+@post = Post.findBy(slug: @@slug) # @@slug → Astro.params.slug
+```
+
+**Enhancement - destructuring syntax:**
+```ruby
+params :id, :slug  # Explicit param declaration
+
+@post = Post.find(id)
+```
+
+**Transpiles to:**
+```javascript
+const { id, slug } = Astro.params;
+const post = await Post.find(id);
+```
+
+### Component Props
+
+**Current (verbose):**
+```ruby
+@title = Astro.props[:title]
+@count = Astro.props[:count] || 0
+```
+
+**Proposed (Ruby-style):**
+```ruby
+props :title
+props :count, default: 0
+props :items, type: Array
+```
+
+**Transpiles to:**
+```javascript
+const { title, count = 0, items } = Astro.props;
+```
+
+**With TypeScript (optional):**
+```ruby
+props :title, type: String
+props :count, type: Integer, default: 0
+```
+
+```typescript
+interface Props {
+  title: string;
+  count?: number;
+}
+const { title, count = 0 } = Astro.props as Props;
+```
+
+### Static Paths
+
+**Current (already works):**
+```ruby
+export def get_static_paths
+  Post.all.map { |p| { params: { slug: p.slug } } }
+end
+```
+
+**Enhancement - helper method:**
+```ruby
+def get_static_paths
+  static_paths_from Post.all, param: :slug
+end
+```
+
+**Transpiles to:**
+```javascript
+export async function getStaticPaths() {
+  const posts = await Post.all();
+  return posts.map(p => ({ params: { slug: p.slug } }));
+}
+```
+
+### Slots
+
+**Current (JSX-style):**
+```ruby
+__END__
+<Layout>
+  <div slot="sidebar">...</div>
+  <slot />
+</Layout>
+```
+
+**Proposed (Ruby-style in components):**
+```ruby
+def render
+  yield                    # default slot
+  yield :sidebar           # named slot
+  slot_defined?(:footer)   # check if slot exists
+end
+```
+
+### Content Collections
+
+**Current (JavaScript API):**
+```ruby
+posts = await getCollection('blog')
+post = await getEntry('blog', slug)
+```
+
+**Proposed (ActiveRecord-style):**
+```ruby
+# Collection as model
+posts = BlogPost.all
+post = BlogPost.find_by(slug: slug)
+
+# Or explicit collection syntax
+posts = collection(:blog).all
+post = collection(:blog).find(slug)
+```
+
+### Client Directives
+
+Client directives (`client:load`, `client:visible`, etc.) are preserved as-is since they're HTML attributes. No changes needed.
+
+### Implementation Notes
+
+**SFC Filter changes:**
+1. Detect top-level method calls: `revalidate`, `prerender`, `partial`, `params`, `props`
+2. Transform to appropriate `export const` or destructuring
+3. Maintain source maps for debugging
+
+**Testing strategy:**
+1. Unit tests for each transformation in `spec/sfc_spec.rb`
+2. Integration tests with full `.astro.rb` files
+3. Verify source maps point to original Ruby lines
+
+**Documentation updates:**
+1. `docs/src/_docs/juntos/coming-from/astro.md` - Primary syntax reference
+2. `docs/src/_docs/juntos/isr.md` - Update with `revalidate` macro
+3. Demo walkthrough showing idiomatic patterns
+
+### Definition of Done
+
+- [ ] `revalidate N` transpiles to `export const revalidate = N`
+- [ ] `prerender bool` transpiles to `export const prerender = bool`
+- [ ] `params :name, ...` destructures `Astro.params`
+- [ ] `props :name, default: val` destructures `Astro.props`
+- [ ] Tests cover all new syntax patterns
+- [ ] Documentation updated with Ruby-idiomatic examples
+- [ ] Astro Blog demo updated to use new syntax
+
+### Priority Order
+
+1. **Page exports** (`revalidate`, `prerender`) - Most impactful, simplest implementation
+2. **Props destructuring** - Common pattern, improves component ergonomics
+3. **Params destructuring** - Builds on existing `@@` syntax
+4. **Static paths helper** - Nice-to-have, lower priority
+5. **Content collections** - Future consideration, depends on demand
 
 ---
 
