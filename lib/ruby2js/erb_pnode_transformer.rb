@@ -121,6 +121,11 @@ module Ruby2JS
       result = Ruby2JS.convert(modified_ruby, convert_options)
       js_code = result.to_s
 
+      # Add JSX pragma for Preact if in Preact mode
+      if @options[:react] == 'Preact'
+        js_code = "/** @jsxImportSource preact */\n" + js_code
+      end
+
       Result.new(
         component: js_code,
         script: ruby_code,
