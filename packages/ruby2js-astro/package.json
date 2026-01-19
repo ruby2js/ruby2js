@@ -25,7 +25,7 @@
     "url": "https://github.com/ruby2js/ruby2js"
   },
   "dependencies": {
-    "ruby2js": "file:../../demo/selfhost"
+    "ruby2js": "*"
   },
   "peerDependencies": {
     "astro": "^4.0.0 || ^5.0.0"
