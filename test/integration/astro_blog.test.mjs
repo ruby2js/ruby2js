@@ -132,7 +132,8 @@ describe('Astro Blog Integration Tests', () => {
       for (const pagePath of pages) {
         const html = readFileSync(pagePath, 'utf-8');
         expect(html).toContain('<!DOCTYPE html>');
-        expect(html).toContain('<nav>');
+        // Astro adds data-astro-cid attributes for CSS scoping
+        expect(html).toMatch(/<nav[^>]*>/);
         expect(html).toContain('Home');
         expect(html).toContain('Posts');
         expect(html).toContain('About');
