@@ -106,6 +106,63 @@ Relationships are inferred by convention:
 - `author: alice` + `authors/` collection → `belongsTo` (singular → plural)
 - `tags: [a, b]` + `tags/` collection → `hasMany` (array attribute)
 
+## Liquid Template Compiler
+
+The Vite plugin also transforms `.liquid.rb` files, converting Ruby expressions to JavaScript.
+
+### Input (index.liquid.rb)
+
+```liquid
+{% for post in published_posts %}
+  <article>
+    <h2>{{ post.title }}</h2>
+    <time>{{ post.published_at }}</time>
+    {% if post.featured %}
+      <span class="featured">Featured</span>
+    {% endif %}
+  </article>
+{% endfor %}
+```
+
+### Output (index.liquid)
+
+```liquid
+{% for post in publishedPosts %}
+  <article>
+    <h2>{{ post.title }}</h2>
+    <time>{{ post.publishedAt }}</time>
+    {% if post.featured %}
+      <span class="featured">Featured</span>
+    {% endif %}
+  </article>
+{% endfor %}
+```
+
+### Supported Transformations
+
+| Liquid Syntax | Ruby → JavaScript |
+|--------------|-------------------|
+| `{{ expr }}` | snake_case → camelCase |
+| `{% for x in collection %}` | Collection expressions converted |
+| `{% if condition %}` | Conditions converted |
+| `{% elsif condition %}` | Conditions converted |
+| `{% unless condition %}` | Conditions converted |
+| `{% case expr %}` | Expression converted |
+| `{% when value %}` | Values converted |
+| `{% assign var = expr %}` | Expression converted |
+
+Liquid filters (e.g., `{{ title | escape }}`) are preserved.
+
+### Programmatic Usage
+
+```javascript
+import { compileLiquid } from '@ruby2js/content-adapter/liquid';
+
+const result = await compileLiquid(template, { eslevel: 2022 });
+console.log(result.template);  // Compiled Liquid
+console.log(result.errors);    // Any conversion errors
+```
+
 ## License
 
 MIT

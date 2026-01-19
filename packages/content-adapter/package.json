@@ -6,7 +6,8 @@
   "main": "src/index.js",
   "exports": {
     ".": "./src/index.js",
-    "./vite": "./src/vite.js"
+    "./vite": "./src/vite.js",
+    "./liquid": "./src/liquid.js"
   },
   "files": [
     "src/"
@@ -37,8 +38,14 @@
     "vite": "^5.0.0 || ^6.0.0"
   },
   "peerDependenciesMeta": {
+    "ruby2js": {
+      "optional": true
+    },
     "vite": {
       "optional": true
     }
+  },
+  "devDependencies": {
+    "ruby2js": "file:../../demo/selfhost"
   }
 }

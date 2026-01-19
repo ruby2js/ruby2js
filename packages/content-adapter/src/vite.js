@@ -1,14 +1,26 @@
 /**
  * @ruby2js/content-adapter/vite
  *
- * Vite plugin that scans content directories, parses markdown with front matter,
- * and generates a virtual:content module with queryable collections.
+ * Vite plugin that:
+ * 1. Scans content directories, parses markdown with front matter,
+ *    and generates a virtual:content module with queryable collections.
+ * 2. Transforms .liquid.rb files to .liquid by compiling Ruby expressions to JavaScript.
  */
 
 import fs from 'fs';
 import path from 'path';
 import matter from 'gray-matter';
 import { marked } from 'marked';
+
+// Lazy load the Liquid compiler to avoid requiring ruby2js when not needed
+let compileLiquid = null;
+async function getLiquidCompiler() {
+  if (!compileLiquid) {
+    const mod = await import('./liquid.js');
+    compileLiquid = mod.compileLiquid;
+  }
+  return compileLiquid;
+}
 
 const VIRTUAL_MODULE_ID = 'virtual:content';
 const RESOLVED_VIRTUAL_MODULE_ID = '\0' + VIRTUAL_MODULE_ID;
@@ -253,6 +265,37 @@ export default function contentAdapter(options = {}) {
           }
         }
       });
+    },
+
+    /**
+     * Transform .liquid.rb files to .liquid by compiling Ruby expressions to JavaScript.
+     */
+    async transform(code, id) {
+      if (!id.endsWith('.liquid.rb')) return null;
+
+      try {
+        const compile = await getLiquidCompiler();
+        const result = await compile(code, { eslevel: options.eslevel || 2022 });
+
+        if (result.errors.length > 0) {
+          const errorMsg = result.errors.map(e =>
+            `${e.type}: ${e.expression} - ${e.error}`
+          ).join('\n');
+          this.warn(`Liquid compilation warnings in ${id}:\n${errorMsg}`);
+        }
+
+        return {
+          code: result.template,
+          map: null
+        };
+      } catch (error) {
+        const enhancedError = new Error(
+          `Liquid template compilation error in ${id}: ${error.message}`
+        );
+        enhancedError.id = id;
+        enhancedError.plugin = 'ruby2js-content-adapter';
+        throw enhancedError;
+      }
     }
   };
 }
