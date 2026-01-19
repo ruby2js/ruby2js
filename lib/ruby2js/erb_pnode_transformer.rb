@@ -68,7 +68,7 @@ module Ruby2JS
     DEFAULT_OPTIONS = {
       eslevel: 2022,
       filters: [],
-      react: 'Preact'  # Default to Preact for Astro islands
+      react: 'React'  # Default to React for Astro islands
     }.freeze
 
     # HTML5 void elements (self-closing)
@@ -120,17 +120,6 @@ module Ruby2JS
       convert_options = build_convert_options
       result = Ruby2JS.convert(modified_ruby, convert_options)
       js_code = result.to_s
-
-      # Add JSX pragma and h import for Preact if in Preact mode
-      if @options[:react] == 'Preact'
-        # Use classic JSX pragma with explicit h import
-        pragma = "/** @jsx h */\n"
-        # Add h import if not already present
-        unless js_code.include?('import { h')
-          pragma += "import { h } from \"preact\";\n"
-        end
-        js_code = pragma + js_code
-      end
 
       Result.new(
         component: js_code,

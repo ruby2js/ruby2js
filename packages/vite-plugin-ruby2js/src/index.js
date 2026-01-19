@@ -271,7 +271,7 @@ export default function ruby2js(options = {}) {
 
         const result = Transformer.transform(code, {
           eslevel,
-          react: ruby2jsOptions.react || 'Preact',
+          react: ruby2jsOptions.react || 'React',
           ...ruby2jsOptions
         });
 

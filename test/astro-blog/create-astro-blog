@@ -39,11 +39,11 @@ cd "$APP_DIR"
 # In CI, these will be replaced with the actual tarball paths
 if [ -n "$RUBY2JS_TARBALL" ]; then
   npm install "$RUBY2JS_TARBALL" "$ASTRO_INTEGRATION_TARBALL" "$VITE_PLUGIN_TARBALL" "$RAILS_TARBALL"
-  npm install @astrojs/preact preact dexie
+  npm install @astrojs/react react react-dom dexie
 else
   # Default: assume we're in the ruby2js repo for local dev
   npm install "$REPO_ROOT/demo/selfhost" "$REPO_ROOT/packages/ruby2js-astro" "$REPO_ROOT/packages/vite-plugin-ruby2js" "$REPO_ROOT/packages/ruby2js-rails"
-  npm install @astrojs/preact preact dexie
+  npm install @astrojs/react react react-dom dexie
 fi
 
 # Remove the default index.astro from the template
@@ -58,14 +58,14 @@ mkdir -p src/layouts src/pages/posts src/islands src/models src/lib public
 
 cat > astro.config.mjs << 'CONFIG'
 import { defineConfig } from 'astro/config';
-import preact from '@astrojs/preact';
+import react from '@astrojs/react';
 import ruby2js from 'ruby2js-astro';
 import ruby2jsVite from 'vite-plugin-ruby2js';
 
 export default defineConfig({
   integrations: [
     ruby2js(),
-    preact()
+    react()
   ],
   vite: {
     plugins: [
@@ -454,7 +454,7 @@ ISR
 # ============================================
 
 cat > src/islands/PostList.jsx.rb << 'POSTLIST'
-import ['useState', 'useEffect'], from: 'preact/hooks'
+import ['useState', 'useEffect'], from: 'react'
 import ['setupDatabase', 'Post'], from: '../lib/db.js'
 import ['withRevalidate', 'invalidate'], from: '../lib/isr.js'
 
@@ -521,7 +521,7 @@ POSTLIST
 # ============================================
 
 cat > src/islands/PostForm.jsx.rb << 'POSTFORM'
-import ['useState', 'useEffect'], from: 'preact/hooks'
+import ['useState', 'useEffect'], from: 'react'
 import ['Post'], from: '../lib/db.js'
 
 def PostForm(post: nil, onSave: nil, onCancel: nil)
@@ -603,7 +603,7 @@ POSTFORM
 # The template goes after __END__ and uses ERB-style tags
 
 cat > src/islands/Counter.erb.rb << 'COUNTER'
-import ['useState'], from: 'preact/hooks'
+import ['useState'], from: 'react'
 
 def Counter(initial: 0)
   count, setCount = useState(initial)
@@ -642,7 +642,7 @@ COUNTER
 # ============================================
 
 cat > src/islands/PostDetail.jsx.rb << 'POSTDETAIL_ISLAND'
-import ['useState', 'useEffect'], from: 'preact/hooks'
+import ['useState', 'useEffect'], from: 'react'
 import ['setupDatabase', 'Post'], from: '../lib/db.js'
 import PostForm, from: './PostForm.jsx'
 
