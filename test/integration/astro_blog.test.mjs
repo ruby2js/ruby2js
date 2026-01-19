@@ -2,16 +2,15 @@
 // Tests the three-level architecture:
 // - Level 1: Static markdown (about page)
 // - Level 2: Astro pages (.astro.rb)
-// - Level 3: Preact islands (.jsx.rb)
+// - Level 3: React islands (.jsx.rb)
 //
 // Note: Posts are stored in IndexedDB (client-side), so we can't test
 // post content at build time. We verify structure and island inclusion.
 
 import { describe, it, expect, beforeAll } from 'vitest';
-import { readFileSync, existsSync, readdirSync } from 'fs';
+import { readFileSync, existsSync, readdirSync, globSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { globSync } from 'glob';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DEMO_DIR = join(__dirname, 'workspace/astro_blog');
@@ -58,7 +57,7 @@ describe('Astro Blog Integration Tests', () => {
     });
   });
 
-  describe('Preact Islands (Level 3)', () => {
+  describe('React Islands (Level 3)', () => {
     it('includes PostList island with client:load hydration', () => {
       const postsPath = join(DIST_DIR, 'posts/index.html');
       const html = readFileSync(postsPath, 'utf-8');
@@ -84,21 +83,21 @@ describe('Astro Blog Integration Tests', () => {
       const jsFiles = globSync(join(DIST_DIR, '_astro/*.js'));
       expect(jsFiles.length).toBeGreaterThan(0);
 
-      // Check that at least one bundle contains Preact-related code
+      // Check that at least one bundle contains React-related code
       // (either direct references or minified equivalents)
-      let hasPreactCode = false;
+      let hasReactCode = false;
       for (const file of jsFiles) {
         const content = readFileSync(file, 'utf-8');
-        // Look for signs of transpiled JSX/Preact code
+        // Look for signs of transpiled JSX/React code
         if (content.includes('useState') ||
             content.includes('useEffect') ||
             content.includes('createElement') ||
-            content.includes('preact')) {
-          hasPreactCode = true;
+            content.includes('react')) {
+          hasReactCode = true;
           break;
         }
       }
-      expect(hasPreactCode).toBe(true);
+      expect(hasReactCode).toBe(true);
     });
 
     it('does not contain Ruby syntax in bundled JS', () => {
