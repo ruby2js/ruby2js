@@ -15,6 +15,7 @@ Hands-on examples showcasing Juntos capabilities. Each demo is a complete Rails 
 
 | Demo | What It Demonstrates |
 |------|---------------------|
+| **[SSG Blog](/docs/juntos/demos/ssg-blog)** | Start simple - markdown content, ActiveRecord queries, zero JavaScript |
 | **[Blog](/docs/juntos/demos/blog)** | CRUD operations, nested resources, validations, multi-platform deployment |
 | **[Astro Blog](/docs/juntos/demos/astro-blog)** | Astro islands, `.astro.rb` pages, Preact components, ISR caching, IndexedDB |
 | **[Chat](/docs/juntos/demos/chat)** | Real-time Turbo Streams, Stimulus controllers in Ruby, WebSocket broadcasting |
@@ -73,6 +74,17 @@ bin/juntos deploy -d d1
 The `db:prepare` command creates the D1 database (if needed), runs migrations, and seeds if fresh.
 
 ## What Each Demo Teaches
+
+### SSG Blog Demo
+
+The simplest demo - a static blog showing progressive disclosure:
+
+- **Markdown content** — Posts and authors as `.md` files with front matter
+- **Content adapter** — ActiveRecord-like queries over markdown
+- **Liquid templates** — Standard 11ty templating, no framework
+- **Zero JavaScript** — Pure static HTML output
+
+Best for understanding the content adapter without additional complexity. Start here, then explore Astro Blog when ready for interactivity.
 
 ### Astro Blog Demo
 

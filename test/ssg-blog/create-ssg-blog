@@ -1,0 +1,557 @@
+#!/usr/bin/env bash
+# Create an 11ty blog demo with Ruby2JS content adapter
+# Usage: create-ssg-blog [app-name]
+#
+# Creates a minimal static blog demonstrating:
+# - Markdown content with YAML front matter
+# - ActiveRecord-like queries over content
+# - Liquid templates
+# - No JavaScript required - just content queries
+#
+# This is the "progressive disclosure" demo - start simple, scale up when ready.
+
+set -e
+
+APP_NAME="${1:-ssg-blog}"
+
+# Calculate script location before cd'ing anywhere
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+echo "Creating 11ty blog: $APP_NAME"
+echo ""
+
+# Get the directory name for cd (handle both relative and absolute paths)
+APP_DIR="$APP_NAME"
+if [[ "$APP_NAME" == /* ]]; then
+  APP_DIR="$APP_NAME"
+else
+  APP_DIR="$PWD/$APP_NAME"
+fi
+
+# Create directory structure
+mkdir -p "$APP_DIR"
+cd "$APP_DIR"
+
+# Initialize package.json
+cat > package.json << 'PACKAGE'
+{
+  "name": "ruby2js-ssg-blog",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Demo: Ruby authoring for 11ty with Ruby2JS content adapter",
+  "scripts": {
+    "dev": "npx @11ty/eleventy --serve",
+    "build": "npx @11ty/eleventy",
+    "clean": "rm -rf _site"
+  },
+  "devDependencies": {
+    "@11ty/eleventy": "^3.0.0"
+  },
+  "dependencies": {
+    "gray-matter": "^4.0.3",
+    "marked": "^17.0.1"
+  }
+}
+PACKAGE
+
+# Install dependencies
+# In CI, these will be replaced with the actual tarball paths
+if [ -n "$CONTENT_ADAPTER_TARBALL" ]; then
+  npm install
+  npm install "$CONTENT_ADAPTER_TARBALL"
+else
+  # Default: assume we're in the ruby2js repo for local dev
+  npm install
+  npm install "$REPO_ROOT/packages/content-adapter"
+fi
+
+# Create directory structure
+mkdir -p content/posts content/authors src/_data src/_includes
+
+# ============================================
+# 11ty Configuration
+# ============================================
+
+cat > eleventy.config.js << 'CONFIG'
+/**
+ * 11ty Configuration for Ruby2JS SSG Demo
+ *
+ * This demo shows Ruby authoring with:
+ * - ActiveRecord-like queries over markdown content
+ * - Liquid templates
+ * - No JavaScript islands - just static content
+ */
+
+export default function(eleventyConfig) {
+  // Copy static assets
+  eleventyConfig.addPassthroughCopy("src/css");
+  eleventyConfig.addPassthroughCopy("src/js");
+
+  // Watch for changes in content
+  eleventyConfig.addWatchTarget("content/");
+
+  // Configure Liquid options
+  eleventyConfig.setLiquidOptions({
+    dynamicPartials: true,
+    strictFilters: false
+  });
+
+  return {
+    dir: {
+      input: "src",
+      output: "_site",
+      includes: "_includes",
+      data: "_data"
+    },
+    templateFormats: ["liquid", "md", "html"],
+    htmlTemplateEngine: "liquid",
+    markdownTemplateEngine: "liquid"
+  };
+}
+CONFIG
+
+# ============================================
+# Data File: Content Collections
+# ============================================
+
+cat > src/_data/site.js << 'DATAFILE'
+/**
+ * 11ty Data File: Content Collections
+ *
+ * Scans content/ directory, parses markdown with front matter,
+ * and returns queryable collections using the content adapter.
+ */
+
+import fs from 'fs';
+import path from 'path';
+import matter from 'gray-matter';
+import { marked } from 'marked';
+import { createCollection } from '@ruby2js/content-adapter';
+
+const contentDir = path.resolve(process.cwd(), 'content');
+
+/**
+ * Singularize a plural word.
+ */
+function singularize(word) {
+  if (word.endsWith('ies')) return word.slice(0, -3) + 'y';
+  if (word.endsWith('es')) return word.slice(0, -2);
+  if (word.endsWith('s')) return word.slice(0, -1);
+  return word;
+}
+
+/**
+ * Convert to PascalCase.
+ */
+function toPascalCase(str) {
+  return singularize(str)
+    .split(/[-_]/)
+    .map(part => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join('');
+}
+
+/**
+ * Extract slug from filename.
+ */
+function extractSlug(filename) {
+  const basename = path.basename(filename, path.extname(filename));
+  return basename.replace(/^\d{4}-\d{2}-\d{2}-/, '');
+}
+
+/**
+ * Parse a content file.
+ */
+function parseContentFile(filePath) {
+  const content = fs.readFileSync(filePath, 'utf-8');
+  const { data, content: body } = matter(content);
+  const slug = data.slug || extractSlug(filePath);
+  const renderedBody = marked(body);
+
+  return {
+    ...data,
+    slug,
+    body: renderedBody
+  };
+}
+
+/**
+ * Scan a directory for markdown files.
+ */
+function scanDirectory(dir) {
+  if (!fs.existsSync(dir)) return [];
+  return fs.readdirSync(dir, { withFileTypes: true })
+    .filter(entry => entry.isFile() && (entry.name.endsWith('.md') || entry.name.endsWith('.markdown')))
+    .map(entry => path.join(dir, entry.name));
+}
+
+/**
+ * Load all collections from content directory.
+ */
+export default function() {
+  const collections = {};
+
+  if (!fs.existsSync(contentDir)) {
+    return collections;
+  }
+
+  // Scan each subdirectory as a collection
+  for (const entry of fs.readdirSync(contentDir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+
+    const collectionName = entry.name;
+    const collectionDir = path.join(contentDir, collectionName);
+    const files = scanDirectory(collectionDir);
+    const records = files.map(parseContentFile);
+
+    // Create queryable collection
+    const collection = createCollection(collectionName, records);
+
+    // Export both as array and as queryable collection
+    // - posts: array for simple iteration
+    // - Post: queryable collection for advanced queries
+    collections[collectionName] = records;
+    collections[toPascalCase(collectionName)] = collection;
+  }
+
+  // Wire up relationships between collections
+  const collectionNames = Object.keys(collections).filter(k => k === k.toLowerCase());
+
+  for (const name of collectionNames) {
+    const className = toPascalCase(name);
+    const collection = collections[className];
+    if (!collection || collection.toArray().length === 0) continue;
+
+    const sample = collection.toArray()[0];
+
+    for (const [attr, value] of Object.entries(sample)) {
+      if (attr === 'slug' || attr === 'body') continue;
+
+      // Check for belongsTo (singular attr → plural collection)
+      const pluralAttr = attr + 's';
+      if (collectionNames.includes(pluralAttr)) {
+        collection.belongsTo(attr, collections[toPascalCase(pluralAttr)]);
+      }
+
+      // Check for hasMany (array attr → collection)
+      if (Array.isArray(value) && collectionNames.includes(attr)) {
+        collection.hasMany(attr, collections[toPascalCase(attr)]);
+      }
+    }
+  }
+
+  return collections;
+}
+DATAFILE
+
+# ============================================
+# Layout Template
+# ============================================
+
+cat > src/_includes/layout.liquid << 'LAYOUT'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ title | default: "Ruby2JS SSG Demo" }}</title>
+  <style>
+    :root {
+      --primary: #c41230;
+      --text: #333;
+      --bg: #fff;
+      --code-bg: #f5f5f5;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      line-height: 1.6;
+      color: var(--text);
+      background: var(--bg);
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+    header {
+      border-bottom: 2px solid var(--primary);
+      padding-bottom: 1rem;
+      margin-bottom: 2rem;
+    }
+    header h1 { margin: 0; color: var(--primary); }
+    header nav { margin-top: 0.5rem; }
+    header nav a { margin-right: 1rem; color: var(--primary); }
+    article { margin-bottom: 2rem; padding-bottom: 2rem; border-bottom: 1px solid #eee; }
+    article h2 { margin-top: 0; }
+    article h2 a { color: var(--text); text-decoration: none; }
+    article h2 a:hover { color: var(--primary); }
+    time { color: #666; font-size: 0.9rem; }
+    .excerpt { color: #555; }
+    .tags { margin-top: 0.5rem; }
+    .tag {
+      display: inline-block;
+      background: var(--code-bg);
+      padding: 0.2rem 0.5rem;
+      border-radius: 3px;
+      font-size: 0.8rem;
+      margin-right: 0.3rem;
+    }
+    pre { background: var(--code-bg); padding: 1rem; overflow-x: auto; border-radius: 4px; }
+    code { font-family: ui-monospace, monospace; }
+    footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid #eee; color: #666; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Ruby2JS SSG Demo</h1>
+    <nav>
+      <a href="/">Home</a>
+      <a href="/about/">About</a>
+    </nav>
+  </header>
+
+  <main>
+    {{ content }}
+  </main>
+
+  <footer>
+    <p>Built with <a href="https://www.11ty.dev/">11ty</a> and <a href="https://www.ruby2js.com/">Ruby2JS</a></p>
+  </footer>
+</body>
+</html>
+LAYOUT
+
+# ============================================
+# Home Page
+# ============================================
+
+cat > src/index.liquid << 'INDEX'
+---
+layout: layout.liquid
+title: Home
+---
+
+<h2>Recent Posts</h2>
+
+{% for post in site.posts %}
+  {% unless post.draft %}
+  <article>
+    <h2><a href="/posts/{{ post.slug }}/">{{ post.title }}</a></h2>
+    <time datetime="{{ post.date }}">{{ post.date | date: "%B %d, %Y" }}</time>
+    <p class="excerpt">{{ post.excerpt }}</p>
+    {% if post.tags %}
+    <div class="tags">
+      {% for tag in post.tags %}
+        <span class="tag">{{ tag }}</span>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </article>
+  {% endunless %}
+{% endfor %}
+INDEX
+
+# ============================================
+# About Page
+# ============================================
+
+cat > src/about.liquid << 'ABOUT'
+---
+layout: layout.liquid
+title: About
+permalink: /about/
+---
+
+<h2>About This Demo</h2>
+
+<p>This is a demonstration of using Ruby2JS with 11ty for static site generation.</p>
+
+<h3>Features Demonstrated</h3>
+
+<ul>
+  <li><strong>Content Collections</strong> - Markdown files with YAML front matter</li>
+  <li><strong>ActiveRecord-like API</strong> - Query content using familiar Ruby patterns</li>
+  <li><strong>Automatic Relationships</strong> - Link posts to authors by convention</li>
+  <li><strong>Liquid Templates</strong> - Standard 11ty templating</li>
+</ul>
+
+<h3>Content Statistics</h3>
+
+<p>This site has:</p>
+<ul>
+  <li><strong>{{ site.posts | size }}</strong> total posts</li>
+  <li><strong>{{ site.authors | size }}</strong> authors</li>
+</ul>
+
+<h3>Authors</h3>
+
+{% for author in site.authors %}
+<div style="margin-bottom: 1rem; padding: 1rem; background: #f5f5f5; border-radius: 4px;">
+  <strong>{{ author.name }}</strong>
+  <p>{{ author.bio }}</p>
+</div>
+{% endfor %}
+ABOUT
+
+# ============================================
+# Content: Posts
+# ============================================
+
+cat > content/posts/2024-01-15-welcome.md << 'POST1'
+---
+title: Welcome to the Blog
+date: 2024-01-15
+author: sam
+draft: false
+tags: [ruby, javascript]
+excerpt: An introduction to Ruby2JS and static site generation.
+---
+
+Welcome to this demonstration of Ruby2JS with 11ty!
+
+This blog showcases how you can use Ruby syntax to query your content collections while still leveraging the power of 11ty for static site generation.
+
+## Features
+
+- **ActiveRecord-like queries** over markdown content
+- **Ruby expressions** in Liquid templates
+- **Automatic relationships** between collections
+
+Stay tuned for more posts!
+POST1
+
+cat > content/posts/2024-01-20-getting-started.md << 'POST2'
+---
+title: Getting Started with Ruby2JS
+date: 2024-01-20
+author: sam
+draft: false
+tags: [ruby, tutorial]
+excerpt: Learn how to set up Ruby2JS for your static site.
+---
+
+Let's walk through setting up Ruby2JS for your static site generator.
+
+## Installation
+
+First, install the required packages:
+
+```bash
+npm install @ruby2js/content-adapter
+```
+
+## Configuration
+
+Create your `eleventy.config.js`:
+
+```javascript
+export default function(eleventyConfig) {
+  // Your config here
+}
+```
+
+## Content Structure
+
+Organize your content in directories:
+
+```
+content/
+  posts/
+    2024-01-15-welcome.md
+  authors/
+    sam.md
+```
+
+That's it! You're ready to start writing.
+POST2
+
+cat > content/posts/2024-01-25-draft.md << 'POST3'
+---
+title: Upcoming Features
+date: 2024-01-25
+author: sam
+draft: true
+tags: [roadmap]
+excerpt: A preview of what's coming next.
+---
+
+This is a draft post that won't appear in the published site.
+
+## Coming Soon
+
+- More filter support
+- Better error messages
+- IDE integration
+POST3
+
+# ============================================
+# Content: Authors
+# ============================================
+
+cat > content/authors/sam.md << 'AUTHOR1'
+---
+name: Sam Ruby
+bio: Creator of Ruby2JS
+twitter: samruby
+---
+
+Sam Ruby is a software developer and the creator of Ruby2JS, a Ruby to JavaScript transpiler.
+AUTHOR1
+
+# ============================================
+# .gitignore
+# ============================================
+
+cat > .gitignore << 'GITIGNORE'
+_site/
+node_modules/
+GITIGNORE
+
+# ============================================
+# Dockerfile
+# ============================================
+
+cat > Dockerfile << 'DOCKERFILE'
+FROM node:24-slim
+
+WORKDIR /app
+
+# Copy package files and install dependencies
+COPY package*.json ./
+RUN npm install
+
+# Copy source files
+COPY . .
+
+# Build the static site
+RUN npm run build
+
+# Serve with a simple static server
+RUN npm install -g serve
+
+EXPOSE 8080
+
+CMD ["serve", "-s", "_site", "-l", "8080"]
+DOCKERFILE
+
+echo ""
+echo "==================================="
+echo "11ty blog created: $APP_NAME"
+echo "==================================="
+echo ""
+echo "Features:"
+echo "  - Markdown content with YAML front matter"
+echo "  - ActiveRecord-like queries (site.Post.where(...))"
+echo "  - Liquid templates"
+echo "  - No JavaScript required"
+echo ""
+echo "To run locally:"
+echo "  cd $APP_NAME"
+echo "  npm run dev"
+echo ""
+echo "To build for production:"
+echo "  npm run build"
+echo ""
+echo "To run with Docker:"
+echo "  docker build -t ssg-blog ."
+echo "  docker run -p 8080:8080 ssg-blog"
+echo ""

@@ -26,10 +26,11 @@ mise.toml
 # Release tarballs
 *.tgz
 
-# Local test demos (generated Rails apps)
+# Local test demos (generated apps)
 demo/blog/
 demo/chat/
 demo/notes/
 demo/photo_gallery/
+demo/ssg-blog/
 demo/workflow_builder/
 artifacts/
