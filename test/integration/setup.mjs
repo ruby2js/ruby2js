@@ -57,9 +57,14 @@ async function setup() {
   const tarballs = join(WORK_DIR, 'tarballs');
   mkdirSync(tarballs, { recursive: true });
 
-  // Special handling for Astro demos (static site, not Rails)
+  // Special handling for static site demos (not Rails)
   if (demo === 'astro_blog') {
     await setupAstroBlog(tarballs);
+    return;
+  }
+
+  if (demo === 'ssg_blog') {
+    await setupSsgBlog(tarballs);
     return;
   }
 
@@ -221,6 +226,71 @@ async function setupAstroBlog(tarballs) {
   console.log('\n5. Setup complete!');
   console.log(`   Demo built at: ${demoDir}/dist`);
   console.log('   Run tests with: npm test -- astro_blog.test.mjs');
+}
+
+async function setupSsgBlog(tarballs) {
+  // SSG blog is a static 11ty site - simplest setup
+  // 1. Download/copy tarballs (content-adapter)
+  // 2. Extract demo tarball
+  // 3. Install dependencies from tarballs
+  // 4. Build the static site
+
+  if (useLocal) {
+    const localTarballs = join(PROJECT_ROOT, 'artifacts/tarballs');
+    if (!existsSync(localTarballs)) {
+      console.error('Local artifacts not found. Run: bundle exec rake -f demo/selfhost/Rakefile release');
+      process.exit(1);
+    }
+    console.log('1. Copying local tarballs...');
+    execSync(`cp ${localTarballs}/*.tgz ${tarballs}/`);
+    // CI downloads artifact to artifacts/demo-*.tar.gz directly
+    // Local rake builds to artifacts/demo-*/demo-*.tar.gz
+    const ciPath = join(PROJECT_ROOT, 'artifacts/demo-ssg-blog.tar.gz');
+    const localPath = join(PROJECT_ROOT, 'artifacts/demo-ssg-blog/demo-ssg-blog.tar.gz');
+    const demoTarball = existsSync(ciPath) ? ciPath : localPath;
+    execSync(`cp ${demoTarball} ${tarballs}/`);
+  } else if (useLocalPackages) {
+    const localTarballs = join(PROJECT_ROOT, 'artifacts/tarballs');
+    if (!existsSync(localTarballs)) {
+      console.error('Local package tarballs not found. Run: bundle exec rake -f demo/selfhost/Rakefile release');
+      process.exit(1);
+    }
+    console.log('1. Downloading demo tarball + copying local packages...');
+    await downloadFile(`${RELEASES_URL}/demo-ssg-blog.tar.gz`, join(tarballs, 'demo-ssg-blog.tar.gz'));
+    execSync(`cp ${localTarballs}/*.tgz ${tarballs}/`);
+  } else {
+    console.log('1. Downloading tarballs from releases...');
+    await downloadFile(`${RELEASES_URL}/ruby2js-content-adapter-beta.tgz`, join(tarballs, 'ruby2js-content-adapter-beta.tgz'));
+    await downloadFile(`${RELEASES_URL}/demo-ssg-blog.tar.gz`, join(tarballs, 'demo-ssg-blog.tar.gz'));
+  }
+
+  // Extract demo
+  console.log('\n2. Extracting ssg_blog demo...');
+  execSync(`tar -xzf ${tarballs}/demo-ssg-blog.tar.gz -C ${WORK_DIR}`);
+  // Rename to use underscore for consistency with test file naming
+  const extractedDir = join(WORK_DIR, 'ssg-blog');
+  const demoDir = join(WORK_DIR, 'ssg_blog');
+  if (existsSync(extractedDir)) {
+    execSync(`mv ${extractedDir} ${demoDir}`);
+  }
+
+  // Install dependencies from tarballs
+  console.log('\n3. Installing dependencies...');
+  execSync(`npm install ${tarballs}/ruby2js-content-adapter-beta.tgz`, {
+    cwd: demoDir,
+    stdio: 'inherit'
+  });
+
+  // Build the static site
+  console.log('\n4. Building 11ty site...');
+  execSync('npm run build', {
+    cwd: demoDir,
+    stdio: 'inherit'
+  });
+
+  console.log('\n5. Setup complete!');
+  console.log(`   Demo built at: ${demoDir}/_site`);
+  console.log('   Run tests with: npm test -- ssg_blog.test.mjs');
 }
 
 setup().catch(err => {

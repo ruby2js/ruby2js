@@ -415,12 +415,12 @@ jobs:
         run: node test/smoke-test.mjs artifacts/chat --database ${{ matrix.database }}
 
   integration-test:
-    needs: [build-tarballs, create-blog, create-chat, create-photo-gallery, create-workflow, create-notes, create-astro-blog]
+    needs: [build-tarballs, create-blog, create-chat, create-photo-gallery, create-workflow, create-notes, create-astro-blog, create-ssg-blog]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        demo: [blog, chat, photo_gallery, workflow, notes, astro_blog]
+        demo: [blog, chat, photo_gallery, workflow, notes, astro_blog, ssg_blog]
     steps:
       - uses: actions/checkout@v4
 
@@ -452,7 +452,7 @@ jobs:
       - name: Download demo
         uses: actions/download-artifact@v4
         with:
-          name: demo-${{ matrix.demo == 'photo_gallery' && 'photo-gallery' || matrix.demo == 'astro_blog' && 'astro-blog' || matrix.demo }}
+          name: demo-${{ matrix.demo == 'photo_gallery' && 'photo-gallery' || matrix.demo == 'astro_blog' && 'astro-blog' || matrix.demo == 'ssg_blog' && 'ssg-blog' || matrix.demo }}
           path: artifacts
 
       - name: Run integration tests
