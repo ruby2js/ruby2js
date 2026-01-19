@@ -24,6 +24,17 @@ You know the framework. Juntos adds the Rails ecosystem—ORM, validations, asso
 | **[Next.js](/docs/juntos/coming-from/nextjs)** | Rails patterns in your API routes and pages |
 | **[Astro](/docs/juntos/coming-from/astro)** | ORM in frontmatter, multi-framework islands |
 
+## From Static Site Generators
+
+You have a content-focused site. Juntos adds ActiveRecord-like queries over your markdown content.
+
+| Your Background | What You Gain |
+|-----------------|---------------|
+| **[11ty/Eleventy](/docs/juntos/coming-from/eleventy)** | Query content like a database, familiar Liquid templates |
+| **[VitePress](/docs/juntos/coming-from/vitepress)** | Ruby Vue components, content collections |
+| **[Nuxt](/docs/juntos/coming-from/nuxt)** | Rails query syntax replaces queryContent() |
+| **[Bridgetown](/docs/juntos/coming-from/bridgetown)** | Ruby everywhere—templates, components, and JavaScript |
+
 ## From Rails
 
 You know Rails. Juntos takes those patterns to platforms Rails can't reach.
