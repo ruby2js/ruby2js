@@ -100,6 +100,7 @@ async function transformErbFile(filePath, options = {}) {
   const source = await readFile(filePath, 'utf-8');
   const result = ErbPnodeTransformer.transform(source, {
     eslevel: options.eslevel || 2022,
+    react: options.react || 'Preact',
     ...options
   });
 
