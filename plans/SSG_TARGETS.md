@@ -2,7 +2,7 @@
 
 Add static site generators to Juntos's list of transformation targets. Ruby authoring with ActiveRecord queries, deploying to Astro, Nuxt, SvelteKit, VitePress, and 11ty.
 
-**Status:** Ready for implementation
+**Status:** Design validated, ready for implementation
 
 ## Vision
 
@@ -78,6 +78,39 @@ The Vite plugin is the universal integration point. SSGs see their native format
 | Liquid template compiler | Medium | Same pattern as Vue, Svelte, Astro |
 | SSG integration glue | Small | Vite plugin infrastructure exists |
 
+## Package Architecture
+
+The content adapter is a separate package with no coupling to `vite-plugin-ruby2js`:
+
+```
+@ruby2js/content-adapter
+├── index.js              # Runtime: createCollection, query API
+└── vite.js               # Build-time: Vite plugin for scanning content/
+```
+
+**User's Vite config:**
+
+```javascript
+import ruby2js from 'vite-plugin-ruby2js';
+import content from '@ruby2js/content-adapter/vite';
+
+export default {
+  plugins: [
+    ruby2js(),
+    content({ dir: 'content' })
+  ]
+}
+```
+
+**Why separate:**
+
+- **No coupling** — Two independent Vite plugins that work together
+- **Clear responsibility** — Content scanning/querying is distinct from Ruby→JS transformation
+- **Independent versioning** — Can release fixes without touching the Vite plugin
+- **Smaller footprint** — Users not doing SSG work don't pull in gray-matter, markdown parser, etc.
+
+**Integration point:** The `virtual:content` module exports collection classes that Ruby code imports and queries—standard JavaScript imports, nothing special.
+
 ## The ActiveRecord Content Adapter
 
 Content collections are just another ActiveRecord backend. The same query API that works across Dexie, SQLite, D1, Neon, and Turso also works over markdown files.
@@ -134,6 +167,86 @@ The content adapter implements the Dexie-compatible subset of ActiveRecord:
 | Raw SQL | ❌ (no SQL backend) |
 
 This is the same constraint as Dexie/IndexedDB—if it works there, it works here.
+
+### Build Strategy: Build-Time Materialization
+
+Content is scanned and materialized at build time, not runtime:
+
+```
+content/posts/*.md
+       ↓ (Vite build)
+JavaScript module with records array
+       ↓
+ActiveRecord-like API filters in-memory
+```
+
+This matches how SSGs work—all content is known at build time. The Dexie adapter already proves the array-filtering approach works.
+
+### Conventions
+
+**Directory → Class name:** Pluralized directory name becomes singularized class name (standard Rails inflection):
+
+```
+content/posts/    → Post
+content/authors/  → Author
+content/tags/     → Tag
+```
+
+**Slug from filename:** The filename (without date prefix and extension) becomes the `slug` attribute:
+
+```
+2024-01-01-hello-world.md → slug: "hello-world"
+alice.md                  → slug: "alice"
+```
+
+### Relationship Resolution
+
+Relationships are inferred by convention. When an attribute name matches a collection name:
+
+```yaml
+# content/posts/hello.md
+author: alice           # → Author.find_by(slug: "alice")
+tags: [ruby, javascript] # → Tag.where(slug: ["ruby", "javascript"])
+```
+
+- Singular attribute (`author`) → `belongsTo` (returns one record)
+- Plural attribute (`tags`) → `hasMany` (returns array)
+
+### Generated Output
+
+The Vite plugin provides a virtual module `virtual:content` (following the convention of `astro:content`, etc.):
+
+```javascript
+// virtual:content
+import { createCollection } from '@ruby2js/content-adapter';
+
+export const Post = createCollection('posts', [
+  { slug: "hello-world", title: "Hello World", date: "2024-01-01", author: "alice", body: "<p>...</p>" },
+  { slug: "another-post", title: "Another Post", date: "2024-01-02", author: "bob", body: "<p>...</p>" }
+]);
+
+export const Author = createCollection('authors', [
+  { slug: "alice", name: "Alice", bio: "..." },
+  { slug: "bob", name: "Bob", bio: "..." }
+]);
+
+// Relationship wiring
+Post.belongsTo('author', Author);
+Post.hasMany('tags', Tag);
+```
+
+### Importing Collections
+
+Ruby code uses explicit imports (matching the majority of frameworks):
+
+```ruby
+import { Post, Author } from 'virtual:content'
+
+Post.where(draft: false).order(date: :desc).limit(10)
+post.author  # Resolves via belongsTo
+```
+
+Transforms to JavaScript that queries these in-memory collections. Auto-import could be added later as an enhancement.
 
 ## The Liquid Template Compiler
 
