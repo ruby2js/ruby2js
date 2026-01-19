@@ -9,6 +9,19 @@ Ruby2JS is a Ruby to JavaScript transpiler. It parses Ruby source code and gener
 **Website:** https://www.ruby2js.com/
 **Documentation:** https://www.ruby2js.com/docs/
 
+## IMPORTANT: Read VISION.md First
+
+Before making implementation choices, read **[VISION.md](./VISION.md)**. It contains the foundational principles that guide this project:
+
+1. **Ruby → JavaScript** - A useful subset transpiles cleanly
+2. **ERB → JSX** - Well-formed templates transpile to JSX
+3. **MVC ≅ SFC** - Same concepts, different packaging
+
+**Key guidance from VISION.md:**
+- Use existing infrastructure (adapters, targets) - don't hard-code what should be pluggable
+- Fix bugs in the existing approach before pivoting to a "simpler" solution
+- Preserve deployment optionality - same source should build for browser, Node, and edge
+
 ## Architecture
 
 ```
