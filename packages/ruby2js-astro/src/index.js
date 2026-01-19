@@ -26,6 +26,7 @@ import { readdir, readFile, writeFile, stat } from 'fs/promises';
 import { join, relative } from 'path';
 import { fileURLToPath } from 'url';
 import { AstroComponentTransformer } from 'ruby2js/astro';
+import { ErbPnodeTransformer } from 'ruby2js/erb';
 import { convert, initPrism } from 'ruby2js';
 
 // Import filters for JSX transformation
@@ -91,6 +92,29 @@ async function transformJsxFile(filePath, options = {}) {
   return outputPath;
 }
 
+/**
+ * Transform a single .erb.rb file to .jsx
+ * Uses ErbPnodeTransformer for ERB-style templates
+ */
+async function transformErbFile(filePath, options = {}) {
+  const source = await readFile(filePath, 'utf-8');
+  const result = ErbPnodeTransformer.transform(source, {
+    eslevel: options.eslevel || 2022,
+    ...options
+  });
+
+  if (result.errors?.length > 0) {
+    const errorMsg = result.errors
+      .map(e => typeof e === 'string' ? e : (e.message || JSON.stringify(e)))
+      .join(', ');
+    throw new Error(`Transform errors in ${filePath}: ${errorMsg}`);
+  }
+
+  const outputPath = filePath.replace(/\.erb\.rb$/, '.jsx');
+  await writeFile(outputPath, result.component);
+  return outputPath;
+}
+
 // Backward compatibility alias
 const transformFile = transformAstroFile;
 
@@ -151,15 +175,44 @@ async function findJsxRbFiles(dir) {
 }
 
 /**
- * Transform all .astro.rb and .jsx.rb files in the src directory
+ * Recursively find all .erb.rb files in a directory
+ */
+async function findErbRbFiles(dir) {
+  const files = [];
+
+  async function walk(currentDir) {
+    let entries;
+    try {
+      entries = await readdir(currentDir, { withFileTypes: true });
+    } catch {
+      return; // Directory doesn't exist or not readable
+    }
+
+    for (const entry of entries) {
+      const fullPath = join(currentDir, entry.name);
+      if (entry.isDirectory()) {
+        await walk(fullPath);
+      } else if (entry.name.endsWith('.erb.rb')) {
+        files.push(fullPath);
+      }
+    }
+  }
+
+  await walk(dir);
+  return files;
+}
+
+/**
+ * Transform all .astro.rb, .jsx.rb, and .erb.rb files in the src directory
  */
 async function transformAll(srcDir, options = {}, logger = console) {
   await ensurePrism();
 
   const astroFiles = await findAstroRbFiles(srcDir);
   const jsxFiles = await findJsxRbFiles(srcDir);
+  const erbFiles = await findErbRbFiles(srcDir);
 
-  if (astroFiles.length === 0 && jsxFiles.length === 0) {
+  if (astroFiles.length === 0 && jsxFiles.length === 0 && erbFiles.length === 0) {
     return [];
   }
 
@@ -182,6 +235,18 @@ async function transformAll(srcDir, options = {}, logger = console) {
     try {
       const outputPath = await transformJsxFile(file, options);
       transformed.push({ input: file, output: outputPath, type: 'jsx' });
+      logger.info?.(`  ${relative(srcDir, file)} → ${relative(srcDir, outputPath)}`);
+    } catch (error) {
+      logger.error?.(`  Error transforming ${file}: ${error.message}`);
+      throw error;
+    }
+  }
+
+  // Transform .erb.rb files (ERB-style templates)
+  for (const file of erbFiles) {
+    try {
+      const outputPath = await transformErbFile(file, options);
+      transformed.push({ input: file, output: outputPath, type: 'erb' });
       logger.info?.(`  ${relative(srcDir, file)} → ${relative(srcDir, outputPath)}`);
     } catch (error) {
       logger.error?.(`  Error transforming ${file}: ${error.message}`);
@@ -261,6 +326,21 @@ export default function ruby2jsIntegration(options = {}) {
                   } catch (error) {
                     logger.error(`ruby2js: Transform error: ${error.message}`);
                   }
+                } else if (file.endsWith('.erb.rb')) {
+                  logger.info(`ruby2js: Re-transforming ${relative(srcDir, file)}`);
+                  try {
+                    await ensurePrism();
+                    await transformErbFile(file, options);
+                    // Trigger reload of the .jsx file (erb.rb outputs .jsx)
+                    const jsxFile = file.replace(/\.erb\.rb$/, '.jsx');
+                    const mod = server.moduleGraph.getModuleById(jsxFile);
+                    if (mod) {
+                      server.moduleGraph.invalidateModule(mod);
+                      return [mod];
+                    }
+                  } catch (error) {
+                    logger.error(`ruby2js: Transform error: ${error.message}`);
+                  }
                 }
               },
               configureServer(server) {
@@ -279,6 +359,14 @@ export default function ruby2jsIntegration(options = {}) {
                     try {
                       await ensurePrism();
                       await transformJsxFile(file, options);
+                    } catch (error) {
+                      logger.error(`ruby2js: Transform error: ${error.message}`);
+                    }
+                  } else if (file.endsWith('.erb.rb')) {
+                    logger.info(`ruby2js: New file ${relative(srcDir, file)}`);
+                    try {
+                      await ensurePrism();
+                      await transformErbFile(file, options);
                     } catch (error) {
                       logger.error(`ruby2js: Transform error: ${error.message}`);
                     }
@@ -307,4 +395,4 @@ export default function ruby2jsIntegration(options = {}) {
 
 // Named exports
 export { ruby2jsIntegration as ruby2js };
-export { transformFile, transformAstroFile, transformJsxFile, findAstroRbFiles, findJsxRbFiles, transformAll };
+export { transformFile, transformAstroFile, transformJsxFile, transformErbFile, findAstroRbFiles, findJsxRbFiles, findErbRbFiles, transformAll };

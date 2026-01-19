@@ -16,7 +16,8 @@
     "./dist/*": "./dist/*",
     "./astro": "./dist/astro_component_transformer.mjs",
     "./svelte": "./dist/svelte_component_transformer.mjs",
-    "./vue": "./dist/vue_component_transformer.mjs"
+    "./vue": "./dist/vue_component_transformer.mjs",
+    "./erb": "./dist/erb_pnode_transformer.mjs"
   },
   "files": [
     "ruby2js.js",
