@@ -7,123 +7,104 @@ category: juntos-demos
 
 # Demo Applications
 
-Hands-on examples showcasing Juntos capabilities. Each demo is a complete Rails application that runs across all supported platforms.
+**Start anywhere. Go anywhere. Same patterns throughout.**
+
+Whether you're publishing content or building an application, the same ActiveRecord patterns work everywhere. Pick your entry point. Move when your needs change. No rewrite required.
 
 {% toc %}
 
-## Available Demos
+## Starting from Content
 
-| Demo | What It Demonstrates |
-|------|---------------------|
-| **[SSG Blog](/docs/juntos/demos/ssg-blog)** | Start simple - markdown content, ActiveRecord queries, zero JavaScript |
-| **[Blog](/docs/juntos/demos/blog)** | CRUD operations, nested resources, validations, multi-platform deployment |
-| **[Astro Blog](/docs/juntos/demos/astro-blog)** | Astro islands, `.astro.rb` pages, Preact components, ISR caching, IndexedDB |
-| **[Chat](/docs/juntos/demos/chat)** | Real-time Turbo Streams, Stimulus controllers in Ruby, WebSocket broadcasting |
-| **[Photo Gallery](/docs/juntos/demos/photo-gallery)** | Camera integration, Capacitor mobile apps, Electron desktop apps |
-| **[Workflow Builder](/docs/juntos/demos/workflow-builder)** | React Flow integration, real-time collaboration, JSON broadcasting |
-| **[Notes](/docs/juntos/demos/notes)** | Path helper RPC, JSON API, Server Functions-style data fetching, React components |
+When your starting point is markdown files, documentation, or a blog.
 
-## Running Any Demo
+| Demo | What It Shows |
+|------|---------------|
+| **[SSG Blog](/docs/juntos/demos/ssg-blog)** | Pure static. Markdown → HTML. Zero JavaScript. |
+| **[Astro Blog](/docs/juntos/demos/astro-blog)** | Add interactivity with islands. Client-side CRUD when needed. |
 
-All demos follow the same pattern:
+**The path:** content → static site → interactive islands → client-side app
 
-### 1. Create the App
+### SSG Blog
 
-```bash
-curl -sL https://raw.githubusercontent.com/ruby2js/ruby2js/master/test/DEMO/create-DEMO | bash -s myapp
-cd myapp
-```
-
-Replace `DEMO` with `blog` or `chat`.
-
-### 2. Run with Rails (Baseline)
-
-Verify it works as standard Rails:
-
-```bash
-RAILS_ENV=production bin/rails db:prepare
-bin/rails server -e production
-```
-
-### 3. Run in Browser
-
-Same app, no Ruby runtime:
-
-```bash
-bin/juntos dev -d dexie
-```
-
-### 4. Run on Node.js
-
-Full server with SQLite:
-
-```bash
-bin/juntos db:prepare -d sqlite
-bin/juntos up -d sqlite
-```
-
-### 5. Deploy to Edge
-
-Cloudflare Workers with D1:
-
-```bash
-bin/juntos db:prepare -d d1
-bin/juntos deploy -d d1
-```
-
-The `db:prepare` command creates the D1 database (if needed), runs migrations, and seeds if fresh.
-
-## What Each Demo Teaches
-
-### SSG Blog Demo
-
-The simplest demo - a static blog showing progressive disclosure:
+The simplest entry point - a static blog with no JavaScript:
 
 - **Markdown content** — Posts and authors as `.md` files with front matter
 - **Content adapter** — ActiveRecord-like queries over markdown
-- **Liquid templates** — Standard 11ty templating, no framework
+- **Liquid templates** — Standard 11ty templating
 - **Zero JavaScript** — Pure static HTML output
 
-Best for understanding the content adapter without additional complexity. Start here, then explore Astro Blog when ready for interactivity.
+Best for understanding the content adapter. When you need interactivity, add islands.
 
-### Astro Blog Demo
+### Astro Blog
 
-A static blog demonstrating Astro integration with Ruby2JS:
+Content meets application - static pages with interactive islands:
 
-- **Astro pages** — `.astro.rb` format with Ruby frontmatter and `__END__` template
+- **Astro pages** — `.astro.rb` format with Ruby frontmatter
 - **Preact islands** — `.jsx.rb` interactive components with `client:load`
-- **ActiveRecord patterns** — Familiar `Post.all`, `Post.find`, `post.save` with IndexedDB
-- **ISR caching** — `withRevalidate` for stale-while-revalidate data fetching
-- **Full CRUD** — Create, edit, delete posts with cross-component events
+- **ActiveRecord patterns** — `Post.all`, `Post.find`, `post.save` with IndexedDB
+- **ISR caching** — `withRevalidate` for stale-while-revalidate
+- **Full CRUD** — Create, edit, delete posts
 
-Best for understanding Astro integration and static site patterns with Ruby.
+Best for understanding how content and application coexist. Static shell, interactive islands.
 
-### Blog Demo
+## Starting from Application
 
-The blog is the "hello world" of web frameworks—articles with comments. It covers:
+When your starting point is a Rails app with runtime data.
+
+| Demo | What It Shows |
+|------|---------------|
+| **[Blog](/docs/juntos/demos/blog)** | Full CRUD. Deploy to browser, Node, or Edge. |
+| **[Chat](/docs/juntos/demos/chat)** | Add real-time with Turbo Streams. |
+| **[Notes](/docs/juntos/demos/notes)** | JSON API patterns, path helper RPC. |
+
+**The path:** Rails → browser (Dexie) → Node (SQLite) → Edge (D1) → add ISR
+
+### Blog
+
+The "hello world" of web frameworks - articles with comments:
 
 - **Model associations** — `has_many`, `belongs_to`, `dependent: :destroy`
 - **Validations** — `presence`, `length`
 - **Nested routes** — `resources :articles { resources :comments }`
 - **CRUD operations** — All seven RESTful actions
-- **Form helpers** — `form_with`, nested forms
+- **Multi-platform** — Same app runs on Rails, browser, Node, Edge
 
-Best for understanding how Rails patterns translate to JavaScript.
+Best for understanding how Rails patterns translate to JavaScript across all deployment targets.
 
-### Chat Demo
+### Chat
 
-A real-time chat room demonstrating Hotwire patterns:
+Real-time capabilities with Hotwire:
 
 - **Turbo Streams** — `broadcast_append_to`, `broadcast_remove_to`
 - **Stimulus controllers** — Written in Ruby, transpiled to JavaScript
 - **WebSocket subscription** — `turbo_stream_from` helper
 - **Format negotiation** — `respond_to` with turbo_stream format
 
-Best for understanding real-time features and Hotwire integration.
+Best for understanding real-time features. Add this capability to any app.
 
-### Photo Gallery Demo
+### Notes
 
-A camera-enabled gallery demonstrating native device integration:
+JSON API patterns for React data fetching:
+
+- **Path helper RPC** — `notes_path.get()`, `note_path(id).patch()` return Response objects
+- **JSON by default** — Path helpers default to JSON format
+- **RBX components** — React components written in Ruby syntax
+- **Unified API** — Same code works on browser and server
+
+Best for understanding Server Functions-style data fetching with React.
+
+## Adding Capabilities
+
+Focused demos showing specific integrations you can add to any app.
+
+| Demo | Capability |
+|------|------------|
+| **[Photo Gallery](/docs/juntos/demos/photo-gallery)** | Device APIs (camera, Capacitor, Electron) |
+| **[Workflow Builder](/docs/juntos/demos/workflow-builder)** | Third-party React libraries |
+
+### Photo Gallery
+
+Native device integration across platforms:
 
 - **Browser camera** — `getUserMedia()` for webcam access
 - **Capacitor camera** — Native iOS/Android camera plugin
@@ -132,9 +113,9 @@ A camera-enabled gallery demonstrating native device integration:
 
 Best for understanding Capacitor and Electron targets.
 
-### Workflow Builder Demo
+### Workflow Builder
 
-A visual workflow editor demonstrating React integration and real-time collaboration:
+Complex third-party library integration:
 
 - **React Flow** — Third-party React library for node-based editors
 - **JSON broadcasting** — `broadcast_json_to` for React state updates
@@ -143,16 +124,48 @@ A visual workflow editor demonstrating React integration and real-time collabora
 
 Best for understanding React component integration and JSON broadcasting patterns.
 
-### Notes Demo
+## Running the Demos
 
-A notes app demonstrating Server Functions-style path helpers and JSON API patterns:
+### Content Demos (11ty, Astro)
 
-- **Path helper RPC** — `notes_path.get()`, `note_path(id).patch()` return Response objects
-- **JSON by default** — Path helpers default to JSON format for React data fetching
-- **RBX components** — React components written in Ruby syntax
-- **Unified API** — Same code works on browser (direct invocation) and server (HTTP fetch)
+```bash
+# SSG Blog
+curl -sL https://raw.githubusercontent.com/ruby2js/ruby2js/master/test/ssg-blog/create-ssg-blog | bash -s myapp
+cd myapp
+npm run dev
 
-Best for understanding Server Functions-style data fetching and JSON API patterns with React.
+# Astro Blog
+curl -sL https://raw.githubusercontent.com/ruby2js/ruby2js/master/test/astro-blog/create-astro-blog | bash -s myapp
+cd myapp
+npm run dev
+```
+
+### Application Demos (Rails)
+
+```bash
+# Create any Rails demo (blog, chat, notes, photo_gallery, workflow)
+curl -sL https://raw.githubusercontent.com/ruby2js/ruby2js/master/test/DEMO/create-DEMO | bash -s myapp
+cd myapp
+```
+
+Then deploy anywhere:
+
+```bash
+# Run with Rails (baseline)
+RAILS_ENV=production bin/rails db:prepare
+bin/rails server -e production
+
+# Run in browser (no server)
+bin/juntos dev -d dexie
+
+# Run on Node.js
+bin/juntos db:prepare -d sqlite
+bin/juntos up -d sqlite
+
+# Deploy to Edge (Cloudflare D1)
+bin/juntos db:prepare -d d1
+bin/juntos deploy -d d1
+```
 
 ## Creating Your Own
 
@@ -165,4 +178,12 @@ cd myapp
 bin/juntos dev -d dexie
 ```
 
-If something doesn't transpile correctly, check the [Architecture](/docs/juntos/architecture) docs or open an issue.
+Or start from content:
+
+```bash
+# Create content directory with markdown files
+# Add @ruby2js/content-adapter
+# Query with Post.where(...).order(...)
+```
+
+Same patterns, any entry point, any destination.

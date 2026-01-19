@@ -442,6 +442,12 @@ task :release => [:build, :build_lib, :build_transformers, "build_mjs:npm"] do
     sh "npm version 1.0.0-beta --no-git-tag-version --allow-same-version"
   end
 
+  Dir.chdir(File.join(ROOT, 'packages/content-adapter')) do
+    sh "npm version #{vite_plugin_version} --no-git-tag-version --allow-same-version"
+    sh "npm pack --pack-destination #{tarballs_dir}"
+    sh "npm version 0.1.0 --no-git-tag-version --allow-same-version"
+  end
+
   # Rename to stable names (strip version numbers for predictable paths)
   Dir.chdir(tarballs_dir) do
     Dir.glob('ruby2js-6*.tgz').each { |f| FileUtils.mv(f, 'ruby2js-beta.tgz') }
@@ -452,6 +458,7 @@ task :release => [:build, :build_lib, :build_transformers, "build_mjs:npm"] do
     Dir.glob('ruby2js-astro-*.tgz').reject { |f| f == 'ruby2js-astro-beta.tgz' }.each { |f| FileUtils.mv(f, 'ruby2js-astro-beta.tgz') }
     Dir.glob('ruby2js-svelte-*.tgz').reject { |f| f == 'ruby2js-svelte-beta.tgz' }.each { |f| FileUtils.mv(f, 'ruby2js-svelte-beta.tgz') }
     Dir.glob('ruby2js-nuxt-*.tgz').reject { |f| f == 'ruby2js-nuxt-beta.tgz' }.each { |f| FileUtils.mv(f, 'ruby2js-nuxt-beta.tgz') }
+    Dir.glob('ruby2js-content-adapter-*.tgz').reject { |f| f == 'ruby2js-content-adapter-beta.tgz' }.each { |f| FileUtils.mv(f, 'ruby2js-content-adapter-beta.tgz') }
   end
 
   puts ""

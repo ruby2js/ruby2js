@@ -246,6 +246,36 @@ jobs:
           path: artifacts/demo-astro-blog.tar.gz
           retention-days: 7
 
+  create-ssg-blog:
+    needs: [build-tarballs]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Download tarballs
+        uses: actions/download-artifact@v4
+        with:
+          name: tarballs
+          path: artifacts/tarballs
+
+      - name: Create ssg-blog demo
+        run: |
+          export CONTENT_ADAPTER_TARBALL="$GITHUB_WORKSPACE/artifacts/tarballs/ruby2js-content-adapter-beta.tgz"
+          test/ssg-blog/create-ssg-blog artifacts/ssg-blog
+          tar -czf artifacts/demo-ssg-blog.tar.gz -C artifacts ssg-blog
+
+      - name: Upload ssg-blog demo
+        uses: actions/upload-artifact@v4
+        with:
+          name: demo-ssg-blog
+          path: artifacts/demo-ssg-blog.tar.gz
+          retention-days: 7
+
   # ===========================================================================
   # Stage 2: Tests (some run immediately, others depend on Stage 1 artifacts)
   # ===========================================================================
@@ -438,7 +468,7 @@ jobs:
   # ===========================================================================
 
   build-site:
-    needs: [build-tarballs, create-blog, create-chat, create-photo-gallery, create-workflow, create-notes, create-astro-blog]
+    needs: [build-tarballs, create-blog, create-chat, create-photo-gallery, create-workflow, create-notes, create-astro-blog, create-ssg-blog]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -490,6 +520,15 @@ jobs:
           # Build with base path for GitHub Pages
           npm run build -- --base "$base_path"
 
+      - name: Build SSG demo
+        run: |
+          echo "Building ssg-blog for GitHub Pages..."
+          cd artifacts/ssg-blog
+          # Install content adapter from tarball
+          npm install ../tarballs/ruby2js-content-adapter-beta.tgz
+          # Build static site
+          npm run build
+
       - name: Assemble site
         run: |
           mkdir -p _site
@@ -533,17 +572,19 @@ jobs:
                 <li><a href="ruby2js-astro-beta.tgz">ruby2js-astro-beta.tgz</a> - Astro integration</li>
                 <li><a href="ruby2js-svelte-beta.tgz">ruby2js-svelte-beta.tgz</a> - SvelteKit preprocessor</li>
                 <li><a href="ruby2js-nuxt-beta.tgz">ruby2js-nuxt-beta.tgz</a> - Nuxt module</li>
+                <li><a href="ruby2js-content-adapter-beta.tgz">ruby2js-content-adapter-beta.tgz</a> - Content adapter for SSG</li>
               </ul>
             </div>
             <div class="section">
               <h2>Demo App Tarballs</h2>
               <ul>
-                <li><a href="demo-blog.tar.gz">demo-blog.tar.gz</a> - Blog demo (CRUD, nested routes)</li>
+                <li><a href="demo-ssg-blog.tar.gz">demo-ssg-blog.tar.gz</a> - SSG blog demo (11ty, static)</li>
+                <li><a href="demo-astro-blog.tar.gz">demo-astro-blog.tar.gz</a> - Astro blog demo (islands)</li>
+                <li><a href="demo-blog.tar.gz">demo-blog.tar.gz</a> - Blog demo (Rails, CRUD)</li>
                 <li><a href="demo-chat.tar.gz">demo-chat.tar.gz</a> - Chat demo (Turbo Streams)</li>
-                <li><a href="demo-notes.tar.gz">demo-notes.tar.gz</a> - Notes demo (JSON API, scopes)</li>
+                <li><a href="demo-notes.tar.gz">demo-notes.tar.gz</a> - Notes demo (JSON API)</li>
                 <li><a href="demo-photo-gallery.tar.gz">demo-photo-gallery.tar.gz</a> - Photo gallery demo</li>
                 <li><a href="demo-workflow.tar.gz">demo-workflow.tar.gz</a> - Workflow builder demo</li>
-                <li><a href="demo-astro-blog.tar.gz">demo-astro-blog.tar.gz</a> - Astro blog demo (static site)</li>
               </ul>
             </div>
             <p class="back"><a href="../">← Back to demos</a></p>
@@ -558,6 +599,7 @@ jobs:
           cp -r artifacts/photo_gallery/dist _site/photo-gallery
           cp -r artifacts/workflow/dist _site/workflow
           cp -r artifacts/astro-blog/dist _site/astro-blog
+          cp -r artifacts/ssg-blog/_site _site/ssg-blog
 
           # Create index page
           cat > _site/index.html << 'EOF'
@@ -570,11 +612,13 @@ jobs:
             <style>
               body { font-family: system-ui, sans-serif; max-width: 800px; margin: 0 auto; padding: 2rem; line-height: 1.6; }
               h1 { color: #1a202c; }
-              .demos { display: grid; gap: 1rem; margin-top: 2rem; }
+              h2.section { margin-top: 2rem; margin-bottom: 0.5rem; font-size: 1.1rem; color: #4a5568; }
+              .tagline { font-weight: bold; color: #2d3748; margin-bottom: 0.5rem; }
+              .demos { display: grid; gap: 1rem; margin-top: 1rem; }
               .demo { padding: 1.5rem; background: #f7fafc; border-radius: 8px; border: 1px solid #e2e8f0; }
-              .demo h2 { margin: 0 0 0.5rem 0; }
-              .demo h2 a { color: #2563eb; text-decoration: none; }
-              .demo h2 a:hover { text-decoration: underline; }
+              .demo h3 { margin: 0 0 0.5rem 0; }
+              .demo h3 a { color: #2563eb; text-decoration: none; }
+              .demo h3 a:hover { text-decoration: underline; }
               .demo p { margin: 0; color: #4a5568; }
               .releases { margin-top: 2rem; padding: 1rem; background: #edf2f7; border-radius: 8px; }
               .releases h2 { margin: 0 0 0.5rem 0; font-size: 1rem; }
@@ -583,33 +627,49 @@ jobs:
           </head>
           <body>
             <h1>Ruby2JS Demos</h1>
-            <p>Example applications showcasing Ruby2JS. Rails apps run in the browser with IndexedDB, Astro generates static sites.</p>
+            <p class="tagline">Start anywhere. Go anywhere. Same patterns throughout.</p>
+            <p>Whether you're publishing content or building an application, the same ActiveRecord patterns work everywhere.</p>
+
+            <h2 class="section">Starting from Content</h2>
             <div class="demos">
               <div class="demo">
-                <h2><a href="blog/">Blog</a></h2>
-                <p>CRUD operations, nested routes, validations. Articles with comments.</p>
+                <h3><a href="ssg-blog/">SSG Blog</a></h3>
+                <p>Pure static. Markdown → HTML. Zero JavaScript. (11ty)</p>
               </div>
               <div class="demo">
-                <h2><a href="chat/">Chat</a></h2>
-                <p>Real-time Turbo Streams, Stimulus controllers.</p>
-              </div>
-              <div class="demo">
-                <h2><a href="notes/">Notes</a></h2>
-                <p>JSON API, scopes, search. Simple single-model CRUD.</p>
-              </div>
-              <div class="demo">
-                <h2><a href="photo-gallery/">Photo Gallery</a></h2>
-                <p>Camera integration via getUserMedia.</p>
-              </div>
-              <div class="demo">
-                <h2><a href="workflow/">Workflow Builder</a></h2>
-                <p>React Flow integration, drag-and-drop nodes.</p>
-              </div>
-              <div class="demo">
-                <h2><a href="astro-blog/">Astro Blog</a></h2>
-                <p>Static site with .astro.rb files. Ruby syntax in Astro components.</p>
+                <h3><a href="astro-blog/">Astro Blog</a></h3>
+                <p>Content + islands. Client-side CRUD when needed. (Astro)</p>
               </div>
             </div>
+
+            <h2 class="section">Starting from Application</h2>
+            <div class="demos">
+              <div class="demo">
+                <h3><a href="blog/">Blog</a></h3>
+                <p>Full CRUD. Deploy to browser, Node, or Edge. (Rails)</p>
+              </div>
+              <div class="demo">
+                <h3><a href="chat/">Chat</a></h3>
+                <p>Real-time Turbo Streams, Stimulus controllers. (Rails)</p>
+              </div>
+              <div class="demo">
+                <h3><a href="notes/">Notes</a></h3>
+                <p>JSON API, path helper RPC. (Rails + React)</p>
+              </div>
+            </div>
+
+            <h2 class="section">Adding Capabilities</h2>
+            <div class="demos">
+              <div class="demo">
+                <h3><a href="photo-gallery/">Photo Gallery</a></h3>
+                <p>Device APIs: camera, Capacitor, Electron.</p>
+              </div>
+              <div class="demo">
+                <h3><a href="workflow/">Workflow Builder</a></h3>
+                <p>Third-party React libraries: React Flow.</p>
+              </div>
+            </div>
+
             <div class="releases">
               <h2>Downloads</h2>
               <p><a href="releases/">NPM packages and demo app tarballs</a></p>
@@ -632,7 +692,7 @@ jobs:
               // GitHub Pages SPA redirect for direct URL access
               // Detects which demo the path belongs to and redirects there
               const path = location.pathname;
-              const demos = ['blog', 'chat', 'notes', 'photo-gallery', 'workflow', 'astro-blog'];
+              const demos = ['ssg-blog', 'astro-blog', 'blog', 'chat', 'notes', 'photo-gallery', 'workflow'];
               const base = '/ruby2js/';
 
               // Find which demo this path belongs to
