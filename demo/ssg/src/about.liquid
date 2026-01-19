@@ -1,0 +1,35 @@
+---
+layout: layout.liquid
+title: About
+permalink: /about/
+---
+
+<h2>About This Demo</h2>
+
+<p>This is a demonstration of using Ruby2JS with 11ty for static site generation.</p>
+
+<h3>Features Demonstrated</h3>
+
+<ul>
+  <li><strong>Content Collections</strong> - Markdown files with YAML front matter</li>
+  <li><strong>ActiveRecord-like API</strong> - Query content using familiar Ruby patterns</li>
+  <li><strong>Automatic Relationships</strong> - Link posts to authors by convention</li>
+  <li><strong>Liquid Templates</strong> - Standard 11ty templating</li>
+</ul>
+
+<h3>Content Statistics</h3>
+
+<p>This site has:</p>
+<ul>
+  <li><strong>{{ site.posts | size }}</strong> total posts</li>
+  <li><strong>{{ site.authors | size }}</strong> authors</li>
+</ul>
+
+<h3>Authors</h3>
+
+{% for author in site.authors %}
+<div style="margin-bottom: 1rem; padding: 1rem; background: #f5f5f5; border-radius: 4px;">
+  <strong>{{ author.name }}</strong>
+  <p>{{ author.bio }}</p>
+</div>
+{% endfor %}
