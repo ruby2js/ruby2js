@@ -130,6 +130,7 @@ vue_template_deps = FileList["#{ROOT}/lib/ruby2js/vue_template_compiler.rb"]
 astro_component_deps = FileList["#{ROOT}/lib/ruby2js/astro_component_transformer.rb"]
 svelte_component_deps = FileList["#{ROOT}/lib/ruby2js/svelte_component_transformer.rb"]
 vue_component_deps = FileList["#{ROOT}/lib/ruby2js/vue_component_transformer.rb"]
+erb_pnode_deps = FileList["#{ROOT}/lib/ruby2js/erb_pnode_transformer.rb"]
 
 desc "Build astro_template_compiler.mjs"
 file "#{SELFHOST}/dist/astro_template_compiler.mjs" => [*astro_template_deps, "#{SELFHOST}/ruby2js.js"] do
@@ -167,13 +168,20 @@ file "#{SELFHOST}/dist/vue_component_transformer.mjs" => [*vue_component_deps, "
   sh bundle_exec("ruby #{SELFHOST}/scripts/transpile_vue_component_transformer.rb > #{SELFHOST}/dist/vue_component_transformer.mjs")
 end
 
+desc "Build erb_pnode_transformer.mjs (ERB-style templates to JSX)"
+file "#{SELFHOST}/dist/erb_pnode_transformer.mjs" => [*erb_pnode_deps, "#{SELFHOST}/ruby2js.js"] do
+  FileUtils.mkdir_p(DIST)
+  sh bundle_exec("ruby #{SELFHOST}/scripts/transpile_erb_pnode_transformer.rb > #{SELFHOST}/dist/erb_pnode_transformer.mjs")
+end
+
 TRANSFORMER_TARGETS = [
   "#{SELFHOST}/dist/astro_template_compiler.mjs",
   "#{SELFHOST}/dist/svelte_template_compiler.mjs",
   "#{SELFHOST}/dist/vue_template_compiler.mjs",
   "#{SELFHOST}/dist/astro_component_transformer.mjs",
   "#{SELFHOST}/dist/svelte_component_transformer.mjs",
-  "#{SELFHOST}/dist/vue_component_transformer.mjs"
+  "#{SELFHOST}/dist/vue_component_transformer.mjs",
+  "#{SELFHOST}/dist/erb_pnode_transformer.mjs"
 ]
 
 desc "Build SFC filter (required by transformers)"

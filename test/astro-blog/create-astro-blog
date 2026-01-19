@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Create an Astro blog demo with .astro.rb and .jsx.rb files
+# Create an Astro blog demo with .astro.rb, .jsx.rb, and .erb.rb files
 # Usage: create-astro-blog [app-name]
 #
 # Creates a full-stack blog demo featuring:
 # - Level 1: Static content (.md) - About page
 # - Level 2: Astro pages (.astro.rb) - Layout, landing, post shells
-# - Level 3: Preact Islands (.jsx.rb) - PostList, PostForm with IndexedDB
+# - Level 3: Preact Islands (.jsx.rb or .erb.rb) - PostList, PostForm, Counter
 #
 # This demonstrates Ruby2JS at every level of an Astro project.
 
@@ -69,10 +69,11 @@ export default defineConfig({
   ],
   vite: {
     plugins: [
-      // Handle .jsx.rb files -> JSX with React+JSX filters
+      // Handle .jsx.rb and .erb.rb files -> JSX with React+JSX filters
+      // .jsx.rb: Ruby with inline %x{} JSX
+      // .erb.rb: Ruby with ERB-style __END__ template
       ruby2jsVite({
-        include: ['**/*.jsx.rb'],
-        // Note: vite-plugin-ruby2js automatically uses React+JSX+Functions+ESM filters for .jsx.rb
+        include: ['**/*.jsx.rb', '**/*.erb.rb'],
       })
     ]
   }
@@ -220,7 +221,7 @@ __END__
       <ul style="list-style: disc; padding-left: 1.5rem;">
         <li><strong>Level 1:</strong> Static markdown (<a href="/about">About page</a>)</li>
         <li><strong>Level 2:</strong> Astro pages in <code>.astro.rb</code> (this page)</li>
-        <li><strong>Level 3:</strong> Preact islands in <code>.jsx.rb</code> (<a href="/posts">Posts page</a>)</li>
+        <li><strong>Level 3:</strong> Preact islands in <code>.jsx.rb</code> or <code>.erb.rb</code> (<a href="/posts">Posts page</a>)</li>
       </ul>
     </section>
 
@@ -243,6 +244,7 @@ cat > src/pages/posts/index.astro.rb << 'POSTS'
 import Layout, from: '../../layouts/Layout.astro'
 import PostList, from: '../../islands/PostList.jsx'
 import PostForm, from: '../../islands/PostForm.jsx'
+import Counter, from: '../../islands/Counter.jsx'
 
 @title = "Blog Posts"
 __END__
@@ -254,9 +256,16 @@ __END__
       <PostList client:load />
     </section>
 
-    <section>
+    <section style="margin-bottom: 2rem;">
       <h2>Create New Post</h2>
       <PostForm client:load />
+    </section>
+
+    <section style="padding: 1rem; background: #fff; border: 1px solid var(--color-border); border-radius: 8px;">
+      <p style="color: var(--color-muted); font-size: 0.875rem; margin-bottom: 0.5rem;">
+        This counter uses the <code>.erb.rb</code> format (ERB-style templates)
+      </p>
+      <Counter client:load initial={0} />
     </section>
   </main>
 </Layout>
@@ -455,12 +464,12 @@ def PostList()
     -> { window.removeEventListener('post-created', handler) }
   }, []
 
-  return `<div class="loading">Loading posts...</div>` if loading
-  return `<p>No posts yet. Create one below!</p>` if posts.length == 0
+  return %x{<div class="loading">Loading posts...</div>} if loading
+  return %x{<p>No posts yet. Create one below!</p>} if posts.length == 0
 
   # Render a single post card - defined separately to avoid arrow function parsing issues in JSX
   renderPost = ->(post) {
-    `<article key={post.id} class="post-card">
+    %x{<article key={post.id} class="post-card">
       <h3>
         <a href={"/posts/" + post.slug}>{post.title}</a>
       </h3>
@@ -470,12 +479,12 @@ def PostList()
       <p style="margin-top: 0.5rem;">
         {post.body.slice(0, 150)}...
       </p>
-    </article>`
+    </article>}
   }
 
-  `<div class="posts">
+  %x{<div class="posts">
     {posts.map(renderPost)}
-  </div>`
+  </div>}
 end
 
 export default PostList
@@ -509,7 +518,7 @@ def PostForm()
     end
   }
 
-  `<form onSubmit={handleSubmit} class="post-form">
+  %x{<form onSubmit={handleSubmit} class="post-form">
     <input
       type="text"
       value={postTitle}
@@ -527,11 +536,52 @@ def PostForm()
     <button type="submit" disabled={saving || postTitle.trim() == "" || postBody.trim() == ""}>
       {saving ? "Creating..." : "Create Post"}
     </button>
-  </form>`
+  </form>}
 end
 
 export default PostForm
 POSTFORM
+
+# ============================================
+# Level 3: Counter Island (.erb.rb) - ERB template style
+# ============================================
+# This demonstrates the alternative ERB template syntax for Preact islands
+# The template goes after __END__ and uses ERB-style tags
+
+cat > src/islands/Counter.erb.rb << 'COUNTER'
+import ['useState'], from: 'preact/hooks'
+
+def Counter(initial: 0)
+  count, setCount = useState(initial)
+
+  increment = -> { setCount(count + 1) }
+  decrement = -> { setCount(count - 1) }
+  reset = -> { setCount(initial) }
+
+  render
+end
+
+export default Counter
+__END__
+<div class="counter">
+  <h3>Counter Demo</h3>
+  <p style="font-size: 2rem; font-weight: bold;"><%= count %></p>
+  <div style="display: flex; gap: 0.5rem;">
+    <button onClick={decrement}>-</button>
+    <button onClick={reset}>Reset</button>
+    <button onClick={increment}>+</button>
+  </div>
+  <p style="color: var(--color-muted); font-size: 0.875rem;">
+    <% if count > 0 %>
+      Count is positive
+    <% elsif count < 0 %>
+      Count is negative
+    <% else %>
+      Count is zero
+    <% end %>
+  </p>
+</div>
+COUNTER
 
 # ============================================
 # Favicon
@@ -578,7 +628,7 @@ echo ""
 echo "Features:"
 echo "  - Level 1: Static markdown (/about)"
 echo "  - Level 2: Astro pages in .astro.rb"
-echo "  - Level 3: Preact islands in .jsx.rb"
+echo "  - Level 3: Preact islands in .jsx.rb or .erb.rb"
 echo "  - IndexedDB storage via Dexie.js"
 echo "  - View Transitions for smooth navigation"
 echo ""

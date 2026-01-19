@@ -20,6 +20,7 @@
  *   - .svelte.rb files (Ruby script + Svelte template)
  *   - .astro.rb files (Ruby script + Astro template)
  *   - .jsx.rb files (Ruby with inline JSX → JSX output)
+ *   - .erb.rb files (Ruby with ERB-style __END__ template → JSX output)
  */
 
 import { convert, initPrism } from 'ruby2js';
@@ -40,6 +41,7 @@ import 'ruby2js/filters/jsx.js';
 let VueComponentTransformer = null;
 let SvelteComponentTransformer = null;
 let AstroComponentTransformer = null;
+let ErbPnodeTransformer = null;
 
 async function getVueTransformer() {
   if (!VueComponentTransformer) {
@@ -63,6 +65,14 @@ async function getAstroTransformer() {
     AstroComponentTransformer = mod.AstroComponentTransformer;
   }
   return AstroComponentTransformer;
+}
+
+async function getErbTransformer() {
+  if (!ErbPnodeTransformer) {
+    const mod = await import('ruby2js/erb');
+    ErbPnodeTransformer = mod.ErbPnodeTransformer;
+  }
+  return ErbPnodeTransformer;
 }
 
 // Initialize Prism lazily
@@ -160,6 +170,12 @@ export default function ruby2js(options = {}) {
         return await this.transformJSX(code, id, eslevel, ruby2jsOptions);
       }
 
+      // Handle .erb.rb files - Ruby with ERB-style __END__ template → JSX output
+      // Uses ErbPnodeTransformer to convert ERB templates to JSX
+      if (id.endsWith('.erb.rb')) {
+        return await this.transformERB(code, id, eslevel, ruby2jsOptions);
+      }
+
       try {
         const result = convert(code, {
           filters: normalizedFilters,
@@ -240,6 +256,38 @@ export default function ruby2js(options = {}) {
       } catch (error) {
         const enhancedError = new Error(
           `Ruby2JS SFC transform error in ${id}: ${error.message}`
+        );
+        enhancedError.id = id;
+        enhancedError.plugin = 'vite-plugin-ruby2js';
+        throw enhancedError;
+      }
+    },
+
+    // Transform .erb.rb files - Ruby with ERB-style __END__ template to JSX output
+    // Uses ErbPnodeTransformer to convert ERB templates to Preact/React JSX
+    async transformERB(code, id, eslevel, ruby2jsOptions) {
+      try {
+        const Transformer = await getErbTransformer();
+
+        const result = Transformer.transform(code, {
+          eslevel,
+          ...ruby2jsOptions
+        });
+
+        if (result.errors && result.errors.length > 0) {
+          const errorMsg = result.errors.map(e =>
+            typeof e === 'string' ? e : JSON.stringify(e)
+          ).join(', ');
+          throw new Error(`ERB transform errors: ${errorMsg}`);
+        }
+
+        return {
+          code: result.component,
+          map: null
+        };
+      } catch (error) {
+        const enhancedError = new Error(
+          `Ruby2JS ERB transform error in ${id}: ${error.message}`
         );
         enhancedError.id = id;
         enhancedError.plugin = 'vite-plugin-ruby2js';

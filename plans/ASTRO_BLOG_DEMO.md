@@ -1296,22 +1296,22 @@ Both produce the same Preact output. ERB is more familiar to Rails developers; J
 
 ### Definition of Done
 
-- [ ] `ErbPnodeTransformer` class with XML parser
-- [ ] ERB expression handling (`<%= %>`, `<% %>`)
-- [ ] Control flow mapping (if/else, each → map)
-- [ ] pnode output compatible with React filter
-- [ ] vite-plugin-ruby2js handles `.erb.rb` files
-- [ ] Selfhosted transformer for browser use
-- [ ] Unit tests for parser
-- [ ] Integration tests for full pipeline
-- [ ] Demo includes at least one `.erb.rb` island
+- [x] `ErbPnodeTransformer` class with XML parser
+- [x] ERB expression handling (`<%= %>`, `<% %>`)
+- [x] Control flow mapping (if/else, each → map)
+- [x] pnode output compatible with React filter
+- [x] vite-plugin-ruby2js handles `.erb.rb` files
+- [x] Selfhosted transformer for browser use
+- [x] Unit tests for parser (15 tests, 81 assertions)
+- [x] Integration tests for full pipeline
+- [x] Demo includes at least one `.erb.rb` island (Counter)
 
 ### Success Criteria
 
-- [ ] `PostList.erb.rb` transpiles to valid Preact JSX
-- [ ] ERB and JSX styles can coexist in same project
-- [ ] Rails developers recognize the authoring experience
-- [ ] pnode → React filter pipeline works correctly
+- [x] `.erb.rb` files transpile to valid Preact JSX
+- [x] ERB and JSX styles can coexist in same project
+- [x] Rails developers recognize the authoring experience
+- [x] Ruby `%x{}` JSX syntax pipeline works correctly
 
 ---
 
