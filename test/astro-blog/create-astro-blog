@@ -5,7 +5,7 @@
 # Creates a full-stack blog demo featuring:
 # - Level 1: Static content (.md) - About page
 # - Level 2: Astro pages (.astro.rb) - Layout, landing, post shells
-# - Level 3: Preact Islands (.jsx.rb or .erb.rb) - PostList, PostForm, Counter
+# - Level 3: React Islands (.jsx.rb or .erb.rb) - PostList, PostForm, Counter
 #
 # This demonstrates Ruby2JS at every level of an Astro project.
 
@@ -499,10 +499,10 @@ def PostList()
       <h3>
         <a href={"/posts/" + post.slug}>{post.title}</a>
       </h3>
-      <time style="color: var(--color-muted); font-size: 0.875rem;">
+      <time style={{color: "var(--color-muted)", fontSize: "0.875rem"}}>
         {new Date(post.created_at).toLocaleDateString()}
       </time>
-      <p style="margin-top: 0.5rem;">
+      <p style={{marginTop: "0.5rem"}}>
         {post.body.slice(0, 150)}...
       </p>
     </article>}
@@ -580,12 +580,12 @@ def PostForm(post: nil, onSave: nil, onCancel: nil)
       rows={6}
       disabled={saving}
     />
-    <div style="display: flex; gap: 0.5rem;">
+    <div style={{display: "flex", gap: "0.5rem"}}>
       <button type="submit" disabled={saving || postTitle.trim() == "" || postBody.trim() == ""}>
         {buttonText}
       </button>
       {isEditing && onCancel && (
-        <button type="button" onClick={onCancel} disabled={saving} style="background: var(--color-muted);">
+        <button type="button" onClick={onCancel} disabled={saving} style={{background: "var(--color-muted)"}}>
           Cancel
         </button>
       )}
@@ -599,7 +599,7 @@ POSTFORM
 # ============================================
 # Level 3: Counter Island (.erb.rb) - ERB template style
 # ============================================
-# This demonstrates the alternative ERB template syntax for Preact islands
+# This demonstrates the alternative ERB template syntax for React islands
 # The template goes after __END__ and uses ERB-style tags
 
 cat > src/islands/Counter.erb.rb << 'COUNTER'
@@ -619,13 +619,13 @@ export default Counter
 __END__
 <div class="counter">
   <h3>Counter Demo</h3>
-  <p style="font-size: 2rem; font-weight: bold;"><%= count %></p>
-  <div style="display: flex; gap: 0.5rem;">
+  <p style={{fontSize: "2rem", fontWeight: "bold"}}><%= count %></p>
+  <div style={{display: "flex", gap: "0.5rem"}}>
     <button onClick={decrement}>-</button>
     <button onClick={reset}>Reset</button>
     <button onClick={increment}>+</button>
   </div>
-  <p style="color: var(--color-muted); font-size: 0.875rem;">
+  <p style={{color: "var(--color-muted)", fontSize: "0.875rem"}}>
     <% if count > 0 %>
       Count is positive
     <% elsif count < 0 %>
@@ -682,9 +682,9 @@ def PostDetail(slug:)
 
   if deleted
     return %x{
-      <div style="text-align: center; padding: 2rem;">
-        <p style="color: var(--color-muted);">Post deleted successfully.</p>
-        <a href="/posts" style="margin-top: 1rem; display: inline-block;">&larr; Back to all posts</a>
+      <div style={{textAlign: "center", padding: "2rem"}}>
+        <p style={{color: "var(--color-muted)"}}>Post deleted successfully.</p>
+        <a href="/posts" style={{marginTop: "1rem", display: "inline-block"}}>&larr; Back to all posts</a>
       </div>
     }
   end
@@ -700,20 +700,20 @@ def PostDetail(slug:)
 
   %x{<div>
     <h1>{post.title}</h1>
-    <time style="color: var(--color-muted); display: block; margin-bottom: 1rem;">
+    <time style={{color: "var(--color-muted)", display: "block", marginBottom: "1rem"}}>
       {new Date(post.createdAt).toLocaleDateString()}
     </time>
-    <div style="white-space: pre-wrap; line-height: 1.6; margin-bottom: 2rem;">
+    <div style={{whiteSpace: "pre-wrap", lineHeight: 1.6, marginBottom: "2rem"}}>
       {post.body}
     </div>
-    <div style="display: flex; gap: 0.5rem; padding-top: 1rem; border-top: 1px solid var(--color-border);">
+    <div style={{display: "flex", gap: "0.5rem", paddingTop: "1rem", borderTop: "1px solid var(--color-border)"}}>
       <button onClick={-> { setEditing(true) }}>
         Edit
       </button>
-      <button onClick={handleDelete} style="background: #dc2626;">
+      <button onClick={handleDelete} style={{background: "#dc2626"}}>
         Delete
       </button>
-      <a href="/posts" style="margin-left: auto; color: var(--color-muted);">
+      <a href="/posts" style={{marginLeft: "auto", color: "var(--color-muted)"}}>
         &larr; Back to posts
       </a>
     </div>

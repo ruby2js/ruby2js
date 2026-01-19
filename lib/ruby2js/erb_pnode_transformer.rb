@@ -121,6 +121,11 @@ module Ruby2JS
       result = Ruby2JS.convert(modified_ruby, convert_options)
       js_code = result.to_s
 
+      # Add React import for SSR compatibility when in React mode
+      if @options[:react] == 'React' && !js_code.include?('import React')
+        js_code = "import React from \"react\";\n" + js_code
+      end
+
       Result.new(
         component: js_code,
         script: ruby_code,
