@@ -119,6 +119,22 @@ To clear data, use browser DevTools → Application → Storage → Clear site d
 - **Storage limits** — Browser quotas apply (~50MB-unlimited depending on browser)
 - **No background jobs** — Use `setTimeout` or Web Workers
 
+## ISR Caching
+
+Browser deployments can use in-memory ISR for data caching:
+
+```ruby
+import ['withRevalidate', 'invalidate'], from: '../lib/isr.js'
+
+# Cache data for 60 seconds
+posts = await withRevalidate('posts:all', 60, -> { Post.all })
+
+# Invalidate on mutations
+invalidate('posts:all')
+```
+
+The cache persists in memory during the session. See the [ISR documentation](/docs/juntos/isr) for details and the [Astro Blog demo](/docs/juntos/demos/astro-blog) for a working example.
+
 ## Hybrid Approaches
 
 For apps needing both offline and server sync:

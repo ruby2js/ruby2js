@@ -13,6 +13,18 @@ Juntos currently supports the core Rails patterns: models, controllers, views, r
 
 ## Recently Implemented
 
+### Astro Blog Demo with ISR
+
+The [Astro Blog demo](/docs/juntos/demos/astro-blog) showcases Ruby2JS integration with Astro:
+
+- **`.astro.rb` pages** — Ruby frontmatter with `__END__` template separator
+- **Preact islands** — `.jsx.rb` components with `client:load` hydration
+- **ActiveRecord patterns** — `Post.all`, `Post.find`, `post.save` with IndexedDB
+- **ISR caching** — In-memory stale-while-revalidate via `withRevalidate`
+- **Full CRUD** — Create, edit, delete with cross-component events
+
+See the [ISR documentation](/docs/juntos/isr) for the caching API.
+
 ### Capacitor, Electron & Tauri Targets
 
 Native app support is now available. See the [Photo Gallery demo](/docs/juntos/demos/photo-gallery) for a complete example.

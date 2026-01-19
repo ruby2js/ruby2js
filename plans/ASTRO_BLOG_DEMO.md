@@ -1534,12 +1534,12 @@ Add to "Recently Implemented":
 
 ### Definition of Done
 
-- [ ] Juntos CLI works with Astro projects
-- [ ] Multi-target Dockerfile
-- [ ] ISR documentation page
-- [ ] Astro Blog demo documentation page
-- [ ] Cross-references in existing docs
-- [ ] Roadmap updated
+- [ ] Juntos CLI works with Astro projects (deferred - future work)
+- [ ] Multi-target Dockerfile (deferred - future work)
+- [x] ISR documentation page
+- [x] Astro Blog demo documentation page
+- [x] Cross-references in existing docs
+- [x] Roadmap updated
 
 ---
 

@@ -316,7 +316,28 @@ __END__
 </Layout>
 ```
 
-See [Vercel Deployment](/docs/juntos/deploying/vercel#isr-incremental-static-regeneration) or [Cloudflare Deployment](/docs/juntos/deploying/cloudflare#isr-incremental-static-regeneration) for details.
+For interactive islands, use the `withRevalidate` function:
+
+```ruby
+import ['withRevalidate', 'invalidate'], from: '../lib/isr.js'
+
+def PostList()
+  posts, setPosts = useState([])
+
+  loadPosts = -> {
+    withRevalidate('posts:all', 60, -> { Post.all }).then { |data| setPosts(data) }
+  }
+
+  # Invalidate cache on mutations
+  handleCreate = ->(post) {
+    invalidate('posts:all')
+    loadPosts.()
+  }
+  # ...
+end
+```
+
+See the [ISR documentation](/docs/juntos/isr) for the full API, or the [Astro Blog demo](/docs/juntos/demos/astro-blog) for a working example.
 
 ## Migration Path
 

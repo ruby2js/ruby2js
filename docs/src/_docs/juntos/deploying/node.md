@@ -171,6 +171,22 @@ import { ChatOpenAI } from 'langchain/chat_models/openai';
 
 Add dependencies to `dist/package.json` after building, or maintain a separate package.json that gets merged during build.
 
+## ISR Caching
+
+Server deployments can use in-memory ISR for data caching:
+
+```ruby
+import ['withRevalidate', 'invalidate'], from: '../lib/isr.js'
+
+# Cache data for 60 seconds
+posts = await withRevalidate('posts:all', 60, -> { Post.all })
+
+# Invalidate on mutations
+invalidate('posts:all')
+```
+
+The in-memory cache reduces database load for frequently accessed data. See the [ISR documentation](/docs/juntos/isr) for details.
+
 ## Performance
 
 - **Cold start:** ~100-500ms depending on app size
@@ -181,4 +197,4 @@ For high-traffic applications, consider:
 
 - Connection pooling (pg-pool, mysql2 pooling)
 - Clustering (PM2 cluster mode)
-- Caching (Redis, in-memory)
+- Caching (Redis, in-memory ISR)

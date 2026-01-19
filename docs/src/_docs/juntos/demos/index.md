@@ -16,6 +16,7 @@ Hands-on examples showcasing Juntos capabilities. Each demo is a complete Rails 
 | Demo | What It Demonstrates |
 |------|---------------------|
 | **[Blog](/docs/juntos/demos/blog)** | CRUD operations, nested resources, validations, multi-platform deployment |
+| **[Astro Blog](/docs/juntos/demos/astro-blog)** | Astro islands, `.astro.rb` pages, Preact components, ISR caching, IndexedDB |
 | **[Chat](/docs/juntos/demos/chat)** | Real-time Turbo Streams, Stimulus controllers in Ruby, WebSocket broadcasting |
 | **[Photo Gallery](/docs/juntos/demos/photo-gallery)** | Camera integration, Capacitor mobile apps, Electron desktop apps |
 | **[Workflow Builder](/docs/juntos/demos/workflow-builder)** | React Flow integration, real-time collaboration, JSON broadcasting |
@@ -72,6 +73,18 @@ bin/juntos deploy -d d1
 The `db:prepare` command creates the D1 database (if needed), runs migrations, and seeds if fresh.
 
 ## What Each Demo Teaches
+
+### Astro Blog Demo
+
+A static blog demonstrating Astro integration with Ruby2JS:
+
+- **Astro pages** — `.astro.rb` format with Ruby frontmatter and `__END__` template
+- **Preact islands** — `.jsx.rb` interactive components with `client:load`
+- **ActiveRecord patterns** — Familiar `Post.all`, `Post.find`, `post.save` with IndexedDB
+- **ISR caching** — `withRevalidate` for stale-while-revalidate data fetching
+- **Full CRUD** — Create, edit, delete posts with cross-component events
+
+Best for understanding Astro integration and static site patterns with Ruby.
 
 ### Blog Demo
 
