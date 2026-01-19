@@ -137,7 +137,7 @@ module Ruby2JS
     private
 
     def build_convert_options
-      convert_options = @options.dup
+      convert_options = {**@options}
       convert_options[:filters] ||= []
 
       # Add required filters
