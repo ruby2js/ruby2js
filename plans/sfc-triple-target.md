@@ -6,7 +6,7 @@ Take the existing Rails blog demo and transpile it to three SFC syntaxes (Astro,
 
 ## Input
 
-The existing blog demo at `/tmp/blog` (or generated via `test/blog/create-blog`):
+The existing blog demo (generated via `test/blog/create-blog`):
 - Models: `article.rb`, `comment.rb` → already transpile to JS
 - Controllers: `articles_controller.rb`, `comments_controller.rb` → already transpile to JS
 - Views: ERB templates → verified JSX-compatible (well-formed)
@@ -17,9 +17,9 @@ The existing blog demo at `/tmp/blog` (or generated via `test/blog/create-blog`)
 Three parallel builds, each producing a working blog:
 
 ```
-bin/juntos build -d dexie -f astro    → dist-astro/
-bin/juntos build -d dexie -f vue      → dist-vue/
-bin/juntos build -d dexie -f svelte   → dist-svelte/
+bin/juntos build -d dexie -f astro    → Astro components
+bin/juntos build -d dexie -f vue      → Vue SFCs
+bin/juntos build -d dexie -f svelte   → Svelte components
 ```
 
 All three:
@@ -28,19 +28,252 @@ All three:
 - Render the same blog UI
 - Run via Vite
 
-## Phase 1: ERB → SFC Template Transformation
+---
 
-### Astro Output
+## Current State Analysis
+
+### What Exists
+
+| Component | Location | Status |
+|-----------|----------|--------|
+| `AstroComponentTransformer` | `packages/ruby2js-rails/dist/astro_component_transformer.mjs` | Defined, not wired |
+| `AstroTemplateCompiler` | `packages/ruby2js-rails/dist/astro_template_compiler.mjs` | Defined, not wired |
+| `VueComponentTransformer` | `packages/ruby2js-rails/dist/vue_component_transformer.mjs` | Defined, not wired |
+| `VueTemplateCompiler` | `packages/ruby2js-rails/dist/vue_template_compiler.mjs` | Defined, not wired |
+| `SvelteComponentTransformer` | `packages/ruby2js-rails/dist/svelte_component_transformer.mjs` | Defined, not wired |
+| `SvelteTemplateCompiler` | `packages/ruby2js-rails/dist/svelte_template_compiler.mjs` | Defined, not wired |
+| `ErbCompiler` | `packages/ruby2js-rails/lib/erb_compiler.js` | Active - produces string templates |
+| juntos CLI | `lib/ruby2js/cli/juntos.rb` | Has `-d` and `-t`, no `-f` |
+
+### What's Missing
+
+1. **CLI flag**: `-f` / `--framework` option to select output format
+2. **Build wiring**: Connect framework transformers to `SelfhostBuilder` and Vite plugin
+3. **Framework routing**: Logic to select transformer based on `-f` flag
+4. **Vite configs**: Framework-specific Vite configurations (plugins, etc.)
+
+### Current Build Flow
+
+```
+ERB template
+    ↓
+ErbCompiler (erb_compiler.js)
+    ↓
+Ruby code (_buf << "..." pattern)
+    ↓
+Ruby2JS transpiler
+    ↓
+JavaScript (string concatenation)
+```
+
+### Target Build Flow
+
+```
+ERB template
+    ↓
+[Framework]TemplateCompiler
+    ↓
+[Framework]-specific syntax
+    ↓
+Ruby2JS transpiler (for script section)
+    ↓
+Complete SFC (.astro / .vue / .svelte)
+```
+
+---
+
+## Implementation Steps
+
+### Phase 1: CLI and Configuration
+
+**1.1 Add `-f` / `--framework` flag to juntos CLI**
+
+File: `lib/ruby2js/cli/juntos.rb`
+
+```ruby
+# In parse_common_options:
+when '-f', '--framework'
+  options[:framework] = args[i + 1]
+  i += 2
+
+# In apply_common_options:
+ENV['JUNTOS_FRAMEWORK'] = options[:framework] if options[:framework]
+```
+
+Valid values: `rails` (default, current behavior), `astro`, `vue`, `svelte`
+
+**1.2 Update build options**
+
+Files: `lib/ruby2js/cli/build.rb`, `lib/ruby2js/cli/build_helper.rb`
+
+Pass `framework` option through to builder.
+
+### Phase 2: Build System Wiring
+
+**2.1 Create framework selector**
+
+File: `packages/ruby2js-rails/lib/framework_selector.mjs` (new)
+
+```javascript
+import { AstroComponentTransformer } from '../dist/astro_component_transformer.mjs';
+import { VueComponentTransformer } from '../dist/vue_component_transformer.mjs';
+import { SvelteComponentTransformer } from '../dist/svelte_component_transformer.mjs';
+import { ErbCompiler } from './erb_compiler.js';
+
+export function getTransformer(framework) {
+  switch (framework) {
+    case 'astro': return AstroComponentTransformer;
+    case 'vue': return VueComponentTransformer;
+    case 'svelte': return SvelteComponentTransformer;
+    case 'rails':
+    default: return ErbCompiler;
+  }
+}
+```
+
+**2.2 Update SelfhostBuilder**
+
+File: `packages/ruby2js-rails/build.mjs`
+
+- Read `JUNTOS_FRAMEWORK` environment variable
+- Use `getTransformer()` to select appropriate compiler
+- Adjust output paths based on framework (`.astro`, `.vue`, `.svelte`)
+
+**2.3 Update Vite plugin**
+
+File: `packages/ruby2js-rails/vite.mjs`
+
+- Pass framework option through configuration
+- Select appropriate file extensions for watch/transform
+- May need framework-specific Vite plugins:
+  - Astro: `@astrojs/vite-plugin-astro` (or none if static)
+  - Vue: `@vitejs/plugin-vue`
+  - Svelte: `@sveltejs/vite-plugin-svelte`
+
+### Phase 3: Validate Existing Transformers
+
+**3.1 Test AstroComponentTransformer**
+
+- Does it handle the blog's ERB patterns?
+- Does output compile with Astro?
+- Fix any gaps
+
+**3.2 Test VueComponentTransformer**
+
+- Does it handle the blog's ERB patterns?
+- Does output compile with Vue?
+- Fix any gaps
+
+**3.3 Test SvelteComponentTransformer**
+
+- Does it handle the blog's ERB patterns?
+- Does output compile with Svelte?
+- Fix any gaps
+
+### Phase 4: Framework-Specific Vite Configs
+
+**4.1 Astro configuration**
+
+May need minimal config since Astro has its own build, or may work as static components.
+
+**4.2 Vue configuration**
+
+```javascript
+import vue from '@vitejs/plugin-vue';
+
+export default {
+  plugins: [vue(), /* ruby2js plugin */]
+}
+```
+
+**4.3 Svelte configuration**
+
+```javascript
+import { svelte } from '@sveltejs/vite-plugin-svelte';
+
+export default {
+  plugins: [svelte(), /* ruby2js plugin */]
+}
+```
+
+### Phase 5: Integration Testing
+
+**5.1 Create test script**
+
+```bash
+#!/bin/bash
+# test/integration/sfc_triple_target.sh
+
+# Generate blog
+cd /tmp && rm -rf blog
+curl -sL .../create-blog | bash -s blog
+cd blog
+
+# Test each framework
+for framework in astro vue svelte; do
+  echo "Testing $framework..."
+  bin/juntos build -d dexie -f $framework
+  # Verify output exists and is valid
+done
+```
+
+**5.2 Add to CI**
+
+Extend existing integration tests to cover framework outputs.
+
+---
+
+## Potential Adjustments
+
+### Things That May Need Changing
+
+1. **Existing transformers** - May have bugs or missing patterns when tested against real ERB
+2. **Test expectations** - If transformer output format changes, update expected results
+3. **Demo structure** - May need adjustment to work with multiple frameworks
+4. **Unused code** - If transformers have dead code paths, remove them
+
+### Things That Must Keep Working
+
+1. **CI must pass** - All existing tests continue to work
+2. **Existing demos** - Blog demo with `-f rails` (default) works as before
+3. **Database adapters** - All adapters work with all frameworks
+
+### Acceptable Changes
+
+- Revising expected test output if the new output is correct
+- Modifying demos to demonstrate framework flexibility
+- Removing code that was speculative but doesn't fit the architecture
+- Simplifying transformers if they're over-engineered
+
+---
+
+## ERB → SFC Transformation Examples
+
+### Input (ERB)
+
+```erb
+<% if notice.present? %>
+  <p class="notice"><%= notice %></p>
+<% end %>
+
+<% @articles.each do |article| %>
+  <div class="article">
+    <h2><%= link_to article.title, article %></h2>
+  </div>
+<% end %>
+```
+
+### Output: Astro
 
 ```astro
 ---
-// frontmatter: transpiled controller action
 import { Article } from '../models/article.js';
-const articles = await Article.includes("comments").all();
+const articles = await Article.all();
+const notice = Astro.props.notice;
 ---
 
-{flash.notice && (
-  <p class="notice">{flash.notice}</p>
+{notice && (
+  <p class="notice">{notice}</p>
 )}
 
 {articles.map(article => (
@@ -50,7 +283,7 @@ const articles = await Article.includes("comments").all();
 ))}
 ```
 
-### Vue Output
+### Output: Vue
 
 ```vue
 <script setup>
@@ -58,15 +291,15 @@ import { ref, onMounted } from 'vue';
 import { Article } from '../models/article.js';
 
 const articles = ref([]);
-const notice = ref(null);
+const props = defineProps(['notice']);
 
 onMounted(async () => {
-  articles.value = await Article.includes("comments").all();
+  articles.value = await Article.all();
 });
 </script>
 
 <template>
-  <p v-if="notice" class="notice">{{ notice }}</p>
+  <p v-if="props.notice" class="notice">{{ props.notice }}</p>
 
   <div v-for="article in articles" :key="article.id" class="article">
     <h2><router-link :to="`/articles/${article.id}`">{{ article.title }}</router-link></h2>
@@ -74,18 +307,18 @@ onMounted(async () => {
 </template>
 ```
 
-### Svelte Output
+### Output: Svelte
 
 ```svelte
 <script>
 import { onMount } from 'svelte';
 import { Article } from '../models/article.js';
 
+export let notice;
 let articles = [];
-let notice = null;
 
 onMount(async () => {
-  articles = await Article.includes("comments").all();
+  articles = await Article.all();
 });
 </script>
 
@@ -100,136 +333,47 @@ onMount(async () => {
 {/each}
 ```
 
-## Transformation Mapping
-
-| ERB | Astro | Vue | Svelte |
-|-----|-------|-----|--------|
-| `<% if cond %>` | `{cond && (...)}` | `v-if="cond"` | `{#if cond}` |
-| `<% else %>` | ternary | `v-else` | `{:else}` |
-| `<% end %>` | `}` | (implicit) | `{/if}` |
-| `<% items.each do \|i\| %>` | `{items.map(i => ...)}` | `v-for="i in items"` | `{#each items as i}` |
-| `<%= expr %>` | `{expr}` | `{{ expr }}` | `{expr}` |
-| `<%= link_to ... %>` | `<a href={...}>` | `<router-link>` | `<a href={...}>` |
-| `<%= form_with ... %>` | `<form>` | `<form>` | `<form>` |
-
-## Phase 2: Vite Integration
-
-Each framework has its own Vite plugin:
-
-```javascript
-// vite.config.js for Astro
-import { defineConfig } from 'vite';
-import astro from '@astrojs/vite-plugin-astro';
-
-// vite.config.js for Vue
-import { defineConfig } from 'vite';
-import vue from '@vitejs/plugin-vue';
-
-// vite.config.js for Svelte
-import { defineConfig } from 'vite';
-import { svelte } from '@sveltejs/vite-plugin-svelte';
-```
-
-The `bin/juntos build -f <framework>` command:
-1. Transpiles Ruby models/controllers (same for all)
-2. Transforms ERB → framework-specific templates
-3. Generates appropriate vite.config.js
-4. Runs Vite build
-
-## Phase 3 (Follow-on): Turbo Streams / Real-time Updates
-
-### Feasibility Assessment
-
-| Framework | Approach | Feasibility |
-|-----------|----------|-------------|
-| Astro | Islands with WebSocket, Turbo-style DOM updates | Medium - requires island boundaries |
-| Vue | Native reactivity, WebSocket → reactive state | High - natural fit |
-| Svelte | Native reactivity, WebSocket → stores | High - natural fit |
-
-### Adaptation Strategy
-
-**Option A: Preserve Turbo Streams protocol**
-- WebSocket receives HTML fragments
-- DOM manipulation (insert, replace, remove)
-- Works identically across frameworks
-- Astro: works out of the box
-- Vue/Svelte: works but doesn't leverage reactivity
-
-**Option B: Adapt to framework idioms**
-- WebSocket receives JSON data
-- Each framework handles updates natively
-- Astro: island re-render
-- Vue: reactive state update
-- Svelte: store update
-
-Recommendation: Start with Option A (simpler, proves concept), Option B as enhancement.
-
-## File Structure
-
-```
-packages/ruby2js-rails/
-├── lib/
-│   └── erb_to_sfc/
-│       ├── astro.rb      # ERB → Astro transformation
-│       ├── vue.rb        # ERB → Vue transformation
-│       └── svelte.rb     # ERB → Svelte transformation
-├── targets/
-│   ├── astro/
-│   │   └── vite.config.js
-│   ├── vue/
-│   │   └── vite.config.js
-│   └── svelte/
-│       └── vite.config.js
-```
-
-## Implementation Steps
-
-1. **Create ERB → Astro transformer**
-   - Parse ERB (already done in erb2jsx)
-   - Output Astro syntax
-   - Test with blog views
-
-2. **Create ERB → Vue transformer**
-   - Same parse step
-   - Output Vue SFC syntax
-   - Test with blog views
-
-3. **Create ERB → Svelte transformer**
-   - Same parse step
-   - Output Svelte syntax
-   - Test with blog views
-
-4. **Add `-f` flag to juntos CLI**
-   - `-f astro` (default, current behavior)
-   - `-f vue`
-   - `-f svelte`
-
-5. **Vite configs for each framework**
-   - Use existing Vite infrastructure
-   - Swap plugin based on framework
-
-6. **Integration test**
-   - Build blog with each framework
-   - Verify all work with dexie adapter
-   - Verify CRUD operations
+---
 
 ## Success Criteria
 
+### Phase 1-2 (CLI and Wiring)
+- [ ] `-f astro|vue|svelte|rails` flag works
+- [ ] `JUNTOS_FRAMEWORK` env var propagates through build
+- [ ] Framework selector returns correct transformer
+
+### Phase 3-4 (Transformers and Vite)
+- [ ] Astro transformer produces valid `.astro` files
+- [ ] Vue transformer produces valid `.vue` files
+- [ ] Svelte transformer produces valid `.svelte` files
+- [ ] Each integrates with framework's Vite plugin
+
+### Phase 5 (Integration)
 - [ ] `bin/juntos build -d dexie -f astro` produces working blog
 - [ ] `bin/juntos build -d dexie -f vue` produces working blog
 - [ ] `bin/juntos build -d dexie -f svelte` produces working blog
-- [ ] Same models/controllers used by all three
-- [ ] All views render correctly (index, show, new, edit for articles and comments)
+- [ ] CI passes
+- [ ] Existing demos unchanged (default behavior preserved)
 
-## Follow-on Success Criteria (Phase 3)
+---
 
-- [ ] Real-time updates work in at least one framework
-- [ ] If feasible, real-time updates work in all three
-- [ ] If not feasible for some, clear mechanical reason documented
+## Follow-on: Turbo Streams / Real-time Updates
+
+Deferred to separate iteration. Feasibility assessment:
+
+| Framework | Approach | Feasibility |
+|-----------|----------|-------------|
+| Astro | Islands + WebSocket DOM updates | Medium |
+| Vue | Native reactivity + WebSocket | High |
+| Svelte | Stores + WebSocket | High |
+
+Will assess after Phase 5 completes successfully.
+
+---
 
 ## Notes
 
-- This is a stepping stone to the store demo
-- Proves VISION.md principle: one input → multiple outputs
-- Some combinations may not work - document why if so
-- Don't commit broken states; revert if Phase 3 doesn't pan out
+- This plan aligns with VISION.md: use existing infrastructure, don't hard-code
+- The transformers exist - the work is wiring, not creation
+- If transformers have bugs, fix them rather than working around
+- Preserve optionality: same source → multiple outputs
