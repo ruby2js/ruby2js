@@ -1420,11 +1420,11 @@ end
 
 ### Definition of Done
 
-- [ ] Edit post functionality
-- [ ] Delete post with confirmation
-- [ ] ISR adapter with `withRevalidate(key, ttl, fetcher)`
-- [ ] Cache invalidation on create/update/delete
-- [ ] `# Pragma: revalidate 60` support (optional)
+- [x] Edit post functionality
+- [x] Delete post with confirmation
+- [x] ISR adapter with `withRevalidate(key, ttl, fetcher)`
+- [x] Cache invalidation on create/update/delete
+- [ ] `# Pragma: revalidate 60` support (optional, deferred)
 
 ---
 

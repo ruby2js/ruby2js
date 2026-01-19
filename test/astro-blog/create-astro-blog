@@ -277,6 +277,7 @@ POSTS
 
 cat > 'src/pages/posts/[slug].astro.rb' << 'POSTDETAIL'
 import Layout, from: '../../layouts/Layout.astro'
+import PostDetail, from: '../../islands/PostDetail.jsx'
 
 # Return empty paths - this route loads data client-side from IndexedDB
 # Routes are accessed via View Transitions navigation, not pre-rendered
@@ -289,36 +290,11 @@ end
 __END__
 <Layout title={title}>
   <article>
-    <div id="post-content" data-slug={slug}>
-      <p class="loading">Loading post...</p>
-    </div>
+    <PostDetail client:load slug={slug} />
     <footer style="margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--color-border);">
       <a href="/posts">&larr; Back to all posts</a>
     </footer>
   </article>
-
-  <script>
-    // Client-side: load post from IndexedDB
-    import { setupDatabase, Post } from '../../lib/db.js';
-
-    const container = document.getElementById('post-content');
-    const slug = container?.dataset.slug;
-
-    if (slug) {
-      setupDatabase().then(async () => {
-        const post = await Post.findBy({ slug });
-        if (post) {
-          container.innerHTML = `
-            <h1>${post.title}</h1>
-            <time style="color: var(--color-muted);">${new Date(post.createdAt).toLocaleDateString()}</time>
-            <div style="margin-top: 1rem; white-space: pre-wrap;">${post.body}</div>
-          `;
-        } else {
-          container.innerHTML = '<p>Post not found.</p>';
-        }
-      });
-    }
-  </script>
 </Layout>
 POSTDETAIL
 
@@ -435,19 +411,60 @@ export { db };
 DATABASE
 
 # ============================================
+# Level 2: ISR Cache Utility
+# ============================================
+
+cat > src/lib/isr.js << 'ISR'
+// In-memory cache with stale-while-revalidate semantics
+const cache = new Map();
+
+export async function withRevalidate(key, ttlSeconds, fetcher) {
+  const cached = cache.get(key);
+  const now = Date.now();
+
+  if (cached && now < cached.staleAt) {
+    return cached.data; // Fresh
+  }
+
+  if (cached) {
+    // Stale - return cached, revalidate in background
+    fetcher().then(data => {
+      cache.set(key, { data, staleAt: now + ttlSeconds * 1000 });
+    });
+    return cached.data;
+  }
+
+  // Missing - fetch fresh
+  const data = await fetcher();
+  cache.set(key, { data, staleAt: now + ttlSeconds * 1000 });
+  return data;
+}
+
+export function invalidate(key) {
+  cache.delete(key);
+}
+
+export function invalidateAll() {
+  cache.clear();
+}
+ISR
+
+# ============================================
 # Level 3: PostList Island (.jsx.rb)
 # ============================================
 
 cat > src/islands/PostList.jsx.rb << 'POSTLIST'
 import ['useState', 'useEffect'], from: 'preact/hooks'
 import ['setupDatabase', 'Post'], from: '../lib/db.js'
+import ['withRevalidate', 'invalidate'], from: '../lib/isr.js'
 
 def PostList()
   posts, setPosts = useState([])
   loading, setLoading = useState(true)
 
   loadPosts = -> {
-    Post.all().then do |data|
+    # Use ISR cache with 60 second TTL
+    withRevalidate('posts:all', 60, -> { Post.all() }).then do |data|
       setPosts(data)
       setLoading(false)
     end
@@ -457,11 +474,20 @@ def PostList()
     setupDatabase().then { loadPosts.() }
   }, []
 
-  # Listen for new posts
+  # Listen for post changes - invalidate cache and reload
   useEffect -> {
-    handler = ->(e) { loadPosts.() }
+    handler = ->(e) {
+      invalidate('posts:all')
+      loadPosts.()
+    }
     window.addEventListener('post-created', handler)
-    -> { window.removeEventListener('post-created', handler) }
+    window.addEventListener('post-updated', handler)
+    window.addEventListener('post-deleted', handler)
+    -> {
+      window.removeEventListener('post-created', handler)
+      window.removeEventListener('post-updated', handler)
+      window.removeEventListener('post-deleted', handler)
+    }
   }, []
 
   return %x{<div class="loading">Loading posts...</div>} if loading
@@ -495,13 +521,19 @@ POSTLIST
 # ============================================
 
 cat > src/islands/PostForm.jsx.rb << 'POSTFORM'
-import ['useState'], from: 'preact/hooks'
+import ['useState', 'useEffect'], from: 'preact/hooks'
 import ['Post'], from: '../lib/db.js'
 
-def PostForm()
-  postTitle, setPostTitle = useState("")
-  postBody, setPostBody = useState("")
+def PostForm(post: nil, onSave: nil, onCancel: nil)
+  postTitle, setPostTitle = useState(post ? post.title : "")
+  postBody, setPostBody = useState(post ? post.body : "")
   saving, setSaving = useState(false)
+
+  # Update form when post prop changes
+  useEffect -> {
+    setPostTitle(post ? post.title : "")
+    setPostBody(post ? post.body : "")
+  }, [post&.id]
 
   handleSubmit = ->(e) {
     e.preventDefault()
@@ -509,14 +541,29 @@ def PostForm()
 
     setSaving(true)
 
-    Post.create({ title: postTitle, body: postBody }).then do |post|
-      setPostTitle("")
-      setPostBody("")
-      setSaving(false)
-      # Notify PostList to refresh
-      window.dispatchEvent(new CustomEvent('post-created'))
+    if post
+      # Update existing post
+      post.title = postTitle
+      post.body = postBody
+      post.save().then do
+        setSaving(false)
+        onSave.(post) if onSave
+      end
+    else
+      # Create new post
+      Post.create({ title: postTitle, body: postBody }).then do |newPost|
+        setPostTitle("")
+        setPostBody("")
+        setSaving(false)
+        onSave.(newPost) if onSave
+        # Notify PostList to refresh
+        window.dispatchEvent(new CustomEvent('post-created'))
+      end
     end
   }
+
+  isEditing = !!post
+  buttonText = saving ? (isEditing ? "Saving..." : "Creating...") : (isEditing ? "Save Changes" : "Create Post")
 
   %x{<form onSubmit={handleSubmit} class="post-form">
     <input
@@ -533,9 +580,16 @@ def PostForm()
       rows={6}
       disabled={saving}
     />
-    <button type="submit" disabled={saving || postTitle.trim() == "" || postBody.trim() == ""}>
-      {saving ? "Creating..." : "Create Post"}
-    </button>
+    <div style="display: flex; gap: 0.5rem;">
+      <button type="submit" disabled={saving || postTitle.trim() == "" || postBody.trim() == ""}>
+        {buttonText}
+      </button>
+      {isEditing && onCancel && (
+        <button type="button" onClick={onCancel} disabled={saving} style="background: var(--color-muted);">
+          Cancel
+        </button>
+      )}
+    </div>
   </form>}
 end
 
@@ -582,6 +636,92 @@ __END__
   </p>
 </div>
 COUNTER
+
+# ============================================
+# Level 3: PostDetail Island (.jsx.rb) - View/Edit/Delete
+# ============================================
+
+cat > src/islands/PostDetail.jsx.rb << 'POSTDETAIL_ISLAND'
+import ['useState', 'useEffect'], from: 'preact/hooks'
+import ['setupDatabase', 'Post'], from: '../lib/db.js'
+import PostForm, from: './PostForm.jsx'
+
+def PostDetail(slug:)
+  post, setPost = useState(nil)
+  loading, setLoading = useState(true)
+  editing, setEditing = useState(false)
+  deleted, setDeleted = useState(false)
+
+  useEffect -> {
+    setupDatabase().then do
+      Post.findBy({ slug: slug }).then do |found|
+        setPost(found)
+        setLoading(false)
+      end
+    end
+  }, [slug]
+
+  handleDelete = -> {
+    return unless window.confirm("Are you sure you want to delete this post?")
+    post.destroy().then do
+      setDeleted(true)
+      # Notify PostList to refresh
+      window.dispatchEvent(new CustomEvent('post-deleted'))
+    end
+  }
+
+  handleSave = ->(updated) {
+    setPost(updated)
+    setEditing(false)
+    # Notify PostList to refresh
+    window.dispatchEvent(new CustomEvent('post-updated'))
+  }
+
+  return %x{<p class="loading">Loading post...</p>} if loading
+  return %x{<p>Post not found. <a href="/posts">Back to posts</a></p>} unless post
+
+  if deleted
+    return %x{
+      <div style="text-align: center; padding: 2rem;">
+        <p style="color: var(--color-muted);">Post deleted successfully.</p>
+        <a href="/posts" style="margin-top: 1rem; display: inline-block;">&larr; Back to all posts</a>
+      </div>
+    }
+  end
+
+  if editing
+    return %x{
+      <div>
+        <h2>Edit Post</h2>
+        <PostForm post={post} onSave={handleSave} onCancel={-> { setEditing(false) }} />
+      </div>
+    }
+  end
+
+  %x{<div>
+    <h1>{post.title}</h1>
+    <time style="color: var(--color-muted); display: block; margin-bottom: 1rem;">
+      {new Date(post.createdAt).toLocaleDateString()}
+    </time>
+    <div style="white-space: pre-wrap; line-height: 1.6; margin-bottom: 2rem;">
+      {post.body}
+    </div>
+    <div style="display: flex; gap: 0.5rem; padding-top: 1rem; border-top: 1px solid var(--color-border);">
+      <button onClick={-> { setEditing(true) }}>
+        Edit
+      </button>
+      <button onClick={handleDelete} style="background: #dc2626;">
+        Delete
+      </button>
+      <a href="/posts" style="margin-left: auto; color: var(--color-muted);">
+        &larr; Back to posts
+      </a>
+    </div>
+  </div>}
+end
+
+export default PostDetail
+POSTDETAIL_ISLAND
 
 # ============================================
 # Favicon
