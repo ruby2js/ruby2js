@@ -40,6 +40,7 @@ module Ruby2JS
         @frontmatter_lines = []
         @partials_used = []
         @helpers_used = Set.new
+        @models_used = Set.new
         @patterns = HelperPatterns.new(options)
       end
 
@@ -69,9 +70,18 @@ module Ruby2JS
       def parse_action
         return unless @action
 
+        # Detect model names from controller code (e.g., Article.all, Comment.find)
+        @action.scan(/\b([A-Z][a-z]+)\.(?:all|find|where|create|new|first|last|count)\b/) do |model|
+          @models_used << model[0]
+        end
+
         # Extract instance variable assignments
         # Pattern: @var = expr
         @action.scan(/@(\w+)\s*=\s*(.+)$/) do |var, expr|
+          # Also detect models in the expression
+          expr.scan(/\b([A-Z][a-z]+)\./) do |model|
+            @models_used << model[0]
+          end
           js_expr = transform_ruby_expr(expr.strip)
           @frontmatter_lines << "const #{var} = await #{js_expr};"
         end
@@ -182,21 +192,23 @@ module Ruby2JS
           is_new: false
         }
 
-        # Extract model: option
+        # Extract model: option and detect model classes
         if expr =~ /model:\s*\[([^\]]+)\]/
           # Nested model: [@article, Comment.new]
           parts = $1.split(',').map(&:strip)
           if parts.length >= 2
             result[:parent_model] = parts[0].sub(/^@/, '')
             child = parts[1]
-            if child =~ /(\w+)\.new/
+            if child =~ /([A-Z]\w*)\.new/
+              @models_used << $1
               result[:model_name] = $1.downcase
               result[:is_new] = true
             else
               result[:model_name] = child.sub(/^@/, '')
             end
           end
-        elsif expr =~ /model:\s*(\w+)\.new/
+        elsif expr =~ /model:\s*([A-Z]\w*)\.new/
+          @models_used << $1
           result[:model_name] = $1.downcase
           result[:is_new] = true
         elsif expr =~ /model:\s*@?(\w+)/
@@ -581,6 +593,11 @@ module Ruby2JS
       def transform_output_expr(expr)
         expr = expr.strip
 
+        # Detect model names (e.g., Article.find, Comment.new)
+        expr.scan(/\b([A-Z][a-z]\w*)\.(?:all|find|where|create|new|first|last|count)\b/) do |model|
+          @models_used << model[0]
+        end
+
         # turbo_stream_from - deferred
         if expr =~ /^turbo_stream_from/
           return "<!-- turbo_stream_from (deferred) -->"
@@ -695,15 +712,14 @@ module Ruby2JS
       def render_partial(result)
         partial_name = result[:partial_name]
 
-        # Convert partial name to component name: "form" -> "Form", "article_card" -> "ArticleCard"
+        # Convert partial name to component name
+        # Forms stay as-is: "form" -> "Form"
+        # Other partials get Card suffix: "article" -> "ArticleCard"
         base_component = partial_name.split('_').map(&:capitalize).join
-
-        # Check if component name conflicts with model imports
-        # If so, add "Card" suffix for model-like partials (not "Form")
-        component = if model_names.include?(base_component) && !partial_name.end_with?('form')
-          "#{base_component}Card"
-        else
+        component = if partial_name.end_with?('form')
           base_component
+        else
+          "#{base_component}Card"
         end
 
         # Track partial for imports
@@ -972,7 +988,9 @@ module Ruby2JS
 
         # Database and model imports
         lines << "import { setupDatabase } from '#{db_path}';"
-        lines << "import { #{model_imports} } from '#{models_path}';"
+        unless @models_used.empty?
+          lines << "import { #{model_imports} } from '#{models_path}';"
+        end
 
         # Helper imports
         unless @helpers_used.empty?
@@ -1047,18 +1065,8 @@ module Ruby2JS
       end
 
       def model_imports
-        # Infer from controller name
-        model_names.join(', ')
-      end
-
-      def model_names
-        # Return array of model names that will be imported
-        @model_names ||= if @controller
-          singular = @controller.chomp('s')
-          [singular.capitalize, 'Comment']
-        else
-          ['Article', 'Comment']
-        end
+        # Return models detected during parsing
+        @models_used.to_a.sort.join(', ')
       end
     end
   end
