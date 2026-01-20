@@ -13,7 +13,11 @@ module Ruby2JS
           options = parse_options(args)
 
           validate_rails_app!
-          check_installation!
+
+          # Non-Rails frameworks generate their own project structure
+          unless options[:framework] && options[:framework] != 'rails'
+            check_installation!
+          end
 
           build(options)
         end

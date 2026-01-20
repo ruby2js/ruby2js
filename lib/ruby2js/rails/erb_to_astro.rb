@@ -1065,7 +1065,7 @@ module Ruby2JS
         # Helper imports
         unless @helpers_used.empty?
           helpers = @helpers_used.to_a.join(', ')
-          lines << "import { #{helpers} } from 'ruby2js-rails/targets/browser/rails.js';"
+          lines << "import { #{helpers} } from 'ruby2js-rails/helpers.js';"
         end
 
         # For SSG: dynamic routes need getStaticPaths
@@ -1217,7 +1217,7 @@ module Ruby2JS
         # Helper imports
         unless @helpers_used.empty?
           helpers = @helpers_used.to_a.join(', ')
-          lines << "import { #{helpers} } from 'ruby2js-rails/targets/browser/rails.js';"
+          lines << "import { #{helpers} } from 'ruby2js-rails/helpers.js';"
         end
 
         lines << '---'
