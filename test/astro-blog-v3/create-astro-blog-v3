@@ -421,6 +421,7 @@ import {
   defineSchema,
   registerSchema
 } from 'ruby2js-rails/adapters/active_record_dexie.mjs';
+import { runSeeds } from './seeds.mjs';
 
 let initialized = false;
 
@@ -435,6 +436,9 @@ export async function setupDatabase() {
   defineSchema(1);
   await openDatabase();
 
+  // Run seeds if database is empty
+  await runSeeds();
+
   initialized = true;
 }
 
@@ -442,10 +446,68 @@ export async function setupDatabase() {
 export { initDatabase, openDatabase, defineSchema, registerSchema };
 EOF
 
+# Create seeds module
+cat > src/lib/seeds.mjs << 'EOF'
+// Sample articles and comments for the blog demo
+// Seeds are idempotent - only run if database is empty
+import { Article, Comment } from './models/index.js';
+
+export async function runSeeds() {
+  // Check if already seeded
+  const count = await Article.count();
+  if (count > 0) return;
+
+  console.log('Seeding database...');
+
+  // Article 1
+  const article1 = await Article.create({
+    title: "Getting Started with Rails",
+    body: "Rails is a web application framework running on the Ruby programming language. It makes building web apps faster and easier with conventions over configuration."
+  });
+
+  await Comment.create({
+    article_id: article1.id,
+    commenter: "Alice",
+    body: "Great introduction! Rails really does make development faster."
+  });
+
+  await Comment.create({
+    article_id: article1.id,
+    commenter: "Bob",
+    body: "I love how Rails handles database migrations automatically."
+  });
+
+  // Article 2
+  const article2 = await Article.create({
+    title: "Understanding MVC Architecture",
+    body: "MVC stands for Model-View-Controller. Models handle data and business logic, Views display information to users, and Controllers coordinate between them."
+  });
+
+  await Comment.create({
+    article_id: article2.id,
+    commenter: "Carol",
+    body: "This pattern really helps keep code organized!"
+  });
+
+  // Article 3
+  await Article.create({
+    title: "Ruby2JS: Rails Everywhere",
+    body: "Ruby2JS transpiles Ruby to JavaScript, enabling Rails applications to run in browsers, on Node.js, and at the edge. Same code, different runtimes."
+  });
+
+  const articleCount = await Article.count();
+  const commentCount = await Comment.count();
+  console.log(`Seeded ${articleCount} articles and ${commentCount} comments`);
+}
+EOF
+
 # Create Article model (Ruby - transpiled by vite plugin)
 cat > src/models/article.rb << 'EOF'
 class Article < ApplicationRecord
   has_many :comments, dependent: :destroy
+
+  # Broadcast article changes to index page subscribers
+  broadcasts_to ->(_article) { "articles" }, inserts_by: :prepend
 
   validates :title, presence: true
   validates :body, presence: true, length: { minimum: 10 }
@@ -456,6 +518,9 @@ EOF
 cat > src/models/comment.rb << 'EOF'
 class Comment < ApplicationRecord
   belongs_to :article
+
+  # Broadcast comment changes to article show page subscribers
+  broadcasts_to ->(comment) { "article_#{comment.article_id}_comments" }, target: "comments"
 
   validates :commenter, presence: true
   validates :body, presence: true
@@ -764,11 +829,61 @@ cat > public/index.html << 'EOF'
 <body>
   <div id="app">Loading...</div>
   <script type="module">
+    // Load Turbo from CDN
+    import * as Turbo from 'https://esm.sh/@hotwired/turbo@8';
+
     // Minimal shim for process.env
     window.process = { env: {} };
 
+    // TurboBroadcast for cross-tab real-time updates
+    class TurboBroadcast {
+      static channels = new Map();
+
+      static getChannel(name) {
+        if (!this.channels.has(name)) {
+          const channel = new BroadcastChannel(name);
+          channel.onmessage = (event) => {
+            // Render turbo-stream messages via Turbo
+            if (event.data && event.data.includes('<turbo-stream')) {
+              Turbo.renderStreamMessage(event.data);
+            }
+          };
+          this.channels.set(name, channel);
+        }
+        return this.channels.get(name);
+      }
+
+      static broadcast(channelName, html) {
+        const channel = this.getChannel(channelName);
+        channel.postMessage(html);
+        // Also apply locally
+        if (html.includes('<turbo-stream')) {
+          Turbo.renderStreamMessage(html);
+        }
+      }
+
+      static subscribe(channelName) {
+        this.getChannel(channelName);
+        return '';
+      }
+
+      static unsubscribe(channelName) {
+        const channel = this.channels.get(channelName);
+        if (channel) {
+          channel.close();
+          this.channels.delete(channelName);
+        }
+      }
+    }
+
+    // Make TurboBroadcast available globally for models
+    // Models call: globalThis.BroadcastChannel.broadcast(channel, html)
+    window.TurboBroadcast = TurboBroadcast;
+    globalThis.BroadcastChannel = TurboBroadcast;
+
     const app = document.getElementById('app');
     let worker;
+    let activeSubscriptions = new Set();
 
     async function init() {
       worker = await import('./browser-worker.mjs');
@@ -796,9 +911,33 @@ cat > public/index.html << 'EOF'
 
         // Re-attach click handlers for navigation
         attachLinkHandlers();
+
+        // Manage broadcast subscriptions based on path
+        updateSubscriptions(path);
       } catch (e) {
         app.innerHTML = '<p style="color:red">Error: ' + e.message + '</p>';
         console.error(e);
+      }
+    }
+
+    function updateSubscriptions(path) {
+      // Unsubscribe from old channels
+      for (const channel of activeSubscriptions) {
+        TurboBroadcast.unsubscribe(channel);
+      }
+      activeSubscriptions.clear();
+
+      // Subscribe based on current path
+      if (path === '/articles' || path === '/articles/') {
+        // Subscribe to article list updates
+        TurboBroadcast.subscribe('articles');
+        activeSubscriptions.add('articles');
+      } else if (path.match(/^\/articles\/(\d+)$/)) {
+        // Subscribe to comment updates for this article
+        const articleId = path.match(/^\/articles\/(\d+)$/)[1];
+        const channel = `article_${articleId}_comments`;
+        TurboBroadcast.subscribe(channel);
+        activeSubscriptions.add(channel);
       }
     }
 

@@ -128,11 +128,11 @@ export function ruby2jsModels(options = {}) {
         file: filePath
       });
 
-      const jsPath = path.join(destDir, `${fileName}.mjs`);
+      const jsPath = path.join(destDir, `${fileName}.js`);
       await fs.promises.mkdir(destDir, { recursive: true });
       await fs.promises.writeFile(jsPath, result.toString());
 
-      console.log(`[ruby2js-models] Transpiled ${path.basename(filePath)} → ${fileName}.mjs`);
+      console.log(`[ruby2js-models] Transpiled ${path.basename(filePath)} → ${fileName}.js`);
       return jsPath;
     } catch (error) {
       console.error(`[ruby2js-models] Error transpiling ${filePath}:`, error.message);
@@ -154,7 +154,7 @@ export function ruby2jsModels(options = {}) {
         file: filePath
       });
 
-      const jsPath = path.join(destDir, `${fileName}.mjs`);
+      const jsPath = path.join(destDir, `${fileName}.js`);
       await fs.promises.mkdir(destDir, { recursive: true });
       await fs.promises.writeFile(jsPath, result.toString());
 
@@ -170,7 +170,7 @@ export function ruby2jsModels(options = {}) {
   async function generateMigrationsIndex(migrationsDestDir) {
     const files = await fs.promises.readdir(migrationsDestDir).catch(() => []);
     const migrationFiles = files
-      .filter(f => f.endsWith('.mjs') && f !== 'index.mjs')
+      .filter(f => f.endsWith('.js') && f !== 'index.js')
       .sort();
 
     if (migrationFiles.length === 0) return;
@@ -194,7 +194,7 @@ ${exports}
 `;
 
     await fs.promises.writeFile(
-      path.join(migrationsDestDir, 'index.mjs'),
+      path.join(migrationsDestDir, 'index.js'),
       indexContent
     );
     console.log(`[ruby2js-models] Generated migrations index`);
@@ -211,7 +211,7 @@ ${exports}
       });
 
     const imports = models.map(m =>
-      `import { ${m.className} } from './${m.name}.mjs';`
+      `import { ${m.className} } from './${m.name}.js';`
     ).join('\n');
 
     const registrations = models.map(m =>
@@ -231,7 +231,7 @@ export { ${exports} };
 `;
 
     await fs.promises.writeFile(
-      path.join(modelsDestDir, 'index.mjs'),
+      path.join(modelsDestDir, 'index.js'),
       indexContent
     );
     console.log(`[ruby2js-models] Generated models index`);
@@ -309,6 +309,44 @@ export {
       path.join(libDir, 'active_record.mjs'),
       activeRecordBridge
     );
+
+    // Generate rails.js bridge file for BroadcastChannel (used by broadcasts_to)
+    // Models import from ../../lib/rails.js, so this should be in the same lib dir as models
+    const modelsLibDir = path.dirname(modelsDestDir);
+    const targetMap = {
+      browser: 'browser',
+      cloudflare: 'cloudflare',
+      node: 'node',
+      vercel: 'vercel-edge',
+      deno: 'deno',
+      bun: 'bun'
+    };
+    const railsTarget = targetMap[target] || 'browser';
+
+    if (target === 'browser') {
+      // For browser, BroadcastChannel is set on globalThis by the browser shell
+      const railsBridge = `// Rails helpers bridge for browser target
+// BroadcastChannel is set on globalThis by the browser initialization
+// This file provides named exports for generated model imports
+
+export const BroadcastChannel = globalThis.BroadcastChannel || {
+  broadcast: () => console.warn('BroadcastChannel not initialized')
+};
+`;
+      await fs.promises.writeFile(
+        path.join(modelsLibDir, 'rails.js'),
+        railsBridge
+      );
+    } else {
+      // For server targets, re-export from the target-specific rails.js
+      const railsBridge = `// Rails helpers bridge - re-exports from target
+export { BroadcastChannel } from 'ruby2js-rails/targets/${railsTarget}/rails.js';
+`;
+      await fs.promises.writeFile(
+        path.join(modelsLibDir, 'rails.js'),
+        railsBridge
+      );
+    }
 
     console.log(`[ruby2js-models] Using adapter: ${adapterFile} (database: ${database})`);
   }

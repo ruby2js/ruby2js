@@ -1,0 +1,858 @@
+#!/bin/bash
+# Create Vue blog - browser-first SPA with worker-in-browser pattern
+# Same code can target browser (IndexedDB) or edge (D1) with adapter swap
+
+set -e
+
+# Color output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Get the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+RUBY2JS_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
+
+echo -e "${BLUE}Creating Vue blog...${NC}"
+
+# Create project directory
+PROJECT_DIR="${1:-/tmp/vue-blog}"
+rm -rf "$PROJECT_DIR"
+mkdir -p "$PROJECT_DIR"
+cd "$PROJECT_DIR"
+
+echo -e "${GREEN}Initializing npm project...${NC}"
+npm init -y > /dev/null
+
+# Install dependencies
+echo -e "${GREEN}Installing dependencies...${NC}"
+npm install vue vue-router @hotwired/turbo > /dev/null 2>&1
+
+# Install ruby2js packages from local development paths
+npm install "$RUBY2JS_ROOT/packages/ruby2js-rails" > /dev/null 2>&1
+
+# Install Vite and plugin for Vue
+npm install -D vite @vitejs/plugin-vue > /dev/null 2>&1
+
+# Install vite-plugin-ruby2js from local
+npm install -D "$RUBY2JS_ROOT/packages/vite-plugin-ruby2js" > /dev/null 2>&1
+
+# Create directory structure
+mkdir -p src/{layouts,views/articles,components,lib,models}
+mkdir -p src/router
+mkdir -p public
+
+# ============================================================
+# Vite Configuration
+# ============================================================
+
+cat > vite.config.mjs << 'EOF'
+import { defineConfig } from 'vite';
+import vue from '@vitejs/plugin-vue';
+import ruby2js from 'vite-plugin-ruby2js';
+import { ruby2jsModels } from 'ruby2js-rails/vite-models';
+
+export default defineConfig({
+  plugins: [
+    vue(),
+    ruby2js({
+      include: /\.vue\.rb$/,
+      eslevel: 2022
+    }),
+    ruby2jsModels({
+      database: 'dexie',
+      modelsDir: 'src/models',
+      outDir: 'src/lib/models'
+    })
+  ],
+  resolve: {
+    alias: {
+      '@': '/src'
+    }
+  }
+});
+EOF
+
+# Update package.json with scripts
+cat > package.json << 'EOF'
+{
+  "name": "vue-blog",
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "vue": "^3.4.0",
+    "vue-router": "^4.2.0",
+    "@hotwired/turbo": "^8.0.0"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0",
+    "@vitejs/plugin-vue": "^5.0.0"
+  }
+}
+EOF
+
+# Reinstall dependencies to update package.json properly
+npm install > /dev/null 2>&1
+npm install "$RUBY2JS_ROOT/packages/ruby2js-rails" > /dev/null 2>&1
+npm install -D "$RUBY2JS_ROOT/packages/vite-plugin-ruby2js" > /dev/null 2>&1
+
+# ============================================================
+# Index HTML
+# ============================================================
+
+cat > index.html << 'EOF'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vue Blog</title>
+</head>
+<body>
+  <div id="app"></div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
+EOF
+
+# ============================================================
+# Main Entry Point
+# ============================================================
+
+cat > src/main.js << 'EOF'
+import { createApp } from 'vue';
+import { createRouter, createWebHistory } from 'vue-router';
+import App from './App.vue';
+import { setupDatabase } from './lib/db.mjs';
+
+// Import views
+import Home from './views/Home.vue';
+import About from './views/About.vue';
+import ArticlesIndex from './views/articles/Index.vue';
+import ArticlesShow from './views/articles/Show.vue';
+import ArticlesNew from './views/articles/New.vue';
+import ArticlesEdit from './views/articles/Edit.vue';
+
+// TurboBroadcast for cross-tab real-time updates
+class TurboBroadcast {
+  static channels = new Map();
+
+  static getChannel(name) {
+    if (!this.channels.has(name)) {
+      const channel = new BroadcastChannel(name);
+      this.channels.set(name, channel);
+    }
+    return this.channels.get(name);
+  }
+
+  static broadcast(channelName, html) {
+    const channel = this.getChannel(channelName);
+    channel.postMessage(html);
+  }
+
+  static subscribe(channelName, callback) {
+    const channel = this.getChannel(channelName);
+    channel.onmessage = callback;
+    return '';
+  }
+
+  static unsubscribe(channelName) {
+    const channel = this.channels.get(channelName);
+    if (channel) {
+      channel.close();
+      this.channels.delete(channelName);
+    }
+  }
+}
+
+// Make TurboBroadcast available globally for models
+globalThis.BroadcastChannel = TurboBroadcast;
+
+// Create router
+const router = createRouter({
+  history: createWebHistory(),
+  routes: [
+    { path: '/', component: Home },
+    { path: '/about', component: About },
+    { path: '/articles', component: ArticlesIndex },
+    { path: '/articles/new', component: ArticlesNew },
+    { path: '/articles/:id', component: ArticlesShow, props: true },
+    { path: '/articles/:id/edit', component: ArticlesEdit, props: true }
+  ]
+});
+
+// Initialize database before mounting
+async function init() {
+  await setupDatabase();
+
+  const app = createApp(App);
+  app.use(router);
+  app.mount('#app');
+}
+
+init();
+EOF
+
+# ============================================================
+# App Component
+# ============================================================
+
+cat > src/App.vue << 'EOF'
+<template>
+  <MainLayout>
+    <router-view />
+  </MainLayout>
+</template>
+
+<script setup>
+import MainLayout from './layouts/MainLayout.vue';
+</script>
+EOF
+
+# ============================================================
+# Layout Component
+# ============================================================
+
+cat > src/layouts/MainLayout.vue << 'EOF'
+<template>
+  <div class="container">
+    <header>
+      <h1><router-link to="/">Vue Blog</router-link></h1>
+      <nav>
+        <router-link to="/">Home</router-link>
+        <router-link to="/articles">Articles</router-link>
+        <router-link to="/about">About</router-link>
+      </nav>
+    </header>
+    <main>
+      <slot />
+    </main>
+  </div>
+</template>
+
+<style>
+:root {
+  --color-bg: #f9fafb;
+  --color-text: #111827;
+  --color-primary: #2563eb;
+  --color-primary-dark: #1d4ed8;
+  --color-border: #e5e7eb;
+  --color-error: #dc2626;
+  --max-width: 800px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  background: var(--color-bg);
+  color: var(--color-text);
+  line-height: 1.6;
+  padding: 2rem;
+}
+
+.container {
+  max-width: var(--max-width);
+  margin: 0 auto;
+}
+
+header {
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+header h1 a {
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+nav {
+  margin-top: 0.5rem;
+}
+
+nav a {
+  color: var(--color-primary);
+  text-decoration: none;
+  margin-right: 1rem;
+}
+
+nav a:hover {
+  text-decoration: underline;
+}
+
+nav a.router-link-active {
+  font-weight: bold;
+}
+
+.btn {
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  background: var(--color-primary);
+  color: white;
+  text-decoration: none;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btn:hover {
+  background: var(--color-primary-dark);
+}
+
+.btn-danger {
+  background: var(--color-error);
+}
+
+.form-group {
+  margin-bottom: 1rem;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-weight: 500;
+}
+
+.form-group input,
+.form-group textarea {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+}
+
+.article-card {
+  background: white;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+}
+
+.article-card h2 a {
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.article-card h2 a:hover {
+  color: var(--color-primary);
+}
+
+.article-meta {
+  color: #666;
+  font-size: 0.875rem;
+  margin: 0.5rem 0;
+}
+
+.actions {
+  margin: 1rem 0;
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.comment {
+  background: #f3f4f6;
+  padding: 1rem;
+  margin-bottom: 0.5rem;
+  border-radius: 4px;
+}
+
+.comment-meta {
+  font-size: 0.875rem;
+  color: #666;
+}
+
+.error-messages {
+  background: #fef2f2;
+  border: 1px solid var(--color-error);
+  color: var(--color-error);
+  padding: 1rem;
+  border-radius: 4px;
+  margin-bottom: 1rem;
+}
+
+.error-messages ul {
+  margin: 0;
+  padding-left: 1.5rem;
+}
+</style>
+EOF
+
+# ============================================================
+# View Components
+# ============================================================
+
+cat > src/views/Home.vue << 'EOF'
+<template>
+  <div>
+    <h2>Welcome to Vue Blog</h2>
+    <p>
+      This blog demonstrates Ruby2JS with Vue.
+      Models are written in Ruby and transpiled to JavaScript.
+    </p>
+    <p style="margin-top: 1rem;">
+      <router-link to="/articles" class="btn">View Articles</router-link>
+    </p>
+  </div>
+</template>
+EOF
+
+cat > src/views/About.vue << 'EOF'
+<template>
+  <div>
+    <h2>About Vue Blog</h2>
+    <p>
+      This is a simple blog application built with:
+    </p>
+    <ul style="margin: 1rem 0; padding-left: 2rem;">
+      <li>Vue 3 with Composition API</li>
+      <li>Vue Router for navigation</li>
+      <li>Ruby2JS for model transpilation</li>
+      <li>IndexedDB (via Dexie) for browser storage</li>
+      <li>BroadcastChannel API for real-time updates</li>
+    </ul>
+    <p>
+      The same Ruby model code can target different backends:
+      browser (IndexedDB), Node (SQLite), or edge (D1).
+    </p>
+  </div>
+</template>
+EOF
+
+cat > src/views/articles/Index.vue << 'EOF'
+<template>
+  <div>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+      <h2>Articles</h2>
+      <router-link to="/articles/new" class="btn">New Article</router-link>
+    </div>
+
+    <p v-if="articles.length === 0">
+      No articles yet. <router-link to="/articles/new">Create one</router-link>!
+    </p>
+
+    <div v-else id="articles">
+      <div v-for="article in articles" :key="article.id" class="article-card">
+        <h2>
+          <router-link :to="`/articles/${article.id}`">{{ article.title }}</router-link>
+        </h2>
+        <p class="article-meta">
+          Created {{ formatDate(article.created_at) }}
+        </p>
+        <p>{{ truncate(article.body, 200) }}</p>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted, onUnmounted } from 'vue';
+import { Article } from '../../lib/models/index.js';
+
+const articles = ref([]);
+
+async function loadArticles() {
+  articles.value = await Article.order({ created_at: 'desc' }).toArray();
+}
+
+function formatDate(date) {
+  return new Date(date).toLocaleDateString();
+}
+
+function truncate(text, length) {
+  if (text.length <= length) return text;
+  return text.substring(0, length) + '...';
+}
+
+// Subscribe to article broadcasts
+onMounted(() => {
+  loadArticles();
+
+  globalThis.BroadcastChannel.subscribe('articles', (event) => {
+    // Reload articles when changes occur
+    loadArticles();
+  });
+});
+
+onUnmounted(() => {
+  globalThis.BroadcastChannel.unsubscribe('articles');
+});
+</script>
+EOF
+
+cat > src/views/articles/Show.vue << 'EOF'
+<template>
+  <div v-if="article">
+    <article>
+      <h2>{{ article.title }}</h2>
+      <p class="article-meta">
+        Created {{ formatDate(article.created_at) }}
+        <span v-if="article.updated_at !== article.created_at">
+          &middot; Updated {{ formatDate(article.updated_at) }}
+        </span>
+      </p>
+      <div class="article-body">{{ article.body }}</div>
+
+      <div class="actions">
+        <router-link :to="`/articles/${id}/edit`" class="btn">Edit</router-link>
+        <button @click="deleteArticle" class="btn btn-danger">Delete</button>
+        <router-link to="/articles">Back to Articles</router-link>
+      </div>
+    </article>
+
+    <section class="comments-section">
+      <h3>Comments ({{ comments.length }})</h3>
+
+      <div id="comments">
+        <div v-for="comment in comments" :key="comment.id" class="comment">
+          <p class="comment-meta">
+            <strong>{{ comment.commenter }}</strong> &middot;
+            {{ formatDate(comment.created_at) }}
+            <button
+              @click="deleteComment(comment.id)"
+              style="background: none; border: none; color: var(--color-error); cursor: pointer; margin-left: 1rem;"
+            >
+              Delete
+            </button>
+          </p>
+          <p>{{ comment.body }}</p>
+        </div>
+      </div>
+
+      <h4 style="margin-top: 1rem;">Add a comment</h4>
+      <form @submit.prevent="addComment">
+        <div class="form-group">
+          <label for="commenter">Name</label>
+          <input type="text" id="commenter" v-model="newComment.commenter" placeholder="Anonymous" />
+        </div>
+        <div class="form-group">
+          <label for="body">Comment</label>
+          <textarea id="body" v-model="newComment.body" rows="3"></textarea>
+        </div>
+        <button type="submit" class="btn">Post Comment</button>
+      </form>
+    </section>
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted, onUnmounted } from 'vue';
+import { useRouter } from 'vue-router';
+import { Article, Comment } from '../../lib/models/index.js';
+
+const props = defineProps(['id']);
+const router = useRouter();
+
+const article = ref(null);
+const comments = ref([]);
+const newComment = ref({ commenter: '', body: '' });
+
+async function loadArticle() {
+  try {
+    article.value = await Article.find(Number(props.id));
+  } catch (e) {
+    router.push('/articles');
+  }
+}
+
+async function loadComments() {
+  comments.value = await Comment.where({ article_id: Number(props.id) })
+    .order({ created_at: 'asc' })
+    .toArray();
+}
+
+function formatDate(date) {
+  return new Date(date).toLocaleDateString();
+}
+
+async function deleteArticle() {
+  if (confirm('Are you sure?')) {
+    await article.value.destroy();
+    router.push('/articles');
+  }
+}
+
+async function addComment() {
+  if (newComment.value.body.trim()) {
+    await Comment.create({
+      article_id: Number(props.id),
+      commenter: newComment.value.commenter || 'Anonymous',
+      body: newComment.value.body
+    });
+    newComment.value = { commenter: '', body: '' };
+    loadComments();
+  }
+}
+
+async function deleteComment(commentId) {
+  const comment = await Comment.find(commentId);
+  await comment.destroy();
+  loadComments();
+}
+
+// Subscribe to comment broadcasts
+onMounted(() => {
+  loadArticle();
+  loadComments();
+
+  const channel = `article_${props.id}_comments`;
+  globalThis.BroadcastChannel.subscribe(channel, () => {
+    loadComments();
+  });
+});
+
+onUnmounted(() => {
+  const channel = `article_${props.id}_comments`;
+  globalThis.BroadcastChannel.unsubscribe(channel);
+});
+</script>
+EOF
+
+cat > src/views/articles/New.vue << 'EOF'
+<template>
+  <div>
+    <h2>New Article</h2>
+
+    <div v-if="errors.length > 0" class="error-messages">
+      <ul>
+        <li v-for="error in errors" :key="error">{{ error }}</li>
+      </ul>
+    </div>
+
+    <form @submit.prevent="createArticle">
+      <div class="form-group">
+        <label for="title">Title</label>
+        <input type="text" id="title" v-model="article.title" />
+      </div>
+      <div class="form-group">
+        <label for="body">Body</label>
+        <textarea id="body" v-model="article.body" rows="8"></textarea>
+      </div>
+      <div class="actions">
+        <button type="submit" class="btn">Create Article</button>
+        <router-link to="/articles">Cancel</router-link>
+      </div>
+    </form>
+  </div>
+</template>
+
+<script setup>
+import { ref } from 'vue';
+import { useRouter } from 'vue-router';
+import { Article } from '../../lib/models/index.js';
+
+const router = useRouter();
+const article = ref({ title: '', body: '' });
+const errors = ref([]);
+
+async function createArticle() {
+  const newArticle = new Article(article.value);
+
+  if (await newArticle.save()) {
+    router.push(`/articles/${newArticle.id}`);
+  } else {
+    errors.value = newArticle.errors.full_messages;
+  }
+}
+</script>
+EOF
+
+cat > src/views/articles/Edit.vue << 'EOF'
+<template>
+  <div v-if="article">
+    <h2>Edit Article</h2>
+
+    <div v-if="errors.length > 0" class="error-messages">
+      <ul>
+        <li v-for="error in errors" :key="error">{{ error }}</li>
+      </ul>
+    </div>
+
+    <form @submit.prevent="updateArticle">
+      <div class="form-group">
+        <label for="title">Title</label>
+        <input type="text" id="title" v-model="article.title" />
+      </div>
+      <div class="form-group">
+        <label for="body">Body</label>
+        <textarea id="body" v-model="article.body" rows="8"></textarea>
+      </div>
+      <div class="actions">
+        <button type="submit" class="btn">Update Article</button>
+        <router-link :to="`/articles/${id}`">Cancel</router-link>
+      </div>
+    </form>
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
+import { Article } from '../../lib/models/index.js';
+
+const props = defineProps(['id']);
+const router = useRouter();
+
+const article = ref(null);
+const errors = ref([]);
+
+async function loadArticle() {
+  try {
+    article.value = await Article.find(Number(props.id));
+  } catch (e) {
+    router.push('/articles');
+  }
+}
+
+async function updateArticle() {
+  if (await article.value.save()) {
+    router.push(`/articles/${article.value.id}`);
+  } else {
+    errors.value = article.value.errors.full_messages;
+  }
+}
+
+onMounted(() => {
+  loadArticle();
+});
+</script>
+EOF
+
+# ============================================================
+# Models
+# ============================================================
+
+cat > src/models/article.rb << 'EOF'
+class Article < ApplicationRecord
+  has_many :comments, dependent: :destroy
+
+  # Broadcast article changes to index page subscribers
+  broadcasts_to ->(_article) { "articles" }, inserts_by: :prepend
+
+  validates :title, presence: true
+  validates :body, presence: true, length: { minimum: 10 }
+end
+EOF
+
+cat > src/models/comment.rb << 'EOF'
+class Comment < ApplicationRecord
+  belongs_to :article
+
+  # Broadcast comment changes to article show page subscribers
+  broadcasts_to ->(comment) { "article_#{comment.article_id}_comments" }, target: "comments"
+
+  validates :commenter, presence: true
+  validates :body, presence: true
+end
+EOF
+
+# ============================================================
+# Database Setup
+# ============================================================
+
+cat > src/lib/db.mjs << 'EOF'
+// Database setup - uses Dexie adapter for IndexedDB
+import {
+  initDatabase,
+  openDatabase,
+  defineSchema,
+  registerSchema
+} from 'ruby2js-rails/adapters/active_record_dexie.mjs';
+import { runSeeds } from './seeds.mjs';
+
+let initialized = false;
+
+// Register schemas for Dexie (needed before openDatabase)
+registerSchema('articles', '++id, title, created_at');
+registerSchema('comments', '++id, article_id, created_at');
+
+export async function setupDatabase() {
+  if (initialized) return;
+
+  await initDatabase({ database: 'vue-blog' });
+  defineSchema(1);
+  await openDatabase();
+
+  // Run seeds if database is empty
+  await runSeeds();
+
+  initialized = true;
+}
+
+// Re-export for direct access if needed
+export { initDatabase, openDatabase, defineSchema, registerSchema };
+EOF
+
+cat > src/lib/seeds.mjs << 'EOF'
+// Sample articles and comments for the blog demo
+// Seeds are idempotent - only run if database is empty
+import { Article, Comment } from './models/index.js';
+
+export async function runSeeds() {
+  // Check if already seeded
+  const count = await Article.count();
+  if (count > 0) return;
+
+  console.log('Seeding database...');
+
+  // Article 1
+  const article1 = await Article.create({
+    title: "Getting Started with Vue",
+    body: "Vue is a progressive JavaScript framework for building user interfaces. It builds on top of standard HTML, CSS, and JavaScript with intuitive API and documentation."
+  });
+
+  await Comment.create({
+    article_id: article1.id,
+    commenter: "Alice",
+    body: "Great introduction! Vue's reactivity system is amazing."
+  });
+
+  await Comment.create({
+    article_id: article1.id,
+    commenter: "Bob",
+    body: "I love the Composition API. It makes code more reusable."
+  });
+
+  // Article 2
+  const article2 = await Article.create({
+    title: "Understanding Vue Reactivity",
+    body: "Vue's reactivity system uses JavaScript Proxies to detect when data changes and automatically update the DOM. This is what makes Vue feel magical to work with."
+  });
+
+  await Comment.create({
+    article_id: article2.id,
+    commenter: "Carol",
+    body: "The proxy-based system is much better than the old defineProperty approach!"
+  });
+
+  // Article 3
+  await Article.create({
+    title: "Ruby2JS: Vue with Ruby Syntax",
+    body: "Ruby2JS transpiles Ruby to JavaScript, enabling Vue components to be written with Ruby syntax. Same code, different runtimes: browser, Node, and edge."
+  });
+
+  const articleCount = await Article.count();
+  const commentCount = await Comment.count();
+  console.log(`Seeded ${articleCount} articles and ${commentCount} comments`);
+}
+EOF
+
+echo -e "${GREEN}Vue blog created at: $PROJECT_DIR${NC}"
+echo ""
+echo "To run:"
+echo "  cd $PROJECT_DIR"
+echo "  npm run dev      # Start Vite dev server"
+echo "  npm run build    # Build for production"
+echo "  npm run preview  # Preview production build"

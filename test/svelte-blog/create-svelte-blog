@@ -1,0 +1,830 @@
+#!/bin/bash
+# Create Svelte blog - browser-first SPA with SvelteKit
+# Same code can target browser (IndexedDB) or edge (D1) with adapter swap
+
+set -e
+
+# Color output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Get the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+RUBY2JS_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
+
+echo -e "${BLUE}Creating Svelte blog...${NC}"
+
+# Create project directory
+PROJECT_DIR="${1:-/tmp/svelte-blog}"
+rm -rf "$PROJECT_DIR"
+mkdir -p "$PROJECT_DIR"
+cd "$PROJECT_DIR"
+
+echo -e "${GREEN}Initializing npm project...${NC}"
+npm init -y > /dev/null
+
+# Install dependencies
+echo -e "${GREEN}Installing dependencies...${NC}"
+npm install @hotwired/turbo > /dev/null 2>&1
+
+# Install SvelteKit and Svelte
+npm install -D @sveltejs/kit@latest @sveltejs/vite-plugin-svelte@latest svelte@latest vite > /dev/null 2>&1
+
+# Install ruby2js packages from local development paths
+npm install "$RUBY2JS_ROOT/packages/ruby2js-rails" > /dev/null 2>&1
+
+# Install vite-plugin-ruby2js from local
+npm install -D "$RUBY2JS_ROOT/packages/vite-plugin-ruby2js" > /dev/null 2>&1
+
+# Install adapter for static site generation
+npm install -D @sveltejs/adapter-static > /dev/null 2>&1
+
+# Create directory structure
+mkdir -p src/routes/about
+mkdir -p src/routes/articles/new
+mkdir -p 'src/routes/articles/[id]/edit'
+mkdir -p src/lib/components
+mkdir -p src/lib/models
+mkdir -p static
+
+# ============================================================
+# Configuration Files
+# ============================================================
+
+cat > svelte.config.js << 'EOF'
+import adapter from '@sveltejs/adapter-static';
+import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
+
+export default {
+  preprocess: [vitePreprocess()],
+  kit: {
+    adapter: adapter({
+      pages: 'build',
+      assets: 'build',
+      fallback: 'index.html',
+      precompress: false,
+      strict: true
+    }),
+    prerender: {
+      entries: []
+    }
+  }
+};
+EOF
+
+cat > vite.config.js << 'EOF'
+import { sveltekit } from '@sveltejs/kit/vite';
+import { defineConfig } from 'vite';
+import { ruby2jsModels } from 'ruby2js-rails/vite-models';
+
+export default defineConfig({
+  plugins: [
+    sveltekit(),
+    ruby2jsModels({
+      database: 'dexie',
+      modelsDir: 'src/lib/models',
+      outDir: 'src/lib/models'
+    })
+  ]
+});
+EOF
+
+# Update package.json
+cat > package.json << 'EOF'
+{
+  "name": "svelte-blog",
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "preview": "vite preview"
+  }
+}
+EOF
+
+# Reinstall dependencies
+npm install > /dev/null 2>&1
+npm install @hotwired/turbo > /dev/null 2>&1
+npm install -D @sveltejs/kit@latest @sveltejs/vite-plugin-svelte@latest svelte@latest vite @sveltejs/adapter-static > /dev/null 2>&1
+npm install "$RUBY2JS_ROOT/packages/ruby2js-rails" > /dev/null 2>&1
+npm install -D "$RUBY2JS_ROOT/packages/vite-plugin-ruby2js" > /dev/null 2>&1
+
+# ============================================================
+# App HTML
+# ============================================================
+
+cat > src/app.html << 'EOF'
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    %sveltekit.head%
+  </head>
+  <body data-sveltekit-preload-data="hover">
+    <div style="display: contents">%sveltekit.body%</div>
+  </body>
+</html>
+EOF
+
+# ============================================================
+# Layout
+# ============================================================
+
+cat > src/routes/+layout.svelte << 'EOF'
+<script>
+  import { onMount } from 'svelte';
+  import { setupDatabase } from '$lib/db.mjs';
+
+  // TurboBroadcast for cross-tab real-time updates
+  class TurboBroadcast {
+    static channels = new Map();
+
+    static getChannel(name) {
+      if (!this.channels.has(name)) {
+        const channel = new BroadcastChannel(name);
+        this.channels.set(name, channel);
+      }
+      return this.channels.get(name);
+    }
+
+    static broadcast(channelName, html) {
+      const channel = this.getChannel(channelName);
+      channel.postMessage(html);
+    }
+
+    static subscribe(channelName, callback) {
+      const channel = this.getChannel(channelName);
+      channel.onmessage = callback;
+      return '';
+    }
+
+    static unsubscribe(channelName) {
+      const channel = this.channels.get(channelName);
+      if (channel) {
+        channel.close();
+        this.channels.delete(channelName);
+      }
+    }
+  }
+
+  // Make TurboBroadcast available globally for models
+  if (typeof window !== 'undefined') {
+    globalThis.BroadcastChannel = TurboBroadcast;
+  }
+
+  let ready = false;
+
+  onMount(async () => {
+    await setupDatabase();
+    ready = true;
+  });
+</script>
+
+<div class="container">
+  <header>
+    <h1><a href="/">Svelte Blog</a></h1>
+    <nav>
+      <a href="/">Home</a>
+      <a href="/articles">Articles</a>
+      <a href="/about">About</a>
+    </nav>
+  </header>
+  <main>
+    {#if ready}
+      <slot />
+    {:else}
+      <p>Loading...</p>
+    {/if}
+  </main>
+</div>
+
+<style>
+  :global(:root) {
+    --color-bg: #f9fafb;
+    --color-text: #111827;
+    --color-primary: #2563eb;
+    --color-primary-dark: #1d4ed8;
+    --color-border: #e5e7eb;
+    --color-error: #dc2626;
+    --max-width: 800px;
+  }
+
+  :global(*) {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  :global(body) {
+    font-family: system-ui, -apple-system, sans-serif;
+    background: var(--color-bg);
+    color: var(--color-text);
+    line-height: 1.6;
+    padding: 2rem;
+  }
+
+  .container {
+    max-width: var(--max-width);
+    margin: 0 auto;
+  }
+
+  header {
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  header h1 a {
+    color: var(--color-text);
+    text-decoration: none;
+  }
+
+  nav {
+    margin-top: 0.5rem;
+  }
+
+  nav a {
+    color: var(--color-primary);
+    text-decoration: none;
+    margin-right: 1rem;
+  }
+
+  nav a:hover {
+    text-decoration: underline;
+  }
+
+  :global(.btn) {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    background: var(--color-primary);
+    color: white;
+    text-decoration: none;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+
+  :global(.btn:hover) {
+    background: var(--color-primary-dark);
+  }
+
+  :global(.btn-danger) {
+    background: var(--color-error);
+  }
+
+  :global(.form-group) {
+    margin-bottom: 1rem;
+  }
+
+  :global(.form-group label) {
+    display: block;
+    margin-bottom: 0.25rem;
+    font-weight: 500;
+  }
+
+  :global(.form-group input),
+  :global(.form-group textarea) {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+  }
+
+  :global(.article-card) {
+    background: white;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border-radius: 8px;
+    border: 1px solid var(--color-border);
+  }
+
+  :global(.article-card h2 a) {
+    color: var(--color-text);
+    text-decoration: none;
+  }
+
+  :global(.article-card h2 a:hover) {
+    color: var(--color-primary);
+  }
+
+  :global(.article-meta) {
+    color: #666;
+    font-size: 0.875rem;
+    margin: 0.5rem 0;
+  }
+
+  :global(.actions) {
+    margin: 1rem 0;
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  :global(.comment) {
+    background: #f3f4f6;
+    padding: 1rem;
+    margin-bottom: 0.5rem;
+    border-radius: 4px;
+  }
+
+  :global(.comment-meta) {
+    font-size: 0.875rem;
+    color: #666;
+  }
+
+  :global(.error-messages) {
+    background: #fef2f2;
+    border: 1px solid var(--color-error);
+    color: var(--color-error);
+    padding: 1rem;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+  }
+
+  :global(.error-messages ul) {
+    margin: 0;
+    padding-left: 1.5rem;
+  }
+</style>
+EOF
+
+# ============================================================
+# Pages
+# ============================================================
+
+cat > src/routes/+page.svelte << 'EOF'
+<script>
+  export const prerender = false;
+</script>
+
+<h2>Welcome to Svelte Blog</h2>
+<p>
+  This blog demonstrates Ruby2JS with SvelteKit.
+  Models are written in Ruby and transpiled to JavaScript.
+</p>
+<p style="margin-top: 1rem;">
+  <a href="/articles" class="btn">View Articles</a>
+</p>
+EOF
+
+cat > src/routes/about/+page.svelte << 'EOF'
+<script>
+  export const prerender = false;
+</script>
+
+<h2>About Svelte Blog</h2>
+<p>
+  This is a simple blog application built with:
+</p>
+<ul style="margin: 1rem 0; padding-left: 2rem;">
+  <li>SvelteKit for the framework</li>
+  <li>File-based routing</li>
+  <li>Ruby2JS for model transpilation</li>
+  <li>IndexedDB (via Dexie) for browser storage</li>
+  <li>BroadcastChannel API for real-time updates</li>
+</ul>
+<p>
+  The same Ruby model code can target different backends:
+  browser (IndexedDB), Node (SQLite), or edge (D1).
+</p>
+EOF
+
+cat > src/routes/articles/+page.svelte << 'EOF'
+<script>
+  import { onMount, onDestroy } from 'svelte';
+  import { Article } from '$lib/models/index.js';
+
+  export const prerender = false;
+
+  let articles = [];
+
+  async function loadArticles() {
+    articles = await Article.order({ created_at: 'desc' }).toArray();
+  }
+
+  function formatDate(date) {
+    return new Date(date).toLocaleDateString();
+  }
+
+  function truncate(text, length) {
+    if (text.length <= length) return text;
+    return text.substring(0, length) + '...';
+  }
+
+  onMount(() => {
+    loadArticles();
+
+    globalThis.BroadcastChannel.subscribe('articles', () => {
+      loadArticles();
+    });
+  });
+
+  onDestroy(() => {
+    if (typeof window !== 'undefined') {
+      globalThis.BroadcastChannel.unsubscribe('articles');
+    }
+  });
+</script>
+
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+  <h2>Articles</h2>
+  <a href="/articles/new" class="btn">New Article</a>
+</div>
+
+{#if articles.length === 0}
+  <p>No articles yet. <a href="/articles/new">Create one</a>!</p>
+{:else}
+  <div id="articles">
+    {#each articles as article (article.id)}
+      <div class="article-card">
+        <h2>
+          <a href="/articles/{article.id}">{article.title}</a>
+        </h2>
+        <p class="article-meta">
+          Created {formatDate(article.created_at)}
+        </p>
+        <p>{truncate(article.body, 200)}</p>
+      </div>
+    {/each}
+  </div>
+{/if}
+EOF
+
+cat > src/routes/articles/new/+page.svelte << 'EOF'
+<script>
+  import { goto } from '$app/navigation';
+  import { Article } from '$lib/models/index.js';
+
+  export const prerender = false;
+
+  let title = '';
+  let body = '';
+  let errors = [];
+
+  async function createArticle() {
+    const article = new Article({ title, body });
+
+    if (await article.save()) {
+      goto(`/articles/${article.id}`);
+    } else {
+      errors = article.errors.full_messages;
+    }
+  }
+</script>
+
+<h2>New Article</h2>
+
+{#if errors.length > 0}
+  <div class="error-messages">
+    <ul>
+      {#each errors as error}
+        <li>{error}</li>
+      {/each}
+    </ul>
+  </div>
+{/if}
+
+<form on:submit|preventDefault={createArticle}>
+  <div class="form-group">
+    <label for="title">Title</label>
+    <input type="text" id="title" bind:value={title} />
+  </div>
+  <div class="form-group">
+    <label for="body">Body</label>
+    <textarea id="body" bind:value={body} rows="8"></textarea>
+  </div>
+  <div class="actions">
+    <button type="submit" class="btn">Create Article</button>
+    <a href="/articles">Cancel</a>
+  </div>
+</form>
+EOF
+
+cat > 'src/routes/articles/[id]/+page.svelte' << 'EOF'
+<script>
+  import { page } from '$app/stores';
+  import { goto } from '$app/navigation';
+  import { onMount, onDestroy } from 'svelte';
+  import { Article, Comment } from '$lib/models/index.js';
+
+  export const prerender = false;
+
+  let article = null;
+  let comments = [];
+  let commenter = '';
+  let commentBody = '';
+
+  $: id = Number($page.params.id);
+
+  async function loadArticle() {
+    try {
+      article = await Article.find(id);
+    } catch (e) {
+      goto('/articles');
+    }
+  }
+
+  async function loadComments() {
+    comments = await Comment.where({ article_id: id })
+      .order({ created_at: 'asc' })
+      .toArray();
+  }
+
+  function formatDate(date) {
+    return new Date(date).toLocaleDateString();
+  }
+
+  async function deleteArticle() {
+    if (confirm('Are you sure?')) {
+      await article.destroy();
+      goto('/articles');
+    }
+  }
+
+  async function addComment() {
+    if (commentBody.trim()) {
+      await Comment.create({
+        article_id: id,
+        commenter: commenter || 'Anonymous',
+        body: commentBody
+      });
+      commenter = '';
+      commentBody = '';
+      loadComments();
+    }
+  }
+
+  async function deleteComment(commentId) {
+    const comment = await Comment.find(commentId);
+    await comment.destroy();
+    loadComments();
+  }
+
+  onMount(() => {
+    loadArticle();
+    loadComments();
+
+    const channel = `article_${id}_comments`;
+    globalThis.BroadcastChannel.subscribe(channel, () => {
+      loadComments();
+    });
+  });
+
+  onDestroy(() => {
+    if (typeof window !== 'undefined') {
+      const channel = `article_${id}_comments`;
+      globalThis.BroadcastChannel.unsubscribe(channel);
+    }
+  });
+</script>
+
+{#if article}
+  <article>
+    <h2>{article.title}</h2>
+    <p class="article-meta">
+      Created {formatDate(article.created_at)}
+      {#if article.updated_at !== article.created_at}
+        <span> &middot; Updated {formatDate(article.updated_at)}</span>
+      {/if}
+    </p>
+    <div class="article-body">{article.body}</div>
+
+    <div class="actions">
+      <a href="/articles/{id}/edit" class="btn">Edit</a>
+      <button on:click={deleteArticle} class="btn btn-danger">Delete</button>
+      <a href="/articles">Back to Articles</a>
+    </div>
+  </article>
+
+  <section class="comments-section">
+    <h3>Comments ({comments.length})</h3>
+
+    <div id="comments">
+      {#each comments as comment (comment.id)}
+        <div class="comment">
+          <p class="comment-meta">
+            <strong>{comment.commenter}</strong> &middot;
+            {formatDate(comment.created_at)}
+            <button
+              on:click={() => deleteComment(comment.id)}
+              style="background: none; border: none; color: var(--color-error); cursor: pointer; margin-left: 1rem;"
+            >
+              Delete
+            </button>
+          </p>
+          <p>{comment.body}</p>
+        </div>
+      {/each}
+    </div>
+
+    <h4 style="margin-top: 1rem;">Add a comment</h4>
+    <form on:submit|preventDefault={addComment}>
+      <div class="form-group">
+        <label for="commenter">Name</label>
+        <input type="text" id="commenter" bind:value={commenter} placeholder="Anonymous" />
+      </div>
+      <div class="form-group">
+        <label for="comment_body">Comment</label>
+        <textarea id="comment_body" bind:value={commentBody} rows="3"></textarea>
+      </div>
+      <button type="submit" class="btn">Post Comment</button>
+    </form>
+  </section>
+{/if}
+EOF
+
+cat > 'src/routes/articles/[id]/edit/+page.svelte' << 'EOF'
+<script>
+  import { page } from '$app/stores';
+  import { goto } from '$app/navigation';
+  import { onMount } from 'svelte';
+  import { Article } from '$lib/models/index.js';
+
+  export const prerender = false;
+
+  let article = null;
+  let errors = [];
+
+  $: id = Number($page.params.id);
+
+  async function loadArticle() {
+    try {
+      article = await Article.find(id);
+    } catch (e) {
+      goto('/articles');
+    }
+  }
+
+  async function updateArticle() {
+    if (await article.save()) {
+      goto(`/articles/${article.id}`);
+    } else {
+      errors = article.errors.full_messages;
+    }
+  }
+
+  onMount(() => {
+    loadArticle();
+  });
+</script>
+
+{#if article}
+  <h2>Edit Article</h2>
+
+  {#if errors.length > 0}
+    <div class="error-messages">
+      <ul>
+        {#each errors as error}
+          <li>{error}</li>
+        {/each}
+      </ul>
+    </div>
+  {/if}
+
+  <form on:submit|preventDefault={updateArticle}>
+    <div class="form-group">
+      <label for="title">Title</label>
+      <input type="text" id="title" bind:value={article.title} />
+    </div>
+    <div class="form-group">
+      <label for="body">Body</label>
+      <textarea id="body" bind:value={article.body} rows="8"></textarea>
+    </div>
+    <div class="actions">
+      <button type="submit" class="btn">Update Article</button>
+      <a href="/articles/{id}">Cancel</a>
+    </div>
+  </form>
+{/if}
+EOF
+
+# ============================================================
+# Models
+# ============================================================
+
+cat > src/lib/models/article.rb << 'EOF'
+class Article < ApplicationRecord
+  has_many :comments, dependent: :destroy
+
+  # Broadcast article changes to index page subscribers
+  broadcasts_to ->(_article) { "articles" }, inserts_by: :prepend
+
+  validates :title, presence: true
+  validates :body, presence: true, length: { minimum: 10 }
+end
+EOF
+
+cat > src/lib/models/comment.rb << 'EOF'
+class Comment < ApplicationRecord
+  belongs_to :article
+
+  # Broadcast comment changes to article show page subscribers
+  broadcasts_to ->(comment) { "article_#{comment.article_id}_comments" }, target: "comments"
+
+  validates :commenter, presence: true
+  validates :body, presence: true
+end
+EOF
+
+# ============================================================
+# Database Setup
+# ============================================================
+
+cat > src/lib/db.mjs << 'EOF'
+// Database setup - uses Dexie adapter for IndexedDB
+import {
+  initDatabase,
+  openDatabase,
+  defineSchema,
+  registerSchema
+} from 'ruby2js-rails/adapters/active_record_dexie.mjs';
+import { runSeeds } from './seeds.mjs';
+
+let initialized = false;
+
+// Register schemas for Dexie (needed before openDatabase)
+registerSchema('articles', '++id, title, created_at');
+registerSchema('comments', '++id, article_id, created_at');
+
+export async function setupDatabase() {
+  if (initialized) return;
+
+  await initDatabase({ database: 'svelte-blog' });
+  defineSchema(1);
+  await openDatabase();
+
+  // Run seeds if database is empty
+  await runSeeds();
+
+  initialized = true;
+}
+
+// Re-export for direct access if needed
+export { initDatabase, openDatabase, defineSchema, registerSchema };
+EOF
+
+cat > src/lib/seeds.mjs << 'EOF'
+// Sample articles and comments for the blog demo
+// Seeds are idempotent - only run if database is empty
+import { Article, Comment } from './models/index.js';
+
+export async function runSeeds() {
+  // Check if already seeded
+  const count = await Article.count();
+  if (count > 0) return;
+
+  console.log('Seeding database...');
+
+  // Article 1
+  const article1 = await Article.create({
+    title: "Getting Started with Svelte",
+    body: "Svelte is a radical new approach to building user interfaces. It shifts work to compile time, producing highly efficient JavaScript that surgically updates the DOM."
+  });
+
+  await Comment.create({
+    article_id: article1.id,
+    commenter: "Alice",
+    body: "Great introduction! The compile-time approach is brilliant."
+  });
+
+  await Comment.create({
+    article_id: article1.id,
+    commenter: "Bob",
+    body: "I love how there's no virtual DOM overhead."
+  });
+
+  // Article 2
+  const article2 = await Article.create({
+    title: "SvelteKit for Full-Stack Apps",
+    body: "SvelteKit provides a framework for building web applications with Svelte. It handles routing, server-side rendering, and deployment configuration out of the box."
+  });
+
+  await Comment.create({
+    article_id: article2.id,
+    commenter: "Carol",
+    body: "The file-based routing is so intuitive!"
+  });
+
+  // Article 3
+  await Article.create({
+    title: "Ruby2JS: Svelte with Ruby Syntax",
+    body: "Ruby2JS transpiles Ruby to JavaScript, enabling Svelte components to be written with Ruby syntax. Same code, different runtimes: browser, Node, and edge."
+  });
+
+  const articleCount = await Article.count();
+  const commentCount = await Comment.count();
+  console.log(`Seeded ${articleCount} articles and ${commentCount} comments`);
+}
+EOF
+
+echo -e "${GREEN}Svelte blog created at: $PROJECT_DIR${NC}"
+echo ""
+echo "To run:"
+echo "  cd $PROJECT_DIR"
+echo "  npm run dev      # Start Vite dev server"
+echo "  npm run build    # Build for production"
+echo "  npm run preview  # Preview production build"
