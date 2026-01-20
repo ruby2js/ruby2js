@@ -42,6 +42,7 @@ module Ruby2JS
         @partials_used = []
         @helpers_used = Set.new
         @models_used = Set.new
+        @uses_actions = false
         @patterns = HelperPatterns.new(options)
       end
 
@@ -293,41 +294,51 @@ module Ruby2JS
         result
       end
 
-      # Render form_with as Astro HTML form
+      # Render form_with as Astro HTML form using Astro Actions
       def render_form_with(info, content)
         parts = []
+        model = info[:model_name]
+        parent = info[:parent_model]
 
-        # Determine form action
-        action = if info[:url]
-          info[:url]
-        elsif info[:model_name]
+        # Mark that we need to import actions
+        @uses_actions = true
+
+        # Determine the Astro Action to use
+        action_name = if info[:url]
+          # Custom URL - fall back to traditional form action
+          nil
+        elsif model
+          model_class = model.capitalize
           if info[:is_new]
-            if info[:parent_model]
-              "`/#{info[:parent_model]}s/${#{info[:parent_model]}.id}/#{info[:model_name]}s`"
-            else
-              "\"/#{info[:model_name]}s\""
-            end
+            "actions.create#{model_class}"
           else
-            "`/#{info[:model_name]}s/${#{info[:model_name]}.id}`"
+            # For existing records, dynamically choose create vs update
+            "#{model}.id ? actions.update#{model_class} : actions.create#{model_class}"
           end
         else
-          '""'
+          nil
         end
 
         # Build form attributes
-        attrs = ["method=\"POST\"", "action={#{action}}"]
+        if action_name
+          attrs = ["method=\"POST\"", "action={#{action_name}}"]
+        else
+          # Fallback for custom URL forms
+          url = info[:url] || '""'
+          attrs = ["method=\"POST\"", "action={#{url}}"]
+        end
         attrs << "class=\"#{info[:css_class]}\"" if info[:css_class]
 
         parts << "<form #{attrs.join(' ')}>"
 
-        # Add hidden _method field for non-POST methods
-        if info[:method] != :post && info[:method] != :get
-          parts << "<input type=\"hidden\" name=\"_method\" value=\"#{info[:method]}\" />"
+        # Add hidden id field for existing records (needed by update/delete actions)
+        if model && !info[:is_new]
+          parts << "{#{model}.id && <input type=\"hidden\" name=\"id\" value={#{model}.id.toString()} />}"
         end
 
-        # Add hidden _method field for existing records (PATCH)
-        if info[:model_name] && !info[:is_new]
-          parts << "{#{info[:model_name]}.id && <input type=\"hidden\" name=\"_method\" value=\"patch\" />}"
+        # Add hidden parent_id field for nested resources
+        if parent
+          parts << "<input type=\"hidden\" name=\"#{parent}_id\" value={#{parent}.id.toString()} />"
         end
 
         # Process form content - transform form builder calls
@@ -475,9 +486,12 @@ module Ruby2JS
 
       # Render an input field
       def render_input_field(type, field, options_str)
+        # Use flat names for Astro Actions, nested names for traditional forms
+        field_name = @uses_actions ? field : "#{@form_model}[#{field}]"
+
         attrs = [
           "type=\"#{type}\"",
-          "name=\"#{@form_model}[#{field}]\"",
+          "name=\"#{field_name}\"",
           "id=\"#{@form_model}_#{field}\""
         ]
 
@@ -500,8 +514,11 @@ module Ruby2JS
 
       # Render a textarea field
       def render_textarea_field(field, options_str)
+        # Use flat names for Astro Actions, nested names for traditional forms
+        field_name = @uses_actions ? field : "#{@form_model}[#{field}]"
+
         attrs = [
-          "name=\"#{@form_model}[#{field}]\"",
+          "name=\"#{field_name}\"",
           "id=\"#{@form_model}_#{field}\""
         ]
 
@@ -755,12 +772,32 @@ module Ruby2JS
       # Render button_to as Astro form with button
       def render_button_to(result)
         path_info = result[:path]
-        href = render_path_info(path_info)
 
-        form_parts = ["<form method=\"POST\" action={#{href}} style=\"display: inline;\">"]
+        # For delete actions, use Astro Actions
+        if result[:method] == :delete && path_info[:type] == :model
+          @uses_actions = true
+          model = path_info[:model]
+          model_class = model.capitalize
+          action = "actions.delete#{model_class}"
 
-        if result[:method] == :delete
-          form_parts << '<input type="hidden" name="_action" value="delete" />'
+          form_parts = ["<form method=\"POST\" action={#{action}} style=\"display: inline;\">"]
+          form_parts << "<input type=\"hidden\" name=\"id\" value={#{model}.id.toString()} />"
+        elsif result[:method] == :delete && path_info[:type] == :nested
+          @uses_actions = true
+          parent = path_info[:parent]
+          child = path_info[:child]
+          model_class = child.capitalize
+          action = "actions.delete#{model_class}"
+
+          form_parts = ["<form method=\"POST\" action={#{action}} style=\"display: inline;\">"]
+          form_parts << "<input type=\"hidden\" name=\"id\" value={#{child}.id.toString()} />"
+          form_parts << "<input type=\"hidden\" name=\"#{parent}_id\" value={#{parent}.id.toString()} />"
+        else
+          href = render_path_info(path_info)
+          form_parts = ["<form method=\"POST\" action={#{href}} style=\"display: inline;\">"]
+          if result[:method] == :delete
+            form_parts << '<input type="hidden" name="_action" value="delete" />'
+          end
         end
 
         button_attrs = ['type="submit"']
@@ -780,11 +817,13 @@ module Ruby2JS
         partial_name = result[:partial_name]
 
         # Convert partial name to component name
-        # Forms stay as-is: "form" -> "Form"
+        # Forms get model prefix: "form" -> "ArticleForm" (based on controller)
         # Other partials get Card suffix: "article" -> "ArticleCard"
         base_component = partial_name.split('_').map(&:capitalize).join
         component = if partial_name.end_with?('form')
-          base_component
+          # Get model name from controller (e.g., "articles" -> "Article")
+          model_name = @controller&.gsub(/s$/, '')&.capitalize || 'Item'
+          "#{model_name}#{base_component}"
         else
           "#{base_component}Card"
         end
@@ -1068,6 +1107,33 @@ module Ruby2JS
           lines << "import { #{helpers} } from 'ruby2js-rails/helpers.js';"
         end
 
+        # Astro Actions import and result handling
+        # Always add action handling for pages that may receive form submissions
+        actions_to_check = []
+        actions_to_check << "actions.create#{primary_model}" if @action_name == 'new'
+        actions_to_check << "actions.update#{primary_model}" if @action_name == 'edit'
+        actions_to_check << "actions.delete#{primary_model}" if %w[show index].include?(@action_name)
+        # Also check for nested resource actions (comments on articles)
+        if @action_name == 'show'
+          actions_to_check << "actions.createComment"
+          actions_to_check << "actions.deleteComment"
+        end
+
+        if @uses_actions || actions_to_check.any?
+          lines << "import { actions } from 'astro:actions';"
+
+          if actions_to_check.any?
+            lines << ''
+            lines << '// Handle action results (redirects after form submission)'
+            actions_to_check.uniq.each do |action|
+              lines << "const #{action.gsub('.', '_')}_result = Astro.getActionResult(#{action});"
+              lines << "if (#{action.gsub('.', '_')}_result?.data?.redirect) {"
+              lines << "  return Astro.redirect(#{action.gsub('.', '_')}_result.data.redirect);"
+              lines << '}'
+            end
+          end
+        end
+
         # For SSG: dynamic routes need getStaticPaths
         if needs_dynamic_routes?
           lines << ''
@@ -1218,6 +1284,11 @@ module Ruby2JS
         unless @helpers_used.empty?
           helpers = @helpers_used.to_a.join(', ')
           lines << "import { #{helpers} } from 'ruby2js-rails/helpers.js';"
+        end
+
+        # Astro Actions import for form components
+        if @uses_actions
+          lines << "import { actions } from 'astro:actions';"
         end
 
         lines << '---'

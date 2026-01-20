@@ -35,6 +35,7 @@ module Ruby2JS
         convert_views
         convert_partials
         copy_models
+        generate_actions
         generate_database_setup
         generate_seeds
         generate_browser_shell
@@ -77,6 +78,7 @@ module Ruby2JS
         FileUtils.mkdir_p(File.join(DIST_DIR, 'src', 'layouts'))
         FileUtils.mkdir_p(File.join(DIST_DIR, 'src', 'lib'))
         FileUtils.mkdir_p(File.join(DIST_DIR, 'src', 'models'))
+        FileUtils.mkdir_p(File.join(DIST_DIR, 'src', 'actions'))
         FileUtils.mkdir_p(File.join(DIST_DIR, 'public'))
       end
 
@@ -405,8 +407,14 @@ module Ruby2JS
         model_name = dir_name.end_with?('s') ? dir_name[0..-2] : dir_name
 
         # Determine component name
+        # For forms, prefix with model name (ArticleForm, CommentForm) to avoid collisions
+        # For other partials, suffix with Card (ArticleCard, CommentCard)
         base_component = partial_name.split('_').map(&:capitalize).join
-        component_name = partial_name.end_with?('form') ? base_component : "#{base_component}Card"
+        if partial_name.end_with?('form')
+          component_name = "#{model_name.capitalize}#{base_component}"
+        else
+          component_name = "#{base_component}Card"
+        end
 
         astro_content = convert_partial_to_component(erb_content, partial_name, model_name, component_name)
 
@@ -429,6 +437,163 @@ module Ruby2JS
           FileUtils.cp(model_file, dest)
           log "    #{File.basename(model_file)}"
         end
+      end
+
+      def generate_actions
+        log "  Generating Astro Actions..."
+
+        # Detect controllers and their resourceful actions
+        controller_files = Dir.glob('app/controllers/*_controller.rb')
+          .reject { |f| File.basename(f) == 'application_controller.rb' }
+
+        actions_content = generate_actions_file(controller_files)
+        actions_path = File.join(DIST_DIR, 'src', 'actions', 'index.ts')
+        File.write(actions_path, actions_content)
+        log "    index.ts"
+      end
+
+      def generate_actions_file(controller_files)
+        lines = []
+        lines << "import { defineAction } from 'astro:actions';"
+        lines << "import { z } from 'astro:schema';"
+        lines << "import { setupDatabase } from '../lib/db.mjs';"
+
+        # Collect model imports
+        models = controller_files.map do |f|
+          File.basename(f, '_controller.rb').gsub(/s$/, '').capitalize
+        end.uniq
+
+        lines << "import { #{models.join(', ')} } from '../lib/models/index.js';"
+        lines << ""
+        lines << "export const server = {"
+
+        controller_files.each do |controller_file|
+          content = File.read(controller_file)
+          controller_name = File.basename(controller_file, '_controller.rb')
+          model_name = controller_name.gsub(/s$/, '').capitalize
+          model_var = model_name.downcase
+
+          # Detect if this is a nested resource (has parent like article for comments)
+          # Only consider it nested if the parent model is different from the current model
+          parent_match = content.match(/def set_(\w+)\s+@(\w+)\s*=\s*(\w+)\.find/)
+          if parent_match && parent_match[3] != model_name
+            parent_var = parent_match[1]
+            parent_model = parent_match[3]
+          else
+            parent_var = nil
+            parent_model = nil
+          end
+
+          # Detect which CRUD actions exist
+          has_create = content.include?('def create')
+          has_update = content.include?('def update')
+          has_destroy = content.include?('def destroy')
+
+          # Extract permitted params from strong params
+          params_match = content.match(/params\.(?:expect|require)\(#{model_var}:\s*\[\s*([^\]]+)\s*\]\)/) ||
+                         content.match(/params\.(?:expect|require)\(:#{model_var}\)\.permit\(([^)]+)\)/)
+          permitted_attrs = if params_match
+            params_match[1].scan(/:(\w+)/).flatten
+          else
+            %w[title body] # fallback
+          end
+
+          # Generate Zod schema for this model
+          schema_fields = permitted_attrs.map { |attr| "#{attr}: z.string().optional()" }.join(",\n      ")
+
+          if has_create
+            lines << ""
+            lines << "  create#{model_name}: defineAction({"
+            lines << "    accept: 'form',"
+            lines << "    input: z.object({"
+            if parent_var
+              lines << "      #{parent_var}_id: z.string(),"
+            end
+            lines << "      #{schema_fields}"
+            lines << "    }),"
+            lines << "    handler: async (input) => {"
+            lines << "      await setupDatabase();"
+            if parent_var
+              lines << "      const #{parent_var} = await #{parent_model}.find(parseInt(input.#{parent_var}_id));"
+              lines << "      const #{model_var} = new #{model_name}({"
+              lines << "        #{parent_var}_id: #{parent_var}.id,"
+            else
+              lines << "      const #{model_var} = new #{model_name}({"
+            end
+            permitted_attrs.each do |attr|
+              lines << "        #{attr}: input.#{attr},"
+            end
+            lines << "      });"
+            lines << "      if (await #{model_var}.save()) {"
+            if parent_var
+              lines << "        return { success: true, id: #{model_var}.id, redirect: `/#{parent_var}s/${#{parent_var}.id}?notice=#{model_name} was successfully created.` };"
+            else
+              lines << "        return { success: true, id: #{model_var}.id, redirect: `/#{controller_name}/${#{model_var}.id}?notice=#{model_name} was successfully created.` };"
+            end
+            lines << "      } else {"
+            lines << "        return { success: false, errors: #{model_var}.errors };"
+            lines << "      }"
+            lines << "    }"
+            lines << "  }),"
+          end
+
+          if has_update
+            lines << ""
+            lines << "  update#{model_name}: defineAction({"
+            lines << "    accept: 'form',"
+            lines << "    input: z.object({"
+            lines << "      id: z.string(),"
+            if parent_var
+              lines << "      #{parent_var}_id: z.string(),"
+            end
+            lines << "      #{schema_fields}"
+            lines << "    }),"
+            lines << "    handler: async (input) => {"
+            lines << "      await setupDatabase();"
+            lines << "      const #{model_var} = await #{model_name}.find(parseInt(input.id));"
+            lines << "      if (await #{model_var}.update({"
+            permitted_attrs.each do |attr|
+              lines << "        #{attr}: input.#{attr},"
+            end
+            lines << "      })) {"
+            if parent_var
+              lines << "        return { success: true, redirect: `/#{parent_var}s/${input.#{parent_var}_id}?notice=#{model_name} was successfully updated.` };"
+            else
+              lines << "        return { success: true, redirect: `/#{controller_name}/${#{model_var}.id}?notice=#{model_name} was successfully updated.` };"
+            end
+            lines << "      } else {"
+            lines << "        return { success: false, errors: #{model_var}.errors };"
+            lines << "      }"
+            lines << "    }"
+            lines << "  }),"
+          end
+
+          if has_destroy
+            lines << ""
+            lines << "  delete#{model_name}: defineAction({"
+            lines << "    accept: 'form',"
+            lines << "    input: z.object({"
+            lines << "      id: z.string(),"
+            if parent_var
+              lines << "      #{parent_var}_id: z.string(),"
+            end
+            lines << "    }),"
+            lines << "    handler: async (input) => {"
+            lines << "      await setupDatabase();"
+            lines << "      const #{model_var} = await #{model_name}.find(parseInt(input.id));"
+            lines << "      await #{model_var}.destroy();"
+            if parent_var
+              lines << "      return { success: true, redirect: `/#{parent_var}s/${input.#{parent_var}_id}?notice=#{model_name} was successfully destroyed.` };"
+            else
+              lines << "      return { success: true, redirect: `/#{controller_name}?notice=#{model_name} was successfully destroyed.` };"
+            end
+            lines << "    }"
+            lines << "  }),"
+          end
+        end
+
+        lines << "};"
+        lines.join("\n")
       end
 
       def generate_database_setup
@@ -692,34 +857,76 @@ module Ruby2JS
               }
 
               async function submitForm(form) {
-                const url = new URL(form.action || location.href, location.origin);
+                const formAction = form.action || location.href;
                 const formData = new FormData(form);
+
+                // Check if this is an Astro Action (action URL has ?_action= query param)
+                const isAction = formAction.includes('_action=');
+
+                const url = new URL(formAction, location.origin);
                 const request = new Request(url.href, {
                   method: form.method?.toUpperCase() || 'POST',
-                  body: formData
+                  body: formData,
+                  headers: isAction ? { 'Accept': 'application/json' } : {}
                 });
 
                 try {
                   const response = await worker.default.fetch(request);
+                  console.log('Form response:', response.status, response.headers.get('Content-Type'));
 
+                  // Handle redirect responses
                   if (response.status >= 300 && response.status < 400) {
-                    const location = response.headers.get('Location');
-                    if (location) {
-                      history.pushState({}, '', location);
-                      await navigate(location);
+                    const redirectUrl = response.headers.get('Location');
+                    if (redirectUrl) {
+                      history.pushState({}, '', redirectUrl);
+                      await navigate(redirectUrl);
                       return;
                     }
                   }
 
-                  const html = await response.text();
-                  const parser = new DOMParser();
-                  const doc = parser.parseFromString(html, 'text/html');
+                  // Check content type to determine if it's JSON (action result) or HTML
+                  const contentType = response.headers.get('Content-Type') || '';
 
-                  const title = doc.querySelector('title');
-                  if (title) document.title = title.textContent;
+                  if (contentType.includes('application/json')) {
+                    // Handle Astro Action JSON response
+                    const result = await response.json();
+                    console.log('Action result:', result);
 
-                  document.body.innerHTML = doc.body.innerHTML;
-                  attachLinkHandlers();
+                    if (result.data?.redirect) {
+                      history.pushState({}, '', result.data.redirect);
+                      await navigate(result.data.redirect);
+                      return;
+                    }
+
+                    if (result.error) {
+                      console.error('Action error:', result.error);
+                      // Could show validation errors in the form here
+                    }
+                  } else if (isAction && !contentType.includes('text/html')) {
+                    // Action URL but unknown content type - try JSON
+                    try {
+                      const result = await response.json();
+                      console.log('Action result:', result);
+                      if (result.data?.redirect) {
+                        history.pushState({}, '', result.data.redirect);
+                        await navigate(result.data.redirect);
+                        return;
+                      }
+                    } catch (e) {
+                      console.error('Failed to parse action response:', e);
+                    }
+                  } else {
+                    // Handle HTML response (traditional form submission)
+                    const html = await response.text();
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+
+                    const title = doc.querySelector('title');
+                    if (title) document.title = title.textContent;
+
+                    document.body.innerHTML = doc.body.innerHTML;
+                    attachLinkHandlers();
+                  }
                 } catch (e) {
                   console.error('Form submission error:', e);
                 }
