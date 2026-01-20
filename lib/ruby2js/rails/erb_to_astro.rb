@@ -21,6 +21,10 @@ require_relative 'helper_patterns'
 module Ruby2JS
   module Rails
     class ErbToAstro
+      # Block expression regex from Rails ActionView (erubi.rb)
+      # Matches: ") do |...|", " do |...|", "{ |...|", etc.
+      BLOCK_EXPR = /((\s|\))do|\{)(\s*\|[^|]*\|)?\s*\z/
+
       # Main entry point
       def self.convert(erb:, action: nil, controller: nil, action_name: nil, options: {})
         new(erb, action, controller, action_name, options).convert
@@ -113,7 +117,367 @@ module Ruby2JS
       def parse_erb_output
         @scanner.scan(/<%=\s*/)
         expr = scan_until_erb_close
+
+        # Check if this is a block expression using Rails' BLOCK_EXPR regex
+        if expr =~ BLOCK_EXPR
+          # Extract block variable if present
+          block_var = nil
+          if expr =~ /\|\s*([^|]+)\s*\|\s*\z/
+            block_var = $1.strip
+          end
+          # Remove the block syntax from expression
+          expr_without_block = expr.sub(BLOCK_EXPR, '')
+          return parse_output_block(expr_without_block, block_var)
+        end
+
         transform_output_expr(expr)
+      end
+
+      # Parse output block: <%= form_with ... do |form| %> ... <% end %>
+      def parse_output_block(expr, block_var)
+        # Parse the block body
+        old_form_builder = @form_builder
+        old_form_model = @form_model
+
+        # Check if this is a form_with
+        if expr =~ /^form_with/
+          @form_builder = block_var
+          form_info = parse_form_with_expr(expr)
+          @form_model = form_info[:model_name]
+
+          # Parse block content
+          block_content = parse_content(:end)
+          @scanner.scan(/<%\s*end\s*-?%>/)
+
+          # Render form BEFORE restoring context (process_form_content needs @form_builder)
+          result = render_form_with(form_info, block_content)
+
+          # Restore form context
+          @form_builder = old_form_builder
+          @form_model = old_form_model
+
+          return result
+        end
+
+        # For other blocks, just parse content and return
+        block_content = parse_content(:end)
+        @scanner.scan(/<%\s*end\s*-?%>/)
+
+        @form_builder = old_form_builder
+        @form_model = old_form_model
+
+        # Return placeholder for unhandled blocks
+        "<!-- block: #{expr} -->#{block_content}<!-- end block -->"
+      end
+
+      # Parse form_with expression to extract model, url, class, etc.
+      def parse_form_with_expr(expr)
+        result = {
+          model_name: nil,
+          model_var: nil,
+          parent_model: nil,
+          url: nil,
+          css_class: nil,
+          method: :post,
+          is_new: false
+        }
+
+        # Extract model: option
+        if expr =~ /model:\s*\[([^\]]+)\]/
+          # Nested model: [@article, Comment.new]
+          parts = $1.split(',').map(&:strip)
+          if parts.length >= 2
+            result[:parent_model] = parts[0].sub(/^@/, '')
+            child = parts[1]
+            if child =~ /(\w+)\.new/
+              result[:model_name] = $1.downcase
+              result[:is_new] = true
+            else
+              result[:model_name] = child.sub(/^@/, '')
+            end
+          end
+        elsif expr =~ /model:\s*(\w+)\.new/
+          result[:model_name] = $1.downcase
+          result[:is_new] = true
+        elsif expr =~ /model:\s*@?(\w+)/
+          result[:model_name] = $1
+          result[:model_var] = $1
+        end
+
+        # Extract url: option
+        if expr =~ /url:\s*["']([^"']+)["']/
+          result[:url] = $1
+        elsif expr =~ /url:\s*(\w+_path(?:\([^)]*\))?)/
+          result[:url] = transform_path_string($1)
+        end
+
+        # Extract class: option
+        if expr =~ /class:\s*["']([^"']+)["']/
+          result[:css_class] = $1
+        end
+
+        # Extract method: option
+        if expr =~ /method:\s*:(\w+)/
+          result[:method] = $1.to_sym
+        end
+
+        result
+      end
+
+      # Render form_with as Astro HTML form
+      def render_form_with(info, content)
+        parts = []
+
+        # Determine form action
+        action = if info[:url]
+          info[:url]
+        elsif info[:model_name]
+          if info[:is_new]
+            if info[:parent_model]
+              "`/#{info[:parent_model]}s/${#{info[:parent_model]}.id}/#{info[:model_name]}s`"
+            else
+              "\"/#{info[:model_name]}s\""
+            end
+          else
+            "`/#{info[:model_name]}s/${#{info[:model_name]}.id}`"
+          end
+        else
+          '""'
+        end
+
+        # Build form attributes
+        attrs = ["method=\"POST\"", "action={#{action}}"]
+        attrs << "class=\"#{info[:css_class]}\"" if info[:css_class]
+
+        parts << "<form #{attrs.join(' ')}>"
+
+        # Add hidden _method field for non-POST methods
+        if info[:method] != :post && info[:method] != :get
+          parts << "<input type=\"hidden\" name=\"_method\" value=\"#{info[:method]}\" />"
+        end
+
+        # Add hidden _method field for existing records (PATCH)
+        if info[:model_name] && !info[:is_new]
+          parts << "{#{info[:model_name]}.id && <input type=\"hidden\" name=\"_method\" value=\"patch\" />}"
+        end
+
+        # Process form content - transform form builder calls
+        processed_content = process_form_content(content)
+        parts << processed_content
+
+        parts << "</form>"
+
+        parts.join("\n")
+      end
+
+      # Process content inside a form, transforming form builder calls
+      def process_form_content(content)
+        return content unless @form_builder && @form_model
+
+        fb = Regexp.escape(@form_builder)
+
+        # Use a helper to find balanced brace expressions
+        # Transform form.label
+        content = transform_form_calls(content, fb, 'label') do |field, options|
+          css_class = extract_option_class(options)
+          label_text = field.gsub('_', ' ').capitalize
+          class_attr = css_class ? " class=\"#{css_class}\"" : ""
+          "<label for=\"#{@form_model}_#{field}\"#{class_attr}>#{label_text}</label>"
+        end
+
+        # Transform form.text_field
+        content = transform_form_calls(content, fb, 'text_field') do |field, options|
+          render_input_field('text', field, options)
+        end
+
+        # Transform form.email_field
+        content = transform_form_calls(content, fb, 'email_field') do |field, options|
+          render_input_field('email', field, options)
+        end
+
+        # Transform form.password_field
+        content = transform_form_calls(content, fb, 'password_field') do |field, options|
+          render_input_field('password', field, options)
+        end
+
+        # Transform form.number_field
+        content = transform_form_calls(content, fb, 'number_field') do |field, options|
+          render_input_field('number', field, options)
+        end
+
+        # Transform form.hidden_field
+        content = transform_form_calls(content, fb, 'hidden_field') do |field, options|
+          render_input_field('hidden', field, options)
+        end
+
+        # Transform form.text_area/textarea
+        content = transform_form_calls(content, fb, 'text_area') do |field, options|
+          render_textarea_field(field, options)
+        end
+        content = transform_form_calls(content, fb, 'textarea') do |field, options|
+          render_textarea_field(field, options)
+        end
+
+        # Transform form.submit with text
+        content = transform_form_submit(content, fb)
+
+        content
+      end
+
+      # Transform form builder method calls with balanced brace matching
+      def transform_form_calls(content, fb, method)
+        result = ""
+        remaining = content
+
+        pattern = /\{#{fb}\.#{method}\s+'(\w+)'/
+
+        while match = pattern.match(remaining)
+          # Add everything before the match
+          result += remaining[0...match.begin(0)]
+
+          # Find the balanced closing brace
+          start_pos = match.begin(0)
+          brace_start = match.end(0)
+          field = match[1]
+
+          # Find matching }
+          depth = 1
+          pos = brace_start
+          while pos < remaining.length && depth > 0
+            case remaining[pos]
+            when '{', '[' then depth += 1
+            when '}', ']' then depth -= 1
+            end
+            pos += 1
+          end
+
+          # Extract the full match and options
+          full_match = remaining[start_pos...pos]
+          options_part = remaining[brace_start...(pos - 1)].strip
+          options = options_part.empty? || options_part == ',' ? nil : options_part.sub(/^,\s*/, '')
+
+          # Transform using the block
+          result += yield(field, options)
+
+          remaining = remaining[pos..-1] || ""
+        end
+
+        result + remaining
+      end
+
+      # Transform form.submit calls
+      def transform_form_submit(content, fb)
+        result = ""
+        remaining = content
+
+        # Match form.submit with or without text
+        pattern = /\{#{fb}\.submit(?:\s+"([^"]+)")?/
+
+        while match = pattern.match(remaining)
+          result += remaining[0...match.begin(0)]
+
+          start_pos = match.begin(0)
+          text = match[1]
+
+          # Find matching }
+          depth = 1
+          pos = match.end(0)
+          while pos < remaining.length && depth > 0
+            case remaining[pos]
+            when '{', '[' then depth += 1
+            when '}', ']' then depth -= 1
+            end
+            pos += 1
+          end
+
+          # Extract options if any
+          options_str = remaining[match.end(0)...(pos - 1)].strip
+          options = options_str.empty? || options_str == ',' ? nil : options_str.sub(/^,?\s*/, '')
+
+          # Default text based on model
+          text ||= @form_model ? "Save #{@form_model.capitalize}" : 'Submit'
+
+          result += render_submit_button(text, options)
+          remaining = remaining[pos..-1] || ""
+        end
+
+        result + remaining
+      end
+
+      # Render an input field
+      def render_input_field(type, field, options_str)
+        attrs = [
+          "type=\"#{type}\"",
+          "name=\"#{@form_model}[#{field}]\"",
+          "id=\"#{@form_model}_#{field}\""
+        ]
+
+        # Parse options
+        css_class = extract_option_class(options_str)
+        attrs << "class=\"#{css_class}\"" if css_class
+
+        # Add value binding (except for password fields)
+        unless type == 'password'
+          attrs << "value={#{@form_model}.#{field} || ''}"
+        end
+
+        "<input #{attrs.join(' ')} />"
+      end
+
+      # Render a textarea field
+      def render_textarea_field(field, options_str)
+        attrs = [
+          "name=\"#{@form_model}[#{field}]\"",
+          "id=\"#{@form_model}_#{field}\""
+        ]
+
+        # Parse options
+        css_class = extract_option_class(options_str)
+        rows = extract_option_value(options_str, 'rows')
+
+        attrs << "class=\"#{css_class}\"" if css_class
+        attrs << "rows=\"#{rows}\"" if rows
+
+        "<textarea #{attrs.join(' ')}>{#{@form_model}.#{field} || ''}</textarea>"
+      end
+
+      # Render a submit button
+      def render_submit_button(text, options_str)
+        attrs = ['type="submit"']
+
+        css_class = extract_option_class(options_str)
+        attrs << "class=\"#{css_class}\"" if css_class
+
+        "<button #{attrs.join(' ')}>#{text}</button>"
+      end
+
+      # Extract class option from options string
+      def extract_option_class(options_str)
+        return nil unless options_str
+
+        # Simple string class: class: "foo bar"
+        if options_str =~ /class:\s*"([^"]+)"/
+          return $1
+        end
+
+        # Array class: class: ["static classes", ...] - just get the first string
+        if options_str =~ /class:\s*\["([^"]+)"/
+          return $1
+        end
+
+        nil
+      end
+
+      # Extract a simple option value
+      def extract_option_value(options_str, key)
+        return nil unless options_str
+        if options_str =~ /#{key}:\s*(\d+)/
+          $1
+        elsif options_str =~ /#{key}:\s*["']([^"']+)["']/
+          $1
+        else
+          nil
+        end
       end
 
       # Parse <% ... %> - control tag
@@ -573,8 +937,9 @@ module Ruby2JS
         # .all -> .order({ created_at: "desc" }).toArray() (for Dexie compatibility)
         expr = expr.gsub(/\.all\b(?!\()/, '.order({ created_at: "desc" }).toArray()')
 
-        # Symbol to string
-        expr = expr.gsub(/:(\w+)(?!\()/, "'\\1'")
+        # Symbol to string - only match Ruby symbols (preceded by space, comma, [, {, or start)
+        # Don't match colons inside strings like "sm:w-auto"
+        expr = expr.gsub(/(?<=[\s,\[\{(]|^):(\w+)(?!\()/, "'\\1'")
 
         # .size -> .length
         expr = expr.gsub(/\.size/, '.length')
