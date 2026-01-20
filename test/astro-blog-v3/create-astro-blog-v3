@@ -39,6 +39,10 @@ import cloudflare from '@astrojs/cloudflare';
 
 export default defineConfig({
   output: 'server',
+  // Disable CSRF check for browser mode (Origin header can't be set from JS)
+  security: {
+    checkOrigin: false
+  },
   adapter: cloudflare({
     platformProxy: {
       enabled: true
@@ -609,7 +613,7 @@ if (Astro.request.method === 'POST') {
 <Layout title="New Article - Astro Blog">
   <h2>New Article</h2>
 
-  <form method="POST">
+  <form method="POST" action="/articles/new">
     <div class="form-group">
       <label for="title">Title</label>
       <input type="text" id="title" name="title" value={title} />
@@ -691,7 +695,7 @@ const comments = await getComments(id);
 
     <div class="actions">
       <a href={`/articles/${id}/edit`} class="btn">Edit</a>
-      <form method="POST" style="display: inline;">
+      <form method="POST" action={`/articles/${id}`} style="display: inline;">
         <input type="hidden" name="_action" value="delete_article" />
         <button type="submit" class="btn btn-danger"
                 onclick="return confirm('Are you sure?')">Delete</button>
@@ -709,7 +713,7 @@ const comments = await getComments(id);
           <p class="comment-meta">
             <strong>{comment.commenter}</strong> ·
             {new Date(comment.created_at).toLocaleDateString()}
-            <form method="POST" style="display: inline; margin-left: 1rem;">
+            <form method="POST" action={`/articles/${id}`} style="display: inline; margin-left: 1rem;">
               <input type="hidden" name="_action" value="delete_comment" />
               <input type="hidden" name="comment_id" value={comment.id} />
               <button type="submit" style="background: none; border: none; color: var(--color-error); cursor: pointer;">
@@ -723,7 +727,7 @@ const comments = await getComments(id);
     </div>
 
     <h4 style="margin-top: 1rem;">Add a comment</h4>
-    <form method="POST">
+    <form method="POST" action={`/articles/${id}`}>
       <input type="hidden" name="_action" value="add_comment" />
       <div class="form-group">
         <label for="commenter">Name</label>
@@ -778,7 +782,7 @@ if (Astro.request.method === 'POST') {
 <Layout title={`Edit: ${article.title} - Astro Blog`}>
   <h2>Edit Article</h2>
 
-  <form method="POST">
+  <form method="POST" action={`/articles/${id}/edit`}>
     <div class="form-group">
       <label for="title">Title</label>
       <input type="text" id="title" name="title" value={title} />
@@ -1054,6 +1058,12 @@ class PreparedStatement {
   }
 
   async all() {
+    // Handle INSERT...RETURNING as a special case
+    if (this.sql.trim().toUpperCase().startsWith('INSERT') && this.sql.includes('RETURNING')) {
+      const result = await this._insert();
+      return { results: result ? [result] : [] };
+    }
+
     const { table, where, orderBy, orderDir } = this._parseSelect();
     if (!table) {
       console.warn('Could not parse SELECT:', this.sql);
