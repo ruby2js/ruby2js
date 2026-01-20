@@ -1,0 +1,1496 @@
+#!/bin/bash
+# Create Astro blog v3 - idiomatic SSR targeting Cloudflare
+# Same code runs on edge (D1) and browser (worker-in-browser + Dexie)
+
+set -e
+
+# Color output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Get the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+echo -e "${BLUE}Creating Astro blog v3...${NC}"
+
+# Create project directory
+PROJECT_DIR="${1:-/tmp/astro-blog-v3}"
+rm -rf "$PROJECT_DIR"
+mkdir -p "$PROJECT_DIR"
+cd "$PROJECT_DIR"
+
+echo -e "${GREEN}Initializing npm project...${NC}"
+npm init -y > /dev/null
+
+# Install dependencies
+echo -e "${GREEN}Installing dependencies...${NC}"
+npm install astro @astrojs/cloudflare @hotwired/turbo > /dev/null 2>&1
+
+# Create directory structure
+mkdir -p src/{layouts,pages/articles,lib,models}
+mkdir -p public
+
+# Create astro.config.mjs
+cat > astro.config.mjs << 'EOF'
+import { defineConfig } from 'astro/config';
+import cloudflare from '@astrojs/cloudflare';
+
+export default defineConfig({
+  output: 'server',
+  adapter: cloudflare({
+    platformProxy: {
+      enabled: true
+    }
+  })
+});
+EOF
+
+# Create wrangler.toml for D1 binding
+cat > wrangler.toml << 'EOF'
+name = "astro-blog-v3"
+compatibility_date = "2024-01-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "blog"
+database_id = "local"
+EOF
+
+# Create tsconfig.json
+cat > tsconfig.json << 'EOF'
+{
+  "extends": "astro/tsconfigs/strict",
+  "compilerOptions": {
+    "strictNullChecks": true
+  }
+}
+EOF
+
+# Create src/env.d.ts
+cat > src/env.d.ts << 'EOF'
+/// <reference types="astro/client" />
+
+type D1Database = import("@cloudflare/workers-types").D1Database;
+
+type Runtime = import("@astrojs/cloudflare").Runtime<{
+  DB: D1Database;
+}>;
+
+declare namespace App {
+  interface Locals extends Runtime {}
+}
+EOF
+
+# Create the base layout with Turbo
+cat > src/layouts/Layout.astro << 'EOF'
+---
+interface Props {
+  title: string;
+}
+
+const { title } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>{title}</title>
+    <style>
+      :root {
+        --color-bg: #f9fafb;
+        --color-text: #111827;
+        --color-primary: #2563eb;
+        --color-primary-dark: #1d4ed8;
+        --color-border: #e5e7eb;
+        --color-error: #dc2626;
+        --max-width: 800px;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: system-ui, -apple-system, sans-serif;
+        background: var(--color-bg);
+        color: var(--color-text);
+        line-height: 1.6;
+        padding: 2rem;
+      }
+
+      .container {
+        max-width: var(--max-width);
+        margin: 0 auto;
+      }
+
+      header {
+        margin-bottom: 2rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid var(--color-border);
+      }
+
+      header h1 a {
+        color: var(--color-text);
+        text-decoration: none;
+      }
+
+      nav {
+        margin-top: 0.5rem;
+      }
+
+      nav a {
+        color: var(--color-primary);
+        text-decoration: none;
+        margin-right: 1rem;
+      }
+
+      nav a:hover {
+        text-decoration: underline;
+      }
+
+      main {
+        min-height: 60vh;
+      }
+
+      a {
+        color: var(--color-primary);
+      }
+
+      a:hover {
+        color: var(--color-primary-dark);
+      }
+
+      .btn {
+        display: inline-block;
+        padding: 0.5rem 1rem;
+        background: var(--color-primary);
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        text-decoration: none;
+        font-size: 1rem;
+      }
+
+      .btn:hover {
+        background: var(--color-primary-dark);
+        color: white;
+      }
+
+      .btn-danger {
+        background: var(--color-error);
+      }
+
+      .btn-danger:hover {
+        background: #b91c1c;
+      }
+
+      .form-group {
+        margin-bottom: 1rem;
+      }
+
+      .form-group label {
+        display: block;
+        margin-bottom: 0.25rem;
+        font-weight: 500;
+      }
+
+      .form-group input,
+      .form-group textarea {
+        width: 100%;
+        padding: 0.5rem;
+        border: 1px solid var(--color-border);
+        border-radius: 4px;
+        font-size: 1rem;
+      }
+
+      .form-group textarea {
+        min-height: 150px;
+        resize: vertical;
+      }
+
+      .article-card {
+        padding: 1rem;
+        margin-bottom: 1rem;
+        border: 1px solid var(--color-border);
+        border-radius: 4px;
+        background: white;
+      }
+
+      .article-card h2 {
+        margin-bottom: 0.5rem;
+      }
+
+      .article-card h2 a {
+        text-decoration: none;
+      }
+
+      .article-meta {
+        color: #6b7280;
+        font-size: 0.875rem;
+      }
+
+      .article-body {
+        margin: 1rem 0;
+        white-space: pre-wrap;
+      }
+
+      .actions {
+        display: flex;
+        gap: 0.5rem;
+        margin-top: 1rem;
+      }
+
+      .comment {
+        padding: 1rem;
+        margin-bottom: 0.5rem;
+        background: #f3f4f6;
+        border-radius: 4px;
+      }
+
+      .comment-meta {
+        color: #6b7280;
+        font-size: 0.875rem;
+        margin-bottom: 0.5rem;
+      }
+
+      .comments-section {
+        margin-top: 2rem;
+        padding-top: 1rem;
+        border-top: 1px solid var(--color-border);
+      }
+
+      .error {
+        color: var(--color-error);
+        font-size: 0.875rem;
+        margin-top: 0.25rem;
+      }
+
+      .flash {
+        padding: 1rem;
+        margin-bottom: 1rem;
+        border-radius: 4px;
+        background: #d1fae5;
+        color: #065f46;
+      }
+
+      .flash.error {
+        background: #fee2e2;
+        color: var(--color-error);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1><a href="/">Astro Blog</a></h1>
+        <nav>
+          <a href="/">Home</a>
+          <a href="/articles">Articles</a>
+          <a href="/about">About</a>
+        </nav>
+      </header>
+      <main>
+        <slot />
+      </main>
+    </div>
+    <script>
+      import * as Turbo from '@hotwired/turbo';
+      Turbo.start();
+    </script>
+  </body>
+</html>
+EOF
+
+# Create landing page
+cat > src/pages/index.astro << 'EOF'
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="Astro Blog">
+  <h2>Welcome to Astro Blog</h2>
+  <p>A simple blog built with Astro SSR, running on Cloudflare Workers.</p>
+  <p>The same code runs:</p>
+  <ul>
+    <li><strong>On the Edge</strong> - Cloudflare Workers with D1 database</li>
+    <li><strong>In the Browser</strong> - Worker-in-browser with IndexedDB</li>
+  </ul>
+  <p>
+    <a href="/articles" class="btn">View Articles</a>
+  </p>
+</Layout>
+EOF
+
+# Create about page
+cat > src/pages/about.astro << 'EOF'
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="About - Astro Blog">
+  <h2>About This Demo</h2>
+  <p>
+    This blog demonstrates the <strong>worker-in-browser pattern</strong>:
+    the same SSR code that runs on Cloudflare Workers can also run
+    directly in your browser.
+  </p>
+
+  <h3>How It Works</h3>
+  <ol>
+    <li>Build Astro for Cloudflare (produces <code>_worker.js</code>)</li>
+    <li>Bundle the worker for browser with esbuild</li>
+    <li>Turbo intercepts navigation and form submissions</li>
+    <li>Requests route to <code>worker.fetch()</code> instead of HTTP</li>
+    <li>Worker renders HTML, Turbo updates the page</li>
+  </ol>
+
+  <h3>Database Adapters</h3>
+  <ul>
+    <li><strong>Edge</strong>: D1 (SQLite at the edge)</li>
+    <li><strong>Browser</strong>: Dexie (IndexedDB)</li>
+  </ul>
+
+  <p>Same application logic, different storage backends.</p>
+
+  <p><a href="/articles">&larr; Back to Articles</a></p>
+</Layout>
+EOF
+
+# Create database adapter (D1)
+cat > src/lib/db.ts << 'EOF'
+// Database adapter for Cloudflare D1
+// This file abstracts database access so it can be swapped for Dexie in browser
+
+import type { D1Database } from '@cloudflare/workers-types';
+
+let db: D1Database | null = null;
+
+export function initDatabase(binding: D1Database) {
+  db = binding;
+}
+
+export function getDatabase(): D1Database {
+  if (!db) throw new Error('Database not initialized. Call initDatabase first.');
+  return db;
+}
+
+// Schema creation (run once via wrangler d1 execute)
+export const SCHEMA = `
+CREATE TABLE IF NOT EXISTS articles (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  body TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS comments (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  article_id INTEGER NOT NULL,
+  commenter TEXT NOT NULL,
+  body TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  FOREIGN KEY (article_id) REFERENCES articles(id) ON DELETE CASCADE
+);
+`;
+EOF
+
+# Create Article model
+cat > src/models/Article.ts << 'EOF'
+// Article model - matches Rails blog structure
+
+import { getDatabase } from '../lib/db';
+
+export interface Article {
+  id: number;
+  title: string;
+  body: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ArticleInput {
+  title: string;
+  body: string;
+}
+
+export interface ValidationErrors {
+  title?: string[];
+  body?: string[];
+}
+
+export function validateArticle(input: ArticleInput): ValidationErrors {
+  const errors: ValidationErrors = {};
+
+  if (!input.title || input.title.trim() === '') {
+    errors.title = ["can't be blank"];
+  }
+
+  if (!input.body || input.body.trim() === '') {
+    errors.body = ["can't be blank"];
+  } else if (input.body.length < 10) {
+    errors.body = ["is too short (minimum is 10 characters)"];
+  }
+
+  return errors;
+}
+
+export function hasErrors(errors: ValidationErrors): boolean {
+  return Object.keys(errors).length > 0;
+}
+
+export async function getAllArticles(): Promise<Article[]> {
+  const db = getDatabase();
+  const result = await db.prepare(
+    'SELECT * FROM articles ORDER BY created_at DESC'
+  ).all<Article>();
+  return result.results;
+}
+
+export async function getArticle(id: number): Promise<Article | null> {
+  const db = getDatabase();
+  const result = await db.prepare(
+    'SELECT * FROM articles WHERE id = ?'
+  ).bind(id).first<Article>();
+  return result;
+}
+
+export async function createArticle(input: ArticleInput): Promise<Article> {
+  const db = getDatabase();
+  const now = new Date().toISOString();
+
+  const result = await db.prepare(
+    'INSERT INTO articles (title, body, created_at, updated_at) VALUES (?, ?, ?, ?) RETURNING *'
+  ).bind(input.title, input.body, now, now).first<Article>();
+
+  return result!;
+}
+
+export async function updateArticle(id: number, input: ArticleInput): Promise<Article | null> {
+  const db = getDatabase();
+  const now = new Date().toISOString();
+
+  const result = await db.prepare(
+    'UPDATE articles SET title = ?, body = ?, updated_at = ? WHERE id = ? RETURNING *'
+  ).bind(input.title, input.body, now, id).first<Article>();
+
+  return result;
+}
+
+export async function deleteArticle(id: number): Promise<boolean> {
+  const db = getDatabase();
+
+  // Delete comments first (cascade)
+  await db.prepare('DELETE FROM comments WHERE article_id = ?').bind(id).run();
+
+  const result = await db.prepare('DELETE FROM articles WHERE id = ?').bind(id).run();
+  return result.meta.changes > 0;
+}
+EOF
+
+# Create Comment model
+cat > src/models/Comment.ts << 'EOF'
+// Comment model - belongs to Article
+
+import { getDatabase } from '../lib/db';
+
+export interface Comment {
+  id: number;
+  article_id: number;
+  commenter: string;
+  body: string;
+  created_at: string;
+}
+
+export interface CommentInput {
+  commenter: string;
+  body: string;
+}
+
+export async function getComments(articleId: number): Promise<Comment[]> {
+  const db = getDatabase();
+  const result = await db.prepare(
+    'SELECT * FROM comments WHERE article_id = ? ORDER BY created_at ASC'
+  ).bind(articleId).all<Comment>();
+  return result.results;
+}
+
+export async function createComment(articleId: number, input: CommentInput): Promise<Comment> {
+  const db = getDatabase();
+  const now = new Date().toISOString();
+
+  const result = await db.prepare(
+    'INSERT INTO comments (article_id, commenter, body, created_at) VALUES (?, ?, ?, ?) RETURNING *'
+  ).bind(articleId, input.commenter, input.body, now).first<Comment>();
+
+  return result!;
+}
+
+export async function deleteComment(id: number): Promise<boolean> {
+  const db = getDatabase();
+  const result = await db.prepare('DELETE FROM comments WHERE id = ?').bind(id).run();
+  return result.meta.changes > 0;
+}
+EOF
+
+# Create articles index page
+cat > src/pages/articles/index.astro << 'EOF'
+---
+import Layout from '../../layouts/Layout.astro';
+import { initDatabase } from '../../lib/db';
+import { getAllArticles, type Article } from '../../models/Article';
+
+// Initialize D1 from Cloudflare binding
+initDatabase(Astro.locals.runtime.env.DB);
+
+const articles = await getAllArticles();
+---
+
+<Layout title="Articles - Astro Blog">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+    <h2>Articles</h2>
+    <a href="/articles/new" class="btn">New Article</a>
+  </div>
+
+  {articles.length === 0 ? (
+    <p>No articles yet. <a href="/articles/new">Create one</a>!</p>
+  ) : (
+    <div id="articles">
+      {articles.map((article: Article) => (
+        <div class="article-card">
+          <h2><a href={`/articles/${article.id}`}>{article.title}</a></h2>
+          <p class="article-meta">
+            Created {new Date(article.created_at).toLocaleDateString()}
+          </p>
+          <p>{article.body.substring(0, 200)}{article.body.length > 200 ? '...' : ''}</p>
+        </div>
+      ))}
+    </div>
+  )}
+</Layout>
+EOF
+
+# Create new article page
+cat > src/pages/articles/new.astro << 'EOF'
+---
+import Layout from '../../layouts/Layout.astro';
+import { initDatabase } from '../../lib/db';
+import { createArticle, validateArticle, hasErrors, type ValidationErrors } from '../../models/Article';
+
+// Initialize D1 from Cloudflare binding
+initDatabase(Astro.locals.runtime.env.DB);
+
+let errors: ValidationErrors = {};
+let title = '';
+let body = '';
+
+if (Astro.request.method === 'POST') {
+  const formData = await Astro.request.formData();
+  title = formData.get('title')?.toString() || '';
+  body = formData.get('body')?.toString() || '';
+
+  errors = validateArticle({ title, body });
+
+  if (!hasErrors(errors)) {
+    const article = await createArticle({ title, body });
+    return Astro.redirect(`/articles/${article.id}`);
+  }
+}
+---
+
+<Layout title="New Article - Astro Blog">
+  <h2>New Article</h2>
+
+  <form method="POST">
+    <div class="form-group">
+      <label for="title">Title</label>
+      <input type="text" id="title" name="title" value={title} />
+      {errors.title && <p class="error">{errors.title[0]}</p>}
+    </div>
+
+    <div class="form-group">
+      <label for="body">Body</label>
+      <textarea id="body" name="body">{body}</textarea>
+      {errors.body && <p class="error">{errors.body[0]}</p>}
+    </div>
+
+    <div class="actions">
+      <button type="submit" class="btn">Create Article</button>
+      <a href="/articles">Cancel</a>
+    </div>
+  </form>
+</Layout>
+EOF
+
+# Create show article page
+cat > 'src/pages/articles/[id].astro' << 'EOF'
+---
+import Layout from '../../layouts/Layout.astro';
+import { initDatabase } from '../../lib/db';
+import { getArticle, deleteArticle } from '../../models/Article';
+import { getComments, createComment, deleteComment, type Comment } from '../../models/Comment';
+
+// Initialize D1 from Cloudflare binding
+initDatabase(Astro.locals.runtime.env.DB);
+
+const id = Number(Astro.params.id);
+
+// Handle POST actions
+if (Astro.request.method === 'POST') {
+  const formData = await Astro.request.formData();
+  const action = formData.get('_action');
+
+  if (action === 'delete_article') {
+    await deleteArticle(id);
+    return Astro.redirect('/articles');
+  }
+
+  if (action === 'add_comment') {
+    const commenter = formData.get('commenter')?.toString() || 'Anonymous';
+    const body = formData.get('body')?.toString() || '';
+    if (body.trim()) {
+      await createComment(id, { commenter, body });
+    }
+    return Astro.redirect(`/articles/${id}`);
+  }
+
+  if (action === 'delete_comment') {
+    const commentId = Number(formData.get('comment_id'));
+    await deleteComment(commentId);
+    return Astro.redirect(`/articles/${id}`);
+  }
+}
+
+const article = await getArticle(id);
+
+if (!article) {
+  return Astro.redirect('/articles');
+}
+
+const comments = await getComments(id);
+---
+
+<Layout title={`${article.title} - Astro Blog`}>
+  <article>
+    <h2>{article.title}</h2>
+    <p class="article-meta">
+      Created {new Date(article.created_at).toLocaleDateString()}
+      {article.updated_at !== article.created_at && (
+        <span> · Updated {new Date(article.updated_at).toLocaleDateString()}</span>
+      )}
+    </p>
+    <div class="article-body">{article.body}</div>
+
+    <div class="actions">
+      <a href={`/articles/${id}/edit`} class="btn">Edit</a>
+      <form method="POST" style="display: inline;">
+        <input type="hidden" name="_action" value="delete_article" />
+        <button type="submit" class="btn btn-danger"
+                onclick="return confirm('Are you sure?')">Delete</button>
+      </form>
+      <a href="/articles">Back to Articles</a>
+    </div>
+  </article>
+
+  <section class="comments-section">
+    <h3>Comments ({comments.length})</h3>
+
+    <div id="comments">
+      {comments.map((comment: Comment) => (
+        <div class="comment">
+          <p class="comment-meta">
+            <strong>{comment.commenter}</strong> ·
+            {new Date(comment.created_at).toLocaleDateString()}
+            <form method="POST" style="display: inline; margin-left: 1rem;">
+              <input type="hidden" name="_action" value="delete_comment" />
+              <input type="hidden" name="comment_id" value={comment.id} />
+              <button type="submit" style="background: none; border: none; color: var(--color-error); cursor: pointer;">
+                Delete
+              </button>
+            </form>
+          </p>
+          <p>{comment.body}</p>
+        </div>
+      ))}
+    </div>
+
+    <h4 style="margin-top: 1rem;">Add a comment</h4>
+    <form method="POST">
+      <input type="hidden" name="_action" value="add_comment" />
+      <div class="form-group">
+        <label for="commenter">Name</label>
+        <input type="text" id="commenter" name="commenter" placeholder="Anonymous" />
+      </div>
+      <div class="form-group">
+        <label for="comment_body">Comment</label>
+        <textarea id="comment_body" name="body" rows="3"></textarea>
+      </div>
+      <button type="submit" class="btn">Post Comment</button>
+    </form>
+  </section>
+</Layout>
+EOF
+
+# Create edit article page
+mkdir -p 'src/pages/articles/[id]'
+cat > 'src/pages/articles/[id]/edit.astro' << 'EOF'
+---
+import Layout from '../../../layouts/Layout.astro';
+import { initDatabase } from '../../../lib/db';
+import { getArticle, updateArticle, validateArticle, hasErrors, type ValidationErrors } from '../../../models/Article';
+
+// Initialize D1 from Cloudflare binding
+initDatabase(Astro.locals.runtime.env.DB);
+
+const id = Number(Astro.params.id);
+let article = await getArticle(id);
+
+if (!article) {
+  return Astro.redirect('/articles');
+}
+
+let errors: ValidationErrors = {};
+let title = article.title;
+let body = article.body;
+
+if (Astro.request.method === 'POST') {
+  const formData = await Astro.request.formData();
+  title = formData.get('title')?.toString() || '';
+  body = formData.get('body')?.toString() || '';
+
+  errors = validateArticle({ title, body });
+
+  if (!hasErrors(errors)) {
+    await updateArticle(id, { title, body });
+    return Astro.redirect(`/articles/${id}`);
+  }
+}
+---
+
+<Layout title={`Edit: ${article.title} - Astro Blog`}>
+  <h2>Edit Article</h2>
+
+  <form method="POST">
+    <div class="form-group">
+      <label for="title">Title</label>
+      <input type="text" id="title" name="title" value={title} />
+      {errors.title && <p class="error">{errors.title[0]}</p>}
+    </div>
+
+    <div class="form-group">
+      <label for="body">Body</label>
+      <textarea id="body" name="body">{body}</textarea>
+      {errors.body && <p class="error">{errors.body[0]}</p>}
+    </div>
+
+    <div class="actions">
+      <button type="submit" class="btn">Update Article</button>
+      <a href={`/articles/${id}`}>Cancel</a>
+    </div>
+  </form>
+</Layout>
+EOF
+
+# Create favicon
+cat > public/favicon.svg << 'EOF'
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <rect width="128" height="128" fill="#2563eb" rx="8"/>
+  <text x="64" y="80" font-family="system-ui" font-size="64" fill="white" text-anchor="middle">A</text>
+</svg>
+EOF
+
+# Update package.json with scripts
+cat > package.json << 'EOF'
+{
+  "name": "astro-blog-v3",
+  "type": "module",
+  "version": "0.0.1",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro",
+    "db:init": "wrangler d1 execute blog --local --file=./schema.sql",
+    "db:seed": "wrangler d1 execute blog --local --file=./seed.sql"
+  },
+  "dependencies": {
+    "@astrojs/cloudflare": "^12.0.0",
+    "@hotwired/turbo": "^8.0.0",
+    "astro": "^5.0.0"
+  }
+}
+EOF
+
+# Create schema.sql for D1 initialization
+cat > schema.sql << 'EOF'
+CREATE TABLE IF NOT EXISTS articles (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  body TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS comments (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  article_id INTEGER NOT NULL,
+  commenter TEXT NOT NULL,
+  body TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  FOREIGN KEY (article_id) REFERENCES articles(id) ON DELETE CASCADE
+);
+EOF
+
+# Create seed.sql with sample data
+cat > seed.sql << 'EOF'
+INSERT INTO articles (title, body, created_at, updated_at) VALUES
+  ('Welcome to Astro Blog', 'This is the first article in our Astro blog demo. It demonstrates idiomatic Astro SSR with Cloudflare Workers.
+
+The same code runs on the edge (with D1 database) or in the browser (with IndexedDB via the worker-in-browser pattern).', datetime('now'), datetime('now')),
+
+  ('Understanding the Worker-in-Browser Pattern', 'Edge functions like Cloudflare Workers use standard Web APIs: Request in, Response out. These same APIs are available in browsers.
+
+This means we can bundle the worker for the browser, intercept navigation with Turbo, and route requests to worker.fetch() instead of HTTP. The result is offline-capable SSR!', datetime('now'), datetime('now')),
+
+  ('Database Adapters', 'The only difference between edge and browser deployments is the database:
+
+- Edge: D1 (SQLite at the edge)
+- Browser: Dexie (IndexedDB)
+
+The application code stays the same. Only the adapter changes.', datetime('now'), datetime('now'));
+
+INSERT INTO comments (article_id, commenter, body, created_at) VALUES
+  (1, 'Alice', 'Great introduction! Looking forward to more posts.', datetime('now')),
+  (1, 'Bob', 'This is exactly what I was looking for.', datetime('now')),
+  (2, 'Charlie', 'The worker-in-browser pattern is brilliant!', datetime('now'));
+EOF
+
+# ============================================================
+# Browser Shim Infrastructure
+# ============================================================
+
+echo -e "${GREEN}Creating browser shim infrastructure...${NC}"
+
+# Create browser directory
+mkdir -p browser
+
+# Create esbuild bundler for browser
+cat > browser/bundle-for-browser.mjs << 'EOF'
+// Bundle the Cloudflare worker for browser execution
+import * as esbuild from 'esbuild';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const projectRoot = join(__dirname, '..');
+
+// List of Node.js built-in modules to shim
+const nodeBuiltins = [
+  'fs', 'path', 'os', 'crypto', 'util', 'events', 'stream', 'buffer',
+  'child_process', 'http', 'https', 'net', 'tls', 'dns', 'url', 'querystring',
+  'zlib', 'assert', 'constants', 'module', 'process', 'vm', 'worker_threads',
+  'perf_hooks', 'async_hooks', 'string_decoder', 'timers', 'tty', 'readline'
+];
+
+// Plugin to shim cloudflare:*, node:*, and Node.js built-ins
+const browserShimPlugin = {
+  name: 'browser-shim',
+  setup(build) {
+    // Shim cloudflare:workers (used by @astrojs/cloudflare)
+    build.onResolve({ filter: /^cloudflare:/ }, args => {
+      return { path: args.path, namespace: 'cloudflare-shim' };
+    });
+
+    build.onLoad({ filter: /.*/, namespace: 'cloudflare-shim' }, () => {
+      return {
+        contents: `
+          // Cloudflare Workers shim for browser
+          export const WorkerEntrypoint = class {};
+          export default {};
+        `,
+        loader: 'js'
+      };
+    });
+
+    // Shim node:* imports
+    build.onResolve({ filter: /^node:/ }, args => {
+      return { path: args.path, namespace: 'node-shim' };
+    });
+
+    // Shim bare Node.js built-in imports (without node: prefix)
+    const builtinPattern = new RegExp(`^(${nodeBuiltins.join('|')})$`);
+    build.onResolve({ filter: builtinPattern }, args => {
+      return { path: args.path, namespace: 'node-shim' };
+    });
+
+    build.onLoad({ filter: /.*/, namespace: 'node-shim' }, (args) => {
+      // Provide empty shims for Node.js built-ins
+      const moduleName = args.path.replace(/^node:/, '');
+
+      // Special handling for common modules
+      if (moduleName === 'path') {
+        return {
+          contents: `
+            export const join = (...args) => args.join('/');
+            export const resolve = (...args) => args.join('/');
+            export const dirname = (p) => p.split('/').slice(0, -1).join('/');
+            export const basename = (p) => p.split('/').pop();
+            export const extname = (p) => { const m = p.match(/\\.[^.]+$/); return m ? m[0] : ''; };
+            export default { join, resolve, dirname, basename, extname };
+          `,
+          loader: 'js'
+        };
+      }
+
+      if (moduleName === 'fs' || moduleName === 'child_process') {
+        return {
+          contents: `
+            export const readFileSync = () => { throw new Error('fs not available in browser'); };
+            export const writeFileSync = () => { throw new Error('fs not available in browser'); };
+            export const existsSync = () => false;
+            export const execSync = () => { throw new Error('child_process not available in browser'); };
+            export default {};
+          `,
+          loader: 'js'
+        };
+      }
+
+      // Generic empty shim for other modules
+      return {
+        contents: 'export default {};',
+        loader: 'js'
+      };
+    });
+  }
+};
+
+// Plugin to replace D1 database with Dexie
+const dexieAdapterPlugin = {
+  name: 'dexie-adapter',
+  setup(build) {
+    // Replace db.ts imports with browser version
+    build.onResolve({ filter: /\.\.\/lib\/db|\.\.\/\.\.\/lib\/db|\.\.\/\.\.\/\.\.\/lib\/db/ }, args => {
+      return { path: join(projectRoot, 'browser/db-browser.mjs') };
+    });
+  }
+};
+
+async function bundle() {
+  console.log('Bundling worker for browser...');
+
+  try {
+    const result = await esbuild.build({
+      entryPoints: [join(projectRoot, 'dist/_worker.js/index.js')],
+      bundle: true,
+      outfile: join(projectRoot, 'dist/browser-worker.mjs'),
+      format: 'esm',
+      platform: 'browser',
+      target: 'es2020',
+      plugins: [browserShimPlugin, dexieAdapterPlugin],
+      external: [], // Bundle everything
+      minify: false, // Keep readable for debugging
+      sourcemap: true,
+      define: {
+        'process.env.NODE_ENV': '"production"'
+      },
+      logLevel: 'info'
+    });
+
+    console.log('Bundle created: dist/browser-worker.mjs');
+    return result;
+  } catch (error) {
+    console.error('Bundle failed:', error);
+    process.exit(1);
+  }
+}
+
+bundle();
+EOF
+
+# Create Dexie-based database adapter for browser
+cat > browser/db-browser.mjs << 'EOF'
+// Database adapter for browser (Dexie/IndexedDB)
+// This is a drop-in replacement for src/lib/db.ts when running in browser
+
+import Dexie from 'dexie';
+
+let db = null;
+
+// Create a D1-compatible interface on top of Dexie
+class DexieD1Compat {
+  constructor(dexie) {
+    this.dexie = dexie;
+  }
+
+  prepare(sql) {
+    return new PreparedStatement(this.dexie, sql);
+  }
+
+  async exec(sql) {
+    // For schema creation - Dexie handles this automatically
+    console.log('exec (no-op for Dexie):', sql.substring(0, 50) + '...');
+    return { results: [] };
+  }
+}
+
+class PreparedStatement {
+  constructor(dexie, sql) {
+    this.dexie = dexie;
+    this.sql = sql;
+    this.params = [];
+  }
+
+  bind(...params) {
+    this.params = params;
+    return this;
+  }
+
+  async all() {
+    const { table, where, orderBy, orderDir } = this._parseSelect();
+    if (!table) {
+      console.warn('Could not parse SELECT:', this.sql);
+      return { results: [] };
+    }
+
+    let query = this.dexie.table(table);
+
+    if (where) {
+      query = query.where(where.column).equals(where.value);
+    }
+
+    let results = await query.toArray();
+
+    if (orderBy) {
+      results.sort((a, b) => {
+        const aVal = a[orderBy];
+        const bVal = b[orderBy];
+        const cmp = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
+        return orderDir === 'DESC' ? -cmp : cmp;
+      });
+    }
+
+    return { results };
+  }
+
+  async first() {
+    const result = await this.all();
+    return result.results[0] || null;
+  }
+
+  async run() {
+    const sqlUpper = this.sql.trim().toUpperCase();
+
+    if (sqlUpper.startsWith('INSERT')) {
+      return await this._insert();
+    } else if (sqlUpper.startsWith('UPDATE')) {
+      return await this._update();
+    } else if (sqlUpper.startsWith('DELETE')) {
+      return await this._delete();
+    }
+
+    return { meta: { changes: 0 } };
+  }
+
+  async _insert() {
+    const match = this.sql.match(/INSERT INTO (\w+)\s*\(([^)]+)\)/i);
+    if (!match) {
+      console.warn('Could not parse INSERT:', this.sql);
+      return { meta: { changes: 0, last_row_id: null } };
+    }
+
+    const table = match[1];
+    const columns = match[2].split(',').map(c => c.trim());
+
+    const data = {};
+    columns.forEach((col, i) => {
+      data[col] = this.params[i];
+    });
+
+    const id = await this.dexie.table(table).add(data);
+
+    // Handle RETURNING *
+    if (this.sql.includes('RETURNING')) {
+      const record = await this.dexie.table(table).get(id);
+      return record;
+    }
+
+    return { meta: { changes: 1, last_row_id: id } };
+  }
+
+  async _update() {
+    const match = this.sql.match(/UPDATE (\w+)\s+SET\s+(.+?)\s+WHERE\s+(\w+)\s*=\s*\?/i);
+    if (!match) {
+      console.warn('Could not parse UPDATE:', this.sql);
+      return { meta: { changes: 0 } };
+    }
+
+    const table = match[1];
+    const setClause = match[2];
+    const whereColumn = match[3];
+
+    // Parse SET clause
+    const setParts = setClause.split(',').map(p => p.trim());
+    const updates = {};
+    let paramIdx = 0;
+
+    for (const part of setParts) {
+      const [col] = part.split('=').map(s => s.trim());
+      updates[col] = this.params[paramIdx++];
+    }
+
+    const whereValue = this.params[paramIdx];
+
+    await this.dexie.table(table).where(whereColumn).equals(whereValue).modify(updates);
+
+    // Handle RETURNING *
+    if (this.sql.includes('RETURNING')) {
+      const record = await this.dexie.table(table).get(whereValue);
+      return record;
+    }
+
+    return { meta: { changes: 1 } };
+  }
+
+  async _delete() {
+    const match = this.sql.match(/DELETE FROM (\w+)\s+WHERE\s+(\w+)\s*=\s*\?/i);
+    if (!match) {
+      console.warn('Could not parse DELETE:', this.sql);
+      return { meta: { changes: 0 } };
+    }
+
+    const table = match[1];
+    const column = match[2];
+    const value = this.params[0];
+
+    const count = await this.dexie.table(table).where(column).equals(value).delete();
+    return { meta: { changes: count } };
+  }
+
+  _parseSelect() {
+    const selectMatch = this.sql.match(/SELECT\s+.+?\s+FROM\s+(\w+)/i);
+    if (!selectMatch) return {};
+
+    const table = selectMatch[1];
+
+    let where = null;
+    const whereMatch = this.sql.match(/WHERE\s+(\w+)\s*=\s*\?/i);
+    if (whereMatch && this.params.length > 0) {
+      where = { column: whereMatch[1], value: this.params[0] };
+    }
+
+    let orderBy = null;
+    let orderDir = 'ASC';
+    const orderMatch = this.sql.match(/ORDER BY\s+(\w+)(?:\s+(ASC|DESC))?/i);
+    if (orderMatch) {
+      orderBy = orderMatch[1];
+      orderDir = orderMatch[2] || 'ASC';
+    }
+
+    return { table, where, orderBy, orderDir };
+  }
+}
+
+export function initDatabase(binding) {
+  // In browser mode, binding is ignored - we use Dexie
+  if (db) return;
+
+  const dexie = new Dexie('astro-blog');
+  dexie.version(1).stores({
+    articles: '++id, title, created_at',
+    comments: '++id, article_id, created_at'
+  });
+
+  db = new DexieD1Compat(dexie);
+  console.log('Initialized Dexie database for browser');
+}
+
+export function getDatabase() {
+  if (!db) throw new Error('Database not initialized. Call initDatabase first.');
+  return db;
+}
+
+export const SCHEMA = ''; // Not needed for Dexie
+EOF
+
+# Create Turbo integration for browser
+cat > browser/turbo-integration.mjs << 'EOF'
+// Turbo integration for worker-in-browser pattern
+// Intercepts navigation and form submissions, routes to local worker
+
+let worker = null;
+
+export async function initWorkerInBrowser() {
+  console.log('Initializing worker-in-browser...');
+
+  // Import the bundled worker
+  const workerModule = await import('./browser-worker.mjs');
+  worker = workerModule.default;
+
+  // Set up Turbo event interception
+  setupTurboInterception();
+
+  console.log('Worker-in-browser ready');
+  return worker;
+}
+
+function setupTurboInterception() {
+  // Intercept Turbo navigation (link clicks)
+  document.addEventListener('turbo:before-fetch-request', async (event) => {
+    const { url, fetchOptions } = event.detail;
+
+    // Only intercept same-origin requests
+    if (new URL(url).origin !== window.location.origin) {
+      return;
+    }
+
+    // Prevent the actual HTTP request
+    event.preventDefault();
+
+    try {
+      // Route to local worker
+      const response = await routeToWorker(url, fetchOptions);
+
+      // Complete the Turbo request with our response
+      event.detail.resume();
+
+      // Turbo will handle the response
+      // We need to provide it through a custom response handler
+    } catch (error) {
+      console.error('Worker error:', error);
+      // Let Turbo handle the error
+    }
+  });
+
+  // Intercept form submissions
+  document.addEventListener('turbo:submit-start', async (event) => {
+    const form = event.target;
+    const formData = new FormData(form);
+    const method = form.method?.toUpperCase() || 'GET';
+    const action = form.action || window.location.href;
+
+    // Only intercept same-origin submissions
+    if (new URL(action).origin !== window.location.origin) {
+      return;
+    }
+
+    event.preventDefault();
+
+    try {
+      const response = await routeToWorker(action, {
+        method,
+        body: formData,
+        headers: {
+          'Accept': 'text/html'
+        }
+      });
+
+      // Handle redirect responses
+      if (response.status >= 300 && response.status < 400) {
+        const location = response.headers.get('Location');
+        if (location) {
+          window.Turbo.visit(location);
+          return;
+        }
+      }
+
+      // Update the page with the response
+      const html = await response.text();
+      document.documentElement.innerHTML = html;
+      window.Turbo.visit(action, { action: 'replace' });
+    } catch (error) {
+      console.error('Form submission error:', error);
+    }
+  });
+}
+
+async function routeToWorker(url, fetchOptions = {}) {
+  // Create a Request object
+  const request = new Request(url, {
+    method: fetchOptions.method || 'GET',
+    headers: fetchOptions.headers || {},
+    body: fetchOptions.body
+  });
+
+  // Create browser-compatible env
+  const env = {
+    DB: null, // Will be initialized by the worker
+    ASSETS: {
+      fetch: async (assetUrl) => {
+        // Fetch static assets normally
+        return fetch(assetUrl);
+      }
+    }
+  };
+
+  const ctx = {
+    waitUntil: (promise) => promise.catch(console.error)
+  };
+
+  // Call the worker's fetch handler
+  return await worker.fetch(request, env, ctx);
+}
+
+// Export for manual navigation
+export async function navigate(url) {
+  const response = await routeToWorker(url);
+  const html = await response.text();
+  document.documentElement.innerHTML = html;
+  history.pushState({}, '', url);
+}
+EOF
+
+# Create browser entry point HTML
+cat > browser/index.html << 'EOF'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Astro Blog (Browser Mode)</title>
+</head>
+<body>
+  <div id="loading">Loading worker...</div>
+
+  <script type="module">
+    import * as Turbo from '@hotwired/turbo';
+    import { initWorkerInBrowser, navigate } from './turbo-integration.mjs';
+
+    // Shim caches API (browsers have it, but we need to ensure it's available)
+    globalThis.caches = globalThis.caches || {
+      open: async () => ({
+        match: async () => undefined,
+        put: async () => {}
+      })
+    };
+
+    async function boot() {
+      try {
+        await initWorkerInBrowser();
+
+        // Initial page render
+        const response = await navigate('/');
+
+        document.getElementById('loading').remove();
+      } catch (error) {
+        document.getElementById('loading').innerHTML =
+          `<p style="color: red;">Error loading worker: ${error.message}</p>`;
+        console.error(error);
+      }
+    }
+
+    boot();
+  </script>
+</body>
+</html>
+EOF
+
+# Create a simple test script for browser mode
+cat > browser/test-worker.mjs << 'EOF'
+// Test the browser worker bundle in Node.js
+// This verifies the worker can render HTML without actual browser APIs
+
+// Shim browser globals
+globalThis.caches = {
+  open: async () => ({
+    match: async () => undefined,
+    put: async () => {}
+  }),
+  default: {
+    match: async () => undefined,
+    put: async () => {}
+  }
+};
+
+async function test() {
+  console.log('Loading browser worker bundle...');
+
+  try {
+    const worker = await import('../dist/browser-worker.mjs');
+    console.log('Worker loaded successfully!');
+
+    // Create a test request
+    const request = new Request('http://localhost/');
+
+    const env = {
+      DB: null,
+      ASSETS: {
+        fetch: async (url) => new Response('Not found', { status: 404 })
+      }
+    };
+
+    const ctx = {
+      waitUntil: (p) => p.catch(console.error)
+    };
+
+    console.log('\nRendering index page...');
+    const response = await worker.default.fetch(request, env, ctx);
+    console.log(`Response status: ${response.status}`);
+
+    if (response.ok) {
+      const html = await response.text();
+      console.log(`Response length: ${html.length} chars`);
+      console.log('\n--- HTML Output (first 500 chars) ---');
+      console.log(html.slice(0, 500));
+      console.log('\n--- Success! ---');
+    }
+  } catch (error) {
+    console.error('Error:', error.message);
+    console.error(error.stack);
+  }
+}
+
+test();
+EOF
+
+# Update package.json with browser scripts
+cat > package.json << 'EOF'
+{
+  "name": "astro-blog-v3",
+  "type": "module",
+  "version": "0.0.1",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "build:browser": "astro build && node browser/bundle-for-browser.mjs",
+    "preview": "astro preview",
+    "astro": "astro",
+    "db:init": "wrangler d1 execute blog --local --file=./schema.sql",
+    "db:seed": "wrangler d1 execute blog --local --file=./seed.sql",
+    "test:worker": "node browser/test-worker.mjs"
+  },
+  "dependencies": {
+    "@astrojs/cloudflare": "^12.0.0",
+    "@hotwired/turbo": "^8.0.0",
+    "astro": "^5.0.0",
+    "dexie": "^4.0.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.0"
+  }
+}
+EOF
+
+# Install additional dependencies
+npm install dexie esbuild --save > /dev/null 2>&1
+
+echo ""
+echo -e "${GREEN}Astro blog v3 created at: $PROJECT_DIR${NC}"
+echo ""
+echo "Next steps for Cloudflare deployment:"
+echo "  cd $PROJECT_DIR"
+echo "  npm run db:init    # Initialize D1 schema"
+echo "  npm run db:seed    # Add sample data"
+echo "  npm run dev        # Start dev server"
+echo ""
+echo "For browser-only mode:"
+echo "  npm run build:browser    # Build worker for browser"
+echo "  npm run test:worker      # Test worker in Node"
+echo ""

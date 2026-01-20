@@ -32,6 +32,8 @@
     "./migrate.mjs": "./migrate.mjs",
     "./vite": "./vite.mjs",
     "./vite.mjs": "./vite.mjs",
+    "./vite-models": "./vite-models.mjs",
+    "./vite-models.mjs": "./vite-models.mjs",
     "./vite-ssr-dev": "./vite-ssr-dev.mjs",
     "./vite-ssr-dev.mjs": "./vite-ssr-dev.mjs",
     "./astro": "./dist/astro_component_transformer.mjs",
@@ -57,6 +59,7 @@
     "server.mjs",
     "migrate.mjs",
     "vite.mjs",
+    "vite-models.mjs",
     "vite-ssr-dev.mjs"
   ],
   "keywords": [

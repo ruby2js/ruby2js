@@ -6,75 +6,137 @@ Transpile the Rails blog demo to three SFC frameworks (Astro, Vue, Svelte), prov
 
 ## Approach
 
-**Stage 0**: Hand-craft target applications equivalent to the Rails blog
-**Stage 1**: Build transpiler that produces Stage 0 output from Rails source
-**Stage 2**: Add real-time updates
-**Stage 3**: Expand target/database combinations
+**Stage 0**: Hand-craft target applications equivalent to the Rails blog (using ruby2js-rails infrastructure)
+**Stage 1**: Build transpiler that produces Stage 0 output from Rails source (real-time included via model broadcasts)
+**Stage 2**: Expand target/database combinations
 
 ---
 
-## Combination Triage
+## Key Architectural Insight: Worker-in-Browser Pattern
+
+**Discovery (Jan 2026)**: Edge functions (Cloudflare Workers, Vercel Edge) use standard Web APIs (`Request` → `Response`) - the same APIs available in browsers. This means:
+
+1. **Same code runs everywhere**: Build for Cloudflare → runs on edge OR in browser
+2. **Turbo provides the glue**: Same event hooks (`turbo:before-fetch-request`) that work for Rails work for any edge worker
+3. **No architectural split**: Instead of separate browser (SPA/islands) vs server (SSR) architectures, use ONE architecture
+
+### Proof of Concept Results
+
+- Astro SSR builds to Cloudflare Worker (`_worker.js`)
+- Worker can be bundled for browser (~530KB with esbuild)
+- Only two shims needed: `cloudflare:workers` (empty), `caches` (browsers have natively)
+- Worker renders HTML correctly when called as a function
+- Same Turbo integration pattern as Rails blog
+
+### What This Changes
+
+| Before | After |
+|--------|-------|
+| Browser target needs React islands for interactivity | Browser runs the SSR worker locally |
+| Separate architectures for browser vs server | One architecture: edge SSR |
+| Heavy client-side rendering for CRUD | Standard HTML with Turbo enhancement |
+| Framework-specific browser adaptations | Generic worker-in-browser shim |
+
+### The Pattern
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Turbo intercepts navigation/forms                          │
+│                         │                                   │
+│           ┌─────────────┴─────────────┐                    │
+│           ▼                           ▼                    │
+│   ┌───────────────┐           ┌───────────────┐           │
+│   │ Edge Runtime  │           │ Browser       │           │
+│   │ (Cloudflare)  │           │ (Worker-in-   │           │
+│   │               │           │  browser)     │           │
+│   │ worker.fetch()│           │ worker.fetch()│           │
+│   └───────────────┘           └───────────────┘           │
+│           │                           │                    │
+│           ▼                           ▼                    │
+│   ┌───────────────┐           ┌───────────────┐           │
+│   │ D1 Database   │           │ IndexedDB     │           │
+│   └───────────────┘           └───────────────┘           │
+└─────────────────────────────────────────────────────────────┘
+
+Same SSR code, same HTML output, same Turbo integration.
+Only the database adapter changes.
+```
+
+### Implications for Stage 0
+
+Instead of:
+- Astro pages + React islands for browser interactivity
+- Complex state management in islands
+- Client-side data fetching
+
+Use:
+- Idiomatic Astro SSR (standard links, forms)
+- Build for Cloudflare
+- Browser target runs the worker locally with Turbo
+
+This produces more idiomatic framework code and less custom infrastructure.
+
+---
+
+## Combination Triage (Revised)
 
 ### Dimensions
 
 - **Framework (-f)**: astro, vue, svelte, rails
-- **Target (-t)**: browser, node, cloudflare, vercel
-- **Database (-d)**: dexie, sqlite3, d1, neon, turso
+- **Target (-t)**: browser, node, cloudflare
+- **Database (-d)**: dexie, sqlite3, d1
 
-### Priority Matrix
+### Key Insight: Browser = Edge + Dexie
 
-#### Tier 1: Should Definitely Work (Initial Focus)
+With the worker-in-browser pattern, the browser target is just the edge build running locally:
+- **Build**: Target Cloudflare (produces `_worker.js`)
+- **Runtime**: Worker runs in browser, Turbo intercepts navigation
+- **Database**: Swap D1 → IndexedDB (Dexie)
 
-| Framework | Target | Database | Notes |
-|-----------|--------|----------|-------|
-| astro | browser | dexie | Static site + IndexedDB, simplest starting point |
-| vue | browser | dexie | SPA + IndexedDB |
-| svelte | browser | dexie | SvelteKit SPA + IndexedDB |
-| rails | browser | dexie | Current behavior (string templates + RPC) |
-| rails | node | sqlite3 | Current behavior (server-side rendering) |
+This means browser and cloudflare targets share 95% of code.
 
-These combinations use proven infrastructure and should work with minimal new code.
+### Priority Matrix (Revised)
 
-#### Tier 2: Should Work with Investigation
+#### Tier 1: Primary Focus
 
 | Framework | Target | Database | Notes |
 |-----------|--------|----------|-------|
-| astro | node | sqlite3 | Astro SSR mode |
-| astro | cloudflare | d1 | Astro + Cloudflare adapter |
-| svelte | node | sqlite3 | SvelteKit node adapter |
+| astro | cloudflare | d1 | Reference build - idiomatic SSR |
+| astro | browser | dexie | Same worker, different DB adapter |
+| rails | browser | dexie | Current behavior (baseline) |
+| rails | node | sqlite3 | Current behavior (baseline) |
+
+**Strategy**: Build Astro for Cloudflare first, then add browser shim.
+
+#### Tier 2: Extend to Other Frameworks
+
+| Framework | Target | Database | Notes |
+|-----------|--------|----------|-------|
 | svelte | cloudflare | d1 | SvelteKit cloudflare adapter |
-| vue | node | sqlite3 | Vue SSR (Nuxt-style or custom) |
-| rails | cloudflare | d1 | Current infrastructure |
+| svelte | browser | dexie | Same worker-in-browser pattern |
+| vue | cloudflare | d1 | Nuxt cloudflare adapter |
+| vue | browser | dexie | Same worker-in-browser pattern |
 
-These require understanding framework-specific SSR/edge patterns.
+Same pattern applies to all frameworks that target Cloudflare.
 
-#### Tier 3: Needs Research
+#### Tier 3: Node Targets
 
 | Framework | Target | Database | Notes |
 |-----------|--------|----------|-------|
-| vue | cloudflare | d1 | Vue on edge - Nuxt or custom? |
-| astro | vercel | neon | Astro + Vercel + Postgres |
-| svelte | vercel | neon | SvelteKit + Vercel + Postgres |
+| astro | node | sqlite3 | Astro node adapter |
+| svelte | node | sqlite3 | SvelteKit node adapter |
+| vue | node | sqlite3 | Nuxt node target |
 
-Edge + Postgres combinations need connection pooling investigation.
+Node targets use different adapters but same application code.
 
-#### Tier 4: Likely Impractical
+### Initial Scope (Revised)
 
-| Framework | Target | Database | Why |
-|-----------|--------|----------|-----|
-| * | browser | sqlite3 | SQLite needs server (unless sql.js WASM) |
-| * | browser | d1 | D1 is Cloudflare-only |
-| * | browser | neon/turso | Need server for connection |
+**Stage 0 focuses on Astro + Cloudflare:**
+1. Build idiomatic Astro SSR for Cloudflare
+2. Add worker-in-browser shim with Turbo integration
+3. Verify same app runs on edge AND in browser
 
-Browser target requires client-side database (dexie) or RPC to server.
-
-### Initial Scope
-
-**Stage 0-1 focuses on Tier 1:**
-- All frameworks with browser + dexie
-- Rails with node + sqlite3 (baseline)
-
-This proves the concept with the simplest viable combinations.
+This proves the pattern before extending to Vue/Svelte.
 
 ---
 
@@ -82,43 +144,65 @@ This proves the concept with the simplest viable combinations.
 
 ### Goal
 
-Create three hand-crafted SFC applications that match the Rails blog functionality:
+Create idiomatic SFC applications that match the Rails blog functionality:
 - Articles: index, show, new, edit, delete
 - Comments: nested under articles, create, delete
 - Shared layout with navigation
-- Same Dexie database schema
-- Same transpiled model classes (not shortcuts)
+- Standard HTML forms and links (Turbo-enhanced)
+- Same database schema, different adapters per target
 
-### 0.1 Astro Blog
+### 0.1 Astro Blog (Cloudflare Target)
 
-Create `test/astro-blog-v2/create-astro-blog`:
+Create `test/astro-blog-v3/` with idiomatic Astro SSR:
 
 ```
 src/
 ├── layouts/
-│   └── Layout.astro.rb         # Main layout
+│   └── Layout.astro             # Main layout with Turbo
 ├── pages/
-│   ├── index.astro.rb          # Landing page
-│   ├── about.astro.rb          # Static about page
+│   ├── index.astro              # Landing page
+│   ├── about.astro              # Static about page
 │   └── articles/
-│       ├── index.astro.rb      # Article list
-│       ├── new.astro.rb        # New article form (island)
-│       ├── [id].astro.rb       # Show article + comments
+│       ├── index.astro          # Article list (SSR)
+│       ├── new.astro            # New article form
+│       ├── [id].astro           # Show article + comments
 │       └── [id]/
-│           └── edit.astro.rb   # Edit article form (island)
-├── islands/
-│   ├── ArticleList.erb.rb      # Interactive article list
-│   ├── ArticleForm.erb.rb      # Article create/edit form
-│   ├── CommentList.erb.rb      # Comments for an article
-│   └── CommentForm.erb.rb      # Add comment form
+│           └── edit.astro       # Edit article form
 ├── models/
-│   ├── article.rb              # Transpiled from Rails
-│   └── comment.rb              # Transpiled from Rails
+│   ├── article.rb               # Ruby model (transpiled at build)
+│   └── comment.rb               # Ruby model (transpiled at build)
 └── lib/
-    └── db.js                   # Dexie setup (shared)
+    └── active_record.mjs        # Copied from ruby2js-rails/adapters
 ```
 
-**Key difference from existing astro-blog:** Uses transpiled models, not hand-written shortcuts.
+**Key approach: Reuse ruby2js-rails infrastructure**
+
+Instead of writing new adapters and Turbo integration:
+- **Models**: Ruby files, transpiled by ruby2js (same as Rails blog)
+- **Adapters**: Import from `ruby2js-rails/adapters/` (Dexie, D1, SQLite)
+- **Turbo integration**: Reuse pattern from `targets/browser/rails.js`
+- **Flash messages**: Already handled by existing infrastructure
+
+This means:
+- No new Dexie adapter code needed
+- No new Turbo event interception code needed
+- Stage 1 transpiler only converts views/controllers (models stay Ruby)
+- Same battle-tested infrastructure across Rails and Astro demos
+
+### 0.1.1 Browser Shim
+
+For browser target, reuse existing infrastructure:
+
+```
+browser/
+├── bundle-for-browser.mjs       # esbuild bundler (already created)
+└── boot.js                      # Initialize worker + Turbo interception
+```
+
+The boot script:
+1. Imports bundled worker
+2. Uses Turbo event interception pattern from ruby2js-rails
+3. Adapter swap happens at build time (D1 → Dexie)
 
 ### 0.2 Vue Blog
 
@@ -196,6 +280,18 @@ Each app must:
 
 ## Stage 1: Build the Transpiler
 
+### Key Insight: Models Stay as Ruby
+
+Since Astro (and Vue/Svelte) will use the same ruby2js-rails infrastructure:
+- **Models**: Copy directly from Rails (`app/models/*.rb` → `src/models/*.rb`)
+- **Adapters**: Already exist in ruby2js-rails package
+- **Turbo/Flash**: Already working infrastructure
+
+**The transpiler only needs to convert:**
+1. Controllers → page frontmatter (data fetching)
+2. Views (ERB) → framework templates (Astro/Vue/Svelte)
+3. Routes → file-based routing structure
+
 ### 1.1 Add Framework Flag
 
 Update `lib/ruby2js/cli/juntos.rb`:
@@ -236,10 +332,15 @@ module Ruby2JS
       private
 
       def convert_to_astro
-        # Read Rails source, produce Astro output
-        # - app/views/*.html.erb → src/pages/*.astro.rb or src/islands/*.erb.rb
-        # - app/controllers/*.rb → frontmatter in pages
-        # - app/models/*.rb → src/models/*.rb (copy)
+        # Models: copy as-is (transpiled at build time)
+        copy_models('src/models')
+
+        # Views + Controllers → Astro pages
+        # - app/views/articles/index.html.erb + index action → src/pages/articles/index.astro
+        convert_views_to_astro_pages
+
+        # Layout → src/layouts/Layout.astro
+        convert_layout
       end
 
       # Similar for vue, svelte, rails
@@ -331,65 +432,55 @@ __END__
 
 Update `SelfhostBuilder` to use framework converter when `-f` flag is set.
 
----
+### 1.5 Real-Time Updates (Included)
 
-## Stage 2: Real-Time Updates
+Since models copy as-is with their broadcast callbacks:
+```ruby
+class Article < ApplicationRecord
+  broadcasts_to ->(_article) { "articles" }, inserts_by: :prepend
+```
 
-### Goal
+Real-time should work automatically via:
+- `broadcast_append_to`, `broadcast_replace_to`, `broadcast_remove_to` (already in ActiveRecordBase)
+- BroadcastChannel API (works in browser)
+- Turbo Stream rendering (already in ruby2js-rails)
 
-Add real-time updates equivalent to Rails Turbo Streams.
-
-### Approach Per Framework
+**If framework-specific issues arise**, fall back to:
 
 | Framework | Mechanism | Implementation |
 |-----------|-----------|----------------|
-| Astro | Islands + WebSocket | Island subscribes to WS, re-renders on message |
-| Vue | Reactive + WebSocket | Composable that updates reactive refs on WS message |
-| Svelte | Stores + WebSocket | Store subscribes to WS, components react to store |
-| Rails | Turbo Streams | Current implementation |
+| Astro | Turbo Streams | Same as Rails (Turbo handles DOM updates) |
+| Vue | Turbo Streams or reactive | Turbo for SSR pages, reactive for SPA mode |
+| Svelte | Turbo Streams or stores | Turbo for SSR pages, stores for SPA mode |
 
-### Shared Infrastructure
+### Stage 1 Validation
 
-```javascript
-// lib/realtime.js - Shared WebSocket client
-export function subscribe(channel, callback) {
-  const ws = new WebSocket(wsUrl);
-  ws.onmessage = (e) => {
-    const data = JSON.parse(e.data);
-    if (data.channel === channel) {
-      callback(data.payload);
-    }
-  };
-  return () => ws.close();
-}
-```
-
-### Stage 2 Validation
-
-- [ ] Create article in one tab → appears in another tab
-- [ ] Delete article → removed in other tabs
-- [ ] Same for comments
-- [ ] Works across all three frameworks
+- [ ] `-f astro` produces working Astro app
+- [ ] `-f vue` produces working Vue app
+- [ ] `-f svelte` produces working Svelte app
+- [ ] CRUD works in all frameworks
+- [ ] Real-time updates work (create in one tab → appears in another)
+- [ ] CI passes
 
 ---
 
-## Stage 3: Expand Combinations
+## Stage 2: Expand Combinations
 
-### 3.1 Node Targets
+### 2.1 Node Targets
 
 Add SSR support:
 - Astro node adapter
 - Vue SSR (or Nuxt)
 - SvelteKit node adapter
 
-### 3.2 Edge Targets
+### 2.2 Edge Targets
 
 Add edge deployment:
 - Astro cloudflare adapter
 - SvelteKit cloudflare adapter
 - D1 database integration
 
-### 3.3 Additional Databases
+### 2.3 Additional Databases
 
 - sqlite3 for node targets
 - D1 for cloudflare targets
@@ -401,14 +492,14 @@ Add edge deployment:
 
 ### Transformers
 
-| Source | Transformer | Output | Status |
-|--------|-------------|--------|--------|
-| `.astro.rb` | AstroComponentTransformer | `.astro` | ✓ Wired |
-| `.vue.rb` | VueComponentTransformer | `.vue` | ✓ Wired |
-| `.svelte.rb` | SvelteComponentTransformer | `.svelte` | ✓ Wired |
-| `.erb.rb` | ErbPnodeTransformer | `.jsx` | ✓ Wired |
-| `.jsx.rb` | React+JSX filters | `.jsx` | ✓ Wired |
-| `.html.erb` | ErbCompiler | JS string | ✓ Wired |
+| Source | Transformer | Output | Status | Notes |
+|--------|-------------|--------|--------|-------|
+| `.astro.rb` | AstroComponentTransformer | `.astro` | ✓ Wired | Primary for Stage 0 |
+| `.vue.rb` | VueComponentTransformer | `.vue` | ✓ Wired | Stage 0.2 |
+| `.svelte.rb` | SvelteComponentTransformer | `.svelte` | ✓ Wired | Stage 0.3 |
+| `.erb.rb` | ErbFileTransformer | `.jsx` | ✓ Wired | For React islands if needed |
+| `.jsx.rb` | React+JSX filters | `.jsx` | ✓ Wired | |
+| `.html.erb` | ErbCompiler | JS string | ✓ Wired | Stage 1 transpiler |
 
 ### Integration Packages
 
@@ -426,17 +517,29 @@ Add edge deployment:
 | sqlite3 | - | ✓ | - |
 | d1 | - | - | ✓ |
 
+### Worker-in-Browser Infrastructure (New)
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| esbuild bundler for worker | ✓ Complete | Bundles _worker.js for browser (412KB) |
+| cloudflare:workers shim | ✓ Complete | Empty module |
+| caches API shim | ✓ Complete | Browsers have natively |
+| Turbo event integration | ✓ Complete | turbo-integration.mjs with before-fetch-request |
+| D1 → Dexie adapter swap | ✓ Complete | db-browser.mjs provides D1-compatible interface |
+| `ruby2jsModels` plugin | ✓ Complete | Framework-agnostic model/migration transpilation |
+
 ### From Existing Astro Blog (Recyclable)
 
 - Dexie database setup pattern (`lib/db.js`)
-- Island component structure
 - Layout patterns
-- Some CSS/styling
+- CSS/styling
+- Model transpilation approach
 
 ### From Existing Astro Blog (Discard)
 
+- Heavy React islands approach → use SSR + worker-in-browser instead
 - Hand-written model shortcuts → replace with transpiled models
-- ISR implementation → replace with adapter-based approach
+- ISR implementation → replace with standard SSR
 
 ---
 
@@ -478,48 +581,99 @@ Add edge deployment:
 ## Success Criteria
 
 ### Stage 0
-- [ ] Astro blog v2 runs with transpiled models
-- [ ] Vue blog runs with transpiled models
-- [ ] Svelte blog runs with transpiled models
-- [ ] All have CRUD for articles and comments
-- [ ] All use same Dexie schema
+- [ ] Astro blog builds for Cloudflare (idiomatic SSR)
+- [ ] Same Astro blog runs in browser (worker-in-browser + Turbo)
+- [ ] CRUD works: create, read, update, delete articles
+- [ ] Comments work: create, delete nested under articles
+- [ ] Data persists (D1 on edge, IndexedDB in browser)
+- [ ] Uses ruby2js-rails infrastructure (adapters, Turbo, models)
+- [ ] Vue blog follows same pattern
+- [ ] Svelte blog follows same pattern
 
-### Stage 1
+### Stage 1 (Transpiler + Real-Time)
 - [ ] `-f astro` produces Astro app matching Stage 0
 - [ ] `-f vue` produces Vue app matching Stage 0
 - [ ] `-f svelte` produces Svelte app matching Stage 0
 - [ ] Default (`-f rails`) works as before
+- [ ] Real-time updates work (models broadcast, Turbo Streams update DOM)
 - [ ] CI passes
 
 ### Stage 2
-- [ ] Real-time updates work in Astro
-- [ ] Real-time updates work in Vue
-- [ ] Real-time updates work in Svelte
-
-### Stage 3
 - [ ] Node targets work with sqlite3
-- [ ] Edge targets work with D1
+- [ ] Additional edge platforms (Vercel, Deno Deploy)
 
 ---
 
 ## Open Questions
 
-1. **Shared database schema**: Should all three SFC apps share exact same Dexie schema as Rails blog, or can there be minor differences?
+1. **Shared database schema**: Should all three SFC apps share exact same schema as Rails blog, or can there be minor differences?
 
 2. **Model location**: In SFC apps, where do models live? `src/models/`, `src/lib/models/`, imported from package?
 
-3. **Form handling**: Rails has `form_with` helpers. How should forms work in each SFC framework? Native forms with handlers?
+3. ~~**Form handling**: Rails has `form_with` helpers. How should forms work in each SFC framework?~~
+   **RESOLVED**: Use standard HTML forms. Turbo handles form submission the same way it does for Rails.
 
-4. **Flash messages**: Rails has flash. What's the equivalent pattern in each framework?
+4. **Flash messages**: Rails has flash. What's the equivalent pattern in each framework? (Cookies + Turbo should work)
 
 5. **Routing params**: Rails has `params[:id]`. Each framework handles route params differently - document the mapping.
+
+6. ~~**Bundle size**: What's acceptable for the browser worker bundle? Current PoC is ~530KB for minimal Astro.~~
+   **RESOLVED**: 126KB gzipped (minified) is acceptable. Comparable to other SSR frameworks.
+
+7. ~~**Database adapter injection**: How to cleanly swap D1 ↔ Dexie at build time?~~
+   **RESOLVED**: Use existing ruby2js-rails adapter infrastructure. Same pattern as Rails blog demo.
 
 ---
 
 ## Notes
 
 - Stage 0 is essential - concrete targets before automation
-- Recyclable pieces from astro-blog: patterns, not code
-- Database models must be transpiled, not shortcuts
+- **Worker-in-browser pattern is key** - same SSR code runs on edge and in browser
+- Turbo provides navigation/form handling - no need for framework-specific solutions
+- Database adapter is the only target-specific code
+- Build for Cloudflare first, add browser shim second
 - Real-time is Stage 2, after basic CRUD works
-- Tier 1 combinations first, expand later
+- **Reuse ruby2js-rails infrastructure** - adapters, Turbo integration, flash messages already exist
+- Models stay as Ruby across all frameworks - only views/controllers need conversion
+
+## Proof of Concept Completed (Jan 2026)
+
+- [x] Astro SSR builds to Cloudflare Worker
+- [x] Worker bundles for browser with esbuild
+- [x] Worker renders HTML when called as function
+- [x] Only minimal shims needed (cloudflare:workers, caches)
+- [x] Full Turbo integration (turbo:before-fetch-request interception)
+
+## Stage 0.1 Progress (Jan 2026)
+
+Created `test/astro-blog-v3/` with idiomatic Astro SSR:
+
+- [x] Astro project with Cloudflare adapter
+- [x] Layout with Turbo script loading
+- [x] Article and Comment models (TypeScript) - *to be replaced with Ruby*
+- [x] Database adapter (D1 for edge) - *to be replaced with ruby2js-rails adapter*
+- [x] CRUD pages: articles index, show, new, edit
+- [x] Comments functionality (create, delete)
+- [x] Build succeeds for Cloudflare (produces `_worker.js/`)
+- [x] Browser bundler with esbuild (412KB minified, 126KB gzipped)
+- [x] Node.js shims for fs, path, child_process, etc.
+- [x] Test script validates worker renders HTML
+
+**Revised approach: Reuse ruby2js-rails infrastructure**
+
+Instead of hand-written TypeScript models and custom adapters:
+- Use Ruby models (transpiled at build time)
+- Use existing adapters from `ruby2js-rails/adapters/`
+- Use existing Turbo integration pattern from `targets/browser/rails.js`
+
+**Completed:**
+- [x] Replace TypeScript models with Ruby models
+- [x] Create `ruby2jsModels` Vite plugin (framework-agnostic model/migration transpilation)
+- [x] Wire up ruby2js-rails Dexie adapter via bridge files
+- [x] Wire up Turbo event interception
+- [x] Browser bundler copies integration files to dist/
+
+**Next steps:**
+- [ ] Test full CRUD workflow in browser mode
+- [ ] Add seed data for initial testing
+- [ ] Verify real-time broadcasts work
