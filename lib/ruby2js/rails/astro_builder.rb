@@ -21,6 +21,7 @@ module Ruby2JS
         @options = options
         @verbose = options[:verbose]
         @database = options[:database] || ENV['JUNTOS_DATABASE'] || 'dexie'
+        @target = options[:target] || ENV['JUNTOS_TARGET'] || 'browser'
         @app_name = detect_app_name
       end
 
@@ -71,6 +72,10 @@ module Ruby2JS
         File.basename(Dir.pwd).downcase.gsub(/[^a-z0-9]/, '-')
       end
 
+      def server_target?
+        %w[node bun deno].include?(@target)
+      end
+
       def setup_output_directories
         FileUtils.rm_rf(DIST_DIR)
         FileUtils.mkdir_p(File.join(DIST_DIR, 'src', 'pages'))
@@ -86,18 +91,33 @@ module Ruby2JS
         log "  Generating project files..."
 
         # package.json
+        # Scripts vary by target:
+        # - Browser: build includes bundling for browser, serve static files (Vite convention: preview)
+        # - Server (node, bun, deno): standard astro build/dev, run node server (Node convention: start)
+        if server_target?
+          scripts = {
+            "dev" => "astro dev",
+            "build" => "astro build",
+            "start" => "node dist/server/entry.mjs"
+          }
+        else
+          scripts = {
+            "dev" => "npm run build && npx serve -s dist/client",
+            "build" => "astro build && node bundle-for-browser.mjs",
+            "preview" => "npx serve -s dist/client"
+          }
+        end
+
         package = {
           "name" => "#{@app_name}-astro",
           "version" => "0.0.1",
           "type" => "module",
-          "scripts" => {
-            "dev" => "astro dev",
-            "build" => "astro build && node bundle-for-browser.mjs",
-            "preview" => "npx serve dist/client"
-          },
+          "scripts" => scripts,
           "dependencies" => {
             "astro" => "^5.0.0",
-            "@hotwired/turbo" => "^8.0.0"
+            "@astrojs/tailwind" => "^6.0.0",
+            "@hotwired/turbo" => "^8.0.0",
+            "tailwindcss" => "^3.4.0"
           },
           "devDependencies" => {
             "esbuild" => "^0.24.0"
@@ -113,6 +133,19 @@ module Ruby2JS
           }
         }
         File.write(File.join(DIST_DIR, 'tsconfig.json'), JSON.pretty_generate(tsconfig) + "\n")
+
+        # tailwind.config.js
+        tailwind_config = <<~JS
+          /** @type {import('tailwindcss').Config} */
+          export default {
+            content: ['./src/**/*.{astro,html,js,jsx,md,mdx,svelte,ts,tsx,vue}'],
+            theme: {
+              extend: {},
+            },
+            plugins: [],
+          }
+        JS
+        File.write(File.join(DIST_DIR, 'tailwind.config.mjs'), tailwind_config)
       end
 
       def generate_browser_adapter
@@ -175,12 +208,14 @@ module Ruby2JS
 
         config = <<~JS
           import { defineConfig } from 'astro/config';
+          import tailwind from '@astrojs/tailwind';
           import browserAdapter from './browser-adapter.mjs';
           import { ruby2jsModels } from 'ruby2js-rails/vite-models';
 
           export default defineConfig({
             output: 'server',
             adapter: browserAdapter(),
+            integrations: [tailwind()],
             security: {
               checkOrigin: false
             },
@@ -828,6 +863,22 @@ module Ruby2JS
 
                   const title = doc.querySelector('title');
                   if (title) document.title = title.textContent;
+
+                  // Copy styles from rendered page to our head (for Tailwind/Layout styles)
+                  // Remove old Astro styles/links
+                  document.head.querySelectorAll('style[data-astro], link[data-astro]').forEach(s => s.remove());
+                  // Copy inline styles
+                  doc.head.querySelectorAll('style').forEach(style => {
+                    const newStyle = style.cloneNode(true);
+                    newStyle.setAttribute('data-astro', '');
+                    document.head.appendChild(newStyle);
+                  });
+                  // Copy stylesheet links
+                  doc.head.querySelectorAll('link[rel="stylesheet"]').forEach(link => {
+                    const newLink = link.cloneNode(true);
+                    newLink.setAttribute('data-astro', '');
+                    document.head.appendChild(newLink);
+                  });
 
                   document.body.innerHTML = doc.body.innerHTML;
                   attachLinkHandlers();

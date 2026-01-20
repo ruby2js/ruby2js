@@ -34,8 +34,8 @@ export async function initDatabase(options = {}) {
 
   db = new Dexie(dbName);
 
-  // Time polyfill for Ruby compatibility
-  initTimePolyfill(window);
+  // Time polyfill for Ruby compatibility (use globalThis for SSR compatibility)
+  initTimePolyfill(globalThis);
 
   return db;
 }
