@@ -567,6 +567,62 @@ No copying needed—Vite resolves from `node_modules/`.
 4. **Move config files:** `vite.config.js`, `package.json` to project root
 5. **Remove dist/ copying:** Vite serves source directly, dist/ is output only
 
+### Build Output Philosophy: No Intermediate Directory
+
+**Current problem:** `juntos build -f astro` generates an intermediate Astro project into `dist/`, which then builds into `dist/dist/`. This nested structure is confusing.
+
+**Target philosophy:** `juntos build` produces only deployable output. The intermediate project structure (Astro's `src/`, `astro.config.mjs`, etc.) should be hidden by default.
+
+```bash
+# Current (confusing)
+juntos build -f astro
+# Result: dist/ contains full Astro project, dist/dist/client/ is deployable
+
+# Ultimate (clean)
+juntos build -f astro
+# Result: dist/ contains only deployable files (index.html, browser-worker.mjs, etc.)
+```
+
+**Implementation approach:** Run the entire pipeline (generate Astro project → npm install → astro build → esbuild bundle) in a temp directory, then copy only the final output to `dist/`.
+
+### The `juntos eject` Command
+
+For users who want to customize the intermediate project (modify Astro config, add plugins, etc.), provide an eject command:
+
+```bash
+juntos eject -f astro
+# Result: astro/ directory with full Astro project source
+```
+
+After ejecting:
+- User owns the intermediate project
+- Can modify `astro.config.mjs`, add Astro plugins, customize layouts
+- Runs `npm run build` directly instead of `juntos build`
+
+**Eject is one-way:** Once ejected, the user maintains the project. Similar to Create React App's eject model, but less destructive since the original Rails source remains untouched.
+
+### Framework Conversion vs Build Targets
+
+Two orthogonal dimensions:
+
+| Dimension | Flag | Examples |
+|-----------|------|----------|
+| **Framework** | `-f` | `astro`, `vue`, `svelte` (output project structure) |
+| **Target** | `-t` | `browser`, `node`, `cloudflare` (runtime environment) |
+
+```bash
+# Same Rails app, different output frameworks
+juntos build -f astro -t browser     # Astro with IndexedDB
+juntos build -f astro -t cloudflare  # Astro with D1
+juntos build -f vue -t browser       # Vue SPA with IndexedDB
+juntos build -f svelte -t node       # SvelteKit with SQLite
+
+# Default: Rails-native output
+juntos build -t browser              # Juntos runtime, no framework conversion
+```
+
+When `-f` is specified, the intermediate project uses that framework's conventions (Astro's file-based routing, Vue's SFCs, etc.). When omitted, uses Juntos-native patterns.
+
 ### Selfhost Transpiler Requirements
 
 For the ultimate architecture, the selfhost transpiler must handle:
