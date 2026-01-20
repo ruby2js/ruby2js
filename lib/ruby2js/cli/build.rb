@@ -27,7 +27,8 @@ module Ruby2JS
             sourcemap: false,
             base: nil,
             target: ENV['JUNTOS_TARGET'],
-            database: ENV['JUNTOS_DATABASE']
+            database: ENV['JUNTOS_DATABASE'],
+            framework: ENV['JUNTOS_FRAMEWORK']
           }
 
           parser = OptionParser.new do |opts|
@@ -36,6 +37,10 @@ module Ruby2JS
             opts.separator "Build a Rails-like app for deployment."
             opts.separator ""
             opts.separator "Options:"
+
+            opts.on("-f", "--framework FRAMEWORK", "Output framework: rails (default), astro, vue, svelte") do |framework|
+              options[:framework] = framework
+            end
 
             opts.on("-t", "--target TARGET", "Build target: browser, node, vercel, cloudflare") do |target|
               options[:target] = target
@@ -100,24 +105,41 @@ module Ruby2JS
         def build(options)
           puts "Building application..."
 
-          success = if options[:selfhost] && !BuildHelper.vite_configured?
+          # Framework-specific builds
+          if options[:framework] && options[:framework] != 'rails'
+            success = build_for_framework(options)
+          elsif options[:selfhost] && !BuildHelper.vite_configured?
             # Legacy: Use JavaScript transpiler via npm (run from dist/)
             Dir.chdir(DIST_DIR) do
               if options[:verbose]
-                system("npm run build")
+                success = system("npm run build")
               else
-                system("npm run build > /dev/null 2>&1")
+                success = system("npm run build > /dev/null 2>&1")
               end
             end
           else
             # Use unified build (Vite if configured, else Ruby builder)
-            BuildHelper.build(options)
+            success = BuildHelper.build(options)
           end
 
           if success
             puts "Build complete. Output in dist/"
           else
             abort "Error: Build failed. Run with --verbose for details."
+          end
+        end
+
+        def build_for_framework(options)
+          framework = options[:framework]
+
+          case framework
+          when 'astro'
+            require 'ruby2js/rails/astro_builder'
+            Ruby2JS::Rails::AstroBuilder.new(options).build
+          when 'vue', 'svelte'
+            abort "Error: #{framework} framework not yet implemented."
+          else
+            abort "Error: Unknown framework '#{framework}'. Valid options: rails, astro, vue, svelte"
           end
         end
       end

@@ -49,7 +49,8 @@ module Ruby2JS
           options = {
             database: nil,
             environment: nil,
-            target: nil
+            target: nil,
+            framework: nil
           }
 
           # We need to extract common flags without consuming subcommand flags
@@ -79,6 +80,12 @@ module Ruby2JS
             when /^-t(.+)/, /^--target=(.+)/
               options[:target] = $1
               i += 1
+            when '-f', '--framework'
+              options[:framework] = args[i + 1]
+              i += 2
+            when /^-f(.+)/, /^--framework=(.+)/
+              options[:framework] = $1
+              i += 1
             else
               remaining << arg
               i += 1
@@ -95,10 +102,11 @@ module Ruby2JS
             ENV['NODE_ENV'] = options[:environment]
           end
 
-          # Database and target are applied by modifying the effective config
+          # Database, target, and framework are applied by modifying the effective config
           # Store in environment variables for subcommands to read
           ENV['JUNTOS_DATABASE'] = options[:database] if options[:database]
           ENV['JUNTOS_TARGET'] = options[:target] if options[:target]
+          ENV['JUNTOS_FRAMEWORK'] = options[:framework] if options[:framework]
         end
 
         def show_help
@@ -121,11 +129,13 @@ module Ruby2JS
             Common Options:
               -d, --database ADAPTER   Database adapter (dexie, sqlite, turso, etc.)
               -e, --environment ENV    Environment (development, production, test)
+              -f, --framework FW       Output framework (rails, astro, vue, svelte)
               -t, --target TARGET      Deploy target (browser, node, vercel, cloudflare)
 
             Examples:
               juntos up                              # Build and run (uses database.yml)
               juntos up -t node -d better_sqlite3    # Build and run with Node + SQLite
+              juntos build -f astro                  # Convert Rails app to Astro
               juntos dev                             # Start dev server with hot reload
               juntos deploy -t vercel -d neon        # Deploy to Vercel with Neon DB
               juntos db prepare                      # Create, migrate, and seed D1 database

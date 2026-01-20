@@ -16,6 +16,7 @@
 #   )
 #
 require 'strscan'
+require 'ruby2js'
 require_relative 'helper_patterns'
 
 module Ruby2JS
@@ -51,8 +52,55 @@ module Ruby2JS
         # Convert ERB template to Astro template
         template = convert_erb_to_astro_template
 
+        # Post-process: fix attribute expressions "{ ... }" -> { ... }
+        template = fix_attribute_expressions(template)
+
         # Build the complete .astro file
         build_astro_file(template)
+      end
+
+      # Fix attribute expressions: id="{foo}" -> id={foo}
+      # In Astro/JSX, when the entire attribute value is dynamic, no quotes needed
+      # Handles expressions with nested quotes like: id="{dom_id(article, "prefix")}"
+      def fix_attribute_expressions(template)
+        # Pattern: attr="{...}" where ... can contain balanced quotes
+        # Replace with attr={...}
+        result = ""
+        remaining = template
+
+        while match = remaining.match(/(\w+)="\{/)
+          # Add everything before the match
+          result += remaining[0...match.begin(0)]
+
+          # Find the matching closing }"
+          attr = match[1]
+          start_pos = match.end(0)
+          depth = 1
+          pos = start_pos
+
+          while pos < remaining.length && depth > 0
+            char = remaining[pos]
+            if char == '{'
+              depth += 1
+            elsif char == '}' && pos + 1 < remaining.length && remaining[pos + 1] == '"'
+              depth -= 1
+              if depth == 0
+                # Found the closing }"
+                expression = remaining[start_pos...pos]
+                result += "#{attr}={#{expression}}"
+                pos += 2  # Skip }"
+                break
+              end
+            elsif char == '}'
+              depth -= 1
+            end
+            pos += 1
+          end
+
+          remaining = remaining[pos..-1] || ""
+        end
+
+        result + remaining
       end
 
       private
@@ -68,6 +116,12 @@ module Ruby2JS
 
       # Parse controller action to extract data fetching
       def parse_action
+        # For show/edit pages, always include the primary model
+        # (Rails uses before_action to set it, which we handle separately)
+        if needs_dynamic_routes?
+          @models_used << primary_model
+        end
+
         return unless @action
 
         # Detect model names from controller code (e.g., Article.all, Comment.find)
@@ -148,12 +202,14 @@ module Ruby2JS
         # Parse the block body
         old_form_builder = @form_builder
         old_form_model = @form_model
+        old_form_is_new = @form_is_new
 
         # Check if this is a form_with
         if expr =~ /^form_with/
           @form_builder = block_var
           form_info = parse_form_with_expr(expr)
           @form_model = form_info[:model_name]
+          @form_is_new = form_info[:is_new]
 
           # Parse block content
           block_content = parse_content(:end)
@@ -165,6 +221,7 @@ module Ruby2JS
           # Restore form context
           @form_builder = old_form_builder
           @form_model = old_form_model
+          @form_is_new = old_form_is_new
 
           return result
         end
@@ -429,8 +486,13 @@ module Ruby2JS
         attrs << "class=\"#{css_class}\"" if css_class
 
         # Add value binding (except for password fields)
+        # For new records, use empty string; for existing, bind to model
         unless type == 'password'
-          attrs << "value={#{@form_model}.#{field} || ''}"
+          if @form_is_new
+            attrs << 'value=""'
+          else
+            attrs << "value={#{@form_model}.#{field} || ''}"
+          end
         end
 
         "<input #{attrs.join(' ')} />"
@@ -450,7 +512,12 @@ module Ruby2JS
         attrs << "class=\"#{css_class}\"" if css_class
         attrs << "rows=\"#{rows}\"" if rows
 
-        "<textarea #{attrs.join(' ')}>{#{@form_model}.#{field} || ''}</textarea>"
+        # For new records, use empty content; for existing, bind to model
+        if @form_is_new
+          "<textarea #{attrs.join(' ')}></textarea>"
+        else
+          "<textarea #{attrs.join(' ')}>{#{@form_model}.#{field} || ''}</textarea>"
+        end
       end
 
       # Render a submit button
@@ -955,6 +1022,9 @@ module Ruby2JS
         # Remove @ from instance variables
         expr = expr.gsub(/@(\w+)/, '\1')
 
+        # Model.new -> new Model() (must come before other transformations)
+        expr = expr.gsub(/\b([A-Z]\w*)\.new\b/, 'new \1()')
+
         # .includes(:assoc) -> .includes('assoc')
         expr = expr.gsub(/\.includes\(:(\w+)\)/, ".includes('\\1')")
 
@@ -998,6 +1068,17 @@ module Ruby2JS
           lines << "import { #{helpers} } from 'ruby2js-rails/targets/browser/rails.js';"
         end
 
+        # For SSG: dynamic routes need getStaticPaths
+        if needs_dynamic_routes?
+          lines << ''
+          lines << '// SSG: Generate paths for all records'
+          lines << 'export async function getStaticPaths() {'
+          lines << '  await setupDatabase();'
+          lines << "  const items = await #{primary_model}.order({ created_at: 'desc' }).toArray();"
+          lines << '  return items.map(item => ({ params: { id: item.id.toString() } }));'
+          lines << '}'
+        end
+
         lines << ''
         lines << '// Initialize database'
         lines << 'await setupDatabase();'
@@ -1007,6 +1088,14 @@ module Ruby2JS
         lines << '// Flash message (from query param)'
         lines << "const notice = Astro.url.searchParams.get('notice');"
         lines << ''
+
+        # For dynamic routes, fetch the record by ID
+        if needs_dynamic_routes?
+          lines << '// Fetch record by ID from params'
+          lines << 'const { id } = Astro.params;'
+          lines << "const #{primary_model_var} = await #{primary_model}.find(parseInt(id));"
+          lines << ''
+        end
 
         # Add controller action code
         @frontmatter_lines.each do |line|
@@ -1025,6 +1114,21 @@ module Ruby2JS
         lines << '</Layout>'
 
         lines.join("\n")
+      end
+
+      # Check if this page needs dynamic routes (show/edit actions)
+      def needs_dynamic_routes?
+        %w[show edit].include?(@action_name)
+      end
+
+      # Get the primary model for this controller (e.g., "Article" for articles_controller)
+      def primary_model
+        @controller&.gsub(/s$/, '')&.capitalize || 'Item'
+      end
+
+      # Get the primary model variable name (e.g., "article")
+      def primary_model_var
+        @controller&.gsub(/s$/, '') || 'item'
       end
 
       # Path helpers for imports
@@ -1067,6 +1171,65 @@ module Ruby2JS
       def model_imports
         # Return models detected during parsing
         @models_used.to_a.sort.join(', ')
+      end
+    end
+
+    # Simplified converter for partials (components)
+    # Partials receive props and render content without full page infrastructure
+    class PartialConverter < ErbToAstro
+      def initialize(erb, partial_name, model_name, options = {})
+        # Call parent with minimal settings
+        super(erb, nil, nil, nil, options)
+        @partial_name = partial_name
+        @model_name = model_name
+        # Set up form context for form partials
+        if partial_name.end_with?('form')
+          @form_builder = 'form'
+          @form_model = model_name
+        end
+      end
+
+      def convert
+        # Convert ERB template to Astro template
+        template = convert_erb_to_astro_template
+
+        # Post-process: fix attribute expressions "{ ... }" -> { ... }
+        template = fix_attribute_expressions(template)
+
+        # Build a simpler component file
+        build_component_file(template)
+      end
+
+      private
+
+      # Inherits fix_attribute_expressions from ErbToAstro
+
+      def build_component_file(template)
+        lines = ['---']
+        lines << "// #{component_name} component"
+        lines << "// Converted from _#{@partial_name}.html.erb"
+
+        # Component receives the model as a prop
+        # For form partials, use the model name; otherwise use partial name
+        prop_name = @partial_name.end_with?('form') ? @model_name : @partial_name
+        lines << "const { #{prop_name} } = Astro.props;"
+
+        # Helper imports
+        unless @helpers_used.empty?
+          helpers = @helpers_used.to_a.join(', ')
+          lines << "import { #{helpers} } from 'ruby2js-rails/targets/browser/rails.js';"
+        end
+
+        lines << '---'
+        lines << ''
+        lines << template
+
+        lines.join("\n")
+      end
+
+      def component_name
+        base = @partial_name.split('_').map(&:capitalize).join
+        @partial_name.end_with?('form') ? base : "#{base}Card"
       end
     end
   end
