@@ -592,6 +592,8 @@ module Ruby2JS
               window.process = { env: {} };
 
               // TurboBroadcast for cross-tab real-time updates
+              // Note: We use native BroadcastChannel internally, but expose as TurboBroadcast
+              // to avoid conflicting with Dexie's use of BroadcastChannel
               class TurboBroadcast {
                 static channels = new Map();
 
@@ -609,6 +611,10 @@ module Ruby2JS
                 }
 
                 static broadcast(channelName, html) {
+                  if (typeof html !== 'string') {
+                    console.warn('TurboBroadcast: html is not a string:', typeof html, html);
+                    return;
+                  }
                   const channel = this.getChannel(channelName);
                   channel.postMessage(html);
                   if (html.includes('<turbo-stream')) {
@@ -631,15 +637,16 @@ module Ruby2JS
               }
 
               // Make TurboBroadcast available globally for models
+              // Note: We use TurboBroadcast name, NOT BroadcastChannel, because Dexie needs native BroadcastChannel
               window.TurboBroadcast = TurboBroadcast;
-              globalThis.BroadcastChannel = TurboBroadcast;
+              globalThis.TurboBroadcast = TurboBroadcast;
 
               const app = document.getElementById('app');
               let worker;
               let activeSubscriptions = new Set();
 
               async function init() {
-                worker = await import('./browser-worker.mjs');
+                worker = await import('/browser-worker.mjs');
                 await navigate(location.pathname || '/');
               }
 

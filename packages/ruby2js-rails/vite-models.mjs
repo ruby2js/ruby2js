@@ -324,13 +324,14 @@ export {
     const railsTarget = targetMap[target] || 'browser';
 
     if (target === 'browser') {
-      // For browser, BroadcastChannel is set on globalThis by the browser shell
+      // For browser, TurboBroadcast is set on globalThis by the browser shell
+      // Note: We use TurboBroadcast (not BroadcastChannel) to avoid conflicting with Dexie's use of native BroadcastChannel
       const railsBridge = `// Rails helpers bridge for browser target
-// BroadcastChannel is set on globalThis by the browser initialization
+// TurboBroadcast is set on globalThis by the browser initialization
 // This file provides named exports for generated model imports
 
-export const BroadcastChannel = globalThis.BroadcastChannel || {
-  broadcast: () => console.warn('BroadcastChannel not initialized')
+export const BroadcastChannel = globalThis.TurboBroadcast || {
+  broadcast: () => console.warn('TurboBroadcast not initialized')
 };
 `;
       await fs.promises.writeFile(
