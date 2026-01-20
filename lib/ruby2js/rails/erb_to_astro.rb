@@ -696,7 +696,15 @@ module Ruby2JS
         partial_name = result[:partial_name]
 
         # Convert partial name to component name: "form" -> "Form", "article_card" -> "ArticleCard"
-        component = partial_name.split('_').map(&:capitalize).join
+        base_component = partial_name.split('_').map(&:capitalize).join
+
+        # Check if component name conflicts with model imports
+        # If so, add "Card" suffix for model-like partials (not "Form")
+        component = if model_names.include?(base_component) && !partial_name.end_with?('form')
+          "#{base_component}Card"
+        else
+          base_component
+        end
 
         # Track partial for imports
         @partials_used << { name: "_#{partial_name}", component: component }
@@ -1040,11 +1048,16 @@ module Ruby2JS
 
       def model_imports
         # Infer from controller name
-        if @controller
+        model_names.join(', ')
+      end
+
+      def model_names
+        # Return array of model names that will be imported
+        @model_names ||= if @controller
           singular = @controller.chomp('s')
-          [singular.capitalize, 'Comment'].join(', ')
+          [singular.capitalize, 'Comment']
         else
-          'Article, Comment'
+          ['Article', 'Comment']
         end
       end
     end
