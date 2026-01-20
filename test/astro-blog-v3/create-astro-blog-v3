@@ -509,7 +509,7 @@ import { Article } from '../../lib/models/index.js';
 // Initialize database
 await setupDatabase();
 
-let errors = {};
+let errors = [];
 let title = '';
 let body = '';
 
@@ -524,24 +524,31 @@ if (Astro.request.method === 'POST') {
     return Astro.redirect(`/articles/${article.id}`);
   }
 
-  errors = article.errors;
+  errors = [...article.errors];
 }
 ---
 
 <Layout title="New Article - Astro Blog">
   <h2>New Article</h2>
 
+  {errors.length > 0 && (
+    <div class="flash error">
+      <p>{errors.length} error(s) prohibited this article from being saved:</p>
+      <ul style="margin-left: 1.5rem; list-style: disc;">
+        {errors.map(error => <li>{error.full_message}</li>)}
+      </ul>
+    </div>
+  )}
+
   <form method="POST" action="/articles/new">
     <div class="form-group">
       <label for="title">Title</label>
       <input type="text" id="title" name="title" value={title} />
-      {errors.title && <p class="error">{errors.title[0]}</p>}
     </div>
 
     <div class="form-group">
       <label for="body">Body</label>
       <textarea id="body" name="body">{body}</textarea>
-      {errors.body && <p class="error">{errors.body[0]}</p>}
     </div>
 
     <div class="actions">
@@ -682,7 +689,7 @@ try {
   return Astro.redirect('/articles');
 }
 
-let errors = {};
+let errors = [];
 let title = article.title;
 let body = article.body;
 
@@ -698,24 +705,31 @@ if (Astro.request.method === 'POST') {
     return Astro.redirect(`/articles/${id}`);
   }
 
-  errors = article.errors;
+  errors = [...article.errors];
 }
 ---
 
 <Layout title={`Edit: ${article.title} - Astro Blog`}>
   <h2>Edit Article</h2>
 
+  {errors.length > 0 && (
+    <div class="flash error">
+      <p>{errors.length} error(s) prohibited this article from being saved:</p>
+      <ul style="margin-left: 1.5rem; list-style: disc;">
+        {errors.map(error => <li>{error.full_message}</li>)}
+      </ul>
+    </div>
+  )}
+
   <form method="POST" action={`/articles/${id}/edit`}>
     <div class="form-group">
       <label for="title">Title</label>
       <input type="text" id="title" name="title" value={title} />
-      {errors.title && <p class="error">{errors.title[0]}</p>}
     </div>
 
     <div class="form-group">
       <label for="body">Body</label>
       <textarea id="body" name="body">{body}</textarea>
-      {errors.body && <p class="error">{errors.body[0]}</p>}
     </div>
 
     <div class="actions">
