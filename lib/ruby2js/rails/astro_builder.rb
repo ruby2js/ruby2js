@@ -434,15 +434,21 @@ module Ruby2JS
       def generate_database_setup
         log "  Generating database setup..."
 
-        # Detect model names from app/models
-        models = Dir.glob('app/models/*.rb')
-          .map { |f| File.basename(f, '.rb') }
-          .reject { |n| n == 'application_record' }
+        # Detect model names and their associations from app/models
+        model_files = Dir.glob('app/models/*.rb')
+          .reject { |f| File.basename(f) == 'application_record.rb' }
 
-        # Generate Dexie schema registrations
-        schema_registrations = models.map do |model|
+        # Generate Dexie schema registrations with proper indexes
+        schema_registrations = model_files.map do |model_file|
+          model = File.basename(model_file, '.rb')
           table = model.end_with?('s') ? model : "#{model}s"
-          "registerSchema('#{table}', '++id, created_at');"
+
+          # Detect belongs_to associations for foreign key indexes
+          content = File.read(model_file)
+          foreign_keys = content.scan(/belongs_to\s+:(\w+)/).flatten
+          indexes = ['++id'] + foreign_keys.map { |fk| "#{fk}_id" } + ['created_at']
+
+          "registerSchema('#{table}', '#{indexes.join(', ')}');"
         end.join("\n")
 
         db_mjs = <<~JS
@@ -481,16 +487,6 @@ module Ruby2JS
       def generate_seeds
         log "  Generating seeds..."
 
-        # Check for Rails seeds file
-        rails_seeds = 'db/seeds.rb'
-
-        if File.exist?(rails_seeds)
-          # TODO: Transpile Ruby seeds to JS
-          # For now, generate a placeholder
-          seeds_content = File.read(rails_seeds)
-          log "    (Rails seeds found, needs manual conversion)"
-        end
-
         # Detect models for import
         models = Dir.glob('app/models/*.rb')
           .map { |f| File.basename(f, '.rb') }
@@ -498,9 +494,27 @@ module Ruby2JS
           .map { |n| n.split('_').map(&:capitalize).join }
 
         imports = models.empty? ? '' : "import { #{models.join(', ')} } from './models/index.js';"
-
-        # Generate seeds that check first model count
         first_model = models.first || 'Article'
+
+        # Check for Rails seeds file
+        rails_seeds = 'db/seeds.rb'
+        seed_body = nil
+
+        if File.exist?(rails_seeds)
+          seed_body = transpile_seeds(File.read(rails_seeds), first_model)
+          if seed_body
+            log "    Transpiled db/seeds.rb"
+          else
+            log "    (Rails seeds found, transpilation failed - using placeholder)"
+          end
+        end
+
+        # Fallback placeholder if no seeds or transpilation failed
+        seed_body ||= <<~JS.strip
+            // TODO: Add seed data here
+            // Example:
+            // await Article.create({ title: 'Hello World', body: 'Welcome to the app!' });
+        JS
 
         seeds_mjs = <<~JS
           // Sample data for the application
@@ -514,14 +528,47 @@ module Ruby2JS
 
             console.log('Seeding database...');
 
-            // TODO: Add seed data here
-            // Example:
-            // await Article.create({ title: 'Hello World', body: 'Welcome to the app!' });
+          #{seed_body}
 
-            console.log('Seeding complete');
+            const articleCount = await Article.count();
+            const commentCount = await Comment.count();
+            console.log(`Seeded ${articleCount} articles and ${commentCount} comments`);
           }
         JS
         File.write(File.join(DIST_DIR, 'src', 'lib', 'seeds.mjs'), seeds_mjs)
+      end
+
+      def transpile_seeds(ruby_code, first_model)
+        # Remove the idempotency guard (we handle it in the wrapper)
+        ruby_code = ruby_code.gsub(/^return if #{first_model}\.count > 0\s*\n?/, '')
+
+        # Remove puts statements (we handle logging in the wrapper)
+        ruby_code = ruby_code.gsub(/^puts .*\n?/, '')
+
+        # Transform seeds to async JavaScript
+        begin
+          js = Ruby2JS.convert(ruby_code, filters: [:functions, :esm, :return]).to_s
+
+          # Post-process for async/await patterns
+          # IMPORTANT: Handle association creates FIRST (before general Model.create)
+
+          # article.comments.create({...}) -> Comment.create({ article_id: article.id, ... })
+          # Note: Don't add await here - the Model.create regex below will add it
+          js = js.gsub(/(\w+)\.comments\.create!?\(\{([^}]+)\}\)/) do
+            parent_var = $1
+            attrs = $2
+            "Comment.create({ article_id: #{parent_var}.id, #{attrs} })"
+          end
+
+          # Model.create!({...}) -> await Model.create({...})
+          # Only match capitalized model names to avoid matching method chains
+          js = js.gsub(/([A-Z]\w*)\.create!?\(/, 'await \1.create(')
+
+          # Indent the result
+          js.lines.map { |line| "  #{line}" }.join
+        rescue => e
+          nil
+        end
       end
 
       def generate_browser_shell

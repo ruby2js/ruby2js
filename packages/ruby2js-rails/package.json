@@ -86,6 +86,7 @@
     "ws": "^8.14.2"
   },
   "peerDependencies": {
+    "ruby2js": "*",
     "vite": "^5.0.0 || ^6.0.0",
     "vite-plugin-ruby2js": "*"
   },
@@ -99,10 +100,5 @@
     "ruby2js": {
       "optional": true
     }
-  },
-  "optionalDependencies": {
-    "@ruby2js/ruby2js": "file:../ruby2js",
-    "dexie": "^4.2.1",
-    "ruby2js": "file:../../demo/selfhost"
   }
 }
