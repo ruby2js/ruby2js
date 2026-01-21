@@ -171,14 +171,13 @@ module Ruby2JS
           end
 
           # Handle association.size/count/length patterns in ERB
-          # article.comments.size -> (await article.comments).size
+          # article.comments.size -> await article.comments.size()
+          # The proxy's size() method returns count from memory or does COUNT query
           if @erb_bufvar && [:size, :count, :length].include?(method) && association_access?(target)
             self.erb_mark_async!()
-            # Wrap the association access with await, then access the property
-            # Use :attr for property access (no parentheses) instead of :send (method call)
-            return s(:attr,
-              s(:begin, s(:send, nil, :await, process(target))),
-              method)
+            # Generate: await target.method()
+            return s(:send, nil, :await,
+              s(:send, process(target), method))
           end
 
           super

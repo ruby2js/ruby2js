@@ -18,17 +18,21 @@ export class CollectionProxy {
 
   // --- Counting ---
 
-  get size() {
+  // size() - returns count from memory if loaded, or does COUNT query if not
+  // Can be awaited: await article.comments.size()
+  size() {
     if (this._records) return this._records.length;
-    return 0;  // Not loaded yet - use await or count() for async count
+    const fk = this._association.foreignKey;
+    return this._model.where({ [fk]: this._owner.id }).count();
   }
 
-  get length() {
-    return this.size;
+  // length() - alias for size()
+  length() {
+    return this.size();
   }
 
+  // count() - always does a COUNT query (even if loaded)
   async count() {
-    if (this._records) return this._records.length;
     const fk = this._association.foreignKey;
     return this._model.where({ [fk]: this._owner.id }).count();
   }
@@ -161,18 +165,15 @@ export class CollectionProxy {
   }
 
   // --- Thenable (for await support) ---
-  // Returns the proxy itself (not records array) so .size/.length work after await
 
   then(resolve, reject) {
-    if (this._loaded) {
-      // Don't use Promise.resolve(this) - it calls then() again (infinite recursion)
-      // Instead, resolve via microtask to properly fulfill the Promise protocol
-      return Promise.resolve().then(() => resolve ? resolve(this) : this);
+    if (this._records) {
+      return Promise.resolve(this._records).then(resolve, reject);
     }
     return this.toRelation().then(records => {
       this._records = records;
       this._loaded = true;
-      return this;  // Return proxy, not records, so .size works
+      return records;
     }).then(resolve, reject);
   }
 
