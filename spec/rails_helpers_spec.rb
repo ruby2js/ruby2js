@@ -386,17 +386,16 @@ describe Ruby2JS::Filter::Rails::Helpers do
 
     it "should handle association.size with async" do
       # article.comments.size -> await article.comments.size()
-      # The proxy's size() returns count from memory or does COUNT query
+      # size() is smart: returns cached count or does COUNT query
       erb_src = '_erbout = +\'\'; _erbout.<<(( article.comments.size ).to_s); _erbout'
       result = to_js(erb_src)
-      # Should be an async function
       result.must_include 'async function render'
-      # Should await the size() method call on the proxy
       result.must_include 'await article.comments.size()'
     end
 
     it "should handle association.count with async" do
       # article.comments.count -> await article.comments.count()
+      # count() always does COUNT query
       erb_src = '_erbout = +\'\'; _erbout.<<(( article.comments.count ).to_s); _erbout'
       result = to_js(erb_src)
       result.must_include 'async function render'
@@ -404,11 +403,12 @@ describe Ruby2JS::Filter::Rails::Helpers do
     end
 
     it "should handle association.length with async" do
-      # article.comments.length -> await article.comments.length()
+      # article.comments.length -> (await article.comments).length
+      # Loads all records, then accesses array's .length
       erb_src = '_erbout = +\'\'; _erbout.<<(( article.comments.length ).to_s); _erbout'
       result = to_js(erb_src)
       result.must_include 'async function render'
-      result.must_include 'await article.comments.length()'
+      result.must_include '(await article.comments).length'
     end
   end
 

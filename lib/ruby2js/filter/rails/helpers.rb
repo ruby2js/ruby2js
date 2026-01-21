@@ -171,13 +171,22 @@ module Ruby2JS
           end
 
           # Handle association.size/count/length patterns in ERB
-          # article.comments.size -> await article.comments.size()
-          # The proxy's size() method returns count from memory or does COUNT query
+          # Maps to Rails semantics:
+          #   .size   -> await proxy.size()    (smart: cached or COUNT query)
+          #   .count  -> await proxy.count()   (always COUNT query)
+          #   .length -> (await proxy).length  (load all, array length)
           if @erb_bufvar && [:size, :count, :length].include?(method) && association_access?(target)
             self.erb_mark_async!()
-            # Generate: await target.method()
-            return s(:send, nil, :await,
-              s(:send, process(target), method))
+            if method == :length
+              # Load records first, then access array's .length property
+              return s(:attr,
+                s(:begin, s(:send, nil, :await, process(target))),
+                :length)
+            else
+              # size/count are method calls on the proxy
+              return s(:send, nil, :await,
+                s(:send, process(target), method))
+            end
           end
 
           super

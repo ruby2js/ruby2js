@@ -18,23 +18,26 @@ export class CollectionProxy {
 
   // --- Counting ---
 
-  // size() - returns count from memory if loaded, or does COUNT query if not
-  // Can be awaited: await article.comments.size()
+  // size() - smart like Rails: returns cached count or does COUNT query
+  // Usage: await article.comments.size()
   size() {
     if (this._records) return this._records.length;
     const fk = this._association.foreignKey;
     return this._model.where({ [fk]: this._owner.id }).count();
   }
 
-  // length() - alias for size()
-  length() {
-    return this.size();
-  }
-
-  // count() - always does a COUNT query (even if loaded)
+  // count() - always does COUNT query (ignores cache), like Rails
+  // Usage: await article.comments.count()
   async count() {
     const fk = this._association.foreignKey;
     return this._model.where({ [fk]: this._owner.id }).count();
+  }
+
+  // length property - for (await proxy).length after loading records
+  // This is accessed on the records array, not the proxy, but keep for direct access
+  get length() {
+    if (this._records) return this._records.length;
+    return 0;
   }
 
   get empty() {
