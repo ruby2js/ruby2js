@@ -37,6 +37,7 @@ module Ruby2JS
     # Uses location-based detection like Parser::AST::Node to check for '(' after selector
     def is_method?
       return false if @type == :attr
+      return false if @type == :await_attr  # await on property access (no parens)
       return true if @type == :call
       return true unless @location
 

@@ -14,7 +14,7 @@ module Ruby2JS
     # send! forces interpretation as a method call even with zero parameters.
     # Sendw forces parameters to be placed on separate lines.
 
-    handle :send, :sendw, :send!, :await, :await!, :attr, :call do |receiver, method, *args|
+    handle :send, :sendw, :send!, :await, :await!, :await_attr, :attr, :call do |receiver, method, *args|
       if \
         args.length == 1 and method == :+
       then
@@ -127,6 +127,11 @@ module Ruby2JS
             # await f(x)
             return parse args.first.updated(:await)
 
+          elsif args.first.type == :attr
+            # await obj.prop (property access, no parentheses)
+            # Use :await_attr to preserve property access semantics (no parens)
+            return parse args.first.updated(:await_attr)
+
           elsif args.first.type == :block
             # await f(x) { ... }
             block = args.first
@@ -196,7 +201,7 @@ module Ruby2JS
         group_target ||= GROUP_OPERATORS.include? target.type # Pragma: logical
       end
 
-      put 'await ' if [:await, :await!].include?(@ast.type)
+      put 'await ' if [:await, :await!, :await_attr].include?(@ast.type)
 
       if method == :!
         parse s(:not, receiver)

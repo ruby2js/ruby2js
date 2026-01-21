@@ -81,7 +81,7 @@ describe Ruby2JS::Filter::Rails::Model do
       RUBY
       assert_includes result, 'async destroy()'
       # Uses for..of with await to iterate over association
-      assert_includes result, 'for (let record of await(this.comments))'
+      assert_includes result, 'for (let record of await this.comments)'
       assert_includes result, 'await record.destroy()'
     end
 
@@ -242,6 +242,44 @@ describe Ruby2JS::Filter::Rails::Model do
       RUBY
       assert_includes result, 'after_create()'
       assert_includes result, 'notify_subscribers()'
+    end
+
+    it "generates async callback when accessing associations" do
+      result = to_js(<<~RUBY)
+        class Comment < ApplicationRecord
+          belongs_to :article
+          after_create_commit { article.broadcast_replace_to "articles" }
+        end
+      RUBY
+      # Callback should be async because it accesses the association
+      assert_includes result, 'async $record =>'
+      # Association access should be awaited
+      assert_includes result, '(await $record.article)'
+      # Method call on awaited association
+      assert_includes result, '.broadcast_replace_to'
+    end
+
+    it "generates sync callback when not accessing associations" do
+      result = to_js(<<~RUBY)
+        class Article < ApplicationRecord
+          after_create_commit { broadcast_append_to "articles" }
+        end
+      RUBY
+      # Callback should NOT be async when not accessing associations
+      assert_includes result, '$record =>'
+      refute_includes result, 'async $record =>'
+    end
+
+    it "supports ActiveRecord::Base as superclass" do
+      result = to_js(<<~RUBY)
+        class Comment < ActiveRecord::Base
+          belongs_to :article
+          after_create_commit { article.broadcast_replace_to "articles" }
+        end
+      RUBY
+      # Should detect ActiveRecord::Base as a model superclass
+      assert_includes result, 'async $record =>'
+      assert_includes result, '(await $record.article)'
     end
   end
 

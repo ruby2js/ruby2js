@@ -1543,6 +1543,13 @@ describe Ruby2JS do
       to_js( 'await f(x) {|y| y}' ).must_equal 'await f(x, y => y)'
       to_js( 'await f(x) do |y| y; end' ).must_equal 'await f(x, y => y)'
     end
+
+    it "should preserve parentheses based on source" do
+      # Without parens in source -> no parens in output
+      to_js( 'await o.f' ).must_equal 'await o.f'
+      # With explicit parens in source -> parens in output
+      to_js( 'await o.f()' ).must_equal 'await o.f()'
+    end
   end
 
   describe 'keyword arguments' do

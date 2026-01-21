@@ -165,6 +165,7 @@ module Ruby2JS
 
         # Handle callback blocks (after_create_commit do ... end)
         # Transform to accept record parameter: (record) => { ... }
+        # If associations are accessed, generates async callback with await
         def on_block(node)
           send_node, args_node, body = node.children
           return super unless send_node&.type == :send
@@ -176,21 +177,36 @@ module Ruby2JS
 
           # Transform the callback body to use 'record' parameter
           # Replace: self -> record, id -> record.id, etc.
+          # Track if any associations are accessed (they're async)
+          @callback_uses_associations = false
           transformed_body = transform_callback_body(body)
+          uses_associations = @callback_uses_associations
 
           # Set flag so broadcast methods know to use 'record' instead of 'this'
           @in_callback_block = true
           processed_body = process(transformed_body)
           @in_callback_block = false
 
-          # Generate: ClassName.callback_method(($record) => { ... })
-          s(:send,
-            s(:const, nil, @rails_model_name.to_sym),
-            method,
-            s(:block,
-              s(:send, nil, :proc),
-              s(:args, s(:arg, :"$record")),
-              processed_body))
+          # Generate callback - async if associations are accessed
+          if uses_associations
+            # Generate: ClassName.callback_method(async ($record) => { ... })
+            s(:send,
+              s(:const, nil, @rails_model_name.to_sym),
+              method,
+              s(:block,
+                s(:send, nil, :async),
+                s(:args, s(:arg, :"$record")),
+                processed_body))
+          else
+            # Generate: ClassName.callback_method(($record) => { ... })
+            s(:send,
+              s(:const, nil, @rails_model_name.to_sym),
+              method,
+              s(:block,
+                s(:send, nil, :proc),
+                s(:args, s(:arg, :"$record")),
+                processed_body))
+          end
         end
 
         # Handle broadcast_*_to method calls inside model callbacks
@@ -213,6 +229,7 @@ module Ruby2JS
 
         # Transform callback body to use '$record' parameter instead of self/id
         # Uses $record to avoid conflicts with user-defined 'record' variables
+        # Wraps association accesses with await and sets @callback_uses_associations
         def transform_callback_body(node)
           return node unless node.respond_to?(:type)
 
@@ -226,7 +243,16 @@ module Ruby2JS
 
             if target.nil?
               # Bare method call - could be a record attribute/method or broadcast_json_to
-              if instance_method?(method)
+              if association_method?(method)
+                # Association access - wrap with await: article -> (await $record.article)
+                # Use :begin to ensure parentheses when used as receiver for method chain
+                @callback_uses_associations = true
+                s(:begin,
+                  s(:send, nil, :await,
+                    s(:attr,
+                      s(:lvar, :"$record"),
+                      method)))
+              elsif instance_method?(method)
                 # id, article_id, created_at, etc. -> $record.id, $record.article_id, etc.
                 # Use :attr for property access (no parentheses in JS)
                 s(:attr,
@@ -246,10 +272,20 @@ module Ruby2JS
                 node.updated(nil, [target, method, *args.map { |arg| transform_callback_body(arg) }])
               end
             elsif target&.type == :self
-              # self.foo -> $record.foo (property access)
-              s(:attr,
-                s(:lvar, :"$record"),
-                method)
+              # self.foo -> check if it's an association
+              if association_method?(method)
+                @callback_uses_associations = true
+                s(:begin,
+                  s(:send, nil, :await,
+                    s(:attr,
+                      s(:lvar, :"$record"),
+                      method)))
+              else
+                # self.foo -> $record.foo (property access)
+                s(:attr,
+                  s(:lvar, :"$record"),
+                  method)
+              end
             else
               # Recurse into target and args
               node.updated(nil, [
@@ -270,6 +306,12 @@ module Ruby2JS
           end
         end
 
+        # Check if a method name is a known association (async access)
+        def association_method?(method)
+          method_str = method.to_s
+          @rails_associations&.any? { |a| a[:name].to_s == method_str }
+        end
+
         # Check if a method name looks like an instance method (attribute accessor or association)
         def instance_method?(method)
           method_str = method.to_s
@@ -279,7 +321,7 @@ module Ruby2JS
           return true if method_str.end_with?('_at')  # timestamps
           return true if %w[created_at updated_at].include?(method_str)
           # Check if it's a known association name
-          return true if @rails_associations&.any? { |a| a[:name].to_s == method_str }
+          return true if association_method?(method)
           false
         end
 
@@ -480,8 +522,20 @@ module Ruby2JS
           return false unless class_name&.type == :const
           return false unless superclass&.type == :const
 
-          superclass_str = superclass.children.last.to_s
-          superclass_str == 'ApplicationRecord' || superclass_str == 'ActiveRecord::Base'
+          # Check for ApplicationRecord (simple const)
+          superclass_name = superclass.children.last.to_s
+          return true if superclass_name == 'ApplicationRecord'
+
+          # Check for ActiveRecord::Base (nested const)
+          # AST: s(:const, s(:const, nil, :ActiveRecord), :Base)
+          if superclass_name == 'Base'
+            parent_const = superclass.children.first
+            if parent_const&.type == :const && parent_const.children.last == :ActiveRecord
+              return true
+            end
+          end
+
+          false
         end
 
         def collect_model_metadata(body)
