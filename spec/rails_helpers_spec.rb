@@ -354,25 +354,33 @@ describe Ruby2JS::Filter::Rails::Helpers do
   end
 
   describe 'render helper' do
-    it "should handle render with method call collection" do
-      # render @article.comments -> article.comments.map(comment => _comment_module.render(...)).join('')
+    it "should handle render with method call collection (async)" do
+      # render @article.comments -> (await article.comments).map(comment => _comment_module.render(...)).join('')
+      # Association access returns a Promise, so needs async render function and await
       erb_src = '_erbout = +\'\'; _erbout.<<(( render(@article.comments) ).to_s); _erbout'
       result = to_js(erb_src)
       # Should import from the model's view directory
       result.must_include 'import * as _comment_module from "../comments/_comment.js"'
-      # Should map over the collection
-      result.must_include 'article.comments.map'
+      # Should be an async function
+      result.must_include 'async function render'
+      # Should await the association access
+      result.must_include '(await article.comments).map'
       result.must_include '_comment_module.render'
     end
 
-    it "should handle render with ivar collection" do
+    it "should handle render with ivar collection (sync)" do
       # render @messages -> messages.map(message => _message_module.render(...)).join('')
+      # Instance variables passed directly are already resolved, no await needed
       erb_src = '_erbout = +\'\'; _erbout.<<(( render(@messages) ).to_s); _erbout'
       result = to_js(erb_src)
       # Should import from current directory (same as singular model name)
       result.must_include 'import * as _message_module from "./_message.js"'
-      # Should map over the collection
+      # Should NOT be async (no association access)
+      result.must_include 'function render'
+      result.wont_include 'async function render'
+      # Should map over the collection without await
       result.must_include 'messages.map'
+      result.wont_include 'await messages'
       result.must_include '_message_module.render'
     end
   end

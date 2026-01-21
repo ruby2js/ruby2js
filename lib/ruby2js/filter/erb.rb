@@ -13,6 +13,7 @@ module Ruby2JS
         @erb_locals = Set.new      # Undefined local variables (used but not assigned)
         @erb_lvar_assigns = Set.new # Local variable assignments
         @erb_bufvar = nil
+        @erb_needs_async = false   # Track if render function needs to be async
       end
 
       # Main entry point - detect ERB/HERB output patterns and transform
@@ -105,7 +106,18 @@ module Ruby2JS
         end
 
         # Wrap in arrow function or regular function
-        s(:def, :render, args, body)
+        # Use async if any async operations were detected (e.g., association access)
+        if @erb_needs_async || erb_needs_async?
+          s(:async, :render, args, body)
+        else
+          s(:def, :render, args, body)
+        end
+      end
+
+      # Hook for subclasses to indicate async is needed
+      # Override in rails/helpers when async operations are detected
+      def erb_needs_async?
+        false
       end
 
       # Hook for subclasses to add imports - override in rails/helpers
@@ -276,6 +288,11 @@ module Ruby2JS
       # Accessor for subclasses
       def erb_bufvar
         @erb_bufvar
+      end
+
+      # Mark that async is needed (for subclasses to call)
+      def erb_mark_async!
+        @erb_needs_async = true
       end
 
       private

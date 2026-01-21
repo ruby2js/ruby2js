@@ -1160,9 +1160,18 @@ module Ruby2JS
           # For collections, wrap in map().join('')
           # messages.map(message => _message_module.render({$context, message})).join('')
           if is_collection
+            # Check if the collection is an association access (returns Promise)
+            # If so, wrap with await and mark render as async
+            collection_expr = process(collection_var)
+            if association_access?(collection_var)
+              erb_mark_async!
+              # Wrap in begin to get parentheses: (await article.comments).map(...)
+              collection_expr = s(:begin, s(:send, nil, :await, collection_expr))
+            end
+
             s(:send,
               s(:send,
-                process(collection_var),
+                collection_expr,
                 :map,
                 s(:block,
                   s(:send, nil, :lambda),
@@ -1878,6 +1887,24 @@ module Ruby2JS
         end
 
         private
+
+        # Check if a node represents an association access (e.g., article.comments)
+        # Association access returns a Promise that needs to be awaited
+        def association_access?(node)
+          return false unless node&.type == :send
+          receiver = node.children[0]
+          method = node.children[1]
+
+          # Receiver must be a model instance (lvar or ivar that's been converted to lvar)
+          return false unless receiver
+          return false unless [:lvar, :ivar, :send].include?(receiver.type)
+
+          # Method name should be plural (convention for has_many associations)
+          # This is a heuristic - plural method names on model instances are likely associations
+          method_str = method.to_s
+          singular = Ruby2JS::Inflector.singularize(method_str)
+          method_str != singular
+        end
 
         # Check if targeting browser (vs server-side rendering)
         # Explicit :target option takes precedence over database inference
