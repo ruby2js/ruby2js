@@ -1176,11 +1176,11 @@ module Ruby2JS
           render_call = s(:send, s(:lvar, module_name), :render,
             s(:hash, *pairs))
 
-          # For collections, wrap in map().join('')
-          # messages.map(message => _message_module.render({$context, message})).join('')
+          # For collections, wrap in Promise.all().join('')
+          # (await Promise.all(messages.map(message => _message_module.render({...})))).join('')
           if is_collection
             # Check if the collection is an association access (returns Promise)
-            # If so, wrap with await and mark render as async
+            # If so, wrap with await first
             collection_expr = process(collection_var)
             if association_access?(collection_var)
               self.erb_mark_async!()
@@ -1188,18 +1188,25 @@ module Ruby2JS
               collection_expr = s(:begin, s(:send, nil, :await, collection_expr))
             end
 
+            # Each partial render might be async, use Promise.all to await all
+            self.erb_mark_async!()
+            map_expr = s(:send, collection_expr, :map,
+              s(:block,
+                s(:send, nil, :lambda),
+                s(:args, s(:arg, singular_name)),
+                render_call))
+
+            # (await Promise.all(map_expr)).join('')
             s(:send,
-              s(:send,
-                collection_expr,
-                :map,
-                s(:block,
-                  s(:send, nil, :lambda),
-                  s(:args, s(:arg, singular_name)),
-                  render_call)),
+              s(:begin,
+                s(:send, nil, :await,
+                  s(:send, s(:const, nil, :Promise), :all, map_expr))),
               :join,
               s(:str, ''))
           else
-            render_call
+            # Single object render - await in case partial is async
+            self.erb_mark_async!()
+            s(:send, nil, :await, render_call)
           end
         end
 

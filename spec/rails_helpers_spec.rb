@@ -368,19 +368,18 @@ describe Ruby2JS::Filter::Rails::Helpers do
       result.must_include '_comment_module.render'
     end
 
-    it "should handle render with ivar collection (sync)" do
-      # render @messages -> messages.map(message => _message_module.render(...)).join('')
-      # Instance variables passed directly are already resolved, no await needed
+    it "should handle render with ivar collection (async)" do
+      # render @messages -> (await Promise.all(messages.map(...))).join('')
+      # Partials might be async, so use Promise.all
       erb_src = '_erbout = +\'\'; _erbout.<<(( render(@messages) ).to_s); _erbout'
       result = to_js(erb_src)
       # Should import from current directory (same as singular model name)
       result.must_include 'import * as _message_module from "./_message.js"'
-      # Should NOT be async (no association access)
-      result.must_include 'function render'
-      result.wont_include 'async function render'
-      # Should map over the collection without await
+      # Should be async (partials might be async)
+      result.must_include 'async function render'
+      # Should use Promise.all for parallel rendering
+      result.must_include 'Promise.all'
       result.must_include 'messages.map'
-      result.wont_include 'await messages'
       result.must_include '_message_module.render'
     end
 
