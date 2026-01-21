@@ -1640,7 +1640,8 @@ class SelfhostBuilder
 
     js = result.to_s
     # Note: Function may not be at start if imports were added by rails/helpers filter
-    js = js.sub(/(^|\n)function render/, '\1export function render')
+    # Handle both sync and async render functions
+    js = js.sub(/(^|\n)(async )?function render/, '\1export \2function render')
 
     FileUtils.mkdir_p(File.dirname(dest_path))
 

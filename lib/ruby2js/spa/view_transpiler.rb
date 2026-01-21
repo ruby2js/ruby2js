@@ -156,8 +156,9 @@ module Ruby2JS
 
         # Ensure export is present
         # Note: Function may not be at start if imports were added by rails/helpers filter
+        # Handle both sync and async render functions
         unless js.include?('export ')
-          js = js.sub(/(^|\n)function render/, '\1export function render')
+          js = js.sub(/(^|\n)(async )?function render/, '\1export \2function render')
         end
 
         js
