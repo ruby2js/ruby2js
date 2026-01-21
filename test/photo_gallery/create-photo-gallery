@@ -161,7 +161,9 @@ cat > app/views/photos/_photo.html.erb << 'PARTIAL'
     <% if photo.caption %>
       <p class="text-gray-800 mb-2"><%= photo.caption %></p>
     <% end %>
-    <time class="text-gray-500 text-sm"><%= photo.taken_at.toLocaleString() %></time>
+    <% if photo.taken_at %>
+      <time class="text-gray-500 text-sm"><%= photo.taken_at.toLocaleString() %></time>
+    <% end %>
   </div>
 </div>
 PARTIAL

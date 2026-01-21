@@ -1356,11 +1356,18 @@ module Ruby2JS
             target_expr = s(:str, target)
           end
 
-          # Content is rendered via the partial: await render({ article: $record })
+          # Content is rendered via the partial: await render({ $context: {...}, article: $record })
           # The partial is imported as 'render' from the views directory
+          # Pass a minimal $context with empty authenticityToken (forms won't work in broadcasts anyway)
+          context_obj = s(:hash,
+            s(:pair, s(:sym, :authenticityToken), s(:str, '')),
+            s(:pair, s(:sym, :flash), s(:hash)),
+            s(:pair, s(:sym, :contentFor), s(:hash)))
+
           content_expr = s(:send, nil, :await,
             s(:send, nil, :render,
               s(:hash,
+                s(:pair, s(:sym, :"$context"), context_obj),
                 s(:pair, s(:sym, model_name_sym), receiver))))
 
           html = s(:dstr,

@@ -580,8 +580,10 @@ describe Ruby2JS::Filter::Rails::Model do
           broadcasts_to -> { "chat_room" }
         end
       RUBY
-      # Should use the partial's render function
-      assert_includes result, 'await render({message: $record})'
+      # Should use the partial's render function with $context
+      assert_includes result, 'await render({'
+      assert_includes result, '$context: {authenticityToken: "", flash: {}, contentFor: {}}'
+      assert_includes result, 'message: $record'
       # Should import the partial
       assert_includes result, 'import { render } from "../views/messages/_message.js"'
     end
