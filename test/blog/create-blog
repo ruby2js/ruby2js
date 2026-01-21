@@ -55,6 +55,10 @@ class Comment < ApplicationRecord
   # Broadcast comment changes to article show page subscribers
   # Lambda receives the record being broadcast
   broadcasts_to ->(comment) { "article_#{comment.article_id}_comments" }, target: "comments"
+
+  # Also update article on index when comments change (for comment count)
+  after_create_commit { article.broadcast_replace_to "articles" }
+  after_destroy_commit { article.broadcast_replace_to "articles" }
 end
 MODEL
 
@@ -69,27 +73,56 @@ Rails.application.routes.draw do
 end
 ROUTES
 
-# Update ArticlesController to use eager loading
-sed -i.bak 's/@articles = Article.all/@articles = Article.includes(:comments).all/' app/controllers/articles_controller.rb
+# Update ArticlesController to use eager loading and newest-first order
+sed -i.bak 's/@articles = Article.all/@articles = Article.includes(:comments).order(created_at: :desc)/' app/controllers/articles_controller.rb
 rm -f app/controllers/articles_controller.rb.bak
 
-# Add turbo_stream_from subscription to articles index for real-time updates
-sed -i.bak '1s/^/<%= turbo_stream_from "articles" %>\n\n<div id="articles">\n/' app/views/articles/index.html.erb
-echo '</div>' >> app/views/articles/index.html.erb
-rm -f app/views/articles/index.html.erb.bak
+# Replace articles index with simplified version that uses the partial for everything
+# This ensures broadcast renders match the index display (partial includes buttons)
+cat > app/views/articles/index.html.erb << 'VIEW'
+<%= turbo_stream_from "articles" %>
 
-# Update article partial with ID for targeting and comment count
+<% content_for :title, "Articles" %>
+
+<div class="w-full">
+  <% if notice.present? %>
+    <p class="py-2 px-3 bg-green-50 mb-5 text-green-500 font-medium rounded-md inline-block" id="notice"><%= notice %></p>
+  <% end %>
+
+  <div class="flex justify-between items-center">
+    <h1 class="font-bold text-4xl">Articles</h1>
+    <%= link_to "New article", new_article_path, class: "rounded-md px-3.5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white block font-medium" %>
+  </div>
+
+  <div id="articles" class="min-w-full divide-y divide-gray-200 space-y-5">
+    <% if @articles.any? %>
+      <%= render @articles %>
+    <% else %>
+      <p class="text-center my-10">No articles found.</p>
+    <% end %>
+  </div>
+</div>
+VIEW
+
+# Update article partial with ID for targeting, comment count, and action buttons
 # The ID allows turbo streams to target individual articles for updates/removal
-# Action buttons are in the scaffold-generated index.html.erb, not here
+# Including buttons here ensures broadcast renders match the index display
 cat > app/views/articles/_article.html.erb << 'PARTIAL'
-<div id="<%= dom_id(article) %>" class="p-4 border rounded mb-4">
-  <h2 class="text-xl font-bold">
-    <%= link_to article.title, article, class: "text-blue-600 hover:underline" %>
-    <span id="<%= dom_id(article, :comments_count) %>" class="text-gray-500 text-sm font-normal ml-2">
-      (<%= pluralize(article.comments.size, "comment") %>)
-    </span>
-  </h2>
-  <p class="text-gray-700 mt-2"><%= truncate(article.body, length: 100) %></p>
+<div id="<%= dom_id(article) %>" class="flex flex-col sm:flex-row justify-between items-center pb-5 sm:pb-0">
+  <div class="p-4 border rounded mb-4 flex-grow">
+    <h2 class="text-xl font-bold">
+      <%= link_to article.title, article, class: "text-blue-600 hover:underline" %>
+      <span id="<%= dom_id(article, :comments_count) %>" class="text-gray-500 text-sm font-normal ml-2">
+        (<%= pluralize(article.comments.size, "comment") %>)
+      </span>
+    </h2>
+    <p class="text-gray-700 mt-2"><%= truncate(article.body, length: 100) %></p>
+  </div>
+  <div class="w-full sm:w-auto flex flex-col sm:flex-row space-x-2 space-y-2">
+    <%= link_to "Show", article, class: "w-full sm:w-auto text-center rounded-md px-3.5 py-2.5 bg-gray-100 hover:bg-gray-50 inline-block font-medium" %>
+    <%= link_to "Edit", edit_article_path(article), class: "w-full sm:w-auto text-center rounded-md px-3.5 py-2.5 bg-gray-100 hover:bg-gray-50 inline-block font-medium" %>
+    <%= button_to "Destroy", article, method: :delete, class: "w-full sm:w-auto rounded-md px-3.5 py-2.5 text-white bg-red-600 hover:bg-red-500 font-medium cursor-pointer", data: { turbo_confirm: "Are you sure?" } %>
+  </div>
 </div>
 PARTIAL
 
@@ -137,8 +170,26 @@ cat > app/views/comments/_comment.html.erb << 'PARTIAL'
 </div>
 PARTIAL
 
-# Add comments section to article show view with real-time updates
-cat >> app/views/articles/show.html.erb << 'VIEW'
+# Replace article show view with comments section and real-time updates
+# Don't use the partial here since it includes index-style buttons
+cat > app/views/articles/show.html.erb << 'VIEW'
+<% content_for :title, "Showing article" %>
+
+<div class="md:w-2/3 w-full">
+  <% if notice.present? %>
+    <p class="py-2 px-3 bg-green-50 mb-5 text-green-500 font-medium rounded-md inline-block" id="notice"><%= notice %></p>
+  <% end %>
+
+  <h1 class="font-bold text-4xl"><%= @article.title %></h1>
+
+  <div class="my-4">
+    <p class="text-gray-700"><%= @article.body %></p>
+  </div>
+
+  <%= link_to "Edit this article", edit_article_path(@article), class: "w-full sm:w-auto text-center rounded-md px-3.5 py-2.5 bg-gray-100 hover:bg-gray-50 inline-block font-medium" %>
+  <%= link_to "Back to articles", articles_path, class: "w-full sm:w-auto text-center mt-2 sm:mt-0 sm:ml-2 rounded-md px-3.5 py-2.5 bg-gray-100 hover:bg-gray-50 inline-block font-medium" %>
+  <%= button_to "Destroy this article", @article, method: :delete, form_class: "sm:inline-block mt-2 sm:mt-0 sm:ml-2", class: "w-full rounded-md px-3.5 py-2.5 text-white bg-red-600 hover:bg-red-500 font-medium cursor-pointer", data: { turbo_confirm: "Are you sure?" } %>
+</div>
 
 <hr class="my-8">
 
@@ -165,6 +216,10 @@ cat >> app/views/articles/show.html.erb << 'VIEW'
   <%= form.submit "Add Comment", class: "bg-blue-600 text-white px-4 py-2 rounded" %>
 <% end %>
 VIEW
+
+# Fix layout to use single column (flex-col) instead of row (flex)
+sed -i.bak 's/class="container mx-auto mt-28 px-5 flex"/class="container mx-auto mt-28 px-5 flex flex-col"/' app/views/layouts/application.html.erb
+rm -f app/views/layouts/application.html.erb.bak
 
 # Rebuild Tailwind CSS to include all view classes
 bin/rails tailwindcss:build
