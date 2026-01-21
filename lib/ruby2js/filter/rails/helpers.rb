@@ -1164,7 +1164,7 @@ module Ruby2JS
             # If so, wrap with await and mark render as async
             collection_expr = process(collection_var)
             if association_access?(collection_var)
-              erb_mark_async!
+              self.erb_mark_async!()
               # Wrap in begin to get parentheses: (await article.comments).map(...)
               collection_expr = s(:begin, s(:send, nil, :await, collection_expr))
             end
