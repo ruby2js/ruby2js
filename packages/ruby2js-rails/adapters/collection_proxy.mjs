@@ -165,7 +165,9 @@ export class CollectionProxy {
 
   then(resolve, reject) {
     if (this._loaded) {
-      return Promise.resolve(this).then(resolve, reject);
+      // Don't use Promise.resolve(this) - it calls then() again (infinite recursion)
+      // Instead, resolve via microtask to properly fulfill the Promise protocol
+      return Promise.resolve().then(() => resolve ? resolve(this) : this);
     }
     return this.toRelation().then(records => {
       this._records = records;
