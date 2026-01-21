@@ -433,13 +433,14 @@ module Ruby2JS
 
         # :send!, :call, and :await! force method call output (with parens)
         # :await preserves is_method? from the underlying node via updated()
+        # :await_attr is explicitly for property access (no parens), regardless of is_method?
         # Apply private method prefix if present
         method_name = private_prefix ? "#{private_prefix}#{method}" : method
-        if not @ast.is_method? and ![:send!, :call, :await!].include?(@ast.type)
+        if (@ast.type == :await_attr || !@ast.is_method?) and ![:send!, :call, :await!].include?(@ast.type)
           if receiver
             (group_receiver ? group(receiver) : parse(receiver))
             put ".#{ method_name }"
-          elsif @ast.type == :attr
+          elsif @ast.type == :attr || @ast.type == :await_attr
             put method_name
           else
             parse @ast.updated(:lvasgn, [method_name]), @state
