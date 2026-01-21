@@ -383,6 +383,34 @@ describe Ruby2JS::Filter::Rails::Helpers do
       result.wont_include 'await messages'
       result.must_include '_message_module.render'
     end
+
+    it "should handle association.size with async" do
+      # article.comments.size -> (await article.comments).size
+      # Association access returns a Promise, so needs async render function and await
+      erb_src = '_erbout = +\'\'; _erbout.<<(( article.comments.size ).to_s); _erbout'
+      result = to_js(erb_src)
+      # Should be an async function
+      result.must_include 'async function render'
+      # Should await the association and access .size as property (no parens)
+      result.must_include '(await article.comments).size'
+      result.wont_include '.size()'  # Should be property access, not method call
+    end
+
+    it "should handle association.count with async" do
+      # article.comments.count -> (await article.comments).count
+      erb_src = '_erbout = +\'\'; _erbout.<<(( article.comments.count ).to_s); _erbout'
+      result = to_js(erb_src)
+      result.must_include 'async function render'
+      result.must_include '(await article.comments).count'
+    end
+
+    it "should handle association.length with async" do
+      # article.comments.length -> (await article.comments).length
+      erb_src = '_erbout = +\'\'; _erbout.<<(( article.comments.length ).to_s); _erbout'
+      result = to_js(erb_src)
+      result.must_include 'async function render'
+      result.must_include '(await article.comments).length'
+    end
   end
 
   describe 'truncate helper' do

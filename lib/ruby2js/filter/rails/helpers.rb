@@ -170,6 +170,17 @@ module Ruby2JS
             return process_turbo_stream_from(args)
           end
 
+          # Handle association.size/count/length patterns in ERB
+          # article.comments.size -> (await article.comments).size
+          if @erb_bufvar && [:size, :count, :length].include?(method) && association_access?(target)
+            self.erb_mark_async!()
+            # Wrap the association access with await, then access the property
+            # Use :attr for property access (no parentheses) instead of :send (method call)
+            return s(:attr,
+              s(:begin, s(:send, nil, :await, process(target))),
+              method)
+          end
+
           super
         end
 

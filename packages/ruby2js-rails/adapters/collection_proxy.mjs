@@ -20,7 +20,7 @@ export class CollectionProxy {
 
   get size() {
     if (this._records) return this._records.length;
-    return 0;  // Not loaded yet - use count() for async count
+    return 0;  // Not loaded yet - use await or count() for async count
   }
 
   get length() {
@@ -161,15 +161,16 @@ export class CollectionProxy {
   }
 
   // --- Thenable (for await support) ---
+  // Returns the proxy itself (not records array) so .size/.length work after await
 
   then(resolve, reject) {
-    if (this._records) {
-      return Promise.resolve(this._records).then(resolve, reject);
+    if (this._loaded) {
+      return Promise.resolve(this).then(resolve, reject);
     }
     return this.toRelation().then(records => {
       this._records = records;
       this._loaded = true;
-      return records;
+      return this;  // Return proxy, not records, so .size works
     }).then(resolve, reject);
   }
 
