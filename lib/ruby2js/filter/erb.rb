@@ -107,7 +107,7 @@ module Ruby2JS
 
         # Wrap in arrow function or regular function
         # Use async if any async operations were detected (e.g., association access)
-        if @erb_needs_async || erb_needs_async?
+        if @erb_needs_async || self.erb_needs_async?()
           s(:async, :render, args, body)
         else
           s(:def, :render, args, body)
