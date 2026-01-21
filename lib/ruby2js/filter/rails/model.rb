@@ -124,8 +124,17 @@ module Ruby2JS
             model_import_nodes.push(broadcast_import)
 
             # Collect and import broadcast partials
-            # For now, only supports one partial per model (imported as 'render')
+            # Includes both explicit broadcast_*_to partials and inferred broadcasts_to partial
             partials = collect_broadcast_partials(body)
+
+            # Add inferred partial from broadcasts_to (model name -> model partial)
+            # Article with broadcasts_to -> articles/article partial
+            if @rails_broadcasts_to.any?
+              model_name_lower = @rails_model_name.downcase
+              model_partial = "#{Ruby2JS::Inflector.pluralize(model_name_lower)}/#{model_name_lower}"
+              partials << model_partial unless partials.include?(model_partial)
+            end
+
             if partials.length > 0
               partial_path = partials.first
               # Build path: messages/message -> ../views/messages/_message.js
@@ -1288,19 +1297,35 @@ module Ruby2JS
           # Build the broadcast call body
           broadcast_body = build_broadcasts_to_body(action, stream_node, target, partial_name)
 
-          # Model.callback_type(($record) => { ... })
-          s(:send,
-            s(:const, nil, @rails_model_name.to_sym),
-            callback_type,
-            s(:block,
-              s(:send, nil, :proc),
-              s(:args, s(:arg, :"$record")),
-              broadcast_body))
+          # For remove action, callback doesn't need async (no render call)
+          # For other actions, callback is async since render() is async
+          if action == :remove
+            # Model.callback_type(($record) => { ... })
+            s(:send,
+              s(:const, nil, @rails_model_name.to_sym),
+              callback_type,
+              s(:block,
+                s(:send, nil, :proc),
+                s(:args, s(:arg, :"$record")),
+                broadcast_body))
+          else
+            # Model.callback_type(async ($record) => { ... })
+            # Use s(:send, nil, :async, block) pattern for async arrow
+            s(:send,
+              s(:const, nil, @rails_model_name.to_sym),
+              callback_type,
+              s(:send, nil, :async,
+                s(:block,
+                  s(:send, nil, :proc),
+                  s(:args, s(:arg, :"$record")),
+                  broadcast_body)))
+          end
         end
 
         # Build the body of a broadcast callback
         def build_broadcasts_to_body(action, stream_node, target, partial_name)
           receiver = s(:lvar, :"$record")
+          model_name_sym = @rails_model_name.downcase.to_sym
 
           # For remove action, use dom_id for target
           if action == :remove
@@ -1331,8 +1356,12 @@ module Ruby2JS
             target_expr = s(:str, target)
           end
 
-          # Content is $record.toHTML() - the partial rendering is handled at runtime
-          content_expr = s(:send, receiver, :toHTML)
+          # Content is rendered via the partial: await render({ article: $record })
+          # The partial is imported as 'render' from the views directory
+          content_expr = s(:send, nil, :await,
+            s(:send, nil, :render,
+              s(:hash,
+                s(:pair, s(:sym, model_name_sym), receiver))))
 
           html = s(:dstr,
             s(:str, "<turbo-stream action=\"#{action}\" target=\""),

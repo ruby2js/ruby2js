@@ -574,13 +574,16 @@ describe Ruby2JS::Filter::Rails::Model do
       assert_includes result, 'import { BroadcastChannel }'
     end
 
-    it "uses $record.toHTML() for content" do
+    it "uses render() for content instead of toHTML()" do
       result = to_js(<<~RUBY)
         class Message < ApplicationRecord
           broadcasts_to -> { "chat_room" }
         end
       RUBY
-      assert_includes result, '$record.toHTML()'
+      # Should use the partial's render function
+      assert_includes result, 'await render({message: $record})'
+      # Should import the partial
+      assert_includes result, 'import { render } from "../views/messages/_message.js"'
     end
 
     it "broadcasts to BroadcastChannel" do
