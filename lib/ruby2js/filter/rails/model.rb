@@ -270,7 +270,7 @@ module Ruby2JS
           end
         end
 
-        # Check if a method name looks like an instance method (attribute accessor)
+        # Check if a method name looks like an instance method (attribute accessor or association)
         def instance_method?(method)
           method_str = method.to_s
           # Common ActiveRecord attribute accessors
@@ -278,6 +278,8 @@ module Ruby2JS
           return true if method_str.end_with?('_id')  # foreign keys
           return true if method_str.end_with?('_at')  # timestamps
           return true if %w[created_at updated_at].include?(method_str)
+          # Check if it's a known association name
+          return true if @rails_associations&.any? { |a| a[:name].to_s == method_str }
           false
         end
 

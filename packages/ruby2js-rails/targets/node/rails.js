@@ -23,7 +23,9 @@ import {
   formData,
   handleFormResult,
   setupFormHandlers,
-  TurboBroadcast
+  TurboBroadcast,
+  turbo_stream_from,
+  resolveContent
 } from './rails_server.js';
 
 import { createRPCHandler, getRegistry, getCSRF, csrfMetaTag } from 'ruby2js-rails/rpc/server.mjs';
@@ -32,7 +34,7 @@ import { createRPCHandler, getRegistry, getCSRF, csrfMetaTag } from 'ruby2js-rai
 let rpcHandler = null;
 
 // Re-export everything from server module
-export { createContext, createFlash, truncate, pluralize, dom_id, navigate, submitForm, formData, handleFormResult, setupFormHandlers };
+export { createContext, createFlash, truncate, pluralize, dom_id, navigate, submitForm, formData, handleFormResult, setupFormHandlers, turbo_stream_from };
 
 // Re-export RPC utilities for layout integration
 export { csrfMetaTag, getRegistry as getRPCRegistry };
@@ -218,15 +220,14 @@ export class Router extends RouterServer {
         }
       }
 
-      // Check if result is a JSON response
-      console.log('  DEBUG: Got result from controller');
-      console.log('  Result type:', typeof html, html && typeof html === 'object' ? Object.keys(html).slice(0, 5) : 'n/a');
-      if (html && typeof html === 'object' && 'json' in html) {
+      // Check if result is a JSON response (not a React element)
+      // React elements have $$typeof property, JSON responses have 'json' property
+      if (html && typeof html === 'object' && 'json' in html && !html.$$typeof) {
         console.log(`  Rendering JSON for ${controllerName}/${action}`);
         this.sendJson(res, html.json);
       } else {
         console.log(`  Rendering ${controllerName}/${action}`);
-        this.sendHtml(context, res, html);
+        await this.sendHtml(context, res, html);
       }
     } catch (e) {
       console.error('  Error:', e.message || e);
@@ -286,7 +287,7 @@ export class Router extends RouterServer {
   }
 
   // Handle controller result for Node.js
-  static handleResultNode(context, res, result, defaultRedirect) {
+  static async handleResultNode(context, res, result, defaultRedirect) {
     if (result.json) {
       // JSON response
       console.log('  Rendering JSON response');
@@ -308,7 +309,7 @@ export class Router extends RouterServer {
     } else if (result.render) {
       // Return 422 Unprocessable Entity so Turbo Drive renders the response
       console.log('  Re-rendering form (validation failed)');
-      this.sendHtml(context, res, result.render, 422);
+      await this.sendHtml(context, res, result.render, 422);
     } else {
       this.redirectNode(context, res, defaultRedirect);
     }
@@ -343,7 +344,8 @@ export class Router extends RouterServer {
   }
 
   // Send HTML response with proper headers, wrapped in layout
-  static sendHtml(context, res, html, status = 200) {
+  static async sendHtml(context, res, content, status = 200) {
+    const html = await resolveContent(content);
     const fullHtml = Application.wrapInLayout(context, html);
     const headers = { 'Content-Type': 'text/html; charset=utf-8' };
 
@@ -472,6 +474,9 @@ export class Application extends ApplicationServer {
       // Handle WebSocket connections
       this.wsServer.on('connection', (ws, req) => {
         console.log('WebSocket connected');
+
+        // Send Action Cable welcome message
+        TurboBroadcast.sendWelcome(ws);
 
         ws.on('message', (data) => {
           TurboBroadcast.handleMessage(ws, data.toString());

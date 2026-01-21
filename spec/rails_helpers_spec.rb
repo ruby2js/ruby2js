@@ -559,14 +559,12 @@ describe Ruby2JS::Filter::Rails::Helpers do
         result.wont_include '<script'
       end
 
-      it "should generate inline WebSocket script for server target with turbo_stream_from" do
+      it "should use turbo_stream_from helper for server target" do
         erb_src = '_buf = ::String.new; _buf << ( turbo_stream_from "chat_room" ).to_s; _buf.to_s'
         result = to_js_with_target(erb_src, database: 'sqlite3', target: 'node')
-        # Output is a JS string, so quotes are escaped
-        result.must_include '<script type=\\"module\\">'
-        result.must_include 'WebSocket'
-        result.must_include '/cable'
-        result.must_include 'subscribe'
+        # Server targets use turbo_stream_from helper which renders <turbo-cable-stream-source>
+        result.must_include 'turbo_stream_from'
+        result.must_include 'import'
         result.must_include 'chat_room'
         result.wont_include 'TurboBroadcast.subscribe'
       end
@@ -575,18 +573,17 @@ describe Ruby2JS::Filter::Rails::Helpers do
         erb_src = '_buf = ::String.new; _buf << ( turbo_stream_from "room_#{room_id}" ).to_s; _buf.to_s'
         result = to_js_with_target(erb_src, database: 'sqlite3', target: 'node')
         # Dynamic channel uses template literal
-        result.must_include '<script type='
+        result.must_include 'turbo_stream_from'
         result.must_include 'room_'
         result.must_include '${room_id}'
-        result.must_include 'WebSocket'
       end
 
-      it "should generate WebSocket script for Cloudflare target with turbo_stream_from" do
+      it "should use turbo_stream_from helper for Cloudflare target" do
         erb_src = '_buf = ::String.new; _buf << ( turbo_stream_from "notifications" ).to_s; _buf.to_s'
         result = to_js_with_target(erb_src, database: 'd1', target: 'cloudflare')
-        # Cloudflare Workers use Durable Objects for WebSockets, handled differently
-        result.must_include '<script type=\\"module\\">'
-        result.must_include 'WebSocket'
+        # Cloudflare target also uses turbo_stream_from helper
+        result.must_include 'turbo_stream_from'
+        result.must_include 'notifications'
       end
     end
   end

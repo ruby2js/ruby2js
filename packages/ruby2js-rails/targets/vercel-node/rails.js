@@ -16,11 +16,13 @@ import {
   submitForm,
   formData,
   handleFormResult,
-  setupFormHandlers
+  setupFormHandlers,
+  turbo_stream_from,
+  resolveContent
 } from './rails_server.js';
 
 // Re-export everything from server module
-export { createContext, createFlash, truncate, pluralize, dom_id, navigate, submitForm, formData, handleFormResult, setupFormHandlers };
+export { createContext, createFlash, truncate, pluralize, dom_id, navigate, submitForm, formData, handleFormResult, setupFormHandlers, turbo_stream_from };
 
 // Stubbed TurboBroadcast for Vercel - no persistent WebSocket support
 // Broadcasts are silently ignored since Vercel Serverless Functions don't support WebSockets
@@ -92,7 +94,7 @@ export class Router extends RouterServer {
   }
 
   // Override handleResult to use full URL for redirects
-  static handleResult(context, result, defaultRedirect) {
+  static async handleResult(context, result, defaultRedirect) {
     if (result.turbo_stream) {
       // Turbo Stream response - return with proper content type
       console.log('  Rendering turbo_stream response');
@@ -110,7 +112,7 @@ export class Router extends RouterServer {
     } else if (result.render) {
       // Return 422 Unprocessable Entity so Turbo Drive renders the response
       console.log('  Re-rendering form (validation failed)');
-      return this.htmlResponse(context, result.render, 422);
+      return await this.htmlResponse(context, result.render, 422);
     } else {
       return this.redirect(context, defaultRedirect);
     }
@@ -130,7 +132,8 @@ export class Router extends RouterServer {
 
   // Override htmlResponse to use the correct Application class
   // (Parent class references its own Application which doesn't have layoutFn set)
-  static htmlResponse(context, html, status = 200) {
+  static async htmlResponse(context, content, status = 200) {
+    const html = await resolveContent(content);
     const fullHtml = Application.wrapInLayout(context, html);
     const headers = { 'Content-Type': 'text/html; charset=utf-8' };
 

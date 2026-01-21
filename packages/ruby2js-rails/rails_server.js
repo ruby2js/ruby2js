@@ -18,6 +18,33 @@ import {
 
 import { getCSRF } from './rpc/server.mjs';
 
+// Lazy-loaded ReactDOMServer for rendering React elements
+// Only imported when needed (apps with RBX/JSX views)
+let ReactDOMServer = null;
+async function getReactDOMServer() {
+  if (!ReactDOMServer) {
+    ReactDOMServer = await import('react-dom/server');
+  }
+  return ReactDOMServer;
+}
+
+// Resolve view content to HTML string
+// Handles: strings, Promises, and React elements
+// Exported for use by target-specific htmlResponse overrides
+export async function resolveContent(content) {
+  // Await if content is a promise (async ERB or async React component)
+  const resolved = await Promise.resolve(content);
+
+  // Convert to HTML string based on type
+  if (typeof resolved === 'string') {
+    return resolved;
+  } else {
+    // React element - render to string
+    const ReactDOMServer = await getReactDOMServer();
+    return ReactDOMServer.renderToString(resolved);
+  }
+}
+
 // Re-export base helpers
 export { createFlash, truncate, pluralize, dom_id, navigate, submitForm, formData, handleFormResult, setupFormHandlers };
 
@@ -293,7 +320,7 @@ export class Router extends RouterBase {
   }
 
   // Handle controller result (redirect, render, or turbo_stream)
-  static handleResult(context, result, defaultRedirect) {
+  static async handleResult(context, result, defaultRedirect) {
     if (result.turbo_stream) {
       // Turbo Stream response - return with proper content type
       console.log('  Rendering turbo_stream response');
@@ -312,7 +339,7 @@ export class Router extends RouterBase {
       // Validation failed - render contains pre-rendered HTML from the view
       // Return 422 Unprocessable Entity so Turbo Drive renders the response
       console.log('  Re-rendering form (validation failed)');
-      return this.htmlResponse(context, result.render, 422);
+      return await this.htmlResponse(context, result.render, 422);
     } else {
       return this.redirect(context, defaultRedirect);
     }
@@ -351,7 +378,9 @@ export class Router extends RouterBase {
   }
 
   // Create HTML response with proper headers, wrapped in layout
-  static htmlResponse(context, html, status = 200) {
+  // Handles both sync and async views, and both string and React element returns
+  static async htmlResponse(context, content, status = 200) {
+    const html = await resolveContent(content);
     const fullHtml = Application.wrapInLayout(context, html);
     const headers = { 'Content-Type': 'text/html; charset=utf-8' };
 
@@ -379,6 +408,14 @@ export class Application extends ApplicationBase {
 // Turbo Streams Broadcasting for server targets
 // Manages WebSocket connections and channel subscriptions
 // Platform-specific targets provide the WebSocket server, this handles the protocol
+//
+// Implements Action Cable protocol for compatibility with @hotwired/turbo-rails:
+// - Client sends: {"command":"subscribe","identifier":"{\"channel\":\"Turbo::StreamsChannel\",\"signed_stream_name\":\"...\"}"}
+// - Server sends: {"type":"confirm_subscription","identifier":"..."}
+// - Server broadcasts: {"identifier":"...","message":"<turbo-stream>...</turbo-stream>"}
+//
+// The signed_stream_name is base64-encoded JSON of the stream name. We decode it
+// but don't verify the signature (no shared secret needed for our use case).
 export class TurboBroadcast {
   // Map of channel name -> Set of WebSocket connections
   static channels = new Map();
@@ -386,9 +423,46 @@ export class TurboBroadcast {
   // Map of WebSocket -> Set of channel names (for cleanup on disconnect)
   static subscriptions = new Map();
 
+  // Map of WebSocket -> Map of channel name -> identifier string (for Action Cable responses)
+  static identifiers = new Map();
+
+  // Decode Action Cable signed_stream_name to get the actual stream name
+  // Format: base64(JSON.stringify(streamName)) + "--" + signature
+  // We ignore the signature since we're not verifying it
+  static decodeStreamName(signedName) {
+    // Remove signature if present (everything after --)
+    const base64Part = signedName.split('--')[0];
+    try {
+      // Decode base64 and parse JSON
+      const decoded = atob(base64Part);
+      return JSON.parse(decoded);
+    } catch (e) {
+      // If decoding fails, use as-is (might be plain stream name)
+      return signedName;
+    }
+  }
+
+  // Create an Action Cable identifier for a stream name
+  static createIdentifier(streamName) {
+    const signedName = btoa(JSON.stringify(streamName));
+    return JSON.stringify({
+      channel: 'Turbo::StreamsChannel',
+      signed_stream_name: signedName
+    });
+  }
+
+  // Send welcome message when client connects
+  static sendWelcome(ws) {
+    try {
+      ws.send(JSON.stringify({ type: 'welcome' }));
+    } catch (e) {
+      // Ignore send errors
+    }
+  }
+
   // Subscribe a WebSocket to a channel
-  // Called by handleMessage when client sends subscribe message
-  static subscribe(ws, channel) {
+  // Called by handleMessage when client sends subscribe command
+  static subscribe(ws, channel, identifier) {
     // Add to channel's subscriber set
     if (!this.channels.has(channel)) {
       this.channels.set(channel, new Set());
@@ -401,7 +475,23 @@ export class TurboBroadcast {
     }
     this.subscriptions.get(ws).add(channel);
 
+    // Store the identifier for this channel (needed for broadcast messages)
+    if (!this.identifiers.has(ws)) {
+      this.identifiers.set(ws, new Map());
+    }
+    this.identifiers.get(ws).set(channel, identifier);
+
     console.log(`  Subscribed to channel: ${channel}`);
+
+    // Send confirmation (Action Cable protocol)
+    try {
+      ws.send(JSON.stringify({
+        type: 'confirm_subscription',
+        identifier: identifier
+      }));
+    } catch (e) {
+      // Ignore send errors
+    }
   }
 
   // Unsubscribe a WebSocket from a channel
@@ -417,6 +507,11 @@ export class TurboBroadcast {
     const wsChannels = this.subscriptions.get(ws);
     if (wsChannels) {
       wsChannels.delete(channel);
+    }
+
+    const wsIdentifiers = this.identifiers.get(ws);
+    if (wsIdentifiers) {
+      wsIdentifiers.delete(channel);
     }
 
     console.log(`  Unsubscribed from channel: ${channel}`);
@@ -437,26 +532,32 @@ export class TurboBroadcast {
       }
       this.subscriptions.delete(ws);
     }
+    this.identifiers.delete(ws);
   }
 
   // Broadcast a turbo-stream message to all subscribers of a channel
   // Called by model broadcast_*_to methods
+  // Uses Action Cable message format for compatibility with @hotwired/turbo-rails
   static broadcast(channel, html) {
     const subscribers = this.channels.get(channel);
     if (!subscribers || subscribers.size === 0) {
       return;
     }
 
-    const message = JSON.stringify({
-      type: 'message',
-      stream: channel,
-      message: html
-    });
-
     console.log(`  Broadcasting to ${channel} (${subscribers.size} subscribers)`);
 
     for (const ws of subscribers) {
       try {
+        // Get the identifier this client used when subscribing
+        const wsIdentifiers = this.identifiers.get(ws);
+        const identifier = wsIdentifiers?.get(channel) || this.createIdentifier(channel);
+
+        // Action Cable message format
+        const message = JSON.stringify({
+          identifier: identifier,
+          message: html
+        });
+
         ws.send(message);
       } catch (e) {
         // Connection may have closed, clean up
@@ -465,14 +566,40 @@ export class TurboBroadcast {
     }
   }
 
-  // Handle incoming WebSocket message (subscribe/unsubscribe protocol)
+  // Handle incoming WebSocket message
+  // Supports both Action Cable protocol and our legacy simple protocol
   static handleMessage(ws, data) {
     try {
       const msg = typeof data === 'string' ? JSON.parse(data) : data;
 
+      // Action Cable protocol uses "command" field
+      if (msg.command) {
+        switch (msg.command) {
+          case 'subscribe': {
+            // Parse the identifier to get the stream name
+            const identifierObj = JSON.parse(msg.identifier);
+            const streamName = this.decodeStreamName(identifierObj.signed_stream_name);
+            this.subscribe(ws, streamName, msg.identifier);
+            break;
+          }
+          case 'unsubscribe': {
+            const identifierObj = JSON.parse(msg.identifier);
+            const streamName = this.decodeStreamName(identifierObj.signed_stream_name);
+            this.unsubscribe(ws, streamName);
+            break;
+          }
+          case 'message':
+            // Client-to-server messages - not used for Turbo Streams (server->client only)
+            break;
+        }
+        return;
+      }
+
+      // Legacy simple protocol (for backwards compatibility)
       switch (msg.type) {
         case 'subscribe':
-          this.subscribe(ws, msg.stream);
+          // Simple format: { type: 'subscribe', stream: 'articles' }
+          this.subscribe(ws, msg.stream, this.createIdentifier(msg.stream));
           break;
         case 'unsubscribe':
           this.unsubscribe(ws, msg.stream);
@@ -490,3 +617,14 @@ export class TurboBroadcast {
 // Export BroadcastChannel as alias for model broadcast methods (server-side)
 // Models call: BroadcastChannel.broadcast("channel", html)
 export { TurboBroadcast as BroadcastChannel };
+
+// Helper function for views to subscribe to turbo streams
+// Renders a <turbo-cable-stream-source> element that turbo-rails JavaScript picks up
+// The turbo-rails JS sees this element and subscribes via Action Cable WebSocket
+// Usage in ERB: <%= turbo_stream_from "chat_room" %>
+export function turbo_stream_from(streamName) {
+  // Create signed_stream_name in same format as Rails (base64-encoded JSON)
+  // We omit the HMAC signature since our server doesn't verify it
+  const signedName = btoa(JSON.stringify(streamName));
+  return `<turbo-cable-stream-source channel="Turbo::StreamsChannel" signed-stream-name="${signedName}"></turbo-cable-stream-source>`;
+}

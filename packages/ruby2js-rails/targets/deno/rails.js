@@ -17,11 +17,12 @@ import {
   formData,
   handleFormResult,
   setupFormHandlers,
-  TurboBroadcast
+  TurboBroadcast,
+  turbo_stream_from
 } from './rails_server.js';
 
 // Re-export everything from server module
-export { createContext, createFlash, truncate, pluralize, dom_id, navigate, submitForm, formData, handleFormResult, setupFormHandlers };
+export { createContext, createFlash, truncate, pluralize, dom_id, navigate, submitForm, formData, handleFormResult, setupFormHandlers, turbo_stream_from };
 
 // Re-export TurboBroadcast and alias as BroadcastChannel for model compatibility
 export { TurboBroadcast, TurboBroadcast as BroadcastChannel };
@@ -66,6 +67,8 @@ export class Application extends ApplicationServer {
 
             socket.onopen = () => {
               console.log('WebSocket connected');
+              // Send Action Cable welcome message
+              TurboBroadcast.sendWelcome(socket);
             };
 
             socket.onmessage = (event) => {

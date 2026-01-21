@@ -804,42 +804,16 @@ module Ruby2JS
           end
         end
 
-        # Build inline WebSocket subscription script for server-side rendering
-        # Generates a template literal with the channel name interpolated
+        # Build <turbo-cable-stream-source> element for server-side rendering
+        # This element is picked up by @hotwired/turbo-rails JavaScript which
+        # subscribes to the channel via Action Cable WebSocket
+        # Format: <turbo-cable-stream-source channel="Turbo::StreamsChannel" signed-stream-name="...">
+        # The signed-stream-name is base64-encoded JSON of the stream name (no signature needed for our server)
         def build_turbo_stream_websocket_script(channel_node)
-          # The script that will run in the browser
-          script_prefix = '<script type="module">
-(function() {
-  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-  const ws = new WebSocket(protocol + "//" + window.location.host + "/cable");
-  ws.onopen = () => {
-    ws.send(JSON.stringify({ type: "subscribe", stream: "'
-          script_suffix = '" }));
-  };
-  ws.onmessage = (event) => {
-    const data = JSON.parse(event.data);
-    if (data.type === "message" && data.message) {
-      if (typeof Turbo !== "undefined") {
-        Turbo.renderStreamMessage(data.message);
-      }
-    }
-  };
-  ws.onerror = (err) => console.error("WebSocket error:", err);
-})();
-</script>'
+          @erb_view_helpers << :turbo_stream_from unless @erb_view_helpers.include?(:turbo_stream_from)
 
-          # If channel is a simple string, we can build a simple dstr
-          # If channel is already processed (could be dstr), embed it
-          if channel_node.type == :str
-            # Simple string channel - just concatenate
-            s(:str, script_prefix + channel_node.children[0] + script_suffix)
-          else
-            # Dynamic channel - build template literal
-            s(:dstr,
-              s(:str, script_prefix),
-              channel_node,
-              s(:str, script_suffix))
-          end
+          # Call the turbo_stream_from helper function which returns the HTML element
+          s(:send, nil, :turbo_stream_from, channel_node)
         end
 
         # Process turbo_stream.replace, turbo_stream.append, etc.

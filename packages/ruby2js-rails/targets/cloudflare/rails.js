@@ -15,11 +15,13 @@ import {
   submitForm,
   formData,
   handleFormResult,
-  setupFormHandlers
+  setupFormHandlers,
+  turbo_stream_from,
+  resolveContent
 } from './rails_server.js';
 
 // Re-export everything from server module
-export { createContext, createFlash, truncate, pluralize, dom_id, navigate, submitForm, formData, handleFormResult, setupFormHandlers };
+export { createContext, createFlash, truncate, pluralize, dom_id, navigate, submitForm, formData, handleFormResult, setupFormHandlers, turbo_stream_from };
 
 // Router with Cloudflare-specific redirect handling
 export class Router extends RouterServer {
@@ -70,7 +72,7 @@ export class Router extends RouterServer {
   }
 
   // Override handleResult to use full URL for redirects
-  static handleResult(context, result, defaultRedirect) {
+  static async handleResult(context, result, defaultRedirect) {
     if (result.turbo_stream) {
       // Turbo Stream response - return with proper content type
       console.log('  Rendering turbo_stream response');
@@ -88,7 +90,7 @@ export class Router extends RouterServer {
     } else if (result.render) {
       // Return 422 Unprocessable Entity so Turbo Drive renders the response
       console.log('  Re-rendering form (validation failed)');
-      return this.htmlResponse(context, result.render, 422);
+      return await this.htmlResponse(context, result.render, 422);
     } else {
       return this.redirect(context, defaultRedirect);
     }
@@ -108,7 +110,8 @@ export class Router extends RouterServer {
 
   // Override htmlResponse to use the correct Application class
   // (Parent class references its own Application which doesn't have layoutFn set)
-  static htmlResponse(context, html, status = 200) {
+  static async htmlResponse(context, content, status = 200) {
+    const html = await resolveContent(content);
     const fullHtml = Application.wrapInLayout(context, html);
     const headers = { 'Content-Type': 'text/html; charset=utf-8' };
 
@@ -196,6 +199,26 @@ export class TurboBroadcaster {
     this.channels = new Map();
   }
 
+  // Decode Action Cable signed_stream_name to get the actual stream name
+  decodeStreamName(signedName) {
+    const base64Part = signedName.split('--')[0];
+    try {
+      const decoded = atob(base64Part);
+      return JSON.parse(decoded);
+    } catch (e) {
+      return signedName;
+    }
+  }
+
+  // Create an Action Cable identifier for a stream name
+  createIdentifier(streamName) {
+    const signedName = btoa(JSON.stringify(streamName));
+    return JSON.stringify({
+      channel: 'Turbo::StreamsChannel',
+      signed_stream_name: signedName
+    });
+  }
+
   async fetch(request) {
     const url = new URL(request.url);
 
@@ -206,6 +229,9 @@ export class TurboBroadcaster {
 
       // Accept the WebSocket with hibernation
       this.state.acceptWebSocket(server);
+
+      // Send Action Cable welcome message
+      server.send(JSON.stringify({ type: 'welcome' }));
 
       return new Response(null, { status: 101, webSocket: client });
     }
@@ -221,13 +247,34 @@ export class TurboBroadcaster {
   }
 
   // WebSocket message handler (with hibernation support)
+  // Supports both Action Cable protocol and legacy simple protocol
   async webSocketMessage(ws, message) {
     try {
       const msg = JSON.parse(message);
 
+      // Action Cable protocol uses "command" field
+      if (msg.command) {
+        switch (msg.command) {
+          case 'subscribe': {
+            const identifierObj = JSON.parse(msg.identifier);
+            const streamName = this.decodeStreamName(identifierObj.signed_stream_name);
+            this.subscribe(ws, streamName, msg.identifier);
+            break;
+          }
+          case 'unsubscribe': {
+            const identifierObj = JSON.parse(msg.identifier);
+            const streamName = this.decodeStreamName(identifierObj.signed_stream_name);
+            this.unsubscribe(ws, streamName);
+            break;
+          }
+        }
+        return;
+      }
+
+      // Legacy simple protocol
       switch (msg.type) {
         case 'subscribe':
-          this.subscribe(ws, msg.stream);
+          this.subscribe(ws, msg.stream, this.createIdentifier(msg.stream));
           break;
         case 'unsubscribe':
           this.unsubscribe(ws, msg.stream);
@@ -252,17 +299,29 @@ export class TurboBroadcaster {
     this.cleanup(ws);
   }
 
-  subscribe(ws, channel) {
+  subscribe(ws, channel, identifier) {
     if (!this.channels.has(channel)) {
       this.channels.set(channel, new Set());
     }
     this.channels.get(channel).add(ws);
 
-    // Store subscription in WebSocket attachment for cleanup
-    const attachment = ws.deserializeAttachment() || { channels: [] };
+    // Store subscription in WebSocket attachment for cleanup and broadcast
+    const attachment = ws.deserializeAttachment() || { channels: [], identifiers: {} };
     if (!attachment.channels.includes(channel)) {
       attachment.channels.push(channel);
-      ws.serializeAttachment(attachment);
+    }
+    attachment.identifiers = attachment.identifiers || {};
+    attachment.identifiers[channel] = identifier;
+    ws.serializeAttachment(attachment);
+
+    // Send confirmation (Action Cable protocol)
+    try {
+      ws.send(JSON.stringify({
+        type: 'confirm_subscription',
+        identifier: identifier
+      }));
+    } catch (e) {
+      // Ignore send errors
     }
   }
 
@@ -291,14 +350,18 @@ export class TurboBroadcaster {
       return;
     }
 
-    const message = JSON.stringify({
-      type: 'message',
-      stream: channel,
-      message: html
-    });
-
     for (const ws of subscribers) {
       try {
+        // Get the identifier this client used when subscribing
+        const attachment = ws.deserializeAttachment();
+        const identifier = attachment?.identifiers?.[channel] || this.createIdentifier(channel);
+
+        // Action Cable message format
+        const message = JSON.stringify({
+          identifier: identifier,
+          message: html
+        });
+
         ws.send(message);
       } catch (e) {
         this.cleanup(ws);

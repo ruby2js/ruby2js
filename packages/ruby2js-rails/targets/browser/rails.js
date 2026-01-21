@@ -83,7 +83,7 @@ export class Router extends RouterBase {
       }
 
       console.log(`  Rendering ${controllerName}/${action}`);
-      this.renderContent(context, html);
+      await this.renderContent(context, html);
     } catch (e) {
       console.error('  Error:', e.message || e);
       document.getElementById('content').innerHTML = '<h1>Not Found</h1>';
@@ -91,28 +91,31 @@ export class Router extends RouterBase {
   }
 
   // Render content and handle flash cookie
-  static renderContent(context, content) {
+  // Handles both sync and async views, and both string and React element returns
+  static async renderContent(context, content) {
     const container = document.getElementById('content');
 
+    // Await if content is a promise (async ERB or async React component)
+    const resolved = await Promise.resolve(content);
+
     // Check if content is a React element (has $$typeof Symbol)
-    if (content && typeof content === 'object' && content.$$typeof) {
+    if (resolved && typeof resolved === 'object' && resolved.$$typeof) {
       // React element - use ReactDOM to render
       // Wrap in layout if needed (layout returns React element or passes through)
-      const wrappedContent = Application.wrapInLayout(context, content);
+      const wrappedContent = Application.wrapInLayout(context, resolved);
 
       // Import ReactDOM dynamically and render
-      import('react-dom/client').then(({ createRoot }) => {
-        // Clear any existing React root
-        if (container._reactRoot) {
-          container._reactRoot.unmount();
-        }
-        const root = createRoot(container);
-        container._reactRoot = root;
-        root.render(wrappedContent);
-      });
+      const { createRoot } = await import('react-dom/client');
+      // Clear any existing React root
+      if (container._reactRoot) {
+        container._reactRoot.unmount();
+      }
+      const root = createRoot(container);
+      container._reactRoot = root;
+      root.render(wrappedContent);
     } else {
       // HTML string - use innerHTML
-      const fullHtml = Application.wrapInLayout(context, content);
+      const fullHtml = Application.wrapInLayout(context, resolved);
       container.innerHTML = fullHtml;
     }
 
@@ -270,7 +273,7 @@ export class FormHandler {
       await Router.navigate(result.redirect);
     } else if (result.render) {
       console.log(`  Rendering ${controllerName}/${action} (validation failed)`);
-      Router.renderContent(context, result.render);
+      await Router.renderContent(context, result.render);
     }
   }
 }
@@ -606,7 +609,7 @@ export async function submitForm(event, handler) {
       await Router.dispatch(result.redirect);
     } else if (result?.render) {
       console.log(`  Re-rendering form (validation failed)`);
-      Router.renderContent(context, result.render);
+      await Router.renderContent(context, result.render);
     }
     return result;
   } catch (e) {
@@ -624,7 +627,7 @@ export function formData(event) {
 }
 
 // Handle form submission result (context-aware)
-export function handleFormResult(context, result, rerenderFn = null) {
+export async function handleFormResult(context, result, rerenderFn = null) {
   if (result?.turbo_stream) {
     // Turbo Stream response - apply partial page update via Turbo
     console.log(`  Rendering turbo_stream response`);
@@ -645,7 +648,7 @@ export function handleFormResult(context, result, rerenderFn = null) {
     Router.navigate(result.redirect);
   } else if (result?.render) {
     console.log(`  Re-rendering form (validation failed)`);
-    Router.renderContent(context, result.render);
+    await Router.renderContent(context, result.render);
   }
   return false;
 }
