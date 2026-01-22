@@ -150,9 +150,9 @@ module Ruby2JS
       end
 
       # Sort nodes by start position, keeping parallel arrays in sync
-      # For equal positions, prefer children (higher index) over parents (lower index).
-      # Children are collected after parents but should receive comments first since
-      # they represent the actual code inside blocks.
+      # For equal positions, prefer parents (lower index) over children (higher index).
+      # This ensures leading comments attach to the outermost node (e.g., magic comments).
+      # Trailing comments are handled separately by iterating all nodes and tracking best match.
       # Use explicit comparison (not array-based) because JS array comparison differs from Ruby.
       num_nodes = nodes.length
       indices = (0...num_nodes).to_a
@@ -162,7 +162,7 @@ module Ruby2JS
         if pos_a != pos_b
           pos_a - pos_b
         else
-          i_b - i_a  # Higher index (child) before lower (parent)
+          i_a - i_b  # Lower index (parent) before higher (child)
         end
       }
       nodes = indices.map { |i| nodes[i] }
