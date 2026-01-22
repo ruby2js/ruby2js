@@ -1,0 +1,268 @@
+#!/usr/bin/env node
+
+// Compare Ruby and JavaScript transpiler output
+// Usage: bin/compare [options] [file]
+//   -e CODE          Evaluate inline Ruby code
+//   --filter NAME    Apply filter(s), comma-separated
+//   --es2022         Use ES2022 level
+//   --ast            Compare AST output
+//   --diff           Show unified diff (default: side-by-side)
+
+import { execSync } from 'child_process';
+import { readFileSync, writeFileSync, unlinkSync, existsSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join, resolve } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const ROOT = resolve(__dirname, '..');
+
+// Parse arguments
+const args = process.argv.slice(2);
+let code = null;
+let file = null;
+let filters = [];
+let eslevel = '2020';
+let showAst = false;
+let showDiff = false;
+
+for (let i = 0; i < args.length; i++) {
+  const arg = args[i];
+  if (arg === '-e' && args[i + 1]) {
+    code = args[++i];
+  } else if (arg === '--filter' && args[i + 1]) {
+    filters.push(...args[++i].split(','));
+  } else if (arg === '-f' && args[i + 1]) {
+    filters.push(...args[++i].split(','));
+  } else if (arg.startsWith('--es')) {
+    eslevel = arg.replace('--es', '');
+  } else if (arg === '--ast') {
+    showAst = true;
+  } else if (arg === '--diff') {
+    showDiff = true;
+  } else if (arg === '--help' || arg === '-h') {
+    console.log(`Usage: bin/compare [options] [file]
+
+Compare Ruby and JavaScript transpiler output side-by-side.
+
+Options:
+  -e CODE              Evaluate inline Ruby code
+  -f, --filter NAME    Apply filter(s), comma-separated
+  --es2020/2021/2022   Set ES level (default: 2020)
+  --ast                Compare AST output instead of JS
+  --diff               Show unified diff instead of side-by-side
+
+Examples:
+  bin/compare -e 'foo rescue nil'
+  bin/compare --filter rails --es2022 demo/blog/app/models/comment.rb
+  bin/compare -e 'x ||= 1' --diff
+`);
+    process.exit(0);
+  } else if (!arg.startsWith('-')) {
+    file = arg;
+  }
+}
+
+if (!code && !file) {
+  console.error('Error: Provide -e CODE or a file path');
+  process.exit(1);
+}
+
+// Build Ruby CLI arguments
+const rubyArgs = [];
+if (eslevel) rubyArgs.push(`--es${eslevel}`);
+filters.forEach(f => rubyArgs.push('--filter', f));
+if (showAst) rubyArgs.push('--ast');
+if (code) {
+  rubyArgs.push('-e', code);
+} else {
+  rubyArgs.push(file);
+}
+
+// Run Ruby transpiler
+let rubyOutput;
+try {
+  rubyOutput = execSync(`bin/ruby2js ${rubyArgs.map(a => `'${a}'`).join(' ')}`, {
+    cwd: ROOT,
+    encoding: 'utf8',
+    stdio: ['pipe', 'pipe', 'pipe']
+  }).trim();
+} catch (e) {
+  rubyOutput = `ERROR: ${e.message}`;
+}
+
+// Run JavaScript transpiler
+let jsOutput;
+try {
+  const sourceCode = code || readFileSync(resolve(ROOT, file), 'utf8');
+
+  // Check if using rails filters - need ruby2js-rails package
+  const hasRailsFilters = filters.some(f => f.includes('rails'));
+
+  // Write a temp script file to avoid shell escaping issues
+  const tempScript = join(ROOT, '.compare-temp.mjs');
+  const jsCode = hasRailsFilters ? `
+// Using selfhost transpiler with Rails filters
+import * as Ruby2JS from './demo/selfhost/ruby2js.js';
+import { Rails_Model } from './demo/selfhost/filters/rails/model.js';
+import { Rails_Controller } from './demo/selfhost/filters/rails/controller.js';
+import { Rails_Routes } from './demo/selfhost/filters/rails/routes.js';
+import { Rails_Seeds } from './demo/selfhost/filters/rails/seeds.js';
+import { Functions } from './demo/selfhost/filters/functions.js';
+import { ESM } from './demo/selfhost/filters/esm.js';
+import { Return } from './demo/selfhost/filters/return.js';
+
+const code = ${JSON.stringify(sourceCode)};
+const options = {
+  eslevel: ${eslevel},
+  file: ${file ? JSON.stringify(file) : 'null'},
+  filters: [
+    Rails_Model.prototype,
+    Rails_Controller.prototype,
+    Rails_Routes.prototype,
+    Rails_Seeds.prototype,
+    Functions.prototype,
+    ESM.prototype,
+    Return.prototype
+  ]
+};
+
+try {
+  const result = Ruby2JS.convert(code, options);
+  console.log(result.toString());
+} catch (e) {
+  console.log('ERROR: ' + e.message);
+  if (e.stack) console.log(e.stack);
+}
+` : `
+import Ruby2JS from './packages/ruby2js/ruby2js.mjs';
+
+const code = ${JSON.stringify(sourceCode)};
+const options = {
+  eslevel: ${eslevel},
+  file: ${file ? JSON.stringify(file) : 'null'}
+};
+${filters.length ? `options.filters = ${JSON.stringify(filters)};` : ''}
+
+try {
+  const result = Ruby2JS.convert(code, options);
+  ${showAst ?
+    `const ast = result.ast;
+     function formatAst(node, indent = 0) {
+       if (!node || typeof node !== 'object') return String(node);
+       if (!node.type) return JSON.stringify(node);
+       const prefix = '  '.repeat(indent);
+       const children = node.children || [];
+       if (children.length === 0) {
+         return prefix + 's(:' + node.type + ')';
+       }
+       const childStrs = children.map(c => {
+         if (c && typeof c === 'object' && c.type) {
+           return formatAst(c, indent + 1);
+         } else if (c === null || c === undefined) {
+           return '  '.repeat(indent + 1) + 'nil';
+         } else if (typeof c === 'string') {
+           return '  '.repeat(indent + 1) + JSON.stringify(c);
+         } else {
+           return '  '.repeat(indent + 1) + String(c);
+         }
+       });
+       return prefix + 's(:' + node.type + ',\\n' + childStrs.join(',\\n') + '\\n' + prefix + ')';
+     }
+     console.log(formatAst(ast));`
+    :
+    `console.log(result.toString());`
+  }
+} catch (e) {
+  console.log('ERROR: ' + e.message);
+  if (e.stack) console.log(e.stack);
+}
+`;
+
+  writeFileSync(tempScript, jsCode);
+
+  jsOutput = execSync(`node ${tempScript}`, {
+    cwd: ROOT,
+    encoding: 'utf8',
+    stdio: ['pipe', 'pipe', 'pipe']
+  }).trim();
+
+  // Clean up temp file
+  unlinkSync(tempScript);
+
+  // Remove parser warning if present
+  jsOutput = jsOutput.split('\n').filter(l =>
+    !l.includes('parser/current') &&
+    !l.includes('whitequark/parser') &&
+    !l.includes('Please see https://')
+  ).join('\n');
+} catch (e) {
+  jsOutput = `ERROR: ${e.stderr || e.message}`;
+}
+
+// Compare outputs
+const rubyLines = rubyOutput.split('\n');
+const jsLines = jsOutput.split('\n');
+const maxLines = Math.max(rubyLines.length, jsLines.length);
+
+if (showDiff) {
+  // Show unified diff
+  const { diffLines } = await import('diff').catch(() => ({ diffLines: null }));
+
+  if (diffLines) {
+    const diff = diffLines(rubyOutput + '\n', jsOutput + '\n');
+    let hasDiff = false;
+
+    diff.forEach(part => {
+      if (part.added) {
+        hasDiff = true;
+        process.stdout.write('\x1b[32m+ ' + part.value.replace(/\n/g, '\n+ ').slice(0, -2) + '\x1b[0m');
+      } else if (part.removed) {
+        hasDiff = true;
+        process.stdout.write('\x1b[31m- ' + part.value.replace(/\n/g, '\n- ').slice(0, -2) + '\x1b[0m');
+      } else {
+        process.stdout.write('  ' + part.value.replace(/\n/g, '\n  ').slice(0, -2));
+      }
+    });
+
+    if (!hasDiff) {
+      console.log('\x1b[32m✓ Output matches\x1b[0m');
+    }
+  } else {
+    // Fallback without diff module
+    if (rubyOutput === jsOutput) {
+      console.log('\x1b[32m✓ Output matches\x1b[0m');
+    } else {
+      console.log('\x1b[31m✗ Output differs\x1b[0m');
+      console.log('\n--- Ruby ---');
+      console.log(rubyOutput);
+      console.log('\n--- JavaScript ---');
+      console.log(jsOutput);
+    }
+  }
+} else {
+  // Side-by-side comparison
+  const COL_WIDTH = Math.min(60, Math.floor((process.stdout.columns || 120) / 2) - 2);
+
+  console.log('\x1b[1m' + 'Ruby'.padEnd(COL_WIDTH) + ' | ' + 'JavaScript\x1b[0m');
+  console.log('─'.repeat(COL_WIDTH) + '─┼─' + '─'.repeat(COL_WIDTH));
+
+  for (let i = 0; i < maxLines; i++) {
+    const rubyLine = (rubyLines[i] || '').slice(0, COL_WIDTH);
+    const jsLine = (jsLines[i] || '').slice(0, COL_WIDTH);
+
+    const isDiff = rubyLines[i] !== jsLines[i];
+    const color = isDiff ? '\x1b[33m' : '';
+    const reset = isDiff ? '\x1b[0m' : '';
+
+    console.log(color + rubyLine.padEnd(COL_WIDTH) + reset + ' │ ' + color + jsLine + reset);
+  }
+
+  console.log('─'.repeat(COL_WIDTH) + '─┴─' + '─'.repeat(COL_WIDTH));
+
+  if (rubyOutput === jsOutput) {
+    console.log('\x1b[32m✓ Output matches\x1b[0m');
+  } else {
+    console.log('\x1b[31m✗ Output differs\x1b[0m');
+  }
+}

@@ -196,6 +196,11 @@ module Ruby2JS
           processed_body = process(transformed_body)
           @in_callback_block = false
 
+          # Preserve original body's location for comment re-association
+          if body && body.loc && processed_body.respond_to?(:updated)
+            processed_body = body.updated(processed_body.type, processed_body.children)
+          end
+
           # Generate callback - async if associations are accessed
           if uses_associations
             # Generate: ClassName.callback_method(async ($record) => { ... })

@@ -150,9 +150,21 @@ module Ruby2JS
       end
 
       # Sort nodes by start position, keeping parallel arrays in sync
+      # For equal positions, prefer children (higher index) over parents (lower index).
+      # Children are collected after parents but should receive comments first since
+      # they represent the actual code inside blocks.
+      # Use explicit comparison (not array-based) because JS array comparison differs from Ruby.
       num_nodes = nodes.length
       indices = (0...num_nodes).to_a
-      indices = indices.sort_by { |i| node_starts[i] || 0 }
+      indices = indices.sort { |i_a, i_b|
+        pos_a = node_starts[i_a] || 0
+        pos_b = node_starts[i_b] || 0
+        if pos_a != pos_b
+          pos_a - pos_b
+        else
+          i_b - i_a  # Higher index (child) before lower (parent)
+        end
+      }
       nodes = indices.map { |i| nodes[i] }
       node_lines = indices.map { |i| node_lines[i] }
       node_starts = indices.map { |i| node_starts[i] }

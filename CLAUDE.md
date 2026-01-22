@@ -134,7 +134,7 @@ puts ast.to_sexp
 
 ### Debugging Tools
 
-Two CLI tools are available for debugging transpilation issues:
+Several CLI tools are available for debugging transpilation issues:
 
 **Ruby CLI (`bin/ruby2js`)** - The main Ruby-based converter:
 ```bash
@@ -173,6 +173,27 @@ node ruby2js.mjs --inspect=root.statements.body[0] -e 'self.foo ||= 1'
 
 # ES level and comparison options (aligned with Ruby CLI)
 node ruby2js.mjs --es2022 --identity -e 'x == y'
+```
+
+**Comparison Tool (`bin/compare`)** - Compare Ruby vs JS transpiler output side-by-side:
+```bash
+# Compare inline code
+bin/compare -e 'foo rescue nil'
+
+# Compare file with filters
+bin/compare --filter rails --es2022 demo/blog/app/models/comment.rb
+
+# Show unified diff instead of side-by-side
+bin/compare --diff -e 'x ||= 1'
+```
+
+**Comment Debugger (`bin/debug-comments`)** - Debug comment associations after filtering:
+```bash
+# Show how comments are associated with AST nodes
+bin/debug-comments demo/blog/app/models/comment.rb
+
+# With specific filters
+bin/debug-comments --filter rails file.rb
 ```
 
 These tools help debug differences between Ruby and JS converters, especially for self-hosting work.

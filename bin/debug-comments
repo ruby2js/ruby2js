@@ -1,0 +1,205 @@
+#!/usr/bin/env node
+
+// Debug comment positioning between Ruby and JavaScript transpilers
+// Shows where comments end up after filtering
+
+import { spawnSync } from 'child_process';
+import { readFileSync, writeFileSync, unlinkSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join, resolve } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const ROOT = resolve(__dirname, '..');
+
+const args = process.argv.slice(2);
+let file = null;
+let filters = [];
+
+for (let i = 0; i < args.length; i++) {
+  const arg = args[i];
+  if ((arg === '--filter' || arg === '-f') && args[i + 1]) {
+    filters.push(...args[++i].split(','));
+  } else if (arg === '--help' || arg === '-h') {
+    console.log(`Usage: bin/debug-comments [options] <file>
+
+Debug comment positioning by showing where comments get associated after filtering.
+
+Options:
+  -f, --filter NAME    Apply filter(s), comma-separated
+
+Example:
+  bin/debug-comments --filter rails /tmp/test.rb
+`);
+    process.exit(0);
+  } else if (!arg.startsWith('-')) {
+    file = arg;
+  }
+}
+
+if (!file) {
+  console.error('Error: Provide a file path');
+  process.exit(1);
+}
+
+const sourceCode = readFileSync(resolve(ROOT, file), 'utf8');
+
+// Show source with line numbers
+console.log('\x1b[1m=== Source ===\x1b[0m');
+sourceCode.split('\n').forEach((line, i) => {
+  console.log(`${String(i + 1).padStart(3)}: ${line}`);
+});
+console.log();
+
+// Ruby debug script - use --show-comments flag on ruby2js CLI
+const rubyArgs = ['--es2022', '--show-comments'];
+filters.forEach(f => rubyArgs.push('--filter', f));
+rubyArgs.push(resolve(ROOT, file));
+
+console.log('\x1b[1m=== RUBY (via bin/ruby2js --show-comments) ===\x1b[0m');
+try {
+  const result = spawnSync('bin/ruby2js', rubyArgs, {
+    cwd: ROOT,
+    encoding: 'utf8',
+    stdio: ['pipe', 'pipe', 'pipe']
+  });
+  if (result.stdout) {
+    // Just show comments section
+    const lines = result.stdout.split('\n');
+    const commentsStart = lines.findIndex(l => l.includes('=== Comments Map ==='));
+    const jsStart = lines.findIndex(l => l.includes('=== JavaScript Output ==='));
+    if (commentsStart >= 0 && jsStart >= 0) {
+      console.log(lines.slice(commentsStart, jsStart).join('\n'));
+    } else {
+      console.log(result.stdout.slice(0, 2000));
+    }
+  }
+  if (result.stderr && result.status !== 0) console.log('STDERR:', result.stderr.slice(0, 500));
+} catch (e) {
+  console.log('ERROR:', e.message);
+}
+
+// JavaScript - run convert and show comment associations
+const hasRailsFilters = filters.some(f => f.includes('rails'));
+const jsScript = hasRailsFilters ? `
+import * as Ruby2JS from './demo/selfhost/ruby2js.js';
+import { Rails_Model } from './demo/selfhost/filters/rails/model.js';
+import { Rails_Controller } from './demo/selfhost/filters/rails/controller.js';
+import { Rails_Routes } from './demo/selfhost/filters/rails/routes.js';
+import { Rails_Seeds } from './demo/selfhost/filters/rails/seeds.js';
+import { Functions } from './demo/selfhost/filters/functions.js';
+import { ESM } from './demo/selfhost/filters/esm.js';
+import { Return } from './demo/selfhost/filters/return.js';
+import fs from 'fs';
+
+const file = process.argv[2];
+const source = fs.readFileSync(file, 'utf8');
+
+const result = Ruby2JS.convert(source, {
+  file: file,
+  eslevel: 2022,
+  filters: [
+    Rails_Model.prototype,
+    Rails_Controller.prototype,
+    Rails_Routes.prototype,
+    Rails_Seeds.prototype,
+    Functions.prototype,
+    ESM.prototype,
+    Return.prototype
+  ]
+});
+
+console.log("=== Comments Map ===");
+const resultComments = result.comments;
+console.log("comments type:", typeof resultComments, resultComments?.constructor?.name);
+
+// Show raw comments - handle both Map and object
+const raw = resultComments?.get ? resultComments.get('_raw') : resultComments?.['_raw'];
+const rawList = raw || [];
+if (rawList.length > 0) {
+  console.log("Raw comments:");
+  rawList.forEach(c => {
+    const loc = c.location || c.loc;
+    const line = loc?.startLine ?? loc?.line ?? loc?.expression?.line;
+    const start = loc?.startOffset ?? loc?.start_offset ?? loc?.expression?.begin_pos;
+    const end = loc?.endOffset ?? loc?.end_offset ?? loc?.expression?.end_pos ?? (start + (loc?.length || 0));
+    const text = c.slice ?? c.text ?? source.slice(start, end);
+    console.log(\`  Line \${line}: pos \${start}-\${end} | \${JSON.stringify(text)}\`);
+  });
+}
+
+// Show associations
+console.log("\\nAssociations:");
+const entries = resultComments?.entries ? [...resultComments.entries()] : Object.entries(resultComments || {});
+for (const [node, clist] of entries) {
+  if (typeof node === 'string') continue; // skip _raw, _trailing, etc
+  if (!clist || clist.length === 0) continue;
+  if (node && node.type) {
+    const loc = node.loc || node.location;
+    const line = loc?.expression?.line ?? loc?.start_line ?? loc?.line ?? loc?.startLine;
+    const start = loc?.expression?.begin_pos ?? loc?.start_offset ?? loc?.startOffset;
+    console.log(\`  \${node.type} (line \${line}, pos \${start}):\`);
+    clist.forEach(c => {
+      const text = c.slice ?? c.text;
+      console.log(\`    -> \${JSON.stringify(text)}\`);
+    });
+  }
+}
+
+// Show trailing
+const trailing = resultComments?.get ? resultComments.get('_trailing') : resultComments?.['_trailing'];
+const trailingList = trailing || [];
+if (trailingList.length > 0) {
+  console.log("\\nTrailing:");
+  trailingList.forEach(([node, comment]) => {
+    const loc = node?.loc || node?.location;
+    const line = loc?.expression?.line ?? loc?.start_line ?? loc?.line ?? loc?.startLine;
+    const text = comment.slice ?? comment.text;
+    console.log(\`  \${node?.type} (line \${line}) -> \${JSON.stringify(text)}\`);
+  });
+}
+
+// Show orphan
+const orphan = resultComments?.get ? resultComments.get('_orphan') : resultComments?.['_orphan'];
+const orphanList = orphan || [];
+if (orphanList.length > 0) {
+  console.log("\\nOrphan:");
+  orphanList.forEach(c => {
+    const text = c.slice ?? c.text;
+    console.log(\`  \${JSON.stringify(text)}\`);
+  });
+}
+
+console.log("\\n=== JavaScript Output (excerpt) ===");
+const output = result.toString();
+// Find after_create_commit and show context
+const lines = output.split('\\n');
+const idx = lines.findIndex(l => l.includes('after_create_commit(async ($record)'));
+if (idx >= 0) {
+  console.log(lines.slice(idx, idx + 10).join('\\n'));
+}
+` : `console.log("Non-rails filters not yet implemented");`;
+
+const jsTempScript = join(ROOT, '.debug-js-temp.mjs');
+writeFileSync(jsTempScript, jsScript);
+
+console.log('\n\x1b[1m=== JAVASCRIPT ===\x1b[0m');
+try {
+  const result = spawnSync('node', [jsTempScript, resolve(ROOT, file)], {
+    cwd: ROOT,
+    encoding: 'utf8',
+    stdio: ['pipe', 'pipe', 'pipe']
+  });
+  if (result.stdout) {
+    const filtered = result.stdout.split('\n').filter(l =>
+      !l.includes('parser/current') &&
+      !l.includes('whitequark/parser') &&
+      !l.includes('Please see https://')
+    ).join('\n');
+    console.log(filtered);
+  }
+  if (result.stderr && result.status !== 0) console.log('STDERR:', result.stderr.slice(0, 1000));
+} catch (e) {
+  console.log('ERROR:', e.message);
+}
+unlinkSync(jsTempScript);
