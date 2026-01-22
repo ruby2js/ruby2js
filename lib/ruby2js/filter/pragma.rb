@@ -335,7 +335,7 @@ module Ruby2JS
       # Re-scans when new comments are added (e.g., from require filter merging files)
       # Uses both source buffer name and line number to avoid collisions across files
       def scan_pragmas
-        raw_comments = @comments[:_raw] || []
+        raw_comments = @comments[:_raw] || [] # Pragma: map
         return if raw_comments.length == @pragma_scanned_count
 
         # Process only new comments (from index @pragma_scanned_count onwards)

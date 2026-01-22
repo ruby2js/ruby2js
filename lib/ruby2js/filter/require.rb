@@ -18,7 +18,7 @@ module Ruby2JS
         return false unless @comments
 
         # Check comments in _raw array for this node's line
-        raw_comments = @comments[:_raw] || []
+        raw_comments = @comments[:_raw] || [] # Pragma: map
         return false if raw_comments.empty?
 
         # Get the line number and file of the node

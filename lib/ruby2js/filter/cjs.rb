@@ -43,7 +43,7 @@ module Ruby2JS
 
           if replacement != child
             replaced << replacement
-            @comments[replacement] = @comments[child] if @comments[child]
+            @comments[replacement] = @comments[child] if @comments[child] # Pragma: map
           end
 
           replacement
@@ -54,7 +54,7 @@ module Ruby2JS
             if child == replaced.first
               replacement = s(:send, nil, :export, s(:send, nil, :default,
                 *child.children[2..-1]))
-              @comments[replacement] = @comments[child] if @comments[child]
+              @comments[replacement] = @comments[child] if @comments[child] # Pragma: map
               replacement
             else
               child

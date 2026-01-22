@@ -409,10 +409,16 @@ module Ruby2JS
     end
 
     def parse_all(*args)
-      last_arg = args[-1]
+      # Extract options hash from end of args if present
       # In selfhost JS, is_a?(Hash) becomes Object check which matches Node too.
       # Add !respond_to?(:type) to exclude Node objects (they have a type property)
-      @options = last_arg.is_a?(Hash) && !last_arg.respond_to?(:type) ? args.pop() : {}
+      # Use explicit empty check to avoid transpilation issues with nil/undefined
+      if args.empty?
+        @options = {}
+      else
+        last_arg = args[-1]
+        @options = last_arg.is_a?(Hash) && !last_arg.respond_to?(:type) ? args.pop() : {}
+      end
       sep = @options[:join].to_s
       state = @options[:state] || :expression
 
