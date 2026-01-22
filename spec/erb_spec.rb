@@ -101,6 +101,27 @@ describe Ruby2JS::Filter::Erb do
     end
   end
 
+  describe 'layout mode' do
+    def to_js_layout(string, eslevel: 2015)
+      _(Ruby2JS.convert(string, filters: [Ruby2JS::Filter::Erb, Ruby2JS::Filter::Functions], eslevel: eslevel, layout: true).to_s)
+    end
+
+    it "should generate layout function with positional args" do
+      erb_src = '_buf = ::String.new; _buf << "<html>".freeze; _buf << (@title).to_s; _buf << "</html>".freeze; _buf.to_s'
+      result = to_js_layout(erb_src)
+      result.must_include 'function layout(context, content)'
+      result.wont_include 'function render'
+    end
+
+    it "should not use destructured kwargs in layout mode" do
+      erb_src = '_buf = ::String.new; _buf << (@title).to_s; _buf.to_s'
+      result = to_js_layout(erb_src)
+      result.must_include 'function layout(context, content)'
+      result.wont_include '$context'
+      result.wont_include '{ title }'
+    end
+  end
+
   describe Ruby2JS::Filter::DEFAULTS do
     it "should include Erb" do
       _(Ruby2JS::Filter::DEFAULTS).must_include Ruby2JS::Filter::Erb

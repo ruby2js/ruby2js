@@ -23,6 +23,36 @@ module Ruby2JS
           @erb_view_modules = [] # Track view module imports (PhotoViews, etc.)
         end
 
+        # Check if layout mode is enabled (options are set after initialize)
+        def erb_layout_mode?
+          @options && @options[:layout]
+        end
+
+        # Handle yield in layout context
+        # <%= yield %> -> content (the main content parameter)
+        # <%= yield :head %> -> context.contentFor.head || ''
+        def on_yield(node)
+          return super unless erb_layout_mode?()
+
+          args = node.children
+
+          if args.empty?
+            # yield -> content (the content parameter passed to layout function)
+            s(:lvar, :content)
+          else
+            # yield :head -> context.contentFor.head || ''
+            section = args.first
+            if section.type == :sym
+              section_name = section.children.first
+              s(:or,
+                s(:attr, s(:attr, s(:lvar, :context), :contentFor), section_name),
+                s(:str, ''))
+            else
+              super
+            end
+          end
+        end
+
         # Add imports for path helpers and view helpers
         # Called by Erb filter's on_begin via erb_prepend_imports hook
         def erb_prepend_imports
@@ -84,8 +114,32 @@ module Ruby2JS
         # Views need $context for flash, contentFor, params, etc.
         # Using $ prefix to avoid conflicts with @context instance variables
         # Now returns kwarg for unified signature: render({ $context, articles })
+        # In layout mode, context comes as positional arg so no extra kwargs needed
         def erb_render_extra_args
+          return [] if erb_layout_mode?()
           [s(:kwarg, :"$context")]
+        end
+
+        # Helper to get the context reference for layout vs view mode
+        # Layout mode: context (positional arg)
+        # View mode: $context (kwarg)
+        def context_ref
+          if erb_layout_mode?()
+            s(:lvar, :context)
+          else
+            s(:lvar, :"$context")
+          end
+        end
+
+        # Helper to get global context reference (used in form helpers)
+        # Layout mode: context (from scope)
+        # View mode: $context (global)
+        def context_gvar
+          if erb_layout_mode?()
+            s(:lvar, :context)
+          else
+            s(:gvar, :$context)
+          end
         end
 
         def on_send(node)
@@ -133,9 +187,19 @@ module Ruby2JS
           end
 
           # Handle csrf_meta_tags - returns the CSRF meta tag from server context
-          # The server passes $csrfMetaTag when rendering views (from csrfMetaTag() in rpc/server.mjs)
+          # In layout mode, context is a positional arg; in view mode, $csrfMetaTag is passed globally
           if method == :csrf_meta_tags && target.nil?
-            return s(:or, s(:gvar, :$csrfMetaTag), s(:str, ''))
+            if erb_layout_mode?()
+              # Layout mode: build meta tag from context.authenticityToken
+              return s(:or,
+                s(:dstr,
+                  s(:str, '<meta name="csrf-token" content="'),
+                  s(:begin, s(:or, s(:attr, s(:lvar, :context), :authenticityToken), s(:str, ''))),
+                  s(:str, '">')),
+                s(:str, ''))
+            else
+              return s(:or, s(:gvar, :$csrfMetaTag), s(:str, ''))
+            end
           end
 
           # Handle csp_meta_tag - stub for demo (returns empty string)
@@ -739,7 +803,7 @@ module Ruby2JS
             s(:str, "<form method=\"post\" action=\""),
             s(:begin, path_expr),
             s(:str, "\"#{form_class_attr}#{form_style}#{turbo_confirm}><input type=\"hidden\" name=\"_method\" value=\"delete\"><input type=\"hidden\" name=\"authenticity_token\" value=\""),
-            s(:begin, s(:or, s(:attr, s(:gvar, :$context), :authenticityToken), s(:str, ''))),
+            s(:begin, s(:or, s(:attr, context_gvar, :authenticityToken), s(:str, ''))),
             s(:str, "\"><button type=\"submit\"#{btn_class_attr}>#{text_str}</button></form>"))
         end
 
@@ -759,7 +823,7 @@ module Ruby2JS
             s(:str, '" action="'),
             s(:begin, path_expr),
             s(:str, "\"#{form_class_attr}#{form_style}><input type=\"hidden\" name=\"authenticity_token\" value=\""),
-            s(:begin, s(:or, s(:attr, s(:gvar, :$context), :authenticityToken), s(:str, ''))),
+            s(:begin, s(:or, s(:attr, context_gvar, :authenticityToken), s(:str, ''))),
             s(:str, "\"><button type=\"submit\"#{btn_class_attr}>#{text_str}</button></form>"))
         end
 
@@ -943,7 +1007,7 @@ module Ruby2JS
                   s(:const, nil, view_module.to_sym),
                   partial_method.to_sym,
                   s(:hash,
-                    s(:pair, s(:sym, :"$context"), s(:gvar, :$context)),
+                    s(:pair, s(:sym, :"$context"), context_gvar),
                     s(:pair, s(:sym, local_var.to_sym), s(:lvar, local_var.to_sym)))))
             else
               # For other expressions, just process and add to buffer
@@ -1034,7 +1098,7 @@ module Ruby2JS
         # <%= notice %> -> context.flash.consumeNotice()
         def process_notice
           # Access flash through context parameter (no import needed)
-          s(:send, s(:attr, s(:lvar, :"$context"), :flash), :consumeNotice)
+          s(:send, s(:attr, context_ref, :flash), :consumeNotice)
         end
 
         # Process content_for helper
@@ -1055,7 +1119,7 @@ module Ruby2JS
             # context.contentFor.title = "Articles"; return ""
             s(:begin,
               s(:send,
-                s(:attr, s(:lvar, :"$context"), :contentFor),
+                s(:attr, context_ref, :contentFor),
                 "#{key_name}=".to_sym,
                 process(value)),
               s(:str, ''))
@@ -1063,7 +1127,7 @@ module Ruby2JS
             # Getting content: content_for(:title)
             # context.contentFor.title || ""
             s(:or,
-              s(:attr, s(:attr, s(:lvar, :"$context"), :contentFor), key_name),
+              s(:attr, s(:attr, context_ref, :contentFor), key_name),
               s(:str, ''))
           end
         end
@@ -1168,7 +1232,8 @@ module Ruby2JS
           module_name = "_#{partial_name}_module".to_sym
 
           # Build unified props hash with $context and locals
-          pairs = [s(:pair, s(:sym, :"$context"), s(:lvar, :"$context"))]
+          # Use the appropriate context reference (context in layout mode, $context otherwise)
+          pairs = [s(:pair, s(:sym, :"$context"), context_ref)]
           locals.keys.each do |key|
             pairs << s(:pair, s(:sym, key), process(locals[key]))
           end
@@ -1553,7 +1618,7 @@ module Ruby2JS
           statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
             s(:dstr,
               s(:str, '<input type="hidden" name="authenticity_token" value="'),
-              s(:begin, s(:or, s(:attr, s(:gvar, :$context), :authenticityToken), s(:str, ''))),
+              s(:begin, s(:or, s(:attr, context_gvar, :authenticityToken), s(:str, ''))),
               s(:str, "\">\n")))
 
           if block_body
@@ -1779,7 +1844,7 @@ module Ruby2JS
           statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
             s(:dstr,
               s(:str, '<input type="hidden" name="authenticity_token" value="'),
-              s(:begin, s(:or, s(:attr, s(:gvar, :$context), :authenticityToken), s(:str, ''))),
+              s(:begin, s(:or, s(:attr, context_gvar, :authenticityToken), s(:str, ''))),
               s(:str, "\">\n")))
 
           if block_body
@@ -1833,7 +1898,7 @@ module Ruby2JS
           statements << s(:op_asgn, s(:lvasgn, self.erb_bufvar), :+,
             s(:dstr,
               s(:str, '<input type="hidden" name="authenticity_token" value="'),
-              s(:begin, s(:or, s(:attr, s(:gvar, :$context), :authenticityToken), s(:str, ''))),
+              s(:begin, s(:or, s(:attr, context_gvar, :authenticityToken), s(:str, ''))),
               s(:str, "\">\n")))
 
           if block_body

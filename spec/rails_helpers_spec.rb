@@ -655,6 +655,37 @@ describe Ruby2JS::Filter::Rails::Helpers do
     end
   end
 
+  describe 'layout mode' do
+    def to_js_layout(string, eslevel: 2015)
+      _(Ruby2JS.convert(string, filters: [Ruby2JS::Filter::Rails::Helpers, Ruby2JS::Filter::Erb, Ruby2JS::Filter::Functions], eslevel: eslevel, layout: true).to_s)
+    end
+
+    def erb_to_js_layout(template, eslevel: 2015)
+      return skip() unless defined?(Ruby2JS::Erubi)
+      src = Ruby2JS::Erubi.new(template).src
+      _(Ruby2JS.convert(src, filters: [Ruby2JS::Filter::Rails::Helpers, Ruby2JS::Filter::Erb, Ruby2JS::Filter::Functions], eslevel: eslevel, layout: true).to_s)
+    end
+
+    it "should generate layout function signature" do
+      erb_src = '_buf = ::String.new; _buf << "<html>".freeze; _buf << (@title).to_s; _buf << "</html>".freeze; _buf.to_s'
+      result = to_js_layout(erb_src)
+      result.must_include 'function layout(context, content)'
+    end
+
+    it "should use context.authenticityToken for csrf_meta_tags in layout mode" do
+      erb_src = '_buf = ::String.new; _buf << ( csrf_meta_tags ).to_s; _buf.to_s'
+      result = to_js_layout(erb_src)
+      result.must_include 'context.authenticityToken'
+      result.wont_include '$csrfMetaTag'
+    end
+
+    it "should not add $context kwarg in layout mode" do
+      erb_src = '_buf = ::String.new; _buf << (@title).to_s; _buf.to_s'
+      result = to_js_layout(erb_src)
+      result.wont_include '$context'
+    end
+  end
+
   describe Ruby2JS::Filter::DEFAULTS do
     it "should include Rails::Helpers" do
       _(Ruby2JS::Filter::DEFAULTS).must_include Ruby2JS::Filter::Rails::Helpers

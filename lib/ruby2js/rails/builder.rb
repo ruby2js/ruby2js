@@ -222,6 +222,21 @@ class SelfhostBuilder
     ]
   }.freeze
 
+  # Options for layout templates (ERB with layout: true)
+  # Layouts have different function signature: layout(context, content)
+  # and yield becomes content interpolation
+  LAYOUT_OPTIONS = {
+    eslevel: 2022,
+    include: [:class, :call],
+    layout: true,
+    filters: [
+      Ruby2JS::Filter::Rails::Helpers,
+      Ruby2JS::Filter::Erb,
+      Ruby2JS::Filter::Functions,
+      Ruby2JS::Filter::Return
+    ]
+  }.freeze
+
   # Options for RBX files (Ruby with JSX syntax via %x{})
   # RBX files compile to React components with React.createElement output
   # Note: JSX filter is for Wunderbar syntax (_div {}), not %x{} syntax
@@ -2008,15 +2023,11 @@ class SelfhostBuilder
 
     puts("Transpiling layout: application.html.erb")
 
-    # Detect app name from config/application.rb for title
-    app_name = 'Ruby2JS App'
-    app_config = File.join(DEMO_ROOT, 'config/application.rb')
-    if File.exist?(app_config)
-      content = File.read(app_config)
-      if content =~ /module\s+(\w+)/
-        app_name = $1
-      end
-    end
+    # Read the original layout ERB
+    template = File.read(layout_path)
+
+    # Pre-process the template to replace Rails asset helpers with our JS-friendly versions
+    # These helpers are stubbed in helpers.rb but we need actual content
 
     # Detect CSS framework for correct stylesheet link
     css_link = ''
@@ -2038,21 +2049,9 @@ class SelfhostBuilder
       stimulus_url = '/node_modules/@hotwired/stimulus/dist/stimulus.js'
     end
 
-    # Generate a minimal layout for server-side rendering
-    # Rails-specific helpers (csrf_meta_tags, etc.) don't make sense in JS context
-    # Layout receives context for access to contentFor, flash, etc.
-    js = <<~JS
-      // Application layout - wraps view content
-      // Generated from app/views/layouts/application.html.erb
-      export function layout(context, content) {
-        const title = context.contentFor.title || '#{app_name}';
-        return `<!DOCTYPE html>
-      <html lang="en">
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>\${title}</title>
-        #{css_link}
+    # Build the import map and module script to replace javascript_importmap_tags
+    importmap_replacement = <<~HTML
+      #{css_link}
         <script type="importmap">
         {
           "imports": {
@@ -2066,15 +2065,38 @@ class SelfhostBuilder
           import '/app/javascript/controllers/index.js';
           window.Turbo = Turbo;
         </script>
-      </head>
-      <body>
-        <main class="container mx-auto px-4 py-8">
-          \${content}
-        </main>
-      </body>
-      </html>`;
-      }
-    JS
+    HTML
+
+    # Replace Rails asset helpers with our versions
+    # stylesheet_link_tag outputs nothing (CSS is in importmap replacement)
+    template = template.gsub(/<%=\s*stylesheet_link_tag[^%]*%>/, '')
+    # javascript_importmap_tags gets replaced with our import map
+    template = template.gsub(/<%=\s*javascript_importmap_tags\s*%>/, importmap_replacement.strip)
+
+    # Replace yield with valid Ruby expressions (yield is not valid outside methods)
+    # <%= yield %> -> <%= content %> (content is passed to layout function)
+    # <%= yield :head %> -> <%= context.contentFor.head || '' %>
+    template = template.gsub(/<%=\s*yield\s+:(\w+)\s*%>/) { |_| "<%= context.contentFor.#{$1} || '' %>" }
+    template = template.gsub(/<%=\s*yield\s*%>/, '<%= content %>')
+
+    # Compile ERB to Ruby
+    compiler = ErbCompiler.new(template)
+    ruby_src = compiler.src
+
+    # Use relative path for cleaner display
+    relative_src = layout_path.sub(DEMO_ROOT + '/', '')
+
+    # Transpile with layout mode enabled
+    layout_options = LAYOUT_OPTIONS.merge(
+      database: @database,
+      target: @target,
+      file: relative_src
+    )
+    result = Ruby2JS.convert(ruby_src, layout_options)
+    js = result.to_s
+
+    # Add export to the layout function
+    js = js.sub(/^function layout/, 'export function layout')
 
     dest_dir = File.join(@dist_dir, 'app/views/layouts')
     FileUtils.mkdir_p(dest_dir)

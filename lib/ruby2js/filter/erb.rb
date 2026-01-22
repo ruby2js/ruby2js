@@ -16,6 +16,11 @@ module Ruby2JS
         @erb_needs_async = false   # Track if render function needs to be async
       end
 
+      # Check if layout mode is enabled (options are set after initialize)
+      def erb_layout_mode?
+        @options && @options[:layout]
+      end
+
       # Main entry point - detect ERB/HERB output patterns and transform
       def on_begin(node)
         # Check if this looks like ERB/HERB output:
@@ -62,6 +67,13 @@ module Ruby2JS
 
         # Build the function body with autoreturn for the last expression
         body = s(:autoreturn, *transformed_children)
+
+        # Layout mode: generate function layout(context, content) signature
+        # yield becomes content, yield :section becomes context.contentFor.section
+        if erb_layout_mode?()
+          args = s(:args, s(:arg, :context), s(:arg, :content))
+          return s(:def, :layout, args, body)
+        end
 
         # Create parameter for the function - destructure ivars and undefined locals
         # Combine ivars (converted to names) and undefined locals
