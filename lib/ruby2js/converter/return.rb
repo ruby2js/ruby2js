@@ -81,6 +81,12 @@ module Ruby2JS
             end
           elsif EXPRESSIONS.include? children[i].type
             children[i] = children[i].updated(:return, [children[i]])
+          elsif children[i].type == :begin
+            # Multi-statement else clause - apply autoreturn to the begin block
+            children[i] = s(:autoreturn, children[i])
+          elsif children[i].type == :if
+            # if expression in else clause - apply autoreturn
+            children[i] = s(:autoreturn, children[i])
           end
         end
         block.push node.updated(nil, children)

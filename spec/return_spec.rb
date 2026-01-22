@@ -113,6 +113,12 @@ describe Ruby2JS::Filter::Return do
       to_js( 'lambda {|x| case x; when :a; foo ? bar : nil; else nil; end}' ).
         must_include 'return foo ? bar : null'
     end
+
+    it "should handle case statements with multi-statement else clause" do
+      # Bug: if-modifier return followed by fallback expression wasn't getting return added
+      to_js( 'def f(x); case x; when :a; x; else; return y if z; x; end; end' ).
+        must_include 'default: if (z) return y; return x'
+    end
   end
 
   describe 'Class.new' do
