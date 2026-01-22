@@ -3,6 +3,8 @@
 // better-sqlite3 is a fast, synchronous SQLite3 binding for Node.js
 
 import Database from 'better-sqlite3';
+import { mkdirSync, existsSync } from 'node:fs';
+import { dirname } from 'node:path';
 
 import { SQLiteDialect, SQLITE_TYPE_MAP } from './dialects/sqlite.mjs';
 import { attr_accessor, initTimePolyfill } from 'ruby2js-rails/adapters/active_record_base.mjs';
@@ -20,6 +22,14 @@ let db = null;
 export async function initDatabase(options = {}) {
   const config = { ...DB_CONFIG, ...options };
   const dbPath = config.database || ':memory:';
+
+  // Ensure parent directory exists for file-based databases
+  if (dbPath !== ':memory:') {
+    const dir = dirname(dbPath);
+    if (dir && dir !== '.' && !existsSync(dir)) {
+      mkdirSync(dir, { recursive: true });
+    }
+  }
 
   db = new Database(dbPath, {
     verbose: config.verbose ? console.log : null
@@ -129,6 +139,16 @@ export async function insert(tableName, data) {
   const sql = `INSERT INTO ${tableName} (${keys.join(', ')}) VALUES (${placeholders.join(', ')})`;
   const stmt = db.prepare(sql);
   stmt.run(...values);
+}
+
+// Close database connection and flush WAL to main database file
+export async function closeDatabase() {
+  if (db) {
+    // Checkpoint WAL to ensure all data is written to main database file
+    db.pragma('wal_checkpoint(TRUNCATE)');
+    db.close();
+    db = null;
+  }
 }
 
 // better-sqlite3-specific ActiveRecord implementation

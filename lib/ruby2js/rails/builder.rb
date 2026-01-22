@@ -285,27 +285,28 @@ class SelfhostBuilder
     app_root ||= DEMO_ROOT
     env = ENV['RAILS_ENV'] || ENV['NODE_ENV'] || 'development'
 
-    # Priority 1: JUNTOS_DATABASE or DATABASE environment variable
-    db_env = ENV['JUNTOS_DATABASE'] || ENV['DATABASE']
-    if db_env
-      puts("  Using #{ENV['JUNTOS_DATABASE'] ? 'JUNTOS_DATABASE' : 'DATABASE'}=#{db_env} from environment") unless quiet
-      return { 'adapter' => db_env.downcase }
-    end
-
-    # Priority 2: config/database.yml
+    # Load config from database.yml first
     config_path = File.join(app_root, 'config/database.yml')
-    if File.exist?(config_path)
+    db_config = if File.exist?(config_path)
       # Ruby 3.4+/4.0+ requires aliases: true for YAML anchors used by Rails
       config = YAML.load_file(config_path, aliases: true)
-      if config && config[env] && config[env]['adapter']
+      if config && config[env]
         puts("  Using config/database.yml [#{env}]") unless quiet
-        return config[env]
+        config[env]
       end
     end
 
-    # Default: sqljs
-    puts("  Using default adapter: sqljs") unless quiet
-    { 'adapter' => 'sqljs', 'database' => 'ruby2js_rails' }
+    # Default config if database.yml not found or empty
+    db_config ||= { 'adapter' => 'sqljs', 'database' => 'ruby2js_rails' }
+
+    # JUNTOS_DATABASE or DATABASE env var overrides adapter only
+    db_env = ENV['JUNTOS_DATABASE'] || ENV['DATABASE']
+    if db_env
+      puts("  Adapter override: #{ENV['JUNTOS_DATABASE'] ? 'JUNTOS_DATABASE' : 'DATABASE'}=#{db_env}") unless quiet
+      db_config['adapter'] = db_env.downcase
+    end
+
+    db_config
   end
 
   # Detect runtime/target from database configuration
@@ -745,7 +746,7 @@ class SelfhostBuilder
     # Also preserve database files (SQLite, etc.)
     if File.directory?(@dist_dir)
       Dir.children(@dist_dir).each do |basename|
-        next if ['package.json', 'package-lock.json', 'node_modules', 'vite.config.js'].include?(basename)
+        next if ['package.json', 'package-lock.json', 'node_modules', 'vite.config.js', 'storage'].include?(basename)
         # Preserve SQLite database files (including WAL mode files)
         next if basename.end_with?('.sqlite3', '.db', '-shm', '-wal')
         FileUtils.rm_rf(File.join(@dist_dir, basename))
@@ -1270,16 +1271,16 @@ class SelfhostBuilder
       end
     end
 
-    # Get database config for injection (load from file or use minimal config for override)
-    db_config = if @database_override
-      { 'adapter' => @database, 'database' => "#{File.basename(DEMO_ROOT)}_dev" }
-    else
-      self.load_database_config()
+    # Get database config for injection
+    # Always load from database.yml, but CLI -d flag overrides the adapter
+    db_config = self.load_database_config()
+    if @database_override
+      db_config['adapter'] = @database
     end
 
     # Ensure SQLite databases have .sqlite3 extension for reliable preservation during rebuilds
     db_name = db_config['database'] || db_config[:database]
-    if db_name && ['sqlite', 'better_sqlite3'].include?(@database)
+    if db_name && ['sqlite', 'sqlite3', 'better_sqlite3'].include?(@database)
       unless db_name.end_with?('.sqlite3', '.db') || db_name == ':memory:'
         db_config['database'] = "#{db_name}.sqlite3"
       end

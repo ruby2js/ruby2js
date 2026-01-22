@@ -54,6 +54,9 @@ module Ruby2JS
           default_mode = options[:default_mode] || 'development'
           mode = options[:environment] || ENV['RAILS_ENV'] || ENV['NODE_ENV'] || default_mode
 
+          # Explicitly set NODE_ENV to match mode (Vite build defaults to production)
+          ENV['NODE_ENV'] = mode
+
           # Build command
           cmd = "npx vite build --mode #{mode}"
           cmd += " --sourcemap" if options[:sourcemap]
