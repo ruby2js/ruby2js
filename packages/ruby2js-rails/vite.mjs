@@ -272,6 +272,19 @@ function createErbPlugin(config) {
     let js = result.toString();
     js = js.replace(/(^|\n)(async )?function render/, '$1export $2function render');
 
+    // Step 3.5: Fix import paths for Vite
+    // The selfhost converter generates relative paths for a .juntos/ structure
+    // but we're now serving ERB from app/views/, so use aliases instead
+    js = js.replace(/from ["']\.\.\/\.\.\/\.\.\/config\/paths\.js["']/g, 'from "@config/paths.js"');
+    js = js.replace(/from ["']\.\.\/\.\.\/\.\.\/lib\/rails\.js["']/g, 'from "lib/rails.js"');
+
+    // Fix partial imports: _./_partial.js -> ./_partial.html.erb
+    // Partials are source files that Vite will transform on-the-fly
+    js = js.replace(/from ["'](\.\/_\w+)\.js["']/g, 'from "$1.html.erb"');
+
+    // Fix cross-directory partial imports: ../comments/_comment.js -> @views/comments/_comment.html.erb
+    js = js.replace(/from ["']\.\.\/(\w+)\/(\_\w+)\.js["']/g, 'from "@views/$1/$2.html.erb"');
+
     // Step 4: Generate source map pointing to original ERB
     const map = result.sourcemap;
     if (map) {
@@ -309,63 +322,21 @@ function createErbPlugin(config) {
 }
 
 /**
- * Structure plugin - runs SelfhostBuilder for models, controllers, views, routes.
- * Also watches source files and syncs changes to dist/ for HMR.
+ * Structure plugin - generates essential files to .juntos/ directory.
+ * Source files (models, controllers, views) are transformed on-the-fly by Vite.
+ *
+ * Generated files (.juntos/):
+ * - routes.js - compiled from config/routes.rb (one-to-many)
+ * - lib/ - runtime helpers (rails.js, active_record.mjs, etc.)
+ *
+ * On-the-fly transformation (via other plugins):
+ * - Models - Rails_Model filter
+ * - Controllers - Rails_Controller filter
+ * - Views - ERB/JSX.rb filters
+ * - Stimulus - Stimulus filter
  */
 function createStructurePlugin(config, appRoot) {
-  const distDir = path.join(appRoot, 'dist');
-  let convert, initPrism;
-  let prismReady = false;
-
-  // Ensure ruby2js is ready for transpilation
-  async function ensureReady() {
-    if (!convert) {
-      const ruby2jsModule = await import('ruby2js');
-      convert = ruby2jsModule.convert;
-      initPrism = ruby2jsModule.initPrism;
-    }
-    if (!prismReady && initPrism) {
-      await initPrism();
-      prismReady = true;
-    }
-  }
-
-  // Transpile a single Ruby file to JavaScript
-  async function transpileRubyFile(srcPath, destPath) {
-    await ensureReady();
-
-    const code = await fs.promises.readFile(srcPath, 'utf-8');
-    const filters = ['Functions', 'ESM', 'Return'];
-
-    // Add Stimulus filter for controllers
-    if (srcPath.includes('/javascript/controllers/')) {
-      filters.unshift('Stimulus');
-    }
-
-    try {
-      const result = convert(code, {
-        filters,
-        eslevel: config.eslevel || 2022,
-        file: srcPath
-      });
-
-      const jsPath = destPath.replace(/\.rb$/, '.js');
-      await fs.promises.mkdir(path.dirname(jsPath), { recursive: true });
-      await fs.promises.writeFile(jsPath, result.toString());
-
-      return jsPath;
-    } catch (error) {
-      console.error(`[juntos] Transpile error in ${srcPath}:`, error.message);
-      return null;
-    }
-  }
-
-  // Copy a file from source to dist
-  async function copyFile(srcPath, destPath) {
-    await fs.promises.mkdir(path.dirname(destPath), { recursive: true });
-    await fs.promises.copyFile(srcPath, destPath);
-    return destPath;
-  }
+  const juntosDir = path.join(appRoot, '.juntos');
 
   // Rebuild routes (generates multiple files)
   async function rebuildRoutes() {
@@ -373,7 +344,7 @@ function createStructurePlugin(config, appRoot) {
     SelfhostBuilder.DEMO_ROOT = appRoot;
 
     try {
-      const builder = new SelfhostBuilder(null, {
+      const builder = new SelfhostBuilder(juntosDir, {
         database: config.database,
         target: config.target,
         broadcast: config.broadcast,
@@ -387,121 +358,190 @@ function createStructurePlugin(config, appRoot) {
     }
   }
 
-  // Handle a source file change
-  async function handleFileChange(file, server) {
-    // Calculate relative path from appRoot
-    const relativePath = path.relative(appRoot, file);
-
-    // Skip if not in watched directories
-    if (!relativePath.startsWith('app/') && !relativePath.startsWith('config/')) {
-      return;
-    }
-
-    console.log(`[juntos] Source file changed: ${relativePath}`);
-
-    // Special case: routes.rb needs full rebuild (generates multiple files)
-    if (relativePath === 'config/routes.rb') {
-      await rebuildRoutes();
-      return;
-    }
-
-    const destPath = path.join(distDir, relativePath);
-
-    // Determine how to handle the file
-    if (file.endsWith('.erb') || file.endsWith('.jsx.rb')) {
-      // ERB and JSX.rb files: copy to dist, Vite transforms on-the-fly
-      await copyFile(file, destPath);
-      console.log(`[juntos] Copied ${relativePath} to dist/`);
-    } else if (file.endsWith('.rb')) {
-      // Ruby files: transpile to JavaScript
-      // Note: Models and Rails controllers use rails/* filters which may not be
-      // fully supported in the JS transpiler yet. Full parity is tracked in
-      // plans/VITE_RUBY2JS.md under "Selfhost Transpiler Requirements".
-      // Stimulus controllers work well since Stimulus filter is available.
-      const jsPath = await transpileRubyFile(file, destPath);
-      if (jsPath) {
-        console.log(`[juntos] Transpiled ${relativePath} to ${path.relative(distDir, jsPath)}`);
-      }
-    } else {
-      // Other files (CSS, etc.): just copy
-      await copyFile(file, destPath);
-      console.log(`[juntos] Copied ${relativePath} to dist/`);
-    }
-  }
-
   return {
     name: 'juntos-structure',
 
     async buildStart() {
+      // Ensure .juntos directory exists
+      await fs.promises.mkdir(juntosDir, { recursive: true });
+
       // Set the app root for the builder
       const originalRoot = SelfhostBuilder.DEMO_ROOT;
       SelfhostBuilder.DEMO_ROOT = appRoot;
 
       try {
-        const builder = new SelfhostBuilder(null, {
+        const builder = new SelfhostBuilder(juntosDir, {
           database: config.database,
           target: config.target,
           broadcast: config.broadcast,
           base: process.env.JUNTOS_BASE
         });
 
-        // Run the full build pipeline
-        builder.build();
+        // Only generate essential files - source is transformed on-the-fly
+        console.log('[juntos] Generating essential files to .juntos/');
+
+        // These methods need to initialize database/target/runtime first
+        // (normally done by build() but we're calling methods directly)
+        builder._database = config.database || 'dexie';
+        builder._target = config.target || 'browser';
+
+        // Set runtime based on target (mirrors logic in build())
+        if (builder._target === 'browser' || builder._target === 'capacitor') {
+          builder._runtime = null;
+        } else if (builder._target === 'electron') {
+          builder._runtime = 'electron';
+        } else if (builder._target === 'cloudflare') {
+          builder._runtime = 'cloudflare';
+        } else {
+          builder._runtime = builder._target; // node, bun, deno
+        }
+
+        console.log(`[juntos] Config: database=${builder._database}, target=${builder._target}, runtime=${builder._runtime}`);
+
+        // Generate routes (one-to-many transformation)
+        builder.transpile_routes_files();
+
+        // Copy lib files (runtime helpers)
+        builder.copy_lib_files();
+
+        // Generate database adapter with config
+        builder.copy_database_adapter();
+
+        // Setup broadcast adapter if needed
+        if (config.broadcast) {
+          builder.setup_broadcast_adapter();
+        }
+
+        // Generate ApplicationRecord wrapper
+        builder.generate_application_record();
+
+        // For now, also generate controllers and views
+        // (TODO: Add Rails filters to Vite plugins for on-the-fly transformation)
+        const modelsDir = path.join(appRoot, 'app/models');
+        const controllersDir = path.join(appRoot, 'app/controllers');
+        const viewsDir = path.join(appRoot, 'app/views');
+
+        if (fs.existsSync(modelsDir)) {
+          builder.transpile_directory(
+            modelsDir,
+            path.join(juntosDir, 'app/models'),
+            '**/*.rb',
+            { skip: ['application_record.rb'] }
+          );
+        }
+
+        // Generate models index AFTER models are transpiled
+        builder.generate_models_index();
+
+        if (fs.existsSync(controllersDir)) {
+          builder.transpile_directory(
+            controllersDir,
+            path.join(juntosDir, 'app/controllers'),
+            '**/*.rb',
+            { skip: ['application_controller.rb'], section: 'controllers' }
+          );
+        }
+
+        if (fs.existsSync(viewsDir)) {
+          builder.transpile_erb_directory();
+          // Server targets need the layout
+          if (isServerTarget(config.target)) {
+            builder.transpile_layout();
+          }
+        }
+
+        // Generate migrations and seeds
+        const dbSrcDir = path.join(appRoot, 'db');
+        const dbDestDir = path.join(juntosDir, 'db');
+        if (fs.existsSync(dbSrcDir)) {
+          builder.transpile_migrations(dbSrcDir, dbDestDir);
+          builder.transpile_seeds(dbSrcDir, dbDestDir);
+        }
+
+        console.log('[juntos] Essential files generated');
       } finally {
         // Restore original root
         SelfhostBuilder.DEMO_ROOT = originalRoot;
       }
     },
 
-    // Watch source files and sync to dist for HMR
+    // Watch config files for route regeneration
     configureServer(server) {
-      // Watch source directories
-      const watchDirs = [
-        path.join(appRoot, 'app'),
-        path.join(appRoot, 'config')
-      ];
+      // Watch config directory for route changes
+      const configDir = path.join(appRoot, 'config');
+      if (fs.existsSync(configDir)) {
+        server.watcher.add(configDir);
+      }
 
-      // Add directories to Vite's watcher
-      watchDirs.forEach(dir => {
-        if (fs.existsSync(dir)) {
-          server.watcher.add(dir);
-        }
-      });
-
-      // Handle file changes
+      // Handle route changes
       server.watcher.on('change', async (file) => {
-        // Only handle files in appRoot (not dist/)
-        if (!file.startsWith(appRoot) || file.startsWith(distDir)) {
-          return;
-        }
+        const relativePath = path.relative(appRoot, file);
 
-        try {
-          await handleFileChange(file, server);
-        } catch (error) {
-          console.error(`[juntos] Error handling file change:`, error);
+        // Route changes need regeneration
+        if (relativePath === 'config/routes.rb') {
+          console.log(`[juntos] Routes changed, regenerating...`);
+          await rebuildRoutes();
         }
       });
 
-      // Handle new files
-      server.watcher.on('add', async (file) => {
-        if (!file.startsWith(appRoot) || file.startsWith(distDir)) {
-          return;
-        }
+      console.log(`[juntos] Watching config files in ${appRoot}`);
+    },
 
-        try {
-          await handleFileChange(file, server);
-        } catch (error) {
-          console.error(`[juntos] Error handling new file:`, error);
-        }
-      });
+    // For server builds, copy essential files to dist/
+    async closeBundle() {
+      if (!isServerTarget(config.target)) return;
 
-      console.log(`[juntos] Watching source files in ${appRoot}`);
+      const distDir = path.join(appRoot, 'dist');
+      console.log('[juntos] Copying essential files to dist/ for server build...');
+
+      // Copy .juntos/ structure to dist/
+      await copyDirRecursive(juntosDir, distDir);
+
+      // Symlink node_modules into dist/ for package resolution
+      const nodeModulesLink = path.join(distDir, 'node_modules');
+      const nodeModulesTarget = path.join(appRoot, 'node_modules');
+      try {
+        await fs.promises.unlink(nodeModulesLink).catch(() => {});
+        await fs.promises.symlink(nodeModulesTarget, nodeModulesLink, 'junction');
+        console.log('[juntos] Linked node_modules to dist/');
+      } catch (e) {
+        // Symlink may fail on some systems, copy public folder instead
+        console.warn('[juntos] Could not create node_modules symlink:', e.message);
+      }
+
+      console.log('[juntos] Server files copied to dist/');
     }
   };
 }
 
 /**
+ * Recursively copy a directory.
+ */
+async function copyDirRecursive(src, dest) {
+  const entries = await fs.promises.readdir(src, { withFileTypes: true });
+  await fs.promises.mkdir(dest, { recursive: true });
+
+  for (const entry of entries) {
+    const srcPath = path.join(src, entry.name);
+    const destPath = path.join(dest, entry.name);
+
+    if (entry.isDirectory()) {
+      await copyDirRecursive(srcPath, destPath);
+    } else {
+      await fs.promises.copyFile(srcPath, destPath);
+    }
+  }
+}
+
+/**
  * Config plugin - platform-specific Vite/Rollup configuration.
+ *
+ * New Vite-native structure:
+ * - vite.config.js at project root
+ * - node_modules at project root
+ * - Source in app/ (transformed on-the-fly)
+ * - Generated files in .juntos/
+ * - Build output to dist/
  */
 function createConfigPlugin(config, appRoot) {
   return {
@@ -509,32 +549,31 @@ function createConfigPlugin(config, appRoot) {
     enforce: 'post',  // Run after other plugins to ensure our config takes precedence
 
     config(userConfig, { command }) {
-      const distDir = path.join(appRoot, 'dist');
+      const juntosDir = path.join(appRoot, '.juntos');
+
       const aliases = {
+        // Source directories (transformed on-the-fly by Vite plugins)
         '@controllers': path.join(appRoot, 'app/javascript/controllers'),
         '@models': path.join(appRoot, 'app/models'),
         '@views': path.join(appRoot, 'app/views'),
         'components': path.join(appRoot, 'app/components'),
-        // lib/ folder is in dist/ (contains runtime helpers like JsonStreamProvider)
-        'lib': path.join(distDir, 'lib'),
+
+        // Generated files in .juntos/
+        'lib': path.join(juntosDir, 'lib'),
+        '@config': path.join(juntosDir, 'config'),
+
         // Alias for Rails importmap-style imports in Stimulus controllers
         'controllers/application': path.join(appRoot, 'app/javascript/controllers/application.js'),
-        // Hotwire packages are in dist/node_modules, not appRoot/node_modules
-        '@hotwired/stimulus': path.join(distDir, 'node_modules/@hotwired/stimulus'),
-        '@hotwired/turbo': path.join(distDir, 'node_modules/@hotwired/turbo'),
-        '@hotwired/turbo-rails': path.join(distDir, 'node_modules/@hotwired/turbo-rails'),
-        // React packages for source file imports from app/ directory
-        'react': path.join(distDir, 'node_modules/react'),
-        'react-dom': path.join(distDir, 'node_modules/react-dom'),
-        'reactflow': path.join(distDir, 'node_modules/reactflow'),
-        'reactflow/dist/style.css': path.join(distDir, 'node_modules/reactflow/dist/style.css')
+
+        // node_modules is now at appRoot (standard Vite structure)
+        // No aliases needed - Vite resolves these automatically
       };
 
       // For server targets, client bundles should use RPC adapter instead of SQL adapter
       // This redirects lib/active_record.mjs imports to lib/active_record_client.mjs
       // The server runtime uses lib/active_record.mjs directly (SQL adapter)
       if (isServerTarget(config.target)) {
-        const rpcAdapterPath = path.join(distDir, 'lib/active_record_client.mjs');
+        const rpcAdapterPath = path.join(juntosDir, 'lib/active_record_client.mjs');
         if (fs.existsSync(rpcAdapterPath)) {
           // Match both relative and absolute paths to lib/active_record.mjs
           aliases['lib/active_record.mjs'] = rpcAdapterPath;
@@ -545,7 +584,7 @@ function createConfigPlugin(config, appRoot) {
       } else {
         // For browser targets, use path_helper_browser.mjs (direct controller invocation)
         // instead of path_helper.mjs (fetch-based for server targets)
-        const browserPathHelper = path.join(distDir, 'path_helper_browser.mjs');
+        const browserPathHelper = path.join(juntosDir, 'path_helper_browser.mjs');
         if (fs.existsSync(browserPathHelper)) {
           aliases['ruby2js-rails/path_helper.mjs'] = browserPathHelper;
         }
@@ -573,21 +612,20 @@ function createConfigPlugin(config, appRoot) {
         }
       }
 
-      // Note: We don't set root here - Vite should use its default (directory of vite.config.js)
-      // which is dist/. The index.html and all built files are in dist/.
-      // The aliases above point to source files in appRoot (parent of dist/).
+      // Vite-native structure: config at root, output to dist/
       return {
         build: {
           target: buildTarget,
-          outDir: '.', // Output to current directory (dist/), not dist/dist/
-          emptyOutDir: false, // Preserve node_modules, package.json, etc.
+          outDir: 'dist',
+          emptyOutDir: true, // Clean dist/ on each build
           rollupOptions
         },
         resolve: {
           alias: aliases,
           // Add Ruby extensions for auto-resolution
           extensions: ['.mjs', '.js', '.mts', '.ts', '.jsx', '.tsx', '.json', '.jsx.rb', '.rb']
-        }
+        },
+        // publicDir is public/ by default, which is correct
       };
     }
   };
@@ -682,7 +720,10 @@ function getRollupOptions(target, database) {
     case 'deno':
       return {
         input: 'node_modules/ruby2js-rails/server.mjs',
-        external: getNativeModules(database)
+        external: getNativeModules(database),
+        output: {
+          entryFileNames: 'index.js'
+        }
       };
 
     case 'vercel':
@@ -695,7 +736,10 @@ function getRollupOptions(target, database) {
     case 'cloudflare':
       return {
         input: 'src/index.js',
-        external: ['__STATIC_CONTENT_MANIFEST']
+        external: ['__STATIC_CONTENT_MANIFEST'],
+        output: {
+          entryFileNames: 'worker.js'
+        }
       };
 
     case 'deno-deploy':
@@ -706,7 +750,10 @@ function getRollupOptions(target, database) {
     case 'fly':
       return {
         input: 'node_modules/ruby2js-rails/server.mjs',
-        external: getNativeModules(database)
+        external: getNativeModules(database),
+        output: {
+          entryFileNames: 'index.js'
+        }
       };
 
     default:

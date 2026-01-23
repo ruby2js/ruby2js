@@ -135,9 +135,16 @@ export function createContext(req, params = {}) {
       headers: headers
     },
 
-    // CSRF token for form authenticity
-    authenticityToken: getCSRF().generateToken()
+    // CSRF token for form authenticity (placeholder, set by async init)
+    authenticityToken: null
   };
+}
+
+// Async version that initializes CSRF token
+export async function createContextAsync(params = {}, req = null) {
+  const context = createContext(params, req);
+  context.authenticityToken = await getCSRF().generateToken();
+  return context;
 }
 
 // Server Router with HTTP dispatch
@@ -196,7 +203,7 @@ export class Router extends RouterBase {
     if (['POST', 'PATCH', 'PUT', 'DELETE'].includes(method)) {
       const token = getHeader(req, 'x-csrf-token') || params.authenticity_token;
       const csrf = getCSRF();
-      if (!csrf.validateToken(token)) {
+      if (!await csrf.validateToken(token)) {
         console.warn('  CSRF token invalid');
         return new Response('<h1>422 Invalid Authenticity Token</h1>', {
           status: 422,

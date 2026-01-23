@@ -11,7 +11,34 @@
  * - Extensible handler registry
  */
 
-import { randomBytes, createHmac } from 'node:crypto';
+// Web Crypto API helpers (works in Node.js 15+, browsers, Cloudflare Workers, Deno, Bun)
+function getRandomBytes(length) {
+  const array = new Uint8Array(length);
+  crypto.getRandomValues(array);
+  return array;
+}
+
+function bytesToHex(bytes) {
+  return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Convert string to Uint8Array for Web Crypto
+function stringToBytes(str) {
+  return new TextEncoder().encode(str);
+}
+
+// HMAC-SHA256 using Web Crypto (async)
+async function hmacSign(secret, data) {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    stringToBytes(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const signature = await crypto.subtle.sign('HMAC', key, stringToBytes(data));
+  return bytesToHex(new Uint8Array(signature)).slice(0, 16);
+}
 
 /**
  * Registry for RPC handlers
@@ -94,33 +121,33 @@ export class RPCRegistry {
 export class CSRFProtection {
   constructor(secret = null) {
     // Use provided secret or generate one (should be consistent across restarts in production)
-    this.secret = secret || process.env.CSRF_SECRET || randomBytes(32).toString('hex');
+    this.secret = secret || (typeof process !== 'undefined' && process.env?.CSRF_SECRET) || bytesToHex(getRandomBytes(32));
   }
 
   /**
    * Generate a CSRF token for a session
    * @param {string} sessionId - Session identifier
-   * @returns {string} Token
+   * @returns {Promise<string>} Token
    */
-  generateToken(sessionId = '') {
+  async generateToken(sessionId = '') {
     const timestamp = Date.now().toString(36);
-    const random = randomBytes(16).toString('hex');
+    const random = bytesToHex(getRandomBytes(16));
     const data = `${timestamp}:${random}:${sessionId}`;
-    const signature = this.sign(data);
-    return Buffer.from(`${data}:${signature}`).toString('base64');
+    const signature = await this.sign(data);
+    return btoa(`${data}:${signature}`);
   }
 
   /**
    * Validate a CSRF token
    * @param {string} token - Token from request header
    * @param {string} sessionId - Session identifier (optional)
-   * @returns {boolean} Whether token is valid
+   * @returns {Promise<boolean>} Whether token is valid
    */
-  validateToken(token, sessionId = '') {
+  async validateToken(token, sessionId = '') {
     if (!token) return false;
 
     try {
-      const decoded = Buffer.from(token, 'base64').toString();
+      const decoded = atob(token);
       const parts = decoded.split(':');
       if (parts.length !== 4) return false;
 
@@ -128,7 +155,8 @@ export class CSRFProtection {
       const data = `${timestamp}:${random}:${tokenSessionId}`;
 
       // Verify signature
-      if (signature !== this.sign(data)) return false;
+      const expectedSignature = await this.sign(data);
+      if (signature !== expectedSignature) return false;
 
       // Optionally verify session ID matches
       if (sessionId && tokenSessionId !== sessionId) return false;
@@ -145,11 +173,11 @@ export class CSRFProtection {
   }
 
   /**
-   * Sign data with HMAC
+   * Sign data with HMAC-SHA256
    * @private
    */
-  sign(data) {
-    return createHmac('sha256', this.secret).update(data).digest('hex').slice(0, 16);
+  async sign(data) {
+    return hmacSign(this.secret, data);
   }
 }
 
@@ -210,7 +238,7 @@ export function createRPCHandler(options = {}) {
     // Validate CSRF token
     if (requireCSRF) {
       const token = req.headers['x-csrf-token'];
-      if (!csrf.validateToken(token)) {
+      if (!await csrf.validateToken(token)) {
         res.writeHead(422, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: { message: 'Invalid authenticity token', code: 'CSRF_INVALID' } }));
         return true;
@@ -310,9 +338,9 @@ function serializeResult(result) {
 /**
  * Generate a meta tag for CSRF token (for HTML responses)
  * @param {string} sessionId - Optional session ID
- * @returns {string} HTML meta tag
+ * @returns {Promise<string>} HTML meta tag
  */
-export function csrfMetaTag(sessionId = '') {
-  const token = getCSRF().generateToken(sessionId);
+export async function csrfMetaTag(sessionId = '') {
+  const token = await getCSRF().generateToken(sessionId);
   return `<meta name="csrf-token" content="${token}">`;
 }

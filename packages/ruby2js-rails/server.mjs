@@ -6,7 +6,7 @@
 //
 // Usage:
 //   DATABASE=better_sqlite3 npm run build  # Build for Node.js
-//   node node_modules/ruby2js-rails/server.mjs  # Start server
+//   node dist/index.js  # Start server
 //
 // Or with npm script:
 //   npm run start:node
@@ -15,11 +15,12 @@
 //   PORT            - HTTP port (default: 3000)
 //   DATABASE_URL    - Database connection URL (for pg adapter)
 
-import { join } from 'path';
-import { pathToFileURL } from 'url';
+import { join, dirname } from 'path';
+import { pathToFileURL, fileURLToPath } from 'url';
 
-// Import Application from the current directory (npm scripts run from dist/)
-const routesPath = join(process.cwd(), 'config/routes.js');
+// Import Application from the dist directory (relative to this file)
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const routesPath = join(__dirname, 'config/routes.js');
 const { Application } = await import(pathToFileURL(routesPath).href);
 
 const port = process.env.PORT || 3000;

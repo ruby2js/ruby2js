@@ -57,16 +57,17 @@ module Ruby2JS
         # Called by Erb filter's on_begin via erb_prepend_imports hook
         def erb_prepend_imports
           # Add import for path helpers if any were used
-          # ERB files are at app/views/articles/*.js, so 3 levels up to dist root
+          # Use @config alias (resolves to .juntos/config in Vite)
           unless @erb_path_helpers.empty?
             helpers = @erb_path_helpers.uniq.sort.map { |name| s(:const, nil, name) }
-            self.prepend_list << s(:import, '../../../config/paths.js', helpers)
+            self.prepend_list << s(:import, '@config/paths.js', helpers)
           end
 
           # Add import for view helpers (truncate, etc.) from rails.js
+          # Use lib alias (resolves to .juntos/lib in Vite)
           unless @erb_view_helpers.empty?
             helpers = @erb_view_helpers.uniq.sort.map { |name| s(:const, nil, name) }
-            self.prepend_list << s(:import, '../../../lib/rails.js', helpers)
+            self.prepend_list << s(:import, 'lib/rails.js', helpers)
           end
 
           # Add imports for partials
