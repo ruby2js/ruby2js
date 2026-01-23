@@ -305,12 +305,23 @@ export class ActiveRecordBase {
   }
 
   // Broadcast Turbo Stream replace for ERB views
-  broadcast_replace_to(channel, options = {}) {
+  async broadcast_replace_to(channel, options = {}) {
     const BroadcastChannel = globalThis.BroadcastChannel;
     if (!BroadcastChannel?.broadcast) return;
 
     const target = options.target || this.domId();
-    const html = options.html || this.toHTML();
+    // Use renderPartial if available (from broadcasts_to), otherwise fall back to toHTML
+    let html = options.html;
+    if (!html && this.constructor.renderPartial) {
+      // Build locals object with model name as key (e.g., { article: this })
+      // Use class name lowercased to match transpiler output
+      const modelName = this.constructor.name.toLowerCase();
+      html = await this.constructor.renderPartial({
+        $context: { authenticityToken: '', flash: {}, contentFor: {} },
+        [modelName]: this
+      });
+    }
+    if (!html) html = this.toHTML();
     const stream = `<turbo-stream action="replace" target="${target}"><template>${html}</template></turbo-stream>`;
     BroadcastChannel.broadcast(channel, stream);
   }

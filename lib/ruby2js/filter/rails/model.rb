@@ -151,7 +151,21 @@ module Ruby2JS
             end
           end
 
-          begin_node = s(:begin, import_node, *model_import_nodes, exported_class)
+          # Add Model.renderPartial = render assignment so broadcast_replace_to
+          # can use the partial at runtime when called from other models
+          render_partial_assignment = nil
+          if @rails_broadcasts_to.any?
+            render_partial_assignment = s(:send,
+              s(:const, nil, @rails_model_name.to_sym),
+              :renderPartial=,
+              s(:lvar, :render))
+          end
+
+          begin_node = if render_partial_assignment
+            s(:begin, import_node, *model_import_nodes, exported_class, render_partial_assignment)
+          else
+            s(:begin, import_node, *model_import_nodes, exported_class)
+          end
           result = process(begin_node)
           # Set empty comments on processed begin node to prevent first-location lookup
           # from incorrectly inheriting comments from child nodes
