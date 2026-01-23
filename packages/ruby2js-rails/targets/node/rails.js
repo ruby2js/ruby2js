@@ -89,23 +89,10 @@ export class Router extends RouterServer {
     }
   }
 
-  // Create context from Node.js request (different cookie access than Fetch API)
+  // Create context from Node.js request
+  // Uses shared createContext which handles both Fetch API and Node.js headers
   static createContextNode(req, params) {
-    const parsedUrl = parseUrl(req.url, true);
-    // Node.js uses req.headers.cookie (string) vs Fetch API's req.headers.get('cookie')
-    const cookieHeader = req.headers.cookie || '';
-
-    return {
-      contentFor: {},
-      flash: createFlash(cookieHeader),  // Use shared flash creation
-      params: params,
-      request: {
-        path: parsedUrl.pathname,
-        method: req.method,
-        url: req.url,
-        headers: req.headers
-      }
-    };
+    return createContext(req, params);
   }
 
   // Dispatch an HTTP request to the appropriate controller action

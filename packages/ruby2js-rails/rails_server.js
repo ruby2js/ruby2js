@@ -132,7 +132,10 @@ export function createContext(req, params = {}) {
       method: req.method,
       url: url.href,  // Full URL for redirect base
       headers: headers
-    }
+    },
+
+    // CSRF token for form authenticity
+    authenticityToken: getCSRF().generateToken()
   };
 }
 
