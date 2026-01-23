@@ -44,6 +44,10 @@ export class Router extends RouterBase {
   // Dispatch a path to the appropriate controller action
   // Context is created fresh for each navigation, or passed from form handlers
   static async dispatch(path, context = null) {
+    // Normalize path to string (handle URL objects from Turbo)
+    if (path && typeof path !== 'string') {
+      path = path.pathname || path.toString();
+    }
     console.log(`Started GET "${path}"`);
 
     // Create context if not provided (fresh navigation)

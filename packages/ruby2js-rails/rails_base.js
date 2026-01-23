@@ -103,6 +103,14 @@ export class RouterBase {
 
   // Find matching route for a path
   static match(path, method = 'GET') {
+    // Handle URL objects or other non-string paths
+    if (path && typeof path !== 'string') {
+      path = path.pathname || path.toString();
+    }
+    if (!path || typeof path !== 'string') {
+      console.warn('Router.match called with invalid path:', path);
+      return null;
+    }
     for (const route of this.routes) {
       if (route.method !== method) continue;
       const match = path.match(route.pattern);
