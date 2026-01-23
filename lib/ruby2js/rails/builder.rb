@@ -394,6 +394,8 @@ class SelfhostBuilder
       }
     end
 
+    dev_deps = {}
+
     # Hotwire Turbo and Stimulus - used by all targets
     deps['@hotwired/turbo'] = '^8.0.0'
     deps['@hotwired/stimulus'] = '^3.2.0'
@@ -407,6 +409,7 @@ class SelfhostBuilder
     tailwind_css = app_root ? File.join(app_root, 'app/assets/tailwind/application.css') : 'app/assets/tailwind/application.css'
     if File.exist?(tailwind_css)
       deps['tailwindcss'] = '^4.0.0'
+      dev_deps['@tailwindcss/cli'] = '^4.0.0'
     end
 
     # Add user dependencies from ruby2js.yml
@@ -434,7 +437,7 @@ class SelfhostBuilder
       'start:deno' => 'deno run --allow-all node_modules/ruby2js-rails/server.mjs'
     }
 
-    {
+    result = {
       'name' => app_name.to_s.gsub('_', '-'),
       'version' => '0.1.0',
       'type' => 'module',
@@ -442,6 +445,8 @@ class SelfhostBuilder
       'scripts' => scripts,
       'dependencies' => deps
     }
+    result['devDependencies'] = dev_deps unless dev_deps.empty?
+    result
   end
 
   # Map database adapters to their required npm dependencies
