@@ -715,6 +715,7 @@ export class TurboBroadcast {
   // Broadcast a turbo-stream message to all subscribers
   // Called by model broadcast_*_to methods
   static broadcast(channelName, html) {
+    console.log(`  [Broadcast] ${channelName}:`, html.substring(0, 100) + (html.length > 100 ? '...' : ''));
     const channel = this.getChannel(channelName);
     channel.postMessage(html);
     // Also apply locally via Turbo
@@ -727,8 +728,10 @@ export class TurboBroadcast {
   // Used by turbo_stream_from helper in views
   // Returns empty string for ERB interpolation compatibility
   static subscribe(channelName, callback) {
+    console.log(`  [Subscribe] ${channelName}`);
     const channel = this.getChannel(channelName);
     channel.onmessage = (event) => {
+      console.log(`  [Received] ${channelName}:`, event.data.substring(0, 100) + (event.data.length > 100 ? '...' : ''));
       // Render the turbo-stream via Turbo
       if (typeof Turbo !== 'undefined' && Turbo.renderStreamMessage) {
         Turbo.renderStreamMessage(event.data);
@@ -754,6 +757,10 @@ export class TurboBroadcast {
 // Export BroadcastChannel as alias for model broadcast methods
 // Models call: BroadcastChannel.broadcast("channel", html)
 export { TurboBroadcast as BroadcastChannel };
+
+// Set on globalThis for instance methods in active_record_base.mjs
+// (Can't shadow native BroadcastChannel since we use it internally)
+globalThis.TurboBroadcast = TurboBroadcast;
 
 // Helper function for views to subscribe to turbo streams
 // Usage in ERB: <%= turbo_stream_from "chat_room" %>

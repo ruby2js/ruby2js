@@ -641,6 +641,9 @@ export class TurboBroadcast {
 // Models call: BroadcastChannel.broadcast("channel", html)
 export { TurboBroadcast as BroadcastChannel };
 
+// Set on globalThis for instance methods in active_record_base.mjs
+globalThis.TurboBroadcast = TurboBroadcast;
+
 // Helper function for views to subscribe to turbo streams
 // Renders a <turbo-cable-stream-source> element that turbo-rails JavaScript picks up
 // The turbo-rails JS sees this element and subscribes via Action Cable WebSocket

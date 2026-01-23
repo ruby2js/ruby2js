@@ -358,3 +358,6 @@ export class TurboBroadcast {
 
 // Export BroadcastChannel as alias for model broadcast methods
 export { TurboBroadcast as BroadcastChannel };
+
+// Set on globalThis for instance methods in active_record_base.mjs
+globalThis.TurboBroadcast = TurboBroadcast;
