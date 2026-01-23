@@ -455,10 +455,22 @@ export class TurboBroadcast {
     });
   }
 
-  // Send welcome message when client connects
+  // Map of WebSocket -> ping interval (for cleanup on disconnect)
+  static pingIntervals = new Map();
+
+  // Send welcome message when client connects and start ping interval
   static sendWelcome(ws) {
     try {
       ws.send(JSON.stringify({ type: 'welcome' }));
+      // Start sending pings every 3 seconds (Action Cable stale threshold is 6s)
+      const interval = setInterval(() => {
+        try {
+          ws.send(JSON.stringify({ type: 'ping', message: Date.now() }));
+        } catch (e) {
+          // Connection closed, cleanup will handle it
+        }
+      }, 3000);
+      this.pingIntervals.set(ws, interval);
     } catch (e) {
       // Ignore send errors
     }
@@ -523,6 +535,13 @@ export class TurboBroadcast {
 
   // Clean up all subscriptions for a WebSocket (on disconnect)
   static cleanup(ws) {
+    // Clear ping interval
+    const interval = this.pingIntervals.get(ws);
+    if (interval) {
+      clearInterval(interval);
+      this.pingIntervals.delete(ws);
+    }
+
     const wsChannels = this.subscriptions.get(ws);
     if (wsChannels) {
       for (const channel of wsChannels) {
