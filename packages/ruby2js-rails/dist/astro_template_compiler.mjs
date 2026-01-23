@@ -58,12 +58,10 @@ export class AstroTemplateCompiler {
       let braceStart = this.#findNextBrace(processed, pos);
 
       if (braceStart == null) {
-        // No more braces, add remaining text
         result.push(processed.slice(pos));
         break
       };
 
-      // Add text before brace
       if (braceStart > pos) result.push(processed.slice(pos, braceStart));
       let braceEnd = this.#findMatchingBrace(processed, braceStart);
 
@@ -76,8 +74,6 @@ export class AstroTemplateCompiler {
 
       // Extract content between braces
       let content = processed.slice(braceStart + 1, braceEnd);
-
-      // Process the expression
       result.push("{", this.#processExpression(content), "}");
       pos = braceEnd + 1
     };

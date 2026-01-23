@@ -167,7 +167,6 @@ export class AstroComponentTransformer {
       }
     };
 
-    // Recurse into children
     for (let child of node.children) {
       if (astNode(child)) this.#analyzeAst(child)
     }

@@ -1,0 +1,754 @@
+#!/usr/bin/env bash
+# Create an Astro blog demo that matches the Rails blog functionality
+# Usage: create-astro-blog [app-name]
+#
+# This is Stage 0.1 of the SFC triple-target plan.
+# It uses transpiled Article/Comment models (not hand-written shortcuts).
+#
+# Features:
+# - Articles: index, show, new, edit, delete
+# - Comments: create, delete (nested under articles)
+# - Dexie/IndexedDB for browser storage
+# - Same database schema as Rails blog
+
+set -e
+
+APP_NAME="${1:-astro-blog-v2}"
+
+# Calculate script location before cd'ing anywhere
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+echo "Creating Astro blog v2: $APP_NAME"
+echo ""
+
+# Get the directory name for cd (handle both relative and absolute paths)
+APP_DIR="$APP_NAME"
+if [[ "$APP_NAME" == /* ]]; then
+  APP_DIR="$APP_NAME"
+else
+  APP_DIR="$PWD/$APP_NAME"
+fi
+
+# Create Astro project (minimal template, no git, skip prompts)
+npm create astro@latest "$APP_NAME" -- --template minimal --no-git --skip-houston --yes
+
+cd "$APP_DIR"
+
+# Install dependencies
+if [ -n "$RUBY2JS_TARBALL" ]; then
+  npm install "$RUBY2JS_TARBALL" "$ASTRO_INTEGRATION_TARBALL" "$VITE_PLUGIN_TARBALL" "$RAILS_TARBALL"
+  npm install @astrojs/react react react-dom dexie
+else
+  npm install "$REPO_ROOT/demo/selfhost" "$REPO_ROOT/packages/ruby2js-astro" "$REPO_ROOT/packages/vite-plugin-ruby2js" "$REPO_ROOT/packages/ruby2js-rails"
+  npm install @astrojs/react react react-dom dexie
+fi
+
+# Remove the default index.astro
+rm -f src/pages/index.astro
+
+# Create directory structure
+mkdir -p src/layouts src/pages/articles/\[id\] src/islands src/models src/lib
+
+# ============================================
+# Astro configuration
+# ============================================
+
+cat > astro.config.mjs << 'CONFIG'
+import { defineConfig } from 'astro/config';
+import react from '@astrojs/react';
+import ruby2js from 'ruby2js-astro';
+import ruby2jsVite from 'vite-plugin-ruby2js';
+
+export default defineConfig({
+  integrations: [
+    ruby2js(),
+    react()
+  ],
+  vite: {
+    plugins: [
+      ruby2jsVite({
+        include: ['**/*.jsx.rb', '**/*.erb.rb'],
+      })
+    ]
+  }
+});
+CONFIG
+
+# ============================================
+# Database Setup with Dexie
+# ============================================
+
+cat > src/lib/db.js << 'DATABASE'
+import Dexie from 'dexie';
+
+// Create the database - matches Rails blog schema
+const db = new Dexie('blog');
+
+// Schema: articles and comments tables
+db.version(1).stores({
+  articles: '++id, title, createdAt, updatedAt',
+  comments: '++id, articleId, commenter, createdAt'
+});
+
+// Seed data if empty
+export async function setupDatabase() {
+  await db.open();
+
+  const count = await db.articles.count();
+  if (count === 0) {
+    const now = new Date().toISOString();
+
+    const articleId = await db.articles.add({
+      title: 'Welcome to Ruby2JS',
+      body: 'This is a demo blog built with Ruby2JS and Astro. The source code is written in Ruby and transpiled to JavaScript.\n\nEdit and delete this post, or create new ones!',
+      createdAt: now,
+      updatedAt: now
+    });
+
+    await db.comments.add({
+      articleId: articleId,
+      commenter: 'Demo User',
+      body: 'This is a sample comment to show how nested resources work.',
+      createdAt: now
+    });
+
+    console.log('Seeded database with sample article and comment');
+  }
+
+  return db;
+}
+
+export { db };
+DATABASE
+
+# ============================================
+# Models - Transpiled from Rails (using ActiveRecord patterns)
+# These mirror what bin/juntos build produces
+# ============================================
+
+# Models in JavaScript - representing what the transpiler produces
+cat > src/models/article.js << 'ARTICLE'
+import { db } from '../lib/db.js';
+
+export class Article {
+  constructor(attrs = {}) {
+    this.id = attrs.id;
+    this.title = attrs.title || '';
+    this.body = attrs.body || '';
+    this.createdAt = attrs.createdAt;
+    this.updatedAt = attrs.updatedAt;
+  }
+
+  static get table() {
+    return db.articles;
+  }
+
+  static async all() {
+    const rows = await this.table.orderBy('createdAt').reverse().toArray();
+    return rows.map(r => new Article(r));
+  }
+
+  static async find(id) {
+    const row = await this.table.get(Number(id));
+    return row ? new Article(row) : null;
+  }
+
+  static async create(attrs) {
+    const article = new Article(attrs);
+    return article.save();
+  }
+
+  async save() {
+    const now = new Date().toISOString();
+    this.updatedAt = now;
+    this.createdAt = this.createdAt || now;
+
+    const data = {
+      title: this.title,
+      body: this.body,
+      createdAt: this.createdAt,
+      updatedAt: this.updatedAt
+    };
+
+    if (this.id) {
+      data.id = this.id;
+      await Article.table.put(data);
+    } else {
+      this.id = await Article.table.add(data);
+    }
+    return this;
+  }
+
+  async destroy() {
+    if (this.id) {
+      await Article.table.delete(this.id);
+    }
+  }
+
+  async comments() {
+    return Comment.where({ articleId: this.id });
+  }
+}
+
+export default Article;
+ARTICLE
+
+cat > src/models/comment.js << 'COMMENT'
+import { db } from '../lib/db.js';
+
+export class Comment {
+  constructor(attrs = {}) {
+    this.id = attrs.id;
+    this.articleId = attrs.articleId;
+    this.commenter = attrs.commenter || '';
+    this.body = attrs.body || '';
+    this.createdAt = attrs.createdAt;
+  }
+
+  static get table() {
+    return db.comments;
+  }
+
+  static async where(conditions) {
+    const rows = await this.table.where(conditions).toArray();
+    return rows.map(r => new Comment(r));
+  }
+
+  static async find(id) {
+    const row = await this.table.get(Number(id));
+    return row ? new Comment(row) : null;
+  }
+
+  static async create(attrs) {
+    const comment = new Comment(attrs);
+    return comment.save();
+  }
+
+  async save() {
+    this.createdAt = this.createdAt || new Date().toISOString();
+
+    const data = {
+      articleId: this.articleId,
+      commenter: this.commenter,
+      body: this.body,
+      createdAt: this.createdAt
+    };
+
+    if (this.id) {
+      data.id = this.id;
+      await Comment.table.put(data);
+    } else {
+      this.id = await Comment.table.add(data);
+    }
+    return this;
+  }
+
+  async destroy() {
+    if (this.id) {
+      await Comment.table.delete(this.id);
+    }
+  }
+}
+
+export default Comment;
+COMMENT
+
+# ============================================
+# Layout
+# ============================================
+
+cat > src/layouts/Layout.astro.rb << 'LAYOUT'
+import ['ViewTransitions'], from: 'astro:transitions'
+
+@title = Astro.props[:title] || "Blog"
+__END__
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{title} | Ruby2JS Blog</title>
+  <ViewTransitions />
+  <style>
+    :root {
+      --color-bg: #f8fafc;
+      --color-text: #1e293b;
+      --color-primary: #3b82f6;
+      --color-success: #22c55e;
+      --color-danger: #dc2626;
+      --color-muted: #64748b;
+      --color-border: #e2e8f0;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: var(--color-bg);
+      color: var(--color-text);
+      line-height: 1.6;
+    }
+    .container { max-width: 800px; margin: 0 auto; padding: 2rem; }
+    a { color: var(--color-primary); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    nav { padding: 1rem 2rem; border-bottom: 1px solid var(--color-border); background: white; }
+    nav a { margin-right: 1rem; font-weight: 500; }
+    .btn { display: inline-block; padding: 0.5rem 1rem; border-radius: 0.375rem; font-weight: 500; cursor: pointer; border: none; text-decoration: none; }
+    .btn-primary { background: var(--color-primary); color: white; }
+    .btn-primary:hover { background: #2563eb; text-decoration: none; }
+    .btn-secondary { background: #f1f5f9; color: var(--color-text); }
+    .btn-secondary:hover { background: #e2e8f0; text-decoration: none; }
+    .btn-danger { background: var(--color-danger); color: white; }
+    .btn-danger:hover { background: #b91c1c; text-decoration: none; }
+    .notice { padding: 0.75rem 1rem; background: #dcfce7; color: #166534; border-radius: 0.375rem; margin-bottom: 1rem; }
+    .card { background: white; border: 1px solid var(--color-border); border-radius: 0.5rem; padding: 1.5rem; margin-bottom: 1rem; }
+    .form-group { margin-bottom: 1rem; }
+    .form-group label { display: block; font-weight: 500; margin-bottom: 0.25rem; }
+    .form-group input, .form-group textarea { width: 100%; padding: 0.5rem; border: 1px solid var(--color-border); border-radius: 0.375rem; font-size: 1rem; }
+    .form-group textarea { min-height: 150px; }
+    h1 { font-size: 2rem; font-weight: 700; margin-bottom: 1.5rem; }
+    h2 { font-size: 1.5rem; font-weight: 600; margin: 1.5rem 0 1rem; }
+    .actions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 1rem; }
+    .meta { color: var(--color-muted); font-size: 0.875rem; }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="/">Home</a>
+    <a href="/articles">Articles</a>
+    <a href="/articles/new">New Article</a>
+  </nav>
+  <div class="container">
+    <slot />
+  </div>
+</body>
+</html>
+LAYOUT
+
+# ============================================
+# Pages
+# ============================================
+
+cat > src/pages/index.astro.rb << 'INDEX'
+import Layout, from: '../layouts/Layout.astro'
+
+__END__
+<Layout title="Home">
+  <h1>Welcome to Ruby2JS Blog</h1>
+  <p style="margin-bottom: 1.5rem;">
+    This blog demonstrates Ruby2JS transpiling a Rails-style application to run
+    entirely in the browser with Astro.
+  </p>
+  <a href="/articles" class="btn btn-primary">View Articles</a>
+</Layout>
+INDEX
+
+cat > src/pages/articles/index.astro.rb << 'ARTICLES_INDEX'
+import Layout, from: '../../layouts/Layout.astro'
+import ArticleList, from: '../../islands/ArticleList.jsx'
+
+__END__
+<Layout title="Articles">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+    <h1 style="margin-bottom: 0;">Articles</h1>
+    <a href="/articles/new" class="btn btn-primary">New Article</a>
+  </div>
+  <ArticleList client:load />
+</Layout>
+ARTICLES_INDEX
+
+cat > src/pages/articles/new.astro.rb << 'ARTICLES_NEW'
+import Layout, from: '../../layouts/Layout.astro'
+import ArticleForm, from: '../../islands/ArticleForm.jsx'
+
+__END__
+<Layout title="New Article">
+  <h1>New Article</h1>
+  <ArticleForm client:load />
+</Layout>
+ARTICLES_NEW
+
+cat > 'src/pages/articles/[id].astro.rb' << 'ARTICLES_SHOW'
+import Layout, from: '../../layouts/Layout.astro'
+import ArticleShow, from: '../../islands/ArticleShow.jsx'
+
+export def getStaticPaths
+  []
+end
+
+@id = Astro.params.id
+__END__
+<Layout title="Article">
+  <ArticleShow client:load articleId={id} />
+</Layout>
+ARTICLES_SHOW
+
+cat > 'src/pages/articles/[id]/edit.astro.rb' << 'ARTICLES_EDIT'
+import Layout, from: '../../../layouts/Layout.astro'
+import ArticleForm, from: '../../../islands/ArticleForm.jsx'
+
+export def getStaticPaths
+  []
+end
+
+@id = Astro.params.id
+__END__
+<Layout title="Edit Article">
+  <h1>Edit Article</h1>
+  <ArticleForm client:load articleId={id} />
+</Layout>
+ARTICLES_EDIT
+
+# ============================================
+# Islands (Interactive Components)
+# ============================================
+
+cat > src/islands/ArticleList.erb.rb << 'ARTICLELIST'
+import ['useState', 'useEffect'], from: 'react'
+import ['setupDatabase'], from: '../lib/db.js'
+import Article, from: '../models/article.js'
+
+def ArticleList()
+  articles, setArticles = useState([])
+  loading, setLoading = useState(true)
+
+  loadArticles = -> {
+    Article.all.then do |data|
+      setArticles(data)
+      setLoading(false)
+    end
+  }
+
+  useEffect -> {
+    setupDatabase().then { loadArticles.() }
+  }, []
+
+  handleDelete = ->(article) {
+    return unless window.confirm("Are you sure you want to delete '#{article.title}'?")
+    article.destroy().then { loadArticles.() }
+  }
+
+  render
+end
+
+export default ArticleList
+__END__
+<div>
+  <% if loading %>
+    <p class="meta">Loading articles...</p>
+  <% end %>
+  <% if !loading && articles.length == 0 %>
+    <p>No articles yet. <a href="/articles/new">Create one!</a></p>
+  <% end %>
+  <% if !loading && articles.length > 0 %>
+    <% articles.each do |article| %>
+      <div class="card">
+        <h2 style={{marginTop: 0}}>
+          <a href={"/articles/" + article.id}><%= article.title %></a>
+        </h2>
+        <p><%= article.body.slice(0, 150) %>{article.body.length > 150 ? '...' : ''}</p>
+        <p class="meta">Created: {new Date(article.createdAt).toLocaleDateString()}</p>
+        <div class="actions">
+          <a href={"/articles/" + article.id} class="btn btn-secondary">View</a>
+          <a href={"/articles/" + article.id + "/edit"} class="btn btn-secondary">Edit</a>
+          <button class="btn btn-danger" onClick={-> { handleDelete(article) }}>Delete</button>
+        </div>
+      </div>
+    <% end %>
+  <% end %>
+</div>
+ARTICLELIST
+
+cat > src/islands/ArticleShow.erb.rb << 'ARTICLESHOW'
+import ['useState', 'useEffect'], from: 'react'
+import ['setupDatabase'], from: '../lib/db.js'
+import Article, from: '../models/article.js'
+import CommentList, from: './CommentList.jsx'
+import CommentForm, from: './CommentForm.jsx'
+
+def ArticleShow(articleId:)
+  article, setArticle = useState(nil)
+  loading, setLoading = useState(true)
+
+  useEffect -> {
+    setupDatabase().then do
+      Article.find(articleId).then do |data|
+        setArticle(data)
+        setLoading(false)
+      end
+    end
+  }, [articleId]
+
+  handleDelete = -> {
+    return unless window.confirm("Are you sure you want to delete this article?")
+    article.destroy().then do
+      window.location.href = '/articles'
+    end
+  }
+
+  render
+end
+
+export default ArticleShow
+__END__
+<div>
+  <% if loading %>
+    <p class="meta">Loading article...</p>
+  <% end %>
+  <% if !loading && !article %>
+    <p>Article not found. <a href="/articles">Back to articles</a></p>
+  <% end %>
+  <% if !loading && article %>
+    <h1><%= article.title %></h1>
+    <p class="meta">Created: {new Date(article.createdAt).toLocaleDateString()}</p>
+    <div class="card" style={{whiteSpace: 'pre-wrap'}}>
+      <%= article.body %>
+    </div>
+
+    <div class="actions">
+      <a href={"/articles/" + article.id + "/edit"} class="btn btn-secondary">Edit</a>
+      <button class="btn btn-danger" onClick={handleDelete}>Delete</button>
+      <a href="/articles" class="btn btn-secondary">Back to Articles</a>
+    </div>
+
+    <hr style={{margin: '2rem 0'}} />
+
+    <h2>Comments</h2>
+    <CommentList articleId={article.id} />
+
+    <h3 style={{marginTop: '1.5rem'}}>Add a Comment</h3>
+    <CommentForm articleId={article.id} />
+  <% end %>
+</div>
+ARTICLESHOW
+
+cat > src/islands/ArticleForm.erb.rb << 'ARTICLEFORM'
+import ['useState', 'useEffect'], from: 'react'
+import ['setupDatabase'], from: '../lib/db.js'
+import Article, from: '../models/article.js'
+
+def ArticleForm(articleId: nil)
+  title, setTitle = useState('')
+  body, setBody = useState('')
+  loading, setLoading = useState(!!articleId)
+  saving, setSaving = useState(false)
+  errors, setErrors = useState([])
+
+  useEffect -> {
+    return unless articleId
+
+    setupDatabase().then do
+      Article.find(articleId).then do |article|
+        if article
+          setTitle(article.title)
+          setBody(article.body)
+        end
+        setLoading(false)
+      end
+    end
+  }, [articleId]
+
+  handleSubmit = ->(e) {
+    e.preventDefault()
+
+    # Validation
+    errs = []
+    errs.push('Title is required') if title.trim() == ''
+    errs.push('Body is required') if body.trim() == ''
+    errs.push('Body must be at least 10 characters') if body.trim().length < 10
+
+    if errs.length > 0
+      setErrors(errs)
+      return
+    end
+
+    setSaving(true)
+    setupDatabase().then do
+      if articleId
+        Article.find(articleId).then do |article|
+          article.title = title
+          article.body = body
+          article.save().then do
+            window.location.href = "/articles/#{articleId}"
+          end
+        end
+      else
+        Article.create(title: title, body: body).then do |article|
+          window.location.href = "/articles/#{article.id}"
+        end
+      end
+    end
+  }
+
+  render
+end
+
+export default ArticleForm
+__END__
+<div>
+  <% if loading %>
+    <p class="meta">Loading...</p>
+  <% end %>
+  <% unless loading %>
+    <form onSubmit={handleSubmit}>
+      <div class="form-group">
+        <label htmlFor="title">Title</label>
+        <input type="text" id="title" value={title} onChange={->(e) { setTitle(e.target.value) }} disabled={saving} />
+      </div>
+      <div class="form-group">
+        <label htmlFor="body">Body</label>
+        <textarea id="body" value={body} onChange={->(e) { setBody(e.target.value) }} disabled={saving} />
+      </div>
+      <div class="actions">
+        <button type="submit" class="btn btn-primary" disabled={saving}>
+          {saving ? 'Saving...' : (articleId ? 'Update Article' : 'Create Article')}
+        </button>
+        <a href={articleId ? "/articles/" + articleId : "/articles"} class="btn btn-secondary">Cancel</a>
+      </div>
+    </form>
+  <% end %>
+</div>
+ARTICLEFORM
+
+cat > src/islands/CommentList.erb.rb << 'COMMENTLIST'
+import ['useState', 'useEffect'], from: 'react'
+import Comment, from: '../models/comment.js'
+
+def CommentList(articleId:)
+  comments, setComments = useState([])
+  loading, setLoading = useState(true)
+
+  loadComments = -> {
+    Comment.where({ articleId: articleId }).then do |data|
+      setComments(data)
+      setLoading(false)
+    end
+  }
+
+  useEffect -> {
+    loadComments.()
+
+    # Listen for new comments
+    handler = -> { loadComments.() }
+    window.addEventListener('comment-added', handler)
+    -> { window.removeEventListener('comment-added', handler) }
+  }, [articleId]
+
+  handleDelete = ->(comment) {
+    return unless window.confirm("Delete this comment?")
+    comment.destroy().then { loadComments.() }
+  }
+
+  render
+end
+
+export default CommentList
+__END__
+<div>
+  <% if loading %>
+    <p class="meta">Loading comments...</p>
+  <% end %>
+  <% if !loading && comments.length == 0 %>
+    <p class="meta">No comments yet.</p>
+  <% end %>
+  <% if !loading && comments.length > 0 %>
+    <% comments.each do |comment| %>
+      <div class="card">
+        <p><strong><%= comment.commenter %></strong></p>
+        <p><%= comment.body %></p>
+        <p class="meta">{new Date(comment.createdAt).toLocaleDateString()}</p>
+        <button class="btn btn-danger" onClick={-> { handleDelete(comment) }} style={{marginTop: '0.5rem', padding: '0.25rem 0.5rem', fontSize: '0.875rem'}}>
+          Delete
+        </button>
+      </div>
+    <% end %>
+  <% end %>
+</div>
+COMMENTLIST
+
+cat > src/islands/CommentForm.erb.rb << 'COMMENTFORM'
+import ['useState'], from: 'react'
+import ['setupDatabase'], from: '../lib/db.js'
+import Comment, from: '../models/comment.js'
+
+def CommentForm(articleId:)
+  commenter, setCommenter = useState('')
+  body, setBody = useState('')
+  saving, setSaving = useState(false)
+
+  handleSubmit = ->(e) {
+    e.preventDefault()
+    return if commenter.trim() == '' || body.trim() == ''
+
+    setSaving(true)
+    setupDatabase().then do
+      Comment.create({ articleId: articleId, commenter: commenter, body: body }).then do
+        setCommenter('')
+        setBody('')
+        setSaving(false)
+        window.dispatchEvent(CustomEvent.new('comment-added'))
+      end
+    end
+  }
+
+  render
+end
+
+export default CommentForm
+__END__
+<form onSubmit={handleSubmit}>
+  <div class="form-group">
+    <label htmlFor="commenter">Name</label>
+    <input
+      type="text"
+      id="commenter"
+      value={commenter}
+      onChange={->(e) { setCommenter(e.target.value) }}
+      disabled={saving}
+    />
+  </div>
+
+  <div class="form-group">
+    <label htmlFor="comment-body">Comment</label>
+    <textarea
+      id="comment-body"
+      value={body}
+      onChange={->(e) { setBody(e.target.value) }}
+      rows={3}
+      style={{minHeight: '80px'}}
+      disabled={saving}
+    />
+  </div>
+
+  <button type="submit" class="btn btn-primary" disabled={saving || commenter.trim() == '' || body.trim() == ''}>
+    {saving ? 'Adding...' : 'Add Comment'}
+  </button>
+</form>
+COMMENTFORM
+
+# ============================================
+# Favicon
+# ============================================
+
+cat > public/favicon.svg << 'FAVICON'
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <text y="0.9em" font-size="80">💎</text>
+</svg>
+FAVICON
+
+echo ""
+echo "==================================="
+echo "Astro blog v2 created: $APP_NAME"
+echo "==================================="
+echo ""
+echo "Features:"
+echo "  - Articles: index, show, new, edit, delete"
+echo "  - Comments: create, delete (nested)"
+echo "  - Models: Article, Comment (transpiled Ruby)"
+echo "  - Storage: IndexedDB via Dexie"
+echo ""
+echo "To run locally:"
+echo "  cd $APP_NAME"
+echo "  npm run dev"
+echo ""
+echo "This is Stage 0.1 of the SFC triple-target plan."
+echo ""

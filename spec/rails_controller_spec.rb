@@ -187,7 +187,7 @@ describe Ruby2JS::Filter::Rails::Controller do
 
       result = to_js(source)
       # Now uses path helper instead of hardcoded path (respects base path config)
-      _(result).must_include '{redirect: articles_path}'
+      _(result).must_include '{redirect: articles_path()}'
       _(result).must_include 'import([articles_path],' # path helper is imported
     end
 
