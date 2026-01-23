@@ -406,7 +406,7 @@ class SelfhostBuilder
     # Add tailwindcss if tailwindcss-rails gem is detected
     tailwind_css = app_root ? File.join(app_root, 'app/assets/tailwind/application.css') : 'app/assets/tailwind/application.css'
     if File.exist?(tailwind_css)
-      deps['tailwindcss'] = '^3.4.0'
+      deps['tailwindcss'] = '^4.0.0'
     end
 
     # Add user dependencies from ruby2js.yml
@@ -3100,40 +3100,34 @@ class SelfhostBuilder
     tailwind_dest_dir = File.join(@dist_dir, 'app/assets/tailwind')
     FileUtils.mkdir_p(tailwind_dest_dir)
 
-    # Read the tailwindcss-rails source and convert to npm-compatible format
+    # Read the tailwindcss-rails source
     source = File.read(tailwind_src)
 
-    # Convert @import "tailwindcss" to npm @tailwind directives
-    npm_css = source.gsub(/@import\s+["']tailwindcss["'];?/, <<~CSS.strip)
-      @tailwind base;
-      @tailwind components;
-      @tailwind utilities;
-    CSS
+    # Tailwind v4 uses CSS-first configuration with @import "tailwindcss"
+    # Add @source directive to specify content paths for class scanning
+    if source.include?('@import "tailwindcss"') || source.include?("@import 'tailwindcss'")
+      # Tailwind v4: keep @import as-is, add @source for content scanning
+      npm_css = <<~CSS
+        @import "tailwindcss";
+        @source "./app/**/*.{js,html,erb}";
+        @source "./index.html";
+      CSS
+    else
+      # Legacy format: use as-is
+      npm_css = source
+    end
 
-    # Write the converted CSS to dist (source for Tailwind build)
+    # Write the CSS to dist (source for Tailwind build)
     dest_path = File.join(tailwind_dest_dir, 'application.css')
     File.write(dest_path, npm_css)
     puts("  -> app/assets/tailwind/application.css")
 
-    # Create tailwind.config.js if not present
+    # Tailwind v4 uses CSS-first config, no JS config needed
+    # Remove old config if present to avoid conflicts
     config_path = File.join(@dist_dir, 'tailwind.config.js')
-    unless File.exist?(config_path)
-      # Generate config that watches dist/ for class names
-      config = <<~JS
-        /** @type {import('tailwindcss').Config} */
-        export default {
-          content: [
-            './app/**/*.{js,html,erb}',
-            './index.html'
-          ],
-          theme: {
-            extend: {},
-          },
-          plugins: [],
-        }
-      JS
-      File.write(config_path, config)
-      puts("  -> tailwind.config.js")
+    if File.exist?(config_path)
+      FileUtils.rm(config_path)
+      puts("  -> removed tailwind.config.js (v4 uses CSS config)")
     end
 
     # Create output directory for built CSS (Rails convention: public/assets/)

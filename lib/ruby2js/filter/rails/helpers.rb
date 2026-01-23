@@ -537,26 +537,27 @@ module Ruby2JS
             return build_nav_link_with_dynamic_class(text_node, path_node, path_expr, class_node)
           end
 
-          # Build static class attribute string
-          class_attr = css_class ? " class=\"#{css_class}\"" : ""
+          # Build static class attribute string - Rails puts class before href
+          class_attr = css_class ? "class=\"#{css_class}\" " : ""
 
           # Generate standard href links - Turbo Drive intercepts clicks automatically
+          # Match Rails attribute order: class before href
           if text_node.type == :str && path_node.type == :str
             text_str = text_node.children[0]
             path_str = path_node.children[0]
-            s(:str, "<a href=\"#{path_str}\"#{class_attr}>#{text_str}</a>")
+            s(:str, "<a #{class_attr}href=\"#{path_str}\">#{text_str}</a>")
           elsif text_node.type == :str
             text_str = text_node.children[0]
             s(:dstr,
-              s(:str, '<a href="'),
+              s(:str, "<a #{class_attr}href=\""),
               s(:begin, path_expr),
-              s(:str, "\"#{class_attr}>#{text_str}</a>"))
+              s(:str, "\">#{text_str}</a>"))
           else
             text_expr = process(text_node)
             s(:dstr,
-              s(:str, '<a href="'),
+              s(:str, "<a #{class_attr}href=\""),
               s(:begin, path_expr),
-              s(:str, "\"#{class_attr}>"),
+              s(:str, "\">"),
               s(:begin, text_expr),
               s(:str, '</a>'))
           end
@@ -594,25 +595,26 @@ module Ruby2JS
           text_expr = text_str ? nil : process(text_node)
 
           # Generate standard href links - Turbo Drive intercepts clicks automatically
+          # Match Rails attribute order: class before href
           if text_str && path_node.type == :str
             path_str = path_node.children[0]
             s(:dstr,
-              s(:str, "<a href=\"#{path_str}\" class=\""),
+              s(:str, '<a class="'),
               s(:begin, class_expr),
-              s(:str, "\">#{text_str}</a>"))
+              s(:str, "\" href=\"#{path_str}\">#{text_str}</a>"))
           elsif text_str
             s(:dstr,
-              s(:str, '<a href="'),
-              s(:begin, path_expr),
-              s(:str, '" class="'),
+              s(:str, '<a class="'),
               s(:begin, class_expr),
+              s(:str, '" href="'),
+              s(:begin, path_expr),
               s(:str, "\">#{text_str}</a>"))
           else
             s(:dstr,
-              s(:str, '<a href="'),
-              s(:begin, path_expr),
-              s(:str, '" class="'),
+              s(:str, '<a class="'),
               s(:begin, class_expr),
+              s(:str, '" href="'),
+              s(:begin, path_expr),
               s(:str, '">'),
               s(:begin, text_expr),
               s(:str, '</a>'))
@@ -649,8 +651,8 @@ module Ruby2JS
           end
           confirm_str = confirm_msg ? confirm_msg.children[0] : 'Are you sure?'
 
-          # Build class attribute
-          class_attr = css_class ? " class=\"#{css_class}\"" : ""
+          # Build class attribute - Rails puts class before href
+          class_attr = css_class ? "class=\"#{css_class}\" " : ""
 
           # Build Turbo data attributes for delete method and confirmation
           turbo_attrs = " data-turbo-method=\"delete\" data-turbo-confirm=\"#{confirm_str}\""
@@ -658,20 +660,21 @@ module Ruby2JS
           text_str = text_node.type == :str ? text_node.children[0] : nil
 
           # Generate link with Turbo data attributes - Turbo handles the DELETE request
+          # Match Rails attribute order: class before href
           if text_str && path_node.type == :str
             path_str = path_node.children[0]
-            s(:str, "<a href=\"#{path_str}\"#{class_attr}#{turbo_attrs}>#{text_str}</a>")
+            s(:str, "<a #{class_attr}href=\"#{path_str}\"#{turbo_attrs}>#{text_str}</a>")
           elsif text_str
             s(:dstr,
-              s(:str, '<a href="'),
+              s(:str, "<a #{class_attr}href=\""),
               s(:begin, path_expr),
-              s(:str, "\"#{class_attr}#{turbo_attrs}>#{text_str}</a>"))
+              s(:str, "\"#{turbo_attrs}>#{text_str}</a>"))
           else
             text_expr = process(text_node)
             s(:dstr,
-              s(:str, '<a href="'),
+              s(:str, "<a #{class_attr}href=\""),
               s(:begin, path_expr),
-              s(:str, "\"#{class_attr}#{turbo_attrs}>"),
+              s(:str, "\"#{turbo_attrs}>"),
               s(:begin, text_expr),
               s(:str, '</a>'))
           end
@@ -731,10 +734,9 @@ module Ruby2JS
         # Build a delete button using Turbo-compatible form
         # Turbo intercepts the form submission and handles the DELETE request
         def build_delete_button(text_str, path_node, confirm_str, css_class = nil, form_class = nil)
-          # Build class attributes
+          # Build class attributes - Rails uses "button_to" as default form class
           btn_class_attr = css_class ? " class=\"#{css_class}\"" : ""
-          form_class_attr = form_class ? " class=\"#{form_class}\"" : ""
-          form_style = form_class ? "" : " style=\"display:inline\""
+          form_class_attr = " class=\"#{form_class || 'button_to'}\""
 
           # Convert model object to path helper call
           if path_node&.type == :lvar
@@ -794,37 +796,38 @@ module Ruby2JS
             path_expr = process(path_node)
           end
 
-          # Use data-turbo-confirm for confirmation dialog
+          # Use data-turbo-confirm on the button (Rails puts it there, not on the form)
           turbo_confirm = " data-turbo-confirm=\"#{confirm_str}\""
 
           # Generate form with action and method - Turbo handles the submission
           # Include authenticity_token for CSRF protection
+          # Rails order: form, _method input, button, authenticity_token input
           s(:dstr,
-            s(:str, "<form method=\"post\" action=\""),
+            s(:str, "<form#{form_class_attr} method=\"post\" action=\""),
             s(:begin, path_expr),
-            s(:str, "\"#{form_class_attr}#{form_style}#{turbo_confirm}><input type=\"hidden\" name=\"_method\" value=\"delete\"><input type=\"hidden\" name=\"authenticity_token\" value=\""),
+            s(:str, "\"><input type=\"hidden\" name=\"_method\" value=\"delete\"><button#{btn_class_attr}#{turbo_confirm} type=\"submit\">#{text_str}</button><input type=\"hidden\" name=\"authenticity_token\" value=\""),
             s(:begin, s(:or, s(:attr, context_gvar, :authenticityToken), s(:str, ''))),
-            s(:str, "\"><button type=\"submit\"#{btn_class_attr}>#{text_str}</button></form>"))
+            s(:str, "\"></form>"))
         end
 
         # Build a regular form button
         def build_form_button(text_str, path_node, http_method, css_class = nil, form_class = nil)
           path_expr = process(path_node)
 
-          # Build class attributes
+          # Build class attributes - Rails uses "button_to" as default form class
           btn_class_attr = css_class ? " class=\"#{css_class}\"" : ""
-          form_class_attr = form_class ? " class=\"#{form_class}\"" : ""
-          form_style = form_class ? "" : " style=\"display:inline\""
+          form_class_attr = " class=\"#{form_class || 'button_to'}\""
 
           # Include authenticity_token for CSRF protection
+          # Rails order: form, button, authenticity_token input
           s(:dstr,
-            s(:str, '<form method="'),
+            s(:str, "<form#{form_class_attr} method=\""),
             s(:str, http_method.to_s),
-            s(:str, '" action="'),
+            s(:str, "\" action=\""),
             s(:begin, path_expr),
-            s(:str, "\"#{form_class_attr}#{form_style}><input type=\"hidden\" name=\"authenticity_token\" value=\""),
+            s(:str, "\"><button#{btn_class_attr} type=\"submit\">#{text_str}</button><input type=\"hidden\" name=\"authenticity_token\" value=\""),
             s(:begin, s(:or, s(:attr, context_gvar, :authenticityToken), s(:str, ''))),
-            s(:str, "\"><button type=\"submit\"#{btn_class_attr}>#{text_str}</button></form>"))
+            s(:str, "\"></form>"))
         end
 
         # Process truncate helper
