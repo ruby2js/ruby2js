@@ -209,7 +209,7 @@ export function createRPCHandler(options = {}) {
 
     // Validate CSRF token
     if (requireCSRF) {
-      const token = req.headers['x-authenticity-token'];
+      const token = req.headers['x-csrf-token'];
       if (!csrf.validateToken(token)) {
         res.writeHead(422, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: { message: 'Invalid authenticity token', code: 'CSRF_INVALID' } }));

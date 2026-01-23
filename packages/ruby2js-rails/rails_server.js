@@ -193,7 +193,7 @@ export class Router extends RouterBase {
 
     // Validate CSRF token for mutating requests
     if (['POST', 'PATCH', 'PUT', 'DELETE'].includes(method)) {
-      const token = getHeader(req, 'x-authenticity-token') || params.authenticity_token;
+      const token = getHeader(req, 'x-csrf-token') || params.authenticity_token;
       const csrf = getCSRF();
       if (!csrf.validateToken(token)) {
         console.warn('  CSRF token invalid');
