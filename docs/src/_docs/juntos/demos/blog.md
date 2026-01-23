@@ -6,7 +6,7 @@ category: juntos/demos
 hide_in_toc: true
 ---
 
-A classic Rails blog with articles and comments. The same code runs on Rails, in browsers with IndexedDB, on Node.js with SQLite, and on edge platforms.
+A Rails blog with articles, comments, and real-time updates. The same code runs on Rails, in browsers with IndexedDB, on Node.js with SQLite, and on edge platforms. Open multiple browser tabs to see changes sync instantly.
 
 {% toc %}
 
@@ -24,6 +24,7 @@ This creates a Rails app with:
 - **Associations** — `has_many :comments, dependent: :destroy`
 - **Validations** — `validates :title, presence: true`, `validates :body, length: { minimum: 10 }`
 - **Nested routes** — `resources :articles { resources :comments }`
+- **Real-time updates** — `broadcasts_to` for live create/update/destroy
 - **Tailwind CSS** — styled forms and layouts
 - **Sample data** — seeded articles and comments
 
@@ -124,6 +125,7 @@ The code is idiomatic Rails. **Try it** — edit the Ruby to see how models tran
 ```ruby
 class Article < ApplicationRecord
   has_many :comments, dependent: :destroy
+  broadcasts_to ->(article) { "articles" }, inserts_by: :prepend
   validates :title, presence: true
   validates :body, presence: true, length: { minimum: 10 }
 end
@@ -198,10 +200,18 @@ Nothing special. Nothing modified for transpilation. Standard Rails conventions 
 - `root "articles#index"`
 - Generated path helpers (`article_path`, `new_article_path`)
 
+### Real-Time Updates
+
+- `broadcasts_to` for automatic create/update/destroy broadcasts
+- `turbo_stream_from` to subscribe views to channels
+- `after_create_commit` / `after_destroy_commit` callbacks
+- Comment count updates live on the index page
+
 ## What Works Differently
 
 - **Migrations** — In browsers, migrations run automatically on startup
 - **Database** — IndexedDB in browsers, SQLite/PostgreSQL on servers
+- **Real-time transport** — Browser tabs use BroadcastChannel API; Node/Bun/Deno use Action Cable; Cloudflare uses Durable Objects with WebSockets
 - **ActiveRecord queries** — Use `where`, `find`, `all`, chainable queries, and basic raw SQL conditions (see [Active Record](/docs/juntos/active-record) for the full query interface)
 
 ## What Doesn't Work
@@ -212,6 +222,6 @@ Nothing special. Nothing modified for transpilation. Standard Rails conventions 
 
 ## Next Steps
 
-- Try the [Chat Demo](/docs/juntos/demos/chat) for real-time features
+- Try the [Chat Demo](/docs/juntos/demos/chat) for multi-user real-time messaging
 - Read the [Architecture](/docs/juntos/architecture) to understand what gets generated
 - Check [Deployment Guides](/docs/juntos/deploying/) for detailed platform setup
