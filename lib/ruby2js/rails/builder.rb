@@ -397,6 +397,8 @@ class SelfhostBuilder
     dev_deps = {}
 
     # Hotwire Turbo and Stimulus - used by all targets
+    # Include both base Turbo (for browser-only) and turbo-rails (for server targets with WebSockets)
+    deps['@hotwired/turbo'] = '^8.0.0'
     deps['@hotwired/turbo-rails'] = '^8.0.0'
     deps['@hotwired/stimulus'] = '^3.2.0'
 
@@ -565,9 +567,8 @@ class SelfhostBuilder
     true  # npm install needed
   end
 
-  # Common importmap entries for all browser builds
+  # Common importmap entries for all browser builds (turbo added dynamically based on target)
   COMMON_IMPORTMAP_ENTRIES = {
-    '@hotwired/turbo-rails' => '/node_modules/@hotwired/turbo-rails/app/assets/javascripts/turbo.js',
     '@hotwired/stimulus' => '/node_modules/@hotwired/stimulus/dist/stimulus.js',
     # Shared ruby2js-rails modules (imported by adapters, not copied to dist)
     'ruby2js-rails/adapters/active_record_base.mjs' => '/node_modules/ruby2js-rails/adapters/active_record_base.mjs',
@@ -591,6 +592,7 @@ class SelfhostBuilder
   # Options:
   #   app_name: Application name (for title)
   #   database: Database adapter (for importmap)
+  #   target: Target runtime ('browser' uses base Turbo, server targets use turbo-rails)
   #   css: CSS framework ('none', 'tailwind', 'pico', 'bootstrap', 'bulma')
   #   output_path: Where to write the file (if nil, returns string)
   #   importmap: Hash of additional import map entries (e.g., {'react' => 'https://esm.sh/react'})
@@ -598,6 +600,7 @@ class SelfhostBuilder
   def self.generate_index_html(options = {})
     app_name = options[:app_name] || 'Ruby2JS App'
     database = options[:database] || 'dexie'
+    target = options[:target] || 'browser'
     css = options[:css] || 'none'
     output_path = options[:output_path]
     # Base path for assets - '/dist' when serving from app root, '' when serving from dist/
@@ -608,6 +611,9 @@ class SelfhostBuilder
     dist_dir = options[:dist_dir]
     # bundled: true generates index.html for Vite bundling (no importmap)
     bundled = options[:bundled] || false
+    # Use base Turbo for browser-only targets, turbo-rails for server targets
+    # Browser-only uses BroadcastChannel API, server targets need Action Cable
+    use_turbo_rails = target != 'browser'
 
     # CSS link based on framework
     # This method is only used for browser targets, which serve from dist/ root
@@ -658,9 +664,12 @@ class SelfhostBuilder
 
       # Also generate main.js entry point for Vite to bundle
       if dist_dir
+        # Browser-only targets use base Turbo (no Action Cable needed, uses BroadcastChannel)
+        # Server targets use turbo-rails for WebSocket support via Action Cable
+        turbo_import = use_turbo_rails ? '@hotwired/turbo-rails' : '@hotwired/turbo'
         main_js = <<~JS
           // Main entry point for Vite bundling
-          import * as Turbo from '@hotwired/turbo-rails';
+          import * as Turbo from '#{turbo_import}';
           import { Application } from './config/routes.js';
           import './app/javascript/controllers/index.js';
           window.Turbo = Turbo;
@@ -673,6 +682,13 @@ class SelfhostBuilder
       # Build importmap - merge common entries with database-specific and user entries
       db_entries = IMPORTMAP_ENTRIES[database] || IMPORTMAP_ENTRIES['dexie']
       importmap_entries = COMMON_IMPORTMAP_ENTRIES.merge(db_entries).merge(user_importmap)
+
+      # Add turbo import based on target - browser-only uses base Turbo, server targets use turbo-rails
+      turbo_import = use_turbo_rails ? '@hotwired/turbo-rails' : '@hotwired/turbo'
+      turbo_path = use_turbo_rails ?
+        '/node_modules/@hotwired/turbo-rails/app/assets/javascripts/turbo.js' :
+        '/node_modules/@hotwired/turbo/dist/turbo.es2017-esm.js'
+      importmap_entries[turbo_import] = turbo_path
 
       # Add dependencies from ruby2js.yml to importmap
       # Read each package's package.json to find ESM entry point
@@ -723,7 +739,7 @@ class SelfhostBuilder
             <main class="#{main_class}" id="content"></main>
           </div>
           <script type="module">
-            import * as Turbo from '@hotwired/turbo-rails';
+            import * as Turbo from '#{turbo_import}';
             import { Application } from '#{base_path}/config/routes.js';
             import '#{base_path}/app/javascript/controllers/index.js';
             window.Turbo = Turbo;
@@ -2452,6 +2468,7 @@ class SelfhostBuilder
     SelfhostBuilder.generate_index_html(
       app_name: app_name,
       database: @database,
+      target: @target,
       css: css,
       output_path: output_path,
       base_path: '',  # Serving from dist/ root, not /dist

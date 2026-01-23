@@ -199,6 +199,36 @@ export class TurboBroadcaster {
     this.channels = new Map();
   }
 
+  // Schedule next ping alarm (Action Cable client expects pings within 6 seconds)
+  async schedulePingAlarm() {
+    const currentAlarm = await this.state.storage.getAlarm();
+    if (!currentAlarm) {
+      // Schedule alarm for 3 seconds from now
+      await this.state.storage.setAlarm(Date.now() + 3000);
+    }
+  }
+
+  // Alarm handler - send pings to all connected WebSockets
+  async alarm() {
+    const sockets = this.state.getWebSockets();
+    if (sockets.length === 0) {
+      return; // No connections, don't reschedule
+    }
+
+    // Send ping to all connected clients
+    const pingMessage = JSON.stringify({ type: 'ping', message: Date.now() });
+    for (const ws of sockets) {
+      try {
+        ws.send(pingMessage);
+      } catch (e) {
+        // Connection closed, will be cleaned up
+      }
+    }
+
+    // Schedule next ping
+    await this.state.storage.setAlarm(Date.now() + 3000);
+  }
+
   // Decode Action Cable signed_stream_name to get the actual stream name
   decodeStreamName(signedName) {
     const base64Part = signedName.split('--')[0];
@@ -232,6 +262,9 @@ export class TurboBroadcaster {
 
       // Send Action Cable welcome message
       server.send(JSON.stringify({ type: 'welcome' }));
+
+      // Start ping alarm to keep Action Cable client happy
+      await this.schedulePingAlarm();
 
       return new Response(null, { status: 101, webSocket: client });
     }
