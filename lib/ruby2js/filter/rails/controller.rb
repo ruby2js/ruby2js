@@ -835,7 +835,9 @@ module Ruby2JS
             if target.children[0].nil? && target.children[1].to_s.end_with?('_path')
               path_helper = target.children[1]
               @rails_path_helpers.add(path_helper)
-              path = target
+              # Use :send! to force method call with parentheses
+              # Ruby source may have no parens but JS needs them
+              path = s(:send!, nil, path_helper, *target.children[2..-1])
             else
               path = transform_ivars_to_locals(target)
             end
