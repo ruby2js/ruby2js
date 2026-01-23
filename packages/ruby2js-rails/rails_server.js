@@ -17,6 +17,7 @@ import {
 } from './rails_base.js';
 
 import { getCSRF } from './rpc/server.mjs';
+export { getCSRF };
 
 // Lazy-loaded ReactDOMServer for rendering React elements
 // Only imported when needed (apps with RBX/JSX views)

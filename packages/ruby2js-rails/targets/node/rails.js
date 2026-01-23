@@ -25,10 +25,11 @@ import {
   setupFormHandlers,
   TurboBroadcast,
   turbo_stream_from,
-  resolveContent
+  resolveContent,
+  getCSRF
 } from './rails_server.js';
 
-import { createRPCHandler, getRegistry, getCSRF, csrfMetaTag } from 'ruby2js-rails/rpc/server.mjs';
+import { createRPCHandler, getRegistry, csrfMetaTag } from './rpc/server.mjs';
 
 // RPC handler instance (initialized when models are registered)
 let rpcHandler = null;

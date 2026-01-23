@@ -71,9 +71,9 @@ export class ActiveRecordBase {
 
     return new Proxy(allErrors, {
       get(target, prop) {
-        // count property for Rails compatibility
+        // count as method for Rails compatibility (ERB transpiles to method call)
         if (prop === 'count') {
-          return target.length;
+          return () => target.length;
         }
         // Array methods delegate to _all array
         if (prop in target) {
