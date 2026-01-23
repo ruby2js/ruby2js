@@ -16,12 +16,19 @@ import {
   formData,
   handleFormResult,
   setupFormHandlers,
-  turbo_stream_from,
   resolveContent
 } from './rails_server.js';
 
 // Re-export everything from server module
-export { createContext, createFlash, truncate, pluralize, dom_id, navigate, submitForm, formData, handleFormResult, setupFormHandlers, turbo_stream_from };
+export { createContext, createFlash, truncate, pluralize, dom_id, navigate, submitForm, formData, handleFormResult, setupFormHandlers };
+
+// Cloudflare-specific turbo_stream_from - uses simple element for turbo_cable_simple.js
+// This avoids Action Cable protocol and allows true Durable Object hibernation
+// Usage in ERB: <%= turbo_stream_from "articles" %>
+export function turbo_stream_from(streamName) {
+  // Simple element that turbo_cable_simple.js will pick up and handle
+  return `<turbo-stream-source stream="${streamName}"></turbo-stream-source>`;
+}
 
 // Router with Cloudflare-specific redirect handling
 export class Router extends RouterServer {
@@ -187,7 +194,8 @@ export class Application extends ApplicationServer {
 }
 
 // Durable Object for Turbo Streams broadcasting
-// Manages WebSocket connections with hibernation support
+// Uses simple protocol (no Action Cable, no pings) for hibernation-friendly operation
+// The Durable Object truly hibernates between broadcasts - no alarms wake it up
 // Add to wrangler.toml:
 //   [durable_objects]
 //   bindings = [{ name = "TURBO_BROADCASTER", class_name = "TurboBroadcaster" }]
@@ -195,58 +203,8 @@ export class TurboBroadcaster {
   constructor(state, env) {
     this.state = state;
     this.env = env;
-    // Map of channel -> Set of WebSocket connections
-    this.channels = new Map();
-  }
-
-  // Schedule next ping alarm (Action Cable client expects pings within 6 seconds)
-  async schedulePingAlarm() {
-    const currentAlarm = await this.state.storage.getAlarm();
-    if (!currentAlarm) {
-      // Schedule alarm for 3 seconds from now
-      await this.state.storage.setAlarm(Date.now() + 3000);
-    }
-  }
-
-  // Alarm handler - send pings to all connected WebSockets
-  async alarm() {
-    const sockets = this.state.getWebSockets();
-    if (sockets.length === 0) {
-      return; // No connections, don't reschedule
-    }
-
-    // Send ping to all connected clients
-    const pingMessage = JSON.stringify({ type: 'ping', message: Date.now() });
-    for (const ws of sockets) {
-      try {
-        ws.send(pingMessage);
-      } catch (e) {
-        // Connection closed, will be cleaned up
-      }
-    }
-
-    // Schedule next ping
-    await this.state.storage.setAlarm(Date.now() + 3000);
-  }
-
-  // Decode Action Cable signed_stream_name to get the actual stream name
-  decodeStreamName(signedName) {
-    const base64Part = signedName.split('--')[0];
-    try {
-      const decoded = atob(base64Part);
-      return JSON.parse(decoded);
-    } catch (e) {
-      return signedName;
-    }
-  }
-
-  // Create an Action Cable identifier for a stream name
-  createIdentifier(streamName) {
-    const signedName = btoa(JSON.stringify(streamName));
-    return JSON.stringify({
-      channel: 'Turbo::StreamsChannel',
-      signed_stream_name: signedName
-    });
+    // Map of stream name -> Set of WebSocket connections
+    this.streams = new Map();
   }
 
   async fetch(request) {
@@ -257,14 +215,15 @@ export class TurboBroadcaster {
       const pair = new WebSocketPair();
       const [client, server] = Object.values(pair);
 
-      // Accept the WebSocket with hibernation
+      // Accept the WebSocket with hibernation support
+      // Cloudflare keeps the connection alive at the edge while DO sleeps
       this.state.acceptWebSocket(server);
 
-      // Send Action Cable welcome message
+      // Send simple welcome (no Action Cable protocol)
       server.send(JSON.stringify({ type: 'welcome' }));
 
-      // Start ping alarm to keep Action Cable client happy
-      await this.schedulePingAlarm();
+      // No ping alarm needed - Cloudflare maintains the connection
+      // The DO can truly hibernate until a broadcast or message arrives
 
       return new Response(null, { status: 101, webSocket: client });
     }
@@ -272,7 +231,7 @@ export class TurboBroadcaster {
     // Handle broadcast POST from model callbacks
     if (request.method === 'POST' && url.pathname === '/broadcast') {
       const { stream, html } = await request.json();
-      this.broadcastToChannel(stream, html);
+      this.broadcastToStream(stream, html);
       return new Response('ok');
     }
 
@@ -280,40 +239,17 @@ export class TurboBroadcaster {
   }
 
   // WebSocket message handler (with hibernation support)
-  // Supports both Action Cable protocol and legacy simple protocol
+  // Simple protocol: { type: 'subscribe'|'unsubscribe', stream: 'name' }
   async webSocketMessage(ws, message) {
     try {
       const msg = JSON.parse(message);
 
-      // Action Cable protocol uses "command" field
-      if (msg.command) {
-        switch (msg.command) {
-          case 'subscribe': {
-            const identifierObj = JSON.parse(msg.identifier);
-            const streamName = this.decodeStreamName(identifierObj.signed_stream_name);
-            this.subscribe(ws, streamName, msg.identifier);
-            break;
-          }
-          case 'unsubscribe': {
-            const identifierObj = JSON.parse(msg.identifier);
-            const streamName = this.decodeStreamName(identifierObj.signed_stream_name);
-            this.unsubscribe(ws, streamName);
-            break;
-          }
-        }
-        return;
-      }
-
-      // Legacy simple protocol
       switch (msg.type) {
         case 'subscribe':
-          this.subscribe(ws, msg.stream, this.createIdentifier(msg.stream));
+          this.subscribe(ws, msg.stream);
           break;
         case 'unsubscribe':
           this.unsubscribe(ws, msg.stream);
-          break;
-        case 'ping':
-          ws.send(JSON.stringify({ type: 'pong' }));
           break;
       }
     } catch (e) {
@@ -332,69 +268,58 @@ export class TurboBroadcaster {
     this.cleanup(ws);
   }
 
-  subscribe(ws, channel, identifier) {
-    if (!this.channels.has(channel)) {
-      this.channels.set(channel, new Set());
+  subscribe(ws, stream) {
+    if (!this.streams.has(stream)) {
+      this.streams.set(stream, new Set());
     }
-    this.channels.get(channel).add(ws);
+    this.streams.get(stream).add(ws);
 
-    // Store subscription in WebSocket attachment for cleanup and broadcast
-    const attachment = ws.deserializeAttachment() || { channels: [], identifiers: {} };
-    if (!attachment.channels.includes(channel)) {
-      attachment.channels.push(channel);
+    // Store subscription in WebSocket attachment for cleanup
+    const attachment = ws.deserializeAttachment() || { streams: [] };
+    if (!attachment.streams.includes(stream)) {
+      attachment.streams.push(stream);
     }
-    attachment.identifiers = attachment.identifiers || {};
-    attachment.identifiers[channel] = identifier;
     ws.serializeAttachment(attachment);
 
-    // Send confirmation (Action Cable protocol)
+    // Send confirmation
     try {
-      ws.send(JSON.stringify({
-        type: 'confirm_subscription',
-        identifier: identifier
-      }));
+      ws.send(JSON.stringify({ type: 'subscribed', stream }));
     } catch (e) {
       // Ignore send errors
     }
   }
 
-  unsubscribe(ws, channel) {
-    const subscribers = this.channels.get(channel);
+  unsubscribe(ws, stream) {
+    const subscribers = this.streams.get(stream);
     if (subscribers) {
       subscribers.delete(ws);
       if (subscribers.size === 0) {
-        this.channels.delete(channel);
+        this.streams.delete(stream);
       }
     }
   }
 
   cleanup(ws) {
     const attachment = ws.deserializeAttachment();
-    if (attachment && attachment.channels) {
-      for (const channel of attachment.channels) {
-        this.unsubscribe(ws, channel);
+    if (attachment && attachment.streams) {
+      for (const stream of attachment.streams) {
+        this.unsubscribe(ws, stream);
       }
     }
   }
 
-  broadcastToChannel(channel, html) {
-    const subscribers = this.channels.get(channel);
+  broadcastToStream(stream, html) {
+    const subscribers = this.streams.get(stream);
     if (!subscribers || subscribers.size === 0) {
       return;
     }
 
+    // Simple message format: { stream, html }
+    // The client's turbo_cable_simple.js knows how to handle this
+    const message = JSON.stringify({ stream, html });
+
     for (const ws of subscribers) {
       try {
-        // Get the identifier this client used when subscribing
-        const attachment = ws.deserializeAttachment();
-        const identifier = attachment?.identifiers?.[channel] || this.createIdentifier(channel);
-
-        // Action Cable message format
-        const message = JSON.stringify({
-          identifier: identifier,
-          message: html
-        });
-
         ws.send(message);
       } catch (e) {
         this.cleanup(ws);

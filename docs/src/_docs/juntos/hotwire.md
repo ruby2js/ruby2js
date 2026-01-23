@@ -82,7 +82,10 @@ Subscribe to broadcasts in your views:
 </div>
 ```
 
-The `turbo_stream_from` helper generates a `<turbo-cable-stream-source>` element that establishes the WebSocket connection.
+The `turbo_stream_from` helper establishes the real-time connection. The element format varies by target:
+- **Server targets** (Node/Bun/Deno): `<turbo-cable-stream-source>` for Action Cable
+- **Cloudflare**: `<turbo-stream-source>` for simple WebSocket protocol
+- **Browser**: Subscribes via BroadcastChannel API (no element needed)
 
 ### JSON Broadcasting for React Components
 
@@ -175,7 +178,8 @@ end
 
 The provider handles the transport automatically:
 - **Browser target**: Uses `BroadcastChannel` for same-origin tab sync
-- **Node target**: Uses WebSocket to `/cable` endpoint
+- **Server targets** (Node/Bun/Deno): Uses WebSocket with Action Cable protocol
+- **Cloudflare**: Uses WebSocket with simple protocol (hibernation-friendly)
 
 See the [Workflow Builder demo](/docs/juntos/demos/workflow-builder) for a complete example.
 
@@ -280,54 +284,75 @@ For Juntos targets, the builder:
 
 ## WebSocket Support by Target
 
-| Target | Implementation | Notes |
-|--------|---------------|-------|
-| **Browser** | `BroadcastChannel` | Same-origin tabs only |
-| **Node.js** | `ws` package | Full WebSocket server |
-| **Bun** | Native WebSocket | Built into `Bun.serve` |
-| **Deno** | Native WebSocket | `Deno.upgradeWebSocket` |
-| **Cloudflare** | Durable Objects | Hibernation-aware |
-| **Vercel** | Stubbed | Platform limitation |
+| Target | Turbo Package | Transport | Protocol |
+|--------|--------------|-----------|----------|
+| **Browser** | `@hotwired/turbo` | `BroadcastChannel` | Local tabs only |
+| **Node.js** | `@hotwired/turbo-rails` | `ws` package | Action Cable |
+| **Bun** | `@hotwired/turbo-rails` | Native WebSocket | Action Cable |
+| **Deno** | `@hotwired/turbo-rails` | Native WebSocket | Action Cable |
+| **Cloudflare** | `@hotwired/turbo` | Durable Objects | Simple (hibernation-friendly) |
+| **Vercel** | `@hotwired/turbo-rails` | Stubbed | Platform limitation |
 
 ### WebSocket Endpoint
 
-Server targets expose a `/cable` endpoint for WebSocket connections:
+All server targets expose a `/cable` endpoint for WebSocket connections. The protocol varies:
+
+**Action Cable protocol (Node/Bun/Deno):**
 
 ```javascript
-// Client connection
-const ws = new WebSocket('ws://localhost:3000/cable');
-
-// Subscribe to a channel
+// Subscribe using Action Cable format
 ws.send(JSON.stringify({
   command: 'subscribe',
-  channel: 'chat_room'
+  identifier: JSON.stringify({
+    channel: 'Turbo::StreamsChannel',
+    signed_stream_name: btoa(JSON.stringify('chat_room'))
+  })
+}));
+```
+
+**Simple protocol (Cloudflare):**
+
+```javascript
+// Subscribe using simple format
+ws.send(JSON.stringify({
+  type: 'subscribe',
+  stream: 'chat_room'
 }));
 
-// Receive broadcasts
+// Receive broadcasts as { stream, html }
 ws.onmessage = (event) => {
-  const data = JSON.parse(event.data);
-  if (data.type === 'turbo-stream') {
-    Turbo.renderStreamMessage(data.html);
-  }
+  const { stream, html } = JSON.parse(event.data);
+  Turbo.renderStreamMessage(html);
 };
 ```
 
+The simple protocol allows Cloudflare's Durable Object to truly hibernate between broadcasts, while Action Cable's ping requirements keep server processes active.
+
 ### Cloudflare Durable Objects
 
-On Cloudflare, real-time features use Durable Objects for WebSocket coordination:
+On Cloudflare, real-time features use Durable Objects with a simple protocol designed for hibernation:
 
 ```javascript
 // wrangler.toml (auto-generated)
 [[durable_objects.bindings]]
-name = "BROADCASTER"
+name = "TURBO_BROADCASTER"
 class_name = "TurboBroadcaster"
 ```
 
+**Why a simple protocol?**
+
+Action Cable requires server-initiated pings every 3 seconds to keep connections alive. On Durable Objects, this would prevent hibernation and incur continuous billing. Instead, Cloudflare uses:
+
+- **Base Turbo** (`@hotwired/turbo`) instead of turbo-rails
+- **Simple WebSocket protocol**: `{ type: 'subscribe', stream }` / `{ stream, html }`
+- **No server pings**: Cloudflare's edge maintains connections while the DO hibernates
+- **True hibernation**: The Durable Object only wakes when broadcasts occur
+
 The `TurboBroadcaster` class handles:
-- WebSocket upgrade requests
-- Channel subscriptions
-- Broadcasting to subscribers
-- Hibernation for cost efficiency
+- WebSocket upgrade requests at `/cable`
+- Stream subscriptions with hibernation-aware storage
+- Broadcasting to subscribers (wakes DO briefly, then hibernates)
+- Automatic cleanup on disconnect
 
 ## RPC and Real-Time Features
 

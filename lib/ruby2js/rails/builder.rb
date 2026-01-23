@@ -611,9 +611,10 @@ class SelfhostBuilder
     dist_dir = options[:dist_dir]
     # bundled: true generates index.html for Vite bundling (no importmap)
     bundled = options[:bundled] || false
-    # Use base Turbo for browser-only targets, turbo-rails for server targets
-    # Browser-only uses BroadcastChannel API, server targets need Action Cable
-    use_turbo_rails = target != 'browser'
+    # Use base Turbo for browser and edge targets, turbo-rails for server targets
+    # Browser uses BroadcastChannel API, Cloudflare uses simple WebSocket (hibernation-friendly)
+    # Server targets (Node/Bun/Deno) use turbo-rails for Action Cable WebSocket support
+    use_turbo_rails = !['browser', 'cloudflare'].include?(target)
 
     # CSS link based on framework
     # This method is only used for browser targets, which serve from dist/ root
@@ -665,12 +666,17 @@ class SelfhostBuilder
       # Also generate main.js entry point for Vite to bundle
       if dist_dir
         # Browser-only targets use base Turbo (no Action Cable needed, uses BroadcastChannel)
+        # Cloudflare uses base Turbo + simple cable client (hibernation-friendly)
         # Server targets use turbo-rails for WebSocket support via Action Cable
         turbo_import = use_turbo_rails ? '@hotwired/turbo-rails' : '@hotwired/turbo'
+
+        # Cloudflare needs the simple cable client for WebSocket subscriptions
+        cable_import = target == 'cloudflare' ? "import './lib/turbo_cable_simple.js';\n" : ''
+
         main_js = <<~JS
           // Main entry point for Vite bundling
           import * as Turbo from '#{turbo_import}';
-          import { Application } from './config/routes.js';
+          #{cable_import}import { Application } from './config/routes.js';
           import './app/javascript/controllers/index.js';
           window.Turbo = Turbo;
           Application.start();
@@ -1436,6 +1442,8 @@ class SelfhostBuilder
       target_dir = 'electron'
     elsif @target == 'tauri'
       target_dir = 'tauri'
+    elsif @target == 'cloudflare'
+      target_dir = 'cloudflare'
     elsif FLY_RUNTIMES.include?(@runtime)
       target_dir = 'node'  # Fly.io runs Node.js in containers
     else
@@ -1493,6 +1501,16 @@ class SelfhostBuilder
       FileUtils.cp(src_path, dest_path)
       puts("  Copying: #{filename}")
       puts("    -> #{dest_path}")
+    end
+
+    # Copy simple cable client for Cloudflare (hibernation-friendly WebSocket)
+    if @target == 'cloudflare'
+      cable_src = File.join(package_dir, 'turbo_cable_simple.js')
+      if File.exist?(cable_src)
+        FileUtils.cp(cable_src, File.join(lib_dest, 'turbo_cable_simple.js'))
+        puts("  Copying: turbo_cable_simple.js")
+        puts("    -> #{lib_dest}/turbo_cable_simple.js")
+      end
     end
   end
 
