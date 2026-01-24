@@ -49,7 +49,7 @@ describe Ruby2JS::Filter::Rails::Migration do
         end
       RUBY
       assert_includes result, 'import { createTable, addIndex, addColumn, removeColumn, dropTable }'
-      assert_includes result, '../../lib/active_record.mjs'
+      assert_includes result, 'juntos:active-record'
     end
   end
 
