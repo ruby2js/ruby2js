@@ -505,7 +505,8 @@ jobs:
             base_path="/ruby2js/${demo//_/-}/"
             # Install fresh tarballs into demo root (where package.json lives in vite-native architecture)
             # Must install all three: ruby2js (transpiler), ruby2js-rails (runtime), vite-plugin-ruby2js (build plugin)
-            (cd "artifacts/$demo" && npm install ../tarballs/ruby2js-beta.tgz ../tarballs/ruby2js-rails-beta.tgz ../tarballs/vite-plugin-ruby2js-beta.tgz)
+            # Also install dexie since we're building for browser with IndexedDB
+            (cd "artifacts/$demo" && npm install ../tarballs/ruby2js-beta.tgz ../tarballs/ruby2js-rails-beta.tgz ../tarballs/vite-plugin-ruby2js-beta.tgz dexie)
             # Build from demo root (bin/juntos expects to be run from app root)
             (cd "artifacts/$demo" && bundle install --quiet && bin/juntos build -d dexie -t browser --base "$base_path" --sourcemap)
           done
