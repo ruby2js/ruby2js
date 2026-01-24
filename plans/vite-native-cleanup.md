@@ -496,9 +496,11 @@ Ruby CLI infrastructure has been replaced by JavaScript CLI.
 **Files removed:**
 1. [x] `lib/ruby2js/installer.rb` - No longer needed, logic moved to install_generator.rb
 
-**Files kept (for selfhost demo and eject command):**
-1. `lib/ruby2js/rails/builder.rb` - Used by selfhost demo and future eject command
-2. `packages/ruby2js-rails/build.mjs` - Transpiled from builder.rb for selfhost
+**Files deprecated (pending removal):**
+1. `lib/ruby2js/rails/builder.rb` - DEPRECATED. Eject command will use Vite instead.
+2. `packages/ruby2js-rails/build.mjs` - DEPRECATED. Transpiled from builder.rb.
+
+See "Phase 9: Remove builder.rb" for removal plan.
 
 **Verify nothing breaks:**
 1. [ ] `bundle exec rake test` - Ruby gem tests (CLI tests removed)
@@ -512,12 +514,18 @@ Ruby CLI infrastructure has been replaced by JavaScript CLI.
 3. [ ] Handle partial vs template updates
 4. [ ] Add to documentation if successful
 
-### Phase 7: Eject Command
-1. [ ] Add `juntos eject` subcommand
-2. [ ] Generate all transpiled files to output directory
-3. [ ] Include standalone vite.config.js (no ruby2js plugin)
-4. [ ] Copy runtime files from node_modules
-5. [ ] Generate package.json with only runtime dependencies
+### Phase 7: Eject Command (Vite-based)
+
+The eject command uses `vite build` as its foundation, NOT builder.rb.
+
+1. [ ] Add `juntos eject` subcommand to JavaScript CLI
+2. [ ] Run `vite build` to generate transpiled output
+3. [ ] Post-process: generate standalone vite.config.js (no ruby2js plugin needed)
+4. [ ] Post-process: generate package.json with only runtime dependencies
+5. [ ] Copy dist/ to ejected/ directory
+6. [ ] Document: ejected app runs with standard `vite dev` / `vite build`
+
+**Key insight:** Eject is just `vite build` + cleanup. No need for separate build system.
 
 ### Phase 8: Documentation
 1. [ ] Update docs/src/_docs/juntos/demos/blog.md
@@ -525,6 +533,40 @@ Ruby CLI infrastructure has been replaced by JavaScript CLI.
 3. [ ] Document new project structure
 4. [ ] Document `juntos eject` command
 5. [ ] Retest all targets
+
+### Phase 9: Remove builder.rb (Discussion Needed)
+
+**Question:** Should builder.rb be completely removed?
+
+**Current uses of builder.rb:**
+1. Selfhost demo (`demo/selfhost/`) - bundles Ruby2JS transpiler for browser
+2. Smoke tests (`test/smoke-test.mjs`) - compares Ruby vs JS builder output
+3. Release Rakefile (`demo/selfhost/Rakefile`) - creates npm tarballs
+
+**Arguments for removal:**
+- 3000+ lines of code that duplicates what Vite does
+- Maintenance burden: two build systems that can diverge
+- Vite-native philosophy: use Vite for everything
+- Confusing: which build system should developers use?
+
+**Arguments for keeping:**
+- Selfhost demo needs to bundle the transpiler itself (special case)
+- Gradual migration is safer than big-bang removal
+
+**Possible approaches:**
+1. **Full removal:** Replace all uses with Vite/Rollup configs
+2. **Minimal extraction:** Keep only what selfhost demo needs, delete the rest
+3. **Separate project:** Move selfhost bundling to its own focused tool
+
+**Decision needed:** [TODO - discuss and decide]
+
+**If removing, steps would be:**
+1. [ ] Update selfhost demo to use Rollup/Vite for bundling
+2. [ ] Update smoke tests to test `vite build` output (or remove them)
+3. [ ] Update Rakefile to use `vite build` + `npm pack`
+4. [ ] Delete `lib/ruby2js/rails/builder.rb`
+5. [ ] Delete `packages/ruby2js-rails/build.mjs`
+6. [ ] Update any remaining references
 
 ## Files to Review
 
@@ -572,11 +614,13 @@ Ruby CLI infrastructure has been replaced by JavaScript CLI.
 - vite.mjs is self-contained (no build.mjs dependency for configuration)
 - Integration tests use `vite build` instead of SelfhostBuilder
 - **installer.rb removed** - all install logic is now in install_generator.rb
-- **builder.rb/build.mjs** kept only for selfhost demo and future eject command
+- **builder.rb/build.mjs deprecated** - no longer used by vite.mjs or integration tests
 
 **Pending work:**
 
 - CI verification with new structure
+- Phase 7: Eject command (Vite-based, not builder.rb)
+- Phase 9: Decision on builder.rb removal (see discussion section)
 - Phase 6: Turbo 8 HMR (experimental)
 - Phase 7: Eject command
 - Phase 8: Documentation updates
