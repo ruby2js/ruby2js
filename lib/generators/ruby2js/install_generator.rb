@@ -59,6 +59,32 @@ module Ruby2js
       chmod binstub_path, 0755
     end
 
+    def update_stimulus_controllers
+      controllers_dir = 'app/javascript/controllers'
+      index_path = "#{controllers_dir}/index.js"
+
+      return unless File.exist?(index_path)
+
+      content = File.read(index_path)
+
+      # Check if this is Rails' importmap-style controllers/index.js
+      # (uses @hotwired/stimulus-loading for lazy loading)
+      if content.include?('stimulus-loading')
+        say_status :update, index_path
+
+        # Find all controller files
+        controller_files = Dir.glob("#{controllers_dir}/*_controller.{js,rb}").map do |f|
+          File.basename(f)
+        end.sort
+
+        # Generate Vite-compatible controllers/index.js
+        new_content = generate_vite_controllers_index(controller_files)
+
+        remove_file index_path
+        create_file index_path, new_content
+      end
+    end
+
     def show_instructions
       say ""
       say "Ruby2JS/Juntos installed!", :green
@@ -102,6 +128,43 @@ module Ruby2js
 
       remove_file package_path
       create_file package_path, JSON.pretty_generate(existing) + "\n"
+    end
+
+    # Generate a Vite-compatible controllers/index.js that imports and registers
+    # all Stimulus controllers. Rails 7+ generates an importmap-style version that
+    # uses @hotwired/stimulus-loading, which doesn't work with Vite.
+    def generate_vite_controllers_index(controller_files)
+      imports = []
+      registrations = []
+
+      controller_files.each do |file|
+        # Extract controller name from filename
+        # hello_controller.js -> HelloController, "hello"
+        # live_scores_controller.rb -> LiveScoresController, "live-scores"
+        basename = File.basename(file).sub(/\.(js|rb)$/, '')
+        name_part = basename.sub(/_controller$/, '')
+
+        # Convert to class name (hello_world -> HelloWorld)
+        class_name = name_part.split('_').map(&:capitalize).join('') + 'Controller'
+
+        # Convert to Stimulus identifier (hello_world -> hello-world)
+        identifier = name_part.tr('_', '-')
+
+        imports << "import #{class_name} from \"./#{file}\";"
+        registrations << "application.register(\"#{identifier}\", #{class_name});"
+      end
+
+      <<~JS
+        import { Application } from "@hotwired/stimulus";
+
+        #{imports.join("\n")}
+
+        const application = Application.start();
+
+        #{registrations.join("\n")}
+
+        export { application };
+      JS
     end
   end
 end
