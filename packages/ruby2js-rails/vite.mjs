@@ -128,7 +128,7 @@ function getBuildOptions(section, target) {
       return {
         ...baseOptions,
         autoexports: true,
-        filters: ['Rails_Model', 'Rails_Controller', 'Rails_Routes', 'Rails_Seeds', 'Functions', 'ESM', 'Return'],
+        filters: ['Rails_Model', 'Rails_Controller', 'Rails_Routes', 'Rails_Seeds', 'Rails_Migration', 'Functions', 'ESM', 'Return'],
         target
       };
   }
@@ -431,6 +431,14 @@ function createErbPlugin(config) {
     async load(id) {
       if (!id.endsWith('.erb')) return null;
 
+      // Skip layout files - they use yield which needs special handling
+      // Layouts are typically used by the server at request time, not imported directly
+      if (id.includes('/layouts/')) {
+        console.log('[juntos-erb] Skipping layout file:', id);
+        // Return a stub that throws an error if used
+        return `export function layout() { throw new Error('Layout files cannot be used as modules. Use a wrapper function.'); }`;
+      }
+
       try {
         // Read the file content
         const code = await fs.promises.readFile(id, 'utf-8');
@@ -480,6 +488,7 @@ function createRubyTransformPlugin(config, appRoot) {
       await import('ruby2js/filters/rails/controller.js');
       await import('ruby2js/filters/rails/routes.js');
       await import('ruby2js/filters/rails/seeds.js');
+      await import('ruby2js/filters/rails/migration.js');
       await import('ruby2js/filters/functions.js');
       await import('ruby2js/filters/esm.js');
       await import('ruby2js/filters/return.js');
@@ -631,6 +640,7 @@ export class ApplicationRecord extends ActiveRecord {}
       }
 
       // Virtual module: juntos:models (registry of all models)
+      // Registers models with both Application and the adapter's modelRegistry
       if (id === '\0juntos:models') {
         const models = findModels();
         const imports = models.map(m => {
@@ -642,22 +652,25 @@ export class ApplicationRecord extends ActiveRecord {}
         );
         return `${imports.join('\n')}
 import { Application } from 'juntos:rails';
-Application.registerModels({ ${classNames.join(', ')} });
+import { modelRegistry } from 'juntos:active-record';
+const models = { ${classNames.join(', ')} };
+Application.registerModels(models);
+Object.assign(modelRegistry, models);
 export { ${classNames.join(', ')} };
 `;
       }
 
       // Virtual module: juntos:migrations (registry of all migrations)
+      // Migration filter transforms class to { up: async () => {...}, tableSchemas: {...} }
       if (id === '\0juntos:migrations') {
         const migrations = findMigrations();
-        // Extract class name from migration name: 20260123_create_articles -> CreateArticles
-        const imports = migrations.map((m, i) => {
-          const parts = m.name.split('_').slice(1); // Remove timestamp
-          const className = parts.map(p => p[0].toUpperCase() + p.slice(1)).join('');
-          return `import { ${className} as Migration${i} } from 'db/migrate/${m.file}';`;
-        });
+        // Import the migration object from each file (filter exports 'migration' constant)
+        const imports = migrations.map((m, i) =>
+          `import { migration as migration${i} } from 'db/migrate/${m.file}';`
+        );
+        // Build migration registry entries
         const exports = migrations.map((m, i) =>
-          `{ version: '${m.name.split('_')[0]}', name: '${m.name}', up: () => new Migration${i}().change() }`
+          `{ version: '${m.name.split('_')[0]}', name: '${m.name}', ...migration${i} }`
         );
         return `${imports.join('\n')}
 export const migrations = [${exports.join(', ')}];

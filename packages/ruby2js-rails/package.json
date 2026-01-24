@@ -41,7 +41,9 @@
     "./vite-ssr-dev.mjs": "./vite-ssr-dev.mjs",
     "./astro": "./dist/astro_component_transformer.mjs",
     "./svelte": "./dist/svelte_component_transformer.mjs",
-    "./vue": "./dist/vue_component_transformer.mjs"
+    "./vue": "./dist/vue_component_transformer.mjs",
+    "./testing": "./testing.mjs",
+    "./testing.mjs": "./testing.mjs"
   },
   "files": [
     "adapters/",
@@ -65,7 +67,8 @@
     "migrate.mjs",
     "vite.mjs",
     "vite-models.mjs",
-    "vite-ssr-dev.mjs"
+    "vite-ssr-dev.mjs",
+    "testing.mjs"
   ],
   "keywords": [
     "ruby2js",

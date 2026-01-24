@@ -98,6 +98,7 @@ async function setup() {
     console.log('1. Downloading tarballs from releases...');
     await downloadFile(`${RELEASES_URL}/ruby2js-beta.tgz`, join(tarballs, 'ruby2js-beta.tgz'));
     await downloadFile(`${RELEASES_URL}/ruby2js-rails-beta.tgz`, join(tarballs, 'ruby2js-rails-beta.tgz'));
+    await downloadFile(`${RELEASES_URL}/vite-plugin-ruby2js-beta.tgz`, join(tarballs, 'vite-plugin-ruby2js-beta.tgz'));
     await downloadFile(`${RELEASES_URL}/demo-${demoHyphen}.tar.gz`, join(tarballs, `demo-${demoHyphen}.tar.gz`));
   }
 
@@ -108,30 +109,28 @@ async function setup() {
   const demoDir = join(WORK_DIR, demo);
 
   // Vite-native architecture: package.json is at app root, not dist/
-  // Install dependencies at app root where package.json lives
+  // First install all dependencies from package.json (vite, vitest, etc.)
   console.log('\n3. Installing dependencies...');
-  execSync(`npm install ${tarballs}/ruby2js-beta.tgz ${tarballs}/ruby2js-rails-beta.tgz`, {
+  execSync('npm install', {
     cwd: demoDir,
     stdio: 'inherit'
   });
 
-  // Install better-sqlite3 for the demo (Node.js testing)
+  // Then install fresh tarballs to override any released versions
+  console.log('\n4. Installing fresh tarballs...');
+  execSync(`npm install ${tarballs}/ruby2js-beta.tgz ${tarballs}/ruby2js-rails-beta.tgz ${tarballs}/vite-plugin-ruby2js-beta.tgz`, {
+    cwd: demoDir,
+    stdio: 'inherit'
+  });
+
+  // Install better-sqlite3 for Node.js testing (Vitest will transform .rb on-the-fly)
   execSync('npm install better-sqlite3', {
     cwd: demoDir,
     stdio: 'inherit'
   });
 
-  // Build with Vite using better-sqlite3 adapter and node target
-  // This is the Vite-native approach - testing the actual build pipeline
-  console.log('\n4. Building demo with Vite (sqlite + node target)...');
-
-  execSync('JUNTOS_DATABASE=sqlite JUNTOS_TARGET=node npm run build', {
-    cwd: demoDir,
-    stdio: 'inherit'
-  });
-
   console.log('\n5. Setup complete!');
-  console.log(`   Demo built at: ${demoDir}/dist`);
+  console.log(`   Demo at: ${demoDir}`);
   console.log('   Run tests with: npm test');
 }
 

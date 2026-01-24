@@ -264,8 +264,170 @@ article3 = Article.create!(
 puts "Created #{Article.count} articles and #{Comment.count} comments"
 SEEDS
 
-# Run ruby2js:install generator to set up dist/, package.json, and npm dependencies
+# Update fixtures with valid data (body must be >= 10 chars per validation)
+cat > test/fixtures/articles.yml << 'FIXTURES'
+one:
+  title: Getting Started with Rails
+  body: Rails is a web application framework running on the Ruby programming language.
+
+two:
+  title: Understanding MVC Architecture
+  body: MVC stands for Model-View-Controller. Models handle data and business logic.
+FIXTURES
+
+cat > test/fixtures/comments.yml << 'FIXTURES'
+one:
+  article: one
+  commenter: Alice
+  body: Great introduction! Rails really does make development faster.
+
+two:
+  article: two
+  commenter: Bob
+  body: This pattern really helps keep code organized!
+FIXTURES
+
+# Run ruby2js:install generator to set up package.json, vite config, vitest config, and test setup
 bin/rails generate ruby2js:install
+
+# Create integration test for articles (demo-specific)
+cat > test/articles.test.mjs << 'TEST'
+import { describe, it, expect } from 'vitest';
+
+describe('Article Model', () => {
+  it('creates an article with valid attributes', async () => {
+    const { Article } = await import('juntos:models');
+
+    const article = await Article.create({
+      title: 'Test Article',
+      body: 'This is the body of the test article with enough content.'
+    });
+
+    expect(article.id).toBeDefined();
+    expect(article.title).toBe('Test Article');
+  });
+
+  it('validates title presence', async () => {
+    const { Article } = await import('juntos:models');
+
+    const article = new Article({ title: '', body: 'Valid body content here.' });
+    const saved = await article.save();
+
+    expect(saved).toBe(false);
+    expect(article.errors.title).toBeDefined();
+  });
+
+  it('validates body minimum length', async () => {
+    const { Article } = await import('juntos:models');
+
+    const article = new Article({ title: 'Valid Title', body: 'Short' });
+    const saved = await article.save();
+
+    expect(saved).toBe(false);
+    expect(article.errors.body).toBeDefined();
+  });
+});
+
+describe('Comment Model', () => {
+  it('creates a comment on an article', async () => {
+    const { Article, Comment } = await import('juntos:models');
+
+    const article = await Article.create({
+      title: 'Article with Comments',
+      body: 'This article will have comments attached.'
+    });
+
+    const comment = await Comment.create({
+      article_id: article.id,
+      commenter: 'Test User',
+      body: 'This is a test comment.'
+    });
+
+    expect(comment.id).toBeDefined();
+    expect(comment.article_id).toBe(article.id);
+  });
+
+  it('belongs to article association', async () => {
+    const { Article, Comment } = await import('juntos:models');
+
+    const article = await Article.create({
+      title: 'Parent Article',
+      body: 'This article has a comment child.'
+    });
+
+    const comment = await Comment.create({
+      article_id: article.id,
+      commenter: 'Commenter',
+      body: 'Comment body text.'
+    });
+
+    const parentArticle = await comment.article;
+    expect(parentArticle.id).toBe(article.id);
+  });
+});
+
+describe('ArticlesController', () => {
+  it('index action returns list', async () => {
+    const { Article } = await import('juntos:models');
+    const { ArticlesController } = await import('../app/controllers/articles_controller.rb');
+
+    await Article.create({ title: 'Listed Article', body: 'This should appear in the index.' });
+
+    const context = {
+      params: {},
+      flash: { get: () => '', consumeNotice: () => ({ present: false }), consumeAlert: () => '' },
+      contentFor: {}
+    };
+
+    const html = await ArticlesController.index(context);
+    expect(html).toContain('Listed Article');
+  });
+
+  it('show action returns article details', async () => {
+    const { Article } = await import('juntos:models');
+    const { ArticlesController } = await import('../app/controllers/articles_controller.rb');
+
+    const article = await Article.create({
+      title: 'Show This Article',
+      body: 'The full article body should be visible on show page.'
+    });
+
+    const context = {
+      params: { id: article.id },
+      flash: { get: () => '', consumeNotice: () => ({ present: false }), consumeAlert: () => '' },
+      contentFor: {}
+    };
+
+    const html = await ArticlesController.show(context, article.id);
+    expect(html).toContain('Show This Article');
+  });
+
+  it('create action adds a new article', async () => {
+    const { Article } = await import('juntos:models');
+    const { ArticlesController } = await import('../app/controllers/articles_controller.rb');
+
+    const context = {
+      params: {},
+      flash: { set: () => {} },
+      contentFor: {}
+    };
+
+    const params = {
+      title: 'New Article via Controller',
+      body: 'Created through the controller action.'
+    };
+
+    const result = await ArticlesController.create(context, params);
+
+    // Should return redirect after successful create
+    expect(result.redirect).toBeDefined();
+
+    const articles = await Article.all();
+    expect(articles.length).toBe(1);
+    expect(articles[0].title).toBe('New Article via Controller');
+  });
+});
+TEST
 
 echo ""
 echo "Blog created: $APP_NAME/"

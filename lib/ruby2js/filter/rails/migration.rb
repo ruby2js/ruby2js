@@ -443,6 +443,7 @@ module Ruby2JS
             s(:casgn, nil, :migration, migration_obj))
 
           # Import createTable, addIndex, addColumn, etc. from adapter
+          # Use virtual module path for Vite-native builds
           import_stmt = s(:send, nil, :import,
             s(:array,
               s(:const, nil, :createTable),
@@ -450,7 +451,7 @@ module Ruby2JS
               s(:const, nil, :addColumn),
               s(:const, nil, :removeColumn),
               s(:const, nil, :dropTable)),
-            s(:str, '../../lib/active_record.mjs'))
+            s(:str, 'juntos:active-record'))
 
           process(s(:begin, import_stmt, export_stmt))
         end

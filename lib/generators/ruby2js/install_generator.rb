@@ -15,7 +15,8 @@ module Ruby2js
       'ruby2js-rails' => "#{RELEASES_URL}/ruby2js-rails-beta.tgz"
     }.freeze
     DEV_DEPENDENCIES = {
-      'vite' => '^6.0.0'
+      'vite' => '^6.0.0',
+      'vitest' => '^2.0.0'
     }.freeze
 
     def create_package_json
@@ -42,6 +43,64 @@ module Ruby2js
 
         export default defineConfig({
           plugins: juntos()
+        });
+      JS
+    end
+
+    def create_vitest_config
+      config_path = 'vitest.config.js'
+
+      if File.exist?(config_path)
+        say_status :skip, "vitest.config.js already exists"
+        return
+      end
+
+      create_file config_path, <<~JS
+        import { defineConfig, mergeConfig } from 'vitest/config';
+        import viteConfig from './vite.config.js';
+
+        export default mergeConfig(viteConfig, defineConfig({
+          test: {
+            globals: true,
+            environment: 'node',
+            include: ['test/**/*.test.mjs', 'test/**/*.test.js'],
+            setupFiles: ['./test/setup.mjs']
+          }
+        }));
+      JS
+    end
+
+    def create_test_setup
+      setup_path = 'test/setup.mjs'
+
+      if File.exist?(setup_path)
+        say_status :skip, "test/setup.mjs already exists"
+        return
+      end
+
+      create_file setup_path, <<~JS
+        // Test setup for Vitest
+        // Initializes the database before each test
+
+        import { beforeAll, beforeEach } from 'vitest';
+
+        beforeAll(async () => {
+          // Import models (registers them with Application and modelRegistry)
+          await import('juntos:models');
+
+          // Configure migrations
+          const rails = await import('juntos:rails');
+          const migrations = await import('juntos:migrations');
+          rails.Application.configure({ migrations: migrations.migrations });
+        });
+
+        beforeEach(async () => {
+          // Fresh in-memory database for each test
+          const activeRecord = await import('juntos:active-record');
+          await activeRecord.initDatabase({ database: ':memory:' });
+
+          const rails = await import('juntos:rails');
+          await rails.Application.runMigrations(activeRecord);
         });
       JS
     end
@@ -113,6 +172,7 @@ module Ruby2js
       say "  bin/juntos dev                - Start Vite dev server"
       say "  bin/juntos build              - Build with Vite"
       say "  bin/juntos server             - Production server (Node.js)"
+      say "  npm test                      - Run tests with Vitest"
       say ""
       say "Database adapters are installed automatically when needed."
       say ""
@@ -155,7 +215,8 @@ module Ruby2js
         "scripts" => {
           "dev" => "vite",
           "build" => "vite build",
-          "preview" => "vite preview"
+          "preview" => "vite preview",
+          "test" => "vitest run"
         },
         "dependencies" => CORE_DEPENDENCIES.dup,
         "devDependencies" => DEV_DEPENDENCIES.dup
@@ -192,7 +253,7 @@ module Ruby2js
       end
 
       # Add scripts if missing
-      { "dev" => "vite", "build" => "vite build", "preview" => "vite preview" }.each do |name, cmd|
+      { "dev" => "vite", "build" => "vite build", "preview" => "vite preview", "test" => "vitest run" }.each do |name, cmd|
         unless existing["scripts"].key?(name)
           existing["scripts"][name] = cmd
           added << "script: #{name}"

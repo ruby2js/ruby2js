@@ -2,14 +2,17 @@
 #
 # Demonstrates running a Rails-generated blog with Juntos.
 #
-# Build and run:
+# Build and run (default: browser with Dexie/IndexedDB):
 #   docker build -t ruby2js-blog .
 #   docker run -p 3000:3000 ruby2js-blog
 #
 # Build with specific database/target:
-#   docker build --build-arg DATABASE=dexie -t ruby2js-blog .
-#   docker build --build-arg DATABASE=sqlite --build-arg TARGET=node -t ruby2js-blog .
+#   docker build --build-arg NPM_INSTALL=dexie -t ruby2js-blog .
+#   docker build --build-arg DATABASE=sqlite --build-arg TARGET=node --build-arg NPM_INSTALL=better-sqlite3 -t ruby2js-blog .
 #   docker build --build-arg DATABASE=turso --build-arg TARGET=vercel -t ruby2js-blog .
+#
+# For CI testing with local artifacts, use the integration test infrastructure
+# (test/integration/setup.mjs) instead of this Dockerfile.
 
 FROM ruby
 
@@ -31,13 +34,17 @@ RUN chmod +x create-blog && ./create-blog blog
 WORKDIR /app/blog
 
 # Build args for Juntos
-ARG DATABASE=sqlite
-ARG TARGET=node
+ARG DATABASE=dexie
+ARG TARGET=browser
 ARG RAILS_ENV=production
+ARG NPM_INSTALL=""
 
 ENV RAILS_ENV=${RAILS_ENV}
 ENV JUNTOS_DATABASE=${DATABASE}
 ENV JUNTOS_TARGET=${TARGET}
+
+# Install database adapter package if specified
+RUN if [ -n "${NPM_INSTALL}" ]; then npm install ${NPM_INSTALL}; fi
 
 # Build with specified database and target
 RUN bin/juntos build -d ${DATABASE} -t ${TARGET} --verbose
