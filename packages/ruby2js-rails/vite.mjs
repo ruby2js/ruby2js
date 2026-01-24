@@ -24,6 +24,9 @@ import yaml from 'js-yaml';
 // Import React filter for .jsx.rb files
 import 'ruby2js/filters/react.js';
 
+// Import Stimulus filter for controller support
+import 'ruby2js/filters/stimulus.js';
+
 // ============================================================
 // Configuration constants (previously from SelfhostBuilder)
 // ============================================================
