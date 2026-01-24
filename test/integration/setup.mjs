@@ -108,16 +108,17 @@ async function setup() {
   const demoDir = join(WORK_DIR, demo);
   const distDir = join(demoDir, 'dist');
 
-  // Install dependencies in dist/ (where package.json lives and builder looks for adapters)
-  console.log('\n3. Installing dependencies in dist/...');
+  // Vite-native architecture: package.json is at app root, not dist/
+  // Install dependencies at app root where package.json lives
+  console.log('\n3. Installing dependencies...');
   execSync(`npm install ${tarballs}/ruby2js-beta.tgz ${tarballs}/ruby2js-rails-beta.tgz`, {
-    cwd: distDir,
+    cwd: demoDir,
     stdio: 'inherit'
   });
 
-  // Install better-sqlite3 in dist/ for the demo
+  // Install better-sqlite3 for the demo (Node.js testing)
   execSync('npm install better-sqlite3', {
-    cwd: distDir,
+    cwd: demoDir,
     stdio: 'inherit'
   });
 
@@ -136,17 +137,17 @@ async function setup() {
     }
   );
 
-  // When using local packages, reinstall them in dist/ to override the build's npm install
+  // When using local packages, reinstall them to override the build's npm install
   // (the build's package.json has hardcoded URLs to released packages)
   // Also copy rails.js to lib/ since build already copied it before reinstall
   if (useLocal || useLocalPackages) {
-    console.log('\n5. Reinstalling local packages in dist/...');
+    console.log('\n5. Reinstalling local packages...');
     execSync(`npm install ${tarballs}/ruby2js-rails-beta.tgz`, {
-      cwd: distDir,
+      cwd: demoDir,
       stdio: 'inherit'
     });
     // Copy the updated rails.js to lib/ (build copied it before reinstall)
-    execSync(`cp "${distDir}/node_modules/ruby2js-rails/targets/browser/rails.js" "${distDir}/lib/rails.js"`, {
+    execSync(`cp "${demoDir}/node_modules/ruby2js-rails/targets/browser/rails.js" "${distDir}/lib/rails.js"`, {
       stdio: 'inherit'
     });
     console.log('\n6. Setup complete!');

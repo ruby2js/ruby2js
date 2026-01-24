@@ -20,7 +20,6 @@
 import path from 'node:path';
 import fs from 'node:fs';
 import yaml from 'js-yaml';
-import ruby2js from 'vite-plugin-ruby2js';
 import { SelfhostBuilder } from './build.mjs';
 
 // Import React filter for .jsx.rb files
@@ -143,9 +142,6 @@ export function juntos(options = {}) {
     // Eliminates need for .juntos/lib/ directory
     createVirtualPlugin(config, appRoot),
 
-    // Core Ruby transformation with Rails filters
-    createRubyPlugin(config, ruby2jsOptions),
-
     // JSX.rb file handling (Ruby + JSX)
     createJsxRbPlugin(config),
 
@@ -164,26 +160,6 @@ export function juntos(options = {}) {
     // HMR support for Stimulus controllers
     ...(hmr ? [createHmrPlugin()] : [])
   ];
-}
-
-/**
- * Core Ruby plugin wrapper with Rails filters.
- */
-function createRubyPlugin(config, options) {
-  return ruby2js({
-    filters: ['Pragma', 'Stimulus', 'ESM', 'Functions', 'Return'],
-    eslevel: config.eslevel,
-    target: config.target,  // Pass target for pragma filter to strip target-specific lines
-    exclude: [
-      '**/*.jsx.rb',        // JSX.rb files handled by juntos-jsx-rb
-      'app/models/',        // Models handled by juntos-ruby (on-the-fly)
-      'app/controllers/',   // Controllers handled by juntos-ruby (on-the-fly)
-      'config/routes.rb',   // Routes handled by juntos-ruby (on-the-fly)
-      'db/migrate/',        // Migrations handled by juntos-ruby (on-the-fly)
-      'db/seeds.rb'         // Seeds handled by juntos-ruby (on-the-fly)
-    ],
-    ...options
-  });
 }
 
 /**
@@ -685,7 +661,8 @@ export { ${members.join(', ')} };
         let section = null;
 
         // Determine transformation section
-        if (id.includes('/controllers/')) section = 'controllers';
+        if (id.includes('/app/javascript/controllers/')) section = 'stimulus';
+        else if (id.includes('/app/controllers/')) section = 'controllers';
         else if (id.includes('/db/migrate/')) section = null; // Migrations use default options
         else if (id.endsWith('/routes.rb')) section = null; // Routes use default with special options
 
