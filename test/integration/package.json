@@ -15,10 +15,5 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "vitest": "^3.0.0"
-  },
-  "dependencies": {
-    "ruby2js": "file:workspace/tarballs/ruby2js-beta.tgz",
-    "ruby2js-rails": "file:workspace/tarballs/ruby2js-rails-beta.tgz",
-    "vite-plugin-ruby2js": "file:workspace/tarballs/vite-plugin-ruby2js-beta.tgz"
   }
 }
