@@ -63,6 +63,11 @@ module Ruby2js
       controllers_dir = 'app/javascript/controllers'
       index_path = "#{controllers_dir}/index.js"
 
+      # Clean up .js files created by Rails mode (ruby2js:transpile_controllers).
+      # Juntos mode uses Vite which transpiles .rb files on-the-fly, so these
+      # pre-transpiled .js files are redundant and would cause duplicate imports.
+      cleanup_redundant_js_controllers(controllers_dir)
+
       return unless File.exist?(index_path)
 
       content = File.read(index_path)
@@ -82,6 +87,21 @@ module Ruby2js
 
         remove_file index_path
         create_file index_path, new_content
+      end
+    end
+
+    # Remove .js files that have corresponding .rb files.
+    # These are created by Rails mode for importmap but conflict with Juntos mode
+    # where Vite transpiles .rb files on-the-fly.
+    def cleanup_redundant_js_controllers(controllers_dir)
+      return unless File.directory?(controllers_dir)
+
+      Dir.glob("#{controllers_dir}/*_controller.rb").each do |rb_path|
+        js_path = rb_path.sub(/\.rb$/, '.js')
+        if File.exist?(js_path)
+          say_status :remove, File.basename(js_path), :yellow
+          remove_file js_path
+        end
       end
     end
 
@@ -137,7 +157,15 @@ module Ruby2js
       imports = []
       registrations = []
 
-      controller_files.each do |file|
+      # Deduplicate: if both .js and .rb exist, prefer .rb (Ruby2JS)
+      # Group by base name, then pick the best extension
+      by_basename = controller_files.group_by { |f| File.basename(f).sub(/\.(js|rb)$/, '') }
+      unique_files = by_basename.map do |_basename, files|
+        # Prefer .rb over .js
+        files.find { |f| f.end_with?('.rb') } || files.first
+      end
+
+      unique_files.sort.each do |file|
         # Extract controller name from filename
         # hello_controller.js -> HelloController, "hello"
         # live_scores_controller.rb -> LiveScoresController, "live-scores"

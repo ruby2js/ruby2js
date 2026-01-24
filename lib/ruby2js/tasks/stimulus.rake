@@ -1,9 +1,23 @@
 # frozen_string_literal: true
 
+# Stimulus controller transpilation for Rails mode (importmap/Sprockets).
+#
+# Ruby2JS apps can run in two modes:
+# - Rails mode: Uses importmap, which only discovers .js files. This task
+#   pre-transpiles .rb controllers to .js so importmap can find them.
+# - Juntos mode: Uses Vite, which transpiles .rb files on-the-fly.
+#   No pre-transpilation needed.
+
 namespace :ruby2js do
-  desc "Transpile Ruby Stimulus controllers to JavaScript"
+  desc "Transpile Ruby Stimulus controllers to JavaScript (for Rails/importmap mode)"
   task transpile_controllers: :environment do
     require 'ruby2js'
+
+    # Skip in Juntos mode - Vite handles transpilation on-the-fly
+    if File.exist?(Rails.root.join("vite.config.js"))
+      puts "Ruby2JS: Skipping transpile_controllers (Vite handles transpilation)"
+      next
+    end
 
     controllers_path = Rails.root.join("app/javascript/controllers")
     next unless controllers_path.exist?

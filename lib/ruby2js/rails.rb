@@ -14,10 +14,20 @@ class Ruby2JSRailtie < Rails::Railtie
     end
   end
 
-  # Transpile Ruby Stimulus controllers at boot time in development
-  # so importmap discovers them. Production uses rake task via assets:precompile.
+  # Transpile Ruby Stimulus controllers at boot time in development.
+  #
+  # Ruby2JS apps can run in two modes:
+  # - Rails mode: Uses importmap, which only discovers .js files. This
+  #   initializer pre-transpiles .rb controllers so importmap can find them.
+  # - Juntos mode: Uses Vite, which transpiles .rb files on-the-fly.
+  #   No pre-transpilation needed.
+  #
+  # Production Rails builds use the rake task via assets:precompile instead.
   initializer "ruby2js.transpile_controllers", before: :set_load_path do |app|
     next unless ::Rails.env.development?
+
+    # Skip in Juntos mode - Vite handles transpilation on-the-fly
+    next if File.exist?(::Rails.root.join("vite.config.js"))
 
     controllers_path = ::Rails.root.join("app/javascript/controllers")
     next unless controllers_path.exist?
