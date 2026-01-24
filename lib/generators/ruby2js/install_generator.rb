@@ -90,6 +90,19 @@ module Ruby2js
       end
     end
 
+    def show_instructions
+      say ""
+      say "Ruby2JS/Juntos installed!", :green
+      say ""
+      say "Next steps:"
+      say "  bin/juntos dev                - Start Vite dev server"
+      say "  bin/juntos build              - Build with Vite"
+      say "  bin/juntos server             - Production server (Node.js)"
+      say ""
+    end
+
+    private
+
     # Remove .js files that have corresponding .rb files.
     # These are created by Rails mode for importmap but conflict with Juntos mode
     # where Vite transpiles .rb files on-the-fly.
@@ -104,19 +117,6 @@ module Ruby2js
         end
       end
     end
-
-    def show_instructions
-      say ""
-      say "Ruby2JS/Juntos installed!", :green
-      say ""
-      say "Next steps:"
-      say "  bin/juntos dev                - Start Vite dev server"
-      say "  bin/juntos build              - Build with Vite"
-      say "  bin/juntos server             - Production server (Node.js)"
-      say ""
-    end
-
-    private
 
     def write_package_json(package_path)
       say_status :create, package_path
