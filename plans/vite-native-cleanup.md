@@ -32,7 +32,38 @@ The project originally had a custom build system. Vite was added later. The goal
    - CSRF token generation/validation now async
    - Works across all platforms (Node, Cloudflare, Deno, Bun, browsers)
 
-## Current Architecture
+## Current Architecture (Vite-Native)
+
+```
+blog/
+├── vite.config.js          # Minimal config, just juntos() call
+├── package.json            # Standard npm scripts
+├── index.html              # Browser entry point
+├── main.js                 # App initialization (imports config/routes.rb directly)
+├── app/                    # Source Ruby files (Rails structure)
+│   ├── controllers/*.rb    # Transformed on-the-fly
+│   ├── models/*.rb         # Transformed on-the-fly
+│   └── views/**/*.erb      # Transformed on-the-fly
+├── config/
+│   └── routes.rb           # Transformed on-the-fly
+├── db/
+│   ├── migrate/*.rb        # Transformed on-the-fly
+│   └── seeds.rb            # Transformed on-the-fly
+└── dist/                   # Final build output (only directory created by build)
+
+# NO .juntos/ directory - everything is virtual or on-the-fly
+```
+
+### Virtual Modules
+
+- `juntos:rails` - Re-exports from target-specific runtime (browser, node, cloudflare, etc.)
+- `juntos:active-record` - Injects DB_CONFIG and re-exports from database adapter
+- `juntos:application-record` - ApplicationRecord base class
+- `juntos:models` - Registry of all models
+- `juntos:migrations` - Registry of all migrations
+- `juntos:views/*` - Unified view modules (e.g., `juntos:views/articles` → ArticleViews)
+
+## Previous Architecture (Pre-Vite-Native)
 
 ```
 blog/
@@ -40,7 +71,7 @@ blog/
 ├── package.json            # Standard npm scripts
 ├── index.html              # Browser entry point
 ├── main.js                 # App initialization
-├── .juntos/                # Pre-transpiled output (staging)
+├── .juntos/                # Pre-transpiled output (staging) - NOW ELIMINATED
 │   ├── app/
 │   │   ├── controllers/    # Pre-compiled from app/controllers/*.rb
 │   │   ├── models/         # Pre-compiled from app/models/*.rb
@@ -58,30 +89,22 @@ blog/
 
 ## What's In .juntos/ Today
 
-```
-.juntos/
-├── app/
-│   ├── controllers/     # Pre-transpiled from app/controllers/*.rb
-│   ├── models/          # Pre-transpiled from app/models/*.rb
-│   └── views/           # Pre-transpiled from app/views/**/*.erb
-├── config/
-│   ├── routes.js        # Generated from config/routes.rb (one-to-many)
-│   └── paths.js         # Generated path helpers
-├── db/
-│   ├── migrate/         # Transpiled migrations
-│   │   └── index.js     # Migration registry
-│   └── seeds.js         # Transpiled seeds
-└── lib/
-    ├── rails.js         # Target-specific runtime (vercel-edge, cloudflare, node, browser)
-    ├── rails_server.js  # Shared server runtime
-    ├── rails_base.js    # Shared base runtime
-    ├── active_record.mjs      # Adapter-specific + DB_CONFIG injected
-    ├── active_record_client.mjs  # RPC adapter for browser
-    ├── erb_runtime.mjs  # ERB runtime helpers
-    ├── dialects/        # SQL dialects (postgres.mjs, mysql.mjs)
-    ├── rpc/             # RPC server/client
-    └── turbo_*.js       # Turbo broadcast helpers
-```
+**Nothing! The `.juntos/` directory has been eliminated.**
+
+All content that was previously in `.juntos/` is now handled by:
+
+| Previous Location | Now Handled By |
+|-------------------|----------------|
+| `.juntos/app/controllers/` | On-the-fly transformation in `juntos-ruby` plugin |
+| `.juntos/app/models/` | On-the-fly transformation in `juntos-ruby` plugin |
+| `.juntos/app/views/` | On-the-fly transformation in `juntos-erb` plugin |
+| `.juntos/config/routes.js` | On-the-fly transformation in `juntos-ruby` plugin |
+| `.juntos/config/paths.js` | Paths exported inline from routes.rb |
+| `.juntos/db/migrate/` | On-the-fly transformation + `juntos:migrations` virtual module |
+| `.juntos/db/seeds.js` | On-the-fly transformation in `juntos-ruby` plugin |
+| `.juntos/lib/rails.js` | `juntos:rails` virtual module |
+| `.juntos/lib/active_record.mjs` | `juntos:active-record` virtual module |
+| `.juntos/lib/*` | Virtual modules or direct imports from `ruby2js-rails` package |
 
 ## Analysis: What Can Be Eliminated?
 
@@ -188,30 +211,32 @@ C. Generate to `node_modules/.juntos/db/`
 
 **Recommendation:** Option A or C - migrations need to be stable for database versioning.
 
-## Proposed Architecture (Minimal .juntos/)
+## Achieved Architecture (Zero .juntos/)
 
 ```
-.juntos/                    # Minimal - only generated files
-├── config/
-│   ├── routes.js           # Generated (one-to-many)
-│   └── paths.js            # Generated path helpers
-└── db/
-    ├── migrate/            # Transpiled migrations
-    │   └── index.js
-    └── seeds.js            # Transpiled seeds
+# NO .juntos/ directory at all!
 
-# Everything else is virtual or on-the-fly:
-# - lib/* → virtual modules (juntos:rails, juntos:active-record)
+# Everything is virtual or on-the-fly:
+# - juntos:rails → virtual module re-exporting from ruby2js-rails/targets/*/rails.js
+# - juntos:active-record → virtual module re-exporting from adapter
+# - juntos:application-record → virtual module with ApplicationRecord class
+# - juntos:models → virtual module importing all models
+# - juntos:migrations → virtual module importing all migrations
+# - juntos:views/* → virtual modules with unified view exports
 # - app/models/*.rb → on-the-fly transformation
 # - app/controllers/*.rb → on-the-fly transformation
-# - app/views/**/*.erb → already on-the-fly
+# - config/routes.rb → on-the-fly transformation
+# - db/migrate/*.rb → on-the-fly transformation
+# - db/seeds.rb → on-the-fly transformation
+# - app/views/**/*.erb → on-the-fly transformation via juntos-erb
 ```
 
 **Benefits:**
-- `.juntos/` shrinks from ~20 files to ~5 files
-- No duplication of source files
+- `.juntos/` completely eliminated (was ~20+ files)
+- Zero duplication of source files
 - True Vite-native development experience
-- Source maps point directly to Ruby files
+- Source maps point directly to Ruby/ERB files
+- Simpler mental model: source → build output, nothing in between
 
 ## Open Questions
 
@@ -316,19 +341,22 @@ Each output is a complete standalone project for that specific target.
 
 ## Proposed Next Steps
 
-### Phase 1: Virtual Modules for lib/ (High Impact)
-1. [ ] Add `juntos-virtual` plugin with `resolveId`/`load` hooks
-2. [ ] Create virtual `juntos:rails` that re-exports from target-specific runtime
-3. [ ] Create virtual `juntos:active-record` that injects minimal config
-4. [ ] Update route generation to use virtual imports
-5. [ ] Delete `.juntos/lib/` - everything comes from node_modules
+### Phase 1: Virtual Modules for lib/ (High Impact) ✅ COMPLETE
+1. [x] Add `juntos-virtual` plugin with `resolveId`/`load` hooks
+2. [x] Create virtual `juntos:rails` that re-exports from target-specific runtime
+3. [x] Create virtual `juntos:active-record` that injects minimal config
+4. [x] Update route generation to use virtual imports
+5. [x] Delete `.juntos/lib/` - everything comes from node_modules
 
-### Phase 2: On-the-Fly Transformation (Medium Risk)
-1. [ ] Add `load()` hook for `app/models/*.rb` files
-2. [ ] Add `load()` hook for `app/controllers/*.rb` files
-3. [ ] Update imports in routes.js to reference source `.rb` files
-4. [ ] Delete `.juntos/app/models/` and `.juntos/app/controllers/`
-5. [ ] Views already work on-the-fly - just update imports
+### Phase 2: On-the-Fly Transformation (Medium Risk) ✅ COMPLETE
+1. [x] Add `load()` hook for `app/models/*.rb` files
+2. [x] Add `load()` hook for `app/controllers/*.rb` files
+3. [x] Add `load()` hook for `config/routes.rb` - routes transformed on-the-fly
+4. [x] Add `load()` hook for `db/migrate/*.rb` - migrations transformed on-the-fly
+5. [x] Add `load()` hook for `db/seeds.rb` - seeds transformed on-the-fly
+6. [x] Views already work on-the-fly via `juntos-erb` plugin
+7. [x] Virtual modules: `juntos:models`, `juntos:migrations`, `juntos:views/*`, `juntos:application-record`
+8. [x] No `.juntos/` directory generated - everything is virtual/on-the-fly
 
 ### Phase 3: Turbo 8 HMR (Experimental)
 1. [ ] Research Turbo 8 morphing API
@@ -358,7 +386,18 @@ Each output is a complete standalone project for that specific target.
 
 ## Success Criteria
 
-1. Blog demo works with reduced `.juntos/` footprint
-2. Documentation accurately reflects current architecture
-3. Developer experience is improved (fewer directories, clearer structure)
-4. All existing tests still pass
+1. ✅ Blog demo works with NO `.juntos/` footprint - everything is virtual/on-the-fly
+2. [ ] Documentation accurately reflects current architecture
+3. ✅ Developer experience is improved (no staging directories, cleaner project structure)
+4. [ ] All existing tests still pass
+
+## Current Status (January 2025)
+
+The Vite-native implementation is complete. Key achievements:
+
+- **No staging directory**: `.juntos/` is never created
+- **All Ruby transformed on-the-fly**: models, controllers, routes, migrations, seeds
+- **Virtual modules** for generated code: `juntos:rails`, `juntos:active-record`, `juntos:models`, `juntos:migrations`, `juntos:views/*`, `juntos:application-record`
+- **ERB views** transformed on-the-fly by `juntos-erb` plugin
+- **Browser build** works: `npm run build` produces `dist/` directly
+- **Dev server** works: `npm run dev` with HMR
