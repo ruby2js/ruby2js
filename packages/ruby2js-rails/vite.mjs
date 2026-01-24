@@ -292,6 +292,14 @@ function createErbPlugin(config) {
     // Fix cross-directory partial imports: ../comments/_comment.js -> @views/comments/_comment.html.erb
     js = js.replace(/from ["']\.\.\/(\w+)\/(\_\w+)\.js["']/g, 'from "@views/$1/$2.html.erb"');
 
+    // Fix model imports from views: ../photos.js -> app/models/photo.rb
+    // Views import models like Photo from "../photos.js" (plural, relative up)
+    // These should resolve to app/models/<singular>.rb
+    js = js.replace(/from ["']\.\.\/(\w+)\.js["']/g, (match, plural) => {
+      const singular = singularize(plural);
+      return `from "app/models/${singular}.rb"`;
+    });
+
     // Step 4: Generate source map pointing to original ERB
     const map = result.sourcemap;
     if (map) {
