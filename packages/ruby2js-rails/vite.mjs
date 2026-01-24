@@ -526,8 +526,8 @@ function createRubyTransformPlugin(config, appRoot) {
         }
       }
 
-      // Resolve .erb files for views
-      if (source.endsWith('.html.erb')) {
+      // Resolve .erb files for views (both .html.erb and .turbo_stream.erb)
+      if (source.endsWith('.erb')) {
         if (!source.startsWith('.') && !source.startsWith('/')) {
           const absPath = path.join(appRoot, source);
           if (fs.existsSync(absPath)) return absPath;
@@ -587,11 +587,49 @@ export const migrations = [${exports.join(', ')}];
       // Exports a namespace object like `ArticleViews` with methods for each view
       if (id.startsWith('\0juntos:views/')) {
         const resource = id.replace('\0juntos:views/', '');
-        const viewsDir = path.join(appRoot, 'app/views', resource);
-        if (!fs.existsSync(viewsDir)) return `export const ${capitalize(resource)}Views = {};`;
 
         // JS reserved words that can't be used as identifiers
         const RESERVED = new Set(['new', 'delete', 'class', 'function', 'return', 'if', 'else', 'for', 'while', 'do', 'switch', 'case', 'break', 'continue', 'default', 'var', 'let', 'const', 'import', 'export', 'try', 'catch', 'finally', 'throw', 'typeof', 'instanceof', 'in', 'of', 'with', 'yield', 'await', 'async', 'static', 'super', 'this', 'null', 'true', 'false', 'void']);
+
+        // Handle Turbo Streams: juntos:views/messages_turbo_streams
+        // These aggregate *.turbo_stream.erb files from app/views/messages/
+        if (resource.endsWith('_turbo_streams')) {
+          const plural = resource.replace('_turbo_streams', '');
+          const singular = singularize(plural);
+          const viewsDir = path.join(appRoot, 'app/views', plural);
+
+          if (!fs.existsSync(viewsDir)) {
+            const className = capitalize(singular) + 'TurboStreams';
+            return `export const ${className} = {};`;
+          }
+
+          const turboViews = fs.readdirSync(viewsDir)
+            .filter(f => f.endsWith('.turbo_stream.erb'))
+            .map(f => {
+              // create.turbo_stream.erb → create
+              const name = f.replace('.turbo_stream.erb', '');
+              let exportName = name;
+              if (RESERVED.has(exportName)) exportName = exportName + '_';
+              return { file: f, name, exportName };
+            });
+
+          const imports = turboViews.map(v =>
+            `import { render as ${v.exportName}_render } from 'app/views/${plural}/${v.file}';`
+          );
+
+          // Create namespace object: MessageTurboStreams = { create: create_render, destroy: destroy_render }
+          const className = capitalize(singular) + 'TurboStreams';
+          const members = turboViews.map(v => `${v.exportName}: ${v.exportName}_render`);
+
+          return `// ${className} - auto-generated from .turbo_stream.erb templates
+${imports.join('\n')}
+export const ${className} = { ${members.join(', ')} };
+`;
+        }
+
+        // Regular views: juntos:views/articles
+        const viewsDir = path.join(appRoot, 'app/views', resource);
+        if (!fs.existsSync(viewsDir)) return `export const ${capitalize(resource)}Views = {};`;
 
         const views = fs.readdirSync(viewsDir)
           .filter(f => f.endsWith('.html.erb'))
