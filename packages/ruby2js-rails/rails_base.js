@@ -156,8 +156,8 @@ export class ApplicationBase {
   // Initialize the database using the adapter
   // Note: Migrations are NOT run automatically - use 'juntos migrate' before starting
   static async initDatabase(options = {}) {
-    // Import the adapter (selected at build time)
-    const adapter = await import('./active_record.mjs');
+    // Import the adapter (selected at build time via virtual module)
+    const adapter = await import('juntos:active-record');
     this.activeRecordModule = adapter;
 
     // Populate model registry for association resolution (avoids circular dependencies)

@@ -8,7 +8,7 @@ import {
   truncate,
   pluralize,
   dom_id
-} from './rails_base.js';
+} from 'ruby2js-rails/rails_base.js';
 
 // Re-export base helpers
 // Note: createContext is defined in this file with browser-specific logic
@@ -294,8 +294,8 @@ export class Application extends ApplicationBase {
 
   // Initialize the database using the adapter
   static async initDatabase() {
-    // Import the adapter (selected at build time)
-    const adapter = await import('./active_record.mjs');
+    // Import the adapter (resolved via virtual module at build time)
+    const adapter = await import('juntos:active-record');
     this.activeRecordModule = adapter;
 
     // Populate model registry for association resolution (avoids circular dependencies)

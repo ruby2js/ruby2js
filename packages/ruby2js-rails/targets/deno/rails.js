@@ -19,7 +19,7 @@ import {
   setupFormHandlers,
   TurboBroadcast,
   turbo_stream_from
-} from './rails_server.js';
+} from 'ruby2js-rails/rails_server.js';
 
 // Re-export everything from server module
 export { createContext, createFlash, truncate, pluralize, dom_id, navigate, submitForm, formData, handleFormResult, setupFormHandlers, turbo_stream_from };

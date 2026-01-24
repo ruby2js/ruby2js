@@ -128,6 +128,10 @@ export function juntos(options = {}) {
   const config = loadConfig(appRoot, { database, target, broadcast, eslevel, external });
 
   return [
+    // Virtual modules (juntos:rails, juntos:active-record)
+    // Eliminates need for .juntos/lib/ directory
+    createVirtualPlugin(config, appRoot),
+
     // Core Ruby transformation with Rails filters
     createRubyPlugin(config, ruby2jsOptions),
 
@@ -137,7 +141,10 @@ export function juntos(options = {}) {
     // ERB file handling (server-rendered templates as JS modules)
     createErbPlugin(config),
 
-    // Structural transforms (models, controllers, views, routes)
+    // On-the-fly transformation for models/controllers from routes.js
+    createModelControllerPlugin(config, appRoot),
+
+    // Structural transforms (routes, migrations, seeds)
     createStructurePlugin(config, appRoot),
 
     // Platform-specific Vite configuration (includes external from ruby2js.yml)
@@ -155,7 +162,11 @@ function createRubyPlugin(config, options) {
   return ruby2js({
     filters: ['Stimulus', 'ESM', 'Functions', 'Return'],
     eslevel: config.eslevel,
-    exclude: ['**/*.jsx.rb'], // JSX.rb files handled separately
+    exclude: [
+      '**/*.jsx.rb',        // JSX.rb files handled by juntos-jsx-rb
+      'app/models/',        // Models handled by juntos-ruby (on-the-fly)
+      'app/controllers/'    // Controllers handled by juntos-ruby (on-the-fly)
+    ],
     ...options
   });
 }
@@ -274,9 +285,11 @@ function createErbPlugin(config) {
 
     // Step 3.5: Fix import paths for Vite
     // The selfhost converter generates relative paths for a .juntos/ structure
-    // but we're now serving ERB from app/views/, so use aliases instead
+    // but we're now serving ERB from app/views/, so use virtual modules and aliases
     js = js.replace(/from ["']\.\.\/\.\.\/\.\.\/config\/paths\.js["']/g, 'from "@config/paths.js"');
-    js = js.replace(/from ["']\.\.\/\.\.\/\.\.\/lib\/rails\.js["']/g, 'from "lib/rails.js"');
+    js = js.replace(/from ["']\.\.\/\.\.\/\.\.\/lib\/rails\.js["']/g, 'from "juntos:rails"');
+    // Also handle lib/rails.js in case it's already been partially transformed
+    js = js.replace(/from ["']lib\/rails\.js["']/g, 'from "juntos:rails"');
 
     // Fix partial imports: _./_partial.js -> ./_partial.html.erb
     // Partials are source files that Vite will transform on-the-fly
@@ -322,17 +335,191 @@ function createErbPlugin(config) {
 }
 
 /**
+ * Ruby transformation plugin - transforms .rb files on-the-fly.
+ * Handles models and controllers in app/ directory.
+ *
+ * When routes.js imports '.../articles_controller.js', this plugin:
+ * 1. Redirects to the source .rb file (resolveId hook)
+ * 2. Transforms Ruby to JavaScript (load hook)
+ *
+ * This eliminates pre-compilation to .juntos/app/ for models and controllers.
+ */
+function createModelControllerPlugin(config, appRoot) {
+  // Ruby2JS converter and initialization
+  let convert, initPrism;
+  let prismReady = false;
+
+  async function ensureReady() {
+    if (!convert) {
+      const ruby2jsModule = await import('ruby2js');
+      convert = ruby2jsModule.convert;
+      initPrism = ruby2jsModule.initPrism;
+
+      // Import Rails filters for models and controllers
+      await import('ruby2js/filters/rails/model.js');
+      await import('ruby2js/filters/rails/controller.js');
+      await import('ruby2js/filters/rails/routes.js');
+      await import('ruby2js/filters/rails/seeds.js');
+      await import('ruby2js/filters/functions.js');
+      await import('ruby2js/filters/esm.js');
+      await import('ruby2js/filters/return.js');
+    }
+    if (!prismReady && initPrism) {
+      await initPrism();
+      prismReady = true;
+    }
+  }
+
+  // Cache for transformed files
+  const transformCache = new Map();
+
+  // Check if file is a source model/controller (not in .juntos/)
+  function isSourceRuby(id) {
+    if (!id.endsWith('.rb')) return false;
+    if (id.includes('/.juntos/')) return false;
+    if (id.includes('/node_modules/')) return false;
+
+    // Must be in app/models or app/controllers
+    return id.includes('/app/models/') || id.includes('/app/controllers/');
+  }
+
+  return {
+    name: 'juntos-ruby',
+    enforce: 'pre',
+
+    // Resolve imports to correct locations
+    resolveId(source, importer) {
+      if (!importer) return null;
+
+      // Handle imports from .juntos/ files (routes.js importing controllers, index.js importing models)
+      if (importer.includes('/.juntos/')) {
+        // Controller/model import with .js extension: ../app/controllers/foo.js -> app/controllers/foo.rb
+        if (source.endsWith('.js')) {
+          const appMatch = source.match(/\.\.\/app\/(controllers|models)\/(\w+)\.js$/);
+          if (appMatch) {
+            const rbPath = path.join(appRoot, 'app', appMatch[1], `${appMatch[2]}.rb`);
+            if (fs.existsSync(rbPath)) return rbPath;
+          }
+        }
+
+        // Model import with .rb extension: ../../app/models/foo.rb -> app/models/foo.rb
+        if (source.endsWith('.rb')) {
+          const rbMatch = source.match(/\.\.\/\.\.\/app\/models\/(\w+)\.rb$/);
+          if (rbMatch) {
+            const rbPath = path.join(appRoot, 'app/models', `${rbMatch[1]}.rb`);
+            if (fs.existsSync(rbPath)) return rbPath;
+          }
+        }
+        return null;
+      }
+
+      // Handle imports from source .rb files (models/controllers importing generated files)
+      if (importer.endsWith('.rb') && importer.includes('/app/')) {
+        // ApplicationRecord import from models: ./application_record.js -> .juntos/app/models/application_record.js
+        if (source === './application_record.js' && importer.includes('/app/models/')) {
+          const appRecordPath = path.join(appRoot, '.juntos/app/models/application_record.js');
+          if (fs.existsSync(appRecordPath)) return appRecordPath;
+        }
+
+        // Views import: ../views/articles.js -> .juntos/app/views/articles.js
+        // Also handles partials: ../views/articles/_article.js -> .juntos/app/views/articles/_article.js
+        const viewsMatch = source.match(/\.\.\/views\/(.+)\.js$/);
+        if (viewsMatch) {
+          const viewsPath = path.join(appRoot, '.juntos/app/views', `${viewsMatch[1]}.js`);
+          if (fs.existsSync(viewsPath)) return viewsPath;
+        }
+
+        // Config path imports: ../../config/paths.js -> .juntos/config/paths.js
+        const configMatch = source.match(/\.\.\/\.\.\/config\/(\w+)\.js$/);
+        if (configMatch) {
+          const configPath = path.join(appRoot, '.juntos/config', `${configMatch[1]}.js`);
+          if (fs.existsSync(configPath)) return configPath;
+        }
+      }
+
+      return null;
+    },
+
+    // Transform .rb files to JavaScript
+    async load(id) {
+      if (!isSourceRuby(id)) return null;
+
+      // Skip application_record.rb and application_controller.rb (base classes)
+      const basename = path.basename(id);
+      if (basename === 'application_record.rb' || basename === 'application_controller.rb') {
+        return null;
+      }
+
+      // Check cache
+      const stat = fs.statSync(id);
+      const cached = transformCache.get(id);
+      if (cached && cached.mtime >= stat.mtimeMs) {
+        return cached.code;
+      }
+
+      try {
+        // Read Ruby source
+        const source = await fs.promises.readFile(id, 'utf-8');
+
+        // Determine section (model or controller)
+        const isController = id.includes('/controllers/');
+        const section = isController ? 'controllers' : null;
+
+        // Build options using SelfhostBuilder's option builder
+        await ensureReady();
+        const builder = new SelfhostBuilder(path.join(appRoot, '.juntos'), {
+          database: config.database,
+          target: config.target
+        });
+
+        const options = {
+          ...builder.build_options(section),
+          file: path.relative(appRoot, id)
+        };
+
+        // Transform Ruby to JavaScript
+        const result = convert(source, options);
+        let js = result.toString();
+
+        // Fix imports to use virtual modules
+        js = js.replace(/from ['"]\.\.\/lib\/rails\.js['"]/g, "from 'juntos:rails'");
+        js = js.replace(/from ['"]\.\.\/\.\.\/lib\/rails\.js['"]/g, "from 'juntos:rails'");
+        js = js.replace(/from ['"]\.\.\/lib\/active_record\.mjs['"]/g, "from 'juntos:active-record'");
+        js = js.replace(/from ['"]\.\.\/\.\.\/lib\/active_record\.mjs['"]/g, "from 'juntos:active-record'");
+
+        // Fix model imports: *.js -> *.rb (for same-directory and relative imports)
+        // Models and controllers import other models with .js extension, but source files are .rb
+        js = js.replace(/from ['"]\.\.\/models\/(\w+)\.js['"]/g, "from '../models/$1.rb'");
+        js = js.replace(/from ['"]\.\/(\w+)\.js['"]/g, (match, name) => {
+          // Only change model imports, not other .js imports
+          if (name === 'application_record') return match; // Keep ApplicationRecord as .js
+          return `from './${name}.rb'`;
+        });
+
+        // Cache result
+        transformCache.set(id, { code: js, mtime: stat.mtimeMs });
+
+        console.log(`[juntos-ruby] Transformed: ${path.relative(appRoot, id)}`);
+        return { code: js, map: result.sourcemap };
+      } catch (error) {
+        console.error(`[juntos-ruby] Transform error in ${id}:`, error);
+        throw error;
+      }
+    }
+  };
+}
+
+/**
  * Structure plugin - generates essential files to .juntos/ directory.
  * Source files (models, controllers, views) are transformed on-the-fly by Vite.
  *
  * Generated files (.juntos/):
  * - routes.js - compiled from config/routes.rb (one-to-many)
- * - lib/ - runtime helpers (rails.js, active_record.mjs, etc.)
  *
  * On-the-fly transformation (via other plugins):
- * - Models - Rails_Model filter
- * - Controllers - Rails_Controller filter
- * - Views - ERB/JSX.rb filters
+ * - Models - juntos-ruby plugin (Rails_Model filter)
+ * - Controllers - juntos-ruby plugin (Rails_Controller filter)
+ * - Views - juntos-erb plugin (ERB/JSX filters)
  * - Stimulus - Stimulus filter
  */
 function createStructurePlugin(config, appRoot) {
@@ -401,45 +588,41 @@ function createStructurePlugin(config, appRoot) {
         // Generate routes (one-to-many transformation)
         builder.transpile_routes_files();
 
-        // Copy lib files (runtime helpers)
-        builder.copy_lib_files();
-
-        // Generate database adapter with config
-        builder.copy_database_adapter();
+        // NOTE: lib files and database adapter are now provided via virtual modules
+        // (juntos:rails and juntos:active-record) - no need to copy files
 
         // Setup broadcast adapter if needed
         if (config.broadcast) {
           builder.setup_broadcast_adapter();
         }
 
-        // Generate ApplicationRecord wrapper
-        builder.generate_application_record();
+        // Generate ApplicationRecord wrapper with virtual import
+        const modelsDestDir = path.join(juntosDir, 'app/models');
+        await fs.promises.mkdir(modelsDestDir, { recursive: true });
+        const applicationRecordContent = `// ApplicationRecord - wraps ActiveRecord from virtual adapter
+// This file is generated by the Vite plugin
+import { ActiveRecord, CollectionProxy } from 'juntos:active-record';
 
-        // For now, also generate controllers and views
-        // (TODO: Add Rails filters to Vite plugins for on-the-fly transformation)
+export { CollectionProxy };
+
+export class ApplicationRecord extends ActiveRecord {
+  // Subclasses (Article, Comment) extend this and add their own validations
+}
+`;
+        await fs.promises.writeFile(
+          path.join(modelsDestDir, 'application_record.js'),
+          applicationRecordContent
+        );
+        console.log('[juntos] Generated app/models/application_record.js (uses virtual import)');
+
+        // Models and controllers are now transformed on-the-fly by juntos-ruby plugin
+        // We only need to generate the models index and application_record.js
         const modelsDir = path.join(appRoot, 'app/models');
-        const controllersDir = path.join(appRoot, 'app/controllers');
         const viewsDir = path.join(appRoot, 'app/views');
 
         if (fs.existsSync(modelsDir)) {
-          builder.transpile_directory(
-            modelsDir,
-            path.join(juntosDir, 'app/models'),
-            '**/*.rb',
-            { skip: ['application_record.rb'] }
-          );
-        }
-
-        // Generate models index AFTER models are transpiled
-        builder.generate_models_index();
-
-        if (fs.existsSync(controllersDir)) {
-          builder.transpile_directory(
-            controllersDir,
-            path.join(juntosDir, 'app/controllers'),
-            '**/*.rb',
-            { skip: ['application_controller.rb'], section: 'controllers' }
-          );
+          // Generate models index that imports from source .rb files
+          await generateModelsIndex(modelsDir, juntosDir);
         }
 
         if (fs.existsSync(viewsDir)) {
@@ -457,6 +640,10 @@ function createStructurePlugin(config, appRoot) {
           builder.transpile_migrations(dbSrcDir, dbDestDir);
           builder.transpile_seeds(dbSrcDir, dbDestDir);
         }
+
+        // Post-process ALL generated files to use virtual imports
+        // Must run AFTER all transpilation is complete (models, controllers, views, migrations, seeds)
+        await updateGeneratedImports(juntosDir);
 
         console.log('[juntos] Essential files generated');
       } finally {
@@ -515,6 +702,90 @@ function createStructurePlugin(config, appRoot) {
 }
 
 /**
+ * Update generated files to use virtual module imports.
+ * Replaces relative lib/ imports with juntos: virtual imports.
+ */
+async function updateGeneratedImports(juntosDir) {
+  // Collect files to update - config files plus all transpiled app files
+  const filesToUpdate = [
+    path.join(juntosDir, 'config/routes.js'),
+    path.join(juntosDir, 'config/paths.js'),
+    path.join(juntosDir, 'db/seeds.js')
+  ];
+
+  // Helper to add all .js files in a directory (non-recursive)
+  async function addJsFilesFromDir(dir) {
+    if (!fs.existsSync(dir)) return;
+    const entries = await fs.promises.readdir(dir);
+    for (const entry of entries) {
+      if (entry.endsWith('.js')) {
+        filesToUpdate.push(path.join(dir, entry));
+      }
+    }
+  }
+
+  // Helper to recursively add all .js files
+  async function addJsFilesRecursive(dir) {
+    if (!fs.existsSync(dir)) return;
+    const entries = await fs.promises.readdir(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        await addJsFilesRecursive(fullPath);
+      } else if (entry.name.endsWith('.js')) {
+        filesToUpdate.push(fullPath);
+      }
+    }
+  }
+
+  // Add all model files
+  await addJsFilesFromDir(path.join(juntosDir, 'app/models'));
+
+  // Add all controller files
+  await addJsFilesFromDir(path.join(juntosDir, 'app/controllers'));
+
+  // Add all view files (nested structure: app/views/articles/*.js, etc.)
+  await addJsFilesRecursive(path.join(juntosDir, 'app/views'));
+
+  // Add all migration files
+  await addJsFilesFromDir(path.join(juntosDir, 'db/migrate'));
+
+  const replacements = [
+    // Various relative paths to lib/rails.js (from different directory depths)
+    [/from ['"]\.\.\/lib\/rails\.js['"]/g, "from 'juntos:rails'"],
+    [/from ['"]\.\.\/\.\.\/lib\/rails\.js['"]/g, "from 'juntos:rails'"],
+    [/from ['"]\.\.\/\.\.\/\.\.\/lib\/rails\.js['"]/g, "from 'juntos:rails'"],  // views are 3 levels deep
+    [/from ['"]\.\/lib\/rails\.js['"]/g, "from 'juntos:rails'"],
+    [/from ['"]lib\/rails\.js['"]/g, "from 'juntos:rails'"],
+    // Various relative paths to lib/active_record.mjs
+    [/from ['"]\.\.\/lib\/active_record\.mjs['"]/g, "from 'juntos:active-record'"],
+    [/from ['"]\.\.\/\.\.\/lib\/active_record\.mjs['"]/g, "from 'juntos:active-record'"],
+    [/from ['"]\.\.\/\.\.\/\.\.\/lib\/active_record\.mjs['"]/g, "from 'juntos:active-record'"],  // views are 3 levels deep
+    [/from ['"]\.\/lib\/active_record\.mjs['"]/g, "from 'juntos:active-record'"],
+    [/from ['"]lib\/active_record\.mjs['"]/g, "from 'juntos:active-record'"]
+  ];
+
+  for (const filePath of filesToUpdate) {
+    if (!fs.existsSync(filePath)) continue;
+
+    let content = await fs.promises.readFile(filePath, 'utf-8');
+    let modified = false;
+
+    for (const [pattern, replacement] of replacements) {
+      if (pattern.test(content)) {
+        content = content.replace(pattern, replacement);
+        modified = true;
+      }
+    }
+
+    if (modified) {
+      await fs.promises.writeFile(filePath, content);
+      console.log(`[juntos] Updated imports in ${path.relative(juntosDir, filePath)}`);
+    }
+  }
+}
+
+/**
  * Recursively copy a directory.
  */
 async function copyDirRecursive(src, dest) {
@@ -531,6 +802,49 @@ async function copyDirRecursive(src, dest) {
       await fs.promises.copyFile(srcPath, destPath);
     }
   }
+}
+
+/**
+ * Generate models index.js that imports from source .rb files.
+ * This enables on-the-fly transformation via the juntos-ruby plugin.
+ */
+async function generateModelsIndex(modelsDir, juntosDir) {
+  // Find all model .rb files (excluding application_record.rb)
+  const modelFiles = fs.globSync(path.join(modelsDir, '*.rb'))
+    .map(f => path.basename(f, '.rb'))
+    .filter(name => name !== 'application_record')
+    .sort();
+
+  if (modelFiles.length === 0) return;
+
+  // Build imports, exports, and class names
+  const imports = [];
+  const exports = [];
+  const classNames = [];
+
+  for (const name of modelFiles) {
+    // Convert snake_case to PascalCase (article -> Article, order_item -> OrderItem)
+    const className = name.split('_').map(s => s[0].toUpperCase() + s.slice(1)).join('');
+    // Import from source .rb files (Vite will transform on-the-fly)
+    imports.push(`import { ${className} } from '../../app/models/${name}.rb';`);
+    exports.push(`export { ${className} };`);
+    classNames.push(className);
+  }
+
+  // Generate index.js
+  const indexJs = `${imports.join('\n')}
+import { Application } from 'juntos:rails';
+
+// Register models for association resolution (avoids circular dependency issues)
+Application.registerModels({ ${classNames.join(', ')} });
+
+${exports.join('\n')}
+`;
+
+  const destDir = path.join(juntosDir, 'app/models');
+  await fs.promises.mkdir(destDir, { recursive: true });
+  await fs.promises.writeFile(path.join(destDir, 'index.js'), indexJs);
+  console.log('  -> app/models/index.js (re-exports from source .rb)');
 }
 
 /**
@@ -558,8 +872,7 @@ function createConfigPlugin(config, appRoot) {
         '@views': path.join(appRoot, 'app/views'),
         'components': path.join(appRoot, 'app/components'),
 
-        // Generated files in .juntos/
-        'lib': path.join(juntosDir, 'lib'),
+        // Generated files in .juntos/ (only config and db, lib is now virtual)
         '@config': path.join(juntosDir, 'config'),
 
         // Alias for Rails importmap-style imports in Stimulus controllers
@@ -567,23 +880,16 @@ function createConfigPlugin(config, appRoot) {
 
         // node_modules is now at appRoot (standard Vite structure)
         // No aliases needed - Vite resolves these automatically
+
+        // NOTE: lib/ aliases removed - now using virtual modules:
+        // - juntos:rails - target-specific runtime
+        // - juntos:active-record - database adapter
+        // - juntos:active-record-client - RPC adapter for browser in server builds
       };
 
-      // For server targets, client bundles should use RPC adapter instead of SQL adapter
-      // This redirects lib/active_record.mjs imports to lib/active_record_client.mjs
-      // The server runtime uses lib/active_record.mjs directly (SQL adapter)
-      if (isServerTarget(config.target)) {
-        const rpcAdapterPath = path.join(juntosDir, 'lib/active_record_client.mjs');
-        if (fs.existsSync(rpcAdapterPath)) {
-          // Match both relative and absolute paths to lib/active_record.mjs
-          aliases['lib/active_record.mjs'] = rpcAdapterPath;
-          aliases['./lib/active_record.mjs'] = rpcAdapterPath;
-          aliases['../lib/active_record.mjs'] = rpcAdapterPath;
-          aliases['../../lib/active_record.mjs'] = rpcAdapterPath;
-        }
-      } else {
-        // For browser targets, use path_helper_browser.mjs (direct controller invocation)
-        // instead of path_helper.mjs (fetch-based for server targets)
+      // For browser targets, use path_helper_browser.mjs (direct controller invocation)
+      // instead of path_helper.mjs (fetch-based for server targets)
+      if (!isServerTarget(config.target)) {
         const browserPathHelper = path.join(juntosDir, 'path_helper_browser.mjs');
         if (fs.existsSync(browserPathHelper)) {
           aliases['ruby2js-rails/path_helper.mjs'] = browserPathHelper;
@@ -623,7 +929,14 @@ function createConfigPlugin(config, appRoot) {
         resolve: {
           alias: aliases,
           // Add Ruby extensions for auto-resolution
-          extensions: ['.mjs', '.js', '.mts', '.ts', '.jsx', '.tsx', '.json', '.jsx.rb', '.rb']
+          extensions: ['.mjs', '.js', '.mts', '.ts', '.jsx', '.tsx', '.json', '.jsx.rb', '.rb'],
+          // Ensure these packages resolve from the app's node_modules, not from the package
+          // (browser rails.js has dynamic imports for optional React and database adapters)
+          dedupe: ['react', 'react-dom', 'dexie', 'better-sqlite3', '@neondatabase/serverless', '@libsql/client']
+        },
+        // Ensure react/react-dom are pre-bundled in dev
+        optimizeDeps: {
+          include: ['react', 'react-dom', 'react-dom/client']
         },
         // publicDir is public/ by default, which is correct
       };
@@ -928,5 +1241,95 @@ if (import.meta.hot) {
   });
 }
 `;
+
+/**
+ * Virtual modules plugin.
+ * Provides virtual modules for rails runtime and active record adapter,
+ * eliminating the need for .juntos/lib/ directory.
+ *
+ * Virtual modules:
+ * - juntos:rails - Re-exports from target-specific runtime
+ * - juntos:active-record - Injects DB_CONFIG and re-exports from adapter
+ */
+function createVirtualPlugin(config, appRoot) {
+  // Map targets/runtimes to target directory names
+  const TARGET_DIR_MAP = {
+    'browser': 'browser',
+    'capacitor': 'capacitor',
+    'electron': 'electron',
+    'tauri': 'tauri',
+    'cloudflare': 'cloudflare',
+    'node': 'node',
+    'bun': 'bun',
+    'deno': 'deno',
+    'vercel-edge': 'vercel-edge',
+    'vercel-node': 'vercel-node',
+    'deno-deploy': 'vercel-edge',  // Deno Deploy uses same runtime as Vercel Edge
+    'fly': 'node'  // Fly.io runs Node.js
+  };
+
+  // Map database names to adapter file names
+  const ADAPTER_FILE_MAP = {
+    'dexie': 'active_record_dexie.mjs',
+    'sqlite': 'active_record_better_sqlite3.mjs',
+    'better_sqlite3': 'active_record_better_sqlite3.mjs',
+    'pg': 'active_record_pg.mjs',
+    'postgres': 'active_record_pg.mjs',
+    'mysql2': 'active_record_mysql2.mjs',
+    'neon': 'active_record_neon.mjs',
+    'turso': 'active_record_turso.mjs',
+    'planetscale': 'active_record_planetscale.mjs',
+    'd1': 'active_record_d1.mjs',
+    'sqljs': 'active_record_sqljs.mjs',
+    'pglite': 'active_record_pglite.mjs',
+    'supabase': 'active_record_supabase.mjs'
+  };
+
+  const targetDir = TARGET_DIR_MAP[config.target] || 'browser';
+  const adapterFile = ADAPTER_FILE_MAP[config.database] || 'active_record_dexie.mjs';
+
+  // Load database config for injection
+  const dbConfig = SelfhostBuilder.load_database_config(appRoot, { quiet: true }) || {};
+  if (config.database) dbConfig.adapter = config.database;
+
+  return {
+    name: 'juntos-virtual',
+    enforce: 'pre',
+
+    resolveId(id) {
+      if (id === 'juntos:rails') return '\0juntos:rails';
+      if (id === 'juntos:active-record') return '\0juntos:active-record';
+      if (id === 'juntos:active-record-client') return '\0juntos:active-record-client';
+      return null;
+    },
+
+    load(id) {
+      if (id === '\0juntos:rails') {
+        // Re-export from target-specific runtime
+        return `export * from 'ruby2js-rails/targets/${targetDir}/rails.js';`;
+      }
+
+      if (id === '\0juntos:active-record') {
+        // Inject DB_CONFIG and re-export from adapter
+        // The adapter expects DB_CONFIG to be defined, but for most databases
+        // it prefers runtime environment variables (DATABASE_URL, etc.)
+        return `
+// Database configuration injected at build time
+// Runtime environment variables take precedence
+export const DB_CONFIG = ${JSON.stringify(dbConfig)};
+
+export * from 'ruby2js-rails/adapters/${adapterFile}';
+`;
+      }
+
+      if (id === '\0juntos:active-record-client') {
+        // RPC adapter for browser in server-target builds
+        return `export * from 'ruby2js-rails/adapters/active_record_rpc.mjs';`;
+      }
+
+      return null;
+    }
+  };
+}
 
 export default juntos;

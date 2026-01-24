@@ -19,7 +19,7 @@ import {
   setupFormHandlers,
   turbo_stream_from,
   resolveContent
-} from './rails_server.js';
+} from 'ruby2js-rails/rails_server.js';
 
 // Re-export everything from server module
 export { createContext, createFlash, truncate, pluralize, dom_id, navigate, submitForm, formData, handleFormResult, setupFormHandlers, turbo_stream_from };
@@ -158,7 +158,7 @@ export class Application extends ApplicationServer {
     if (this._initialized) return;
 
     // Import the adapter (selected at build time)
-    const adapter = await import('./active_record.mjs');
+    const adapter = await import('juntos:active-record');
     this.activeRecordModule = adapter;
 
     // Initialize database connection with environment variable

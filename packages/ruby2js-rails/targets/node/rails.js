@@ -27,9 +27,9 @@ import {
   turbo_stream_from,
   resolveContent,
   getCSRF
-} from './rails_server.js';
+} from 'ruby2js-rails/rails_server.js';
 
-import { createRPCHandler, getRegistry, csrfMetaTag } from './rpc/server.mjs';
+import { createRPCHandler, getRegistry, csrfMetaTag } from 'ruby2js-rails/rpc/server.mjs';
 
 // RPC handler instance (initialized when models are registered)
 let rpcHandler = null;
