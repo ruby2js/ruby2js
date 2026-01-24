@@ -23,6 +23,7 @@ module Ruby2JS
       )
 
       add_vite_dependencies(package, app_root: app_root)
+      add_database_dependencies(package, app_root: app_root)
       package
     end
 
@@ -57,6 +58,33 @@ module Ruby2JS
       package["scripts"]["vite"] = "vite"
       package["scripts"]["vite:build"] = "vite build"
       package["scripts"]["vite:preview"] = "vite preview"
+    end
+
+    # Add database adapter dependencies based on detected database or default
+    # Uses SelfhostBuilder::ADAPTER_DEPENDENCIES for version info
+    def add_database_dependencies(package, app_root: nil)
+      require 'ruby2js/rails/builder'
+
+      database = detect_database(app_root || Dir.pwd)
+      deps = SelfhostBuilder::ADAPTER_DEPENDENCIES[database]
+
+      return unless deps
+
+      package["dependencies"] ||= {}
+
+      # Check if this is a native adapter (needs optionalDependencies)
+      is_native = SelfhostBuilder::NATIVE_ADAPTERS.include?(database)
+
+      if is_native
+        package["optionalDependencies"] ||= {}
+        deps.each do |name, version|
+          package["optionalDependencies"][name] ||= version
+        end
+      else
+        deps.each do |name, version|
+          package["dependencies"][name] ||= version
+        end
+      end
     end
 
     # Generate vite.config.js content
