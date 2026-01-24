@@ -171,8 +171,9 @@ export function juntos(options = {}) {
  */
 function createRubyPlugin(config, options) {
   return ruby2js({
-    filters: ['Stimulus', 'ESM', 'Functions', 'Return'],
+    filters: ['Pragma', 'Stimulus', 'ESM', 'Functions', 'Return'],
     eslevel: config.eslevel,
+    target: config.target,  // Pass target for pragma filter to strip target-specific lines
     exclude: [
       '**/*.jsx.rb',        // JSX.rb files handled by juntos-jsx-rb
       'app/models/',        // Models handled by juntos-ruby (on-the-fly)
