@@ -1389,14 +1389,23 @@ class SelfhostBuilder
   end
 
   # Find the adapters directory
+  # Checks multiple locations:
+  # 1. Local packages (development)
+  # 2. App root node_modules (Vite-native architecture)
+  # 3. dist/ node_modules (legacy .juntos architecture)
+  # 4. Vendor directory
   def find_adapter_dir()
     npm_adapter_dir = File.join(@dist_dir, 'node_modules/ruby2js-rails/adapters')
     npm_dist_dir = File.join(@dist_dir, 'node_modules/ruby2js-rails/dist/lib')
     pkg_adapter_dir = File.join(DEMO_ROOT, '../../packages/ruby2js-rails/adapters')
     vendor_adapter_dir = File.join(DEMO_ROOT, 'vendor/ruby2js/adapters')
+    # Vite-native: node_modules at app root
+    app_root_adapter_dir = File.join(DEMO_ROOT, 'node_modules/ruby2js-rails/adapters')
 
     if File.exist?(pkg_adapter_dir)
       pkg_adapter_dir
+    elsif File.exist?(app_root_adapter_dir)
+      app_root_adapter_dir
     elsif File.exist?(npm_adapter_dir)
       npm_adapter_dir
     elsif File.exist?(npm_dist_dir)
