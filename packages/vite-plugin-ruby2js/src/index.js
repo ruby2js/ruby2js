@@ -37,6 +37,9 @@ import 'ruby2js/filters/return.js';
 import 'ruby2js/filters/react.js';
 import 'ruby2js/filters/jsx.js';
 
+// Import Stimulus filter for Rails controller support
+import 'ruby2js/filters/stimulus.js';
+
 // Import SFC component transformers (lazy loaded when needed)
 let VueComponentTransformer = null;
 let SvelteComponentTransformer = null;
