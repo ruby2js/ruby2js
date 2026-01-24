@@ -27,6 +27,9 @@ import 'ruby2js/filters/react.js';
 // Import Stimulus filter for controller support
 import 'ruby2js/filters/stimulus.js';
 
+// Import Pragma filter for target-specific pragmas (browser, capacitor, etc.)
+import 'ruby2js/filters/pragma.js';
+
 // ============================================================
 // Configuration constants (previously from SelfhostBuilder)
 // ============================================================
@@ -115,7 +118,8 @@ function getBuildOptions(section, target) {
       return {
         ...baseOptions,
         autoexports: 'default',
-        filters: ['Stimulus', 'Functions', 'ESM', 'Return']
+        filters: ['Pragma', 'Stimulus', 'Functions', 'ESM', 'Return'],
+        target
       };
 
     case 'controllers':
