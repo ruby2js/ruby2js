@@ -20,10 +20,119 @@
 import path from 'node:path';
 import fs from 'node:fs';
 import yaml from 'js-yaml';
-import { SelfhostBuilder } from './build.mjs';
 
 // Import React filter for .jsx.rb files
 import 'ruby2js/filters/react.js';
+
+// ============================================================
+// Configuration constants (previously from SelfhostBuilder)
+// ============================================================
+
+/**
+ * Default target for each database adapter (used when target not specified).
+ */
+const DEFAULT_TARGETS = Object.freeze({
+  // Browser-only databases
+  dexie: 'browser',
+  indexeddb: 'browser',
+  sqljs: 'browser',
+  'sql.js': 'browser',
+  pglite: 'browser',
+
+  // TCP-based server databases
+  better_sqlite3: 'node',
+  sqlite3: 'node',
+  sqlite: 'node',
+  pg: 'node',
+  postgres: 'node',
+  postgresql: 'node',
+  mysql2: 'node',
+  mysql: 'node',
+
+  // Platform-specific databases
+  d1: 'cloudflare',
+  mpg: 'fly',
+
+  // HTTP-based edge databases
+  neon: 'vercel',
+  turso: 'vercel',
+  libsql: 'vercel',
+  planetscale: 'vercel',
+  supabase: 'vercel'
+});
+
+/**
+ * Load database configuration from environment or config/database.yml.
+ * Returns: { adapter: 'dexie', database: 'myapp_dev', ... }
+ */
+function loadDatabaseConfig(appRoot, { quiet = false } = {}) {
+  const env = process.env.RAILS_ENV || process.env.NODE_ENV || 'development';
+  const configPath = path.join(appRoot, 'config/database.yml');
+
+  let dbConfig = null;
+  if (fs.existsSync(configPath)) {
+    try {
+      const config = yaml.load(fs.readFileSync(configPath, 'utf8'));
+      if (config && config[env]) {
+        if (!quiet) console.log(`  Using config/database.yml [${env}]`);
+        dbConfig = config[env];
+      }
+    } catch (e) {
+      if (!quiet) console.warn(`  Warning: Failed to parse database.yml: ${e.message}`);
+    }
+  }
+
+  // Default config if database.yml not found or empty
+  dbConfig = dbConfig || { adapter: 'dexie', database: 'ruby2js_rails' };
+
+  // JUNTOS_DATABASE or DATABASE env var overrides adapter only
+  const dbEnv = process.env.JUNTOS_DATABASE || process.env.DATABASE;
+  if (dbEnv) {
+    if (!quiet) {
+      console.log(`  Adapter override: ${process.env.JUNTOS_DATABASE ? 'JUNTOS_DATABASE' : 'DATABASE'}=${dbEnv}`);
+    }
+    dbConfig.adapter = dbEnv.toLowerCase();
+  }
+
+  return dbConfig;
+}
+
+/**
+ * Get Ruby2JS transpilation options for a given section.
+ * Uses filter names as strings (resolved by ruby2js).
+ */
+function getBuildOptions(section, target) {
+  const baseOptions = {
+    eslevel: 2022,
+    include: ['class', 'call']
+  };
+
+  switch (section) {
+    case 'stimulus':
+      return {
+        ...baseOptions,
+        autoexports: 'default',
+        filters: ['Stimulus', 'Functions', 'ESM', 'Return']
+      };
+
+    case 'controllers':
+      return {
+        ...baseOptions,
+        autoexports: true,
+        filters: ['Rails_Controller', 'Functions', 'ESM', 'Return'],
+        target
+      };
+
+    default:
+      // Models, routes, seeds, migrations
+      return {
+        ...baseOptions,
+        autoexports: true,
+        filters: ['Rails_Model', 'Rails_Controller', 'Rails_Routes', 'Rails_Seeds', 'Functions', 'ESM', 'Return'],
+        target
+      };
+  }
+}
 
 // Import ERB compiler for .erb files
 import { ErbCompiler } from './lib/erb_compiler.js';
@@ -79,7 +188,7 @@ export function loadConfig(appRoot, overrides = {}) {
   // Priority: JUNTOS_DATABASE env > overrides > database.yml > default
   let database = process.env.JUNTOS_DATABASE || overrides.database;
   if (!database) {
-    const dbConfig = SelfhostBuilder.load_database_config(appRoot, { quiet: true });
+    const dbConfig = loadDatabaseConfig(appRoot, { quiet: true });
     database = dbConfig?.adapter || 'dexie';
   }
 
@@ -88,7 +197,7 @@ export function loadConfig(appRoot, overrides = {}) {
   const target = process.env.JUNTOS_TARGET ||
                  overrides.target ||
                  ruby2jsConfig.target ||
-                 SelfhostBuilder.DEFAULT_TARGETS?.[database] ||
+                 DEFAULT_TARGETS[database] ||
                  'browser';
 
   // External modules: top-level config, then env-specific, then overrides
@@ -384,18 +493,6 @@ function createRubyTransformPlugin(config, appRoot) {
   // Cache for transformed files
   const transformCache = new Map();
 
-  // Get SelfhostBuilder instance (cached)
-  let _builder = null;
-  function getBuilder() {
-    if (!_builder) {
-      _builder = new SelfhostBuilder(appRoot, {
-        database: config.database,
-        target: config.target
-      });
-    }
-    return _builder;
-  }
-
   // Find all model files
   function findModels() {
     const modelsDir = path.join(appRoot, 'app/models');
@@ -427,9 +524,8 @@ function createRubyTransformPlugin(config, appRoot) {
   // Transform Ruby source to JS
   async function transformRuby(source, filePath, section = null) {
     await ensureReady();
-    const builder = getBuilder();
     const options = {
-      ...builder.build_options(section),
+      ...getBuildOptions(section, config.target),
       file: path.relative(appRoot, filePath),
       database: config.database,
       target: config.target
@@ -678,9 +774,8 @@ export { ${members.join(', ')} };
         let result;
         if (id.endsWith('/routes.rb')) {
           await ensureReady();
-          const builder = getBuilder();
           const options = {
-            ...builder.build_options(),
+            ...getBuildOptions(null, config.target),
             file: path.relative(appRoot, id),
             database: config.database,
             target: config.target,
@@ -1332,7 +1427,7 @@ function createVirtualPlugin(config, appRoot) {
   const adapterFile = ADAPTER_FILE_MAP[config.database] || 'active_record_dexie.mjs';
 
   // Load database config for injection
-  const dbConfig = SelfhostBuilder.load_database_config(appRoot, { quiet: true }) || {};
+  const dbConfig = loadDatabaseConfig(appRoot, { quiet: true }) || {};
   if (config.database) dbConfig.adapter = config.database;
 
   return {

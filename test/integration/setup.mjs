@@ -106,7 +106,6 @@ async function setup() {
   execSync(`tar -xzf ${tarballs}/demo-${demoHyphen}.tar.gz -C ${WORK_DIR}`);
 
   const demoDir = join(WORK_DIR, demo);
-  const distDir = join(demoDir, 'dist');
 
   // Vite-native architecture: package.json is at app root, not dist/
   // Install dependencies at app root where package.json lives
@@ -122,43 +121,16 @@ async function setup() {
     stdio: 'inherit'
   });
 
-  // Build with browser target but better-sqlite3 adapter (for Node.js testing)
-  // vite: false ensures .js imports instead of .html.erb (no Vite transform in Node)
-  console.log('\n4. Building demo with better-sqlite3 + browser target...');
+  // Build with Vite using better-sqlite3 adapter and node target
+  // This is the Vite-native approach - testing the actual build pipeline
+  console.log('\n4. Building demo with Vite (sqlite + node target)...');
 
-  // Use the Ruby builder since it's more reliable
-  // Point to the local ruby2js gem for building
-  // sourcemap: false avoids Vite SSR transform issues with generated sourcemaps
-  execSync(
-    `BUNDLE_GEMFILE="${PROJECT_ROOT}/Gemfile" bundle exec ruby -r ruby2js/rails/builder -e "SelfhostBuilder.new('dist', database: 'sqlite', target: 'browser', vite: false, sourcemap: false).build"`,
-    {
-      cwd: demoDir,
-      stdio: 'inherit'
-    }
-  );
+  execSync('JUNTOS_DATABASE=sqlite JUNTOS_TARGET=node npm run build', {
+    cwd: demoDir,
+    stdio: 'inherit'
+  });
 
-  // When using local packages, reinstall them to override the build's npm install
-  // (the build's package.json has hardcoded URLs to released packages)
-  // Also copy rails.js to lib/ since build already copied it before reinstall
-  if (useLocal || useLocalPackages) {
-    console.log('\n5. Reinstalling local packages...');
-    execSync(`npm install ${tarballs}/ruby2js-rails-beta.tgz`, {
-      cwd: demoDir,
-      stdio: 'inherit'
-    });
-    // Copy the updated rails.js to lib/ (build copied it before reinstall)
-    execSync(`cp "${demoDir}/node_modules/ruby2js-rails/targets/browser/rails.js" "${distDir}/lib/rails.js"`, {
-      stdio: 'inherit'
-    });
-    console.log('\n6. Setup complete!');
-  } else {
-    // When using remote packages, apply local rails.js to get latest fixes
-    console.log('\n5. Applying local rails.js (workaround for remote packages)...');
-    execSync(`cp "${PROJECT_ROOT}/packages/ruby2js-rails/targets/browser/rails.js" "${distDir}/lib/rails.js"`, {
-      stdio: 'inherit'
-    });
-    console.log('\n6. Setup complete!');
-  }
+  console.log('\n5. Setup complete!');
   console.log(`   Demo built at: ${demoDir}/dist`);
   console.log('   Run tests with: npm test');
 }

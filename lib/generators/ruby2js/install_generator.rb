@@ -2,13 +2,21 @@
 
 require 'rails/generators'
 require 'json'
-require 'ruby2js/installer'
 
 # Use Ruby2js (lowercase 'js') so Rails finds this as 'ruby2js:install'
 # rather than 'ruby2_j_s:install'
 module Ruby2js
   class InstallGenerator < Rails::Generators::Base
     desc "Set up Ruby2JS/Juntos for transpiling Rails to JavaScript"
+
+    # Core dependencies - database adapters are installed on-demand
+    RELEASES_URL = 'https://ruby2js.github.io/ruby2js/releases'.freeze
+    CORE_DEPENDENCIES = {
+      'ruby2js-rails' => "#{RELEASES_URL}/ruby2js-rails-beta.tgz"
+    }.freeze
+    DEV_DEPENDENCIES = {
+      'vite' => '^6.0.0'
+    }.freeze
 
     def create_package_json
       package_path = 'package.json'
@@ -28,20 +36,22 @@ module Ruby2js
         return
       end
 
-      database = Ruby2JS::Installer.detect_database(destination_root)
-      config_content = Ruby2JS::Installer.generate_vite_config(database: database)
+      create_file config_path, <<~JS
+        import { defineConfig } from 'vite';
+        import { juntos } from 'ruby2js-rails/vite';
 
-      create_file config_path, config_content
+        export default defineConfig({
+          plugins: juntos()
+        });
+      JS
     end
 
     def install_dependencies
       say_status :run, "npm install"
-      # Use verbose: true so npm errors are visible
       run "npm install", verbose: true
 
       # Verify critical package was installed
-      vite_path = 'node_modules/vite'
-      unless File.directory?(vite_path)
+      unless File.directory?('node_modules/vite')
         say_status :warn, "vite not found, installing explicitly"
         run "npm install vite@^6.0.0 --save-dev", verbose: true
       end
@@ -55,7 +65,12 @@ module Ruby2js
         return
       end
 
-      create_file binstub_path, Ruby2JS::Installer.generate_binstub
+      create_file binstub_path, <<~SHELL
+        #!/bin/sh
+        # Juntos - Rails patterns, JavaScript runtimes
+        # This binstub delegates to the juntos CLI from ruby2js-rails
+        exec npx juntos "$@"
+      SHELL
       chmod binstub_path, 0755
     end
 
@@ -99,6 +114,8 @@ module Ruby2js
       say "  bin/juntos build              - Build with Vite"
       say "  bin/juntos server             - Production server (Node.js)"
       say ""
+      say "Database adapters are installed automatically when needed."
+      say ""
     end
 
     private
@@ -118,14 +135,31 @@ module Ruby2js
       end
     end
 
+    def detect_app_name
+      app_rb = File.join(destination_root, "config/application.rb")
+      if File.exist?(app_rb)
+        content = File.read(app_rb)
+        if content =~ /module\s+(\w+)/
+          return $1.gsub(/([a-z])([A-Z])/, '\1_\2').downcase
+        end
+      end
+      File.basename(destination_root).gsub(/[^a-z0-9_-]/i, '_').downcase
+    end
+
     def write_package_json(package_path)
       say_status :create, package_path
 
-      app_name = Ruby2JS::Installer.detect_app_name(destination_root)
-      package = Ruby2JS::Installer.generate_package_json(
-        app_name: app_name,
-        app_root: destination_root
-      )
+      package = {
+        "name" => detect_app_name,
+        "type" => "module",
+        "scripts" => {
+          "dev" => "vite",
+          "build" => "vite build",
+          "preview" => "vite preview"
+        },
+        "dependencies" => CORE_DEPENDENCIES.dup,
+        "devDependencies" => DEV_DEPENDENCIES.dup
+      }
 
       create_file package_path, JSON.pretty_generate(package) + "\n"
     end
@@ -134,17 +168,38 @@ module Ruby2js
       say_status :update, package_path
 
       existing = JSON.parse(File.read(package_path))
-      app_name = Ruby2JS::Installer.detect_app_name(destination_root)
-      required = Ruby2JS::Installer.generate_package_json(
-        app_name: existing["name"] || app_name,
-        app_root: destination_root
-      )
+      existing["type"] ||= "module"
+      existing["dependencies"] ||= {}
+      existing["devDependencies"] ||= {}
+      existing["scripts"] ||= {}
 
-      added = Ruby2JS::Installer.merge_package_dependencies(existing, required)
+      added = []
 
-      added.each do |type, name|
-        say_status :add, "#{type}: #{name}"
+      # Add core dependencies
+      CORE_DEPENDENCIES.each do |name, version|
+        unless existing["dependencies"].key?(name)
+          existing["dependencies"][name] = version
+          added << "dependency: #{name}"
+        end
       end
+
+      # Add dev dependencies
+      DEV_DEPENDENCIES.each do |name, version|
+        unless existing["devDependencies"].key?(name)
+          existing["devDependencies"][name] = version
+          added << "devDependency: #{name}"
+        end
+      end
+
+      # Add scripts if missing
+      { "dev" => "vite", "build" => "vite build", "preview" => "vite preview" }.each do |name, cmd|
+        unless existing["scripts"].key?(name)
+          existing["scripts"][name] = cmd
+          added << "script: #{name}"
+        end
+      end
+
+      added.each { |item| say_status :add, item }
 
       remove_file package_path
       create_file package_path, JSON.pretty_generate(existing) + "\n"
@@ -158,24 +213,15 @@ module Ruby2js
       registrations = []
 
       # Deduplicate: if both .js and .rb exist, prefer .rb (Ruby2JS)
-      # Group by base name, then pick the best extension
       by_basename = controller_files.group_by { |f| File.basename(f).sub(/\.(js|rb)$/, '') }
       unique_files = by_basename.map do |_basename, files|
-        # Prefer .rb over .js
         files.find { |f| f.end_with?('.rb') } || files.first
       end
 
       unique_files.sort.each do |file|
-        # Extract controller name from filename
-        # hello_controller.js -> HelloController, "hello"
-        # live_scores_controller.rb -> LiveScoresController, "live-scores"
         basename = File.basename(file).sub(/\.(js|rb)$/, '')
         name_part = basename.sub(/_controller$/, '')
-
-        # Convert to class name (hello_world -> HelloWorld)
         class_name = name_part.split('_').map(&:capitalize).join('') + 'Controller'
-
-        # Convert to Stimulus identifier (hello_world -> hello-world)
         identifier = name_part.tr('_', '-')
 
         imports << "import #{class_name} from \"./#{file}\";"

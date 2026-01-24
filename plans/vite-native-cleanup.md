@@ -487,13 +487,18 @@ Ruby CLI infrastructure has been replaced by JavaScript CLI.
 11. [x] `lib/ruby2js/cli/` - Directory removed
 
 **Files updated:**
-1. [x] `lib/ruby2js/installer.rb` - Generate shell binstub instead of Ruby binstub
-2. [x] `bin/juntos` - Now a shell script that delegates to `npx juntos`
-3. [x] `demo/ruby2js.rb` - Subcommand support removed, points to npx
+1. [x] `bin/juntos` - Now a shell script that delegates to `npx juntos`
+2. [x] `demo/ruby2js.rb` - Subcommand support removed, points to npx
+3. [x] `lib/generators/ruby2js/install_generator.rb` - Now self-contained (no installer.rb dependency)
+4. [x] `packages/ruby2js-rails/vite.mjs` - Now self-contained (no build.mjs dependency)
+5. [x] `test/integration/setup.mjs` - Uses `vite build` instead of SelfhostBuilder
 
-**Files kept (still used):**
-1. `lib/ruby2js/rails/builder.rb` - Used by vite.mjs for Ruby2JS transpilation options
-2. `packages/ruby2js-rails/build.mjs` - Keep `load_database_config()` and `build_options()`
+**Files removed:**
+1. [x] `lib/ruby2js/installer.rb` - No longer needed, logic moved to install_generator.rb
+
+**Files kept (for selfhost demo and eject command):**
+1. `lib/ruby2js/rails/builder.rb` - Used by selfhost demo and future eject command
+2. `packages/ruby2js-rails/build.mjs` - Transpiled from builder.rb for selfhost
 
 **Verify nothing breaks:**
 1. [ ] `bundle exec rake test` - Ruby gem tests (CLI tests removed)
@@ -534,10 +539,10 @@ Ruby CLI infrastructure has been replaced by JavaScript CLI.
 - `test/notes/create-notes` - Same
 - `demo/blog/bin/juntos` - Update deploy commands
 
-**To remove in Phase 4:**
-- `lib/generators/ruby2js/install_generator.rb` - Ruby generator
-- `lib/ruby2js/installer.rb` - Installer module
-- `packages/ruby2js-rails/build.mjs` - File generation parts (keep utilities)
+**Already removed/simplified:**
+- `lib/ruby2js/installer.rb` - Removed (January 2025)
+- `lib/generators/ruby2js/install_generator.rb` - Simplified, now self-contained
+- `packages/ruby2js-rails/vite.mjs` - No longer depends on build.mjs
 
 ## Success Criteria
 
@@ -559,9 +564,19 @@ Ruby CLI infrastructure has been replaced by JavaScript CLI.
 - **Browser build** works: `npm run build` produces `dist/` directly
 - **Dev server** works: `npm run dev` with HMR
 
-**Phase 3-4 Pending:** CI and cleanup work:
+**Phase 5 Complete:** Ruby CLI removed, JavaScript CLI is primary:
 
-- CI still uses old generator-based structure (`dist/` with package.json)
-- Create-* scripts need updating to use root-level Vite structure
-- Ruby generator and related files can be removed once CI migrated
-- Deploy commands in bin/juntos still reference `.juntos/` paths
+- Ruby CLI files removed
+- `bin/juntos` binstub delegates to `npx juntos`
+- Generator simplified to be self-contained (no installer.rb dependency)
+- vite.mjs is self-contained (no build.mjs dependency for configuration)
+- Integration tests use `vite build` instead of SelfhostBuilder
+- **installer.rb removed** - all install logic is now in install_generator.rb
+- **builder.rb/build.mjs** kept only for selfhost demo and future eject command
+
+**Pending work:**
+
+- CI verification with new structure
+- Phase 6: Turbo 8 HMR (experimental)
+- Phase 7: Eject command
+- Phase 8: Documentation updates
