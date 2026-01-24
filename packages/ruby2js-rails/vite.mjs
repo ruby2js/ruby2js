@@ -774,6 +774,10 @@ function createConfigPlugin(config, appRoot) {
         '@views': path.join(appRoot, 'app/views'),
         'components': path.join(appRoot, 'app/components'),
 
+        // Config aliases (used by rails/helpers filter for ERB transforms)
+        // @config/paths.js exports path helpers (e.g., articles_path)
+        '@config/paths.js': path.join(appRoot, 'config/routes.rb'),
+
         // Alias for Rails importmap-style imports in Stimulus controllers
         'controllers/application': path.join(appRoot, 'app/javascript/controllers/application.js'),
 
