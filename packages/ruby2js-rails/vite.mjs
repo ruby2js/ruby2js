@@ -136,6 +136,9 @@ export function juntos(options = {}) {
   const config = loadConfig(appRoot, { database, target, broadcast, eslevel, external });
 
   return [
+    // Generate .browser/index.html and main.js for browser targets
+    createBrowserEntryPlugin(config, appRoot),
+
     // Virtual modules (juntos:rails, juntos:active-record)
     // Eliminates need for .juntos/lib/ directory
     createVirtualPlugin(config, appRoot),
@@ -827,6 +830,29 @@ function createConfigPlugin(config, appRoot) {
         },
         // publicDir is public/ by default, which is correct
       };
+    },
+
+    // Flatten .browser/ output to dist root for browser targets
+    async closeBundle() {
+      const browserTargets = ['browser', 'pwa', 'capacitor', 'electron', 'tauri'];
+      if (!browserTargets.includes(config.target)) return;
+
+      const distDir = path.join(appRoot, 'dist');
+      const browserOutDir = path.join(distDir, '.browser');
+
+      if (!fs.existsSync(browserOutDir)) return;
+
+      // Move all files from dist/.browser/ to dist/
+      const files = await fs.promises.readdir(browserOutDir);
+      for (const file of files) {
+        const src = path.join(browserOutDir, file);
+        const dest = path.join(distDir, file);
+        await fs.promises.rename(src, dest);
+      }
+
+      // Remove the empty .browser/ directory
+      await fs.promises.rmdir(browserOutDir);
+      console.log('[juntos] Flattened .browser/ output to dist/');
     }
   };
 }
@@ -896,7 +922,7 @@ function getRollupOptions(target, database) {
     case 'pwa':
     case 'capacitor':
       return {
-        input: 'index.html'
+        input: '.browser/index.html'
       };
 
     case 'electron':
@@ -904,14 +930,14 @@ function getRollupOptions(target, database) {
         input: {
           main: 'main.js',
           preload: 'preload.js',
-          renderer: 'index.html'
+          renderer: '.browser/index.html'
         },
         external: ['electron', 'better-sqlite3', 'path', 'fs', 'url']
       };
 
     case 'tauri':
       return {
-        input: 'index.html',
+        input: '.browser/index.html',
         external: ['@tauri-apps/api']
       };
 
@@ -958,7 +984,7 @@ function getRollupOptions(target, database) {
 
     default:
       return {
-        input: 'index.html'
+        input: '.browser/index.html'
       };
   }
 }
@@ -983,6 +1009,108 @@ function getNativeModules(database) {
   const clientModules = ['@hotwired/stimulus', '@hotwired/turbo', '@hotwired/turbo-rails'];
 
   return [...baseModules, ...(dbModules[database] || []), ...clientModules];
+}
+
+/**
+ * Browser entry plugin - generates .browser/index.html and main.js for browser targets.
+ *
+ * This plugin creates entry points for SPA builds only when needed (browser, pwa, capacitor).
+ * Files are generated in .browser/ to avoid conflicts with Rails' public/ directory.
+ *
+ * For server-side targets (Node, Cloudflare, etc.), no index.html is needed.
+ */
+function createBrowserEntryPlugin(config, appRoot) {
+  const browserTargets = ['browser', 'pwa', 'capacitor', 'electron', 'tauri'];
+  const isBrowserTarget = browserTargets.includes(config.target);
+
+  return {
+    name: 'juntos-browser-entry',
+
+    async buildStart() {
+      // Only generate for browser-like targets
+      if (!isBrowserTarget) return;
+
+      const browserDir = path.join(appRoot, '.browser');
+      const indexPath = path.join(browserDir, 'index.html');
+      const mainPath = path.join(browserDir, 'main.js');
+
+      // Create .browser directory if needed
+      if (!fs.existsSync(browserDir)) {
+        await fs.promises.mkdir(browserDir, { recursive: true });
+        console.log('[juntos] Created .browser/ directory');
+      }
+
+      // Generate index.html if it doesn't exist
+      if (!fs.existsSync(indexPath)) {
+        const appName = detectAppName(appRoot);
+        const indexContent = generateIndexHtml(appName);
+        await fs.promises.writeFile(indexPath, indexContent);
+        console.log('[juntos] Generated .browser/index.html');
+      }
+
+      // Generate main.js if it doesn't exist
+      if (!fs.existsSync(mainPath)) {
+        const mainContent = generateMainJs();
+        await fs.promises.writeFile(mainPath, mainContent);
+        console.log('[juntos] Generated .browser/main.js');
+      }
+    }
+  };
+}
+
+/**
+ * Detect app name from config/application.rb or directory name.
+ */
+function detectAppName(appRoot) {
+  const appRb = path.join(appRoot, 'config/application.rb');
+  if (fs.existsSync(appRb)) {
+    const content = fs.readFileSync(appRb, 'utf8');
+    const match = content.match(/module\s+(\w+)/);
+    if (match) {
+      // Convert CamelCase to Title Case
+      return match[1].replace(/([a-z])([A-Z])/g, '$1 $2');
+    }
+  }
+  // Fall back to directory name, capitalize first letter
+  const dirName = path.basename(appRoot);
+  return dirName.charAt(0).toUpperCase() + dirName.slice(1);
+}
+
+/**
+ * Generate index.html content for browser builds.
+ */
+function generateIndexHtml(appName) {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${appName}</title>
+  <link href="/app/assets/builds/tailwind.css" rel="stylesheet">
+</head>
+<body>
+  <div id="loading">Loading...</div>
+  <div id="app" style="display:none">
+    <main class="container mx-auto mt-28 px-5" id="content"></main>
+  </div>
+  <script type="module" src="./main.js"></script>
+</body>
+</html>
+`;
+}
+
+/**
+ * Generate main.js content for browser builds.
+ * Paths are relative from .browser/ directory.
+ */
+function generateMainJs() {
+  return `// Main entry point for Vite bundling
+import * as Turbo from '@hotwired/turbo';
+import { Application } from '../config/routes.rb';
+import '../app/javascript/controllers/index.js';
+window.Turbo = Turbo;
+Application.start();
+`;
 }
 
 /**
