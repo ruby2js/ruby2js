@@ -25,10 +25,11 @@ $:.unshift File.absolute_path('../../lib', __FILE__)
 SUBCOMMANDS = %w[dev server build install].freeze
 
 if SUBCOMMANDS.include?(ARGV.first)
-  subcommand = ARGV.shift
-  require "ruby2js/cli/#{subcommand}"
-  Ruby2JS::CLI.const_get(subcommand.capitalize).run(ARGV)
-  exit
+  # CLI subcommands have been moved to the JavaScript CLI
+  # Use: npx juntos <command>
+  puts "CLI subcommands have been moved to the JavaScript CLI."
+  puts "Use: npx juntos #{ARGV.first} #{ARGV[1..].join(' ')}"
+  exit 1
 end
 
 require 'ruby2js/demo'

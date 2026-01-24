@@ -358,42 +358,199 @@ Each output is a complete standalone project for that specific target.
 7. [x] Virtual modules: `juntos:models`, `juntos:migrations`, `juntos:views/*`, `juntos:application-record`
 8. [x] No `.juntos/` directory generated - everything is virtual/on-the-fly
 
-### Phase 3: Turbo 8 HMR (Experimental)
+### Phase 3: Migrate Project Structure (Required for CI) ✅ COMPLETE
+
+The old structure had `dist/` containing package.json and vite.config.js, with the Ruby generator creating this structure. The new Vite-native structure has these at project root.
+
+**Old structure (generator-based):**
+```
+app/
+├── app/models/*.rb
+├── config/routes.rb
+├── dist/                    # Created by Ruby generator
+│   ├── package.json         # npm dependencies
+│   ├── vite.config.js       # Vite config
+│   ├── node_modules/
+│   └── .juntos/             # Pre-compiled output (NOW ELIMINATED)
+└── bin/juntos               # Ruby binstub
+```
+
+**New structure (Vite-native):**
+```
+app/
+├── app/models/*.rb
+├── config/routes.rb
+├── package.json             # At root (standard Vite)
+├── vite.config.js           # At root (standard Vite)
+├── node_modules/            # At root
+├── dist/                    # Build output only
+└── bin/juntos               # Ruby binstub (delegates to gem CLI)
+```
+
+**Note:** `index.html` and `main.js` are NOT installed by the generator - they are only needed for browser SPA deployments and should be added separately when needed.
+
+**Completed Tasks:**
+1. [x] Updated Ruby generator to install at project root:
+   - `lib/ruby2js/installer.rb` - Updated path calculations for root install
+   - `lib/generators/ruby2js/install_generator.rb` - Creates files at root, not dist/
+   - `lib/ruby2js/rails/builder.rb` - Added `root_install` option for path calculation
+
+2. [x] Updated `vite.config.js` generation:
+   - No longer needs `appRoot: '..'` since it's at root
+   - Just `juntos()` plugin call with no options needed
+
+3. [x] Updated Ruby CLI commands to run from project root:
+   - `lib/ruby2js/cli/dev.rb` - No longer chdir to dist/
+   - `lib/ruby2js/cli/build.rb` - No longer chdir to dist/
+   - `lib/ruby2js/cli/build_helper.rb` - No longer chdir to dist/
+   - `lib/ruby2js/cli/server.rb` - No longer chdir to dist/
+   - `lib/ruby2js/cli/up.rb` - No longer chdir to dist/
+   - `lib/ruby2js/cli/doctor.rb` - Checks package.json and node_modules at root
+   - `lib/ruby2js/cli/db.rb` - Node.js operations run from root (D1 operations still run from dist/)
+
+4. [x] Test scripts continue to work:
+   - `test/blog/create-blog` ends with `bin/rails generate ruby2js:install`
+   - Generator now creates root-level structure automatically
+
+5. [ ] Update CI workflow if needed:
+   - Verify `bin/juntos build` works (it already just calls `vite build`)
+   - Verify smoke tests pass with new structure
+   - Verify integration tests pass
+
+### Phase 4: JavaScript CLI (Feature Complete)
+
+Make the JavaScript CLI (`demo/blog/bin/juntos`) feature-complete and move it to the `ruby2js-rails` npm package. This allows Juntos to appeal to both audiences:
+
+- **JavaScript developers**: Use familiar `npm run dev`, `npx vite build`, `npx juntos db:migrate`
+- **Rails developers**: Use `bin/juntos dev`, `bin/juntos build` - feels like Rails, but just sets env vars and calls npm/npx
+
+**Current JavaScript CLI status:**
+- ✅ `dev` - Start development server
+- ✅ `build` - Build for deployment
+- ✅ `up` - Build and run locally
+- ✅ `deploy` - Build and deploy (Cloudflare, Vercel)
+- ✅ `db` - Database commands (D1, SQLite basic support)
+- ✅ `info` - Show configuration
+- ✅ `doctor` - Check environment
+- ❌ `server` - Missing (start production server)
+
+**Out of scope for JavaScript CLI:**
+- `--framework` option (Astro/Vue/Svelte conversion) - This is part of the SFC triple-target transpiler project (see `plans/sfc-triple-target.md`), which is incomplete and requires Ruby2JS transpilation. It will remain a separate Ruby-based tool.
+
+**Tasks:**
+1. [x] Add missing `server` command to JavaScript CLI
+2. [x] Database adapters already supported via generic `migrate.mjs` runner:
+   - D1: Cloudflare-specific wrangler commands
+   - SQLite/better-sqlite3: Node.js migrate.mjs
+   - All others (pg, neon, turso, planetscale, supabase): Node.js migrate.mjs
+   - Create/drop for cloud databases done via provider tools (as expected)
+3. [x] Update deploy entry points to use virtual modules:
+   - Change `../.juntos/lib/rails.js` → `juntos:rails`
+   - Change `../.juntos/config/routes.js` → `config/routes.rb`
+   - Change `../.juntos/db/migrate/index.js` → `juntos:migrations`
+4. [x] Fix migration paths: `node_modules/ruby2js-rails/migrate.mjs` (not `dist/node_modules/`)
+5. [x] Move CLI from `demo/blog/bin/juntos` to `packages/ruby2js-rails/cli.mjs`
+6. [x] Add `bin` entry to `packages/ruby2js-rails/package.json`:
+   ```json
+   {
+     "bin": {
+       "juntos": "./cli.mjs"
+     }
+   }
+   ```
+7. [x] Update generator to create shell binstub:
+   ```bash
+   #!/bin/sh
+   exec npx juntos "$@"
+   ```
+
+**Result:** After `npm install`, users can run:
+- `npx juntos dev` or `bin/juntos dev`
+- `npx juntos build` or `bin/juntos build`
+- `npx juntos db:migrate` or `bin/juntos db:migrate`
+
+### Phase 5: Remove Ruby CLI ✅ COMPLETE
+
+Ruby CLI infrastructure has been replaced by JavaScript CLI.
+
+**Files removed:**
+1. [x] `lib/ruby2js/cli/juntos.rb` - Main CLI dispatcher
+2. [x] `lib/ruby2js/cli/dev.rb` - Dev command
+3. [x] `lib/ruby2js/cli/build.rb` - Build command
+4. [x] `lib/ruby2js/cli/build_helper.rb` - Build helper
+5. [x] `lib/ruby2js/cli/server.rb` - Server command
+6. [x] `lib/ruby2js/cli/up.rb` - Up command
+7. [x] `lib/ruby2js/cli/deploy.rb` - Deploy command
+8. [x] `lib/ruby2js/cli/db.rb` - Database commands
+9. [x] `lib/ruby2js/cli/info.rb` - Info command
+10. [x] `lib/ruby2js/cli/doctor.rb` - Doctor command
+11. [x] `lib/ruby2js/cli/` - Directory removed
+
+**Files updated:**
+1. [x] `lib/ruby2js/installer.rb` - Generate shell binstub instead of Ruby binstub
+2. [x] `bin/juntos` - Now a shell script that delegates to `npx juntos`
+3. [x] `demo/ruby2js.rb` - Subcommand support removed, points to npx
+
+**Files kept (still used):**
+1. `lib/ruby2js/rails/builder.rb` - Used by vite.mjs for Ruby2JS transpilation options
+2. `packages/ruby2js-rails/build.mjs` - Keep `load_database_config()` and `build_options()`
+
+**Verify nothing breaks:**
+1. [ ] `bundle exec rake test` - Ruby gem tests (CLI tests removed)
+2. [ ] `node run_all_specs.mjs` - Selfhost tests
+3. [ ] CI workflow passes
+4. [ ] Manual test: `npx juntos dev`, `npx juntos build`, `npx juntos db:migrate`
+
+### Phase 6: Turbo 8 HMR (Experimental)
 1. [ ] Research Turbo 8 morphing API
 2. [ ] Prototype ERB HMR with morphing
 3. [ ] Handle partial vs template updates
 4. [ ] Add to documentation if successful
 
-### Phase 4: Eject Command
+### Phase 7: Eject Command
 1. [ ] Add `juntos eject` subcommand
 2. [ ] Generate all transpiled files to output directory
 3. [ ] Include standalone vite.config.js (no ruby2js plugin)
 4. [ ] Copy runtime files from node_modules
 5. [ ] Generate package.json with only runtime dependencies
 
-### Phase 5: Documentation
+### Phase 8: Documentation
 1. [ ] Update docs/src/_docs/juntos/demos/blog.md
 2. [ ] Update docs/src/_docs/juntos/cli.md
-3. [ ] Document `juntos eject` command
-4. [ ] Retest all targets
+3. [ ] Document new project structure
+4. [ ] Document `juntos eject` command
+5. [ ] Retest all targets
 
 ## Files to Review
 
-- `packages/ruby2js-rails/vite.mjs` - Main Vite plugin
-- `packages/ruby2js-rails/build.mjs` - SelfhostBuilder (pre-compilation)
-- `demo/blog/bin/juntos` - CLI (not tracked in git)
-- `demo/blog/main.js` - Current entry point imports
+**Vite plugin (already updated):**
+- `packages/ruby2js-rails/vite.mjs` - Main Vite plugin (Vite-native complete)
+
+**Need updates for Phase 3:**
+- `test/blog/create-blog` - Update to root-level structure
+- `test/chat/create-chat` - Same
+- `test/photo_gallery/create-photo-gallery` - Same
+- `test/workflow/create-workflow` - Same
+- `test/notes/create-notes` - Same
+- `demo/blog/bin/juntos` - Update deploy commands
+
+**To remove in Phase 4:**
+- `lib/generators/ruby2js/install_generator.rb` - Ruby generator
+- `lib/ruby2js/installer.rb` - Installer module
+- `packages/ruby2js-rails/build.mjs` - File generation parts (keep utilities)
 
 ## Success Criteria
 
 1. ✅ Blog demo works with NO `.juntos/` footprint - everything is virtual/on-the-fly
-2. [ ] Documentation accurately reflects current architecture
-3. ✅ Developer experience is improved (no staging directories, cleaner project structure)
-4. [ ] All existing tests still pass
+2. [ ] CI passes with Vite-native project structure
+3. [ ] Ruby generator removed - apps use standard Vite structure
+4. [ ] Documentation accurately reflects current architecture
+5. ✅ Developer experience is improved (no staging directories, cleaner project structure)
+6. [ ] All existing tests still pass
 
 ## Current Status (January 2025)
 
-The Vite-native implementation is complete. Key achievements:
+**Phase 1-2 Complete:** The core Vite-native implementation is done:
 
 - **No staging directory**: `.juntos/` is never created
 - **All Ruby transformed on-the-fly**: models, controllers, routes, migrations, seeds
@@ -401,3 +558,10 @@ The Vite-native implementation is complete. Key achievements:
 - **ERB views** transformed on-the-fly by `juntos-erb` plugin
 - **Browser build** works: `npm run build` produces `dist/` directly
 - **Dev server** works: `npm run dev` with HMR
+
+**Phase 3-4 Pending:** CI and cleanup work:
+
+- CI still uses old generator-based structure (`dist/` with package.json)
+- Create-* scripts need updating to use root-level Vite structure
+- Ruby generator and related files can be removed once CI migrated
+- Deploy commands in bin/juntos still reference `.juntos/` paths

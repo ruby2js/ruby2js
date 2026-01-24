@@ -8,9 +8,8 @@ require 'pathname'
 module Ruby2JS
   # Shared installer logic for both Rails generator and CLI install command.
   # Provides methods for generating package.json, vite.config.js, and binstubs.
+  # Files are created at the project root (not in a subdirectory).
   module Installer
-    DIST_DIR = 'dist'
-
     module_function
 
     # Generate package.json content with Vite dependencies
@@ -19,7 +18,8 @@ module Ruby2JS
 
       package = SelfhostBuilder.generate_package_json(
         app_name: app_name,
-        app_root: app_root
+        app_root: app_root,
+        root_install: true  # Signal that package.json is at project root
       )
 
       add_vite_dependencies(package, app_root: app_root)
@@ -35,19 +35,19 @@ module Ruby2JS
       # Check for local vite-plugin-ruby2js (when running from ruby2js repo)
       gem_root = File.expand_path("../..", __dir__)
       local_plugin = File.join(gem_root, "packages/vite-plugin-ruby2js")
-      dist_dir = File.join(app_root || Dir.pwd, 'dist')
+      project_root = app_root || Dir.pwd
 
       # Only use local plugin if running from development checkout
       # (gem_root is a parent of the app, not installed in bundle/gems)
       use_local = false
       if File.directory?(local_plugin)
-        app_path = Pathname.new(app_root || Dir.pwd).expand_path
+        app_path = Pathname.new(project_root).expand_path
         gem_path = Pathname.new(gem_root).expand_path
         use_local = app_path.to_s.start_with?(gem_path.to_s)
       end
 
       if use_local
-        relative_path = Pathname.new(local_plugin).relative_path_from(Pathname.new(dist_dir))
+        relative_path = Pathname.new(local_plugin).relative_path_from(Pathname.new(project_root))
         package["devDependencies"]["vite-plugin-ruby2js"] = "file:#{relative_path}"
       else
         package["devDependencies"]["vite-plugin-ruby2js"] = "https://ruby2js.github.io/ruby2js/releases/vite-plugin-ruby2js-beta.tgz"
@@ -68,27 +68,20 @@ module Ruby2JS
         import { juntos } from 'ruby2js-rails/vite';
 
         export default defineConfig({
-          plugins: juntos({
-            appRoot: '..'  // Source files are in parent directory
-          })
+          plugins: juntos()
         });
       JS
     end
 
     # Generate bin/juntos binstub content
+    # This creates a shell script that delegates to npx juntos
     def generate_binstub
-      <<~RUBY
-        #!/usr/bin/env ruby
-        # frozen_string_literal: true
-
+      <<~SHELL
+        #!/bin/sh
         # Juntos - Rails patterns, JavaScript runtimes
-        # This binstub delegates to the ruby2js gem's Juntos CLI
-
-        require "bundler/setup"
-        require "ruby2js/cli/juntos"
-
-        Ruby2JS::CLI::Juntos.run(ARGV)
-      RUBY
+        # This binstub delegates to the juntos CLI from ruby2js-rails
+        exec npx juntos "$@"
+      SHELL
     end
 
     # Detect database adapter from database.yml

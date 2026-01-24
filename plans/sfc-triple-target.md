@@ -4,6 +4,109 @@
 
 Transpile the Rails blog demo to three SFC frameworks (Astro, Vue, Svelte), proving the mechanical transformation principle from VISION.md.
 
+---
+
+## Prerequisites: Vite-Native Architecture (Jan 2026)
+
+**This plan was paused** while the Juntos build system was refactored to be "Vite-native." That work is now complete. See `plans/vite-native-cleanup.md` for details.
+
+### What Changed
+
+The old architecture used a `.juntos/` staging directory with pre-compiled files. The new architecture uses Vite's plugin system for on-the-fly transformation:
+
+| Before (Pre-compiled) | After (Vite-native) |
+|-----------------------|---------------------|
+| `.juntos/app/models/*.js` | Virtual module `juntos:models` + on-the-fly `.rb` transformation |
+| `.juntos/config/routes.js` | On-the-fly transformation of `config/routes.rb` |
+| `.juntos/lib/rails.js` | Virtual module `juntos:rails` |
+| `.juntos/lib/active_record.mjs` | Virtual module `juntos:active-record` |
+| `.juntos/db/migrate/*.js` | Virtual module `juntos:migrations` + on-the-fly transformation |
+| `.juntos/app/views/**/*.js` | Virtual module `juntos:views/*` + on-the-fly ERB transformation |
+
+### Infrastructure Now Available
+
+The following Vite plugins handle all transformation at dev/build time:
+
+1. **`juntos-ruby`** - Transforms `.rb` files to JavaScript on-the-fly
+   - Uses selfhost Ruby2JS transpiler (JavaScript-based)
+   - Applies Rails filters for models, controllers, routes, migrations, seeds
+
+2. **`juntos-erb`** - Transforms `.erb` files to JavaScript on-the-fly
+   - Parses ERB templates
+   - Currently outputs JSX-like render functions
+   - **Key for SFC work**: Could be extended to output Astro/Vue/Svelte templates
+
+3. **`juntos-virtual`** - Provides virtual modules
+   - `juntos:rails` - Target-specific runtime (browser, node, cloudflare)
+   - `juntos:active-record` - Database adapter with injected config
+   - `juntos:models` - Registry of all model classes
+   - `juntos:migrations` - Registry of all migrations
+   - `juntos:views/*` - Unified view exports per resource
+   - `juntos:application-record` - Base class for models
+
+4. **Selfhost Ruby2JS** - The transpiler itself runs in JavaScript
+   - Located in `demo/selfhost/`
+   - Used by Vite plugins for on-the-fly transformation
+   - No Ruby runtime needed at build time
+
+### How This Enables SFC Triple-Target
+
+**Models are framework-agnostic**: The `juntos:models` virtual module and Ruby model transformation work regardless of target framework. Astro/Vue/Svelte apps can use the same Ruby models.
+
+**ERB transformation is the key extension point**: The `juntos-erb` plugin already parses ERB and outputs JavaScript. For SFC frameworks:
+- Same parsing logic
+- Different output generators: `generateAstro()`, `generateVue()`, `generateSvelte()`
+
+**Virtual modules can be framework-aware**: The `juntos:rails` virtual module already selects runtime by target (browser/node/cloudflare). It could also select by framework.
+
+**The Vite plugin accepts options**: `juntos({ database, target, ... })` could accept a `framework` option:
+```javascript
+// vite.config.js for Astro output
+export default defineConfig({
+  plugins: juntos({ framework: 'astro' })
+});
+```
+
+### Recommended Approach for Stage 1 (Updated)
+
+Instead of building a separate Ruby-based transpiler (`astro_builder.rb`), extend the Vite-native infrastructure:
+
+1. **Add output format generators to `juntos-erb`**:
+   - `generateJsx()` (current)
+   - `generateAstroTemplate()`
+   - `generateVueTemplate()`
+   - `generateSvelteTemplate()`
+
+2. **Add `framework` option to `juntos()` plugin**:
+   - Changes ERB output format
+   - Changes file structure expectations
+   - Changes entry point generation
+
+3. **Create framework-specific project generators** (for `juntos convert`):
+   - Generate `astro.config.mjs`, `package.json`, file structure
+   - Similar to current deploy entry point generators
+
+This approach:
+- Reuses all existing transformation infrastructure
+- Keeps everything in JavaScript (no Ruby runtime needed)
+- Works with Vite's dev server for hot reload during development
+- Is consistent with the "Vite-native" philosophy
+
+### Files to Understand
+
+Before resuming work, review these key files:
+
+| File | Purpose |
+|------|---------|
+| `packages/ruby2js-rails/vite.mjs` | Main Vite plugin with all transformation logic |
+| `packages/ruby2js-rails/rails_base.js` | Base runtime (Router, Application, helpers) |
+| `packages/ruby2js-rails/targets/*/rails.js` | Target-specific runtimes |
+| `packages/ruby2js-rails/adapters/*.mjs` | Database adapters (Dexie, D1, SQLite, etc.) |
+| `demo/selfhost/ruby2js.mjs` | Selfhost transpiler entry point |
+| `lib/ruby2js/erb_to_jsx.rb` | Ruby ERB→JSX compiler (reference for JS port) |
+
+---
+
 ## Approach
 
 **Stage 0**: Hand-craft target applications equivalent to the Rails blog (using ruby2js-rails infrastructure)
@@ -292,62 +395,83 @@ Since Astro (and Vue/Svelte) will use the same ruby2js-rails infrastructure:
 2. Views (ERB) → framework templates (Astro/Vue/Svelte)
 3. Routes → file-based routing structure
 
-### 1.1 Add Framework Flag
+### 1.1 Add Framework Option to Vite Plugin
 
-Update `lib/ruby2js/cli/juntos.rb`:
+**Updated approach (Vite-native)**: Instead of a Ruby-based converter, extend the existing Vite plugin.
 
-```ruby
-# Add to parse_common_options:
-when '-f', '--framework'
-  options[:framework] = args[i + 1]
-  i += 2
+Update `packages/ruby2js-rails/vite.mjs`:
 
-# Valid values: astro, vue, svelte, rails (default)
-ENV['JUNTOS_FRAMEWORK'] = options[:framework] if options[:framework]
+```javascript
+export function juntos(options = {}) {
+  const {
+    appRoot = process.cwd(),
+    database,
+    target,
+    framework = 'rails',  // NEW: 'rails', 'astro', 'vue', 'svelte'
+  } = options;
+
+  // Framework affects:
+  // 1. ERB output format (JSX vs Astro vs Vue vs Svelte templates)
+  // 2. File structure expectations
+  // 3. Entry point generation
+  // ...
+}
 ```
 
-### 1.2 Create Framework Converter
+### 1.2 Extend ERB Transformer for Multiple Output Formats
 
-New file: `lib/ruby2js/rails/framework_converter.rb`
+The `juntos-erb` plugin currently outputs JSX. Add framework-specific generators:
 
-```ruby
-module Ruby2JS
-  module Rails
-    class FrameworkConverter
-      def initialize(framework:, source_dir:, output_dir:)
-        @framework = framework
-        @source_dir = source_dir
-        @output_dir = output_dir
-      end
+```javascript
+// In vite.mjs or a new erb-transforms.mjs file
 
-      def convert
-        case @framework
-        when 'astro' then convert_to_astro
-        when 'vue' then convert_to_vue
-        when 'svelte' then convert_to_svelte
-        else convert_to_rails # default
-        end
-      end
+function transformErb(erbCode, options) {
+  const ast = parseErb(erbCode);  // Shared parsing logic
 
-      private
-
-      def convert_to_astro
-        # Models: copy as-is (transpiled at build time)
-        copy_models('src/models')
-
-        # Views + Controllers → Astro pages
-        # - app/views/articles/index.html.erb + index action → src/pages/articles/index.astro
-        convert_views_to_astro_pages
-
-        # Layout → src/layouts/Layout.astro
-        convert_layout
-      end
-
-      # Similar for vue, svelte, rails
-    end
-  end
-end
+  switch (options.framework) {
+    case 'astro':
+      return generateAstroTemplate(ast);
+    case 'vue':
+      return generateVueTemplate(ast);
+    case 'svelte':
+      return generateSvelteTemplate(ast);
+    default:
+      return generateJsx(ast);  // Current behavior
+  }
+}
 ```
+
+### 1.3 Create Framework Project Generator
+
+For `juntos convert --framework astro`, generate a complete project:
+
+```javascript
+// packages/ruby2js-rails/convert.mjs
+
+export async function convertToFramework(sourceDir, outputDir, framework) {
+  // 1. Generate framework config (astro.config.mjs, etc.)
+  await generateFrameworkConfig(outputDir, framework);
+
+  // 2. Copy models as-is (Ruby files, transpiled at build time)
+  await copyModels(sourceDir, outputDir, framework);
+
+  // 3. Convert views to framework templates
+  await convertViews(sourceDir, outputDir, framework);
+
+  // 4. Generate routes/pages from controllers
+  await generatePages(sourceDir, outputDir, framework);
+
+  // 5. Generate package.json with framework dependencies
+  await generatePackageJson(outputDir, framework);
+}
+```
+
+### 1.4 (Legacy) Ruby-based Converter
+
+The existing `lib/ruby2js/rails/astro_builder.rb` (1,130 lines) can serve as a reference implementation, but the Vite-native approach is preferred for:
+- Consistency with the rest of the build system
+- Hot reload during development
+- No Ruby runtime requirement at build time
 
 ### 1.3 Mapping Rules
 

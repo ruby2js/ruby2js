@@ -360,13 +360,14 @@ class SelfhostBuilder
   def self.generate_package_json(options = {})
     app_name = options[:app_name] || 'ruby2js-app'
     app_root = options[:app_root]
+    root_install = options[:root_install]  # If true, package.json is at project root
 
     # Check for local packages directory (when running from ruby2js repo)
     # For deploy targets, always use tarball URL since deployed code can't access local files
     gem_root = File.expand_path("../../..", __dir__)
     local_package = File.join(gem_root, "packages/ruby2js-rails")
-    # Path is relative to dist/ directory where package.json lives
-    dist_dir = File.join(app_root || Dir.pwd, 'dist')
+    # Path is relative to where package.json lives (root or dist/)
+    package_dir = root_install ? (app_root || Dir.pwd) : File.join(app_root || Dir.pwd, 'dist')
 
     # Only use local package if running from development checkout
     # (gem_root is a parent of the app, not installed in bundle/gems)
@@ -379,10 +380,10 @@ class SelfhostBuilder
     end
 
     deps = if use_local
-      relative_path = Pathname.new(local_package).relative_path_from(Pathname.new(dist_dir))
+      relative_path = Pathname.new(local_package).relative_path_from(Pathname.new(package_dir))
       # Also add ruby2js directly - Node's module resolution doesn't follow symlinks
       # in file: dependencies, so the peerDep in ruby2js-rails isn't found
-      selfhost_path = Pathname.new(File.join(gem_root, "demo/selfhost")).relative_path_from(Pathname.new(dist_dir))
+      selfhost_path = Pathname.new(File.join(gem_root, "demo/selfhost")).relative_path_from(Pathname.new(package_dir))
       {
         'ruby2js-rails' => "file:#{relative_path}",
         'ruby2js' => "file:#{selfhost_path}"

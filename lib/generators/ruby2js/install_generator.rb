@@ -10,15 +10,8 @@ module Ruby2js
   class InstallGenerator < Rails::Generators::Base
     desc "Set up Ruby2JS/Juntos for transpiling Rails to JavaScript"
 
-    DIST_DIR = Ruby2JS::Installer::DIST_DIR
-
-    def setup_dist_directory
-      empty_directory DIST_DIR
-      say_status :create, "#{DIST_DIR}/ directory"
-    end
-
     def create_package_json
-      package_path = File.join(DIST_DIR, 'package.json')
+      package_path = 'package.json'
 
       if File.exist?(package_path)
         merge_package_json(package_path)
@@ -28,7 +21,7 @@ module Ruby2js
     end
 
     def create_vite_config
-      config_path = File.join(DIST_DIR, 'vite.config.js')
+      config_path = 'vite.config.js'
 
       if File.exist?(config_path)
         say_status :skip, "vite.config.js already exists"
@@ -42,20 +35,15 @@ module Ruby2js
     end
 
     def install_dependencies
-      say_status :run, "npm install from \"./#{DIST_DIR}\""
-      inside DIST_DIR do
-        # Use verbose: true so npm errors are visible
-        # Include dev dependencies explicitly to ensure vite is installed
-        run "npm install", verbose: true
-      end
+      say_status :run, "npm install"
+      # Use verbose: true so npm errors are visible
+      run "npm install", verbose: true
 
       # Verify critical package was installed
-      vite_path = File.join(DIST_DIR, 'node_modules', 'vite')
+      vite_path = 'node_modules/vite'
       unless File.directory?(vite_path)
         say_status :warn, "vite not found, installing explicitly"
-        inside DIST_DIR do
-          run "npm install vite@^6.0.0 --save-dev", verbose: true
-        end
+        run "npm install vite@^6.0.0 --save-dev", verbose: true
       end
     end
 
