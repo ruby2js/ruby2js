@@ -99,6 +99,27 @@ bundle exec rake spec SPEC=spec/converter_spec.rb
 RUBY_VERSION=3.3 bundle exec rake test
 ```
 
+### Demo Integration and System Tests
+
+The `test/Rakefile` provides tasks for testing demo applications (blog, chat, notes, etc.):
+
+```bash
+# Integration tests (automated, uses vitest)
+# Builds tarballs, creates demo, runs its test suite
+bundle exec rake -f test/Rakefile integration[blog]
+
+# System tests (manual browser testing with Docker)
+# Builds and runs demo in container, open http://localhost:3000
+bundle exec rake -f test/Rakefile system[blog,sqlite,node]
+bundle exec rake -f test/Rakefile system[blog,dexie,browser]
+
+# Stop system test container
+bundle exec rake -f test/Rakefile system_stop[blog]
+
+# List available demos
+bundle exec rake -f test/Rakefile list
+```
+
 ## Common Development Tasks
 
 ### Adding a New Handler
@@ -151,28 +172,28 @@ bin/ruby2js --filtered-ast -e 'self.foo ||= 1'
 bin/ruby2js --filter functions --filter esm -e 'puts "hello"'
 ```
 
-**JavaScript CLI (`demo/selfhost/ruby2js.mjs`)** - The self-hosted JS converter:
+**JavaScript CLI (`demo/selfhost/ruby2js-cli.js`)** - The self-hosted JS converter:
 ```bash
 cd demo/selfhost
 
 # Basic conversion (inline code or stdin)
-node ruby2js.mjs -e 'self.foo ||= 1'
-echo 'self.foo ||= 1' | node ruby2js.mjs
+node ruby2js-cli.js -e 'self.foo ||= 1'
+echo 'self.foo ||= 1' | node ruby2js-cli.js
 
 # Show AST (s-expression format, like Ruby CLI)
-node ruby2js.mjs --ast -e 'self.foo'
+node ruby2js-cli.js --ast -e 'self.foo'
 
 # Show raw Prism AST (JavaScript objects)
-node ruby2js.mjs --prism-ast -e 'self.foo'
+node ruby2js-cli.js --prism-ast -e 'self.foo'
 
 # Find nodes matching a pattern in Prism AST
-node ruby2js.mjs --find=OrAssign -e 'self.foo ||= 1'
+node ruby2js-cli.js --find=OrAssign -e 'self.foo ||= 1'
 
 # Inspect specific property paths
-node ruby2js.mjs --inspect=root.statements.body[0] -e 'self.foo ||= 1'
+node ruby2js-cli.js --inspect=root.statements.body[0] -e 'self.foo ||= 1'
 
 # ES level and comparison options (aligned with Ruby CLI)
-node ruby2js.mjs --es2022 --identity -e 'x == y'
+node ruby2js-cli.js --es2022 --identity -e 'x == y'
 ```
 
 **Comparison Tool (`bin/compare`)** - Compare Ruby vs JS transpiler output side-by-side:
