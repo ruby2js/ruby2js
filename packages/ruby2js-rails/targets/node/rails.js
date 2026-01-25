@@ -429,7 +429,18 @@ export class Application extends ApplicationServer {
     try {
       await this.initDatabase();
       console.log('Database initialized');
+      return this.startServer(listenPort);
+    } catch (e) {
+      console.error('Failed to start server:', e);
+      process.exit(1);
+    }
+  }
 
+  // Start HTTP server (assumes database is already initialized)
+  static async startServer(port = null) {
+    const listenPort = port || process.env.PORT || 3000;
+
+    try {
       const server = http.createServer(async (req, res) => {
         await Router.dispatch(req, res);
       });

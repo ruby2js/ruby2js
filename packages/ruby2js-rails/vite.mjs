@@ -530,7 +530,7 @@ function createRubyTransformPlugin(config, appRoot) {
     const modelsDir = path.join(appRoot, 'app/models');
     if (!fs.existsSync(modelsDir)) return [];
     return fs.readdirSync(modelsDir)
-      .filter(f => f.endsWith('.rb') && f !== 'application_record.rb')
+      .filter(f => f.endsWith('.rb') && f !== 'application_record.rb' && !f.startsWith('._'))
       .map(f => f.replace('.rb', ''));
   }
 
@@ -539,7 +539,7 @@ function createRubyTransformPlugin(config, appRoot) {
     const migrateDir = path.join(appRoot, 'db/migrate');
     if (!fs.existsSync(migrateDir)) return [];
     return fs.readdirSync(migrateDir)
-      .filter(f => f.endsWith('.rb'))
+      .filter(f => f.endsWith('.rb') && !f.startsWith('._'))
       .sort()
       .map(f => ({ file: f, name: f.replace('.rb', '') }));
   }
@@ -549,7 +549,7 @@ function createRubyTransformPlugin(config, appRoot) {
     const viewsDir = path.join(appRoot, 'app/views');
     if (!fs.existsSync(viewsDir)) return [];
     return fs.readdirSync(viewsDir, { withFileTypes: true })
-      .filter(d => d.isDirectory() && d.name !== 'layouts')
+      .filter(d => d.isDirectory() && d.name !== 'layouts' && !d.name.startsWith('.'))
       .map(d => d.name);
   }
 
@@ -721,7 +721,7 @@ export const migrations = [${exports.join(', ')}];
           }
 
           const turboViews = fs.readdirSync(viewsDir)
-            .filter(f => f.endsWith('.turbo_stream.erb'))
+            .filter(f => f.endsWith('.turbo_stream.erb') && !f.startsWith('._'))
             .map(f => {
               // create.turbo_stream.erb → create
               const name = f.replace('.turbo_stream.erb', '');
@@ -749,7 +749,7 @@ export const ${className} = { ${members.join(', ')} };
         if (!fs.existsSync(viewsDir)) return `export const ${capitalize(resource)}Views = {};`;
 
         const views = fs.readdirSync(viewsDir)
-          .filter(f => f.endsWith('.html.erb'))
+          .filter(f => f.endsWith('.html.erb') && !f.startsWith('._'))
           .map(f => {
             const name = f.replace('.html.erb', '');
             const isPartial = name.startsWith('_');
@@ -852,6 +852,12 @@ export { application };
 
         let js = result.toString();
         js = fixImports(js, id);
+
+        // For routes.rb, re-export database functions from the bundled adapter
+        // This allows migrate.mjs to use the same adapter instance as migrations
+        if (id.endsWith('/routes.rb')) {
+          js += '\nexport { initDatabase, query, execute, insert, closeDatabase } from "juntos:active-record";\n';
+        }
 
         // Cache and return
         const output = { code: js, map: result.sourcemap };
@@ -1000,6 +1006,7 @@ function createConfigPlugin(config, appRoot) {
           target: buildTarget,
           outDir: 'dist',
           emptyOutDir: true, // Clean dist/ on each build
+          minify: false, // Disable minification for debugging
           rollupOptions
         },
         resolve: {
@@ -1131,11 +1138,15 @@ function getRollupOptions(target, database) {
     case 'bun':
     case 'deno':
       return {
-        input: 'node_modules/ruby2js-rails/server.mjs',
+        input: {
+          index: 'node_modules/ruby2js-rails/server.mjs',
+          'config/routes': 'config/routes.rb'
+        },
         external: getNativeModules(database),
         output: {
-          entryFileNames: 'index.js'
-        }
+          entryFileNames: '[name].js'
+        },
+        preserveEntrySignatures: 'allow-extension'
       };
 
     case 'vercel':
@@ -1179,7 +1190,12 @@ function getRollupOptions(target, database) {
  * Get native modules to externalize based on database adapter.
  */
 function getNativeModules(database) {
-  const baseModules = ['path', 'fs', 'url', 'crypto', 'http', 'https', 'net', 'tls', 'stream', 'buffer', 'util', 'os'];
+  // Node.js built-in modules (both with and without node: prefix)
+  const nodeBuiltins = ['path', 'fs', 'url', 'crypto', 'http', 'https', 'net', 'tls', 'stream', 'buffer', 'util', 'os', 'string_decoder', 'fs/promises'];
+  const baseModules = [
+    ...nodeBuiltins,
+    ...nodeBuiltins.map(m => `node:${m}`)
+  ];
 
   const dbModules = {
     pg: ['pg', 'pg-native'],
@@ -1194,7 +1210,10 @@ function getNativeModules(database) {
   // Client-side framework modules that should not be bundled in server builds
   const clientModules = ['@hotwired/stimulus', '@hotwired/turbo', '@hotwired/turbo-rails'];
 
-  return [...baseModules, ...(dbModules[database] || []), ...clientModules];
+  // React modules - externalize for SSR (resolved at runtime)
+  const reactModules = ['react', 'react-dom', 'react-dom/server', 'react-dom/client'];
+
+  return [...baseModules, ...(dbModules[database] || []), ...clientModules, ...reactModules];
 }
 
 /**

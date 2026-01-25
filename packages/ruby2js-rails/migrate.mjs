@@ -19,6 +19,7 @@
 import { pathToFileURL } from 'url';
 import path from 'path';
 import fs from 'fs';
+import yaml from 'js-yaml';
 
 // Direct Postgres adapter for migrations (used by Supabase)
 // Supabase's PostgREST doesn't support DDL, so we use pg directly for schema changes
@@ -51,6 +52,33 @@ async function createPgMigrationAdapter() {
   };
 }
 
+// Load database configuration from config/database.yml
+function loadDatabaseConfig(projectRoot) {
+  const env = process.env.RAILS_ENV || process.env.NODE_ENV || 'development';
+  const configPath = path.join(projectRoot, 'config/database.yml');
+
+  let dbConfig = {};
+  if (fs.existsSync(configPath)) {
+    try {
+      const content = fs.readFileSync(configPath, 'utf8');
+      const config = yaml.load(content);
+      if (config && config[env]) {
+        console.log(`Using config/database.yml [${env}]`);
+        dbConfig = config[env];
+      }
+    } catch (e) {
+      console.warn(`Warning: Failed to parse database.yml: ${e.message}`);
+    }
+  }
+
+  // Environment variables override
+  if (process.env.DATABASE_URL) {
+    dbConfig.url = process.env.DATABASE_URL;
+  }
+
+  return dbConfig;
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const migrateOnly = args.includes('--migrate-only');
@@ -61,11 +89,13 @@ async function main() {
 
   // Find the application root (where config/routes.js exists)
   let appRoot = process.cwd();
+  let projectRoot = process.cwd(); // For config files (database.yml)
 
   // Check if we're in dist/ or the app root
   if (!fs.existsSync(path.join(appRoot, 'config/routes.js'))) {
     if (fs.existsSync(path.join(appRoot, 'dist/config/routes.js'))) {
       appRoot = path.join(appRoot, 'dist');
+      // projectRoot stays as cwd for config files
     } else {
       console.error('Error: Cannot find config/routes.js');
       console.error('Run this from your app root or dist/ directory');
@@ -75,14 +105,19 @@ async function main() {
 
   console.log(`App root: ${appRoot}\n`);
 
+  // Load database config from project root (not dist/)
+  const dbConfig = loadDatabaseConfig(projectRoot);
+
   try {
-    // Import the routes module which sets up Application
+    // Import the routes module which sets up Application and re-exports initDatabase
+    // The initDatabase from routes.js is the same instance used by migrations
     const routesPath = pathToFileURL(path.join(appRoot, 'config/routes.js')).href;
-    const { Application } = await import(routesPath);
+    const routesModule = await import(routesPath);
+    const { Application, initDatabase } = routesModule;
 
     // Choose adapter based on mode:
     // - JUNTOS_MIGRATE_VIA_PG: Use direct Postgres for migrations (Supabase)
-    // - Otherwise: Use the app's configured adapter
+    // - Otherwise: Use the app's configured adapter (bundled with migrations)
     const usePgForMigrations = process.env.JUNTOS_MIGRATE_VIA_PG === '1';
 
     let adapter;
@@ -92,21 +127,22 @@ async function main() {
       console.log('Using direct Postgres connection for migrations...');
       migrationAdapter = await createPgMigrationAdapter();
 
-      // For seeds, still use the app's adapter (Supabase PostgREST)
+      // For seeds, still use the app's adapter
       if (!migrateOnly) {
-        const adapterPath = pathToFileURL(path.join(appRoot, 'lib/active_record.mjs')).href;
-        adapter = await import(adapterPath);
-        await adapter.initDatabase();
+        // Initialize the bundled adapter for seed operations
+        console.log('Initializing database for seeds...');
+        await initDatabase(dbConfig);
+        adapter = routesModule;
       }
     } else {
-      // Import the active_record adapter
-      const adapterPath = pathToFileURL(path.join(appRoot, 'lib/active_record.mjs')).href;
-      adapter = await import(adapterPath);
-      migrationAdapter = adapter;
-
-      // Initialize the database connection
+      // Use the bundled adapter from routes.js (same instance as migrations)
       console.log('Initializing database connection...');
-      await adapter.initDatabase();
+      if (dbConfig.database) {
+        console.log(`Database: ${dbConfig.database}`);
+      }
+      await initDatabase(dbConfig);
+      adapter = routesModule;
+      migrationAdapter = routesModule;
     }
 
     // Run migrations and track if database was fresh

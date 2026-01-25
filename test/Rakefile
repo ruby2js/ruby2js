@@ -289,6 +289,9 @@ def generate_system_test_dockerfile(path, demo, database, target)
     # Build
     RUN npx juntos build --verbose
 
+    # Run migrations and seeds for server targets (Node/SQLite/PG)
+    RUN npx juntos db prepare || echo "Migration skipped (browser target)"
+
     EXPOSE 3000 5173
 
     CMD ["npx", "juntos", "server"]
