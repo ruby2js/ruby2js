@@ -108,23 +108,17 @@ async function setup() {
 
   const demoDir = join(WORK_DIR, demo);
 
-  // Vite-native architecture: package.json is at app root, not dist/
-  // First install all dependencies from package.json (vite, vitest, etc.)
-  console.log('\n3. Installing dependencies...');
-  execSync('npm install', {
-    cwd: demoDir,
-    stdio: 'inherit'
-  });
+  // Delete package-lock.json to avoid checksum mismatches with GitHub Pages URLs.
+  // We'll install from local tarballs instead.
+  const lockFile = join(demoDir, 'package-lock.json');
+  if (existsSync(lockFile)) {
+    rmSync(lockFile);
+  }
 
-  // Then install fresh tarballs to override any released versions
-  console.log('\n4. Installing fresh tarballs...');
-  execSync(`npm install ${tarballs}/ruby2js-beta.tgz ${tarballs}/ruby2js-rails-beta.tgz ${tarballs}/vite-plugin-ruby2js-beta.tgz`, {
-    cwd: demoDir,
-    stdio: 'inherit'
-  });
-
-  // Install better-sqlite3 for Node.js testing (Vitest will transform .rb on-the-fly)
-  execSync('npm install better-sqlite3', {
+  // Install local tarballs + better-sqlite3 in one command.
+  // This uses local tarballs instead of fetching from GitHub Pages URLs in package.json.
+  console.log('\n3. Installing dependencies from local tarballs...');
+  execSync(`npm install ${tarballs}/ruby2js-beta.tgz ${tarballs}/ruby2js-rails-beta.tgz ${tarballs}/vite-plugin-ruby2js-beta.tgz better-sqlite3`, {
     cwd: demoDir,
     stdio: 'inherit'
   });
