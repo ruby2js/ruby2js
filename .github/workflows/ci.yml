@@ -473,11 +473,18 @@ jobs:
             tar -xzf "$tarball" -C artifacts
           done
 
+      - name: Extract CLI for init
+        run: |
+          mkdir -p artifacts/cli
+          tar -xzf artifacts/tarballs/ruby2js-rails-beta.tgz -C artifacts/cli
+
       - name: Build browser demos
         run: |
           for demo in blog chat photo_gallery workflow notes; do
             echo "Building $demo for browser..."
             base_path="/ruby2js/${demo//_/-}/"
+            # Initialize Juntos config (package.json, vite.config.js, bin/juntos)
+            (cd "artifacts/$demo" && node ../cli/package/cli.mjs init --no-install)
             # Install fresh tarballs into demo root (where package.json lives in vite-native architecture)
             # Must install all three: ruby2js (transpiler), ruby2js-rails (runtime), vite-plugin-ruby2js (build plugin)
             # Also install browser runtime dependencies: dexie (IndexedDB), turbo/stimulus (Rails UJS), react (ERB rendering)
