@@ -408,9 +408,16 @@ function createErbPlugin(config) {
     // Fix cross-directory partial imports: ../comments/_comment.js -> @views/comments/_comment.html.erb
     js = js.replace(/from ["']\.\.\/(\w+)\/(\_\w+)\.js["']/g, 'from "@views/$1/$2.html.erb"');
 
+    // Fix view module imports: import { PhotoViews } from "../photos.js" -> from "juntos:views/photos"
+    // The helpers filter generates these for turbo_stream shorthand: turbo_stream.prepend "photos", @photo
+    // Match pattern: import { <Name>Views } from "../<resource>.js"
+    js = js.replace(/import\s*\{\s*(\w+)Views\s*\}\s*from\s*["']\.\.\/(\w+)\.js["']/g,
+      (match, name, plural) => `import { ${name}Views } from "juntos:views/${plural}"`);
+
     // Fix model imports from views: ../photos.js -> app/models/photo.rb
     // Views import models like Photo from "../photos.js" (plural, relative up)
     // These should resolve to app/models/<singular>.rb
+    // Note: This runs AFTER view module replacement, so it won't affect *Views imports
     js = js.replace(/from ["']\.\.\/(\w+)\.js["']/g, (match, plural) => {
       const singular = singularize(plural);
       return `from "app/models/${singular}.rb"`;
