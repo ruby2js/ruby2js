@@ -161,6 +161,10 @@ to:
 import { ActiveRecord } from 'juntos:active-record';
 ```
 
+**Important caveat (discovered January 2025):** When code imports from the virtual module, Vite bundles the adapter into the output. But tools that run *outside* Vite (like `migrate.mjs`) that import the adapter directly get a **different module instance** with a separate `db` variable. This caused migrations to fail because `initDatabase()` was called on the wrong instance.
+
+**Solution:** `routes.js` re-exports key functions (`initDatabase`, `query`, `execute`, `insert`, `closeDatabase`) from the bundled adapter. External tools import from `routes.js` to use the same adapter instance that migrations use.
+
 ### 2. app/models/, app/controllers/ → On-the-fly transformation
 
 **Current:** Pre-transpiled during `buildStart()` to `.juntos/app/`.
@@ -627,8 +631,36 @@ The eject command uses `vite build` as its foundation, NOT builder.rb.
 - **installer.rb removed** - all install logic is now in install_generator.rb
 - **builder.rb/build.mjs deprecated** - no longer used by vite.mjs or integration tests
 
+**Issues Discovered During System Testing (January 2025):**
+
+While building system test infrastructure (`rake system[blog,sqlite,node]`), several issues were discovered in the Node.js target build:
+
+1. **External modules incomplete** - Rollup was trying to bundle Node.js built-ins that use the `node:` prefix (e.g., `node:url`, `node:fs/promises`). Also `react-dom/server` wasn't externalized (needed by `rails_server.js` even for non-React apps).
+   - **Fixed:** Added both prefixed and unprefixed Node.js builtins to external list, plus React modules for SSR support.
+
+2. **Database configuration not flowing through** - The `juntos:active-record` virtual module exports `DB_CONFIG` at build time, but the adapter's internal `const DB_CONFIG = {}` was a separate variable. Database path from `database.yml` wasn't being used.
+   - **Fixed:** `migrate.mjs` and `server.mjs` now load `config/database.yml` directly and pass options to `initDatabase()`.
+
+3. **migrate.mjs using wrong adapter instance** - Migrations import `createTable`, `addIndex`, etc. from `juntos:active-record` which gets bundled into `routes.js`. But `migrate.mjs` was importing a separate adapter module, so calling `initDatabase()` on that adapter didn't initialize the `db` variable used by migrations.
+   - **Fixed:** `routes.js` now re-exports `initDatabase`, `query`, `execute`, `insert`, `closeDatabase` from the bundled adapter. `migrate.mjs` imports these from `routes.js` to use the same adapter instance.
+
+4. **Server initialization** - `Application.start()` called `this.initDatabase()` with no config. Added `Application.startServer()` that skips initDatabase (for when database is pre-initialized with config).
+   - **Fixed:** `server.mjs` now loads database.yml, calls `initDatabase(dbConfig)`, then calls `Application.startServer()`.
+
+5. **Layout files with yield** - ERB layouts use Ruby's `yield` which can't be transpiled. The `juntos-erb` plugin intentionally returns a stub that throws an error for layouts.
+   - **Status:** Known limitation. Server-side rendering with layouts needs different handling (layouts wrap content, not the other way around).
+
+**System Test Infrastructure (January 2025):**
+
+Added `test/Rakefile` with unified test commands:
+- `rake integration[blog]` - Automated vitest tests
+- `rake system[blog,sqlite,node]` - Manual browser testing with Docker
+
+The system test builds and runs migrations/seeds correctly. The database persists to `storage/development.sqlite3`. However, HTML responses fail due to the layout issue above.
+
 **Pending work:**
 
+- **Layout SSR support** - Layouts need to wrap rendered content, not be imported as modules. This is architecturally different from how views are currently handled.
 - Restore chat, notes, photo_gallery, workflow integration tests with Vite-native updates
 - Phase 6: Turbo 8 HMR (experimental)
 - Phase 7: Eject command (Vite-based, not builder.rb)
