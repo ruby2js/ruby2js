@@ -161,9 +161,9 @@ to:
 import { ActiveRecord } from 'juntos:active-record';
 ```
 
-**Important caveat (discovered January 2025):** When code imports from the virtual module, Vite bundles the adapter into the output. But tools that run *outside* Vite (like `migrate.mjs`) that import the adapter directly get a **different module instance** with a separate `db` variable. This caused migrations to fail because `initDatabase()` was called on the wrong instance.
+**Important caveat (discovered January 2026):** When code imports from the virtual module, Vite bundles the adapter into the output. But tools that run *outside* Vite (like `migrate.mjs`) that import the adapter directly get a **different module instance** with a separate `db` variable. This caused migrations to fail because `initDatabase()` was called on the wrong instance.
 
-**Solution (January 2025):** Rather than having migration code import adapter functions, migrations now receive the adapter as a parameter: `up: async (adapter) => { await adapter.createTable(...); }`. The migration runner (migrate.mjs or Application.runMigrations) passes its initialized adapter instance directly. This decouples migration code from how the adapter is obtained. Note: routes.js still re-exports `initDatabase`, `query`, etc. for use by migrate.mjs and server.mjs (the runners), but migration code itself no longer imports these functions.
+**Solution (January 2026):** Rather than having migration code import adapter functions, migrations now receive the adapter as a parameter: `up: async (adapter) => { await adapter.createTable(...); }`. The migration runner (migrate.mjs or Application.runMigrations) passes its initialized adapter instance directly. This decouples migration code from how the adapter is obtained. Note: routes.js still re-exports `initDatabase`, `query`, etc. for use by migrate.mjs and server.mjs (the runners), but migration code itself no longer imports these functions.
 
 ### 2. app/models/, app/controllers/ → On-the-fly transformation
 
@@ -513,7 +513,7 @@ See "Phase 9: Remove builder.rb" for removal plan.
 1. [x] `bundle exec rake test` - Ruby gem tests pass
 2. [x] `node run_all_specs.mjs` - Selfhost tests pass
 3. [x] CI workflow passes (build-site and integration-test are now Ruby-free)
-4. [ ] Manual test: `npx juntos dev`, `npx juntos build`, `npx juntos db:migrate`
+4. [x] Manual test: `npx juntos dev`, `npx juntos build`, `npx juntos db:migrate`
 
 ### Phase 6: Turbo 8 HMR (Experimental)
 1. [ ] Research Turbo 8 morphing API
@@ -589,7 +589,7 @@ The eject command uses `vite build` as its foundation, NOT builder.rb.
 - `demo/blog/bin/juntos` - Update deploy commands
 
 **Already removed/simplified:**
-- `lib/ruby2js/installer.rb` - Removed (January 2025)
+- `lib/ruby2js/installer.rb` - Removed (January 2026)
 - `lib/generators/ruby2js/install_generator.rb` - Simplified, now self-contained
 - `packages/ruby2js-rails/vite.mjs` - No longer depends on build.mjs
 
@@ -597,12 +597,12 @@ The eject command uses `vite build` as its foundation, NOT builder.rb.
 
 1. ✅ Blog demo works with NO `.juntos/` footprint - everything is virtual/on-the-fly
 2. ✅ CI passes with Vite-native project structure (build-site and integration-test are Ruby-free)
-3. [ ] Ruby generator removed - apps use standard Vite structure
+3. [x] Ruby generator creates standard Vite structure (package.json and vite.config.js at root)
 4. [ ] Documentation accurately reflects current architecture
 5. ✅ Developer experience is improved (no staging directories, cleaner project structure)
 6. ⚠️ Most tests pass (chat, notes, photo_gallery, workflow integration tests temporarily removed)
 
-## Current Status (January 2025)
+## Current Status (January 2026)
 
 **Phase 1-2 Complete:** The core Vite-native implementation is done:
 
@@ -631,7 +631,7 @@ The eject command uses `vite build` as its foundation, NOT builder.rb.
 - **installer.rb removed** - all install logic is now in install_generator.rb
 - **builder.rb/build.mjs deprecated** - no longer used by vite.mjs or integration tests
 
-**Issues Discovered During System Testing (January 2025):**
+**Issues Discovered During System Testing (January 2026):**
 
 While building system test infrastructure (`rake system[blog,sqlite,node]`), several issues were discovered in the Node.js target build:
 
@@ -643,7 +643,7 @@ While building system test infrastructure (`rake system[blog,sqlite,node]`), sev
 
 3. **migrate.mjs using wrong adapter instance** - Migrations import `createTable`, `addIndex`, etc. from `juntos:active-record` which gets bundled into `routes.js`. But `migrate.mjs` was importing a separate adapter module, so calling `initDatabase()` on that adapter didn't initialize the `db` variable used by migrations.
    - **Initial workaround:** `routes.js` re-exported `initDatabase`, `query`, etc. from the bundled adapter.
-   - **Proper fix (January 2025):** Refactored migration architecture. Migrations now receive the adapter as a parameter:
+   - **Proper fix (January 2026):** Refactored migration architecture. Migrations now receive the adapter as a parameter:
      ```javascript
      export const migration = {
        up: async (adapter) => {
@@ -668,13 +668,13 @@ While building system test infrastructure (`rake system[blog,sqlite,node]`), sev
    - **Fixed:** `server.mjs` now loads database.yml, calls `initDatabase(dbConfig)`, then calls `Application.startServer()`.
 
 5. **Layout files with yield** - ERB layouts use Ruby's `yield` which can't be transpiled directly.
-   - **Fixed (January 2025):** Updated `juntos-erb` plugin to handle layouts:
+   - **Fixed (January 2026):** Updated `juntos-erb` plugin to handle layouts:
      - Replaces `<%= yield %>` → `<%= content %>`
      - Replaces `<%= yield :section %>` → `<%= context.contentFor.section || '' %>`
      - Passes `layout: true` option to ERB filter (changes function signature to `layout(context, content)`)
      - Exports as `function layout` instead of `function render`
 
-**System Test Infrastructure (January 2025):**
+**System Test Infrastructure (January 2026):**
 
 Added `test/Rakefile` with unified test commands:
 - `rake integration[blog]` - Automated vitest tests
