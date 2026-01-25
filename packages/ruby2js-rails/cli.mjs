@@ -17,6 +17,7 @@ import { spawn, spawnSync, execSync } from 'child_process';
 import { existsSync, readFileSync, writeFileSync, unlinkSync, mkdirSync, chmodSync } from 'fs';
 import { join, basename, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import yaml from 'js-yaml';
 
 // CLI runs from the app's working directory
 const APP_ROOT = process.cwd();
@@ -135,29 +136,14 @@ function loadDatabaseConfig(options) {
   const configPath = join(APP_ROOT, 'config/database.yml');
   if (existsSync(configPath)) {
     try {
-      // Simple YAML parsing for database.yml (handles basic cases)
       const content = readFileSync(configPath, 'utf-8');
-      const lines = content.split('\n');
-      let currentEnv = null;
-      let inEnv = false;
+      const config = yaml.load(content);
+      const envConfig = config[env];
 
-      for (const line of lines) {
-        const envMatch = line.match(/^(\w+):$/);
-        if (envMatch) {
-          currentEnv = envMatch[1];
-          inEnv = currentEnv === env;
-          continue;
-        }
-
-        if (inEnv && line.startsWith('  ')) {
-          const adapterMatch = line.match(/^\s+adapter:\s*(.+)$/);
-          const databaseMatch = line.match(/^\s+database:\s*(.+)$/);
-          const targetMatch = line.match(/^\s+target:\s*(.+)$/);
-
-          if (adapterMatch) options.database = options.database || adapterMatch[1].trim();
-          if (databaseMatch) options.dbName = options.dbName || databaseMatch[1].trim();
-          if (targetMatch) options.target = options.target || targetMatch[1].trim();
-        }
+      if (envConfig) {
+        if (envConfig.adapter) options.database = options.database || envConfig.adapter;
+        if (envConfig.database) options.dbName = options.dbName || envConfig.database;
+        if (envConfig.target) options.target = options.target || envConfig.target;
       }
     } catch (e) {
       console.warn(`Warning: Could not parse config/database.yml: ${e.message}`);
@@ -1239,6 +1225,7 @@ function runTest(options, testArgs) {
   loadDatabaseConfig(options);
   validateDatabaseTarget(options);
   ensurePackagesInstalled(options);
+  applyEnvOptions(options);
 
   // Ensure vitest is installed
   if (!isPackageInstalled('vitest')) {
