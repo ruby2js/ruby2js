@@ -1067,11 +1067,48 @@ function createConfigPlugin(config, appRoot) {
           dedupe: ['react', 'react-dom', 'dexie', 'better-sqlite3', '@neondatabase/serverless', '@libsql/client']
         },
         // Ensure react/react-dom are pre-bundled in dev
+        // Exclude packages that use virtual modules esbuild can't resolve
+        // Include the database adapter's npm package since ruby2js-rails is excluded
         optimizeDeps: {
-          include: ['react', 'react-dom', 'react-dom/client']
+          include: ['react', 'react-dom', 'react-dom/client', ...getDatabasePackages(config.database)],
+          exclude: ['ruby2js-rails'],
+          // Replace Rails importmap-style controllers/index.js during esbuild pre-bundling
+          esbuildOptions: {
+            plugins: [{
+              name: 'juntos-controllers-index',
+              setup(build) {
+                build.onLoad({ filter: /app\/javascript\/controllers\/index\.js$/ }, () => ({
+                  contents: `import { Application } from "@hotwired/stimulus";
+const application = Application.start();
+const controllers = import.meta.glob(['./*_controller.js', './*_controller.rb'], { eager: true });
+for (const [path, module] of Object.entries(controllers)) {
+  const match = path.match(/\\.\\/(.+)_controller/);
+  if (match) application.register(match[1].replace(/_/g, '-'), module.default);
+}
+export { application };`,
+                  loader: 'js'
+                }));
+              }
+            }]
+          }
         },
         // publicDir is public/ by default, which is correct
       };
+    },
+
+    // Serve .browser/index.html for the root URL in dev mode
+    configureServer(server) {
+      const browserTargets = ['browser', 'pwa', 'capacitor', 'electron', 'tauri'];
+      if (!browserTargets.includes(config.target)) return;
+
+      // Middleware to serve .browser/index.html for root requests
+      server.middlewares.use((req, res, next) => {
+        // Only handle root path requests for HTML
+        if (req.url === '/' || req.url === '/index.html') {
+          req.url = '/.browser/index.html';
+        }
+        next();
+      });
     },
 
     // Flatten .browser/ output to dist root for browser targets
@@ -1266,6 +1303,34 @@ function getNativeModules(database) {
 }
 
 /**
+ * Get npm packages to pre-bundle for the database adapter.
+ * Since ruby2js-rails is excluded from optimization (uses virtual modules),
+ * we need to explicitly include its database adapter dependencies.
+ */
+function getDatabasePackages(database) {
+  const packages = {
+    // Browser-only databases
+    dexie: ['dexie'],
+    indexeddb: ['dexie'],
+    sqljs: ['sql.js'],
+    'sql.js': ['sql.js'],
+    pglite: ['@electric-sql/pglite'],
+    // Universal databases (HTTP-based, work in browser and server)
+    neon: ['@neondatabase/serverless'],
+    turso: ['@libsql/client'],
+    supabase: ['@supabase/supabase-js'],
+    // Server-only adapters (native modules, not used in browser dev)
+    sqlite: [],
+    better_sqlite3: [],
+    pg: [],
+    postgres: [],
+    mysql2: [],
+    d1: []  // Cloudflare D1 uses Workers bindings, not npm package
+  };
+  return packages[database] || [];
+}
+
+/**
  * Browser entry plugin - generates .browser/index.html and main.js for browser targets.
  *
  * This plugin creates entry points for SPA builds only when needed (browser, pwa, capacitor).
@@ -1348,7 +1413,7 @@ function generateIndexHtml(appName) {
   <div id="app" style="display:none">
     <main class="container mx-auto mt-28 px-5" id="content"></main>
   </div>
-  <script type="module" src="./main.js"></script>
+  <script type="module" src="/.browser/main.js"></script>
 </body>
 </html>
 `;
