@@ -204,6 +204,91 @@ class ChatController < Stimulus::Controller
 end
 CONTROLLER
 
+# Create integration test for messages (demo-specific)
+cat > test/messages.test.mjs << 'TEST'
+import { describe, it, expect } from 'vitest';
+
+describe('Message Model', () => {
+  it('creates a message with valid attributes', async () => {
+    const { Message } = await import('juntos:models');
+
+    const message = await Message.create({
+      username: 'TestUser',
+      body: 'Hello, world!'
+    });
+
+    expect(message.id).toBeDefined();
+    expect(message.username).toBe('TestUser');
+    expect(message.body).toBe('Hello, world!');
+  });
+
+  it('validates username presence', async () => {
+    const { Message } = await import('juntos:models');
+
+    const message = new Message({ username: '', body: 'Valid body' });
+    const saved = await message.save();
+
+    expect(saved).toBe(false);
+    expect(message.errors.username).toBeDefined();
+  });
+
+  it('validates body presence', async () => {
+    const { Message } = await import('juntos:models');
+
+    const message = new Message({ username: 'TestUser', body: '' });
+    const saved = await message.save();
+
+    expect(saved).toBe(false);
+    expect(message.errors.body).toBeDefined();
+  });
+});
+
+describe('MessagesController', () => {
+  it('index action returns list', async () => {
+    const { Message } = await import('juntos:models');
+    const { MessagesController } = await import('../app/controllers/messages_controller.rb');
+
+    await Message.create({ username: 'Alice', body: 'Hello everyone!' });
+
+    const context = {
+      params: {},
+      flash: { get: () => '', consumeNotice: () => ({ present: false }), consumeAlert: () => '' },
+      contentFor: {}
+    };
+
+    const html = await MessagesController.index(context);
+    expect(html).toContain('Alice');
+    expect(html).toContain('Hello everyone!');
+  });
+
+  it('create action adds a new message', async () => {
+    const { Message } = await import('juntos:models');
+    const { MessagesController } = await import('../app/controllers/messages_controller.rb');
+
+    const context = {
+      params: {},
+      flash: { set: () => {} },
+      contentFor: {},
+      request: { headers: { get: () => 'text/html' } }
+    };
+
+    const params = {
+      username: 'Bob',
+      body: 'New message from controller'
+    };
+
+    const result = await MessagesController.create(context, params);
+
+    // Should return redirect after successful create
+    expect(result.redirect).toBeDefined();
+
+    const messages = await Message.all();
+    expect(messages.length).toBe(1);
+    expect(messages[0].username).toBe('Bob');
+  });
+});
+TEST
+
 echo ""
 echo "Chat created: $APP_NAME/"
 echo ""

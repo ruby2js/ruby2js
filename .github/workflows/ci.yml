@@ -405,12 +405,12 @@ jobs:
         run: node test/smoke-test.mjs artifacts/chat --database ${{ matrix.database }}
 
   integration-test:
-    needs: [build-tarballs, create-blog, create-astro-blog, create-ssg-blog]
+    needs: [build-tarballs, create-blog, create-chat, create-astro-blog, create-ssg-blog]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        demo: [blog, astro_blog, ssg_blog]
+        demo: [blog, chat, astro_blog, ssg_blog]
     steps:
       - uses: actions/checkout@v4
 
@@ -445,9 +445,10 @@ jobs:
           npm install
           node setup.mjs --local ${{ matrix.demo }}
           # Test files use hyphens to avoid vitest substring matching
-          # blog -> juntos-blog (to avoid matching astro-blog, ssg-blog)
+          # blog -> juntos-blog, chat -> juntos-chat (to avoid matching astro-blog, ssg-blog)
           TEST_FILE=$(echo "${{ matrix.demo }}" | tr '_' '-')
           if [ "$TEST_FILE" = "blog" ]; then TEST_FILE="juntos-blog"; fi
+          if [ "$TEST_FILE" = "chat" ]; then TEST_FILE="juntos-chat"; fi
           npm test -- "./${TEST_FILE}.test.mjs"
 
   # ===========================================================================

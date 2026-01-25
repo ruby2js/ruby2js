@@ -26,7 +26,11 @@ This creates a Rails app with:
 
 ## Run with Rails
 
+The demo includes a Stimulus controller written in Ruby (`app/javascript/controllers/chat_controller.rb`). To transpile it automatically, install ruby2js:
+
 ```bash
+bundle add ruby2js --github ruby2js/ruby2js --branch master
+bin/rails generate ruby2js:install
 bin/rails db:prepare
 bin/dev
 ```
