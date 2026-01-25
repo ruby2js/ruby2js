@@ -893,13 +893,18 @@ export { application };
           js += '\nexport { initDatabase, query, execute, insert, closeDatabase, createTable, addIndex, addColumn, removeColumn, dropTable } from "juntos:active-record";\n';
         }
 
-        // Normalize sourcemap sources to be relative to the file
+        // Normalize sourcemap for Vite bundling
+        // Use absolute path for sources - Vite will normalize to correct relative paths
+        // Using relative paths from appRoot causes duplication when Vite resolves them
+        // relative to the file's directory location
         const map = result.sourcemap;
-        if (map && map.sources) {
-          // Make sources point to the original file with relative path from app root
-          const relPath = path.relative(appRoot, id);
-          map.sources = [relPath];
-          map.sourceRoot = '';  // Clear sourceRoot to avoid path duplication
+        if (map) {
+          // Use absolute path - Vite normalizes this correctly during bundle
+          map.file = path.basename(id).replace('.rb', '.js');
+          map.sources = [id];  // Absolute path
+          map.sourceRoot = '';
+          // Embed source content so browsers don't need to fetch it
+          map.sourcesContent = [source];
         }
 
         // Cache and return
@@ -1050,6 +1055,7 @@ function createConfigPlugin(config, appRoot) {
           outDir: 'dist',
           emptyOutDir: true, // Clean dist/ on each build
           minify: false, // Disable minification for debugging
+          sourcemap: true, // Enable sourcemaps for debugging
           rollupOptions
         },
         resolve: {
