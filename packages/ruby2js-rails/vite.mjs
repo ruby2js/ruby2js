@@ -373,31 +373,55 @@ function createErbPlugin(config) {
     }
   }
 
-  async function transformErb(code, id) {
+  async function transformErb(code, id, isLayout = false) {
     await ensureReady();
 
     console.log('[juntos-erb] Transforming:', id);
 
+    let template = code;
+
+    // For layouts, replace yield with content/contentFor
+    // yield becomes content, yield :section becomes context.contentFor.section
+    if (isLayout) {
+      // <%= yield :head %> -> <%= context.contentFor.head || '' %>
+      template = template.replace(/<%=\s*yield\s+:(\w+)\s*%>/g, (_, section) =>
+        `<%= context.contentFor.${section} || '' %>`
+      );
+      // <%= yield %> -> <%= content %>
+      template = template.replace(/<%=\s*yield\s*%>/g, '<%= content %>');
+    }
+
     // Step 1: Compile ERB to Ruby
-    const compiler = new ErbCompiler(code);
+    const compiler = new ErbCompiler(template);
     const rubySrc = compiler.src;
 
     // Step 2: Convert Ruby to JavaScript with ERB filters
     // Note: Rails_Helpers must come before Erb for method overrides
-    const result = convert(rubySrc, {
+    const options = {
       filters: ['Rails_Helpers', 'Erb', 'Functions', 'Return'],
       eslevel: config.eslevel,
       include: ['class', 'call'],
       database: config.database,
       target: config.target,
       file: id
-    });
+    };
 
-    // Step 3: Export the render function
-    // Note: Function may not be at start if imports were added by rails/helpers filter
-    // Handle both sync and async render functions
+    // Layout mode changes the function signature to layout(context, content)
+    if (isLayout) {
+      options.layout = true;
+    }
+
+    const result = convert(rubySrc, options);
+
+    // Step 3: Export the function
+    // For layouts: export function layout(context, content)
+    // For views: export function render(context)
     let js = result.toString();
-    js = js.replace(/(^|\n)(async )?function render/, '$1export $2function render');
+    if (isLayout) {
+      js = js.replace(/(^|\n)(async )?function layout/, '$1export $2function layout');
+    } else {
+      js = js.replace(/(^|\n)(async )?function render/, '$1export $2function render');
+    }
 
     // Step 3.5: Fix import paths for Vite-native structure
     // The selfhost converter generates relative paths assuming .juntos/ structure
@@ -454,18 +478,16 @@ function createErbPlugin(config) {
     async load(id) {
       if (!id.endsWith('.erb')) return null;
 
-      // Skip layout files - they use yield which needs special handling
-      // Layouts are typically used by the server at request time, not imported directly
-      if (id.includes('/layouts/')) {
-        console.log('[juntos-erb] Skipping layout file:', id);
-        // Return a stub that throws an error if used
-        return `export function layout() { throw new Error('Layout files cannot be used as modules. Use a wrapper function.'); }`;
+      // Detect layout files - they need special handling (yield -> content)
+      const isLayout = id.includes('/layouts/');
+      if (isLayout) {
+        console.log('[juntos-erb] Transforming layout:', id);
       }
 
       try {
         // Read the file content
         const code = await fs.promises.readFile(id, 'utf-8');
-        return await transformErb(code, id);
+        return await transformErb(code, id, isLayout);
       } catch (error) {
         const errorMsg = error?.message || error?.toString?.() || String(error);
         console.error('[juntos-erb] Transform error details:', error);
@@ -726,7 +748,8 @@ export const migrations = [${exports.join(', ')}];
               // create.turbo_stream.erb → create
               const name = f.replace('.turbo_stream.erb', '');
               let exportName = name;
-              if (RESERVED.has(exportName)) exportName = exportName + '_';
+              // Escape reserved words by adding $ prefix (matches Ruby2JS convention)
+              if (RESERVED.has(exportName)) exportName = '$' + exportName;
               return { file: f, name, exportName };
             });
 
@@ -754,8 +777,8 @@ export const ${className} = { ${members.join(', ')} };
             const name = f.replace('.html.erb', '');
             const isPartial = name.startsWith('_');
             let exportName = isPartial ? name.slice(1) : name;
-            // Escape reserved words by adding underscore suffix
-            if (RESERVED.has(exportName)) exportName = exportName + '_';
+            // Escape reserved words by adding $ prefix (matches Ruby2JS convention)
+            if (RESERVED.has(exportName)) exportName = '$' + exportName;
             return { file: f, name, exportName, isPartial };
           });
 
@@ -854,9 +877,12 @@ export { application };
         js = fixImports(js, id);
 
         // For routes.rb, re-export database functions from the bundled adapter
-        // This allows migrate.mjs to use the same adapter instance as migrations
+        // This allows migrate.mjs and server.mjs to use the same adapter instance
+        // - initDatabase, closeDatabase: connection management
+        // - query, execute, insert: general database operations
+        // - createTable, addIndex, addColumn, removeColumn, dropTable: migration operations
         if (id.endsWith('/routes.rb')) {
-          js += '\nexport { initDatabase, query, execute, insert, closeDatabase } from "juntos:active-record";\n';
+          js += '\nexport { initDatabase, query, execute, insert, closeDatabase, createTable, addIndex, addColumn, removeColumn, dropTable } from "juntos:active-record";\n';
         }
 
         // Cache and return

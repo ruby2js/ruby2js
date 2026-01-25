@@ -144,19 +144,17 @@ task :integration, [:demo] do |t, args|
 
     # Run tests
     puts "\nRunning tests..."
-    demo_hyphen = demo.tr('_', '-')
-    # Handle special cases where test file uses underscore or hyphen
-    test_files = Dir.glob("#{demo}*.test.mjs") + Dir.glob("#{demo_hyphen}*.test.mjs")
-    if test_files.empty?
-      # Try with underscores
-      test_files = Dir.glob("#{demo.tr('-', '_')}*.test.mjs")
+    # Test files use hyphens to avoid vitest substring matching
+    # blog -> juntos-blog (to avoid matching astro-blog, ssg-blog)
+    test_name = demo.tr('_', '-')
+    test_name = 'juntos-blog' if test_name == 'blog'
+    test_file = "./#{test_name}.test.mjs"
+
+    unless File.exist?(test_file)
+      abort "No test file found: #{test_file}"
     end
 
-    if test_files.empty?
-      abort "No test file found for #{demo}"
-    end
-
-    sh "npm test -- #{test_files.first}"
+    sh "npm test -- #{test_file}"
   end
 end
 

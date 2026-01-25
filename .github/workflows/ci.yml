@@ -444,8 +444,11 @@ jobs:
           cd test/integration
           npm install
           node setup.mjs --local ${{ matrix.demo }}
-          # blog uses rails_blog.test.mjs to avoid vitest matching astro_blog.test.mjs
-          npm test -- "./${{ matrix.demo == 'blog' && 'rails_blog' || matrix.demo }}.test.mjs"
+          # Test files use hyphens to avoid vitest substring matching
+          # blog -> juntos-blog (to avoid matching astro-blog, ssg-blog)
+          TEST_FILE=$(echo "${{ matrix.demo }}" | tr '_' '-')
+          if [ "$TEST_FILE" = "blog" ]; then TEST_FILE="juntos-blog"; fi
+          npm test -- "./${TEST_FILE}.test.mjs"
 
   # ===========================================================================
   # Stage 2: Deploy (runs in parallel with tests, depends on Stage 1)

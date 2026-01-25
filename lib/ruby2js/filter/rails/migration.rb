@@ -409,10 +409,12 @@ module Ruby2JS
           method_body = statements.length == 1 ? statements.first : s(:begin, *statements)
 
           # Export migration object with version and up function
+          # The up function receives the adapter as a parameter, making migrations
+          # independent of how the adapter is obtained (no virtual module imports)
           up_method = s(:pair, s(:sym, :up),
             s(:block,
               s(:send, nil, :async),
-              s(:args),
+              s(:args, s(:arg, :adapter)),
               method_body))
 
           # Build tableSchemas for Dexie (e.g., { articles: '++id, title, created_at' })
@@ -442,18 +444,8 @@ module Ruby2JS
           export_stmt = s(:send, nil, :export,
             s(:casgn, nil, :migration, migration_obj))
 
-          # Import createTable, addIndex, addColumn, etc. from adapter
-          # Use virtual module path for Vite-native builds
-          import_stmt = s(:send, nil, :import,
-            s(:array,
-              s(:const, nil, :createTable),
-              s(:const, nil, :addIndex),
-              s(:const, nil, :addColumn),
-              s(:const, nil, :removeColumn),
-              s(:const, nil, :dropTable)),
-            s(:str, 'juntos:active-record'))
-
-          process(s(:begin, import_stmt, export_stmt))
+          # No imports needed - adapter is passed as parameter to up()
+          process(export_stmt)
         end
 
         def build_statement_call(stmt)
@@ -495,7 +487,7 @@ module Ruby2JS
           args = [s(:str, stmt[:table]), s(:array, *columns_ast)]
           args << s(:hash, *options_pairs) if options_pairs.any?
 
-          s(:send, nil, :await, s(:send, nil, :createTable, *args))
+          s(:send, nil, :await, s(:send, s(:lvar, :adapter), :createTable, *args))
         end
 
         def build_add_index_call(stmt)
@@ -508,12 +500,12 @@ module Ruby2JS
           args = [s(:str, stmt[:table]), columns_ast]
           args << s(:hash, *options_pairs) if options_pairs.any?
 
-          s(:send, nil, :await, s(:send, nil, :addIndex, *args))
+          s(:send, nil, :await, s(:send, s(:lvar, :adapter), :addIndex, *args))
         end
 
         def build_add_column_call(stmt)
           s(:send, nil, :await,
-            s(:send, nil, :addColumn,
+            s(:send, s(:lvar, :adapter), :addColumn,
               s(:str, stmt[:table]),
               s(:str, stmt[:column]),
               s(:str, stmt[:column_type])))
@@ -521,14 +513,14 @@ module Ruby2JS
 
         def build_remove_column_call(stmt)
           s(:send, nil, :await,
-            s(:send, nil, :removeColumn,
+            s(:send, s(:lvar, :adapter), :removeColumn,
               s(:str, stmt[:table]),
               s(:str, stmt[:column])))
         end
 
         def build_drop_table_call(stmt)
           s(:send, nil, :await,
-            s(:send, nil, :dropTable,
+            s(:send, s(:lvar, :adapter), :dropTable,
               s(:str, stmt[:table])))
         end
 

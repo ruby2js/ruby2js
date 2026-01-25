@@ -392,7 +392,7 @@ export class Application extends ApplicationServer {
 
       console.log(`Running migration ${migration.version}...`);
       try {
-        await migration.up();
+        await migration.up(adapter);
         await adapter.execute('INSERT INTO schema_migrations (version) VALUES (?)', [migration.version]);
         ran++;
       } catch (e) {
