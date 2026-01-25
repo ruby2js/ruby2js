@@ -222,6 +222,13 @@ export function loadConfig(appRoot, overrides = {}) {
                    topLevelConfig.external ||
                    [];
 
+  // Base path for subdirectory deployment (e.g., '/ruby2js/blog/')
+  // Priority: JUNTOS_BASE env > overrides > ruby2js.yml > default
+  const base = process.env.JUNTOS_BASE ||
+               overrides.base ||
+               ruby2jsConfig.base ||
+               '/';
+
   // Spread configs first, then override with our calculated values
   // This ensures env vars take precedence over hardcoded vite.config.js values
   return {
@@ -231,7 +238,8 @@ export function loadConfig(appRoot, overrides = {}) {
     database: database || 'dexie',
     target,
     broadcast: overrides.broadcast || ruby2jsConfig.broadcast,
-    external
+    external,
+    base
   };
 }
 
@@ -885,8 +893,17 @@ export { application };
           js += '\nexport { initDatabase, query, execute, insert, closeDatabase, createTable, addIndex, addColumn, removeColumn, dropTable } from "juntos:active-record";\n';
         }
 
+        // Normalize sourcemap sources to be relative to the file
+        const map = result.sourcemap;
+        if (map && map.sources) {
+          // Make sources point to the original file with relative path from app root
+          const relPath = path.relative(appRoot, id);
+          map.sources = [relPath];
+          map.sourceRoot = '';  // Clear sourceRoot to avoid path duplication
+        }
+
         // Cache and return
-        const output = { code: js, map: result.sourcemap };
+        const output = { code: js, map };
         transformCache.set(id, { result: output, mtime: stat.mtimeMs });
 
         console.log(`[juntos] Transformed: ${path.relative(appRoot, id)}`);
@@ -1317,6 +1334,7 @@ function generateIndexHtml(appName) {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${appName}</title>
+  <link rel="icon" href="data:,">
   <link href="/app/assets/builds/tailwind.css" rel="stylesheet">
 </head>
 <body>
