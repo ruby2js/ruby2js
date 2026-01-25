@@ -424,12 +424,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: "3.4"
-          bundler-cache: true
-
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
