@@ -473,12 +473,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: "3.4"
-          bundler-cache: true
-
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
@@ -497,9 +491,6 @@ jobs:
 
       - name: Build browser demos
         run: |
-          # Point bundler to the checked-out ruby2js repo instead of fetching from GitHub
-          bundle config set --global local.ruby2js $GITHUB_WORKSPACE
-
           for demo in blog chat photo_gallery workflow notes; do
             echo "Building $demo for browser..."
             base_path="/ruby2js/${demo//_/-}/"
@@ -507,8 +498,8 @@ jobs:
             # Must install all three: ruby2js (transpiler), ruby2js-rails (runtime), vite-plugin-ruby2js (build plugin)
             # Also install browser runtime dependencies: dexie (IndexedDB), turbo/stimulus (Rails UJS), react (ERB rendering)
             (cd "artifacts/$demo" && npm install ../tarballs/ruby2js-beta.tgz ../tarballs/ruby2js-rails-beta.tgz ../tarballs/vite-plugin-ruby2js-beta.tgz dexie @hotwired/turbo @hotwired/stimulus react react-dom)
-            # Build from demo root (bin/juntos expects to be run from app root)
-            (cd "artifacts/$demo" && bundle install --quiet && bin/juntos build -d dexie -t browser --base "$base_path" --sourcemap)
+            # Build from demo root - pure JavaScript via Vite
+            (cd "artifacts/$demo" && bin/juntos build -d dexie -t browser --base "$base_path" --sourcemap)
           done
 
       - name: Build Astro demo
