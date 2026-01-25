@@ -187,11 +187,81 @@ function validateRailsApp() {
 }
 
 // ============================================
+// Auto-install required packages
+// ============================================
+
+const DATABASE_PACKAGES = {
+  dexie: ['dexie'],
+  sqlite: ['better-sqlite3'],
+  better_sqlite3: ['better-sqlite3'],
+  sqljs: ['sql.js'],
+  pglite: ['@electric-sql/pglite'],
+  pg: ['pg'],
+  postgres: ['pg'],
+  neon: ['@neondatabase/serverless'],
+  d1: [],  // No npm package needed, uses Cloudflare bindings
+  turso: ['@libsql/client'],
+  mysql: ['mysql2']
+};
+
+const RUNTIME_PACKAGES = {
+  browser: ['@hotwired/turbo', '@hotwired/stimulus', 'react', 'react-dom'],
+  node: [],
+  bun: [],
+  deno: []
+};
+
+function ensurePackagesInstalled(options) {
+  const missing = [];
+
+  // Check database packages
+  if (options.database && DATABASE_PACKAGES[options.database]) {
+    for (const pkg of DATABASE_PACKAGES[options.database]) {
+      if (!isPackageInstalled(pkg)) {
+        missing.push(pkg);
+      }
+    }
+  }
+
+  // Check runtime packages for browser target
+  const target = options.target || 'browser';
+  if (RUNTIME_PACKAGES[target]) {
+    for (const pkg of RUNTIME_PACKAGES[target]) {
+      if (!isPackageInstalled(pkg)) {
+        missing.push(pkg);
+      }
+    }
+  }
+
+  // Install missing packages
+  if (missing.length > 0) {
+    console.log(`Installing required packages: ${missing.join(', ')}...`);
+    try {
+      execSync(`npm install ${missing.join(' ')}`, {
+        cwd: APP_ROOT,
+        stdio: 'inherit'
+      });
+    } catch (e) {
+      console.error('Failed to install required packages.');
+      process.exit(1);
+    }
+  }
+}
+
+function isPackageInstalled(packageName) {
+  // Check node_modules directly
+  const packagePath = join(APP_ROOT, 'node_modules', packageName);
+  return existsSync(packagePath);
+}
+
+// ============================================
 // Command: dev
 // ============================================
 
 function runDev(options) {
   validateRailsApp();
+  loadDatabaseConfig(options);
+  ensurePackagesInstalled(options);
   applyEnvOptions(options);
 
   const args = ['vite'];
@@ -221,6 +291,8 @@ function runDev(options) {
 
 function runBuild(options) {
   validateRailsApp();
+  loadDatabaseConfig(options);
+  ensurePackagesInstalled(options);
   applyEnvOptions(options);
 
   const args = ['vite', 'build'];
@@ -252,6 +324,7 @@ function runBuild(options) {
 function runUp(options) {
   validateRailsApp();
   loadDatabaseConfig(options);
+  ensurePackagesInstalled(options);
   applyEnvOptions(options);
 
   const isServerTarget = ['node', 'bun', 'deno'].includes(options.target);
@@ -296,6 +369,7 @@ function runUp(options) {
 function runServer(options) {
   validateRailsApp();
   loadDatabaseConfig(options);
+  ensurePackagesInstalled(options);
   applyEnvOptions(options);
 
   // Check that app has been built
@@ -887,6 +961,7 @@ function runDeploy(options) {
   validateRailsApp();
   loadEnvLocal();
   loadDatabaseConfig(options);
+  ensurePackagesInstalled(options);
 
   // Default to production environment for deploy
   options.environment = options.environment || 'production';
